@@ -25,9 +25,8 @@ import { loadBlueprintCatalog, type BlueprintCatalog } from './blueprintCatalog'
 import { loadCharacterBlueprints } from './data';
 import { useOwnedStockSnapshot } from './useDetectedOwnedStock';
 import { useCorpOwnedStockSource, type CorpOwnedStockState } from './corpOwnedStock';
-import { useCorpOwnedBlueprints, type CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { useBuildGroups } from './buildGroups';
-import { useAssumedMe } from './assumedMe';
+import { useBuildPlanPricingInputs, type BuildPlanPricingInputs } from './buildPlanPricingInputs';
 import { useAssumedTe } from './assumedTe';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 
@@ -44,8 +43,12 @@ export interface IndustryWorkspace {
   modifiers: CharacterModifiers;
   ownedStockSnapshot: OwnedStockSnapshot;
   corpOwnedStock: CorpOwnedStockState;
-  corpOwnedBlueprints: CorpOwnedBlueprintsState;
-  assumedMe: number;
+  /**
+   * Everything a Build Plan is priced against beyond the fields above
+   * (`buildPlanPricingInputs.ts`), for the active Character. Loaded here, above
+   * the open plan's remount boundary, so switching plans never reloads it.
+   */
+  pricingInputs: BuildPlanPricingInputs;
   assumedTe: number;
   buildGroups: ReturnType<typeof useBuildGroups.getState>['value'];
   buildGroupsHydrated: boolean;
@@ -68,21 +71,18 @@ export function useIndustryWorkspace(): IndustryWorkspace {
 
   const ownedStockSnapshot = useOwnedStockSnapshot();
   const corpOwnedStock = useCorpOwnedStockSource();
-  const corpOwnedBlueprints = useCorpOwnedBlueprints();
+  const pricingInputs = useBuildPlanPricingInputs(activeCharacterId);
 
   const buildGroups = useBuildGroups((state) => state.value);
   const buildGroupsHydrated = useBuildGroups((state) => state.hydrated);
   const hydrateBuildGroups = useBuildGroups((state) => state.hydrate);
   const setBuildGroups = useBuildGroups((state) => state.setValue);
-  const assumedMe = useAssumedMe((state) => state.value);
-  const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
   const assumedTe = useAssumedTe((state) => state.value);
   const hydrateAssumedTe = useAssumedTe((state) => state.hydrate);
   useEffect(() => {
     void hydrateBuildGroups();
-    void hydrateAssumedMe();
     void hydrateAssumedTe();
-  }, [hydrateBuildGroups, hydrateAssumedMe, hydrateAssumedTe]);
+  }, [hydrateBuildGroups, hydrateAssumedTe]);
 
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
   const [pi, setPi] = useState<PiData | null>(null);
@@ -130,8 +130,7 @@ export function useIndustryWorkspace(): IndustryWorkspace {
     modifiers,
     ownedStockSnapshot,
     corpOwnedStock,
-    corpOwnedBlueprints,
-    assumedMe,
+    pricingInputs,
     assumedTe,
     buildGroups,
     buildGroupsHydrated,

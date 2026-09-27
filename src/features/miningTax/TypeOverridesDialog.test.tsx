@@ -70,7 +70,9 @@ describe('TypeOverridesDialog', () => {
     await waitFor(async () => {
       expect(await loadManualMoonOreTypeIds()).toEqual([]);
     });
-    expect(screen.queryByText('Chromite')).not.toBeInTheDocument();
+    // The row re-renders after the Dexie write resolves, not with it — asserting
+    // synchronously here raced on slow CI runners.
+    await waitFor(() => expect(screen.queryByText('Chromite')).not.toBeInTheDocument());
   });
 
   it('refreshes the route once on close, not once per removal', async () => {

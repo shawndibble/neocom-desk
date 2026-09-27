@@ -1,9 +1,10 @@
-// Two-way sync of Skill Plans, Build Plans, the Quickbar, Station Pins,
-// Production Runs + their two linking-record collections, + synced settings
-// for one character. Public API and UI wiring live in index.ts.
+// Two-way sync of every collection in the synced collection registry
+// (syncedCollections.ts) — the editable collections, the Notification Feed
+// and synced settings — for one character. Public API and UI wiring live in
+// index.ts.
 //
-// Remote layout: /characters/char:{id}/{plans,buildPlans,quickbars,stationPins,
-// productionRuns,productionSaleLinks,productionOrderWatches,settings}.
+// Remote layout: /characters/char:{id}/{remoteName} for each declared
+// collection.
 // Merge policy is pure and lives in merge.ts: last-write-wins per record id,
 // tombstones for deletes kept 30 days.
 //
@@ -29,22 +30,11 @@ import {
 } from 'firebase/firestore/lite';
 import {
   db,
-  type BuildPlanRecord,
   type CharacterRecord,
   type NotificationFeedRecord,
   type PlanetRichnessRecord,
-  type ProductionOrderWatchRecord,
-  type ProductionRunRecord,
-  type ProductionSaleLinkRecord,
-  type QuickbarRecord,
-  type SkillPlanRecord,
   type StationPinRecord,
-  type PayeeRecord,
-  type FittingRecord,
-  type MiningTaxAssignmentRecord,
 } from '@/db';
-import { normalizeMaterialSourcingMap } from '@/engine/industry/sourcing';
-import { resolveRigFit } from '@/engine/industry/types';
 import { planetRichnessDeletedAtByKey, stationPinDeletedAtByKey } from './accountWideBackfill';
 import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
 import {
@@ -58,20 +48,10 @@ import { refreshAppBadge } from '@/features/notifications/appBadge';
 import { retryPendingRemotePurge } from './characterPurge';
 import { getSyncFirestore } from './firebaseApp';
 import {
-  buildPlanTombstonesKey,
   INTERNAL_PREFIX,
   ownerHashKey,
-  planTombstonesKey,
-  quickbarTombstonesKey,
-  stationPinTombstonesKey,
-  planetRichnessTombstonesKey,
-  payeeTombstonesKey,
-  fittingTombstonesKey,
-  miningTaxAssignmentTombstonesKey,
-  productionOrderWatchTombstonesKey,
-  productionRunTombstonesKey,
-  productionSaleLinkTombstonesKey,
   readTombstones,
+  tombstoneKey,
   clearPullCursors,
   pullCursorKey,
   readPullCursor,
@@ -86,25 +66,30 @@ import {
   mergeSettings,
   TOMBSTONE_TTL_MS,
   type LocalTombstone,
-  type RemoteBuildPlanDoc,
   type RemoteDoc,
   type RemoteFeedDoc,
-  type RemotePlanDoc,
-  type RemoteQuickbarDoc,
-  type RemoteStationPinDoc,
-  type RemotePlanetRichnessDoc,
-  type RemotePayeeDoc,
-  type RemoteFittingDoc,
-  type RemoteMiningTaxAssignmentDoc,
-  type RemoteProductionOrderWatchDoc,
-  type RemoteProductionRunDoc,
-  type RemoteProductionSaleLinkDoc,
   type RemoteSyncedSetting,
   type SyncedSettingTombstone,
   type SyncedSettingValue,
-  type SyncRecord,
 } from './merge';
 import { isAllowedSyncedSettingKey } from './syncedSettings';
+import {
+  BUILD_PLANS,
+  EDITABLE_COLLECTIONS,
+  FITTINGS,
+  MINING_TAX_ASSIGNMENTS,
+  NOTIFICATION_FEED,
+  PAYEES,
+  PLANET_RICHNESS,
+  PRODUCTION_ORDER_WATCHES,
+  PRODUCTION_RUNS,
+  PRODUCTION_SALE_LINKS,
+  SKILL_PLANS,
+  STATION_PINS,
+  SYNCED_SETTINGS,
+  type EditableCollection,
+  type EditableRecord,
+} from './syncedCollections';
 
 // ---------------------------------------------------------------------------
 // Local bookkeeping (Dexie settings table). 'sync.__' keys are internal and
@@ -112,12 +97,9 @@ import { isAllowedSyncedSettingKey } from './syncedSettings';
 // ---------------------------------------------------------------------------
 
 const SYNCED_PREFIX = 'sync.';
-// Key builders (ownerHashKey, planTombstonesKey, buildPlanTombstonesKey,
-// quickbarTombstonesKey) live in localBookkeeping.ts, Firebase-free, so
-// features/character/removeCharacter.ts can clear them without pulling in
-// Firebase. The Quickbar is one record per character, never deleted (only
-// emptied), so its tombstone key stays empty in practice — kept for symmetry
-// with syncEditableCollection, which needs one for every CollectionSpec.
+// Key builders (ownerHashKey, tombstoneKey) live in localBookkeeping.ts,
+// Firebase-free, so features/character/removeCharacter.ts can clear them
+// without pulling in Firebase.
 const SETTINGS_META_KEY = `${INTERNAL_PREFIX}settingsMeta`;
 // Synced settings are a single global set (not per-character, like plans), so
 // their tombstones live under one global key too — a delete recorded during
@@ -200,7 +182,7 @@ async function recordBulkDeletion(
 
 /** Delete a Skill Plan locally + tombstone, so the deletion propagates. */
 export async function markPlanDeleted(characterId: number, planId: string): Promise<void> {
-  await recordDeletion(characterId, planId, planTombstonesKey(characterId), () =>
+  await recordDeletion(characterId, planId, tombstoneKey(SKILL_PLANS, characterId), () =>
     db.skillPlans.delete(planId)
   );
 }
@@ -220,7 +202,7 @@ export async function markPlanDeleted(characterId: number, planId: string): Prom
  * Records row click.
  */
 export async function markBuildPlanDeleted(characterId: number, planId: string): Promise<void> {
-  await recordDeletion(characterId, planId, buildPlanTombstonesKey(characterId), () =>
+  await recordDeletion(characterId, planId, tombstoneKey(BUILD_PLANS, characterId), () =>
     db.buildPlans.delete(planId)
   );
 }
@@ -233,21 +215,21 @@ export async function markBuildPlanDeleted(characterId: number, planId: string):
  * dropping tombstones for all but the last write to land.
  */
 export async function markBuildPlansDeleted(characterId: number, planIds: string[]): Promise<void> {
-  await recordBulkDeletion(characterId, planIds, buildPlanTombstonesKey(characterId), (ids) =>
+  await recordBulkDeletion(characterId, planIds, tombstoneKey(BUILD_PLANS, characterId), (ids) =>
     db.buildPlans.bulkDelete(ids)
   );
 }
 
 /** Payee analogue of markPlanDeleted — same tombstone semantics (issue #523). */
 export async function markPayeeDeleted(characterId: number, payeeId: string): Promise<void> {
-  await recordDeletion(characterId, payeeId, payeeTombstonesKey(characterId), () =>
+  await recordDeletion(characterId, payeeId, tombstoneKey(PAYEES, characterId), () =>
     db.payees.delete(payeeId)
   );
 }
 
 /** Fitting analogue of markPlanDeleted — same tombstone semantics (issue #1538). */
 export async function markFittingDeleted(characterId: number, fittingId: string): Promise<void> {
-  await recordDeletion(characterId, fittingId, fittingTombstonesKey(characterId), () =>
+  await recordDeletion(characterId, fittingId, tombstoneKey(FITTINGS, characterId), () =>
     db.fittings.delete(fittingId)
   );
 }
@@ -260,7 +242,7 @@ export async function markMiningTaxAssignmentDeleted(
   await recordDeletion(
     characterId,
     assignmentId,
-    miningTaxAssignmentTombstonesKey(characterId),
+    tombstoneKey(MINING_TAX_ASSIGNMENTS, characterId),
     () => db.miningTaxAssignments.delete(assignmentId)
   );
 }
@@ -324,7 +306,7 @@ export async function clearStationPin(locationId: number): Promise<void> {
   const rows = await db.stationPins.where('locationId').equals(locationId).toArray();
   await Promise.all(
     rows.map((row) =>
-      recordDeletion(row.characterId, row.id, stationPinTombstonesKey(row.characterId), () =>
+      recordDeletion(row.characterId, row.id, tombstoneKey(STATION_PINS, row.characterId), () =>
         db.stationPins.delete(row.id)
       )
     )
@@ -368,7 +350,7 @@ export async function clearPlanetRichness(planetId: number): Promise<void> {
   const rows = await db.planetRichness.where('planetId').equals(planetId).toArray();
   await Promise.all(
     rows.map((row) =>
-      recordDeletion(row.characterId, row.id, planetRichnessTombstonesKey(row.characterId), () =>
+      recordDeletion(row.characterId, row.id, tombstoneKey(PLANET_RICHNESS, row.characterId), () =>
         db.planetRichness.delete(row.id)
       )
     )
@@ -487,28 +469,14 @@ async function handleOwnerHashChange(character: CharacterRecord): Promise<void> 
   const key = ownerHashKey(character.characterId);
   const stored = await db.settings.get(key);
   if (stored !== undefined && stored.value !== character.ownerHash) {
-    await db.skillPlans.where('characterId').equals(character.characterId).delete();
-    await db.buildPlans.where('characterId').equals(character.characterId).delete();
-    await db.quickbars.where('characterId').equals(character.characterId).delete();
-    await db.stationPins.where('characterId').equals(character.characterId).delete();
-    await db.planetRichness.where('characterId').equals(character.characterId).delete();
-    await db.productionRuns.where('characterId').equals(character.characterId).delete();
-    await db.productionSaleLinks.where('characterId').equals(character.characterId).delete();
-    await db.productionOrderWatches.where('characterId').equals(character.characterId).delete();
-    await db.payees.where('characterId').equals(character.characterId).delete();
-    await db.fittings.where('characterId').equals(character.characterId).delete();
-    await db.miningTaxAssignments.where('characterId').equals(character.characterId).delete();
-    await writeTombstones(planTombstonesKey(character.characterId), []);
-    await writeTombstones(buildPlanTombstonesKey(character.characterId), []);
-    await writeTombstones(quickbarTombstonesKey(character.characterId), []);
-    await writeTombstones(stationPinTombstonesKey(character.characterId), []);
-    await writeTombstones(planetRichnessTombstonesKey(character.characterId), []);
-    await writeTombstones(productionRunTombstonesKey(character.characterId), []);
-    await writeTombstones(productionSaleLinkTombstonesKey(character.characterId), []);
-    await writeTombstones(productionOrderWatchTombstonesKey(character.characterId), []);
-    await writeTombstones(payeeTombstonesKey(character.characterId), []);
-    await writeTombstones(fittingTombstonesKey(character.characterId), []);
-    await writeTombstones(miningTaxAssignmentTombstonesKey(character.characterId), []);
+    // Every editable collection, whatever its removal rule: this is the
+    // previous owner's data, not a Character the pilot chose to drop.
+    for (const collection of EDITABLE_COLLECTIONS) {
+      await db.table(collection.table).where('characterId').equals(character.characterId).delete();
+    }
+    for (const collection of EDITABLE_COLLECTIONS) {
+      await writeTombstones(tombstoneKey(collection, character.characterId), []);
+    }
     // The new owner's docs can carry an `updatedAt` below the previous owner's
     // high-water mark, so a surviving cursor would hide them entirely.
     await clearPullCursors(character.characterId);
@@ -539,31 +507,47 @@ async function handleOwnerHashChange(character: CharacterRecord): Promise<void> 
 }
 
 // ---------------------------------------------------------------------------
-// Generic editable-collection sync (Skill Plans, Build Plans)
+// Generic editable-collection sync (every EDITABLE_COLLECTIONS declaration)
 // ---------------------------------------------------------------------------
 
-interface CollectionSpec<L extends SyncRecord, R extends RemoteDoc> {
-  /** Firestore subcollection name under /characters/{uid}. */
-  name: string;
-  tombstoneKey: (characterId: number) => string;
-  loadLocal: (characterId: number) => Promise<L[]>;
-  /** Full remote doc payload for a local record (explicit field list — never spread). */
-  toRemoteDoc: (local: L, ownerHash: string) => Record<string, unknown>;
-  /** Local record from a remote doc, stripping remote-only fields. */
-  toLocalRecord: (remote: R) => L;
-  bulkPutLocal: (records: L[]) => Promise<unknown>;
-  bulkDeleteLocal: (ids: string[]) => Promise<unknown>;
-  /**
-   * Account-wide collections only (issue #436): the shared key a deletion is
-   * recognized by regardless of which Character's id a row was copied onto,
-   * and the current per-key deletion times to check it against. See
-   * `AccountWideTombstones` in merge.ts.
-   */
-  accountWide?: {
-    sharedKey: (record: L) => string | undefined;
-    deletedAtByKey: () => Promise<Map<string, number>>;
-  };
+/**
+ * Account-wide collections only (issue #436): the shared key a deletion is
+ * recognized by regardless of which Character's id a row was copied onto,
+ * and the current per-key deletion times to check it against. See
+ * `AccountWideTombstones` in merge.ts.
+ *
+ * Merge policy, not part of a collection's declaration: its `deletedAtByKey`
+ * comes from accountWideBackfill.ts, which itself reads the registry.
+ */
+interface AccountWideMerge<L extends EditableRecord> {
+  sharedKey: (record: L) => string | undefined;
+  deletedAtByKey: () => Promise<Map<string, number>>;
 }
+
+/** Pairs a merge hook with its typed declaration, then erases the row type for the lookup below. */
+function accountWideMerge<L extends EditableRecord>(
+  collection: EditableCollection<L, RemoteDoc & L>,
+  merge: AccountWideMerge<L>
+): [EditableCollection, AccountWideMerge<EditableRecord>] {
+  return [collection as EditableCollection, merge as AccountWideMerge<EditableRecord>];
+}
+
+const ACCOUNT_WIDE_MERGES = new Map([
+  accountWideMerge<StationPinRecord>(STATION_PINS, {
+    // Only an account-wide row can be resurrected onto a Character added
+    // after the delete (accountWideBackfill.ts only ever copies `scope:
+    // 'account'` rows) — a `character`-scoped pin at the same locationId
+    // must not be caught by a deletion that only ever applied to the
+    // account-wide one.
+    sharedKey: (row) => (row.scope === 'account' ? String(row.locationId) : undefined),
+    deletedAtByKey: stationPinDeletedAtByKey,
+  }),
+  accountWideMerge<PlanetRichnessRecord>(PLANET_RICHNESS, {
+    // Every row is account-wide — no per-Character variant exists to opt out.
+    sharedKey: (row) => String(row.planetId),
+    deletedAtByKey: planetRichnessDeletedAtByKey,
+  }),
+]);
 
 interface SyncContext {
   firestore: Firestore;
@@ -680,23 +664,29 @@ async function pullOwnedDocs<R extends { ownerHash: string; updatedAt?: number }
   };
 }
 
-async function syncEditableCollection<L extends SyncRecord, R extends RemoteDoc>(
-  spec: CollectionSpec<L, R>,
-  ctx: SyncContext
-): Promise<void> {
-  const col = collection(ctx.firestore, 'characters', ctx.uid, spec.name);
-  const pull = await pullOwnedDocs<R>(col, ctx, spec.name);
+async function syncEditableCollection(spec: EditableCollection, ctx: SyncContext): Promise<void> {
+  const col = collection(ctx.firestore, 'characters', ctx.uid, spec.remoteName);
+  const pull = await pullOwnedDocs<RemoteDoc>(col, ctx, spec.remoteName);
   const remote = pull.remote;
-  const local = await spec.loadLocal(ctx.characterId);
-  const tombstoneKey = spec.tombstoneKey(ctx.characterId);
-  const tombstones = await readTombstones(tombstoneKey);
-  const accountWide = spec.accountWide
+  const table = db.table<EditableRecord, string>(spec.table);
+  const local = await table.where('characterId').equals(ctx.characterId).toArray();
+  const tombstonesKey = tombstoneKey(spec, ctx.characterId);
+  const tombstones = await readTombstones(tombstonesKey);
+  const accountWideHooks = ACCOUNT_WIDE_MERGES.get(spec);
+  const accountWide = accountWideHooks
     ? {
-        sharedKey: spec.accountWide.sharedKey,
-        deletedAtByKey: await spec.accountWide.deletedAtByKey(),
+        sharedKey: accountWideHooks.sharedKey,
+        deletedAtByKey: await accountWideHooks.deletedAtByKey(),
       }
     : undefined;
-  const plan = mergeRecords<L, R>(local, tombstones, remote, ctx.now, accountWide, pull.since);
+  const plan = mergeRecords<EditableRecord, RemoteDoc>(
+    local,
+    tombstones,
+    remote,
+    ctx.now,
+    accountWide,
+    pull.since
+  );
 
   await Promise.all([
     ...plan.pushUpserts.map((p) => setDoc(doc(col, p.id), spec.toRemoteDoc(p, ctx.ownerHash))),
@@ -713,10 +703,10 @@ async function syncEditableCollection<L extends SyncRecord, R extends RemoteDoc>
   ]);
 
   if (plan.pullUpserts.length > 0) {
-    await spec.bulkPutLocal(plan.pullUpserts.map(spec.toLocalRecord));
+    await table.bulkPut(plan.pullUpserts.map((r) => spec.toLocalRecord(r)));
   }
   if (plan.deleteLocal.length > 0) {
-    await spec.bulkDeleteLocal(plan.deleteLocal);
+    await table.bulkDelete(plan.deleteLocal);
   }
   // A remote tombstone pulled down here (`deleteLocal`) previously left no
   // local trace once the row itself was gone — so `deletedAtByKey()`
@@ -743,7 +733,7 @@ async function syncEditableCollection<L extends SyncRecord, R extends RemoteDoc>
   // Pushed tombstones are now recorded remotely; resolved ones are dropped.
   const settled = new Set([...plan.clearLocalTombstones, ...plan.pushTombstones.map((t) => t.id)]);
   if (settled.size > 0 || learned.length > 0) {
-    await writeTombstones(tombstoneKey, [
+    await writeTombstones(tombstonesKey, [
       ...tombstones.filter((t) => !settled.has(t.id) && !learned.some((l) => l.id === t.id)),
       ...learned,
     ]);
@@ -754,498 +744,13 @@ async function syncEditableCollection<L extends SyncRecord, R extends RemoteDoc>
   await writePullCursor(pull.cursorKey, pull.next);
 }
 
-const skillPlanSpec: CollectionSpec<SkillPlanRecord, RemotePlanDoc> = {
-  name: 'plans',
-  tombstoneKey: planTombstonesKey,
-  loadLocal: (characterId) => db.skillPlans.where('characterId').equals(characterId).toArray(),
-  toRemoteDoc: (p, ownerHash) => ({
-    id: p.id,
-    characterId: p.characterId,
-    name: p.name,
-    entries: p.entries,
-    remapCount: p.remapCount,
-    // Firestore rejects undefined values, so optional fields are omitted.
-    ...(p.markers !== undefined ? { markers: p.markers } : {}),
-    ...(p.markerAttributes !== undefined ? { markerAttributes: p.markerAttributes } : {}),
-    // The lenses the plan is costed under (What-If Implants, Booster) are
-    // part of the plan, not a per-device view preference, so they travel
-    // with it. Same omit-when-absent rule; a Booster's own `expiresAt` is
-    // `number | null`, and null is a value Firestore stores happily.
-    ...(p.whatIfImplants !== undefined ? { whatIfImplants: p.whatIfImplants } : {}),
-    ...(p.boosters !== undefined
-      ? {
-          boosters: p.boosters,
-          // Legacy compat for one release (#1407): a device still on the
-          // single-Booster build reads only `booster`. An empty list is
-          // itself an answer ("no accelerators"), so it writes a disabled
-          // row rather than omitting the key — omitting it would let an
-          // older build's own prefill logic re-arm.
-          booster: p.boosters[0] ?? { enabled: false, bonus: 0, startsAt: null, expiresAt: null },
-        }
-      : p.booster !== undefined
-        ? { booster: p.booster }
-        : {}),
-    ...(p.milestones !== undefined ? { milestones: p.milestones } : {}),
-    updatedAt: p.updatedAt,
-    ownerHash,
-    deleted: false,
-  }),
-  toLocalRecord: (r) => ({
-    id: r.id,
-    characterId: r.characterId,
-    name: r.name,
-    entries: r.entries,
-    remapCount: r.remapCount,
-    ...(r.markers !== undefined ? { markers: r.markers } : {}),
-    ...(r.markerAttributes !== undefined ? { markerAttributes: r.markerAttributes } : {}),
-    ...(r.whatIfImplants !== undefined ? { whatIfImplants: r.whatIfImplants } : {}),
-    ...(r.booster !== undefined ? { booster: r.booster } : {}),
-    ...(r.boosters !== undefined ? { boosters: r.boosters } : {}),
-    ...(r.milestones !== undefined ? { milestones: r.milestones } : {}),
-    updatedAt: r.updatedAt,
-  }),
-  bulkPutLocal: (records) => db.skillPlans.bulkPut(records),
-  bulkDeleteLocal: (ids) => db.skillPlans.bulkDelete(ids),
-};
-
-const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
-  name: 'buildPlans',
-  tombstoneKey: buildPlanTombstonesKey,
-  loadLocal: (characterId) => db.buildPlans.where('characterId').equals(characterId).toArray(),
-  toRemoteDoc: (p, ownerHash) => {
-    // Firestore rejects undefined at any depth, so the map is normalized (empty
-    // and undefined-valued entries dropped) before it can reach a setDoc.
-    const materialSourcing = normalizeMaterialSourcingMap(p.materialSourcing);
-    return {
-      id: p.id,
-      characterId: p.characterId,
-      name: p.name,
-      blueprintTypeID: p.blueprintTypeID,
-      runs: p.runs,
-      me: p.me,
-      te: p.te,
-      facility: p.facility,
-      // Always the normalized fit, never the legacy `rigLevel` — a self-heal
-      // that means a record pushed by this build is never behind a device
-      // still reading the pre-#609 shape only, and repeated pushes converge
-      // on one shape even if the local record still carries stale `rigLevel`.
-      rigFit: resolveRigFit(p),
-      security: p.security,
-      hubId: p.hubId,
-      // One fact, routed as one pair: the id is what the fee is charged at and
-      // the name is what labels it, so a half-pair would label the cost index
-      // with a system it was not charged at. A half-pair syncs as neither,
-      // which falls the plan back to its hub — wrong, but not lying.
-      ...(p.buildSystemId !== undefined && p.buildSystemName !== undefined
-        ? { buildSystemId: p.buildSystemId, buildSystemName: p.buildSystemName }
-        : {}),
-      // Independent, unlike the system pair above: an id whose name ESI
-      // withheld still travels, and the picker composes the stand-in label.
-      ...(p.buildLocationId !== undefined ? { buildLocationId: p.buildLocationId } : {}),
-      ...(p.buildLocationName !== undefined ? { buildLocationName: p.buildLocationName } : {}),
-      ...(p.facilityTaxPct !== undefined ? { facilityTaxPct: p.facilityTaxPct } : {}),
-      ...(p.materialPriceBasis !== undefined ? { materialPriceBasis: p.materialPriceBasis } : {}),
-      ...(materialSourcing !== undefined ? { materialSourcing } : {}),
-      ...(p.ownedStockScope !== undefined ? { ownedStockScope: p.ownedStockScope } : {}),
-      ...(p.includeCorpAssets !== undefined ? { includeCorpAssets: p.includeCorpAssets } : {}),
-      // An empty selection is omitted rather than pushed as [], so a plan that
-      // expanded a row and collapsed it again is byte-identical to one that
-      // never did — the same rule materialSourcing follows above.
-      ...(p.buildHere !== undefined && p.buildHere.length > 0 ? { buildHere: p.buildHere } : {}),
-      // Build Group membership (issue #626). Easy to forget and impossible to
-      // notice: `RemoteBuildPlanDoc` derives from `BuildPlanRecord`, so a new
-      // field appears on the remote type for free and omitting it here
-      // compiles clean — while being silently dropped on push *and* pull.
-      // planSync.test.ts's `fullBuildPlan` is `Required<BuildPlanRecord>` and
-      // its key list is pinned, so a new field fails there until it is routed
-      // here deliberately.
-      ...(p.buildGroupId !== undefined ? { buildGroupId: p.buildGroupId } : {}),
-      // Include Reactions / Reaction Location (issue #698) — same
-      // present-or-omitted convention as the plan's own location fields
-      // above, and the same buildSystemId/Name pairing rule, since the
-      // Reaction Location mirrors the primary location one-for-one.
-      ...(p.includeReactions !== undefined ? { includeReactions: p.includeReactions } : {}),
-      ...(p.reactionFacility !== undefined ? { reactionFacility: p.reactionFacility } : {}),
-      ...(p.reactionRigFit !== undefined ? { reactionRigFit: p.reactionRigFit } : {}),
-      ...(p.reactionSecurity !== undefined ? { reactionSecurity: p.reactionSecurity } : {}),
-      ...(p.reactionFacilityTaxPct !== undefined
-        ? { reactionFacilityTaxPct: p.reactionFacilityTaxPct }
-        : {}),
-      ...(p.reactionBuildSystemId !== undefined && p.reactionBuildSystemName !== undefined
-        ? {
-            reactionBuildSystemId: p.reactionBuildSystemId,
-            reactionBuildSystemName: p.reactionBuildSystemName,
-          }
-        : {}),
-      ...(p.reactionBuildLocationId !== undefined
-        ? { reactionBuildLocationId: p.reactionBuildLocationId }
-        : {}),
-      ...(p.reactionBuildLocationName !== undefined
-        ? { reactionBuildLocationName: p.reactionBuildLocationName }
-        : {}),
-      updatedAt: p.updatedAt,
-      ownerHash,
-      deleted: false,
-    };
-  },
-  toLocalRecord: (r) => ({
-    id: r.id,
-    characterId: r.characterId,
-    name: r.name,
-    blueprintTypeID: r.blueprintTypeID,
-    runs: r.runs,
-    me: r.me,
-    te: r.te,
-    facility: r.facility,
-    // Migrates a remote doc from an older device that still only carries the
-    // legacy `rigLevel` (see the analogous note in `toRemoteDoc` above).
-    rigFit: resolveRigFit(r),
-    security: r.security,
-    hubId: r.hubId,
-    ...(r.buildSystemId !== undefined && r.buildSystemName !== undefined
-      ? { buildSystemId: r.buildSystemId, buildSystemName: r.buildSystemName }
-      : {}),
-    ...(r.buildLocationId !== undefined ? { buildLocationId: r.buildLocationId } : {}),
-    ...(r.buildLocationName !== undefined ? { buildLocationName: r.buildLocationName } : {}),
-    ...(r.facilityTaxPct !== undefined ? { facilityTaxPct: r.facilityTaxPct } : {}),
-    ...(r.materialPriceBasis !== undefined ? { materialPriceBasis: r.materialPriceBasis } : {}),
-    ...(r.materialSourcing !== undefined ? { materialSourcing: r.materialSourcing } : {}),
-    ...(r.ownedStockScope !== undefined ? { ownedStockScope: r.ownedStockScope } : {}),
-    ...(r.includeCorpAssets !== undefined ? { includeCorpAssets: r.includeCorpAssets } : {}),
-    ...(r.buildHere !== undefined ? { buildHere: r.buildHere } : {}),
-    ...(r.buildGroupId !== undefined ? { buildGroupId: r.buildGroupId } : {}),
-    ...(r.includeReactions !== undefined ? { includeReactions: r.includeReactions } : {}),
-    ...(r.reactionFacility !== undefined ? { reactionFacility: r.reactionFacility } : {}),
-    ...(r.reactionRigFit !== undefined ? { reactionRigFit: r.reactionRigFit } : {}),
-    ...(r.reactionSecurity !== undefined ? { reactionSecurity: r.reactionSecurity } : {}),
-    ...(r.reactionFacilityTaxPct !== undefined
-      ? { reactionFacilityTaxPct: r.reactionFacilityTaxPct }
-      : {}),
-    ...(r.reactionBuildSystemId !== undefined && r.reactionBuildSystemName !== undefined
-      ? {
-          reactionBuildSystemId: r.reactionBuildSystemId,
-          reactionBuildSystemName: r.reactionBuildSystemName,
-        }
-      : {}),
-    ...(r.reactionBuildLocationId !== undefined
-      ? { reactionBuildLocationId: r.reactionBuildLocationId }
-      : {}),
-    ...(r.reactionBuildLocationName !== undefined
-      ? { reactionBuildLocationName: r.reactionBuildLocationName }
-      : {}),
-    updatedAt: r.updatedAt,
-  }),
-  bulkPutLocal: (records) => db.buildPlans.bulkPut(records),
-  bulkDeleteLocal: (ids) => db.buildPlans.bulkDelete(ids),
-};
-
-const quickbarSpec: CollectionSpec<QuickbarRecord, RemoteQuickbarDoc> = {
-  name: 'quickbars',
-  tombstoneKey: quickbarTombstonesKey,
-  loadLocal: (characterId) => db.quickbars.where('characterId').equals(characterId).toArray(),
-  toRemoteDoc: (q, ownerHash) => ({
-    id: q.id,
-    characterId: q.characterId,
-    items: q.items,
-    updatedAt: q.updatedAt,
-    ownerHash,
-    deleted: false,
-  }),
-  toLocalRecord: (r) => ({
-    id: r.id,
-    characterId: r.characterId,
-    items: r.items,
-    updatedAt: r.updatedAt,
-  }),
-  bulkPutLocal: (records) => db.quickbars.bulkPut(records),
-  bulkDeleteLocal: (ids) => db.quickbars.bulkDelete(ids),
-};
-
-const stationPinSpec: CollectionSpec<StationPinRecord, RemoteStationPinDoc> = {
-  name: 'stationPins',
-  tombstoneKey: stationPinTombstonesKey,
-  loadLocal: (characterId) => db.stationPins.where('characterId').equals(characterId).toArray(),
-  toRemoteDoc: (p, ownerHash) => ({
-    id: p.id,
-    characterId: p.characterId,
-    locationId: p.locationId,
-    scope: p.scope,
-    updatedAt: p.updatedAt,
-    ownerHash,
-    deleted: false,
-  }),
-  toLocalRecord: (r) => ({
-    id: r.id,
-    characterId: r.characterId,
-    locationId: r.locationId,
-    scope: r.scope,
-    updatedAt: r.updatedAt,
-  }),
-  bulkPutLocal: (records) => db.stationPins.bulkPut(records),
-  bulkDeleteLocal: (ids) => db.stationPins.bulkDelete(ids),
-  accountWide: {
-    // Only an account-wide row can be resurrected onto a Character added
-    // after the delete (accountWideBackfill.ts only ever copies `scope:
-    // 'account'` rows) — a `character`-scoped pin at the same locationId
-    // must not be caught by a deletion that only ever applied to the
-    // account-wide one.
-    sharedKey: (row) => (row.scope === 'account' ? String(row.locationId) : undefined),
-    deletedAtByKey: stationPinDeletedAtByKey,
-  },
-};
-
-const planetRichnessSpec: CollectionSpec<PlanetRichnessRecord, RemotePlanetRichnessDoc> = {
-  name: 'planetRichness',
-  tombstoneKey: planetRichnessTombstonesKey,
-  loadLocal: (characterId) => db.planetRichness.where('characterId').equals(characterId).toArray(),
-  toRemoteDoc: (row, ownerHash) => ({
-    id: row.id,
-    characterId: row.characterId,
-    planetId: row.planetId,
-    order: row.order,
-    updatedAt: row.updatedAt,
-    ownerHash,
-    deleted: false,
-  }),
-  toLocalRecord: (r) => ({
-    id: r.id,
-    characterId: r.characterId,
-    planetId: r.planetId,
-    order: r.order,
-    updatedAt: r.updatedAt,
-  }),
-  bulkPutLocal: (records) => db.planetRichness.bulkPut(records),
-  bulkDeleteLocal: (ids) => db.planetRichness.bulkDelete(ids),
-  accountWide: {
-    // Every row is account-wide — no per-Character variant exists to opt out.
-    sharedKey: (row) => String(row.planetId),
-    deletedAtByKey: planetRichnessDeletedAtByKey,
-  },
-};
-
-const fittingSpec: CollectionSpec<FittingRecord, RemoteFittingDoc> = {
-  name: 'fittings',
-  tombstoneKey: fittingTombstonesKey,
-  loadLocal: (characterId) => db.fittings.where('characterId').equals(characterId).toArray(),
-  toRemoteDoc: (f, ownerHash) => ({
-    id: f.id,
-    characterId: f.characterId,
-    name: f.name,
-    code: f.code,
-    // Firestore rejects `undefined`, so "no notes" travels as an empty string.
-    notes: f.notes ?? '',
-    updatedAt: f.updatedAt,
-    ownerHash,
-    deleted: false,
-  }),
-  toLocalRecord: (r) => ({
-    id: r.id,
-    characterId: r.characterId,
-    name: r.name,
-    code: r.code,
-    ...(r.notes ? { notes: r.notes } : {}),
-    updatedAt: r.updatedAt,
-  }),
-  bulkPutLocal: (records) => db.fittings.bulkPut(records),
-  bulkDeleteLocal: (ids) => db.fittings.bulkDelete(ids),
-};
-
-const payeeSpec: CollectionSpec<PayeeRecord, RemotePayeeDoc> = {
-  name: 'payees',
-  tombstoneKey: payeeTombstonesKey,
-  loadLocal: (characterId) => db.payees.where('characterId').equals(characterId).toArray(),
-  toRemoteDoc: (p, ownerHash) => ({
-    id: p.id,
-    characterId: p.characterId,
-    name: p.name,
-    defaultTaxPct: p.defaultTaxPct,
-    ...(p.systemId !== undefined ? { systemId: p.systemId } : {}),
-    ...(p.hubId !== undefined ? { hubId: p.hubId } : {}),
-    ...(p.entityId !== undefined ? { entityId: p.entityId } : {}),
-    updatedAt: p.updatedAt,
-    ownerHash,
-    deleted: false,
-  }),
-  toLocalRecord: (r) => ({
-    id: r.id,
-    characterId: r.characterId,
-    name: r.name,
-    defaultTaxPct: r.defaultTaxPct,
-    ...(r.systemId !== undefined ? { systemId: r.systemId } : {}),
-    ...(r.hubId !== undefined ? { hubId: r.hubId } : {}),
-    ...(r.entityId !== undefined ? { entityId: r.entityId } : {}),
-    updatedAt: r.updatedAt,
-  }),
-  bulkPutLocal: (records) => db.payees.bulkPut(records),
-  bulkDeleteLocal: (ids) => db.payees.bulkDelete(ids),
-};
-
-const miningTaxAssignmentSpec: CollectionSpec<
-  MiningTaxAssignmentRecord,
-  RemoteMiningTaxAssignmentDoc
-> = {
-  name: 'miningTaxAssignments',
-  tombstoneKey: miningTaxAssignmentTombstonesKey,
-  loadLocal: (characterId) =>
-    db.miningTaxAssignments.where('characterId').equals(characterId).toArray(),
-  toRemoteDoc: (a, ownerHash) => ({
-    id: a.id,
-    characterId: a.characterId,
-    date: a.date,
-    solarSystemId: a.solarSystemId,
-    ...(a.payeeId !== undefined ? { payeeId: a.payeeId } : {}),
-    oreLines: a.oreLines,
-    taxPct: a.taxPct,
-    estimatedValue: a.estimatedValue,
-    taxOwed: a.taxOwed,
-    status: a.status,
-    ...(a.reviewDiff !== undefined ? { reviewDiff: a.reviewDiff } : {}),
-    ...(a.paidAt !== undefined ? { paidAt: a.paidAt } : {}),
-    ...(a.groupId !== undefined ? { groupId: a.groupId } : {}),
-    ...(a.collectsGrowth !== undefined ? { collectsGrowth: a.collectsGrowth } : {}),
-    ...(a.payment !== undefined ? { payment: a.payment } : {}),
-    updatedAt: a.updatedAt,
-    ownerHash,
-    deleted: false,
-  }),
-  toLocalRecord: (r) => ({
-    id: r.id,
-    characterId: r.characterId,
-    date: r.date,
-    solarSystemId: r.solarSystemId,
-    ...(r.payeeId !== undefined ? { payeeId: r.payeeId } : {}),
-    oreLines: r.oreLines,
-    taxPct: r.taxPct,
-    estimatedValue: r.estimatedValue,
-    taxOwed: r.taxOwed,
-    status: r.status,
-    ...(r.reviewDiff !== undefined ? { reviewDiff: r.reviewDiff } : {}),
-    ...(r.paidAt !== undefined ? { paidAt: r.paidAt } : {}),
-    ...(r.groupId !== undefined ? { groupId: r.groupId } : {}),
-    ...(r.collectsGrowth !== undefined ? { collectsGrowth: r.collectsGrowth } : {}),
-    ...(r.payment !== undefined ? { payment: r.payment } : {}),
-    updatedAt: r.updatedAt,
-  }),
-  bulkPutLocal: (records) => db.miningTaxAssignments.bulkPut(records),
-  bulkDeleteLocal: (ids) => db.miningTaxAssignments.bulkDelete(ids),
-};
-
 // ---------------------------------------------------------------------------
-// Production Log sync (issue #525): one CollectionSpec for the run itself,
-// plus one each for its two linking-record collections. Each linking record
-// is its own document (see ProductionSaleLinkRecord/ProductionOrderWatchRecord
-// doc comments in @/db for why), so this is three plain CollectionSpecs, not
-// one with a nested array — ordinary mergeRecords LWW-per-document already
-// gives each allocation its own independent merge, no special-casing needed.
+// Production Log mutations (issue #525). The run and its two linking-record
+// collections are three plain registry declarations (syncedCollections.ts),
+// each linking record its own document (see ProductionSaleLinkRecord /
+// ProductionOrderWatchRecord in @/db for why) — ordinary mergeRecords
+// LWW-per-document already gives each allocation its own independent merge.
 // ---------------------------------------------------------------------------
-
-const productionRunSpec: CollectionSpec<ProductionRunRecord, RemoteProductionRunDoc> = {
-  name: 'productionRuns',
-  tombstoneKey: productionRunTombstonesKey,
-  loadLocal: (characterId) => db.productionRuns.where('characterId').equals(characterId).toArray(),
-  toRemoteDoc: (r, ownerHash) => ({
-    id: r.id,
-    characterId: r.characterId,
-    buildPlanId: r.buildPlanId,
-    productTypeID: r.productTypeID,
-    quantity: r.quantity,
-    materialCost: r.materialCost,
-    jobFee: r.jobFee,
-    totalCost: r.totalCost,
-    loggedAt: r.loggedAt,
-    updatedAt: r.updatedAt,
-    ownerHash,
-    deleted: false,
-  }),
-  toLocalRecord: (r) => ({
-    id: r.id,
-    characterId: r.characterId,
-    buildPlanId: r.buildPlanId,
-    productTypeID: r.productTypeID,
-    quantity: r.quantity,
-    materialCost: r.materialCost,
-    jobFee: r.jobFee,
-    totalCost: r.totalCost,
-    loggedAt: r.loggedAt,
-    updatedAt: r.updatedAt,
-  }),
-  bulkPutLocal: (records) => db.productionRuns.bulkPut(records),
-  bulkDeleteLocal: (ids) => db.productionRuns.bulkDelete(ids),
-};
-
-const productionSaleLinkSpec: CollectionSpec<
-  ProductionSaleLinkRecord,
-  RemoteProductionSaleLinkDoc
-> = {
-  name: 'productionSaleLinks',
-  tombstoneKey: productionSaleLinkTombstonesKey,
-  loadLocal: (characterId) =>
-    db.productionSaleLinks.where('characterId').equals(characterId).toArray(),
-  toRemoteDoc: (r, ownerHash) => ({
-    id: r.id,
-    characterId: r.characterId,
-    runId: r.runId,
-    // Firestore rejects undefined values, so a manual entry's absent
-    // transactionId is omitted rather than sent as null.
-    ...(r.transactionId !== undefined ? { transactionId: r.transactionId } : {}),
-    quantity: r.quantity,
-    unitPrice: r.unitPrice,
-    linkedAt: r.linkedAt,
-    updatedAt: r.updatedAt,
-    ownerHash,
-    deleted: false,
-  }),
-  toLocalRecord: (r) => ({
-    id: r.id,
-    characterId: r.characterId,
-    runId: r.runId,
-    ...(r.transactionId !== undefined ? { transactionId: r.transactionId } : {}),
-    quantity: r.quantity,
-    unitPrice: r.unitPrice,
-    linkedAt: r.linkedAt,
-    updatedAt: r.updatedAt,
-  }),
-  bulkPutLocal: (records) => db.productionSaleLinks.bulkPut(records),
-  bulkDeleteLocal: (ids) => db.productionSaleLinks.bulkDelete(ids),
-};
-
-const productionOrderWatchSpec: CollectionSpec<
-  ProductionOrderWatchRecord,
-  RemoteProductionOrderWatchDoc
-> = {
-  name: 'productionOrderWatches',
-  tombstoneKey: productionOrderWatchTombstonesKey,
-  loadLocal: (characterId) =>
-    db.productionOrderWatches.where('characterId').equals(characterId).toArray(),
-  toRemoteDoc: (r, ownerHash) => ({
-    id: r.id,
-    characterId: r.characterId,
-    runId: r.runId,
-    orderId: r.orderId,
-    unitPrice: r.unitPrice,
-    initialVolumeRemain: r.initialVolumeRemain,
-    lastKnownVolumeRemain: r.lastKnownVolumeRemain,
-    closed: r.closed,
-    watchedAt: r.watchedAt,
-    updatedAt: r.updatedAt,
-    ownerHash,
-    deleted: false,
-  }),
-  toLocalRecord: (r) => ({
-    id: r.id,
-    characterId: r.characterId,
-    runId: r.runId,
-    orderId: r.orderId,
-    unitPrice: r.unitPrice,
-    initialVolumeRemain: r.initialVolumeRemain,
-    lastKnownVolumeRemain: r.lastKnownVolumeRemain,
-    closed: r.closed,
-    watchedAt: r.watchedAt,
-    updatedAt: r.updatedAt,
-  }),
-  bulkPutLocal: (records) => db.productionOrderWatches.bulkPut(records),
-  bulkDeleteLocal: (ids) => db.productionOrderWatches.bulkDelete(ids),
-};
 
 /**
  * Delete a Production Run locally + tombstone, cascading to every sale link
@@ -1261,16 +766,16 @@ export async function markProductionRunDeleted(characterId: number, runId: strin
   await recordBulkDeletion(
     characterId,
     saleLinks.map((l) => l.id),
-    productionSaleLinkTombstonesKey(characterId),
+    tombstoneKey(PRODUCTION_SALE_LINKS, characterId),
     (ids) => db.productionSaleLinks.bulkDelete(ids)
   );
   await recordBulkDeletion(
     characterId,
     orderWatches.map((w) => w.id),
-    productionOrderWatchTombstonesKey(characterId),
+    tombstoneKey(PRODUCTION_ORDER_WATCHES, characterId),
     (ids) => db.productionOrderWatches.bulkDelete(ids)
   );
-  await recordDeletion(characterId, runId, productionRunTombstonesKey(characterId), () =>
+  await recordDeletion(characterId, runId, tombstoneKey(PRODUCTION_RUNS, characterId), () =>
     db.productionRuns.delete(runId)
   );
 }
@@ -1281,7 +786,7 @@ export async function markProductionRunDeleted(characterId: number, runId: strin
  * the removal yet and silently re-attribute the sale.
  */
 export async function removeProductionSaleLink(characterId: number, linkId: string): Promise<void> {
-  await recordDeletion(characterId, linkId, productionSaleLinkTombstonesKey(characterId), () =>
+  await recordDeletion(characterId, linkId, tombstoneKey(PRODUCTION_SALE_LINKS, characterId), () =>
     db.productionSaleLinks.delete(linkId)
   );
 }
@@ -1291,15 +796,18 @@ export async function removeProductionOrderWatch(
   characterId: number,
   watchId: string
 ): Promise<void> {
-  await recordDeletion(characterId, watchId, productionOrderWatchTombstonesKey(characterId), () =>
-    db.productionOrderWatches.delete(watchId)
+  await recordDeletion(
+    characterId,
+    watchId,
+    tombstoneKey(PRODUCTION_ORDER_WATCHES, characterId),
+    () => db.productionOrderWatches.delete(watchId)
   );
 }
 
 // ---------------------------------------------------------------------------
 // Notification Feed sync (issue #362)
 //
-// Deliberate departure from CollectionSpec: this collection has no
+// Deliberate departure from the editable-collection sync: this collection has no
 // tombstones (dismissal is a flag — see NotificationFeedRecord.dismissedAt)
 // and its LWW field is `dismissedAt` alone, not a whole-record `updatedAt`
 // (content never changes once a row is fired). merge.ts's `mergeFeed` encodes
@@ -1328,7 +836,7 @@ export async function removeProductionOrderWatch(
 // bypasses these rules entirely, so the two approaches aren't in conflict.
 // ---------------------------------------------------------------------------
 
-const NOTIFICATION_FEED_COLLECTION = 'notificationFeed';
+const NOTIFICATION_FEED_COLLECTION = NOTIFICATION_FEED.remoteName;
 
 /** Remote Firestore doc at /characters/{uid}/notificationFeed/{id}. */
 interface RemoteNotificationFeedDoc extends RemoteFeedDoc {
@@ -1477,24 +985,16 @@ async function syncCharacter(characterId: number): Promise<void> {
   const now = Date.now();
   const ctx: SyncContext = { firestore, uid, ownerHash, characterId, now };
 
-  await syncEditableCollection(skillPlanSpec, ctx);
-  await syncEditableCollection(buildPlanSpec, ctx);
-  await syncEditableCollection(quickbarSpec, ctx);
-  await syncEditableCollection(stationPinSpec, ctx);
-  await syncEditableCollection(planetRichnessSpec, ctx);
-  await syncEditableCollection(productionRunSpec, ctx);
-  await syncEditableCollection(productionSaleLinkSpec, ctx);
-  await syncEditableCollection(productionOrderWatchSpec, ctx);
-  await syncEditableCollection(payeeSpec, ctx);
-  await syncEditableCollection(fittingSpec, ctx);
-  await syncEditableCollection(miningTaxAssignmentSpec, ctx);
+  for (const spec of EDITABLE_COLLECTIONS) {
+    await syncEditableCollection(spec, ctx);
+  }
   await syncFeed(ctx);
 
   // ---- Synced settings ----
   // The second `ownerHash` read, and under the same index constraint as
   // `fetchOwnedDocs` — see its docstring. Deliberately unwindowed: settings
   // tombstones never expire and `mergeSettings`' absence semantics differ.
-  const settingsCol = collection(firestore, 'characters', uid, 'settings');
+  const settingsCol = collection(firestore, 'characters', uid, SYNCED_SETTINGS.remoteName);
   const snapshot = await getDocs(query(settingsCol, where('ownerHash', '==', ownerHash)));
   // Only honour well-formed synced keys: a hostile or stale doc naming a
   // non-synced Dexie key ('activeCharacterId') or an internal 'sync.__' key

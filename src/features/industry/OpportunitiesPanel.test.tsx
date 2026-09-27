@@ -96,6 +96,7 @@ describe('OpportunitiesPanel', () => {
         facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
         activeCharacterId={CHARACTER_ID}
         ownedStockSnapshot={SNAPSHOT}
+        assumedMe={0}
         onAddToCompare={() => {}}
         onStartPlan={() => {}}
         onAddToQuickbar={() => {}}
@@ -169,6 +170,7 @@ describe('OpportunitiesPanel', () => {
           facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
           activeCharacterId={CHARACTER_ID}
           ownedStockSnapshot={SNAPSHOT}
+          assumedMe={0}
           onAddToCompare={() => {}}
           onStartPlan={() => {}}
           onAddToQuickbar={onAddToQuickbar}
@@ -281,6 +283,7 @@ describe('OpportunitiesPanel', () => {
           facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
           activeCharacterId={CHARACTER_ID}
           ownedStockSnapshot={SNAPSHOT}
+          assumedMe={0}
           onAddToCompare={() => {}}
           onStartPlan={() => {}}
           onAddToQuickbar={() => {}}

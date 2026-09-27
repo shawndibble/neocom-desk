@@ -6,6 +6,7 @@ import {
   remotePurgePendingKey,
   retryPendingRemotePurge,
 } from './characterPurge';
+import { REMOTE_COLLECTION_NAMES } from './syncedCollections';
 
 interface FakeCol {
   path: string;
@@ -83,6 +84,17 @@ describe('purgeCharacterRemoteData', () => {
     expect(remoteStore.get('characters/char:1/productionSaleLinks')?.size).toBe(0);
     expect(remoteStore.get('characters/char:1/productionOrderWatches')?.size).toBe(0);
   });
+
+  it.each(REMOTE_COLLECTION_NAMES)(
+    'deletes every doc in the declared %s collection',
+    async (name) => {
+      seed(1, name, [{ id: 'a' }, { id: 'b' }]);
+
+      await purgeCharacterRemoteData(1);
+
+      expect(remoteStore.get(`characters/char:1/${name}`)?.size).toBe(0);
+    }
+  );
 
   it('does not touch another character’s docs', async () => {
     seed(1, 'plans', [{ id: 'p1' }]);

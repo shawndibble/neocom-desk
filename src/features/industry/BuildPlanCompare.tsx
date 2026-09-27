@@ -18,21 +18,18 @@ import { formatDuration } from '@/lib/duration';
 import { iskToneClass } from '@/features/character/format';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import type { BlueprintCatalog } from './blueprintCatalog';
-import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { formatPercent } from './format';
 import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBuildResults';
-import type { TradeHubStandingsMap } from '@/features/market/useTradeHubStandings';
+import type { BuildPlanPricingInputs } from './buildPlanPricingInputs';
 
 interface BuildPlanCompareProps {
   plans: readonly BuildPlanRecord[];
   catalog: BlueprintCatalog;
   pi: PiData | null;
   ownedBlueprints: readonly CharacterBlueprint[];
-  /** Folded into each plan on its own `includeCorpAssets` — see `resolveBuildPlan`. */
-  corpOwnedBlueprints?: CorpOwnedBlueprintsState;
   modifiers: CharacterModifiers;
-  /** The active Character's per-Trade-Hub standings (issue #1238) — see `useComparedBuildResults`. */
-  tradeHubStandings?: TradeHubStandingsMap;
+  /** `useIndustryWorkspace`'s pricing inputs — see `useComparedBuildResults`. */
+  pricingInputs: BuildPlanPricingInputs;
   /** Exits compare mode, restoring the previously open single-plan detail. */
   onDone: () => void;
 }
@@ -82,9 +79,8 @@ export function BuildPlanCompare({
   catalog,
   pi,
   ownedBlueprints,
-  corpOwnedBlueprints,
   modifiers,
-  tradeHubStandings,
+  pricingInputs,
   onDone,
 }: BuildPlanCompareProps) {
   const { t } = useTranslation();
@@ -93,9 +89,8 @@ export function BuildPlanCompare({
     catalog,
     pi,
     ownedBlueprints,
-    corpOwnedBlueprints,
     modifiers,
-    tradeHubStandings,
+    pricingInputs,
   });
   const unknown = t('common.unknown');
 

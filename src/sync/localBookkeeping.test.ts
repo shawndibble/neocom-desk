@@ -1,13 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db';
-import {
-  buildPlanTombstonesKey,
-  clearCharacterSyncBookkeeping,
-  ownerHashKey,
-  planTombstonesKey,
-  quickbarTombstonesKey,
-  stationPinTombstonesKey,
-} from './localBookkeeping';
+import { clearCharacterSyncBookkeeping, ownerHashKey, tombstoneKey } from './localBookkeeping';
+import { EDITABLE_COLLECTIONS } from './syncedCollections';
 
 beforeEach(async () => {
   await db.settings.clear();
@@ -15,23 +9,23 @@ beforeEach(async () => {
 
 describe('clearCharacterSyncBookkeeping', () => {
   it('drops every bookkeeping key for the character, leaving other characters alone', async () => {
+    const characterKeys = [
+      ownerHashKey(1),
+      ...EDITABLE_COLLECTIONS.map((collection) => tombstoneKey(collection, 1)),
+    ];
     await db.settings.bulkPut([
-      { key: ownerHashKey(1), value: 'hash-a' },
-      { key: planTombstonesKey(1), value: [{ id: 'p1', deletedAt: 1 }] },
-      { key: buildPlanTombstonesKey(1), value: [] },
-      { key: quickbarTombstonesKey(1), value: [] },
-      { key: stationPinTombstonesKey(1), value: [] },
+      ...characterKeys.map((key) => ({ key, value: [{ id: 'p1', deletedAt: 1 }] })),
       { key: ownerHashKey(2), value: 'hash-b' },
+      { key: tombstoneKey(EDITABLE_COLLECTIONS[0]!, 2), value: [{ id: 'p2', deletedAt: 1 }] },
     ]);
 
     await clearCharacterSyncBookkeeping(1);
 
-    expect(await db.settings.get(ownerHashKey(1))).toBeUndefined();
-    expect(await db.settings.get(planTombstonesKey(1))).toBeUndefined();
-    expect(await db.settings.get(buildPlanTombstonesKey(1))).toBeUndefined();
-    expect(await db.settings.get(quickbarTombstonesKey(1))).toBeUndefined();
-    expect(await db.settings.get(stationPinTombstonesKey(1))).toBeUndefined();
+    for (const key of characterKeys) {
+      expect({ [key]: await db.settings.get(key) }).toEqual({ [key]: undefined });
+    }
     expect((await db.settings.get(ownerHashKey(2)))?.value).toBe('hash-b');
+    expect(await db.settings.get(tombstoneKey(EDITABLE_COLLECTIONS[0]!, 2))).toBeDefined();
   });
 
   it('is a no-op when nothing is stored for the character', async () => {

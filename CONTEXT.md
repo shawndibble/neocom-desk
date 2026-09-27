@@ -898,6 +898,15 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   every cycle, and the number `chainCost` and `pinBudget` take as their
   extraction rate. CCP's own worked example averages ~5,580/hr against the
   13,930/hr `qty_per_cycle` alone implies.
+- **Synced Collection**: One collection that leaves the device for Firestore
+  under `/characters/{uid}` — each **Editable Data** table, the Notification
+  Feed's synced window, and synced settings — declared once in
+  `sync/syncedCollections.ts` (issue #2043): its remote name, Dexie table,
+  tombstone key, what removing a Character does to its local rows, its remote
+  mapping, and its **What We Store** line. Sync, tombstones, the owner-change
+  wipe, the remote purge, Character removal and the encrypted backup all derive
+  from that one declaration. `firestore.rules` and `firestore.indexes.json` do
+  not — they stay hand-written, with a test that fails until they cover it.
 - **System Label**: One of ESI's four built-in mail labels — Inbox, Sent,
   Corp, Alliance — returned by `/characters/{id}/mail/labels/` alongside
   their `unread_count`. Unrenamable/undeletable in-game; CCP does the
@@ -963,10 +972,10 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   has no variation data.
 - **What We Store**: The section of Settings' FAQ tab that tells a pilot, in
   their own words, what leaves their device. Not documentation — a
-  **commitment**: `sync/characterPurge.ts`'s exported `REMOTE_COLLECTIONS` is
-  the authoritative set, and `features/faq`'s test maps every entry in it to
-  the line that mentions it, so a newly synced collection fails the suite until
-  the copy accounts for it. Names its own exceptions (Notification Feed rows,
+  **commitment**: the **Synced Collection** registry's `REMOTE_COLLECTIONS` is
+  the authoritative set, and every declaration names the line that mentions
+  it, so a newly synced collection fails the suite until the copy accounts for
+  it. Names its own exceptions (Notification Feed rows,
   Scheduled Push occurrences, crash reports) rather than rounding them off; a
   section a reader can catch overclaiming is worth less than none. Deep-linkable
   at `/settings#faq`.

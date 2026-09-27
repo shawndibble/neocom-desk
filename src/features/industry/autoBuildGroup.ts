@@ -36,7 +36,7 @@ import {
 import { materialPricesFor } from './priceBasis';
 import { acquisitionForLookup, recipeForLookup, type RecipeCatalog } from './recipes';
 import { planOwnedBlueprints, reactionFacilityFor, resolveTopLevelTier } from './resolveBuildPlan';
-import { offersForRegion } from './useBpcAcquisitionOffers';
+import { offersForRegion } from './buildPlanPricingInputs';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 
 interface ResolvedMember {

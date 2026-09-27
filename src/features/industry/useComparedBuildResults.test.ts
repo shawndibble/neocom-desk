@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
-import { create } from 'zustand';
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import '@/i18n';
 import {
   useComparedBuildResults,
@@ -9,35 +8,18 @@ import {
 } from './useComparedBuildResults';
 import { computeBuildPlan } from './computeBuildPlan';
 import { loadMarketSnapshots, type MarketSnapshot } from './marketData';
-import { useAssumedMe } from './assumedMe';
-import { useIncludeBlueprintCost } from './includeBlueprintCost';
-import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
 import type { BuildPlanRecord } from '@/db';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import type { BuildResult } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
+import { PRICING_INPUTS_FIXTURE as PRICING_INPUTS } from './pricingInputsFixtures';
 
 vi.mock('./computeBuildPlan', () => ({ computeBuildPlan: vi.fn() }));
 vi.mock('./marketData', () => ({ loadMarketSnapshots: vi.fn() }));
-vi.mock('@/features/bpcContracts/syncedContracts', () => ({
-  loadPublicBpcContracts: vi.fn(),
-}));
-// A controllable stand-in for the real synced-setting store, so the
-// hydration-gating test below can flip `hydrated` deterministically instead
-// of racing the real Dexie/fake-indexeddb read.
-vi.mock('./assumedMe', () => ({
-  useAssumedMe: create(() => ({ value: 0, hydrated: false, hydrate: vi.fn() })),
-}));
-vi.mock('./includeBlueprintCost', () => ({
-  useIncludeBlueprintCost: create(() => ({ value: true, hydrated: true, hydrate: vi.fn() })),
-}));
 
 const mockedCompute = vi.mocked(computeBuildPlan);
 const mockedSnapshots = vi.mocked(loadMarketSnapshots);
-const mockedAssumedMe = vi.mocked(useAssumedMe);
-const mockedIncludeBlueprintCost = vi.mocked(useIncludeBlueprintCost);
-const mockedBpcContracts = vi.mocked(loadPublicBpcContracts);
 
 function plan(overrides: Partial<BuildPlanRecord> & { id: string }): BuildPlanRecord {
   return {
@@ -119,18 +101,12 @@ const baseArgs: Omit<UseComparedBuildResultsArgs, 'plans' | 'catalog'> = {
   pi: null,
   ownedBlueprints: [],
   modifiers: NO_CHARACTER_MODIFIERS,
+  pricingInputs: PRICING_INPUTS,
 };
 
 beforeEach(() => {
   mockedCompute.mockReset();
   mockedSnapshots.mockReset();
-  // Hydrated by default so the existing tests below (which don't care about
-  // this setting) exercise the real fetch path; the hydration-gating test
-  // overrides this to `false` itself.
-  mockedAssumedMe.setState({ value: 0, hydrated: true, hydrate: vi.fn() });
-  mockedIncludeBlueprintCost.setState({ value: true, hydrated: true, hydrate: vi.fn() });
-  mockedBpcContracts.mockReset();
-  mockedBpcContracts.mockResolvedValue(null);
   mockedSnapshots.mockImplementation((requests) => requests.map(() => Promise.resolve(SNAPSHOT)));
   mockedCompute.mockReturnValue({ result: RESULT, error: null });
 });
@@ -413,7 +389,7 @@ describe('useComparedBuildResults', () => {
   });
 
   it('reports no blueprint cost, while still resolving the tier, when the includeBlueprintCost setting is off', async () => {
-    mockedIncludeBlueprintCost.setState({ value: false, hydrated: true, hydrate: vi.fn() });
+    const pricingInputs = { ...PRICING_INPUTS, includeBlueprintCost: false };
     const producedEntry = entry({ blueprintTypeID: 100, productTypeID: 1, productName: 'Widget' });
     const catalog: BlueprintCatalog = {
       ...catalogWith([producedEntry]),
@@ -432,7 +408,9 @@ describe('useComparedBuildResults', () => {
     );
     const plans = [plan({ id: 'a' })];
 
-    const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
+    const { result } = renderHook(() =>
+      useComparedBuildResults({ plans, catalog, ...baseArgs, pricingInputs })
+    );
     await waitFor(() => expect(result.current[0]?.loading).toBe(false));
 
     const call = mockedCompute.mock.calls[0]?.[0];
@@ -489,20 +467,22 @@ describe('useComparedBuildResults', () => {
     expect(result.current[0]?.error).toBe('group compute failed');
   });
 
-  it('waits for the assumedMe setting to hydrate before fetching, instead of fetching once at the default and again once hydrated', async () => {
-    mockedAssumedMe.setState({ value: 0, hydrated: false, hydrate: vi.fn() });
+  it('waits for the pricing settings to hydrate before fetching, instead of fetching once at the default and again once hydrated', async () => {
     const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
     const plans = [plan({ id: 'a' })];
+    const unhydrated = { ...PRICING_INPUTS, hydrated: false };
+    const hydrated = { ...PRICING_INPUTS, assumedMe: 3 };
 
-    const { result } = renderHook(() => useComparedBuildResults({ ...baseArgs, plans, catalog }));
+    const { result, rerender } = renderHook(
+      (props: UseComparedBuildResultsArgs) => useComparedBuildResults(props),
+      { initialProps: { ...baseArgs, plans, catalog, pricingInputs: unhydrated } }
+    );
 
     // Hydrate must resolve first (see hook comment above).
     expect(result.current.every((row) => row.loading)).toBe(true);
     expect(mockedSnapshots).not.toHaveBeenCalled();
 
-    act(() => {
-      mockedAssumedMe.setState({ value: 3, hydrated: true, hydrate: vi.fn() });
-    });
+    rerender({ ...baseArgs, plans, catalog, pricingInputs: hydrated });
 
     await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
     expect(mockedSnapshots).toHaveBeenCalledTimes(1);
@@ -571,10 +551,13 @@ describe('useComparedBuildResults', () => {
       plan({ id: 'corp', name: 'corp', includeCorpAssets: true }),
       plan({ id: 'solo', name: 'solo' }),
     ];
-    const corpOwnedBlueprints = { available: true, incomplete: false, blueprints: [corpCopy] };
+    const pricingInputs = {
+      ...PRICING_INPUTS,
+      corpBlueprints: { available: true, incomplete: false, blueprints: [corpCopy] },
+    };
 
     const { result } = renderHook(() =>
-      useComparedBuildResults({ ...baseArgs, plans, catalog, corpOwnedBlueprints })
+      useComparedBuildResults({ ...baseArgs, plans, catalog, pricingInputs })
     );
     await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
 
@@ -618,11 +601,23 @@ describe('useComparedBuildResults', () => {
 
     const { result, rerender } = renderHook(
       (props: UseComparedBuildResultsArgs) => useComparedBuildResults(props),
-      { initialProps: { ...baseArgs, plans, catalog, corpOwnedBlueprints: loading } }
+      {
+        initialProps: {
+          ...baseArgs,
+          plans,
+          catalog,
+          pricingInputs: { ...PRICING_INPUTS, corpBlueprints: loading },
+        },
+      }
     );
     await waitFor(() => expect(result.current[0]?.loading).toBe(false));
 
-    rerender({ ...baseArgs, plans, catalog, corpOwnedBlueprints: landed });
+    rerender({
+      ...baseArgs,
+      plans,
+      catalog,
+      pricingInputs: { ...PRICING_INPUTS, corpBlueprints: landed },
+    });
     await waitFor(() => expect(result.current[0]?.loading).toBe(false));
     expect(mockedSnapshots).toHaveBeenCalledTimes(calls);
   });
