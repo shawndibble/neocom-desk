@@ -175,28 +175,6 @@ export function OpenOrdersPanel() {
     DEFAULT_OPEN_ORDERS_FILTER_PARAMS
   );
   /**
-   * Self-heals a legacy hand-picked-subset `characterIds` (from before the
-   * current/all narrowing) the moment one is seen — a bookmarked or shared
-   * `orders.characters` link naming a Character other than the one now
-   * active, say — back into this filter's own canonical shape: empty, or
-   * exactly the active Character's own id. Without this, `filter.characterIds`
-   * itself never changes just because `CharacterFilterControl` displays it
-   * differently now, so the table would go on filtering to that stale id
-   * while the picker's label and portrait silently claimed something else
-   * entirely, until the pilot happened to touch the picker again.
-   */
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    const canonical =
-      filter.characterIds.length === 1 && filter.characterIds[0] === activeCharacterId
-        ? filter.characterIds
-        : [];
-    const alreadyCanonical =
-      canonical.length === filter.characterIds.length &&
-      canonical.every((id, i) => id === filter.characterIds[i]);
-    if (!alreadyCanonical) setFilter({ ...filter, characterIds: canonical });
-  }, [filter, activeCharacterId, setFilter]);
-  /**
    * The order a Notification Event (an undercut, or a fill) sent the reader
    * to, spent once on arrival (`useHighlightParam`'s own doc). Landing on the
    * row that prompted the click, decision `20260908-123516`.
@@ -414,18 +392,27 @@ export function OpenOrdersPanel() {
   /**
    * `CharacterFilterControl`'s `value` prop, derived the same way from either
    * `filter.characterIds` (desktop strip) or `draft.characterIds` (phone
-   * funnel sheet). `characterIds` narrowed to `'current' | 'all'` alongside
-   * `CharacterFilterControl` itself, so this picker only ever writes an empty
-   * array or exactly one id — but `filter`/`draft` are URL-persisted
-   * (`useUrlFilter`), so a bookmarked or shared link from before the
-   * narrowing can still hand this a genuine multi-id array. That reads as
-   * `'all'`, the same "never guess at 'current' for a legacy subset" rule
-   * `characterFilterValue.ts`'s `fromStoredCharacterFilterValue` applies —
-   * there's no principled way to know which one id (if any) the pilot who
-   * made that link would have meant.
+   * funnel sheet). Reads `'current'` only for the exact single-id array
+   * `characterFilterOnChange` itself would write for that literal value
+   * (`[activeCharacterId]`) — everything else reads `'all'`, the closest this
+   * narrowed picker can still say honestly. That covers two different single-
+   * id cases the same way: a legacy hand-picked-subset link (from before the
+   * current/all narrowing) naming some other Character — there's no
+   * principled way to know which one id, if any, the pilot who made it would
+   * have meant, so this never guesses `'current'` for it (mirrors
+   * `characterFilterValue.ts`'s `fromStoredCharacterFilterValue`) — and the
+   * Overview board's own per-Character Orders tile (`overview/cards.tsx`),
+   * which deep-links here with exactly one *other* alt's id on purpose, live
+   * traffic rather than anything stale. Either way the label falls back to
+   * "All characters" rather than lying that it's "This character," but the
+   * table itself keeps filtering to whatever `characterIds` actually holds —
+   * this function only ever feeds the picker's display, never the row filter
+   * (`matchesCharacterIds` reads `filter.characterIds` directly), so an
+   * Overview tile's narrowed view still opens narrowed; only its label can no
+   * longer name the one alt it's showing.
    */
   function characterFilterValueOf(characterIds: readonly number[]): CharacterFilterValue {
-    return characterIds.length === 1 ? 'current' : 'all';
+    return characterIds.length === 1 && characterIds[0] === activeCharacterId ? 'current' : 'all';
   }
 
   /** `CharacterFilterControl`'s `onChange`, resolving its selection back to `characterIds` and handing it to whichever setter owns them — `setFilter` (commits immediately) or `setDraft` (committed on the funnel's Apply). */

@@ -913,7 +913,7 @@ describe('OpenOrdersPanel', () => {
       expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
     });
 
-    it('self-heals a legacy characterIds link naming an alt other than the active Character to "All characters"', async () => {
+    it('labels a link naming an alt other than the active Character "All characters", without widening the table it still narrows', async () => {
       mockedLoadAll.mockResolvedValue(
         snapshot([
           {
@@ -936,16 +936,21 @@ describe('OpenOrdersPanel', () => {
       );
       mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
       // The active Character (from `useActiveCharacter`) is Alpha (id 1); this
-      // link names Beta (id 2) instead — a bookmark or shared link from
-      // before the current/all narrowing, which used to mean "just Beta."
-      // `CharacterFilterControl` can no longer express that, and must not
-      // silently relabel it as "This character" (Alpha) either — the picker
-      // and the table it filters must end up agreeing on "All characters."
+      // link names Beta (id 2) instead — the Overview board's own per-alt
+      // Orders tile (`overview/cards.tsx`) links exactly this way on purpose,
+      // to open narrowed to one alt's orders regardless of which Character
+      // happens to be active. `CharacterFilterControl` can no longer express
+      // "just Beta" (only "current" or "all"), so its label falls back to
+      // "All characters" rather than lying that it's "This character"
+      // (Alpha) — but the table must keep filtering to Beta's own orders
+      // regardless, exactly as the tile that built this link intended.
       renderPanel('/market/orders?orders.characters=2');
 
       expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
-      // The stale param is corrected away, not just papered over for this render.
-      await waitFor(() => expect(window.location.search).not.toContain('orders.characters'));
+      // Beta's own item (Mexallon, type 36) shows; Alpha's (Tritanium, type
+      // 34) does not — the table stayed narrowed to Beta despite the label.
+      expect(await screen.findByText('Mexallon')).toBeInTheDocument();
+      expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
     });
 
     it('keeps the filter it applied removable, rather than silently narrowing', async () => {
