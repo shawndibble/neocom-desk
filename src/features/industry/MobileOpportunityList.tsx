@@ -49,7 +49,7 @@ interface MobileOpportunityListProps {
   selectedIds: ReadonlySet<string>;
   onToggleSelected: (id: string) => void;
   onStartPlan: (entry: BlueprintCatalogEntry) => void;
-  onViewHistory: (typeId: number, itemName: string) => void;
+  onViewHistory: (typeId: number, itemName: string, regionId: number) => void;
   /** Account-wide skill gate for a row's product (issue #1231). */
   skillGateFor: (productTypeID: number) => SkillGateVerdict | undefined;
   nameForSkill: (typeID: number) => string;
@@ -242,7 +242,11 @@ export function MobileOpportunityList({
                         name: row.candidate.catalogEntry.productName,
                       })}
                       onClick={() =>
-                        onViewHistory(productTypeID, row.candidate.catalogEntry.productName)
+                        onViewHistory(
+                          productTypeID,
+                          row.candidate.catalogEntry.productName,
+                          row.hub.regionId
+                        )
                       }
                     />
                   )}
