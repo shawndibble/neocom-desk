@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import { REMOTE_COLLECTIONS } from '@/sync/characterPurge';
+import { REMOTE_COLLECTIONS } from '@/sync/syncedCollections';
 import { SYNCED_SETTING_KEYS } from '@/sync/syncedSettings';
 import { FaqPanel } from './FaqPanel';
 import { WHAT_WE_STORE_GROUPS, WHAT_WE_STORE_NOTES } from './whatWeStore';
@@ -14,35 +14,6 @@ function renderFaq() {
     </MemoryRouter>
   );
 }
-
-/**
- * Which "What We Store" line accounts for each remote Firestore collection.
- *
- * Pinned deliberately, in the same spirit as `syncedSettings.ts`'s two-file
- * edit: the section is a promise to the user about what leaves their device,
- * and a new synced collection that nobody mentioned there turns that promise
- * into a false one. Adding a collection to `REMOTE_COLLECTIONS` fails this
- * test until whoever added it decides what the user should be told.
- *
- * Several collections map to one line on purpose — a reader does not want
- * "productionSaleLinks" and "productionOrderWatches" as separate bullets, they
- * want "Production Runs, and the sales and orders you linked to them".
- */
-const COLLECTION_TO_ITEM: Readonly<Record<(typeof REMOTE_COLLECTIONS)[number], string>> = {
-  plans: 'skillPlans',
-  buildPlans: 'buildPlans',
-  quickbars: 'quickbar',
-  stationPins: 'stationPins',
-  planetRichness: 'piPicks',
-  payees: 'miningTax',
-  fittings: 'fittings',
-  miningTaxAssignments: 'miningTax',
-  settings: 'settings',
-  notificationFeed: 'notificationFeed',
-  productionRuns: 'productionRuns',
-  productionSaleLinks: 'productionRuns',
-  productionOrderWatches: 'productionRuns',
-};
 
 /**
  * Which words in the "settings" line account for each allow-listed synced key.
@@ -73,6 +44,9 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.skillCloneStates': /Alpha or Omega/i,
   'sync.miningTaxManualMoonOreTypeIds': /ore types you tagged/i,
   'sync.miningTaxManualIgnoredTypeIds': /ore types you tagged/i,
+  'sync.courierHighCollateralRatio': /courier collateral warning/i,
+  'sync.bpcHideAuctions': /hide auctions/i,
+  'sync.bpcHidePlex': /hide PLEX contracts/i,
   'sync.targetSkillPlan': /which skill plan you're adding skills to/i,
 };
 
@@ -82,20 +56,41 @@ function syncedItemIds(): Set<string> {
 }
 
 describe('FaqPanel — What We Store', () => {
+  // Which line accounts for each remote collection is declared on the
+  // collection itself (`faqItem` in sync/syncedCollections.ts), a required
+  // field — so a new synced collection cannot be declared without whoever
+  // adds it deciding what the pilot is told. Several collections share one
+  // line on purpose ("Production Runs, and the sales and orders you linked").
   it('accounts for every collection that actually leaves the device', () => {
     const ids = syncedItemIds();
     for (const collection of REMOTE_COLLECTIONS) {
-      const itemId = COLLECTION_TO_ITEM[collection];
-      expect(itemId, `no "What We Store" line covers the ${collection} collection`).toBeDefined();
-      expect(ids, `${collection} maps to a line that no longer exists`).toContain(itemId);
+      expect(ids, `${collection.remoteName} maps to a line that no longer exists`).toContain(
+        collection.faqItem
+      );
     }
+  });
+
+  it('keeps the synced lines in the order the pilot reads them', () => {
+    const group = WHAT_WE_STORE_GROUPS.find((g) => g.id === 'synced');
+    expect(group?.items.map((item) => item.id)).toEqual([
+      'skillPlans',
+      'buildPlans',
+      'productionRuns',
+      'quickbar',
+      'stationPins',
+      'piPicks',
+      'miningTax',
+      'fittings',
+      'notificationFeed',
+      'settings',
+    ]);
   });
 
   it('has no synced line that no longer corresponds to anything stored', () => {
     // The other direction: a collection removed from sync must not leave the
     // user told we still hold it. `settings` is the one line covering both
     // synced setting keys, so it is expected on both sides.
-    const claimed = new Set(Object.values(COLLECTION_TO_ITEM));
+    const claimed = new Set<string>(REMOTE_COLLECTIONS.map((c) => c.faqItem));
     for (const id of syncedItemIds()) {
       expect(claimed, `"${id}" is listed as synced but maps to no collection`).toContain(id);
     }

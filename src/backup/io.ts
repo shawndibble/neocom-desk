@@ -5,6 +5,7 @@
 import type { Table } from 'dexie';
 import { db } from '@/db';
 import { downloadTextFile } from '@/lib/download';
+import { EDITABLE_COLLECTIONS } from '@/sync/syncedCollections';
 import { isAllowedSyncedSettingKey } from '@/sync/syncedSettings';
 import { encryptExportPayload, decryptExportPayload, type BackupFile } from './crypto';
 import {
@@ -15,29 +16,19 @@ import {
 } from './payload';
 
 /**
- * Dexie table names for every Editable Data table a Character owns
- * (`sync/characterPurge.ts`'s `REMOTE_COLLECTIONS`, minus `settings` and
- * `notificationFeed` — settings are handled separately below by their
- * `sync.` key allow-list, and the Notification Feed is device-local by
- * design, not Editable Data).
+ * Dexie table names for every Editable Data table a Character owns — the
+ * synced collection registry's editable collections. Synced settings are
+ * handled separately below by their `sync.` key allow-list, and the
+ * Notification Feed is device-local by design, not Editable Data.
+ *
+ * The backup file keys rows by these names (ADR 0014), so they are part of
+ * its format; `io.test.ts` restores a file written before the registry.
  */
-const EDITABLE_TABLES = [
-  'skillPlans',
-  'buildPlans',
-  'quickbars',
-  'stationPins',
-  'planetRichness',
-  'payees',
-  'fittings',
-  'miningTaxAssignments',
-  'productionRuns',
-  'productionSaleLinks',
-  'productionOrderWatches',
-] as const;
+const EDITABLE_TABLES: readonly string[] = EDITABLE_COLLECTIONS.map((c) => c.table);
 
 /** Untyped view of one Editable Data table, for the generic read/write loops below. */
-function editableTable(name: (typeof EDITABLE_TABLES)[number]): Table<EditableRow, unknown> {
-  return db[name] as unknown as Table<EditableRow, unknown>;
+function editableTable(name: string): Table<EditableRow, unknown> {
+  return db.table<EditableRow, unknown>(name);
 }
 
 async function readEditableTables(): Promise<Record<string, EditableRow[]>> {

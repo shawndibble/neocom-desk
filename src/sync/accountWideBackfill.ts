@@ -62,17 +62,14 @@
 import { db } from '@/db';
 import type { PlanetRichnessRecord, StationPinRecord } from '@/db';
 import type { SyncRecord } from './merge';
-import {
-  planetRichnessTombstonesKey,
-  readTombstones,
-  stationPinTombstonesKey,
-} from './localBookkeeping';
+import { readTombstones, tombstoneKey } from './localBookkeeping';
+import { PLANET_RICHNESS, STATION_PINS } from './syncedCollections';
 
 /**
  * One account-wide collection, for `ACCOUNT_WIDE_COLLECTIONS` below.
  *
- * Deliberately two functions rather than a `CollectionSpec`-shaped record:
- * that type is ten fields because it describes remote document
+ * Deliberately its own small shape rather than a registry declaration
+ * (`syncedCollections.ts`): that type describes remote document
  * round-tripping, and none of that is needed to copy a local row sideways.
  * All this needs to know is which rows are account-wide, and how to re-key one
  * onto another Character.
@@ -121,7 +118,9 @@ const stationPins: AccountWideCollection<StationPinRecord> = {
     const characters = await db.characters.toCollection().primaryKeys();
     const latest = new Map<string, number>();
     for (const characterId of characters) {
-      for (const tombstone of await readTombstones(stationPinTombstonesKey(Number(characterId)))) {
+      for (const tombstone of await readTombstones(
+        tombstoneKey(STATION_PINS, Number(characterId))
+      )) {
         const locationId = tombstone.id.split(':')[1];
         if (!locationId) continue;
         const held = latest.get(locationId) ?? 0;
@@ -173,7 +172,7 @@ const planetRichness: AccountWideCollection<PlanetRichnessRecord> = {
     const latest = new Map<string, number>();
     for (const characterId of characters) {
       for (const tombstone of await readTombstones(
-        planetRichnessTombstonesKey(Number(characterId))
+        tombstoneKey(PLANET_RICHNESS, Number(characterId))
       )) {
         const planetId = tombstone.id.split(':')[1];
         if (!planetId) continue;

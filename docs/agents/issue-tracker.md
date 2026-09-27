@@ -20,6 +20,17 @@ Tickets from `/to-tickets` record blockers as free text in a `## Blocked by` sec
 2. "None" / "None — can start immediately" → unblocked.
 3. Otherwise extract every `#<n>` reference and check each with `gh issue view <n> --json state`. The ticket is unblocked only when every referenced issue is `CLOSED`.
 
+## Author guard
+
+`/next-ticket` only picks up `ready-for-agent` issues authored by the
+authenticated `gh` user (Shawn). This is enforced in
+`scripts/next-ticket/select-ticket.mjs`, including when an issue number is
+given explicitly. Anything else — a collaborator opening and self-labelling
+an issue under their own account, for instance — is skipped even if it's
+`ready-for-agent` and unblocked, so the loop never autonomously implements
+and auto-merges a ticket Shawn didn't file himself (his own automation,
+which authenticates as him, still counts).
+
 ## Concurrency claim
 
 `/next-ticket` can run as several parallel processes on one machine, each in

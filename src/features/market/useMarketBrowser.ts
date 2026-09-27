@@ -17,7 +17,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useUrlParam } from '@/lib/useUrlState';
+import { useRememberedUrlParams, useUrlParam, type UrlParamValues } from '@/lib/useUrlState';
 import { enumParam, type UrlParamCodec } from '@/lib/urlState';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { useMarketBrowserHub } from '@/features/market/browserHub';
@@ -44,6 +44,23 @@ const BROWSER_SEARCH_PARAM: UrlParamCodec<string> = {
 };
 
 const ITEM_TAB_PARAM = enumParam(['orders', 'history'] as const, 'orders');
+
+/**
+ * The URL's `hub`/`region`, read exactly as `parseMarketParams` reads them,
+ * as the group `useRememberedUrlParams` blends over the device's own Trade
+ * Hub / Location Mode. Written only by `navigateTo`, together with `type`.
+ */
+const LOCATION_PARAMS = {
+  hub: {
+    parse: (raw) => parseMarketParams((key) => (key === 'hub' ? raw : null)).hubId,
+    serialize: (value) => value,
+  } satisfies UrlParamCodec<string | null>,
+  region: {
+    parse: (raw) => parseMarketParams((key) => (key === 'region' ? raw : null)).regionId,
+    serialize: (value) => (value === null ? null : String(value)),
+  } satisfies UrlParamCodec<RegionChoice | null>,
+};
+type LocationParams = UrlParamValues<typeof LOCATION_PARAMS>;
 
 export interface UseMarketBrowserArgs {
   groups: MarketGroupNode[] | null;
@@ -159,15 +176,56 @@ export function useMarketBrowser({
     expandedForGroupId.current = linkedGroupId;
   }, [groups, linkedGroupId, groupsById]);
 
-  // All regions needs no catalogue check — it names every region there is.
-  const regionIsValid =
-    parsedParams.regionId === ALL_REGIONS
-      ? true
-      : resolveAgainstCatalogue(parsedParams.regionId, marketRegions, (r, id) => r.id === id);
-  // A hub id is a small static set (`TRADE_HUBS`), so unlike the region
-  // catalogue there's no loading window to be optimistic about.
-  const hubIsValid =
-    parsedParams.hubId !== null && getTradeHub(parsedParams.hubId as TradeHub['id']) !== undefined;
+  /**
+   * The device's Trade Hub and Location Mode as the stored default behind the
+   * URL's `hub`/`region`. A linked location that names nothing real (a
+   * region the catalogue lacks, a hub not in `TRADE_HUBS`) reads as absent.
+   *
+   * `adoptLinked` is this page's one exception to decision `20260922-221531`
+   * (see decision `20260926-201312`): a valid linked hub/region is copied
+   * into the device's own setting. `buildMarketParams` only ever writes one
+   * of `hub`/`region`, so a linked hub is dropped from the query string the
+   * moment the mode toggles to Region — without the copy, toggling back to
+   * Trade Hub would fall back to whatever hub was stored before the link was
+   * opened, silently abandoning what the link pointed at.
+   */
+  const rememberedLocation = useMemo(
+    () => ({
+      values: {
+        hub: hubId,
+        region: locationModeValue.mode === 'region' ? locationModeValue.regionId : null,
+      } satisfies LocationParams,
+      hydrated: hubHydrated && locationModeHydrated,
+      adoptLinked: true,
+      accepts: (key: keyof LocationParams, value: unknown) => {
+        if (value === null) return false;
+        // A hub id is a small static set (`TRADE_HUBS`), so unlike the region
+        // catalogue there's no loading window to be optimistic about.
+        if (key === 'hub') return getTradeHub(value as TradeHub['id']) !== undefined;
+        // All regions needs no catalogue check — it names every region there is.
+        return (
+          value === ALL_REGIONS ||
+          resolveAgainstCatalogue(value as number, marketRegions, (r, id) => r.id === id)
+        );
+      },
+      remember: (patch: Partial<LocationParams>) => {
+        if (patch.hub) void setHubId(patch.hub as TradeHub['id']);
+        if (patch.region !== undefined && patch.region !== null) {
+          void setLocationModeValue({ mode: 'region', regionId: patch.region });
+        }
+      },
+    }),
+    [
+      hubId,
+      locationModeValue,
+      hubHydrated,
+      locationModeHydrated,
+      marketRegions,
+      setHubId,
+      setLocationModeValue,
+    ]
+  );
+  const [linkedLocation, , isLinked] = useRememberedUrlParams(LOCATION_PARAMS, rememberedLocation);
 
   // Whichever of region/hub the URL names wins, falling back to the
   // device-local Location Mode preference when neither param resolves.
@@ -178,14 +236,19 @@ export function useMarketBrowser({
         : { mode: 'hub', hubId: hub.id },
     [locationModeValue, hub]
   );
+  const regionLinked = isLinked('region');
+  const hubLinked = isLinked('hub');
   const effectiveLocation: MarketLocationParam = useMemo(
     () =>
       resolveMarketLocation(
-        parsedParams,
-        { region: regionIsValid, hub: hubIsValid },
+        {
+          regionId: regionLinked ? linkedLocation.region : null,
+          hubId: hubLinked ? linkedLocation.hub : null,
+        },
+        { region: regionLinked, hub: hubLinked },
         fallbackLocation
       ),
-    [parsedParams, regionIsValid, hubIsValid, fallbackLocation]
+    [linkedLocation, regionLinked, hubLinked, fallbackLocation]
   );
   const effectiveHub =
     effectiveLocation.mode === 'hub'
@@ -202,39 +265,6 @@ export function useMarketBrowser({
     effectiveLocation.mode === 'region' && effectiveLocation.regionId !== ALL_REGIONS
       ? effectiveLocation.regionId
       : effectiveHub.regionId;
-
-  // Catches the device's persisted Location Mode up to a valid URL override.
-  // `buildMarketParams` only ever writes one of `hub`/`region` at a time, so
-  // a URL-supplied hub is dropped from the query string the moment the mode
-  // toggles to Region — without this, toggling back to Trade Hub would have
-  // nothing left to read and would fall back to whatever hub was persisted
-  // before the link was opened, silently abandoning what the link pointed
-  // at. `effectiveLocation`/`effectiveHub` still read the URL directly for
-  // the render that shows the link's own view, so this is purely about what
-  // survives a later, unrelated interaction.
-  useEffect(() => {
-    if (!hubHydrated || !locationModeHydrated) return;
-    if (hubIsValid && parsedParams.hubId !== null && parsedParams.hubId !== hubId) {
-      void setHubId(parsedParams.hubId as TradeHub['id']);
-    }
-    if (
-      regionIsValid &&
-      parsedParams.regionId !== null &&
-      (locationModeValue.mode !== 'region' || locationModeValue.regionId !== parsedParams.regionId)
-    ) {
-      void setLocationModeValue({ mode: 'region', regionId: parsedParams.regionId });
-    }
-  }, [
-    parsedParams,
-    hubIsValid,
-    regionIsValid,
-    hubId,
-    locationModeValue,
-    hubHydrated,
-    locationModeHydrated,
-    setHubId,
-    setLocationModeValue,
-  ]);
 
   const filterResult = useMemo(
     () => (groups && types ? filterMarketTree(groups, types, query) : null),

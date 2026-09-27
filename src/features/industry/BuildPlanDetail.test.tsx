@@ -12,6 +12,7 @@ import type { BlueprintType, TypeMap } from '@/sde/types';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import type { CorpOwnedStockState } from './corpOwnedStock';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
+import { PRICING_INPUTS_FIXTURE } from './pricingInputsFixtures';
 import { EMPTY_OWNED_STOCK_SNAPSHOT } from './ownedStockDetection';
 import { BuildPlanDetail, type PlanPatch } from './BuildPlanDetail';
 import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
@@ -211,12 +212,6 @@ const CORP_OWNED_STOCK_UNAVAILABLE: CorpOwnedStockState = {
   incomplete: false,
 };
 
-const CORP_OWNED_BLUEPRINTS_UNAVAILABLE: CorpOwnedBlueprintsState = {
-  blueprints: [],
-  available: false,
-  incomplete: false,
-};
-
 /**
  * Stands in for Industry.tsx: holds the plan in local state and applies
  * `onUpdate` patches to it, so a committed edit is visible in the next
@@ -242,7 +237,17 @@ function Harness({
           modifiers={NO_CHARACTER_MODIFIERS}
           ownedStockSnapshot={EMPTY_OWNED_STOCK_SNAPSHOT}
           corpOwnedStock={{ ...CORP_OWNED_STOCK_UNAVAILABLE, ...corpOwnedStock }}
-          corpOwnedBlueprints={{ ...CORP_OWNED_BLUEPRINTS_UNAVAILABLE, ...corpOwnedBlueprints }}
+          pricingInputs={
+            corpOwnedBlueprints
+              ? {
+                  ...PRICING_INPUTS_FIXTURE,
+                  corpBlueprints: {
+                    ...PRICING_INPUTS_FIXTURE.corpBlueprints,
+                    ...corpOwnedBlueprints,
+                  },
+                }
+              : PRICING_INPUTS_FIXTURE
+          }
           onChange={(change) => {
             if (change.kind === 'sourcing') return;
             (change.kind === 'edit' ? onUpdate : onDerivedFix)?.(change.patch);

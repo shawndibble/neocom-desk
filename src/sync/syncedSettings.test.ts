@@ -6,7 +6,10 @@ import { isAllowedSyncedSettingKey, SYNCED_SETTING_KEYS } from './syncedSettings
 // to SYNCED_SETTING_KEYS. Add it here too, and confirm the caller records
 // deletions via deleteSyncedSetting so the tombstone path in merge.ts applies.
 const PINNED_SYNCED_SETTING_KEYS: string[] = [
+  'sync.bpcHideAuctions',
+  'sync.bpcHidePlex',
   'sync.corpDarkAfterDays',
+  'sync.courierHighCollateralRatio',
   'sync.defaultCharacterFilter',
   'sync.fittingDamageProfileId',
   'sync.fittingDamageProfiles',

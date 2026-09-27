@@ -15,8 +15,11 @@
  *   so keys that change together (a filter bar's text, types and standings)
  *   belong in one group.
  * - **Read-only defaults.** The URL wins over a default; absent means the
- *   default. Nothing here writes back to a stored setting (scope decision
- *   "persisted view preferences stay out of the URL").
+ *   default. Nothing read from the URL is written back to a stored setting
+ *   (scope decision "persisted view preferences stay out of the URL").
+ *   `useRememberedUrlParams` below stores a reader's own *edit* of a field
+ *   with a stored default, and its opt-in `adoptLinked` is the one recorded
+ *   exception.
  *
  * Pass a schema that is stable across renders — module scope, or a `useMemo`.
  */
@@ -235,4 +238,137 @@ export function useUrlFilter<F extends object>(
     setParams(emptyParams);
   }, [scopeKey, setParams, emptyParams]);
   return [filter, setFilter];
+}
+
+/**
+ * The stored side of a `useRememberedUrlParams` group: a preference saved
+ * long-term (a `useLocalSetting` store, say) that stands in for any field the
+ * URL leaves out. Build it in a `useMemo` over the store's value.
+ */
+export interface RememberedDefaults<S extends UrlParamSchema> {
+  /**
+   * The stored default for each field it covers. A field it leaves out has no
+   * stored default: it is URL-only, and the codec's own default applies.
+   */
+  values: Partial<UrlParamValues<S>>;
+  /**
+   * False until the store has read its value. Only `adoptLinked` waits on
+   * it, and absent reads as false, so an adopting caller that forgets it
+   * never adopts against a not-yet-read default.
+   */
+  hydrated?: boolean;
+  /** Persists an edit — called with only the covered fields the edit touched. */
+  remember(patch: Partial<UrlParamValues<S>>): void;
+  /**
+   * Whether a value the URL states is usable. One it rejects (an id no
+   * catalogue has) reads as absent, so the stored default shows instead.
+   */
+  accepts?: (key: keyof S & string, value: unknown) => boolean;
+  /**
+   * Opt-in exception to scope decision `20260922-221531`: once hydrated,
+   * copy each covered field the URL states into storage whenever the two
+   * differ. Market Browser only — see decision `20260926-201312`. Everyone
+   * else leaves it off, and nothing read from the URL is ever stored.
+   */
+  adoptLinked?: boolean;
+}
+
+/**
+ * A `useUrlParams` group with a remembered default behind some of its fields
+ * (scope decision `20260922-221531`, ADR 0015):
+ *
+ * - **Per-field presence.** A field the URL states wins; one it leaves out
+ *   reads the stored default. Presence is the raw query string's, since a
+ *   parsed value equal to the codec default cannot tell "not given" from
+ *   "the sender chose the default".
+ * - **Edits go only where they belong.** The setter takes a patch or the
+ *   whole displayed object (a `FilterBar` commits the whole thing on every
+ *   edit) and diffs it against what is shown. Only the fields that actually
+ *   changed are written — to the URL, and to storage when they have a stored
+ *   default. An untouched field is never carried from one source into the
+ *   other: a stored default is not mirrored into the URL, and a link's value
+ *   is not written into storage.
+ *
+ * The third return value says whether the URL states a field right now.
+ */
+export function useRememberedUrlParams<S extends UrlParamSchema>(
+  schema: S,
+  remembered: RememberedDefaults<S>
+): [
+  UrlParamValues<S>,
+  (next: Partial<UrlParamValues<S>>, options?: UrlWriteOptions) => void,
+  (key: keyof S & string) => boolean,
+] {
+  const [urlValues, setUrlValues] = useUrlParams(schema);
+  const { search } = useLocation();
+  const codecs = schema as unknown as Record<string, AnyCodec>;
+  const { values: stored, accepts, hydrated = false, adoptLinked = false, remember } = remembered;
+  const storedValues = stored as Record<string, unknown>;
+
+  // What the URL itself states, parsed from the query string rather than read
+  // off `urlValues` — that also carries a debounced edit not yet written.
+  const linked = useMemo(() => {
+    const raw = new URLSearchParams(search);
+    const result = new Map<string, unknown>();
+    for (const [key, codec] of Object.entries(codecs)) {
+      if (!raw.has(key)) continue;
+      const value = codec.parse(raw.get(key));
+      if (accepts && !accepts(key as keyof S & string, value)) continue;
+      result.set(key, value);
+    }
+    return result;
+  }, [search, codecs, accepts]);
+
+  const values = useMemo(() => {
+    const result: Record<string, unknown> = { ...urlValues };
+    for (const key of Object.keys(storedValues)) {
+      if (!linked.has(key)) result[key] = storedValues[key];
+    }
+    return result;
+  }, [urlValues, storedValues, linked]);
+
+  const latest = useRef({ values, storedValues, remember });
+  useLayoutEffect(() => {
+    latest.current = { values, storedValues, remember };
+  });
+
+  const setValues = useCallback(
+    (next: Partial<UrlParamValues<S>>, options?: UrlWriteOptions) => {
+      const { values: shown, storedValues: covered, remember: persist } = latest.current;
+      const changed: Record<string, unknown> = {};
+      const toRemember: Record<string, unknown> = {};
+      let rememberAny = false;
+      for (const [key, value] of Object.entries(next as Record<string, unknown>)) {
+        const codec = codecs[key];
+        if (codec.serialize(value as never) === codec.serialize(shown[key] as never)) continue;
+        changed[key] = value;
+        if (key in covered) {
+          toRemember[key] = value;
+          rememberAny = true;
+        }
+      }
+      // Called even when nothing changed, as `useUrlParams`' own setter would
+      // be: a commit flushes any debounced text still waiting.
+      setUrlValues(changed as Partial<UrlParamValues<S>>, options);
+      if (rememberAny) persist(toRemember as Partial<UrlParamValues<S>>);
+    },
+    [codecs, setUrlValues]
+  );
+
+  useEffect(() => {
+    if (!adoptLinked || !hydrated) return;
+    const patch: Record<string, unknown> = {};
+    let adoptAny = false;
+    for (const [key, value] of linked) {
+      if (!(key in storedValues)) continue;
+      const codec = codecs[key];
+      if (codec.serialize(value as never) === codec.serialize(storedValues[key] as never)) continue;
+      patch[key] = value;
+      adoptAny = true;
+    }
+    if (adoptAny) remember(patch as Partial<UrlParamValues<S>>);
+  }, [adoptLinked, hydrated, linked, storedValues, codecs, remember]);
+
+  const isLinked = useCallback((key: keyof S & string) => linked.has(key), [linked]);
+  return [values as UrlParamValues<S>, setValues, isLinked];
 }

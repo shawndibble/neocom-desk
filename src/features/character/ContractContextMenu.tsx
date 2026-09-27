@@ -5,12 +5,7 @@
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from '@/components/ui';
+import { MenuItem, RowActionsMenu } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
 import { CONTRACT_TYPE_KEY } from '@/features/character/contractLabels';
 import type { Contract } from '@/esi/endpoints';
@@ -25,16 +20,20 @@ export function ContractContextMenu({ contract, children }: ContractContextMenuP
   const title = contract.title || t(CONTRACT_TYPE_KEY[contract.type]);
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem onSelect={() => void writeToClipboard(title)}>
-          {t('contracts.contextMenu.copyTitle')}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => void writeToClipboard(String(contract.contract_id))}>
-          {t('contracts.contextMenu.copyContractId')}
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+    <RowActionsMenu
+      name={title}
+      items={
+        <>
+          <MenuItem onSelect={() => void writeToClipboard(title)}>
+            {t('contracts.contextMenu.copyTitle')}
+          </MenuItem>
+          <MenuItem onSelect={() => void writeToClipboard(String(contract.contract_id))}>
+            {t('contracts.contextMenu.copyContractId')}
+          </MenuItem>
+        </>
+      }
+    >
+      {children}
+    </RowActionsMenu>
   );
 }

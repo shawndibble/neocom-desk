@@ -195,6 +195,12 @@ describe('asksFarMoreCollateralThanReward', () => {
     expect(asksFarMoreCollateralThanReward(100)).toBe(true);
   });
 
+  it('takes the threshold the pilot set instead of the default', () => {
+    expect(asksFarMoreCollateralThanReward(30, 25)).toBe(true);
+    expect(asksFarMoreCollateralThanReward(24.9, 25)).toBe(false);
+    expect(asksFarMoreCollateralThanReward(60, 100)).toBe(false);
+  });
+
   it('says nothing about a haul whose ratio cannot be stated', () => {
     // A haul paying nothing has no ratio — unknowable, not infinite.
     expect(asksFarMoreCollateralThanReward(null)).toBe(false);

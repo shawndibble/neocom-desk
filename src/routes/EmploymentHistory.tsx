@@ -209,6 +209,7 @@ export function EmploymentHistory() {
               rowKey={(row) => row.recordId}
               rowClassName={(row) => (row.ongoing ? 'bg-success/5' : undefined)}
               rowContextMenu={historyRowContextMenu}
+              rowMoreActions
               // Rows already arrive most-recent-first; match it so the
               // header shows this as the active sort rather than none.
               defaultSort={{ columnId: 'started', direction: 'desc' }}

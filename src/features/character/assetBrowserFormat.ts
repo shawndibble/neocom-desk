@@ -12,3 +12,8 @@ export function formatBadge(
     value: formatIsk(totals.estimatedValue),
   });
 }
+
+/** Whether a level has any item row — the label strip has nothing to name otherwise. */
+export function hasItemRows(rows: readonly { kind: string; node?: { kind: string } }[]): boolean {
+  return rows.some((r) => r.kind === 'node' && r.node?.kind === 'item');
+}

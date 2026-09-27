@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { REMOTE_COLLECTIONS } from './characterPurge';
+import { REMOTE_COLLECTION_NAMES } from './syncedCollections';
 
 /**
  * Drift guard over `firestore.indexes.json` — **not** a proof that Firestore
@@ -9,9 +9,10 @@ import { REMOTE_COLLECTIONS } from './characterPurge';
  * valid query", so nothing run locally can observe an index being absent.
  *
  * What it does check is that the config still covers what the sync code
- * needs, and that it keeps covering it. `REMOTE_COLLECTIONS` is the
- * authoritative list of remotely-owned collections, so a 13th one added
- * there fails this file until it is exempted too — the case the wildcard
+ * needs, and that it keeps covering it. The synced collection registry's
+ * `REMOTE_COLLECTION_NAMES` is the authoritative list of remotely-owned
+ * collections, so a 14th one declared there fails this file until it is
+ * exempted too — the case the wildcard
  * design exists to survive, and the one a list hardcoded here would sail
  * straight past.
  */
@@ -60,7 +61,7 @@ const EXTRA_INDEXED_FIELDS: Partial<Record<string, readonly string[]>> = {
 };
 
 describe('firestore.indexes.json field overrides', () => {
-  it.each(REMOTE_COLLECTIONS)('exempts every field of %s from auto-indexing', (group) => {
+  it.each(REMOTE_COLLECTION_NAMES)('exempts every field of %s from auto-indexing', (group) => {
     expect(overridesFor(group)).toContainEqual({
       collectionGroup: group,
       fieldPath: '*',
@@ -69,7 +70,7 @@ describe('firestore.indexes.json field overrides', () => {
     });
   });
 
-  it.each(REMOTE_COLLECTIONS)('re-enables the ownerHash index on %s', (group) => {
+  it.each(REMOTE_COLLECTION_NAMES)('re-enables the ownerHash index on %s', (group) => {
     // The one field any of these is ever filtered on. Ascending only: the
     // query is an equality, and `updatedAt` rides a composite index rather
     // than a single-field one — an exemption applies only to *automatic*
@@ -82,7 +83,7 @@ describe('firestore.indexes.json field overrides', () => {
     });
   });
 
-  it.each(REMOTE_COLLECTIONS)('exempts nothing else on %s', (group) => {
+  it.each(REMOTE_COLLECTION_NAMES)('exempts nothing else on %s', (group) => {
     expect(
       overridesFor(group)
         .map((o) => o.fieldPath)
@@ -104,7 +105,7 @@ describe('firestore.indexes.json field overrides', () => {
   });
 
   it('overrides nothing outside the remotely-owned collections', () => {
-    const groups = new Set(REMOTE_COLLECTIONS as readonly string[]);
+    const groups = new Set(REMOTE_COLLECTION_NAMES);
     expect(config.fieldOverrides.filter((o) => !groups.has(o.collectionGroup))).toEqual([]);
   });
 

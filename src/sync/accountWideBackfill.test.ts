@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import type { StationPinRecord } from '@/db';
-import { stationPinTombstonesKey } from './localBookkeeping';
+import { tombstoneKey } from './localBookkeeping';
+import { STATION_PINS } from './syncedCollections';
 import { backfillAccountWideData } from './accountWideBackfill';
 
 async function seedCharacter(characterId: number): Promise<void> {
@@ -34,7 +35,7 @@ async function seedTombstone(
   deletedAt: number
 ): Promise<void> {
   await db.settings.put({
-    key: stationPinTombstonesKey(characterId),
+    key: tombstoneKey(STATION_PINS, characterId),
     value: [{ id: `${characterId}:${locationId}`, deletedAt }],
   });
 }

@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { FULL_RECORDS } from '@/sync/syncedCollectionFixtures';
+import { EDITABLE_COLLECTIONS } from '@/sync/syncedCollections';
 import { removeCharacter } from './removeCharacter';
 
 const syncMock = vi.hoisted(() => ({
@@ -163,6 +165,22 @@ describe('removeCharacter', () => {
     expect(await db.orderProblemSamples.where('characterId').equals(1).count()).toBe(0);
     expect(await db.mailDrafts.where('characterId').equals(1).count()).toBe(0);
     expect(await db.miningLedgerHistory.get(1)).toBeUndefined();
+  });
+
+  it('applies each synced collection’s declared removal rule to its local rows', async () => {
+    await seedCharacter(1);
+    for (const [table, record] of Object.entries(FULL_RECORDS)) {
+      await db.table(table).put(record);
+    }
+
+    await removeCharacter(1, true);
+
+    for (const c of EDITABLE_COLLECTIONS) {
+      const left = await db.table(c.table).where('characterId').equals(1).count();
+      // `keep` is the Production Log's three tables, which removal never
+      // deleted locally — preserved as-is by the registry (issue #2043).
+      expect({ [c.table]: left > 0 }).toEqual({ [c.table]: c.onRemoval === 'keep' });
+    }
   });
 
   it('does not touch another character’s data', async () => {

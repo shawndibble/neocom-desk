@@ -37,7 +37,7 @@ export function IndustryPlanPage() {
     modifiers,
     ownedStockSnapshot,
     corpOwnedStock,
-    corpOwnedBlueprints,
+    pricingInputs,
     blueprintsNeedsReauth,
   } = workspace;
 
@@ -128,7 +128,7 @@ export function IndustryPlanPage() {
             modifiers={modifiers}
             ownedStockSnapshot={ownedStockSnapshot}
             corpOwnedStock={corpOwnedStock}
-            corpOwnedBlueprints={corpOwnedBlueprints}
+            pricingInputs={pricingInputs}
             onChange={(change) => void applyBuildPlanChange(plan.id, change)}
             groupSnapshot={groupSnapshot}
             onSearchBpcSourcing={(typeId) => navigate(bpcSourcingHref(typeId))}

@@ -57,7 +57,6 @@ import { SkillGateMarker } from './SkillGateMarker';
 import { useOpportunities } from './useOpportunities';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
-import { useAssumedMe } from './assumedMe';
 
 interface OpportunitiesPanelProps {
   catalog: BlueprintCatalog;
@@ -66,6 +65,12 @@ interface OpportunitiesPanelProps {
   facilityDefaults: ActivityFacilityDefaults;
   activeCharacterId: number;
   ownedStockSnapshot: OwnedStockSnapshot;
+  /**
+   * ME to quote an unowned sub-build at — `buildPlanPricingInputs.ts`'s
+   * `assumedMe`, the one pricing input this panel reads (#2055), read without
+   * waiting on the settings' hydration gate (#2054).
+   */
+  assumedMe: number;
   onAddToCompare: (rows: readonly OpportunityRow[]) => void;
   onStartPlan: (entry: BlueprintCatalogEntry) => void;
 }
@@ -89,6 +94,7 @@ export function OpportunitiesPanel({
   facilityDefaults,
   activeCharacterId,
   ownedStockSnapshot,
+  assumedMe,
   onAddToCompare,
   onStartPlan,
 }: OpportunitiesPanelProps) {
@@ -168,15 +174,6 @@ export function OpportunitiesPanel({
     () => buildOpportunityCandidates(ownedByCharacter, characterNames, catalog),
     [ownedByCharacter, characterNames, catalog]
   );
-
-  // Same setting BuildPlanDetail.tsx uses for an owned-blueprint's unowned
-  // sub-builds — a priced sub-build quotes at the pilot's own assumption,
-  // not a hard 0, the same way a hand-ticked one would.
-  const assumedMe = useAssumedMe((state) => state.value);
-  const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateAssumedMe();
-  }, [hydrateAssumedMe]);
 
   const { rows, loading, progress, manualRefreshOnly, refresh } = useOpportunities({
     candidates,

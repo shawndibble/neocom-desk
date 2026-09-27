@@ -2,13 +2,14 @@
  * Row components for the Assets drill-down (issue #148 follow-up).
  *
  * Every row here obeys one layout rule, which is the whole point of the
- * rework: nothing is laid out in fixed-width columns that a 390px screen
- * cannot honour. A row is a name that truncates and one wrapping metadata
+ * rework: below `md`, nothing is laid out in fixed-width columns that a 390px
+ * screen cannot honour (the one md+ exception is an item row's figure cells,
+ * see `ItemRow`). A row is a name that truncates and one wrapping metadata
  * line beneath it — item count, ISK value, security, jumps — rendered once
  * (no `sm:hidden`/`hidden sm:flex` duplicate pair), so the page never
  * scrolls sideways and never puts the same text in the DOM twice at any
- * width. Numbers that used to be fixed-width columns (`w-14`/`w-16`/`w-20`)
- * are gone; they wrap with everything else.
+ * width. Below `md` the numbers that used to be fixed-width columns
+ * (`w-14`/`w-16`/`w-20`) wrap with everything else.
  */
 
 import type { ReactElement, ReactNode } from 'react';
@@ -267,6 +268,45 @@ export function ContainerRow({
 
 /* ---------------------------------------------------------------- item row */
 
+/*
+ * md+ column geometry for an item row. The label strip
+ * (`ItemColumnLabels`) reads the same constants, so the labels sit over the
+ * cells by construction rather than by two hand-matched sets of widths.
+ * Below `md` none of these apply and the figures wrap as before.
+ */
+const ITEM_CELL = 'md:shrink-0 md:truncate md:text-right';
+const ITEM_QUANTITY_CELL = cx(ITEM_CELL, 'md:w-24');
+const ITEM_VOLUME_CELL = cx(ITEM_CELL, 'md:w-28');
+const ITEM_VALUE_CELL = cx(ITEM_CELL, 'md:w-24');
+/** The row menu button's md+ box (`IconButton` size `row`, `md:size-7`), reserved even when the row has no menu. */
+const ITEM_MENU_SLOT = 'md:flex md:w-7 md:shrink-0 md:justify-end';
+const ITEM_MENU_SPACER = 'md:w-7 md:shrink-0';
+
+interface ItemColumnLabelsProps {
+  t: Translate;
+}
+
+/**
+ * The label strip above a level's item rows, md+ only. Right-aligned to the
+ * same cells `ItemRow` lays out; container rows in the same level keep their
+ * own shape and simply have no figures under it.
+ */
+export function ItemColumnLabels({ t }: ItemColumnLabelsProps) {
+  return (
+    <div
+      aria-hidden="true"
+      data-testid="item-column-labels"
+      className="sticky top-0 z-10 hidden shrink-0 items-center gap-2.5 border-b border-line bg-panel-2 py-1 pr-3 pl-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:flex"
+    >
+      <span className="min-w-0 flex-1 truncate">{t('assets.sort.name')}</span>
+      <span className={ITEM_QUANTITY_CELL}>{t('assets.columns.quantity')}</span>
+      <span className={ITEM_VOLUME_CELL}>{t('assets.columns.volume')}</span>
+      <span className={ITEM_VALUE_CELL}>{t('assets.sort.value')}</span>
+      <span className={ITEM_MENU_SPACER} />
+    </div>
+  );
+}
+
 interface ItemRowProps {
   name: string;
   quantity: number;
@@ -316,22 +356,34 @@ export function ItemRow({
       )}
       {wrap(
         <div className="flex min-h-12 w-full min-w-0 items-center gap-2.5 py-1.5 pr-3">
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="flex min-w-0 items-center">
-              <span className="truncate text-sm">{name}</span>
+          {/* `md:contents` dissolves both wrappers at md+, so the name and the
+              three figures become direct cells of this flex row — one DOM,
+              two layouts (a stacked name + wrapping line below, a table row
+              above). */}
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5 md:contents">
+            <span className="flex min-w-0 items-center md:flex-1">
+              <span className="truncate text-sm" title={name}>
+                {name}
+              </span>
               {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
             </span>
-            <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-dim tabular-nums">
-              <span>×{quantity.toLocaleString()}</span>
-              <span aria-hidden="true">·</span>
-              <span>{volumeText}</span>
-              <span aria-hidden="true">·</span>
-              <span className="text-isk-pos">
+            <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-dim tabular-nums md:contents md:text-xs">
+              <span className={ITEM_QUANTITY_CELL}>×{quantity.toLocaleString()}</span>
+              <span aria-hidden="true" className="md:hidden">
+                ·
+              </span>
+              <span className={ITEM_VOLUME_CELL}>{volumeText}</span>
+              <span aria-hidden="true" className="md:hidden">
+                ·
+              </span>
+              <span className={cx('text-isk-pos', ITEM_VALUE_CELL)}>
                 <IskAmount value={estimatedValue} revealOn="longPress" decimals={0} />
               </span>
             </span>
           </span>
-          <RowMoreActions />
+          <span className={ITEM_MENU_SLOT}>
+            <RowMoreActions />
+          </span>
         </div>
       )}
     </div>

@@ -25,6 +25,11 @@ import { PLAY_STORE_PACKAGE, androidNotificationSettingsUrl } from '@/lib/playSt
 import { assignLocation } from '@/app/navigation';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeFormat, DEFAULT_TIME_FORMAT, TIME_FORMAT_SETTING_KEY } from '@/lib/timeFormat';
+import {
+  useCalendarWeekStart,
+  DEFAULT_CALENDAR_WEEK_START,
+  CALENDAR_WEEK_START_KEY,
+} from '@/features/character/calendarWeekStart';
 import { useMarketHub } from '@/features/market/hub';
 import { useAssumedMe, ASSUMED_ME_SETTING_KEY } from '@/features/industry/assumedMe';
 import { useAssumedTe, ASSUMED_TE_SETTING_KEY } from '@/features/industry/assumedTe';
@@ -103,6 +108,7 @@ beforeEach(async () => {
   // Module-scope singletons: a value left over from a previous test would
   // make the assertions below pass or fail for the wrong reason.
   useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: false });
+  useCalendarWeekStart.setState({ value: DEFAULT_CALENDAR_WEEK_START, hydrated: false });
   useMarketHub.setState({ value: 'jita', hydrated: false });
   useAssumedMe.setState({ value: 0, hydrated: false });
   useAssumedTe.setState({ value: 0, hydrated: false });
@@ -1320,6 +1326,21 @@ describe('Settings defaults', () => {
 
     await waitFor(async () => {
       expect((await db.settings.get(TIME_FORMAT_SETTING_KEY))?.value).toBe('eve');
+    });
+  });
+
+  it('defaults the week start to Monday, and persists a switch to Sunday', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    const group = await screen.findByRole('group', { name: /week starts on/i });
+    expect(group.querySelector('[aria-pressed="true"]')).toHaveTextContent(/^monday$/i);
+
+    await user.click(screen.getByRole('button', { name: /^sunday$/i }));
+
+    await waitFor(async () => {
+      expect((await db.settings.get(CALENDAR_WEEK_START_KEY))?.value).toBe('sunday');
     });
   });
 

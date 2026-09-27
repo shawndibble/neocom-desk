@@ -3,8 +3,7 @@
  * covering a build's blueprint shortfall costs, at whichever ME/TE tier is
  * cheapest) counts toward a plan's `totalCost`/profit, everywhere that number
  * is shown: a plan's own page, the Industry index's Profit column, and a
- * Build Group's rollup (all three price through `useComparedBuildResults` and
- * `BuildPlanDetail.tsx`, which both read this).
+ * Build Group's rollup (all three read it through `buildPlanPricingInputs.ts`).
  *
  * Default true — blueprint cost counted in, matching what those pages already
  * did once Blueprint Acquisition landed. The toggle exists for a pilot who

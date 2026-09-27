@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type BuildPlanRecord } from '@/db';
 import { scheduleSync } from '@/sync';
-import { buildPlanTombstonesKey, readTombstones } from '@/sync/localBookkeeping';
+import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
+import { BUILD_PLANS } from '@/sync/syncedCollections';
 import {
   applyBuildPlanChange,
   createBuildPlans,
@@ -225,7 +226,7 @@ describe('removeBuildPlan', () => {
     await db.buildPlans.add(plan({ id: 'a' }));
     await removeBuildPlan(1, 'a');
     expect(await db.buildPlans.get('a')).toBeUndefined();
-    const tombstones = await readTombstones(buildPlanTombstonesKey(1));
+    const tombstones = await readTombstones(tombstoneKey(BUILD_PLANS, 1));
     expect(tombstones.map((t) => t.id)).toEqual(['a']);
   });
 });

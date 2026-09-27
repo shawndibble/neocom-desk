@@ -98,6 +98,7 @@ describe('OpportunitiesPanel', () => {
           facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
           activeCharacterId={CHARACTER_ID}
           ownedStockSnapshot={SNAPSHOT}
+          assumedMe={0}
           onAddToCompare={() => {}}
           onStartPlan={() => {}}
         />
@@ -169,6 +170,7 @@ describe('OpportunitiesPanel', () => {
             facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
             activeCharacterId={CHARACTER_ID}
             ownedStockSnapshot={SNAPSHOT}
+            assumedMe={0}
             onAddToCompare={() => {}}
             onStartPlan={() => {}}
             {...handlers}
@@ -281,6 +283,7 @@ describe('OpportunitiesPanel', () => {
             facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
             activeCharacterId={CHARACTER_ID}
             ownedStockSnapshot={SNAPSHOT}
+            assumedMe={0}
             onAddToCompare={() => {}}
             onStartPlan={() => {}}
           />

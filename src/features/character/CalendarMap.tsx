@@ -28,7 +28,7 @@
 import { useTranslation } from 'react-i18next';
 import type { DayLoad } from '@/engine/character/deadlines';
 import { localMidnight } from '@/engine/character/deadlines';
-import { weekdayLabels, type GridDay } from '@/lib/calendarGrid';
+import { weekdayLabels, type GridDay, type WeekStart } from '@/lib/calendarGrid';
 import { cx } from '@/lib/cx';
 
 import { kindDotClassName } from '@/components/ui/kindTone';
@@ -38,6 +38,7 @@ export interface CalendarMapProps {
   days: readonly GridDay[];
   loads: Map<number, DayLoad>;
   nowMs: number;
+  weekStart: WeekStart;
   selectedDayMs: number | null;
   onSelectDay: (dayStartMs: number | null) => void;
 }
@@ -54,9 +55,16 @@ export function CalendarPastHint({ className = '' }: { className?: string }) {
   return <p className={cx('text-xs text-text-dim', className)}>{t('calendar.map.pastHint')}</p>;
 }
 
-export function CalendarMap({ days, loads, nowMs, selectedDayMs, onSelectDay }: CalendarMapProps) {
+export function CalendarMap({
+  days,
+  loads,
+  nowMs,
+  weekStart,
+  selectedDayMs,
+  onSelectDay,
+}: CalendarMapProps) {
   const { t } = useTranslation();
-  const labels = weekdayLabels();
+  const labels = weekdayLabels(weekStart);
   const dayLabel = useDayLoadLabel();
   const todayMs = localMidnight(nowMs);
 
