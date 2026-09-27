@@ -304,7 +304,11 @@ export interface OpportunityPricingInputs {
   assumedMe: number;
   modifiers: CharacterModifiers;
   facilityDefaults: ActivityFacilityDefaults;
-  /** Owned blueprints' ME/TE price both the candidates and any sub-build the pilot owns a copy of. */
+  /**
+   * Owned blueprints' ME/TE price both the candidates and any sub-build the
+   * pilot owns a copy of. Owned stock is left out on purpose: assets churn
+   * on every ESI refresh, which would ask for Refresh on nearly every visit.
+   */
   ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>;
 }
 
@@ -346,18 +350,16 @@ export type OpportunitiesCacheDecision =
   { kind: 'serve'; rows: OpportunityRow[] } | { kind: 'needs-refresh' } | { kind: 'compute' };
 
 /**
- * What to do with a batch's cached rows. A small batch, or a Refresh, always
- * computes; a large batch never computed computes once (issue #642's first
- * visit). A large batch cached at other pricing inputs is neither served
- * (its rows would be priced at the old inputs) nor silently recomputed
- * (large batches are manual-refresh only) — it waits on Refresh (#2056).
+ * A large batch cached at other pricing inputs is neither served (stale
+ * prices) nor silently recomputed (manual-refresh only, #642); it waits on
+ * Refresh (#2056), which drops the entry so this sees none.
  */
 export function decideOpportunitiesCache(
   entry: OpportunitiesCacheEntry | undefined,
   inputsKey: string,
-  { manualRefreshOnly, refreshRequested }: { manualRefreshOnly: boolean; refreshRequested: boolean }
+  manualRefreshOnly: boolean
 ): OpportunitiesCacheDecision {
-  if (!manualRefreshOnly || refreshRequested || !entry) return { kind: 'compute' };
+  if (!manualRefreshOnly || !entry) return { kind: 'compute' };
   return entry.inputsKey === inputsKey
     ? { kind: 'serve', rows: entry.rows }
     : { kind: 'needs-refresh' };
@@ -372,6 +374,10 @@ export function readOpportunitiesCache(batchKey: string): OpportunitiesCacheEntr
 
 export function writeOpportunitiesCache(batchKey: string, entry: OpportunitiesCacheEntry): void {
   rowsCache.set(batchKey, entry);
+}
+
+export function deleteOpportunitiesCache(batchKey: string): void {
+  rowsCache.delete(batchKey);
 }
 
 /** Test-only: production callers rely on the manual Refresh action instead of clearing. */

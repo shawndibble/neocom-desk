@@ -8,17 +8,15 @@
  * the one frame they land in.
  *
  * Mirrors `useComparedBuildResults.ts`'s latest-ref + value-stable-key shape:
- * `candidatesRef` lets the effect depend on `key` (built from candidate ids,
+ * `candidatesRef` lets the effect depend on `batchKey` (built from candidate ids,
  * not array identity) so a re-render that hands in a freshly-computed but
  * content-identical `candidates` array does not restart the fetch.
  *
  * Above `AUTO_RECALCULATE_MAX` owned blueprints, a remount (switching tabs
  * away and back) must not silently recompute — the ticket calls that out as
- * a manual-refresh action. Nor may it serve rows priced at inputs that have
- * since changed (Assumed ME, modifiers, facility defaults, blueprint
- * research — issue #2056): that batch reports `needsRefresh` instead, see
- * `decideOpportunitiesCache`. `rowsCache` is module-level (outside React
- * state) so it survives the panel unmounting when the tab changes, the same way
+ * a manual-refresh action. Nor may it serve rows priced at since-changed
+ * inputs (issue #2056); see `decideOpportunitiesCache`. `rowsCache` is
+ * module-level (outside React state) so it survives the panel unmounting when the tab changes, the same way
  * `marketData.ts`'s cost-index cache survives a remount. `rows`/`progress`/
  * `loading` live in one state object (rather than three separate `useState`
  * calls) so every branch below is exactly one `setState` call, matching this
@@ -38,6 +36,7 @@ import {
   autoRecalculates,
   computeOpportunityRow,
   decideOpportunitiesCache,
+  deleteOpportunitiesCache,
   detectOpportunityStock,
   opportunitiesBatchKey,
   opportunitiesInputsKey,
@@ -104,10 +103,6 @@ export function useOpportunities({
 }: UseOpportunitiesArgs): UseOpportunitiesResult {
   const [state, setState] = useState<OpportunitiesState>(EMPTY_STATE);
   const [refreshToken, setRefreshToken] = useState(0);
-  // The refresh token the last finished compute ran under. Set on
-  // completion rather than on start so StrictMode's double-invoked effect
-  // (whose first run is cancelled) still computes on the second run.
-  const completedRefreshRef = useRef(0);
 
   const candidatesRef = useRef(candidates);
   useEffect(() => {
@@ -128,24 +123,21 @@ export function useOpportunities({
       return;
     }
 
-    // A cached batch is only reused above the auto-recalculate threshold,
-    // and only until the pilot explicitly hits Refresh — below the
-    // threshold this always recomputes, matching "recalculates
-    // automatically" for a small owned-blueprint count.
-    const decision = decideOpportunitiesCache(readOpportunitiesCache(batchKey), inputsKey, {
-      manualRefreshOnly,
-      refreshRequested: refreshToken !== completedRefreshRef.current,
-    });
+    const decision = decideOpportunitiesCache(
+      readOpportunitiesCache(batchKey),
+      inputsKey,
+      manualRefreshOnly
+    );
     if (decision.kind === 'serve') {
       // Serves the module-level cache verbatim — a remount (tab switch away
       // and back) must land here without ever entering the loading/fetch
       // path below, which is exactly what "does not auto-recalculate above
       // the threshold" means.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({
+        ...EMPTY_STATE,
         rows: decision.rows,
         progress: { done: decision.rows.length, total: decision.rows.length },
-        loading: false,
-        needsRefresh: false,
       });
       return;
     }
@@ -156,10 +148,9 @@ export function useOpportunities({
 
     let cancelled = false;
     setState({
-      rows: [],
+      ...EMPTY_STATE,
       progress: { done: 0, total: currentCandidates.length },
       loading: true,
-      needsRefresh: false,
     });
 
     void (async () => {
@@ -198,10 +189,10 @@ export function useOpportunities({
         }
         const done = Math.min(i + CHUNK_SIZE, currentCandidates.length);
         setState({
+          ...EMPTY_STATE,
           rows: rankOpportunityRows(unranked),
           progress: { done, total: currentCandidates.length },
           loading: true,
-          needsRefresh: false,
         });
         if (done < currentCandidates.length) {
           await new Promise((resolve) => setTimeout(resolve, 0));
@@ -210,12 +201,10 @@ export function useOpportunities({
       if (cancelled) return;
       const ranked = rankOpportunityRows(unranked);
       writeOpportunitiesCache(batchKey, { inputsKey, rows: ranked });
-      completedRefreshRef.current = refreshToken;
       setState({
+        ...EMPTY_STATE,
         rows: ranked,
         progress: { done: ranked.length, total: currentCandidates.length },
-        loading: false,
-        needsRefresh: false,
       });
     })();
 
@@ -237,7 +226,12 @@ export function useOpportunities({
     manualRefreshOnly,
   ]);
 
-  const refresh = useCallback(() => setRefreshToken((t) => t + 1), []);
+  // Dropping the entry is what makes the next run compute; the token only
+  // re-runs the effect.
+  const refresh = useCallback(() => {
+    deleteOpportunitiesCache(batchKey);
+    setRefreshToken((t) => t + 1);
+  }, [batchKey]);
 
   return { ...state, manualRefreshOnly, refresh };
 }

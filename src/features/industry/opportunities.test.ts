@@ -294,39 +294,19 @@ describe('decideOpportunitiesCache', () => {
   const entry = { inputsKey: 'me10', rows };
 
   it('serves a large batch computed at the same inputs', () => {
-    expect(
-      decideOpportunitiesCache(entry, 'me10', { manualRefreshOnly: true, refreshRequested: false })
-    ).toEqual({ kind: 'serve', rows });
+    expect(decideOpportunitiesCache(entry, 'me10', true)).toEqual({ kind: 'serve', rows });
   });
 
   it('asks for Refresh, not a silent recompute, when a large batch was priced at other inputs', () => {
-    expect(
-      decideOpportunitiesCache(entry, 'me0', { manualRefreshOnly: true, refreshRequested: false })
-    ).toEqual({ kind: 'needs-refresh' });
+    expect(decideOpportunitiesCache(entry, 'me0', true)).toEqual({ kind: 'needs-refresh' });
   });
 
-  it('computes a large batch that was never computed', () => {
-    expect(
-      decideOpportunitiesCache(undefined, 'me10', {
-        manualRefreshOnly: true,
-        refreshRequested: false,
-      })
-    ).toEqual({ kind: 'compute' });
-  });
-
-  it('computes when the pilot asks for Refresh', () => {
-    expect(
-      decideOpportunitiesCache(entry, 'me0', { manualRefreshOnly: true, refreshRequested: true })
-    ).toEqual({ kind: 'compute' });
-    expect(
-      decideOpportunitiesCache(entry, 'me10', { manualRefreshOnly: true, refreshRequested: true })
-    ).toEqual({ kind: 'compute' });
+  it('computes a large batch with no cached entry (first visit, or after Refresh)', () => {
+    expect(decideOpportunitiesCache(undefined, 'me10', true)).toEqual({ kind: 'compute' });
   });
 
   it('always computes a small batch', () => {
-    expect(
-      decideOpportunitiesCache(entry, 'me10', { manualRefreshOnly: false, refreshRequested: false })
-    ).toEqual({ kind: 'compute' });
+    expect(decideOpportunitiesCache(entry, 'me10', false)).toEqual({ kind: 'compute' });
   });
 });
 
