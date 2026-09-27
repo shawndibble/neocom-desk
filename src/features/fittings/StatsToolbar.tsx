@@ -48,7 +48,7 @@ export function StatsToolbar({ stats }: { stats: FittingStats }) {
             {notice}
           </span>
         )}
-        <Button size="sm" className="min-h-11 md:min-h-8" onClick={() => void copy()}>
+        <Button size="sm" className="min-h-11 md:min-h-7" onClick={() => void copy()}>
           {t('fittings.stats.copy')}
         </Button>
       </span>

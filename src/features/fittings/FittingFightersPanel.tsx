@@ -149,7 +149,7 @@ export function FittingFightersPanel({
                 </span>
                 <Button
                   size="sm"
-                  className="min-h-11 min-w-11 md:min-h-8 md:min-w-8"
+                  className="min-h-11 min-w-11 md:min-h-7 md:min-w-7"
                   aria-label={t('fittings.fighters.fewer', { name })}
                   disabled={squadron.quantity <= 1}
                   onClick={() =>
@@ -163,7 +163,7 @@ export function FittingFightersPanel({
                 </span>
                 <Button
                   size="sm"
-                  className="min-h-11 min-w-11 md:min-h-8 md:min-w-8"
+                  className="min-h-11 min-w-11 md:min-h-7 md:min-w-7"
                   aria-label={t('fittings.fighters.more', { name })}
                   disabled={squadron.quantity >= full}
                   onClick={() =>
@@ -172,7 +172,7 @@ export function FittingFightersPanel({
                 >
                   +
                 </Button>
-                <label className="flex min-h-11 cursor-pointer items-center gap-1.5 md:min-h-8">
+                <label className="flex min-h-11 cursor-pointer items-center gap-1.5 md:min-h-7">
                   <Checkbox
                     checked={squadron.state === 'active'}
                     // Launching takes a tube and class room the others may have used up.
@@ -230,7 +230,7 @@ export function FittingFightersPanel({
               <Button
                 size="sm"
                 align="start"
-                className="min-h-11 w-full md:min-h-8"
+                className="min-h-11 w-full md:min-h-7"
                 onClick={() => {
                   onChange((f) =>
                     addSquadron(f, typeId, { launch: canLaunch(squadrons, typeId, limits) })

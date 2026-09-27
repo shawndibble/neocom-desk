@@ -135,7 +135,7 @@ function CustomLevelsModal({ open, onClose }: { open: boolean; onClose: () => vo
               <Button
                 size="sm"
                 align="start"
-                className="min-h-11 w-full md:min-h-8"
+                className="min-h-11 w-full md:min-h-7"
                 onClick={() => {
                   set(skill.typeID, 5);
                   setQuery('');
@@ -183,7 +183,7 @@ export function SkillOverridesControl() {
           ))}
         </SelectContent>
       </Select>
-      <Button size="sm" className="min-h-11 md:min-h-8" onClick={() => setEditing(true)}>
+      <Button size="sm" className="min-h-11 md:min-h-7" onClick={() => setEditing(true)}>
         {customCount > 0
           ? t('fittings.skillOverrides.customCount', { count: customCount })
           : t('fittings.skillOverrides.custom')}
