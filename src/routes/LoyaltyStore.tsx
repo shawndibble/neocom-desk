@@ -559,7 +559,7 @@ export function LoyaltyStore() {
 
   return (
     <ItemActionsProvider page={itemActions}>
-      <div className="flex flex-col gap-3">
+      <div className="mx-auto flex max-w-6xl flex-col gap-3">
         {/* `self-start`, unlike `SkillPlanEditor`'s otherwise identical link:
           this one's parent is a `flex flex-col`, whose default
           `align-items: stretch` would blow the control's intrinsic width out
