@@ -8,6 +8,26 @@ vi.mock('./foregroundPoller', async (importOriginal) => {
   return { ...actual, runForegroundPoll: vi.fn(async () => {}), liveDependencies: vi.fn() };
 });
 
+const leaderMock = vi.hoisted(() => {
+  let leader = true;
+  const listeners = new Set<() => void>();
+  return {
+    joinTabElection: (_job: string, listener: () => void) => {
+      listeners.add(listener);
+      return { isLeader: () => leader, leave: () => listeners.delete(listener) };
+    },
+    runUnlessRunningElsewhere: (_lock: string, task: () => Promise<void>) => task(),
+    /** Seats still standing — for the unmount assertion. */
+    seats: () => listeners.size,
+    /** Simulate the election: another tab leads (`false`) or this one does. */
+    setLeader(next: boolean) {
+      leader = next;
+      listeners.forEach((listener) => listener());
+    },
+  };
+});
+vi.mock('@/lib/tabLeader', () => leaderMock);
+
 function setHidden(hidden: boolean) {
   Object.defineProperty(document, 'hidden', { configurable: true, value: hidden });
 }
@@ -93,5 +113,43 @@ describe('ForegroundNotificationPoller', () => {
   it('renders nothing', () => {
     const { container } = render(<ForegroundNotificationPoller />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('stands for the poller election only while mounted', () => {
+    const { unmount } = render(<ForegroundNotificationPoller />);
+    expect(leaderMock.seats()).toBe(1);
+    unmount();
+    expect(leaderMock.seats()).toBe(0);
+  });
+
+  describe('with another tab leading', () => {
+    afterEach(() => leaderMock.setLeader(true));
+
+    it('does not poll while another tab leads', () => {
+      vi.useFakeTimers();
+      leaderMock.setLeader(false);
+      render(<ForegroundNotificationPoller />);
+      vi.advanceTimersByTime(FIRST_POLL_DELAY_MS + POLL_INTERVAL_MS);
+      expect(runForegroundPoll).not.toHaveBeenCalled();
+    });
+
+    it('catches up at once on taking leadership over', () => {
+      vi.useFakeTimers();
+      leaderMock.setLeader(false);
+      render(<ForegroundNotificationPoller />);
+      vi.advanceTimersByTime(FIRST_POLL_DELAY_MS);
+      leaderMock.setLeader(true);
+      expect(runForegroundPoll).toHaveBeenCalledTimes(1);
+    });
+
+    it('winning leadership at boot still waits out the first-poll delay', () => {
+      vi.useFakeTimers();
+      leaderMock.setLeader(false);
+      render(<ForegroundNotificationPoller />);
+      leaderMock.setLeader(true);
+      expect(runForegroundPoll).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(FIRST_POLL_DELAY_MS);
+      expect(runForegroundPoll).toHaveBeenCalledTimes(1);
+    });
   });
 });

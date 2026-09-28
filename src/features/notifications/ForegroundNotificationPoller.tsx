@@ -6,10 +6,12 @@ import {
   POLL_INTERVAL_MS,
 } from './foregroundPoller';
 import { refreshAppBadge } from './appBadge';
+import { joinTabElection, runUnlessRunningElsewhere } from '@/lib/tabLeader';
 
 /**
  * Mounts the Foreground Poller (CONTEXT.md round 20): renders nothing, just
- * runs a poll every `POLL_INTERVAL_MS` while the tab is visible, paused while
+ * runs a poll every `POLL_INTERVAL_MS` while the tab is visible *and* the Tab
+ * Leader (`lib/tabLeader.ts` — one tab polls for all of them), paused while
  * hidden, with an immediate catch-up check on regaining visibility — and
  * shortly after mount (`FIRST_POLL_DELAY_MS`), since opening the app is itself
  * the strongest case of "becoming visible", just not one worth contending
@@ -27,13 +29,27 @@ export function ForegroundNotificationPoller() {
 
   useEffect(() => {
     let cancelled = false;
+    /** Whether the boot hold-off is over — taking leadership must not skip it. */
+    let firstPollDue = false;
+
+    // Leadership arrives a beat after `visibilitychange` (the lock is granted
+    // asynchronously), so the catch-up below finds this tab not yet leader —
+    // hence a catch-up on taking leadership over, too.
+    const seat = joinTabElection('poller', () => {
+      if (firstPollDue) poll();
+    });
 
     function poll() {
-      if (cancelled || document.hidden) return;
-      void runForegroundPoll(liveDependencies());
+      if (cancelled || document.hidden || !seat.isLeader()) return;
+      // A new leader's catch-up must not overlap the old leader's poll still
+      // in flight: both would fire, and feed, the same occurrences.
+      void runUnlessRunningElsewhere('neocom:poll', () => runForegroundPoll(liveDependencies()));
     }
 
-    const firstPoll = setTimeout(poll, FIRST_POLL_DELAY_MS);
+    const firstPoll = setTimeout(() => {
+      firstPollDue = true;
+      poll();
+    }, FIRST_POLL_DELAY_MS);
     const interval = setInterval(poll, POLL_INTERVAL_MS);
 
     function onVisibilityChange() {
@@ -42,6 +58,7 @@ export function ForegroundNotificationPoller() {
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
+      seat.leave();
       cancelled = true;
       clearTimeout(firstPoll);
       clearInterval(interval);
