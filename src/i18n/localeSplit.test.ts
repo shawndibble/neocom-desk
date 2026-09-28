@@ -147,7 +147,13 @@ describe('the real en.json against the real sources', () => {
   // Every string a build can split, so a key added on any branch is covered
   // the moment it lands: nothing it adds can fall out of both halves.
   const sources = import.meta.glob<string>(
-    ['/src/**/*.{ts,tsx}', '!/src/**/*.test.{ts,tsx}', '!/src/**/*.d.ts', '!/src/test/**'],
+    [
+      '/src/**/*.{ts,tsx}',
+      '!/src/**/*.test.{ts,tsx}',
+      '!/src/**/*.d.ts',
+      '!/src/test/**',
+      '!/src/i18n/**',
+    ],
     { query: '?raw', import: 'default', eager: true }
   );
   const plan = planLocaleSplit(en as LocaleTree, sources);

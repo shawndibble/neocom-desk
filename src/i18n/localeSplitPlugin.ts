@@ -21,7 +21,7 @@ import { planLocaleSplit, type LocalePlan, type LocaleTree } from './localeSplit
 
 const GROUP_PREFIX = 'virtual:neocom-locale/';
 const RESOLVED_PREFIX = '\0neocom-locale/';
-const SHELL_ID = `${RESOLVED_PREFIX}shell`;
+const SHELL_ID = `${RESOLVED_PREFIX}locale-shell`;
 
 /**
  * The group imports for one source file, prepended on its first line so every
@@ -44,7 +44,8 @@ function sourceFiles(srcDir: string): Record<string, string> {
   for (const entry of readdirSync(srcDir, { recursive: true, encoding: 'utf8' })) {
     const rel = normalizePath(entry);
     if (!/\.tsx?$/.test(rel) || /\.test\.tsx?$/.test(rel) || rel.endsWith('.d.ts')) continue;
-    if (rel.startsWith('test/')) continue;
+    // `src/i18n/` only describes keys (in doc comments); nothing there renders one.
+    if (rel.startsWith('test/') || rel.startsWith('i18n/')) continue;
     const file = normalizePath(join(srcDir, entry));
     sources[file] = readFileSync(file, 'utf8');
   }
@@ -102,6 +103,36 @@ export function localeSplitPlugin(): Plugin {
         if (!groupIds) return null;
         return { code: prependGroupImports(code, groupIds), map: null };
       },
+    },
+    generateBundle(_options, bundle) {
+      // One line in the build log, so the split's effect on startup can be
+      // read from CI without a local build.
+      const chunks = Object.values(bundle).filter((o) => o.type === 'chunk');
+      const byName = new Map(chunks.map((c) => [c.fileName, c]));
+      const startup = new Set<string>();
+      const queue = chunks.filter((c) => c.isEntry).map((c) => c.fileName);
+      while (queue.length > 0) {
+        const name = queue.pop()!;
+        if (startup.has(name)) continue;
+        startup.add(name);
+        queue.push(...(byName.get(name)?.imports ?? []));
+      }
+      let atStartup = 0;
+      let total = 0;
+      let shellChunk = '(none)';
+      for (const chunk of chunks) {
+        for (const [id, info] of Object.entries(chunk.modules)) {
+          if (!id.startsWith(RESOLVED_PREFIX)) continue;
+          total += info.renderedLength;
+          if (startup.has(chunk.fileName)) atStartup += info.renderedLength;
+          if (id === SHELL_ID) shellChunk = chunk.fileName;
+        }
+      }
+      const kb = (n: number) => `${(n / 1024).toFixed(1)} kB`;
+      console.log(
+        `[neocom-locale-split] shell in ${shellChunk}; locale at startup ${kb(atStartup)} of ${kb(total)}; ` +
+          `startup chunks ${[...startup].sort().join(', ')}`
+      );
     },
   };
 }

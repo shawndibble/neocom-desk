@@ -188,7 +188,7 @@ export function planLocaleSplit(
   const groups = new Map<string, LocaleTree>();
   const importsByFile = new Map<string, string[]>();
   [...bySignature.keys()].sort().forEach((signature, index) => {
-    const id = `g${index}`;
+    const id = `locale-${index}`;
     const tree: LocaleTree = {};
     for (const leaf of bySignature.get(signature)!) {
       setLeaf(tree, leaf, getLeaf(en, leaf));
