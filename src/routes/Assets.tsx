@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
-  TextInput,
+  IskInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { EsiEndpointId } from '@/esi/registry';
@@ -68,7 +68,7 @@ import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurren
 import { downloadCsv } from '@/lib/downloadCsv';
 import { assetCsvRows, assetsCsvColumns } from '@/features/character/assetsCsv';
 import { getAdjustedPrices } from '@/market/prices';
-import { formatIsk } from '@/lib/isk';
+import { formatIsk, parseIskAmount } from '@/lib/isk';
 import {
   buildAssetTree,
   compareStations,
@@ -657,7 +657,7 @@ export function Assets() {
   const allItemsView = view.all;
   const minValueInput = view.min;
   const flatModeActive = searchActive || allItemsView;
-  const minValueThreshold = Number(minValueInput) > 0 ? Number(minValueInput) : 0;
+  const minValueThreshold = parseIskAmount(minValueInput) ?? 0;
 
   // Multi-select and bulk actions (issue #90): select mode is off by default and
   // browsing (select mode off) renders exactly as it did before this ticket.
@@ -1674,16 +1674,14 @@ export function Assets() {
                       </span>
                     )}
                     <div className="ml-auto flex items-center gap-2">
-                      <TextInput
-                        type="number"
+                      <IskInput
                         size="sm"
-                        min={0}
-                        inputMode="decimal"
+                        echo={false}
                         value={minValueInput}
-                        onChange={(e) => setView({ min: e.target.value })}
+                        onChange={(min) => setView({ min })}
                         placeholder={t('assets.minValue.placeholder')}
                         aria-label={t('assets.minValue.label')}
-                        className="w-24 tabular-nums"
+                        className="w-24"
                       />
                       <Select
                         value={sortField}
