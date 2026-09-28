@@ -254,8 +254,9 @@ describe('Ship Info window', () => {
     await user.click(within(dialog).getByRole('tab', { name: 'Skills & Mastery' }));
     // The tier button itself says so before it's even selected.
     await user.click(within(dialog).getByRole('button', { name: 'Tier II, in plan' }));
-    // Both the row and the footer read "In plan" — one per skill, one for the tier as a whole.
-    expect(within(dialog).getAllByText('In plan')).toHaveLength(2);
+    // The row shows a "Planned" badge; the footer reads "In plan" for the tier as a whole.
+    expect(within(dialog).getByText('Planned')).toBeVisible();
+    expect(within(dialog).getByText('In plan')).toBeVisible();
     // No button left to click that would silently no-op.
     expect(
       within(dialog).queryByRole('button', { name: 'Add tier II to plan' })

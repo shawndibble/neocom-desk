@@ -37,16 +37,15 @@ export function SkillRow({
   plannedLevel,
   skillTypeID,
 }: SkillRowProps) {
+  const inPlan = status !== 'trained' && inPlanLabel !== undefined;
   const trailing =
-    status === 'trained' ? null : inPlanLabel ? (
-      <span className="text-text-dim">{inPlanLabel}</span>
-    ) : (
-      onAdd && (
-        <Button size="sm" variant="ghost" onClick={onAdd}>
-          {addLabel}
-        </Button>
-      )
-    );
+    status === 'trained' || inPlan
+      ? null
+      : onAdd && (
+          <Button size="sm" variant="ghost" onClick={onAdd}>
+            {addLabel}
+          </Button>
+        );
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
@@ -69,6 +68,11 @@ export function SkillRow({
           word-breaks mid-word (issue: mobile Market required skills). */}
       <div className="ml-auto flex shrink-0 items-center gap-3">
         {tags !== undefined && <span className="flex gap-1">{tags}</span>}
+        {inPlan && (
+          <span className="inline-flex items-center rounded-xs border border-accent-dim bg-accent/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+            {inPlanLabel}
+          </span>
+        )}
         <SkillBar level={currentLevel} plannedLevel={plannedLevel} />
         {timeLabel !== undefined && (
           <span className="w-16 text-right text-text-dim tabular-nums">{timeLabel}</span>
