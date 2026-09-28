@@ -534,17 +534,25 @@ export function AssignDialog({
                 key={line.typeId}
                 className="flex items-center gap-1.5 py-1 text-sm first:pt-0 last:pb-0"
               >
-                <Checkbox
-                  id={`line-${line.typeId}`}
-                  checked={includedTypeIds.has(line.typeId)}
-                  onChange={() => toggleLine(line.typeId)}
-                />
-                <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
-                <label htmlFor={`line-${line.typeId}`} className="w-40 shrink-0 truncate">
+                <label
+                  htmlFor={`line-${line.typeId}`}
+                  className="flex shrink-0 items-center gap-1.5"
+                >
+                  <Checkbox
+                    id={`line-${line.typeId}`}
+                    checked={includedTypeIds.has(line.typeId)}
+                    onChange={() => toggleLine(line.typeId)}
+                    aria-label={t('miningTax.includeLineLabel', {
+                      ore: typeNames.get(line.typeId) ?? `#${line.typeId}`,
+                    })}
+                  />
+                  <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
+                </label>
+                <span className="w-40 shrink-0 truncate">
                   <MarketItemLink typeId={line.typeId}>
                     {typeNames.get(line.typeId) ?? `#${line.typeId}`}
                   </MarketItemLink>
-                </label>
+                </span>
                 <span className="tabular-nums text-text-dim">{line.quantity.toLocaleString()}</span>
               </li>
             ))}
