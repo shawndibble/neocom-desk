@@ -531,24 +531,42 @@ export async function completeLogin(
   return persistTokens(tokens, pending.scopes);
 }
 
-// Single-flight per character: EVE rotates refresh tokens, so two concurrent
-// refreshes with the same (now-burned) token would fail the second.
+// Single-flight per character, in this tab and — through Web Locks — across
+// tabs. EVE's docs say the refresh token "may not be the same" after a refresh
+// and that rotation is coming for native (PKCE) clients like this one; they
+// don't say whether the old token dies on use. If it does, two concurrent
+// refreshes with one token would fail the second as `invalid_grant`, which
+// reads as a dead grant (`app/tokenProvider.ts`). Serialising is cheap
+// insurance either way, and saves the duplicate round trip.
 const inflightRefresh = new Map<number, Promise<string>>();
+
+/**
+ * Runs `task` holding this character's refresh lock, so only one tab at a time
+ * reads-then-rotates its token row. Where Web Locks don't exist, runs it
+ * directly: the in-tab single flight still holds.
+ */
+function withRefreshLock<T>(characterId: number, task: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+  if (!locks) return task();
+  return locks.request(`neocom:refresh:${characterId}`, task);
+}
 
 /**
  * Return a usable access token, refreshing (and persisting rotation) if near
  * expiry.
  *
  * The in-flight check is FIRST and synchronous, and the token record is read
- * INSIDE the single-flight task: reading it earlier could act on a snapshot
- * gone stale mid-refresh and re-send the rotated (burned) refresh token.
+ * INSIDE the single-flight task — and inside the cross-tab lock: reading it
+ * earlier could act on a snapshot gone stale mid-refresh (here or in another
+ * tab) and re-send the rotated refresh token. A tab that waited on the lock
+ * reads the row the winner just wrote, finds it fresh, and returns it.
  */
 export function getValidAccessToken(characterId: number, config?: SsoConfig): Promise<string> {
   const pending = inflightRefresh.get(characterId);
   if (pending) return pending;
 
   const { clientId } = resolveConfig(config);
-  const task = (async () => {
+  const task = withRefreshLock(characterId, async () => {
     const record = await db.tokens.get(characterId);
     if (!record) throw new Error(`No token stored for character ${characterId}`);
     if (record.expiresAt - Date.now() > EXPIRY_BUFFER_MS) return record.accessToken;
@@ -556,7 +574,7 @@ export function getValidAccessToken(characterId: number, config?: SsoConfig): Pr
     const tokens = await refreshToken({ clientId, refreshToken: record.refreshToken });
     await persistTokens(tokens);
     return tokens.access_token;
-  })().finally(() => inflightRefresh.delete(characterId));
+  }).finally(() => inflightRefresh.delete(characterId));
   inflightRefresh.set(characterId, task);
   return task;
 }
