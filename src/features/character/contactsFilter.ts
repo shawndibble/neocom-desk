@@ -23,6 +23,20 @@ export const ALL_CONTACT_TYPES: readonly ContactType[] = [
   'faction',
 ];
 
+/**
+ * ESI's `contact_type` verbatim was what the table used to print. "Player" is
+ * what a pilot calls a character contact (a "character" is also a thing corps
+ * and alliances are made of), and "Corp" is how the name is written everywhere
+ * in game — both shorter than what they replace. Shared with `contactsCsv.ts`
+ * so the export prints the same words the table does.
+ */
+export const CONTACT_TYPE_KEY: Record<ContactType, string> = {
+  character: 'contacts.typeCharacter',
+  corporation: 'contacts.typeCorporation',
+  alliance: 'contacts.typeAlliance',
+  faction: 'contacts.typeFaction',
+};
+
 /** Zero is its own category, not a rounding of either side: it is what "no opinion" looks like. */
 export function standingCategory(standing: number): StandingCategory {
   if (standing > 0) return 'good';

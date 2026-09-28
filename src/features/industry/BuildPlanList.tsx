@@ -469,6 +469,7 @@ function PlanRow({
               onClick={() => onSelect(plan.id)}
               onDoubleClick={() => setRenaming(true)}
               className="flex-1 truncate text-left"
+              title={plan.name}
             >
               {plan.name}
             </button>
@@ -601,6 +602,7 @@ function GroupHeader({
                 onClick={onSelect}
                 onDoubleClick={() => setRenaming(true)}
                 className="flex-1 truncate text-left font-semibold"
+                title={group.name}
               >
                 {group.name}
               </button>
