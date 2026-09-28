@@ -9,6 +9,9 @@ _Recorded 2026-09-28._
   Upwell Hauler had zero sells at Jita 4-4 and 24 elsewhere in The Forge, all
   at 2,000,000. The old station-only aggregate read that as "No sell orders".
   The hub row stays so the station price is still visible where there is one.
+  "Open in Market" opens the hub's region (Region mode), not Trade Hub mode,
+  because Trade Hub mode is that same one station and would show the empty
+  sell book again.
 
 - **The NPC price is the SDE `basePrice`, labelled as the fixed price where
   the book is seeded.** `skills.json` now carries `basePrice` (omitted at 0).

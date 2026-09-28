@@ -189,7 +189,7 @@ describe('SkillDetailModal', () => {
     expect(within(dialog).queryByText('NPC price')).not.toBeInTheDocument();
   });
 
-  it('links to the hub in Market and to the nearest sellers within 10 jumps', async () => {
+  it("links to the hub's region in Market and to the nearest sellers within 10 jumps", async () => {
     renderModal();
     act(() => useSkillDetailModalStore.getState().open(2));
 
@@ -197,7 +197,7 @@ describe('SkillDetailModal', () => {
     await within(dialog).findByText('Frigate');
     expect(within(dialog).getByRole('link', { name: 'Open in Market' })).toHaveAttribute(
       'href',
-      '/market/browser?type=2&hub=jita'
+      '/market/browser?type=2&region=10000002'
     );
     expect(within(dialog).getByRole('link', { name: 'Find nearby (≤10 jumps)' })).toHaveAttribute(
       'href',

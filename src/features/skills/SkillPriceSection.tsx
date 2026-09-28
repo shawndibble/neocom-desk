@@ -17,14 +17,17 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { InfoTooltip, IskAmount } from '@/components/ui';
 import { PriceHubSelect } from '@/features/fittings/PriceHubSelect';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useMarketHub } from '@/features/market/hub';
 import { getOrderBook } from '@/features/market/orderBook';
-import { marketNearbyParams } from '@/engine/market/urlState';
+import { buildMarketParams, marketNearbyParams } from '@/engine/market/urlState';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { skillSellPrices, type SkillSellPrices } from './skillSellPrices';
 
 const NEARBY_JUMPS = '10';
+
+function marketBrowserHref(params: Record<string, string>): string {
+  return `/market/browser?${new URLSearchParams(params).toString()}`;
+}
 
 export function SkillPriceSection({
   typeID,
@@ -120,15 +123,18 @@ export function SkillPriceSection({
         )}
       </dl>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        <MarketItemLink
-          typeId={typeID}
-          hubId={hub.id}
+        {/* The hub's region, not the hub: Hub mode is the one station, which is
+            exactly where an NPC-seeded book is often missing. */}
+        <Link
+          to={marketBrowserHref(
+            buildMarketParams(typeID, { mode: 'region', regionId: hub.regionId })
+          )}
           className="inline-block text-accent hover:underline"
         >
           {t('skills.inspector.openInMarket')}
-        </MarketItemLink>
+        </Link>
         <Link
-          to={`/market/browser?${new URLSearchParams(marketNearbyParams(typeID, NEARBY_JUMPS)).toString()}`}
+          to={marketBrowserHref(marketNearbyParams(typeID, NEARBY_JUMPS))}
           className="inline-block text-accent hover:underline"
         >
           {t('skills.inspector.findNearby', { jumps: NEARBY_JUMPS })}

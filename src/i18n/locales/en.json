@@ -1341,7 +1341,7 @@
       "priceHubSell": "Sell at {{hub}}",
       "priceRegionSell": "Lowest sell in {{region}}",
       "priceNpc": "NPC price",
-      "priceNpcHint": "The fixed price NPC stations sell this skillbook at, where it's seeded — often a jump or two from a trade hub rather than in it.",
+      "priceNpcHint": "The fixed price NPC stations sell this skillbook at, in regions where NPCs seed it. Find nearby shows where it is on sale.",
       "priceNoSellOrders": "No sell orders",
       "priceUnavailable": "Couldn't load",
       "openInMarket": "Open in Market",
