@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import {
   BACKGROUND_SYNC_BOOT_DELAY_MS,
   BACKGROUND_SYNC_MIN_GAP_MS,
   BACKGROUND_SYNC_TICK_MS,
+  SWEEP_STAMPS_KEY,
   idsToSweep,
   useBackgroundSync,
 } from './backgroundSync';
@@ -16,6 +17,25 @@ const syncMock = vi.hoisted(() => ({
 }));
 vi.mock('@/sync', () => syncMock);
 vi.mock('./syncStatus', () => ({ isSyncConfigured: () => true }));
+
+const leaderMock = vi.hoisted(() => {
+  let leader = true;
+  const listeners = new Set<() => void>();
+  return {
+    joinTabElection: (_job: string, listener: () => void) => {
+      listeners.add(listener);
+      return { isLeader: () => leader, leave: () => listeners.delete(listener) };
+    },
+    /** Seats still standing — for the unmount assertion. */
+    seats: () => listeners.size,
+    /** Simulate the election: another tab leads (`false`) or this one does. */
+    setLeader(next: boolean) {
+      leader = next;
+      listeners.forEach((listener) => listener());
+    },
+  };
+});
+vi.mock('@/lib/tabLeader', () => leaderMock);
 
 const NOW = 1_756_000_000_000;
 
@@ -31,6 +51,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   syncMock.getSyncStatus.mockReturnValue({ state: 'idle', lastSyncedAt: null, error: null });
   setVisibility('visible');
+  localStorage.clear();
 });
 
 describe('idsToSweep', () => {
@@ -200,5 +221,64 @@ describe('useBackgroundSync', () => {
     vi.advanceTimersByTime(BACKGROUND_SYNC_MIN_GAP_MS + BACKGROUND_SYNC_TICK_MS);
 
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
+  it('shares its sweep stamps, so a tab taking over does not re-sweep inside the gap', () => {
+    mountPastBoot([1]); // tab A
+    syncMock.scheduleSync.mockClear();
+
+    mountPastBoot([1]); // tab B: its own refs, the same localStorage
+
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
+  it('sweeps anyway when the shared stamps are unreadable', () => {
+    localStorage.setItem(SWEEP_STAMPS_KEY, 'not json');
+    mountPastBoot([1]);
+    expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
+  });
+
+  it('stands down from the sweep election once unmounted', () => {
+    const { unmount } = mountPastBoot([1]);
+    expect(leaderMock.seats()).toBe(1);
+    unmount();
+    expect(leaderMock.seats()).toBe(0);
+  });
+
+  it('keeps its seat when the character list changes', () => {
+    const { rerender } = renderHook(({ ids }) => useBackgroundSync(ids), {
+      initialProps: { ids: [1] },
+    });
+    const seats = leaderMock.seats();
+    rerender({ ids: [1, 2] });
+    expect(leaderMock.seats()).toBe(seats);
+  });
+
+  describe('with another tab leading', () => {
+    afterEach(() => leaderMock.setLeader(true));
+
+    it('does not sweep while another tab leads', () => {
+      leaderMock.setLeader(false);
+      mountPastBoot([1]);
+      vi.advanceTimersByTime(BACKGROUND_SYNC_MIN_GAP_MS + BACKGROUND_SYNC_TICK_MS);
+      becomeVisible();
+      expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+    });
+
+    it('sweeps at once on taking leadership over', () => {
+      leaderMock.setLeader(false);
+      mountPastBoot([1]);
+      leaderMock.setLeader(true);
+      expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
+    });
+
+    it('winning leadership at boot still waits out the boot delay', () => {
+      leaderMock.setLeader(false);
+      renderHook(() => useBackgroundSync([1]));
+      leaderMock.setLeader(true);
+      expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(BACKGROUND_SYNC_BOOT_DELAY_MS);
+      expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
+    });
   });
 });
