@@ -22,6 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   EmptyState,
+  Tooltip,
   iconButtonClassName,
 } from '@/components/ui';
 import { controlHeightClassName } from '@/components/ui/controlStyles';
@@ -393,6 +394,15 @@ interface EntryRowProps {
   columns: ColumnVisibility;
   isDesktop: boolean;
   onRemove: (skillTypeID: number, targetLevel: number) => void;
+  /**
+   * Undefined when the row is freely removable. Set to a plain-language
+   * reason (naming what still needs it) when some other entry — a later
+   * level of this skill, or a dependent skill's own entry — would pull this
+   * exact level straight back in as a dimmed prereq row the instant it's
+   * removed (`findRemovalBlockers`). The remove button disables rather than
+   * accepting a click that silently undoes itself.
+   */
+  removalBlockedReason: (skillTypeID: number, targetLevel: number) => string | undefined;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
   /**
    * Set when this row IS the in-game queue's currently-training level (#1701
@@ -427,6 +437,7 @@ const EntryRow = memo(function EntryRow({
   columns,
   isDesktop,
   onRemove,
+  removalBlockedReason,
   onSetPriority,
   pinnedInProgress,
   milestoneStatus,
@@ -505,15 +516,25 @@ const EntryRow = memo(function EntryRow({
     />
   );
 
-  const removeButton = (
+  const blockedReason = removalBlockedReason(entry.skillTypeID, entry.targetLevel);
+  const removeButtonEl = (
     <button
       type="button"
-      className={DANGER_ICON_BUTTON}
+      className={blockedReason ? ICON_BUTTON : DANGER_ICON_BUTTON}
       onClick={() => onRemove(entry.skillTypeID, entry.targetLevel)}
       aria-label={t('plans.removeEntry', { name: rowLabel })}
+      disabled={blockedReason !== undefined}
     >
       <Icon.Close size={Icon.ICON_SIZE.sm} aria-hidden="true" />
     </button>
+  );
+  // Tooltip only when blocked (rare relative to a long queue's row count) —
+  // every row wrapping in a Radix provider is exactly what ICON_BUTTON's own
+  // comment above says to avoid.
+  const removeButton = blockedReason ? (
+    <Tooltip content={blockedReason}>{removeButtonEl}</Tooltip>
+  ) : (
+    removeButtonEl
   );
 
   /**
@@ -828,6 +849,8 @@ interface EntryListProps {
   startDate?: Date;
   onReorder: (activeId: string, overId: string) => void;
   onRemove: (skillTypeID: number, targetLevel: number) => void;
+  /** See EntryRowProps' field of the same name. */
+  removalBlockedReason: (skillTypeID: number, targetLevel: number) => string | undefined;
   onRemoveMarker: (markerIndex: number) => void;
   /** A marker's target attribute spread, once known. Undefined when no "Optimize at my markers" result covers it yet. */
   markerAttributesFor?: (markerIndex: number) => Attributes | undefined;
@@ -875,6 +898,7 @@ export function EntryList({
   startDate,
   onReorder,
   onRemove,
+  removalBlockedReason,
   onRemoveMarker,
   markerAttributesFor,
   markerImplants = EMPTY_IMPLANTS,
@@ -956,6 +980,7 @@ export function EntryList({
                       columns={columns}
                       isDesktop={isDesktop}
                       onRemove={onRemove}
+                      removalBlockedReason={removalBlockedReason}
                       onSetPriority={onSetPriority}
                       pinnedInProgress={pinnedInProgress}
                       milestoneStatus={milestoneStatusFor(

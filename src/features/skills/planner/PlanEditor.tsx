@@ -39,6 +39,7 @@ import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useAutoDismiss } from '@/lib/useAutoDismiss';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
+import { findRemovalBlockers, planEntryKey } from '@/engine/plan';
 import {
   milestoneKey,
   milestoneStates,
@@ -530,6 +531,27 @@ export function PlanEditor({
       markerAttributes: plan.markerAttributes,
     }),
     [plan.entries, plan.markers, plan.markerAttributes]
+  );
+
+  /**
+   * Which entries the remove button must refuse (#2223): removing one that
+   * some other entry still needs would just have it reappear as a dimmed
+   * prereq row, which used to look like the removal silently did nothing.
+   */
+  const removalBlockers = useMemo(
+    () => findRemovalBlockers(editable.entries, catalog.engineSkills, trainedSkills),
+    [editable.entries, catalog.engineSkills, trainedSkills]
+  );
+
+  const removalBlockedReason = useCallback(
+    (skillTypeID: number, targetLevel: number): string | undefined => {
+      const blocker = removalBlockers.get(planEntryKey(skillTypeID, targetLevel));
+      if (!blocker) return undefined;
+      return t('plans.removeBlockedByDependent', {
+        blocker: `${nameFor(blocker.skillTypeID)} ${ROMAN[blocker.targetLevel - 1]}`,
+      });
+    },
+    [removalBlockers, nameFor, t]
   );
 
   // Manual overrides (RemapMarkerModal), aligned to the current markers.
@@ -1983,6 +2005,7 @@ export function PlanEditor({
                 onReorder={handleDrop}
                 onPromotePrereq={handlePromotePrereq}
                 onRemove={requestRemoveEntry}
+                removalBlockedReason={removalBlockedReason}
                 pinnedInProgress={pinnedInProgress}
                 onRemoveMarker={handleRemoveMarker}
                 markerAttributesFor={markerAttributesFor}
