@@ -22,6 +22,7 @@ import {
   deleteSyncedSetting,
   getSyncStatus,
   haltSync,
+  HEARTBEAT_INTERVAL_MS,
   markBuildPlanDeleted,
   markBuildPlansDeleted,
   markPlanDeleted,
@@ -2184,14 +2185,51 @@ describe('triggerSync: last-synced heartbeat (#2065)', () => {
     expect((heartbeat() as { lastSyncedAt: number }).lastSyncedAt).toBeGreaterThanOrEqual(before);
   });
 
-  it('bumps the heartbeat on every sync even when no document changed', async () => {
-    await triggerSync(1);
-    vi.mocked(setDoc).mockClear();
-    await triggerSync(1);
-    const writes = vi
+  const heartbeatWrites = () =>
+    vi
       .mocked(setDoc)
-      .mock.calls.map(([ref]) => (ref as unknown as FakeRef).col.path);
-    expect(writes).toEqual(['characters']);
+      .mock.calls.map(([ref]) => (ref as unknown as FakeRef).col.path)
+      .filter((path) => path === 'characters');
+
+  it('stamps at most once per HEARTBEAT_INTERVAL_MS, since only a 90-day purge reads it', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000);
+    try {
+      await triggerSync(1);
+      vi.mocked(setDoc).mockClear();
+
+      clock.mockReturnValue(1_800_000_000_000 + HEARTBEAT_INTERVAL_MS - 1);
+      await triggerSync(1);
+      expect(heartbeatWrites()).toEqual([]);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('bumps the heartbeat again once the interval has passed, even when no document changed', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000);
+    try {
+      await triggerSync(1);
+      vi.mocked(setDoc).mockClear();
+
+      clock.mockReturnValue(1_800_000_000_000 + HEARTBEAT_INTERVAL_MS);
+      await triggerSync(1);
+      expect(heartbeatWrites()).toEqual(['characters']);
+      expect(heartbeat()).toEqual({ lastSyncedAt: 1_800_000_000_000 + HEARTBEAT_INTERVAL_MS });
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('retries the stamp on the next sync when the write failed', async () => {
+    vi.mocked(setDoc).mockImplementationOnce(async () => {
+      throw new Error('offline');
+    });
+    await triggerSync(1).catch(() => {});
+    vi.mocked(setDoc).mockClear();
+
+    await triggerSync(1);
+
+    expect(heartbeatWrites()).toEqual(['characters']);
   });
 
   it('writes only the lastSyncedAt field, so the rules can allow just that', async () => {

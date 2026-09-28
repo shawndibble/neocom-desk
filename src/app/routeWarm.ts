@@ -21,7 +21,7 @@
  *   re-auth notice — so an unfiltered warm would paint that banner for merely
  *   sweeping the pointer down the rail. Each warmer therefore declares the
  *   endpoints its loader reaches and is filtered against the stored grant with
- *   `prefetch.ts`'s own `grantCovers`. Deliberately **not** the route's
+ *   the same `grantCovers` (`grantCovers.ts`) `prefetch.ts` uses. Deliberately **not** the route's
  *   `locked` flag, which asks a different question: `/calendar` is `UNGATED`
  *   (the page has something to show without any one grant) yet composes six
  *   scope-gated reads, so a lock-based gate would have warmed it for everyone
@@ -36,7 +36,7 @@ import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { readRouteSnapshot, writeRouteSnapshot } from '@/lib/routeSnapshotCache';
 import { onCachePurged } from '@/esi/cachePurge';
 import type { EsiEndpointId } from '@/esi/registry';
-import { grantCovers } from './prefetch';
+import { grantCovers } from './grantCovers';
 import { loadCalendarBoard } from '@/features/character/calendarBoardData';
 
 export interface RouteWarmer {

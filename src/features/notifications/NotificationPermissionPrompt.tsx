@@ -9,7 +9,7 @@ import {
   promptStateAfterAsk,
   shouldShowPermissionExplainer,
 } from './permission';
-import { webPushSupport } from '@/sync/deviceRegistration';
+import { webPushSupport } from '@/sync/webPushSupport';
 import { enableWebPush } from './webPush';
 import { useOnboardingBannerSlot } from '@/app/onboardingBannerSlot';
 import { useHasLeftFirstScreen } from './firstScreen';

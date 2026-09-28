@@ -10,14 +10,18 @@
  * Gated on live permission (`webPushSupport`) rather than attempted
  * unconditionally: a device with no granted push permission has no FCM token
  * to register against, so `registerDeviceForWebPush` would just fail its own
- * `getToken` call every 5 minutes for no reason.
+ * `getToken` call every 5 minutes for no reason. Past that gate it uploads
+ * on every poll, unchanged or not: the backend replaces a Character's unfired
+ * rows wholesale whichever device sent them, so re-asserting this device's
+ * rows every poll is what restores them after another device overwrote them.
+ *
+ * Firebase-free on purpose: this module is reached statically from the
+ * startup bundle (the Foreground Poller in `Layout`, and Remove / Log out), so
+ * `@/sync/deviceRegistration` loads on demand, past the gates — a device that
+ * never enabled push never fetches it (`app/bootImportGraph.test.ts`).
  */
 import type { ProjectionRow } from '@/engine/projection';
-import {
-  webPushSupport,
-  registerDeviceForWebPush,
-  unregisterDeviceForWebPush,
-} from '@/sync/deviceRegistration';
+import { webPushSupport } from '@/sync/webPushSupport';
 import { readNotificationPermission } from './permission';
 
 export async function uploadProjectionRows(
@@ -27,6 +31,7 @@ export async function uploadProjectionRows(
   if (readNotificationPermission() !== 'granted') return;
 
   try {
+    const { registerDeviceForWebPush } = await import('@/sync/deviceRegistration');
     const registration = await navigator.serviceWorker.ready;
     const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY ?? '';
     await registerDeviceForWebPush(vapidKey, registration, rowsByCharacter);
@@ -48,6 +53,7 @@ export async function unregisterProjectionRegistration(): Promise<void> {
   if (readNotificationPermission() !== 'granted') return;
 
   try {
+    const { unregisterDeviceForWebPush } = await import('@/sync/deviceRegistration');
     await unregisterDeviceForWebPush();
   } catch (err) {
     console.error('Scheduled Push unregistration failed', err);

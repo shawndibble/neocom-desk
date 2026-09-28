@@ -4,13 +4,15 @@
  * Settings' own Enable button — the same two callers `permission.ts`
  * documents for `requestNotificationPermission`), so the FCM token
  * acquisition and the permission request share the gesture Safari requires.
+ *
+ * `@/sync/deviceRegistration` is Firebase, so it loads on demand — this module
+ * is reached from the startup bundle (`app/bootImportGraph.test.ts`). The load
+ * starts before the permission request but is only awaited after it: nothing
+ * may be awaited ahead of `requestNotificationPermission`, or Safari no longer
+ * counts the request as part of the tap.
  */
 import { requestNotificationPermission, type NotificationPermissionState } from './permission';
-import {
-  webPushSupport,
-  registerDeviceForWebPush,
-  type WebPushSupport,
-} from '@/sync/deviceRegistration';
+import { webPushSupport, type WebPushSupport } from '@/sync/webPushSupport';
 
 export interface EnableWebPushResult {
   support: WebPushSupport;
@@ -26,9 +28,16 @@ export async function enableWebPush(): Promise<EnableWebPushResult> {
     return { support, permission: 'default' };
   }
 
+  const deviceRegistration =
+    support === 'supported' ? import('@/sync/deviceRegistration') : undefined;
+  // Awaited only on the grant path below; a denial must not leave the load's
+  // failure unhandled.
+  deviceRegistration?.catch(() => {});
+
   const permission = await requestNotificationPermission();
-  if (permission === 'granted' && support === 'supported') {
+  if (permission === 'granted' && deviceRegistration) {
     try {
+      const { registerDeviceForWebPush } = await deviceRegistration;
       const registration = await navigator.serviceWorker.ready;
       const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY ?? '';
       await registerDeviceForWebPush(vapidKey, registration);

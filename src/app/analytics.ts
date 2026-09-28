@@ -7,8 +7,13 @@
  * `isSupported()` additionally rules out environments without cookies/
  * IndexedDB (some privacy modes) — analytics silently no-ops there rather
  * than throwing.
+ *
+ * The Firebase app is dynamically imported too, from `sync/firebaseCore`
+ * (just `firebase/app`) rather than `sync/firebaseApp` (auth + firestore +
+ * functions): this module is reached statically from `App.tsx`, and a static
+ * Firebase import here once pulled the whole SDK into the startup bundle
+ * (`app/bootImportGraph.test.ts` guards that now).
  */
-import { getFirebaseApp } from '@/sync/firebaseApp';
 import type { Analytics } from 'firebase/analytics';
 
 export interface AnalyticsEnv {
@@ -24,7 +29,10 @@ let analyticsPromise: Promise<Analytics | null> | undefined;
 
 async function loadAnalytics(): Promise<Analytics | null> {
   if (!isAnalyticsConfigured()) return null;
-  const { getAnalytics, isSupported } = await import('firebase/analytics');
+  const [{ getAnalytics, isSupported }, { getFirebaseApp }] = await Promise.all([
+    import('firebase/analytics'),
+    import('@/sync/firebaseCore'),
+  ]);
   if (!(await isSupported())) return null;
   return getAnalytics(getFirebaseApp());
 }

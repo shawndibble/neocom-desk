@@ -536,6 +536,12 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
       http.get(`https://esi.evetech.net/characters/${ALT_ID}/skillqueue`, () =>
         HttpResponse.json([])
       ),
+      // Both Characters' industry modifiers read implants. Left unhandled,
+      // those reads error and the modifiers settle late — after the rows are
+      // on screen — so the recompute swaps the rows out under the second
+      // click. (Masked until the Foreground Poller stopped warming the same
+      // reads at mount.)
+      http.get('https://esi.evetech.net/characters/:id/implants', () => HttpResponse.json([])),
       // The sidebar's character switcher now has two characters to show and
       // fetches public/corp info for each — not exercised by any single-
       // character test in this file.

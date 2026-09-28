@@ -1,13 +1,19 @@
 import { useEffect } from 'react';
-import { runForegroundPoll, liveDependencies, POLL_INTERVAL_MS } from './foregroundPoller';
+import {
+  runForegroundPoll,
+  liveDependencies,
+  FIRST_POLL_DELAY_MS,
+  POLL_INTERVAL_MS,
+} from './foregroundPoller';
 import { refreshAppBadge } from './appBadge';
 
 /**
  * Mounts the Foreground Poller (CONTEXT.md round 20): renders nothing, just
  * runs a poll every `POLL_INTERVAL_MS` while the tab is visible, paused while
- * hidden, with an immediate catch-up check on regaining visibility — and on
- * mount, since opening the app is itself the strongest case of "becoming
- * visible". Mounted once in `Layout`, beside `NotificationPermissionPrompt`;
+ * hidden, with an immediate catch-up check on regaining visibility — and
+ * shortly after mount (`FIRST_POLL_DELAY_MS`), since opening the app is itself
+ * the strongest case of "becoming visible", just not one worth contending
+ * with the first route's own reads for. Mounted once in `Layout`, beside `NotificationPermissionPrompt`;
  * `runForegroundPoll` (features/notifications/foregroundPoller.ts) owns every
  * decision about whether a poll actually does anything.
  */
@@ -27,7 +33,7 @@ export function ForegroundNotificationPoller() {
       void runForegroundPoll(liveDependencies());
     }
 
-    poll();
+    const firstPoll = setTimeout(poll, FIRST_POLL_DELAY_MS);
     const interval = setInterval(poll, POLL_INTERVAL_MS);
 
     function onVisibilityChange() {
@@ -37,6 +43,7 @@ export function ForegroundNotificationPoller() {
 
     return () => {
       cancelled = true;
+      clearTimeout(firstPoll);
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };

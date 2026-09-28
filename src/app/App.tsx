@@ -13,7 +13,7 @@ import { triggerSync } from '@/sync';
 import { db } from '@/db';
 import { isSyncConfigured } from './syncStatus';
 import { useBackgroundSync } from './backgroundSync';
-import { prefetchCharacterData } from './prefetch';
+import { scheduleBootPrefetch } from './bootPrefetch';
 import { Login } from '@/routes/Login';
 import { Callback } from '@/routes/Callback';
 import * as routeChunks from './routeChunks';
@@ -258,14 +258,12 @@ export function App() {
   // Same shape, for API-derived data: warm every granted surface into Dexie at
   // boot so a later page opens from cache rather than the network. Cancelled on
   // character switch so a slow run cannot keep spending requests for a
-  // character the user has already left.
+  // character the user has already left. Deferred to an idle slot and loaded
+  // as its own chunk (`bootPrefetch.ts`), so it neither weighs on the startup
+  // bundle nor races the visible route's own reads.
   useEffect(() => {
     if (activeCharacterId === null) return;
-    const signal = { cancelled: false };
-    void prefetchCharacterData(activeCharacterId, signal);
-    return () => {
-      signal.cancelled = true;
-    };
+    return scheduleBootPrefetch(activeCharacterId);
   }, [activeCharacterId]);
 
   return (

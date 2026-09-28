@@ -1,17 +1,19 @@
 /**
  * Web Push device registration (issue #356, ADR 0010).
  *
- * Two halves:
- * - `webPushSupport` is a pure read of the environment, used to decide
- *   whether to offer the flow at all and, when not, why not — iOS delivers
- *   Web Push only to an installed PWA, so a non-installed iOS Safari tab must
- *   be told that rather than silently failing the permission request.
- * - `registerDeviceForWebPush` is the one-call orchestration: acquire an FCM
- *   token, gather every stored Character's access token (already cached by
- *   `auth/session.ts`), and hand the batch to the `registerDevice` callable.
- *   Must be called from the same user gesture as the permission grant —
- *   Safari requires the FCM/permission dance to happen in one, and this is
- *   also the point at which an iOS user must already have installed the PWA.
+ * Whether to offer the flow at all is `webPushSupport.ts`, a pure read of the
+ * environment kept apart so the startup bundle can ask it without loading
+ * Firebase. This module *is* Firebase: reach it only through `await
+ * import(...)` from anything the startup bundle reaches
+ * (`app/bootImportGraph.test.ts`).
+ *
+ * `registerDeviceForWebPush` is the one-call orchestration: acquire an FCM
+ * token, gather every stored Character's access token (already cached by
+ * `auth/session.ts`), and hand the batch to the `registerDevice` callable.
+ * The Enable tap's call must happen in the same user gesture as the
+ * permission grant — Safari requires the FCM/permission dance to happen in
+ * one, and this is also the point at which an iOS user must already have
+ * installed the PWA.
  */
 import { deleteToken, getMessaging, getToken } from 'firebase/messaging';
 import { httpsCallable } from 'firebase/functions';
@@ -21,8 +23,6 @@ import type { ProjectionRow } from '@/engine/projection';
 import { getFirebaseApp, getSyncFunctions } from './firebaseApp';
 import { getDeviceId } from './deviceId';
 
-export type WebPushSupport = 'unsupported' | 'requires-install' | 'supported';
-
 interface RegisterDeviceResponse {
   deviceId: string;
   registered: number[];
@@ -31,36 +31,6 @@ interface RegisterDeviceResponse {
 
 /** No Projection to upload for a Character this call doesn't mention. */
 const NO_PROJECTION_ROWS: readonly ProjectionRow[] = [];
-
-function isIos(): boolean {
-  return /iP(hone|ad|od)/.test(navigator.userAgent);
-}
-
-/** True once launched as an installed PWA (Android/desktop `display-mode`, or iOS's own flag). */
-function isStandalone(): boolean {
-  const standaloneMedia =
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(display-mode: standalone)').matches;
-  const iosStandalone = (navigator as { standalone?: boolean }).standalone === true;
-  return standaloneMedia || iosStandalone;
-}
-
-/**
- * Whether this device can receive Web Push right now. `'requires-install'` is
- * distinct from `'unsupported'`: the capability exists, but only once the
- * page is running as an installed PWA (iOS Safari's own restriction) — the
- * permission flow should explain that rather than requesting a grant that
- * will never deliver anything.
- */
-export function webPushSupport(): WebPushSupport {
-  // Checked before the Notification/serviceWorker probe below: real
-  // non-installed iOS Safari has no `Notification` global at all, so that
-  // check alone would misreport 'unsupported' and this branch would never
-  // be reached on the one platform it exists for.
-  if (isIos() && !isStandalone()) return 'requires-install';
-  if (typeof Notification === 'undefined' || !navigator.serviceWorker) return 'unsupported';
-  return 'supported';
-}
 
 /**
  * Acquire an FCM token and register this device against every Character
