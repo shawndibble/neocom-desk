@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { normalizePlanWithBoundaries } from '@/engine/plan';
 import type { RemapSegment } from '@/engine/optimizer';
 import type {
+  AttributeName,
   Attributes,
   EngineSkill,
   PlanEntry,
@@ -17,6 +18,7 @@ import {
   addRemapMarker,
   appendImport,
   applyOptimizeForMe,
+  applyOptimizerRemapSegments,
   applyRemapSegments,
   applyReorder,
   moveRow,
@@ -28,6 +30,7 @@ import {
   setPriority,
   setRemapMarkerAttributes,
   splitByLevel,
+  type RemapPricingContext,
   type SkillPlanEditable,
 } from './skillPlanEdit';
 
@@ -35,6 +38,14 @@ const entry = (skillTypeID: number, targetLevel = 1): PlanEntry => ({ skillTypeI
 
 const A: Attributes = { intelligence: 17, memory: 17, perception: 27, willpower: 21, charisma: 17 };
 const B: Attributes = { ...A, perception: 20, willpower: 24 };
+const CURRENT: Attributes = {
+  intelligence: 20,
+  memory: 20,
+  perception: 20,
+  willpower: 20,
+  charisma: 19,
+};
+const PRICING: RemapPricingContext = { currentAttributes: CURRENT };
 
 /** Three entries (1, 2, 3), plus whatever markers the test gives it. */
 const plan = (extra: Partial<SkillPlanEditable> = {}): SkillPlanEditable => ({
@@ -42,18 +53,34 @@ const plan = (extra: Partial<SkillPlanEditable> = {}): SkillPlanEditable => ({
   ...extra,
 });
 
-const skill = (typeID: number, prereqs: EngineSkill['prereqs'] = []): EngineSkill => ({
+const skill = (
+  typeID: number,
+  prereqs: EngineSkill['prereqs'] = [],
+  primary: AttributeName = 'perception',
+  secondary: AttributeName = 'willpower'
+): EngineSkill => ({
   typeID,
   name: `Skill ${typeID}`,
   rank: 1,
-  primary: 'perception',
-  secondary: 'willpower',
+  primary,
+  secondary,
   prereqs,
 });
 
-/** 1, 3 and 4 are free-standing; 2 needs 1 at III. */
+/**
+ * 1, 3 and 4 are free-standing; 2 needs 1 at III. 3 and 4 sit on different
+ * attribute pairs from 1 and from each other, so a genuine two-remap split
+ * across them has a real benefit — `applyRemapSegments`'s redundant-marker
+ * drop (see skillPlanEdit.ts) would otherwise collapse them, since same-pair
+ * segments always re-price to the same spread.
+ */
 const SKILLS = new Map<number, EngineSkill>(
-  [skill(1), skill(2, [{ typeID: 1, level: 3 }]), skill(3), skill(4)].map((s) => [s.typeID, s])
+  [
+    skill(1, [], 'perception', 'willpower'),
+    skill(2, [{ typeID: 1, level: 3 }]),
+    skill(3, [], 'intelligence', 'memory'),
+    skill(4, [], 'charisma', 'willpower'),
+  ].map((s) => [s.typeID, s])
 );
 
 const NO_TRAINED = new Map<number, TrainedSkill>();
@@ -303,7 +330,7 @@ describe('replaceWithImport', () => {
   });
 });
 
-describe('applyRemapSegments / applyOptimizeForMe', () => {
+describe('applyRemapSegments / applyOptimizerRemapSegments / applyOptimizeForMe', () => {
   it("replaces the markers with one per remapped segment, dropping the old markers' overrides", () => {
     // Steps [1, 3, 4], one per entry: each segment start is an entry boundary.
     const p: SkillPlanEditable = {
@@ -317,6 +344,61 @@ describe('applyRemapSegments / applyOptimizeForMe', () => {
     });
   });
 
+  it('never drops a marker: these are the plan’s own, not the optimizer’s', () => {
+    // Same setup as the redundant-marker test below, but through the plain
+    // (non-search) path "Optimize at my markers" uses: even though entries 11
+    // and 12 share a pair and the split changes nothing, a manually-placed
+    // marker is never this function's call to delete.
+    const sameAttrsSkills = new Map<number, EngineSkill>(
+      [
+        skill(10, [], 'perception', 'willpower'),
+        skill(11, [], 'perception', 'willpower'),
+        skill(12, [], 'perception', 'willpower'),
+      ].map((s) => [s.typeID, s])
+    );
+    const p: SkillPlanEditable = {
+      entries: [entry(10), entry(11), entry(12)],
+      markers: [],
+    };
+    expect(
+      applyRemapSegments(p, [seg(0, false), seg(1), seg(2)], sameAttrsSkills, NO_TRAINED)
+    ).toEqual({
+      markers: [1, 2],
+      markerAttributes: [],
+    });
+  });
+
+  it('drops an optimizer-proposed marker whose re-priced spread matches the segment before it', () => {
+    // Entries 11 and 12 train the same attribute pair at the same rank, so
+    // splitting between them never changes anything: the two proposed remap
+    // segments (bogus, distinct `attributes` from `seg()`) are only what the
+    // search *proposed* — re-pricing each at its real, entry-snapped boundary
+    // always lands on the same spread, so the second marker is redundant.
+    const sameAttrsSkills = new Map<number, EngineSkill>(
+      [
+        skill(10, [], 'perception', 'willpower'),
+        skill(11, [], 'perception', 'willpower'),
+        skill(12, [], 'perception', 'willpower'),
+      ].map((s) => [s.typeID, s])
+    );
+    const p: SkillPlanEditable = {
+      entries: [entry(10), entry(11), entry(12)],
+      markers: [],
+    };
+    expect(
+      applyOptimizerRemapSegments(
+        p,
+        [seg(0, false), seg(1), seg(2)],
+        sameAttrsSkills,
+        NO_TRAINED,
+        PRICING
+      )
+    ).toEqual({
+      markers: [1],
+      markerAttributes: [],
+    });
+  });
+
   it('reorders the entries and places markers against the new order, in one patch', () => {
     const p: SkillPlanEditable = { entries: [entry(1), entry(3), entry(4)], markers: [1] };
     const order = [
@@ -325,7 +407,9 @@ describe('applyRemapSegments / applyOptimizeForMe', () => {
       { skillTypeID: 1, level: 1 },
     ];
     // Segment 2 starts at step 2 of the *new* order — entry 1, now last.
-    expect(applyOptimizeForMe(p, order, [seg(0, false), seg(2)], SKILLS, NO_TRAINED)).toEqual({
+    expect(
+      applyOptimizeForMe(p, order, [seg(0, false), seg(2)], SKILLS, NO_TRAINED, PRICING)
+    ).toEqual({
       entries: [entry(4), entry(3), entry(1)],
       markers: [2],
       markerAttributes: [],

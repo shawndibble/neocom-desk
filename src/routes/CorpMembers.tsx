@@ -204,6 +204,19 @@ async function loadMembersSnapshot(
   return { corporationId, members, roles, labels, diff, fetchedAt, loadedAt };
 }
 
+/**
+ * Row context menu (issue #421, AC1): the shared Public Info Modal is the one
+ * entry point, same as every other list with a Show Info action. Module-level,
+ * so the roster's memoized rows see one stable function.
+ */
+function memberRowContextMenu(row: RosterRow, tr: ReactElement) {
+  return (
+    <MemberContextMenu characterId={row.characterId} name={label(row.name, row.characterId)}>
+      {tr}
+    </MemberContextMenu>
+  );
+}
+
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
 function CorpMembersView() {
   const { t } = useTranslation();
@@ -280,16 +293,6 @@ function CorpMembersView() {
       ),
     [rows, debouncedSearch, darkOnly, ship, loc]
   );
-
-  // Row context menu (issue #421, AC1): the shared Public Info Modal is the
-  // one entry point, same as every other list with a Show Info action.
-  function memberRowContextMenu(row: RosterRow, tr: ReactElement) {
-    return (
-      <MemberContextMenu characterId={row.characterId} name={label(row.name, row.characterId)}>
-        {tr}
-      </MemberContextMenu>
-    );
-  }
 
   if (!snapshot.hydrated) return <Spinner />;
 

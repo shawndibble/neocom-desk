@@ -17,7 +17,7 @@
  * "what did we buy last Tuesday" is a question worth a control, and the
  * character view answers a much smaller list.
  */
-import { useMemo, type ReactElement, type ReactNode } from 'react';
+import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -154,6 +154,9 @@ export function TransactionsFilterBar({
   );
 }
 
+/** Module-level so the table's windowing and row memo see one stable function. */
+const corpTransactionRowKey = (txn: CorporationWalletTransaction) => txn.transaction_id;
+
 export function CorpTransactionsPanel({
   transactionsResult,
   transactions,
@@ -170,14 +173,17 @@ export function CorpTransactionsPanel({
   const { t } = useTranslation();
 
   /** Same menu every other item table carries (issue #817). */
-  function rowContextMenu(txn: CorporationWalletTransaction, tr: ReactElement) {
-    const itemName = nameFor(txn.type_id);
-    return (
-      <ItemContextMenu typeId={txn.type_id} itemName={itemName} blueprintTypeID={null}>
-        {tr}
-      </ItemContextMenu>
-    );
-  }
+  const rowContextMenu = useCallback(
+    (txn: CorporationWalletTransaction, tr: ReactElement) => {
+      const itemName = nameFor(txn.type_id);
+      return (
+        <ItemContextMenu typeId={txn.type_id} itemName={itemName} blueprintTypeID={null}>
+          {tr}
+        </ItemContextMenu>
+      );
+    },
+    [nameFor]
+  );
 
   // The same six columns Market's character panel draws, and in the same
   // order: the two tables answer the same question about different wallets,
@@ -357,7 +363,8 @@ export function CorpTransactionsPanel({
               label={t('wallet.transactionsTab')}
               columns={shownColumns}
               rows={filteredTransactions}
-              rowKey={(txn) => txn.transaction_id}
+              rowKey={corpTransactionRowKey}
+              virtualize="auto"
               sort={sort}
               onSortChange={onSortChange}
               rowContextMenu={rowContextMenu}

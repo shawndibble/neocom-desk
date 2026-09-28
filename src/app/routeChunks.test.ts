@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { ComponentType } from 'react';
-import { named } from './routeChunks';
+import { named, remembered } from './routeChunks';
 
 const Page: ComponentType = () => null;
 
@@ -26,5 +26,36 @@ describe('named', () => {
       new Promise((resolve) => setTimeout(() => resolve('pending'), 20)),
     ]);
     expect(outcome).toBe('pending');
+  });
+});
+
+describe('remembered', () => {
+  it('exposes the component synchronously once the chunk has loaded', async () => {
+    const load = remembered(() => Promise.resolve({ default: Page }));
+    expect(load.peek()).toBeUndefined();
+    await load();
+    expect(load.peek()).toBe(Page);
+  });
+
+  it('shares one request between a preload and the later render', async () => {
+    const importer = vi.fn(() => Promise.resolve({ default: Page }));
+    const load = remembered(importer);
+    const first = load();
+    const second = load();
+    expect(second).toBe(first);
+    await second;
+    expect(importer).toHaveBeenCalledTimes(1);
+  });
+
+  it('forgets a failed load so the lazy render can retry it', async () => {
+    const importer = vi
+      .fn<() => Promise<{ default: ComponentType }>>()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce({ default: Page });
+    const load = remembered(importer);
+    await expect(load()).rejects.toThrow('offline');
+    expect(load.peek()).toBeUndefined();
+    await expect(load()).resolves.toEqual({ default: Page });
+    expect(importer).toHaveBeenCalledTimes(2);
   });
 });

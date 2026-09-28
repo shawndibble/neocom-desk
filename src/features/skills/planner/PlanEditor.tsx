@@ -52,7 +52,6 @@ import { parseSkillQueue } from '@/engine/queueImport';
 import { exportPlanToClipboard } from '@/engine/clipboardExport';
 import {
   optimizeAtMarkers,
-  optimizeForMe,
   placeRemaps,
   sortShortestFirst,
   suggestReorder,
@@ -108,13 +107,14 @@ import { queueCsvColumns } from './queueCsv';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
-import { dedupeEntries } from './reorder';
+import { applyReorderSuggestion, dedupeEntries } from './reorder';
 import { buildRows } from './markers';
 import {
   addEntry,
   addRemapMarker,
   appendImport,
   applyOptimizeForMe,
+  applyOptimizerRemapSegments,
   applyRemapSegments,
   applyReorder,
   moveRow,
@@ -1014,13 +1014,76 @@ export function PlanEditor({
     };
   }
 
+  /**
+   * What `optimizeAtMarkers` (via `schedulePlan`) actually reports for a
+   * candidate `(entries, markers)` pair — the SAME costing Accept's write
+   * will show afterwards, redundant-marker drop and entry-snap included.
+   * Every optimize-and-preview flow re-prices through this before showing a
+   * segment count or a savings figure, so the preview never promises a remap
+   * that Accept goes on to drop as redundant. `markers.length === 0` (every
+   * proposed remap turned out redundant) reports `schedulePlan`'s own
+   * `markersResult: null` as the same "keep current attributes" baseline
+   * `placeRemaps` itself falls back to when no remap beats it.
+   */
+  function pricedAfterApply(
+    finalEntries: readonly PlanEntry[],
+    finalMarkers: readonly number[]
+  ): { order: PlanStep[]; remaps: PlaceRemapsResult } {
+    const finalSchedule = schedulePlan(
+      {
+        entries: [...finalEntries],
+        markers: [...finalMarkers],
+        markerAttributes: [],
+        whatIfImplants: plan.whatIfImplants,
+        booster: plan.booster,
+        boosters: plan.boosters,
+      },
+      {
+        catalog,
+        trained: trainedSkills,
+        queueEntries,
+        attributes,
+        attributeBaseline,
+        implants,
+        cloneState,
+      },
+      loadedAtMs
+    );
+    const remaps: PlaceRemapsResult = finalSchedule.markersResult ?? {
+      segments:
+        finalSchedule.scheduled.length > 0
+          ? [
+              {
+                startIndex: 0,
+                endIndex: finalSchedule.scheduled.length - 1,
+                attributes,
+                seconds: finalSchedule.totalSeconds,
+                remap: false,
+              },
+            ]
+          : [],
+      totalSeconds: finalSchedule.totalSeconds,
+      currentSeconds: finalSchedule.totalSeconds,
+      savingsSeconds: 0,
+    };
+    return { order: finalSchedule.scheduled, remaps };
+  }
+
   // A "saves" verdict now also opens its own Accept/Reject Modal (below),
   // beside this beside-the-button confirmation (#222) — the same pairing
   // "Suggest reorder" already uses: an instant toast plus the Modal that
   // holds the actual decision.
   function handleOptimizeRemaps() {
     if (scheduled.length === 0) return;
-    const result = placeRemaps(scheduled, catalog.engineSkills, buildRemapOptions());
+    const searched = placeRemaps(scheduled, catalog.engineSkills, buildRemapOptions());
+    const patch = applyOptimizerRemapSegments(
+      editable,
+      searched.segments,
+      catalog.engineSkills,
+      trainedSkills,
+      buildRemapOptions()
+    );
+    const { remaps: result } = pricedAfterApply(editable.entries, patch.markers ?? []);
     const verdict = remapVerdict(result, remapCount);
     // Whether the timed (on-cooldown yearly) slot actually ended up used:
     // every remap up to `timedRemap.remapCount` counted, not just requested.
@@ -1038,24 +1101,24 @@ export function PlanEditor({
   }
 
   /**
-   * Turn a set of RemapSegments into actual Remap Markers, so the user
-   * doesn't have to drag/add them by hand to match what a search (Optimize
-   * Remaps) or a live read of the plan's existing markers (Optimize at my
-   * markers) found. For Optimize at my markers this round-trips the plan's
-   * own markers back through the same conversion, so it is normally a
-   * no-op, but two markers that now delimit the same optimizer step (see
-   * markerAttributesByStepIndex below) collapse to one. "Optimize for me"
-   * goes through `applyOptimizeForMe` instead: its segments index its own
-   * reordered entries, not the plan's current ones.
+   * Accept on the Optimize Remaps preview Modal: turn the SEARCH's own
+   * RemapSegments into actual Remap Markers. Its boundaries can land mid-entry
+   * (a prereq chain spanning two attribute pairs) and snap forward to the
+   * entry after it, which can leave a marker whose re-priced spread matches
+   * the one before it — `applyOptimizerRemapSegments` drops that marker,
+   * since it is the search's own proposal, never a manual one.
    */
-  function applySegmentsAsMarkers(segments: readonly RemapSegment[]) {
-    onUpdate(applyRemapSegments(editable, segments, catalog.engineSkills, trainedSkills));
-  }
-
-  /** Accept on the Optimize Remaps preview Modal. */
   function acceptOptimizeRemaps() {
     if (!optimizeResult) return;
-    applySegmentsAsMarkers(optimizeResult.segments);
+    onUpdate(
+      applyOptimizerRemapSegments(
+        editable,
+        optimizeResult.segments,
+        catalog.engineSkills,
+        trainedSkills,
+        buildRemapOptions()
+      )
+    );
     setOptimizeResult(null);
     setOptimizeVerdict(null);
   }
@@ -1066,11 +1129,55 @@ export function PlanEditor({
     setOptimizeVerdict(null);
   }
 
-  /** Priority-respecting reorder, then remap placement on that new order, previewed as one Accept/Reject. */
+  /**
+   * Priority-respecting reorder, then remap placement on that new order,
+   * previewed as one Accept/Reject. `placeRemaps` runs on the order's own
+   * re-expansion (via `schedulePlan`, the same costing `scheduled` itself
+   * goes through), not on `suggestReorder`'s raw step list: a prereq chain
+   * can straddle two attribute pairs inside one entry, so the entries
+   * `applyReorderSuggestion` reconstructs from a step order don't always
+   * re-expand to that exact same order. The preview itself is then re-priced
+   * through `pricedAfterApply` against the exact `(entries, markers)` Accept
+   * will write, so a marker `applyOptimizerRemapSegments` drops as redundant
+   * never shows up as a promised remap here either.
+   */
   function handleOptimizeForMe() {
     if (scheduled.length === 0) return;
-    const result = optimizeForMe(scheduled, catalog.engineSkills, buildRemapOptions(), priorityMap);
-    setOptimizeForMePreview(result);
+    const suggested = suggestReorder(scheduled, catalog.engineSkills, priorityMap);
+    const reorderedEntries = applyReorderSuggestion(editable.entries, suggested);
+    const reorderedSchedule = schedulePlan(
+      {
+        entries: reorderedEntries,
+        markers: plan.markers,
+        markerAttributes: plan.markerAttributes,
+        whatIfImplants: plan.whatIfImplants,
+        booster: plan.booster,
+        boosters: plan.boosters,
+      },
+      {
+        catalog,
+        trained: trainedSkills,
+        queueEntries,
+        attributes,
+        attributeBaseline,
+        implants,
+        cloneState,
+      },
+      loadedAtMs
+    );
+    const order = reorderedSchedule.scheduled;
+    const searched = placeRemaps(order, catalog.engineSkills, buildRemapOptions());
+    const patch = applyOptimizeForMe(
+      editable,
+      order,
+      searched.segments,
+      catalog.engineSkills,
+      trainedSkills,
+      buildRemapOptions()
+    );
+    setOptimizeForMePreview(
+      pricedAfterApply(patch.entries ?? reorderedEntries, patch.markers ?? [])
+    );
   }
 
   /** Accept on the "Optimize for me" preview Modal: one write, new order and remap markers together. */
@@ -1082,7 +1189,8 @@ export function PlanEditor({
         optimizeForMePreview.order,
         optimizeForMePreview.remaps.segments,
         catalog.engineSkills,
-        trainedSkills
+        trainedSkills,
+        buildRemapOptions()
       )
     );
     setOptimizeForMePreview(null);
@@ -1097,10 +1205,24 @@ export function PlanEditor({
     setMarkersPanelOpen(true);
   }
 
-  /** Accept on the Optimize at my markers preview Modal. */
+  /**
+   * Accept on the Optimize at my markers preview Modal: re-costs the plan's
+   * OWN markers wholesale (a no-op on position, since this round-trips them
+   * through the same conversion `segmentsToMarkers` uses). Goes through
+   * `applyRemapSegments`, not the redundant-marker-dropping variant: these
+   * are markers the user placed themselves, and silently deleting one they
+   * placed is not this accept's call to make.
+   */
   function acceptOptimizeAtMarkers() {
     if (!markersAtCurrentPositions) return;
-    applySegmentsAsMarkers(markersAtCurrentPositions.segments);
+    onUpdate(
+      applyRemapSegments(
+        editable,
+        markersAtCurrentPositions.segments,
+        catalog.engineSkills,
+        trainedSkills
+      )
+    );
     setMarkersPanelOpen(false);
   }
 
