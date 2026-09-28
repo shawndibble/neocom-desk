@@ -1,5 +1,6 @@
+import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import type { SkillCatalog } from './skillMap';
-import type { TrainedSkill } from '@/engine/types';
+import { isEntryCovered } from './planner/reorder';
 import { stripEveMarkup } from './typeDisplay';
 
 export interface PrereqRow {
@@ -8,9 +9,11 @@ export interface PrereqRow {
   level: number;
   /** Whether the character's trained level already meets `level`. */
   trained: boolean;
+  /** Whether an open plan already targets `level` or higher, independent of `trained`. */
+  planned: boolean;
 }
 
-export type UnlockRow = Omit<PrereqRow, 'trained'>;
+export type UnlockRow = Omit<PrereqRow, 'trained' | 'planned'>;
 
 export interface SkillRequirements {
   name: string;
@@ -33,7 +36,8 @@ function skillName(catalog: SkillCatalog, typeID: number): string {
 export function buildSkillRequirements(
   catalog: SkillCatalog,
   trainedSkills: ReadonlyMap<number, TrainedSkill>,
-  typeID: number
+  typeID: number,
+  planEntries: readonly PlanEntry[] = []
 ): SkillRequirements | null {
   const engineSkill = catalog.engineSkills.get(typeID);
   const info = catalog.bySkillTypeID.get(typeID);
@@ -44,6 +48,7 @@ export function buildSkillRequirements(
     name: skillName(catalog, p.typeID),
     level: p.level,
     trained: (trainedSkills.get(p.typeID)?.level ?? 0) >= p.level,
+    planned: isEntryCovered(planEntries, p.typeID, p.level),
   }));
   const unlocks: UnlockRow[] = (catalog.unlocksByTypeID.get(typeID) ?? []).map((u) => ({
     typeID: u.typeID,

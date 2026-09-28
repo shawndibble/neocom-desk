@@ -56,7 +56,7 @@ describe('buildSkillRequirements', () => {
     const trainedSkills = new Map<number, TrainedSkill>([[1, { level: 3, sp: 1 }]]);
     const result = buildSkillRequirements(catalog, trainedSkills, 2);
     expect(result?.prereqs).toEqual([
-      { typeID: 1, name: 'Spaceship Command', level: 3, trained: true },
+      { typeID: 1, name: 'Spaceship Command', level: 3, trained: true, planned: false },
     ]);
   });
 
@@ -64,8 +64,24 @@ describe('buildSkillRequirements', () => {
     const trainedSkills = new Map<number, TrainedSkill>([[1, { level: 1, sp: 1 }]]);
     const result = buildSkillRequirements(catalog, trainedSkills, 2);
     expect(result?.prereqs).toEqual([
-      { typeID: 1, name: 'Spaceship Command', level: 3, trained: false },
+      { typeID: 1, name: 'Spaceship Command', level: 3, trained: false, planned: false },
     ]);
+  });
+
+  it('marks a prereq planned when an open plan already targets its level', () => {
+    const result = buildSkillRequirements(catalog, new Map(), 2, [
+      { skillTypeID: 1, targetLevel: 3 },
+    ]);
+    expect(result?.prereqs).toEqual([
+      { typeID: 1, name: 'Spaceship Command', level: 3, trained: false, planned: true },
+    ]);
+  });
+
+  it('does not mark a prereq planned when the plan targets a lower level', () => {
+    const result = buildSkillRequirements(catalog, new Map(), 2, [
+      { skillTypeID: 1, targetLevel: 2 },
+    ]);
+    expect(result?.prereqs[0].planned).toBe(false);
   });
 
   it('treats a skill with no trained-skills entry as untrained (level 0)', () => {
@@ -85,7 +101,9 @@ describe('buildSkillRequirements', () => {
       [sdeSkill({ typeID: 2, name: 'Frigate' })] // typeID 1 missing from bySkillTypeID
     );
     const result = buildSkillRequirements(withGap, new Map(), 2);
-    expect(result?.prereqs).toEqual([{ typeID: 1, name: '#1', level: 1, trained: false }]);
+    expect(result?.prereqs).toEqual([
+      { typeID: 1, name: '#1', level: 1, trained: false, planned: false },
+    ]);
   });
 
   it('strips EVE markup from the description', () => {

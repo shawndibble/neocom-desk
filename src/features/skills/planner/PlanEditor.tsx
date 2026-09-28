@@ -40,6 +40,7 @@ import { useAutoDismiss } from '@/lib/useAutoDismiss';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
 import { findRemovalBlockers, planEntryKey } from '@/engine/plan';
+import { openSkillDetailModal } from '@/stores/skillDetailModal';
 import {
   milestoneKey,
   milestoneStates,
@@ -552,6 +553,12 @@ export function PlanEditor({
       });
     },
     [removalBlockers, nameFor, t]
+  );
+
+  /** A row's skill name opens the shared Skill Detail modal, carrying this plan's own (possibly unsaved) entries so a prereq already staged here reads "Planned". */
+  const handleOpenSkillDetail = useCallback(
+    (skillTypeID: number) => openSkillDetailModal(skillTypeID, { planEntries: editable.entries }),
+    [editable.entries]
   );
 
   // Manual overrides (RemapMarkerModal), aligned to the current markers.
@@ -2005,6 +2012,7 @@ export function PlanEditor({
                 onReorder={handleDrop}
                 onPromotePrereq={handlePromotePrereq}
                 onRemove={requestRemoveEntry}
+                onOpenSkillDetail={handleOpenSkillDetail}
                 removalBlockedReason={removalBlockedReason}
                 pinnedInProgress={pinnedInProgress}
                 onRemoveMarker={handleRemoveMarker}

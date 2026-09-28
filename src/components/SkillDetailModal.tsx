@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Modal, Spinner } from '@/components/ui';
+import { SkillPriceSection } from '@/features/skills/SkillPriceSection';
 import { SkillRequirementsList } from '@/features/skills/SkillRequirementsList';
 import {
   buildSkillRequirements,
@@ -68,7 +69,12 @@ export function SkillDetailModal() {
           trainedSkills = corrected.trained;
         }
 
-        const requirements = buildSkillRequirements(catalog, trainedSkills, request.typeID);
+        const requirements = buildSkillRequirements(
+          catalog,
+          trainedSkills,
+          request.typeID,
+          request.planEntries
+        );
         if (cancelled) return;
         setState(requirements ? { status: 'ready', data: requirements } : { status: 'not-found' });
       } catch {
@@ -113,7 +119,12 @@ export function SkillDetailModal() {
           {state.data.description && (
             <p className="text-xs text-text-dim">{state.data.description}</p>
           )}
-          <SkillRequirementsList prereqs={state.data.prereqs} unlocks={state.data.unlocks} />
+          <SkillPriceSection typeID={request.typeID} />
+          <SkillRequirementsList
+            prereqs={state.data.prereqs}
+            unlocks={state.data.unlocks}
+            planEntries={request.planEntries}
+          />
         </div>
       )}
     </Modal>

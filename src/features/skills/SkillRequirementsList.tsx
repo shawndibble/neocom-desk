@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { PlanEntry } from '@/engine/types';
 import { openSkillDetailModal } from '@/stores/skillDetailModal';
 import type { PrereqRow, UnlockRow } from './skillRequirements';
 
@@ -7,6 +8,13 @@ interface SkillRequirementsListProps {
   prereqs: readonly PrereqRow[];
   unlocks: readonly UnlockRow[];
   className?: string;
+  /**
+   * Carried into a nested `openSkillDetailModal` call so drilling into a
+   * prereq/unlock's own detail keeps reading the same open plan's entries —
+   * otherwise a skill two levels deep would lose "Planned" and fall back to
+   * "Level needed" the instant its own detail opened.
+   */
+  planEntries?: readonly PlanEntry[];
 }
 
 interface RequirementRowProps {
@@ -14,6 +22,7 @@ interface RequirementRowProps {
   name: string;
   muted?: boolean;
   trailing: ReactNode;
+  planEntries?: readonly PlanEntry[];
 }
 
 /**
@@ -22,12 +31,18 @@ interface RequirementRowProps {
  * skill row, so a prereq/unlock two levels deep in another skill's detail
  * re-targets the same popover instead of opening a second one.
  */
-function RequirementRow({ typeID, name, muted = false, trailing }: RequirementRowProps) {
+function RequirementRow({
+  typeID,
+  name,
+  muted = false,
+  trailing,
+  planEntries,
+}: RequirementRowProps) {
   return (
     <li className="flex items-center justify-between gap-2 py-1 text-xs">
       <button
         type="button"
-        onClick={() => openSkillDetailModal(typeID)}
+        onClick={() => openSkillDetailModal(typeID, { planEntries })}
         className={`truncate text-left hover:underline ${muted ? 'text-text-dim' : 'text-text'}`}
       >
         {name}
@@ -42,6 +57,7 @@ export function SkillRequirementsList({
   prereqs,
   unlocks,
   className = '',
+  planEntries,
 }: SkillRequirementsListProps) {
   const { t } = useTranslation();
   return (
@@ -60,16 +76,24 @@ export function SkillRequirementsList({
                 typeID={req.typeID}
                 name={req.name}
                 muted={!req.trained}
+                planEntries={planEntries}
                 trailing={
                   <span
                     data-trained={req.trained}
+                    data-planned={req.planned}
                     className={`shrink-0 rounded-xs px-1.5 py-0.5 text-[0.6875rem] uppercase tracking-widest ${
-                      req.trained ? 'bg-accent/20 text-accent' : 'border border-line text-text-dim'
+                      req.trained
+                        ? 'bg-accent/20 text-accent'
+                        : req.planned
+                          ? 'border border-accent/40 text-accent'
+                          : 'border border-line text-text-dim'
                     }`}
                   >
                     {req.trained
                       ? t('skills.inspector.trained', { level: req.level })
-                      : t('skills.inspector.levelNeeded', { level: req.level })}
+                      : req.planned
+                        ? t('skills.inspector.planned', { level: req.level })
+                        : t('skills.inspector.levelNeeded', { level: req.level })}
                   </span>
                 }
               />
@@ -91,6 +115,7 @@ export function SkillRequirementsList({
                 key={req.typeID}
                 typeID={req.typeID}
                 name={req.name}
+                planEntries={planEntries}
                 trailing={
                   <span className="shrink-0 text-text-dim">
                     {t('skills.inspector.levelNeeded', { level: req.level })}
