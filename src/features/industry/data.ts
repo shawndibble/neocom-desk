@@ -2,7 +2,7 @@
 import { getCharacterBlueprints, type CharacterBlueprint } from '@/esi/endpoints';
 import { loadPaginatedWithCacheStatus, type StatusResult } from '@/esi/cache';
 
-const KEY = 'blueprints';
+export const KEY = 'blueprints';
 
 /**
  * Owned blueprints (originals + copies) for a character. ESI or cache, with

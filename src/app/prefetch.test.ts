@@ -122,4 +122,53 @@ describe('prefetchCharacterData', () => {
 
     expect(isPrefetching(usePrefetch.getState())).toBe(false);
   });
+
+  describe('skipping a task whose row is already fresh', () => {
+    const KEY = 'prefetch-skip-test';
+
+    beforeEach(async () => {
+      await db.esiCache.clear();
+      await db.tokens.put({
+        characterId: CHAR_ID,
+        refreshToken: 'r',
+        accessToken: 'a',
+        expiresAt: Date.now() + 60_000,
+        scopes: [...ALL_SCOPES],
+      });
+    });
+
+    function task(run: () => Promise<unknown>): PrefetchTask {
+      return { id: 'skip', endpoints: ['getCharacterAssets'], cacheKey: KEY, run };
+    }
+
+    it('does not run the loader — so never reads the value — while the row is fresh', async () => {
+      await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: [1], fetchedAt: Date.now() });
+      const run = vi.fn(async () => {});
+      const get = vi.spyOn(db.esiCache, 'get');
+
+      await prefetchCharacterData(CHAR_ID, { cancelled: false }, [task(run)]);
+
+      expect(run).not.toHaveBeenCalled();
+      expect(get).not.toHaveBeenCalled();
+      expect(isPrefetching(usePrefetch.getState())).toBe(false);
+      vi.restoreAllMocks();
+    });
+
+    it('runs the loader for a lapsed row', async () => {
+      await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: [1], fetchedAt: 1 });
+      const run = vi.fn(async () => {});
+
+      await prefetchCharacterData(CHAR_ID, { cancelled: false }, [task(run)]);
+
+      expect(run).toHaveBeenCalledTimes(1);
+    });
+
+    it('runs the loader when nothing is cached', async () => {
+      const run = vi.fn(async () => {});
+
+      await prefetchCharacterData(CHAR_ID, { cancelled: false }, [task(run)]);
+
+      expect(run).toHaveBeenCalledTimes(1);
+    });
+  });
 });

@@ -907,6 +907,103 @@ describe('PlanEditor tools pane', () => {
   });
 });
 
+/**
+ * Regression for a real report: "Optimize for me" placed two Remap Markers
+ * one skill apart with identical target attributes — a wasted remap. Skill B
+ * needs Skill A at II, but B isn't itself perception/willpower, so
+ * `suggestReorder` can separate A's implicit prereq steps from B's own step
+ * in an order no entry list can represent (prereqs always expand next to
+ * their dependent). `placeRemaps` then costed a two-remap split that could
+ * never be saved as proposed, and the entry-snap it forces at Accept can
+ * re-price the second segment onto the same spread as the first.
+ */
+describe('"Optimize for me" never previews or writes a redundant remap (real report)', () => {
+  const PW_SKILLS: SkillType[] = [
+    skill({
+      typeID: 41,
+      name: 'Skill A',
+      rank: 5,
+      primaryAttr: 'perception',
+      secondaryAttr: 'willpower',
+    }),
+    skill({
+      typeID: 42,
+      name: 'Skill B',
+      rank: 1,
+      primaryAttr: 'intelligence',
+      secondaryAttr: 'memory',
+      prereqs: [{ skillTypeID: 41, level: 2 }],
+    }),
+    skill({
+      typeID: 43,
+      name: 'Skill C',
+      rank: 5,
+      primaryAttr: 'perception',
+      secondaryAttr: 'willpower',
+    }),
+  ];
+  const PW_CATALOG: SkillCatalog = (() => {
+    const engineSkills = new Map(
+      PW_SKILLS.map((s) => [
+        s.typeID,
+        {
+          typeID: s.typeID,
+          name: s.name,
+          rank: s.rank,
+          primary: s.primaryAttr,
+          secondary: s.secondaryAttr,
+          prereqs: s.prereqs.map((p) => ({ typeID: p.skillTypeID, level: p.level })),
+        },
+      ])
+    );
+    return {
+      engineSkills,
+      bySkillTypeID: new Map(PW_SKILLS.map((s) => [s.typeID, s])),
+      unlocksByTypeID: buildUnlockIndex(engineSkills),
+    };
+  })();
+  const PW_PLAN: SkillPlanRecord = {
+    id: 'plan-pw',
+    characterId: 1,
+    name: 'PW plan',
+    // One row per level already (reorder.ts's rule) — a single "I-V" entry
+    // would trip the plan's own one-time auto-split effect and fire an extra
+    // onUpdate this test isn't about.
+    entries: [
+      { skillTypeID: 42, targetLevel: 1 },
+      { skillTypeID: 43, targetLevel: 1 },
+      { skillTypeID: 43, targetLevel: 2 },
+      { skillTypeID: 43, targetLevel: 3 },
+      { skillTypeID: 43, targetLevel: 4 },
+      { skillTypeID: 43, targetLevel: 5 },
+    ],
+    remapCount: 2,
+    markers: [],
+    updatedAt: 0,
+  };
+
+  it('collapses the redundant segment in the preview itself, before Accept', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor(vi.fn(), { plan: PW_PLAN, catalog: PW_CATALOG });
+    await openTools(user);
+
+    await clickOptimizeMode(user, 'Optimize for me');
+
+    const dialog = screen.getByRole('dialog', { name: 'Optimize for me' });
+    expect(within(dialog).getByText('Segment 1')).toBeInTheDocument();
+    // The whole point of the fix: a second segment that would just repeat
+    // the first's spread never gets previewed as a real second remap.
+    expect(within(dialog).queryByText('Segment 2')).toBeNull();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    const [patch] = onUpdate.mock.calls[0];
+    // Exactly what the preview showed — one marker, not two.
+    expect(patch.markers).toHaveLength(1);
+  });
+});
+
 describe('PlanEditor tools pane placement', () => {
   it('folds the tools into one collapsed disclosure below `lg`, so the plan leads the page', () => {
     renderEditor();

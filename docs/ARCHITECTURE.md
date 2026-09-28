@@ -106,6 +106,12 @@ cache; `null` only when neither exists. Auth failures (401/403/refresh failure) 
 `esi/client.ts`) — every `features/*` data module (`skills/data.ts`,
 `character/{wallet,assets,mail,calendar,contracts,orders}.ts`,
 `industry/data.ts`, `industry/jobs.ts`) is a thin wrapper over it.
+Freshness is decided from `db.esiCacheMeta` — each row minus its value, kept
+in step by a DBCore middleware (`db/esiCacheMeta.ts`) in the same transaction
+as every `esiCache` write/delete — so a stale check never deserializes a
+multi-MB value; the boot prefetch skips a task whose row is fresh
+(`isCacheFresh`). A loader built with `conditionalFetch` sends the stored
+ETag, and a 304 bumps only the meta row.
 `character/stations.ts` is the exception that reads the SDE snapshot first and
 only wraps `loadWithCache` for what the snapshot misses — see **NPC stations
 come from the SDE snapshot** below.
