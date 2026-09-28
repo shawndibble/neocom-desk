@@ -25,6 +25,19 @@
         background-color: #0a0e14;
       }
     </style>
+    <!-- Applies the stored text scale (src/lib/fontScale.ts) before the first
+         paint, from the localStorage mirror that store keeps: its own Dexie
+         hydrate lands a frame or more later, and every rem on the page would
+         jump when it did. A classic script, so it runs before the module
+         entry. The step list duplicates FONT_SCALE_STEPS, which
+         src/app/indexHtmlFontScale.test.ts keeps in step. -->
+    <script id="font-scale-boot">
+      try {
+        var s = Number(localStorage.getItem('neocom:font-scale'));
+        if ([0.875, 1, 1.125, 1.25].indexOf(s) !== -1)
+          document.documentElement.style.fontSize = s * 100 + '%';
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
