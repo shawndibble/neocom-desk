@@ -56,7 +56,10 @@ const target: TargetPlan = {
   addEntries: vi.fn(async (entries) => ({ planId: 'p', planName: 'Crow', added: [...entries] })),
   removeEntries: vi.fn(async () => {}),
 };
-vi.mock('@/features/skills/useTargetPlan', () => ({ useTargetPlan: () => target }));
+vi.mock('@/features/skills/useTargetPlan', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTargetPlan: () => target,
+}));
 
 const MERLIN_BLUEPRINT = 954;
 vi.mock('@/features/industry/blueprintCatalog', async (importOriginal) => {

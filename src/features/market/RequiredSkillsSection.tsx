@@ -13,7 +13,7 @@ import { isEntryCovered, plannedLevelFor } from '@/features/skills/planner/reord
 import { SkillRow } from '@/features/skills/SkillRow';
 import { skillTrainingStatus } from '@/features/skills/skillStatus';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
-import type { TargetPlan } from '@/features/skills/useTargetPlan';
+import { targetPlanEntries, type TargetPlan } from '@/features/skills/useTargetPlan';
 import { openSkillDetailModal } from '@/stores/skillDetailModal';
 import { skillNameOrFallback } from './skillNameOrFallback';
 
@@ -48,8 +48,7 @@ export function RequiredSkillsSection({
   // to "Add" still being clickable and silently no-op'ing (issue report:
   // "clicked Add to Skill Plan and nothing happened" — the skill was already
   // there from before).
-  const selectedPlan = target.plans?.find((p) => p.id === target.targetPlanId);
-  const planEntries = selectedPlan?.entries ?? [];
+  const planEntries = targetPlanEntries(target);
 
   return (
     <div>

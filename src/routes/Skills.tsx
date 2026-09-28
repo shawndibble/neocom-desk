@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/db';
 import {
   Caret,
   DataAgeBadge,
@@ -249,6 +251,31 @@ export function Skills() {
     () => toTrainedSkillsMap(skillsResult?.data?.skills ?? []),
     [skillsResult]
   );
+
+  // Every plan this row's own context menu can add into (it targets any of
+  // them, not one "current" plan — see `SkillRowContextMenu`), merged by
+  // skill at the highest level any of them asks. Drives the bar's planned
+  // mark: without it a skill already queued in a plan looks identical to one
+  // that isn't (issue: no indicator anywhere a skill can be added to a plan).
+  const skillPlans = useLiveQuery(
+    () =>
+      activeCharacterId === null
+        ? []
+        : db.skillPlans.where('characterId').equals(activeCharacterId).toArray(),
+    [activeCharacterId]
+  );
+  const plannedLevels = useMemo(() => {
+    const levels = new Map<number, number>();
+    for (const plan of skillPlans ?? []) {
+      for (const entry of plan.entries) {
+        levels.set(
+          entry.skillTypeID,
+          Math.max(levels.get(entry.skillTypeID) ?? 0, entry.targetLevel)
+        );
+      }
+    }
+    return levels;
+  }, [skillPlans]);
 
   const inspector = useMemo(() => {
     if (selectedSkillTypeID === null || !catalog) return null;
@@ -499,7 +526,11 @@ export function Skills() {
                                 </span>
                                 {training?.skillTypeID === skill.skillTypeID && trainingChip}
                               </span>
-                              <SkillBar level={skill.level} progress={progress} />
+                              <SkillBar
+                                level={skill.level}
+                                progress={progress}
+                                plannedLevel={plannedLevels.get(skill.skillTypeID) ?? null}
+                              />
                               <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
                                 {skill.sp === null
                                   ? t('common.unknown')

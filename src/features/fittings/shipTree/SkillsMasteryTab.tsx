@@ -23,7 +23,7 @@ import { SkillRow } from '@/features/skills/SkillRow';
 import { openSkillDetailModal } from '@/stores/skillDetailModal';
 import { skillTrainingStatus } from '@/features/skills/skillStatus';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
-import type { TargetPlan } from '@/features/skills/useTargetPlan';
+import { targetPlanEntries, type TargetPlan } from '@/features/skills/useTargetPlan';
 import { formatDuration } from '@/lib/duration';
 import { cx } from '@/lib/cx';
 import type { ShipTreeShip } from '@/sde/types';
@@ -62,8 +62,7 @@ export function SkillsMasteryTab({
   const hasCharacter = characterId !== null;
   const mastery = source.statuses.get(ship.typeID)?.mastery ?? 0;
   const tiers = source.masteries[String(ship.typeID)];
-  const selectedPlan = target.plans?.find((p) => p.id === target.targetPlanId);
-  const planEntries = useMemo(() => selectedPlan?.entries ?? [], [selectedPlan]);
+  const planEntries = useMemo(() => targetPlanEntries(target), [target]);
   const [tier, setTier] = useState(() => Math.min(5, mastery + 1));
   const storedShowMissing = useShipInfoShowMissing((state) => state.value);
   const setShowMissing = useShipInfoShowMissing((state) => state.setValue);
@@ -99,50 +98,45 @@ export function SkillsMasteryTab({
     [hasTiers, tiers, tier, trainedLevel, planEntries]
   );
 
-  const tierSeconds = useMemo(() => {
-    if (!hasCharacter || tierBundle.length === 0) return new Map<number, number>();
-    const entries = tierBundle.map((p) => ({ skillTypeID: p.skillTypeID, targetLevel: p.level }));
-    const scheduled = scheduleEntries(entries, {
-      skills: source.catalog.engineSkills,
+  // Shared by both schedule calls below, so the six-field context — and the
+  // deps array that goes with it — exists in one place, not two.
+  const scheduleCtx = useMemo(
+    () =>
+      hasCharacter
+        ? {
+            skills: source.catalog.engineSkills,
+            trainedSkills,
+            attributes: source.attributes,
+            implants: source.implants,
+            cloneState: source.cloneState,
+          }
+        : null,
+    [
+      hasCharacter,
+      source.catalog,
       trainedSkills,
-      attributes: source.attributes,
-      implants: source.implants,
-      cloneState: source.cloneState,
-    });
+      source.attributes,
+      source.implants,
+      source.cloneState,
+    ]
+  );
+
+  const tierSeconds = useMemo(() => {
+    if (!scheduleCtx || tierBundle.length === 0) return new Map<number, number>();
+    const entries = tierBundle.map((p) => ({ skillTypeID: p.skillTypeID, targetLevel: p.level }));
+    const scheduled = scheduleEntries(entries, scheduleCtx);
     const seconds = new Map<number, number>();
     for (const step of scheduled) {
       seconds.set(step.skillTypeID, (seconds.get(step.skillTypeID) ?? 0) + step.seconds);
     }
     return seconds;
-  }, [
-    hasCharacter,
-    tierBundle,
-    source.catalog,
-    trainedSkills,
-    source.attributes,
-    source.implants,
-    source.cloneState,
-  ]);
+  }, [scheduleCtx, tierBundle]);
 
   const tierTotalSeconds = useMemo(() => {
-    if (!hasCharacter || toAdd.length === 0) return 0;
-    const scheduled = scheduleEntries(toAdd, {
-      skills: source.catalog.engineSkills,
-      trainedSkills,
-      attributes: source.attributes,
-      implants: source.implants,
-      cloneState: source.cloneState,
-    });
+    if (!scheduleCtx || toAdd.length === 0) return 0;
+    const scheduled = scheduleEntries(toAdd, scheduleCtx);
     return scheduled.reduce((sum, step) => sum + step.seconds, 0);
-  }, [
-    hasCharacter,
-    toAdd,
-    source.catalog,
-    trainedSkills,
-    source.attributes,
-    source.implants,
-    source.cloneState,
-  ]);
+  }, [scheduleCtx, toAdd]);
 
   async function addTier() {
     const result = await target.addEntries(unplanned, ship.name);

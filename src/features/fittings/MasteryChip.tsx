@@ -29,7 +29,7 @@ import {
 } from '@/features/skills/ships/unifiedShipRows';
 import { SkillRow } from '@/features/skills/SkillRow';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
-import { useTargetPlan } from '@/features/skills/useTargetPlan';
+import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
 
 const TIERS = [0, 1, 2, 3, 4] as const;
 const TOAST_MS = 8000;
@@ -103,7 +103,7 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
   const visible = hideCompleted ? rows.filter((row) => row.status !== 'trained') : rows;
   const untrained = visible.filter((row) => row.status !== 'trained');
   const totalSeconds = untrained.reduce((sum, row) => sum + row.seconds, 0);
-  const planEntries = target.plans?.find((p) => p.id === target.targetPlanId)?.entries ?? [];
+  const planEntries = targetPlanEntries(target);
 
   async function add(entries: readonly PlanEntry[]) {
     const result = await target.addEntries(entries, hullName);
