@@ -24,6 +24,9 @@ import {
   createHandlerBoundToURL,
 } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
+import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
+import { ExpirationPlugin } from 'workbox-expiration';
+import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import {
   handleNotificationClick,
   urlFromNotificationData,
@@ -42,7 +45,13 @@ self.addEventListener('message', (event) => {
 clientsClaim();
 
 cleanupOutdatedCaches();
-precacheAndRoute(self.__WB_MANIFEST);
+// `v` joins Workbox's default ignore list (which passing this option
+// replaces): SDE loaders request `/data/<file>?v=<content hash>`
+// (src/sde/sdeDataUrl.ts), and a precached file must still be served from
+// the precache — its own revision already tracks the same bytes.
+precacheAndRoute(self.__WB_MANIFEST, {
+  ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^v$/],
+});
 
 // SPA fallback: any non-precached navigation resolves to the cached
 // index.html, except API calls (never a page navigation, but matches the
@@ -50,6 +59,63 @@ precacheAndRoute(self.__WB_MANIFEST);
 registerRoute(
   new NavigationRoute(createHandlerBoundToURL('/index.html'), {
     denylist: [/^\/api\//],
+  })
+);
+
+const DAY_SECONDS = 24 * 60 * 60;
+// Only a real 200 is cached. The <img>s that load these (src/lib/eveImages.ts
+// call sites) set crossOrigin="anonymous" — the image server answers with
+// `Access-Control-Allow-Origin: *` — so responses are readable rather than
+// opaque, and an error (e.g. a blueprint's 400 on /icon) is never cached.
+const cacheOnly200 = new CacheableResponsePlugin({ statuses: [200] });
+
+// SDE files not in the precache (vite.config.ts globIgnores): cache-first
+// under their content-versioned URL. A changed file is a new `?v=`, i.e. a
+// cache miss, so this never serves stale SDE; unchanged files survive any
+// number of deploys. maxEntries ~2x the file count so superseded versions
+// get evicted rather than accumulating.
+registerRoute(
+  ({ url, sameOrigin }) =>
+    sameOrigin && url.pathname.startsWith('/data/') && url.searchParams.has('v'),
+  new CacheFirst({
+    cacheName: 'sde-data',
+    plugins: [cacheOnly200, new ExpirationPlugin({ maxEntries: 32, purgeOnQuotaError: true })],
+  })
+);
+
+// EVE image server: every icon/render/bp is `max-age=3600`, so without this
+// each one revalidated hourly. Type art only changes with a game expansion.
+registerRoute(
+  ({ url }) => url.origin === 'https://images.evetech.net' && url.pathname.startsWith('/types/'),
+  new CacheFirst({
+    cacheName: 'eve-type-images',
+    plugins: [
+      cacheOnly200,
+      new ExpirationPlugin({
+        maxEntries: 3000,
+        maxAgeSeconds: 30 * DAY_SECONDS,
+        purgeOnQuotaError: true,
+      }),
+    ],
+  })
+);
+
+// Portraits and logos do change (a new portrait, a corp rebrand): serve the
+// cached one instantly and refresh it in the background.
+registerRoute(
+  ({ url }) =>
+    url.origin === 'https://images.evetech.net' &&
+    /^\/(characters|corporations|alliances)\//.test(url.pathname),
+  new StaleWhileRevalidate({
+    cacheName: 'eve-portraits',
+    plugins: [
+      cacheOnly200,
+      new ExpirationPlugin({
+        maxEntries: 500,
+        maxAgeSeconds: 30 * DAY_SECONDS,
+        purgeOnQuotaError: true,
+      }),
+    ],
   })
 );
 

@@ -397,6 +397,7 @@ function ShipRender({ typeId }: { typeId: number }) {
   return (
     <img
       src={failed ? typeIconUrl(typeId, 128) : typeRenderUrl(typeId, 512)}
+      crossOrigin="anonymous"
       alt=""
       aria-hidden="true"
       loading="lazy"

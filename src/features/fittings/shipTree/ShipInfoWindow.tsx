@@ -131,6 +131,7 @@ function ShipInfoHeader({ ship, source }: { ship: ShipTreeShip; source: ShipTree
     <div className="flex gap-3">
       <img
         src={typeRenderUrl(ship.typeID, 256)}
+        crossOrigin="anonymous"
         alt=""
         className="h-28 w-28 shrink-0 rounded-xs border border-line object-cover"
       />

@@ -213,6 +213,7 @@ function CharacterTab({
     <div className="flex items-start gap-3 text-xs">
       <img
         src={characterPortraitUrl(data.character_id, 128)}
+        crossOrigin="anonymous"
         alt=""
         width={64}
         height={64}
@@ -272,6 +273,7 @@ function CorporationTab({
     <div className="flex items-start gap-3 text-xs">
       <img
         src={corporationLogoUrl(data.corporation_id, 128)}
+        crossOrigin="anonymous"
         alt=""
         width={64}
         height={64}
@@ -317,6 +319,7 @@ function AllianceTab({ state }: { state: TabState<PublicAllianceInfo> }) {
     <div className="flex items-start gap-3 text-xs">
       <img
         src={allianceLogoUrl(data.alliance_id, 128)}
+        crossOrigin="anonymous"
         alt=""
         width={64}
         height={64}

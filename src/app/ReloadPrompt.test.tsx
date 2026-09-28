@@ -213,13 +213,14 @@ describe('ReloadPrompt', () => {
       vi.unstubAllGlobals();
     });
 
-    it('re-fetches the service worker and updates it on a healthy response', async () => {
-      vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 200 }));
+    it('checks for an update without downloading sw.js a second time itself', async () => {
       const { update } = setup();
 
       await vi.advanceTimersByTimeAsync(THIRTY_MINUTES_MS);
 
-      expect(fetch).toHaveBeenCalledWith('sw.js', expect.objectContaining({ cache: 'no-store' }));
+      // registration.update() already fetches sw.js past the HTTP cache; a
+      // pre-fetch of our own made every check download it twice.
+      expect(fetch).not.toHaveBeenCalled();
       expect(update).toHaveBeenCalledTimes(1);
     });
 
@@ -233,21 +234,21 @@ describe('ReloadPrompt', () => {
       expect(update).not.toHaveBeenCalled();
     });
 
-    it('survives a failed fetch and still checks again next tick', async () => {
-      vi.mocked(fetch)
-        .mockRejectedValueOnce(new Error('offline'))
-        .mockResolvedValue(new Response(null, { status: 200 }));
-      const { update } = setup();
+    it('survives a failed update check and still checks again next tick', async () => {
+      const registration = {
+        installing: null,
+        update: vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined),
+      };
+      setup(registration);
 
       await vi.advanceTimersByTimeAsync(THIRTY_MINUTES_MS);
-      expect(update).not.toHaveBeenCalled();
+      expect(registration.update).toHaveBeenCalledTimes(1);
 
       await vi.advanceTimersByTimeAsync(THIRTY_MINUTES_MS);
-      expect(update).toHaveBeenCalledTimes(1);
+      expect(registration.update).toHaveBeenCalledTimes(2);
     });
 
     it('starts only one interval when StrictMode double-invokes registration for the same registration', async () => {
-      vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 200 }));
       const registration = setup();
       fireOnRegistered(registration);
 
