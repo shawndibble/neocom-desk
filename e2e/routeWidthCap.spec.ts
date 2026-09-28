@@ -17,7 +17,13 @@ test('LP Store root content is capped at max-w-6xl on desktop', async ({ page })
   await signInAndGoto(page, `./wallet/loyalty/${CORPORATION_ID}`);
   await page.setViewportSize(DESKTOP);
 
-  await expect(page.getByRole('heading', { level: 1, name: 'LP Store' })).toBeVisible();
+  // Level 2, not 1: the route's `PageHeader` h1 races the corp-name fetch —
+  // it reads "LP Store" only until the name resolves, then flips to the
+  // corp's own name (here "Test Corp", seeded fast enough to usually beat
+  // this assertion's first poll) — while the offers `Panel`'s own h2 always
+  // reads "LP Store", corp name or not. Asserting on the h1 made this test
+  // flaky: pass only on the rare poll that landed before the fetch resolved.
+  await expect(page.getByRole('heading', { level: 2, name: 'LP Store' })).toBeVisible();
   // `main`'s direct child is `Layout`'s own focus-management wrapper
   // (`focus:outline-none`, no width classes of its own) — the route's capped
   // root div is its child.
