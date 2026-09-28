@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import {
   BACKGROUND_SYNC_BOOT_DELAY_MS,
@@ -16,6 +16,24 @@ const syncMock = vi.hoisted(() => ({
 }));
 vi.mock('@/sync', () => syncMock);
 vi.mock('./syncStatus', () => ({ isSyncConfigured: () => true }));
+
+const leaderMock = vi.hoisted(() => {
+  let leader = true;
+  const listeners = new Set<() => void>();
+  return {
+    isTabLeader: () => leader,
+    onTabLeaderChange: (listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    /** Simulate the election: another tab leads (`false`) or this one does. */
+    setLeader(next: boolean) {
+      leader = next;
+      listeners.forEach((listener) => listener());
+    },
+  };
+});
+vi.mock('@/lib/tabLeader', () => leaderMock);
 
 const NOW = 1_756_000_000_000;
 
@@ -200,5 +218,33 @@ describe('useBackgroundSync', () => {
     vi.advanceTimersByTime(BACKGROUND_SYNC_MIN_GAP_MS + BACKGROUND_SYNC_TICK_MS);
 
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
+  describe('with another tab leading', () => {
+    afterEach(() => leaderMock.setLeader(true));
+
+    it('does not sweep while another tab leads', () => {
+      leaderMock.setLeader(false);
+      mountPastBoot([1]);
+      vi.advanceTimersByTime(BACKGROUND_SYNC_MIN_GAP_MS + BACKGROUND_SYNC_TICK_MS);
+      becomeVisible();
+      expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+    });
+
+    it('sweeps at once on taking leadership over', () => {
+      leaderMock.setLeader(false);
+      mountPastBoot([1]);
+      leaderMock.setLeader(true);
+      expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
+    });
+
+    it('winning leadership at boot still waits out the boot delay', () => {
+      leaderMock.setLeader(false);
+      renderHook(() => useBackgroundSync([1]));
+      leaderMock.setLeader(true);
+      expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(BACKGROUND_SYNC_BOOT_DELAY_MS);
+      expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
+    });
   });
 });

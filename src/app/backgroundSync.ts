@@ -17,6 +17,7 @@
 import { useEffect, useRef } from 'react';
 import { getSyncStatus, scheduleSync } from '@/sync';
 import { isSyncConfigured } from './syncStatus';
+import { isTabLeader, onTabLeaderChange } from '@/lib/tabLeader';
 
 /**
  * Smallest gap between two sweeps *of one Character*. Five minutes is well
@@ -95,6 +96,8 @@ export function useBackgroundSync(characterIds: readonly number[]): void {
       // A hidden tab has nobody reading its alerts, and sweeping one would
       // spend the gap that the first real look wants.
       if (document.visibilityState !== 'visible') return;
+      // Every Character is swept by one tab — the Tab Leader — not by each.
+      if (!isTabLeader()) return;
       const now = Date.now();
       for (const characterId of idsRef.current) {
         const synced = getSyncStatus(characterId).lastSyncedAt;
@@ -119,7 +122,13 @@ export function useBackgroundSync(characterIds: readonly number[]): void {
     else sweep();
     document.addEventListener('visibilitychange', sweep);
     const tick = window.setInterval(sweep, BACKGROUND_SYNC_TICK_MS);
+    // A tab taking leadership over sweeps at once — but not before the boot
+    // hold-off, which winning the election at boot would otherwise skip.
+    const stopLeaderWatch = onTabLeaderChange(() => {
+      if (Date.now() >= (bootSweepAt.current ?? Infinity)) sweep();
+    });
     return () => {
+      stopLeaderWatch();
       window.clearTimeout(bootSweep);
       document.removeEventListener('visibilitychange', sweep);
       window.clearInterval(tick);
