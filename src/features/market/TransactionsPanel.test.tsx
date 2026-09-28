@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { TransactionsPanel } from './TransactionsPanel';
@@ -52,6 +52,11 @@ function transaction(overrides: Partial<WalletTransaction> = {}): WalletTransact
   };
 }
 
+/** Renders the current query string, so a test can assert the filter params left the URL. */
+function LocationProbe() {
+  return <output data-testid="location-search">{useLocation().search}</output>;
+}
+
 function renderPanel(url = '/market/history/transactions') {
   const actions = fakeItemActions();
   const onViewChange = vi.fn();
@@ -60,6 +65,7 @@ function renderPanel(url = '/market/history/transactions') {
       <FakeItemActions actions={actions}>
         <TransactionsPanel onViewChange={onViewChange} />
       </FakeItemActions>
+      <LocationProbe />
     </MemoryRouter>
   );
   return { actions, onViewChange };
@@ -174,6 +180,7 @@ describe('TransactionsPanel — desktop filter and totals', () => {
     expect(await screen.findByRole('row', { name: /Damage Control II/ })).toBeInTheDocument();
     expect(screen.getByRole('row', { name: /Tritanium/ })).toBeInTheDocument();
     expect(screen.queryByText('No transactions match this filter.')).toBeNull();
+    expect(screen.getByTestId('location-search')).not.toHaveTextContent('txn.');
   });
 
   it('says when the fetch stopped at the page cap, so the totals are not read as full history', async () => {
