@@ -14,6 +14,7 @@ import { romanLevel } from '@/engine/projection';
 import type { PlanEntry } from '@/engine/types';
 import { RequiredSkillsSection } from '@/features/market/RequiredSkillsSection';
 import { SkillRow } from '@/features/skills/SkillRow';
+import { openSkillDetailModal } from '@/stores/skillDetailModal';
 import { skillTrainingStatus } from '@/features/skills/skillStatus';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import type { TargetPlan } from '@/features/skills/useTargetPlan';
@@ -161,12 +162,19 @@ export function SkillsMasteryTab({
                       {hasCharacter ? (
                         <SkillRow
                           name={`${skillName(p.skillTypeID)} ${romanLevel(p.level)}`}
+                          skillTypeID={p.skillTypeID}
                           status={skillTrainingStatus(have, p.level)}
                           currentLevel={have}
                         />
                       ) : (
                         <div className="flex items-center gap-3">
-                          <span className="flex-1 text-text">{skillName(p.skillTypeID)}</span>
+                          <button
+                            type="button"
+                            onClick={() => openSkillDetailModal(p.skillTypeID)}
+                            className="flex-1 text-left text-text hover:underline"
+                          >
+                            {skillName(p.skillTypeID)}
+                          </button>
                           <span className="text-text-dim">
                             {t('plans.level', { level: p.level })}
                           </span>

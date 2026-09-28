@@ -9,6 +9,7 @@ import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { TRADE_HUBS } from '@/market/hubs';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
+import type { BuildResult } from '@/engine/industry/types';
 
 const useLoyaltyStoreOffers = vi.fn();
 vi.mock('@/features/loyalty/useLoyaltyStoreOffers', () => ({
@@ -467,8 +468,12 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     await user.click(screen.getByText('Vexor Navy Issue Blueprint'));
 
     expect(screen.getByText('Required items')).toBeInTheDocument();
-    expect(screen.getByText('8 × Serpentis Palladium Tag')).toBeInTheDocument();
-    expect(screen.getByText('1 × Shadow Serpentis Gold Tag')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Serpentis Palladium Tag' }).closest('dt')
+    ).toHaveTextContent('8 × Serpentis Palladium Tag');
+    expect(
+      screen.getByRole('link', { name: 'Shadow Serpentis Gold Tag' }).closest('dt')
+    ).toHaveTextContent('1 × Shadow Serpentis Gold Tag');
     // The Required items total must equal what profit already subtracted —
     // this reads it straight off `row.requiredItemsCost`, the same number
     // fed into `loyaltyOfferProfit`, so there's nothing here to recompute or
@@ -493,7 +498,9 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     const mobileUser = userEvent.setup();
     const mobile = renderStore();
     await mobileUser.click(screen.getByText('Vexor Navy Issue Blueprint'));
-    expect(screen.getByText('8 × Serpentis Palladium Tag')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Serpentis Palladium Tag' }).closest('dt')
+    ).toHaveTextContent('8 × Serpentis Palladium Tag');
     mobile.unmount();
 
     // Desktop: renders inline, no sheet.
@@ -502,8 +509,12 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     renderStore();
     await desktopUser.click(screen.getByText('Vexor Navy Issue Blueprint'));
     expect(screen.getByText('Required items')).toBeInTheDocument();
-    expect(screen.getByText('8 × Serpentis Palladium Tag')).toBeInTheDocument();
-    expect(screen.getByText('1 × Shadow Serpentis Gold Tag')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Serpentis Palladium Tag' }).closest('dt')
+    ).toHaveTextContent('8 × Serpentis Palladium Tag');
+    expect(
+      screen.getByRole('link', { name: 'Shadow Serpentis Gold Tag' }).closest('dt')
+    ).toHaveTextContent('1 × Shadow Serpentis Gold Tag');
   });
 
   it('marks an unpriced required item\'s line "Not priced", and names a required item as the cannot-be-priced cause', async () => {
@@ -513,7 +524,9 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
 
     await user.click(screen.getByText('Some Other Offer'));
 
-    expect(screen.getByText('3 × Unpriced Faction Tag')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Unpriced Faction Tag' }).closest('dt')
+    ).toHaveTextContent('3 × Unpriced Faction Tag');
     expect(screen.getAllByText('Not priced').length).toBeGreaterThan(0);
     expect(
       screen.getByText("Can't be priced at this hub — a required item has no listed sell price.")
@@ -532,5 +545,87 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
         "Can't be priced at this hub — a material or the product has no listed sell price."
       )
     ).toBeInTheDocument();
+  });
+});
+
+describe('LoyaltyStore offer detail market links (issue #2205)', () => {
+  const BUILD: BuildResult = {
+    materials: [
+      {
+        typeID: 40_500,
+        baseQuantity: 10,
+        quantity: 10,
+        ownedQuantity: 0,
+        remainingQuantity: 10,
+        unitPrice: 1_000,
+        lineCost: 10_000,
+        unpriced: false,
+      },
+    ],
+    seconds: 3600,
+    jobFee: { eiv: 0, grossCost: 0, sccSurcharge: 0, facilityTax: 0, total: 0 },
+    materialCost: 10_000,
+    totalCost: 10_000,
+    buyCost: null,
+    revenue: null,
+    salesTax: null,
+    brokerFee: null,
+    netRevenue: null,
+    profit: null,
+    marginPct: null,
+    iskPerHour: null,
+    grossProfit: null,
+    grossMargin: null,
+    grossIskPerHour: null,
+    breakEvenPrice: null,
+    unpricedMaterials: [],
+    unpriceable: false,
+    recommendation: 'build',
+  };
+
+  const BUILD_ROW: LoyaltyOfferRow = {
+    ...BLUEPRINT_ROW,
+    offer: offer({ offer_id: 40, type_id: 700 }),
+    itemName: 'Warp Disruptor II Blueprint',
+    build: BUILD,
+  };
+
+  function mockRows(rows: LoyaltyOfferRow[]) {
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: 'Federal Navy Academy',
+      offersFetchedAt: null,
+      offersFromCache: false,
+      rows,
+      catalog: null,
+      playerLp: 12_000,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+  }
+
+  it('renders "View in Market" as a real anchor to the product, forcing the LP Store hub', async () => {
+    mockRows([BLUEPRINT_ROW]);
+    const user = userEvent.setup();
+    renderStore();
+
+    await user.click(screen.getByText(BLUEPRINT_ROW.itemName));
+
+    const link = screen.getByRole('link', { name: /View in Market/ });
+    expect(link).toHaveAttribute('href', expect.stringContaining('type=300'));
+    expect(link).toHaveAttribute('href', expect.stringContaining('hub=jita'));
+  });
+
+  it('links each material name in the build breakdown to Market, forcing the LP Store hub', async () => {
+    mockRows([BUILD_ROW]);
+    const user = userEvent.setup();
+    renderStore();
+
+    await user.click(screen.getByText(BUILD_ROW.itemName));
+
+    const link = screen.getByRole('link', { name: '#40500' });
+    expect(link).toHaveAttribute('href', expect.stringContaining('type=40500'));
+    expect(link).toHaveAttribute('href', expect.stringContaining('hub=jita'));
   });
 });

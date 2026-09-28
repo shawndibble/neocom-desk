@@ -244,7 +244,7 @@ export function FittingCompare() {
   );
 
   return (
-    <div className="space-y-3">
+    <div className="mx-auto max-w-6xl space-y-3">
       <PageHeader
         title={t('fittings.compare.title')}
         actions={
@@ -261,7 +261,7 @@ export function FittingCompare() {
       {/* One wrapping toolbar from `md` up (label + select stay adjacent per group); phones keep the stacked rows. */}
       <div
         data-testid="compare-controls"
-        className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:gap-x-3 md:gap-y-2"
+        className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:gap-x-2 md:gap-y-2"
       >
         <DamageProfilePicker damageProfiles={damageProfiles} />
         <AbyssalWeatherPicker />
@@ -274,9 +274,7 @@ export function FittingCompare() {
           title={t('fittings.compare.emptyTitle')}
           hint={t('fittings.compare.emptyHint')}
           action={
-            <Button variant="primary" onClick={() => setPickerOpen(true)}>
-              {t('fittings.compare.addFitting')}
-            </Button>
+            <Button onClick={() => setPickerOpen(true)}>{t('fittings.compare.addFitting')}</Button>
           }
         />
       ) : (

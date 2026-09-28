@@ -21,9 +21,21 @@ import type { PriceSource } from '@/engine/miningTax/priceBasis';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, Panel, type DataTableColumn } from '@/components/ui';
-import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
+import {
+  COMPACT_ISK_Y_AXIS_MARGIN_LEFT,
+  COMPACT_ISK_Y_AXIS_WIDTH,
+  COMPACT_COUNT_Y_AXIS_WIDTH,
+} from '@/lib/chartAxis';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
-import { topTypesWithOther, type RankedType } from './topTypes';
+import { formatCompactNumber } from '@/lib/compactNumber';
+import {
+  topTypesWithOther,
+  topValuesWithOther,
+  type RankedType,
+  type ValueRanked,
+} from './topTypes';
+import type { DailyMetricPoint } from './chartAggregation';
+import type { ChartMetric } from './chartMetricPref';
 
 export interface DailyRatePoint {
   date: string;
@@ -53,10 +65,21 @@ interface ComparisonBar extends TypeComparisonPoint {
 }
 
 interface MiningYieldChartsProps {
+  /** Which quantity the two charts plot (issue #2160). ISK keeps every prior behaviour byte-for-byte; volume/count are a separate, simpler render. */
+  metric: ChartMetric;
   dailyRate: DailyRatePoint[];
+  dailyVolume: DailyMetricPoint[];
+  dailyCount: DailyMetricPoint[];
   typeComparison: TypeComparisonPoint[];
-  /** Issue #1281's page switch — raw-only bars with end labels and a note, no refined series at all. */
+  typeVolumeComparison: ValueRanked[];
+  typeCountComparison: ValueRanked[];
+  /** Issue #1281's page switch — raw-only bars with end labels and a note, no refined series at all. Ignored for volume/count, which never show a refined series or Legend. */
   showRefining: boolean;
+}
+
+/** A drawn bar for the volume/count comparison chart — one type, or the "Other" roll-up carrying the types it folds. */
+interface MetricComparisonBar extends ValueRanked {
+  folded?: ValueRanked[];
 }
 
 /** `date` is a bare calendar date — build the tick from Y/M/D components, never `new Date(string)`, to avoid a UTC/local day shift. */
@@ -118,11 +141,82 @@ function CompareTooltip({
   );
 }
 
-export default function MiningYieldCharts({
+/** `formatCompactNumber`, plus an "m³" suffix for the volume metric — count has no unit. */
+function formatMetricCompact(metric: 'volume' | 'count', value: number): string {
+  return metric === 'volume' ? `${formatCompactNumber(value)} m³` : formatCompactNumber(value);
+}
+
+/** `toLocaleString`, plus an "m³" suffix for the volume metric — the sr-only tables' full-precision figure. */
+function formatMetricFull(metric: 'volume' | 'count', value: number): string {
+  return metric === 'volume' ? `${value.toLocaleString()} m³` : value.toLocaleString();
+}
+
+function MetricRateTooltip({
+  active,
+  payload,
+  label,
+  metric,
+}: TooltipContentProps & { metric: 'volume' | 'count' }): React.ReactElement | null {
+  const { t } = useTranslation();
+  if (!active || !payload || payload.length === 0) return null;
+  const point = payload[0]?.payload as DailyMetricPoint | undefined;
+  if (!point) return null;
+  const valueLabel = t(
+    metric === 'volume' ? 'miningTax.overview.m3PerHour' : 'miningTax.overview.countPerHour'
+  );
+  return (
+    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs tabular-nums text-text shadow-lg shadow-black/50">
+      <p className="font-semibold">{typeof label === 'string' ? formatDateTick(label) : ''}</p>
+      <p>
+        {valueLabel}: {formatMetricCompact(metric, point.value)}
+      </p>
+      <p className="text-text-dim">
+        {t(
+          metric === 'volume'
+            ? 'miningTax.overview.rateChartBasisVolume'
+            : 'miningTax.overview.rateChartBasisCount'
+        )}
+      </p>
+    </div>
+  );
+}
+
+function MetricCompareTooltip({
+  active,
+  payload,
+  metric,
+}: TooltipContentProps & { metric: 'volume' | 'count' }): React.ReactElement | null {
+  const { t } = useTranslation();
+  if (!active || !payload || payload.length === 0) return null;
+  const point = payload[0]?.payload as MetricComparisonBar | undefined;
+  if (!point) return null;
+  const valueLabel = t(
+    metric === 'volume' ? 'miningTax.overview.volumeTotal' : 'miningTax.overview.countTotal'
+  );
+  return (
+    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs tabular-nums text-text shadow-lg shadow-black/50">
+      <p className="font-semibold">{point.typeName}</p>
+      <p>
+        {valueLabel}: {formatMetricCompact(metric, point.value)}
+      </p>
+      {point.folded && (
+        <ul className="mt-1 border-t border-line pt-1 text-text-dim">
+          {point.folded.map((type) => (
+            <li key={type.typeId}>
+              {type.typeName}: {formatMetricCompact(metric, type.value)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function IskCharts({
   dailyRate,
   typeComparison,
   showRefining,
-}: MiningYieldChartsProps) {
+}: Pick<MiningYieldChartsProps, 'dailyRate' | 'typeComparison' | 'showRefining'>) {
   const { t } = useTranslation();
   const compareChartTitle = t(
     showRefining
@@ -334,5 +428,210 @@ export default function MiningYieldCharts({
         )}
       </Panel>
     </div>
+  );
+}
+
+/**
+ * The volume/count render (issue #2160): a single-series rate chart and a
+ * single-series ore-type chart, always in "raw only" shape — no refined
+ * series, no Legend, regardless of the show-refining toggle, since neither
+ * metric has a refined side.
+ */
+function MetricCharts({
+  metric,
+  dailyPoints,
+  typeComparison,
+}: {
+  metric: 'volume' | 'count';
+  dailyPoints: DailyMetricPoint[];
+  typeComparison: ValueRanked[];
+}) {
+  const { t } = useTranslation();
+  const rateChartTitle = t(
+    metric === 'volume'
+      ? 'miningTax.overview.rateChartTitleVolume'
+      : 'miningTax.overview.rateChartTitleCount'
+  );
+  const rateChartBasis = t(
+    metric === 'volume'
+      ? 'miningTax.overview.rateChartBasisVolume'
+      : 'miningTax.overview.rateChartBasisCount'
+  );
+  const compareChartTitle = t(
+    metric === 'volume'
+      ? 'miningTax.overview.compareChartTitleVolume'
+      : 'miningTax.overview.compareChartTitleCount'
+  );
+  const rateValueLabel = t(
+    metric === 'volume' ? 'miningTax.overview.m3PerHour' : 'miningTax.overview.countPerHour'
+  );
+  const totalValueLabel = t(
+    metric === 'volume' ? 'miningTax.overview.volumeTotal' : 'miningTax.overview.countTotal'
+  );
+
+  const rateColumns = useMemo<DataTableColumn<DailyMetricPoint>[]>(
+    () => [
+      {
+        id: 'date',
+        header: t('miningTax.overview.dateColumn'),
+        render: (point) => formatDateTick(point.date),
+      },
+      {
+        id: 'value',
+        header: rateValueLabel,
+        render: (point) => formatMetricFull(metric, point.value),
+      },
+    ],
+    [t, rateValueLabel, metric]
+  );
+  const compareColumns = useMemo<DataTableColumn<ValueRanked>[]>(
+    () => [
+      {
+        id: 'type',
+        header: t('miningTax.overview.typeColumn'),
+        render: (point) => point.typeName,
+      },
+      {
+        id: 'value',
+        header: totalValueLabel,
+        render: (point) => formatMetricFull(metric, point.value),
+      },
+    ],
+    [t, totalValueLabel, metric]
+  );
+
+  const { top, other } = topValuesWithOther(typeComparison, { limit: TOP_TYPE_LIMIT });
+  const compareBars: MetricComparisonBar[] = other
+    ? [
+        ...top,
+        {
+          typeId: -1,
+          typeName: t('miningTax.overview.otherTypes', { count: other.types.length }),
+          value: other.value,
+          folded: other.types,
+        },
+      ]
+    : top;
+  // Always the "raw only" row height/margin — there is never a second series here.
+  const compareHeight = Math.max(256, compareBars.length * 24 + 32);
+
+  return (
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <Panel padded>
+        <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {rateChartTitle}
+        </p>
+        <p className="mb-1 text-[0.6875rem] text-text-dim">{rateChartBasis}</p>
+        <div role="img" aria-label={rateChartTitle} className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={dailyPoints}
+              margin={{ top: 8, right: 8, left: COMPACT_ISK_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
+            >
+              <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                tickFormatter={formatDateTick}
+                stroke="var(--color-text-dim)"
+                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+              />
+              <YAxis
+                stroke="var(--color-text-dim)"
+                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                width={COMPACT_COUNT_Y_AXIS_WIDTH}
+                tickFormatter={(value: number) => formatCompactNumber(value)}
+              />
+              <Tooltip content={(props) => <MetricRateTooltip {...props} metric={metric} />} />
+              <Bar dataKey="value" name={rateValueLabel} fill="var(--color-accent)" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="sr-only">
+          <DataTable
+            columns={rateColumns}
+            rows={dailyPoints}
+            rowKey={(point) => point.date}
+            label={rateChartTitle}
+          />
+        </div>
+      </Panel>
+
+      <Panel padded>
+        <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {compareChartTitle}
+        </p>
+        <div
+          role="img"
+          aria-label={compareChartTitle}
+          className="w-full"
+          style={{ height: compareHeight }}
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={compareBars}
+              layout="vertical"
+              margin={{ top: 8, right: 56, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
+              <XAxis
+                type="number"
+                stroke="var(--color-text-dim)"
+                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                tickFormatter={(value: number) => formatCompactNumber(value)}
+              />
+              <YAxis
+                type="category"
+                dataKey="typeName"
+                stroke="var(--color-text-dim)"
+                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                interval={0}
+                width={120}
+              />
+              <Tooltip content={(props) => <MetricCompareTooltip {...props} metric={metric} />} />
+              <Bar dataKey="value" fill="var(--color-line-bright)" name={totalValueLabel}>
+                <LabelList
+                  dataKey="value"
+                  position="right"
+                  formatter={(value: unknown) => formatMetricCompact(metric, Number(value))}
+                  style={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="sr-only">
+          <DataTable
+            columns={compareColumns}
+            rows={typeComparison}
+            rowKey={(point) => point.typeId}
+            label={compareChartTitle}
+          />
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+export default function MiningYieldCharts({
+  metric,
+  dailyRate,
+  dailyVolume,
+  dailyCount,
+  typeComparison,
+  typeVolumeComparison,
+  typeCountComparison,
+  showRefining,
+}: MiningYieldChartsProps) {
+  if (metric === 'volume' || metric === 'count') {
+    return (
+      <MetricCharts
+        metric={metric}
+        dailyPoints={metric === 'volume' ? dailyVolume : dailyCount}
+        typeComparison={metric === 'volume' ? typeVolumeComparison : typeCountComparison}
+      />
+    );
+  }
+  return (
+    <IskCharts dailyRate={dailyRate} typeComparison={typeComparison} showRefining={showRefining} />
   );
 }

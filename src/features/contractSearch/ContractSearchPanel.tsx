@@ -75,6 +75,7 @@ import {
 } from '@/features/contractSearch/contractSearchNames';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { seedFromOfferRow } from '@/features/industry/planSeed';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import {
   PublicContractDetailModal,
   type PublicContractDetailModalStatChip,
@@ -801,7 +802,11 @@ export function ContractSearchPanel({
         header: t('contractSearch.itemColumn'),
         primary: true,
         sortValue: (row) => typeNames.get(row.typeId) ?? `#${row.typeId}`,
-        render: (row) => typeNames.get(row.typeId) ?? `#${row.typeId}`,
+        render: (row) => (
+          <MarketItemLink typeId={row.typeId}>
+            {typeNames.get(row.typeId) ?? `#${row.typeId}`}
+          </MarketItemLink>
+        ),
       },
     ];
     for (const id of CONTRACT_SEARCH_ITEMS_COLUMN_IDS) {

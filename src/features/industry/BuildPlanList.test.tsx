@@ -314,6 +314,23 @@ describe('BuildPlanList: build groups (#626)', () => {
     expect(screen.getByText('Data Analyzer II')).toBeInTheDocument();
   });
 
+  it('titles the truncated group name button with the full name (#2175)', () => {
+    const longName = 'Punisher Hull Line — bulk run for the Amarr Navy Issue reprocessing project';
+    renderGrouped({
+      groups: [{ id: 'g1', name: longName, order: 0 }],
+    });
+    expect(screen.getByText(longName)).toHaveAttribute('title', longName);
+  });
+
+  it('titles the truncated plan name button with the full name (#2175)', () => {
+    const longName = 'Punisher Hull Line — bulk run for the Amarr Navy Issue reprocessing project';
+    renderGrouped({
+      plans: [plan({ id: 'a', name: longName, buildGroupId: 'g1' })],
+      expandedGroupIds: new Set(['g1']),
+    });
+    expect(screen.getByText(longName)).toHaveAttribute('title', longName);
+  });
+
   it('always lists a plan that is in no group', () => {
     renderGrouped();
     expect(screen.getByText('Rokh')).toBeInTheDocument();
