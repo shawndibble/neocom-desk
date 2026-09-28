@@ -414,7 +414,7 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
 
   return (
     <ItemActionsProvider page={itemActions}>
-      <div className="space-y-4">
+      <div className="mx-auto max-w-6xl space-y-4">
         {/*
         Title, tabs, data age and the refresh action on one 36px line (#566).
         The three stacked bands this replaces — `PageHeader`, then `CorpSubNav`,
@@ -528,7 +528,7 @@ export function Corp() {
   // that from Settings' Corporation Permission row.
   if (gate.status === 'denied') {
     return (
-      <div className="space-y-4">
+      <div className="mx-auto max-w-6xl space-y-4">
         <PageHeader title={t('corp.title')} />
         <CorpDenied
           reason={gate.reason}

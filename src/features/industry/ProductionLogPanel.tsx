@@ -25,6 +25,7 @@ import type { SkillLevels } from '@/engine/industry/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import {
@@ -424,7 +425,7 @@ export function ProductionLogPanel({
       header: t('industry.product'),
       primary: true,
       sortValue: (r) => r.itemName,
-      render: (r) => r.itemName,
+      render: (r) => <MarketItemLink typeId={r.productTypeID}>{r.itemName}</MarketItemLink>,
     },
     {
       id: 'runsLogged',
@@ -492,7 +493,7 @@ export function ProductionLogPanel({
       id: 'item',
       header: t('industry.productionRunColumnItem'),
       sortValue: (r) => r.itemName,
-      render: (r) => r.itemName,
+      render: (r) => <MarketItemLink typeId={r.run.productTypeID}>{r.itemName}</MarketItemLink>,
     },
     quantityColumn(t),
     totalCostColumn(t),

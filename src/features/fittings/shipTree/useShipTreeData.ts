@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { hullStatuses } from '@/engine/shipTree/status';
 import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
-import type { CloneState, TrainedSkill } from '@/engine/types';
+import type { Attributes, CloneState, Implants, TrainedSkill } from '@/engine/types';
 import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import type { SkillCatalog } from '@/features/skills/skillMap';
@@ -35,6 +35,10 @@ export interface ShipTreeSource {
   alphaMaxLevel: (skillTypeID: number) => number;
   /** A skill's name, or `#id` when the catalog doesn't know it. */
   skillName: (skillTypeID: number) => string;
+  /** The active Character's attributes, implants and clone — what a training-time estimate needs. Meaningless with no Character; callers gate on `characterId !== null` first. */
+  attributes: Attributes;
+  implants: Implants;
+  cloneState: CloneState;
 }
 
 /** Null until the tree and the skill catalog have both loaded; `'failed'` when either can't be. */
@@ -103,7 +107,20 @@ export function useShipTreeData(characterId: number | null): ShipTreeSource | nu
       trainedLevel: (id: number) => trainedSkills.get(id)?.level ?? 0,
       alphaMaxLevel: (id: number) => catalog.engineSkills.get(id)?.alphaMaxLevel ?? 0,
       skillName: (id: number) => catalog.bySkillTypeID.get(id)?.name ?? `#${id}`,
+      attributes,
+      implants,
+      cloneState,
     };
-  }, [data, masteries, catalog, characterId, trainedSkills, statuses]);
+  }, [
+    data,
+    masteries,
+    catalog,
+    characterId,
+    trainedSkills,
+    statuses,
+    attributes,
+    implants,
+    cloneState,
+  ]);
   return failed ? 'failed' : source;
 }

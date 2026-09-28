@@ -57,7 +57,10 @@ const target: TargetPlan = {
   })),
   removeEntries: vi.fn(async () => {}),
 };
-vi.mock('@/features/skills/useTargetPlan', () => ({ useTargetPlan: () => target }));
+vi.mock('@/features/skills/useTargetPlan', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTargetPlan: () => target,
+}));
 
 async function openChip(user: ReturnType<typeof userEvent.setup>, hullTypeId = 626) {
   render(<MasteryChip hullTypeId={hullTypeId} hullName="Vexor" characterId={1} />);
