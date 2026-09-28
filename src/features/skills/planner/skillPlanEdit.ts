@@ -17,16 +17,26 @@
  * extra synced write.
  */
 import type { SkillPlanRecord } from '@/db';
-import type { RemapSegment } from '@/engine/optimizer';
+import { normalizePlan } from '@/engine/plan';
+import { optimizeAtMarkers } from '@/engine/optimizer';
+import type { BoosterContext, RemapSegment } from '@/engine/optimizer';
+import { hasKnownSkill } from '@/engine/remapMarkers';
 import type {
   Attributes,
+  CloneState,
   EngineSkill,
+  Implants,
   PlanEntry,
   PlanPriority,
   PlanStep,
   TrainedSkill,
 } from '@/engine/types';
-import { normalizeMarkerAttributes, normalizeMarkers, segmentsToMarkers } from './markers';
+import {
+  markerStepIndices,
+  normalizeMarkerAttributes,
+  normalizeMarkers,
+  segmentsToMarkers,
+} from './markers';
 import { planDrop, promotePrereq, type PlanDropResult, type PlanDropState } from './planDrop';
 import type { MergedRow } from './queueRows';
 import {
@@ -194,10 +204,73 @@ export function replaceWithImport(
   };
 }
 
+/** Whatever the optimizer needs to re-price a segment, once its markers land. */
+export interface RemapPricingContext {
+  currentAttributes: Attributes;
+  implants?: Implants;
+  cloneState?: CloneState;
+  booster?: BoosterContext;
+}
+
+function attributesEqual(a: Attributes, b: Attributes): boolean {
+  return (
+    a.intelligence === b.intelligence &&
+    a.memory === b.memory &&
+    a.perception === b.perception &&
+    a.willpower === b.willpower &&
+    a.charisma === b.charisma
+  );
+}
+
 /**
- * Accept on "Place remaps only" / "Use my remap markers": the markers become
- * one per remapped segment, replacing the old ones wholesale. Their
- * overrides go too — they were for a segmentation this just discarded.
+ * `segmentsToMarkers` snaps a boundary that falls mid-entry (a prereq chain
+ * spanning two attribute pairs) forward to the entry after it — correct,
+ * since a remap can't happen mid-skill, but it can shift a step or two out of
+ * the segment `placeRemaps` costed onto its neighbor. Re-pricing each
+ * resulting segment at its ACTUAL (snapped) boundary can then land it on the
+ * exact same attribute spread as the segment before it: a remap that changed
+ * nothing. Dropping that marker is only safe for markers the OPTIMIZER just
+ * proposed (Optimize Remaps / Optimize for me) — never for the user's own
+ * Remap Markers (Optimize at my markers), which this must not silently
+ * delete. Filters out catalog-missing entries first, the same way
+ * `segmentsToMarkers`/`markerStepIndices` do, since `normalizePlan` throws on
+ * an unknown skill typeID.
+ */
+function dropRedundantMarkers(
+  entries: readonly PlanEntry[],
+  markers: readonly number[],
+  skills: ReadonlyMap<number, EngineSkill>,
+  trainedSkills: ReadonlyMap<number, TrainedSkill>,
+  pricing: RemapPricingContext
+): number[] {
+  if (markers.length === 0) return markers as number[];
+  const knownEntries = entries.filter((e) => hasKnownSkill(e, skills));
+  const steps = normalizePlan(knownEntries, skills, trainedSkills);
+  const stepIndices = markerStepIndices(entries, markers, skills, trainedSkills);
+  const resolved = optimizeAtMarkers(steps, skills, {
+    markers: stepIndices,
+    currentAttributes: pricing.currentAttributes,
+    implants: pricing.implants,
+    cloneState: pricing.cloneState,
+    booster: pricing.booster,
+  });
+  const remapSegments = resolved.segments.filter((s) => s.remap);
+  const kept: number[] = [];
+  let lastKeptAttributes: Attributes | null = null;
+  remapSegments.forEach((segment, i) => {
+    if (lastKeptAttributes && attributesEqual(segment.attributes, lastKeptAttributes)) return;
+    kept.push(markers[i]);
+    lastKeptAttributes = segment.attributes;
+  });
+  return kept;
+}
+
+/**
+ * Accept on "Use my remap markers" (Optimize at my markers): the markers
+ * become one per remapped segment, replacing the old ones wholesale. Their
+ * overrides go too — they were for a segmentation this just discarded. These
+ * are the user's own marker positions (just re-costed), so nothing here is
+ * ever dropped as redundant — see `applyOptimizerRemapSegments` for that.
  */
 export function applyRemapSegments(
   plan: SkillPlanEditable,
@@ -212,20 +285,44 @@ export function applyRemapSegments(
 }
 
 /**
+ * Accept on "Optimize Remaps": same as `applyRemapSegments`, but `segments`
+ * is the optimizer's OWN proposal (placeRemaps' search), not the user's
+ * existing markers — so a marker whose entry-snapped boundary re-prices to
+ * the same spread as the one before it is redundant and gets dropped
+ * (`dropRedundantMarkers`). `pricing` is what that re-pricing needs.
+ */
+export function applyOptimizerRemapSegments(
+  plan: SkillPlanEditable,
+  segments: readonly RemapSegment[],
+  skills: ReadonlyMap<number, EngineSkill>,
+  trainedSkills: ReadonlyMap<number, TrainedSkill>,
+  pricing: RemapPricingContext
+): SkillPlanPatch {
+  const markers = segmentsToMarkers(plan.entries, segments, skills, trainedSkills);
+  return {
+    markers: dropRedundantMarkers(plan.entries, markers, skills, trainedSkills, pricing),
+    markerAttributes: [],
+  };
+}
+
+/**
  * Accept on "Optimize for me": the reordered entries and the markers for
  * them in one write. `segments` index the *new* order, so the markers are
- * placed against it, not against the plan's current entries.
+ * placed against it, not against the plan's current entries. Goes through
+ * `applyOptimizerRemapSegments`, not `applyRemapSegments`: these are the
+ * optimizer's own segments too.
  */
 export function applyOptimizeForMe(
   plan: SkillPlanEditable,
   order: readonly PlanStep[],
   segments: readonly RemapSegment[],
   skills: ReadonlyMap<number, EngineSkill>,
-  trainedSkills: ReadonlyMap<number, TrainedSkill>
+  trainedSkills: ReadonlyMap<number, TrainedSkill>,
+  pricing: RemapPricingContext
 ): SkillPlanPatch {
   const entries = applyReorderSuggestion(plan.entries, order);
   return {
-    ...applyRemapSegments({ ...plan, entries }, segments, skills, trainedSkills),
+    ...applyOptimizerRemapSegments({ ...plan, entries }, segments, skills, trainedSkills, pricing),
     entries,
   };
 }

@@ -6,7 +6,11 @@ export {
   pairKey,
   ATTRIBUTE_NAMES,
 } from '@/engine/optimizer/bestAttributes';
-export type { BestAttributesResult, SpByPair } from '@/engine/optimizer/bestAttributes';
+export type {
+  BestAttributesResult,
+  BoosterContext,
+  SpByPair,
+} from '@/engine/optimizer/bestAttributes';
 
 export {
   MAX_SUPPORTED_REMAPS,
