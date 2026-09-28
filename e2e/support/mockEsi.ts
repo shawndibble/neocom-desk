@@ -249,6 +249,14 @@ export async function installEsiMock(page: Page): Promise<void> {
   });
 
   await page.route('https://images.evetech.net/**', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'image/svg+xml', body: TINY_SVG });
+    // The app's EVE image <img>s are crossOrigin="anonymous" (so the service
+    // worker can cache them), which makes a response without this header a
+    // CORS failure. The real image server sends it.
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/svg+xml',
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: TINY_SVG,
+    });
   });
 }

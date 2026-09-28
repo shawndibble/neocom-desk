@@ -41,6 +41,7 @@ export function HoverCard({
       <div className="flex gap-3">
         <img
           src={typeRenderUrl(ship.typeID, 128)}
+          crossOrigin="anonymous"
           alt=""
           className="isis-hover-render h-20 w-20 shrink-0 border object-cover"
         />

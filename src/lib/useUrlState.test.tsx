@@ -250,6 +250,33 @@ describe('useUrlFilter', () => {
     );
     await waitFor(() => expect(screen.getByLabelText('text')).toHaveValue(''));
   });
+
+  it('hands row derivation a deferred copy, so a keystroke paints the input first', async () => {
+    const seen: [string, string][] = [];
+    function Deferred() {
+      const [filter, setFilter, rowsFilter] = useUrlFilter<TestFilter>(
+        'a',
+        FILTER_SCHEMA,
+        FILTER_FIELD_TO_PARAM,
+        EMPTY_FILTER_PARAMS
+      );
+      seen.push([filter.text, rowsFilter.text]);
+      return (
+        <input
+          aria-label="text"
+          value={filter.text}
+          onChange={(event) => setFilter({ ...filter, text: event.target.value })}
+        />
+      );
+    }
+    const user = userEvent.setup();
+    renderAt('/p', <Deferred />);
+    await user.type(screen.getByLabelText('text'), 'x');
+    // Some render showed the typed text in the box while rows still read the old filter...
+    expect(seen).toContainEqual(['x', '']);
+    // ...and the rows caught up once React got to the deferred pass.
+    expect(seen.at(-1)).toEqual(['x', 'x']);
+  });
 });
 
 describe('useRememberedUrlParams', () => {

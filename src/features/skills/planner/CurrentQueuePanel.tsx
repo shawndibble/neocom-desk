@@ -6,6 +6,7 @@ import { loadCharacterSkillQueue, type CachedResult } from '../data';
 import { classifySkillQueue, isQueuePaused, type SkillQueueStatus } from '../queueStatus';
 import type { SkillCatalog } from '../skillMap';
 import { formatCountdown } from '@/lib/duration';
+import { useTicker } from '@/lib/ticker';
 
 interface CurrentQueuePanelProps {
   characterId: number;
@@ -26,6 +27,8 @@ const TICK_MS = 30_000;
  * inside a still-fresh window is a cheap cache hit, not a wasted round trip.
  */
 const REFETCH_MS = 5 * 60_000;
+/** Timer jitter allowance: a scheduled tick this close to a full cadence since the last fetch still counts as due. */
+const REFETCH_SLACK_MS = 5_000;
 
 const BADGE_STYLE: Record<SkillQueueStatus, string> = {
   training: 'border-accent/50 bg-accent/15 text-accent',
@@ -55,7 +58,8 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
   const [result, setResult] = useState<CachedResult<SkillQueueEntry[]> | null | undefined>(
     undefined
   );
-  const [now, setNow] = useState(() => Date.now());
+  // Shared with every other 30 s clock on screen; paused while the tab is hidden.
+  const now = useTicker(TICK_MS);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,18 +68,28 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
         if (!cancelled) setResult(r);
       });
     };
+    let lastLoadAt = Date.now();
     load();
-    const id = setInterval(load, REFETCH_MS);
+    // A hidden tab skips the refetch, and catches up the moment it is shown
+    // again if one fell due meanwhile. A catch-up resets the clock, so the
+    // next scheduled tick skips rather than refetching seconds later.
+    const id = setInterval(() => {
+      if (document.hidden || Date.now() - lastLoadAt < REFETCH_MS - REFETCH_SLACK_MS) return;
+      lastLoadAt = Date.now();
+      load();
+    }, REFETCH_MS);
+    const onVisibilityChange = () => {
+      if (document.hidden || Date.now() - lastLoadAt < REFETCH_MS) return;
+      lastLoadAt = Date.now();
+      load();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       cancelled = true;
       clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [characterId]);
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), TICK_MS);
-    return () => clearInterval(id);
-  }, []);
 
   const rows = useMemo(() => classifySkillQueue(result?.data ?? [], now), [result, now]);
 

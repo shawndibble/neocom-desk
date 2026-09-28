@@ -58,4 +58,42 @@ describe('TypeIcon', () => {
     const img = container.querySelector('img');
     expect(img?.src).toBe(`https://images.evetech.net/types/${BLUEPRINT_TYPE_ID}/icon?size=32`);
   });
+
+  it('lazy-loads, decodes off the main thread, and requests CORS so the service worker can cache it', () => {
+    const { container } = render(<TypeIcon typeId={BLUEPRINT_TYPE_ID} size={32} />);
+    const img = container.querySelector('img')!;
+    expect(img).toHaveAttribute('loading', 'lazy');
+    expect(img).toHaveAttribute('decoding', 'async');
+    expect(img).toHaveAttribute('crossorigin', 'anonymous');
+  });
+
+  it('goes straight to the blueprint render for a type whose bp render already loaded once', () => {
+    const typeId = 688; // distinct id: the remembered set is module-level
+    const first = render(<TypeIcon typeId={typeId} size={32} />);
+    fail(first.container.querySelector('img')!);
+    fireEvent.load(first.container.querySelector('img')!);
+    first.unmount();
+
+    const { container, rerender } = render(<TypeIcon typeId={SKIN_TYPE_ID} size={64} />);
+    expect(container.querySelector('img')?.src).toContain(`/types/${SKIN_TYPE_ID}/icon`);
+    rerender(<TypeIcon typeId={typeId} size={64} />);
+    expect(container.querySelector('img')?.src).toBe(
+      `https://images.evetech.net/types/${typeId}/bp?size=64`
+    );
+
+    const second = render(<TypeIcon typeId={typeId} size={32} />);
+    expect(second.container.querySelector('img')?.src).toBe(
+      `https://images.evetech.net/types/${typeId}/bp?size=32`
+    );
+  });
+
+  it('does not remember a type whose icon failed but whose bp never loaded (e.g. a network blip)', () => {
+    const typeId = 689;
+    const first = render(<TypeIcon typeId={typeId} size={32} />);
+    fail(first.container.querySelector('img')!);
+    first.unmount();
+
+    const second = render(<TypeIcon typeId={typeId} size={32} />);
+    expect(second.container.querySelector('img')?.src).toContain(`/types/${typeId}/icon`);
+  });
 });

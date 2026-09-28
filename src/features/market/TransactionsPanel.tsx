@@ -126,15 +126,15 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
 
   // One filter bar on this tab, so the scope key never changes and the
   // filter never needs `useUrlFilter`'s scope-reset.
-  const [filter, setFilter] = useUrlFilter<WalletTransactionFilter>(
+  const [filter, setFilter, rowsFilter] = useUrlFilter<WalletTransactionFilter>(
     'transactions',
     TRANSACTION_FILTER_PARAMS,
     TRANSACTION_FIELD_TO_PARAM,
     EMPTY_TRANSACTION_FILTER_PARAMS
   );
   const filteredTransactions = useMemo(
-    () => filterWalletTransactions(transactions, filter, nameFor),
-    [transactions, filter, nameFor]
+    () => filterWalletTransactions(transactions, rowsFilter, nameFor),
+    [transactions, rowsFilter, nameFor]
   );
   // The phone has no filter bar, so it lists and exports everything.
   const exportedTransactions = isPhone ? transactions : filteredTransactions;

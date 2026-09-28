@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useTicker } from './ticker';
 
 const TICK_MS = 60_000;
 
-/** `Date.now()` is impure, so a live-ticking countdown reads it only inside this hook's `useState` initializer / interval — never directly in a component's render body (react-hooks/purity). */
+/**
+ * `Date.now()` is impure, so a live-ticking countdown reads it only through
+ * this hook — never directly in a component's render body
+ * (react-hooks/purity). Every caller shares one minute clock (`ticker.ts`),
+ * which pauses while the tab is hidden.
+ */
 export function useNow(): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), TICK_MS);
-    return () => clearInterval(id);
-  }, []);
-  return now;
+  return useTicker(TICK_MS);
 }

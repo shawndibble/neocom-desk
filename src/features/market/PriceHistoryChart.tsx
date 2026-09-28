@@ -331,6 +331,7 @@ export default function PriceHistoryChart({
               <Tooltip content={(props) => <HistoryTooltip {...props} />} />
               {/* First, so the two price lines draw over the band, not under it. */}
               <Area
+                isAnimationActive={false}
                 type={CURVE_TYPE}
                 dataKey="range"
                 stroke="none"
@@ -339,6 +340,7 @@ export default function PriceHistoryChart({
                 name={t('market.priceHistory.priceRange')}
               />
               <Line
+                isAnimationActive={false}
                 type={CURVE_TYPE}
                 dataKey="average"
                 stroke="var(--color-accent)"
@@ -348,6 +350,7 @@ export default function PriceHistoryChart({
               />
               {movingAverage.length > 0 && (
                 <Line
+                  isAnimationActive={false}
                   type={CURVE_TYPE}
                   dataKey="movingAverage"
                   stroke="var(--color-text-dim)"
@@ -411,6 +414,7 @@ export default function PriceHistoryChart({
                 tickFormatter={(value: number) => formatCompactNumber(value)}
               />
               <Bar
+                isAnimationActive={false}
                 yAxisId="volume"
                 dataKey="volume"
                 fill="var(--color-line-bright)"
@@ -420,6 +424,7 @@ export default function PriceHistoryChart({
                   shape — where activity rose, not by how much. The legend
                   names it and the tooltip carries the number at every width. */}
               <Line
+                isAnimationActive={false}
                 yAxisId="orders"
                 type={CURVE_TYPE}
                 dataKey="orderCount"

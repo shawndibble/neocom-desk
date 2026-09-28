@@ -112,6 +112,7 @@ export default function WalletBalanceChart({ points, trend, timeZone }: WalletBa
             />
             <Tooltip content={(props) => <BalanceTooltip {...props} />} />
             <Line
+              isAnimationActive={false}
               type="monotone"
               dataKey="balance"
               stroke={TREND_STROKE[trend]}

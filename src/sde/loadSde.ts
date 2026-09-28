@@ -10,9 +10,10 @@ import type {
   SkillType,
   TypeMap,
 } from './types';
+import { sdeDataUrl } from './sdeDataUrl';
 
 async function fetchJson<T>(file: string): Promise<T> {
-  const res = await fetch(`${import.meta.env.BASE_URL}data/${file}`);
+  const res = await fetch(sdeDataUrl(import.meta.env.BASE_URL, file));
   if (!res.ok) throw new Error(`Failed to load ${file}: HTTP ${res.status}`);
   return res.json() as Promise<T>;
 }

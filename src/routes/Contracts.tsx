@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -269,6 +269,9 @@ export function Contracts() {
     }),
     [historyParams]
   );
+  // Rows derive from a deferred copy so a keystroke paints the box first
+  // (`useUrlFilter`'s rule); the bar and its setter keep the immediate one.
+  const rowsFilter = useDeferredValue(filter);
   const setFilter = (next: ContractsFilter) =>
     setHistoryParams({
       'history.q': next.text,
@@ -473,8 +476,8 @@ export function Contracts() {
   const statusOptions = useMemo(() => contractStatusOptions(contracts), [contracts]);
   const typeOptions = useMemo(() => contractTypeOptions(contracts), [contracts]);
   const filteredContracts = useMemo(
-    () => filterContracts(contracts, filter, issuerNames),
-    [contracts, filter, issuerNames]
+    () => filterContracts(contracts, rowsFilter, issuerNames),
+    [contracts, rowsFilter, issuerNames]
   );
 
   if (!hydrated) {

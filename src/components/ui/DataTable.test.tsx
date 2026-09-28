@@ -345,6 +345,35 @@ describe('DataTable', () => {
       expect(itemNames()).toEqual(['Bravo', 'Delta', 'Charlie', 'Alpha']);
     });
 
+    it('does not re-sort for a fresh but equal sort object, and does for a new sortValue', () => {
+      const sortValue = vi.fn((row: SortRow) => row.value);
+      const columnsWith = (value: (row: SortRow) => number | undefined) =>
+        sortColumns.map((column) =>
+          column.id === 'value' ? { ...column, sortValue: value } : column
+        );
+      const table = (cols: DataTableColumn<SortRow>[]) => (
+        <DataTable
+          columns={cols}
+          rows={sortRows}
+          rowKey={(row) => row.id}
+          label="Sortable"
+          // A new object every render, as `useUrlSort` hands out after any URL change.
+          sort={{ columnId: 'value', direction: 'asc' }}
+        />
+      );
+      const { rerender } = render(table(columnsWith(sortValue)));
+      const calls = sortValue.mock.calls.length;
+      expect(calls).toBeGreaterThan(0);
+
+      // Rebuilt column objects around the same `sortValue`: no re-sort.
+      rerender(table(columnsWith(sortValue)));
+      expect(sortValue.mock.calls.length).toBe(calls);
+
+      // A genuinely different `sortValue` still re-sorts.
+      rerender(table(columnsWith((row) => (row.value === undefined ? undefined : -row.value))));
+      expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
+    });
+
     it('still reports sort changes from an uncontrolled table that asks for them', async () => {
       const user = userEvent.setup();
       const onSortChange = vi.fn();
