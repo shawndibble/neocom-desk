@@ -17,6 +17,7 @@ import {
   clearCachePurgePending,
   isCachePurgePending,
 } from '@/esi/cachePurge';
+import { createFakeLockManager } from '@/lib/fakeLockManager';
 
 const CHAR_ID = 2112625428;
 
@@ -446,6 +447,64 @@ describe('getValidAccessToken', () => {
     const stored = await db.tokens.get(CHAR_ID);
     expect(stored?.accessToken).toBe(access);
     expect(stored?.refreshToken).toBe('refresh-keeper'); // NOT clobbered to undefined
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-tab refresh: the in-tab single flight above is per module instance, so
+// a second open tab has its own. `navigator.locks` serialises the two, and the
+// tab that waited re-reads the row the first one just rotated.
+// ---------------------------------------------------------------------------
+
+describe('getValidAccessToken across tabs', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'locks');
+    vi.resetModules();
+  });
+
+  /** A second tab: its own `session` module (and single flight), same IndexedDB. */
+  async function openSecondTab() {
+    vi.resetModules();
+    return import('./session');
+  }
+
+  async function putStaleToken() {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'stale-access',
+      refreshToken: 'refresh-old',
+      expiresAt: Date.now() + 30_000,
+      scopes: [],
+    });
+  }
+
+  it('two tabs refreshing at once hit the token endpoint once', async () => {
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: createFakeLockManager(),
+    });
+    await putStaleToken();
+    const tabB = await openSecondTab();
+
+    const [a, b] = await Promise.all([
+      getValidAccessToken(CHAR_ID, cfg),
+      tabB.getValidAccessToken(CHAR_ID, cfg),
+    ]);
+
+    expect(tokenRequests).toHaveLength(1);
+    expect(a).toBe(b);
+    expect((await db.tokens.get(CHAR_ID))?.refreshToken).toBe('refresh-rotated');
+  });
+
+  it('without Web Locks, each tab still single-flights its own callers', async () => {
+    expect('locks' in navigator).toBe(false);
+    await putStaleToken();
+    const [a, b] = await Promise.all([
+      getValidAccessToken(CHAR_ID, cfg),
+      getValidAccessToken(CHAR_ID, cfg),
+    ]);
+    expect(tokenRequests).toHaveLength(1);
+    expect(a).toBe(b);
   });
 });
 
