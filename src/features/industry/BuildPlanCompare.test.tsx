@@ -79,10 +79,11 @@ function row(overrides: Partial<ComparedBuildRow> & { planId: string }): Compare
   };
 }
 
-function renderCompare(rows: ComparedBuildRow[], onDone = vi.fn()) {
+function renderCompare(rows: ComparedBuildRow[], onDone = vi.fn(), onOpenPlan = vi.fn()) {
   mockedUseComparedBuildResults.mockReturnValue(rows);
   return {
     onDone,
+    onOpenPlan,
     ...render(
       <BuildPlanCompare
         plans={rows.map((r) => plan({ id: r.planId }))}
@@ -92,6 +93,7 @@ function renderCompare(rows: ComparedBuildRow[], onDone = vi.fn()) {
         modifiers={NO_CHARACTER_MODIFIERS}
         pricingInputs={PRICING_INPUTS_FIXTURE}
         onDone={onDone}
+        onOpenPlan={onOpenPlan}
       />
     ),
   };
@@ -172,5 +174,13 @@ describe('BuildPlanCompare', () => {
     ]);
     await userEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(onDone).toHaveBeenCalled();
+  });
+
+  it('calls onOpenPlan with the row planId when the plan name is clicked', async () => {
+    const { onOpenPlan } = renderCompare([
+      row({ planId: 'a', planName: 'Raven mission fit', result: RESULT }),
+    ]);
+    await userEvent.click(screen.getByRole('button', { name: 'Raven mission fit' }));
+    expect(onOpenPlan).toHaveBeenCalledWith('a');
   });
 });
