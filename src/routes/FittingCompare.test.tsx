@@ -43,4 +43,18 @@ describe('FittingCompare', () => {
     await user.click(removeButton);
     expect(await screen.findByText('Add a Fitting to start comparing.')).toBeInTheDocument();
   });
+
+  it('caps the page content at the shared max-w-6xl width', async () => {
+    renderAt('/ships/fittings/compare');
+    const heading = await screen.findByRole('heading', { name: 'Compare Fittings' });
+    expect(heading.closest('.max-w-6xl')).toBeInTheDocument();
+  });
+
+  it('shows exactly one primary Add Fitting button in the empty state', async () => {
+    renderAt('/ships/fittings/compare');
+    const addButtons = await screen.findAllByRole('button', { name: 'Compare with…' });
+    expect(addButtons).toHaveLength(2);
+    const primaryButtons = addButtons.filter((button) => button.className.includes('bg-accent'));
+    expect(primaryButtons).toHaveLength(1);
+  });
 });
