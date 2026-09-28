@@ -63,13 +63,20 @@ export function SkillRequirementsList({
                 trailing={
                   <span
                     data-trained={req.trained}
+                    data-planned={req.planned}
                     className={`shrink-0 rounded-xs px-1.5 py-0.5 text-[0.6875rem] uppercase tracking-widest ${
-                      req.trained ? 'bg-accent/20 text-accent' : 'border border-line text-text-dim'
+                      req.trained
+                        ? 'bg-accent/20 text-accent'
+                        : req.planned
+                          ? 'border border-accent/40 text-accent'
+                          : 'border border-line text-text-dim'
                     }`}
                   >
                     {req.trained
                       ? t('skills.inspector.trained', { level: req.level })
-                      : t('skills.inspector.levelNeeded', { level: req.level })}
+                      : req.planned
+                        ? t('skills.inspector.planned', { level: req.level })
+                        : t('skills.inspector.levelNeeded', { level: req.level })}
                   </span>
                 }
               />

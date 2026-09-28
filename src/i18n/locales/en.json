@@ -1335,7 +1335,12 @@
       "noUnlocks": "Doesn't unlock anything yet",
       "levelNeeded": "Level {{level}}",
       "trained": "Trained · Level {{level}}",
-      "close": "Close"
+      "planned": "Planned · Level {{level}}",
+      "close": "Close",
+      "priceTitle": "Price",
+      "priceSell": "Sell price",
+      "priceNoSellOrders": "No sell orders",
+      "openInMarket": "Open in Market"
     },
     "detail": {
       "title": "Skill Detail",

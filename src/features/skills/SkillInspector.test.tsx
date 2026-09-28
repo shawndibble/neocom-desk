@@ -9,8 +9,8 @@ describe('SkillInspector', () => {
       <SkillInspector
         skillName="Frigate"
         prereqs={[
-          { typeID: 1, name: 'Spaceship Command', level: 3, trained: true },
-          { typeID: 2, name: 'Gunnery', level: 5, trained: false },
+          { typeID: 1, name: 'Spaceship Command', level: 3, trained: true, planned: false },
+          { typeID: 2, name: 'Gunnery', level: 5, trained: false, planned: false },
         ]}
         unlocks={[]}
         onClose={vi.fn()}
