@@ -105,44 +105,47 @@ function OfferDetail({
   const { typeId: marketTypeId, itemName: displayName } = resolveLoyaltyRowItem(row);
   const { profit } = row;
 
-  const materialColumns: DataTableColumn<ResolvedMaterial>[] = [
-    {
-      id: 'name',
-      header: t('loyaltyStore.materialColName'),
-      primary: true,
-      sortValue: (material) =>
-        catalog ? nameForType(catalog, material.typeID) : `#${material.typeID}`,
-      render: (material) => (
-        <MarketItemLink typeId={material.typeID} hubId={hubId}>
-          {catalog ? nameForType(catalog, material.typeID) : `#${material.typeID}`}
-        </MarketItemLink>
-      ),
-    },
-    {
-      id: 'needed',
-      header: t('loyaltyStore.materialColNeeded'),
-      align: 'right',
-      className: 'tabular-nums text-text-dim',
-      sortValue: (material) => material.quantity,
-      render: (material) => material.quantity.toLocaleString(),
-    },
-    {
-      id: 'owned',
-      header: t('loyaltyStore.materialColOwned'),
-      align: 'right',
-      className: 'tabular-nums text-text-dim',
-      sortValue: (material) => material.ownedQuantity,
-      render: (material) => material.ownedQuantity.toLocaleString(),
-    },
-    {
-      id: 'buyCost',
-      header: t('loyaltyStore.materialColBuyCost'),
-      align: 'right',
-      className: 'tabular-nums text-text',
-      sortValue: (material) => material.lineCost,
-      render: (material) => <IskAmount value={material.lineCost} revealOn="tap" decimals={0} />,
-    },
-  ];
+  const materialColumns = useMemo<DataTableColumn<ResolvedMaterial>[]>(
+    () => [
+      {
+        id: 'name',
+        header: t('loyaltyStore.materialColName'),
+        primary: true,
+        sortValue: (material) =>
+          catalog ? nameForType(catalog, material.typeID) : `#${material.typeID}`,
+        render: (material) => (
+          <MarketItemLink typeId={material.typeID} hubId={hubId}>
+            {catalog ? nameForType(catalog, material.typeID) : `#${material.typeID}`}
+          </MarketItemLink>
+        ),
+      },
+      {
+        id: 'needed',
+        header: t('loyaltyStore.materialColNeeded'),
+        align: 'right',
+        className: 'tabular-nums text-text-dim',
+        sortValue: (material) => material.quantity,
+        render: (material) => material.quantity.toLocaleString(),
+      },
+      {
+        id: 'owned',
+        header: t('loyaltyStore.materialColOwned'),
+        align: 'right',
+        className: 'tabular-nums text-text-dim',
+        sortValue: (material) => material.ownedQuantity,
+        render: (material) => material.ownedQuantity.toLocaleString(),
+      },
+      {
+        id: 'buyCost',
+        header: t('loyaltyStore.materialColBuyCost'),
+        align: 'right',
+        className: 'tabular-nums text-text',
+        sortValue: (material) => material.lineCost,
+        render: (material) => <IskAmount value={material.lineCost} revealOn="tap" decimals={0} />,
+      },
+    ],
+    [t, catalog, hubId]
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -428,35 +431,39 @@ export function LoyaltyStore() {
 
   // The identity column (never hidden) plus the optional columns the picker
   // controls, in table order — `LOYALTY_STORE_OFFERS_COLUMN_IDS`' own order.
-  const optionalOfferColumns: Record<
-    LoyaltyStoreOffersColumnId,
-    DataTableColumn<LoyaltyOfferRow>
-  > = {
-    profit: {
-      id: 'profit',
-      header: t('loyaltyStore.colProfit'),
-      align: 'right',
-      sortValue: (row) => row.profit.profit ?? undefined,
-      cellClassName: (row) => iskPerLpTone(row.profit.profit),
-      render: (row) =>
-        row.profit.profit === null ? (
-          '—'
-        ) : (
-          <IskAmount value={row.profit.profit} revealOn="longPress" decimals={0} />
-        ),
-    },
-    iskPerLp: {
-      id: 'iskPerLp',
-      header: t('loyaltyStore.colIskPerLp'),
-      align: 'right',
-      headerClassName: 'whitespace-nowrap',
-      sortValue: (row) => row.profit.iskPerLp ?? undefined,
-      cellClassName: (row) => `font-semibold tabular-nums ${iskPerLpTone(row.profit.iskPerLp)}`,
-      render: (row) => (row.profit.iskPerLp === null ? '—' : row.profit.iskPerLp.toFixed(1)),
-    },
-  };
-  const columns: DataTableColumn<LoyaltyOfferRow>[] = [
-    {
+  // Memoized so the `sortValue`s `DataTable` keys its sort on keep their
+  // identity across renders (a keystroke in the search box re-renders this).
+  const optionalOfferColumns = useMemo<
+    Record<LoyaltyStoreOffersColumnId, DataTableColumn<LoyaltyOfferRow>>
+  >(
+    () => ({
+      profit: {
+        id: 'profit',
+        header: t('loyaltyStore.colProfit'),
+        align: 'right',
+        sortValue: (row) => row.profit.profit ?? undefined,
+        cellClassName: (row) => iskPerLpTone(row.profit.profit),
+        render: (row) =>
+          row.profit.profit === null ? (
+            '—'
+          ) : (
+            <IskAmount value={row.profit.profit} revealOn="longPress" decimals={0} />
+          ),
+      },
+      iskPerLp: {
+        id: 'iskPerLp',
+        header: t('loyaltyStore.colIskPerLp'),
+        align: 'right',
+        headerClassName: 'whitespace-nowrap',
+        sortValue: (row) => row.profit.iskPerLp ?? undefined,
+        cellClassName: (row) => `font-semibold tabular-nums ${iskPerLpTone(row.profit.iskPerLp)}`,
+        render: (row) => (row.profit.iskPerLp === null ? '—' : row.profit.iskPerLp.toFixed(1)),
+      },
+    }),
+    [t]
+  );
+  const itemColumn = useMemo<DataTableColumn<LoyaltyOfferRow>>(
+    () => ({
       id: 'item',
       header: t('loyaltyStore.colItem'),
       primary: true,
@@ -480,7 +487,11 @@ export function LoyaltyStore() {
           </span>
         </span>
       ),
-    },
+    }),
+    [t]
+  );
+  const columns: DataTableColumn<LoyaltyOfferRow>[] = [
+    itemColumn,
     ...LOYALTY_STORE_OFFERS_COLUMN_IDS.filter(offersColumnVisibility.isVisible).map(
       (id) => optionalOfferColumns[id]
     ),

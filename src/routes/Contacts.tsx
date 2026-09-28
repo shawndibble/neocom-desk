@@ -441,75 +441,87 @@ function AcrossCharactersPanel({
 
   // The identity column (never hidden) plus the optional columns the picker
   // controls, in table order — `CONTACTS_ACROSS_COLUMN_IDS`' own order.
-  const optionalColumns: Record<ContactsAcrossColumnId, DataTableColumn<AcrossCharactersRow>> = {
-    type: {
-      id: 'type',
-      header: t('contacts.type'),
-      className: 'text-text-dim',
-      render: (row) => t(CONTACT_TYPE_KEY[row.contactType]),
-      sortValue: (row) => t(CONTACT_TYPE_KEY[row.contactType]),
-    },
-    held: {
-      id: 'held',
-      header: t('contacts.acrossCharacters'),
-      headerTooltip: t('contacts.acrossCharactersHeaderTooltip'),
-      align: 'center',
-      // The names go in the tooltip rather than the cell: with a dozen alts
-      // the cell would be the widest thing on the page, and the count is what
-      // a reader scans for. The count takes focus so a keyboard can open it.
-      render: (row) => (
-        <Tooltip
-          content={[
-            t('contacts.acrossHeldBy', { names: row.held.map((h) => h.name).join(', ') }),
-            row.missing.length > 0 &&
-              t('contacts.acrossMissingOn', {
-                names: row.missing.map((m) => m.name).join(', '),
-              }),
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-          openOnTap
-        >
-          <span
-            tabIndex={0}
-            className={cx(
-              'tabular-nums focus-visible:outline-2 focus-visible:outline-accent',
-              row.missing.length > 0 && 'text-warning'
-            )}
+  // Memoized so the `sortValue`s `DataTable` keys its sort on keep their
+  // identity across renders (a keystroke in the filter re-renders this).
+  const acrossListCount = effectiveLists.length;
+  const optionalColumns = useMemo<
+    Record<ContactsAcrossColumnId, DataTableColumn<AcrossCharactersRow>>
+  >(
+    () => ({
+      type: {
+        id: 'type',
+        header: t('contacts.type'),
+        className: 'text-text-dim',
+        render: (row) => t(CONTACT_TYPE_KEY[row.contactType]),
+        sortValue: (row) => t(CONTACT_TYPE_KEY[row.contactType]),
+      },
+      held: {
+        id: 'held',
+        header: t('contacts.acrossCharacters'),
+        headerTooltip: t('contacts.acrossCharactersHeaderTooltip'),
+        align: 'center',
+        // The names go in the tooltip rather than the cell: with a dozen alts
+        // the cell would be the widest thing on the page, and the count is what
+        // a reader scans for. The count takes focus so a keyboard can open it.
+        render: (row) => (
+          <Tooltip
+            content={[
+              t('contacts.acrossHeldBy', { names: row.held.map((h) => h.name).join(', ') }),
+              row.missing.length > 0 &&
+                t('contacts.acrossMissingOn', {
+                  names: row.missing.map((m) => m.name).join(', '),
+                }),
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+            openOnTap
           >
-            {t('contacts.acrossCharactersCount', {
-              count: row.held.length,
-              total: effectiveLists.length,
-            })}
+            <span
+              tabIndex={0}
+              className={cx(
+                'tabular-nums focus-visible:outline-2 focus-visible:outline-accent',
+                row.missing.length > 0 && 'text-warning'
+              )}
+            >
+              {t('contacts.acrossCharactersCount', {
+                count: row.held.length,
+                total: acrossListCount,
+              })}
+            </span>
+          </Tooltip>
+        ),
+        sortValue: (row) => row.held.length,
+      },
+      standings: {
+        id: 'standings',
+        header: t('contacts.acrossStandings'),
+        align: 'center',
+        // Every distinct standing, not an average: two alts at +10 and -10 have
+        // no meaningful midpoint, and seeing both is the whole point of the row.
+        render: (row) => (
+          <span className="inline-flex items-center gap-1.5">
+            {row.standings.map((standing) => (
+              <StandingIcon key={standing} value={standing} />
+            ))}
           </span>
-        </Tooltip>
-      ),
-      sortValue: (row) => row.held.length,
-    },
-    standings: {
-      id: 'standings',
-      header: t('contacts.acrossStandings'),
-      align: 'center',
-      // Every distinct standing, not an average: two alts at +10 and -10 have
-      // no meaningful midpoint, and seeing both is the whole point of the row.
-      render: (row) => (
-        <span className="inline-flex items-center gap-1.5">
-          {row.standings.map((standing) => (
-            <StandingIcon key={standing} value={standing} />
-          ))}
-        </span>
-      ),
-      // Worst first on a descending click, which is the direction trouble is in.
-      sortValue: (row) => row.standings[0],
-    },
-  };
-  const columns: DataTableColumn<AcrossCharactersRow>[] = [
-    {
+        ),
+        // Worst first on a descending click, which is the direction trouble is in.
+        sortValue: (row) => row.standings[0],
+      },
+    }),
+    [t, acrossListCount]
+  );
+  const nameColumn = useMemo<DataTableColumn<AcrossCharactersRow>>(
+    () => ({
       id: 'name',
       header: t('contacts.name'),
       render: (row) => entityName(names, row.contactId),
       sortValue: (row) => entityName(names, row.contactId),
-    },
+    }),
+    [t, names]
+  );
+  const columns: DataTableColumn<AcrossCharactersRow>[] = [
+    nameColumn,
     ...CONTACTS_ACROSS_COLUMN_IDS.filter(isColumnVisible).map((id) => optionalColumns[id]),
   ];
   // The full catalog, not just `columns`' currently-visible ids: a sort

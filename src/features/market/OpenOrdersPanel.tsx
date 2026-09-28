@@ -374,6 +374,125 @@ export function OpenOrdersPanel() {
   const detailRow =
     detailOrderId !== null ? (allRows.find((r) => r.orderId === detailOrderId) ?? null) : null;
 
+  // On a phone `OpenOrdersList` renders instead of `DataTable` and none of
+  // this is used — the ternary short-circuits so the array (8 columns'
+  // worth of render closures, rebuilt every render otherwise) is never
+  // actually constructed there. Memoized so the render closures (and the
+  // `sortValue`s `DataTable` keys its sort on) keep their identity across
+  // renders; above the early returns below, as a hook must be.
+  const columns = useMemo<DataTableColumn<OpenOrderRow>[]>(
+    () =>
+      isPhone
+        ? []
+        : [
+            {
+              id: 'item',
+              header: t('orders.item'),
+              primary: true,
+              sortValue: (row) => row.typeName,
+              render: (row) => (
+                <span className="flex flex-wrap items-center gap-1">
+                  <MarketItemLink typeId={row.typeId}>{row.typeName}</MarketItemLink>
+                  {showCharacterStrip && <CharacterBadge characterName={row.characterName} t={t} />}
+                </span>
+              ),
+            },
+            {
+              id: 'where',
+              header: t('market.location'),
+              className: 'text-text-dim',
+              sortValue: (row) => row.stationName ?? undefined,
+              render: (row) => (
+                <span className="flex flex-col gap-0.5">
+                  <span>
+                    {row.stationName === null ? (
+                      t('market.unknownStructure')
+                    ) : (
+                      <Tooltip content={row.stationName} openOnTap>
+                        <span
+                          tabIndex={0}
+                          className="cursor-help underline decoration-dotted decoration-text-dim/50 underline-offset-2"
+                        >
+                          {stationShortName(row.stationName)}
+                        </span>
+                      </Tooltip>
+                    )}
+                  </span>
+                  {isOffHubStation(row.stationName, row.locationId) && (
+                    <span className="flex items-center gap-1 text-[0.6875rem] text-warning">
+                      {t('market.orders.offHub')}
+                      <InfoTooltip
+                        label={t('common.aboutLabel', { label: t('market.orders.offHub') })}
+                        content={t('market.orders.offHubHelp')}
+                      />
+                    </span>
+                  )}
+                </span>
+              ),
+            },
+            {
+              id: 'price',
+              header: t('orders.price'),
+              align: 'right',
+              className: 'tabular-nums',
+              sortValue: (row) => row.price,
+              render: (row) => formatIskAuto(row.price),
+            },
+            {
+              id: 'problem',
+              header: t('market.orders.filter.problem'),
+              render: (row) => {
+                const badge = orderBadgeFor(row);
+                return (
+                  <span className="flex flex-col items-start gap-1">
+                    {badge && <OrderProblemBadge kind={badge.kind} detail={badge.detail} />}
+                    <OrderRowSummaryText row={row} copyRelistPrice />
+                  </span>
+                );
+              },
+            },
+            {
+              id: 'floor',
+              header: t('market.orders.floorLabel'),
+              align: 'right',
+              className: 'tabular-nums',
+              // Sorted by the EXACT break-even, unaffected by the rounded-up figure
+              // the cell itself renders (issue #1421) — no copy button here, no room
+              // in the row (see `OrderDetailModal.tsx` for the copyable version).
+              sortValue: (row) => row.floor?.relist,
+              render: (row) => (row.floor ? formatOrderFloorPrice(row.floor) : t('common.unknown')),
+            },
+            {
+              id: 'remaining',
+              header: t('orders.remaining'),
+              align: 'right',
+              className: 'tabular-nums',
+              sortValue: (row) => row.volumeRemain,
+              render: (row) => formatOrderRemaining(row.volumeRemain, row.volumeTotal),
+            },
+            {
+              id: 'expires',
+              header: t('orders.expires'),
+              className: 'whitespace-nowrap text-text-dim',
+              sortValue: (row) => row.expiry?.expiresAt,
+              render: (row) =>
+                row.expiry
+                  ? new Date(row.expiry.expiresAt).toLocaleDateString()
+                  : t('common.unknown'),
+            },
+            {
+              id: 'details',
+              header: t('market.orders.details'),
+              render: (row) => (
+                <Button size="sm" onClick={() => setDetailOrderId(row.orderId)}>
+                  {t('market.orders.details')}
+                </Button>
+              ),
+            },
+          ],
+    [isPhone, t, showCharacterStrip]
+  );
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -468,117 +587,6 @@ export function OpenOrdersPanel() {
       </ItemContextMenu>
     );
   }
-
-  // On a phone `OpenOrdersList` renders instead of `DataTable` and none of
-  // this is used — the ternary short-circuits so the array (8 columns'
-  // worth of render closures, rebuilt every render otherwise) is never
-  // actually constructed there.
-  const columns: DataTableColumn<OpenOrderRow>[] = isPhone
-    ? []
-    : [
-        {
-          id: 'item',
-          header: t('orders.item'),
-          primary: true,
-          sortValue: (row) => row.typeName,
-          render: (row) => (
-            <span className="flex flex-wrap items-center gap-1">
-              <MarketItemLink typeId={row.typeId}>{row.typeName}</MarketItemLink>
-              {showCharacterStrip && <CharacterBadge characterName={row.characterName} t={t} />}
-            </span>
-          ),
-        },
-        {
-          id: 'where',
-          header: t('market.location'),
-          className: 'text-text-dim',
-          sortValue: (row) => row.stationName ?? undefined,
-          render: (row) => (
-            <span className="flex flex-col gap-0.5">
-              <span>
-                {row.stationName === null ? (
-                  t('market.unknownStructure')
-                ) : (
-                  <Tooltip content={row.stationName} openOnTap>
-                    <span
-                      tabIndex={0}
-                      className="cursor-help underline decoration-dotted decoration-text-dim/50 underline-offset-2"
-                    >
-                      {stationShortName(row.stationName)}
-                    </span>
-                  </Tooltip>
-                )}
-              </span>
-              {isOffHubStation(row.stationName, row.locationId) && (
-                <span className="flex items-center gap-1 text-[0.6875rem] text-warning">
-                  {t('market.orders.offHub')}
-                  <InfoTooltip
-                    label={t('common.aboutLabel', { label: t('market.orders.offHub') })}
-                    content={t('market.orders.offHubHelp')}
-                  />
-                </span>
-              )}
-            </span>
-          ),
-        },
-        {
-          id: 'price',
-          header: t('orders.price'),
-          align: 'right',
-          className: 'tabular-nums',
-          sortValue: (row) => row.price,
-          render: (row) => formatIskAuto(row.price),
-        },
-        {
-          id: 'problem',
-          header: t('market.orders.filter.problem'),
-          render: (row) => {
-            const badge = orderBadgeFor(row);
-            return (
-              <span className="flex flex-col items-start gap-1">
-                {badge && <OrderProblemBadge kind={badge.kind} detail={badge.detail} />}
-                <OrderRowSummaryText row={row} copyRelistPrice />
-              </span>
-            );
-          },
-        },
-        {
-          id: 'floor',
-          header: t('market.orders.floorLabel'),
-          align: 'right',
-          className: 'tabular-nums',
-          // Sorted by the EXACT break-even, unaffected by the rounded-up figure
-          // the cell itself renders (issue #1421) — no copy button here, no room
-          // in the row (see `OrderDetailModal.tsx` for the copyable version).
-          sortValue: (row) => row.floor?.relist,
-          render: (row) => (row.floor ? formatOrderFloorPrice(row.floor) : t('common.unknown')),
-        },
-        {
-          id: 'remaining',
-          header: t('orders.remaining'),
-          align: 'right',
-          className: 'tabular-nums',
-          sortValue: (row) => row.volumeRemain,
-          render: (row) => formatOrderRemaining(row.volumeRemain, row.volumeTotal),
-        },
-        {
-          id: 'expires',
-          header: t('orders.expires'),
-          className: 'whitespace-nowrap text-text-dim',
-          sortValue: (row) => row.expiry?.expiresAt,
-          render: (row) =>
-            row.expiry ? new Date(row.expiry.expiresAt).toLocaleDateString() : t('common.unknown'),
-        },
-        {
-          id: 'details',
-          header: t('market.orders.details'),
-          render: (row) => (
-            <Button size="sm" onClick={() => openDetails(row)}>
-              {t('market.orders.details')}
-            </Button>
-          ),
-        },
-      ];
 
   // No VISIBLE order carries a floor (nothing has a linked build), so the
   // whole column would be a wall of dashes — dropped rather than shown
