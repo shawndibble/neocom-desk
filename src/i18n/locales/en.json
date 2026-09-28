@@ -5888,6 +5888,8 @@
       "you": "You",
       "never": "Never",
       "total": "Members",
+      "mobileSortSummary_one": "{{count}} member",
+      "mobileSortSummary_other": "{{count}} members",
       "dark": "Dark {{days}}d+",
       "darkHint": "Members with no login for {{days}} days or more. A member who joined and has never logged in counts from the day they joined.",
       "joined_one": "{{count}} joined: {{names}}",
