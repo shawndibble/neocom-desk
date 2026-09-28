@@ -33,6 +33,7 @@ import {
 } from '@/features/notifications/notificationClick';
 import { handlePush, type PushEnv } from '@/features/notifications/pushHandler';
 import { recordFeedEntry } from '@/features/notifications/feed';
+import { isEvePortraitImage, isEveTypeImage, isVersionedSdeData } from '@/lib/swRoutes';
 
 declare let self: ServiceWorkerGlobalScope;
 
@@ -72,21 +73,30 @@ const cacheOnly200 = new CacheableResponsePlugin({ statuses: [200] });
 // SDE files not in the precache (vite.config.ts globIgnores): cache-first
 // under their content-versioned URL. A changed file is a new `?v=`, i.e. a
 // cache miss, so this never serves stale SDE; unchanged files survive any
-// number of deploys. maxEntries ~2x the file count so superseded versions
-// get evicted rather than accumulating.
+// number of deploys. maxEntries ~2x the file count and a 90-day age cap so
+// superseded versions get evicted rather than accumulating.
+// The base path comes from the registration scope (= Vite's `base`), not
+// `import.meta`, which would break sw.js as a classic script (check-sw.mjs).
+const scopePath = new URL(self.registration.scope).pathname;
 registerRoute(
-  ({ url, sameOrigin }) =>
-    sameOrigin && url.pathname.startsWith('/data/') && url.searchParams.has('v'),
+  ({ url, request }) => isVersionedSdeData(url, request.mode, self.location.origin, scopePath),
   new CacheFirst({
     cacheName: 'sde-data',
-    plugins: [cacheOnly200, new ExpirationPlugin({ maxEntries: 32, purgeOnQuotaError: true })],
+    plugins: [
+      cacheOnly200,
+      new ExpirationPlugin({
+        maxEntries: 32,
+        maxAgeSeconds: 90 * DAY_SECONDS,
+        purgeOnQuotaError: true,
+      }),
+    ],
   })
 );
 
 // EVE image server: every icon/render/bp is `max-age=3600`, so without this
 // each one revalidated hourly. Type art only changes with a game expansion.
 registerRoute(
-  ({ url }) => url.origin === 'https://images.evetech.net' && url.pathname.startsWith('/types/'),
+  ({ url }) => isEveTypeImage(url),
   new CacheFirst({
     cacheName: 'eve-type-images',
     plugins: [
@@ -103,9 +113,7 @@ registerRoute(
 // Portraits and logos do change (a new portrait, a corp rebrand): serve the
 // cached one instantly and refresh it in the background.
 registerRoute(
-  ({ url }) =>
-    url.origin === 'https://images.evetech.net' &&
-    /^\/(characters|corporations|alliances)\//.test(url.pathname),
+  ({ url }) => isEvePortraitImage(url),
   new StaleWhileRevalidate({
     cacheName: 'eve-portraits',
     plugins: [
