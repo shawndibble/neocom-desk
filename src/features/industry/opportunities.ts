@@ -7,9 +7,12 @@
  * classifies. What's new here is turning "every manufacturing blueprint a
  * set of characters owns" into the inputs those already-tested pieces need.
  */
-import { newBuildPlan } from './newBuildPlan';
+import { mostRecentlyUpdatedPlan, newBuildPlan } from './newBuildPlan';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { computeBuildPlan } from './computeBuildPlan';
+import type { BuildPlanRecord } from '@/db';
+import type { ResolvedStandings } from '@/engine/market/standings';
+import type { TradeHubStandingsMap } from '@/features/market/useTradeHubStandings';
 import {
   toIndustryBlueprint,
   type BlueprintCatalog,
@@ -38,7 +41,7 @@ import {
   type OrderDepthThresholds,
 } from '@/engine/industry/opportunities';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import type { TradeHub } from '@/market/hubs';
+import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import type { PiData } from '@/sde/types';
 
 /** One owned blueprint (original or copy) matched to what it builds — the unit of an Opportunities row. */
@@ -77,6 +80,45 @@ export function buildOpportunityCandidates(
     }
   }
   return candidates;
+}
+
+/**
+ * The Trade Hub a fresh Build Plan for this Character would default to —
+ * `newBuildPlan`'s own `defaultsFrom?.hubId ?? DEFAULT_TRADE_HUB.id` rule,
+ * reused here so a candidate's row prices at the same hub "Add to Compare"
+ * would seed the plan at (issue #2055), not a hard-coded default.
+ */
+export function hubForCharacter(
+  characterId: number,
+  plansByCharacter: ReadonlyMap<number, readonly BuildPlanRecord[]>
+): TradeHub {
+  const plan = mostRecentlyUpdatedPlan(plansByCharacter.get(characterId));
+  return (plan && getTradeHub(plan.hubId)) ?? DEFAULT_TRADE_HUB;
+}
+
+export interface OpportunityHubGroup {
+  hub: TradeHub;
+  candidates: OpportunityCandidate[];
+}
+
+/**
+ * Candidates grouped by the Trade Hub their owning Character would price at —
+ * one batched snapshot request per hub, not per row (issue #2055's "batched
+ * per Character/hub" acceptance criterion), same batching shape issue #642
+ * already established for one shared hub.
+ */
+export function groupCandidatesByHub(
+  candidates: readonly OpportunityCandidate[],
+  hubFor: (characterId: number) => TradeHub
+): OpportunityHubGroup[] {
+  const byHubId = new Map<TradeHub['id'], OpportunityHubGroup>();
+  for (const candidate of candidates) {
+    const hub = hubFor(candidate.characterId);
+    const group = byHubId.get(hub.id);
+    if (group) group.candidates.push(candidate);
+    else byHubId.set(hub.id, { hub, candidates: [candidate] });
+  }
+  return [...byHubId.values()];
 }
 
 /** One request, one hub, every candidate's materials+product unioned — the "bounded, batched" pricing the ticket asks for. */
@@ -130,6 +172,11 @@ export function pricedRuns(blueprint: { runs: number }): number {
  * unreachable). Required, not defaulted to the candidate's id: `characterId`
  * plays no part in the pricing this also seeds for, so there is no correct
  * default and a caller must say who the plan is for.
+ *
+ * `hub` is the Trade Hub the row was actually priced at (issue #2055:
+ * `hubForCharacter`'s per-owning-Character resolution, not a hard-coded
+ * default) — stamped onto the seeded plan's own `hubId` so re-pricing it as a
+ * real Build Plan reads the same broker fee/sell price the row did.
  */
 export function planForOpportunityCandidate(
   candidate: OpportunityCandidate,
@@ -137,7 +184,8 @@ export function planForOpportunityCandidate(
   materialSourcing: MaterialSourcingMap,
   /** Auto-picked build-vs-buy materials (issue #652) carried onto the seeded plan verbatim. */
   buildHere: readonly number[] | undefined,
-  ownerCharacterId: number
+  ownerCharacterId: number,
+  hub: TradeHub
 ) {
   const { blueprint } = candidate;
   // A BPC prices at its own remaining runs; a BPO (runs === -1, unlimited)
@@ -151,6 +199,7 @@ export function planForOpportunityCandidate(
       runs,
       ...(buildHere !== undefined && buildHere.length > 0 ? { buildHere: [...buildHere] } : {}),
     }),
+    hubId: hub.id,
     materialSourcing,
   };
 }
@@ -160,6 +209,8 @@ export interface UnrankedOpportunityRow {
   result: BuildResult;
   /** ISK value of sell orders for the product at the hub; null when the product itself is unpriced. */
   sellDepthIsk: number | null;
+  /** The Trade Hub this row was priced at (issue #2055) — `hubForCharacter`'s resolution for the owning Character, reused verbatim by `planForOpportunityCandidate` so "Add to Compare" seeds a plan at the same hub. */
+  hub: TradeHub;
   /** The owned-materials claim this row was priced with — reused verbatim by `planForOpportunityCandidate` so a seeded plan's cost matches what justified picking it. */
   materialSourcing: MaterialSourcingMap;
   /** Materials the auto make-or-buy depth pass (issue #652) chose to build; empty at depth 0. Reused verbatim by `planForOpportunityCandidate` for the same reason as `materialSourcing`. */
@@ -177,14 +228,33 @@ export interface OpportunityAutoBuildOptions {
   depth: number;
 }
 
-/** Prices one candidate against an already-fetched snapshot. Null only when the plan cannot be built at all (an engine-level throw `computeBuildPlan` already guards). */
+/**
+ * Prices one candidate against an already-fetched snapshot. Null only when
+ * the plan cannot be built at all (an engine-level throw `computeBuildPlan`
+ * already guards).
+ *
+ * `standing` is the owning Character's real standing toward this row's Trade
+ * Hub (issue #1238's broker-fee/tax fix) — absent/`undefined` reads as zero
+ * standings, same as a Build Plan's own `computeBuildPlan` call.
+ *
+ * Every candidate is, by construction, an owned blueprint
+ * (`buildOpportunityCandidates` only ever enumerates blueprints the owning
+ * Character already holds) — so the top-level product always resolves as
+ * "owned, nothing to acquire" (`line: null`), regardless of the Include
+ * Blueprint Cost setting (issue #2055). This is a different rule from a
+ * hand-made Build Plan's own acquisition resolution, which prices the gap
+ * when nothing is owned: Opportunities never has that gap at the top level.
+ */
 export function computeOpportunityRow(
   candidate: OpportunityCandidate,
   snapshot: MarketSnapshot,
   facilityDefaults: ActivityFacilityDefaults,
   modifiers: CharacterModifiers,
   stock: DetectedOwnedStockMap,
-  autoBuild: OpportunityAutoBuildOptions
+  autoBuild: OpportunityAutoBuildOptions,
+  /** The Trade Hub this candidate's owning Character would price at (issue #2055) — `hubForCharacter`'s resolution, batched per hub by the caller. */
+  hub: TradeHub,
+  standing?: ResolvedStandings
 ): UnrankedOpportunityRow | null {
   const blueprint = toIndustryBlueprint(candidate.catalogEntry.blueprint);
   const materialSourcing = ownedMaterialSourcing(candidate.catalogEntry.blueprint.materials, stock);
@@ -193,7 +263,8 @@ export function computeOpportunityRow(
     facilityDefaults,
     materialSourcing,
     undefined,
-    candidate.characterId
+    candidate.characterId,
+    hub
   );
 
   const systemCostIndex = snapshot.systemCostIndex ?? 0;
@@ -227,7 +298,10 @@ export function computeOpportunityRow(
     adjustedPrices,
     hubPrices: snapshot.hubPrices,
     modifiers,
+    standing,
     recipeFor: autoBuild.recipeFor,
+    // Owned, free — see the doc comment above.
+    blueprintAcquisition: { blueprintTypeID: candidate.blueprint.type_id, line: null },
   });
   if (!result) return null;
 
@@ -237,7 +311,7 @@ export function computeOpportunityRow(
   const sellDepthIsk =
     sellPrice !== undefined && sellVolume !== undefined ? sellPrice * sellVolume : null;
 
-  return { candidate, result, sellDepthIsk, materialSourcing, buildHere };
+  return { candidate, result, sellDepthIsk, hub, materialSourcing, buildHere };
 }
 
 /** Sorts and classifies through the tested engine module, then re-attaches each row's own candidate/result. */
@@ -291,18 +365,21 @@ export function detectOpportunityStock(
  */
 export function opportunitiesBatchKey(
   candidates: readonly OpportunityCandidate[],
-  hub: TradeHub
+  hubFor: (characterId: number) => TradeHub
 ): string {
-  return `${hub.id}:${candidates
-    .map((c) => c.id)
+  return candidates
+    .map((c) => `${hubFor(c.characterId).id}:${c.id}`)
     .sort()
-    .join(',')}`;
+    .join(',');
 }
 
 /** What every row in a batch is priced at (issue #2056). */
 export interface OpportunityPricingInputs {
   assumedMe: number;
-  modifiers: CharacterModifiers;
+  /** Each owning Character's own skills/implants (issue #2055) — absent reads as `NO_CHARACTER_MODIFIERS`. */
+  modifiersByCharacter: ReadonlyMap<number, CharacterModifiers>;
+  /** Each owning Character's own standing toward every Trade Hub (issue #2055) — absent reads as zero. */
+  standingsByCharacter: ReadonlyMap<number, TradeHubStandingsMap>;
   facilityDefaults: ActivityFacilityDefaults;
   /**
    * Owned blueprints' ME/TE price both the candidates and any sub-build the
@@ -327,9 +404,17 @@ export function opportunitiesInputsKey(inputs: OpportunityPricingInputs): string
     .flat()
     .map((bp) => `${bp.item_id}:${bp.material_efficiency}:${bp.time_efficiency}`)
     .sort();
+  const modifiers = [...inputs.modifiersByCharacter.entries()].sort(([a], [b]) => a - b);
+  const standings = [...inputs.standingsByCharacter.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(
+      ([characterId, byHub]) =>
+        [characterId, [...byHub.entries()].sort(([a], [b]) => a.localeCompare(b))] as const
+    );
   return stableSerialize({
     assumedMe: inputs.assumedMe,
-    modifiers: inputs.modifiers,
+    modifiers,
+    standings,
     facilityDefaults: inputs.facilityDefaults,
     research,
   });

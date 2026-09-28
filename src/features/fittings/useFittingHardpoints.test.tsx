@@ -1,15 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { Fitting } from '@/engine/fittings/types';
+import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 
 const KIND: Record<number, 'turret' | 'launcher' | null> = {
   2889: 'turret',
   10631: 'launcher',
   3244: null,
 };
+let inFlight = 0;
+let maxInFlight = 0;
 // 99 stands for a type ESI couldn't supply.
 vi.mock('./hardpointKinds', () => ({
-  loadHardpointKind: async (typeId: number) => (typeId === 99 ? undefined : (KIND[typeId] ?? null)),
+  loadHardpointKind: async (typeId: number) => {
+    inFlight += 1;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await Promise.resolve();
+    inFlight -= 1;
+    return typeId === 99 ? undefined : (KIND[typeId] ?? null);
+  },
 }));
 
 const { useFittingHardpoints } = await import('./useFittingHardpoints');
@@ -47,5 +56,23 @@ describe('useFittingHardpoints', () => {
   it('is null with nothing open', () => {
     const { result } = renderHook(() => useFittingHardpoints(null));
     expect(result.current).toBeNull();
+  });
+
+  it('caps how many high-slot types it looks up at once (N+1 fan-out)', async () => {
+    maxInFlight = 0;
+    // More distinct high-slot types than the fan-out's concurrency cap, so an
+    // unbounded `Promise.all` would fire them all at once.
+    const many: Fitting = {
+      ...RIFTER,
+      modules: Array.from({ length: ESI_FANOUT_CONCURRENCY + 5 }, (_, index) => ({
+        slot: 'high' as const,
+        slotIndex: index,
+        typeId: 20000 + index,
+        state: 'active' as const,
+      })),
+    };
+    const { result } = renderHook(() => useFittingHardpoints(many));
+    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(maxInFlight).toBeLessThanOrEqual(ESI_FANOUT_CONCURRENCY);
   });
 });

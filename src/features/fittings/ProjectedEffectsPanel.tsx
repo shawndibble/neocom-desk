@@ -111,7 +111,7 @@ export function ProjectedEffectsPanel() {
               </span>
               <Button
                 size="sm"
-                className="min-h-11 min-w-11 md:min-h-8 md:min-w-8"
+                className="min-h-11 min-w-11 md:min-h-7 md:min-w-7"
                 aria-label={t('fittings.projected.fewer', { name: source.name })}
                 disabled={source.count <= 1}
                 onClick={() => setCount(source.id, source.count - 1)}
@@ -123,7 +123,7 @@ export function ProjectedEffectsPanel() {
               </span>
               <Button
                 size="sm"
-                className="min-h-11 min-w-11 md:min-h-8 md:min-w-8"
+                className="min-h-11 min-w-11 md:min-h-7 md:min-w-7"
                 aria-label={t('fittings.projected.more', { name: source.name })}
                 disabled={source.count >= MAX_SHIPS}
                 onClick={() => setCount(source.id, source.count + 1)}

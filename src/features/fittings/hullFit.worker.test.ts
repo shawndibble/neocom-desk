@@ -29,22 +29,26 @@ beforeEach(() => {
   loadDogmaEngine.mockResolvedValue(undefined);
   hullRacks.mockReturnValue(new Set(['low', 'drone']));
   checkHullCandidate.mockImplementation((_ship: number, _rack: string, typeId: number) =>
-    typeId === 11 ? null : { fitsHull: true, canFly: true, fitsResources: true }
+    typeId === 11
+      ? { fitsHull: false, canFly: false, fitsResources: false }
+      : { fitsHull: true, canFly: true, fitsResources: true }
   );
 });
 
 describe('runHullFit', () => {
-  it('lists what goes on the hull, skips racks the hull has no slot in, packs each check', async () => {
+  it('lists every item, answering racks the hull has no slot in without asking the engine', async () => {
     const reply = await runHullFit(request(), () => true);
 
     expect(reply).toEqual({
       id: 1,
       entries: [
         [10, 7],
+        [11, 0],
+        [20, 0],
         [30, 7],
       ],
     });
-    // The subsystem rack is never asked about; the pilot's skills are passed as a Map.
+    // The subsystem rack (20) is never asked about; the pilot's skills are passed as a Map.
     expect(checkHullCandidate.mock.calls.map((call) => call[2])).toEqual([10, 11, 30]);
     expect(checkHullCandidate.mock.calls[0][3]).toEqual(new Map([[3300, 5]]));
   });

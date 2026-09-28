@@ -229,39 +229,50 @@ export function HaulingRowDetail({ row, from, to, fees }: HaulingRowDetailProps)
           </Section>
 
           <Section title={t('market.hauling.detail.ordersTitle', { hub: to.systemName })}>
-            <table className="w-full text-sm tabular-nums">
-              <thead>
-                <tr className="text-left text-[0.6875rem] tracking-wider text-text-dim uppercase">
-                  <th className="py-1 font-semibold">{t('market.hauling.detail.colPrice')}</th>
-                  <th className="py-1 text-right font-semibold">
-                    {t('market.hauling.detail.colUnits')}
-                  </th>
-                  <th className="py-1 text-right font-semibold">
-                    {t('market.hauling.detail.colTotal')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {orderRows.flatMap((level, index) => {
-                  const rows = [];
-                  if (index === markerAt) rows.push(<MarkerRow key="marker" price={sale.price} />);
-                  rows.push(
-                    <tr
-                      key={level.price}
-                      className={`border-t border-line/60 ${level.price <= reach ? 'bg-warning/10' : ''}`}
-                    >
-                      <td className="py-1">{formatIsk(level.price, 2)}</td>
-                      <td className="py-1 text-right">{level.units.toLocaleString()}</td>
-                      <td className="py-1 text-right text-text-dim">
-                        {level.running.toLocaleString()}
-                      </td>
-                    </tr>
-                  );
-                  return rows;
-                })}
-                {markerAt === orderRows.length && <MarkerRow price={sale.price} />}
-              </tbody>
-            </table>
+            {/* `min-w` plus `overflow-x-auto`: a narrow phone scrolls this one
+                table sideways rather than the whole card losing its columns —
+                unlike `DataTable`, this is a plain `<table>` with no card
+                layout to fall back to, so it must keep row/column shape at
+                every width. `dt-embedded-table` is the hook `index.css` uses
+                to undo the outer `DataTable`'s phone card-layout CSS, which
+                otherwise leaks into this nested table too — see the comment
+                there. */}
+            <div className="overflow-x-auto">
+              <table className="dt-embedded-table w-full min-w-[20rem] text-sm tabular-nums">
+                <thead>
+                  <tr className="text-left text-[0.6875rem] tracking-wider text-text-dim uppercase">
+                    <th className="py-1 font-semibold">{t('market.hauling.detail.colPrice')}</th>
+                    <th className="py-1 text-right font-semibold">
+                      {t('market.hauling.detail.colUnits')}
+                    </th>
+                    <th className="py-1 text-right font-semibold">
+                      {t('market.hauling.detail.colTotal')}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orderRows.flatMap((level, index) => {
+                    const rows = [];
+                    if (index === markerAt)
+                      rows.push(<MarkerRow key="marker" price={sale.price} />);
+                    rows.push(
+                      <tr
+                        key={level.price}
+                        className={`border-t border-line/60 ${level.price <= reach ? 'bg-warning/10' : ''}`}
+                      >
+                        <td className="py-1">{formatIsk(level.price, 2)}</td>
+                        <td className="py-1 text-right">{level.units.toLocaleString()}</td>
+                        <td className="py-1 text-right text-text-dim">
+                          {level.running.toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                    return rows;
+                  })}
+                  {markerAt === orderRows.length && <MarkerRow price={sale.price} />}
+                </tbody>
+              </table>
+            </div>
             <p className="text-xs text-text-dim">{t('market.hauling.detail.ordersNote')}</p>
           </Section>
         </div>

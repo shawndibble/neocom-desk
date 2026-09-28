@@ -10,7 +10,7 @@
  *
  * A resolved name is written under the character that resolved it *and*
  * mirrored to the global sentinel row, so every other Character in this
- * browser's roster reads it with no ESI call of their own. That used to be
+ * device's roster reads it with no ESI call of their own. That used to be
  * called out as a leak: the ACL is genuinely per-Character, so a name one
  * Character can see is not automatically one every Character should. What
  * changed is *who* the "every Character" is — every row here is scoped to

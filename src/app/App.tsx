@@ -6,6 +6,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { subscribeToEsiAuthFailures } from '@/stores/authFailure';
 import { subscribeToEsiActivity } from '@/stores/activityLog';
 import { subscribeToUpgradeBlockedReports } from './upgradeBlockedReport';
+import { reloadOnDatabaseWipe } from './databaseWipe';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { configureEsi } from '@/esi/client';
 import { triggerSync } from '@/sync';
@@ -179,7 +180,7 @@ function Root() {
   const characterCount = useLiveQuery(() => db.characters.count());
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  if (characterCount === undefined || !hydrated) return <BootScreen />;
+  if (characterCount === undefined || !hydrated) return <BootScreen gate="root" />;
   if (characterCount === 0) return <Navigate to="/login" replace />;
   return <Navigate to={activeCharacterId === null ? '/characters' : '/overview'} replace />;
 }
@@ -238,6 +239,7 @@ export function App() {
   // And again for a blocked IndexedDB upgrade — the one Dexie failure that
   // never surfaces as an error, so it needs reporting to exist at all.
   useEffect(() => subscribeToUpgradeBlockedReports(), []);
+  useEffect(() => reloadOnDatabaseWipe(), []);
 
   // Fire-and-forget, on app start (once hydration resolves an active character)
   // and every character switch. Errors (offline, no Firebase config) are

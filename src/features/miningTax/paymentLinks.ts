@@ -7,7 +7,12 @@
  * and the Balances strip's own per-Payee figures (`balances.ts`), so the
  * matching rules stay testable without ESI or Dexie.
  */
-import type { MiningTaxAssignmentRecord, MiningTaxPaymentMethod, PayeeRecord } from '@/db';
+import type {
+  MiningTaxAssignmentRecord,
+  MiningTaxPaymentInfo,
+  MiningTaxPaymentMethod,
+  PayeeRecord,
+} from '@/db';
 import { DAY_MS } from '@/lib/age';
 import type { PayeeBalance } from './balances';
 import type { GroupMember } from './groupRows';
@@ -96,13 +101,39 @@ export function withinLinkWindow(entryDate: string, paymentDate: string): boolea
   return delta >= -1 && delta <= LINK_WINDOW_DAYS;
 }
 
+/**
+ * Reads back a payment written before it could hold more than one linked
+ * transaction (pre-issue-#540-followup): a bare `journalRefId`/`contractId`
+ * becomes a single link, sourced `auto` since every pre-existing link was
+ * written by the silent recorded-payment matcher. Every reader of a stored
+ * `payment` goes through this rather than the raw field, so the legacy shape
+ * never needs a Dexie migration (`db/index.ts`'s usual rule for an unindexed
+ * field).
+ */
+export function normalizePaymentInfo(payment: MiningTaxPaymentInfo): MiningTaxPaymentInfo {
+  const legacy = payment as MiningTaxPaymentInfo & { journalRefId?: number; contractId?: number };
+  if (legacy.journalRefId === undefined && legacy.contractId === undefined) return payment;
+  const { journalRefId, contractId, ...rest } = legacy;
+  return {
+    ...rest,
+    journalLinks:
+      rest.journalLinks ??
+      (journalRefId === undefined ? undefined : [{ refId: journalRefId, source: 'auto' }]),
+    contractLinks:
+      rest.contractLinks ??
+      (contractId === undefined ? undefined : [{ refId: contractId, source: 'auto' }]),
+  };
+}
+
 /** The journal and contract ids some Assignment already records a payment against. */
 function linkedRefIds(assignments: readonly MiningTaxAssignmentRecord[]) {
   const journal = new Set<number>();
   const contract = new Set<number>();
   for (const a of assignments) {
-    if (a.payment?.journalRefId !== undefined) journal.add(a.payment.journalRefId);
-    if (a.payment?.contractId !== undefined) contract.add(a.payment.contractId);
+    if (!a.payment) continue;
+    const normalized = normalizePaymentInfo(a.payment);
+    for (const link of normalized.journalLinks ?? []) journal.add(link.refId);
+    for (const link of normalized.contractLinks ?? []) contract.add(link.refId);
   }
   return { journal, contract };
 }
@@ -154,7 +185,10 @@ export function unlinkedRecordedPayments(
   for (const a of assignments) {
     const { payment } = a;
     if (a.status !== 'paid' || !payment) continue;
-    if (payment.journalRefId !== undefined || payment.contractId !== undefined) continue;
+    const normalized = normalizePaymentInfo(payment);
+    if ((normalized.journalLinks?.length ?? 0) > 0 || (normalized.contractLinks?.length ?? 0) > 0) {
+      continue;
+    }
     const group = groups.get(payment.paymentId);
     if (group) group.members.push(a);
     else
@@ -334,6 +368,22 @@ export function suggestLink(
     if (members) return { payment, balance: c.balance, members, confidence: 'amount' };
   }
   return null;
+}
+
+/**
+ * The exact-ISK candidate(s) for manually linking a transaction to an
+ * already-Paid Assignment (issue #540 follow-up: "paying backwards" applied
+ * retroactively) — deliberately stricter than `suggestLink`'s fuzzy, tiered
+ * confidence: a row the pilot already marked paid needs no "maybe", so an
+ * inexact figure is left for the pilot to find and pick themselves in the
+ * manual picker rather than guessed at. Still only a suggestion, pre-ticked
+ * but never applied without the pilot confirming it.
+ */
+export function exactAmountMatches(
+  payments: readonly MadePayment[],
+  amount: number
+): MadePayment[] {
+  return payments.filter((p) => p.amount !== null && Math.round(p.amount) === Math.round(amount));
 }
 
 /** Every payment worth offering, most confident first, then newest. */

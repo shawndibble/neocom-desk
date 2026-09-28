@@ -20,7 +20,7 @@ import type { FittingCatalogue } from './useFittingCatalogue';
 export type HullFitChecks = ReadonlyMap<number, CandidateCheck>;
 
 /** Bump when what a saved check means changes without the engine pins doing so (`HULL_RULES`, the pre-filter, the packing). */
-const RESULT_VERSION = 1;
+const RESULT_VERSION = 2;
 /** Ids per engine call on the page; small enough that one slice stays well under a frame. */
 const BATCH = 50;
 /** How long one slice on the page may run before yielding. */
@@ -140,7 +140,7 @@ function computeInWorker(
   });
 }
 
-/** The page's own path: every item through the memoizing engine call, in slices that yield; keeps what fits the hull, as the worker does. */
+/** The page's own path: every item through the memoizing engine call, in slices that yield. */
 function computeOnPage(
   shipTypeId: number,
   jobs: [CandidateRack, number[]][],
@@ -158,7 +158,7 @@ function computeOnPage(
       while (next < slices.length && performance.now() < until) {
         const [rack, ids] = slices[next++];
         for (const [id, check] of checkCandidates(shipTypeId, rack, ids, profile)) {
-          if (check.fitsHull) checks.set(id, check);
+          checks.set(id, check);
         }
       }
       if (next < slices.length) setTimeout(slice, 0);

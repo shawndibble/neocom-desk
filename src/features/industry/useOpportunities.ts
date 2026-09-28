@@ -23,10 +23,17 @@
  * codebase's `react-hooks/set-state-in-effect` rule.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
+import {
+  NO_CHARACTER_MODIFIERS,
+  type CharacterModifiers,
+} from '@/engine/industry/characterModifiers';
 import type { PiData } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
 import type { CharacterBlueprint } from '@/esi/endpoints';
+import {
+  tradeHubStanding,
+  type TradeHubStandingsMap,
+} from '@/features/market/useTradeHubStandings';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import { loadMarketSnapshots } from './marketData';
@@ -38,6 +45,7 @@ import {
   decideOpportunitiesCache,
   deleteOpportunitiesCache,
   detectOpportunityStock,
+  groupCandidatesByHub,
   opportunitiesBatchKey,
   opportunitiesInputsKey,
   opportunitySnapshotRequest,
@@ -55,9 +63,13 @@ export interface UseOpportunitiesArgs {
   candidates: readonly OpportunityCandidate[];
   catalog: BlueprintCatalog | null;
   pi: PiData | null;
-  hub: TradeHub;
+  /** The Trade Hub each candidate's owning Character would price at (issue #2055) — `hubForCharacter`'s resolution, not a hard-coded default. */
+  hubForCharacter: (characterId: number) => TradeHub;
   facilityDefaults: ActivityFacilityDefaults;
-  modifiers: CharacterModifiers;
+  /** Each candidate's owning Character's own skills/implants (issue #2055) — absent reads as `NO_CHARACTER_MODIFIERS`. */
+  modifiersByCharacter: ReadonlyMap<number, CharacterModifiers>;
+  /** Each candidate's owning Character's own standing toward every Trade Hub (issue #2055) — absent reads as zero. */
+  standingsByCharacter: ReadonlyMap<number, TradeHubStandingsMap>;
   ownedStockSnapshot: OwnedStockSnapshot;
   /** Every owned blueprint by character, so a sub-build the recursive engine prices quotes at a researched copy's real ME where the pilot owns one. */
   ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>;
@@ -94,9 +106,10 @@ export function useOpportunities({
   candidates,
   catalog,
   pi,
-  hub,
+  hubForCharacter,
   facilityDefaults,
-  modifiers,
+  modifiersByCharacter,
+  standingsByCharacter,
   ownedStockSnapshot,
   ownedByCharacter,
   assumedMe,
@@ -110,10 +123,20 @@ export function useOpportunities({
   });
 
   const manualRefreshOnly = !autoRecalculates(candidates.length);
-  const batchKey = useMemo(() => opportunitiesBatchKey(candidates, hub), [candidates, hub]);
+  const batchKey = useMemo(
+    () => opportunitiesBatchKey(candidates, hubForCharacter),
+    [candidates, hubForCharacter]
+  );
   const inputsKey = useMemo(
-    () => opportunitiesInputsKey({ assumedMe, modifiers, facilityDefaults, ownedByCharacter }),
-    [assumedMe, modifiers, facilityDefaults, ownedByCharacter]
+    () =>
+      opportunitiesInputsKey({
+        assumedMe,
+        modifiersByCharacter,
+        standingsByCharacter,
+        facilityDefaults,
+        ownedByCharacter,
+      }),
+    [assumedMe, modifiersByCharacter, standingsByCharacter, facilityDefaults, ownedByCharacter]
   );
 
   useEffect(() => {
@@ -154,9 +177,18 @@ export function useOpportunities({
     });
 
     void (async () => {
-      const request = opportunitySnapshotRequest(currentCandidates, hub, catalog, pi);
-      const snapshot = await loadMarketSnapshots([request])[0]!;
+      // Grouped by hub (issue #2055's "batched per Character/hub, not per
+      // row"): one snapshot request per distinct hub the batch's owning
+      // Characters resolve to, not one shared hard-coded default.
+      const hubGroups = groupCandidatesByHub(currentCandidates, hubForCharacter);
+      const requests = hubGroups.map((group) =>
+        opportunitySnapshotRequest(group.candidates, group.hub, catalog, pi)
+      );
+      const snapshots = await Promise.all(loadMarketSnapshots(requests));
       if (cancelled) return;
+      const snapshotByHubId = new Map(
+        hubGroups.map((group, i) => [group.hub.id, snapshots[i]!] as const)
+      );
 
       const stock = detectOpportunityStock(ownedStockSnapshot.sources, currentCandidates);
       const unranked: UnrankedOpportunityRow[] = [];
@@ -170,11 +202,12 @@ export function useOpportunities({
             ownedBlueprints: ownedByCharacter.get(candidate.characterId) ?? [],
             assumedMeForUnowned: assumedMe,
           });
+          const hub = hubForCharacter(candidate.characterId);
           const row = computeOpportunityRow(
             candidate,
-            snapshot,
+            snapshotByHubId.get(hub.id)!,
             facilityDefaults,
-            modifiers,
+            modifiersByCharacter.get(candidate.characterId) ?? NO_CHARACTER_MODIFIERS,
             stock,
             {
               recipeFor,
@@ -183,7 +216,9 @@ export function useOpportunities({
               // prices with nothing auto-built, `computeOpportunityRow`'s
               // own pre-#652 plain behavior.
               depth: 0,
-            }
+            },
+            hub,
+            tradeHubStanding(standingsByCharacter.get(candidate.characterId) ?? new Map(), hub.id)
           );
           if (row) unranked.push(row);
         }
@@ -216,9 +251,10 @@ export function useOpportunities({
     inputsKey,
     catalog,
     pi,
-    hub,
+    hubForCharacter,
     facilityDefaults,
-    modifiers,
+    modifiersByCharacter,
+    standingsByCharacter,
     ownedStockSnapshot,
     ownedByCharacter,
     assumedMe,
