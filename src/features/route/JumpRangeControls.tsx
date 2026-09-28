@@ -27,6 +27,7 @@ import { cx } from '@/lib/cx';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { loadSolarSystems } from '@/sde/loadMarketSde';
 import type { SolarSystemEntry } from '@/sde/marketTypes';
+import { lookupSolarSystem } from '@/sde/solarSystems';
 import type { CurrentSystemState, JumpRangeStatus } from './currentSystem';
 
 const MATCH_LIMIT = 8;
@@ -79,8 +80,8 @@ function useSystemName(systemId: number | null): string | null {
   useEffect(() => {
     if (systemId === null) return;
     let cancelled = false;
-    void loadSolarSystems()
-      .then((entries) => entries.find((entry) => entry.id === systemId)?.name ?? null)
+    void lookupSolarSystem(systemId)
+      .then((entry) => entry?.name ?? null)
       .catch(() => null)
       .then((found) => {
         if (!cancelled && found !== null) setName({ id: systemId, name: found });
