@@ -19,17 +19,20 @@ let index: Promise<ReadonlyMap<number, MarketTypeEntry>> | null = null;
 
 /** The whole market catalogue keyed by type id, built once per session. */
 export function loadMarketTypesById(): Promise<ReadonlyMap<number, MarketTypeEntry>> {
-  index ??= loadMarketTypes()
+  if (index) return index;
+  const pending = loadMarketTypes()
     .then((entries): ReadonlyMap<number, MarketTypeEntry> => {
       const map = new Map<number, MarketTypeEntry>();
       for (const entry of entries) map.set(entry.typeId, entry);
       return map;
     })
     .catch((error: unknown) => {
-      index = null; // allow retry after failure
+      // Allow retry after failure — unless a clear already replaced this load.
+      if (index === pending) index = null;
       throw error;
     });
-  return index;
+  index = pending;
+  return pending;
 }
 
 /** Test-only: drops the memoized index so tests can swap the catalogue between cases. */

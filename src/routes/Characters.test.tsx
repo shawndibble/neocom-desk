@@ -751,6 +751,23 @@ describe('Characters', () => {
     expect(screen.getByText('Pilot Two')).toBeInTheDocument();
   });
 
+  it('says so, and keeps the character, when the removal fails', async () => {
+    const removal = await import('@/features/character/removeCharacter');
+    vi.spyOn(removal, 'removeCharacterAfterSync').mockRejectedValueOnce(new Error('disk full'));
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+
+    expect(
+      await screen.findByText('Could not remove Pilot One. Nothing was deleted — try again.')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Pilot One')).toBeInTheDocument();
+  });
+
   it('keeps the character when the removal confirmation is declined', async () => {
     const user = userEvent.setup();
     renderCharacters();
