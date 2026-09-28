@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, TextInput, Checkbox, Radio } from '@/components/ui';
+import { Button, Modal, IskInput, Checkbox, Radio } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { PayeeRecord } from '@/db';
 import { cx } from '@/lib/cx';
@@ -58,6 +58,9 @@ export function LinkPaymentDialog({
   const [excluded, setExcluded] = useState<ReadonlySet<string>>(new Set());
   // Only meaningful for a payment in kind, whose cargo is never priced.
   const [amountInKind, setAmountInKind] = useState('');
+  // False while the field shows text `amountInKind` doesn't reflect ("1bx"):
+  // saving then would record a figure the pilot can't see.
+  const [amountInKindParses, setAmountInKindParses] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const selected = suggestions.find((s) => s.payment.key === selectedKey) ?? null;
@@ -72,6 +75,7 @@ export function LinkPaymentDialog({
     setSelectedKey(key);
     setExcluded(new Set());
     setAmountInKind('');
+    setAmountInKindParses(true);
   }
 
   function toggle(id: string) {
@@ -90,7 +94,10 @@ export function LinkPaymentDialog({
   const recordedAmount =
     selected?.payment.amount ??
     (amountInKind.trim() === '' ? Math.round(includedTotal) : Number(amountInKind));
-  const amountValid = Number.isFinite(recordedAmount) && recordedAmount >= 0;
+  const amountValid =
+    Number.isFinite(recordedAmount) &&
+    recordedAmount >= 0 &&
+    (selected?.payment.amount != null || amountInKindParses);
 
   // Only shown for a real ISK payment, where a gap between what was sent and
   // what the ticked entries owe is worth noticing before committing.
@@ -217,12 +224,11 @@ export function LinkPaymentDialog({
                 <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                   {t('miningTax.linkPaymentAmountLabel')}
                 </p>
-                <TextInput
-                  type="number"
-                  min={0}
+                <IskInput
                   value={amountInKind}
-                  onChange={(e) => setAmountInKind(e.target.value)}
-                  placeholder={String(Math.round(includedTotal))}
+                  onChange={setAmountInKind}
+                  onParseableChange={setAmountInKindParses}
+                  defaultAmount={Math.round(includedTotal)}
                   aria-label={t('miningTax.linkPaymentAmountLabel')}
                   className="w-full"
                 />
