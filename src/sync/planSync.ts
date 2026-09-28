@@ -11,7 +11,10 @@
 // Syncs are serialized GLOBALLY, not just per character: the Firebase session is
 // a single slot swapped by ensureSignedIn, so two concurrent syncs would race
 // the auth state mid-flight. Status is tracked per character so a later
-// character's success cannot mask an earlier one's failure.
+// character's success cannot mask an earlier one's failure. Within one
+// character's sync the collections pull concurrently (syncCharacter). Queued
+// syncs start foreground-first (SyncPriority), so an edit never waits behind a
+// whole background sweep.
 //
 // Owner-hash safety, so a previous owner's data neither leaks in nor gets
 // pushed up: reads filter on the current hash, and Firestore rules deny
@@ -45,6 +48,7 @@ import {
   trimFeed,
 } from '@/features/notifications/feed';
 import { refreshAppBadge } from '@/features/notifications/appBadge';
+import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { getSyncFirestore } from './firebaseApp';
 import {
   INTERNAL_PREFIX,
@@ -410,25 +414,117 @@ export async function deleteSyncedSetting(key: string): Promise<void> {
 // Sync driver
 // ---------------------------------------------------------------------------
 
-const running = new Map<number, Promise<void>>();
-const pendingTimers = new Map<number, ReturnType<typeof setTimeout>>();
+/**
+ * One Character's sync, from the moment it is requested until its promise
+ * settles. It may run more than one pass: a request that arrives after a pass
+ * has started (`started`) cannot be served by it — the pass may already have
+ * read the local rows the request is about — so it sets `rerun` and the job
+ * goes back in the queue once the pass ends. Callers keep awaiting the one
+ * promise, so `flushSync` (features/character/removeCharacter.ts) never deletes
+ * a Character's rows before an edit made mid-pass has actually been pushed.
+ */
+interface SyncJob {
+  characterId: number;
+  priority: SyncPriority;
+  started: boolean;
+  rerun: SyncPriority | null;
+  promise: Promise<void>;
+  resolve: () => void;
+  reject: (error: unknown) => void;
+}
+
+const running = new Map<number, SyncJob>();
+const pendingTimers = new Map<
+  number,
+  { timer: ReturnType<typeof setTimeout>; priority: SyncPriority }
+>();
 const DEFAULT_DEBOUNCE_MS = 2000;
-// Global serialization chain. Never left rejected: failures surface through the
-// per-run promise and the status stream.
-let syncChain: Promise<void> = Promise.resolve();
+
+/**
+ * `foreground` is everything a user is waiting on — an edit, the boot sync, a
+ * Character switch. `background` is the sweep (`app/backgroundSync.ts`), which
+ * may queue one sync per Character: a foreground sync overtakes every queued
+ * background one, so an edit waits for at most the one sync already in
+ * flight, never the whole sweep.
+ */
+export type SyncPriority = 'foreground' | 'background';
+
+function higher(a: SyncPriority | null, b: SyncPriority): SyncPriority {
+  return a === 'foreground' || b === 'foreground' ? 'foreground' : 'background';
+}
+
+/** Syncs waiting their turn, FIFO within each priority. */
+const queue: SyncJob[] = [];
+/** True while a sync holds the (single) Firebase session. */
+let busy = false;
 // Set by `haltSync` for the rest of the page's life: a purge-then-wipe must
 // not race a sync that pushes the purged rows back or re-mints a session.
 let halted = false;
 
+function finish(job: SyncJob, error?: { error: unknown }): void {
+  if (running.get(job.characterId) === job) running.delete(job.characterId);
+  if (error) job.reject(error.error);
+  else job.resolve();
+}
+
+/**
+ * Start the next queued sync — foreground first — unless one is running.
+ * After `haltSync` a queued job is settled without running: it would only
+ * push data the halt is about to purge.
+ */
+function pump(): void {
+  while (!busy && queue.length > 0) {
+    const foreground = queue.findIndex((job) => job.priority === 'foreground');
+    const [job] = queue.splice(foreground === -1 ? 0 : foreground, 1);
+    if (halted) {
+      finish(job);
+      continue;
+    }
+    busy = true;
+    job.started = true;
+    void runPass(job);
+  }
+}
+
+async function runPass(job: SyncJob): Promise<void> {
+  const { characterId } = job;
+  let failure: { error: unknown } | undefined;
+  setStatus(characterId, { state: 'syncing', error: null });
+  try {
+    await syncCharacter(characterId);
+    setStatus(characterId, { state: 'idle', lastSyncedAt: Date.now(), error: null });
+  } catch (error) {
+    failure = { error };
+    setStatus(characterId, {
+      state: 'error',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    busy = false;
+    if (job.rerun !== null && !halted) {
+      job.priority = job.rerun;
+      job.rerun = null;
+      job.started = false;
+      queue.push(job);
+    } else {
+      finish(job, failure);
+    }
+    pump();
+  }
+}
+
 /**
  * Stop syncing on this page until it reloads: pending debounces are dropped,
- * new syncs are refused, and this resolves once any sync in flight is done.
+ * new syncs are refused, queued ones are skipped, and this resolves once the
+ * sync in flight (if any) is done.
  */
 export async function haltSync(): Promise<void> {
   halted = true;
-  for (const timer of pendingTimers.values()) clearTimeout(timer);
+  for (const { timer } of pendingTimers.values()) clearTimeout(timer);
   pendingTimers.clear();
-  await Promise.allSettled(running.values());
+  // Not-yet-started jobs settle now, without running.
+  for (const job of queue.splice(0)) finish(job);
+  await Promise.allSettled([...running.values()].map((job) => job.promise));
 }
 
 /** Undo `haltSync`. Tests only — the app reloads instead. */
@@ -436,56 +532,73 @@ export function resetSyncHalt(): void {
   halted = false;
 }
 
-/** Debounced sync — call after each edit. */
-export function scheduleSync(characterId: number, debounceMs = DEFAULT_DEBOUNCE_MS): void {
+/**
+ * Debounced sync — call after each edit. `background` is for the sweep only;
+ * a foreground call for the same Character inside the debounce wins.
+ */
+export function scheduleSync(
+  characterId: number,
+  debounceMs = DEFAULT_DEBOUNCE_MS,
+  priority: SyncPriority = 'foreground'
+): void {
   if (halted) return;
   const existing = pendingTimers.get(characterId);
-  if (existing !== undefined) clearTimeout(existing);
-  pendingTimers.set(
-    characterId,
-    setTimeout(() => {
+  if (existing !== undefined) clearTimeout(existing.timer);
+  const merged = higher(existing?.priority ?? null, priority);
+  pendingTimers.set(characterId, {
+    priority: merged,
+    timer: setTimeout(() => {
       pendingTimers.delete(characterId);
-      triggerSync(characterId).catch(() => {
+      triggerSync(characterId, merged).catch(() => {
         // Failure already surfaced via subscribeSyncStatus.
       });
-    }, debounceMs)
-  );
+    }, debounceMs),
+  });
 }
 
 /**
- * Run a sync now. Coalesced per character (an already-running sync for it is
- * awaited instead) and serialized globally.
+ * Run a sync now, serialized globally. Coalesced per character: a queued sync
+ * for it is awaited instead (promoted to foreground when this call is), and
+ * one already running is awaited *through one more pass*, since it may have
+ * read the local rows before whatever edit prompted this call.
  */
-export function triggerSync(characterId: number): Promise<void> {
+export function triggerSync(
+  characterId: number,
+  priority: SyncPriority = 'foreground'
+): Promise<void> {
   if (halted) return Promise.resolve();
   const pending = pendingTimers.get(characterId);
   if (pending !== undefined) {
-    clearTimeout(pending);
+    clearTimeout(pending.timer);
     pendingTimers.delete(characterId);
+    priority = higher(pending.priority, priority);
   }
-  const active = running.get(characterId);
-  if (active) return active;
+  const existing = running.get(characterId);
+  if (existing) {
+    if (existing.started) existing.rerun = higher(existing.rerun, priority);
+    else existing.priority = higher(existing.priority, priority);
+    return existing.promise;
+  }
 
-  const run = syncChain.then(async () => {
-    setStatus(characterId, { state: 'syncing', error: null });
-    try {
-      await syncCharacter(characterId);
-      setStatus(characterId, { state: 'idle', lastSyncedAt: Date.now(), error: null });
-    } catch (error) {
-      setStatus(characterId, {
-        state: 'error',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    } finally {
-      running.delete(characterId);
-    }
+  let resolve!: () => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<void>((res, rej) => {
+    resolve = res;
+    reject = rej;
   });
-  syncChain = run.catch(() => {
-    // Keep the chain alive; the failure is reported via `run` and the status.
-  });
-  running.set(characterId, run);
-  return run;
+  const job: SyncJob = {
+    characterId,
+    priority,
+    started: false,
+    rerun: null,
+    promise,
+    resolve,
+    reject,
+  };
+  running.set(characterId, job);
+  queue.push(job);
+  pump();
+  return promise;
 }
 
 /**
@@ -900,7 +1013,7 @@ function toRemoteFeedDoc(
     //
     // A wall clock, not the row's own `max(firedAt, dismissedAt)` — see
     // `LocalFeedRow` for why the derived stamp hid rows from other devices.
-    // `writeNow`, never `ctx.now`: a pass stamps `ctx.now` before ten other
+    // `writeNow`, never `ctx.now`: a pass stamps `ctx.now` before a dozen
     // collections' round trips, and a doc written a minute later under a
     // stamp a minute old can land below a cursor another device has already
     // moved past. Nothing here re-dates the row itself — `firedAt` and
@@ -998,23 +1111,12 @@ async function syncFeed(ctx: SyncContext): Promise<void> {
   await writePullCursor(pull.cursorKey, pull.next);
 }
 
-async function syncCharacter(characterId: number): Promise<void> {
-  const character = await db.characters.get(characterId);
-  if (!character) throw new Error(`Unknown character ${characterId}`);
-  await handleOwnerHashChange(character);
+// ---------------------------------------------------------------------------
+// Synced settings
+// ---------------------------------------------------------------------------
 
-  const uid = await ensureSignedIn(characterId);
-  const firestore = getSyncFirestore();
-  const ownerHash = character.ownerHash;
-  const now = Date.now();
-  const ctx: SyncContext = { firestore, uid, ownerHash, characterId, now };
-
-  for (const spec of EDITABLE_COLLECTIONS) {
-    await syncEditableCollection(spec, ctx);
-  }
-  await syncFeed(ctx);
-
-  // ---- Synced settings ----
+async function syncSettings(ctx: SyncContext): Promise<void> {
+  const { firestore, uid, ownerHash, now } = ctx;
   // The second `ownerHash` read, and under the same index constraint as
   // `fetchOwnedDocs` — see its docstring. Deliberately unwindowed: settings
   // tombstones never expire and `mergeSettings`' absence semantics differ.
@@ -1033,16 +1135,14 @@ async function syncCharacter(characterId: number): Promise<void> {
     .map((record) => ({ key: record.key, value: record.value, updatedAt: meta[record.key] ?? 0 }));
 
   const settings = mergeSettings(localSettings, settingsTombstones, remoteSettings, now);
-  let metaDirty = false;
+  /** LWW stamps this pass wants to record, applied under the transaction below. */
+  const stamps = new Map<string, number>();
 
   await Promise.all([
     ...settings.push.map((s) => {
       // A key written outside setSyncedSetting has no timestamp yet: stamp now.
       const updatedAt = s.updatedAt > 0 ? s.updatedAt : now;
-      if (meta[s.key] !== updatedAt) {
-        meta[s.key] = updatedAt;
-        metaDirty = true;
-      }
+      if (meta[s.key] !== updatedAt) stamps.set(s.key, updatedAt);
       return setDoc(doc(settingsCol, s.key), {
         key: s.key,
         value: s.value,
@@ -1063,19 +1163,45 @@ async function syncCharacter(characterId: number): Promise<void> {
     ...settings.purgeRemote.map((key) => deleteDoc(doc(settingsCol, key))),
   ]);
 
-  for (const s of settings.pull) {
-    await db.settings.put({ key: s.key, value: s.value });
-    meta[s.key] = s.updatedAt;
-    metaDirty = true;
+  // One transaction for the whole pull rather than a put/delete per key: the
+  // rows and their LWW stamps land together, and a live query over settings
+  // re-runs once instead of once per row. Dexie only inside it — an awaited
+  // Firestore call would let the transaction auto-commit early.
+  //
+  // The meta is re-read inside it: the merge above worked from a snapshot
+  // taken before the network round trips, and a setSyncedSetting /
+  // deleteSyncedSetting landing in between must neither be overwritten by the
+  // pull nor lose its stamp. A key whose stamp moved since the snapshot is
+  // left alone; the next pass merges it properly.
+  if (settings.pull.length > 0 || settings.deleteLocal.length > 0 || stamps.size > 0) {
+    await db.transaction('rw', db.settings, async () => {
+      const current = await readSettingsMeta();
+      const untouched = (key: string) => current[key] === meta[key];
+      const pull = settings.pull.filter((s) => untouched(s.key));
+      const deleteLocal = settings.deleteLocal.filter(untouched);
+      let dirty = false;
+      for (const [key, updatedAt] of stamps) {
+        if (!untouched(key)) continue;
+        current[key] = updatedAt;
+        dirty = true;
+      }
+      for (const s of pull) {
+        current[s.key] = s.updatedAt;
+        dirty = true;
+      }
+      for (const key of deleteLocal) {
+        if (key in current) {
+          delete current[key];
+          dirty = true;
+        }
+      }
+      if (pull.length > 0) {
+        await db.settings.bulkPut(pull.map((s) => ({ key: s.key, value: s.value })));
+      }
+      if (deleteLocal.length > 0) await db.settings.bulkDelete(deleteLocal);
+      if (dirty) await writeSettingsMeta(current);
+    });
   }
-  for (const key of settings.deleteLocal) {
-    await db.settings.delete(key);
-    if (key in meta) {
-      delete meta[key];
-      metaDirty = true;
-    }
-  }
-  if (metaDirty) await writeSettingsMeta(meta);
 
   // Do NOT also clear on settings.pushTombstones: a tombstone that was just
   // pushed is not yet resolved — see mergeSettings for why it must survive
@@ -1084,6 +1210,69 @@ async function syncCharacter(characterId: number): Promise<void> {
     const cleared = new Set(settings.clearLocalTombstones);
     await writeSettingsTombstones(settingsTombstones.filter((t) => !cleared.has(t.key)));
   }
+}
+
+/**
+ * How many of one Character's collections pull at once. Every collection
+ * touches only its own Dexie table, tombstone key and pull cursor (the
+ * account-wide merges read sibling Characters' tombstones for *their own*
+ * collection, which only that collection's pass writes), so their order never
+ * mattered — they ran one after another purely because they were written as a
+ * loop. A small cap rather than all thirteen at once keeps the browser's
+ * per-host connection pool free for the page's own reads.
+ */
+const COLLECTION_PULL_CONCURRENCY = 4;
+
+/**
+ * Run every task, at most `limit` at a time, and throw only once *all* of them
+ * have settled: the one failure as-is, or an `AggregateError` of several.
+ * Rejecting early would let the queue start the next Character — and swap the
+ * Firebase session — under this one's still-running writes, the race the
+ * global serialization exists to prevent.
+ */
+async function settleAllThenThrow(
+  tasks: readonly (() => Promise<void>)[],
+  limit: number
+): Promise<void> {
+  const errors: unknown[] = [];
+  await mapWithConcurrencyLimit(tasks, limit, async (task) => {
+    try {
+      await task();
+    } catch (error) {
+      errors.push(error);
+    }
+  });
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) {
+    const first = errors[0] instanceof Error ? errors[0].message : String(errors[0]);
+    // Every failure kept for whoever inspects it; the message — what the sync
+    // status line shows — stays the first one's, with a count.
+    throw new AggregateError(errors, `${first} (and ${errors.length - 1} more)`);
+  }
+}
+
+async function syncCharacter(characterId: number): Promise<void> {
+  const character = await db.characters.get(characterId);
+  if (!character) throw new Error(`Unknown character ${characterId}`);
+  await handleOwnerHashChange(character);
+
+  const uid = await ensureSignedIn(characterId);
+  const firestore = getSyncFirestore();
+  const ownerHash = character.ownerHash;
+  const now = Date.now();
+  const ctx: SyncContext = { firestore, uid, ownerHash, characterId, now };
+
+  // A failing collection no longer stops the ones after it: each collection's
+  // cursor only advances on its own success, so what did apply stays applied
+  // and the failed one re-reads its window on the next pass.
+  await settleAllThenThrow(
+    [
+      ...EDITABLE_COLLECTIONS.map((spec) => () => syncEditableCollection(spec, ctx)),
+      () => syncFeed(ctx),
+      () => syncSettings(ctx),
+    ],
+    COLLECTION_PULL_CONCURRENCY
+  );
 
   // Heartbeat (issue #2065): stamped only once every collection above synced,
   // so the scheduled purge of accounts idle for 90 days sees an account that

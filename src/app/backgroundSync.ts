@@ -13,6 +13,12 @@
  * (neither alone catches an app switch that leaves the tab foregrounded), and
  * it is gated per Character by {@link BACKGROUND_SYNC_MIN_GAP_MS} because
  * `sync/syncAuth.ensureSignedIn` mints a Firebase custom token per Character.
+ *
+ * That one Firebase session is also why the order matters: the sweep queues
+ * the active Character last, so the session is left on the Character the
+ * user is editing, and it queues everything as background priority so an
+ * edit-triggered sync overtakes the rest of the sweep (`sync/planSync.ts`
+ * `SyncPriority`) instead of waiting behind every Character.
  */
 import { useEffect, useRef } from 'react';
 import { getSyncStatus, scheduleSync } from '@/sync';
@@ -20,11 +26,17 @@ import { isSyncConfigured } from './syncStatus';
 import { joinTabElection, type TabElectionSeat } from '@/lib/tabLeader';
 
 /**
- * Smallest gap between two sweeps *of one Character*. Five minutes is well
- * inside "fresh enough to read" and well outside "every time the mouse leaves
- * the window", which is what a `visibilitychange` gate has to survive.
+ * Smallest gap between two sweeps *of the active Character*. Five minutes is
+ * well inside "fresh enough to read" and well outside "every time the mouse
+ * leaves the window", which is what a `visibilitychange` gate has to survive.
  */
 export const BACKGROUND_SYNC_MIN_GAP_MS = 5 * 60 * 1000;
+
+/**
+ * The same gap for every *other* Character. Nobody is looking through them,
+ * and each one costs a token mint and a session swap, so they can wait longer.
+ */
+export const BACKGROUND_SYNC_NON_ACTIVE_GAP_MS = 20 * 60 * 1000;
 
 /**
  * How often the gate is re-checked. Not the sync cadence —
@@ -72,19 +84,29 @@ function writeSharedStamps(stamps: ReadonlyMap<number, number>): void {
 }
 
 /**
- * Which of `ids` are due, given when each was last swept. Pure so the throttle
- * is testable without a clock or a DOM event.
+ * Which of `ids` are due, given when each was last swept, in the order to
+ * sweep them. Pure so the throttle is testable without a clock or a DOM event.
+ *
+ * The active Character has the shorter gap and always comes last. It is also
+ * appended whenever any other Character is swept, due or not: the sweep signs
+ * the one Firebase session in as each Character in turn, and ending on anyone
+ * else would make the next edit re-mint the active Character's token.
  */
 export function idsToSweep(
   ids: readonly number[],
   lastSweptAt: ReadonlyMap<number, number>,
   now: number,
-  minGapMs: number = BACKGROUND_SYNC_MIN_GAP_MS
+  activeCharacterId: number | null
 ): number[] {
-  return ids.filter((id) => {
+  const isDue = (id: number) => {
     const last = lastSweptAt.get(id);
-    return last === undefined || now - last >= minGapMs;
-  });
+    const gap =
+      id === activeCharacterId ? BACKGROUND_SYNC_MIN_GAP_MS : BACKGROUND_SYNC_NON_ACTIVE_GAP_MS;
+    return last === undefined || now - last >= gap;
+  };
+  const others = ids.filter((id) => id !== activeCharacterId && isDue(id));
+  if (activeCharacterId === null || !ids.includes(activeCharacterId)) return others;
+  return others.length > 0 || isDue(activeCharacterId) ? [...others, activeCharacterId] : [];
 }
 
 /**
@@ -109,13 +131,18 @@ export function idsToSweep(
  * latest-ref pattern (`market/useCompareRows.ts`) against a joined key that
  * changes exactly when the set of Characters does.
  */
-export function useBackgroundSync(characterIds: readonly number[]): void {
+export function useBackgroundSync(
+  characterIds: readonly number[],
+  activeCharacterId: number | null = null
+): void {
   const lastSweptAt = useRef(new Map<number, number>());
   /** When the boot hold-off ends; set by the first effect run that has Characters. */
   const bootSweepAt = useRef<number | null>(null);
   const idsRef = useRef(characterIds);
+  const activeRef = useRef(activeCharacterId);
   useEffect(() => {
     idsRef.current = characterIds;
+    activeRef.current = activeCharacterId;
   });
   const key = characterIds.join(',');
   const active = key !== '' && isSyncConfigured();
@@ -150,13 +177,14 @@ export function useBackgroundSync(characterIds: readonly number[]): void {
           lastSweptAt.current.set(characterId, synced);
         }
       }
-      for (const characterId of idsToSweep(idsRef.current, lastSweptAt.current, now)) {
+      const due = idsToSweep(idsRef.current, lastSweptAt.current, now, activeRef.current);
+      for (const characterId of due) {
         // A sync already in flight covers this Character. Scheduling a second
         // one behind it would re-read every collection and, since the sweep
         // signs the session in as each Character in turn, re-mint its token.
         if (getSyncStatus(characterId).state === 'syncing') continue;
         lastSweptAt.current.set(characterId, now);
-        scheduleSync(characterId);
+        scheduleSync(characterId, undefined, 'background');
       }
       writeSharedStamps(lastSweptAt.current);
     };

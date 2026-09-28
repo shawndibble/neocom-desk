@@ -58,6 +58,7 @@ interface FakeRef {
   col: FakeCol;
   id: string;
 }
+const pathOf = (target: unknown): string => (target as FakeQuery).col.path;
 
 // In-memory Firestore double: collection path -> doc id -> data. getDocs applies
 // '==' where-filters like the real backend, and like the deployed rules, which
@@ -1675,6 +1676,66 @@ describe('triggerSync: settings', () => {
     expect(remoteStore.get(SETTINGS_PATH)?.has('sync.tradeHub')).toBe(true);
   });
 
+  it('writes a pull of several settings in one bulk write, not a put per key', async () => {
+    const later = Date.now() + 60_000;
+    seedRemote(SETTINGS_PATH, [
+      { key: 'sync.tradeHub', value: 'amarr', updatedAt: later, ownerHash: HASH },
+      { key: 'sync.corpDarkAfterDays', value: 7, updatedAt: later, ownerHash: HASH },
+      { key: 'sync.gone', updatedAt: later, ownerHash: HASH, deleted: true },
+    ]);
+    await seedLocalSetting('sync.gone', 'stale', Date.now() - 60_000);
+    const bulkPut = vi.spyOn(db.settings, 'bulkPut');
+    const bulkDelete = vi.spyOn(db.settings, 'bulkDelete');
+    const put = vi.spyOn(db.settings, 'put');
+    try {
+      await triggerSync(1);
+
+      expect(bulkPut).toHaveBeenCalledTimes(1);
+      expect(bulkPut.mock.calls[0][0]).toEqual([
+        { key: 'sync.tradeHub', value: 'amarr' },
+        { key: 'sync.corpDarkAfterDays', value: 7 },
+      ]);
+      expect(bulkDelete).toHaveBeenCalledWith(['sync.gone']);
+      const putKeys = put.mock.calls.map(([row]) => row.key);
+      expect(putKeys).not.toContain('sync.tradeHub');
+      expect(putKeys).not.toContain('sync.corpDarkAfterDays');
+      expect((await db.settings.get('sync.tradeHub'))?.value).toBe('amarr');
+      expect(await db.settings.get('sync.gone')).toBeUndefined();
+      const meta = (await db.settings.get(SETTINGS_META_KEY))?.value as Record<string, number>;
+      expect(meta['sync.tradeHub']).toBe(later);
+      expect('sync.gone' in meta).toBe(false);
+    } finally {
+      bulkPut.mockRestore();
+      bulkDelete.mockRestore();
+      put.mockRestore();
+    }
+  });
+
+  it('keeps a setting written locally while the pass was in flight, value and stamp', async () => {
+    const remoteAt = Date.now() + 60_000;
+    const localAt = Date.now() + 120_000;
+    seedRemote(SETTINGS_PATH, [
+      { key: 'sync.tradeHub', value: 'amarr', updatedAt: remoteAt, ownerHash: HASH },
+    ]);
+    await seedLocalSetting('sync.tradeHub', 'jita', Date.now() - 60_000);
+    // Something for the settings pass to push, so a write lands between its
+    // read and its local apply.
+    await seedLocalSetting('sync.corpDarkAfterDays', 7);
+    // The first write of the pass is that settings push (nothing else is local).
+    let edited = false;
+    vi.mocked(setDoc).mockImplementationOnce((async (ref: FakeRef) => {
+      edited = ref.col.path === SETTINGS_PATH;
+      await seedLocalSetting('sync.tradeHub', 'dodixie', localAt);
+    }) as never);
+
+    await triggerSync(1);
+
+    expect(edited).toBe(true);
+    expect((await db.settings.get('sync.tradeHub'))?.value).toBe('dodixie');
+    const meta = (await db.settings.get(SETTINGS_META_KEY))?.value as Record<string, number>;
+    expect(meta['sync.tradeHub']).toBe(localAt);
+  });
+
   it('pulls newer remote settings into Dexie', async () => {
     seedRemote(SETTINGS_PATH, [
       { key: 'sync.tradeHub', value: 'amarr', updatedAt: Date.now() + 60_000, ownerHash: HASH },
@@ -1853,6 +1914,170 @@ describe('sync orchestration', () => {
     expect(getSyncStatus(1).state).toBe('idle');
   });
 
+  /** Blocks every read whose path `match`es until `release` is called. */
+  function gateReads(match: (path: string) => boolean) {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const order: string[] = [];
+    vi.mocked(getDocs).mockImplementation((async (target: FakeQuery) => {
+      order.push(target.col.path);
+      if (match(target.col.path)) await gate;
+      return fake.getDocsImpl(target);
+    }) as never);
+    return { order, release };
+  }
+
+  const firstReadOf = (order: string[], id: number) =>
+    order.findIndex((path) => path.startsWith(`characters/char:${id}/`));
+
+  async function addAlts(ids: number[]) {
+    for (const id of ids) {
+      await db.characters.put({ characterId: id, name: `Alt ${id}`, ownerHash: HASH, addedAt: 1 });
+    }
+  }
+
+  it('pulls the collections of one character concurrently, a few at a time', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    vi.mocked(getDocs).mockImplementation((async (target: FakeQuery) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return fake.getDocsImpl(target);
+    }) as never);
+
+    await triggerSync(1);
+
+    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(13);
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(4);
+  });
+
+  it('lets every collection settle before a failed sync gives up the session', async () => {
+    await addAlts([2]);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const order: string[] = [];
+    vi.mocked(getDocs).mockImplementation((async (target: FakeQuery) => {
+      order.push(target.col.path);
+      if (target.col.path === PLANS_PATH) throw new Error('plans offline');
+      if (target.col.path === BUILD_PLANS_PATH) await gate;
+      return fake.getDocsImpl(target);
+    }) as never);
+
+    const p1 = triggerSync(1);
+    const p2 = triggerSync(2);
+    const p1Settled = p1.catch(() => {});
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // The plans pull of character 1 has failed, but its buildPlans pull is
+    // still running under the char:1 session — char:2 must not sign in over it.
+    expect(firstReadOf(order, 2)).toBe(-1);
+
+    release();
+    await p1Settled;
+    await expect(p1).rejects.toThrow('plans offline');
+    await p2;
+    // The failure did not skip the collections after it.
+    expect(order.filter((path) => path.startsWith('characters/char:1/'))).toHaveLength(13);
+  });
+
+  it('runs a foreground sync ahead of queued background ones', async () => {
+    await addAlts([2, 3]);
+    const { order, release } = gateReads((path) => path === 'characters/char:2/plans');
+    const background = [triggerSync(2, 'background'), triggerSync(3, 'background')];
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const edit = triggerSync(1);
+    release();
+    await Promise.all([edit, ...background]);
+
+    // Waits for the one sync already in flight, not for the whole sweep.
+    expect(firstReadOf(order, 2)).toBeLessThan(firstReadOf(order, 1));
+    expect(firstReadOf(order, 1)).toBeLessThan(firstReadOf(order, 3));
+  });
+
+  it('promotes a queued background sync when a foreground one asks for the same character', async () => {
+    await addAlts([2, 3]);
+    const { order, release } = gateReads((path) => path === 'characters/char:2/plans');
+    const queued = [
+      triggerSync(2, 'background'),
+      triggerSync(3, 'background'),
+      triggerSync(1, 'background'),
+    ];
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const edit = triggerSync(1);
+    expect(edit).toBe(queued[2]);
+    release();
+    await Promise.all(queued);
+
+    expect(firstReadOf(order, 1)).toBeLessThan(firstReadOf(order, 3));
+    // Coalesced: character 1 synced once, not once per trigger.
+    expect(order.filter((path) => path.startsWith('characters/char:1/'))).toHaveLength(13);
+  });
+
+  it.each([
+    ['background then foreground', ['background', 'foreground']],
+    ['foreground then background', ['foreground', 'background']],
+  ] as const)(
+    'keeps a debounced sync foreground when an edit and the sweep both schedule it (%s)',
+    async (_label, priorities) => {
+      await addAlts([2, 3]);
+      const { order, release } = gateReads((path) => path === 'characters/char:2/plans');
+      const background = [triggerSync(2, 'background'), triggerSync(3, 'background')];
+      for (const priority of priorities) scheduleSync(1, 10, priority);
+      await new Promise((resolve) => setTimeout(resolve, 40));
+
+      release();
+      await Promise.all(background);
+      await vi.waitFor(() => expect(getSyncStatus(1).state).toBe('idle'));
+
+      expect(firstReadOf(order, 1)).toBeLessThan(firstReadOf(order, 3));
+    }
+  );
+
+  it('runs one more pass for a request that arrives mid-sync, and holds its promise until then', async () => {
+    const { release } = gateReads((path) => path === PLANS_PATH);
+    const first = triggerSync(1);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // An edit lands after the running pass already read its local rows —
+    // what flushSync (removeCharacter.ts) does right before deleting them.
+    await db.skillPlans.put(plan({ id: 'p9', updatedAt: Date.now() }));
+    const flush = triggerSync(1);
+    let flushed = false;
+    void flush.then(() => {
+      flushed = true;
+    });
+    release();
+    await first;
+    await flush;
+
+    expect(flushed).toBe(true);
+    expect(remoteStore.get(PLANS_PATH)?.has('p9')).toBe(true);
+    // Two passes, not one per caller and not one only.
+    expect(vi.mocked(getDocs).mock.calls.filter(([q]) => pathOf(q) === PLANS_PATH)).toHaveLength(2);
+  });
+
+  it('reports every collection that failed, not only the first', async () => {
+    vi.mocked(getDocs).mockImplementation((async (target: FakeQuery) => {
+      if (target.col.path === PLANS_PATH) throw new Error('plans offline');
+      if (target.col.path === BUILD_PLANS_PATH) throw new Error('build plans offline');
+      return fake.getDocsImpl(target);
+    }) as never);
+
+    const error = await triggerSync(1).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(AggregateError);
+    expect((error as AggregateError).errors).toHaveLength(2);
+    expect(getSyncStatus(1).error).toMatch(/offline \(and 1 more\)$/);
+  });
+
   it('debounces scheduleSync into a single run', async () => {
     scheduleSync(1, 20);
     scheduleSync(1, 20);
@@ -1882,6 +2107,29 @@ describe('haltSync', () => {
     await new Promise((resolve) => setTimeout(resolve, 60));
 
     expect(vi.mocked(getDocs)).not.toHaveBeenCalled();
+  });
+
+  it('skips syncs still queued behind the running one rather than running them', async () => {
+    await db.characters.put({ characterId: 2, name: 'Alt', ownerHash: HASH, addedAt: 1 });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(getDocs).mockImplementation((async (target: FakeQuery) => {
+      if (target.col.path === PLANS_PATH) await gate;
+      return fake.getDocsImpl(target);
+    }) as never);
+    const syncs = [triggerSync(1, 'background'), triggerSync(2, 'background')];
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const halt = haltSync();
+
+    release();
+    await halt;
+    await Promise.all(syncs);
+    // A delete-all is about to purge whatever character 2 would have pushed.
+    expect(
+      vi.mocked(getDocs).mock.calls.some(([q]) => pathOf(q).startsWith('characters/char:2/'))
+    ).toBe(false);
   });
 
   it('waits for a sync already running', async () => {

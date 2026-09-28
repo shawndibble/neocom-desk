@@ -53,7 +53,14 @@ describe('lazy sync driver', () => {
 
   it('forwards scheduleSync with its debounce override', async () => {
     scheduleSync(7, 500);
-    await vi.waitFor(() => expect(driver.scheduleSync).toHaveBeenCalledWith(7, 500));
+    await vi.waitFor(() => expect(driver.scheduleSync).toHaveBeenCalledWith(7, 500, undefined));
+  });
+
+  it('forwards the background priority the sweep asks for', async () => {
+    scheduleSync(7, undefined, 'background');
+    await vi.waitFor(() =>
+      expect(driver.scheduleSync).toHaveBeenCalledWith(7, undefined, 'background')
+    );
   });
 
   it('forwards ensureSignedIn to the auth bridge', async () => {

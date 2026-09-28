@@ -3,6 +3,7 @@ import { renderHook } from '@testing-library/react';
 import {
   BACKGROUND_SYNC_BOOT_DELAY_MS,
   BACKGROUND_SYNC_MIN_GAP_MS,
+  BACKGROUND_SYNC_NON_ACTIVE_GAP_MS,
   BACKGROUND_SYNC_TICK_MS,
   SWEEP_STAMPS_KEY,
   idsToSweep,
@@ -56,27 +57,55 @@ beforeEach(() => {
 
 describe('idsToSweep', () => {
   it('sweeps a Character nothing has swept yet', () => {
-    expect(idsToSweep([1], new Map(), NOW)).toEqual([1]);
+    expect(idsToSweep([1], new Map(), NOW, 1)).toEqual([1]);
   });
 
   it('holds off inside the gap, so a tab flicked back and forth syncs once', () => {
-    expect(idsToSweep([1], new Map([[1, NOW]]), NOW + BACKGROUND_SYNC_MIN_GAP_MS - 1)).toEqual([]);
+    expect(idsToSweep([1], new Map([[1, NOW]]), NOW + BACKGROUND_SYNC_MIN_GAP_MS - 1, 1)).toEqual(
+      []
+    );
   });
 
   it('sweeps again once the gap has passed', () => {
-    expect(idsToSweep([1], new Map([[1, NOW]]), NOW + BACKGROUND_SYNC_MIN_GAP_MS)).toEqual([1]);
+    expect(idsToSweep([1], new Map([[1, NOW]]), NOW + BACKGROUND_SYNC_MIN_GAP_MS, 1)).toEqual([1]);
   });
 
   it('holds off only the Characters that are not due', () => {
     const lastSweptAt = new Map([
       [1, NOW],
-      [2, NOW - BACKGROUND_SYNC_MIN_GAP_MS],
+      [2, NOW - BACKGROUND_SYNC_NON_ACTIVE_GAP_MS],
     ]);
-    expect(idsToSweep([1, 2], lastSweptAt, NOW)).toEqual([2]);
+    expect(idsToSweep([1, 2], lastSweptAt, NOW, null)).toEqual([2]);
   });
 
   it('treats a Character it has never swept as due, whatever the others did', () => {
-    expect(idsToSweep([1, 2], new Map([[1, NOW]]), NOW)).toEqual([2]);
+    expect(idsToSweep([1, 2], new Map([[1, NOW]]), NOW, null)).toEqual([2]);
+  });
+
+  it('sweeps the active Character last, so the Firebase session ends on it', () => {
+    expect(idsToSweep([1, 2, 3], new Map(), NOW, 1)).toEqual([2, 3, 1]);
+  });
+
+  it('gives a non-active Character the longer gap', () => {
+    const lastSweptAt = new Map([
+      [1, NOW],
+      [2, NOW],
+    ]);
+    const afterActiveGap = NOW + BACKGROUND_SYNC_MIN_GAP_MS;
+    expect(idsToSweep([1, 2], lastSweptAt, afterActiveGap, 1)).toEqual([1]);
+    expect(idsToSweep([1, 2], lastSweptAt, NOW + BACKGROUND_SYNC_NON_ACTIVE_GAP_MS, 1)).toEqual([
+      2, 1,
+    ]);
+  });
+
+  it('still ends on the active Character when only the others are due', () => {
+    // The boot sync, or an edit, just synced the active Character — but
+    // sweeping an alt after it would leave the session on the alt.
+    expect(idsToSweep([1, 2], new Map([[1, NOW]]), NOW, 1)).toEqual([2, 1]);
+  });
+
+  it('ignores an active Character that is not in the list', () => {
+    expect(idsToSweep([2], new Map(), NOW, 1)).toEqual([2]);
   });
 });
 
@@ -87,15 +116,51 @@ describe('useBackgroundSync', () => {
   });
 
   /** Mount, then let the boot delay pass — the first sweep's real starting point. */
-  function mountPastBoot(ids: number[]) {
-    const hook = renderHook(() => useBackgroundSync(ids));
+  function mountPastBoot(ids: number[], active: number | null = ids[0] ?? null) {
+    const hook = renderHook(() => useBackgroundSync(ids, active));
     vi.advanceTimersByTime(BACKGROUND_SYNC_BOOT_DELAY_MS);
     return hook;
   }
 
+  /** The Characters the sweep scheduled, in order. */
+  const swept = () => syncMock.scheduleSync.mock.calls.map(([id]) => id);
+
   it('sweeps every character shortly after mount, not only the active one', () => {
     mountPastBoot([1, 2]);
-    expect(syncMock.scheduleSync.mock.calls).toEqual([[1], [2]]);
+    expect(swept()).toEqual([2, 1]);
+  });
+
+  it('queues the sweep at background priority, so an edit overtakes it', () => {
+    mountPastBoot([1, 2]);
+    expect(syncMock.scheduleSync.mock.calls.map(([, , priority]) => priority)).toEqual([
+      'background',
+      'background',
+    ]);
+  });
+
+  it('ends the sweep on the active Character even when the boot sync just covered it', () => {
+    syncMock.getSyncStatus.mockImplementation((id: number) => ({
+      state: 'idle',
+      lastSyncedAt: id === 1 ? NOW : null,
+      error: null,
+    }));
+    mountPastBoot([1, 2], 1);
+    expect(swept()).toEqual([2, 1]);
+  });
+
+  it('sweeps the other Characters on the longer gap', () => {
+    mountPastBoot([1, 2], 1);
+    syncMock.scheduleSync.mockClear();
+
+    // The active Character comes round every five minutes; the alt waits out
+    // its own, longer gap.
+    vi.advanceTimersByTime(BACKGROUND_SYNC_NON_ACTIVE_GAP_MS - BACKGROUND_SYNC_TICK_MS);
+    expect(swept()).toContain(1);
+    expect(swept()).not.toContain(2);
+    syncMock.scheduleSync.mockClear();
+
+    vi.advanceTimersByTime(2 * BACKGROUND_SYNC_TICK_MS);
+    expect(swept()).toEqual([2, 1]);
   });
 
   it('holds the first sweep back while the visible route loads', () => {
@@ -110,8 +175,9 @@ describe('useBackgroundSync', () => {
       lastSyncedAt: id === 1 ? NOW : null,
       error: null,
     }));
-    mountPastBoot([1, 2]);
-    expect(syncMock.scheduleSync.mock.calls).toEqual([[2]]);
+    // Character 2 is the active one here, so nothing else forces a re-sweep of 1.
+    mountPastBoot([1, 2], 2);
+    expect(swept()).toEqual([2]);
   });
 
   it('never runs the delayed first sweep once unmounted', () => {
@@ -128,7 +194,7 @@ describe('useBackgroundSync', () => {
     vi.setSystemTime(NOW + BACKGROUND_SYNC_BOOT_DELAY_MS + BACKGROUND_SYNC_MIN_GAP_MS);
     becomeVisible();
 
-    expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
+    expect(swept()).toEqual([1]);
   });
 
   it('sweeps on the tick, for a tab that stayed visible the whole time', () => {
@@ -140,7 +206,7 @@ describe('useBackgroundSync', () => {
 
     vi.advanceTimersByTime(BACKGROUND_SYNC_MIN_GAP_MS + BACKGROUND_SYNC_TICK_MS);
 
-    expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
+    expect(swept()).toEqual([1]);
   });
 
   it('does not sweep on a visibility flicker inside the gap', () => {
@@ -160,7 +226,7 @@ describe('useBackgroundSync', () => {
     // And the hidden mount must not have spent the gap the first real look wants.
     setVisibility('visible');
     becomeVisible();
-    expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
+    expect(swept()).toEqual([1]);
   });
 
   it('skips a Character whose sync is already in flight', () => {
@@ -178,7 +244,7 @@ describe('useBackgroundSync', () => {
 
     rerender({ ids: [1, 2] });
 
-    expect(syncMock.scheduleSync.mock.calls).toEqual([[2]]);
+    expect(swept()).toEqual([2]);
   });
 
   it('does not re-sweep when the character list is rebuilt inside the gap', () => {
@@ -210,7 +276,7 @@ describe('useBackgroundSync', () => {
     rerender({ ids: [1, 2] });
     vi.advanceTimersByTime(BACKGROUND_SYNC_BOOT_DELAY_MS);
 
-    expect(syncMock.scheduleSync.mock.calls).toEqual([[1], [2]]);
+    expect(swept()).toEqual([1, 2]);
   });
 
   it('stops ticking once unmounted', () => {
@@ -235,7 +301,7 @@ describe('useBackgroundSync', () => {
   it('sweeps anyway when the shared stamps are unreadable', () => {
     localStorage.setItem(SWEEP_STAMPS_KEY, 'not json');
     mountPastBoot([1]);
-    expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
+    expect(swept()).toEqual([1]);
   });
 
   it('stands down from the sweep election once unmounted', () => {
@@ -269,7 +335,7 @@ describe('useBackgroundSync', () => {
       leaderMock.setLeader(false);
       mountPastBoot([1]);
       leaderMock.setLeader(true);
-      expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
+      expect(swept()).toEqual([1]);
     });
 
     it('winning leadership at boot still waits out the boot delay', () => {
@@ -278,7 +344,7 @@ describe('useBackgroundSync', () => {
       leaderMock.setLeader(true);
       expect(syncMock.scheduleSync).not.toHaveBeenCalled();
       vi.advanceTimersByTime(BACKGROUND_SYNC_BOOT_DELAY_MS);
-      expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
+      expect(swept()).toEqual([1]);
     });
   });
 });
