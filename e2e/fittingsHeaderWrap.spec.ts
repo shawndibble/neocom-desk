@@ -41,14 +41,25 @@ async function headerMetrics(page: Page) {
     .locator('div.rounded-xs')
     .filter({ has: page.getByRole('heading', { level: 1, name: 'Rifter' }) })
     .last();
+  // The Alpha and Mastery badges each render nothing until their data loads,
+  // then widen the badge group. At 1024 that pushes the whole action group
+  // from the first row onto the second, so measuring before they land (or
+  // one button at a time across their arrival) sees Fittings on one row and
+  // Save on the other. Wait for both, then read every box in one layout.
+  await expect(header.getByRole('button', { name: /^(Alpha OK|Omega only)$/ })).toBeVisible();
+  await expect(header.getByRole('button', { name: 'Mastery', exact: true })).toBeVisible();
   const names = ['Fittings', 'Compare', 'Export', 'Save'];
-  const ys: number[] = [];
-  for (const name of names) {
-    const box = await header.getByRole('button', { name, exact: false }).first().boundingBox();
-    expect(box, name).not.toBeNull();
-    ys.push(box!.y);
-  }
-  return { ys, height: (await header.boundingBox())!.height };
+  const buttons = names.map((name) => header.getByRole('button', { name, exact: false }).first());
+  for (const [i, button] of buttons.entries()) await expect(button, names[i]).toBeVisible();
+  const handles = await Promise.all(buttons.map((button) => button.elementHandle()));
+  const { ys, height } = await header.evaluate(
+    (el, targets) => ({
+      ys: targets.map((target) => target!.getBoundingClientRect().y),
+      height: el.getBoundingClientRect().height,
+    }),
+    handles
+  );
+  return { ys, height };
 }
 
 test.describe('Open Fitting header action group', () => {
