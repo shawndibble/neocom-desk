@@ -106,6 +106,9 @@ const SORT_VALUE = {
 };
 const OPPORTUNITIES_CHARACTERS_KEY = 'opps.chars';
 
+/** Module-level so the table's windowing sees one stable function. */
+const opportunityRowKey = (row: OpportunityRow) => row.candidate.id;
+
 export function OpportunitiesPanel({
   catalog,
   pi,
@@ -532,7 +535,8 @@ export function OpportunitiesPanel({
           <DataTable
             columns={columns}
             rows={rows}
-            rowKey={(row) => row.candidate.id}
+            rowKey={opportunityRowKey}
+            virtualize="auto"
             label={t('industry.opportunitiesTitle')}
             rowContextMenu={rowContextMenu}
             rowMoreActions

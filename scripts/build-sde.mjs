@@ -649,6 +649,9 @@ async function main() {
         // What the type holds, not what it takes up: a Launchpad's 10,000 m3
         // and a Storage Facility's 12,000 are the colony's whole buffer.
         capacity: num(r[h.capacity]) ?? 0,
+        // A skillbook's fixed NPC sell price, where NPCs seed it: NPC orders
+        // for Upwell Hauler across The Forge all sit at exactly its 2,000,000.
+        basePrice: num(r[h.basePrice]) ?? 0,
         published: r[h.published] === '1',
         marketGroupID: r[h.marketGroupID] === '' ? null : Number(r[h.marketGroupID]),
       });
@@ -890,6 +893,7 @@ async function main() {
       primaryAttr: CHAR_ATTR_NAMES[attrs.get(PRIMARY_ATTR)] ?? null,
       secondaryAttr: CHAR_ATTR_NAMES[attrs.get(SECONDARY_ATTR)] ?? null,
       prereqs,
+      ...(t.basePrice > 0 ? { basePrice: t.basePrice } : {}),
       // Omitted for Omega-only skills (most of them), which the app reads as 0.
       ...(alphaMaxLevel.get(typeID) > 0 ? { alphaMaxLevel: alphaMaxLevel.get(typeID) } : {}),
     });

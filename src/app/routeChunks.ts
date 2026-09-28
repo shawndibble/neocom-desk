@@ -6,10 +6,13 @@
  * browser pulled and parsed before the login screen could paint. Each loader
  * here is a separate `import()`, which is what gives Rollup a chunk boundary.
  *
- * The eager routes are the ones a cold load can land on before any choice is
- * made — `Login`, `Callback`, `Overview` (the index redirect's target) and
- * `NotFound` — and stay static in `App.tsx`; a lazy one would only add a
- * fallback frame to the first paint.
+ * The eager routes are the ones a signed-out cold load can land on before any
+ * choice is made — `Login`, `Callback` and `NotFound` — and stay static in
+ * `App.tsx`; a lazy one would only add a fallback frame to the first paint.
+ * The signed-in shell (`Layout`, and `Overview`, the index redirect's target)
+ * is split too, so a first-time visitor on /login does not download it; a
+ * returning user's boot preloads it instead (`preloadSignedInShell`, fired
+ * from `bootShellPreload.ts`).
  *
  * `Layout`'s nav items call `preloadRouteChunk` on hover/focus, beside
  * `warmRoute`, so the chunk is usually in flight before the click. Every call
@@ -43,6 +46,43 @@ export function named<K extends string>(
     );
 }
 
+/** A loader that also hands back its component synchronously once loaded. */
+export interface RememberedLoader<P extends object = object> {
+  (): Promise<{ default: ComponentType<P> }>;
+  /** The loaded component, or `undefined` until the chunk has arrived. */
+  peek(): ComponentType<P> | undefined;
+}
+
+/**
+ * Memoise a loader and keep its result, so a preload fired at boot and the
+ * route's later render share one request — and so the render can use the
+ * component outright if the preload already finished (`preloadedLazy.tsx`),
+ * instead of suspending for a tick it does not need. A failed load is
+ * forgotten, leaving the render free to retry it.
+ */
+export function remembered<P extends object>(
+  loader: () => Promise<{ default: ComponentType<P> }>
+): RememberedLoader<P> {
+  let pending: Promise<{ default: ComponentType<P> }> | undefined;
+  let loaded: ComponentType<P> | undefined;
+  const load = () =>
+    (pending ??= loader().then(
+      (module) => {
+        loaded = module.default;
+        return module;
+      },
+      (error: unknown) => {
+        pending = undefined;
+        throw error;
+      }
+    ));
+  return Object.assign(load, { peek: () => loaded });
+}
+
+// The signed-in shell: every route but the signed-out ones renders inside
+// `Layout`, and `/overview` is where the index redirect sends a returning user.
+export const loadLayout = remembered(named(() => import('./Layout'), 'Layout'));
+export const loadOverview = remembered(named(() => import('@/routes/Overview'), 'Overview'));
 export const loadCharacters = named(() => import('@/routes/Characters'), 'Characters');
 export const loadAlerts = named(() => import('@/routes/Alerts'), 'Alerts');
 export const loadSkills = named(() => import('@/routes/Skills'), 'Skills');
@@ -94,14 +134,14 @@ export const loadFittingShared = named(() => import('@/routes/FittingShared'), '
 export const loadErrorProbe = named(() => import('@/routes/ErrorProbe'), 'ErrorProbe');
 
 /**
- * Every feature route but the eager `/overview`, keyed the way `Layout`'s
- * links are. Exhaustive by type, so a route added to `routeScopes.ts` without
+ * Every feature route, keyed the way `Layout`'s links are. Exhaustive by type, so a route added to `routeScopes.ts` without
  * a chunk here is a compile error rather than a link that never preloads. The
  * redirect-only paths (`/skills`, `/bpc-contracts`, `/skills/ships`,
  * `/fittings/*`) preload their target.
  */
-const PRELOADERS: Record<Exclude<AppRoutePath, '/overview'>, () => Promise<RouteModule>> = {
+const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/characters': loadCharacters,
+  '/overview': loadOverview,
   '/alerts': loadAlerts,
   '/skills': loadSkillPlans,
   '/skills/trained': loadSkills,
@@ -142,6 +182,16 @@ const PRELOADERS: Record<Exclude<AppRoutePath, '/overview'>, () => Promise<Route
  * `lazy()` render, which is where an error belongs.
  */
 export function preloadRouteChunk(path: AppRoutePath): void {
-  if (path === '/overview') return;
   void PRELOADERS[path]().catch(() => {});
+}
+
+/**
+ * Start fetching the signed-in shell — `Layout` and the `Overview` the index
+ * redirect lands on — so a returning user's chunks load alongside React's boot
+ * and the Dexie read that gates the route, rather than after it. Same
+ * fire-and-forget contract as `preloadRouteChunk`.
+ */
+export function preloadSignedInShell(): void {
+  void loadLayout().catch(() => {});
+  preloadRouteChunk('/overview');
 }

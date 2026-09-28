@@ -7,6 +7,7 @@ import {
   resolveMarketLocation,
   marketLinkParams,
   marketItemUrl,
+  marketNearbyParams,
   type MarketLocationParam,
 } from './urlState';
 
@@ -235,5 +236,15 @@ describe('marketItemUrl', () => {
 
   it('falls back to just the typeId when arriving with neither param', () => {
     expect(marketItemUrl(587, '')).toBe('/market/browser?type=587');
+  });
+});
+
+describe('marketNearbyParams', () => {
+  it('opens the item over All regions, narrowed to a Jump Range from the Current System', () => {
+    expect(marketNearbyParams(81032, '10')).toEqual({
+      type: '81032',
+      region: 'all',
+      'browser.jumps': '10',
+    });
   });
 });

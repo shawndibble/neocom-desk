@@ -141,6 +141,9 @@ interface OrderHistoryPanelProps {
   onViewChange: (view: HistoryView) => void;
 }
 
+/** Module-level so the table's windowing and row memo see one stable function. */
+const orderHistoryRowKey = (order: MarketOrderHistory) => order.order_id;
+
 /** Market's History tab, Orders view: a character's completed/expired/cancelled market orders. */
 export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
   const { t } = useTranslation();
@@ -259,14 +262,18 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
   );
 
   /** Same menu the Appraisal ledger carries — an order-history row names an item like any other. */
-  function rowContextMenu(order: MarketOrderHistory, tr: ReactElement) {
-    const itemName = nameFor(order.type_id);
-    return (
-      <ItemContextMenu typeId={order.type_id} itemName={itemName}>
-        {tr}
-      </ItemContextMenu>
-    );
-  }
+  // Stable, so the table's memoized rows skip re-rendering on every panel render.
+  const rowContextMenu = useCallback(
+    (order: MarketOrderHistory, tr: ReactElement) => {
+      const itemName = nameFor(order.type_id);
+      return (
+        <ItemContextMenu typeId={order.type_id} itemName={itemName}>
+          {tr}
+        </ItemContextMenu>
+      );
+    },
+    [nameFor]
+  );
 
   if (!hydrated) {
     return (
@@ -399,7 +406,8 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
             <DataTable
               columns={tableColumns}
               rows={filteredHistory}
-              rowKey={(order) => order.order_id}
+              rowKey={orderHistoryRowKey}
+              virtualize="auto"
               label={t('orders.historyTab')}
               rowContextMenu={rowContextMenu}
               rowMoreActions

@@ -8,6 +8,11 @@ import { describe, it, expect } from 'vitest';
  * anywhere along the way drags the whole SDK into the entry chunk — it has
  * leaked back that way before (analytics, web push, the projection upload).
  *
+ * The signed-in shell (`Layout`, `Overview`) is the other boundary: it is
+ * its own chunk so a first visit to /login does not download it, and a
+ * returning user's boot preloads it (`bootShellPreload.ts`). Any static
+ * import of either from the entry's graph would fold it back in.
+ *
  * This walks the *static* import graph from the entry. Type-only imports are
  * erased by the compiler and dynamic `import()` is the escape hatch, so both
  * are ignored.
@@ -18,6 +23,9 @@ const sources = import.meta.glob<string>(
 );
 
 const ENTRY = '/src/main.tsx';
+
+/** Split from the entry, but fetched at boot by every returning user. */
+const SIGNED_IN_SHELL = ['/src/app/Layout.tsx', '/src/routes/Overview.tsx'];
 
 /**
  * Drops whole-line `//` comments only. Block comments are deliberately left
@@ -81,9 +89,9 @@ interface StaticGraph {
   firebaseLeaks: string[];
 }
 
-function walkFromEntry(): StaticGraph {
-  const parent = new Map<string, string | null>([[ENTRY, null]]);
-  const queue = [ENTRY];
+function walkFrom(roots: string[]): StaticGraph {
+  const parent = new Map<string, string | null>(roots.map((root) => [root, null]));
+  const queue = [...roots];
   const firebaseLeaks: string[] = [];
   while (queue.length > 0) {
     const file = queue.shift()!;
@@ -108,7 +116,10 @@ function chainTo(parent: Map<string, string | null>, file: string): string {
   return chain.join(' -> ');
 }
 
-const graph = walkFromEntry();
+/** What the entry chunk holds: everything a first-time /login visit loads. */
+const graph = walkFrom([ENTRY]);
+/** Plus the shell a returning user's boot fetches right behind it. */
+const bootGraph = walkFrom([ENTRY, ...SIGNED_IN_SHELL]);
 
 describe('startup import graph', () => {
   it('parses the forms of import it needs to', () => {
@@ -139,16 +150,53 @@ describe('startup import graph', () => {
   it('reaches a real slice of the app from the entry', () => {
     expect(ENTRY in sources).toBe(true);
     expect(resolve(ENTRY, './app/App')).toBe('/src/app/App.tsx');
-    expect(graph.parent.has('/src/app/Layout.tsx')).toBe(true);
-    expect(graph.parent.has('/src/features/notifications/projectionUpload.ts')).toBe(true);
+    expect(graph.parent.has('/src/routes/Login.tsx')).toBe(true);
+    expect(graph.parent.has('/src/app/RequireCharacter.tsx')).toBe(true);
+    // The shell walk has to reach real code too, or the checks below that
+    // run over it would pass on an empty graph.
+    expect(bootGraph.parent.has('/src/features/notifications/projectionUpload.ts')).toBe(true);
+  });
+
+  it('keeps the signed-in shell out of the entry chunk', () => {
+    const reached = SIGNED_IN_SHELL.filter((file) => graph.parent.has(file)).map((file) =>
+      chainTo(graph.parent, file)
+    );
+    expect(reached).toEqual([]);
+  });
+
+  it('keeps the boot shell preload light: nothing it imports pulls in more code', () => {
+    // It runs second in the entry, ahead of App, precisely so the fetch starts
+    // early; a runtime import here would put that module's evaluation (and,
+    // for a package, its weight) in front of the preload.
+    const preload = '/src/app/bootShellPreload.ts';
+    const reached = new Set<string>([preload]);
+    const bare: string[] = [];
+    const queue = [preload];
+    while (queue.length > 0) {
+      const file = queue.shift()!;
+      for (const specifier of staticSpecifiers(sources[file])) {
+        const target = resolve(file, specifier);
+        if (!target) bare.push(`${file} -> ${specifier}`);
+        else if (!reached.has(target)) {
+          reached.add(target);
+          queue.push(target);
+        }
+      }
+    }
+    expect(bare).toEqual([]);
+    expect([...reached].sort()).toEqual([
+      '/src/app/bootShellPreload.ts',
+      '/src/app/routeChunks.ts',
+      '/src/app/signedInShellHint.ts',
+    ]);
   });
 
   it('reaches no firebase import without crossing a dynamic import()', () => {
-    expect(graph.firebaseLeaks).toEqual([]);
+    expect(bootGraph.firebaseLeaks).toEqual([]);
   });
 
   it('leaves the boot cache warm-up (and every feature loader it imports) to its own chunk', () => {
     const file = '/src/app/prefetch.ts';
-    expect(graph.parent.has(file) ? chainTo(graph.parent, file) : null).toBeNull();
+    expect(bootGraph.parent.has(file) ? chainTo(bootGraph.parent, file) : null).toBeNull();
   });
 });

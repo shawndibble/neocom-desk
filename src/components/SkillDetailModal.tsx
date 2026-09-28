@@ -116,10 +116,21 @@ export function SkillDetailModal() {
         />
       ) : (
         <div className="space-y-3">
-          {state.data.description && (
-            <p className="text-xs text-text-dim">{state.data.description}</p>
-          )}
-          <SkillPriceSection typeID={request.typeID} />
+          {/* What the skill does leads: it's what a click on a skill name is asking. */}
+          <div className="space-y-1">
+            {state.data.description && (
+              <p className="text-sm whitespace-pre-line text-text">{state.data.description}</p>
+            )}
+            <p className="text-xs text-text-dim">
+              {t('skills.inspector.facts', {
+                group: state.data.groupName,
+                rank: state.data.rank,
+                primary: t(`skills.attr.${state.data.primaryAttr}`),
+                secondary: t(`skills.attr.${state.data.secondaryAttr}`),
+              })}
+            </p>
+          </div>
+          <SkillPriceSection typeID={request.typeID} npcPrice={state.data.npcPrice} />
           <SkillRequirementsList
             prereqs={state.data.prereqs}
             unlocks={state.data.unlocks}

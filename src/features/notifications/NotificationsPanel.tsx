@@ -359,7 +359,15 @@ export function NotificationsPanel() {
   // useLiveQuery resolves asynchronously — render the panel and master switch
   // immediately (like ActivityLogPanel does), and treat "still loading" the
   // same as "no characters yet" rather than blanking the whole section.
-  const characterList = useMemo(() => characters ?? [], [characters]);
+  // "Still loading" covers `tokens` too: the two live queries resolve on
+  // separate ticks, and rendering Characters before their tokens arrive
+  // drew every row scope-less — disabled, "re-authorize" tooltip — for a
+  // frame, then remounted each checkbox out of its Tooltip wrapper once
+  // the scopes landed (a click in that window was swallowed).
+  const characterList = useMemo(
+    () => (characters !== undefined && tokens !== undefined ? characters : []),
+    [characters, tokens]
+  );
 
   /**
    * Every known Character id, active one first (issue #738): the "All

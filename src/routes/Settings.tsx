@@ -49,6 +49,7 @@ import {
 import { VIEW_PREFERENCE_KEYS } from '@/lib/viewPreferenceKeys';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { formatAge } from '@/lib/age';
+import { useTicker } from '@/lib/ticker';
 import { formatTimestamp } from '@/lib/timestamp';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
@@ -257,6 +258,21 @@ function latestFetchPerSource(entries: ActivityLogEntry[]): ActivityLogEntry[] {
   return [...seen.values()];
 }
 
+/** `DataAgeBadge`'s cadence: ages are shown to the minute. */
+const RELATIVE_AGE_TICK_MS = 30_000;
+
+/**
+ * "N min ago", kept current by the shared ticker. Its own component rather
+ * than a `Date.now()` in the column's `render`: `DataTable`'s rows are
+ * memoized, so a render-time read would freeze at whatever it said when the
+ * row last changed.
+ */
+function RelativeAge({ timestamp }: { timestamp: number }) {
+  const { t } = useTranslation();
+  const now = useTicker(RELATIVE_AGE_TICK_MS);
+  return formatAge(now - timestamp, t);
+}
+
 function DataAgePanel() {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -286,7 +302,7 @@ function DataAgePanel() {
         sortValue: (entry) => entry.timestamp,
         render: (entry) => (
           <span title={formatTimestamp(new Date(entry.timestamp), timeZone)}>
-            {formatAge(Date.now() - entry.timestamp, t)}
+            <RelativeAge timestamp={entry.timestamp} />
           </span>
         ),
       },
