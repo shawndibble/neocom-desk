@@ -244,7 +244,7 @@ export function FittingCompare() {
   );
 
   return (
-    <div className="space-y-3">
+    <div className="mx-auto max-w-6xl space-y-3">
       <PageHeader
         title={t('fittings.compare.title')}
         actions={
@@ -274,9 +274,7 @@ export function FittingCompare() {
           title={t('fittings.compare.emptyTitle')}
           hint={t('fittings.compare.emptyHint')}
           action={
-            <Button variant="primary" onClick={() => setPickerOpen(true)}>
-              {t('fittings.compare.addFitting')}
-            </Button>
+            <Button onClick={() => setPickerOpen(true)}>{t('fittings.compare.addFitting')}</Button>
           }
         />
       ) : (
