@@ -221,7 +221,7 @@ export function DamageProfilePicker({ damageProfiles }: { damageProfiles: Damage
     <div className="flex flex-wrap items-center gap-2 text-xs">
       <span className="text-text-dim">{label}</span>
       <Select value={damageProfiles.selected.id} onValueChange={damageProfiles.select}>
-        <SelectTrigger aria-label={label} size="sm" className="w-40">
+        <SelectTrigger aria-label={label} size="sm" className="w-36">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

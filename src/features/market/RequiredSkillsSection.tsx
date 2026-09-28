@@ -13,6 +13,7 @@ import { SkillRow } from '@/features/skills/SkillRow';
 import { skillTrainingStatus } from '@/features/skills/skillStatus';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import type { TargetPlan } from '@/features/skills/useTargetPlan';
+import { openSkillDetailModal } from '@/stores/skillDetailModal';
 import { skillNameOrFallback } from './skillNameOrFallback';
 
 export function RequiredSkillsSection({
@@ -60,7 +61,14 @@ export function RequiredSkillsSection({
         {requiredSkills.map((req) => {
           const name = skillNameOrFallback(req.skillTypeID, skillNames);
           if (!hasCharacter) {
-            return <NameOnlySkillRow key={req.skillTypeID} name={name} level={req.level} />;
+            return (
+              <NameOnlySkillRow
+                key={req.skillTypeID}
+                name={name}
+                level={req.level}
+                skillTypeID={req.skillTypeID}
+              />
+            );
           }
           const currentLevel = trainedSkills.get(req.skillTypeID)?.level ?? 0;
           // Mirrors `upsertEntry`'s own "already covered" check, since that's
@@ -72,6 +80,7 @@ export function RequiredSkillsSection({
             <SkillRow
               key={req.skillTypeID}
               name={name}
+              skillTypeID={req.skillTypeID}
               status={skillTrainingStatus(currentLevel, req.level)}
               currentLevel={currentLevel}
               addLabel={planned ? t('skills.requiredSkills.added') : addLabel}
@@ -89,11 +98,25 @@ export function RequiredSkillsSection({
   );
 }
 
-function NameOnlySkillRow({ name, level }: { name: string; level: number }) {
+function NameOnlySkillRow({
+  name,
+  level,
+  skillTypeID,
+}: {
+  name: string;
+  level: number;
+  skillTypeID: number;
+}) {
   const { t } = useTranslation();
   return (
     <div className="flex items-center gap-3 text-xs">
-      <span className="flex-1 text-text">{name}</span>
+      <button
+        type="button"
+        onClick={() => openSkillDetailModal(skillTypeID)}
+        className="flex-1 text-left text-text hover:underline"
+      >
+        {name}
+      </button>
       <span className="text-text-dim">{t('plans.level', { level })}</span>
     </div>
   );

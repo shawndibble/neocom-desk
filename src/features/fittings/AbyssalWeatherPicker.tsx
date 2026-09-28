@@ -37,7 +37,7 @@ export function AbyssalWeatherPicker() {
         value={picked ? String(picked.typeId) : NORMAL_SPACE}
         onValueChange={(value) => setWeather(value === NORMAL_SPACE ? null : Number(value))}
       >
-        <SelectTrigger aria-label={label} size="sm" className="w-40">
+        <SelectTrigger aria-label={label} size="sm" className="w-36">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
