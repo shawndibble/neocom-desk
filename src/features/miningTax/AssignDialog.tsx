@@ -15,6 +15,7 @@ import {
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { OreLine } from '@/engine/miningTax/types';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { maskIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
@@ -533,15 +534,25 @@ export function AssignDialog({
                 key={line.typeId}
                 className="flex items-center gap-1.5 py-1 text-sm first:pt-0 last:pb-0"
               >
-                <Checkbox
-                  id={`line-${line.typeId}`}
-                  checked={includedTypeIds.has(line.typeId)}
-                  onChange={() => toggleLine(line.typeId)}
-                />
-                <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
-                <label htmlFor={`line-${line.typeId}`} className="w-40 shrink-0 truncate">
-                  {typeNames.get(line.typeId) ?? `#${line.typeId}`}
+                <label
+                  htmlFor={`line-${line.typeId}`}
+                  className="flex shrink-0 items-center gap-1.5"
+                >
+                  <Checkbox
+                    id={`line-${line.typeId}`}
+                    checked={includedTypeIds.has(line.typeId)}
+                    onChange={() => toggleLine(line.typeId)}
+                    aria-label={t('miningTax.includeLineLabel', {
+                      ore: typeNames.get(line.typeId) ?? `#${line.typeId}`,
+                    })}
+                  />
+                  <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                 </label>
+                <span className="w-40 shrink-0 truncate">
+                  <MarketItemLink typeId={line.typeId}>
+                    {typeNames.get(line.typeId) ?? `#${line.typeId}`}
+                  </MarketItemLink>
+                </span>
                 <span className="tabular-nums text-text-dim">{line.quantity.toLocaleString()}</span>
               </li>
             ))}
@@ -565,7 +576,9 @@ export function AssignDialog({
               return (
                 <li key={line.typeId} className="flex items-center gap-1.5 py-1.5 text-sm">
                   <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
-                  <span className="w-32 shrink-0 truncate">{name}</span>
+                  <span className="w-32 shrink-0 truncate">
+                    <MarketItemLink typeId={line.typeId}>{name}</MarketItemLink>
+                  </span>
                   <span className="w-16 shrink-0 tabular-nums text-text-dim">
                     {line.quantity.toLocaleString()}
                   </span>

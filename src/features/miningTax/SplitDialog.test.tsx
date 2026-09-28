@@ -14,6 +14,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { SplitDialog } from './SplitDialog';
@@ -79,18 +80,20 @@ const payees: PayeeRecord[] = [
 
 function renderDialog() {
   return render(
-    <SplitDialog
-      open
-      onClose={vi.fn()}
-      assignment={assignment}
-      row={row}
-      systemName="Jita"
-      payees={payees}
-      typeNames={new Map([[ZEOLITES, 'Zeolites']])}
-      pricesFor={pricesFor}
-      busy={false}
-      onSplit={vi.fn()}
-    />
+    <MemoryRouter>
+      <SplitDialog
+        open
+        onClose={vi.fn()}
+        assignment={assignment}
+        row={row}
+        systemName="Jita"
+        payees={payees}
+        typeNames={new Map([[ZEOLITES, 'Zeolites']])}
+        pricesFor={pricesFor}
+        busy={false}
+        onSplit={vi.fn()}
+      />
+    </MemoryRouter>
   );
 }
 

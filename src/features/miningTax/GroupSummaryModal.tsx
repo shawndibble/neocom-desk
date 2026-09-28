@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip, Modal, StatChip } from '@/components/ui';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
 import { formatIsk } from '@/lib/isk';
@@ -120,7 +121,9 @@ export function GroupSummaryModal({
                 {member.assignment.oreLines.map((line) => (
                   <li key={line.typeId} className="flex items-center justify-between py-1">
                     <span className="min-w-0 truncate">
-                      {typeNames.get(line.typeId) ?? `#${line.typeId}`}
+                      <MarketItemLink typeId={line.typeId}>
+                        {typeNames.get(line.typeId) ?? `#${line.typeId}`}
+                      </MarketItemLink>
                     </span>
                     <span className="tabular-nums text-text-dim">
                       {line.quantity.toLocaleString()}

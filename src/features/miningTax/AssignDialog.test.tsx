@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { AssignDialog } from './AssignDialog';
@@ -20,6 +21,7 @@ const mockedUpdate = vi.mocked(updateAssignment);
 const CHAR = 1;
 const SYSTEM = 30000142;
 const ZEOLITES = 45490;
+const VELDSPAR = 1230;
 
 /**
  * The whole point of the feature: the same ore is worth different money at
@@ -71,22 +73,30 @@ function renderDialog(
   payees: PayeeRecord[],
   assignment: MiningTaxAssignmentRecord | null = null,
   onAddPayee?: () => void,
-  onUnlock?: () => void
+  onUnlock?: () => void,
+  targetRow: MoonMiningTaxRow = row
 ) {
   render(
-    <AssignDialog
-      row={row}
-      assignment={assignment}
-      payees={payees}
-      systemName="Jita"
-      typeNames={new Map([[ZEOLITES, 'Zeolites']])}
-      pricesFor={pricesFor}
-      busy={false}
-      onAssigned={vi.fn()}
-      onCancel={vi.fn()}
-      onAddPayee={onAddPayee}
-      onUnlock={onUnlock}
-    />
+    <MemoryRouter>
+      <AssignDialog
+        row={targetRow}
+        assignment={assignment}
+        payees={payees}
+        systemName="Jita"
+        typeNames={
+          new Map([
+            [ZEOLITES, 'Zeolites'],
+            [VELDSPAR, 'Veldspar'],
+          ])
+        }
+        pricesFor={pricesFor}
+        busy={false}
+        onAssigned={vi.fn()}
+        onCancel={vi.fn()}
+        onAddPayee={onAddPayee}
+        onUnlock={onUnlock}
+      />
+    </MemoryRouter>
   );
 }
 
@@ -109,6 +119,41 @@ describe('AssignDialog — no Payees yet', () => {
     renderDialog([]);
 
     expect(screen.queryByRole('button', { name: 'Add Payee' })).not.toBeInTheDocument();
+  });
+});
+
+describe('AssignDialog — ore line checkbox and Market link', () => {
+  const twoLineRow: MoonMiningTaxRow = {
+    ...row,
+    entry: {
+      ...row.entry,
+      oreLines: [
+        { typeId: ZEOLITES, quantity: 100 },
+        { typeId: VELDSPAR, quantity: 50 },
+      ],
+    },
+    unassignedOreLines: [
+      { typeId: ZEOLITES, quantity: 100 },
+      { typeId: VELDSPAR, quantity: 50 },
+    ],
+  };
+
+  it('links each ore name to its Market listing', () => {
+    renderDialog([payee()], null, undefined, undefined, twoLineRow);
+
+    const link = screen.getByRole('link', { name: 'Zeolites' });
+    expect(link.getAttribute('href')).toContain(`type=${ZEOLITES}`);
+  });
+
+  it('keeps the checkbox independently operable, unchecking a line without following the nested link', async () => {
+    renderDialog([payee()], null, undefined, undefined, twoLineRow);
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include Veldspar' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Assign' }));
+
+    expect(mockedCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ oreLines: [{ typeId: ZEOLITES, quantity: 100 }] })
+    );
   });
 });
 

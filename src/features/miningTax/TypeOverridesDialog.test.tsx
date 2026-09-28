@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -33,7 +34,11 @@ beforeEach(async () => {
 function renderDialog() {
   const onChanged = vi.fn();
   const onClose = vi.fn();
-  render(<TypeOverridesDialog open onClose={onClose} onChanged={onChanged} />);
+  render(
+    <MemoryRouter>
+      <TypeOverridesDialog open onClose={onClose} onChanged={onChanged} />
+    </MemoryRouter>
+  );
   return { onChanged, onClose };
 }
 
