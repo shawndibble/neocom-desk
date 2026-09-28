@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { pageKeyFor } from './pageTabs';
 import { useRouteFocus } from './routeFocus';
@@ -398,8 +398,6 @@ interface MobileMoreSheetProps {
   locked: ReadonlySet<AppRoutePath>;
   tabs: readonly MobileTabPath[];
   unreadAlerts: number;
-  /** The page open when the sheet was opened — the Character link's return-to-origin (#1764). */
-  currentPath: string;
 }
 
 /**
@@ -422,9 +420,12 @@ function MobileMoreSheet({
   locked,
   tabs,
   unreadAlerts,
-  currentPath,
 }: MobileMoreSheetProps) {
   const { t } = useTranslation();
+  // The page open when the sheet was opened — the Character link's
+  // return-to-origin (#1764). Read here rather than passed down, because
+  // `Layout` must not read the location (see `RouteOutlet`).
+  const currentPath = useLocation().pathname;
   // `/characters` always has its own dedicated row below (the portrait+name
   // `CharacterFooterLink`) — an ordinary row for it here too, whenever it
   // isn't chosen for the tab bar, would be a second link to the same
@@ -498,13 +499,72 @@ function useRouteFade(pageKey: string) {
   return ref;
 }
 
-/** App chrome: Neocom-style left rail on desktop, bottom tab bar on mobile. */
-export function Layout() {
-  const { t } = useTranslation();
+/**
+ * The global shortcut listener, as a component that renders nothing: its
+ * `useNavigate` subscribes to the location, which `Layout` itself must not.
+ */
+function KeyboardShortcuts() {
   useKeyboardShortcuts();
+  return null;
+}
+
+/**
+ * The route outlet and everything keyed off the current location: the page
+ * fade, route focus, and the boundary that clears on navigation.
+ *
+ * Its own component so that `Layout` never reads the location. Pages write
+ * their filters and sort into the query string as the pilot types, and each
+ * of those writes is a new location; were `Layout` subscribed, every one would
+ * re-render the whole shell — rail, tab bar, their live queries — for a change
+ * only the page cares about. The nav links still track the route: `NavLink`
+ * reads the location itself.
+ */
+function RouteOutlet() {
+  const { t } = useTranslation();
   const location = useLocation();
   const outletRef = useRouteFade(pageKeyFor(location.pathname));
   useRouteFocus(outletRef, location.pathname, location.hash);
+  return (
+    /*
+      Deliberately not `key={location.pathname}`, which would replay a CSS
+      animation by remounting. Six entries in App.tsx's `ROUTE_ELEMENTS`
+      match more than one pathname (`/assets/*`, `/corp/assets/*`, and the
+      four `:param` routes), and React Router keeps one component instance
+      across those — so re-keying would throw away Assets' search, filters
+      and selection on every drill-down and re-run its loader. Animating
+      the element in place keeps the instance and still replays.
+      `tabIndex={-1}`: where a page never renders an `<h1>`, route focus
+      (`routeFocus.ts`) lands here instead.
+    */
+    <div ref={outletRef} tabIndex={-1} className="focus:outline-none">
+      {/* Routes are code-split (`routeChunks.ts`): the shell stays put
+          while a page's chunk loads on its first visit, and a page that
+          throws — or whose chunk will not load — fails inside the shell,
+          clearing once the pilot navigates elsewhere. */}
+      <ErrorBoundary inline resetKey={location.pathname}>
+        <Suspense
+          fallback={
+            <div className="flex justify-center py-16">
+              <Spinner label={t('common.loading')} />
+            </div>
+          }
+        >
+          <Outlet />
+        </Suspense>
+      </ErrorBoundary>
+    </div>
+  );
+}
+
+/**
+ * App chrome: Neocom-style left rail on desktop, bottom tab bar on mobile.
+ *
+ * Reads no location (`RouteOutlet`), and memoized: it takes no props, so the
+ * re-render its parent (`SignedInShell` in App.tsx, which does read the
+ * location) gets on every query-string write stops here.
+ */
+export const Layout = memo(function Layout() {
+  const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const activeCharacter = useLiveQuery(
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
@@ -669,34 +729,7 @@ export function Layout() {
         <AuthFailureNotice />
         <StandingsScopeNotice />
         <SyncErrorBanner />
-        {/*
-          Deliberately not `key={location.pathname}`, which would replay a CSS
-          animation by remounting. Six entries in App.tsx's `ROUTE_ELEMENTS`
-          match more than one pathname (`/assets/*`, `/corp/assets/*`, and the
-          four `:param` routes), and React Router keeps one component instance
-          across those — so re-keying would throw away Assets' search, filters
-          and selection on every drill-down and re-run its loader. Animating
-          the element in place keeps the instance and still replays.
-          `tabIndex={-1}`: where a page never renders an `<h1>`, route focus
-          (`routeFocus.ts`) lands here instead.
-        */}
-        <div ref={outletRef} tabIndex={-1} className="focus:outline-none">
-          {/* Routes are code-split (`routeChunks.ts`): the shell stays put
-              while a page's chunk loads on its first visit, and a page that
-              throws — or whose chunk will not load — fails inside the shell,
-              clearing once the pilot navigates elsewhere. */}
-          <ErrorBoundary inline resetKey={location.pathname}>
-            <Suspense
-              fallback={
-                <div className="flex justify-center py-16">
-                  <Spinner label={t('common.loading')} />
-                </div>
-              }
-            >
-              <Outlet />
-            </Suspense>
-          </ErrorBoundary>
-        </div>
+        <RouteOutlet />
       </main>
 
       {/* Mobile bottom tab bar: the pilot's four destinations (`lib/mobileTabs.ts`,
@@ -731,6 +764,7 @@ export function Layout() {
         </button>
       </nav>
 
+      <KeyboardShortcuts />
       <NotificationPermissionPrompt />
       {/*
         In the shell rather than in `App`, unlike the install and reload
@@ -748,9 +782,8 @@ export function Layout() {
           locked={locked}
           tabs={tabs}
           unreadAlerts={unreadAlerts}
-          currentPath={location.pathname}
         />
       )}
     </div>
   );
-}
+});
