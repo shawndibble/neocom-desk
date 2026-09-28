@@ -29,6 +29,16 @@ afterEach(() => {
 });
 
 describe('BootScreen', () => {
+  it('without a gate it is the same screen, but never reports or offers recovery', () => {
+    render(<BootScreen />);
+    expect(screen.getByText('Neocom Desk')).toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(BOOT_STALL_MS * 3);
+    });
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(reportBootStallOnce).not.toHaveBeenCalled();
+  });
+
   it('shows only the spinner while the wait is still plausible', () => {
     render(<BootScreen gate="root" />);
     act(() => {

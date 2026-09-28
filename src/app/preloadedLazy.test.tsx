@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { Suspense } from 'react';
+import { describe, it, expect, vi } from 'vitest';
+import { Suspense, type ComponentType } from 'react';
 import { render, screen } from '@testing-library/react';
+import '@/i18n';
+import { ErrorBoundary } from './ErrorBoundary';
 import { remembered } from './routeChunks';
 import { preloadedLazy } from './preloadedLazy';
 
@@ -36,6 +38,34 @@ describe('preloadedLazy', () => {
     );
     expect(screen.getByText('fallback')).toBeInTheDocument();
     resolve({ default: Shell });
+    expect(await screen.findByText('shell')).toBeInTheDocument();
+  });
+
+  it('retries a chunk that failed once the boundary resets, instead of caching the failure', async () => {
+    // Offline until told otherwise — React re-renders once on its own after
+    // an error, so a single rejection would not reach the boundary.
+    let online = false;
+    const importer = vi.fn<() => Promise<{ default: ComponentType<{ label: string }> }>>(() =>
+      online
+        ? Promise.resolve({ default: Shell })
+        : Promise.reject(new Error('Failed to fetch dynamically imported module'))
+    );
+    const Component = preloadedLazy(remembered(importer));
+    const tree = (resetKey: string) => (
+      <ErrorBoundary resetKey={resetKey}>
+        <Suspense fallback={<p>fallback</p>}>
+          <Component label="shell" />
+        </Suspense>
+      </ErrorBoundary>
+    );
+
+    const { rerender } = render(tree('/overview'));
+    expect(await screen.findByRole('button', { name: 'Reload' })).toBeInTheDocument();
+
+    // Navigating resets the boundary; a plain `lazy()` would rethrow its
+    // cached rejection here forever.
+    online = true;
+    rerender(tree('/wallet'));
     expect(await screen.findByText('shell')).toBeInTheDocument();
   });
 });

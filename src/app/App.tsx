@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, type ReactElement } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { withSentryReactRouterV7Routing } from '@sentry/react';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -109,6 +109,25 @@ function RouteFallback() {
  * `<Routes>` must stay unwrapped. Inert unless `instrument.ts` found a DSN.
  */
 const SentryRoutes = withSentryReactRouterV7Routing(Routes);
+
+/**
+ * `Layout`, loaded as its own chunk (`preloadedLazy`). While it is still on
+ * the way the fallback is the screen `RequireCharacter` was just showing, so
+ * the hand-off does not jump — without a `gate`, because a slow download is
+ * not a stalled boot and the boot recovery would only restart it. A chunk that
+ * fails shows the Reload screen, and navigating retries it: the boundary
+ * resets on the path, and `preloadedLazy` does not cache the failure.
+ */
+function SignedInShell() {
+  const location = useLocation();
+  return (
+    <ErrorBoundary resetKey={location.pathname}>
+      <Suspense fallback={<BootScreen />}>
+        <Layout />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
 
 // Vite's BASE_URL (set by `base` in vite.config.ts, currently '/').
 const BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
@@ -292,16 +311,7 @@ export function App() {
             <Route path="/callback" element={<Callback />} />
             {/* Below: a logged-in Character, then the route's own scopes. */}
             <Route element={<RequireCharacter />}>
-              {/* The shell's chunk, if the boot preload has not landed it
-                yet: the same screen `RequireCharacter` was just showing, so
-                the hand-off does not jump. */}
-              <Route
-                element={
-                  <Suspense fallback={<BootScreen gate="signed-in-shell" />}>
-                    <Layout />
-                  </Suspense>
-                }
-              >
+              <Route element={<SignedInShell />}>
                 {/* A tabbed page (`pageTabs.ts`) mounts once at `<path>/*`, so
                   its tabs are one route instance: switching tab keeps the
                   page mounted, and none of the tables above gain an entry. */}

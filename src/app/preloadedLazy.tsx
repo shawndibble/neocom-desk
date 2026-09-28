@@ -16,9 +16,22 @@ import type { RememberedLoader } from './routeChunks';
  * while the chunk is missing, which means it suspends and never commits; by
  * the retry, `peek()` has the component (the loader records it before the
  * promise `lazy()` waits on settles).
+ *
+ * A failed load is not final either. `lazy()` caches a rejection for good, so
+ * the wrapper is rebuilt when one lands: the error still reaches the nearest
+ * boundary, and once that boundary resets (the shell's does on navigation),
+ * the next render asks `load` again — which `remembered` has already made
+ * forget the failure.
  */
 export function preloadedLazy<P extends object>(load: RememberedLoader<P>): ComponentType<P> {
-  const Lazy = lazy(load);
+  const build = () =>
+    lazy(() =>
+      load().catch((error: unknown) => {
+        Lazy = build();
+        throw error;
+      })
+    );
+  let Lazy = build();
   function Preloaded(props: P) {
     const Loaded = load.peek();
     return Loaded ? <Loaded {...props} /> : <Lazy {...props} />;

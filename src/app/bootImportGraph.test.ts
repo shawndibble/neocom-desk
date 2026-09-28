@@ -164,6 +164,33 @@ describe('startup import graph', () => {
     expect(reached).toEqual([]);
   });
 
+  it('keeps the boot shell preload light: nothing it imports pulls in more code', () => {
+    // It runs second in the entry, ahead of App, precisely so the fetch starts
+    // early; a runtime import here would put that module's evaluation (and,
+    // for a package, its weight) in front of the preload.
+    const preload = '/src/app/bootShellPreload.ts';
+    const reached = new Set<string>([preload]);
+    const bare: string[] = [];
+    const queue = [preload];
+    while (queue.length > 0) {
+      const file = queue.shift()!;
+      for (const specifier of staticSpecifiers(sources[file])) {
+        const target = resolve(file, specifier);
+        if (!target) bare.push(`${file} -> ${specifier}`);
+        else if (!reached.has(target)) {
+          reached.add(target);
+          queue.push(target);
+        }
+      }
+    }
+    expect(bare).toEqual([]);
+    expect([...reached].sort()).toEqual([
+      '/src/app/bootShellPreload.ts',
+      '/src/app/routeChunks.ts',
+      '/src/app/signedInShellHint.ts',
+    ]);
+  });
+
   it('reaches no firebase import without crossing a dynamic import()', () => {
     expect(bootGraph.firebaseLeaks).toEqual([]);
   });
