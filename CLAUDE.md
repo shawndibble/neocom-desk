@@ -55,6 +55,14 @@ dev`) — Shawn frequently has another agent working there at the same
   as an optional, manual full-CI-mirror for ad-hoc branches — nothing in the
   ticket loop calls it automatically. `/code-review` sub-agents are
   read-only diff review and must never run tests, lint, typecheck, or build.
+- **A flaky CI test blocking your PR gets fixed, not reran or ignored — even
+  when it's unrelated to your change.** Rerunning the job (or, worse, merging
+  past a known-flaky check) hides the flake instead of closing it, and it
+  will cost the next PR the same CI round trip. Reproduce locally
+  (`npx vitest run <path>`) to tell a real regression from your change apart
+  from a pre-existing flake; if it passes locally but fails intermittently in
+  CI, fix the flake in the same PR before merging, even though the file
+  isn't otherwise part of your diff.
 - i18n: all UI strings through i18next (`src/i18n/locales/en.json`). English only for now.
 
 ## Agent skills

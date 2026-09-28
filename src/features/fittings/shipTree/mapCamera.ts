@@ -26,19 +26,33 @@ const FIT_PADDING = 40;
 
 const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
+/** The tree centred at zoom `z`. `leftInset`: px an overlay panel covers on the left. */
+function centreAt(world: Size, viewport: Size, z: number, leftInset: number): Camera {
+  const width = viewport.width - leftInset;
+  return {
+    z,
+    x: leftInset + (width - world.width * z) / 2,
+    y: (viewport.height - world.height * z) / 2,
+  };
+}
+
 /** The whole tree, centred, at most 100%. */
-/** `leftInset`: px an overlay panel covers on the left, left out of the fit. */
 export function fitCamera(world: Size, viewport: Size, leftInset = 0): Camera {
   const width = viewport.width - leftInset;
   const z = Math.max(
     FIT_FLOOR,
     Math.min(1, (width - FIT_PADDING) / world.width, (viewport.height - FIT_PADDING) / world.height)
   );
-  return {
-    z,
-    x: leftInset + (width - world.width * z) / 2,
-    y: (viewport.height - world.height * z) / 2,
-  };
+  return centreAt(world, viewport, z, leftInset);
+}
+
+/**
+ * The tree centred at its native size (100%), the default the map opens (and
+ * resets to on a faction switch) at — unlike `fitCamera`, this never shrinks
+ * a large tree to make it fit; the reader pans to see the rest.
+ */
+export function initialCamera(world: Size, viewport: Size, leftInset = 0): Camera {
+  return centreAt(world, viewport, 1, leftInset);
 }
 
 /** One class centred in the viewport. */
@@ -57,24 +71,16 @@ export function zoomAround(cam: Camera, factor: number, px: number, py: number):
   return { z, x: px - ((px - cam.x) * z) / cam.z, y: py - ((py - cam.y) * z) / cam.z };
 }
 
-/** One classic mouse-wheel notch, in pixels, zooms by the old fixed 12% step. */
-const WHEEL_NOTCH_PX = 100;
-const WHEEL_NOTCH_FACTOR = 1.12;
-/** `WheelEvent.deltaMode` line and page units, in pixels (Firefox sends 3 lines a notch). */
-const WHEEL_LINE_PX = 33;
-const WHEEL_PAGE_PX = 800;
-/** One event never moves more than this, however large its delta. */
-const WHEEL_MAX_PX = 300;
+/** A wheel event's vertical delta zooms by this much per pixel. */
+const WHEEL_SENSITIVITY = 0.002;
 
 /**
- * The zoom factor for one wheel event: proportional to its vertical delta,
- * so a trackpad's or a pinch's stream of small deltas zooms smoothly and a
- * mouse notch still steps ~12%. No vertical delta (a sideways swipe,
- * shift+wheel) is no zoom.
+ * The zoom factor for one wheel event's vertical delta: scrolling up (a
+ * negative `deltaY`) zooms in. Deliberately simpler than the old
+ * device-aware `wheelZoomFactor` this replaced (no `deltaMode`/notch
+ * handling or per-event cap) — @use-gesture reports raw pixel deltas, and
+ * the pan/pinch gestures already accept its plain, untuned feel.
  */
-export function wheelZoomFactor(deltaY: number, deltaMode: number): number {
-  if (deltaY === 0) return 1;
-  const unit = deltaMode === 1 ? WHEEL_LINE_PX : deltaMode === 2 ? WHEEL_PAGE_PX : 1;
-  const px = Math.max(-WHEEL_MAX_PX, Math.min(WHEEL_MAX_PX, deltaY * unit));
-  return Math.exp((-px * Math.log(WHEEL_NOTCH_FACTOR)) / WHEEL_NOTCH_PX);
+export function wheelZoomFactor(deltaY: number): number {
+  return Math.exp(-deltaY * WHEEL_SENSITIVITY);
 }

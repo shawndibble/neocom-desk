@@ -30,7 +30,7 @@ export function FittingExportNotice({ notice }: { notice: string | null }) {
 
 /** Export's menu items, for whichever menu holds them. */
 export function FittingExportItems({
-  actions: { copy, downloadEveXml, openInAppraisal },
+  actions: { copy, downloadEveXml, openInAppraisal, openManufacturePlan },
   price,
 }: {
   actions: FittingExport;
@@ -53,6 +53,9 @@ export function FittingExportItems({
       </DropdownMenuItem>
       <DropdownMenuItem onSelect={() => void downloadEveXml()}>
         {t('fittings.export.eveXml')}
+      </DropdownMenuItem>
+      <DropdownMenuItem onSelect={() => void openManufacturePlan()}>
+        {t('fittings.export.manufacturePlan')}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <div className="px-2 py-1.5 text-xs text-text-dim">

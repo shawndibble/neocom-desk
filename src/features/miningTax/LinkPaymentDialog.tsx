@@ -109,8 +109,8 @@ export function LinkPaymentDialog({
           method: payment.method,
           amount: Math.round(recordedAmount),
           ...(payment.kind === 'journal'
-            ? { journalRefId: payment.refId }
-            : { contractId: payment.refId }),
+            ? { journalLinks: [{ refId: payment.refId, source: 'manual' as const }] }
+            : { contractLinks: [{ refId: payment.refId, source: 'manual' as const }] }),
         }
       );
       // Learned only on confirmation — the pilot agreeing this payment settled

@@ -23,27 +23,17 @@
  * Labels come from the same `market.contextMenu.*` / `industry.contextMenu.*`
  * keys `ItemContextMenu` uses — one action, one wording, wherever it appears.
  *
- * `BpcOfferMoreActions` (issue #1498) is the visible, keyboard-reachable
- * equivalent of this menu, but only for the BPC Sourcing table's offer rows —
- * the other three surfaces above keep the right-click-only menu unchanged,
- * per the ticket's scope. It shares this file's item list through
- * `useBuildPlanMenuNodes` so the two can't drift, the same shape
- * `ItemContextMenu`'s `useItemMenuNodes` uses for its own button/menu pair.
+ * The visible, keyboard-reachable "More actions" button (WCAG 2.1.1, issue
+ * #1498) is `DataTable`'s own `rowMoreActions` column: it reads the same
+ * items straight out of the `RowActionsContext` this menu publishes, so a
+ * caller opts in with `rowMoreActions` on the table rather than rendering a
+ * second copy of the button here.
  */
 import { useEffect, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { industryTabHref } from './industryTabs';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  IconButton,
-  MenuItem as RowMenuItem,
-  RowActionsMenu,
-} from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
+import { MenuItem as RowMenuItem, RowActionsMenu } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
 import { marketLinkParams } from '@/engine/market/urlState';
 import { useCompareSet } from '@/features/market/compareSet';
@@ -53,9 +43,6 @@ import {
   type PlannableIndex,
 } from './plannableProduct';
 import { applyPlanSeed, type BuildPlanSeed } from './planSeed';
-
-/** `ContextMenuItem` and `DropdownMenuItem` share this shape — both spread onto a Radix `Item`. */
-type MenuItemComponent = typeof RowMenuItem;
 
 export interface BuildPlanContextMenuProps {
   /** The row's own type — a blueprint on the BPC table, anything at all in a contract. */
@@ -119,17 +106,10 @@ function usePlannableIndexOnOpen(): {
   };
 }
 
-/**
- * The item list shared by `BuildPlanContextMenu` (right-click) and
- * `BpcOfferMoreActions` (the visible button, issue #1498) — one function
- * so the two can't drift. `MenuItem` picks which menu family's item component
- * renders each entry, the same parameter `ItemContextMenu`'s
- * `useItemMenuNodes` takes.
- */
+/** The item list `BuildPlanContextMenu` publishes, to both its own right-click trigger and any `RowMoreActions` reading its `RowActionsContext`. */
 function useBuildPlanMenuNodes(
   { typeId, itemName, seed }: Pick<BuildPlanContextMenuProps, 'typeId' | 'itemName' | 'seed'>,
-  index: PlannableIndex | null,
-  MenuItem: MenuItemComponent
+  index: PlannableIndex | null
 ): ReactElement[] {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -140,7 +120,7 @@ function useBuildPlanMenuNodes(
   const productTypeId = index ? plannableProductTypeID(index, typeId) : undefined;
 
   const nodes: ReactElement[] = [
-    <MenuItem
+    <RowMenuItem
       key="viewInMarket"
       onSelect={() => {
         const params = marketLinkParams(typeId, location.search);
@@ -148,20 +128,20 @@ function useBuildPlanMenuNodes(
       }}
     >
       {t('market.contextMenu.viewInMarket')}
-    </MenuItem>,
+    </RowMenuItem>,
   ];
   if (itemName !== undefined) {
     nodes.push(
-      <MenuItem key="addToCompare" onSelect={() => addToCompare({ typeId, itemName })}>
+      <RowMenuItem key="addToCompare" onSelect={() => addToCompare({ typeId, itemName })}>
         {t('market.contextMenu.addToCompare')}
-      </MenuItem>,
-      <MenuItem key="copyName" onSelect={() => void writeToClipboard(itemName)}>
+      </RowMenuItem>,
+      <RowMenuItem key="copyName" onSelect={() => void writeToClipboard(itemName)}>
         {t('market.contextMenu.copyName')}
-      </MenuItem>
+      </RowMenuItem>
     );
   }
   nodes.push(
-    <MenuItem
+    <RowMenuItem
       key="buildPlan"
       disabled={productTypeId == null}
       onSelect={() => {
@@ -176,7 +156,7 @@ function useBuildPlanMenuNodes(
         : productTypeId === null
           ? t('industry.contextMenu.noBlueprintOptions')
           : t('industry.contextMenu.buildPlan')}
-    </MenuItem>
+    </RowMenuItem>
   );
   return nodes;
 }
@@ -188,50 +168,11 @@ export function BuildPlanContextMenu({
   seed,
 }: BuildPlanContextMenuProps) {
   const { index, onOpenChange } = usePlannableIndexOnOpen();
-  const items = useBuildPlanMenuNodes({ typeId, itemName, seed }, index, RowMenuItem);
+  const items = useBuildPlanMenuNodes({ typeId, itemName, seed }, index);
 
   return (
     <RowActionsMenu name={itemName ?? `#${typeId}`} items={items} onOpenChange={onOpenChange}>
       {trigger}
     </RowActionsMenu>
-  );
-}
-
-/**
- * Visible "More actions" trigger for the same item list (WCAG 2.1.1, issue
- * #1498) — rendered only by the BPC Sourcing table's offer rows, which is the
- * one surface among this menu's four call sites the ticket asks for a visible
- * button on; the other three keep `BuildPlanContextMenu`'s right-click-only
- * behavior.
- *
- * `itemName` stays optional, matching `BuildPlanContextMenuProps` — an
- * unresolved name still omits Copy/Compare but must not block the button
- * itself from rendering, since the row's own right-click menu is available in
- * that state too and a keyboard user needs the same access. The accessible
- * name falls back to `#<typeId>`, the same placeholder `BpcSourcingPanel`'s
- * own Item column already prints for an unresolved name, rather than reading
- * "More actions for undefined".
- */
-export function BpcOfferMoreActions({
-  typeId,
-  itemName,
-  seed,
-}: Omit<BuildPlanContextMenuProps, 'trigger'>) {
-  const { t } = useTranslation();
-  const { index, onOpenChange } = usePlannableIndexOnOpen();
-  const items = useBuildPlanMenuNodes({ typeId, itemName, seed }, index, DropdownMenuItem);
-
-  return (
-    <DropdownMenu onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger asChild>
-        <IconButton
-          icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
-          label={t('industry.moreActionsLabel', { name: itemName ?? `#${typeId}` })}
-          variant="plain"
-          size="row"
-        />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">{items}</DropdownMenuContent>
-    </DropdownMenu>
   );
 }

@@ -321,16 +321,16 @@ export function Calendar() {
     <div className="flex items-center gap-1.5">
       <span className="hidden text-xs font-semibold text-text-dim md:inline">{periodLabel}</span>
       <IconButton
-        size="sm"
+        size="md"
         icon={<Icon.Back />}
         label={density === 'month' ? t('calendar.prevMonth') : t('calendar.prevFortnight')}
         onClick={() => step(-1)}
       />
-      <Button size="sm" onClick={goToday}>
+      <Button size="md" onClick={goToday}>
         {t('calendar.map.today')}
       </Button>
       <IconButton
-        size="sm"
+        size="md"
         icon={<Icon.Descend />}
         label={density === 'month' ? t('calendar.nextMonth') : t('calendar.nextFortnight')}
         onClick={() => step(1)}

@@ -17,7 +17,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
-import { CHARACTER_ID, CHARACTER_NAME } from './support/fixtureData';
+import { CHARACTER_ID } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
 
@@ -107,15 +107,35 @@ test('reading pane: subject with a long unbroken token wraps at 390px', async ({
   expect(fits).toBe(true);
 });
 
-// Issue #1765: below `md` only Overview said whose data you were looking at.
-test('PageHeader carries an identity avatar linking to /characters at 390px', async ({ page }) => {
+// Issue #2106: Reply/Forward were the sole touch targets for an open mail
+// below `md` (no side-by-side list to fall back on), but rendered at the
+// `sm` tier (36px) on phone — below the app's 44px touch floor.
+test('reading pane: Reply/Forward meet the 44px touch target floor at 390px', async ({ page }) => {
+  await seedLongMail(page);
   await page.setViewportSize(PHONE);
-  // Mail fetches its mailing lists on mount; mockEsi.ts doesn't cover them.
-  await page.route(`**/characters/${CHARACTER_ID}/mail/lists`, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
-  );
   await signInAndGoto(page, './mail');
-  const avatar = page.getByRole('link', { name: `${CHARACTER_NAME}, switch character` });
-  await expect(avatar).toBeVisible();
-  await expect(avatar).toHaveAttribute('href', /\/characters$/);
+
+  await page.getByText('A very long mail').click();
+
+  const reply = page.getByRole('button', { name: 'Reply' });
+  const forward = page.getByRole('button', { name: 'Forward' });
+  const [replyBox, forwardBox] = await Promise.all([reply.boundingBox(), forward.boundingBox()]);
+
+  expect(replyBox).not.toBeNull();
+  expect(forwardBox).not.toBeNull();
+  expect(replyBox!.height).toBeGreaterThanOrEqual(44);
+  expect(forwardBox!.height).toBeGreaterThanOrEqual(44);
+
+  // Pointer-width behavior must stay put: `size="row"` keeps the same
+  // `md:size-7` pointer height `size="sm"` already had, unlike `size="md"`
+  // which would have widened it from 28px to 36px above `md` (768px).
+  await page.setViewportSize({ width: 1024, height: 800 });
+  const [replyDesktopBox, forwardDesktopBox] = await Promise.all([
+    reply.boundingBox(),
+    forward.boundingBox(),
+  ]);
+  expect(replyDesktopBox).not.toBeNull();
+  expect(forwardDesktopBox).not.toBeNull();
+  expect(replyDesktopBox!.height).toBeCloseTo(28, 0);
+  expect(forwardDesktopBox!.height).toBeCloseTo(28, 0);
 });

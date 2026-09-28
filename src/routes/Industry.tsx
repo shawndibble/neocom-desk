@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -48,6 +48,7 @@ import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import { useComparedBuildResults } from '@/features/industry/useComparedBuildResults';
 import { computeGroupIndexStats } from '@/features/industry/groupIndexStats';
 import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
+import type { IndustryFitImportState } from '@/lib/shortcuts';
 import { usePageTab } from '@/lib/usePageTab';
 import { useUrlParam } from '@/lib/useUrlState';
 import { boolParam } from '@/lib/urlState';
@@ -66,6 +67,7 @@ const COMPARE_MODE = boolParam();
 export function Industry() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const workspace = useIndustryWorkspace();
   const {
     activeCharacterId,
@@ -121,6 +123,23 @@ export function Industry() {
   }, [hydrateExpandedGroups]);
 
   const [fitImportOpen, setFitImportOpen] = useState(false);
+  // EFT text a Fitting's Export menu ("Manufacture Plan") arrived with, to
+  // pre-fill and parse the Fit Import dialog instead of opening it empty.
+  const [fitImportSeedText, setFitImportSeedText] = useState<string | undefined>(undefined);
+  function closeFitImport() {
+    setFitImportOpen(false);
+    setFitImportSeedText(undefined);
+  }
+  // Keyed on the navigation itself so a re-render never reopens the dialog
+  // after the pilot closes it (mirrors Market.tsx's `appraiseText` handling).
+  const handledFitImportKey = useRef<string | null>(null);
+  useEffect(() => {
+    const text = (location.state as Partial<IndustryFitImportState> | null)?.fitImportText;
+    if (!text || handledFitImportKey.current === location.key) return;
+    handledFitImportKey.current = location.key;
+    setFitImportSeedText(text);
+    setFitImportOpen(true);
+  }, [location.key, location.state]);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
 
   const [compareMode, setCompareMode] = useUrlParam('plans.compare', COMPARE_MODE);
@@ -427,7 +446,7 @@ export function Industry() {
     });
     if (!result) return;
     await setGroupExpanded(result.groupId, true);
-    setFitImportOpen(false);
+    closeFitImport();
     navigate(`/industry/groups/${result.groupId}`);
   }
 
@@ -439,7 +458,8 @@ export function Industry() {
         facilityDefaults,
         row.materialSourcing,
         row.buildHere,
-        activeCharacterId
+        activeCharacterId,
+        row.hub
       )
     );
     await createBuildPlans(newPlans);
@@ -504,7 +524,6 @@ export function Industry() {
                   <OpportunitiesPanel
                     catalog={catalog}
                     pi={pi}
-                    modifiers={modifiers}
                     facilityDefaults={facilityDefaults}
                     activeCharacterId={activeCharacterId}
                     ownedStockSnapshot={workspace.ownedStockSnapshot}
@@ -619,7 +638,8 @@ export function Industry() {
           <FitImportDialog
             catalog={catalog}
             onApply={(preview) => void handleFitImport(preview)}
-            onClose={() => setFitImportOpen(false)}
+            onClose={closeFitImport}
+            initialText={fitImportSeedText}
           />
         )}
       </div>

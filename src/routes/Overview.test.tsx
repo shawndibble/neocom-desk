@@ -212,6 +212,7 @@ const ORDERS_SCOPE = 'esi-markets.read_character_orders.v1';
 const PLANETS_SCOPE = 'esi-planets.manage_planets.v1';
 const INDUSTRY_SCOPE = 'esi-industry.read_character_jobs.v1';
 const CONTRACTS_SCOPE = 'esi-contracts.read_character_contracts.v1';
+const CALENDAR_SCOPE = 'esi-calendar.read_calendar_events.v1';
 
 /** An accepted courier with `dueInHours` left to deliver, owed by this Character. */
 function courierContract({ id, dueInHours }: { id: number; dueInHours: number }) {
@@ -229,6 +230,25 @@ function courierContract({ id, dueInHours }: { id: number; dueInHours: number })
     date_expired: hoursFromNow(24 * 20),
     date_accepted: hoursFromNow(dueInHours - 72),
     days_to_complete: 3,
+  };
+}
+
+/** A calendar event `hoursFromNow` away, with a given RSVP. */
+function calendarEvent({
+  id,
+  hours,
+  response,
+}: {
+  id: number;
+  hours: number;
+  response: 'accepted' | 'tentative' | 'declined' | 'not_responded';
+}) {
+  return {
+    event_id: id,
+    event_date: hoursFromNow(hours),
+    title: 'Fleet op',
+    importance: 0,
+    event_response: response,
   };
 }
 
@@ -597,6 +617,49 @@ describe('Overview board', () => {
     const card = await findCard(/^contracts$/i);
     expect(within(card).getByText('In progress')).toBeInTheDocument();
     expect(within(card).getByText('Due < 24h')).toBeInTheDocument();
+  });
+
+  it('draws the next deadline from an accepted calendar event when it is the soonest clock', async () => {
+    await grantScopes([CALENDAR_SCOPE, INDUSTRY_SCOPE]);
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/calendar`, () =>
+        HttpResponse.json([calendarEvent({ id: 1, hours: 3, response: 'accepted' })])
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/industry/jobs`, () =>
+        HttpResponse.json([industryJob({ jobId: 7, endsInHours: 48 })])
+      )
+    );
+    render(<App />);
+
+    const hero = await screen.findByText('Next deadline');
+    const cell = hero.parentElement as HTMLElement;
+    await waitFor(() => {
+      expect(within(cell).getByRole('link')).toHaveAttribute('href', '/calendar');
+    });
+    expect(within(cell).getByText('Fleet op')).toBeInTheDocument();
+  });
+
+  it('ignores a calendar event the pilot has not accepted or tentatively taken', async () => {
+    await grantScopes([CALENDAR_SCOPE, INDUSTRY_SCOPE]);
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/calendar`, () =>
+        HttpResponse.json([
+          calendarEvent({ id: 1, hours: 1, response: 'not_responded' }),
+          calendarEvent({ id: 2, hours: 2, response: 'declined' }),
+        ])
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/industry/jobs`, () =>
+        HttpResponse.json([industryJob({ jobId: 7, endsInHours: 48 })])
+      )
+    );
+    render(<App />);
+
+    const hero = await screen.findByText('Next deadline');
+    const cell = hero.parentElement as HTMLElement;
+    await waitFor(() => {
+      expect(within(cell).getByRole('link')).toHaveAttribute('href', '/industry');
+    });
+    expect(within(cell).queryByText('Fleet op')).not.toBeInTheDocument();
   });
 
   /*

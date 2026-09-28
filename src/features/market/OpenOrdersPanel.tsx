@@ -14,6 +14,7 @@ import {
   IconButton,
   InfoTooltip,
   MenuItem,
+  MultiSelect,
   Panel,
   SearchInput,
   Select,
@@ -32,11 +33,19 @@ import { GrantBanner } from '@/app/GrantNote';
 import { CharacterBadge } from '@/features/character/assetBrowserRows';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import { resolveCharacterFilter } from '@/features/character/characterFilterValue';
+import {
+  resolveCharacterFilter,
+  type CharacterFilterValue,
+} from '@/features/character/characterFilterValue';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { useUrlFilter } from '@/lib/useUrlState';
+import {
+  filterFromParamValues,
+  paramsPatchFromFilter,
+  useRememberedUrlParams,
+  type UrlParamValues,
+} from '@/lib/useUrlState';
 import { cx } from '@/lib/cx';
 import { formatIskAuto, formatIskCompact } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -53,26 +62,24 @@ import { recordOrderProblemSamples, sampleableCharacterIds } from './orderProble
 import { sampledProblem } from '@/engine/market/orderProblemHistory';
 import {
   buildOpenOrderRows,
-  groupOpenOrders,
   needsAttentionCount,
   openOrderProblemCounts,
-  summariseOrderGroup,
   type OpenOrderGroupSummary,
   type OpenOrderRow,
 } from './openOrdersModel';
 import {
   EMPTY_OPEN_ORDERS_FILTER,
   FILTERABLE_PROBLEMS,
-  filterOpenOrders,
+  locationFilterOptions,
   OPEN_ORDERS_FIELD_TO_PARAM,
   OPEN_ORDERS_FILTER_PARAMS,
   OPEN_ORDERS_SORTS,
-  sortOpenOrders,
   activeFilterChips,
-  DEFAULT_OPEN_ORDERS_FILTER_PARAMS,
   type OpenOrdersFilter,
   type OpenOrdersSort,
 } from './openOrdersFilter';
+import { useOpenOrdersLocationFilterPref } from './openOrdersLocationFilterPref';
+import { buildOpenOrdersView, isGroupFolded } from './openOrdersView';
 import type { OrderProblem } from '@/engine/market/orderProblems';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
@@ -129,18 +136,6 @@ function stationShortName(name: string): string {
   return dashIndex === -1 ? name : name.slice(0, dashIndex);
 }
 
-/** The highlighted row's own group always wins over either fold mechanism (decision `20260924-...`, step 9). */
-function isGroupFolded(
-  problem: OrderProblem,
-  highlightedRow: OpenOrderRow | null,
-  filter: OpenOrdersFilter,
-  collapsedGroups: ReadonlySet<OrderProblem>
-): boolean {
-  if (problem === highlightedRow?.problem) return false;
-  if (problem === 'healthy') return filter.hideHealthy;
-  return collapsedGroups.has(problem);
-}
-
 interface ActiveChipDisplay {
   id: string;
   label: string;
@@ -161,16 +156,41 @@ export function OpenOrdersPanel() {
    * field — a deep link (the Overview board's count tiles, `openOrdersHref`)
    * narrows it on arrival, and every chip, select and search keystroke from
    * here on writes straight back to it, so a reload or a shared link always
-   * reopens exactly what was on screen. This page has only the one filter
-   * bar, so it never needs `useUrlFilter`'s scope-reset — the scope key
-   * never changes.
+   * reopens exactly what was on screen.
+   *
+   * `orders.locations` is the one exception: a bare `/market/orders` visit
+   * (no query string at all — every app relaunch) falls back to the
+   * device-local pick remembered in `openOrdersLocationFilterPref.ts`
+   * (decision `20260922-221531` / ADR 0015), via `useRememberedUrlParams`
+   * rather than the plain `useUrlFilter` every other field still reads
+   * through. The URL always wins when it states the field; the stored value
+   * is never mirrored back into it.
    */
-  const [filter, setFilter] = useUrlFilter<OpenOrdersFilter>(
-    'orders',
-    OPEN_ORDERS_FILTER_PARAMS,
-    OPEN_ORDERS_FIELD_TO_PARAM,
-    DEFAULT_OPEN_ORDERS_FILTER_PARAMS
+  const rememberedLocationIds = useOpenOrdersLocationFilterPref((state) => state.value);
+  const hydrateRememberedLocationIds = useOpenOrdersLocationFilterPref((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateRememberedLocationIds();
+  }, [hydrateRememberedLocationIds]);
+  const remembered = useMemo(
+    () => ({
+      values: { 'orders.locations': rememberedLocationIds },
+      remember: (patch: Partial<UrlParamValues<typeof OPEN_ORDERS_FILTER_PARAMS>>) => {
+        if (!('orders.locations' in patch)) return;
+        void useOpenOrdersLocationFilterPref
+          .getState()
+          .setValue(patch['orders.locations'] as readonly number[]);
+      },
+    }),
+    [rememberedLocationIds]
   );
+  const [params, setParams] = useRememberedUrlParams(OPEN_ORDERS_FILTER_PARAMS, remembered);
+  const filter = useMemo(
+    () => filterFromParamValues<OpenOrdersFilter>(params, OPEN_ORDERS_FIELD_TO_PARAM),
+    [params]
+  );
+  function setFilter(next: OpenOrdersFilter) {
+    setParams(paramsPatchFromFilter(next, OPEN_ORDERS_FIELD_TO_PARAM));
+  }
   /**
    * The order a Notification Event (an undercut, or a fill) sent the reader
    * to, spent once on arrival (`useHighlightParam`'s own doc). Landing on the
@@ -281,24 +301,9 @@ export function OpenOrdersPanel() {
 
   const problemCounts = useMemo(() => openOrderProblemCounts(allRows), [allRows]);
 
-  const visibleRows = useMemo(
-    () => sortOpenOrders(filterOpenOrders(allRows, filter), filter.sort),
+  const { visibleRows, groupingRows, groups, groupSummaries, matchCountVisible } = useMemo(
+    () => buildOpenOrdersView(allRows, filter),
     [allRows, filter]
-  );
-  // Healthy orders are FOLDED, not filtered out (CONTEXT.md): grouping always
-  // sees every row that matches every filter but `hideHealthy`, so the
-  // healthy group's own heading and count still render — just without its
-  // table — while `hideHealthy` is on. Using `visibleRows` here instead would
-  // make the group vanish outright, which reads as "nothing matched" rather
-  // than "nothing here needs you."
-  const groupingRows = useMemo(
-    () => sortOpenOrders(filterOpenOrders(allRows, { ...filter, hideHealthy: false }), filter.sort),
-    [allRows, filter]
-  );
-  const groups = useMemo(() => groupOpenOrders(groupingRows), [groupingRows]);
-  const groupSummaries = useMemo(
-    () => new Map(groups.map((group) => [group.problem, summariseOrderGroup(group.rows)])),
-    [groups]
   );
 
   const attentionCount = useMemo(() => needsAttentionCount(allRows), [allRows]);
@@ -314,6 +319,25 @@ export function OpenOrdersPanel() {
     for (const entry of entriesWithOrders) m.set(entry.characterId, entry.characterName);
     return m;
   }, [entriesWithOrders]);
+
+  /**
+   * Every location currently holding an open order — the location filter's
+   * option catalog, so a saved pick from a station that has since sold out
+   * can still be seen and untoggled rather than just quietly narrowing to
+   * nothing (see `filter.locationIds` below).
+   */
+  const locationOptions = useMemo(
+    () =>
+      locationFilterOptions(allRows, (locationId) =>
+        t('market.orders.filter.unknownLocation', { id: locationId })
+      ),
+    [allRows, t]
+  );
+  const locationNamesById = useMemo(
+    () => new Map(locationOptions.map((option) => [option.locationId, option.label])),
+    [locationOptions]
+  );
+  const showLocationFilter = locationOptions.length > 1;
 
   const ordersByOrderId = useMemo(() => {
     const m = new Map<number, MarketOrder>();
@@ -371,7 +395,7 @@ export function OpenOrdersPanel() {
     .filter((chip) => chip.id !== 'hideHealthy')
     .map((chip) => ({
       id: chip.id,
-      label: chipLabel(chip, characterNamesById, t),
+      label: chipLabel(chip, characterNamesById, locationNamesById, t),
       clear: () => setFilter(chip.clear(filter)),
     }));
 
@@ -386,14 +410,35 @@ export function OpenOrdersPanel() {
     setDetailOrderId(row.orderId);
   }
 
-  /** `CharacterFilterControl`'s `value` prop, derived the same way from either `filter.characterIds` (desktop strip) or `draft.characterIds` (phone funnel sheet). */
-  function characterFilterValueOf(characterIds: readonly number[]) {
-    return characterIds.length === 0 ? 'all' : new Set(characterIds);
+  /**
+   * `CharacterFilterControl`'s `value` prop, derived the same way from either
+   * `filter.characterIds` (desktop strip) or `draft.characterIds` (phone
+   * funnel sheet). Reads `'current'` only for the exact single-id array
+   * `characterFilterOnChange` itself would write for that literal value
+   * (`[activeCharacterId]`) — everything else reads `'all'`, the closest this
+   * narrowed picker can still say honestly. That covers two different single-
+   * id cases the same way: a legacy hand-picked-subset link (from before the
+   * current/all narrowing) naming some other Character — there's no
+   * principled way to know which one id, if any, the pilot who made it would
+   * have meant, so this never guesses `'current'` for it (mirrors
+   * `characterFilterValue.ts`'s `fromStoredCharacterFilterValue`) — and the
+   * Overview board's own per-Character Orders tile (`overview/cards.tsx`),
+   * which deep-links here with exactly one *other* alt's id on purpose, live
+   * traffic rather than anything stale. Either way the label falls back to
+   * "All characters" rather than lying that it's "This character," but the
+   * table itself keeps filtering to whatever `characterIds` actually holds —
+   * this function only ever feeds the picker's display, never the row filter
+   * (`matchesCharacterIds` reads `filter.characterIds` directly), so an
+   * Overview tile's narrowed view still opens narrowed; only its label can no
+   * longer name the one alt it's showing.
+   */
+  function characterFilterValueOf(characterIds: readonly number[]): CharacterFilterValue {
+    return characterIds.length === 1 && characterIds[0] === activeCharacterId ? 'current' : 'all';
   }
 
   /** `CharacterFilterControl`'s `onChange`, resolving its selection back to `characterIds` and handing it to whichever setter owns them — `setFilter` (commits immediately) or `setDraft` (committed on the funnel's Apply). */
   function characterFilterOnChange(setCharacterIds: (ids: readonly number[]) => void) {
-    return (next: Parameters<typeof resolveCharacterFilter>[0]) => {
+    return (next: CharacterFilterValue) => {
       const resolved = resolveCharacterFilter(next, activeCharacterId);
       setCharacterIds(resolved === 'all' ? [] : [...resolved]);
     };
@@ -783,6 +828,50 @@ export function OpenOrdersPanel() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {showLocationFilter && (
+                    <MultiSelect
+                      trigger={
+                        <Button size="sm">
+                          {draft.locationIds.length === 0
+                            ? t('market.orders.filter.allLocations')
+                            : t('market.orders.filter.selectedLocationsCount', {
+                                count: draft.locationIds.length,
+                              })}
+                        </Button>
+                      }
+                      options={locationOptions.map((option) => ({
+                        id: option.locationId,
+                        label: option.label,
+                      }))}
+                      selected={new Set(draft.locationIds)}
+                      onToggle={(locationId) =>
+                        setDraft({
+                          ...draft,
+                          locationIds: draft.locationIds.includes(locationId)
+                            ? draft.locationIds.filter((id) => id !== locationId)
+                            : [...draft.locationIds, locationId],
+                        })
+                      }
+                      searchPlaceholder={t('market.orders.filter.locationSearchPlaceholder')}
+                      noResultsLabel={t('market.orders.filter.locationNoResults')}
+                      extraContent={(close) => (
+                        <div className="border-b border-line p-1">
+                          <Button
+                            variant="ghost"
+                            align="start"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              setDraft({ ...draft, locationIds: [] });
+                              close();
+                            }}
+                          >
+                            {t('market.orders.filter.allLocations')}
+                          </Button>
+                        </div>
+                      )}
+                    />
+                  )}
                   <Select
                     value={draft.sort}
                     onValueChange={(value) => setDraft({ ...draft, sort: value as OpenOrdersSort })}
@@ -812,7 +901,6 @@ export function OpenOrdersPanel() {
                   {isPhone && showCharacterStrip && (
                     <div className="w-full border-t border-line pt-2">
                       <CharacterFilterControl
-                        characters={entriesWithOrders}
                         activeCharacterId={activeCharacterId}
                         value={characterFilterValueOf(draft.characterIds)}
                         onChange={characterFilterOnChange((characterIds) =>
@@ -844,7 +932,6 @@ export function OpenOrdersPanel() {
           {showCharacterStrip && !isPhone && (
             <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
               <CharacterFilterControl
-                characters={entriesWithOrders}
                 activeCharacterId={activeCharacterId}
                 value={characterFilterValueOf(filter.characterIds)}
                 onChange={characterFilterOnChange((characterIds) =>
@@ -860,7 +947,7 @@ export function OpenOrdersPanel() {
             would read as a broken filter, so the count steps aside and the
             folded Healthy group speaks for itself.
           */}
-          {(visibleRows.length > 0 || groupingRows.length === 0) && (
+          {matchCountVisible && (
             <p className="px-3 pt-2 text-xs text-text-dim">
               {t('market.orders.filter.matchCount', {
                 count: visibleRows.length,
@@ -1012,6 +1099,7 @@ export function OpenOrdersPanel() {
 function chipLabel(
   chip: ReturnType<typeof activeFilterChips>[number],
   characterNamesById: ReadonlyMap<number, string>,
+  locationNamesById: ReadonlyMap<number, string>,
   t: (key: string, options?: Record<string, unknown>) => string
 ): string {
   const label = t(chip.labelKey);
@@ -1021,6 +1109,10 @@ function chipLabel(
   if (chip.id.startsWith('character:')) {
     const characterId = Number(chip.value);
     return `${label}: ${characterNamesById.get(characterId) ?? chip.value}`;
+  }
+  if (chip.id.startsWith('location:')) {
+    const locationId = Number(chip.value);
+    return `${label}: ${locationNamesById.get(locationId) ?? chip.value}`;
   }
   if (chip.id.startsWith('problem:')) return `${label}: ${t(`market.orders.group.${chip.value}`)}`;
   if (chip.id === 'costBasis') {

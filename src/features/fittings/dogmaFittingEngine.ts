@@ -576,22 +576,25 @@ const NO_SKILLS: Map<number, number> = new Map();
  * The same answer as `checkOneCandidate`, cheaper: the engine's cost per call
  * grows with the number of skills it is handed (about 14x from none to a full
  * skill set), and most of what the check needs doesn't depend on them. Run
- * with no skills, the hull rules already answer "goes on this hull" (null when
- * it doesn't — the browser lists only what does), and the skill rules list
- * every skill the item asks for, so "can fly" is read off them against the
- * pilot's own. Only an item too big for the bare hull without skills needs
- * the real run, since skills are what make room (Power Grid Management, the
- * weapon upgrades); an item that fits without them fits with them.
+ * with no skills, the hull rules already answer "goes on this hull", and the
+ * skill rules list every skill the item asks for, so "can fly" is read off
+ * them against the pilot's own. Only an item too big for the bare hull
+ * without skills needs the real run, since skills are what make room (Power
+ * Grid Management, the weapon upgrades); an item that fits without them fits
+ * with them. An item the hull can never take at all (`fitsHull` false) is
+ * answered from this same bare, no-skill check — the Hull icon filter
+ * (`FittingAddPanel`) is the only consumer that ever sees it, and a
+ * structure module's exact CPU headroom is not worth a full run to report.
  */
 export function checkHullCandidate(
   shipTypeId: number,
   rack: CandidateRack,
   typeId: number,
   skillLevels: Map<number, number>
-): CandidateCheck | null {
+): CandidateCheck {
   const bare = validateCandidate(shipTypeId, rack, typeId, NO_SKILLS);
   const base = classifyRuleBreaks(candidateRuleTypes(bare));
-  if (!base.fitsHull) return null;
+  if (!base.fitsHull) return base;
   if (!base.fitsResources) return checkOneCandidate(shipTypeId, rack, typeId, skillLevels);
   const canFly = rulesNaming(bare, 'item').every(
     (v) => v.rule.type !== 'skill' || (skillLevels.get(v.rule.type_id) ?? 0) >= v.rule.required

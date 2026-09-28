@@ -230,6 +230,37 @@ describe('Clones', () => {
     expect(screen.queryByText('Log in again to see your clones')).not.toBeInTheDocument();
   });
 
+  it('shows a jump clone name beside its location, trimmed, and nothing for a blank name', async () => {
+    const station = { location_id: 60003760, location_type: 'station' as const, implants: [] };
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/clones`, () =>
+        HttpResponse.json({
+          jump_clones: [
+            { ...station, jump_clone_id: 1, name: '  Alpha  ' },
+            { ...station, jump_clone_id: 2, name: 'Beta' },
+            { ...station, jump_clone_id: 3, name: '   ' },
+            { ...station, jump_clone_id: 4 },
+          ],
+        })
+      )
+    );
+    render(<App />);
+    const alpha = await screen.findByText('Alpha');
+    expect(alpha.closest('td')).toHaveTextContent(
+      'Alpha · Jita IV - Moon 4 - Caldari Navy Assembly Plant'
+    );
+    expect(screen.getByText('Beta')).toBeInTheDocument();
+    const cells = screen
+      .getAllByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant')
+      .map((el) => el.closest('td'))
+      .filter((td) => td !== null);
+    const unnamed = cells.filter((td) => !/Alpha|Beta/.test(td.textContent ?? ''));
+    expect(unnamed).toHaveLength(2);
+    for (const td of unnamed) {
+      expect(td).toHaveTextContent(/^Jita IV - Moon 4 - Caldari Navy Assembly Plant$/);
+    }
+  });
+
   it('shows the empty state when there are no clones', async () => {
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/clones`, () => HttpResponse.json({ jump_clones: [] }))
