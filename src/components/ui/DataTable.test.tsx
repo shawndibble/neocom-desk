@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { createPortal } from 'react-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,6 +8,7 @@ import { PHONE_QUERY } from '@/lib/useIsPhone';
 import {
   DataTable,
   DataTableDenseCell,
+  VIRTUALIZE_THRESHOLD,
   type DataTableColumn,
   type DataTableGroupBy,
 } from './DataTable';
@@ -1083,5 +1085,253 @@ describe('DataTable virtualize', () => {
     );
 
     expect(mountedIds()).toHaveLength(1_000);
+  });
+  describe('virtualize="auto"', () => {
+    const rowsOf = (count: number) => many.slice(0, count);
+    const byId = (row: Row) => row.id;
+
+    it(`keeps every row mounted up to ${VIRTUALIZE_THRESHOLD} rows`, () => {
+      render(
+        <DataTable
+          label="Offers"
+          columns={sortableColumns}
+          rows={rowsOf(VIRTUALIZE_THRESHOLD)}
+          rowKey={byId}
+          virtualize="auto"
+        />
+      );
+
+      expect(mountedIds()).toHaveLength(VIRTUALIZE_THRESHOLD);
+      expect(screen.getByRole('table').getAttribute('aria-rowcount')).toBeNull();
+    });
+
+    it('windows once the rows pass the threshold, telling AT the full count', () => {
+      render(
+        <DataTable
+          label="Offers"
+          columns={sortableColumns}
+          rows={rowsOf(VIRTUALIZE_THRESHOLD + 1)}
+          rowKey={byId}
+          virtualize="auto"
+        />
+      );
+
+      expect(mountedIds().length).toBeLessThan(100);
+      expect(screen.getByRole('table').getAttribute('aria-rowcount')).toBe(
+        String(VIRTUALIZE_THRESHOLD + 2)
+      );
+      expect(document.querySelector('[data-row-key="1"]')?.getAttribute('aria-rowindex')).toBe('2');
+    });
+
+    it('never windows an expandable table, whose detail rows it could not measure', () => {
+      render(
+        <DataTable
+          label="Offers"
+          columns={sortableColumns}
+          rows={rowsOf(500)}
+          rowKey={byId}
+          virtualize="auto"
+          expandableRow={{ renderDetail: (row) => `Detail ${row.id}` }}
+        />
+      );
+
+      expect(mountedIds()).toHaveLength(500);
+    });
+
+    it('switches between every row and a window as the rows cross the threshold', () => {
+      const table = (count: number) => (
+        <DataTable
+          label="Offers"
+          columns={sortableColumns}
+          rows={rowsOf(count)}
+          rowKey={byId}
+          virtualize="auto"
+        />
+      );
+      const { rerender } = render(table(VIRTUALIZE_THRESHOLD));
+      expect(mountedIds()).toHaveLength(VIRTUALIZE_THRESHOLD);
+
+      // A live refresh or a cleared filter pushes it over…
+      rerender(table(VIRTUALIZE_THRESHOLD + 1));
+      expect(mountedIds().length).toBeLessThan(100);
+      expect(screen.getByRole('table').getAttribute('aria-rowcount')).toBe(
+        String(VIRTUALIZE_THRESHOLD + 2)
+      );
+
+      // …and a narrowing filter brings it back under.
+      rerender(table(VIRTUALIZE_THRESHOLD));
+      expect(mountedIds()).toHaveLength(VIRTUALIZE_THRESHOLD);
+      expect(screen.getByRole('table').getAttribute('aria-rowcount')).toBeNull();
+      expect(document.querySelector('.dt-spacer')).toBeNull();
+    });
+
+    it('keeps a focused row mounted and focused as the rows cross the threshold', () => {
+      const table = (count: number) => (
+        <DataTable
+          label="Offers"
+          columns={sortableColumns}
+          rows={rowsOf(count)}
+          rowKey={byId}
+          virtualize="auto"
+          onRowClick={() => {}}
+        />
+      );
+      const { rerender } = render(table(VIRTUALIZE_THRESHOLD));
+      const row = document.querySelector<HTMLElement>('[data-row-key="5"]');
+      row?.focus();
+      expect(document.activeElement).toBe(row);
+
+      rerender(table(VIRTUALIZE_THRESHOLD + 1));
+      expect(document.querySelector('[data-row-key="5"]')).toBe(row);
+      expect(document.activeElement).toBe(row);
+
+      rerender(table(VIRTUALIZE_THRESHOLD));
+      expect(document.querySelector('[data-row-key="5"]')).toBe(row);
+      expect(document.activeElement).toBe(row);
+    });
+
+    describe('highlightRowKey', () => {
+      let scrollTo: ReturnType<typeof vi.spyOn>;
+      let scrollIntoView: ReturnType<typeof vi.spyOn>;
+      /** What a real scroll to `top` looks like to the page: `scrollY`, then a later `scroll` event. */
+      const scrollPageTo = (top: number) => {
+        Object.defineProperty(window, 'scrollY', { configurable: true, value: top });
+        setTimeout(() => window.dispatchEvent(new Event('scroll')));
+      };
+
+      beforeEach(() => {
+        scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+        // jsdom has no layout: stand in for a long page and for the browser
+        // moving it. TanStack clamps its target to the document's scroll height.
+        Object.defineProperty(document.documentElement, 'scrollHeight', {
+          configurable: true,
+          value: 1_000_000,
+        });
+        scrollTo = vi
+          .spyOn(window, 'scrollTo')
+          .mockImplementation(((options: ScrollToOptions) =>
+            scrollPageTo(options.top ?? 0)) as typeof window.scrollTo);
+      });
+      afterEach(() => {
+        delete (document.documentElement as { scrollHeight?: number }).scrollHeight;
+        scrollTo.mockRestore();
+        scrollIntoView.mockRestore();
+      });
+
+      const table = (highlightRowKey: number | null) => (
+        <DataTable
+          label="Offers"
+          columns={sortableColumns}
+          rows={many}
+          rowKey={byId}
+          virtualize="auto"
+          highlightRowKey={highlightRowKey}
+        />
+      );
+      const arrivedAt = (key: number) =>
+        waitFor(() =>
+          expect(
+            document.querySelector(`[data-row-key="${key}"]`)?.getAttribute('aria-current')
+          ).toBe('location')
+        );
+
+      it('scrolls a row outside the window into it, then pulses and focuses it', async () => {
+        render(table(900));
+
+        await arrivedAt(900);
+        const row = document.querySelector<HTMLElement>('[data-row-key="900"]');
+        expect(row?.className).toContain('row-pulse');
+        expect(document.activeElement).toBe(row);
+        expect(scrollTo).toHaveBeenCalled();
+        expect(scrollIntoView.mock.instances).toContain(row);
+      });
+
+      it('scrolls to the same row again for a new link after the key cleared', async () => {
+        const { rerender } = render(table(900));
+        await arrivedAt(900);
+
+        rerender(table(null));
+        scrollPageTo(0);
+        await waitFor(() => expect(mountedIds()).not.toContain('900'));
+        scrollTo.mockClear();
+
+        rerender(table(900));
+        await arrivedAt(900);
+        expect(scrollTo).toHaveBeenCalled();
+      });
+    });
+  });
+});
+
+describe('DataTable row memoization', () => {
+  // A plain log rather than `vi.fn`: this suite's config resets mock
+  // implementations between tests.
+  let rendered: number[] = [];
+  const renderItem = (row: Row) => {
+    rendered.push(row.id);
+    return row.item;
+  };
+  const spiedColumns: DataTableColumn<Row>[] = [
+    { id: 'item', header: 'Item', render: renderItem },
+    { id: 'amount', header: 'Amount', render: (row) => row.amount },
+  ];
+  const byId = (row: Row) => row.id;
+  const tenRows: Row[] = Array.from({ length: 10 }, (_, i) => ({
+    id: i + 1,
+    item: `Item ${i + 1}`,
+    amount: i,
+    expired: false,
+  }));
+
+  function Page() {
+    const [clicks, setClicks] = useState(0);
+    const [selected, setSelected] = useState<number | null>(1);
+    return (
+      <>
+        <button type="button" onClick={() => setClicks((n) => n + 1)}>
+          Unrelated {clicks}
+        </button>
+        <button type="button" onClick={() => setSelected(2)}>
+          Select second
+        </button>
+        <DataTable
+          label="Items"
+          columns={spiedColumns}
+          rows={tenRows}
+          rowKey={byId}
+          selectedRowKey={selected}
+          // Inline, as most callers pass it: rows reach it through a stable
+          // activator, so it mustn't cost a re-render of every row.
+          onRowClick={() => {}}
+        />
+      </>
+    );
+  }
+
+  beforeEach(() => {
+    rendered = [];
+  });
+
+  it('re-renders no row for parent state the rows do not read', async () => {
+    const user = userEvent.setup();
+    render(<Page />);
+    expect(rendered).toHaveLength(10);
+    rendered = [];
+
+    await user.click(screen.getByRole('button', { name: /Unrelated/ }));
+
+    expect(screen.getByRole('button', { name: 'Unrelated 1' })).toBeTruthy();
+    expect(rendered).toEqual([]);
+  });
+
+  it('re-renders only the rows whose selection changed', async () => {
+    const user = userEvent.setup();
+    render(<Page />);
+    rendered = [];
+
+    await user.click(screen.getByRole('button', { name: 'Select second' }));
+
+    expect([...rendered].sort()).toEqual([1, 2]);
+    expect(document.querySelector('[data-row-key="2"]')?.getAttribute('aria-current')).toBe('true');
   });
 });

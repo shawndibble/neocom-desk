@@ -64,6 +64,7 @@ import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatTimestamp } from '@/lib/timestamp';
 import { formatCountdown } from '@/lib/duration';
+import { useTicker } from '@/lib/ticker';
 import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -118,9 +119,44 @@ const NO_AFFILIATIONS: ReadonlyMap<number, CharacterAffiliation> = new Map();
  * naturally in the past for anything old, so dimming on date alone (the
  * previous behavior) faded almost every completed contract in the list.
  */
-function isStale(contract: Contract): boolean {
-  return (
-    contract.status === 'outstanding' && new Date(contract.date_expired).getTime() < Date.now()
+function isStale(contract: Contract, nowMs: number): boolean {
+  return contract.status === 'outstanding' && new Date(contract.date_expired).getTime() < nowMs;
+}
+
+/**
+ * Minute cadence for the History table's clock-dependent cells. Their own
+ * components, not a `Date.now()` in the column's `render`: `DataTable`'s rows
+ * are memoized, so a render-time read would stay frozen until the row itself
+ * changed — an outstanding contract would never flip to lapsed, a courier
+ * never to overdue, while the page stayed open.
+ */
+const CONTRACT_CLOCK_MS = 60_000;
+
+/** The status label, with the lapsed-offer warning once its accept-by deadline passes. */
+function ContractStatusCell({ contract }: { contract: Contract }) {
+  const { t } = useTranslation();
+  const nowMs = useTicker(CONTRACT_CLOCK_MS);
+  const label = t(CONTRACT_STATUS_KEY[contract.status]);
+  return isStale(contract, nowMs) ? (
+    <Tooltip content={t('contracts.staleTooltip')} openOnTap>
+      <span className="inline-flex items-center gap-1">
+        <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} className="shrink-0" />
+        {label}
+      </span>
+    </Tooltip>
+  ) : (
+    label
+  );
+}
+
+/** An accepted courier's delivery deadline, counting down to overdue. */
+function CourierDeadlineCell({ deadlineMs, time }: { deadlineMs: number; time: string }) {
+  const { t } = useTranslation();
+  const remainingMs = deadlineMs - useTicker(CONTRACT_CLOCK_MS);
+  return remainingMs <= 0 ? (
+    <span className="text-danger">{t('contracts.deliverOverdue', { time })}</span>
+  ) : (
+    t('contracts.deliverDue', { time, duration: formatCountdown(remainingMs / 1000) })
   );
 }
 
@@ -220,6 +256,9 @@ function ContractsFilterBar({
     </FilterBar>
   );
 }
+
+/** Module-level so the table's windowing and row memo see one stable function. */
+const contractRowKey = (contract: Contract) => contract.contract_id;
 
 function contractRowContextMenu(contract: Contract, tr: ReactElement) {
   return <ContractContextMenu contract={contract}>{tr}</ContractContextMenu>;
@@ -360,19 +399,7 @@ export function Contracts() {
         className: 'font-semibold',
         cellClassName: (contract) => STATUS_TONE[contract.status],
         sortValue: (contract) => t(CONTRACT_STATUS_KEY[contract.status]),
-        render: (contract) => {
-          const label = t(CONTRACT_STATUS_KEY[contract.status]);
-          return isStale(contract) ? (
-            <Tooltip content={t('contracts.staleTooltip')} openOnTap>
-              <span className="inline-flex items-center gap-1">
-                <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} className="shrink-0" />
-                {label}
-              </span>
-            </Tooltip>
-          ) : (
-            label
-          );
-        },
+        render: (contract) => <ContractStatusCell contract={contract} />,
       },
       issuer: {
         id: 'issuer',
@@ -424,12 +451,11 @@ export function Contracts() {
           const deadlineMs = courierDeliveryDeadlineMs(contract);
           if (deadlineMs === null)
             return formatTimestamp(new Date(contract.date_expired), timeZone);
-          const time = formatTimestamp(new Date(deadlineMs), timeZone);
-          const remainingMs = deadlineMs - Date.now();
-          return remainingMs <= 0 ? (
-            <span className="text-danger">{t('contracts.deliverOverdue', { time })}</span>
-          ) : (
-            t('contracts.deliverDue', { time, duration: formatCountdown(remainingMs / 1000) })
+          return (
+            <CourierDeadlineCell
+              deadlineMs={deadlineMs}
+              time={formatTimestamp(new Date(deadlineMs), timeZone)}
+            />
           );
         },
       },
@@ -655,7 +681,8 @@ export function Contracts() {
               label={t('contracts.title')}
               columns={columns}
               rows={filteredContracts}
-              rowKey={(contract) => contract.contract_id}
+              rowKey={contractRowKey}
+              virtualize="auto"
               highlightRowKey={highlightedContractId}
               rowContextMenu={contractRowContextMenu}
               rowMoreActions

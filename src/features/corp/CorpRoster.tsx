@@ -244,6 +244,9 @@ export function CorpRosterColumnPicker() {
   );
 }
 
+/** Module-level so the table's windowing and row memo see one stable function. */
+const rosterRowKey = (row: RosterRow) => row.characterId;
+
 export function CorpRosterTable({
   rows,
   rowContextMenu,
@@ -288,8 +291,9 @@ export function CorpRosterTable({
       rows={rows}
       rowContextMenu={rowContextMenu}
       rowMoreActions={rowContextMenu !== undefined}
-      rowKey={(row) => row.characterId}
+      rowKey={rosterRowKey}
       highlightRowKey={highlightedMemberId}
+      virtualize="auto"
       label={t('corp.members.tableLabel')}
       density="compact"
       {...sortProps}
