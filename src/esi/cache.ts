@@ -810,3 +810,17 @@ export async function writeCached<T>(
 ): Promise<void> {
   await db.esiCache.put({ characterId, key, value, fetchedAt });
 }
+
+/**
+ * `writeCached` for a batch: one `bulkPut` (one IndexedDB transaction) rather
+ * than a transaction per row awaited in turn. Same row shape as `writeCached`,
+ * so the two are interchangeable to every reader.
+ */
+export async function writeCachedMany(
+  characterId: number,
+  rows: ReadonlyArray<readonly [key: string, value: unknown]>,
+  fetchedAt: number
+): Promise<void> {
+  if (rows.length === 0) return;
+  await db.esiCache.bulkPut(rows.map(([key, value]) => ({ characterId, key, value, fetchedAt })));
+}

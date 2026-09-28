@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { ESI_BASE_URL } from '@/esi/client';
@@ -81,5 +81,23 @@ describe('resolveAffiliations', () => {
 
   it('resolves an empty list without touching the cache or the network', async () => {
     expect((await resolveAffiliations([])).size).toBe(0);
+  });
+});
+
+describe('resolveAffiliations — cache writes', () => {
+  it('stores a whole resolved batch in one bulk write, not a transaction per row', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/characters/affiliation`, () => HttpResponse.json([ALICE, BOB]))
+    );
+    const put = vi.spyOn(db.esiCache, 'put');
+    const bulkPut = vi.spyOn(db.esiCache, 'bulkPut');
+
+    await resolveAffiliations([1, 2]);
+
+    expect(put).not.toHaveBeenCalled();
+    expect(bulkPut).toHaveBeenCalledTimes(1);
+    expect((await db.esiCache.get([0, 'affiliation:2']))?.value).toEqual(BOB);
+    put.mockRestore();
+    bulkPut.mockRestore();
   });
 });

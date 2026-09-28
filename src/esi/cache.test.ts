@@ -16,6 +16,7 @@ import {
   readCached,
   readCachedRows,
   writeCached,
+  writeCachedMany,
   GLOBAL_CACHE_CHARACTER_ID,
   CORP_CACHE_KEY_PREFIX,
   corpCacheKey,
@@ -272,6 +273,45 @@ describe('readCached / writeCached', () => {
 
   it('readCached returns undefined for a miss', async () => {
     expect(await readCached(CHAR_ID, 'nope')).toBeUndefined();
+  });
+
+  it('writeCachedMany stores every row in one bulkPut, in the exact shape writeCached does', async () => {
+    const bulkPut = vi.spyOn(db.esiCache, 'bulkPut');
+    const put = vi.spyOn(db.esiCache, 'put');
+
+    await writeCachedMany(
+      GLOBAL_CACHE_CHARACTER_ID,
+      [
+        ['name:1', 'Alpha'],
+        ['name:2', { nested: true }],
+      ],
+      777
+    );
+    await writeCached(GLOBAL_CACHE_CHARACTER_ID, 'name:3', 'Gamma', 777);
+
+    expect(bulkPut).toHaveBeenCalledTimes(1);
+    expect(put).toHaveBeenCalledTimes(1);
+    const viaMany = await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, 'name:1']);
+    const viaOne = await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, 'name:3']);
+    expect(Object.keys(viaMany ?? {}).sort()).toEqual(Object.keys(viaOne ?? {}).sort());
+    expect(viaMany).toEqual({
+      characterId: GLOBAL_CACHE_CHARACTER_ID,
+      key: 'name:1',
+      value: 'Alpha',
+      fetchedAt: 777,
+    });
+    expect(await readCached(GLOBAL_CACHE_CHARACTER_ID, 'name:2')).toEqual({ nested: true });
+    bulkPut.mockRestore();
+    put.mockRestore();
+  });
+
+  it('writeCachedMany with no rows touches nothing', async () => {
+    const bulkPut = vi.spyOn(db.esiCache, 'bulkPut');
+
+    await writeCachedMany(CHAR_ID, [], 1);
+
+    expect(bulkPut).not.toHaveBeenCalled();
+    bulkPut.mockRestore();
   });
 });
 

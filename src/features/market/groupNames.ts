@@ -19,7 +19,7 @@
  * zero-scope guarantee holds.
  */
 import { getUniverseGroup } from '@/esi/endpoints';
-import { GLOBAL_CACHE_CHARACTER_ID, readCached, writeCached } from '@/esi/cache';
+import { GLOBAL_CACHE_CHARACTER_ID, readCachedEntries, writeCachedMany } from '@/esi/cache';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 
 function cacheKey(groupId: number): string {
@@ -32,25 +32,28 @@ export async function loadGroupNames(groupIds: readonly number[]): Promise<Map<n
   const unique = [...new Set(groupIds)];
   if (unique.length === 0) return names;
 
+  const cached = await readCachedEntries<string>(GLOBAL_CACHE_CHARACTER_ID, unique.map(cacheKey));
   const missing: number[] = [];
   for (const id of unique) {
-    const cached = await readCached<string>(GLOBAL_CACHE_CHARACTER_ID, cacheKey(id));
-    if (cached === undefined) missing.push(id);
-    else names.set(id, cached);
+    const row = cached.get(cacheKey(id));
+    if (row === undefined) missing.push(id);
+    else names.set(id, row.value);
   }
   if (missing.length === 0) return names;
 
   const fetchedAt = Date.now();
+  const resolved: Array<readonly [string, string]> = [];
   await mapWithConcurrencyLimit(missing, ESI_FANOUT_CONCURRENCY, async (id) => {
     try {
       const { data } = await getUniverseGroup(id);
       if (!data) return; // 304 Not Modified: unreachable, no etag is ever sent here.
       names.set(id, data.name);
-      await writeCached(GLOBAL_CACHE_CHARACTER_ID, cacheKey(id), data.name, fetchedAt);
+      resolved.push([cacheKey(id), data.name]);
     } catch {
       // Genuinely unresolvable, or offline: left out of the map, and the row
       // keeps rendering its raw id.
     }
   });
+  await writeCachedMany(GLOBAL_CACHE_CHARACTER_ID, resolved, fetchedAt);
   return names;
 }
