@@ -654,6 +654,18 @@ describe('CSV export (issue #421, AC4)', () => {
 
     expect(screen.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
   });
+
+  it('sits in PageHeader actions beside Refresh, not in the roster panel (issue #2188)', async () => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 })])
+    );
+    await rosterTable();
+
+    const exportButton = screen.getByRole('button', { name: 'Export CSV' });
+    const refreshButton = screen.getByRole('button', { name: 'Refresh member list' });
+
+    expect(exportButton.parentElement).toBe(refreshButton.parentElement);
+  });
 });
 
 describe('filters and sort in the URL (issue #1306)', () => {
