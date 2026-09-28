@@ -817,9 +817,27 @@ async function readFreshRow<T>(
  * Whether meta speaks for this value row: written with it (same `fetchedAt`),
  * or moved forward since by a 304 that named the row's own ETag.
  */
-function metaVouchesFor(meta: EsiCacheMetaRecord, row: EsiCacheRecord): boolean {
+function metaVouchesFor(
+  meta: EsiCacheMetaRecord,
+  row: Pick<EsiCacheRecord, 'fetchedAt' | 'etag'>
+): boolean {
   if (meta.fetchedAt === row.fetchedAt) return true;
   return row.etag !== undefined && meta.etag === row.etag && meta.fetchedAt > row.fetchedAt;
+}
+
+/**
+ * When a stored value was last confirmed current: a 304 moves meta's
+ * `fetchedAt` forward without rewriting the value, so every reader that
+ * reports a row's age — not just the loaders — takes the later of the two
+ * while meta vouches for the row.
+ */
+function effectiveFetchedAt(
+  meta: EsiCacheMetaRecord | undefined,
+  row: Pick<EsiCacheRecord, 'fetchedAt' | 'etag'>
+): number {
+  return meta !== undefined && metaVouchesFor(meta, row)
+    ? Math.max(meta.fetchedAt, row.fetchedAt)
+    : row.fetchedAt;
 }
 
 /**
@@ -831,6 +849,12 @@ function metaVouchesFor(meta: EsiCacheMetaRecord, row: EsiCacheRecord): boolean 
  * `esiCacheMeta` existed (the loader will read it and backfill), a purge
  * pending, or meta whose value is somehow missing — a skip must never leave a
  * key cold.
+ *
+ * Unlike `readFreshRow` it cannot check that meta still describes the value
+ * row (`metaVouchesFor` needs the row's `fetchedAt`, i.e. a value read). A
+ * row rewritten behind the middleware's back can therefore look fresh here;
+ * the only cost is one skipped warm-up, since the route's own load reads the
+ * row and judges it by its own age.
  */
 export async function isCacheFresh(
   characterId: number,
@@ -1015,12 +1039,7 @@ async function readStoredRow(characterId: number, key: string): Promise<StoredRo
   if (!row) return undefined;
   return {
     value: row.value,
-    // A 304 moves meta's `fetchedAt` forward without rewriting the value; it
-    // speaks for this row only while it names the row's own ETag.
-    fetchedAt:
-      meta !== undefined && meta.etag === row.etag
-        ? Math.max(meta.fetchedAt, row.fetchedAt)
-        : row.fetchedAt,
+    fetchedAt: effectiveFetchedAt(meta, row),
     truncated: row.truncated === true,
   };
 }
@@ -1131,14 +1150,15 @@ export async function readCachedRows<T>(
   const found = new Map<number, CachedResult<T>>();
   if (characterIds.length === 0) return found;
 
-  const rows = await db.esiCache.bulkGet(characterIds.map((id): [number, string] => [id, key]));
+  const ids = characterIds.map((id): [number, string] => [id, key]);
+  const [rows, metas] = await Promise.all([db.esiCache.bulkGet(ids), db.esiCacheMeta.bulkGet(ids)]);
   const suppressed = await Promise.all(characterIds.map((id) => isCachePurgePending(id)));
 
   rows.forEach((row, i) => {
     if (!row || suppressed[i]) return;
     found.set(characterIds[i], {
       data: row.value as T,
-      fetchedAt: new Date(row.fetchedAt),
+      fetchedAt: new Date(effectiveFetchedAt(metas[i], row)),
       fromCache: true,
       truncated: row.truncated === true,
     });
@@ -1159,10 +1179,11 @@ export async function readCachedEntries<T>(
   if (keys.length === 0) return found;
   if (await isCachePurgePending(characterId)) return found;
 
-  const rows = await db.esiCache.bulkGet(keys.map((key): [number, string] => [characterId, key]));
+  const ids = keys.map((key): [number, string] => [characterId, key]);
+  const [rows, metas] = await Promise.all([db.esiCache.bulkGet(ids), db.esiCacheMeta.bulkGet(ids)]);
   rows.forEach((row, i) => {
     if (!row) return;
-    found.set(keys[i], { value: row.value as T, fetchedAt: row.fetchedAt });
+    found.set(keys[i], { value: row.value as T, fetchedAt: effectiveFetchedAt(metas[i], row) });
   });
   return found;
 }

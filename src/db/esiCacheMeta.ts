@@ -118,7 +118,9 @@ export const esiCacheMetaMiddleware: Middleware<DBCore> = {
               });
             }
             // Both issued synchronously, in one transaction: they commit or
-            // roll back together.
+            // roll back together. Meta goes first only so both requests are
+            // queued before either settles; IndexedDB runs them in order and
+            // nothing reads between them, so the order is not observable.
             const mirrored = meta.mutate(mirror);
             const result = table.mutate(req);
             return Promise.all([result, mirrored]).then(([valueResult]) => valueResult);

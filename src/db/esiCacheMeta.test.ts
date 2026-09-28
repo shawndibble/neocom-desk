@@ -77,6 +77,24 @@ describe('esiCacheMeta mirror', () => {
     expect(left).toEqual(['b']);
   });
 
+  it('Table.update() mirrors the changed row', async () => {
+    await db.esiCache.put(row(1, 'u', 5));
+    await db.esiCache.update([1, 'u'], { fetchedAt: 9 });
+    expect((await db.esiCacheMeta.get([1, 'u']))?.fetchedAt).toBe(9);
+  });
+
+  it('Collection.modify() mirrors every modified row', async () => {
+    await db.esiCache.bulkPut([row(1, 'a', 1), row(1, 'b', 1), row(2, 'a', 1)]);
+    await db.esiCache
+      .where('[characterId+key]')
+      .between([1, Dexie.minKey], [1, Dexie.maxKey], true, true)
+      .modify({ fetchedAt: 7 });
+    const byKey = Object.fromEntries(
+      (await db.esiCacheMeta.toArray()).map((m) => [`${m.characterId}:${m.key}`, m.fetchedAt])
+    );
+    expect(byKey).toEqual({ '1:a': 7, '1:b': 7, '2:a': 1 });
+  });
+
   it('clear() empties meta too (Settings "clear cache", test resets)', async () => {
     await db.esiCache.bulkPut([row(1, 'a'), row(0, 'b')]);
     await db.esiCache.clear();

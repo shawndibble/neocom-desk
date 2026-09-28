@@ -14,6 +14,8 @@ import {
   isCacheFresh,
   loadPaginatedWithCacheStatus,
   loadWithCacheStatus,
+  readCachedEntries,
+  readCachedRows,
   resetRevalidationState,
   STALE_AFTER,
 } from './cache';
@@ -326,5 +328,34 @@ describe('conditional revalidation (ETag / 304)', () => {
       conditional: second.conditional,
     });
     expect(result.cached).toMatchObject({ data: 'v1', fromCache: true });
+  });
+
+  it('cache-only readers report the revalidated time after a 304, not the original fetch', async () => {
+    at(T0);
+    const first = conditionalFetch(async () => esiResult({ data: 'v1', etag: '"e1"' }));
+    await loadWithCacheStatus(CHAR_ID, KEY, first.fetchLive, { conditional: first.conditional });
+    const later = T0 + STALE_AFTER.default + 1;
+    at(later);
+    const second = conditionalFetch(async () => esiResult({ notModified: true, etag: '"e1"' }));
+    await loadWithCacheStatus(CHAR_ID, KEY, second.fetchLive, { conditional: second.conditional });
+
+    const rows = await readCachedRows<string>([CHAR_ID], KEY);
+    expect(rows.get(CHAR_ID)?.fetchedAt).toEqual(new Date(later));
+    const entries = await readCachedEntries<string>(CHAR_ID, [KEY]);
+    expect(entries.get(KEY)?.fetchedAt).toBe(later);
+  });
+
+  it('meta without an ETag never moves a row forward (undefined does not match undefined)', async () => {
+    at(T0);
+    await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'v', fetchedAt: T0 });
+    await db.esiCacheMeta.put({ characterId: CHAR_ID, key: KEY, fetchedAt: T0 + 5 });
+    const rows = await readCachedRows<string>([CHAR_ID], KEY);
+    expect(rows.get(CHAR_ID)?.fetchedAt).toEqual(new Date(T0));
+    // The load path's fallback read too.
+    at(T0 + STALE_AFTER.default + 1);
+    const result = await loadWithCacheStatus(CHAR_ID, KEY, async () => {
+      throw new Error('offline');
+    });
+    expect(result.cached?.fetchedAt).toEqual(new Date(T0));
   });
 });
