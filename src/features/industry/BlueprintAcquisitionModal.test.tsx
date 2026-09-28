@@ -420,9 +420,12 @@ describe('BlueprintAcquisitionModal — Market', () => {
 describe('BlueprintAcquisitionModal — LP Store', () => {
   it('says so when no LP corp sells this blueprint', async () => {
     renderModal();
+    const lp = section('LP Store');
     expect(
-      await within(section('LP Store')).findByText(/No LP Store your characters have LP with/)
+      await within(lp).findByText(/No LP Store your characters have LP with/)
     ).toBeInTheDocument();
+    expect(within(lp).queryByRole('textbox', { name: /Your LP value/ })).not.toBeInTheDocument();
+    expect(within(lp).queryByText(/Prices an LP Store pick/)).not.toBeInTheDocument();
   });
 
   it('names the corp and price when an LP store sells this blueprint', async () => {

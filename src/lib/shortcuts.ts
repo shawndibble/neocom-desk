@@ -20,6 +20,17 @@ export interface MarketAppraiseState {
 }
 
 /**
+ * Router `location.state` shape a Fitting's Export menu navigates `/industry`
+ * with: the fit's EFT text, pre-filled and parsed into the Fit Import dialog
+ * on arrival ("Manufacture Plan"). Shared so the producer
+ * (`features/fittings`) and the consumer (`routes/Industry.tsx`) can't
+ * silently drift apart.
+ */
+export interface IndustryFitImportState {
+  readonly fitImportText: string;
+}
+
+/**
  * Marks an element that owns the keyboard while it is on screen but is not a
  * native `<dialog>` and carries no menu/listbox/dialog role the guard in
  * `app/useKeyboardShortcuts.ts` already recognises — today that means the
@@ -85,6 +96,55 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     displayKey: 'C',
     descriptionKey: 'shortcuts.switchCharacter',
     run: (navigate) => navigate('/characters'),
+  },
+  {
+    id: 'go-to-overview',
+    key: 'o',
+    displayKey: 'O',
+    descriptionKey: 'shortcuts.goToOverview',
+    run: (navigate) => navigate('/overview'),
+  },
+  {
+    id: 'go-to-market',
+    key: 'm',
+    displayKey: 'M',
+    descriptionKey: 'shortcuts.goToMarket',
+    run: (navigate) => navigate('/market'),
+  },
+  {
+    id: 'go-to-industry',
+    key: 'i',
+    displayKey: 'I',
+    descriptionKey: 'shortcuts.goToIndustry',
+    run: (navigate) => navigate('/industry'),
+  },
+  {
+    id: 'go-to-wallet',
+    key: 'w',
+    displayKey: 'W',
+    descriptionKey: 'shortcuts.goToWallet',
+    run: (navigate) => navigate('/wallet'),
+  },
+  {
+    id: 'go-to-planetary-industry',
+    key: 'p',
+    displayKey: 'P',
+    descriptionKey: 'shortcuts.goToPlanetaryIndustry',
+    run: (navigate) => navigate('/planetary-industry'),
+  },
+  {
+    id: 'go-to-alerts',
+    key: 'a',
+    displayKey: 'A',
+    descriptionKey: 'shortcuts.goToAlerts',
+    run: (navigate) => navigate('/alerts'),
+  },
+  {
+    id: 'go-to-mining-tax',
+    key: 't',
+    displayKey: 'T',
+    descriptionKey: 'shortcuts.goToMiningTax',
+    run: (navigate) => navigate('/mining/tax'),
   },
   {
     id: 'open-settings',

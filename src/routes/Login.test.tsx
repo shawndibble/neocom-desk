@@ -267,7 +267,7 @@ describe('Login', () => {
       screen.getByRole('heading', { name: /four writes, and nothing else/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /your refresh token stays in this browser/i })
+      screen.getByRole('heading', { name: /your refresh token stays on this device/i })
     ).toBeInTheDocument();
 
     const permissions = screen.getByText(/logging in lets it read/i);

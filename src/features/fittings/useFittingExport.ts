@@ -5,7 +5,7 @@ import { MARKET_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import { writeToClipboard } from '@/lib/clipboard';
 import { downloadTextFile } from '@/lib/download';
-import type { MarketAppraiseState } from '@/lib/shortcuts';
+import type { IndustryFitImportState, MarketAppraiseState } from '@/lib/shortcuts';
 import type { Fitting } from '@/engine/fittings/types';
 import { exportFitting, type FittingExportKind } from './fittingExportText';
 
@@ -62,7 +62,20 @@ export function useFittingExport(fitting: Fitting) {
     });
   }
 
-  return { notice, copy, downloadEveXml, openInAppraisal };
+  /**
+   * Industry's Fit Import, without the copy/paste round-trip: the same EFT
+   * text Export's own "Copy EFT" would put on the clipboard, handed straight
+   * to the Fit Import dialog pre-filled and already parsed.
+   */
+  async function openManufacturePlan() {
+    const text = await exportFitting('eft', fitting);
+    if (text === null) return;
+    navigate('/industry', {
+      state: { fitImportText: text } satisfies IndustryFitImportState,
+    });
+  }
+
+  return { notice, copy, downloadEveXml, openInAppraisal, openManufacturePlan };
 }
 
 export type FittingExport = ReturnType<typeof useFittingExport>;

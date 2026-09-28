@@ -1,7 +1,7 @@
 /**
  * The Market Browser item header's price alert bell (issue #1427): opens the
  * shared alert form in a popover, and one Save pins the item and sets its
- * target. `md` so the touch target reaches the 44px floor.
+ * target. `sm` to match the adjacent Info button's height.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,7 +32,7 @@ export function ItemPriceAlertBell({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <IconButton
-          size="md"
+          size="sm"
           icon={<Icon.PriceAlert />}
           label={t('market.priceAlert.button', { name })}
           pressed={item !== undefined && hasQuickbarTarget(item)}

@@ -5,6 +5,7 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
 import { formatIsk } from '@/lib/isk';
+import { PaymentLinksCard, type LinkedTransaction } from './PaymentLinksCard';
 import { STATUS_TONE } from './statusTone';
 import type { MoonMiningTaxRow } from './snapshot';
 
@@ -26,6 +27,16 @@ interface GroupSummaryModalProps {
   /** Opens the ordinary single-Assignment editor (`RowDetailModal`) for one member — the only place a joined group's figures are actually corrected. */
   onEditMember: (member: GroupMember) => void;
   onMarkAllPaid: () => void;
+  /**
+   * Every linked transaction across the whole group's members, deduplicated
+   * — present only once every member is Paid. Absent entirely (rather than
+   * an empty list) when there is nothing to show, so the section renders
+   * nothing.
+   */
+  linkedTransactions?: readonly LinkedTransaction[];
+  /** Opens the manual "Link transaction" picker, scoped to every member of this group at once — offered whenever the whole group is Paid. */
+  onLinkTransaction?: () => void;
+  onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
 }
 
 /**
@@ -48,6 +59,9 @@ export function GroupSummaryModal({
   busy,
   onEditMember,
   onMarkAllPaid,
+  linkedTransactions,
+  onLinkTransaction,
+  onUnlinkTransaction,
 }: GroupSummaryModalProps) {
   const { t } = useTranslation();
   const dates = members.map((m) => m.row.entry.date);
@@ -78,6 +92,16 @@ export function GroupSummaryModal({
           <span className="text-text-dim">{payeeDisplayName}</span>
           <span className="text-xl font-medium tabular-nums">{formatIsk(totalTaxOwed)} ISK</span>
         </div>
+
+        {!anyOutstanding &&
+          (onLinkTransaction || (linkedTransactions && linkedTransactions.length > 0)) && (
+            <PaymentLinksCard
+              linkedTransactions={linkedTransactions}
+              onLinkTransaction={onLinkTransaction}
+              onUnlinkTransaction={onUnlinkTransaction}
+              busy={busy}
+            />
+          )}
 
         <ul className="space-y-2">
           {members.map((member) => (

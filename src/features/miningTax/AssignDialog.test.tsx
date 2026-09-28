@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { AssignDialog } from './AssignDialog';
 import { createAssignment, updateAssignment } from './assignments';
+import { useMiningTaxOreValueMode } from './oreValueMode';
 import type { MoonMiningTaxRow } from './snapshot';
 
 vi.mock('./assignments', () => ({
@@ -70,7 +71,8 @@ function payee(overrides: Partial<PayeeRecord> = {}): PayeeRecord {
 function renderDialog(
   payees: PayeeRecord[],
   assignment: MiningTaxAssignmentRecord | null = null,
-  onAddPayee?: () => void
+  onAddPayee?: () => void,
+  onUnlock?: () => void
 ) {
   render(
     <MemoryRouter>
@@ -85,6 +87,7 @@ function renderDialog(
         onAssigned={vi.fn()}
         onCancel={vi.fn()}
         onAddPayee={onAddPayee}
+        onUnlock={onUnlock}
       />
     </MemoryRouter>
   );
@@ -92,6 +95,7 @@ function renderDialog(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useMiningTaxOreValueMode.setState({ value: false, hydrated: true });
 });
 
 describe('AssignDialog — no Payees yet', () => {
@@ -187,5 +191,122 @@ describe('AssignDialog — the money path', () => {
       assignment,
       expect.objectContaining({ estimatedValue: 40_000 })
     );
+  });
+});
+
+function existingAssignment(
+  overrides: Partial<MiningTaxAssignmentRecord> = {}
+): MiningTaxAssignmentRecord {
+  return {
+    id: 'a1',
+    characterId: CHAR,
+    date: '2026-09-04',
+    solarSystemId: SYSTEM,
+    payeeId: 'p-hek',
+    oreLines: [{ typeId: ZEOLITES, quantity: 100 }],
+    taxPct: 10,
+    estimatedValue: 40_000,
+    taxOwed: 4_000,
+    status: 'outstanding',
+    updatedAt: 1,
+    ...overrides,
+  };
+}
+
+describe('AssignDialog — edit ore values individually', () => {
+  it('shows no per-ore boxes when the setting is off, even when editing', () => {
+    renderDialog([payee()], existingAssignment());
+    expect(screen.queryByLabelText('Zeolites value')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Estimated value')).not.toBeDisabled();
+  });
+
+  it('shows no per-ore boxes when creating, even with the setting on', () => {
+    useMiningTaxOreValueMode.setState({ value: true, hydrated: true });
+    renderDialog([payee()]);
+    expect(screen.queryByLabelText('Zeolites value')).not.toBeInTheDocument();
+  });
+
+  it('replaces the whole-row inputs with one box per ore line, deriving Estimated Value/Tax Owed from it', async () => {
+    useMiningTaxOreValueMode.setState({ value: true, hydrated: true });
+    renderDialog([payee()], existingAssignment());
+
+    const oreValue = screen.getByLabelText('Zeolites value');
+    expect(oreValue).toHaveValue('40,000');
+    // Estimated Value/Tax Owed are plain calculated text, not inputs, in this mode.
+    expect(screen.getByLabelText('Estimated value').tagName).toBe('P');
+    expect(screen.getByLabelText('Tax owed').tagName).toBe('P');
+
+    fireEvent.change(oreValue, { target: { value: '30000' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(mockedUpdate).toHaveBeenCalledWith(
+      existingAssignment(),
+      expect.objectContaining({
+        estimatedValue: 30_000,
+        taxOwed: 3_000,
+        oreLineValues: { [ZEOLITES]: 30_000 },
+      })
+    );
+  });
+
+  it('rejects a negative or non-numeric entry, snapping back to the computed default', async () => {
+    useMiningTaxOreValueMode.setState({ value: true, hydrated: true });
+    renderDialog([payee()], existingAssignment());
+
+    const oreValue = screen.getByLabelText('Zeolites value');
+    // A single change event (a paste, or the end result of any keystroke
+    // sequence) carrying a negative number outright — not typed character by
+    // character, since a leading '-' alone would already be rejected and
+    // reset before a following digit lands.
+    fireEvent.change(oreValue, { target: { value: '-5' } });
+
+    // Rejected outright: the field never shows the invalid text, unlike the
+    // whole-row fields' "leave it, disable Save" behavior.
+    expect(oreValue).not.toHaveValue('-5');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(mockedUpdate).toHaveBeenCalledWith(
+      existingAssignment(),
+      // Untouched — the rejected keystroke never became a real override.
+      expect.objectContaining({ oreLineValues: {} })
+    );
+  });
+
+  it('clears oreLineValues when saving with the setting off, even if a prior edit had set some', async () => {
+    renderDialog([payee()], existingAssignment({ oreLineValues: { [ZEOLITES]: 30_000 } }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(mockedUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'a1' }),
+      expect.objectContaining({ oreLineValues: undefined })
+    );
+  });
+});
+
+describe('AssignDialog — paid lock', () => {
+  it('disables every field and offers an unlock prompt instead of a working Save', () => {
+    renderDialog([payee()], existingAssignment({ status: 'paid' }));
+
+    expect(screen.getByText(/marked paid/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Estimated value')).toBeDisabled();
+    expect(screen.getByLabelText('Tax owed')).toBeDisabled();
+    expect(screen.getByLabelText('Tax %')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
+
+  it('calls onUnlock when the unlock button is pressed', async () => {
+    const onUnlock = vi.fn();
+    renderDialog([payee()], existingAssignment({ status: 'paid' }), undefined, onUnlock);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Unlock to edit' }));
+
+    expect(onUnlock).toHaveBeenCalledTimes(1);
+  });
+
+  it('locks the per-ore boxes too, when the setting is on', () => {
+    useMiningTaxOreValueMode.setState({ value: true, hydrated: true });
+    renderDialog([payee()], existingAssignment({ status: 'paid' }));
+
+    expect(screen.getByLabelText('Zeolites value')).toBeDisabled();
   });
 });

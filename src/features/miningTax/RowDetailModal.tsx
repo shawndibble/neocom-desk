@@ -6,7 +6,9 @@ import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/ro
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatIsk } from '@/lib/isk';
+import { formatLocalDate } from '@/lib/localDate';
 import { AssignDialog } from './AssignDialog';
+import { PaymentLinksCard, type LinkedTransaction } from './PaymentLinksCard';
 import { STATUS_TONE } from './statusTone';
 import type { MoonMiningTaxRow } from './snapshot';
 
@@ -43,6 +45,18 @@ interface RowDetailModalProps {
   onSplit?: () => void;
   /** Opens the Payee manager over this modal when the pilot has no Payees yet. */
   onAddPayee?: () => void;
+  /**
+   * The Assignment's payment, resolved for display — present only once
+   * `status` is `paid` (or was, before a later needs-review clears it) and a
+   * `payment` record exists. Absent entirely (rather than an empty list)
+   * when there is no payment to show, so the section renders nothing.
+   */
+  linkedTransactions?: readonly LinkedTransaction[];
+  /** Opens the manual "Link transaction" picker (issue #540 follow-up) — offered whenever there is a payment to link against, paid or not. */
+  onLinkTransaction?: () => void;
+  onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
+  /** Reopens a Paid Assignment for editing ("unlock to edit") — offered only when `assignment.status === 'paid'`. */
+  onUnlock?: () => void | Promise<void>;
 }
 
 /**
@@ -73,6 +87,10 @@ export function RowDetailModal({
   onJoin,
   onSplit,
   onAddPayee,
+  linkedTransactions,
+  onLinkTransaction,
+  onUnlinkTransaction,
+  onUnlock,
 }: RowDetailModalProps) {
   const { t } = useTranslation();
   const oreLines = assignment ? assignment.oreLines : row.unassignedOreLines;
@@ -103,12 +121,36 @@ export function RowDetailModal({
       <div className="space-y-3 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <span className="text-text-dim">{row.characterName}</span>
-          <StatChip
-            label={t('miningTax.statusColumn')}
-            value={t(`miningTax.status.${STATUS_LABEL_KEY[status]}`)}
-            tone={STATUS_TONE[status]}
-          />
+          <div className="flex flex-wrap items-center gap-1.5">
+            {assignment?.paidAt !== undefined && (
+              <StatChip
+                label={t('miningTax.paidAtLabel')}
+                value={formatLocalDate(new Date(assignment.paidAt))}
+              />
+            )}
+            <StatChip
+              label={t('miningTax.statusColumn')}
+              value={t(`miningTax.status.${STATUS_LABEL_KEY[status]}`)}
+              tone={STATUS_TONE[status]}
+            />
+          </div>
         </div>
+
+        {status === 'paid' && (onLinkTransaction || assignment?.payment) && (
+          <PaymentLinksCard
+            linkedTransactions={linkedTransactions}
+            onLinkTransaction={onLinkTransaction}
+            onUnlinkTransaction={onUnlinkTransaction}
+            busy={busy}
+            summary={
+              assignment?.payment && (
+                <span className="tabular-nums text-xs text-text-dim">
+                  {formatIsk(assignment.payment.amount)} ISK · {assignment.payment.paidOn}
+                </span>
+              )
+            }
+          />
+        )}
 
         {status === 'dismissed' && (
           <div className="flex flex-wrap gap-2">
@@ -196,6 +238,7 @@ export function RowDetailModal({
             onAssigned={onAssigned}
             onCancel={onClose}
             onAddPayee={onAddPayee}
+            onUnlock={onUnlock}
             extraActions={
               <>
                 {status === 'unassigned' && (

@@ -194,21 +194,29 @@ describe('Assets', () => {
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
   });
 
-  it('shows the total value as a stat chip in the page header at the root, hidden when drilled in (issue #1617)', async () => {
+  it('shows the total value after the location count in the block title bar, hidden when drilled in (issue #1617)', async () => {
     const user = userEvent.setup();
     render(<App />);
     expect(await screen.findByText(JITA)).toBeInTheDocument();
-    const chipLabel = screen.getByText('Total value');
-    expect(chipLabel.closest('header')).toBe(
+    const locationHeadings = screen
+      .getAllByRole('heading', { level: 2 })
+      .filter((el) => /locations? ·/.test(el.textContent ?? ''));
+    expect(locationHeadings).toHaveLength(1);
+    const locationHeading = locationHeadings[0];
+    expect(locationHeading.closest('header')).not.toBe(
       screen.getByRole('heading', { level: 1 }).closest('header')
     );
-    expect(chipLabel.parentElement).toHaveTextContent('Total value0');
-    expect(screen.queryByText(/Total Assets Value/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/(filtered)/)).not.toBeInTheDocument();
+    expect(locationHeading).toHaveTextContent('0 ISK');
+    expect(screen.queryByText(/Total value/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\(filtered\)/)).not.toBeInTheDocument();
 
     await openLocation(user, JITA);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.queryByText('Total value')).not.toBeInTheDocument();
+    expect(
+      screen
+        .queryAllByRole('heading', { level: 2 })
+        .some((el) => /locations? ·/.test(el.textContent ?? ''))
+    ).toBe(false);
   });
 
   it('moves focus to the level heading on drill-in, and back to the root heading on Back (issue #1485)', async () => {
@@ -1049,12 +1057,12 @@ describe('cross-character search (issue #85)', () => {
 
   async function selectAllCharacters(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('button', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
   }
 
   async function selectThisCharacter(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('button', { name: 'All characters' }));
-    await user.click(await screen.findByRole('button', { name: 'This character' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'This character' }));
   }
 
   it('reaches other characters once "All characters" is picked, tagging the match with a character badge', async () => {
@@ -1730,7 +1738,7 @@ describe('view state in the URL (issue #1306)', () => {
     await screen.findByText(JITA);
 
     await user.click(screen.getByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('button', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
 
     await waitFor(() => expect(window.location.search).toBe('?chars=all'));
     expect((await db.settings.get('sync.defaultCharacterFilter'))?.value).toBeUndefined();

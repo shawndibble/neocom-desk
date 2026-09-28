@@ -15,6 +15,11 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { useMarketHub } from '@/features/market/hub';
 import { useMarketBrowserHub } from '@/features/market/browserHub';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
+import {
+  useBrowserFilterSetting,
+  DEFAULT_BROWSER_FILTER_SETTING,
+  BROWSER_FILTER_SETTING_KEY,
+} from '@/features/market/browserFilterSetting';
 import { clearOrderBookCache } from '@/features/market/orderBook';
 import { usePickedSystems } from '@/features/route/currentSystem';
 import type { LocalJumpDistances } from '@/features/route/localRoute';
@@ -138,6 +143,7 @@ const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
+afterEach(() => vi.restoreAllMocks());
 beforeEach(async () => {
   await db.characters.clear();
   await db.settings.clear();
@@ -147,6 +153,7 @@ beforeEach(async () => {
   useMarketHub.setState({ value: 'jita', hydrated: false });
   useMarketBrowserHub.setState({ value: 'jita', hydrated: false });
   useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
+  useBrowserFilterSetting.setState({ value: DEFAULT_BROWSER_FILTER_SETTING, hydrated: false });
   usePickedSystems.setState({ value: {}, hydrated: false });
   loadCharacterSolarSystemId.mockReset();
   loadCharacterSolarSystemId.mockResolvedValue(null);
@@ -244,5 +251,49 @@ describe('Market Browser: All regions', () => {
     expect(hits.get(DOMAIN)).toBe(1);
     // The "only this region is checked" hint would be false in All regions.
     expect(screen.queryByText('Only orders in this region are checked.')).not.toBeInTheDocument();
+  });
+
+  it('with a persisted Jump Range and no matching query param, fetches only the in-range regions from the first request', async () => {
+    await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
+    // Seeded in Dexie, store left unhydrated (as `beforeEach` sets it) — the
+    // realistic "fresh page load" shape. Setting `hydrated: true` directly
+    // would skip the read this test exists to cover, and the gate it verifies
+    // (`browserFilterSettingHydrated` in `useOrderBookOrchestration.ts`) would
+    // pass even if deleted.
+    await db.settings.put({
+      key: BROWSER_FILTER_SETTING_KEY,
+      value: { ...DEFAULT_BROWSER_FILTER_SETTING, jumps: '5' },
+    });
+    // Delays only this store's read, past the point the network effect would
+    // otherwise fire on the pre-hydration default — without the
+    // `browserFilterSettingHydrated` gate this asserts on, that race would
+    // fire the wide, unfiltered fan-out first.
+    const realGet = db.settings.get.bind(db.settings);
+    vi.spyOn(db.settings, 'get').mockImplementation((async (key: string) => {
+      if (key === BROWSER_FILTER_SETTING_KEY) await new Promise((r) => setTimeout(r, 50));
+      return realGet(key);
+    }) as typeof db.settings.get);
+    loadCharacterSolarSystemId.mockResolvedValue(JITA);
+    localJumpDistances.mockResolvedValue({
+      kind: 'known',
+      jumps: new Map([
+        [JITA, 0],
+        [AMARR, 4],
+        [RENS, 12],
+      ]),
+    });
+    const hits = new Map<number, number>();
+    server.use(regionOrdersHandler(hits));
+    // No `browser.jumps` in the URL: the persisted filter is what applies.
+    window.history.pushState({}, '', `/market/browser?type=${RIFTER}&region=all`);
+    render(<App />);
+
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(await within(sellTable).findByText('1,100,000.00')).toBeInTheDocument();
+    expect(within(sellTable).getByText('1,000,000.00')).toBeInTheDocument();
+    // Never fired for the out-of-range region, not even once before narrowing.
+    expect(hits.get(HEIMATAR)).toBeUndefined();
+    expect(hits.get(THE_FORGE)).toBe(1);
+    expect(hits.get(DOMAIN)).toBe(1);
   });
 });

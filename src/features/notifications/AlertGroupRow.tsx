@@ -125,19 +125,19 @@ export function AlertGroupRow({
 
       {expanded && (
         <ul className="border-t border-line bg-panel-2">
-          {group.entries.map((entry) => (
-            <AlertFireRow
-              key={entry.id}
-              entry={entry}
-              name={
-                showCharacter
-                  ? (nameById.get(entry.characterId) ?? String(entry.characterId))
-                  : null
-              }
-              onDismiss={() => onDismissEntry(entry)}
-              dismissRef={entryDismissRef ? (el) => entryDismissRef(entry.id, el) : undefined}
-            />
-          ))}
+          {group.entries.map((entry) => {
+            const characterName = nameById.get(entry.characterId) ?? String(entry.characterId);
+            return (
+              <AlertFireRow
+                key={entry.id}
+                entry={entry}
+                characterName={characterName}
+                pillName={showCharacter ? characterName : null}
+                onDismiss={() => onDismissEntry(entry)}
+                dismissRef={entryDismissRef ? (el) => entryDismissRef(entry.id, el) : undefined}
+              />
+            );
+          })}
         </ul>
       )}
     </li>
@@ -146,20 +146,23 @@ export function AlertGroupRow({
 
 function AlertFireRow({
   entry,
-  name,
+  characterName,
+  pillName,
   onDismiss,
   dismissRef,
 }: {
   entry: NotificationFeedRecord;
+  /** Always the entry's Character — the body says it once whether or not the pill does. */
+  characterName: string;
   /** Null on a one-Character device — see `showCharacter`. */
-  name: string | null;
+  pillName: string | null;
   onDismiss: () => void;
   dismissRef?: (el: HTMLButtonElement | null) => void;
 }) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const firedAt = new Date(entry.firedAt);
-  const body = dedupeCharacterName(entry.body, name);
+  const body = dedupeCharacterName(entry.body, characterName);
 
   return (
     /*
@@ -195,9 +198,9 @@ function AlertFireRow({
       row has the width to spare instead.
     */
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 py-1.5 last:border-b-0 sm:flex-nowrap">
-      {name !== null && (
+      {pillName !== null && (
         <span className="order-1 max-w-24 shrink-0 truncate rounded-xs border border-line bg-panel-2 px-1 py-0.5 text-[0.6875rem] font-medium text-text-dim sm:order-2 sm:max-w-none">
-          {name}
+          {pillName}
         </span>
       )}
       <time

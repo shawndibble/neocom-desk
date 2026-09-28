@@ -312,6 +312,21 @@
       content: none;
     }
 
+    /* `cardCorner: 'start'` (e.g. a row-selection checkbox): the card's own
+       top-left corner instead of top-right — its own control, not a value
+       about the row, so it reads as the card's leading affordance rather
+       than crowding the actions/expand cluster on the right. */
+    .dt-stack td.dt-corner-start {
+      right: auto;
+      left: 0.75rem;
+    }
+
+    /* The title clears a start-pinned corner the same way it clears the
+       actions button below — first line reads to its right, not under it. */
+    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-corner-start) td.dt-primary {
+      padding-left: 1.75rem;
+    }
+
     /* The More actions button (`rowMoreActions`): a control, not a field —
        no label gutter. `width: auto` overrides the cell's own `w-0` (kept
        for desktop's tight actions column, see the JSX): a zero-width flowed
@@ -345,11 +360,52 @@
       height: 2.75rem;
     }
 
+    /* The expand/collapse disclosure chevron (`expandableRow`): pinned beside
+       the actions button rather than flowing as its own unlabelled line at
+       the card's bottom, where it used to sit. */
+    .dt-stack:not(.dt-stack-dense) td.dt-disclosure {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.75rem;
+      padding: 0;
+      /* Overrides the cell's own `w-0` (kept for desktop's tight trailing
+         column, see the JSX) — left at `w-0` the icon rendered from this
+         corner anchor with no box to fill and overlapped the actions
+         button beside it, the same #1708 mistake `dt-actions` above notes. */
+      width: auto;
+    }
+
+    .dt-stack:not(.dt-stack-dense) td.dt-disclosure::before {
+      content: none;
+    }
+
     /* A row with both a corner value and the actions button: one corner
        control per position, not two overlapping. The button keeps the
-       card's actual top-right corner; the value shifts left to clear it. */
-    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-corner {
+       card's actual top-right corner; the value shifts left to clear it.
+       Excludes `dt-corner-start`, which already sits in the opposite
+       corner and needs no shift. */
+    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-corner:not(.dt-corner-start) {
       right: 3.75rem;
+    }
+
+    /* A row with both a disclosure chevron and the actions button: the
+       chevron sits immediately left of the button rather than under it. */
+    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-disclosure {
+      right: 3.75rem;
+    }
+
+    /* All three corner controls at once (a card with `cardCorner`,
+       `expandableRow` and `rowMoreActions` together, e.g. HaulingPanel):
+       the corner value shifts further left again to clear the chevron,
+       which otherwise shares its offset and sits on top of it. Excludes
+       `dt-corner-start`, which sits in the opposite corner (top-left) and
+       needs no shift — `right` and `left` set together on the same
+       absolutely-positioned, `width: auto` element would fight each other
+       for the box's width instead of just moving it. */
+    .dt-stack:not(.dt-stack-dense)
+      tr:has(> td.dt-actions):has(> td.dt-disclosure)
+      td.dt-corner:not(.dt-corner-start) {
+      right: 5.25rem;
     }
 
     /* The card title truncates before the pinned button rather than
@@ -359,6 +415,12 @@
       overflow: hidden;
       white-space: nowrap;
       text-overflow: ellipsis;
+    }
+
+    /* Both a disclosure chevron and the actions button pinned in the corner
+       need more clearance than the button alone. */
+    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions):has(> td.dt-disclosure) td.dt-primary {
+      padding-right: 5rem;
     }
 
     /*
@@ -513,6 +575,23 @@
       padding: 0;
     }
 
+    /*
+     * `.dt-stack.dt-stack-2col tr` (above) sets every `tr` under it —
+     * including this one — to a two-track `display: grid`, at equal
+     * specificity to the plain rule above. Left alone, the detail `<td>` then
+     * lands in a single grid track (half the card) instead of the full-width
+     * flex cell the rule below expects: `flex: 1 1 100%` is a no-op once its
+     * parent isn't a flex container (Market's order-row expand, #2138 — the
+     * required-skills section rendered at half width). Restoring `flex` here
+     * — at higher specificity than the 2-col rule, so order doesn't matter —
+     * makes `dt-stack tr.dt-row-detail > td`'s existing rule apply again
+     * regardless of `stackColumns`.
+     */
+    .dt-stack.dt-stack-2col tr.dt-row-detail {
+      display: flex;
+      flex-direction: column;
+    }
+
     .dt-stack tr.dt-row-detail > td {
       flex: 1 1 100%;
       padding: 0.75rem;
@@ -520,6 +599,73 @@
     }
 
     .dt-stack tr.dt-row-detail > td::before {
+      content: none;
+    }
+
+    /*
+     * A plain `<table>` nested inside a row's expand detail (Hauling's own
+     * "Sell orders" mini table, round: hauling mobile table detail) — the
+     * rules above key off bare `tbody`/`tr`/`td`/`thead` descendant
+     * selectors with no notion of "table nested in another table," so
+     * without this they flatten the inner table into a second, broken card
+     * layout too. It has no card fallback of its own to fall into, unlike
+     * `DataTable`'s own rows, so every leaky property is undone here,
+     * restated explicitly rather than `revert`ed. This block sits in the
+     * same `utilities` layer as the rules above (see this file's own note
+     * at the top of that layer) and beats the inner table's Tailwind
+     * classes (`py-1`, `text-right`) on ordinary specificity the same way
+     * those rules beat them — `revert` would not: it rolls a property back
+     * past every author style, Tailwind's utilities included, straight to
+     * the UA default, undoing `py-1`/`text-right` right along with the leak
+     * it's meant to fix. `text-align` for the two right-aligned columns is
+     * keyed off that same `text-right` class name instead, rather than
+     * relying on the utility itself to apply.
+     */
+    .dt-stack .dt-embedded-table,
+    .dt-stack .dt-embedded-table tbody,
+    .dt-stack .dt-embedded-table tr,
+    .dt-stack .dt-embedded-table td,
+    .dt-stack .dt-embedded-table th {
+      display: revert;
+    }
+
+    .dt-stack .dt-embedded-table thead {
+      position: revert;
+      width: revert;
+      height: revert;
+      overflow: revert;
+      clip-path: revert;
+      white-space: revert;
+    }
+
+    .dt-stack .dt-embedded-table tr {
+      position: static;
+      padding: 0;
+    }
+
+    /*
+     * `padding`/`text-align` here restate the Tailwind classes this table's
+     * `<td>`/`<th>` already carry (`py-1`, and `text-right` on the two
+     * right-aligned columns — see `HaulingRowDetail.tsx`) rather than
+     * relying on the utilities themselves to apply. Keep these two in sync
+     * with that component if its classes ever change.
+     */
+    .dt-stack .dt-embedded-table td,
+    .dt-stack .dt-embedded-table th {
+      position: static;
+      padding: 0.25rem 0;
+      min-height: 0;
+      text-align: left;
+      white-space: normal;
+      overflow-wrap: normal;
+    }
+
+    .dt-stack .dt-embedded-table td.text-right,
+    .dt-stack .dt-embedded-table th.text-right {
+      text-align: right;
+    }
+
+    .dt-stack .dt-embedded-table td::before {
       content: none;
     }
 

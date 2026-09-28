@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { SHORTCUTS } from './shortcuts';
 
 describe('SHORTCUTS', () => {
@@ -32,5 +32,21 @@ describe('SHORTCUTS', () => {
     for (const shortcut of dispatchable) {
       expect(shortcut.run).toBeTypeOf('function');
     }
+  });
+
+  it.each([
+    ['go-to-overview', 'o', '/overview'],
+    ['go-to-market', 'm', '/market'],
+    ['go-to-industry', 'i', '/industry'],
+    ['go-to-wallet', 'w', '/wallet'],
+    ['go-to-planetary-industry', 'p', '/planetary-industry'],
+    ['go-to-alerts', 'a', '/alerts'],
+    ['go-to-mining-tax', 't', '/mining/tax'],
+  ])('%s fires on "%s" and navigates to %s', (id, key, path) => {
+    const shortcut = SHORTCUTS.find((s) => s.id === id);
+    expect(shortcut?.key).toBe(key);
+    const navigate = vi.fn();
+    shortcut?.run?.(navigate);
+    expect(navigate).toHaveBeenCalledWith(path);
   });
 });
