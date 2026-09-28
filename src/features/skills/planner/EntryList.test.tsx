@@ -737,7 +737,7 @@ describe('EntryList remove button (#2223: a later entry still needing this level
         bandsAt={new Map()}
         {...defaultProps}
         onRemove={(...args) => removed.push(args)}
-        removalBlockedReason={() => 'Skill 2 V still needs this level — remove Skill 2 V first.'}
+        removalBlockedReason={() => 'Required by Skill 2 V'}
       />
     );
     const button = screen.getByRole('button', { name: /remove skill 1/i });
@@ -757,14 +757,12 @@ describe('EntryList remove button (#2223: a later entry still needing this level
         rows={[entryRow(1, [0], [4])]}
         bandsAt={new Map()}
         {...defaultProps}
-        removalBlockedReason={() => 'Skill 2 V still needs this level — remove Skill 2 V first.'}
+        removalBlockedReason={() => 'Required by Skill 2 V'}
       />
     );
     const button = screen.getByRole('button', { name: /remove skill 1/i });
     await userEvent.hover(button);
-    expect(
-      await screen.findByText('Skill 2 V still needs this level — remove Skill 2 V first.')
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Required by Skill 2 V')).toBeInTheDocument();
   });
 
   it('surfaces the blocked reason on keyboard focus too, since a blocked button stays Tab-reachable', () => {
@@ -773,14 +771,12 @@ describe('EntryList remove button (#2223: a later entry still needing this level
         rows={[entryRow(1, [0], [4])]}
         bandsAt={new Map()}
         {...defaultProps}
-        removalBlockedReason={() => 'Skill 2 V still needs this level — remove Skill 2 V first.'}
+        removalBlockedReason={() => 'Required by Skill 2 V'}
       />
     );
     const button = screen.getByRole('button', { name: /remove skill 1/i });
     fireEvent.focus(button);
-    expect(screen.getByRole('tooltip')).toHaveTextContent(
-      'Skill 2 V still needs this level — remove Skill 2 V first.'
-    );
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Required by Skill 2 V');
   });
 });
 
