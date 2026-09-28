@@ -129,7 +129,12 @@ test.describe('Corp Assets — item row volume', () => {
 
       await expect(page.getByText('Tritanium')).toBeVisible();
       await expect(page.getByText('0.01 m³')).toBeVisible();
-      await expect(page.getByText('Type #999999')).toBeVisible();
+
+      const unknownRow = page
+        .locator('[data-virtual-scroll-root] [data-index]')
+        .filter({ hasText: 'Type #999999' });
+      await expect(unknownRow).toBeVisible();
+      await expect(unknownRow.getByText('-', { exact: true })).toBeVisible();
     });
   }
 
