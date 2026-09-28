@@ -51,10 +51,22 @@ function stubNetwork() {
       store.set(String(key), response);
     }),
   };
-  const cachesMock: Partial<CacheStorage> = { open: vi.fn(async () => cache as Cache) };
+  const cacheNames = ['dogma-engine-assets-v1', 'some-other-cache'];
+  const cachesMock: Partial<CacheStorage> = {
+    open: vi.fn(async (name: string) => {
+      if (!cacheNames.includes(name)) cacheNames.push(name);
+      return cache as Cache;
+    }),
+    keys: vi.fn(async () => [...cacheNames]),
+    delete: vi.fn(async (name: string) => {
+      const index = cacheNames.indexOf(name);
+      if (index !== -1) cacheNames.splice(index, 1);
+      return index !== -1;
+    }),
+  };
   vi.stubGlobal('caches', cachesMock);
 
-  return { fetchMock, cache, store };
+  return { fetchMock, cache, store, cachesMock, cacheNames };
 }
 
 async function freshModule() {
@@ -156,6 +168,36 @@ describe('loadDogmaEngine', () => {
     await loadAgain();
 
     expect(fetchMock).toHaveBeenCalledTimes(2); // still just the first module's two fetches
+  });
+
+  it('keys its cache on the pinned engine + SDE versions, so a bump is a fresh fetch', async () => {
+    const { cachesMock } = stubNetwork();
+    const { loadDogmaEngine } = await freshModule();
+
+    await loadDogmaEngine();
+
+    expect(cachesMock.open).toHaveBeenCalledWith(`dogma-engine-assets-${__DOGMA_PINS__}`);
+  });
+
+  it("deletes an earlier pin's cache (and only that) so a bump does not strand ~10 MB", async () => {
+    const { cachesMock, cacheNames } = stubNetwork();
+    const { loadDogmaEngine } = await freshModule();
+
+    await loadDogmaEngine();
+
+    await vi.waitFor(() =>
+      expect(cachesMock.delete).toHaveBeenCalledWith('dogma-engine-assets-v1')
+    );
+    expect(cachesMock.delete).toHaveBeenCalledTimes(1);
+    expect(cacheNames).toEqual(['some-other-cache', `dogma-engine-assets-${__DOGMA_PINS__}`]);
+  });
+
+  it('still loads when stale-cache cleanup fails', async () => {
+    const { cachesMock } = stubNetwork();
+    vi.mocked(cachesMock.keys!).mockRejectedValue(new Error('SecurityError'));
+    const { loadDogmaEngine } = await freshModule();
+
+    await expect(loadDogmaEngine()).resolves.toBeUndefined();
   });
 
   it('clears the failed load so a later call can retry instead of rejecting forever', async () => {

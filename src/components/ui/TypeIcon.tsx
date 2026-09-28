@@ -23,16 +23,29 @@ interface TypeIconProps {
  * have no render at all in any variation. Rather than let every one of
  * those show the browser's identical broken-image glyph, this falls back
  * `icon` -> `bp` -> a generic placeholder glyph.
+ *
+ * A type whose `bp` render has loaded once is remembered for the session
+ * (`typeIdsWithBpRender`), so every later mount — each row of a blueprint
+ * list, each re-render after scrolling — requests `bp` directly instead of
+ * paying a 400 and a retry first. Only a successful `bp` load is
+ * remembered, never a failure: an `icon` error from a network blip must not
+ * pin an ordinary item to the wrong render.
  */
+const typeIdsWithBpRender = new Set<number>();
+
+function initialStage(typeId: number): 0 | 1 {
+  return typeIdsWithBpRender.has(typeId) ? 1 : 0;
+}
+
 export function TypeIcon({ typeId, size, width, height, className }: TypeIconProps) {
-  const [stage, setStage] = useState<0 | 1 | 2>(0);
+  const [stage, setStage] = useState<0 | 1 | 2>(() => initialStage(typeId));
   // Resets the fallback stage when `typeId` changes without an effect — the
   // "adjust state during render" pattern React docs recommend for this
   // exact case (https://react.dev/learn/you-might-not-need-an-effect).
   const [renderedTypeId, setRenderedTypeId] = useState(typeId);
   if (typeId !== renderedTypeId) {
     setRenderedTypeId(typeId);
-    setStage(0);
+    setStage(initialStage(typeId));
   }
 
   if (stage === 2) {
@@ -53,6 +66,12 @@ export function TypeIcon({ typeId, size, width, height, className }: TypeIconPro
       width={width}
       height={height}
       className={className}
+      loading="lazy"
+      decoding="async"
+      crossOrigin="anonymous"
+      onLoad={() => {
+        if (stage === 1) typeIdsWithBpRender.add(typeId);
+      }}
       onError={() => setStage((s) => (s === 0 ? 1 : 2))}
     />
   );

@@ -60,17 +60,17 @@ function coverViewportAndReload() {
   setTimeout(() => window.location.reload(), COVER_FADE_MS);
 }
 
-async function checkForUpdate(swUrl: string, registration: ServiceWorkerRegistration) {
+async function checkForUpdate(registration: ServiceWorkerRegistration) {
   try {
     if (registration.installing || !navigator.onLine) return;
-    // Bypass HTTP cache so a stale sw.js (cached by the browser or a proxy)
-    // doesn't mask a real update — same pattern vite-plugin-pwa docs
-    // recommend for robust periodic checks.
-    const resp = await fetch(swUrl, {
-      cache: 'no-store',
-      headers: { cache: 'no-store', 'cache-control': 'no-cache' },
-    });
-    if (resp.ok) await registration.update();
+    // No `fetch(swUrl, { cache: 'no-store' })` first, as vite-plugin-pwa's
+    // docs sample does: `update()` already fetches sw.js past the HTTP cache
+    // (the registration's default `updateViaCache: 'imports'` only lets
+    // imported scripts use it, and nothing here overrides that), so the
+    // pre-fetch only downloaded sw.js twice per check. Its other job — not
+    // calling `update()` offline — is `navigator.onLine` above plus this
+    // try/catch, which swallows the rejection `update()` gives offline.
+    await registration.update();
   } catch {
     // Offline/flaky network mid-check — next interval tick retries.
   }
@@ -98,10 +98,10 @@ export function ReloadPrompt() {
     needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
-    onRegisteredSW(swUrl, registration) {
+    onRegisteredSW(_swUrl, registration) {
       if (!registration || pollingRegistrations.has(registration)) return;
       pollingRegistrations.add(registration);
-      setInterval(() => void checkForUpdate(swUrl, registration), UPDATE_CHECK_INTERVAL_MS);
+      setInterval(() => void checkForUpdate(registration), UPDATE_CHECK_INTERVAL_MS);
     },
     onNeedReload: coverViewportAndReload,
   });

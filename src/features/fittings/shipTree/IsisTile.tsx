@@ -59,7 +59,13 @@ function TileMarks({ ship, mastery }: { ship: ShipTreeShip; mastery: number }) {
   const mark = techMark(ship);
   return (
     <>
-      <img src={typeRenderUrl(ship.typeID, 128)} alt="" draggable={false} loading="lazy" />
+      <img
+        src={typeRenderUrl(ship.typeID, 128)}
+        crossOrigin="anonymous"
+        alt=""
+        draggable={false}
+        loading="lazy"
+      />
       {mark && (
         <span className={cx('isis-tech', mark)} data-tech={mark} aria-hidden="true">
           {TECH_TEXT[mark]}

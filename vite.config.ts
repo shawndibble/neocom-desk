@@ -4,7 +4,8 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
-import { copyFileSync, mkdirSync, statSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -18,6 +19,29 @@ const { version, dependencies } = JSON.parse(
 // The dogma engine and its SDE snapshot are pinned exactly and bumped together
 // (ADR 0016); anything saved from their answers is keyed on this.
 const dogmaPins = `${dependencies['@eveshipfit/dogma-engine']}+${dependencies['@eveshipfit/sde']}`;
+
+/**
+ * A short content hash per `public/data/**` JSON file, keyed by its path
+ * under `data/` with forward slashes (`types.json`, `market/types.json`).
+ * Loaders fetch `data/<file>?v=<hash>` (`src/sde/sdeDataUrl.ts`) and the
+ * service worker caches those URLs cache-first (`src/sw.ts`): GitHub Pages
+ * re-ETags every file on every deploy, so without a content version the
+ * files were refetched after nearly every deploy even when unchanged — and a
+ * cache-first route on an unversioned URL would never see an SDE update.
+ * Read once at config load, like `dogmaPins`.
+ */
+function sdeDataVersions(): Record<string, string> {
+  const dataDir = fileURLToPath(new URL('./public/data/', import.meta.url));
+  const versions: Record<string, string> = {};
+  for (const entry of readdirSync(dataDir, { recursive: true, encoding: 'utf8' })) {
+    if (!entry.endsWith('.json')) continue;
+    const hash = createHash('sha256')
+      .update(readFileSync(join(dataDir, entry)))
+      .digest('hex');
+    versions[entry.replaceAll('\\', '/')] = hash.slice(0, 12);
+  }
+  return versions;
+}
 
 /**
  * The manifest description is the login hero's own subheading — one sentence,
@@ -206,6 +230,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(version),
     __DOGMA_PINS__: JSON.stringify(dogmaPins),
+    __SDE_DATA_VERSIONS__: JSON.stringify(sdeDataVersions()),
   },
   // The hull-check worker imports the dogma engine (wasm-bindgen glue): ES
   // modules, not the IIFE default, which cannot code-split its imports.
@@ -263,7 +288,26 @@ export default defineConfig({
         // The dogma engine's WASM binary and its SDE data file (ADR 0016,
         // ~10 MB together) are fetched lazily on first Fitting open instead —
         // same reasoning as the market catalogue above.
-        globIgnores: ['**/data/market/**', '**/vendor/dogma/**'],
+        // The large single-feature SDE files (~9 MB of the ~10.5 MB in
+        // public/data) load on demand too, cached cache-first under their
+        // content-versioned URL by src/sw.ts — see
+        // docs/context/decisions/*-feature-sde-files-load-on-demand-not-precached.md.
+        // What stays precached is what the shell and most routes need
+        // (types, skills, pi, the small id lists).
+        // The 512px install icons and the brand lockup are fetched by the
+        // OS installer / docs, never by the running app.
+        globIgnores: [
+          '**/data/market/**',
+          '**/vendor/dogma/**',
+          '**/data/masteries.json',
+          '**/data/marketWideTrees.json',
+          '**/data/reprocessing.json',
+          '**/data/pi-planet-radius.json',
+          '**/data/blueprints.json',
+          '**/data/shipTree.json',
+          '**/icons/icon-512*.png',
+          '**/brand/**',
+        ],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),

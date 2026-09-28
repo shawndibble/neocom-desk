@@ -16,9 +16,10 @@ import type {
   AttributeDictionary,
   VariationData,
 } from './marketTypes';
+import { sdeDataUrl } from './sdeDataUrl';
 
 async function fetchJson<T>(file: string): Promise<T> {
-  const res = await fetch(`${import.meta.env.BASE_URL}data/market/${file}`);
+  const res = await fetch(sdeDataUrl(import.meta.env.BASE_URL, `market/${file}`));
   if (!res.ok) throw new Error(`Failed to load market/${file}: HTTP ${res.status}`);
   return res.json() as Promise<T>;
 }
