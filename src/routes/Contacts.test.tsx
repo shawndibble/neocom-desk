@@ -12,6 +12,7 @@ import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { configureClipboard } from '@/lib/clipboard';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { App } from '@/app/App';
+import * as download from '@/lib/download';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -115,6 +116,7 @@ afterEach(() => {
   server.resetHandlers();
   restoreMatchMedia?.();
   restoreMatchMedia = undefined;
+  vi.restoreAllMocks();
 });
 beforeEach(async () => {
   await db.characters.clear();
@@ -633,6 +635,114 @@ describe('Contacts standing filter chips (issue #403)', () => {
     expect(await screen.findByText('Second Pilot Friend')).toBeInTheDocument();
     openFilters();
     expect(screen.getByRole('group', { name: 'Standing' })).toBeInTheDocument();
+  });
+});
+
+describe('CSV export (issue #2164)', () => {
+  it('exports the Character tab visible rows, with a raw standing number', async () => {
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    render(<App />);
+    await screen.findByText('Good Friend');
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Export CSV' }));
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    const [filename, content] = spy.mock.calls[0];
+    expect(filename).toMatch(/^neocom-contacts-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(content).toContain('Good Friend');
+    // The standing tag replaces the printed number on screen, but the CSV
+    // still carries the raw value the table sorts on.
+    expect(content).toContain('10');
+  });
+
+  it('exports only what the search/type/standing filters currently show', async () => {
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    render(<App />);
+    await screen.findByText('Good Friend');
+    await userEvent.setup().type(screen.getByRole('searchbox', { name: 'Name' }), 'friend');
+    await waitFor(() => expect(screen.queryByText('Neutral Corp')).not.toBeInTheDocument());
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Export CSV' }));
+
+    const content = spy.mock.calls[0][1];
+    expect(content).toContain('Good Friend');
+    expect(content).not.toContain('Neutral Corp');
+  });
+
+  it('marks a truncated fetch with a -partial filename suffix', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'contacts',
+      value: contactsPayload,
+      fetchedAt: Date.now(),
+      truncated: true,
+    });
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    render(<App />);
+    await screen.findByText('Good Friend');
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Export CSV' }));
+
+    expect(spy.mock.calls[0][0]).toMatch(/-partial\.csv$/);
+  });
+
+  it('exports the Across tab own rows, not the Character tab rows', async () => {
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    await addSecondCharacter();
+    await db.esiCache.put({
+      characterId: CHAR_ID_2,
+      key: 'contacts',
+      value: [contactsPayload[0]],
+      fetchedAt: Date.now(),
+    });
+    render(<App />);
+    await screen.findByText('Good Friend');
+    fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+    await screen.findByRole('table', { name: /across/i });
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Export CSV' }));
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    const [filename, content] = spy.mock.calls[0];
+    expect(filename).toMatch(/^neocom-contacts-across-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(content).toContain('Good Friend');
+    // Every contact appears on the Across tab, held by one character or the
+    // other — Bad Alliance is only ever on the main, but it is still a row.
+    expect(content).toContain('Bad Alliance');
+  });
+
+  it('marks the Across tab export -partial when any one character behind it was truncated', async () => {
+    await addSecondCharacter();
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'contacts',
+      value: contactsPayload,
+      fetchedAt: Date.now(),
+      truncated: true,
+    });
+    await db.esiCache.put({
+      characterId: CHAR_ID_2,
+      key: 'contacts',
+      value: [contactsPayload[0]],
+      fetchedAt: Date.now(),
+    });
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    render(<App />);
+    await screen.findByText('Good Friend');
+    fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+    await screen.findByRole('table', { name: /across/i });
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Export CSV' }));
+
+    expect(spy.mock.calls[0][0]).toMatch(/^neocom-contacts-across-\d{4}-\d{2}-\d{2}-partial\.csv$/);
+  });
+
+  it('disables export when the active tab has nothing visible', async () => {
+    server.use(http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () => HttpResponse.json([])));
+    render(<App />);
+    await screen.findByText('No contacts');
+
+    expect(screen.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
   });
 });
 

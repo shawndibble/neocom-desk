@@ -277,6 +277,14 @@ describe('the roster table', () => {
     expect(within(member).getByRole('button')).toBeInTheDocument();
   });
 
+  /** Issue #2187: matches the EmploymentHistory table's `duration` sibling. */
+  it('right-aligns the Last seen column, header and cells alike', async () => {
+    const table = await rosterTable();
+    const header = within(table).getByRole('columnheader', { name: 'Last seen' });
+    expect(within(header).getByRole('button').className).toContain('text-right');
+    expect(within(table).getByText('1h ago').className).toContain('text-right');
+  });
+
   it('falls back to the id rather than a blank cell when a name will not resolve', async () => {
     mocked.loadMemberLabels.mockResolvedValue(labels({ characters: new Map(), ships: new Map() }));
     const table = await rosterTable();
@@ -653,6 +661,18 @@ describe('CSV export (issue #421, AC4)', () => {
     await screen.findByText('No member activity');
 
     expect(screen.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
+  });
+
+  it('sits in PageHeader actions beside Refresh, not in the roster panel (issue #2188)', async () => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 })])
+    );
+    await rosterTable();
+
+    const exportButton = screen.getByRole('button', { name: 'Export CSV' });
+    const refreshButton = screen.getByRole('button', { name: 'Refresh member list' });
+
+    expect(exportButton.parentElement).toBe(refreshButton.parentElement);
   });
 });
 
