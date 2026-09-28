@@ -63,20 +63,42 @@ export async function removeCharacterAfterSync(
  *   unregisters once itself, rather than once per Character.
  */
 export async function removeCharacter(characterId: number, syncPush = true): Promise<void> {
-  await db.characters.delete(characterId);
-  await db.tokens.delete(characterId);
-  for (const collection of EDITABLE_COLLECTIONS) {
-    if (collection.onRemoval !== 'delete') continue;
-    await db.table(collection.table).where('characterId').equals(characterId).delete();
-  }
-  await db.orderProblemSamples.where('characterId').equals(characterId).delete();
-  await db.mailDrafts.where('characterId').equals(characterId).delete();
-  await db.miningLedgerHistory.delete(characterId);
-  // Orphaned feed rows are invisible in the UI (both the Overview list and the
-  // other-character counts skip ids with no Character) but `refreshAppBadge`
-  // counts the whole table — leaving an app-icon count nothing can dismiss.
-  await deleteFeedForCharacter(characterId);
-  await clearCharacterSyncBookkeeping(characterId);
+  // One transaction for every Dexie-only step: all-or-nothing, so a failure
+  // cannot leave a half-removed Character behind, and live queries wake once
+  // at commit rather than once per table. Nothing non-Dexie may be awaited in
+  // here (IndexedDB would auto-commit early) — the badge, Cache API purge and
+  // push registration all run after it.
+  const deletedTables = EDITABLE_COLLECTIONS.filter(
+    (collection) => collection.onRemoval === 'delete'
+  ).map((collection) => collection.table);
+  await db.transaction(
+    'rw',
+    [
+      db.characters,
+      db.tokens,
+      ...deletedTables.map((table) => db.table(table)),
+      db.orderProblemSamples,
+      db.mailDrafts,
+      db.miningLedgerHistory,
+      db.notificationFeed,
+      db.settings,
+    ],
+    async () => {
+      await db.characters.delete(characterId);
+      await db.tokens.delete(characterId);
+      for (const table of deletedTables) {
+        await db.table(table).where('characterId').equals(characterId).delete();
+      }
+      await db.orderProblemSamples.where('characterId').equals(characterId).delete();
+      await db.mailDrafts.where('characterId').equals(characterId).delete();
+      await db.miningLedgerHistory.delete(characterId);
+      // Orphaned feed rows are invisible in the UI (both the Overview list and the
+      // other-character counts skip ids with no Character) but `refreshAppBadge`
+      // counts the whole table — leaving an app-icon count nothing can dismiss.
+      await deleteFeedForCharacter(characterId);
+      await clearCharacterSyncBookkeeping(characterId);
+    }
+  );
   await refreshAppBadge();
   await purgeCharacterCacheOrSuppress(characterId);
   // Not part of that purge: the shared rows aren't this Character's own —
