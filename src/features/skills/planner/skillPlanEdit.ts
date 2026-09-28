@@ -235,6 +235,17 @@ function attributesEqual(a: Attributes, b: Attributes): boolean {
  * delete. Filters out catalog-missing entries first, the same way
  * `segmentsToMarkers`/`markerStepIndices` do, since `normalizePlan` throws on
  * an unknown skill typeID.
+ *
+ * Groups `markers` by the step index each one resolves to, rather than
+ * zipping `markers[i]` against `resolved.segments[i]` positionally: two
+ * distinct marker positions collapse onto the same step (and so the same
+ * segment) whenever the entries strictly between them contribute no step —
+ * an already-trained skill sitting between two near-adjacent markers, the
+ * exact "markers jammed right next to each other" shape this fix targets.
+ * `optimizeAtMarkers` dedupes its own cut points in that case
+ * (`[...new Set(...)]`), so `resolved.segments` can be shorter than
+ * `markers`; a positional zip would then compare the wrong marker against
+ * the wrong segment for every index past the collapse.
  */
 function dropRedundantMarkers(
   entries: readonly PlanEntry[],
@@ -254,14 +265,21 @@ function dropRedundantMarkers(
     cloneState: pricing.cloneState,
     booster: pricing.booster,
   });
-  const remapSegments = resolved.segments.filter((s) => s.remap);
+  const markersByStep = new Map<number, number[]>();
+  markers.forEach((marker, i) => {
+    const step = stepIndices[i];
+    const bucket = markersByStep.get(step);
+    if (bucket) bucket.push(marker);
+    else markersByStep.set(step, [marker]);
+  });
   const kept: number[] = [];
   let lastKeptAttributes: Attributes | null = null;
-  remapSegments.forEach((segment, i) => {
-    if (lastKeptAttributes && attributesEqual(segment.attributes, lastKeptAttributes)) return;
-    kept.push(markers[i]);
+  for (const segment of resolved.segments) {
+    if (!segment.remap) continue;
+    if (lastKeptAttributes && attributesEqual(segment.attributes, lastKeptAttributes)) continue;
+    kept.push(...(markersByStep.get(segment.startIndex) ?? []));
     lastKeptAttributes = segment.attributes;
-  });
+  }
   return kept;
 }
 
