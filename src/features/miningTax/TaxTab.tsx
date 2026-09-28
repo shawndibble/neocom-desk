@@ -846,16 +846,19 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       // `location` column/`LocationCell`: `sm:`-scoped so the stacked-card
       // layout below `sm` still shows the full, untruncated name.
       className: 'sm:max-w-[8rem] truncate',
-      render: (dr) => (
-        <Tooltip content={payeeDisplayName(dr)}>
-          <span
-            tabIndex={0}
-            className="sm:cursor-help sm:underline sm:decoration-dotted sm:decoration-text-dim/50 sm:underline-offset-2"
-          >
-            {payeeDisplayName(dr)}
-          </span>
-        </Tooltip>
-      ),
+      render: (dr) => {
+        const name = payeeDisplayName(dr);
+        return (
+          <Tooltip content={name}>
+            <span
+              tabIndex={0}
+              className="sm:cursor-help sm:underline sm:decoration-dotted sm:decoration-text-dim/50 sm:underline-offset-2"
+            >
+              {name}
+            </span>
+          </Tooltip>
+        );
+      },
       sortValue: (dr) => payeeDisplayName(dr),
     },
     {

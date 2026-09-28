@@ -464,6 +464,7 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
 test.describe('Mining Tax ledger — long Payee name overflow', () => {
   const LONG_PAYEE_NAME = 'A Very Long Corporation Holding Name Ltd';
   const NARROW_DESKTOP = { width: 1024, height: 768 };
+  const WIDE_DESKTOP = { width: 1440, height: 900 };
 
   test('Status column and edit affordance stay on-screen at 1024px with a long Payee name', async ({
     page,
@@ -498,6 +499,21 @@ test.describe('Mining Tax ledger — long Payee name overflow', () => {
     const headerBox = await statusHeader.boundingBox();
     expect(headerBox).not.toBeNull();
     expect(headerBox!.x + headerBox!.width).toBeLessThanOrEqual(NARROW_DESKTOP.width);
+
+    await expect(page.getByRole('table').getByText(PAYEE_NAME, { exact: true })).toBeVisible();
+  });
+
+  test('short Payee name at 1440px renders unchanged', async ({ page }) => {
+    await page.setViewportSize(WIDE_DESKTOP);
+    await signInAndGoto(page);
+    await seedPayeeBalance(page);
+    await page.goto('./mining/tax');
+
+    const statusHeader = page.getByRole('columnheader', { name: 'Status' });
+    await expect(statusHeader).toBeVisible();
+    const headerBox = await statusHeader.boundingBox();
+    expect(headerBox).not.toBeNull();
+    expect(headerBox!.x + headerBox!.width).toBeLessThanOrEqual(WIDE_DESKTOP.width);
 
     await expect(page.getByRole('table').getByText(PAYEE_NAME, { exact: true })).toBeVisible();
   });
