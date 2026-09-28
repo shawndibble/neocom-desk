@@ -1,0 +1,13 @@
+# Scope decisions — Feature-page locale keys split out of the startup bundle at build time
+
+_Recorded 2026-09-28._
+
+- **Adding a string has not changed: it still goes in `src/i18n/locales/en.json`, called with `t('section.key')` as before.** `en.json` stays the only locale file anyone edits, one i18next namespace, no call-site changes. What changed is what the production build does with it. The whole file used to ship in the startup bundle (~275 kB, ~88 kB gzip) although most of it is copy for pages the session may never open.
+
+- **The build splits it (`src/i18n/localeSplitPlugin.ts`, rule in `src/i18n/localeSplit.ts`).** It scans every source file for the keys it names. In the sections on `LAZY_SECTIONS` (the feature pages: industry, fittings, market, settings, PI, mining tax and so on), each named key goes into a group with the other keys named by exactly the same files, and each of those files gets a static import of its groups. The bundler then places each group next to its importers. A key the shell names ships with the shell, and a key only one route names ships in that route's chunk. Static imports run before the importing module, so a key is registered (`addResourceBundle`, deep merge, never overwrite) before any component naming it can render. No route loader waits on a locale, and `routeChunks.ts` knows nothing about it.
+
+- **When unsure, the shell keeps it.** Every section not on `LAZY_SECTIONS` stays whole in the shell: login, notifications, overview, nav, common, sync, boot, error, reauth and the rest. A newly added top-level section starts out that way too, until someone lists it. A lazy key that no source file names literally also stays in the shell. That covers keys built from pieces the scan can't see. The scan errs generous: a template prefix (`` `market.orders.${x}` ``) takes the whole subtree, and a variable section (`` `${ns}.reauthHint` ``) takes that key from every lazy section.
+
+- **What the scan does not see.** It fails for a key whose literal appears only in code that has not loaded yet, while an already-loaded module renders it from a stored or passed-in string. Example: a key saved to IndexedDB by a route and shown after a reload by the shell. If you do that, put the key's section in the shell, meaning take it off `LAZY_SECTIONS`.
+
+- **Dev and Vitest are unchanged.** The plugin is build-only. `npm run dev` and every test load the whole `en.json`, so tests that check keys against `en.json` still see every key. `localeSplit.test.ts` checks against the real file that the shell plus all groups together are exactly `en.json`.

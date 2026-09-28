@@ -1,7 +1,10 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+// The build swaps this import for en.json's shell half (`localeSplitPlugin.ts`);
+// dev and tests get the whole file.
 import en from './locales/en.json';
 import { SHARED_NOTIFICATION_WORDING } from '@/engine/notificationWording';
+import { connectLazyResources } from './lazyResources';
 
 /**
  * The one place these six events' live English wording lives, spliced in here
@@ -31,5 +34,12 @@ i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   interpolation: { escapeValue: false },
 });
+
+// In a production build the rest of en.json arrives as each chunk that names
+// it loads (`localeSplit.ts`): a deep merge that never overwrites, so a group
+// only ever adds keys.
+connectLazyResources((resources) =>
+  i18n.addResourceBundle('en', 'translation', resources, true, false)
+);
 
 export default i18n;
