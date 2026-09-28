@@ -12,10 +12,12 @@ import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
 const PLAN_ID = 'plan-fit';
+/** Tritanium — one of the Rifter blueprint's (691) materials. */
+const TRITANIUM = 34;
 
 async function seed(page: Page): Promise<void> {
   await page.evaluate(
-    async ({ characterId, planId }) => {
+    async ({ characterId, planId, tritanium }) => {
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('neocom');
         request.onsuccess = () => resolve(request.result);
@@ -36,7 +38,7 @@ async function seed(page: Page): Promise<void> {
           security: 'highsec',
           hubId: 'jita',
           // An 8-digit override: the widest Price cell a pilot plausibly types.
-          materialSourcing: { 34: { overridePrice: 12345678.9 } },
+          materialSourcing: { [tritanium]: { overridePrice: 12345678.9 } },
           updatedAt: Date.now(),
         });
         tx.oncomplete = () => resolve();
@@ -44,11 +46,13 @@ async function seed(page: Page): Promise<void> {
       });
       database.close();
     },
-    { characterId: CHARACTER_ID, planId: PLAN_ID }
+    { characterId: CHARACTER_ID, planId: PLAN_ID, tritanium: TRITANIUM }
   );
 }
 
-for (const width of [1024, 1279]) {
+// 1024 and 1279 are the stacked range the fix covers; 1280 and 1440 guard the
+// side-by-side split it now starts at.
+for (const width of [1024, 1279, 1280, 1440]) {
   test(`Build Plan Materials table fits its frame at ${width}px`, async ({ page }) => {
     await signInAndGoto(page);
     await seed(page);
@@ -61,16 +65,16 @@ for (const width of [1024, 1279]) {
     // Every horizontal scroller between the table and the page must fit its
     // content — a clipped column behind one of them is the bug.
     const overflows = await table.evaluate((el) => {
-      const out: { scrollWidth: number; clientWidth: number }[] = [];
+      const scrollers: { scrollWidth: number; clientWidth: number }[] = [];
       for (let node = el.parentElement; node; node = node.parentElement) {
         const { overflowX } = getComputedStyle(node);
         if (overflowX === 'auto' || overflowX === 'scroll') {
-          out.push({ scrollWidth: node.scrollWidth, clientWidth: node.clientWidth });
+          scrollers.push({ scrollWidth: node.scrollWidth, clientWidth: node.clientWidth });
         }
       }
-      return out;
+      return scrollers;
     });
     expect(overflows.length).toBeGreaterThan(0);
-    for (const o of overflows) expect(o.scrollWidth).toBeLessThanOrEqual(o.clientWidth);
+    for (const s of overflows) expect(s.scrollWidth).toBeLessThanOrEqual(s.clientWidth);
   });
 }
