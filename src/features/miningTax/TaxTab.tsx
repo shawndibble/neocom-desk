@@ -1507,6 +1507,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                   rowKey={(dr) => dr.key}
                   label={t('miningTax.title')}
                   {...taxSort}
+                  mobileSort
                   onRowClick={(dr) => setDetailTarget(dr)}
                 />
               </div>
