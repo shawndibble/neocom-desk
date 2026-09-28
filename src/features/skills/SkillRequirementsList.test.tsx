@@ -62,4 +62,21 @@ describe('SkillRequirementsList', () => {
     expect(screen.getByText('Planned · Level 2')).toBeInTheDocument();
     expect(screen.queryByText('Level 2')).not.toBeInTheDocument();
   });
+
+  it('carries planEntries into a nested skill-detail open, so drilling into a prereq keeps its own prereqs Planned-aware', () => {
+    const planEntries = [{ skillTypeID: 1, targetLevel: 5 }];
+    render(
+      <SkillRequirementsList
+        prereqs={[
+          { typeID: 3300, name: 'Spaceship Command', level: 1, trained: true, planned: false },
+        ]}
+        unlocks={[]}
+        planEntries={planEntries}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Spaceship Command'));
+
+    expect(useSkillDetailModalStore.getState().request).toEqual({ typeID: 3300, planEntries });
+  });
 });

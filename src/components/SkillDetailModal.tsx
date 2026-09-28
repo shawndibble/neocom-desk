@@ -120,7 +120,11 @@ export function SkillDetailModal() {
             <p className="text-xs text-text-dim">{state.data.description}</p>
           )}
           <SkillPriceSection typeID={request.typeID} />
-          <SkillRequirementsList prereqs={state.data.prereqs} unlocks={state.data.unlocks} />
+          <SkillRequirementsList
+            prereqs={state.data.prereqs}
+            unlocks={state.data.unlocks}
+            planEntries={request.planEntries}
+          />
         </div>
       )}
     </Modal>

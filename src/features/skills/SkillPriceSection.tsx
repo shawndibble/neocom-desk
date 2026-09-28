@@ -25,23 +25,29 @@ export function SkillPriceSection({ typeID }: { typeID: number }) {
     void hydrateHub();
   }, [hydrateHub]);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+  // What the currently-rendered `aggregate` (if any) was fetched for — a
+  // hub or typeID change invalidates it immediately on render, rather than
+  // showing the previous hub's price under the new hub's label until the
+  // next fetch resolves.
+  const priceKey = `${hub.id}:${typeID}`;
 
-  const [aggregate, setAggregate] = useState<HubAggregate | null>(null);
-  // Distinct from `aggregate === null` (no sell orders) — without this the
-  // fetch's own in-flight window would render that same wrong claim.
-  const [priceLoaded, setPriceLoaded] = useState(false);
+  const [priceResult, setPriceResult] = useState<{
+    key: string;
+    aggregate: HubAggregate | null;
+  } | null>(null);
   useEffect(() => {
     if (!hubHydrated) return;
     let cancelled = false;
     void getHubPrices(hub, [typeID]).then((prices) => {
       if (cancelled) return;
-      setAggregate(prices.get(typeID) ?? null);
-      setPriceLoaded(true);
+      setPriceResult({ key: priceKey, aggregate: prices.get(typeID) ?? null });
     });
     return () => {
       cancelled = true;
     };
-  }, [hub, hubHydrated, typeID]);
+  }, [hub, hubHydrated, typeID, priceKey]);
+
+  const aggregate = priceResult?.key === priceKey ? priceResult.aggregate : undefined;
 
   return (
     <section>
@@ -53,7 +59,7 @@ export function SkillPriceSection({ typeID }: { typeID: number }) {
       </div>
       <div className="mt-1 flex items-center justify-between gap-2 text-xs">
         <span className="text-text-dim">{t('skills.inspector.priceSell')}</span>
-        {!priceLoaded ? (
+        {aggregate === undefined ? (
           <span className="text-text-dim">{t('common.loading')}</span>
         ) : aggregate?.sellMin == null ? (
           <span className="text-text-dim">{t('skills.inspector.priceNoSellOrders')}</span>
