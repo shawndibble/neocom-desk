@@ -121,13 +121,16 @@ test('Prefetch and the Foreground Poller make no calls for scopes the Core Grant
   // /settings makes no ESI call of its own (device-local preferences only —
   // routeScopes.ts), which isolates Prefetch's and the Foreground Poller's
   // own boot-time calls (App.tsx / ForegroundNotificationPoller, both firing
-  // once at mount) from a panel's expected attempt-then-403 degrade, which
-  // this assertion is not about.
+  // once shortly after mount) from a panel's expected attempt-then-403
+  // degrade, which this assertion is not about.
   await signInAndGoto(page, '/settings', CORE_GRANT);
   await expect(page.locator('main')).toBeVisible();
-  // Both run fire-and-forget at mount with no page signal of their own; give
-  // them time to finish rather than asserting on whatever has landed so far.
-  await page.waitForTimeout(2000);
+  // Both run fire-and-forget with no page signal of their own: Prefetch in the
+  // first idle slot (`bootPrefetch.ts`), the poller ~10 s after mount
+  // (`FIRST_POLL_DELAY_MS`). Wait out both rather than asserting on whatever
+  // has landed so far.
+  await expect.poll(() => esiPaths.some((path) => path.endsWith('/skills'))).toBe(true);
+  await page.waitForTimeout(12_000);
 
   expect(
     ungrantedHits,

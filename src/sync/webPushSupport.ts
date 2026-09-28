@@ -1,5 +1,5 @@
 /**
- * Whether this device can receive Web Push (issue #356, ADR 0010) — a pure
+ * Whether this device can receive Web Push (issue #356, ADR 0010) â€” a pure
  * read of the environment, used to decide whether to offer the flow at all
  * and, when not, why not: iOS delivers Web Push only to an installed PWA, so a
  * non-installed iOS Safari tab must be told that rather than silently failing

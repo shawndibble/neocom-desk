@@ -56,6 +56,14 @@ export type { AnyNotificationFire } from './pollDomains';
 
 export const POLL_INTERVAL_MS = 5 * 60 * 1000;
 
+/**
+ * How long after mount the first poll waits. A poll reads every Character's
+ * notification domains, and at boot those reads would queue against the
+ * visible route's own (and the cache warm-up's) for the shared ESI budget.
+ * Regaining visibility still polls at once.
+ */
+export const FIRST_POLL_DELAY_MS = 10 * 1000;
+
 export interface CharacterRef {
   characterId: number;
   name: string;

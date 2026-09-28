@@ -18,14 +18,18 @@
  *   the task list against the stored grant, the same comparison
  *   `routeScopes.ts` makes per route.
  * - **Burst.** ESI bills against a global error-limit budget, and assets alone
- *   can be 20+ pages. The run is capped at `ESI_FANOUT_CONCURRENCY`, the one
- *   fan-out policy (`lib/concurrency.ts`), shared with the roster and PI
- *   detail fan-outs.
+ *   can be 20+ pages. The run is capped at {@link PREFETCH_CONCURRENCY} — well
+ *   under the app-wide ESI ceiling (`esi/budget.ts`), because it runs beside
+ *   the visible route and must leave that route most of the permits.
+ *
+ * Loaded on demand (`bootPrefetch.ts`), not imported by the shell: it pulls in
+ * a loader from nearly every feature, none of which the first paint needs.
  */
 import { db } from '@/db';
-import { ESI_REGISTRY, isScopeRequired, type EsiEndpointId } from '@/esi/registry';
-import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import type { EsiEndpointId } from '@/esi/registry';
+import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { usePrefetch } from '@/stores/prefetch';
+import { grantCovers } from './grantCovers';
 import {
   loadCharacterSkills,
   loadCharacterAttributes,
@@ -209,28 +213,12 @@ export function prefetchTasksFor(
 }
 
 /**
- * Whether `held` satisfies every scope `endpoints` requires — the single
- * definition of "may this Character be asked for this", shared with
- * `routeWarm.ts`.
- *
- * Exported because the answer is **not** a route's `ScopeGate`. A route can be
- * `UNGATED` and still compose scope-gated reads: `/calendar` is ungated because
- * the page has something to show without any one grant, yet `loadCalendarBoard`
- * pulls calendar, skill-queue, industry-job, planet, contract and order
- * endpoints. Gating a speculative read on the route's own lock therefore asks
- * the wrong question, and asking ESI without the grant answers 403, which
- * `esi/cache.ts` turns into the shell-wide re-auth notice. Every speculative
- * read has to ask this instead.
+ * Tasks in flight at once. Deliberately below `ESI_FANOUT_CONCURRENCY`: a
+ * warm-up is background work, and at the shared cap it held most of the
+ * app-wide ESI permits while the route the user is actually looking at queued
+ * behind it.
  */
-export function grantCovers(
-  held: ReadonlySet<string>,
-  endpoints: readonly EsiEndpointId[]
-): boolean {
-  return endpoints.every((endpoint) => {
-    const { scope } = ESI_REGISTRY[endpoint];
-    return !isScopeRequired(scope) || held.has(scope);
-  });
-}
+export const PREFETCH_CONCURRENCY = 4;
 
 /** Cancels a run whose Character is no longer the active one. */
 export interface PrefetchSignal {
@@ -263,7 +251,7 @@ export async function prefetchCharacterData(
   const { begin, advance, finish } = usePrefetch.getState();
   begin(tasks.length);
   try {
-    await mapWithConcurrencyLimit(tasks, ESI_FANOUT_CONCURRENCY, async (task) => {
+    await mapWithConcurrencyLimit(tasks, PREFETCH_CONCURRENCY, async (task) => {
       if (signal.cancelled) return;
       try {
         await task.run(characterId);

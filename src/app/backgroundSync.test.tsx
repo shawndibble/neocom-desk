@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import {
+  BACKGROUND_SYNC_BOOT_DELAY_MS,
   BACKGROUND_SYNC_MIN_GAP_MS,
   BACKGROUND_SYNC_TICK_MS,
   idsToSweep,
@@ -9,7 +10,9 @@ import {
 
 const syncMock = vi.hoisted(() => ({
   scheduleSync: vi.fn(),
-  getSyncStatus: vi.fn(() => ({ state: 'idle', lastSyncedAt: null, error: null })),
+  getSyncStatus: vi.fn<
+    (characterId: number) => { state: string; lastSyncedAt: number | null; error: null }
+  >(() => ({ state: 'idle', lastSyncedAt: null, error: null })),
 }));
 vi.mock('@/sync', () => syncMock);
 vi.mock('./syncStatus', () => ({ isSyncConfigured: () => true }));
@@ -57,60 +60,80 @@ describe('idsToSweep', () => {
 });
 
 describe('useBackgroundSync', () => {
-  it('sweeps every character on mount, not only the active one', () => {
-    renderHook(() => useBackgroundSync([1, 2]));
+  beforeEach(() => {
+    vi.useFakeTimers({ now: NOW });
+    return () => vi.useRealTimers();
+  });
+
+  /** Mount, then let the boot delay pass — the first sweep's real starting point. */
+  function mountPastBoot(ids: number[]) {
+    const hook = renderHook(() => useBackgroundSync(ids));
+    vi.advanceTimersByTime(BACKGROUND_SYNC_BOOT_DELAY_MS);
+    return hook;
+  }
+
+  it('sweeps every character shortly after mount, not only the active one', () => {
+    mountPastBoot([1, 2]);
     expect(syncMock.scheduleSync.mock.calls).toEqual([[1], [2]]);
   });
 
+  it('holds the first sweep back while the visible route loads', () => {
+    renderHook(() => useBackgroundSync([1, 2]));
+    vi.advanceTimersByTime(BACKGROUND_SYNC_BOOT_DELAY_MS - 1);
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
+  it('does not re-sync a Character that already synced inside the gap (the boot sync)', () => {
+    syncMock.getSyncStatus.mockImplementation((id: number) => ({
+      state: 'idle',
+      lastSyncedAt: id === 1 ? NOW : null,
+      error: null,
+    }));
+    mountPastBoot([1, 2]);
+    expect(syncMock.scheduleSync.mock.calls).toEqual([[2]]);
+  });
+
+  it('never runs the delayed first sweep once unmounted', () => {
+    const { unmount } = renderHook(() => useBackgroundSync([1]));
+    unmount();
+    vi.advanceTimersByTime(BACKGROUND_SYNC_BOOT_DELAY_MS);
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
   it('sweeps again when a backgrounded tab is looked at after the gap', () => {
-    vi.useFakeTimers({ now: NOW });
-    try {
-      renderHook(() => useBackgroundSync([1]));
-      syncMock.scheduleSync.mockClear();
+    mountPastBoot([1]);
+    syncMock.scheduleSync.mockClear();
 
-      vi.setSystemTime(NOW + BACKGROUND_SYNC_MIN_GAP_MS);
-      becomeVisible();
+    vi.setSystemTime(NOW + BACKGROUND_SYNC_BOOT_DELAY_MS + BACKGROUND_SYNC_MIN_GAP_MS);
+    becomeVisible();
 
-      expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
   });
 
   it('sweeps on the tick, for a tab that stayed visible the whole time', () => {
     // visibilitychange never fires when the user switches to another
     // application and the tab stays its window's foreground tab — the tick is
     // the only thing covering that, and it is the reported case.
-    vi.useFakeTimers({ now: NOW });
-    try {
-      renderHook(() => useBackgroundSync([1]));
-      syncMock.scheduleSync.mockClear();
+    mountPastBoot([1]);
+    syncMock.scheduleSync.mockClear();
 
-      vi.advanceTimersByTime(BACKGROUND_SYNC_MIN_GAP_MS + BACKGROUND_SYNC_TICK_MS);
+    vi.advanceTimersByTime(BACKGROUND_SYNC_MIN_GAP_MS + BACKGROUND_SYNC_TICK_MS);
 
-      expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
   });
 
   it('does not sweep on a visibility flicker inside the gap', () => {
-    vi.useFakeTimers({ now: NOW });
-    try {
-      renderHook(() => useBackgroundSync([1]));
-      syncMock.scheduleSync.mockClear();
+    mountPastBoot([1]);
+    syncMock.scheduleSync.mockClear();
 
-      becomeVisible();
+    becomeVisible();
 
-      expect(syncMock.scheduleSync).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 
   it('does not sweep while the tab is hidden, mount included', () => {
     setVisibility('hidden');
-    renderHook(() => useBackgroundSync([1]));
+    mountPastBoot([1]);
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
 
     // And the hidden mount must not have spent the gap the first real look wants.
@@ -121,44 +144,36 @@ describe('useBackgroundSync', () => {
 
   it('skips a Character whose sync is already in flight', () => {
     syncMock.getSyncStatus.mockReturnValue({ state: 'syncing', lastSyncedAt: null, error: null });
-    renderHook(() => useBackgroundSync([1]));
+    mountPastBoot([1]);
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 
   it('sweeps a newly added Character at once, without waiting out the others gap', () => {
-    vi.useFakeTimers({ now: NOW });
-    try {
-      const { rerender } = renderHook(({ ids }) => useBackgroundSync(ids), {
-        initialProps: { ids: [1] },
-      });
-      syncMock.scheduleSync.mockClear();
+    const { rerender } = renderHook(({ ids }) => useBackgroundSync(ids), {
+      initialProps: { ids: [1] },
+    });
+    vi.advanceTimersByTime(BACKGROUND_SYNC_BOOT_DELAY_MS);
+    syncMock.scheduleSync.mockClear();
 
-      rerender({ ids: [1, 2] });
+    rerender({ ids: [1, 2] });
 
-      expect(syncMock.scheduleSync.mock.calls).toEqual([[2]]);
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(syncMock.scheduleSync.mock.calls).toEqual([[2]]);
   });
 
   it('does not re-sweep when the character list is rebuilt inside the gap', () => {
-    vi.useFakeTimers({ now: NOW });
-    try {
-      const { rerender } = renderHook(({ ids }) => useBackgroundSync(ids), {
-        initialProps: { ids: [1, 2] },
-      });
-      syncMock.scheduleSync.mockClear();
+    const { rerender } = renderHook(({ ids }) => useBackgroundSync(ids), {
+      initialProps: { ids: [1, 2] },
+    });
+    vi.advanceTimersByTime(BACKGROUND_SYNC_BOOT_DELAY_MS);
+    syncMock.scheduleSync.mockClear();
 
-      rerender({ ids: [1, 2] });
+    rerender({ ids: [1, 2] });
 
-      expect(syncMock.scheduleSync).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 
   it('does nothing at all with no characters', () => {
-    renderHook(() => useBackgroundSync([]));
+    mountPastBoot([]);
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 
@@ -168,25 +183,22 @@ describe('useBackgroundSync', () => {
     const { rerender } = renderHook(({ ids }) => useBackgroundSync(ids), {
       initialProps: { ids: [] as number[] },
     });
+    vi.advanceTimersByTime(BACKGROUND_SYNC_BOOT_DELAY_MS);
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
 
     rerender({ ids: [1, 2] });
+    vi.advanceTimersByTime(BACKGROUND_SYNC_BOOT_DELAY_MS);
 
     expect(syncMock.scheduleSync.mock.calls).toEqual([[1], [2]]);
   });
 
   it('stops ticking once unmounted', () => {
-    vi.useFakeTimers({ now: NOW });
-    try {
-      const { unmount } = renderHook(() => useBackgroundSync([1]));
-      syncMock.scheduleSync.mockClear();
-      unmount();
+    const { unmount } = mountPastBoot([1]);
+    syncMock.scheduleSync.mockClear();
+    unmount();
 
-      vi.advanceTimersByTime(BACKGROUND_SYNC_MIN_GAP_MS + BACKGROUND_SYNC_TICK_MS);
+    vi.advanceTimersByTime(BACKGROUND_SYNC_MIN_GAP_MS + BACKGROUND_SYNC_TICK_MS);
 
-      expect(syncMock.scheduleSync).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 });

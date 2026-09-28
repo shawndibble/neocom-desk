@@ -17,7 +17,7 @@
  *
  * Firebase-free on purpose: this module is reached statically from the
  * startup bundle (the Foreground Poller in `Layout`, and Remove / Log out), so
- * `@/sync/deviceRegistration` loads on demand, past the gates — a device that
+ * `@/sync/deviceRegistration` loads on demand, past the gates â€” a device that
  * never enabled push never fetches it (`app/bootImportGraph.test.ts`).
  */
 import type { ProjectionRow } from '@/engine/projection';

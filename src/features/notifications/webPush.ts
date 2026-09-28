@@ -5,7 +5,7 @@
  * documents for `requestNotificationPermission`), so the FCM token
  * acquisition and the permission request share the gesture Safari requires.
  *
- * `@/sync/deviceRegistration` is Firebase, so it loads on demand — this module
+ * `@/sync/deviceRegistration` is Firebase, so it loads on demand â€” this module
  * is reached from the startup bundle (`app/bootImportGraph.test.ts`). The load
  * starts before the permission request but is only awaited after it: nothing
  * may be awaited ahead of `requestNotificationPermission`, or Safari no longer

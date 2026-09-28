@@ -67,18 +67,22 @@ const isFirebaseSpecifier = (specifier: string) =>
   specifier.startsWith('firebase/') ||
   specifier.startsWith('@firebase/');
 
-/** Every module that statically reaches a Firebase import, with the path from the entry. */
-function firebaseLeaks(): string[] {
+interface StaticGraph {
+  /** Each reached module's importer, for printing the chain that reached it. */
+  parent: Map<string, string | null>;
+  /** Every Firebase specifier reached, with the chain from the entry. */
+  firebaseLeaks: string[];
+}
+
+function walkFromEntry(): StaticGraph {
   const parent = new Map<string, string | null>([[ENTRY, null]]);
   const queue = [ENTRY];
-  const leaks: string[] = [];
+  const firebaseLeaks: string[] = [];
   while (queue.length > 0) {
     const file = queue.shift()!;
     for (const specifier of staticSpecifiers(sources[file])) {
       if (isFirebaseSpecifier(specifier)) {
-        const chain: string[] = [];
-        for (let at: string | null | undefined = file; at; at = parent.get(at)) chain.unshift(at);
-        leaks.push(`${chain.join(' -> ')} -> ${specifier}`);
+        firebaseLeaks.push(`${chainTo(parent, file)} -> ${specifier}`);
         continue;
       }
       const target = resolve(file, specifier);
@@ -88,8 +92,16 @@ function firebaseLeaks(): string[] {
       }
     }
   }
-  return leaks;
+  return { parent, firebaseLeaks };
 }
+
+function chainTo(parent: Map<string, string | null>, file: string): string {
+  const chain: string[] = [];
+  for (let at: string | null | undefined = file; at; at = parent.get(at)) chain.unshift(at);
+  return chain.join(' -> ');
+}
+
+const graph = walkFromEntry();
 
 describe('startup import graph', () => {
   it('parses the forms of import it needs to', () => {
@@ -114,9 +126,16 @@ describe('startup import graph', () => {
   it('reaches a real slice of the app from the entry', () => {
     expect(ENTRY in sources).toBe(true);
     expect(resolve(ENTRY, './app/App')).toBe('/src/app/App.tsx');
+    expect(graph.parent.has('/src/app/Layout.tsx')).toBe(true);
+    expect(graph.parent.has('/src/features/notifications/projectionUpload.ts')).toBe(true);
   });
 
   it('reaches no firebase import without crossing a dynamic import()', () => {
-    expect(firebaseLeaks()).toEqual([]);
+    expect(graph.firebaseLeaks).toEqual([]);
+  });
+
+  it('leaves the boot cache warm-up (and every feature loader it imports) to its own chunk', () => {
+    const file = '/src/app/prefetch.ts';
+    expect(graph.parent.has(file) ? chainTo(graph.parent, file) : null).toBeNull();
   });
 });

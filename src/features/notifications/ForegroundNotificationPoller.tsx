@@ -1,5 +1,10 @@
 import { useEffect } from 'react';
-import { runForegroundPoll, liveDependencies, POLL_INTERVAL_MS } from './foregroundPoller';
+import {
+  runForegroundPoll,
+  liveDependencies,
+  FIRST_POLL_DELAY_MS,
+  POLL_INTERVAL_MS,
+} from './foregroundPoller';
 import { refreshAppBadge } from './appBadge';
 
 /**
@@ -27,7 +32,7 @@ export function ForegroundNotificationPoller() {
       void runForegroundPoll(liveDependencies());
     }
 
-    poll();
+    const firstPoll = setTimeout(poll, FIRST_POLL_DELAY_MS);
     const interval = setInterval(poll, POLL_INTERVAL_MS);
 
     function onVisibilityChange() {
@@ -37,6 +42,7 @@ export function ForegroundNotificationPoller() {
 
     return () => {
       cancelled = true;
+      clearTimeout(firstPoll);
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };

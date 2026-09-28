@@ -33,6 +33,14 @@ export const BACKGROUND_SYNC_MIN_GAP_MS = 5 * 60 * 1000;
 export const BACKGROUND_SYNC_TICK_MS = 60 * 1000;
 
 /**
+ * How long after boot the first sweep waits. Boot already syncs the active
+ * Character (`App.tsx`) and the visible route is making its own reads; a sweep
+ * of every Character on top — each minting a Firebase token — only competes
+ * with them. A few seconds later it costs nobody anything.
+ */
+export const BACKGROUND_SYNC_BOOT_DELAY_MS = 10 * 1000;
+
+/**
  * Which of `ids` are due, given when each was last swept. Pure so the throttle
  * is testable without a clock or a DOM event.
  */
@@ -49,7 +57,14 @@ export function idsToSweep(
 }
 
 /**
- * Sweeps on mount, on every tick, and whenever the tab is looked at again.
+ * Sweeps shortly after mount ({@link BACKGROUND_SYNC_BOOT_DELAY_MS}), on every
+ * tick, and whenever the tab is looked at again. A Character added later is
+ * swept at once — only the boot sweep waits.
+ *
+ * A Character that finished a sync inside the gap by any other route (the
+ * boot sync of the active Character, a mutation's own sync) counts as swept:
+ * re-reading every collection straight after would re-mint its token for
+ * nothing.
  *
  * The last-sweep stamps are a ref rather than module state so they die with
  * the component — there is exactly one mount of this in the app, and module
@@ -65,6 +80,8 @@ export function idsToSweep(
  */
 export function useBackgroundSync(characterIds: readonly number[]): void {
   const lastSweptAt = useRef(new Map<number, number>());
+  /** When the boot hold-off ends; set by the first effect run that has Characters. */
+  const bootSweepAt = useRef<number | null>(null);
   const idsRef = useRef(characterIds);
   useEffect(() => {
     idsRef.current = characterIds;
@@ -79,6 +96,12 @@ export function useBackgroundSync(characterIds: readonly number[]): void {
       // spend the gap that the first real look wants.
       if (document.visibilityState !== 'visible') return;
       const now = Date.now();
+      for (const characterId of idsRef.current) {
+        const synced = getSyncStatus(characterId).lastSyncedAt;
+        if (synced !== null && synced > (lastSweptAt.current.get(characterId) ?? -Infinity)) {
+          lastSweptAt.current.set(characterId, synced);
+        }
+      }
       for (const characterId of idsToSweep(idsRef.current, lastSweptAt.current, now)) {
         // A sync already in flight covers this Character. Scheduling a second
         // one behind it would re-read every collection and, since the sweep
@@ -89,10 +112,15 @@ export function useBackgroundSync(characterIds: readonly number[]): void {
       }
     };
 
-    sweep();
+    bootSweepAt.current ??= Date.now() + BACKGROUND_SYNC_BOOT_DELAY_MS;
+    const holdOff = bootSweepAt.current - Date.now();
+    let bootSweep: number | undefined;
+    if (holdOff > 0) bootSweep = window.setTimeout(sweep, holdOff);
+    else sweep();
     document.addEventListener('visibilitychange', sweep);
     const tick = window.setInterval(sweep, BACKGROUND_SYNC_TICK_MS);
     return () => {
+      window.clearTimeout(bootSweep);
       document.removeEventListener('visibilitychange', sweep);
       window.clearInterval(tick);
     };
