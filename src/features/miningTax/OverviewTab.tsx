@@ -509,13 +509,13 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
             {data?.fetchedAt ? <DataAgeBadge date={data.fetchedAt} /> : undefined}
             {characters.length > 0 && (
               <CharacterFilterControl
-                characters={characters.map((c) => ({
-                  characterId: c.characterId,
-                  characterName: c.characterName,
-                }))}
                 activeCharacterId={activeCharacterId}
                 value={characterFilter}
                 onChange={setCharacterFilter}
+                // Rides in this route's own `PageHeader` meta (no titled
+                // inner `Panel`); its `actions` cluster (the Refresh button
+                // below) sits at `IconButton`'s default touch tier.
+                size="md"
               />
             )}
           </>

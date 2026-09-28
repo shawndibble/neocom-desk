@@ -8,6 +8,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { flattenMarketWideTree, MARKET_WIDE_MAX_DEPTH } from './lib/flattenMarketWideTree.mjs';
 import { buildShipTree } from './lib/shipTree.mjs';
+import { npcCorpFactions, stationOwnerFields } from './lib/stationOwners.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -47,6 +48,9 @@ const FILES = [
   // are kept; see `piPlanetRadius` below.
   'mapDenormalize.csv',
   'staStations.csv',
+  // NPC corporation -> faction, for the owner faction on stations.json (issue
+  // #1675); ESI omits `faction_id` for NPC corps.
+  'crpNPCCorporations.csv',
   // Alpha clone skill caps, per clone grade (issue #1233); see `alphaMaxLevel`
   // on skills.json below.
   'chrCloneGradeSkills.csv',
@@ -1780,6 +1784,7 @@ async function main() {
   {
     const rows = raw['staStations.csv'];
     const h = indexHeader(rows);
+    const factionByCorp = npcCorpFactions(raw['crpNPCCorporations.csv']);
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
       const entry = {
@@ -1794,6 +1799,9 @@ async function main() {
       // `undefined` — so it would pass null through as a type id.
       const typeId = intOrNull(r[h.stationTypeID]);
       if (typeId !== null) entry.typeId = typeId;
+      // Owner corporation and its faction (issue #1675), so broker-fee
+      // standings resolve from the snapshot with no ESI call.
+      Object.assign(entry, stationOwnerFields(r[h.corporationID], factionByCorp));
       npcStations.push(entry);
     }
     npcStations.sort((a, b) => a.id - b.id);

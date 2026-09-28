@@ -18,6 +18,8 @@ import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID, CORPORATION_ID, SCOPES } from './support/fixtureData';
 import { scopesForGroup } from '../src/esi/scopes';
 
+const HOUR_MS = 3_600_000;
+
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
 
@@ -66,6 +68,72 @@ test('"Show all days" keeps its plain text-link size at and above md (1280px)', 
   // touch-tier height.
   expect(height).toBeGreaterThanOrEqual(10);
   expect(height).toBeLessThanOrEqual(20);
+});
+
+test('period-nav controls meet the 44px touch floor at 390px (#2107)', async ({ page }) => {
+  await page.setViewportSize(PHONE);
+  await signInAndGoto(page, './calendar');
+
+  const prev = page.getByRole('button', { name: /previous (month|fortnight)/i });
+  const next = page.getByRole('button', { name: /next (month|fortnight)/i });
+  const today = page.getByRole('button', { name: 'Today' });
+
+  for (const control of [prev, next, today]) {
+    await expect(control).toBeVisible();
+    const height = await control.evaluate((el) => el.getBoundingClientRect().height);
+    expect(height).toBeGreaterThanOrEqual(44);
+  }
+});
+
+test('RSVP buttons meet the 44px touch floor at 390px (#2107)', async ({ page }) => {
+  await page.setViewportSize(PHONE);
+  const now = Date.now();
+  await page.route(`**/characters/${CHARACTER_ID}/calendar`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          event_id: 1,
+          event_date: new Date(now + 23.99 * HOUR_MS).toISOString(),
+          title: 'Fleet op',
+          importance: 0,
+          event_response: 'not_responded',
+        },
+      ]),
+    })
+  );
+  await page.route(`**/characters/${CHARACTER_ID}/calendar/1`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        event_id: 1,
+        title: 'Fleet op',
+        date: new Date(now + 23.99 * HOUR_MS).toISOString(),
+        duration: 60,
+        importance: 0,
+        owner_id: 1,
+        owner_name: 'Fleet Commander',
+        owner_type: 'character',
+        response: 'not_responded',
+        text: 'Bring your own ships.',
+      }),
+    })
+  );
+  await signInAndGoto(page, './calendar');
+
+  await page.getByRole('button', { name: 'Fleet op' }).click();
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+
+  for (const label of ['Accept', 'Decline', 'Tentative']) {
+    const button = dialog.getByRole('button', { name: label });
+    await expect(button).toBeVisible();
+    const height = await button.evaluate((el) => el.getBoundingClientRect().height);
+    expect(height).toBeGreaterThanOrEqual(44);
+  }
 });
 
 test('a Station Manager sees a moon chunk on the phone rail, without overflow', async ({

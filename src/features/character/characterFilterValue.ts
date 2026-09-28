@@ -1,7 +1,15 @@
 /**
  * The value a `CharacterFilterControl` holds: `'current'` (dynamically
- * whichever Character is active — never frozen to a specific id) on top of
- * the ordinary `MultiSelectFilter<number>` (`'all'` or a hand-picked subset).
+ * whichever Character is active — never frozen to a specific id) or `'all'`.
+ *
+ * Used to hold a third case too — a hand-picked subset of specific
+ * characters — but every caller's actual use of that turned out to be either
+ * "current" or "all" wearing a `Set` costume; nothing in the product named a
+ * genuine partial subset as a feature (see the scope decision narrowing this
+ * to two states). `resolveCharacterFilter` still returns the richer
+ * `MultiSelectFilter<number>` shape below, because "current" resolves to a
+ * one-member `Set` for the data-loading code that was never part of what got
+ * narrowed — only the *value a picker can express* did.
  *
  * Every cross-character view (Wallet Balance, Industry Active Jobs) and the
  * synced default in Settings (issue #607) share this one type, so resolving
@@ -10,11 +18,15 @@
 import { useMemo } from 'react';
 import type { MultiSelectFilter } from '@/lib/multiSelectFilter';
 
-export type CharacterFilterValue = 'current' | MultiSelectFilter<number>;
+export type CharacterFilterValue = 'current' | 'all';
 
 /**
- * `'current'` resolved against whichever Character is active right now; every
- * other value passes through unchanged.
+ * `'current'` resolved against whichever Character is active right now; `'all'`
+ * passes through unchanged. Returns the richer `MultiSelectFilter<number>`
+ * shape (`'all'` or a `Set`) that every cross-character data loader already
+ * expects — `'current'` becomes a one-member `Set`, not a bare id, so a
+ * loader written for "some set of characters" never needs a separate branch
+ * for "exactly one."
  *
  * For the `'current'` case this allocates a **fresh `Set` on every call** —
  * fine for a one-off read (an event handler, a single render-time
@@ -29,7 +41,7 @@ export function resolveCharacterFilter(
   value: CharacterFilterValue,
   activeCharacterId: number | null
 ): MultiSelectFilter<number> {
-  if (value !== 'current') return value;
+  if (value === 'all') return 'all';
   return activeCharacterId === null ? 'all' : new Set([activeCharacterId]);
 }
 
@@ -53,26 +65,32 @@ export function useResolvedCharacterFilter(
 }
 
 /**
- * The JSON-safe shape `CharacterFilterValue` is persisted as — a `Set` is
- * neither what Dexie should store for a `sync.`-prefixed key (structured
- * clone would work locally, but `setSyncedSetting`'s Firestore write does
- * not accept one) nor what a device restoring from JSON can trust to still
- * be a `Set` instance.
+ * The JSON-safe shape `CharacterFilterValue` is persisted as. `number[]`
+ * is accepted here only as a *legacy* shape: an older client could still be
+ * writing one for a while after this rollout (a synced `sync.`-prefixed
+ * Firestore value, in particular, is shared across every device on the
+ * account, not just the one that upgraded first). Nothing here writes an
+ * array any more — `toStoredCharacterFilterValue` only ever produces
+ * `'current'` or `'all'` — but the read path still has to make sense of one.
  */
 export type StoredCharacterFilterValue = 'current' | 'all' | number[];
 
 export function toStoredCharacterFilterValue(
   value: CharacterFilterValue
 ): StoredCharacterFilterValue {
-  if (value === 'current' || value === 'all') return value;
-  return [...value].sort((a, b) => a - b);
+  return value;
 }
 
+/**
+ * A legacy `number[]` (a hand-picked subset, from before this value was
+ * narrowed to `'current' | 'all'`) becomes `'all'`, not `'current'` — the
+ * active Character differs per device, so there is no single id in the array
+ * that every device reading this value could safely collapse to.
+ */
 export function fromStoredCharacterFilterValue(
   stored: StoredCharacterFilterValue
 ): CharacterFilterValue {
-  if (stored === 'current' || stored === 'all') return stored;
-  return new Set(stored);
+  return stored === 'current' ? 'current' : Array.isArray(stored) ? 'all' : stored;
 }
 
 export function isStoredCharacterFilterValue(raw: unknown): raw is StoredCharacterFilterValue {

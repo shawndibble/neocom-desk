@@ -59,12 +59,14 @@
 //
 // sync.defaultCharacterFilter (issue #607): a sixth Defaults-panel preference,
 // added later than the five above and with no device-local life to seed from
-// (no `legacyKey`). Which Character(s) a cross-character view (Wallet
-// Balance, Industry Active Jobs) opens on by default — `'current'`, `'all'`,
-// or a hand-picked subset, stored as `StoredCharacterFilterValue`
-// (`features/character/characterFilterValue.ts`) since a `Set` is not
-// Firestore-safe. Same "set to another value, never unset" shape as the five
-// above, so the tombstone-expiry edge does not bite this one either.
+// (no `legacyKey`). Which Character a cross-character view (Wallet Balance,
+// Industry Active Jobs) opens on by default — `'current'` or `'all'`, stored
+// as `StoredCharacterFilterValue` (`features/character/characterFilterValue.ts`).
+// That stored shape still accepts a legacy `number[]` on read — an older
+// client could still be writing one for a while after this value narrowed
+// away from a hand-picked-subset picker — but nothing writes one any more.
+// Same "set to another value, never unset" shape as the five above, so the
+// tombstone-expiry edge does not bite this one either.
 //
 // sync.marketPricePercent: the percentage of market the Market page's
 // Appraisal tab prices a pasted list at. It sits in the same control cluster
@@ -166,6 +168,16 @@
 // the Fittings applied-DPS graphs are worked out against. Two keys for the
 // same reason, never deleted for the same reason — see
 // features/fittings/targetProfiles.ts.
+//
+// sync.miningTaxOreValueMode (grilling session, 2026-09-27): whether the
+// Moon Mining Tax Assign/edit form shows one editable total-value box per
+// ore type instead of a single whole-row total — a pilot reconciling this
+// app's numbers against a corp's own moon-tax tool wants that per-ore
+// workflow available wherever they're doing the reconciling, not re-enabled
+// per device. See features/miningTax/oreValueMode.ts. Same "set to another
+// value, never unset" shape as the Defaults-panel preferences above (off is
+// a value, not an absence), so the tombstone-expiry edge does not bite it.
+// No `legacyKey`: new, with no device-local life to seed from.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.bpcHideAuctions',
   'sync.bpcHidePlex',
@@ -187,6 +199,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.marketPricePercent',
   'sync.miningTaxManualIgnoredTypeIds',
   'sync.miningTaxManualMoonOreTypeIds',
+  'sync.miningTaxOreValueMode',
   'sync.notificationFeedPrefs',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',

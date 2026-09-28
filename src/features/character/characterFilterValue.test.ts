@@ -22,11 +22,6 @@ describe('resolveCharacterFilter', () => {
   it('passes "all" through unchanged', () => {
     expect(resolveCharacterFilter('all', 42)).toBe('all');
   });
-
-  it('passes a concrete subset through unchanged', () => {
-    const subset = new Set([1, 2]);
-    expect(resolveCharacterFilter(subset, 42)).toBe(subset);
-  });
 });
 
 describe('toStoredCharacterFilterValue / fromStoredCharacterFilterValue', () => {
@@ -38,10 +33,9 @@ describe('toStoredCharacterFilterValue / fromStoredCharacterFilterValue', () => 
     expect(fromStoredCharacterFilterValue(toStoredCharacterFilterValue('all'))).toBe('all');
   });
 
-  it('round-trips a concrete subset as a sorted plain array', () => {
-    const stored = toStoredCharacterFilterValue(new Set([3, 1, 2]));
-    expect(stored).toEqual([1, 2, 3]);
-    expect(fromStoredCharacterFilterValue(stored)).toEqual(new Set([1, 2, 3]));
+  it('reads a legacy hand-picked-subset array (predating the current/all narrowing) back as "all", never guessing at "current"', () => {
+    expect(fromStoredCharacterFilterValue([1, 2, 3])).toBe('all');
+    expect(fromStoredCharacterFilterValue([])).toBe('all');
   });
 });
 
