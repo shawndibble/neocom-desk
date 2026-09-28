@@ -424,7 +424,7 @@ describe('OpenOrdersPanel', () => {
 
     await user.click(trigger);
     // The active Character (from `useActiveCharacter`) is Alpha (id 1).
-    await user.click(screen.getByRole('button', { name: 'This character' }));
+    await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
 
     // Narrowed to Alpha's own order (Tritanium, type 34); Bravo's (Mexallon,
     // type 36) is gone. Both groups were on screen before the pick.
@@ -911,6 +911,46 @@ describe('OpenOrdersPanel', () => {
       renderPanel('/market/orders?orders.characters=1');
 
       expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
+    });
+
+    it('labels a link naming an alt other than the active Character "All characters", without widening the table it still narrows', async () => {
+      mockedLoadAll.mockResolvedValue(
+        snapshot([
+          {
+            characterId: 1,
+            characterName: 'Alpha',
+            orders: [BELOW_FLOOR_ORDER, EXPIRING_ORDER],
+            fetchedAt: Date.now(),
+            fromCache: false,
+            needsReauth: false,
+          },
+          {
+            characterId: 2,
+            characterName: 'Beta',
+            orders: [order({ order_id: 301, type_id: 36, price: 300, duration: 5 })],
+            fetchedAt: Date.now(),
+            fromCache: false,
+            needsReauth: false,
+          },
+        ])
+      );
+      mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+      // The active Character (from `useActiveCharacter`) is Alpha (id 1); this
+      // link names Beta (id 2) instead — the Overview board's own per-alt
+      // Orders tile (`overview/cards.tsx`) links exactly this way on purpose,
+      // to open narrowed to one alt's orders regardless of which Character
+      // happens to be active. `CharacterFilterControl` can no longer express
+      // "just Beta" (only "current" or "all"), so its label falls back to
+      // "All characters" rather than lying that it's "This character"
+      // (Alpha) — but the table must keep filtering to Beta's own orders
+      // regardless, exactly as the tile that built this link intended.
+      renderPanel('/market/orders?orders.characters=2');
+
+      expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
+      // Beta's own item (Mexallon, type 36) shows; Alpha's (Tritanium, type
+      // 34) does not — the table stayed narrowed to Beta despite the label.
+      expect(await screen.findByText('Mexallon')).toBeInTheDocument();
+      expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
     });
 
     it('keeps the filter it applied removable, rather than silently narrowing', async () => {

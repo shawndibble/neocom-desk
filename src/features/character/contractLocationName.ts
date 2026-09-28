@@ -26,7 +26,7 @@
  * The *answer* is cached, not just the lookups behind it, so a reopen collapses
  * to one Dexie read for both id spaces. Per character, not under the global
  * sentinel: `structures.ts` already shares a resolved structure name across
- * this browser's own roster on its own row (issue #669), so duplicating that
+ * this device's own roster on its own row (issue #669), so duplicating that
  * sharing here would only be a second cache of the same fact under a
  * different key. An unresolvable location (offline, or a structure nobody in
  * the roster can see into) caches nothing and is retried on the next open,

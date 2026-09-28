@@ -200,6 +200,7 @@ export function ResultsSummary({
               id: 'actions',
               header: '',
               align: 'right',
+              cardActions: true,
               render: () => itemActionsFor(productTypeID),
             } satisfies DataTableColumn<RevenueRow>,
           ]
@@ -246,6 +247,7 @@ export function ResultsSummary({
               id: 'actions',
               header: '',
               align: 'right',
+              cardActions: true,
               render: (row) => itemActionsFor(row.typeID),
             } satisfies DataTableColumn<OwnedStockSaleLine>,
           ]

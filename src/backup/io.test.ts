@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { db } from '@/db';
+import { db, type MiningTaxAssignmentRecord } from '@/db';
 import { FULL_RECORDS } from '@/sync/syncedCollectionFixtures';
 import { EDITABLE_COLLECTIONS } from '@/sync/syncedCollections';
 import { exportBackup, importBackup } from './io';
@@ -139,10 +139,69 @@ describe('restoring an existing-format backup file', () => {
     expect(await db.settings.get('activeCharacterId')).toBeUndefined();
   });
 
-  it.each(Object.entries(FULL_RECORDS))('restores the %s row intact', async (table, record) => {
-    await importBackup(FIXTURE, FIXTURE_PASSWORD);
-    expect(await db.table(table).toArray()).toEqual([record]);
-  });
+  /**
+   * `FULL_RECORDS` is the live "one full row per table" fixture, reused here
+   * for convenience — but `backup-v1.json` is frozen (see the file's own doc
+   * comment above) while `FULL_RECORDS` keeps growing as tables gain new
+   * optional fields. A field added to a record's type after the file was
+   * captured legitimately isn't in it, so restoring the file can never
+   * produce that field — comparing straight against `FULL_RECORDS` would
+   * fail for that table forever, not because restore broke, but because the
+   * frozen file predates the field. `LEGACY_OMISSIONS` lists exactly which
+   * fields to drop from `FULL_RECORDS`' expectation, per table, for this one
+   * test — `toEqual` treats an explicit `undefined` the same as the key being
+   * absent, so this doesn't need a real delete.
+   */
+  const LEGACY_OMISSIONS: Partial<Record<keyof typeof FULL_RECORDS, string[]>> = {
+    // oreLineValues (grilling session, 2026-09-27) postdates this fixture.
+    miningTaxAssignments: ['oreLineValues'],
+  };
+  /**
+   * Like `LEGACY_OMISSIONS`, but for a field that was *reshaped* rather than
+   * merely added, so dropping it to `undefined` isn't enough — the frozen
+   * fixture's raw row still carries the old shape verbatim. `payment`'s
+   * single `journalRefId`/`contractId` became `journalLinks`/`contractLinks`
+   * arrays (manual/retroactive wallet-transaction linking, 2026-09-27),
+   * postdating this fixture the same way `oreLineValues` does.
+   */
+  const LEGACY_RESHAPES: Partial<Record<keyof typeof FULL_RECORDS, (record: unknown) => unknown>> =
+    {
+      miningTaxAssignments: (record) => {
+        const { payment, ...rest } = record as MiningTaxAssignmentRecord;
+        if (!payment) return record;
+        const { journalLinks, contractLinks, ...paymentRest } = payment;
+        return {
+          ...rest,
+          payment: {
+            ...paymentRest,
+            ...(journalLinks?.[0] ? { journalRefId: journalLinks[0].refId } : {}),
+            ...(contractLinks?.[0] ? { contractId: contractLinks[0].refId } : {}),
+          },
+        };
+      },
+    };
+  const LEGACY_EXPECTED_RECORDS = Object.fromEntries(
+    Object.entries(FULL_RECORDS).map(([table, record]) => [
+      table,
+      (LEGACY_RESHAPES[table as keyof typeof FULL_RECORDS] ?? ((r: unknown) => r))({
+        ...record,
+        ...Object.fromEntries(
+          (LEGACY_OMISSIONS[table as keyof typeof FULL_RECORDS] ?? []).map((key) => [
+            key,
+            undefined,
+          ])
+        ),
+      }),
+    ])
+  );
+
+  it.each(Object.entries(LEGACY_EXPECTED_RECORDS))(
+    'restores the %s row intact',
+    async (table, record) => {
+      await importBackup(FIXTURE, FIXTURE_PASSWORD);
+      expect(await db.table(table).toArray()).toEqual([record]);
+    }
+  );
 
   it('restores a row into every Editable Data table the registry declares', async () => {
     await importBackup(FIXTURE, FIXTURE_PASSWORD);

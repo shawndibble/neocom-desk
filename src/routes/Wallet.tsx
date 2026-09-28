@@ -655,7 +655,7 @@ export function Wallet() {
    * today's exact behavior, no extra fan-out, and it keeps following the
    * active Character across a switch with no resync logic of its own
    * (`useResolvedCharacterFilter` re-resolves it whenever the active
-   * Character changes) — or All/a hand-picked subset once the pilot asks via
+   * Character changes) — or `'all'` once the pilot asks via
    * `CharacterFilterControl`.
    *
    * Lives in the `?char=` query param (issue #1302), so it survives a reload
@@ -703,7 +703,6 @@ export function Wallet() {
   const walletCharacterFilterMeta =
     walletFilterCandidates.length > 1 ? (
       <CharacterFilterControl
-        characters={walletFilterCandidates}
         activeCharacterId={activeCharacterId}
         value={walletCharacterFilter}
         onChange={setWalletCharacterFilter}

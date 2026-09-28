@@ -1,8 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueRows';
+import {
+  summarizeEntryQueue,
+  buildMergedRows,
+  placeBandHeaders,
+  pinnedInProgressEntry,
+} from './queueRows';
 import { entryId } from './reorder';
 import { markerRowId, buildRows } from './markers';
 import type { PlanEntry, PlanPriority, ScheduledStep } from '@/engine/types';
+import type { SkillQueueEntry } from '@/esi/endpoints';
 
 const entry = (skillTypeID: number, targetLevel = 1): PlanEntry => ({ skillTypeID, targetLevel });
 
@@ -241,6 +247,72 @@ describe('placeBandHeaders', () => {
     const queue = summarizeEntryQueue(entries, [2], scheduled, alwaysKnown);
     const rows = buildMergedRows(entries, undefined, queue);
     expect(placeBandHeaders(rows, new Map())).toEqual(new Map());
+  });
+});
+
+describe('pinnedInProgressEntry (#1701 follow-up: real remaining time for the in-game-queue row)', () => {
+  const nowMs = Date.parse('2026-09-27T00:00:00Z');
+  const queueEntry = (over: Partial<SkillQueueEntry> = {}): SkillQueueEntry => ({
+    skill_id: 1,
+    queue_position: 0,
+    finished_level: 3,
+    finish_date: '2026-10-01T00:00:00Z',
+    ...over,
+  });
+
+  it('matches the plan entry for the in-progress queue head (queuedLevels[0]), returning its real remaining seconds', () => {
+    const entries = [entry(1, 3)];
+    const projection = { paused: false, queuedLevels: [queueEntry()] };
+    expect(pinnedInProgressEntry(entries, projection, nowMs)).toEqual({
+      id: entryId(entries[0]),
+      seconds: (Date.parse('2026-10-01T00:00:00Z') - nowMs) / 1000,
+    });
+  });
+
+  it('floors remaining seconds at 0 rather than going negative once the head has actually finished', () => {
+    const entries = [entry(1, 3)];
+    const projection = { paused: false, queuedLevels: [queueEntry()] };
+    const afterFinish = Date.parse('2026-10-02T00:00:00Z');
+    expect(pinnedInProgressEntry(entries, projection, afterFinish)).toEqual({
+      id: entryId(entries[0]),
+      seconds: 0,
+    });
+  });
+
+  it('returns null when the plan has no entry for the in-progress level', () => {
+    const entries = [entry(2, 1)];
+    const projection = { paused: false, queuedLevels: [queueEntry()] };
+    expect(pinnedInProgressEntry(entries, projection, nowMs)).toBeNull();
+  });
+
+  it('returns null when the queue is paused, even if queuedLevels is non-empty', () => {
+    const entries = [entry(1, 3)];
+    const projection = { paused: true, queuedLevels: [queueEntry()] };
+    expect(pinnedInProgressEntry(entries, projection, nowMs)).toBeNull();
+  });
+
+  it('returns null when there is no queued lead at all', () => {
+    const entries = [entry(1, 3)];
+    const projection = { paused: false, queuedLevels: [] };
+    expect(pinnedInProgressEntry(entries, projection, nowMs)).toBeNull();
+  });
+
+  it('returns null when the head entry carries no finish_date', () => {
+    const entries = [entry(1, 3)];
+    const projection = { paused: false, queuedLevels: [queueEntry({ finish_date: undefined })] };
+    expect(pinnedInProgressEntry(entries, projection, nowMs)).toBeNull();
+  });
+
+  it('only ever looks at the head (queuedLevels[0]) — a plan entry matching a later queued level is not pinned', () => {
+    const entries = [entry(2, 1)];
+    const projection = {
+      paused: false,
+      queuedLevels: [
+        queueEntry(),
+        queueEntry({ skill_id: 2, finished_level: 1, queue_position: 1 }),
+      ],
+    };
+    expect(pinnedInProgressEntry(entries, projection, nowMs)).toBeNull();
   });
 });
 

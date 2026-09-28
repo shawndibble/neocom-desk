@@ -42,15 +42,22 @@ export function SkillRow({
     );
 
   return (
-    <div className="flex items-center gap-3 text-xs">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
       <SkillStatusIcon status={status} />
-      <span className="flex-1 text-text">{name}</span>
-      {tags !== undefined && <span className="flex shrink-0 gap-1">{tags}</span>}
-      <SkillBar level={currentLevel} />
-      {timeLabel !== undefined && (
-        <span className="w-16 text-right text-text-dim tabular-nums">{timeLabel}</span>
-      )}
-      {trailing}
+      <span className="flex-auto text-text">{name}</span>
+      {/* Grouped and pushed to the row's own line when there's no room beside
+          `name`: `flex-auto` (not `flex-1`'s zero basis) gives `name` a real
+          hypothetical width for the wrap decision, so this whole group wraps
+          below as a unit rather than `name` being squeezed into a sliver that
+          word-breaks mid-word (issue: mobile Market required skills). */}
+      <div className="ml-auto flex shrink-0 items-center gap-3">
+        {tags !== undefined && <span className="flex gap-1">{tags}</span>}
+        <SkillBar level={currentLevel} />
+        {timeLabel !== undefined && (
+          <span className="w-16 text-right text-text-dim tabular-nums">{timeLabel}</span>
+        )}
+        {trailing}
+      </div>
     </div>
   );
 }
