@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { emitUpgradeBlocked } from './blockedSignal';
+import { esiCacheMetaMiddleware, type EsiCacheMetaRecord } from './esiCacheMeta';
 import type { Attributes, Implants, PlanEntry, PlanMilestone } from '@/engine/types';
 import type {
   FacilityKind,
@@ -188,7 +189,15 @@ export interface EsiCacheRecord {
    * freshness window," which is what every row claimed before this existed.
    */
   expiresAt?: number;
+  /**
+   * That response's ETag, sent back as If-None-Match so an unchanged payload
+   * costs a 304 instead of a download, parse and rewrite (`esi/cache.ts`).
+   * Optional and additive like `expiresAt`.
+   */
+  etag?: string;
 }
+
+export type { EsiCacheMetaRecord };
 
 /** One saved shortcut in the Quickbar (CONTEXT.md). */
 export interface QuickbarItem {
@@ -932,6 +941,8 @@ export const db = new Dexie('neocom') as Dexie & {
   settings: EntityTable<SettingRecord, 'key'>;
   skillPlans: EntityTable<SkillPlanRecord, 'id'>;
   esiCache: Dexie.Table<EsiCacheRecord, [number, string]>;
+  /** Mirror of `esiCache` without the values — see `./esiCacheMeta.ts`. */
+  esiCacheMeta: Dexie.Table<EsiCacheMetaRecord, [number, string]>;
   buildPlans: EntityTable<BuildPlanRecord, 'id'>;
   quickbars: EntityTable<QuickbarRecord, 'id'>;
   stationPins: EntityTable<StationPinRecord, 'id'>;
@@ -973,6 +984,10 @@ export const db = new Dexie('neocom') as Dexie & {
  * Another tab *deleting* the database is the other disruption: the app shell
  * reloads on it (`app/databaseWipe.ts`), which a worker has no page to do.
  */
+// Keeps `esiCacheMeta` in step with every `esiCache` write and delete, in the
+// same transaction. See ./esiCacheMeta.ts.
+db.use(esiCacheMetaMiddleware);
+
 db.on('blocked', (event) => {
   emitUpgradeBlocked({ oldVersion: event.oldVersion, newVersion: event.newVersion });
   db.close();
@@ -1296,6 +1311,36 @@ db.version(18).stores({
   settings: 'key',
   skillPlans: 'id, characterId',
   esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: null,
+  orderProblemSamples: 'orderId, characterId',
+  mailDrafts: 'id, characterId',
+  miningLedgerHistory: 'characterId',
+  jitaPriceSnapshots: 'date',
+  fittings: 'id, characterId',
+  hullFitCache: 'key, savedAt',
+});
+
+// Adds `esiCacheMeta`, the value-free mirror of `esiCache` that freshness
+// checks read (./esiCacheMeta.ts). Additive, and deliberately no `upgrade()`:
+// walking `esiCache` to backfill it would deserialize every cached value at
+// open, before first render. Rows older than this get meta lazily, on first read.
+db.version(19).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  esiCacheMeta: '[characterId+key]',
   buildPlans: 'id, characterId',
   quickbars: 'id, characterId',
   stationPins: 'id, characterId, locationId',

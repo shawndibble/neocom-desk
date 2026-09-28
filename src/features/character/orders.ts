@@ -5,9 +5,14 @@ import {
   type MarketOrder,
   type MarketOrderHistory,
 } from '@/esi/endpoints';
-import { loadWithCacheStatus, loadPaginatedWithCacheStatus, type StatusResult } from '@/esi/cache';
+import {
+  conditionalFetch,
+  loadWithCacheStatus,
+  loadPaginatedWithCacheStatus,
+  type StatusResult,
+} from '@/esi/cache';
 
-const KEYS = {
+export const KEYS = {
   open: 'orders',
   history: 'orders:history',
 } as const;
@@ -18,11 +23,11 @@ const KEYS = {
  * silent empty state when the orders scope was revoked (issue #14).
  */
 export function loadOrders(characterId: number): Promise<StatusResult<MarketOrder[]>> {
-  return loadWithCacheStatus(
-    characterId,
-    KEYS.open,
-    async () => (await getCharacterOrders(characterId)).data
+  // Revalidated by ETag: an unchanged order book costs a 304, not a rewrite.
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterOrders(characterId, options)
   );
+  return loadWithCacheStatus(characterId, KEYS.open, fetchLive, { conditional });
 }
 
 /**

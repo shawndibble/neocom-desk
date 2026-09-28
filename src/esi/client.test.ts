@@ -140,6 +140,20 @@ describe('esiFetch — ETag / 304', () => {
 
     expect(result.data).toBeNull();
     expect(result.etag).toBe('"abc123"');
+    expect(result.notModified).toBe(true);
+  });
+
+  it('reports notModified: false on a 200', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/alliances/99000001`, () =>
+        HttpResponse.json({ name: 'Test Alliance' }, { headers: { ETag: '"new"' } })
+      )
+    );
+
+    const result = await esiFetch('/alliances/99000001', { etag: '"abc123"' });
+
+    expect(result.notModified).toBe(false);
+    expect(result.etag).toBe('"new"');
   });
 });
 
@@ -538,6 +552,8 @@ describe('esiFetch — PUT (issue #741)', () => {
     });
 
     expect(result.data).toBeNull();
+    // Also bodiless, but not a revalidation: nothing cached may be reused on it.
+    expect(result.notModified).toBe(false);
   });
 
   it('throws a typed EsiError on a PUT error response', async () => {

@@ -26,6 +26,7 @@
  * a loader from nearly every feature, none of which the first paint needs.
  */
 import { db } from '@/db';
+import { isCacheFresh } from '@/esi/cache';
 import type { EsiEndpointId } from '@/esi/registry';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { usePrefetch } from '@/stores/prefetch';
@@ -37,21 +38,22 @@ import {
   loadCharacterSkillQueue,
 } from '@/features/skills/data';
 import {
+  KEYS as WALLET_KEYS,
   loadWalletBalance,
   loadWalletJournal,
   loadWalletTransactions,
 } from '@/features/character/wallet';
-import { loadCharacterAssets } from '@/features/character/assets';
-import { loadOrders, loadOrderHistory } from '@/features/character/orders';
-import { loadContracts } from '@/features/character/contracts';
+import { KEY as ASSETS_KEY, loadCharacterAssets } from '@/features/character/assets';
+import { KEYS as ORDER_KEYS, loadOrders, loadOrderHistory } from '@/features/character/orders';
+import { KEY as CONTRACTS_KEY, loadContracts } from '@/features/character/contracts';
 import { loadMailHeaders, loadMailLabels } from '@/features/character/mail';
 import { loadCalendarEvents } from '@/features/character/calendar';
 import { loadContacts } from '@/features/character/contacts';
 import { loadCharacterStandings } from '@/features/character/standings';
 import { loadCharacterClones } from '@/features/character/clones';
 import { loadEmploymentHistory } from '@/features/character/employmentHistory';
-import { loadCharacterBlueprints } from '@/features/industry/data';
-import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
+import { KEY as BLUEPRINTS_KEY, loadCharacterBlueprints } from '@/features/industry/data';
+import { KEYS as JOB_KEYS, loadCharacterIndustryJobs } from '@/features/industry/jobs';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 
 export interface PrefetchTask {
@@ -64,6 +66,15 @@ export interface PrefetchTask {
    */
   readonly endpoints: readonly EsiEndpointId[];
   readonly run: (characterId: number) => Promise<unknown>;
+  /**
+   * The one `esiCache` key `run` reads through, on the default window. When
+   * set, a row still fresh by its meta skips the task outright: `run` would
+   * only have read that row back — deserializing the whole value (megabytes,
+   * for assets or a journal) for a warm-up that throws it away. Only for a
+   * task that is a single loader call over exactly this key; imported from
+   * the feature so the two cannot drift.
+   */
+  readonly cacheKey?: string;
 }
 
 /**
@@ -103,11 +114,13 @@ export const PREFETCH_TASKS: readonly PrefetchTask[] = [
   },
   {
     id: 'industry-jobs',
+    cacheKey: JOB_KEYS.jobs,
     endpoints: ['getCharacterIndustryJobs'],
     run: loadCharacterIndustryJobs,
   },
   {
     id: 'orders',
+    cacheKey: ORDER_KEYS.open,
     endpoints: ['getCharacterOrders'],
     run: loadOrders,
   },
@@ -153,16 +166,19 @@ export const PREFETCH_TASKS: readonly PrefetchTask[] = [
   },
   {
     id: 'contracts',
+    cacheKey: CONTRACTS_KEY,
     endpoints: ['getCharacterContracts'],
     run: loadContracts,
   },
   {
     id: 'order-history',
+    cacheKey: ORDER_KEYS.history,
     endpoints: ['getCharacterOrderHistory'],
     run: loadOrderHistory,
   },
   {
     id: 'blueprints',
+    cacheKey: BLUEPRINTS_KEY,
     endpoints: ['getCharacterBlueprints'],
     run: loadCharacterBlueprints,
   },
@@ -182,17 +198,20 @@ export const PREFETCH_TASKS: readonly PrefetchTask[] = [
   },
   {
     id: 'wallet-journal',
+    cacheKey: WALLET_KEYS.journal,
     endpoints: ['getCharacterWalletJournal'],
     run: loadWalletJournal,
   },
   {
     id: 'wallet-transactions',
+    cacheKey: WALLET_KEYS.transactions,
     endpoints: ['getCharacterWalletTransactions'],
     run: loadWalletTransactions,
   },
   {
     // Last on purpose: the one task that can be tens of requests on its own.
     id: 'assets',
+    cacheKey: ASSETS_KEY,
     endpoints: ['getCharacterAssets'],
     run: loadCharacterAssets,
   },
@@ -234,7 +253,8 @@ export interface PrefetchSignal {
  */
 export async function prefetchCharacterData(
   characterId: number,
-  signal: PrefetchSignal = { cancelled: false }
+  signal: PrefetchSignal = { cancelled: false },
+  table: readonly PrefetchTask[] = PREFETCH_TASKS
 ): Promise<void> {
   const token = await db.tokens.get(characterId);
   // No token row is no session for this Character at all, so there is nothing
@@ -245,7 +265,7 @@ export async function prefetchCharacterData(
   if (token === undefined) return;
   // No *scope* is no grant, not a permissive default — same reading
   // `useGrantedScopes` gives it.
-  const tasks = prefetchTasksFor(token.scopes);
+  const tasks = prefetchTasksFor(token.scopes, table);
   if (signal.cancelled || tasks.length === 0) return;
 
   const { begin, advance, finish } = usePrefetch.getState();
@@ -254,7 +274,9 @@ export async function prefetchCharacterData(
     await mapWithConcurrencyLimit(tasks, PREFETCH_CONCURRENCY, async (task) => {
       if (signal.cancelled) return;
       try {
-        await task.run(characterId);
+        const fresh =
+          task.cacheKey !== undefined && (await isCacheFresh(characterId, task.cacheKey));
+        if (!fresh) await task.run(characterId);
       } catch {
         // Swallowed by design; see the doc comment above.
       }
