@@ -536,7 +536,7 @@ function CorpAssetsView() {
 
   return (
     <ItemActionsProvider page={itemActions}>
-      <div className="space-y-4">
+      <div className="mx-auto max-w-6xl space-y-4">
         <PageHeader
           title={t('corp.assets.title')}
           subNav={<CorpSubNav flush />}
@@ -870,7 +870,7 @@ export function CorpAssets() {
 
   if (gate.status === 'denied') {
     return (
-      <div className="space-y-4">
+      <div className="mx-auto max-w-6xl space-y-4">
         <PageHeader title={t('corp.assets.title')} />
         <CorpDenied
           reason={gate.reason}

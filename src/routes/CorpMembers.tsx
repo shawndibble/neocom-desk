@@ -294,7 +294,7 @@ function CorpMembersView() {
   if (!snapshot.hydrated) return <Spinner />;
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader
         title={t('corp.members.title')}
         subNav={<CorpSubNav flush />}
@@ -436,7 +436,7 @@ export function CorpMembers() {
 
   if (gate.status === 'denied') {
     return (
-      <div className="space-y-4">
+      <div className="mx-auto max-w-6xl space-y-4">
         <PageHeader title={t('corp.members.title')} />
         <CorpDenied
           reason={gate.reason}
