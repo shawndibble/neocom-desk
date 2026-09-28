@@ -292,6 +292,8 @@ export function CorpRosterTable({
       label={t('corp.members.tableLabel')}
       density="compact"
       {...sortProps}
+      mobileSort
+      stackSummary={t('corp.members.mobileSortSummary', { count: rows.length })}
     />
   );
 }
