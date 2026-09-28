@@ -17,7 +17,7 @@
 import { useEffect, useRef } from 'react';
 import { getSyncStatus, scheduleSync } from '@/sync';
 import { isSyncConfigured } from './syncStatus';
-import { isTabLeader, onTabLeaderChange } from '@/lib/tabLeader';
+import { joinTabElection, type TabElectionSeat } from '@/lib/tabLeader';
 
 /**
  * Smallest gap between two sweeps *of one Character*. Five minutes is well
@@ -40,6 +40,36 @@ export const BACKGROUND_SYNC_TICK_MS = 60 * 1000;
  * with them. A few seconds later it costs nobody anything.
  */
 export const BACKGROUND_SYNC_BOOT_DELAY_MS = 10 * 1000;
+
+/**
+ * localStorage key for the last-sweep stamps, shared by every tab so that a tab
+ * taking leadership over (`lib/tabLeader.ts`) does not re-sweep every
+ * Character the previous leader swept a minute ago.
+ */
+export const SWEEP_STAMPS_KEY = 'neocom.backgroundSync.lastSweptAt';
+
+/** Fold the other tabs' stamps into `into`, keeping the later of each. */
+function mergeSharedStamps(into: Map<number, number>): void {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(SWEEP_STAMPS_KEY) ?? '{}');
+    if (typeof raw !== 'object' || raw === null) return;
+    for (const [id, at] of Object.entries(raw)) {
+      if (typeof at === 'number' && at > (into.get(Number(id)) ?? -Infinity)) {
+        into.set(Number(id), at);
+      }
+    }
+  } catch {
+    // Unreadable or blocked storage: this tab's own stamps still gate it.
+  }
+}
+
+function writeSharedStamps(stamps: ReadonlyMap<number, number>): void {
+  try {
+    localStorage.setItem(SWEEP_STAMPS_KEY, JSON.stringify(Object.fromEntries(stamps)));
+  } catch {
+    // Blocked or full storage: other tabs just fall back to their own stamps.
+  }
+}
 
 /**
  * Which of `ids` are due, given when each was last swept. Pure so the throttle
@@ -88,17 +118,32 @@ export function useBackgroundSync(characterIds: readonly number[]): void {
     idsRef.current = characterIds;
   });
   const key = characterIds.join(',');
+  const active = key !== '' && isSyncConfigured();
+
+  // One tab — the Tab Leader for the sweep — sweeps every Character for all of
+  // them. Its own effect, so a change to the Character list keeps the seat.
+  const seat = useRef<TabElectionSeat | null>(null);
+  const onLeaderChange = useRef(() => {});
+  useEffect(() => {
+    if (!active) return;
+    const joined = joinTabElection('sweep', () => onLeaderChange.current());
+    seat.current = joined;
+    return () => {
+      joined.leave();
+      seat.current = null;
+    };
+  }, [active]);
 
   useEffect(() => {
-    if (key === '' || !isSyncConfigured()) return;
+    if (!active) return;
 
     const sweep = () => {
       // A hidden tab has nobody reading its alerts, and sweeping one would
       // spend the gap that the first real look wants.
       if (document.visibilityState !== 'visible') return;
-      // Every Character is swept by one tab — the Tab Leader — not by each.
-      if (!isTabLeader()) return;
+      if (!seat.current?.isLeader()) return;
       const now = Date.now();
+      mergeSharedStamps(lastSweptAt.current);
       for (const characterId of idsRef.current) {
         const synced = getSyncStatus(characterId).lastSyncedAt;
         if (synced !== null && synced > (lastSweptAt.current.get(characterId) ?? -Infinity)) {
@@ -113,6 +158,7 @@ export function useBackgroundSync(characterIds: readonly number[]): void {
         lastSweptAt.current.set(characterId, now);
         scheduleSync(characterId);
       }
+      writeSharedStamps(lastSweptAt.current);
     };
 
     bootSweepAt.current ??= Date.now() + BACKGROUND_SYNC_BOOT_DELAY_MS;
@@ -124,14 +170,14 @@ export function useBackgroundSync(characterIds: readonly number[]): void {
     const tick = window.setInterval(sweep, BACKGROUND_SYNC_TICK_MS);
     // A tab taking leadership over sweeps at once — but not before the boot
     // hold-off, which winning the election at boot would otherwise skip.
-    const stopLeaderWatch = onTabLeaderChange(() => {
+    onLeaderChange.current = () => {
       if (Date.now() >= (bootSweepAt.current ?? Infinity)) sweep();
-    });
+    };
     return () => {
-      stopLeaderWatch();
+      onLeaderChange.current = () => {};
       window.clearTimeout(bootSweep);
       document.removeEventListener('visibilitychange', sweep);
       window.clearInterval(tick);
     };
-  }, [key]);
+  }, [key, active]);
 }

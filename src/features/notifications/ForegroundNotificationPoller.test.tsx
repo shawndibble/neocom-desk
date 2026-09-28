@@ -12,11 +12,13 @@ const leaderMock = vi.hoisted(() => {
   let leader = true;
   const listeners = new Set<() => void>();
   return {
-    isTabLeader: () => leader,
-    onTabLeaderChange: (listener: () => void) => {
+    joinTabElection: (_job: string, listener: () => void) => {
       listeners.add(listener);
-      return () => listeners.delete(listener);
+      return { isLeader: () => leader, leave: () => listeners.delete(listener) };
     },
+    runUnlessRunningElsewhere: (_lock: string, task: () => Promise<void>) => task(),
+    /** Seats still standing — for the unmount assertion. */
+    seats: () => listeners.size,
     /** Simulate the election: another tab leads (`false`) or this one does. */
     setLeader(next: boolean) {
       leader = next;
@@ -111,6 +113,13 @@ describe('ForegroundNotificationPoller', () => {
   it('renders nothing', () => {
     const { container } = render(<ForegroundNotificationPoller />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('stands for the poller election only while mounted', () => {
+    const { unmount } = render(<ForegroundNotificationPoller />);
+    expect(leaderMock.seats()).toBe(1);
+    unmount();
+    expect(leaderMock.seats()).toBe(0);
   });
 
   describe('with another tab leading', () => {

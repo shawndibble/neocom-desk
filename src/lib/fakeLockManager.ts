@@ -6,10 +6,11 @@
  * Faithful to the parts the app leans on — exclusive locks granted FIFO per
  * name, granted asynchronously, held until the callback's promise settles,
  * `request` resolving to the callback's result, and an aborted `signal`
- * dropping a still-queued request with an `AbortError`. Shared mode,
- * `ifAvailable`, `steal` and `query` are not modelled.
+ * dropping a still-queued request with an `AbortError`, and `ifAvailable`
+ * calling back with `null` when the lock is taken. Shared mode, `steal` and
+ * `query` are not modelled.
  */
-type Callback = (lock: { name: string; mode: 'exclusive' }) => unknown;
+type Callback = (lock: { name: string; mode: 'exclusive' } | null) => unknown;
 
 interface Waiter {
   callback: Callback;
@@ -21,7 +22,11 @@ interface Waiter {
 
 export interface FakeLockManager {
   request(name: string, callback: Callback): Promise<unknown>;
-  request(name: string, options: { signal?: AbortSignal }, callback: Callback): Promise<unknown>;
+  request(
+    name: string,
+    options: { signal?: AbortSignal; ifAvailable?: boolean },
+    callback: Callback
+  ): Promise<unknown>;
   /** Names currently held — for assertions. */
   held(): string[];
 }
@@ -53,7 +58,7 @@ export function createFakeLockManager(): FakeLockManager {
 
   function request(
     name: string,
-    optionsOrCallback: { signal?: AbortSignal } | Callback,
+    optionsOrCallback: { signal?: AbortSignal; ifAvailable?: boolean } | Callback,
     maybeCallback?: Callback
   ): Promise<unknown> {
     const options = typeof optionsOrCallback === 'function' ? {} : optionsOrCallback;
@@ -62,6 +67,14 @@ export function createFakeLockManager(): FakeLockManager {
       const { signal } = options;
       if (signal?.aborted) {
         reject(new DOMException('The request was aborted.', 'AbortError'));
+        return;
+      }
+      if (options.ifAvailable && (heldNames.has(name) || (queues.get(name)?.length ?? 0) > 0)) {
+        setTimeout(() => {
+          Promise.resolve()
+            .then(() => callback(null))
+            .then(resolve, reject);
+        }, 0);
         return;
       }
       const waiter: Waiter = { callback, resolve, reject, signal };

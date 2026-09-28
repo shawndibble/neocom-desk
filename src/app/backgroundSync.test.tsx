@@ -4,6 +4,7 @@ import {
   BACKGROUND_SYNC_BOOT_DELAY_MS,
   BACKGROUND_SYNC_MIN_GAP_MS,
   BACKGROUND_SYNC_TICK_MS,
+  SWEEP_STAMPS_KEY,
   idsToSweep,
   useBackgroundSync,
 } from './backgroundSync';
@@ -21,11 +22,12 @@ const leaderMock = vi.hoisted(() => {
   let leader = true;
   const listeners = new Set<() => void>();
   return {
-    isTabLeader: () => leader,
-    onTabLeaderChange: (listener: () => void) => {
+    joinTabElection: (_job: string, listener: () => void) => {
       listeners.add(listener);
-      return () => listeners.delete(listener);
+      return { isLeader: () => leader, leave: () => listeners.delete(listener) };
     },
+    /** Seats still standing — for the unmount assertion. */
+    seats: () => listeners.size,
     /** Simulate the election: another tab leads (`false`) or this one does. */
     setLeader(next: boolean) {
       leader = next;
@@ -49,6 +51,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   syncMock.getSyncStatus.mockReturnValue({ state: 'idle', lastSyncedAt: null, error: null });
   setVisibility('visible');
+  localStorage.clear();
 });
 
 describe('idsToSweep', () => {
@@ -218,6 +221,37 @@ describe('useBackgroundSync', () => {
     vi.advanceTimersByTime(BACKGROUND_SYNC_MIN_GAP_MS + BACKGROUND_SYNC_TICK_MS);
 
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
+  it('shares its sweep stamps, so a tab taking over does not re-sweep inside the gap', () => {
+    mountPastBoot([1]); // tab A
+    syncMock.scheduleSync.mockClear();
+
+    mountPastBoot([1]); // tab B: its own refs, the same localStorage
+
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
+  it('sweeps anyway when the shared stamps are unreadable', () => {
+    localStorage.setItem(SWEEP_STAMPS_KEY, 'not json');
+    mountPastBoot([1]);
+    expect(syncMock.scheduleSync.mock.calls).toEqual([[1]]);
+  });
+
+  it('stands down from the sweep election once unmounted', () => {
+    const { unmount } = mountPastBoot([1]);
+    expect(leaderMock.seats()).toBe(1);
+    unmount();
+    expect(leaderMock.seats()).toBe(0);
+  });
+
+  it('keeps its seat when the character list changes', () => {
+    const { rerender } = renderHook(({ ids }) => useBackgroundSync(ids), {
+      initialProps: { ids: [1] },
+    });
+    const seats = leaderMock.seats();
+    rerender({ ids: [1, 2] });
+    expect(leaderMock.seats()).toBe(seats);
   });
 
   describe('with another tab leading', () => {

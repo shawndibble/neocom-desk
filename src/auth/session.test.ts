@@ -496,6 +496,35 @@ describe('getValidAccessToken across tabs', () => {
     expect((await db.tokens.get(CHAR_ID))?.refreshToken).toBe('refresh-rotated');
   });
 
+  it('a tab waiting on a refresh that failed makes its own attempt', async () => {
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: createFakeLockManager(),
+    });
+    server.use(
+      http.post(
+        'https://login.eveonline.com/v2/oauth/token',
+        async ({ request }) => {
+          tokenRequests.push(new URLSearchParams(await request.text()));
+          return HttpResponse.json({ error: 'temporarily_unavailable' }, { status: 503 });
+        },
+        { once: true }
+      )
+    );
+    await putStaleToken();
+    const tabB = await openSecondTab();
+
+    const [a, b] = await Promise.allSettled([
+      getValidAccessToken(CHAR_ID, cfg),
+      tabB.getValidAccessToken(CHAR_ID, cfg),
+    ]);
+
+    expect(a.status).toBe('rejected');
+    expect(b.status).toBe('fulfilled');
+    expect(tokenRequests).toHaveLength(2);
+    expect((await db.tokens.get(CHAR_ID))?.refreshToken).toBe('refresh-rotated');
+  });
+
   it('without Web Locks, each tab still single-flights its own callers', async () => {
     expect('locks' in navigator).toBe(false);
     await putStaleToken();

@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createTabLeader, type TabLeader } from './tabLeader';
+import {
+  createTabElections,
+  createTabLeader,
+  runUnlessRunningElsewhere,
+  type TabElections,
+  type TabLeader,
+} from './tabLeader';
 import { createFakeLockManager, type FakeLockManager } from './fakeLockManager';
 
 /** One simulated tab: its own document and window, sharing the origin's locks. */
@@ -8,7 +14,7 @@ function makeTab(locks: FakeLockManager | undefined, visibility: 'visible' | 'hi
     visibilityState: visibility as DocumentVisibilityState,
   });
   const win = new EventTarget();
-  const leader = createTabLeader({ locks, doc, win });
+  const leader = createTabLeader({ lockName: 'neocom:leader:test', locks, doc, win });
   started.push(leader);
   return {
     leader,
@@ -30,9 +36,21 @@ function makeTab(locks: FakeLockManager | undefined, visibility: 'visible' | 'hi
 }
 
 const started: TabLeader[] = [];
+const startedElections: TabElections[] = [];
 afterEach(() => {
   started.splice(0).forEach((leader) => leader.stop());
+  startedElections.splice(0).forEach((elections) => elections.stopAll());
 });
+
+/** A tab's per-job elections, sharing the origin's locks. */
+function makeElections(locks: FakeLockManager) {
+  const doc = Object.assign(new EventTarget(), {
+    visibilityState: 'visible' as DocumentVisibilityState,
+  });
+  const elections = createTabElections({ locks, doc, win: new EventTarget() });
+  startedElections.push(elections);
+  return elections;
+}
 
 /** Let the fake's queued grants and releases run. */
 async function settle() {
@@ -139,5 +157,85 @@ describe('createTabLeader', () => {
     await settle();
     expect(a.leader.isLeader()).toBe(false);
     expect(b.leader.isLeader()).toBe(true);
+  });
+});
+
+describe('createTabElections', () => {
+  it('holds a job’s lock only while something in the tab stands for it', async () => {
+    const locks = createFakeLockManager();
+    const tab = makeElections(locks);
+    const first = tab.join('poller', () => {});
+    const second = tab.join('poller', () => {});
+    await settle();
+    expect(locks.held()).toEqual(['neocom:leader:poller']);
+
+    first.leave();
+    await settle();
+    expect(locks.held()).toEqual(['neocom:leader:poller']);
+    expect(second.isLeader()).toBe(true);
+
+    second.leave();
+    await settle();
+    expect(locks.held()).toEqual([]);
+    expect(second.isLeader()).toBe(false);
+  });
+
+  it('a tab without the poller mounted (a share route) never blocks another from polling', async () => {
+    const locks = createFakeLockManager();
+    const shareTab = makeElections(locks);
+    const appTab = makeElections(locks);
+    const shareSweep = shareTab.join('sweep', () => {});
+    await settle();
+    const appSweep = appTab.join('sweep', () => {});
+    const appPoller = appTab.join('poller', () => {});
+    await settle();
+
+    expect(shareSweep.isLeader()).toBe(true);
+    expect(appSweep.isLeader()).toBe(false);
+    expect(appPoller.isLeader()).toBe(true);
+  });
+
+  it('hands a job over when its leader unmounts it', async () => {
+    const locks = createFakeLockManager();
+    const a = makeElections(locks);
+    const b = makeElections(locks);
+    const aPoller = a.join('poller', () => {});
+    await settle();
+    const onChange = vi.fn();
+    const bPoller = b.join('poller', onChange);
+    await settle();
+    expect(bPoller.isLeader()).toBe(false);
+
+    aPoller.leave();
+    await settle();
+    expect(bPoller.isLeader()).toBe(true);
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('runUnlessRunningElsewhere', () => {
+  it('skips a run while another tab’s run holds the lock, and runs once it is free', async () => {
+    const locks = createFakeLockManager();
+    let finishFirst!: () => void;
+    const first = runUnlessRunningElsewhere(
+      'neocom:poll',
+      () => new Promise<void>((resolve) => (finishFirst = resolve)),
+      locks
+    );
+    await settle();
+    const second = vi.fn(async () => {});
+    await runUnlessRunningElsewhere('neocom:poll', second, locks);
+    expect(second).not.toHaveBeenCalled();
+
+    finishFirst();
+    await first;
+    await runUnlessRunningElsewhere('neocom:poll', second, locks);
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it('without Web Locks just runs', async () => {
+    const task = vi.fn(async () => {});
+    await runUnlessRunningElsewhere('neocom:poll', task, undefined);
+    expect(task).toHaveBeenCalledTimes(1);
   });
 });
