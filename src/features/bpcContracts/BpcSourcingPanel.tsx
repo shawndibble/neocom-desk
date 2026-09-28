@@ -20,6 +20,7 @@ import {
   FilterField,
   IconButton,
   IskAmount,
+  IskInput,
   Panel,
   RegionSelect,
   SearchInput,
@@ -123,7 +124,7 @@ import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapsh
 import { cx } from '@/lib/cx';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { rankedSearch } from '@/lib/rankedSearch';
-import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
+import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto, parseIskAmount } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 
@@ -449,15 +450,12 @@ function BpcFilterBar({
             />
           </FilterField>
           <FilterField label={t('bpcContracts.maxPriceLabel')}>
-            <TextInput
-              type="number"
-              inputMode="numeric"
-              min={0}
+            <IskInput
               aria-label={t('bpcContracts.maxPriceLabel')}
               placeholder={t('bpcContracts.maxPriceLabel')}
               className="w-32"
               value={draft.maxPrice}
-              onChange={(event) => setDraft({ ...draft, maxPrice: event.target.value })}
+              onChange={(maxPrice) => setDraft({ ...draft, maxPrice })}
             />
           </FilterField>
           <div
@@ -714,7 +712,7 @@ export function BpcSourcingPanel() {
       minMe: parsePositiveNumber(uiFilter.minMe),
       minTe: parsePositiveNumber(uiFilter.minTe),
       minRuns: parsePositiveNumber(uiFilter.minRuns),
-      maxPrice: parsePositiveNumber(uiFilter.maxPrice),
+      maxPrice: uiFilter.maxPrice.trim() === '' ? null : parseIskAmount(uiFilter.maxPrice),
       spaceKinds: activeSpaceKinds,
       allowedSystems: jumpFilter.allowed,
       hideAuctions: uiFilter.hideAuctions,
