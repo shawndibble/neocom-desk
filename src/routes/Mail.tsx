@@ -924,8 +924,21 @@ export function Mail() {
                       )}
                     </p>
                     {selectedHeader !== null && recipients.length > 0 && (
-                      <p>
-                        {t('mail.to')} {recipientNames(selectedHeader).join(', ')}
+                      <p className="flex flex-wrap items-center gap-x-1">
+                        {t('mail.to')}
+                        {recipients.map((recipient, index) => (
+                          <span key={`${recipient.recipient_type}-${recipient.recipient_id}`}>
+                            {recipient.recipient_type === 'character' ? (
+                              <IssuerLink
+                                issuerId={recipient.recipient_id}
+                                name={resolveRecipientName(recipient)}
+                              />
+                            ) : (
+                              resolveRecipientName(recipient)
+                            )}
+                            {index < recipients.length - 1 ? ', ' : ''}
+                          </span>
+                        ))}
                       </p>
                     )}
                   </div>
