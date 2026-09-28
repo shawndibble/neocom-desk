@@ -35,6 +35,7 @@ import {
   type ValueRanked,
 } from './topTypes';
 import type { DailyMetricPoint } from './chartAggregation';
+import { SOURCE_FILL } from './priceSourceTone';
 import type { ChartMetric } from './chartMetricPref';
 
 export interface DailyRatePoint {
@@ -44,14 +45,6 @@ export interface DailyRatePoint {
   source: PriceSource | null;
 }
 
-/** Bar colour per price source — the same meaning as the table's tags. */
-const SOURCE_FILL: Record<PriceSource, string> = {
-  saved: 'var(--color-accent)',
-  historical: 'var(--color-success)',
-  average: 'var(--color-warning)',
-  live: 'var(--color-accent-dim)',
-  none: 'var(--color-line-bright)',
-};
 const LEGEND_SOURCES: PriceSource[] = ['saved', 'historical', 'average', 'live'];
 
 export type TypeComparisonPoint = RankedType;
@@ -91,7 +84,11 @@ function formatDateTick(date: string): string {
   });
 }
 
-function RateTooltip({ active, payload, label }: TooltipContentProps): React.ReactElement | null {
+export function RateTooltip({
+  active,
+  payload,
+  label,
+}: TooltipContentProps): React.ReactElement | null {
   const { t } = useTranslation();
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0]?.payload as DailyRatePoint | undefined;
@@ -103,6 +100,12 @@ function RateTooltip({ active, payload, label }: TooltipContentProps): React.Rea
         {t('miningTax.overview.iskPerHour')}: {formatIsk(point.iskPerHour, 0)} ISK
       </p>
       <p className="text-text-dim">{t('miningTax.overview.rateChartBasis')}</p>
+      {point.source && (
+        <p>
+          {t('miningTax.overview.sourceColumn')}:{' '}
+          {t(`miningTax.overview.priceSource.${point.source}`)}
+        </p>
+      )}
     </div>
   );
 }
@@ -238,6 +241,12 @@ function IskCharts({
         id: 'iskPerHour',
         header: t('miningTax.overview.iskPerHour'),
         render: (point) => `${formatIsk(point.iskPerHour, 0)} ISK`,
+      },
+      {
+        id: 'source',
+        header: t('miningTax.overview.sourceColumn'),
+        render: (point) =>
+          point.source ? t(`miningTax.overview.priceSource.${point.source}`) : '',
       },
     ],
     [t]

@@ -75,6 +75,7 @@ import {
 } from './OverviewSettings';
 import { basisSummary, basisUsage } from './basisLabel';
 import { countDaysBySource, weakestSource, type PriceSource } from '@/engine/miningTax/priceBasis';
+import { SOURCE_TAG_CLASS } from './priceSourceTone';
 import { YieldDetailModal } from './YieldDetailModal';
 import { sumVolume, volumeDisplayMode } from './volume';
 import { VolumeDisplay } from './volumeDisplay';
@@ -102,14 +103,6 @@ function dateRangeLabel(dates: readonly string[]): string {
   const last = sorted[sorted.length - 1];
   return first === last ? first : `${first} – ${last}`;
 }
-
-const SOURCE_TAG_CLASS: Record<PriceSource, string> = {
-  saved: 'border-line-bright text-text-dim',
-  historical: 'border-success/50 text-success',
-  average: 'border-warning/50 text-warning',
-  live: 'border-accent-dim text-accent',
-  none: 'border-line text-text-dim',
-};
 
 /**
  * Saved / Daily avg / Live / No price — where a row's ore prices came from on

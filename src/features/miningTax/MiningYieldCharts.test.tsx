@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import '@/i18n';
-import MiningYieldCharts from './MiningYieldCharts';
+import MiningYieldCharts, { RateTooltip } from './MiningYieldCharts';
 
 /*
  * `ResponsiveContainer` measures its parent and jsdom reports every box as
@@ -56,6 +56,40 @@ describe('MiningYieldCharts — ISK metric', () => {
     expect(within(compare).getByText('Veldspar')).toBeInTheDocument();
     expect(within(compare).getByText('1,000 ISK')).toBeInTheDocument();
     expect(within(compare).getByText('1,200 ISK')).toBeInTheDocument();
+  });
+
+  it("names each day's price source in the rate table", () => {
+    render(
+      <MiningYieldCharts
+        metric="isk"
+        dailyRate={[{ date: '2026-09-01', iskPerHour: 1234567, source: 'live' }]}
+        dailyVolume={[]}
+        dailyCount={[]}
+        typeComparison={typeComparison}
+        typeVolumeComparison={[]}
+        typeCountComparison={[]}
+        showRefining
+      />
+    );
+    const rate = screen.getByRole('table', { name: 'ISK/hr trend' });
+    expect(within(rate).getByRole('columnheader', { name: 'Source' })).toBeInTheDocument();
+    expect(within(rate).getByRole('cell', { name: 'Live' })).toBeInTheDocument();
+  });
+
+  it("names the day's price source in the rate tooltip, and nothing on a day with no source", () => {
+    const tooltipProps = (source: 'live' | null) =>
+      ({
+        active: true,
+        label: '2026-09-01',
+        payload: [{ payload: { date: '2026-09-01', iskPerHour: 1234567, source } }],
+      }) as unknown as Parameters<typeof RateTooltip>[0];
+
+    const { unmount } = render(<RateTooltip {...tooltipProps('live')} />);
+    expect(screen.getByText('Source: Live')).toBeInTheDocument();
+    unmount();
+
+    render(<RateTooltip {...tooltipProps(null)} />);
+    expect(screen.queryByText(/^Source:/)).not.toBeInTheDocument();
   });
 
   it('states the rate chart time basis under its title', () => {
