@@ -48,7 +48,7 @@ import type { CachedResult } from '@/esi/cache';
 import { loadStationName, loadStationSystemId } from '@/features/character/stations';
 import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
 import { loadSystemSecurity, loadSystemName } from '@/features/character/systemSecurity';
-import { loadTypeNames } from '@/features/character/typeNames';
+import { loadTypeNames, loadTypeVolumes } from '@/features/character/typeNames';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadJumpsAway } from '@/features/character/routeDistance';
 import { useRoutePreference, type RoutePreference } from '@/features/character/routePreference';
@@ -61,7 +61,6 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import { assetCsvRows, assetsCsvColumns } from '@/features/character/assetsCsv';
 import { getAdjustedPrices } from '@/market/prices';
 import { formatIsk } from '@/lib/isk';
-import { loadTypes } from '@/sde/loadSde';
 import {
   buildAssetTree,
   compareStations,
@@ -257,21 +256,6 @@ async function loadAssetPrices(): Promise<Map<number, number>> {
       if (price.average !== null) byType.set(typeId, price.average);
     }
     return byType;
-  } catch {
-    return new Map();
-  }
-}
-
-/** Physical volume (m3, unpackaged) per type, best-effort from the slim SDE snapshot — never fetched live per hover, so a market/asset-only type this snapshot doesn't cover just shows as unknown. */
-async function loadTypeVolumes(typeIds: readonly number[]): Promise<Map<number, number>> {
-  try {
-    const types = await loadTypes();
-    const map = new Map<number, number>();
-    for (const id of typeIds) {
-      const volume = types[String(id)]?.volume;
-      if (volume !== undefined) map.set(id, volume);
-    }
-    return map;
   } catch {
     return new Map();
   }

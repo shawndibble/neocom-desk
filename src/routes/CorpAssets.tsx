@@ -91,6 +91,7 @@ import {
   SearchResultRow,
 } from '@/features/character/assetBrowserRows';
 import { hasItemRows } from '@/features/character/assetBrowserFormat';
+import { loadTypeVolumes } from '@/features/character/typeNames';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
@@ -105,6 +106,7 @@ import { useFocusHeading } from '@/lib/useFocusHeading';
 const SEARCH_DEBOUNCE_MS = 250;
 const SEARCH_PARAM = textParam();
 const EMPTY_PRICES: ReadonlyMap<number, number> = new Map();
+const EMPTY_VOLUMES: ReadonlyMap<number, number> = new Map();
 const EMPTY_DIVISION_NAMES: ReadonlyMap<number, string | null> = new Map();
 
 interface AssetsSnapshot {
@@ -122,6 +124,8 @@ interface AssetsSnapshot {
   labels: CorpAssetLabels;
   /** Global average market price per type, best-effort — an outage degrades ISK badges to 0 rather than the whole page. */
   priceByTypeId: ReadonlyMap<number, number>;
+  /** Physical volume (m3, unpackaged) per type, best-effort from the slim SDE snapshot. */
+  volumeByTypeId: ReadonlyMap<number, number>;
   /** The page cap was hit or a page was missing — corp holdings are the likelier of the two lists to hit it. */
   truncated: boolean;
   assetsShown: number;
@@ -136,6 +140,7 @@ const EMPTY_SNAPSHOT: AssetsSnapshot = {
   divisionNames: new Map(),
   labels: EMPTY_CORP_ASSET_LABELS,
   priceByTypeId: new Map(),
+  volumeByTypeId: new Map(),
   truncated: false,
   assetsShown: 0,
   fetchedAt: null,
@@ -181,6 +186,8 @@ async function loadAssetsSnapshot(
     assets === null ? EMPTY_CORP_ASSET_LABELS : await loadCorpAssetLabels(characterId, assets);
   const truncated = assetsResult.cached?.truncated ?? false;
   const assetsShown = assets?.length ?? 0;
+  const typeIds = inputs === null ? [] : [...new Set(inputs.map((i) => i.typeId))];
+  const volumeByTypeId = await loadTypeVolumes(typeIds);
 
   const fetchedAts = [assetsResult, divisionsResult]
     .map((result) => result.cached?.fetchedAt)
@@ -197,6 +204,7 @@ async function loadAssetsSnapshot(
     divisionNames,
     labels,
     priceByTypeId,
+    volumeByTypeId,
     truncated,
     assetsShown,
     fetchedAt,
@@ -734,6 +742,7 @@ function CorpAssetsView() {
                             pathSegments={pathSegments}
                             query={query}
                             priceByTypeId={data?.priceByTypeId ?? EMPTY_PRICES}
+                            volumeByTypeId={data?.volumeByTypeId ?? EMPTY_VOLUMES}
                           />
                         </div>
                       );
@@ -763,6 +772,7 @@ interface BrowseRowViewProps {
   /** Current query string (`?q=…` or empty), kept on drill-down links. */
   query: string;
   priceByTypeId: ReadonlyMap<number, number>;
+  volumeByTypeId: ReadonlyMap<number, number>;
 }
 
 /** Dispatches one virtualized row to the right presentation component. */
@@ -821,6 +831,7 @@ function NodeRowView({
   pathSegments,
   query,
   priceByTypeId,
+  volumeByTypeId,
 }: BrowseRowViewProps & { node: AssetTreeNode }) {
   const label = nodeLabel(node, typeNames, locationNames, t);
 
@@ -846,7 +857,7 @@ function NodeRowView({
     <ItemRow
       name={label}
       quantity={asset.quantity}
-      unitVolume={undefined}
+      unitVolume={volumeByTypeId.get(asset.type_id)}
       estimatedValue={estimatedValueFor(asset, priceByTypeId)}
       characterBadge={null}
       selectMode={selectMode}

@@ -200,3 +200,22 @@ export async function loadTypeNames(typeIds: readonly number[]): Promise<Map<num
   }
   return map;
 }
+
+/**
+ * Physical volume (m3, unpackaged) per type, best-effort from the slim SDE
+ * snapshot — never fetched live, so a market/asset-only type this snapshot
+ * doesn't cover just shows as unknown.
+ */
+export async function loadTypeVolumes(typeIds: readonly number[]): Promise<Map<number, number>> {
+  try {
+    const types = await loadTypes();
+    const map = new Map<number, number>();
+    for (const id of typeIds) {
+      const volume = types[String(id)]?.volume;
+      if (volume !== undefined) map.set(id, volume);
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
