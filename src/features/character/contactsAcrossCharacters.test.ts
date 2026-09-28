@@ -19,14 +19,20 @@ function contact(
   };
 }
 
-const MAIN: CharacterContactList = { characterId: 1, name: 'Main', contacts: [contact(10, 10)] };
-const ALT: CharacterContactList = { characterId: 2, name: 'Alt', contacts: [contact(10, 10)] };
+function list(overrides: Partial<CharacterContactList> = {}): CharacterContactList {
+  return { characterId: 1, name: 'Main', contacts: [], truncated: false, ...overrides };
+}
+
+const MAIN: CharacterContactList = list({ contacts: [contact(10, 10)] });
+const ALT: CharacterContactList = list({
+  characterId: 2,
+  name: 'Alt',
+  contacts: [contact(10, 10)],
+});
 
 describe('mergeContactsAcrossCharacters', () => {
   it('returns nothing when no character has any contacts', () => {
-    expect(mergeContactsAcrossCharacters([{ characterId: 1, name: 'Main', contacts: [] }])).toEqual(
-      []
-    );
+    expect(mergeContactsAcrossCharacters([list()])).toEqual([]);
   });
 
   it('agrees when every character holds the contact at the same standing', () => {
@@ -38,10 +44,7 @@ describe('mergeContactsAcrossCharacters', () => {
   });
 
   it('reports the characters a contact is missing from', () => {
-    const [row] = mergeContactsAcrossCharacters([
-      MAIN,
-      { characterId: 2, name: 'Alt', contacts: [] },
-    ]);
+    const [row] = mergeContactsAcrossCharacters([MAIN, list({ characterId: 2, name: 'Alt' })]);
 
     expect(row.missing.map((m) => m.name)).toEqual(['Alt']);
     expect(row.disagrees).toBe(true);
@@ -50,7 +53,7 @@ describe('mergeContactsAcrossCharacters', () => {
   it('disagrees when two characters hold the same contact at different standings', () => {
     const [row] = mergeContactsAcrossCharacters([
       MAIN,
-      { characterId: 2, name: 'Alt', contacts: [contact(10, -10)] },
+      list({ characterId: 2, name: 'Alt', contacts: [contact(10, -10)] }),
     ]);
 
     expect(row.standings).toEqual([-10, 10]);
@@ -59,11 +62,7 @@ describe('mergeContactsAcrossCharacters', () => {
 
   it('keeps a corp and a character sharing an id apart', () => {
     const rows = mergeContactsAcrossCharacters([
-      {
-        characterId: 1,
-        name: 'Main',
-        contacts: [contact(10, 10), contact(10, -10, 'corporation')],
-      },
+      list({ contacts: [contact(10, 10), contact(10, -10, 'corporation')] }),
     ]);
 
     expect(rows).toHaveLength(2);
@@ -79,9 +78,9 @@ describe('mergeContactsAcrossCharacters', () => {
 
   it('orders held and missing by the order the characters were given', () => {
     const rows = mergeContactsAcrossCharacters([
-      { characterId: 1, name: 'Main', contacts: [] },
-      { characterId: 2, name: 'Alt', contacts: [contact(10, 5)] },
-      { characterId: 3, name: 'Third', contacts: [contact(10, 5)] },
+      list(),
+      list({ characterId: 2, name: 'Alt', contacts: [contact(10, 5)] }),
+      list({ characterId: 3, name: 'Third', contacts: [contact(10, 5)] }),
     ]);
 
     expect(rows[0].held.map((h) => h.name)).toEqual(['Alt', 'Third']);
@@ -91,8 +90,8 @@ describe('mergeContactsAcrossCharacters', () => {
   it('carries the flags of every holder, so a contact blocked on one alt only is visible', () => {
     const blocked = { ...contact(10, -10), is_blocked: true };
     const [row] = mergeContactsAcrossCharacters([
-      { characterId: 1, name: 'Main', contacts: [blocked] },
-      { characterId: 2, name: 'Alt', contacts: [contact(10, -10)] },
+      list({ contacts: [blocked] }),
+      list({ characterId: 2, name: 'Alt', contacts: [contact(10, -10)] }),
     ]);
 
     expect(row.held.map((h) => h.contact.is_blocked)).toEqual([true, false]);

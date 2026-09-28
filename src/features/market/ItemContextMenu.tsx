@@ -9,7 +9,13 @@ import { useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
-import { MenuItem, RowActionsContext, RowActionsMenu, RowMoreActions } from '@/components/ui';
+import {
+  DisabledMenuItem,
+  MenuItem,
+  RowActionsContext,
+  RowActionsMenu,
+  RowMoreActions,
+} from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
 import { marketLinkParams } from '@/engine/market/urlState';
 import { usePiPlannable } from '@/features/pi/usePiPlannable';
@@ -141,13 +147,15 @@ function useItemMenuItems(props: ItemMenuProps, onAlertRequest: () => void): Rea
 
   return (
     <>
-      <MenuItem
-        disabled={!canAddToQuickbar}
-        title={canAddToQuickbar ? undefined : t('market.contextMenu.quickbarNoCharacter')}
-        onSelect={() => addToQuickbar(typeId, itemName)}
-      >
-        {t('market.contextMenu.addToQuickbar')}
-      </MenuItem>
+      {canAddToQuickbar ? (
+        <MenuItem onSelect={() => addToQuickbar(typeId, itemName)}>
+          {t('market.contextMenu.addToQuickbar')}
+        </MenuItem>
+      ) : (
+        <DisabledMenuItem reason={t('market.contextMenu.quickbarNoCharacter')}>
+          {t('market.contextMenu.addToQuickbar')}
+        </DisabledMenuItem>
+      )}
       <PriceAlertMenuItem typeId={typeId} available={canAddToQuickbar} onSelect={onAlertRequest} />
       <ShowInfoMenuItem typeId={typeId} itemName={itemName} />
       <MenuItem onSelect={() => addToCompare({ typeId, itemName })}>

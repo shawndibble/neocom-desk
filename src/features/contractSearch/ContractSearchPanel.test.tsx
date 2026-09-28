@@ -2014,3 +2014,14 @@ describe('ContractSearchPanel — progressive loading', () => {
     expect(await screen.findByText('Refresh failed — showing cached data')).toBeInTheDocument();
   });
 });
+
+describe('ContractSearchPanel — item name links to Market Browser (issue #2169)', () => {
+  it('renders the item cell as a link into the Market Browser, not a bare string', async () => {
+    renderWithRouter();
+
+    const rows = await bodyRows();
+    const link = within(rows[0]).getByRole('link', { name: 'Tritanium' });
+    expect(link).toHaveAttribute('href', expect.stringContaining('/market/browser'));
+    expect(link).toHaveAttribute('href', expect.stringContaining('34'));
+  });
+});
