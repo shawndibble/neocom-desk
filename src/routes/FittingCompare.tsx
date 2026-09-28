@@ -303,7 +303,16 @@ export function FittingCompare() {
           {isPhone && differencesToggle}
           {!statsReady ? (
             <Panel title={t('fittings.compare.statsTitle')}>
-              <p className={profileFailed ? 'text-xs text-danger' : 'text-xs text-text-dim'}>
+              <div className="flex flex-wrap justify-end gap-3">
+                {columns.map((column) => (
+                  <div key={column.index}>{column.header}</div>
+                ))}
+              </div>
+              <p
+                className={
+                  profileFailed ? 'mt-2 text-xs text-danger' : 'mt-2 text-xs text-text-dim'
+                }
+              >
                 {profileFailed
                   ? t('fittings.compare.profileFailed')
                   : anyError
