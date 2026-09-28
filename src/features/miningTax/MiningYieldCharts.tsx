@@ -330,7 +330,11 @@ function IskCharts({
                 tickFormatter={(value: number) => formatIskCompact(value)}
               />
               <Tooltip content={(props) => <RateTooltip {...props} />} />
-              <Bar dataKey="iskPerHour" name={t('miningTax.overview.iskPerHour')}>
+              <Bar
+                isAnimationActive={false}
+                dataKey="iskPerHour"
+                name={t('miningTax.overview.iskPerHour')}
+              >
                 {dailyRate.map((point) => (
                   <Cell key={point.date} fill={SOURCE_FILL[point.source ?? 'saved']} />
                 ))}
@@ -398,6 +402,7 @@ function IskCharts({
               />
               {showRefining && <Legend wrapperStyle={{ fontSize: '0.6875rem' }} />}
               <Bar
+                isAnimationActive={false}
                 dataKey="rawValue"
                 fill="var(--color-line-bright)"
                 name={t('miningTax.overview.rawSellValue')}
@@ -413,6 +418,7 @@ function IskCharts({
               </Bar>
               {showRefining && (
                 <Bar
+                  isAnimationActive={false}
                   dataKey="refineValue"
                   fill="var(--color-accent)"
                   name={t('miningTax.overview.refineValue')}
@@ -551,7 +557,12 @@ function MetricCharts({
                 tickFormatter={(value: number) => formatCompactNumber(value)}
               />
               <Tooltip content={(props) => <MetricRateTooltip {...props} metric={metric} />} />
-              <Bar dataKey="value" name={rateValueLabel} fill="var(--color-accent)" />
+              <Bar
+                isAnimationActive={false}
+                dataKey="value"
+                name={rateValueLabel}
+                fill="var(--color-accent)"
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -597,7 +608,12 @@ function MetricCharts({
                 width={120}
               />
               <Tooltip content={(props) => <MetricCompareTooltip {...props} metric={metric} />} />
-              <Bar dataKey="value" fill="var(--color-line-bright)" name={totalValueLabel}>
+              <Bar
+                isAnimationActive={false}
+                dataKey="value"
+                fill="var(--color-line-bright)"
+                name={totalValueLabel}
+              >
                 <LabelList
                   dataKey="value"
                   position="right"

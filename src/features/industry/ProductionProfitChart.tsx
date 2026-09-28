@@ -103,6 +103,7 @@ export default function ProductionProfitChart({ points, trend }: ProductionProfi
             />
             <Tooltip content={(props) => <ProfitTooltip {...props} />} />
             <Line
+              isAnimationActive={false}
               type="monotone"
               dataKey="profit"
               stroke={TREND_STROKE[trend]}
