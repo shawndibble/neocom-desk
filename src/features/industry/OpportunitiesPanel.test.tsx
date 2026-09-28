@@ -187,6 +187,17 @@ describe('OpportunitiesPanel', () => {
       return { row: name.closest('tr')!, actions };
     }
 
+    it('links the product name to its Market listing when the product type is known', async () => {
+      const { row } = await renderWithRow(1000);
+      expect(within(row).getByRole('link', { name: 'Widget Alpha' })).toBeInTheDocument();
+    });
+
+    it('renders the product name as plain text, not a link, when the product type is unknown', async () => {
+      const { row } = await renderWithRow(null);
+      expect(within(row).queryByRole('link', { name: 'Widget Alpha' })).not.toBeInTheDocument();
+      expect(within(row).getByText('Widget Alpha')).toBeInTheDocument();
+    });
+
     it('opens the shared item menu from a row and wires its actions', async () => {
       const { row, actions } = await renderWithRow(1000);
       fireEvent.contextMenu(row);

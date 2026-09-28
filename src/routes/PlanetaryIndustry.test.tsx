@@ -328,6 +328,15 @@ describe('PlanetaryIndustry', () => {
     expect(within(panel).getByText('Storage full in: unknown')).toBeInTheDocument();
   });
 
+  it('gives the expiry and fill-time cells a title attribute so their text is readable when the cell truncates', async () => {
+    render(<App />);
+    const panel = await colonyPanelFor(/Jita IV/);
+    const expiryCell = within(panel).getByText('Unknown product · Stopped');
+    expect(expiryCell).toHaveAttribute('title', 'Unknown product · Stopped');
+    const fillTimeCell = within(panel).getByText('Storage full in: unknown');
+    expect(fillTimeCell).toHaveAttribute('title', 'Storage full in: unknown');
+  });
+
   it('shows the empty state when there are no colonies', async () => {
     server.use(http.get(`${ESI}/characters/${CHAR_ID}/planets`, () => HttpResponse.json([])));
     render(<App />);

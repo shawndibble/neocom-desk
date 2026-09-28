@@ -22,6 +22,12 @@ export type CsvSurface =
   | 'assets'
   | 'corp-assets'
   | 'contracts'
+  | 'contacts'
+  // The Across tab's rows are a different shape (one row per contact across
+  // every character, not one row per contact on this one) and must never
+  // collide with the Character tab's own file — same reasoning as
+  // corp-vs-personal above.
+  | 'contacts-across'
   | 'orders-open'
   | 'orders-history'
   | 'mail'

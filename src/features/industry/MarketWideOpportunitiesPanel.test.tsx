@@ -63,6 +63,11 @@ function renderPanel(actions = fakeItemActions()) {
 }
 
 describe('MarketWideOpportunitiesPanel row context menu', () => {
+  it('links the product name to its Market listing', () => {
+    renderPanel();
+    expect(screen.getByRole('link', { name: 'Widget Beta' })).toBeInTheDocument();
+  });
+
   it('opens the item menu for the row product', async () => {
     const actions = fakeItemActions();
     renderPanel(actions);
