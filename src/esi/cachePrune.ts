@@ -60,8 +60,9 @@ export interface PruneRule {
 /**
  * The allowlist. A key matching nothing here is never pruned. Deliberately
  * absent: every single-row-per-Character key, anything under `corp:` (its own
- * purge path), and PI's `planet:`/`planet-info:`/`schematic:` — the
- * alt-colony view reads those cache-only, and they are bounded by colonies.
+ * purge path), a citadel's `structure:<id>` name (see its rule), and PI's
+ * `planet:`/`planet-info:`/`schematic:` — the alt-colony view reads those
+ * cache-only, and they are bounded by colonies.
  */
 export const PRUNE_RULES: readonly PruneRule[] = [
   ...[
@@ -84,10 +85,11 @@ export const PRUNE_RULES: readonly PruneRule[] = [
     'contract-location',
     'public-contract-items',
   ].map((prefix) => ({ pattern: new RegExp(`^${prefix}:\\d+$`), maxAgeMs: STATIC_RETENTION_MS })),
-  {
-    pattern: /^structure:\d+(?::forbidden|:roster-forbidden)?$/,
-    maxAgeMs: STATIC_RETENTION_MS,
-  },
+  // Only the refusal memos (valid 24 h). The name row `structure:<id>` is
+  // ACL-gated: after a Character loses access every refetch is a 403 that
+  // never rewrites it, so a pruned name could not come back.
+  // `contract-location:`/`bpc-blueprint-location:v2:` re-resolve through it.
+  { pattern: /^structure:\d+:(?:forbidden|roster-forbidden)$/, maxAgeMs: STATIC_RETENTION_MS },
   { pattern: /^route:\d+:\d+:[a-z]+$/, maxAgeMs: STATIC_RETENTION_MS },
   {
     pattern: /^mail:(\d+)$/,

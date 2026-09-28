@@ -4,7 +4,7 @@ _Recorded 2026-09-28._
 
 - **Per-id `esiCache` rows are deleted once they are far past their
   staleness window; single-row-per-Character rows never are.** Keys such as
-  `name:<id>`, `type:<id>`, `structure:<id>`, `public-character:<id>`,
+  `name:<id>`, `type:<id>`, `station:<id>`, `public-character:<id>`,
   `mail:<id>` and `marketPrice:<station>:<type>` are one row per id the app
   ever looked up, so nothing bounded them. Keys such as `skills`, `assets`,
   `contracts` and `mail:headers` are one row per Character, are refreshed on
@@ -28,10 +28,13 @@ _Recorded 2026-09-28._
   the id has dropped off the list, the row is unreachable from the UI and is
   pruned like any static row.
 
-- **PI rows and `corp:` rows are excluded.** The alt-colony view reads
-  `planet:`, `planet-info:` and `schematic:` cache-only, and those are bounded
-  by the roster's colonies. Corp-owned rows already have their own purge path
-  (`purgeCorpScopedCache`).
+- **PI rows, `corp:` rows and citadel names are excluded.** The alt-colony
+  view reads `planet:`, `planet-info:` and `schematic:` cache-only, and those
+  are bounded by the roster's colonies. Corp-owned rows already have their own
+  purge path (`purgeCorpScopedCache`). A citadel's `structure:<id>` row is
+  ACL-gated: once a Character loses access, every refetch is a 403 that never
+  rewrites it, so a pruned name could never come back. Only its 24-hour
+  `:forbidden`/`:roster-forbidden` memos are pruned.
 
 - **At most once a day, online only, well after boot.** The prune runs 60 s
   after mount, in an idle slot, from its own chunk. A `settings` stamp is

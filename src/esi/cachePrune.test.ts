@@ -60,7 +60,6 @@ describe('pruneRuleFor', () => {
     'public-corporation:98000001',
     'public-alliance:99000001',
     'public-employment:9000',
-    'structure:1035466617946',
     'structure:1035466617946:forbidden',
     'structure:1035466617946:roster-forbidden',
     'station:60003760',
@@ -113,6 +112,8 @@ describe('pruneRuleFor', () => {
     'planet:40000001',
     'planet-info:40000001',
     'schematic:66',
+    // A citadel's name: ACL-gated, so a refetch after losing access is a 403.
+    'structure:1035466617946',
     // Near misses of allowlisted prefixes.
     'name:abc',
     'names:1',
