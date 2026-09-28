@@ -1,6 +1,9 @@
 // Must stay the first import: Sentry has to initialise before any other
 // module gets a chance to throw. See src/instrument.ts.
 import './instrument';
+// Second, so a returning user's signed-in shell chunks start fetching before
+// the rest of the entry evaluates. See src/app/bootShellPreload.ts.
+import './app/bootShellPreload';
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

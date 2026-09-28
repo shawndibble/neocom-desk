@@ -1,7 +1,8 @@
 import { captureMessage } from '@sentry/react';
 
 /** Which of `BootScreen`'s mount points reported the stall. */
-export type BootGate = 'root' | 'require-character' | 'login' | 'fitting-shared';
+export type BootGate =
+  'root' | 'require-character' | 'login' | 'fitting-shared' | 'signed-in-shell';
 
 /**
  * Report a boot that never finished — once per page session.

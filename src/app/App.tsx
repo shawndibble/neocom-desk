@@ -17,9 +17,9 @@ import { scheduleBootPrefetch } from './bootPrefetch';
 import { Login } from '@/routes/Login';
 import { Callback } from '@/routes/Callback';
 import * as routeChunks from './routeChunks';
-import { Overview } from '@/routes/Overview';
 import { NotFound } from '@/routes/NotFound';
-import { Layout } from './Layout';
+import { preloadedLazy } from './preloadedLazy';
+import { writeSignedInShellHint } from './signedInShellHint';
 import { AnalyticsPageViewTracker } from './AnalyticsPageViewTracker';
 import { DocumentTitleTracker } from './DocumentTitleTracker';
 import { ReloadPrompt } from './ReloadPrompt';
@@ -48,8 +48,13 @@ import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 // surfacing as an empty view in whichever feature happened to ask first.
 configureEsi({ getToken: (characterId) => getAccessTokenReportingFailures(characterId) });
 
-// Code-split routes (`routeChunks.ts`). Login, Callback, Overview and
-// NotFound stay eager above: a cold load can land on them before any choice.
+// Code-split routes (`routeChunks.ts`). Login, Callback and NotFound stay
+// eager above: a signed-out cold load can land on them before any choice.
+// The signed-in shell is split so a first visit to /login skips it, and
+// preloaded at boot for a returning user (`bootShellPreload.ts`) —
+// `preloadedLazy` then renders it with no fallback frame once it is in.
+const Layout = preloadedLazy(routeChunks.loadLayout);
+const Overview = preloadedLazy(routeChunks.loadOverview);
 const Characters = lazy(routeChunks.loadCharacters);
 const Alerts = lazy(routeChunks.loadAlerts);
 const Skills = lazy(routeChunks.loadSkills);
@@ -255,6 +260,14 @@ export function App() {
   const characterIds = useLiveQuery(() => db.characters.toCollection().primaryKeys(), [], []);
   useBackgroundSync(characterIds);
 
+  // Keeps `bootShellPreload.ts`'s hint in step with Dexie, so the next cold
+  // load knows to fetch the signed-in shell early. No default on the query:
+  // `undefined` is "not read yet", which must not clear the hint.
+  const characterCount = useLiveQuery(() => db.characters.count());
+  useEffect(() => {
+    if (characterCount !== undefined) writeSignedInShellHint(characterCount > 0);
+  }, [characterCount]);
+
   // Same shape, for API-derived data: warm every granted surface into Dexie at
   // boot so a later page opens from cache rather than the network. Cancelled on
   // character switch so a slow run cannot keep spending requests for a
@@ -279,7 +292,16 @@ export function App() {
             <Route path="/callback" element={<Callback />} />
             {/* Below: a logged-in Character, then the route's own scopes. */}
             <Route element={<RequireCharacter />}>
-              <Route element={<Layout />}>
+              {/* The shell's chunk, if the boot preload has not landed it
+                yet: the same screen `RequireCharacter` was just showing, so
+                the hand-off does not jump. */}
+              <Route
+                element={
+                  <Suspense fallback={<BootScreen gate="signed-in-shell" />}>
+                    <Layout />
+                  </Suspense>
+                }
+              >
                 {/* A tabbed page (`pageTabs.ts`) mounts once at `<path>/*`, so
                   its tabs are one route instance: switching tab keeps the
                   page mounted, and none of the tables above gain an entry. */}
