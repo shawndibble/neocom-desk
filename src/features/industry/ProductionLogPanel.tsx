@@ -382,6 +382,99 @@ export function ProductionLogPanel({
     [profitHistoryPoints]
   );
 
+  // Memoized, and above the early return, so the `sortValue`s `DataTable`
+  // keys its sort on keep their identity across renders.
+  const columns = useMemo<DataTableColumn<ItemRow>[]>(
+    () => [
+      {
+        id: 'item',
+        header: t('industry.product'),
+        primary: true,
+        sortValue: (r) => r.itemName,
+        render: (r) => <MarketItemLink typeId={r.productTypeID}>{r.itemName}</MarketItemLink>,
+      },
+      {
+        id: 'runsLogged',
+        header: t('industry.runsLogged'),
+        align: 'right',
+        className: 'tabular-nums',
+        sortValue: (r) => r.runsLogged,
+        render: (r) => r.runsLogged.toLocaleString(),
+      },
+      {
+        id: 'unitsProduced',
+        header: t('industry.unitsProduced'),
+        align: 'right',
+        className: 'tabular-nums',
+        sortValue: (r) => r.unitsProduced,
+        render: (r) => r.unitsProduced.toLocaleString(),
+      },
+      {
+        id: 'unitsSold',
+        header: t('industry.unitsSold'),
+        align: 'right',
+        className: 'tabular-nums',
+        sortValue: (r) => r.unitsSold,
+        render: (r) => r.unitsSold.toLocaleString(),
+      },
+      {
+        id: 'realizedProfit',
+        header: t('industry.realizedProfit'),
+        align: 'right',
+        className: 'tabular-nums font-semibold',
+        cellClassName: (r) => iskToneClass(r.realizedProfit),
+        sortValue: (r) => r.realizedProfit,
+        render: (r) => formatIsk(r.realizedProfit),
+      },
+      {
+        id: 'avgMargin',
+        header: t('industry.avgMargin'),
+        align: 'right',
+        className: 'tabular-nums text-text-dim',
+        sortValue: (r) => r.avgMarginPct ?? undefined,
+        render: (r) => (r.avgMarginPct === null ? '—' : formatPercent(r.avgMarginPct)),
+      },
+      {
+        id: 'soldUnitsMargin',
+        header: t('industry.soldUnitsMargin'),
+        align: 'right',
+        className: 'tabular-nums',
+        cellClassName: (r) => (r.unitsSold > 0 ? iskToneClass(r.soldUnitsMargin) : 'text-text-dim'),
+        sortValue: (r) => (r.unitsSold > 0 ? r.soldUnitsMargin : undefined),
+        render: (r) => (r.unitsSold > 0 ? formatIsk(r.soldUnitsMargin) : '—'),
+      },
+      {
+        id: 'unsoldCost',
+        header: t('industry.unsoldCost'),
+        align: 'right',
+        className: 'tabular-nums text-text-dim',
+        sortValue: (r) => r.unsoldCost,
+        render: (r) => formatIsk(r.unsoldCost),
+      },
+    ],
+    [t]
+  );
+
+  // `soldActionsColumn` is appended below the early return: `sale` is a fresh
+  // object every render, and none of the sortable columns need it.
+  const baseRunColumns = useMemo<DataTableColumn<RunRow>[]>(
+    () => [
+      loggedAtColumn(t, timeZone),
+      {
+        id: 'item',
+        header: t('industry.productionRunColumnItem'),
+        sortValue: (r) => r.itemName,
+        render: (r) => <MarketItemLink typeId={r.run.productTypeID}>{r.itemName}</MarketItemLink>,
+      },
+      quantityColumn(t),
+      totalCostColumn(t),
+      quantitySoldColumn(t),
+      realizedProfitColumn(t, skills, (r) => standingByPlanId.get(r.run.buildPlanId)),
+      statusColumn(t),
+    ],
+    [t, timeZone, skills, standingByPlanId]
+  );
+
   if (runs.length === 0) {
     return (
       <Panel title={t('industry.productionLog')}>
@@ -419,89 +512,7 @@ export function ProductionLogPanel({
     );
   };
 
-  const columns: DataTableColumn<ItemRow>[] = [
-    {
-      id: 'item',
-      header: t('industry.product'),
-      primary: true,
-      sortValue: (r) => r.itemName,
-      render: (r) => <MarketItemLink typeId={r.productTypeID}>{r.itemName}</MarketItemLink>,
-    },
-    {
-      id: 'runsLogged',
-      header: t('industry.runsLogged'),
-      align: 'right',
-      className: 'tabular-nums',
-      sortValue: (r) => r.runsLogged,
-      render: (r) => r.runsLogged.toLocaleString(),
-    },
-    {
-      id: 'unitsProduced',
-      header: t('industry.unitsProduced'),
-      align: 'right',
-      className: 'tabular-nums',
-      sortValue: (r) => r.unitsProduced,
-      render: (r) => r.unitsProduced.toLocaleString(),
-    },
-    {
-      id: 'unitsSold',
-      header: t('industry.unitsSold'),
-      align: 'right',
-      className: 'tabular-nums',
-      sortValue: (r) => r.unitsSold,
-      render: (r) => r.unitsSold.toLocaleString(),
-    },
-    {
-      id: 'realizedProfit',
-      header: t('industry.realizedProfit'),
-      align: 'right',
-      className: 'tabular-nums font-semibold',
-      cellClassName: (r) => iskToneClass(r.realizedProfit),
-      sortValue: (r) => r.realizedProfit,
-      render: (r) => formatIsk(r.realizedProfit),
-    },
-    {
-      id: 'avgMargin',
-      header: t('industry.avgMargin'),
-      align: 'right',
-      className: 'tabular-nums text-text-dim',
-      sortValue: (r) => r.avgMarginPct ?? undefined,
-      render: (r) => (r.avgMarginPct === null ? '—' : formatPercent(r.avgMarginPct)),
-    },
-    {
-      id: 'soldUnitsMargin',
-      header: t('industry.soldUnitsMargin'),
-      align: 'right',
-      className: 'tabular-nums',
-      cellClassName: (r) => (r.unitsSold > 0 ? iskToneClass(r.soldUnitsMargin) : 'text-text-dim'),
-      sortValue: (r) => (r.unitsSold > 0 ? r.soldUnitsMargin : undefined),
-      render: (r) => (r.unitsSold > 0 ? formatIsk(r.soldUnitsMargin) : '—'),
-    },
-    {
-      id: 'unsoldCost',
-      header: t('industry.unsoldCost'),
-      align: 'right',
-      className: 'tabular-nums text-text-dim',
-      sortValue: (r) => r.unsoldCost,
-      render: (r) => formatIsk(r.unsoldCost),
-    },
-  ];
-
-  const runColumns: DataTableColumn<RunRow>[] = [
-    loggedAtColumn(t, timeZone),
-    {
-      id: 'item',
-      header: t('industry.productionRunColumnItem'),
-      sortValue: (r) => r.itemName,
-      render: (r) => <MarketItemLink typeId={r.run.productTypeID}>{r.itemName}</MarketItemLink>,
-    },
-    quantityColumn(t),
-    totalCostColumn(t),
-    quantitySoldColumn(t),
-    realizedProfitColumn(t, skills, (r) => standingByPlanId.get(r.run.buildPlanId)),
-    statusColumn(t),
-    soldActionsColumn(sale),
-  ];
+  const runColumns = [...baseRunColumns, soldActionsColumn(sale)];
 
   return (
     <Panel

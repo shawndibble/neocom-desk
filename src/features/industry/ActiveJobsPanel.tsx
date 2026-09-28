@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { captureException } from '@sentry/react';
 import { useHighlightParam } from '@/lib/useHighlightParam';
+import { useTicker } from '@/lib/ticker';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
@@ -202,7 +203,8 @@ async function loadActiveJobsSnapshot(characterId: number): Promise<Snapshot> {
  */
 export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   const { t } = useTranslation();
-  const [now, setNow] = useState(() => Date.now());
+  // Shared with every other 30 s clock on screen; paused while the tab is hidden.
+  const now = useTicker(TICK_MS);
   // URL-backed filters (ADR 0015), empty meaning "every activity"/"every
   // status" — matching how no chip pressed reads as no
   // filter everywhere else in the app. Deliberately not the shared
@@ -356,11 +358,6 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       cancelled = true;
     };
   }, [needsJobSlotFanOut, resolvedJobsFilter, jobsFilterCandidates, jobsFanOutRefreshCount]);
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), TICK_MS);
-    return () => clearInterval(id);
-  }, []);
 
   // Stable `{}` fallback: `nameForBlueprint` closes over `types`, and
   // react-hooks/exhaustive-deps rejects a dependency that is a fresh object
