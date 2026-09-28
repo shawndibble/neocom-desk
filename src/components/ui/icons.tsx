@@ -107,16 +107,22 @@ import { Wallet as WalletGlyph } from '@phosphor-icons/react/dist/csr/Wallet';
 import { Warning } from '@phosphor-icons/react/dist/csr/Warning';
 import { WarningOctagon } from '@phosphor-icons/react/dist/csr/WarningOctagon';
 import { X } from '@phosphor-icons/react/dist/csr/X';
-import type { Icon as PhosphorIcon, IconProps } from '@phosphor-icons/react/dist/lib/types';
+import type {
+  Icon as PhosphorIcon,
+  IconProps as PhosphorIconProps,
+} from '@phosphor-icons/react/dist/lib/types';
 import type { ComponentType } from 'react';
-
-export type { IconProps };
+// Every icon renders at `ICON_WEIGHT` unless told otherwise. It lives in
+// `iconWeights.ts` (import it from there) because `vite.config.ts` reads the
+// same file, and a React module can't be loaded there.
+import { type AllowedIconWeight, ICON_WEIGHT } from './iconWeights';
 
 /**
- * Every icon in the app renders at this weight. Exported so a one-off that
- * needs a Phosphor glyph not yet re-exported below can still match.
+ * Phosphor's props with `weight` narrowed to the weights production builds
+ * keep (`iconWeights.ts`) — `phosphorWeightsPlugin` strips the rest, so any
+ * other weight would render blank.
  */
-export const ICON_WEIGHT = 'light' as const;
+export type IconProps = Omit<PhosphorIconProps, 'weight'> & { weight?: AllowedIconWeight };
 
 /** Sized in `rem` so icons scale with the root font-size like their labels do (DESIGN.md §2). */
 export const ICON_SIZE = {
