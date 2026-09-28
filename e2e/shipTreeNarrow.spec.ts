@@ -29,6 +29,10 @@ test.describe('Ship Tree — narrow', () => {
       await expect(merlinRow).toBeVisible();
       await expectNoPageOverflow(page);
 
+      const factionButton = page.getByRole('button', { name: /Caldari State/ });
+      const box = await factionButton.boundingBox();
+      expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+
       await views.getByRole('button', { name: 'Map' }).click();
       await expect(page.getByRole('region', { name: 'Caldari State ship tree' })).toBeVisible();
       await expectNoPageOverflow(page);
