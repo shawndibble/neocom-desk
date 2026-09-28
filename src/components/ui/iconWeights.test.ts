@@ -22,6 +22,7 @@ function sourceFiles(dir: string): string[] {
 }
 
 const WEIGHT_NAME = new RegExp(`['"\`](${PHOSPHOR_WEIGHTS.join('|')})['"\`]`, 'g');
+const WEIGHT_VALUE = /\bweight\s*[=:]\s*(\{[^{}]*\}|[^,;}]+)/g;
 
 describe('Phosphor icon weights', () => {
   it('the default weight is one the build keeps', () => {
@@ -32,16 +33,17 @@ describe('Phosphor icon weights', () => {
     const offenders: string[] = [];
     for (const file of sourceFiles(SRC)) {
       if (file.endsWith('iconWeights.ts')) continue;
-      readFileSync(file, 'utf8')
-        .split('\n')
-        .forEach((line, i) => {
-          if (!/\bweight\s*[=:]/.test(line)) return;
-          for (const [, weight] of line.matchAll(WEIGHT_NAME)) {
-            if (!(ALLOWED_ICON_WEIGHTS as readonly string[]).includes(weight)) {
-              offenders.push(`${relative(SRC, file)}:${i + 1} uses '${weight}'`);
-            }
+      const source = readFileSync(file, 'utf8');
+      // The value of a `weight=` / `weight:` — a whole `{…}` JSX expression or
+      // everything up to the next `,`/`;`/`}` — even when it spans lines.
+      for (const match of source.matchAll(WEIGHT_VALUE)) {
+        const line = source.slice(0, match.index).split('\n').length;
+        for (const [, weight] of match[1].matchAll(WEIGHT_NAME)) {
+          if (!(ALLOWED_ICON_WEIGHTS as readonly string[]).includes(weight)) {
+            offenders.push(`${relative(SRC, file)}:${line} uses '${weight}'`);
           }
-        });
+        }
+      }
     }
     expect(offenders).toEqual([]);
   });
