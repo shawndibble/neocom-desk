@@ -4208,6 +4208,9 @@
   "contacts": {
     "title": "Contacts",
     "refresh": "Refresh",
+    "exportCsv": "Export CSV",
+    "csvYes": "yes",
+    "csvNo": "no",
     "emptyTitle": "No contacts cached",
     "emptyHint": "Reconnect to fetch this character's contacts.",
     "emptyFetchedTitle": "No contacts",
