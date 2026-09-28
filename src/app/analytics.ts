@@ -7,6 +7,12 @@
  * `isSupported()` additionally rules out environments without cookies/
  * IndexedDB (some privacy modes) — analytics silently no-ops there rather
  * than throwing.
+ *
+ * The Firebase app is dynamically imported too, from `sync/firebaseCore`
+ * (just `firebase/app`) rather than `sync/firebaseApp` (auth + firestore +
+ * functions): this module is reached statically from `App.tsx`, and a static
+ * Firebase import here once pulled the whole SDK into the startup bundle
+ * (`app/bootImportGraph.test.ts` guards that now).
  */
 import type { Analytics } from 'firebase/analytics';
 

@@ -1,17 +1,19 @@
 /**
  * Web Push device registration (issue #356, ADR 0010).
  *
- * Two halves:
- * - `webPushSupport` is a pure read of the environment, used to decide
- *   whether to offer the flow at all and, when not, why not — iOS delivers
- *   Web Push only to an installed PWA, so a non-installed iOS Safari tab must
- *   be told that rather than silently failing the permission request.
- * - `registerDeviceForWebPush` is the one-call orchestration: acquire an FCM
- *   token, gather every stored Character's access token (already cached by
- *   `auth/session.ts`), and hand the batch to the `registerDevice` callable.
- *   Must be called from the same user gesture as the permission grant —
- *   Safari requires the FCM/permission dance to happen in one, and this is
- *   also the point at which an iOS user must already have installed the PWA.
+ * Whether to offer the flow at all is `webPushSupport.ts`, a pure read of the
+ * environment kept apart so the startup bundle can ask it without loading
+ * Firebase. This module *is* Firebase: reach it only through `await
+ * import(...)` from anything the startup bundle reaches
+ * (`app/bootImportGraph.test.ts`).
+ *
+ * `registerDeviceForWebPush` is the one-call orchestration: acquire an FCM
+ * token, gather every stored Character's access token (already cached by
+ * `auth/session.ts`), and hand the batch to the `registerDevice` callable.
+ * The Enable tap's call must happen in the same user gesture as the
+ * permission grant — Safari requires the FCM/permission dance to happen in
+ * one, and this is also the point at which an iOS user must already have
+ * installed the PWA.
  */
 import { deleteToken, getMessaging, getToken } from 'firebase/messaging';
 import { httpsCallable } from 'firebase/functions';
@@ -33,8 +35,8 @@ const NO_PROJECTION_ROWS: readonly ProjectionRow[] = [];
 /**
  * How long an unchanged registration is trusted before the poll re-sends it
  * anyway. The backend keeps a device doc until a send to its token fails
- * (`functions/src/index.ts` `dispatchProjections`) � nothing expires it on
- * `updatedAt` � so this is only a backstop against the backend losing a
+ * (`functions/src/index.ts` `dispatchProjections`) — nothing expires it on
+ * `updatedAt` — so this is only a backstop against the backend losing a
  * write, and the 7-day stale-unsent projection purge (keyed on `fireAt`) is
  * far outside it either way.
  */
@@ -70,7 +72,7 @@ function writeLastRegistration(value: LastRegistration | undefined): void {
   }
 }
 
-/** cyrb53 � a short, stable digest so a 72-hour Projection isn't stored verbatim. */
+/** cyrb53 — a short, stable digest so a 72-hour Projection isn't stored verbatim. */
 function digest(text: string): string {
   let h1 = 0xdeadbeef;
   let h2 = 0x41c6ce57;
@@ -116,8 +118,8 @@ function registrationFingerprint(
 
 export interface RegisterDeviceOptions {
   /**
-   * Skip the whole registration � every Character's access-token refresh and
-   * the callable � when this device already registered the same FCM token,
+   * Skip the whole registration — every Character's access-token refresh and
+   * the callable — when this device already registered the same FCM token,
    * roster and Projections within {@link REREGISTER_AFTER_MS}. The 5-minute
    * Foreground Poller sets this; the Enable tap does not, so a user-initiated
    * enable always reaches the backend.
