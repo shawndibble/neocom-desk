@@ -1276,7 +1276,7 @@
       "createPlanAndAdd": "Create Skill Plan and add",
       "add": "Add",
       "trained": "Trained",
-      "inPlan": "In plan",
+      "inPlan": "Planned",
       "addedToast_one": "Added {{count}} skill to {{plan}}",
       "addedToast_other": "Added {{count}} skills to {{plan}}",
       "addedToastUndo": "Undo"
