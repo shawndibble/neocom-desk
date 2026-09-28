@@ -22,3 +22,20 @@ Refines `20260912-125743-alert-dismissals-push-on-dismiss-a-visible-tab.md`.
   edit waits for at most the one sync already in flight, not for the whole
   N-Character sweep. A foreground request for a Character whose background sync
   is still queued promotes that sync rather than queueing a second one.
+- **"Ends on the active Character" is best-effort, not a guarantee.** The
+  session can still end on an alt in two cases:
+  - An edit promotes the active Character's queued sweep sync. It then runs
+    ahead of the alts still queued, which is deliberate: edit latency matters
+    more than where the session ends.
+  - The active Character is already syncing when the sweep fires. The sweep
+    skips it, and the alts queue behind it.
+
+  Either way, the next sync of the active Character re-mints its token. Every
+  sweep costs one token mint per Character it syncs, which counts the
+  appended active Character after any alt.
+
+- **A request that arrives while a Character's sync is running gets one more
+  pass.** It does not just await the pass in flight, which may already have
+  read the local rows before the edit. The caller's promise settles only after
+  that extra pass. `flushSync` relies on this before removing a Character's
+  rows. Syncs still queued when `haltSync` runs are skipped, not run.
