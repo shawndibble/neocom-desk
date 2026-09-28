@@ -97,11 +97,32 @@ export function rosterCoreMap(
   return map;
 }
 
-/** `rosterCoreMap` for one character that just finished refreshing: merges into the previous map rather than replacing it, so the rest of the roster keeps its rows. */
+/**
+ * `rosterCoreMap` for one character that just finished refreshing: merges
+ * into the previous map rather than replacing it, so the rest of the
+ * roster keeps its rows. `jobSlotSkills`/`totalSp` fall back to the
+ * character's previous values when the fresh entry has no skills row
+ * (`loadLive`'s "a failing loader nulls one field rather than sinking the
+ * character" — roster.ts) — a `/skills` refresh that fails must not blank a
+ * value the roster already had, the same as the four-`Map` version this
+ * replaced (its `jobSlotSkillsMap`/`totalSpMap` simply skipped such an
+ * entry, so the old value in each `Map` survived the merge untouched).
+ * `stats`/`queue` always take the fresh value, as before: both are built
+ * for every roster entry regardless of what failed, `queue`'s own `state`
+ * reading `unknown` rather than holding a stale prior reading.
+ */
 export function mergeRosterCore(
   previous: Map<number, RosterCore>,
   entry: RosterEntry,
   nowMs: number
 ): Map<number, RosterCore> {
-  return new Map([...previous, ...rosterCoreMap([entry], nowMs)]);
+  const fresh = rosterCoreMap([entry], nowMs).get(entry.characterId);
+  if (!fresh) return previous; // rosterCoreMap sets one entry per roster row passed in; this never actually misses
+  const prior = previous.get(entry.characterId);
+  const merged: RosterCore = {
+    ...fresh,
+    jobSlotSkills: fresh.jobSlotSkills ?? prior?.jobSlotSkills,
+    totalSp: fresh.totalSp ?? prior?.totalSp,
+  };
+  return new Map(previous).set(entry.characterId, merged);
 }

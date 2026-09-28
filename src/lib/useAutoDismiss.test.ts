@@ -15,7 +15,7 @@ describe('useAutoDismiss', () => {
     const setValue = vi.fn();
     const { result } = renderHook(() => useAutoDismiss<string | null>(setValue, null));
 
-    act(() => result.current('saved'));
+    act(() => result.current.show('saved'));
     expect(setValue).toHaveBeenCalledWith('saved');
 
     act(() => vi.advanceTimersByTime(1999));
@@ -29,7 +29,7 @@ describe('useAutoDismiss', () => {
     const setValue = vi.fn();
     const { result } = renderHook(() => useAutoDismiss<boolean>(setValue, false));
 
-    act(() => result.current(true));
+    act(() => result.current.show(true));
     expect(setValue).toHaveBeenCalledWith(true);
     act(() => vi.advanceTimersByTime(2000));
     expect(setValue).toHaveBeenLastCalledWith(false);
@@ -39,7 +39,7 @@ describe('useAutoDismiss', () => {
     const setValue = vi.fn();
     const { result } = renderHook(() => useAutoDismiss<string | null>(setValue, null));
 
-    act(() => result.current('saved', 4000));
+    act(() => result.current.show('saved', 4000));
     act(() => vi.advanceTimersByTime(2000));
     expect(setValue).not.toHaveBeenCalledWith(null);
     act(() => vi.advanceTimersByTime(2000));
@@ -50,9 +50,9 @@ describe('useAutoDismiss', () => {
     const setValue = vi.fn();
     const { result } = renderHook(() => useAutoDismiss<string | null>(setValue, null));
 
-    act(() => result.current('first'));
+    act(() => result.current.show('first'));
     act(() => vi.advanceTimersByTime(1000));
-    act(() => result.current('second'));
+    act(() => result.current.show('second'));
     // The first call's timer would have fired at 2000ms; it must not clear
     // the second call's value early.
     act(() => vi.advanceTimersByTime(1000));
@@ -63,11 +63,31 @@ describe('useAutoDismiss', () => {
     expect(setValue).toHaveBeenCalledTimes(3); // first, second, null
   });
 
+  it('cancel() clears a pending dismiss without setting offValue (the import-Undo case)', () => {
+    const setValue = vi.fn();
+    const { result } = renderHook(() => useAutoDismiss<string | null>(setValue, null));
+
+    act(() => result.current.show('replaced', 10000));
+    act(() => result.current.cancel());
+    setValue.mockClear();
+
+    act(() => vi.advanceTimersByTime(10000));
+    expect(setValue).not.toHaveBeenCalled();
+  });
+
+  it('cancel() is a no-op when nothing is pending', () => {
+    const setValue = vi.fn();
+    const { result } = renderHook(() => useAutoDismiss<string | null>(setValue, null));
+
+    expect(() => act(() => result.current.cancel())).not.toThrow();
+    expect(setValue).not.toHaveBeenCalled();
+  });
+
   it('clears its pending timeout on unmount, never calling setValue afterward', () => {
     const setValue = vi.fn();
     const { result, unmount } = renderHook(() => useAutoDismiss<string | null>(setValue, null));
 
-    act(() => result.current('saved'));
+    act(() => result.current.show('saved'));
     unmount();
     setValue.mockClear();
 

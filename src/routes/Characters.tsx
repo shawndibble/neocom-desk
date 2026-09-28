@@ -1137,7 +1137,7 @@ export function Characters() {
   /**
    * `rosterCore`'s own `stats` (`rosterCoreMap`) plus the two fields it can't
    * carry itself — group name and alert count both live in stores outside
-   * `rosterView.ts`'s Dexie-free scope (`groups.ts`'s `CharacterSortStats`
+   * `groups.ts`'s Dexie-free scope (`groups.ts`'s `CharacterSortStats`
    * doc comment). Built here, not in `rosterCore` state, so `applyRoster`/
    * `mergeRosterEntry` stay a pure roster-snapshot mirror; this just layers
    * the two extra keys on top for `sortCharacterIds` to read when `sortKey`

@@ -89,4 +89,36 @@ describe('mergeRosterCore', () => {
     expect(merged.get(2)?.stats.name).toBe('B-refreshed');
     expect(merged.size).toBe(2);
   });
+
+  it('keeps the previous jobSlotSkills/totalSp when a refresh comes back with no skills row (a failed /skills call nulls the field rather than sinking the character — roster.ts)', () => {
+    const withSkills = entry({
+      characterId: 1,
+      name: 'A',
+      skills: {
+        data: {
+          total_sp: 5000,
+          skills: [
+            { skill_id: 3387, trained_skill_level: 4, active_skill_level: 4, skillpoints_in_skill: 0 },
+          ],
+        },
+        fetchedAt: new Date('2026-01-01T00:00:00Z'),
+        fromCache: true,
+        truncated: false,
+      },
+      correctedTotalSp: 5000,
+    });
+    const previous = rosterCoreMap([withSkills], NOW);
+    expect(previous.get(1)?.totalSp).toBe(5000);
+    expect(previous.get(1)?.jobSlotSkills?.massProduction).toBe(4);
+
+    // A "Refresh all" pass where this character's /skills call failed:
+    // `entry.skills` comes back null, but the character isn't dropped.
+    const failedRefresh = entry({ characterId: 1, name: 'A', skills: null, correctedTotalSp: null });
+    const merged = mergeRosterCore(previous, failedRefresh, NOW);
+
+    expect(merged.get(1)?.totalSp).toBe(5000);
+    expect(merged.get(1)?.jobSlotSkills?.massProduction).toBe(4);
+    // stats/queue still take the fresh (now-unknown) reading, unlike the two skill-derived fields.
+    expect(merged.get(1)?.stats.skillPoints).toBeUndefined();
+  });
 });
