@@ -74,15 +74,15 @@ function iskPerLpTone(value: number | null): string {
   return value === null ? 'text-text-dim' : iskToneClass(value);
 }
 
+/** Module-level so the table's windowing and row memo see one stable function. */
+const offerRowKey = (row: LoyaltyOfferRow) => row.offer.offer_id;
+
 /**
  * A blueprint offer's row is the *blueprint*, but every market/menu action on
  * it targets the manufactured product — shared by `OfferDetail`'s own
  * View in Market/Plan in Industry buttons and the row's context menu, so the
  * two can't drift on which field means "the real item".
  */
-/** Module-level so the table's windowing and row memo see one stable function. */
-const offerRowKey = (row: LoyaltyOfferRow) => row.offer.offer_id;
-
 function resolveLoyaltyRowItem(row: LoyaltyOfferRow): { typeId: number | null; itemName: string } {
   if (!row.isBlueprint) return { typeId: row.offer.type_id, itemName: row.itemName };
   return { typeId: row.productTypeId, itemName: row.productName ?? row.itemName };
@@ -442,8 +442,9 @@ export function LoyaltyStore() {
     },
     [catalog]
   );
-  // Keyed on the id, not `selectedRow`: a selected offer filtered out of
-  // `filteredRows` has no row to tint either way.
+  // Tint and `selectedRowKey` both key on the selected id rather than
+  // `selectedRow`: a selected offer filtered out of `filteredRows` has no row
+  // to mark either way, and one source keeps the two from disagreeing.
   const offerRowClassName = useCallback(
     (row: LoyaltyOfferRow) => (row.offer.offer_id === selectedOfferId ? 'bg-panel-2' : undefined),
     [selectedOfferId]
@@ -577,7 +578,7 @@ export function LoyaltyStore() {
             stackSummary={t('loyaltyStore.offerCount', { count: filteredRows.length })}
             onRowClick={selectRow}
             rowContextMenu={rowContextMenu}
-            selectedRowKey={selectedRow?.offer.offer_id ?? null}
+            selectedRowKey={selectedOfferId}
             rowClassName={offerRowClassName}
           />
         </>

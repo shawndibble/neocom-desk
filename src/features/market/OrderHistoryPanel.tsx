@@ -141,10 +141,10 @@ interface OrderHistoryPanelProps {
   onViewChange: (view: HistoryView) => void;
 }
 
-/** Market's History tab, Orders view: a character's completed/expired/cancelled market orders. */
 /** Module-level so the table's windowing and row memo see one stable function. */
 const orderHistoryRowKey = (order: MarketOrderHistory) => order.order_id;
 
+/** Market's History tab, Orders view: a character's completed/expired/cancelled market orders. */
 export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();

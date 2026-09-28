@@ -204,7 +204,6 @@ async function loadMembersSnapshot(
   return { corporationId, members, roles, labels, diff, fetchedAt, loadedAt };
 }
 
-/** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
 /**
  * Row context menu (issue #421, AC1): the shared Public Info Modal is the one
  * entry point, same as every other list with a Show Info action. Module-level,
@@ -218,6 +217,7 @@ function memberRowContextMenu(row: RosterRow, tr: ReactElement) {
   );
 }
 
+/** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
 function CorpMembersView() {
   const { t } = useTranslation();
   // The corp's own inactivity policy. Feeds `memberStanding` here so the

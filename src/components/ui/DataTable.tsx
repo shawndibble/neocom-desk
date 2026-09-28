@@ -4,6 +4,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -784,6 +785,11 @@ export function DataTable<T>({
       measureElement(element, entry, instance) || estimatedRowHeight,
     scrollMargin,
     overscan: 10,
+    // The viewport's size before the virtualizer has observed it. Its
+    // default, 0×0, windows nothing on the first render after `enabled`
+    // flips — which, for a table crossing `VIRTUALIZE_THRESHOLD`, would
+    // unmount every row (and drop its focus) for one commit.
+    initialRect: { width: window.innerWidth, height: window.innerHeight },
   });
   // Crossing `sm` swaps table rows for cards of a different height; drop
   // the sizes measured under the old layout (TanStack Virtual's documented
@@ -852,7 +858,7 @@ export function DataTable<T>({
   // reading the latest value through a ref can't render anything stale.
   const onRowClickRef = useRef(onRowClick);
   const expandableRef = useRef(expandable);
-  useEffect(() => {
+  useLayoutEffect(() => {
     onRowClickRef.current = onRowClick;
     expandableRef.current = expandable;
   });
@@ -915,13 +921,14 @@ export function DataTable<T>({
           <td colSpan={columns.length + trailingColumns} className="p-0" />
         </tr>
       );
-    return (
-      <>
-        {spacer(before, 'dt-spacer-before')}
-        {items.map((item) => renderRow(sortedRows[item.index], item.index, false, item.index))}
-        {spacer(after, 'dt-spacer-after')}
-      </>
-    );
+    // One flat keyed array, the same shape the unwindowed body renders: a
+    // table crossing `VIRTUALIZE_THRESHOLD` then keeps its mounted rows (and
+    // their focus, an open menu) instead of remounting them under a fragment.
+    return [
+      spacer(before, 'dt-spacer-before'),
+      ...items.map((item) => renderRow(sortedRows[item.index], item.index, false, item.index)),
+      spacer(after, 'dt-spacer-after'),
+    ];
   }
 
   const sortableColumns = columns.filter((column) => column.sortValue !== undefined);

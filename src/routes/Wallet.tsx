@@ -223,9 +223,10 @@ interface JournalTableProps {
   onSortChange: (sort: DataTableSort) => void;
 }
 
-/** The filter bar plus its result — either the table or a filtered-empty message. Shared by the personal and corp journal panels (issue #413). */
+/** Module-level so the table's windowing and row memo see one stable function. */
 const journalRowKey = (entry: WalletJournalEntry) => entry.id;
 
+/** The filter bar plus its result — either the table or a filtered-empty message. Shared by the personal and corp journal panels (issue #413). */
 function JournalTable({
   filter,
   onFilterChange,

@@ -1165,6 +1165,31 @@ describe('DataTable virtualize', () => {
       expect(document.querySelector('.dt-spacer')).toBeNull();
     });
 
+    it('keeps a focused row mounted and focused as the rows cross the threshold', () => {
+      const table = (count: number) => (
+        <DataTable
+          label="Offers"
+          columns={sortableColumns}
+          rows={rowsOf(count)}
+          rowKey={byId}
+          virtualize="auto"
+          onRowClick={() => {}}
+        />
+      );
+      const { rerender } = render(table(VIRTUALIZE_THRESHOLD));
+      const row = document.querySelector<HTMLElement>('[data-row-key="5"]');
+      row?.focus();
+      expect(document.activeElement).toBe(row);
+
+      rerender(table(VIRTUALIZE_THRESHOLD + 1));
+      expect(document.querySelector('[data-row-key="5"]')).toBe(row);
+      expect(document.activeElement).toBe(row);
+
+      rerender(table(VIRTUALIZE_THRESHOLD));
+      expect(document.querySelector('[data-row-key="5"]')).toBe(row);
+      expect(document.activeElement).toBe(row);
+    });
+
     describe('highlightRowKey', () => {
       let scrollTo: ReturnType<typeof vi.spyOn>;
       let scrollIntoView: ReturnType<typeof vi.spyOn>;
