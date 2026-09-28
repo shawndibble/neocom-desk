@@ -31,6 +31,7 @@ import {
   FilterBar,
   FilterChip,
   FilterField,
+  IskInput,
   Panel,
   RegionSelect,
   SearchInput,
@@ -265,15 +266,12 @@ function ContractSearchFilterBar({
             />
           </FilterField>
           <FilterField label={t('contractSearch.maxPriceLabel')}>
-            <TextInput
-              type="number"
-              inputMode="numeric"
-              min={0}
+            <IskInput
               aria-label={t('contractSearch.maxPriceLabel')}
               placeholder={t('contractSearch.maxPriceLabel')}
               className="w-32"
               value={draft.maxPrice}
-              onChange={(event) => setDraft({ ...draft, maxPrice: event.target.value })}
+              onChange={(maxPrice) => setDraft({ ...draft, maxPrice })}
             />
           </FilterField>
           <FilterField label={t('contractSearch.minQuantityLabel')}>

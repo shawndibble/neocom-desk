@@ -913,6 +913,21 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
   });
 
+  it('takes ISK shorthand in the minimum value, with no echo line in the strip (issue #2227)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText(JITA);
+    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await screen.findByText('Tritanium');
+
+    await user.type(screen.getByLabelText('Minimum value'), '10t');
+
+    await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+    await waitFor(() => expect(window.location.search).toContain('min=10000'));
+    expect(screen.queryByText(/= 10,000 ISK/)).not.toBeInTheDocument();
+  });
+
   it('sorts the flat list by value, highest first', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -976,7 +991,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     await user.click(screen.getByRole('button', { name: 'All items' }));
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByLabelText('Minimum value')).toHaveValue(null);
+    expect(screen.getByLabelText('Minimum value')).toHaveValue('');
   });
 
   it('applies the same min-value filter and sort to active search results', async () => {
@@ -1644,7 +1659,7 @@ describe('view state in the URL (issue #1306)', () => {
       'aria-pressed',
       'true'
     );
-    expect(screen.getByLabelText('Minimum value')).toHaveValue(10000);
+    expect(screen.getByLabelText('Minimum value')).toHaveValue('10000');
   });
 
   it('reads the search text from the URL', async () => {
