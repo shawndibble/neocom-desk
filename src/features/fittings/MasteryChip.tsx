@@ -13,7 +13,7 @@ import {
 import { Skills } from '@/components/ui/icons';
 import { romanLevel } from '@/engine/projection';
 import type { PlanEntry } from '@/engine/types';
-import { formatDuration } from '@/lib/duration';
+import { formatCountdown } from '@/lib/duration';
 import { loadMasteries } from '@/sde/loadSde';
 import type { MasteryMap } from '@/sde/types';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
@@ -163,7 +163,7 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
                         timeLabel={
                           row.status === 'trained'
                             ? t('skills.fitCheck.trained')
-                            : formatDuration(row.seconds)
+                            : formatCountdown(row.seconds)
                         }
                         addLabel={t('skills.fitCheck.add')}
                         inPlanLabel={planned ? t('skills.fitCheck.inPlan') : undefined}
@@ -187,7 +187,7 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
               <div className="flex flex-wrap items-center justify-end gap-2">
                 {untrained.length > 0 && (
                   <span className="text-xs text-text-dim">
-                    {t('fittings.mastery.total', { time: formatDuration(totalSeconds) })}
+                    {t('fittings.mastery.total', { time: formatCountdown(totalSeconds) })}
                   </span>
                 )}
                 <TargetPlanPicker target={target} />

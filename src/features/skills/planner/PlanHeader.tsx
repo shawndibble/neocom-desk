@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Panel, StatChip, TextInput, type StatChipTone } from '@/components/ui';
-import { formatDuration } from '@/lib/duration';
+import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import type { PlanProgress } from '@/engine/planProgress';
@@ -119,7 +119,7 @@ export function PlanHeader({
     >
       {/* A plain wrapping strip, like every other row of StatChips in the app. */}
       <div className="flex flex-wrap gap-2">
-        <StatChip label={t('plans.headerTrainingTime')} value={formatDuration(totalSeconds)} />
+        <StatChip label={t('plans.headerTrainingTime')} value={formatCountdown(totalSeconds)} />
         <StatChip label={t('plans.headerSkillCount')} value={skillCount} />
         <StatChip
           label={t('plans.headerProjectedFinish')}
@@ -167,7 +167,7 @@ export function PlanHeader({
             tone={showsSavings ? 'success' : 'default'}
             value={
               <>
-                {showsSavings ? formatDuration(savingsSeconds) : t('plans.headerSavingsNone')}
+                {showsSavings ? formatCountdown(savingsSeconds) : t('plans.headerSavingsNone')}
                 {badge.capped && (
                   <span className="ml-1 text-text-dim">
                     {t('plans.remapCapNote', { count: badge.evaluatedRemapCount })}
@@ -183,7 +183,7 @@ export function PlanHeader({
             label={t('plans.whatIfChip.label', { lens: whatIf.lens })}
             tone={WHAT_IF_TONE[whatIf.verdict.kind]}
             value={t(`plans.whatIfChip.${whatIf.verdict.kind}`, {
-              duration: formatDuration(whatIf.verdict.seconds),
+              duration: formatCountdown(whatIf.verdict.seconds),
             })}
           />
         )}

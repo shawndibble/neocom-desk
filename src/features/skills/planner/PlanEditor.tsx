@@ -105,7 +105,7 @@ import { cloneStateFor, useCloneStates, withCloneState } from '../cloneState';
 import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
 import { queueCsvColumns } from './queueCsv';
 import { downloadCsv } from '@/lib/downloadCsv';
-import { formatDuration } from '@/lib/duration';
+import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { dedupeEntries } from './reorder';
 import { buildRows } from './markers';
@@ -977,7 +977,7 @@ export function PlanEditor({
     switch (verdict.kind) {
       case 'saves': {
         const saves = t('plans.optimizeConfirmSaves', {
-          duration: formatDuration(verdict.savingsSeconds),
+          duration: formatCountdown(verdict.savingsSeconds),
         });
         return yearlyRemapAfter ? `${saves}. ${yearlyRemapAfterNote(yearlyRemapAfter)}` : saves;
       }
@@ -1316,7 +1316,7 @@ export function PlanEditor({
               <div className="flex items-center justify-between gap-2">
                 <span className="font-semibold">{t('plans.segment', { index: index + 1 })}</span>
                 <span className="tabular-nums text-text-dim">
-                  {formatDuration(segment.seconds)}
+                  {formatCountdown(segment.seconds)}
                 </span>
               </div>
               <p className="text-text-dim">
@@ -1376,7 +1376,7 @@ export function PlanEditor({
           <div className="space-y-2 text-xs">
             {verdict.kind === 'saves' ? (
               <p className="font-semibold text-success">
-                {t('plans.remapSaves', { duration: formatDuration(verdict.savingsSeconds) })}
+                {t('plans.remapSaves', { duration: formatCountdown(verdict.savingsSeconds) })}
               </p>
             ) : (
               <p className="text-text-dim">{message}</p>
@@ -2192,8 +2192,8 @@ export function PlanEditor({
           <div className="space-y-2 text-xs">
             <p className="font-semibold text-success">
               {t('plans.optimizeForMeTotal', {
-                before: formatDuration(totalSeconds),
-                after: formatDuration(optimizeForMePreview.remaps.totalSeconds),
+                before: formatCountdown(totalSeconds),
+                after: formatCountdown(optimizeForMePreview.remaps.totalSeconds),
               })}
             </p>
             <ul className="max-h-56 overflow-y-auto">

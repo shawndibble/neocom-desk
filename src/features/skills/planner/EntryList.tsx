@@ -30,7 +30,7 @@ import * as Icon from '@/components/ui/icons';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
 import type { MilestoneState, MilestoneStatus } from '@/engine/skillPlanMilestones';
 import type { AttributeName, Attributes, Implants, PlanPriority } from '@/engine/types';
-import { formatDuration } from '@/lib/duration';
+import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { doneByText } from './doneBy';
 import type { AttributePair } from './attributePairBands';
@@ -56,8 +56,8 @@ const DANGER_ICON_BUTTON = iconButtonClassName({ size: 'sm', tone: 'danger' });
 /**
  * Every training-time cell and its desktop column header, so the two cannot
  * drift apart and leave the numbers unaligned. 6rem holds the widest duration
- * formatDuration produces ("9999d 23h 59m"); the previous 4rem ran out around
- * "99d 23h 59m", so any plan longer than a few months broke its own times
+ * formatCountdown produces ("9999d 23h"); the previous 4rem ran out around
+ * "99d 23h", so any plan longer than a few months broke its own times
  * across two lines mid-value ("123d 18h" / "58m").
  */
 const TIME_CELL = 'w-24 shrink-0 whitespace-nowrap text-right';
@@ -571,7 +571,7 @@ const EntryRow = memo(function EntryRow({
         {attributeBadge}
         {priorityControl}
         {columns.perLevelTime && (
-          <MetaValue label={t('plans.columnTakes')} value={formatDuration(takesSeconds)} />
+          <MetaValue label={t('plans.columnTakes')} value={formatCountdown(takesSeconds)} />
         )}
         {columns.cumulativeTime && (
           <MetaValue
@@ -599,7 +599,7 @@ const EntryRow = memo(function EntryRow({
           {attributeBadge}
           {priorityControl}
           {columns.perLevelTime && (
-            <TimeCell value={formatDuration(takesSeconds)} dim label={t('plans.columnTakes')} />
+            <TimeCell value={formatCountdown(takesSeconds)} dim label={t('plans.columnTakes')} />
           )}
           {columns.cumulativeTime && (
             <TimeCell
@@ -711,7 +711,7 @@ const PrereqRow = memo(function PrereqRow({
       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-6 text-[0.6875rem]">
         {attributeBadge}
         {columns.perLevelTime && (
-          <MetaValue label={t('plans.columnTakes')} value={formatDuration(row.step.seconds)} />
+          <MetaValue label={t('plans.columnTakes')} value={formatCountdown(row.step.seconds)} />
         )}
         {columns.cumulativeTime && (
           <MetaValue
@@ -736,7 +736,7 @@ const PrereqRow = memo(function PrereqRow({
           {nameSpan}
           {attributeBadge}
           {columns.perLevelTime && (
-            <TimeCell value={formatDuration(row.step.seconds)} label={t('plans.columnTakes')} />
+            <TimeCell value={formatCountdown(row.step.seconds)} label={t('plans.columnTakes')} />
           )}
           {columns.cumulativeTime && (
             <TimeCell

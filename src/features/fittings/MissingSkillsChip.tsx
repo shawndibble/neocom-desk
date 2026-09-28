@@ -4,7 +4,7 @@ import { Button, Popover, PopoverContent, PopoverTrigger } from '@/components/ui
 import { exceedsAlphaCap } from '@/engine/alphaCap';
 import { romanLevel } from '@/engine/projection';
 import type { PlanEntry } from '@/engine/types';
-import { formatDuration } from '@/lib/duration';
+import { formatCountdown } from '@/lib/duration';
 import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { buildFitCheckRows } from '@/features/skills/ships/fitCheckRows';
@@ -58,7 +58,7 @@ export function MissingSkillsChip({ entries, characterId, fittingName }: Missing
         <Button variant="warning">
           {t('fittings.missingSkills.chip', {
             count: rows.length,
-            time: formatDuration(totalSeconds),
+            time: formatCountdown(totalSeconds),
           })}
         </Button>
       </PopoverTrigger>
@@ -76,7 +76,7 @@ export function MissingSkillsChip({ entries, characterId, fittingName }: Missing
                   <span className="text-text">
                     {row.name} {romanLevel(row.targetLevel)}
                   </span>
-                  <span className="text-text-dim">{formatDuration(row.seconds)}</span>
+                  <span className="text-text-dim">{formatCountdown(row.seconds)}</span>
                   {capped && <span className="text-warning">{t('plans.alphaCapped')}</span>}
                 </li>
               );
