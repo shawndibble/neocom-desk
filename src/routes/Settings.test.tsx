@@ -73,9 +73,8 @@ vi.mock('@/features/notifications/projectionRebuild', () => ({
 }));
 
 /**
- * `ForegroundNotificationPoller` runs a poll on every `<App/>` mount (its own
- * doc comment: "on mount, since opening the app is itself the strongest case
- * of 'becoming visible'"), and a poll that reaches its end unconditionally
+ * `ForegroundNotificationPoller` runs a poll shortly after every `<App/>`
+ * mount (`FIRST_POLL_DELAY_MS`), and a poll that reaches its end unconditionally
  * calls `rebuildProjection` too (`foregroundPoller.ts`), independent of the
  * debounced scheduler below. Settings has nothing to do with the poller, so
  * the real thing here was cross-contaminating `rebuildProjection`'s call
@@ -90,6 +89,15 @@ vi.mock('@/features/notifications/foregroundPoller', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/features/notifications/foregroundPoller')>();
   return { ...actual, runForegroundPoll: vi.fn(async () => {}) };
 });
+
+/**
+ * Same reasoning for the boot cache warm-up: it starts in the first idle slot
+ * (`bootPrefetch.ts`; a 2 s timer under jsdom), which lands mid-test here and
+ * re-renders the Notifications list under a click — the virtualized section
+ * remounts and the click hits a detached checkbox. Settings reads nothing it
+ * warms.
+ */
+vi.mock('@/app/bootPrefetch', () => ({ scheduleBootPrefetch: () => () => {} }));
 
 const CHAR_ID = 91;
 
