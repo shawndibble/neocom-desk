@@ -6,6 +6,7 @@ import { loadCharacterSkillQueue, type CachedResult } from '../data';
 import { classifySkillQueue, isQueuePaused, type SkillQueueStatus } from '../queueStatus';
 import type { SkillCatalog } from '../skillMap';
 import { formatCountdown } from '@/lib/duration';
+import { useTicker } from '@/lib/ticker';
 
 interface CurrentQueuePanelProps {
   characterId: number;
@@ -55,7 +56,8 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
   const [result, setResult] = useState<CachedResult<SkillQueueEntry[]> | null | undefined>(
     undefined
   );
-  const [now, setNow] = useState(() => Date.now());
+  // Shared with every other 30 s clock on screen; paused while the tab is hidden.
+  const now = useTicker(TICK_MS);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,18 +66,27 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
         if (!cancelled) setResult(r);
       });
     };
+    let lastLoadAt = Date.now();
     load();
-    const id = setInterval(load, REFETCH_MS);
+    // A hidden tab skips the refetch, and catches up the moment it is shown
+    // again if one fell due meanwhile.
+    const id = setInterval(() => {
+      if (document.hidden) return;
+      lastLoadAt = Date.now();
+      load();
+    }, REFETCH_MS);
+    const onVisibilityChange = () => {
+      if (document.hidden || Date.now() - lastLoadAt < REFETCH_MS) return;
+      lastLoadAt = Date.now();
+      load();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       cancelled = true;
       clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [characterId]);
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), TICK_MS);
-    return () => clearInterval(id);
-  }, []);
 
   const rows = useMemo(() => classifySkillQueue(result?.data ?? [], now), [result, now]);
 

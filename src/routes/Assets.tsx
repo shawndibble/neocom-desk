@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
@@ -223,6 +231,19 @@ function matchAssets(
     matches.push({ asset, name });
   }
   return matches;
+}
+
+/** Whether `matchAssets` would find anything — short-circuits, and builds no match list, for a cheap per-render check. */
+function hasAssetMatch(
+  assets: readonly CharacterAsset[],
+  typeNames: ReadonlyMap<number, string>,
+  query: string
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return assets.length > 0;
+  return assets.some((asset) =>
+    (typeNames.get(asset.type_id) ?? `Type #${asset.type_id}`).toLowerCase().includes(q)
+  );
 }
 
 /** An `AssetMatch` with its estimated value precomputed once, rather than re-derived by every sort comparison. */
@@ -778,9 +799,10 @@ export function Assets() {
         : null,
     [itemActions.actions.blueprints, buildPlans]
   );
-  function handleViewInIndustryAsMaterial(typeId: number) {
-    navigate(`${industryTabHref('plans')}?material=${typeId}`);
-  }
+  const handleViewInIndustryAsMaterial = useCallback(
+    (typeId: number) => navigate(`${industryTabHref('plans')}?material=${typeId}`),
+    [navigate]
+  );
 
   const assetsResult = data?.assetsResult ?? null;
   const assetsTruncated = data?.assetsTruncated ?? false;
@@ -793,11 +815,19 @@ export function Assets() {
   // CSV export always stays scoped to the active Character's own assets,
   // regardless of the cross-character toggle — exporting another Character's
   // items without a character column would misattribute them.
-  const csvAssetsByItemId = useMemo(
-    () => new Map((assetsResult?.data ?? []).map((asset) => [asset.item_id, asset])),
-    [assetsResult]
+  //
+  // The grouped/sorted rows are built only when the export actually runs —
+  // matching every asset and locale-sorting on each data/search change was waste
+  // for a button that is rarely pressed. The button's enabled state only
+  // needs to know whether anything would be exported.
+  const hasCsvRows = useMemo(
+    () => hasAssetMatch(assetsResult?.data ?? [], typeNames, debouncedSearch),
+    [assetsResult, typeNames, debouncedSearch]
   );
-  const csvGroups = useMemo(() => {
+  function buildCsvGroups() {
+    const csvAssetsByItemId = new Map(
+      (assetsResult?.data ?? []).map((asset) => [asset.item_id, asset])
+    );
     const matches = matchAssets(assetsResult?.data ?? [], typeNames, debouncedSearch);
 
     const byLocation = new Map<number, AssetMatch[]>();
@@ -820,8 +850,7 @@ export function Assets() {
         entries: locationEntries.sort((a, b) => a.name.localeCompare(b.name)),
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is stable from i18next
-  }, [assetsResult, typeNames, locationNames, csvAssetsByItemId, debouncedSearch]);
+  }
 
   // On-screen matching: the active Character's own assets, plus every other
   // Character's when the cross-character toggle is on and a search is active
@@ -1432,7 +1461,7 @@ export function Assets() {
     downloadCsv(
       'assets',
       assetCsvRows(
-        csvGroups.map((group) => ({
+        buildCsvGroups().map((group) => ({
           label: group.label,
           entries: group.entries.map((entry) => ({
             name: entry.name,
@@ -1446,12 +1475,15 @@ export function Assets() {
     );
   }
 
-  const assetItemActions: AssetItemActions = {
-    priceByTypeId,
-    volumeByTypeId,
-    materialPlanMap,
-    onViewInIndustryAsMaterial: handleViewInIndustryAsMaterial,
-  };
+  const assetItemActions = useMemo<AssetItemActions>(
+    () => ({
+      priceByTypeId,
+      volumeByTypeId,
+      materialPlanMap,
+      onViewInIndustryAsMaterial: handleViewInIndustryAsMaterial,
+    }),
+    [priceByTypeId, volumeByTypeId, materialPlanMap, handleViewInIndustryAsMaterial]
+  );
 
   if (!hydrated) {
     return (
@@ -1536,7 +1568,7 @@ export function Assets() {
                 <IconButton
                   icon={<Icon.Download />}
                   label={t('assets.exportCsv')}
-                  disabled={csvGroups.length === 0}
+                  disabled={!hasCsvRows}
                   onClick={handleExportCsv}
                 />
                 <IconButton
@@ -1633,7 +1665,7 @@ export function Assets() {
                       {t('assets.search.resultCount', { count: flatMatches.length })}
                     </span>
                     {/* CSV export always stays scoped to the active Character's own
-                      assets (see csvGroups above) — this is the only UI surface
+                      assets (see buildCsvGroups above) — this is the only UI surface
                       that explains why (issue #415), shown exactly when cross-
                       character results are actually on screen to be confused by. */}
                     {activeCrossCharacterData && (

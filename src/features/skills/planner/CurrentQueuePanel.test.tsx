@@ -70,6 +70,39 @@ describe('CurrentQueuePanel periodic ESI refetch (#408)', () => {
     expect(loadCharacterSkillQueue).toHaveBeenCalledTimes(1);
   });
 
+  it('skips the refetch while the tab is hidden and catches up as soon as it is shown', async () => {
+    const setHidden = (hidden: boolean) => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    try {
+      render(<CurrentQueuePanel characterId={1} catalog={catalog} />);
+      await flush();
+      expect(loadCharacterSkillQueue).toHaveBeenCalledTimes(1);
+
+      setHidden(true);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15 * 60_000);
+      });
+      expect(loadCharacterSkillQueue).toHaveBeenCalledTimes(1);
+
+      await act(async () => setHidden(false));
+      expect(loadCharacterSkillQueue).toHaveBeenCalledTimes(2);
+    } finally {
+      setHidden(false);
+    }
+  });
+
+  it('does not refetch on becoming visible when the last fetch is still fresh', async () => {
+    render(<CurrentQueuePanel characterId={1} catalog={catalog} />);
+    await flush();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    expect(loadCharacterSkillQueue).toHaveBeenCalledTimes(1);
+  });
+
   it('shows an empty state once the (empty) periodic refetch settles', async () => {
     render(<CurrentQueuePanel characterId={1} catalog={catalog} />);
     await flush();

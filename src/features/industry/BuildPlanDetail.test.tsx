@@ -332,6 +332,75 @@ describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
   });
 });
 
+describe('BuildPlanDetail facility tax fields', () => {
+  const taxInput = () => screen.getByRole('textbox', { name: 'Facility tax %' });
+
+  it('keeps every typed character and commits once on blur, not per keystroke', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={{ facility: 'raitaru', facilityTaxPct: 1 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.clear(taxInput());
+    await user.type(taxInput(), '12.75');
+
+    expect(valueOf(taxInput())).toBe('12.75');
+    expect(onUpdate).not.toHaveBeenCalled();
+
+    await user.tab();
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith({ facilityTaxPct: 12.75 });
+  });
+
+  it('commits on Enter', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={{ facility: 'raitaru', facilityTaxPct: 1 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.clear(taxInput());
+    await user.type(taxInput(), '3{Enter}');
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith({ facilityTaxPct: 3 });
+  });
+
+  it('reverts a cleared field on blur without writing', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={{ facility: 'raitaru', facilityTaxPct: 2.5 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.clear(taxInput());
+    await user.tab();
+
+    expect(valueOf(taxInput())).toBe('2.5');
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('commits the reaction facility tax once on blur', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(
+      <Harness
+        plan={{ runs: 10, includeReactions: true, reactionFacility: 'tatara' }}
+        onUpdate={onUpdate}
+      />
+    );
+    await openSetup(user);
+
+    const reactionTax = await screen.findByRole('textbox', { name: 'Facility tax %' });
+    await user.clear(reactionTax);
+    await user.type(reactionTax, '4.25');
+    expect(onUpdate).not.toHaveBeenCalled();
+    await user.tab();
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith({ reactionFacilityTaxPct: 4.25 });
+  });
+});
+
 describe('BuildPlanDetail shopping list', () => {
   const copyButton = () => screen.getByRole('button', { name: 'Copy shopping list for multibuy' });
 

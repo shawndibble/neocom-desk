@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatAge, HOUR_MS, DAY_MS } from '@/lib/age';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -7,6 +6,10 @@ import { formatTimestamp } from '@/lib/timestamp';
 // clear of. Read here rather than taken as a prop because every one of this
 // badge's ~15 callers would otherwise have to thread the same global through.
 import { useTimeZone } from '@/lib/timeFormat';
+import { useTicker } from '@/lib/ticker';
+
+/** One shared 30 s clock for every badge on screen, not an interval each. */
+const TICK_MS = 30_000;
 
 interface DataAgeBadgeProps {
   /** When the data was last fetched. */
@@ -64,12 +67,7 @@ export function DataAgeBadge({
 }: DataAgeBadgeProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(id);
-  }, []);
+  const now = useTicker(TICK_MS);
 
   const ms = Math.max(0, now - date.getTime());
   const age = formatAge(ms, t);
