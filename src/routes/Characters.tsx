@@ -45,6 +45,12 @@ import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale'
 import { useNow } from '@/lib/useNow';
 import { loadRosterSnapshot, type RosterEntry } from '@/features/character/roster';
 import {
+  rosterCoreMap,
+  mergeRosterCore,
+  type QueueInfo,
+  type RosterCore,
+} from '@/features/character/rosterView';
+import {
   loadRosterAttention,
   isPiExpired,
   type AttentionEntry,
@@ -60,7 +66,6 @@ import {
 } from '@/features/character/spExtractionSettings';
 import { isSpExtractionReady } from '@/engine/spExtraction';
 import { maxJobSlots, type JobSlotCategory, type JobSlotSkills } from '@/engine/industry/jobSlots';
-import { jobSlotSkillsFromCharacterSkills } from '@/features/character/jobSlotSkills';
 import {
   availableCharacterColumns,
   migrateVisibleColumns,
@@ -71,11 +76,7 @@ import {
   type CharacterColumnId,
 } from '@/features/character/characterColumns';
 import { ATTENTION_RANK, ATTENTION_TONE as PI_ATTENTION_TONE } from '@/engine/pi/colonyStatus';
-import {
-  classifySkillQueue,
-  deriveQueueState,
-  type QueueState,
-} from '@/features/skills/queueStatus';
+import { type QueueState } from '@/features/skills/queueStatus';
 import { formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -98,7 +99,6 @@ import {
   removeGroup,
   renameGroup,
   reorderGroups,
-  rosterSortStats,
   sortCharacterIds,
   ungroupedCharacterIds,
   type CharacterGroup,
@@ -223,14 +223,6 @@ function activeRosterFilterCount(filter: RosterFilter): number {
  * layout). Unsorted (the filter bar's order) by default.
  */
 const TABLE_SORT = optionalSortParam();
-
-interface QueueInfo {
-  state: QueueState;
-  /** When this character's cached queue was last fetched; null when never fetched. */
-  fetchedAt: Date | null;
-  /** Epoch ms the currently-training entry finishes; null unless `state` is `training`/`endingSoon`. */
-  trainingFinishMs: number | null;
-}
 
 interface CharacterCardProps {
   character: CharacterRecord;
@@ -552,75 +544,11 @@ interface CharacterRow {
   alertCount: number;
   /** From the same roster snapshot `stats` comes from — undefined until skills have loaded once. */
   jobSlotSkills: JobSlotSkills | undefined;
-  /** Raw `total_sp` (not `correctedTotalSp`) — see `totalSpMap`'s doc comment. */
+  /** Raw `total_sp` (not `correctedTotalSp`) — see `rosterView.ts`'s doc comment. */
   totalSp: number | undefined;
   starred: boolean;
   /** Null when ungrouped — same as the card's `groupId` prop. */
   groupId: string | null;
-}
-
-/** `queueById`'s shape, built once from a roster snapshot — shared by the initial cache-only load and the "Refresh all" live reload so the two never compute it differently. */
-function queueInfoMap(roster: readonly RosterEntry[], nowMs: number): Map<number, QueueInfo> {
-  return new Map(
-    roster.map((entry) => {
-      const entries = entry.queue?.data;
-      // `classifySkillQueue`'s own "currently training" row, not a second
-      // derivation of it — `deriveQueueState` already calls this for the
-      // categorical state, but doesn't expose which entry it landed on.
-      const training = entries
-        ? classifySkillQueue(entries, nowMs).find((row) => row.status === 'training')
-        : undefined;
-      return [
-        entry.characterId,
-        {
-          state: deriveQueueState(entries, nowMs),
-          fetchedAt: entry.queue?.fetchedAt ?? null,
-          trainingFinishMs:
-            training?.secondsRemaining != null ? nowMs + training.secondsRemaining * 1000 : null,
-        },
-      ];
-    })
-  );
-}
-
-/**
- * Job-slot skill levels from the same roster snapshot `stats` comes from —
- * `roster.ts` already fetches `/skills` for `correctedTotalSp`, so this reads
- * the skills row already in hand rather than fetching it a second time. A
- * character with no cached skills row at all is simply absent, not zero:
- * `jobSlotSkillsFromCharacterSkills([])` would otherwise misreport "no
- * capacity" for a character whose skills just haven't loaded yet.
- */
-function jobSlotSkillsMap(
-  roster: readonly RosterEntry[],
-  nowMs: number
-): Map<number, JobSlotSkills> {
-  const map = new Map<number, JobSlotSkills>();
-  for (const entry of roster) {
-    if (entry.skills?.data) {
-      map.set(
-        entry.characterId,
-        jobSlotSkillsFromCharacterSkills(entry.skills.data.skills, entry.queue?.data ?? [], nowMs)
-      );
-    }
-  }
-  return map;
-}
-
-/**
- * Raw `total_sp`, not `correctedTotalSp` — deliberately, and only for this
- * one column. `correctedTotalSp` exists so a displayed SP total doesn't
- * contradict a per-skill figure shown beside it (roster.ts's own comment);
- * SP-extraction readiness needs no such agreement, and it must match what
- * `pollDomains.ts`'s `spExtractionDomain` alerts on (also raw `total_sp`), or
- * the table and the alert could disagree about whether a character is ready.
- */
-function totalSpMap(roster: readonly RosterEntry[]): Map<number, number> {
-  const map = new Map<number, number>();
-  for (const entry of roster) {
-    if (entry.skills?.data) map.set(entry.characterId, entry.skills.data.total_sp);
-  }
-  return map;
 }
 
 /**
@@ -991,29 +919,17 @@ export function Characters() {
     alertsOnly: filterParams.alerts,
   };
   const [tableSortParam, setTableSort] = useUrlParam('table.sort', TABLE_SORT);
-  const [stats, setStats] = useState<Map<number, CharacterSortStats>>(new Map());
-  const [queueById, setQueueById] = useState<Map<number, QueueInfo>>(new Map());
+  const [rosterCore, setRosterCore] = useState<Map<number, RosterCore>>(new Map());
   const [attentionById, setAttentionById] = useState<Map<number, AttentionEntry>>(new Map());
-  const [jobSlotSkillsById, setJobSlotSkillsById] = useState<Map<number, JobSlotSkills>>(new Map());
-  const [totalSpById, setTotalSpById] = useState<Map<number, number>>(new Map());
 
-  /** The one place a fresh roster snapshot becomes the four derived maps it feeds — shared by the cache-only load effect and "Refresh all" so a future fifth map only needs adding here. */
+  /** The one place a fresh roster snapshot becomes `rosterCore` — shared by the cache-only load effect and "Refresh all" so a future added field only needs adding to `rosterView.ts`'s `RosterCore`. */
   function applyRoster(roster: readonly RosterEntry[], now: number) {
-    setStats(rosterSortStats(roster));
-    setQueueById(queueInfoMap(roster, now));
-    setJobSlotSkillsById(jobSlotSkillsMap(roster, now));
-    setTotalSpById(totalSpMap(roster));
+    setRosterCore(rosterCoreMap(roster, now));
   }
 
-  /** `applyRoster` for one character that just finished refreshing: merges into the maps rather than replacing them, so the rest of the roster keeps its rows. */
+  /** `applyRoster` for one character that just finished refreshing: merges into `rosterCore` rather than replacing it, so the rest of the roster keeps its rows. */
   function mergeRosterEntry(entry: RosterEntry, now: number) {
-    const merge = <V,>(previous: Map<number, V>, fresh: Map<number, V>) =>
-      new Map([...previous, ...fresh]);
-    const one = [entry];
-    setStats((previous) => merge(previous, rosterSortStats(one)));
-    setQueueById((previous) => merge(previous, queueInfoMap(one, now)));
-    setJobSlotSkillsById((previous) => merge(previous, jobSlotSkillsMap(one, now)));
-    setTotalSpById((previous) => merge(previous, totalSpMap(one)));
+    setRosterCore((previous) => mergeRosterCore(previous, entry, now));
   }
 
   const [addingGroup, setAddingGroup] = useState(false);
@@ -1073,7 +989,10 @@ export function Characters() {
         corpName.toLowerCase().includes(query);
       if (!hit) return false;
     }
-    if (rosterFilter.queue !== null && queueById.get(characterId)?.state !== rosterFilter.queue) {
+    if (
+      rosterFilter.queue !== null &&
+      rosterCore.get(characterId)?.queue.state !== rosterFilter.queue
+    ) {
       return false;
     }
     if (rosterFilter.corp !== null && corpName !== rosterFilter.corp) return false;
@@ -1153,10 +1072,7 @@ export function Characters() {
     let cancelled = false;
     void (async () => {
       if (!characters || characters.length === 0) {
-        if (!cancelled) {
-          setStats(new Map());
-          setQueueById(new Map());
-        }
+        if (!cancelled) setRosterCore(new Map());
         return;
       }
       const now = Date.now();
@@ -1219,12 +1135,13 @@ export function Characters() {
   }
 
   /**
-   * `stats` (`rosterSortStats`) plus the two fields it can't carry itself —
-   * group name and alert count both live in stores outside `groups.ts`'s
-   * Dexie-free scope (`groups.ts`'s `CharacterSortStats` doc comment). Built
-   * here, not in `stats` state, so `applyRoster`/`mergeRosterEntry` stay a
-   * pure roster-snapshot mirror; this just layers the two extra keys on top
-   * for `sortCharacterIds` to read when `sortKey` is `'group'`/`'alerts'`.
+   * `rosterCore`'s own `stats` (`rosterCoreMap`) plus the two fields it can't
+   * carry itself — group name and alert count both live in stores outside
+   * `groups.ts`'s Dexie-free scope (`groups.ts`'s `CharacterSortStats`
+   * doc comment). Built here, not in `rosterCore` state, so `applyRoster`/
+   * `mergeRosterEntry` stay a pure roster-snapshot mirror; this just layers
+   * the two extra keys on top for `sortCharacterIds` to read when `sortKey`
+   * is `'group'`/`'alerts'`.
    *
    * Not `useMemo`: its only stable-looking input, `groupIdByCharacterId`, is
    * a `Map` — the React Compiler lint (`react-hooks/preserve-manual-
@@ -1235,7 +1152,8 @@ export function Characters() {
    * data, so recomputing this map alongside them costs nothing extra.
    */
   const sortStatsById = new Map<number, CharacterSortStats>();
-  for (const [characterId, base] of stats) {
+  for (const [characterId, core] of rosterCore) {
+    const base = core.stats;
     const groupId = groupIdByCharacterId.get(characterId);
     const groupName = groupId
       ? groupsValue.groups.find((group) => group.id === groupId)?.name
@@ -1385,8 +1303,8 @@ export function Characters() {
               key={characterId}
               character={character}
               info={publicInfo[characterId]}
-              stats={stats.get(characterId)}
-              queue={queueById.get(characterId)}
+              stats={rosterCore.get(characterId)?.stats}
+              queue={rosterCore.get(characterId)?.queue}
               notTrainingAlertEnabled={notTrainingAlertEnabledFor(characterId)}
               groups={groupsValue.groups}
               groupId={groupIdByCharacterId.get(characterId) ?? null}
@@ -1421,19 +1339,22 @@ export function Characters() {
     const rows: CharacterRow[] = sortedIds
       .map((characterId) => charactersById.get(characterId))
       .filter((character): character is CharacterRecord => character !== undefined)
-      .map((character) => ({
-        character,
-        info: publicInfo[character.characterId],
-        stats: stats.get(character.characterId),
-        queue: queueById.get(character.characterId),
-        notTrainingAlertEnabled: notTrainingAlertEnabledFor(character.characterId),
-        attention: attentionById.get(character.characterId),
-        alertCount: alertCounts.get(character.characterId) ?? 0,
-        jobSlotSkills: jobSlotSkillsById.get(character.characterId),
-        totalSp: totalSpById.get(character.characterId),
-        starred: isCharacterStarred(starred, character.characterId),
-        groupId: groupIdByCharacterId.get(character.characterId) ?? null,
-      }));
+      .map((character) => {
+        const core = rosterCore.get(character.characterId);
+        return {
+          character,
+          info: publicInfo[character.characterId],
+          stats: core?.stats,
+          queue: core?.queue,
+          notTrainingAlertEnabled: notTrainingAlertEnabledFor(character.characterId),
+          attention: attentionById.get(character.characterId),
+          alertCount: alertCounts.get(character.characterId) ?? 0,
+          jobSlotSkills: core?.jobSlotSkills,
+          totalSp: core?.totalSp,
+          starred: isCharacterStarred(starred, character.characterId),
+          groupId: groupIdByCharacterId.get(character.characterId) ?? null,
+        };
+      });
     return (
       // Deliberate deviation from DataTable's usual `.dt-stack` collapse on
       // mobile (docs/context/decisions/20260909-130638-characters-table-

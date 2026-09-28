@@ -36,6 +36,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useAutoDismiss } from '@/lib/useAutoDismiss';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
 import {
@@ -274,6 +275,7 @@ export function PlanEditor({
     if (focusName) navigate(location.pathname, { replace: true, state: null });
   }, [focusName, location.pathname, navigate]);
   const [copyConfirm, setCopyConfirm] = useState(false);
+  const { show: showCopyConfirm } = useAutoDismiss<boolean>(setCopyConfirm, false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [importMenuOpen, setImportMenuOpen] = useState(false);
   const openImportDialogAfterMenuRef = useRef(false);
@@ -283,10 +285,14 @@ export function PlanEditor({
   const optimizeHintId = useId();
   const [importOpen, setImportOpen] = useState(false);
   const [importConfirm, setImportConfirm] = useState<string | null>(null);
-  // The one outstanding timeout clearing importConfirm, so a second
-  // confirmation (Append's 4s vs. Replace's 10s) can supersede it rather than
-  // racing it (#1402).
-  const importConfirmTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // `cancel` covers the early-cancel-on-Undo case below; `show` supersedes a
+  // pending confirmation rather than racing it (Append's 4s vs. Replace's
+  // 10s, #1402) — the same guarantee `useAutoDismiss` gives every other
+  // beside-the-button confirmation in this file.
+  const { show: showImportConfirm, cancel: cancelImportConfirm } = useAutoDismiss<string | null>(
+    setImportConfirm,
+    null
+  );
   const [importError, setImportError] = useState<string | null>(null);
   // A queue import parsed on a non-empty plan (#1402): held until the user
   // picks Append or Replace on the choice Modal below. Scoped to plan.id,
@@ -313,11 +319,17 @@ export function PlanEditor({
   // button, cleared after a couple of seconds. Additive to the full
   // Panel/Modal results those same actions already produce below.
   const [markerConfirm, setMarkerConfirm] = useState(false);
+  const { show: showMarkerConfirm } = useAutoDismiss<boolean>(setMarkerConfirm, false);
   const [reorderConfirm, setReorderConfirm] = useState<'attributes' | 'shortest' | null>(null);
+  const { show: showReorderConfirm } = useAutoDismiss<'attributes' | 'shortest' | null>(
+    setReorderConfirm,
+    null
+  );
   // A promoted prereq row is a quieter change than it looks (a dimmed row
   // turns into user data), so it says so. A "that worked" note about the
   // change that just landed, so it clears on its own timer, not with the plan.
   const [promoteConfirm, setPromoteConfirm] = useState<string | null>(null);
+  const { show: showPromoteConfirm } = useAutoDismiss<string | null>(setPromoteConfirm, null);
   // Which marker's manual attribute editor (RemapMarkerModal) is open, by
   // ordinal — the same addressing `onRemoveMarker`/`markerAttributesFor` use.
   const [editingMarkerIndex, setEditingMarkerIndex] = useState<number | null>(null);
@@ -392,6 +404,7 @@ export function PlanEditor({
   const [optimizeVerdict, setOptimizeVerdict] = useScopedState<OptimizeVerdict>(costingScope);
   // Beside-the-button confirmation (#222) for Optimize Remaps.
   const [optimizeConfirm, setOptimizeConfirm] = useScopedState<string>(costingScope);
+  const { show: showOptimizeConfirm } = useAutoDismiss<string | null>(setOptimizeConfirm, null);
   // Whether the "Optimize at my markers" savings/segments panel is showing.
   // The computation itself is not state — the schedule below derives it live
   // from `plan.markers` so marker rows always have their target attributes on
@@ -832,13 +845,6 @@ export function PlanEditor({
     timedRemap,
   ]);
 
-  /** Beside-the-button import confirmation, superseding whichever one is already showing rather than racing its timer (#1402). */
-  function showImportConfirm(message: string, durationMs: number) {
-    if (importConfirmTimeout.current) clearTimeout(importConfirmTimeout.current);
-    setImportConfirm(message);
-    importConfirmTimeout.current = setTimeout(() => setImportConfirm(null), durationMs);
-  }
-
   /** Shared "Added N skill(s)" wording for both import paths that only ever append (clipboard, queue Append). */
   function appendedCountMessage(imported: readonly PlanEntry[]): string {
     const addedCount = imported.filter(
@@ -917,7 +923,7 @@ export function PlanEditor({
   /** Undo beside the post-Replace confirmation: restores the snapshot taken just before it. */
   function undoQueueImportReplace() {
     if (!undoImport) return;
-    if (importConfirmTimeout.current) clearTimeout(importConfirmTimeout.current);
+    cancelImportConfirm();
     onUpdate(undoImport);
     setUndoImport(null);
     setImportConfirm(null);
@@ -929,8 +935,7 @@ export function PlanEditor({
       catalog.engineSkills
     );
     await writeToClipboard(text);
-    setCopyConfirm(true);
-    setTimeout(() => setCopyConfirm(false), 2000);
+    showCopyConfirm(true);
   }
 
   function handleExportCsv() {
@@ -1000,8 +1005,7 @@ export function PlanEditor({
       yearlyRemapAfter,
     });
     setOptimizeVerdict(verdict);
-    setOptimizeConfirm(confirmRemapOutcome(verdict, yearlyRemapAfter));
-    setTimeout(() => setOptimizeConfirm(null), 2000);
+    showOptimizeConfirm(confirmRemapOutcome(verdict, yearlyRemapAfter));
   }
 
   /**
@@ -1120,10 +1124,9 @@ export function PlanEditor({
 
   const confirmPromotion = useCallback(
     (skillTypeID: number, level: number) => {
-      setPromoteConfirm(t('plans.prereqPromoted', { name: levelLabel(skillTypeID, level) }));
-      setTimeout(() => setPromoteConfirm(null), 4000);
+      showPromoteConfirm(t('plans.prereqPromoted', { name: levelLabel(skillTypeID, level) }), 4000);
     },
-    [t, levelLabel]
+    [t, levelLabel, showPromoteConfirm]
   );
 
   /**
@@ -1260,8 +1263,7 @@ export function PlanEditor({
 
   function handleAddMarker() {
     onUpdate(addRemapMarker(editable));
-    setMarkerConfirm(true);
-    setTimeout(() => setMarkerConfirm(false), 2000);
+    showMarkerConfirm(true);
   }
 
   // Shared per-segment rendering for both optimize modes: a remapped segment
@@ -1391,8 +1393,7 @@ export function PlanEditor({
       kind: 'attributes',
       steps: suggestReorder(scheduled, catalog.engineSkills, priorityMap),
     });
-    setReorderConfirm('attributes');
-    setTimeout(() => setReorderConfirm(null), 2000);
+    showReorderConfirm('attributes');
   }
 
   /** "Shortest first": same preview/Accept-Reject flow as "Reorder only", fastest-ready-step-first instead of attribute-pair grouping. */
@@ -1407,8 +1408,7 @@ export function PlanEditor({
         priorityMap
       ),
     });
-    setReorderConfirm('shortest');
-    setTimeout(() => setReorderConfirm(null), 2000);
+    showReorderConfirm('shortest');
   }
 
   function acceptReorder() {
