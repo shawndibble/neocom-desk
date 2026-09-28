@@ -2567,6 +2567,7 @@
     "remove": "Remove",
     "removeButtonLabel": "Remove {{name}}",
     "removeConfirm": "Remove {{name}}? This deletes their skill plans, build plans, quickbar and cached game data from this device. If sync is on, their synced copy stays on our servers, so adding {{name}} back restores it. It is deleted automatically once no device has synced {{name}} for 90 days. This cannot be undone here.",
+    "removeFailed": "Could not remove {{name}}. Nothing was deleted — try again.",
     "cancel": "Cancel",
     "searchPlaceholder": "Search by name or corporation…",
     "noSearchMatches": "No characters match this search or filter.",

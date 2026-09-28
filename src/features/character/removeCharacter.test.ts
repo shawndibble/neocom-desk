@@ -208,6 +208,19 @@ describe('removeCharacter', () => {
     expect(await db.characters.get(1)).toBeUndefined();
   });
 
+  it('removes the local rows all-or-nothing: a failed step leaves every row in place', async () => {
+    await seedCharacter(1);
+    syncMock.clearCharacterSyncBookkeeping.mockRejectedValueOnce(new Error('disk full'));
+
+    await expect(removeCharacter(1)).rejects.toThrow('disk full');
+
+    expect(await db.characters.get(1)).toBeDefined();
+    expect(await db.tokens.get(1)).toBeDefined();
+    expect(await db.skillPlans.where('characterId').equals(1).count()).toBe(1);
+    expect(await db.mailDrafts.where('characterId').equals(1).count()).toBe(1);
+    expect(await db.miningLedgerHistory.get(1)).toBeDefined();
+  });
+
   it('reassigns the active character when the removed one was active', async () => {
     await seedCharacter(1);
     await seedCharacter(2);

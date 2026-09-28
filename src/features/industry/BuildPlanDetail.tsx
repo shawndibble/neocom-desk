@@ -1618,7 +1618,13 @@ export function BuildPlanDetail({
         )}
       </Panel>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+      {/*
+        Side by side from `xl`, not `lg` (issue #2165): at 1024 the fixed 20rem
+        Costs & revenue column starved Materials by ~189px, pushing Price and
+        Line total — the override input included — out of the table's frame.
+        Between `lg` and `xl` the two stack instead.
+      */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
         <Panel
           title={t('industry.materials')}
           actions={
