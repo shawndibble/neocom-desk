@@ -157,6 +157,8 @@ beforeEach(async () => {
   await useShipTreeViewPreference.getState().setValue('map');
   await useShipInfoShowMissing.getState().setValue(false);
   vi.mocked(target.addEntries).mockClear();
+  target.plans = [];
+  target.targetPlanId = null;
 });
 
 describe('Ship Info window', () => {
@@ -233,6 +235,31 @@ describe('Ship Info window', () => {
     expect(await screen.findByText(/Added 1 skill to Crow/)).toBeVisible();
   });
 
+  it('Skills & Mastery: a tier already covered by the target Skill Plan shows In plan, not a no-op Add', async () => {
+    target.plans = [
+      {
+        id: 'p1',
+        characterId: 1,
+        name: 'Crow plan',
+        entries: [{ skillTypeID: INTERCEPTORS, targetLevel: 3 }],
+        remapCount: 0,
+        updatedAt: 1,
+      },
+    ];
+    target.targetPlanId = 'p1';
+    const { user, dialog } = await openShip(/^Crow/);
+    await user.click(within(dialog).getByRole('tab', { name: 'Skills & Mastery' }));
+    // The tier button itself says so before it's even selected.
+    await user.click(within(dialog).getByRole('button', { name: 'Tier II, in plan' }));
+    // Both the row and the footer read "In plan" — one per skill, one for the tier as a whole.
+    expect(within(dialog).getAllByText('In plan')).toHaveLength(2);
+    // No button left to click that would silently no-op.
+    expect(
+      within(dialog).queryByRole('button', { name: 'Add tier II to plan' })
+    ).not.toBeInTheDocument();
+    expect(target.addEntries).not.toHaveBeenCalled();
+  });
+
   it('Skills & Mastery: a tier lists only the skills it asks a level of', async () => {
     const { user, dialog } = await openShip(/^Crow/);
     await user.click(within(dialog).getByRole('tab', { name: 'Skills & Mastery' }));
@@ -268,6 +295,17 @@ describe('Ship Info window', () => {
     const { user, dialog } = await openShip(/^Merlin/);
     await user.click(within(dialog).getByRole('tab', { name: 'Skills & Mastery' }));
     expect(within(dialog).queryByRole('button', { name: 'Show missing' })).not.toBeInTheDocument();
+  });
+
+  it('Skills & Mastery: each untrained skill shows a training time, and the tier a total', async () => {
+    const { user, dialog } = await openShip(/^Crow/);
+    await user.click(within(dialog).getByRole('tab', { name: 'Skills & Mastery' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Tier II' }));
+
+    // Interceptors III, untrained, gets a real duration rather than staying blank.
+    expect(within(dialog).getByText(/^\d+d \d+h \d+m$|^\d+h \d+m$|^\d+m$/)).toBeVisible();
+    // The footer totals the same training the tier's own row(s) still need.
+    expect(within(dialog).getByText(/^Total /)).toBeVisible();
   });
 
   it('Skills & Mastery: a fully trained hull checks every tier', async () => {

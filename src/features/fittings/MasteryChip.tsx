@@ -19,7 +19,7 @@ import type { MasteryMap } from '@/sde/types';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
-import { isEntryCovered } from '@/features/skills/planner/reorder';
+import { isEntryCovered, plannedLevelFor } from '@/features/skills/planner/reorder';
 import { buildFitCheckRows } from '@/features/skills/ships/fitCheckRows';
 import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
 import {
@@ -167,6 +167,7 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
                         }
                         addLabel={t('skills.fitCheck.add')}
                         inPlanLabel={planned ? t('skills.fitCheck.inPlan') : undefined}
+                        plannedLevel={plannedLevelFor(planEntries, row.skillTypeID)}
                         onAdd={
                           planned
                             ? undefined

@@ -48,6 +48,12 @@ export function isEntryCovered(
   return entries.some((e) => e.skillTypeID === skillTypeID && e.targetLevel >= targetLevel);
 }
 
+/** The highest level a plan already targets for `skillTypeID`, or null if it isn't in the plan at all. */
+export function plannedLevelFor(entries: readonly PlanEntry[], skillTypeID: number): number | null {
+  const levels = entries.filter((e) => e.skillTypeID === skillTypeID).map((e) => e.targetLevel);
+  return levels.length === 0 ? null : Math.max(...levels);
+}
+
 /**
  * Add a skill at a target level as its own row, unless the plan already
  * trains that skill to at least that level — an entry for a level an earlier

@@ -9,6 +9,7 @@
 import { useTranslation } from 'react-i18next';
 import type { TrainedSkill } from '@/engine/types';
 import type { RequiredSkill } from '@/features/skills/dogma';
+import { isEntryCovered, plannedLevelFor } from '@/features/skills/planner/reorder';
 import { SkillRow } from '@/features/skills/SkillRow';
 import { skillTrainingStatus } from '@/features/skills/skillStatus';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
@@ -43,11 +44,12 @@ export function RequiredSkillsSection({
   // already had (e.g. added from a different item earlier) and ones just
   // added this session, once the write resolves. `SkillRow`'s own status
   // only ever reflects *trained* level, never *planned*, so without this a
-  // skill already in the plan looks identical to one that isn't — a click on
-  // "Add" then does nothing visible, which reads as broken (issue report:
+  // skill already in the plan looks identical to one that isn't, right down
+  // to "Add" still being clickable and silently no-op'ing (issue report:
   // "clicked Add to Skill Plan and nothing happened" — the skill was already
   // there from before).
   const selectedPlan = target.plans?.find((p) => p.id === target.targetPlanId);
+  const planEntries = selectedPlan?.entries ?? [];
 
   return (
     <div>
@@ -73,9 +75,7 @@ export function RequiredSkillsSection({
           const currentLevel = trainedSkills.get(req.skillTypeID)?.level ?? 0;
           // Mirrors `upsertEntry`'s own "already covered" check, since that's
           // exactly the condition under which clicking Add would no-op.
-          const planned = (selectedPlan?.entries ?? []).some(
-            (e) => e.skillTypeID === req.skillTypeID && e.targetLevel >= req.level
-          );
+          const planned = isEntryCovered(planEntries, req.skillTypeID, req.level);
           return (
             <SkillRow
               key={req.skillTypeID}
@@ -83,6 +83,7 @@ export function RequiredSkillsSection({
               skillTypeID={req.skillTypeID}
               status={skillTrainingStatus(currentLevel, req.level)}
               currentLevel={currentLevel}
+              plannedLevel={plannedLevelFor(planEntries, req.skillTypeID)}
               addLabel={planned ? t('skills.requiredSkills.added') : addLabel}
               onAdd={() =>
                 void target.addEntries(
