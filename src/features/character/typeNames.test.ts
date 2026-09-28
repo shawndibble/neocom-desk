@@ -379,3 +379,112 @@ describe('loadTypeNames', () => {
     expect(names.get(99999)).toBe('Type #99999');
   });
 });
+
+describe('loadTypeNames — cache I/O', () => {
+  it('stores a resolved batch in one bulk write, not a transaction per name', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () =>
+        HttpResponse.json([
+          { id: 100, name: 'Widget 100', category: 'inventory_type' },
+          { id: 200, name: 'Widget 200', category: 'inventory_type' },
+        ])
+      )
+    );
+    const put = vi.spyOn(db.esiCache, 'put');
+    const bulkPut = vi.spyOn(db.esiCache, 'bulkPut');
+
+    await loadTypeNames([100, 200]);
+
+    expect(put).not.toHaveBeenCalled();
+    expect(bulkPut).toHaveBeenCalledTimes(1);
+    expect((await db.esiCache.get([0, 'type:200']))?.value).toBe('Widget 200');
+    put.mockRestore();
+    bulkPut.mockRestore();
+  });
+
+  it('stores the per-id 404 fallback in one bulk write too', async () => {
+    const typeHandler = (id: number) =>
+      http.get(`${ESI_BASE_URL}/universe/types/${id}`, () =>
+        HttpResponse.json({
+          type_id: id,
+          name: `Widget ${id}`,
+          description: '',
+          group_id: 1,
+          published: true,
+        })
+      );
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () => new HttpResponse(null, { status: 404 })),
+      typeHandler(100),
+      typeHandler(200)
+    );
+    const put = vi.spyOn(db.esiCache, 'put');
+    const bulkPut = vi.spyOn(db.esiCache, 'bulkPut');
+
+    const names = await loadTypeNames([100, 200]);
+
+    expect(names.get(200)).toBe('Widget 200');
+    expect(put).not.toHaveBeenCalled();
+    expect(bulkPut).toHaveBeenCalledTimes(1);
+    expect((await db.esiCache.get([0, 'type:100']))?.value).toBe('Widget 100');
+    put.mockRestore();
+    bulkPut.mockRestore();
+  });
+
+  it('reads the cache fallback for a failed batch in one bulk read, not one get per id', async () => {
+    await db.esiCache.bulkPut([
+      { characterId: 0, key: 'type:100', value: 'Widget 100', fetchedAt: 1 },
+      { characterId: 0, key: 'type:200', value: 'Widget 200', fetchedAt: 1 },
+    ]);
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () => new HttpResponse(null, { status: 500 }))
+    );
+    const get = vi.spyOn(db.esiCache, 'get');
+
+    // 300 has no row, so the caller waits on the network half and its fallback.
+    const names = await loadTypeNames([100, 200, 300]);
+
+    expect(names.get(100)).toBe('Widget 100');
+    expect(names.get(200)).toBe('Widget 200');
+    expect(names.get(300)).toBe('Type #300');
+    expect(get).not.toHaveBeenCalled();
+    get.mockRestore();
+  });
+});
+
+describe('loadTypeNames — an unwritable cache', () => {
+  it('keeps names the per-id 404 fallback resolved when the bulk write fails', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${ESI_BASE_URL}/universe/types/100`, () =>
+        HttpResponse.json({
+          type_id: 100,
+          name: 'Widget 100',
+          description: '',
+          group_id: 1,
+          published: true,
+        })
+      )
+    );
+    const bulkPut = vi.spyOn(db.esiCache, 'bulkPut').mockRejectedValue(new Error('QuotaExceeded'));
+
+    const names = await loadTypeNames([100]);
+
+    expect(names.get(100)).toBe('Widget 100');
+    bulkPut.mockRestore();
+  });
+
+  it('keeps names the batch resolved when the bulk write fails', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () =>
+        HttpResponse.json([{ id: 100, name: 'Widget 100', category: 'inventory_type' }])
+      )
+    );
+    const bulkPut = vi.spyOn(db.esiCache, 'bulkPut').mockRejectedValue(new Error('QuotaExceeded'));
+
+    const names = await loadTypeNames([100]);
+
+    expect(names.get(100)).toBe('Widget 100');
+    bulkPut.mockRestore();
+  });
+});

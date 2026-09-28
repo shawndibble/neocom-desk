@@ -13,7 +13,7 @@ import {
   GLOBAL_CACHE_CHARACTER_ID,
   STALE_AFTER,
   readCachedEntries,
-  writeCached,
+  writeCachedMany,
 } from '@/esi/cache';
 
 function cacheKey(characterId: number): string {
@@ -65,10 +65,12 @@ async function fetchAffiliations(
   try {
     const entries = await postCharactersAffiliation([...ids]);
     const fetchedAt = Date.now();
-    for (const entry of entries) {
-      resolved.set(entry.character_id, entry);
-      await writeCached(GLOBAL_CACHE_CHARACTER_ID, cacheKey(entry.character_id), entry, fetchedAt);
-    }
+    for (const entry of entries) resolved.set(entry.character_id, entry);
+    await writeCachedMany(
+      GLOBAL_CACHE_CHARACTER_ID,
+      entries.map((entry) => [cacheKey(entry.character_id), entry] as const),
+      fetchedAt
+    );
   } catch {
     // Offline or ESI failure. Whatever the caller read from cache stands.
   }

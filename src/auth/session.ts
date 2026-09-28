@@ -197,6 +197,25 @@ async function purgeCacheIfConsentChangedOrPending(
 }
 
 /**
+ * Whole-record equality: the same keys, each holding an equal value. A stored
+ * record carrying a field the rebuilt one lacks is *not* equal, so the write
+ * still happens and drops it, exactly as it did before this check existed.
+ */
+function sameRecord(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  return aKeys.every(
+    (key) =>
+      Object.prototype.hasOwnProperty.call(b, key) &&
+      sameRecord((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])
+  );
+}
+
+/**
  * @param requestedScopes What this grant's authorize URL asked SSO for, or
  * `undefined` on the refresh path, which asks for nothing. See
  * `purgeCacheIfConsentChangedOrPending`.
@@ -229,7 +248,9 @@ async function persistTokens(
 
   await purgeCacheIfConsentChangedOrPending(decoded, existing, previous?.scopes, requestedScopes);
 
-  await db.characters.put(character);
+  // Skipped when nothing changed — the usual refresh. Every `useLiveQuery`
+  // over `db.characters` re-runs on any write to the table, whatever it wrote.
+  if (!sameRecord(existing, character)) await db.characters.put(character);
   await db.tokens.put({
     characterId: decoded.characterId,
     accessToken: tokens.access_token,

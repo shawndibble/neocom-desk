@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { ESI_BASE_URL } from '@/esi/client';
@@ -78,5 +78,39 @@ describe('loadGroupNames', () => {
 
   it('makes no request at all for an empty list', async () => {
     expect((await loadGroupNames([])).size).toBe(0);
+  });
+});
+
+describe('loadGroupNames — cache I/O', () => {
+  it('reads every id in one bulk read and writes every resolved name in one bulk write', async () => {
+    await db.esiCache.put({ characterId: 0, key: 'group:25', value: 'Frigate', fetchedAt: 1 });
+    server.use(group(483, 'Mining Laser'), group(18, 'Mineral'));
+    const get = vi.spyOn(db.esiCache, 'get');
+    const put = vi.spyOn(db.esiCache, 'put');
+    const bulkPut = vi.spyOn(db.esiCache, 'bulkPut');
+
+    const names = await loadGroupNames([483, 25, 18]);
+
+    expect(names.get(25)).toBe('Frigate');
+    expect(names.get(18)).toBe('Mineral');
+    expect(get).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+    expect(bulkPut).toHaveBeenCalledTimes(1);
+    expect((await db.esiCache.get([0, 'group:483']))?.value).toBe('Mining Laser');
+    get.mockRestore();
+    put.mockRestore();
+    bulkPut.mockRestore();
+  });
+});
+
+describe('loadGroupNames — an unwritable cache', () => {
+  it('still returns the names it resolved when the bulk write fails', async () => {
+    server.use(group(483, 'Mining Laser'));
+    const bulkPut = vi.spyOn(db.esiCache, 'bulkPut').mockRejectedValue(new Error('QuotaExceeded'));
+
+    const names = await loadGroupNames([483]);
+
+    expect(names.get(483)).toBe('Mining Laser');
+    bulkPut.mockRestore();
   });
 });

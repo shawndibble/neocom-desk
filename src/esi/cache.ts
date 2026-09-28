@@ -159,9 +159,11 @@ export interface LoadWithCacheStatusOptions {
   /** Freshness window for this key; see `STALE_AFTER`. Defaults to `STALE_AFTER.default`. */
   staleAfterMs?: number;
   /**
-   * Let a lapsed row be shown while the live call runs behind it, even though
-   * this key's window is longer than `STALE_AFTER.default`. Off by default —
-   * see `loadPastWindow` for why a long window normally forbids substitution.
+   * Put a long-window key on the grace race — lapsed row shown after
+   * `STALE_GRACE_MS`, late result signalled — even though its window is longer
+   * than `STALE_AFTER.default`. Off by default — see `loadPastWindow`: without
+   * it a window between the default and `STALE_AFTER.static` blocks on the live
+   * call, and a `STALE_AFTER.static` one is served stale *silently*.
    *
    * For a *published snapshot*: a payload that genuinely changes, but only on
    * a backend's own publish clock, so its long window exists to stop
@@ -324,7 +326,8 @@ function recentRevalidationFailure(dkey: string, now: number): RevalidationFailu
  * The defect this closes is *slowness*, not staleness: offline fails fast, so
  * the cache fallback was already quick, but a slow or hanging connection left
  * every page past its window sitting on a spinner over perfectly good local
- * data — `esiFetch` has no timeout. Racing rather than serving stale
+ * data — `esiFetch`'s own `REQUEST_TIMEOUT_MS` is 30 seconds, far too long to
+ * hold a page on. Racing rather than serving stale
  * unconditionally is deliberate: on a healthy connection the live call wins
  * comfortably, so the page shows *fresh* data with no stale-then-swap flash,
  * and every caller keeps the exact `needsReauth` /`skipCacheOnAuthFailure`
@@ -340,18 +343,23 @@ const GRACE = Symbol('grace');
  * The past-the-window path: run the live call, but do not let it hold the view
  * hostage.
  *
- * Falls back to a plain await — the pre-existing behaviour, unchanged — for
- * the two cases a stale row must not be substituted into:
+ * Game constants (`STALE_AFTER.static` and longer, no opt-in) take their own
+ * path, `loadLapsedConstant`: the stored row at once, refreshed silently.
+ *
+ * Otherwise falls back to a plain await — the pre-existing behaviour,
+ * unchanged — for the two cases a stale row must not be substituted into:
  * - **A manual Refresh** (`isRefreshInvalidated`). The user asked for new data
  *   and is watching the button; it must report what actually happened. Note
  *   this only reaches keys on the default window: `isRefreshInvalidated`
  *   deliberately exempts longer ones, so a Refresh does not force a
  *   `Published Snapshot` live — there is nothing newer to fetch until the
  *   backend republishes, and `chunkedSnapshot.ts` documents that trade.
- * - **Keys whose window is longer than the default.** A lapsed 24h row is a
- *   station name; a re-render per distinct location for data that cannot have
- *   changed is all cost. A key whose long window is a *publish cadence* rather
- *   than a claim of immutability opts back in with `allowStaleServe`.
+ * - **Keys whose window is longer than the default but shorter than a day.**
+ *   Neither a constant nor on the default cadence, so neither substitution
+ *   applies. A key whose long window is a *publish cadence* rather than a
+ *   claim of immutability opts into the grace race with `allowStaleServe`.
+ *   (Constants never reach the race either way: a re-render per distinct
+ *   location for data that cannot have changed is all cost.)
  */
 async function loadPastWindow<T>(
   characterId: number,
@@ -360,11 +368,14 @@ async function loadPastWindow<T>(
   options: LoadWithCacheStatusOptions,
   runLive: () => Promise<StatusResult<T>>
 ): Promise<StatusResult<T>> {
+  const dkey = dedupeKey(characterId, key);
   if (staleAfterMs > STALE_AFTER.default && options.allowStaleServe !== true) {
+    if (staleAfterMs >= STALE_AFTER.static && options.skipCacheOnAuthFailure !== true) {
+      return loadLapsedConstant(characterId, key, staleAfterMs, options, dkey, runLive);
+    }
     return withDedupe(characterId, key, runLive);
   }
 
-  const dkey = dedupeKey(characterId, key);
   const held = await heldAfterFailure<T>(characterId, key, staleAfterMs, options, dkey);
   if (held) return held;
 
@@ -400,6 +411,52 @@ async function loadPastWindow<T>(
   // No bad news yet, so the row reads as current and no view raises its
   // offline banner. `heldAfterFailure` is what corrects that if the call the
   // view is no longer waiting on turns out to have failed.
+  return { cached: stale, needsReauth: false };
+}
+
+/**
+ * A lapsed game constant (`STALE_AFTER.static`): serve the stored row at once
+ * and refresh it behind the caller.
+ *
+ * Unlike the grace race there is nothing to race for — the live answer is, in
+ * all but the rarest case, the value already on disk — so the stored row is
+ * returned without waiting even `STALE_GRACE_MS`. That matters after a day
+ * away: every station, structure, system, public-info, contract-item and
+ * mail-body lookup has lapsed at once, and each used to block on ESI.
+ *
+ * And unlike the grace race it does **not** signal `onCacheRevalidated`. That
+ * signal makes every mounted route re-run its loader; for a constant that
+ * would re-render the page per distinct location to show the same name. The
+ * refreshed row is simply there for the next read.
+ *
+ * A refresh that fails is still recorded, so `heldAfterFailure` answers the
+ * next read with the row flagged `fromCache` (what the old blocking path
+ * returned for a failed call) instead of starting another one straight away.
+ * Loaders that opted out of stale-on-auth-failure never come here.
+ */
+async function loadLapsedConstant<T>(
+  characterId: number,
+  key: string,
+  staleAfterMs: number,
+  options: LoadWithCacheStatusOptions,
+  dkey: string,
+  runLive: () => Promise<StatusResult<T>>
+): Promise<StatusResult<T>> {
+  const held = await heldAfterFailure<T>(characterId, key, staleAfterMs, options, dkey);
+  if (held) return held;
+
+  const stale = await readStaleRow<T>(characterId, key, staleAfterMs);
+  const live = withDedupe(characterId, key, runLive);
+  // Nothing to show in the meantime, so there is no choice but to wait.
+  if (!stale) return live;
+
+  void live.then(
+    (result) => {
+      if (succeededLive(result)) revalidationFailures.delete(dkey);
+      else revalidationFailures.set(dkey, { at: Date.now(), needsReauth: result.needsReauth });
+    },
+    () => revalidationFailures.set(dkey, { at: Date.now(), needsReauth: false })
+  );
   return { cached: stale, needsReauth: false };
 }
 
@@ -809,4 +866,18 @@ export async function writeCached<T>(
   fetchedAt: number
 ): Promise<void> {
   await db.esiCache.put({ characterId, key, value, fetchedAt });
+}
+
+/**
+ * `writeCached` for a batch: one `bulkPut` (one IndexedDB transaction) rather
+ * than a transaction per row awaited in turn. Same row shape as `writeCached`,
+ * so the two are interchangeable to every reader.
+ */
+export async function writeCachedMany(
+  characterId: number,
+  rows: ReadonlyArray<readonly [key: string, value: unknown]>,
+  fetchedAt: number
+): Promise<void> {
+  if (rows.length === 0) return;
+  await db.esiCache.bulkPut(rows.map(([key, value]) => ({ characterId, key, value, fetchedAt })));
 }

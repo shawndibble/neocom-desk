@@ -878,7 +878,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   `docs/context/decisions/20260923-230312-skill-queue-ending-notification.md`
   for why no separate "Skill Plan step completed" event exists alongside it
   (issue #1410).
-- **Stale-Serve**: showing a cached row whose **Freshness Window** has lapsed while the replacement is fetched behind it, rather than spinning until it lands. Only for a **Published Snapshot**, where a long window encodes a publish cadence; a game constant's long window asserts the value cannot change, so a lapsed one is fetched outright instead. A stale-serve that fails to revalidate must say so on the next read — it is never left standing as a loading state.
+- **Stale-Serve**: showing a cached row whose **Freshness Window** has lapsed while the replacement is fetched behind it, rather than spinning until it lands. Signalled for a **Published Snapshot**, where a long window encodes a publish cadence, so a mounted view re-reads the fresher rows. Silent for a game constant: its long window asserts the value cannot change, so the lapsed row is shown at once and the refresh lands for the next read without re-rendering anything. A stale-serve that fails to revalidate must say so on the next read — it is never left standing as a loading state.
 - **Standing (corp)**: The `/corp` overview's top panel: the figures a corp
   manager acts on — clocks due inside a day, Runway, 30-day net — beside the
   Deadline Strip. Degrades figure by figure on Corp Capability, so a Character

@@ -15,7 +15,7 @@ import {
   GLOBAL_CACHE_CHARACTER_ID,
   STALE_AFTER,
   readCachedEntries,
-  writeCached,
+  writeCachedMany,
 } from '@/esi/cache';
 
 function cacheKey(id: number): string {
@@ -71,10 +71,12 @@ async function fetchNames(ids: readonly number[]): Promise<Map<number, string>> 
   try {
     const entries = await postUniverseNames([...ids]);
     const fetchedAt = Date.now();
-    for (const entry of entries) {
-      resolved.set(entry.id, entry.name);
-      await writeCached(GLOBAL_CACHE_CHARACTER_ID, cacheKey(entry.id), entry.name, fetchedAt);
-    }
+    for (const entry of entries) resolved.set(entry.id, entry.name);
+    await writeCachedMany(
+      GLOBAL_CACHE_CHARACTER_ID,
+      entries.map((entry) => [cacheKey(entry.id), entry.name] as const),
+      fetchedAt
+    );
   } catch {
     // Offline or ESI failure. Whatever the caller already read from cache
     // stands; an id with nothing cached is simply absent from its map.
