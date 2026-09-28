@@ -77,7 +77,7 @@ async function settle(): Promise<void> {
   let last = -1;
   while (last !== shellRenders.count) {
     last = shellRenders.count;
-    await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
   }
 }
 
