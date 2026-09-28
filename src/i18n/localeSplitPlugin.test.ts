@@ -50,7 +50,7 @@ describe('localeSplitPlugin in a real build', () => {
       "void import('./route').then((m) => console.log(m.key));",
       'console.log(loaded);',
     ].join('\n'),
-    'src/route.ts': "export const key = 'market.orders.buy';",
+    'src/route.ts': "console.log('ROUTE_BODY_RUNS');\nexport const key = 'market.orders.buy';",
   };
   for (const [path, content] of Object.entries(files)) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
@@ -78,5 +78,12 @@ describe('localeSplitPlugin in a real build', () => {
     expect(entry.code).not.toContain('ROUTE_ONLY_BUY');
     expect(route.code).toContain('ROUTE_ONLY_BUY');
     expect(route.code).toContain('addLazyResources');
+  });
+
+  it("registers a route module's keys before that module's own body runs", async () => {
+    const route = (await chunks).find((c) => c.isDynamicEntry)!;
+    const registered = route.code.indexOf('ROUTE_ONLY_BUY');
+    expect(registered).toBeGreaterThan(-1);
+    expect(registered).toBeLessThan(route.code.indexOf('ROUTE_BODY_RUNS'));
   });
 });

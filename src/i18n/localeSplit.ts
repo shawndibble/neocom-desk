@@ -104,8 +104,11 @@ export function referencedLeaves(
 ): Set<string> {
   const found = new Set<string>();
   if (sections.length === 0) return found;
+  // Longest name first and a boundary after it: with `pi` listed before
+  // `piAdvisor`, a plain alternation would stop at `pi` inside `'piAdvisor.x'`.
+  const names = [...sections].sort((x, y) => y.length - x.length).map(escape);
   const path = new RegExp(
-    `['"\`]((?:${sections.map(escape).join('|')})(?:\\.[\\w-]+)*)(\\.)?(\\$\\{)?`,
+    `['"\`]((?:${names.join('|')})(?![\\w-])(?:\\.[\\w-]+)*)(\\.)?(\\$\\{)?`,
     'g'
   );
   const bySection = new Map<string, string[]>();
@@ -195,7 +198,9 @@ export function planLocaleSplit(
   en: LocaleTree,
   sources: Readonly<Record<string, string>>,
   lazySections: readonly string[] = LAZY_SECTIONS,
-  startupFiles: ReadonlySet<string> = new Set()
+  startupFiles: ReadonlySet<string> = new Set(),
+  /** Stripped from file paths before hashing group ids, so ids match across checkouts. */
+  srcRoot = ''
 ): LocalePlan {
   const sections = lazySections.filter((s) => typeof en[s] === 'object');
   const leaves = leafPaths(en, sections);
@@ -225,7 +230,13 @@ export function planLocaleSplit(
   [...bySignature.keys()].sort().forEach((signature) => {
     // Named for the files that import it, not its position: a key added
     // elsewhere must not rename (and so re-hash) every later group's chunk.
-    let id = `locale-${fnv1a(signature.replace(/^.*?\/src\//gm, 'src/'))}`;
+    const relative = signature
+      .split('\n')
+      .map((file) =>
+        srcRoot && file.startsWith(`${srcRoot}/`) ? file.slice(srcRoot.length + 1) : file
+      )
+      .join('\n');
+    let id = `locale-${fnv1a(relative)}`;
     while (taken.has(id)) id += 'x';
     taken.add(id);
     const tree: LocaleTree = {};

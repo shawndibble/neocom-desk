@@ -89,6 +89,19 @@ describe('referencedLeaves', () => {
     expect(refs(`const tab = 'market'; t('common.save'); t('market.nope')`)).toEqual([]);
     expect(refs(`const marketing = 'marketing.title';`)).toEqual([]);
   });
+
+  it('tells apart sections where one name prefixes another, in either list order', () => {
+    const tree: LocaleTree = { pi: { title: 'PI' }, piAdvisor: { slots: 'Slots' } };
+    for (const sections of [
+      ['pi', 'piAdvisor'],
+      ['piAdvisor', 'pi'],
+    ]) {
+      const leaves = leafPaths(tree, sections);
+      expect(
+        [...referencedLeaves(`t('piAdvisor.slots'); t('pi.title')`, leaves, sections)].sort()
+      ).toEqual(['pi.title', 'piAdvisor.slots']);
+    }
+  });
 });
 
 describe('planLocaleSplit', () => {
@@ -161,6 +174,20 @@ describe('group ids', () => {
     for (const file of ['/src/A.tsx', '/src/B.tsx', '/src/C.tsx']) {
       expect(after.importsByFile.get(file)).toEqual(before.importsByFile.get(file));
     }
+  });
+});
+
+describe('group ids across checkouts', () => {
+  it('depend only on paths below the source root, wherever the checkout lives', () => {
+    const at = (srcRoot: string) =>
+      planLocaleSplit(
+        EN,
+        { [`${srcRoot}/A.tsx`]: `t('market.title')` },
+        LAZY,
+        new Set(),
+        srcRoot
+      ).groups.keys();
+    expect([...at('/home/src/proj/src')]).toEqual([...at('/tmp/proj/src')]);
   });
 });
 

@@ -1,3 +1,4 @@
+import { captureMessage } from '@sentry/react';
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 // The build swaps this import for en.json's shell half (`localeSplitPlugin.ts`);
@@ -5,6 +6,7 @@ import { initReactI18next } from 'react-i18next';
 import en from './locales/en.json';
 import { SHARED_NOTIFICATION_WORDING } from '@/engine/notificationWording';
 import { connectLazyResources } from './lazyResources';
+import { createMissingKeyHandler } from './missingKeyReport';
 
 /**
  * The one place these six events' live English wording lives, spliced in here
@@ -33,6 +35,18 @@ i18n.use(initReactI18next).init({
   lng: 'en',
   fallbackLng: 'en',
   interpolation: { escapeValue: false },
+  // Production only: the build splits en.json (`localeSplit.ts`), so a key
+  // can be missing there that dev and tests, which load the whole file, never
+  // miss. One Sentry message per key per session.
+  saveMissing: import.meta.env.PROD,
+  missingKeyHandler: createMissingKeyHandler((key) =>
+    captureMessage('Missing translation key', {
+      level: 'warning',
+      tags: { subsystem: 'i18n' },
+      fingerprint: ['missing-translation-key', key],
+      extra: { key },
+    })
+  ),
 });
 
 // In a production build the rest of en.json arrives as each chunk that names

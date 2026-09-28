@@ -92,7 +92,8 @@ export function localeSplitPlugin(): Plugin {
           sources,
           STARTUP_ROOTS.map((file) => `${srcDir}/${file}`),
           srcDir
-        )
+        ),
+        srcDir
       );
     },
     resolveId(source, importer) {
