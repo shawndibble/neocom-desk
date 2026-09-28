@@ -5,9 +5,10 @@
  * response nor a cached one. One implementation for every `features/*` data
  * module (docs/ARCHITECTURE.md §3).
  */
-import { db } from '@/db';
+import { db, type EsiCacheMetaRecord, type EsiCacheRecord } from '@/db';
+import { metaOf } from '@/db/esiCacheMeta';
 import { emitEsiAuthFailure } from './authFailureSignal';
-import { EsiError, isAuthFailure } from './client';
+import { EsiError, isAuthFailure, type EsiResult } from './client';
 import { isCachePurgePending } from './cachePurge';
 import { grantHoldsEndpointScope } from './grantScope';
 import type { TruncatableResult } from './paginated';
@@ -105,6 +106,59 @@ export interface ExpiresCapture {
 }
 
 /**
+ * The two-way box for an ETag revalidation, shaped like `ExpiresCapture`:
+ * the cache fills `ifNoneMatch` from the stored row before `fetchLive` runs,
+ * and `fetchLive` reports the response back. Build it with `conditionalFetch`
+ * rather than by hand.
+ *
+ * A 304 then costs a bump of the row's freshness in `esiCacheMeta` — no body
+ * download, no JSON parse, and no rewrite of a value that did not change.
+ * Single-response loaders only (`loadWithCache[Status]`): a paginated list's
+ * page-1 304 says nothing about pages 2..N.
+ */
+export interface ConditionalCapture {
+  /** Set by the cache: the stored row's ETag, or undefined to fetch unconditionally. */
+  ifNoneMatch: string | undefined;
+  /** Set by `fetchLive`: the response's ETag. */
+  etag: string | null;
+  /** Set by `fetchLive`: the response's raw `Expires`, sizing the row's window. */
+  expires: string | null;
+  /** Set by `fetchLive`: the server answered 304 to `ifNoneMatch`. */
+  notModified: boolean;
+}
+
+/**
+ * A `fetchLive` that revalidates with If-None-Match, plus the capture to pass
+ * as `conditional`:
+ *
+ *     const { fetchLive, conditional } = conditionalFetch((o) => getX(id, o));
+ *     return loadWithCache(id, KEY, fetchLive, { conditional });
+ *
+ * Only for a loader whose cached value is the endpoint's `data` as-is — a 304
+ * answers for the response, so a value derived from anything else would be
+ * vouched for by a header that never saw it.
+ */
+export function conditionalFetch<T>(fetch: (options: { etag?: string }) => Promise<EsiResult<T>>): {
+  fetchLive: () => Promise<T | null>;
+  conditional: ConditionalCapture;
+} {
+  const conditional: ConditionalCapture = {
+    ifNoneMatch: undefined,
+    etag: null,
+    expires: null,
+    notModified: false,
+  };
+  const fetchLive = async (): Promise<T | null> => {
+    const result = await fetch({ etag: conditional.ifNoneMatch });
+    conditional.etag = result.etag;
+    conditional.expires = result.expires;
+    conditional.notModified = result.notModified;
+    return result.data;
+  };
+  return { fetchLive, conditional };
+}
+
+/**
  * How long a cached row is served without a live call. The window is a floor,
  * not a ceiling: `readFreshRow` takes whichever is later, this or ESI's own
  * `Expires` (issue #221 / CONTEXT.md round 25) — so an endpoint ESI caches for
@@ -177,6 +231,12 @@ export interface LoadWithCacheStatusOptions {
    * read, so a view can say so rather than leaving a refresh unreported.
    */
   allowStaleServe?: boolean;
+}
+
+/** `loadWithCache[Status]` only — see `ConditionalCapture` for why not paginated. */
+export interface LoadSingleWithCacheOptions extends LoadWithCacheStatusOptions {
+  /** Revalidate with the stored ETag; see `conditionalFetch`. */
+  conditional?: ConditionalCapture;
 }
 
 /**
@@ -366,17 +426,18 @@ async function loadPastWindow<T>(
   key: string,
   staleAfterMs: number,
   options: LoadWithCacheStatusOptions,
+  read: RowReader,
   runLive: () => Promise<StatusResult<T>>
 ): Promise<StatusResult<T>> {
   const dkey = dedupeKey(characterId, key);
   if (staleAfterMs > STALE_AFTER.default && options.allowStaleServe !== true) {
     if (staleAfterMs >= STALE_AFTER.static && options.skipCacheOnAuthFailure !== true) {
-      return loadLapsedConstant(characterId, key, staleAfterMs, options, dkey, runLive);
+      return loadLapsedConstant(characterId, key, staleAfterMs, options, dkey, read, runLive);
     }
     return withDedupe(characterId, key, runLive);
   }
 
-  const held = await heldAfterFailure<T>(characterId, key, staleAfterMs, options, dkey);
+  const held = await heldAfterFailure<T>(staleAfterMs, options, dkey, read);
   if (held) return held;
 
   const live = withDedupe(characterId, key, runLive);
@@ -399,7 +460,7 @@ async function loadPastWindow<T>(
     return winner.result;
   }
 
-  const stale = await readStaleRow<T>(characterId, key, staleAfterMs);
+  const stale = await readStaleRow<T>(read, staleAfterMs);
   if (!stale) {
     // Nothing to show in the meantime, so there is no choice but to wait.
     const outcome = await settled;
@@ -440,12 +501,13 @@ async function loadLapsedConstant<T>(
   staleAfterMs: number,
   options: LoadWithCacheStatusOptions,
   dkey: string,
+  read: RowReader,
   runLive: () => Promise<StatusResult<T>>
 ): Promise<StatusResult<T>> {
-  const held = await heldAfterFailure<T>(characterId, key, staleAfterMs, options, dkey);
+  const held = await heldAfterFailure<T>(staleAfterMs, options, dkey, read);
   if (held) return held;
 
-  const stale = await readStaleRow<T>(characterId, key, staleAfterMs);
+  const stale = await readStaleRow<T>(read, staleAfterMs);
   const live = withDedupe(characterId, key, runLive);
   // Nothing to show in the meantime, so there is no choice but to wait.
   if (!stale) return live;
@@ -498,29 +560,27 @@ async function recordLateOutcome<T>(
  * not be handed a row the character may no longer be entitled to.
  */
 async function heldAfterFailure<T>(
-  characterId: number,
-  key: string,
   staleAfterMs: number,
   options: LoadWithCacheStatusOptions,
-  dkey: string
+  dkey: string,
+  read: RowReader
 ): Promise<StatusResult<T> | null> {
   const failure = recentRevalidationFailure(dkey, Date.now());
   if (!failure) return null;
   if (failure.needsReauth && options.skipCacheOnAuthFailure) {
     return { cached: null, needsReauth: true };
   }
-  const stale = await readStaleRow<T>(characterId, key, staleAfterMs);
+  const stale = await readStaleRow<T>(read, staleAfterMs);
   if (!stale) return null;
   return { cached: { ...stale, fromCache: true }, needsReauth: failure.needsReauth };
 }
 
 /** The stored row, or `null` when there is none or a manual Refresh forbids substituting it. */
 async function readStaleRow<T>(
-  characterId: number,
-  key: string,
+  read: RowReader,
   staleAfterMs: number
 ): Promise<CachedResult<T> | null> {
-  const row = await readCachedRow(characterId, key);
+  const row = await read();
   if (!row) return null;
   if (isRefreshInvalidated(row.fetchedAt, staleAfterMs, Date.now())) return null;
   return {
@@ -553,14 +613,15 @@ export async function loadWithCacheStatus<T>(
   characterId: number,
   key: string,
   fetchLive: () => Promise<T | null>,
-  options: LoadWithCacheStatusOptions = {}
+  options: LoadSingleWithCacheOptions = {}
 ): Promise<StatusResult<T>> {
   const staleAfterMs = options.staleAfterMs ?? STALE_AFTER.default;
   const fresh = await readFreshRow<T>(characterId, key, staleAfterMs);
   if (fresh) return { cached: fresh, needsReauth: false };
 
-  return loadPastWindow<T>(characterId, key, staleAfterMs, options, () =>
-    loadWithCacheStatusLive(characterId, key, fetchLive, options)
+  const read = rowReader(characterId, key);
+  return loadPastWindow<T>(characterId, key, staleAfterMs, options, read, () =>
+    loadWithCacheStatusLive(characterId, key, fetchLive, options, read)
   );
 }
 
@@ -592,21 +653,35 @@ async function loadWithCacheStatusLive<T>(
   characterId: number,
   key: string,
   fetchLive: () => Promise<T | null>,
-  options: LoadWithCacheStatusOptions
+  options: LoadSingleWithCacheOptions,
+  read: RowReader
 ): Promise<StatusResult<T>> {
   const detectAuthFailure = options.detectAuthFailure ?? isAuthFailure;
+  const { conditional } = options;
   let needsReauth = false;
   try {
-    const data = await fetchLive();
-    if (data !== null) {
+    if (conditional) conditional.ifNoneMatch = await revalidationEtag(characterId, key);
+    let data = await fetchLive();
+    if (conditional?.notModified) {
+      const revalidated = await applyNotModified<T>(characterId, key, conditional);
+      if (revalidated) return { cached: revalidated, needsReauth: false };
+      // The row the ETag vouched for changed or vanished in the meantime, so
+      // there is nothing for the 304 to point at: ask again, unconditionally.
+      conditional.ifNoneMatch = undefined;
+      data = await fetchLive();
+    }
+    if (data !== null && conditional?.notModified !== true) {
       const fetchedAt = Date.now();
-      const expiresAt = parseExpiresHeader(options.expiresCapture?.value);
+      const expiresAt = parseExpiresHeader(conditional?.expires ?? options.expiresCapture?.value);
+      const etag = conditional?.etag ?? undefined;
+      // `esiCacheMeta` is written in the same transaction by the db middleware.
       await db.esiCache.put({
         characterId,
         key,
         value: data,
         fetchedAt,
         ...(expiresAt !== undefined ? { expiresAt } : {}),
+        ...(etag !== undefined ? { etag } : {}),
       });
       return {
         cached: { data, fetchedAt: new Date(fetchedAt), fromCache: false, truncated: false },
@@ -627,26 +702,82 @@ async function loadWithCacheStatusLive<T>(
       if (options.skipCacheOnAuthFailure) return { cached: null, needsReauth: true };
     }
   }
-  const cached = await readCachedRow(characterId, key);
+  const cached = await read();
   if (!cached) return { cached: null, needsReauth };
   return {
     cached: {
       data: cached.value as T,
       fetchedAt: new Date(cached.fetchedAt),
       fromCache: true,
-      truncated: cached.truncated === true,
+      truncated: cached.truncated,
     },
     needsReauth,
   };
 }
 
+/** The stored ETag worth sending as If-None-Match, if any. Reads meta only. */
+async function revalidationEtag(characterId: number, key: string): Promise<string | undefined> {
+  const meta = await readMeta(characterId, key);
+  // A partial list's ETag would vouch only for the part we hold.
+  return meta && meta.truncated !== true ? meta.etag : undefined;
+}
+
 /**
- * A row still inside its freshness window — served without a live call.
+ * Apply a 304: the stored value is still current, so push its freshness
+ * forward in `esiCacheMeta` alone and hand back the value as it stands. The
+ * value row is read (the caller needs the data) but never rewritten — no
+ * serialize, no multi-megabyte write for a payload that did not change.
+ *
+ * `null` when the stored row is no longer the one the ETag vouched for — gone
+ * (purged, cleared) or rewritten under another ETag — in which case the 304
+ * points at nothing we hold and the caller must refetch.
+ */
+async function applyNotModified<T>(
+  characterId: number,
+  key: string,
+  conditional: ConditionalCapture
+): Promise<CachedResult<T> | null> {
+  const sent = conditional.ifNoneMatch;
+  if (sent === undefined || (await isCachePurgePending(characterId))) return null;
+  const now = Date.now();
+  const expiresAt = parseExpiresHeader(conditional.expires);
+  return db.transaction('rw', db.esiCache, db.esiCacheMeta, async () => {
+    const meta = await db.esiCacheMeta.get([characterId, key]);
+    if (meta?.etag !== sent) return null;
+    const row = await db.esiCache.get([characterId, key]);
+    if (row?.etag !== sent) return null;
+    const bumped: EsiCacheMetaRecord = { ...meta, fetchedAt: now };
+    if (expiresAt !== undefined) bumped.expiresAt = expiresAt;
+    else delete bumped.expiresAt;
+    await db.esiCacheMeta.put(bumped);
+    return {
+      data: row.value as T,
+      fetchedAt: new Date(now),
+      fromCache: false,
+      truncated: row.truncated === true,
+    };
+  });
+}
+
+/**
+ * Whether a row is inside its freshness window.
  *
  * The window is `max(the row's own Expires, fetchedAt + staleAfterMs)`: the
  * TTL is a floor every key gets, and ESI's header only ever extends it. Before
  * issue #221 the header was the whole mechanism, so a key whose loader did not
  * opt into `expiresCapture` had no window at all.
+ */
+function isWithinWindow(meta: EsiCacheMetaRecord, staleAfterMs: number, now: number): boolean {
+  if (Math.max(meta.expiresAt ?? 0, meta.fetchedAt + staleAfterMs) <= now) return false;
+  return !isRefreshInvalidated(meta.fetchedAt, staleAfterMs, now);
+}
+
+/**
+ * A row still inside its freshness window — served without a live call.
+ *
+ * Decided from `esiCacheMeta` alone, so a row past its window costs no
+ * deserialization of a value that is about to be replaced; the value is read
+ * only for a hit.
  *
  * `fromCache` is `false` here: this is a successful, on-time read, not the
  * degraded "live call failed, fell back to a stale row" case that flag
@@ -657,17 +788,42 @@ async function readFreshRow<T>(
   key: string,
   staleAfterMs: number
 ): Promise<CachedResult<T> | null> {
-  const row = await readCachedRow(characterId, key);
-  if (!row) return null;
-  const now = Date.now();
-  if (Math.max(row.expiresAt ?? 0, row.fetchedAt + staleAfterMs) <= now) return null;
-  if (isRefreshInvalidated(row.fetchedAt, staleAfterMs, now)) return null;
+  const found = await readMetaOrRow(characterId, key);
+  if (!found) return null;
+  const { meta } = found;
+  if (!isWithinWindow(meta, staleAfterMs, Date.now())) return null;
+  const row = found.row ?? (await db.esiCache.get([characterId, key]));
+  if (!row) {
+    void dropOrphanMeta(characterId, key);
+    return null;
+  }
   return {
     data: row.value as T,
-    fetchedAt: new Date(row.fetchedAt),
+    fetchedAt: new Date(meta.fetchedAt),
     fromCache: false,
-    truncated: row.truncated === true,
+    truncated: meta.truncated === true,
   };
+}
+
+/**
+ * Whether a key's cached row is inside its freshness window, without reading
+ * its value — the same verdict the loaders reach, for a caller that only wants
+ * to know whether calling one would touch the network (the boot prefetch).
+ *
+ * `false` whenever that is not certain: no row, a row from before
+ * `esiCacheMeta` existed (the loader will read it and backfill), a purge
+ * pending, or meta whose value is somehow missing — a skip must never leave a
+ * key cold.
+ */
+export async function isCacheFresh(
+  characterId: number,
+  key: string,
+  staleAfterMs: number = STALE_AFTER.default
+): Promise<boolean> {
+  const meta = await readMeta(characterId, key);
+  if (!meta || !isWithinWindow(meta, staleAfterMs, Date.now())) return false;
+  // Primary-key count: answers "is the value there?" without deserializing it.
+  return (await db.esiCache.where(':id').equals([characterId, key]).count()) > 0;
 }
 
 /** ESI or cache, dropping the auth-failure distinction for callers that don't need it. */
@@ -675,7 +831,7 @@ export async function loadWithCache<T>(
   characterId: number,
   key: string,
   fetchLive: () => Promise<T | null>,
-  options: LoadWithCacheStatusOptions = {}
+  options: LoadSingleWithCacheOptions = {}
 ): Promise<CachedResult<T> | null> {
   return (await loadWithCacheStatus(characterId, key, fetchLive, options)).cached;
 }
@@ -705,8 +861,9 @@ export async function loadPaginatedWithCacheStatus<T>(
   const fresh = await readFreshRow<T[]>(characterId, key, staleAfterMs);
   if (fresh) return { cached: fresh, needsReauth: false };
 
-  return loadPastWindow<T[]>(characterId, key, staleAfterMs, options, () =>
-    loadPaginatedWithCacheStatusLive(characterId, key, fetchLive, options)
+  const read = rowReader(characterId, key);
+  return loadPastWindow<T[]>(characterId, key, staleAfterMs, options, read, () =>
+    loadPaginatedWithCacheStatusLive(characterId, key, fetchLive, options, read)
   );
 }
 
@@ -714,16 +871,20 @@ async function loadPaginatedWithCacheStatusLive<T>(
   characterId: number,
   key: string,
   fetchLive: () => Promise<TruncatableResult<T>>,
-  options: LoadWithCacheStatusOptions
+  options: LoadWithCacheStatusOptions,
+  read: RowReader
 ): Promise<StatusResult<T[]>> {
   const detectAuthFailure = options.detectAuthFailure ?? isAuthFailure;
   let needsReauth = false;
   try {
     const { items, truncated } = await fetchLive();
     const fetchedAt = Date.now();
-    const existing = truncated ? await readCachedRow(characterId, key) : undefined;
-    const wouldClobberCompleteList = existing !== undefined && existing.truncated !== true;
-    if (!wouldClobberCompleteList) {
+    // Whether the stored list is complete is a meta question; its value is
+    // read only when it is about to be served in place of this partial one.
+    const existingMeta = truncated ? (await readMetaOrRow(characterId, key))?.meta : undefined;
+    const existing =
+      existingMeta !== undefined && existingMeta.truncated !== true ? await read() : undefined;
+    if (existing === undefined) {
       const expiresAt = parseExpiresHeader(options.expiresCapture?.value);
       await db.esiCache.put({
         characterId,
@@ -758,14 +919,14 @@ async function loadPaginatedWithCacheStatusLive<T>(
       if (options.skipCacheOnAuthFailure) return { cached: null, needsReauth: true };
     }
   }
-  const cached = await readCachedRow(characterId, key);
+  const cached = await read();
   if (!cached) return { cached: null, needsReauth };
   return {
     cached: {
       data: cached.value as T[],
       fetchedAt: new Date(cached.fetchedAt),
       fromCache: true,
-      truncated: cached.truncated === true,
+      truncated: cached.truncated,
     },
     needsReauth,
   };
@@ -781,21 +942,127 @@ export async function loadPaginatedWithCache<T>(
   return (await loadPaginatedWithCacheStatus(characterId, key, fetchLive, options)).cached;
 }
 
+// ---------------------------------------------------------------------------
+// Row and meta reads
+//
+// Every read below is gated by `isCachePurgePending`: a character whose purge
+// is still pending has rows we could not delete and are not allowed to serve,
+// so its cache reads as empty (`cachePurge.ts`). One in-memory lookup per
+// read, not per row. Writes are deliberately left alone — new rows are the
+// *current* owner's data, and the pending purge sweeps them when it succeeds.
+// ---------------------------------------------------------------------------
+
+/** A stored row as a load serves it: the value, and the freshness to report. */
+interface StoredRow {
+  value: unknown;
+  fetchedAt: number;
+  truncated: boolean;
+}
+
+/** One load's memoized read of its stored row — see `rowReader`. */
+type RowReader = () => Promise<StoredRow | undefined>;
+
 /**
- * The single point where a cached row is allowed to reach a caller.
+ * The stored row for one load, deserialized at most once however many of its
+ * paths want it — a stale serve at the grace mark and the fallback after the
+ * live call it raced both used to read (and deserialize) it separately.
  *
- * A character whose purge is still pending has rows we could not delete and
- * are not allowed to serve, so its cache reads as empty (`cachePurge.ts`).
- * One in-memory lookup per read, not per row. Writes are deliberately left
- * alone — new rows are the *current* owner's data, and the pending purge
- * sweeps them when it succeeds.
+ * The purge gate is re-checked on every call, not memoized with the row: a
+ * purge that becomes pending mid-load must still suppress it.
  */
+function rowReader(characterId: number, key: string): RowReader {
+  let memo: Promise<StoredRow | undefined> | undefined;
+  return async () => {
+    if (await isCachePurgePending(characterId)) return undefined;
+    memo ??= readStoredRow(characterId, key);
+    const row = await memo;
+    return (await isCachePurgePending(characterId)) ? undefined : row;
+  };
+}
+
+async function readStoredRow(characterId: number, key: string): Promise<StoredRow | undefined> {
+  const [row, meta] = await Promise.all([
+    db.esiCache.get([characterId, key]),
+    db.esiCacheMeta.get([characterId, key]),
+  ]);
+  if (!row) return undefined;
+  return {
+    value: row.value,
+    // A 304 moves meta's `fetchedAt` forward without rewriting the value; it
+    // speaks for this row only while it names the row's own ETag.
+    fetchedAt:
+      meta !== undefined && meta.etag === row.etag
+        ? Math.max(meta.fetchedAt, row.fetchedAt)
+        : row.fetchedAt,
+    truncated: row.truncated === true,
+  };
+}
+
+/** A row's meta, without its value. Absent for rows older than `esiCacheMeta`. */
+async function readMeta(characterId: number, key: string): Promise<EsiCacheMetaRecord | undefined> {
+  if (await isCachePurgePending(characterId)) return undefined;
+  return db.esiCacheMeta.get([characterId, key]);
+}
+
+/**
+ * A row's meta; for a row older than `esiCacheMeta`, the whole row read the
+ * old way (returned too, so a hit does not read it twice) with its meta
+ * written behind it — a one-time cost per legacy row, where an `upgrade()`
+ * backfill would have paid it for every row at open.
+ */
+async function readMetaOrRow(
+  characterId: number,
+  key: string
+): Promise<{ meta: EsiCacheMetaRecord; row?: EsiCacheRecord } | undefined> {
+  const meta = await readMeta(characterId, key);
+  if (meta) return { meta };
+  if (await isCachePurgePending(characterId)) return undefined;
+  const row = await db.esiCache.get([characterId, key]);
+  if (!row) return undefined;
+  void backfillMeta(row);
+  return { meta: metaOf(row), row };
+}
+
+/** Never rejects: a failed backfill only means the next read takes the legacy path again. */
+async function backfillMeta(row: EsiCacheRecord): Promise<void> {
+  const id: [number, string] = [row.characterId, row.key];
+  try {
+    await db.transaction('rw', db.esiCache, db.esiCacheMeta, async () => {
+      // A row rewritten since (which wrote its own meta) or deleted since must
+      // not be given this stale projection.
+      if ((await db.esiCacheMeta.get(id)) !== undefined) return;
+      const current = await db.esiCache.where(':id').equals(id).count();
+      if (current === 0) return;
+      await db.esiCacheMeta.put(metaOf(row));
+    });
+  } catch {
+    // Best effort.
+  }
+}
+
+/**
+ * Meta whose value is gone — only reachable if something bypassed the db
+ * middleware (a bundle from before it). Dropped so it cannot keep claiming a
+ * fresh row; never rejects.
+ */
+async function dropOrphanMeta(characterId: number, key: string): Promise<void> {
+  const id: [number, string] = [characterId, key];
+  try {
+    await db.transaction('rw', db.esiCache, db.esiCacheMeta, async () => {
+      if ((await db.esiCache.where(':id').equals(id).count()) === 0) {
+        await db.esiCacheMeta.delete(id);
+      }
+    });
+  } catch {
+    // Best effort.
+  }
+}
+
+/** The raw stored row for the non-loader readers below; purge-gated like every read. */
 async function readCachedRow(
   characterId: number,
   key: string
-): Promise<
-  { value: unknown; fetchedAt: number; truncated?: boolean; expiresAt?: number } | undefined
-> {
+): Promise<EsiCacheRecord | undefined> {
   if (await isCachePurgePending(characterId)) return undefined;
   return db.esiCache.get([characterId, key]);
 }

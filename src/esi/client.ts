@@ -90,6 +90,11 @@ export interface EsiResult<T> {
   pages: number;
   /** Raw Expires header, for cache-freshness display. */
   expires: string | null;
+  /**
+   * The server answered 304 to our If-None-Match: what the caller holds is
+   * still current. Distinct from `data: null`, which a 204 also produces.
+   */
+  notModified: boolean;
 }
 
 /**
@@ -274,6 +279,7 @@ export async function esiFetch<T>(
         etag: response.headers.get('etag') ?? etag ?? null,
         pages: parsePages(response),
         expires: response.headers.get('expires'),
+        notModified: response.status === 304,
       };
     }
     if (!response.ok) throw await errorFromResponse(response, endpointId);
@@ -288,6 +294,7 @@ export async function esiFetch<T>(
       etag: response.headers.get('etag'),
       pages: parsePages(response),
       expires: response.headers.get('expires'),
+      notModified: false,
     };
   } catch (err) {
     // A cancelled route load (useRouteSnapshot discarding a stale response)
