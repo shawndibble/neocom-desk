@@ -97,6 +97,9 @@ interface TransactionsPanelProps {
   onViewChange: (view: HistoryView) => void;
 }
 
+/** Module-level so the table's windowing and row memo see one stable function. */
+const transactionRowKey = (txn: WalletTransaction) => txn.transaction_id;
+
 export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -233,14 +236,18 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
   );
 
   /** Same menu the Appraisal ledger carries — a transaction row names an item like any other. */
-  function rowContextMenu(txn: WalletTransaction, tr: ReactElement) {
-    const itemName = typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`;
-    return (
-      <ItemContextMenu typeId={txn.type_id} itemName={itemName}>
-        {tr}
-      </ItemContextMenu>
-    );
-  }
+  // Stable, so the table's memoized rows skip re-rendering on every panel render.
+  const rowContextMenu = useCallback(
+    (txn: WalletTransaction, tr: ReactElement) => {
+      const itemName = typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`;
+      return (
+        <ItemContextMenu typeId={txn.type_id} itemName={itemName}>
+          {tr}
+        </ItemContextMenu>
+      );
+    },
+    [typeNames]
+  );
 
   if (!hydrated) {
     return (
@@ -339,8 +346,9 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
                     label={t('wallet.transactionsTab')}
                     columns={columns}
                     rows={filteredTransactions}
-                    rowKey={(txn) => txn.transaction_id}
+                    rowKey={transactionRowKey}
                     highlightRowKey={highlightId}
+                    virtualize="auto"
                     rowContextMenu={rowContextMenu}
                     rowMoreActions
                     // `transactions` already arrives newest-first (the `sort` above) —

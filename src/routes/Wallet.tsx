@@ -224,6 +224,8 @@ interface JournalTableProps {
 }
 
 /** The filter bar plus its result — either the table or a filtered-empty message. Shared by the personal and corp journal panels (issue #413). */
+const journalRowKey = (entry: WalletJournalEntry) => entry.id;
+
 function JournalTable({
   filter,
   onFilterChange,
@@ -318,10 +320,13 @@ function JournalTable({
           label={label}
           columns={shownColumns}
           rows={filteredJournal}
-          rowKey={(entry) => entry.id}
+          rowKey={journalRowKey}
           highlightRowKey={highlightRowKey}
           sort={sort}
           onSortChange={onSortChange}
+          // Every page of the journal, uncapped: thousands of rows for an
+          // active trader.
+          virtualize="auto"
         />
       )}
     </>

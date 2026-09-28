@@ -1,6 +1,7 @@
 import { measureElement, useWindowVirtualizer } from '@tanstack/react-virtual';
 import {
   Fragment,
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -346,13 +347,225 @@ interface DataTableProps<T> {
    * runs over the whole set first. Unmounted rows are stood in for by two
    * `aria-hidden` spacer rows, so column widths stay the table's own.
    *
-   * Phone `groupBy` renders unwindowed: collapsed groups mount nothing, and
-   * the toggle rows would need their own measuring. `highlightRowKey` and
-   * `expandableRow` are unsupported alongside it — both assume the row they
-   * target is in the DOM.
+   * `'auto'` windows only once the table holds more than
+   * `VIRTUALIZE_THRESHOLD` rows — for a ledger that is usually a screenful
+   * but can run to thousands (a wallet journal, a market history). A short
+   * list keeps every row in the DOM, so find-in-page and a short fixture
+   * behave exactly as an unvirtualized table.
+   *
+   * A windowed `highlightRowKey` is scrolled to through the virtualizer, so
+   * the row mounts before it is focused and pulsed. Phone `groupBy` renders
+   * unwindowed: collapsed groups mount nothing, and the toggle rows would
+   * need their own measuring. So does `expandableRow` under `'auto'` (and it
+   * is unsupported under `true`): its detail is a second `<tr>` the
+   * virtualizer would have to measure as part of the row above it.
    */
-  virtualize?: boolean;
+  virtualize?: boolean | 'auto';
 }
+
+interface DataTableRowProps<T> {
+  row: T;
+  /** `rowKey(row, index)`, computed once by the table. */
+  rowKeyValue: string | number;
+  /** Position in the whole sorted set when windowed; `undefined` otherwise. */
+  windowIndex: number | undefined;
+  member: boolean;
+  columns: readonly DataTableColumn<T>[];
+  cellClass: readonly string[];
+  primaryIndex: number;
+  cardCornerIndex: number;
+  cardCornerStart: boolean;
+  cardActionsIndex: number;
+  firstMetaIndex: number;
+  dense: boolean;
+  activeSortId: string | undefined;
+  highlighted: boolean;
+  selected: boolean;
+  expandable: boolean;
+  expanded: boolean;
+  hideExpandIcon: boolean;
+  /** Only passed to the expanded row, so the caller's inline `expandableRow` object can't re-render the rest. */
+  renderDetail: ((row: T) => ReactNode) | undefined;
+  clickable: boolean;
+  focusable: boolean;
+  /** Stable (see `DataTable`'s `activateRow`). */
+  onActivate: (row: T, key: string | number) => void;
+  rowClassName: ((row: T) => string | undefined) | undefined;
+  rowContextMenu: ((row: T, tr: ReactElement) => ReactElement) | undefined;
+  rowMoreActions: boolean;
+  cellPadding: string;
+  compact: boolean;
+  trailingColumns: number;
+  measureRef: ((node: HTMLTableRowElement | null) => void) | undefined;
+}
+
+/**
+ * One body row (plus its detail row when expanded), memoized so a table-level
+ * re-render — a scroll tick of the virtualizer, another row's selection, a
+ * menu opening in the page around it — skips every row whose own props are
+ * unchanged. That only holds while the caller keeps `columns`, `rowClassName`
+ * and `rowContextMenu` referentially stable (`useMemo`/`useCallback`, or a
+ * module-level function); an inline one re-renders every row, as before.
+ */
+function DataTableRowImpl<T>({
+  row,
+  rowKeyValue: key,
+  windowIndex,
+  member,
+  columns,
+  cellClass,
+  primaryIndex,
+  cardCornerIndex,
+  cardCornerStart,
+  cardActionsIndex,
+  firstMetaIndex,
+  dense,
+  activeSortId,
+  highlighted,
+  selected,
+  expandable,
+  expanded,
+  hideExpandIcon,
+  renderDetail,
+  clickable,
+  focusable,
+  onActivate,
+  rowClassName,
+  rowContextMenu,
+  rowMoreActions,
+  cellPadding,
+  compact,
+  trailingColumns,
+  measureRef,
+}: DataTableRowProps<T>) {
+  const tr = (
+    <tr
+      role="row"
+      // The row's own identity, in the DOM. One static attribute, and
+      // the only way a caller can find a specific row to scroll to
+      // without this component growing a ref API — `TransactionsPanel`
+      // uses it to land on the fill a notification pointed at.
+      data-row-key={key}
+      data-index={windowIndex}
+      // Header row is 1; tells AT where this row sits in the whole set.
+      aria-rowindex={windowIndex === undefined ? undefined : windowIndex + 2}
+      ref={measureRef}
+      aria-expanded={expandable ? expanded : undefined}
+      aria-current={selected ? 'true' : undefined}
+      className={cx(
+        'hover:bg-panel-2',
+        member && 'dt-group-member',
+        clickable && 'cursor-pointer',
+        focusable &&
+          'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+        highlighted && 'row-pulse',
+        rowClassName?.(row)
+      )}
+      tabIndex={focusable ? 0 : undefined}
+      onClick={
+        clickable
+          ? (event) => {
+              if (isRowOwnEvent(event)) onActivate(row, key);
+            }
+          : undefined
+      }
+      onKeyDown={
+        clickable
+          ? (event) => {
+              // Only the row's own keys: a focused control inside it (a
+              // tooltip trigger, a button, a checkbox) keeps its Enter/Space
+              // to itself.
+              if (event.target !== event.currentTarget) return;
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              onActivate(row, key);
+            }
+          : undefined
+      }
+    >
+      {columns.map((column, i) => {
+        const meta = dense && i !== primaryIndex && i !== cardCornerIndex && i !== cardActionsIndex;
+        return (
+          <td
+            key={column.id}
+            role="cell"
+            // Printed as the cell's label in the stacked layout. Set
+            // unconditionally: it costs one static attribute and keeps
+            // the markup width-independent.
+            data-label={column.header}
+            data-stack-before={column.stackAffix?.before}
+            data-stack-after={column.stackAffix?.after}
+            className={cx(
+              cellClass[i],
+              i === primaryIndex && 'dt-primary',
+              i === cardCornerIndex && 'dt-corner',
+              i === cardCornerIndex && cardCornerStart && 'dt-corner-start',
+              i === cardActionsIndex && 'dt-actions',
+              meta && 'dt-meta',
+              meta && i === firstMetaIndex && 'dt-meta-first',
+              // Inert at every width except the dense card, which has no
+              // header row to show the sort on and bolds the value instead.
+              column.id === activeSortId && 'dt-sorted',
+              column.cellClassName?.(row)
+            )}
+          >
+            {column.render(row)}
+          </td>
+        );
+      })}
+      {expandable &&
+        (() => {
+          const Chevron = expanded ? Icon.Expanded : Icon.Descend;
+          return (
+            <td role="cell" aria-hidden="true" className={cx(cellPadding, 'w-0 dt-disclosure')}>
+              {!hideExpandIcon && (
+                <Chevron size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-dim" />
+              )}
+            </td>
+          );
+        })()}
+      {rowMoreActions && (
+        <td
+          role="cell"
+          // No vertical padding: the button is already taller than a line
+          // of text, and would otherwise stretch every row it sits in.
+          className={cx(compact ? 'px-1' : 'px-2', 'dt-actions w-0 py-0 text-right')}
+        >
+          <RowMoreActions />
+        </td>
+      )}
+    </tr>
+  );
+  const mainRow = rowContextMenu ? rowContextMenu(row, tr) : tr;
+  if (!expandable) return mainRow;
+  return (
+    <>
+      {mainRow}
+      {expanded && renderDetail && (
+        <tr role="row" className="dt-row-detail">
+          <td
+            role="cell"
+            colSpan={columns.length + trailingColumns}
+            className="bg-panel-2 px-3 py-3"
+          >
+            {renderDetail(row)}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+// The cast keeps the generic: `memo` alone would pin `T` to `unknown`.
+const DataTableRow = memo(DataTableRowImpl) as typeof DataTableRowImpl;
+
+/**
+ * Row count past which `virtualize="auto"` windows. Well above a screenful,
+ * so a table that only occasionally runs long pays nothing the rest of the
+ * time; well below where mounting every row starts to show (a few hundred
+ * rows of several cells each).
+ */
+export const VIRTUALIZE_THRESHOLD = 150;
 
 const SORT_ARROW = { asc: '↑', desc: '↓' } as const;
 
@@ -423,8 +636,6 @@ export function DataTable<T>({
   const tableRef = useRef<HTMLTableElement>(null);
   const dense = responsive === 'stack' && stackLayout === 'dense';
 
-  useScrollToRowKey(tableRef, highlightRowKey, rows);
-
   const headerPadding = density === 'compact' ? 'px-2 py-1' : 'px-3 py-2';
   const cellPadding = density === 'compact' ? 'px-2 py-1' : 'px-3 py-1.5';
 
@@ -472,15 +683,21 @@ export function DataTable<T>({
   // would misalign a sortable centered column against a non-sortable one
   // beside it — which no gutter can fix, since there is no icon to correct
   // for. Two adjacent columns disagreeing reads worse than 8px.
-  const cellClass = columns.map((column) =>
-    cx(
-      cellPadding,
-      column.align === 'right' && 'text-right',
-      column.align === 'right' && column.sortValue && sortIconGutter,
-      column.align === 'center' && 'text-center',
-      column.stickyStart && `${STICKY_START} ${STICKY_START_CELL}`,
-      column.className
-    )
+  // Memoized, not just hoisted: it is a prop of every memoized row, and a
+  // fresh array per render would re-render them all.
+  const cellClass = useMemo(
+    () =>
+      columns.map((column) =>
+        cx(
+          cellPadding,
+          column.align === 'right' && 'text-right',
+          column.align === 'right' && column.sortValue && sortIconGutter,
+          column.align === 'center' && 'text-center',
+          column.stickyStart && `${STICKY_START} ${STICKY_START_CELL}`,
+          column.className
+        )
+      ),
+    [columns, cellPadding, sortIconGutter]
   );
 
   const sortColumn = sort ? columns.find((column) => column.id === sort.columnId) : undefined;
@@ -511,7 +728,12 @@ export function DataTable<T>({
     );
   }, [grouping, groupBy, sortedRows]);
 
-  const windowed = virtualize && !grouping;
+  const windowed =
+    !grouping &&
+    (virtualize === true ||
+      (virtualize === 'auto' &&
+        expandableRow === undefined &&
+        sortedRows.length > VIRTUALIZE_THRESHOLD));
   // Rough per-layout heights; each mounted row is then measured, so these
   // only have to be close enough to size the rows not yet seen.
   const estimatedRowHeight =
@@ -572,6 +794,43 @@ export function DataTable<T>({
     if (windowed) rowVirtualizer.measure();
   }, [isPhone, windowed, rowVirtualizer]);
 
+  // A highlighted row outside the window isn't in the DOM for
+  // `useScrollToRowKey` to find, so the virtualizer scrolls to it first —
+  // not smoothly: TanStack Virtual can't smooth-scroll to a dynamically
+  // measured row. Re-run as `scrollMargin` settles (the first call on mount
+  // measures from 0) and until the row has actually mounted.
+  const highlightIndex = useMemo(
+    () =>
+      windowed && highlightRowKey !== null
+        ? sortedRows.findIndex((row, index) => rowKey(row, index) === highlightRowKey)
+        : -1,
+    [windowed, highlightRowKey, sortedRows, rowKey]
+  );
+  const highlightMounted =
+    highlightIndex >= 0 &&
+    rowVirtualizer.getVirtualItems().some((item) => item.index === highlightIndex);
+  // Latched per key: which key's row has mounted at least once. Scrolling
+  // away and back must not count as arriving again, or `useScrollToRowKey`
+  // would yank the page back to it and re-take focus.
+  const [reachedHighlightKey, setReachedHighlightKey] = useState<string | number | null>(null);
+  if (highlightMounted && reachedHighlightKey !== highlightRowKey) {
+    setReachedHighlightKey(highlightRowKey);
+  }
+  const highlightReached = highlightRowKey !== null && reachedHighlightKey === highlightRowKey;
+  useEffect(() => {
+    if (highlightIndex < 0 || highlightReached) return;
+    rowVirtualizer.scrollToIndex(highlightIndex, { align: 'center' });
+  }, [highlightIndex, highlightReached, scrollMargin, rowVirtualizer]);
+  // Windowed, the hook also re-runs once the row first mounts. Its
+  // imperative `aria-current="location"` lives on that DOM node, so it is
+  // gone if the reader scrolls the row out of the window and back — the
+  // pulse and focus have done their job by then.
+  const scrollToRowTrigger = useMemo(
+    () => (windowed ? [rows, highlightReached] : rows),
+    [windowed, rows, highlightReached]
+  );
+  useScrollToRowKey(tableRef, highlightRowKey, scrollToRowTrigger);
+
   function toggleSort(column: DataTableColumn<T>) {
     setSort(nextDataTableSort(sort, column.id));
   }
@@ -579,134 +838,60 @@ export function DataTable<T>({
   // Cells after the caller's columns: the disclosure chevron and the More
   // actions button. Full-width rows span them too.
   const trailingColumns = (expandableRow ? 1 : 0) + (rowMoreActions ? 1 : 0);
+  const expandable = expandableRow !== undefined;
+  const clickable = Boolean(onRowClick) || expandable;
+  const focusable = Boolean(rowContextMenu) || clickable;
+
+  // Rows get one stable activator rather than `onRowClick` itself, which
+  // callers pass inline — only ever called from a click or key handler, so
+  // reading the latest value through a ref can't render anything stale.
+  const onRowClickRef = useRef(onRowClick);
+  const expandableRef = useRef(expandable);
+  useEffect(() => {
+    onRowClickRef.current = onRowClick;
+    expandableRef.current = expandable;
+  });
+  const activateRow = useCallback((row: T, key: string | number) => {
+    onRowClickRef.current?.(row);
+    if (expandableRef.current) setExpandedRowKey((current) => (current === key ? null : key));
+  }, []);
 
   function renderRow(row: T, index: number, member = false, windowIndex?: number) {
     const key = rowKey(row, index);
-    const expanded = expandableRow !== undefined && expandedRowKey === key;
-    const focusable = Boolean(rowContextMenu) || Boolean(onRowClick) || expandableRow !== undefined;
-    const activate = () => {
-      onRowClick?.(row);
-      if (expandableRow) setExpandedRowKey((current) => (current === key ? null : key));
-    };
-    const tr = (
-      <tr
-        role="row"
-        // The row's own identity, in the DOM. One static attribute, and
-        // the only way a caller can find a specific row to scroll to
-        // without this component growing a ref API — `TransactionsPanel`
-        // uses it to land on the fill a notification pointed at.
-        data-row-key={key}
-        data-index={windowIndex}
-        // Header row is 1; tells AT where this row sits in the whole set.
-        aria-rowindex={windowIndex === undefined ? undefined : windowIndex + 2}
-        ref={windowIndex === undefined ? undefined : rowVirtualizer.measureElement}
-        aria-expanded={expandableRow ? expanded : undefined}
-        aria-current={selectedRowKey !== null && key === selectedRowKey ? 'true' : undefined}
-        className={cx(
-          'hover:bg-panel-2',
-          member && 'dt-group-member',
-          (onRowClick || expandableRow) && 'cursor-pointer',
-          focusable &&
-            'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
-          key === highlightRowKey && 'row-pulse',
-          rowClassName?.(row)
-        )}
-        tabIndex={focusable ? 0 : undefined}
-        onClick={
-          onRowClick || expandableRow
-            ? (event) => {
-                if (isRowOwnEvent(event)) activate();
-              }
-            : undefined
-        }
-        onKeyDown={
-          onRowClick || expandableRow
-            ? (event) => {
-                // Only the row's own keys: a focused control inside it (a
-                // tooltip trigger, a button, a checkbox) keeps its Enter/Space
-                // to itself.
-                if (event.target !== event.currentTarget) return;
-                if (event.key !== 'Enter' && event.key !== ' ') return;
-                event.preventDefault();
-                activate();
-              }
-            : undefined
-        }
-      >
-        {columns.map((column, i) => {
-          const meta =
-            dense && i !== primaryIndex && i !== cardCornerIndex && i !== cardActionsIndex;
-          return (
-            <td
-              key={column.id}
-              role="cell"
-              // Printed as the cell's label in the stacked layout. Set
-              // unconditionally: it costs one static attribute and keeps
-              // the markup width-independent.
-              data-label={column.header}
-              data-stack-before={column.stackAffix?.before}
-              data-stack-after={column.stackAffix?.after}
-              className={cx(
-                cellClass[i],
-                i === primaryIndex && 'dt-primary',
-                i === cardCornerIndex && 'dt-corner',
-                i === cardCornerIndex && cardCornerStart && 'dt-corner-start',
-                i === cardActionsIndex && 'dt-actions',
-                meta && 'dt-meta',
-                meta && i === firstMetaIndex && 'dt-meta-first',
-                // Inert at every width except the dense card, which has no
-                // header row to show the sort on and bolds the value instead.
-                column.id === activeSortId && 'dt-sorted',
-                column.cellClassName?.(row)
-              )}
-            >
-              {column.render(row)}
-            </td>
-          );
-        })}
-        {expandableRow &&
-          (() => {
-            const Chevron = expanded ? Icon.Expanded : Icon.Descend;
-            return (
-              <td role="cell" aria-hidden="true" className={cx(cellPadding, 'w-0 dt-disclosure')}>
-                {!expandableRow.hideIcon && (
-                  <Chevron size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-dim" />
-                )}
-              </td>
-            );
-          })()}
-        {rowMoreActions && (
-          <td
-            role="cell"
-            // No vertical padding: the button is already taller than a line
-            // of text, and would otherwise stretch every row it sits in.
-            className={cx(
-              density === 'compact' ? 'px-1' : 'px-2',
-              'dt-actions w-0 py-0 text-right'
-            )}
-          >
-            <RowMoreActions />
-          </td>
-        )}
-      </tr>
-    );
-    const mainRow = rowContextMenu ? rowContextMenu(row, tr) : tr;
-    if (!expandableRow) return <Fragment key={key}>{mainRow}</Fragment>;
+    const expanded = expandable && expandedRowKey === key;
     return (
-      <Fragment key={key}>
-        {mainRow}
-        {expanded && (
-          <tr role="row" className="dt-row-detail">
-            <td
-              role="cell"
-              colSpan={columns.length + trailingColumns}
-              className="bg-panel-2 px-3 py-3"
-            >
-              {expandableRow.renderDetail(row)}
-            </td>
-          </tr>
-        )}
-      </Fragment>
+      <DataTableRow
+        key={key}
+        row={row}
+        rowKeyValue={key}
+        windowIndex={windowIndex}
+        member={member}
+        columns={columns}
+        cellClass={cellClass}
+        primaryIndex={primaryIndex}
+        cardCornerIndex={cardCornerIndex}
+        cardCornerStart={cardCornerStart}
+        cardActionsIndex={cardActionsIndex}
+        firstMetaIndex={firstMetaIndex}
+        dense={dense}
+        activeSortId={activeSortId}
+        highlighted={highlightRowKey !== null && key === highlightRowKey}
+        selected={selectedRowKey !== null && key === selectedRowKey}
+        expandable={expandable}
+        expanded={expanded}
+        hideExpandIcon={expandableRow?.hideIcon ?? false}
+        renderDetail={expanded ? expandableRow?.renderDetail : undefined}
+        clickable={clickable}
+        focusable={focusable}
+        onActivate={activateRow}
+        rowClassName={rowClassName}
+        rowContextMenu={rowContextMenu}
+        rowMoreActions={rowMoreActions}
+        cellPadding={cellPadding}
+        compact={density === 'compact'}
+        trailingColumns={trailingColumns}
+        measureRef={windowIndex === undefined ? undefined : rowVirtualizer.measureElement}
+      />
     );
   }
 

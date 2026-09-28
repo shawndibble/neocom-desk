@@ -8,7 +8,14 @@
  * src/features/loyalty/useLoyaltyStoreOffers.ts for how the numbers are
  * assembled.
  */
-import { useDeferredValue, useEffect, useMemo, useState, type ReactElement } from 'react';
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactElement,
+} from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
@@ -73,6 +80,9 @@ function iskPerLpTone(value: number | null): string {
  * View in Market/Plan in Industry buttons and the row's context menu, so the
  * two can't drift on which field means "the real item".
  */
+/** Module-level so the table's windowing and row memo see one stable function. */
+const offerRowKey = (row: LoyaltyOfferRow) => row.offer.offer_id;
+
 function resolveLoyaltyRowItem(row: LoyaltyOfferRow): { typeId: number | null; itemName: string } {
   if (!row.isBlueprint) return { typeId: row.offer.type_id, itemName: row.itemName };
   return { typeId: row.productTypeId, itemName: row.productName ?? row.itemName };
@@ -414,20 +424,30 @@ export function LoyaltyStore() {
     navigate(`${industryTabHref('plans')}?product=${productTypeId}`);
   }
 
-  function rowContextMenu(row: LoyaltyOfferRow, tr: ReactElement) {
-    const { typeId, itemName } = resolveLoyaltyRowItem(row);
-    if (typeId === null) return tr;
-    // `catalog` is always resolved by the time a row exists to right-click —
-    // `useLoyaltyStoreOffers` gates `ready` on `catalog !== null` — so this
-    // never needs the lazy-load `onOpenChange` wiring the Market/Assets menus
-    // use; `?? null` collapsing "not loaded" into "no blueprint" is safe here.
-    const blueprintTypeID = catalog?.byProductTypeID.get(typeId)?.blueprintTypeID ?? null;
-    return (
-      <ItemContextMenu typeId={typeId} itemName={itemName} blueprintTypeID={blueprintTypeID}>
-        {tr}
-      </ItemContextMenu>
-    );
-  }
+  // Stable, so the offers table's memoized rows skip re-rendering on every page render.
+  const rowContextMenu = useCallback(
+    (row: LoyaltyOfferRow, tr: ReactElement) => {
+      const { typeId, itemName } = resolveLoyaltyRowItem(row);
+      if (typeId === null) return tr;
+      // `catalog` is always resolved by the time a row exists to right-click —
+      // `useLoyaltyStoreOffers` gates `ready` on `catalog !== null` — so this
+      // never needs the lazy-load `onOpenChange` wiring the Market/Assets menus
+      // use; `?? null` collapsing "not loaded" into "no blueprint" is safe here.
+      const blueprintTypeID = catalog?.byProductTypeID.get(typeId)?.blueprintTypeID ?? null;
+      return (
+        <ItemContextMenu typeId={typeId} itemName={itemName} blueprintTypeID={blueprintTypeID}>
+          {tr}
+        </ItemContextMenu>
+      );
+    },
+    [catalog]
+  );
+  // Keyed on the id, not `selectedRow`: a selected offer filtered out of
+  // `filteredRows` has no row to tint either way.
+  const offerRowClassName = useCallback(
+    (row: LoyaltyOfferRow) => (row.offer.offer_id === selectedOfferId ? 'bg-panel-2' : undefined),
+    [selectedOfferId]
+  );
 
   // The identity column (never hidden) plus the optional columns the picker
   // controls, in table order — `LOYALTY_STORE_OFFERS_COLUMN_IDS`' own order.
@@ -490,12 +510,16 @@ export function LoyaltyStore() {
     }),
     [t]
   );
-  const columns: DataTableColumn<LoyaltyOfferRow>[] = [
-    itemColumn,
-    ...LOYALTY_STORE_OFFERS_COLUMN_IDS.filter(offersColumnVisibility.isVisible).map(
-      (id) => optionalOfferColumns[id]
-    ),
-  ];
+  const isOfferColumnVisible = offersColumnVisibility.isVisible;
+  const columns = useMemo<DataTableColumn<LoyaltyOfferRow>[]>(
+    () => [
+      itemColumn,
+      ...LOYALTY_STORE_OFFERS_COLUMN_IDS.filter(isOfferColumnVisible).map(
+        (id) => optionalOfferColumns[id]
+      ),
+    ],
+    [itemColumn, optionalOfferColumns, isOfferColumnVisible]
+  );
   // The full catalog, not just `columns`' currently-visible ids: a sort
   // picked while a column was shown should still resolve once the picker
   // hides it, ready to take effect again the moment it's shown back
@@ -544,8 +568,9 @@ export function LoyaltyStore() {
             label={t('loyaltyStore.title')}
             columns={columns}
             rows={filteredRows}
-            rowKey={(row) => row.offer.offer_id}
+            rowKey={offerRowKey}
             density="compact"
+            virtualize="auto"
             sort={offersSortProps.sort}
             onSortChange={offersSortProps.onSortChange}
             mobileSort
@@ -553,9 +578,7 @@ export function LoyaltyStore() {
             onRowClick={selectRow}
             rowContextMenu={rowContextMenu}
             selectedRowKey={selectedRow?.offer.offer_id ?? null}
-            rowClassName={(row) =>
-              row.offer.offer_id === selectedRow?.offer.offer_id ? 'bg-panel-2' : undefined
-            }
+            rowClassName={offerRowClassName}
           />
         </>
       )}

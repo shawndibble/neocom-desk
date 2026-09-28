@@ -221,6 +221,8 @@ function ContractsFilterBar({
   );
 }
 
+const contractRowKey = (contract: Contract) => contract.contract_id;
+
 function contractRowContextMenu(contract: Contract, tr: ReactElement) {
   return <ContractContextMenu contract={contract}>{tr}</ContractContextMenu>;
 }
@@ -655,7 +657,8 @@ export function Contracts() {
               label={t('contracts.title')}
               columns={columns}
               rows={filteredContracts}
-              rowKey={(contract) => contract.contract_id}
+              rowKey={contractRowKey}
+              virtualize="auto"
               highlightRowKey={highlightedContractId}
               rowContextMenu={contractRowContextMenu}
               rowMoreActions
