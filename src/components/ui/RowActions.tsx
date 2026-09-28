@@ -10,7 +10,7 @@
  * publishes its items; a `RowMoreActions` anywhere under it — a cell in the
  * row, or `DataTable`'s `rowMoreActions` column — draws the button.
  */
-import { useContext, type ComponentProps, type ReactElement } from 'react';
+import { useContext, type ComponentProps, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ContextMenu,
@@ -47,6 +47,30 @@ export function MenuItem(props: ComponentProps<typeof ContextMenuItem>) {
     <DropdownMenuItem {...props} />
   ) : (
     <ContextMenuItem {...props} />
+  );
+}
+
+/**
+ * A `MenuItem` that stays hoverable, focusable and tappable while inert,
+ * explaining why via a tap-reachable `Tooltip` (issue #2162) — same
+ * `aria-disabled`-over-native reasoning as `Characters.tsx`'s refresh-all
+ * button, adapted for a Radix menu item: `menuItemClassName`'s
+ * `data-[disabled]:pointer-events-none` keys off the native `disabled` prop,
+ * so passing it here would swallow the very tap meant to reveal `reason`.
+ * `onSelect` no-ops instead, keeping the menu open so the bubble stays
+ * readable.
+ */
+export function DisabledMenuItem({ reason, children }: { reason: string; children: ReactNode }) {
+  return (
+    <Tooltip content={reason} openOnTap>
+      <MenuItem
+        aria-disabled
+        onSelect={(event) => event.preventDefault()}
+        className="aria-disabled:cursor-default aria-disabled:opacity-50"
+      >
+        {children}
+      </MenuItem>
+    </Tooltip>
   );
 }
 
