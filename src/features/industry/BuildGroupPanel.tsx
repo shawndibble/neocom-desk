@@ -475,6 +475,7 @@ export function BuildGroupPanel({
         id: 'stillToBuy',
         header: t('industry.stillToBuyColumn'),
         align: 'right',
+        headerClassName: 'whitespace-nowrap',
         className: 'tabular-nums',
         sortValue: (material) => material.buyToShow,
         render: (material) => (
