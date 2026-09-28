@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { IconButton, Modal, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { loadTypeOverrides, untagIgnored, untagMoonOre } from './typeOverrides';
 
 interface TypeOverridesDialogProps {
@@ -138,7 +139,9 @@ export function TypeOverridesDialog({ open, onClose, onChanged }: TypeOverridesD
               <ul className="divide-y divide-line">
                 {rows[list].map((row) => (
                   <li key={row.typeId} className="flex items-center gap-2 py-1.5">
-                    <span className="min-w-0 flex-1 truncate text-sm">{row.name}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm">
+                      <MarketItemLink typeId={row.typeId}>{row.name}</MarketItemLink>
+                    </span>
                     <IconButton
                       variant="plain"
                       size="sm"

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { AssignDialog } from './AssignDialog';
@@ -72,18 +73,20 @@ function renderDialog(
   onAddPayee?: () => void
 ) {
   render(
-    <AssignDialog
-      row={row}
-      assignment={assignment}
-      payees={payees}
-      systemName="Jita"
-      typeNames={new Map([[ZEOLITES, 'Zeolites']])}
-      pricesFor={pricesFor}
-      busy={false}
-      onAssigned={vi.fn()}
-      onCancel={vi.fn()}
-      onAddPayee={onAddPayee}
-    />
+    <MemoryRouter>
+      <AssignDialog
+        row={row}
+        assignment={assignment}
+        payees={payees}
+        systemName="Jita"
+        typeNames={new Map([[ZEOLITES, 'Zeolites']])}
+        pricesFor={pricesFor}
+        busy={false}
+        onAssigned={vi.fn()}
+        onCancel={vi.fn()}
+        onAddPayee={onAddPayee}
+      />
+    </MemoryRouter>
   );
 }
 

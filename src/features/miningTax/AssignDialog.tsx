@@ -14,6 +14,7 @@ import {
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { OreLine } from '@/engine/miningTax/types';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { maskIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
@@ -381,7 +382,9 @@ export function AssignDialog({
                 />
                 <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                 <label htmlFor={`line-${line.typeId}`} className="w-40 shrink-0 truncate">
-                  {typeNames.get(line.typeId) ?? `#${line.typeId}`}
+                  <MarketItemLink typeId={line.typeId}>
+                    {typeNames.get(line.typeId) ?? `#${line.typeId}`}
+                  </MarketItemLink>
                 </label>
                 <span className="tabular-nums text-text-dim">{line.quantity.toLocaleString()}</span>
               </li>

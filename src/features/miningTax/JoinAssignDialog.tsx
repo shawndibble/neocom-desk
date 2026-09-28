@@ -13,6 +13,7 @@ import {
   Checkbox,
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { AlreadyAssignedError, joinAssignments, type JoinMemberInput } from './assignments';
 import { agreedTerms } from './selection';
 import type { MoonMiningTaxRow } from './snapshot';
@@ -200,9 +201,14 @@ export function JoinAssignDialog({
                       {(candidate.assignment
                         ? candidate.assignment.oreLines
                         : candidate.row.unassignedOreLines
-                      )
-                        .map((line) => typeNames.get(line.typeId) ?? `#${line.typeId}`)
-                        .join(', ')}
+                      ).map((line, index, lines) => (
+                        <span key={line.typeId}>
+                          <MarketItemLink typeId={line.typeId}>
+                            {typeNames.get(line.typeId) ?? `#${line.typeId}`}
+                          </MarketItemLink>
+                          {index < lines.length - 1 ? ', ' : ''}
+                        </span>
+                      ))}
                     </span>
                   </label>
                 </li>
@@ -233,7 +239,9 @@ export function JoinAssignDialog({
                   >
                     <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                     <span className="w-40 shrink-0 truncate">
-                      {typeNames.get(line.typeId) ?? `#${line.typeId}`}
+                      <MarketItemLink typeId={line.typeId}>
+                        {typeNames.get(line.typeId) ?? `#${line.typeId}`}
+                      </MarketItemLink>
                     </span>
                     <span className="w-24 shrink-0 tabular-nums text-text-dim">
                       {line.quantity.toLocaleString()}

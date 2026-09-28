@@ -15,6 +15,7 @@ import {
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { planSplit } from '@/engine/miningTax/split';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import { unmaskNumber } from '@/lib/numberMask';
@@ -211,7 +212,9 @@ export function SplitDialog({
                   <div className="flex items-center gap-1.5">
                     <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                     <label htmlFor={inputId} className="min-w-0 flex-1 truncate">
-                      {typeNames.get(line.typeId) ?? `#${line.typeId}`}
+                      <MarketItemLink typeId={line.typeId}>
+                        {typeNames.get(line.typeId) ?? `#${line.typeId}`}
+                      </MarketItemLink>
                       <span className="ml-1.5 text-xs text-text-dim tabular-nums">
                         {line.quantity.toLocaleString()}
                       </span>
