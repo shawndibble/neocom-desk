@@ -16,7 +16,8 @@
  * board reads it.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { loadMarketRegions, loadMarketTypes } from '@/sde/loadMarketSde';
+import { loadMarketRegions } from '@/sde/loadMarketSde';
+import { loadMarketTypesById } from '@/sde/marketTypesById';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
 import type { CourierEndpoint, PublicCourierContractRow } from '@/engine/contracts/courierSearch';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
@@ -95,11 +96,11 @@ async function resolveTypeNames(
   rows: readonly PublicContractOfferRow[]
 ): Promise<ReadonlyMap<number, string>> {
   if (rows.length === 0) return EMPTY_NAMES;
-  const listed = new Set(rows.map((row) => row.typeId));
-  const catalog = await loadMarketTypes();
+  const catalog = await loadMarketTypesById();
   const names = new Map<number, string>();
-  for (const entry of catalog) {
-    if (listed.has(entry.typeId)) names.set(entry.typeId, entry.name);
+  for (const { typeId } of rows) {
+    const entry = catalog.get(typeId);
+    if (entry) names.set(typeId, entry.name);
   }
   return names;
 }

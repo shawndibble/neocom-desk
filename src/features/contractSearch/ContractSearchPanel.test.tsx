@@ -14,6 +14,7 @@ import {
 import { isSyncConfigured } from '@/app/syncStatus';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { loadMarketTypes, loadSolarSystemJumps } from '@/sde/loadMarketSde';
+import { clearMarketTypeIndex } from '@/sde/marketTypesById';
 import {
   ContractSearchPanel,
   type ContractMode,
@@ -272,6 +273,7 @@ beforeEach(async () => {
   // The jump graph memoizes its index for the session, so without this a
   // later test inherits whichever snapshot an earlier one happened to load.
   clearJumpGraphIndex();
+  clearMarketTypeIndex();
   await db.settings.clear();
   await db.esiCache.clear();
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
