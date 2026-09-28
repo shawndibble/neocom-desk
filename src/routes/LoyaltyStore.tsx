@@ -53,7 +53,7 @@ import { useMarketHub } from '@/features/market/hub';
 import { usePriceBasis, type PriceBasis } from '@/features/loyalty/priceBasis';
 import { TRADE_HUBS } from '@/market/hubs';
 import { nameForType } from '@/features/industry/blueprintCatalog';
-import { buildMarketParams } from '@/engine/market/urlState';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useLoyaltyStoreOffers } from '@/features/loyalty/useLoyaltyStoreOffers';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
@@ -81,24 +81,24 @@ function resolveLoyaltyRowItem(row: LoyaltyOfferRow): { typeId: number | null; i
 interface OfferDetailProps {
   row: LoyaltyOfferRow;
   catalog: BlueprintCatalog | null;
+  hubId: string;
   hubName: string;
   priceBasis: PriceBasis;
   playerLp: number;
   useOwnMaterials: boolean;
   onToggleUseOwnMaterials: () => void;
-  onViewInMarket: (typeId: number) => void;
   onPlanInIndustry: (productTypeId: number) => void;
 }
 
 function OfferDetail({
   row,
   catalog,
+  hubId,
   hubName,
   priceBasis,
   playerLp,
   useOwnMaterials,
   onToggleUseOwnMaterials,
-  onViewInMarket,
   onPlanInIndustry,
 }: OfferDetailProps) {
   const { t } = useTranslation();
@@ -112,8 +112,11 @@ function OfferDetail({
       primary: true,
       sortValue: (material) =>
         catalog ? nameForType(catalog, material.typeID) : `#${material.typeID}`,
-      render: (material) =>
-        catalog ? nameForType(catalog, material.typeID) : `#${material.typeID}`,
+      render: (material) => (
+        <MarketItemLink typeId={material.typeID} hubId={hubId}>
+          {catalog ? nameForType(catalog, material.typeID) : `#${material.typeID}`}
+        </MarketItemLink>
+      ),
     },
     {
       id: 'needed',
@@ -150,12 +153,16 @@ function OfferDetail({
 
       <div className="flex flex-wrap gap-2">
         {marketTypeId !== null && (
-          <Button variant="ghost" size="sm" onClick={() => onViewInMarket(marketTypeId)}>
+          <MarketItemLink
+            typeId={marketTypeId}
+            hubId={hubId}
+            className={buttonClassName({ variant: 'ghost', size: 'sm' })}
+          >
             <span className="inline-flex items-center gap-1.5">
               <Icon.Market size={Icon.ICON_SIZE.sm} aria-hidden="true" />
               {t('loyaltyStore.viewInMarket')}
             </span>
-          </Button>
+          </MarketItemLink>
         )}
         {row.isBlueprint && row.productTypeId !== null && (
           <Button variant="ghost" size="sm" onClick={() => onPlanInIndustry(row.productTypeId!)}>
@@ -226,7 +233,10 @@ function OfferDetail({
                   className="flex justify-between gap-4 text-[0.6875rem] text-text-dim"
                 >
                   <dt>
-                    {item.quantity.toLocaleString()} × {item.name}
+                    {item.quantity.toLocaleString()} ×{' '}
+                    <MarketItemLink typeId={item.typeId} hubId={hubId}>
+                      {item.name}
+                    </MarketItemLink>
                   </dt>
                   <dd className="tabular-nums">
                     {item.unitPrice === null ? (
@@ -394,11 +404,6 @@ export function LoyaltyStore() {
     if (!isDesktop) setSheetOpen(true);
   }
 
-  function viewInMarket(typeId: number) {
-    const params = buildMarketParams(typeId, { mode: 'hub', hubId: hub.id });
-    navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
-  }
-
   function planInIndustry(productTypeId: number) {
     navigate(`${industryTabHref('plans')}?product=${productTypeId}`);
   }
@@ -547,12 +552,12 @@ export function LoyaltyStore() {
     <OfferDetail
       row={selectedRow}
       catalog={catalog}
+      hubId={hub.id}
       hubName={hub.name}
       priceBasis={priceBasis}
       playerLp={playerLp}
       useOwnMaterials={useOwnMaterialsFor.has(selectedRow.offer.offer_id)}
       onToggleUseOwnMaterials={() => toggleUseOwnMaterials(selectedRow.offer.offer_id)}
-      onViewInMarket={viewInMarket}
       onPlanInIndustry={planInIndustry}
     />
   ) : (
