@@ -48,6 +48,7 @@ const defaultProps = {
   columns: DEFAULT_COLUMN_VISIBILITY,
   onReorder: noop,
   onRemove: noop,
+  removalBlockedReason: () => undefined,
   onRemoveMarker: noop,
   onEditMarker: noop,
   onSetPriority: noop,
@@ -719,6 +720,67 @@ describe('EntryList one row per level', () => {
     const rows = screen.getAllByRole('listitem');
     expect(within(rows[0]).queryByRole('img', { name: /booster/i })).toBeNull();
     expect(within(rows[1]).getByRole('img', { name: /booster/i })).toBeInTheDocument();
+  });
+});
+
+describe('EntryList remove button (#2223: a later entry still needing this level)', () => {
+  it('is enabled when nothing depends on the row', () => {
+    render(<EntryList rows={[entryRow(1, [0], [4])]} bandsAt={new Map()} {...defaultProps} />);
+    expect(screen.getByRole('button', { name: /remove skill 1/i })).toBeEnabled();
+  });
+
+  it('marks the row blocked via aria-disabled, not the native attribute, so a click no-ops instead of accepting one that would silently undo itself', async () => {
+    const removed: unknown[] = [];
+    render(
+      <EntryList
+        rows={[entryRow(1, [0], [4])]}
+        bandsAt={new Map()}
+        {...defaultProps}
+        onRemove={(...args) => removed.push(args)}
+        removalBlockedReason={() => 'Skill 2 V still needs this level — remove Skill 2 V first.'}
+      />
+    );
+    const button = screen.getByRole('button', { name: /remove skill 1/i });
+    // Native `disabled` would take the button out of the tab order, so the
+    // Tooltip's "focus" reveal path (its own doc comment: "hover or focus")
+    // could never fire for a keyboard user — `aria-disabled` keeps it
+    // focusable and hoverable while the click itself still does nothing.
+    expect(button).toBeEnabled();
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(button);
+    expect(removed).toEqual([]);
+  });
+
+  it('surfaces the blocked reason as the tooltip on hover', async () => {
+    render(
+      <EntryList
+        rows={[entryRow(1, [0], [4])]}
+        bandsAt={new Map()}
+        {...defaultProps}
+        removalBlockedReason={() => 'Skill 2 V still needs this level — remove Skill 2 V first.'}
+      />
+    );
+    const button = screen.getByRole('button', { name: /remove skill 1/i });
+    await userEvent.hover(button);
+    expect(
+      await screen.findByText('Skill 2 V still needs this level — remove Skill 2 V first.')
+    ).toBeInTheDocument();
+  });
+
+  it('surfaces the blocked reason on keyboard focus too, since a blocked button stays Tab-reachable', () => {
+    render(
+      <EntryList
+        rows={[entryRow(1, [0], [4])]}
+        bandsAt={new Map()}
+        {...defaultProps}
+        removalBlockedReason={() => 'Skill 2 V still needs this level — remove Skill 2 V first.'}
+      />
+    );
+    const button = screen.getByRole('button', { name: /remove skill 1/i });
+    fireEvent.focus(button);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'Skill 2 V still needs this level — remove Skill 2 V first.'
+    );
   });
 });
 

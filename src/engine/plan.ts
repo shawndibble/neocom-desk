@@ -1,5 +1,10 @@
 import type { EngineSkill, PlanEntry, PlanStep, TrainedSkill } from '@/engine/types';
 
+/** `findRemovalBlockers`'s Map key for one (skillTypeID, level) pair. */
+export function planEntryKey(skillTypeID: number, level: number): string {
+  return `${skillTypeID}:${level}`;
+}
+
 export interface NormalizedPlan {
   steps: PlanStep[];
   /**
@@ -49,6 +54,44 @@ export function normalizePlanWithBoundaries(
     entryBoundaries.push(steps.length);
   }
   return { steps, entryBoundaries };
+}
+
+/**
+ * Which entries would silently reappear (as a dimmed prereq row,
+ * normalizePlan's `add` recursion) the instant they're removed, because some
+ * other entry still needs that exact (skillTypeID, level) — either as a real
+ * cross-skill prerequisite, or as a rung a higher level of the *same* skill
+ * climbs through on the way up. Order-independent: which entry "depends" on
+ * which is a property of the requirement graph, not of list position.
+ *
+ * Keyed by `planEntryKey`, each flagged entry maps to *an* other entry that
+ * still needs it (the one whose own `add` recursion first pushed the step
+ * back in) — not necessarily the only one, but enough to name in a "why can't
+ * I remove this" message. Removing entry i and re-running
+ * normalizePlanWithBoundaries is the simplest correct check — the resulting
+ * step *set* never depends on entry order (each step is a no-op once its
+ * skill's running max is already at or past it) — and `entryBoundaries`
+ * hands back which remaining entry owns the reinstated step for free.
+ */
+export function findRemovalBlockers(
+  entries: readonly PlanEntry[],
+  skills: ReadonlyMap<number, EngineSkill>,
+  trainedSkills: ReadonlyMap<number, TrainedSkill> = new Map()
+): Map<string, PlanEntry> {
+  const blockers = new Map<string, PlanEntry>();
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    const without = entries.filter((_, idx) => idx !== i);
+    const { steps, entryBoundaries } = normalizePlanWithBoundaries(without, skills, trainedSkills);
+    const stepIndex = steps.findIndex(
+      (s) => s.skillTypeID === entry.skillTypeID && s.level === entry.targetLevel
+    );
+    if (stepIndex === -1) continue;
+    const ownerIndex = entryBoundaries.findIndex((boundary) => stepIndex < boundary);
+    if (ownerIndex === -1) continue;
+    blockers.set(planEntryKey(entry.skillTypeID, entry.targetLevel), without[ownerIndex]);
+  }
+  return blockers;
 }
 
 /**
