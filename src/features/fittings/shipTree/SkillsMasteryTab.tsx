@@ -24,7 +24,7 @@ import { openSkillDetailModal } from '@/stores/skillDetailModal';
 import { skillTrainingStatus } from '@/features/skills/skillStatus';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { targetPlanEntries, type TargetPlan } from '@/features/skills/useTargetPlan';
-import { formatDuration } from '@/lib/duration';
+import { formatCountdown } from '@/lib/duration';
 import { cx } from '@/lib/cx';
 import type { ShipTreeShip } from '@/sde/types';
 import {
@@ -240,7 +240,7 @@ export function SkillsMasteryTab({
                           timeLabel={
                             status === 'trained'
                               ? t('skills.fitCheck.trained')
-                              : formatDuration(tierSeconds.get(p.skillTypeID) ?? 0)
+                              : formatCountdown(tierSeconds.get(p.skillTypeID) ?? 0)
                           }
                           inPlanLabel={planned ? t('skills.fitCheck.inPlan') : undefined}
                           plannedLevel={plannedLevelFor(planEntries, p.skillTypeID)}
@@ -269,7 +269,7 @@ export function SkillsMasteryTab({
                 {toAdd.length > 0 && tierTotalSeconds > 0 && (
                   <span className="text-text-dim">
                     {t('ships.info.skills.tierTotalTime', {
-                      time: formatDuration(tierTotalSeconds),
+                      time: formatCountdown(tierTotalSeconds),
                     })}
                   </span>
                 )}
