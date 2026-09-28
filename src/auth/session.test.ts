@@ -725,6 +725,9 @@ describe('persistTokens: cache purge on scope revoke', () => {
 
   it('purges BEFORE overwriting the stored record, so a failed purge is retried', async () => {
     await seedPriorLogin({ scopes: [SKILLS, MAIL] });
+    // A record the refresh actually changes: an unchanged one is not rewritten
+    // at all, which would leave no characters write to order against.
+    await db.characters.update(CHAR_ID, { name: 'CCP Old Name' });
     await seedCache(CHAR_ID, 'mail:headers');
     const cacheSpy = vi.spyOn(db.esiCache, 'where');
     const tokensSpy = vi.spyOn(db.tokens, 'put');
@@ -1030,5 +1033,86 @@ describe('persistTokens: the character upsert preserves corporationId', () => {
     await login({ scp: [SKILLS] });
 
     expect((await db.characters.get(CHAR_ID))?.corporationId).toBeUndefined();
+  });
+});
+
+/**
+ * Every `useLiveQuery` over `db.characters` (a couple dozen of them) re-runs on
+ * any write to the table, so a token refresh that learned nothing new about the
+ * Character must not write its record back.
+ */
+describe('persistTokens: character record write on refresh', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  async function seedNearExpiryToken(): Promise<void> {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'stale-access',
+      refreshToken: 'refresh-old',
+      expiresAt: Date.now() + 30_000,
+      scopes: ['esi-skills.read_skills.v1'],
+    });
+  }
+
+  it('skips the characters write when the rebuilt record equals the stored one', async () => {
+    await db.characters.put({
+      characterId: CHAR_ID,
+      name: 'CCP Alpha',
+      ownerHash: 'owner-hash-1',
+      addedAt: 5,
+      corporationId: 98000001,
+    });
+    await seedNearExpiryToken();
+    const put = vi.spyOn(db.characters, 'put');
+
+    const access = await getValidAccessToken(CHAR_ID, cfg);
+
+    expect(put).not.toHaveBeenCalled();
+    put.mockRestore();
+    // The token write is not skipped: the rotated refresh token must land.
+    const stored = await db.tokens.get(CHAR_ID);
+    expect(stored?.accessToken).toBe(access);
+    expect(stored?.refreshToken).toBe('refresh-rotated');
+  });
+
+  it('writes the record when anything in it changed', async () => {
+    await db.characters.put({
+      characterId: CHAR_ID,
+      name: 'CCP Old Name',
+      ownerHash: 'owner-hash-1',
+      addedAt: 5,
+      corporationId: 98000001,
+    });
+    await seedNearExpiryToken();
+    const put = vi.spyOn(db.characters, 'put');
+
+    await getValidAccessToken(CHAR_ID, cfg);
+
+    expect(put).toHaveBeenCalledTimes(1);
+    put.mockRestore();
+    expect(await db.characters.get(CHAR_ID)).toEqual({
+      characterId: CHAR_ID,
+      name: 'CCP Alpha',
+      ownerHash: 'owner-hash-1',
+      addedAt: 5,
+      corporationId: 98000001,
+    });
+  });
+
+  it('writes the record when the stored one carries a field the rebuilt one does not', async () => {
+    await db.characters.put({
+      characterId: CHAR_ID,
+      name: 'CCP Alpha',
+      ownerHash: 'owner-hash-1',
+      addedAt: 5,
+      legacyField: true,
+    } as never);
+    await seedNearExpiryToken();
+    const put = vi.spyOn(db.characters, 'put');
+
+    await getValidAccessToken(CHAR_ID, cfg);
+
+    expect(put).toHaveBeenCalledTimes(1);
+    put.mockRestore();
   });
 });
