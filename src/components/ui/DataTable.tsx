@@ -816,6 +816,11 @@ export function DataTable<T>({
   if (highlightMounted && reachedHighlightKey !== highlightRowKey) {
     setReachedHighlightKey(highlightRowKey);
   }
+  // Cleared with the key, so a later link to the same row is a new arrival
+  // and gets scrolled to again, as an unwindowed table's row would.
+  if (highlightRowKey === null && reachedHighlightKey !== null) {
+    setReachedHighlightKey(null);
+  }
   const highlightReached = highlightRowKey !== null && reachedHighlightKey === highlightRowKey;
   useEffect(() => {
     if (highlightIndex < 0 || highlightReached) return;

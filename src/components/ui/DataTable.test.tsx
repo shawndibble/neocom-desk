@@ -1138,50 +1138,102 @@ describe('DataTable virtualize', () => {
       expect(mountedIds()).toHaveLength(500);
     });
 
-    it('scrolls a highlighted row outside the window into it, then pulses and focuses it', async () => {
-      const scrollIntoView = vi
-        .spyOn(Element.prototype, 'scrollIntoView')
-        .mockImplementation(() => {});
-      // jsdom has no layout: stand in for a long page and for the browser
-      // moving it. TanStack clamps its target to the document's scroll height.
-      Object.defineProperty(document.documentElement, 'scrollHeight', {
-        configurable: true,
-        value: 1_000_000,
-      });
-      const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(((
-        options: ScrollToOptions
-      ) => {
-        Object.defineProperty(window, 'scrollY', { configurable: true, value: options.top ?? 0 });
-        // A real scroll event arrives on a later task, not inside the call.
+    it('switches between every row and a window as the rows cross the threshold', () => {
+      const table = (count: number) => (
+        <DataTable
+          label="Offers"
+          columns={sortableColumns}
+          rows={rowsOf(count)}
+          rowKey={byId}
+          virtualize="auto"
+        />
+      );
+      const { rerender } = render(table(VIRTUALIZE_THRESHOLD));
+      expect(mountedIds()).toHaveLength(VIRTUALIZE_THRESHOLD);
+
+      // A live refresh or a cleared filter pushes it over…
+      rerender(table(VIRTUALIZE_THRESHOLD + 1));
+      expect(mountedIds().length).toBeLessThan(100);
+      expect(screen.getByRole('table').getAttribute('aria-rowcount')).toBe(
+        String(VIRTUALIZE_THRESHOLD + 2)
+      );
+
+      // …and a narrowing filter brings it back under.
+      rerender(table(VIRTUALIZE_THRESHOLD));
+      expect(mountedIds()).toHaveLength(VIRTUALIZE_THRESHOLD);
+      expect(screen.getByRole('table').getAttribute('aria-rowcount')).toBeNull();
+      expect(document.querySelector('.dt-spacer')).toBeNull();
+    });
+
+    describe('highlightRowKey', () => {
+      let scrollTo: ReturnType<typeof vi.spyOn>;
+      let scrollIntoView: ReturnType<typeof vi.spyOn>;
+      /** What a real scroll to `top` looks like to the page: `scrollY`, then a later `scroll` event. */
+      const scrollPageTo = (top: number) => {
+        Object.defineProperty(window, 'scrollY', { configurable: true, value: top });
         setTimeout(() => window.dispatchEvent(new Event('scroll')));
-      }) as typeof window.scrollTo);
-      try {
-        render(
-          <DataTable
-            label="Offers"
-            columns={sortableColumns}
-            rows={many}
-            rowKey={byId}
-            virtualize="auto"
-            highlightRowKey={900}
-          />
+      };
+
+      beforeEach(() => {
+        scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+        // jsdom has no layout: stand in for a long page and for the browser
+        // moving it. TanStack clamps its target to the document's scroll height.
+        Object.defineProperty(document.documentElement, 'scrollHeight', {
+          configurable: true,
+          value: 1_000_000,
+        });
+        scrollTo = vi
+          .spyOn(window, 'scrollTo')
+          .mockImplementation(((options: ScrollToOptions) =>
+            scrollPageTo(options.top ?? 0)) as typeof window.scrollTo);
+      });
+      afterEach(() => {
+        delete (document.documentElement as { scrollHeight?: number }).scrollHeight;
+        scrollTo.mockRestore();
+        scrollIntoView.mockRestore();
+      });
+
+      const table = (highlightRowKey: number | null) => (
+        <DataTable
+          label="Offers"
+          columns={sortableColumns}
+          rows={many}
+          rowKey={byId}
+          virtualize="auto"
+          highlightRowKey={highlightRowKey}
+        />
+      );
+      const arrivedAt = (key: number) =>
+        waitFor(() =>
+          expect(
+            document.querySelector(`[data-row-key="${key}"]`)?.getAttribute('aria-current')
+          ).toBe('location')
         );
 
-        await waitFor(() =>
-          expect(document.querySelector('[data-row-key="900"]')?.getAttribute('aria-current')).toBe(
-            'location'
-          )
-        );
+      it('scrolls a row outside the window into it, then pulses and focuses it', async () => {
+        render(table(900));
+
+        await arrivedAt(900);
         const row = document.querySelector<HTMLElement>('[data-row-key="900"]');
         expect(row?.className).toContain('row-pulse');
         expect(document.activeElement).toBe(row);
         expect(scrollTo).toHaveBeenCalled();
         expect(scrollIntoView.mock.instances).toContain(row);
-      } finally {
-        delete (document.documentElement as { scrollHeight?: number }).scrollHeight;
-        scrollTo.mockRestore();
-        scrollIntoView.mockRestore();
-      }
+      });
+
+      it('scrolls to the same row again for a new link after the key cleared', async () => {
+        const { rerender } = render(table(900));
+        await arrivedAt(900);
+
+        rerender(table(null));
+        scrollPageTo(0);
+        await waitFor(() => expect(mountedIds()).not.toContain('900'));
+        scrollTo.mockClear();
+
+        rerender(table(900));
+        await arrivedAt(900);
+        expect(scrollTo).toHaveBeenCalled();
+      });
     });
   });
 });
