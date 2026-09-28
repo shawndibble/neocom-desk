@@ -10,28 +10,46 @@ interface SkillBarProps {
    * that a skill might be most of the way to its next one (#405).
    */
   progress?: number | null;
+  /**
+   * The highest level a Skill Plan already targets, past `level`. Segments
+   * from `level + 1` through this one render as a distinct outline rather
+   * than plain hairline, so a skill already queued in the plan doesn't look
+   * identical to one that isn't (issue: "Add tier V" looked actionable for a
+   * skill already in the plan, with no way to tell from the bar itself).
+   * Omit, or `null`, when nothing is planned past what's trained.
+   */
+  plannedLevel?: number | null;
   className?: string;
 }
 
 const LEVELS = [1, 2, 3, 4, 5] as const;
 
-export function SkillBar({ level, progress, className = '' }: SkillBarProps) {
+export function SkillBar({ level, progress, plannedLevel, className = '' }: SkillBarProps) {
   const { t } = useTranslation();
+  const ariaLabel =
+    plannedLevel != null && plannedLevel > level
+      ? t('skills.levelOfFivePlanned', { level, planned: plannedLevel })
+      : t('skills.levelOfFive', { level });
   return (
     <span
       role="img"
-      aria-label={t('skills.levelOfFive', { level })}
+      aria-label={ariaLabel}
       className={`inline-flex items-center gap-0.5 ${className}`}
     >
       {LEVELS.map((segment) => {
         const trained = segment <= level;
-        const partial = !trained && segment === level + 1 && progress != null;
+        const planned = !trained && plannedLevel != null && segment <= plannedLevel;
+        const partial = !trained && !planned && segment === level + 1 && progress != null;
         return (
           <span
             key={segment}
             aria-hidden="true"
             className={`relative h-2.5 w-1.5 overflow-hidden rounded-[1px] ${
-              trained ? 'bg-accent' : 'border border-line bg-transparent'
+              trained
+                ? 'bg-accent'
+                : planned
+                  ? 'border border-accent-dim bg-accent-dim/40'
+                  : 'border border-line bg-transparent'
             }`}
           >
             {partial && (

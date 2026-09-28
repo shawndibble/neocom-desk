@@ -12,6 +12,7 @@ import {
 import type { ShipTreeHullStatus, ShipTreeNodeDef } from '@/engine/shipTree/types';
 import type { PlanEntry } from '@/engine/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
+import { isEntryCovered } from '@/features/skills/planner/reorder';
 import type {
   ShipTreeData,
   ShipTreeFaction,
@@ -139,6 +140,30 @@ export function tierComplete(
 }
 
 /**
+ * Whether a still-incomplete tier is nonetheless fully covered by the target
+ * Skill Plan already — every skill this tier still needs trained is either
+ * trained or has a plan entry at that level or higher. Never true for an
+ * empty tier, and always false once `tierComplete` is true (nothing left to
+ * plan for).
+ */
+export function tierPlanned(
+  tier: readonly SkillPrereq[] | undefined,
+  trainedLevel: (skillTypeID: number) => number,
+  planEntries: readonly PlanEntry[]
+): boolean {
+  if (tierComplete(tier, trainedLevel)) return false;
+  return (
+    !!tier &&
+    tier.length > 0 &&
+    tier.every(
+      (p) =>
+        trainedLevel(p.skillTypeID) >= p.level ||
+        isEntryCovered(planEntries, p.skillTypeID, p.level)
+    )
+  );
+}
+
+/**
  * What reaching Mastery `tier` (1–5) still needs: tiers I..N merged by skill
  * at the highest level any of them asks, trained ones dropped.
  */
@@ -155,6 +180,23 @@ export function masteryTierEntries(
   return [...want]
     .filter(([id, level]) => trainedLevel(id) < level)
     .map(([skillTypeID, targetLevel]) => ({ skillTypeID, targetLevel }));
+}
+
+/**
+ * `masteryTierEntries`, minus whatever the target Skill Plan already covers —
+ * what an "Add tier N" click would actually add. Empty when every untrained
+ * skill through this tier is already planned, even though `masteryTierEntries`
+ * itself is not.
+ */
+export function unplannedTierEntries(
+  tiers: readonly (readonly SkillPrereq[])[],
+  tier: number,
+  trainedLevel: (skillTypeID: number) => number,
+  planEntries: readonly PlanEntry[]
+): PlanEntry[] {
+  return masteryTierEntries(tiers, tier, trainedLevel).filter(
+    (e) => !isEntryCovered(planEntries, e.skillTypeID, e.targetLevel)
+  );
 }
 
 /** Owned originals and copies of one blueprint — one ESI row per copy (`quantity` is a sentinel). */

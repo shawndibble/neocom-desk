@@ -168,9 +168,12 @@
         "tiersLabel": "Mastery tiers",
         "tier": "Tier {{tier}}",
         "tierComplete": "Tier {{tier}}, complete",
+        "tierPlanned": "Tier {{tier}}, in plan",
         "tierEmpty": "This tier asks for nothing more.",
         "addTier": "Add tier {{tier}} to plan",
-        "tierTrained": "All trained"
+        "tierTrained": "All trained",
+        "tierInPlan": "In plan",
+        "tierTotalTime": "Total {{time}}"
       },
       "blueprint": {
         "none": "No blueprint — this hull isn't manufactured.",
@@ -1304,6 +1307,7 @@
     "sp": "{{value}} SP",
     "trainingChip": "Training → {{level}} · {{time}}",
     "levelOfFive": "Level {{level}} of 5",
+    "levelOfFivePlanned": "Level {{level}} of 5, planned to {{planned}}",
     "searchPlaceholder": "Search skills…",
     "noResults": "No skills match your search.",
     "noResultsHint": "Clear the search to see every skill.",
