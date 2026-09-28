@@ -17,6 +17,7 @@ import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { maskNumber, unmaskNumber } from '@/lib/numberMask';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatVolume } from './format';
 import { materialRowState } from './materialRow';
 import { suggestedOwnedQuantity } from '@/engine/industry/ownedStock';
@@ -509,7 +510,7 @@ export function MaterialsTable({
                   )
                 )}
               </span>
-              {name}
+              <MarketItemLink typeId={material.typeID}>{name}</MarketItemLink>
               {skillGate?.gated && characterNameFor && (
                 <SkillGateMarker
                   verdict={skillGate}

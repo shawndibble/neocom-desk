@@ -167,6 +167,51 @@ describe('ItemContextMenu — price alert availability', () => {
     const item = await screen.findByRole('menuitem', { name: 'Set price alert…' });
     expect(item).toHaveAttribute('aria-disabled', 'true');
   });
+
+  // Issue #2162: a `title=` explanation is unreachable on a touch device,
+  // which has no hover — the reason must be reachable by a tap instead.
+  it.each([['Add to Quickbar'], ['Set price alert…']])(
+    'reveals the disabled reason on a tap of "%s"',
+    async (name) => {
+      render(
+        <MemoryRouter>
+          <FakeItemActions actions={fakeItemActions({ canAddToQuickbar: false })}>
+            <ItemContextMenu typeId={TRITANIUM} itemName="Tritanium" blueprintTypeID={null}>
+              <button type="button">Tritanium</button>
+            </ItemContextMenu>
+          </FakeItemActions>
+        </MemoryRouter>
+      );
+      fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+
+      const menuItem = await screen.findByRole('menuitem', { name });
+      fireEvent.touchStart(menuItem, {
+        touches: [{ clientX: 0, clientY: 0 }],
+        changedTouches: [{ clientX: 0, clientY: 0 }],
+      });
+      fireEvent.touchEnd(menuItem);
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(
+        'Select a character to use the Quickbar'
+      );
+    }
+  );
+
+  it('does not add to the quickbar when the disabled item is tapped', async () => {
+    const actions = fakeItemActions({ canAddToQuickbar: false });
+    render(
+      <MemoryRouter>
+        <FakeItemActions actions={actions}>
+          <ItemContextMenu typeId={TRITANIUM} itemName="Tritanium" blueprintTypeID={null}>
+            <button type="button">Tritanium</button>
+          </ItemContextMenu>
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+    const item = await screen.findByRole('menuitem', { name: 'Add to Quickbar' });
+    fireEvent.click(item);
+    expect(actions.addToQuickbar).not.toHaveBeenCalled();
+  });
 });
 
 // Issue #1498: every surface wrapping a row in `ItemContextMenu` renders this
