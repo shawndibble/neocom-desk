@@ -76,6 +76,9 @@ interface CellBox {
   top: number;
   left: number;
   width: number;
+  text: string;
+  /** Content wider/taller than the cell's own box — the clipping a paired card's narrower cell can produce that a bounding-box-only check would miss. */
+  overflows: boolean;
 }
 
 /** One buy-materials row's cells, keyed by `data-row-key` (the material's typeId) — position-independent, since sort order isn't asserted here. */
@@ -98,6 +101,8 @@ async function readRow(page: Page, typeId: number): Promise<{ display: string; c
           top: box.top,
           left: box.left,
           width: box.width,
+          text: (td.textContent ?? '').trim(),
+          overflows: td.scrollWidth > td.clientWidth + 1 || td.scrollHeight > td.clientHeight + 1,
         };
       });
       return { display: style.display, cells };
@@ -116,6 +121,12 @@ function labelLines(cells: CellBox[]): string[][] {
   return grouped.map((line) => line.map((cell) => cell.label));
 }
 
+function cellFor(cells: CellBox[], label: string): CellBox {
+  const cell = cells.find((c) => c.label === label);
+  expect(cell).toBeDefined();
+  return cell!;
+}
+
 test.describe('Build Group detail — stacked buy-materials card', () => {
   test.beforeEach(async ({ page }) => {
     await signInAndGoto(page);
@@ -129,6 +140,12 @@ test.describe('Build Group detail — stacked buy-materials card', () => {
     const { display, cells } = await readRow(page, TRITANIUM);
     expect(display).toBe('grid');
     expect(labelLines(cells)).toEqual([['Material'], ['Qty', 'Volume'], ['Owned', 'Still to buy']]);
+
+    // The six-digit case the ticket calls out: the paired-down Qty cell
+    // still fits its own figure without clipping it.
+    const qty = cellFor(cells, 'Qty');
+    expect(qty.text).toContain('640,000');
+    for (const cell of cells) expect(cell.overflows).toBe(false);
 
     await expectNoPageOverflow(page);
   });
@@ -146,6 +163,12 @@ test.describe('Build Group detail — stacked buy-materials card', () => {
       `table[aria-label="${GROUP_MATERIALS_LABEL}"] tr[data-row-key="${PYERITE}"]`
     );
     await expect(row.getByText('No price')).toBeVisible();
+
+    // The paired "Still to buy" cell holds both the figure and the warning
+    // line without clipping either — the compound-cell risk the ticket flags.
+    const stillToBuy = cellFor(cells, 'Still to buy');
+    expect(stillToBuy.text).toContain('No price');
+    expect(stillToBuy.overflows).toBe(false);
   });
 
   test('still renders one real table row per material at 1280px', async ({ page }) => {
