@@ -202,6 +202,8 @@ interface HarnessProps {
   onDerivedFix?: (patch: PlanPatch) => void;
   corpOwnedStock?: Partial<CorpOwnedStockState>;
   corpOwnedBlueprints?: Partial<CorpOwnedBlueprintsState>;
+  /** Fields layered over the held plan on every render — stands in for a change arriving from elsewhere (another device's sync). */
+  externalPlan?: Partial<BuildPlanRecord>;
 }
 
 const CORP_OWNED_STOCK_UNAVAILABLE: CorpOwnedStockState = {
@@ -224,8 +226,10 @@ function Harness({
   onDerivedFix,
   corpOwnedStock,
   corpOwnedBlueprints,
+  externalPlan,
 }: HarnessProps) {
-  const [plan, setPlan] = useState<BuildPlanRecord>(makePlan(planOverrides));
+  const [heldPlan, setPlan] = useState<BuildPlanRecord>(makePlan(planOverrides));
+  const plan = externalPlan ? { ...heldPlan, ...externalPlan } : heldPlan;
   return (
     <MemoryRouter>
       <FakeItemActions>
@@ -377,6 +381,28 @@ describe('BuildPlanDetail facility tax fields', () => {
 
     expect(valueOf(taxInput())).toBe('2.5');
     expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('shows a change made elsewhere while the field is not being edited', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Harness plan={{ facility: 'raitaru', facilityTaxPct: 1 }} />);
+    await openSetup(user);
+
+    rerender(<Harness plan={{ facility: 'raitaru' }} externalPlan={{ facilityTaxPct: 7.5 }} />);
+
+    expect(valueOf(taxInput())).toBe('7.5');
+  });
+
+  it('keeps a half-typed draft when a change arrives mid-edit', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Harness plan={{ facility: 'raitaru', facilityTaxPct: 1 }} />);
+    await openSetup(user);
+
+    await user.clear(taxInput());
+    await user.type(taxInput(), '3.');
+    rerender(<Harness plan={{ facility: 'raitaru' }} externalPlan={{ facilityTaxPct: 7.5 }} />);
+
+    expect(valueOf(taxInput())).toBe('3.');
   });
 
   it('commits the reaction facility tax once on blur', async () => {
