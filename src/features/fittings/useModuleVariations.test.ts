@@ -16,6 +16,12 @@ vi.mock('@/market/prices', () => ({
   getHubPrices: (...args: unknown[]) => getHubPrices(...args),
 }));
 
+// Real macrotask yields by default; a test swaps in a gate it opens by hand.
+const yieldToEventLoop = vi.fn(() => Promise.resolve());
+vi.mock('./yieldToEventLoop', () => ({
+  yieldToEventLoop: () => yieldToEventLoop(),
+}));
+
 function layer(hp: number) {
   return {
     hp,
@@ -112,6 +118,7 @@ const catalogue: FittingCatalogue = {
 describe('useModuleVariations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    yieldToEventLoop.mockImplementation(() => Promise.resolve());
   });
 
   it('lists same-rack siblings only, excluding the currently fitted type, with delta/fits/canFly/price', async () => {
@@ -204,5 +211,91 @@ describe('useModuleVariations', () => {
     );
     expect(result.current.rows.find((row) => row.typeId === 101)?.delta).toBeNull();
     expect(result.current.loading).toBe(false);
+  });
+
+  describe('between variant calculations', () => {
+    /** Both siblings (101, 102) in the high rack, so there are two variants to compare. */
+    const twoSiblings: FittingCatalogue = {
+      ...catalogue,
+      rackOf: { ...catalogue.rackOf, '102': 'high' },
+    };
+    const bothFit = new Map([
+      [101, { fitsHull: true, canFly: true }],
+      [102, { fitsHull: true, canFly: true }],
+    ]);
+
+    /** Each yield waits until the test opens it, so the run can be stepped one variant at a time. */
+    function gatedYields() {
+      const gates: (() => void)[] = [];
+      yieldToEventLoop.mockImplementation(
+        () => new Promise<void>((resolve) => gates.push(resolve))
+      );
+      return gates;
+    }
+
+    it('yields to the event loop before each variant, so the panel never blocks input for all of them', async () => {
+      const gates = gatedYields();
+      checkCandidates.mockReturnValue(bothFit);
+      getHubPrices.mockResolvedValue(new Map());
+      const variants = evaluator(() => ({ ...baseStats, ehp: 24000 }));
+
+      const { result } = renderHook(() =>
+        useModuleVariations({
+          variants,
+          slot: 'high',
+          slotIndex: 0,
+          typeId: 100,
+          catalogue: twoSiblings,
+        })
+      );
+
+      await waitFor(() => expect(gates).toHaveLength(1));
+      expect(variants.compare).not.toHaveBeenCalled();
+
+      gates[0]();
+      await waitFor(() => expect(gates).toHaveLength(2));
+      expect(variants.compare).toHaveBeenCalledTimes(1);
+      expect(result.current.loading).toBe(true);
+
+      gates[1]();
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(variants.compare).toHaveBeenCalledTimes(2);
+      expect(result.current.rows.every((row) => row.delta !== null)).toBe(true);
+    });
+
+    it('stops a run the evaluator changed under, without calculating its remaining variants', async () => {
+      const gates = gatedYields();
+      checkCandidates.mockReturnValue(bothFit);
+      getHubPrices.mockResolvedValue(new Map());
+      const stale = evaluator(() => ({ ...baseStats, ehp: 24000 }));
+      const current = evaluator(() => ({ ...baseStats, ehp: 26000 }));
+
+      const { result, rerender } = renderHook(
+        (variants: VariantEvaluator) =>
+          useModuleVariations({
+            variants,
+            slot: 'high',
+            slotIndex: 0,
+            typeId: 100,
+            catalogue: twoSiblings,
+          }),
+        { initialProps: stale }
+      );
+      await waitFor(() => expect(gates).toHaveLength(1));
+      gates[0]();
+      await waitFor(() => expect(stale.compare).toHaveBeenCalledTimes(1));
+
+      // A Character switch mid-run: the old run must not go on to its second variant.
+      rerender(current);
+      yieldToEventLoop.mockImplementation(() => Promise.resolve());
+      for (const open of gates.slice(1)) open();
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(stale.compare).toHaveBeenCalledTimes(1);
+      expect(current.compare).toHaveBeenCalledTimes(2);
+      expect(result.current.rows.map((row) => row.delta?.changes[0]?.after)).toEqual([
+        26000, 26000,
+      ]);
+    });
   });
 });
