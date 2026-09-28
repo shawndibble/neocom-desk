@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link, MemoryRouter, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import '@/i18n';
-import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
@@ -18,6 +17,10 @@ import { Layout } from './Layout';
  * `?search` is the common case, not the rare one. It must re-render the page
  * and the nav links, never the shell around them. Kept apart from
  * `Layout.test.tsx` because the render counter replaces a real child module.
+ *
+ * Every async read the shell makes is stubbed to a synchronous, stable value,
+ * so no live query can land mid-test and bump the counter on its own: the
+ * count after the first paint is final, with no timing window to wait out.
  */
 
 // A direct child of Layout's body, outside the route outlet: it re-renders
@@ -30,6 +33,19 @@ vi.mock('./StandingsScopeNotice', () => ({
   },
 }));
 
+// Dexie-backed reads, answered synchronously with their empty value.
+vi.mock('dexie-react-hooks', () => ({
+  useLiveQuery: (_query: unknown, _deps?: unknown, defaultResult?: unknown) => defaultResult,
+}));
+vi.mock('@/features/notifications/useUnreadAlertCount', () => ({
+  useUnreadAlertCount: () => 0,
+}));
+const NO_LOCKED_ROUTES = vi.hoisted(() => new Set());
+vi.mock('./useGrantedScopes', () => ({
+  useGrantedScopes: () => undefined,
+  useLockedRoutes: () => NO_LOCKED_ROUTES,
+}));
+vi.mock('@/features/corp/owner', () => ({ useActiveCorporationId: () => null }));
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
 vi.mock('@/sync', () => ({
   getSyncStatus: () => IDLE_SYNC_STATUS,
@@ -53,6 +69,12 @@ function FilteringPage({ name }: { name: string }) {
   );
 }
 
+/** Shows the return-to-origin a switch-character link carries (#1764). */
+function CharactersPage() {
+  const from = (useLocation().state as { from?: string } | null)?.from;
+  return <p>characters page, from: {from ?? ''}</p>;
+}
+
 /** Reads the location and renders Layout, as `SignedInShell` in App.tsx does. */
 function LocationReadingParent() {
   useLocation();
@@ -66,19 +88,11 @@ function renderShell() {
         <Route element={<LocationReadingParent />}>
           <Route path="/wallet" element={<FilteringPage name="wallet" />} />
           <Route path="/market" element={<FilteringPage name="market" />} />
+          <Route path="/characters" element={<CharactersPage />} />
         </Route>
       </Routes>
     </MemoryRouter>
   );
-}
-
-/** Waits until the shell's live queries stop re-rendering it, so later counts are the test's own. */
-async function settle(): Promise<void> {
-  let last = -1;
-  while (last !== shellRenders.count) {
-    last = shellRenders.count;
-    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
-  }
 }
 
 function railLink(name: string): HTMLElement {
@@ -87,7 +101,7 @@ function railLink(name: string): HTMLElement {
   return rail;
 }
 
-beforeEach(async () => {
+beforeEach(() => {
   shellRenders.count = 0;
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
   vi.mocked(useCorpAccess).mockReturnValue({
@@ -96,17 +110,28 @@ beforeEach(async () => {
     missingScopes: [],
     roles: [],
   });
-  await db.characters.clear();
   useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: true });
   useSingleKeyShortcuts.setState({ value: true, hydrated: true });
 });
 
 describe('Layout render isolation from the query string', () => {
+  it('counts a real shell re-render (positive control)', async () => {
+    renderShell();
+    await screen.findByText(/wallet page, filter:/);
+    const before = shellRenders.count;
+
+    // A store Layout subscribes to directly: a change must reach the counter.
+    act(() => {
+      useMobileTabs.setState({ value: [...DEFAULT_MOBILE_TABS].reverse() });
+    });
+
+    expect(shellRenders.count).toBeGreaterThan(before);
+  });
+
   it('does not re-render the shell when only search params change', async () => {
     const user = userEvent.setup();
     renderShell();
     await screen.findByText(/wallet page, filter:/);
-    await settle();
     const before = shellRenders.count;
 
     await user.click(screen.getByRole('button', { name: 'filter' }));
@@ -128,5 +153,20 @@ describe('Layout render isolation from the query string', () => {
     expect(await screen.findByText(/market page, filter:/)).toBeInTheDocument();
     expect(railLink('Market')).toHaveAttribute('aria-current', 'page');
     expect(railLink('Wallet')).not.toHaveAttribute('aria-current');
+  });
+
+  it("points the More sheet's Character link back at the page navigated to", async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await screen.findByText(/wallet page, filter:/);
+    await user.click(screen.getByRole('link', { name: 'to market' }));
+    await screen.findByText(/market page, filter:/);
+
+    const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+    await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
+    const sheet = screen.getByRole('dialog', { name: 'More' });
+    await user.click(within(sheet).getByRole('link', { name: 'Switch character' }));
+
+    expect(await screen.findByText('characters page, from: /market')).toBeInTheDocument();
   });
 });
