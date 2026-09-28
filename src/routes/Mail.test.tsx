@@ -880,6 +880,48 @@ describe('Mail', () => {
     expect(await screen.findByText(/Mailing list/)).toBeInTheDocument();
   });
 
+  it('reading pane "To:" links a character recipient but leaves a mailing list plain (issue #2170)', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/lists`, () =>
+        HttpResponse.json([{ mailing_list_id: 500, name: 'Fleet Announcements' }])
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json([
+          {
+            ...headers[0],
+            recipients: [
+              { recipient_id: 90000003, recipient_type: 'character' },
+              { recipient_id: 500, recipient_type: 'mailing_list' },
+            ],
+          },
+          headers[1],
+        ])
+      ),
+      http.get(`https://esi.evetech.net/characters/90000003`, () =>
+        HttpResponse.json({
+          name: 'Corp Recruiter',
+          birthday: '2020-01-01T00:00:00Z',
+          bloodline_id: 1,
+          gender: 'male',
+          race_id: 1,
+          security_status: 1.5,
+        })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByText('Fleet up!'));
+
+    expect(await screen.findByText(/Fleet Announcements/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Fleet Announcements/ })).not.toBeInTheDocument();
+
+    const recipientButton = await screen.findByRole('button', { name: 'Corp Recruiter' });
+    await user.click(recipientButton);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('tab', { name: 'Character' })).toBeInTheDocument();
+  });
+
   it('remembers the folder selection across a character switch and a reload', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>

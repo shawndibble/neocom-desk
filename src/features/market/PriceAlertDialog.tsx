@@ -9,7 +9,7 @@
  * item mounts only while the menu is open; the dialog only while it is.
  */
 import { useTranslation } from 'react-i18next';
-import { MenuItem, Modal } from '@/components/ui';
+import { DisabledMenuItem, MenuItem, Modal } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { PriceAlertForm } from './PriceAlertForm';
 import { useQuickbar } from './useQuickbar';
@@ -36,14 +36,16 @@ export function PriceAlertMenuItem({
   const { t } = useTranslation();
   const { item } = useQuickbarItem(typeId);
   const hasTarget = item?.targetPrice !== undefined && item.targetDirection !== undefined;
+  const label = t(
+    hasTarget ? 'market.contextMenu.editPriceAlert' : 'market.contextMenu.setPriceAlert'
+  );
+  if (available) {
+    return <MenuItem onSelect={onSelect}>{label}</MenuItem>;
+  }
   return (
-    <MenuItem
-      disabled={!available}
-      title={available ? undefined : t('market.contextMenu.quickbarNoCharacter')}
-      onSelect={onSelect}
-    >
-      {t(hasTarget ? 'market.contextMenu.editPriceAlert' : 'market.contextMenu.setPriceAlert')}
-    </MenuItem>
+    <DisabledMenuItem reason={t('market.contextMenu.quickbarNoCharacter')}>
+      {label}
+    </DisabledMenuItem>
   );
 }
 

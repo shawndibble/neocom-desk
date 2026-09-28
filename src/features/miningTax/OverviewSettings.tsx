@@ -19,6 +19,7 @@ import {
 } from '@/components/ui';
 import { MINING_YIELD_RANGES, type MiningYieldRange } from '@/engine/miningTax/yieldRange';
 import { basisSide, isNowBasis, type PriceBasis } from '@/engine/miningTax/priceBasis';
+import { CHART_METRICS, type ChartMetric } from './chartMetricPref';
 import {
   MAX_BUYBACK_RATE,
   isValidBuybackRate,
@@ -42,6 +43,31 @@ export function RangeControl({ value, onChange, fill = false }: RangeControlProp
       options={MINING_YIELD_RANGES.map((range) => ({
         value: range,
         label: t(`miningTax.overview.range.${range}`),
+      }))}
+      value={value}
+      onChange={onChange}
+      fill={fill}
+      uppercase={false}
+    />
+  );
+}
+
+interface ChartMetricControlProps {
+  value: ChartMetric;
+  onChange: (metric: ChartMetric) => void;
+  /** Full width with 44px tap targets — the phone layout. */
+  fill?: boolean;
+}
+
+/** Segmented ISK / m³ / Count select for the Overview's two charts (issue #2160). */
+export function ChartMetricControl({ value, onChange, fill = false }: ChartMetricControlProps) {
+  const { t } = useTranslation();
+  return (
+    <SegmentedControl
+      label={t('miningTax.overview.chartMetric.title')}
+      options={CHART_METRICS.map((metric) => ({
+        value: metric,
+        label: t(`miningTax.overview.chartMetric.${metric}Option`),
       }))}
       value={value}
       onChange={onChange}

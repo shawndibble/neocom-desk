@@ -29,15 +29,28 @@ export function ItemPriceAlertBell({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(next) => !disabled && setOpen(next)}>
       <PopoverTrigger asChild>
+        {/*
+          `Tooltip` (via `tooltip=`), not a native `title=`: a touch device has
+          no hover, so the disabled reason was unreachable on a phone (#2162).
+          `aria-disabled` rather than the native attribute, same reasoning as
+          `Characters.tsx`'s refresh-all button — a natively disabled button
+          takes no hover, focus, or tap, so the bubble it would carry is
+          unreachable by any route. Unlike that button, the tap here does
+          nothing while disabled (the Popover's own `onOpenChange` guard above
+          keeps it inert), so `openOnTap` reveals the bubble on a plain tap
+          rather than the touch-and-hold a still-live tap would need to keep.
+        */}
         <IconButton
           size="sm"
           icon={<Icon.PriceAlert />}
           label={t('market.priceAlert.button', { name })}
+          tooltip={disabled ? t('market.contextMenu.quickbarNoCharacter') : undefined}
           pressed={item !== undefined && hasQuickbarTarget(item)}
-          disabled={disabled}
-          title={disabled ? t('market.contextMenu.quickbarNoCharacter') : undefined}
+          aria-disabled={disabled || undefined}
+          openOnTap={disabled}
+          className="aria-disabled:cursor-default aria-disabled:opacity-40"
         />
       </PopoverTrigger>
       <PopoverContent align="end">

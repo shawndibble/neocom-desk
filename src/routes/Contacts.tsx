@@ -34,8 +34,11 @@ import {
 } from './contactsColumns';
 import { GrantBanner } from '@/app/GrantNote';
 import { contactLabelNames, loadContactLabels, loadContacts } from '@/features/character/contacts';
+import { downloadCsv } from '@/lib/downloadCsv';
+import { contactsAcrossCsvColumns, contactsCsvColumns } from '@/features/character/contactsCsv';
 import {
   ALL_CONTACT_TYPES,
+  CONTACT_TYPE_KEY,
   STANDING_CATEGORIES,
   EMPTY_CONTACTS_FILTER,
   activeContactsFilterCount,
@@ -92,19 +95,6 @@ interface Snapshot {
    */
   acrossLists: CharacterContactList[];
 }
-
-/**
- * ESI's `contact_type` verbatim was what this column printed. "Player" is what
- * a pilot calls a character contact (a "character" is also a thing corps and
- * alliances are made of), and "Corp" is how the name is written everywhere in
- * game — both shorter than what they replace.
- */
-const CONTACT_TYPE_KEY: Record<CharacterContact['contact_type'], string> = {
-  character: 'contacts.typeCharacter',
-  corporation: 'contacts.typeCorporation',
-  alliance: 'contacts.typeAlliance',
-  faction: 'contacts.typeFaction',
-};
 
 /** What the table prints for an id whose name has not resolved — searchable, per `contactsFilter`. */
 function entityName(names: ReadonlyMap<number, string>, id: number): string {
@@ -378,6 +368,10 @@ interface AcrossCharactersPanelProps {
   /** Reports the count up on every change, so the lifted chip can badge it — the `ContractSearchPanel`/`onStatusChange` pattern. */
   onDisagreementCountChange: (count: number) => void;
   isColumnVisible: (id: ContactsAcrossColumnId) => boolean;
+  /** Reports the currently filtered rows up (export order, not the table's own sort — same as `CorpMembers`' own export), so the page header's CSV export (issue #2164) can read this tab's own rows without owning its fetch/merge state. */
+  onVisibleRowsChange: (rows: readonly AcrossCharactersRow[]) => void;
+  /** Reports whether any list behind the current merge is truncated, so the CSV export's filename can carry the same "-partial" suffix the Character tab's own truncated export does. */
+  onTruncatedChange: (truncated: boolean) => void;
 }
 
 /**
@@ -396,6 +390,8 @@ function AcrossCharactersPanel({
   disagreementsOnly,
   onDisagreementCountChange,
   isColumnVisible,
+  onVisibleRowsChange,
+  onTruncatedChange,
 }: AcrossCharactersPanelProps) {
   const { t } = useTranslation();
   const [fetched, setFetched] = useState<readonly CharacterContactList[] | null>(null);
@@ -408,6 +404,11 @@ function AcrossCharactersPanel({
     () => onDisagreementCountChange(disagreementCount),
     [disagreementCount, onDisagreementCountChange]
   );
+  // Any one character's own fetch stopping short makes the whole merge
+  // incomplete — the export's "-partial" suffix (issue #2164) has to cover
+  // that the same way the Character tab's own truncation does.
+  const truncated = useMemo(() => effectiveLists.some((list) => list.truncated), [effectiveLists]);
+  useEffect(() => onTruncatedChange(truncated), [truncated, onTruncatedChange]);
 
   const text = filter.text.trim().toLowerCase();
   const visibleRows = useMemo(
@@ -420,6 +421,7 @@ function AcrossCharactersPanel({
       }),
     [rows, disagreementsOnly, filter.types, text, names]
   );
+  useEffect(() => onVisibleRowsChange(visibleRows), [visibleRows, onVisibleRowsChange]);
 
   async function fetchEveryCharacter() {
     setFetching(true);
@@ -582,6 +584,12 @@ export function Contacts() {
   const disagreementsOnly = filterParams['across.disagree'];
   const setDisagreementsOnly = (next: boolean) => setFilterParams({ 'across.disagree': next });
   const [disagreementCount, setDisagreementCount] = useState(0);
+  // Lifted the same way `disagreementCount` is (issue #2164): the page
+  // header's CSV export needs the Across tab's own filtered rows, and only
+  // `AcrossCharactersPanel` has the fetch state (`effectiveLists`) they come
+  // from.
+  const [acrossVisibleRows, setAcrossVisibleRows] = useState<readonly AcrossCharactersRow[]>([]);
+  const [acrossTruncated, setAcrossTruncated] = useState(false);
 
   const characterColumnVisibility = useColumnVisibility(
     contactsCharacterColumnsStore,
@@ -869,12 +877,38 @@ export function Contacts() {
         title={t('contacts.title')}
         meta={contactsResult && <DataAgeBadge date={contactsResult.fetchedAt} />}
         actions={
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('contacts.refresh')}
-            onClick={refresh}
-            disabled={loading}
-          />
+          <>
+            <IconButton
+              icon={<Icon.Download />}
+              label={t('contacts.exportCsv')}
+              disabled={
+                view === 'across' ? acrossVisibleRows.length === 0 : filteredContacts.length === 0
+              }
+              onClick={() =>
+                view === 'across'
+                  ? downloadCsv(
+                      'contacts-across',
+                      acrossVisibleRows,
+                      contactsAcrossCsvColumns(t, contactNames),
+                      new Date(),
+                      acrossTruncated
+                    )
+                  : downloadCsv(
+                      'contacts',
+                      filteredContacts,
+                      contactsCsvColumns(t, contactNames, affiliationRows),
+                      new Date(),
+                      contactsTruncated
+                    )
+              }
+            />
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('contacts.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
+          </>
         }
       />
 
@@ -918,6 +952,8 @@ export function Contacts() {
           disagreementsOnly={disagreementsOnly}
           onDisagreementCountChange={setDisagreementCount}
           isColumnVisible={acrossColumnVisibility.isVisible}
+          onVisibleRowsChange={setAcrossVisibleRows}
+          onTruncatedChange={setAcrossTruncated}
         />
       ) : contactsNeedsReauth ? (
         <GrantBanner
