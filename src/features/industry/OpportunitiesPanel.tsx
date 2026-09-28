@@ -84,6 +84,26 @@ function numericCell(
 
 /** `'current'`, not the synced default: this panel has always opened on the active pilot. */
 const CHARACTER_FILTER = characterFilterParam('current');
+
+/**
+ * The columns' sort keys, at module scope: the columns themselves close over
+ * selection state and `onStartPlan` (which the parent rebuilds every
+ * render), but `DataTable` keys its sort memo on the active `sortValue`, so
+ * keeping these stable is what stops a re-render from re-sorting every row.
+ */
+const SORT_VALUE = {
+  product: (row: OpportunityRow) => row.candidate.catalogEntry.productName,
+  // -1 means BPO/unlimited runs — sorts as the largest, not the smallest.
+  // `MAX_SAFE_INTEGER` rather than `Infinity`: two BPO rows would compare
+  // `Infinity - Infinity`, which is `NaN`.
+  blueprint: (row: OpportunityRow) =>
+    row.candidate.blueprint.runs === -1 ? Number.MAX_SAFE_INTEGER : row.candidate.blueprint.runs,
+  unitMargin: (row: OpportunityRow) => unitMargin(row) ?? undefined,
+  margin: (row: OpportunityRow) => row.result.marginPct ?? undefined,
+  duration: (row: OpportunityRow) => row.result.seconds,
+  iskPerHour: (row: OpportunityRow) => row.result.iskPerHour ?? undefined,
+  orderDepth: (row: OpportunityRow) => ORDER_DEPTH_RANK[row.orderDepth],
+};
 const OPPORTUNITIES_CHARACTERS_KEY = 'opps.chars';
 
 export function OpportunitiesPanel({
@@ -299,7 +319,7 @@ export function OpportunitiesPanel({
       id: 'product',
       header: t('industry.product'),
       primary: true,
-      sortValue: (row) => row.candidate.catalogEntry.productName,
+      sortValue: SORT_VALUE.product,
       render: (row) => {
         const productTypeID = row.candidate.catalogEntry.productTypeID;
         const verdict = productTypeID !== null ? skillGateByProductTypeID.get(productTypeID) : null;
@@ -329,13 +349,7 @@ export function OpportunitiesPanel({
     {
       id: 'blueprint',
       header: t('industry.opportunitiesBlueprint'),
-      // -1 means BPO/unlimited runs — sorts as the largest, not the smallest.
-      // `MAX_SAFE_INTEGER` rather than `Infinity`: two BPO rows would compare
-      // `Infinity - Infinity`, which is `NaN`.
-      sortValue: (row) =>
-        row.candidate.blueprint.runs === -1
-          ? Number.MAX_SAFE_INTEGER
-          : row.candidate.blueprint.runs,
+      sortValue: SORT_VALUE.blueprint,
       render: (row) => {
         const original = row.candidate.blueprint.runs === -1;
         return (
@@ -354,7 +368,7 @@ export function OpportunitiesPanel({
       header: t('industry.opportunitiesUnitMargin'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: (row) => unitMargin(row) ?? undefined,
+      sortValue: SORT_VALUE.unitMargin,
       cellClassName: (row) => {
         const margin = unitMargin(row);
         return margin !== null ? iskToneClass(margin) : undefined;
@@ -372,7 +386,7 @@ export function OpportunitiesPanel({
       header: t('industry.margin'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: (row) => row.result.marginPct ?? undefined,
+      sortValue: SORT_VALUE.margin,
       render: (row) => numericCell(row.result.marginPct, formatPercent, unknown),
     },
     {
@@ -380,7 +394,7 @@ export function OpportunitiesPanel({
       header: t('industry.time'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: (row) => row.result.seconds,
+      sortValue: SORT_VALUE.duration,
       render: (row) => formatDuration(row.result.seconds),
     },
     {
@@ -388,7 +402,7 @@ export function OpportunitiesPanel({
       header: t('industry.iskPerHour'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: (row) => row.result.iskPerHour ?? undefined,
+      sortValue: SORT_VALUE.iskPerHour,
       cellClassName: (row) =>
         row.result.iskPerHour !== null ? iskToneClass(row.result.iskPerHour) : undefined,
       render: (row) =>
@@ -402,7 +416,7 @@ export function OpportunitiesPanel({
     {
       id: 'orderDepth',
       header: t('industry.opportunitiesOrderDepthLabel'),
-      sortValue: (row) => ORDER_DEPTH_RANK[row.orderDepth],
+      sortValue: SORT_VALUE.orderDepth,
       render: (row) => (
         <span className="flex items-center gap-1">
           <StatChip

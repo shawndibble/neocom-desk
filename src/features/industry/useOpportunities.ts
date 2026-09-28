@@ -39,6 +39,7 @@ import type { BlueprintCatalog } from './blueprintCatalog';
 import { loadMarketSnapshots } from './marketData';
 import { recipeForLookup } from './recipes';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
+import { throttledRanker } from './throttledRanking';
 import {
   autoRecalculates,
   computeOpportunityRow,
@@ -58,6 +59,8 @@ import {
 } from './opportunities';
 
 const CHUNK_SIZE = 5;
+/** How often a progress frame re-ranks the rows found so far (`throttledRanker`). */
+const PROGRESS_RANK_INTERVAL_MS = 500;
 
 export interface UseOpportunitiesArgs {
   candidates: readonly OpportunityCandidate[];
@@ -192,6 +195,7 @@ export function useOpportunities({
 
       const stock = detectOpportunityStock(ownedStockSnapshot.sources, currentCandidates);
       const unranked: UnrankedOpportunityRow[] = [];
+      const rankProgress = throttledRanker(rankOpportunityRows, PROGRESS_RANK_INTERVAL_MS);
 
       for (let i = 0; i < currentCandidates.length; i += CHUNK_SIZE) {
         if (cancelled) return;
@@ -225,7 +229,7 @@ export function useOpportunities({
         const done = Math.min(i + CHUNK_SIZE, currentCandidates.length);
         setState({
           ...EMPTY_STATE,
-          rows: rankOpportunityRows(unranked),
+          rows: rankProgress(unranked),
           progress: { done, total: currentCandidates.length },
           loading: true,
         });
