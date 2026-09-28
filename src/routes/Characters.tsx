@@ -31,6 +31,7 @@ import {
   StatChip,
   STAT_CHIP_TONE_TEXT_CLASS,
   TextInput,
+  Toast,
   Tooltip,
   type DataTableColumn,
   type StatChipTone,
@@ -939,6 +940,13 @@ export function Characters() {
     id: number;
     name: string;
   } | null>(null);
+  /** The Character whose removal just failed — rolled back whole, so it is still listed. */
+  const [removeFailedName, setRemoveFailedName] = useState<string | null>(null);
+  useEffect(() => {
+    if (removeFailedName === null) return;
+    const timer = setTimeout(() => setRemoveFailedName(null), 5000);
+    return () => clearTimeout(timer);
+  }, [removeFailedName]);
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [customizingPermissions, setCustomizingPermissions] = useState(false);
 
@@ -1225,9 +1233,15 @@ export function Characters() {
 
   async function confirmRemoveCharacter() {
     if (!removingCharacter) return;
-    const { id } = removingCharacter;
+    const { id, name } = removingCharacter;
     setRemovingCharacter(null);
-    await removeCharacterAfterSync(id, isSyncConfigured());
+    try {
+      await removeCharacterAfterSync(id, isSyncConfigured());
+    } catch {
+      // The local removal is one transaction, so a failure left every row in
+      // place — say so rather than leave the click looking ignored.
+      setRemoveFailedName(name);
+    }
   }
 
   async function handleMoveToGroup(characterId: number, groupId: string | null) {
@@ -1753,6 +1767,10 @@ export function Characters() {
             </div>
           )}
         </>
+      )}
+
+      {removeFailedName !== null && (
+        <Toast message={t('characters.removeFailed', { name: removeFailedName })} />
       )}
 
       <Modal

@@ -74,12 +74,8 @@ export interface WalletBalancesSnapshot {
  */
 export async function loadAllCharactersWalletBalances(): Promise<WalletBalancesSnapshot> {
   const characters = await db.characters.toArray();
-  const granted = await Promise.all(
-    characters.map(async (character) => {
-      const token = await db.tokens.get(character.characterId);
-      return (token?.scopes ?? []).includes(WALLET_SCOPE);
-    })
-  );
+  const tokens = await db.tokens.bulkGet(characters.map((character) => character.characterId));
+  const granted = tokens.map((token) => (token?.scopes ?? []).includes(WALLET_SCOPE));
 
   const toFetch = characters.filter((_, i) => granted[i]);
   const noScopeSkipped = characters
