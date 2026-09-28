@@ -48,6 +48,7 @@ const defaultProps = {
   columns: DEFAULT_COLUMN_VISIBILITY,
   onReorder: noop,
   onRemove: noop,
+  onOpenSkillDetail: noop,
   removalBlockedReason: () => undefined,
   onRemoveMarker: noop,
   onEditMarker: noop,
