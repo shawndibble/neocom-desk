@@ -364,6 +364,51 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
 });
 
 /**
+ * Ledger table phone sort picker (issue #2148): `DataTable` defaults to
+ * `responsive="stack"` below `sm`, which hides the `<thead>` and its sort
+ * buttons entirely — the same bug class already fixed for Industry (#1627),
+ * Market (#1628) and Contacts (#1978). The fix is a bare `mobileSort` prop on
+ * the Tax tab's `DataTable` call (every column already carries `sortValue`),
+ * so this only needs to prove the picker renders on phone, is absent on
+ * desktop, and actually reorders the stacked cards.
+ */
+test.describe('Tax ledger — phone sort picker', () => {
+  test('reorders the stacked cards at 390px', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await signInAndGoto(page);
+    await seedPayeeBalance(page, { withUnassignedEntry: true });
+    await page.goto('./mining/tax');
+
+    const table = page.getByRole('table');
+    await expect(table).toBeVisible();
+    const keysOf = () =>
+      table
+        .locator('tbody tr[data-row-key]')
+        .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-row-key')));
+
+    // Default sort is date desc, so the newer Unassigned row (2026-01-02)
+    // leads the older Outstanding row (2026-01-01).
+    const unassignedKey = `${CHARACTER_ID}:${UNASSIGNED_DATE}:${SOLAR_SYSTEM_ID}:unassigned`;
+    await expect.poll(keysOf).toEqual([unassignedKey, ASSIGNMENT_ID]);
+
+    const sortBy = page.getByLabel('Sort by', { exact: true });
+    await expect(sortBy).toBeAttached();
+    await sortBy.selectOption({ label: 'Date ↑' });
+    await expect.poll(keysOf).toEqual([ASSIGNMENT_ID, unassignedKey]);
+  });
+
+  test('no picker at 1280px', async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await signInAndGoto(page);
+    await seedPayeeBalance(page);
+    await page.goto('./mining/tax');
+
+    await expect(page.getByRole('table')).toBeVisible();
+    await expect(page.getByLabel('Sort by', { exact: true })).toBeHidden();
+  });
+});
+
+/**
  * `SelectionToolbar`'s bulk "Settle Up" touch target (issue #1175): the
  * bar's one primary, decision-committing action for the whole checked
  * selection rendered at `size="sm"` (36px) like its four ordinary secondary
