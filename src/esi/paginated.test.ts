@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { http, HttpResponse, delay } from 'msw';
 import { setupServer } from 'msw/node';
-import { fetchAllPagesStatus } from './paginated';
+import { fetchAllPagesStatus, PAGE_FETCH_CONCURRENCY } from './paginated';
 import { configureEsi, ESI_BASE_URL } from './client';
 import { rejectBadEsiHeaders } from './test-helpers';
 import { onEsiActivity, type ActivityEvent } from './activityLog';
@@ -33,7 +33,7 @@ describe('fetchAllPagesStatus', () => {
     expect(requests).toBe(1);
   });
 
-  it('fetches every page reported by X-Pages, in order, one at a time', async () => {
+  it('fetches every page reported by X-Pages, a few at a time, reassembled in page order', async () => {
     const pagesRequested: number[] = [];
     let inFlight = 0;
     let maxInFlight = 0;
@@ -53,8 +53,10 @@ describe('fetchAllPagesStatus', () => {
 
     const { items } = await fetchAllPagesStatus<string>('/markets/10000002/orders');
 
-    expect(pagesRequested).toEqual([1, 2, 3]);
-    expect(maxInFlight).toBe(1);
+    expect([...pagesRequested].sort()).toEqual([1, 2, 3]);
+    // Page 1 alone (it carries X-Pages), then 2 and 3 together.
+    expect(pagesRequested[0]).toBe(1);
+    expect(maxInFlight).toBe(2);
     expect(items).toEqual(['item-1a', 'item-1b', 'item-2a', 'item-2b', 'item-3a', 'item-3b']);
   });
 
@@ -246,5 +248,108 @@ describe('fetchAllPagesStatus — activity log (issue #32)', () => {
       },
     ]);
     unsubscribe();
+  });
+});
+
+/**
+ * Pages 2..N run a few at a time rather than one after another — a 20-page
+ * asset walk was 20 serial round trips. The sequential contract still holds:
+ * items in page order, a 404 after page 1 ends the data, anything else throws.
+ */
+describe('fetchAllPagesStatus — parallel page walk', () => {
+  /** Answers each page after `delayFor(page)` ms, recording concurrency. */
+  function slowPagedHandler(
+    totalPages: number,
+    delayFor: (page: number) => number,
+    statusFor: (page: number) => number = () => 200
+  ) {
+    const state = { inFlight: 0, maxInFlight: 0, requested: [] as number[] };
+    const handler = http.get(`${ESI_BASE_URL}/markets/10000002/orders`, async ({ request }) => {
+      const page = Number(new URL(request.url).searchParams.get('page'));
+      state.requested.push(page);
+      state.inFlight += 1;
+      state.maxInFlight = Math.max(state.maxInFlight, state.inFlight);
+      await delay(delayFor(page));
+      state.inFlight -= 1;
+      const status = statusFor(page);
+      if (status !== 200) return new HttpResponse(null, { status });
+      return HttpResponse.json([`item-${page}`], { headers: { 'X-Pages': String(totalPages) } });
+    });
+    return { handler, state };
+  }
+
+  it('caps pages in flight at PAGE_FETCH_CONCURRENCY and keeps page order when later pages answer first', async () => {
+    // Earlier pages answer slowest, so arrival order is the reverse of page order.
+    const { handler, state } = slowPagedHandler(10, (page) => (page === 1 ? 0 : 60 - page * 5));
+    server.use(handler);
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders');
+
+    expect(result.items).toEqual(Array.from({ length: 10 }, (_, i) => `item-${i + 1}`));
+    expect(result).toMatchObject({ truncated: false, pagesFetched: 10, pagesReported: 10 });
+    expect(state.maxInFlight).toBeGreaterThan(1);
+    expect(state.maxInFlight).toBeLessThanOrEqual(PAGE_FETCH_CONCURRENCY);
+  });
+
+  it('keeps only the pages before the first 404, even when a later page answered', async () => {
+    // Page 3 404s at once while 2, 4 and 5 are still in flight; 4 and 5 then
+    // answer 200 and must be discarded.
+    const { handler, state } = slowPagedHandler(
+      8,
+      (page) => (page === 1 || page === 3 ? 0 : 30),
+      (page) => (page === 3 ? 404 : 200)
+    );
+    server.use(handler);
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders');
+
+    expect(result).toEqual({
+      items: ['item-1', 'item-2'],
+      truncated: true,
+      pagesFetched: 2,
+      pagesReported: 8,
+    });
+    expect(state.requested).toContain(4);
+    // Nothing is dispatched once the 404 is known.
+    expect(Math.max(...state.requested)).toBe(5);
+  });
+
+  it('throws a non-404 failure on a later page, after its siblings settle', async () => {
+    const { handler, state } = slowPagedHandler(
+      6,
+      (page) => (page === 2 ? 0 : 30),
+      (page) => (page === 2 ? 400 : 200)
+    );
+    server.use(handler);
+
+    await expect(fetchAllPagesStatus<string>('/markets/10000002/orders')).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(state.inFlight).toBe(0);
+    expect(state.requested).not.toContain(6);
+  });
+
+  it('ends at a 404 that comes before a failing page, as the sequential walk would', async () => {
+    const { handler } = slowPagedHandler(
+      5,
+      (page) => (page === 2 ? 30 : 0),
+      (page) => (page === 2 ? 404 : page === 3 ? 400 : 200)
+    );
+    server.use(handler);
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders');
+
+    expect(result).toMatchObject({ items: ['item-1'], truncated: true, pagesFetched: 1 });
+  });
+
+  it('never requests past maxPages', async () => {
+    const { handler, state } = slowPagedHandler(20, () => 5);
+    server.use(handler);
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders', { maxPages: 6 });
+
+    expect([...state.requested].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(result).toMatchObject({ truncated: true, pagesFetched: 6, pagesReported: 20 });
+    expect(result.items).toEqual(['item-1', 'item-2', 'item-3', 'item-4', 'item-5', 'item-6']);
   });
 });
