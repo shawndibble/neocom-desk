@@ -1,14 +1,17 @@
 /**
  * Adapts src/market lookups to the flat shapes src/engine/industry expects,
- * and adds a small in-memory TTL cache for system cost indices (the ESI
- * endpoint returns every system in one call; src/market has no cache for it,
- * unlike hub prices / adjusted prices which are already cached there).
+ * and adds a small TTL cache for system cost indices (the ESI endpoint
+ * returns every system in one call; src/market has no cache for it, unlike
+ * hub prices / adjusted prices which are already cached there). Like those,
+ * it is held in memory and persisted to `esiCache` so a reload inside the TTL
+ * does not refetch, and concurrent loads share one in-flight request.
  *
  * `loadMarketSnapshots` is the batching entry point — one fetch per distinct
  * hub for a whole set of plans; `loadMarketSnapshot` is its single-plan face.
  *
  * `adjustedPrices`/`systemCostIndex` are `null` only when the live ESI call
- * itself failed (no local persistence for these — CONTEXT.md: "Data Age").
+ * itself failed with nothing inside its TTL to answer instead — a persisted
+ * row is never served past its TTL as a stale fallback (CONTEXT.md: "Data Age").
  * That is the app's offline signal for price-dependent Build Plan results;
  * hub prices never signal offline this way (src/market/prices.ts already
  * degrades unreachable Fuzzwork to per-type nulls, not a throw).
@@ -20,6 +23,7 @@ import {
   type HubAggregate,
 } from '@/market/prices';
 import { fetchSystemCostIndices, systemCostIndexByActivity } from '@/market/cost-index';
+import { GLOBAL_CACHE_CHARACTER_ID, readCachedEntries, writeCachedMany } from '@/esi/cache';
 import type { SystemCostIndices } from '@/esi/endpoints';
 import type { TradeHub } from '@/market/hubs';
 import type { AdjustedPrices, HubPrices, IndustryActivity } from '@/engine/industry/types';
@@ -66,9 +70,27 @@ const COST_INDEX_TTL_MS = HUB_PRICE_TTL_MS;
  */
 let rawCostIndexCache: { value: SystemCostIndices[]; expiresAt: number } | null = null;
 
+/** The one fetch-or-disk-read in flight, shared by every concurrent caller. */
+let rawCostIndexInFlight: Promise<SystemCostIndices[] | null> | null = null;
+
+/**
+ * Bumped by `clearCostIndexCache` and folded into the persisted key, so the
+ * (synchronous, test-only) clear also retires the row already on disk.
+ * Always 0 in production, which keeps the key stable across reloads.
+ */
+let persistedGeneration = 0;
+
+function persistedKey(): string {
+  return persistedGeneration === 0
+    ? 'industryCostIndices'
+    : `industryCostIndices#${persistedGeneration}`;
+}
+
 /** Test-only: production callers rely on TTL expiry instead of clearing. */
 export function clearCostIndexCache(): void {
   rawCostIndexCache = null;
+  rawCostIndexInFlight = null;
+  persistedGeneration += 1;
 }
 
 async function loadSystemCostIndices(
@@ -76,15 +98,43 @@ async function loadSystemCostIndices(
   now: () => number = Date.now
 ): Promise<Map<number, number> | null> {
   const nowMs = now();
-  if (!rawCostIndexCache || rawCostIndexCache.expiresAt <= nowMs) {
-    try {
-      const value = await fetchSystemCostIndices();
-      rawCostIndexCache = { value, expiresAt: nowMs + COST_INDEX_TTL_MS };
-    } catch {
-      return null;
+  let raw: SystemCostIndices[] | null;
+  if (rawCostIndexCache && rawCostIndexCache.expiresAt > nowMs) {
+    raw = rawCostIndexCache.value;
+  } else {
+    if (!rawCostIndexInFlight) {
+      const load = loadRawCostIndices(nowMs);
+      rawCostIndexInFlight = load;
+      void load.finally(() => {
+        if (rawCostIndexInFlight === load) rawCostIndexInFlight = null;
+      });
     }
+    raw = await rawCostIndexInFlight;
   }
-  return systemCostIndexByActivity(rawCostIndexCache.value, activity);
+  return raw ? systemCostIndexByActivity(raw, activity) : null;
+}
+
+/** The persisted row while inside its TTL, else ESI. Never rejects: `null` is the offline signal. */
+async function loadRawCostIndices(nowMs: number): Promise<SystemCostIndices[] | null> {
+  const key = persistedKey();
+  const row = (await readCachedEntries<SystemCostIndices[]>(GLOBAL_CACHE_CHARACTER_ID, [key])).get(
+    key
+  );
+  if (row && row.fetchedAt + COST_INDEX_TTL_MS > nowMs) {
+    rawCostIndexCache = { value: row.value, expiresAt: row.fetchedAt + COST_INDEX_TTL_MS };
+    return row.value;
+  }
+  let value: SystemCostIndices[];
+  try {
+    value = await fetchSystemCostIndices();
+  } catch {
+    return null;
+  }
+  rawCostIndexCache = { value, expiresAt: nowMs + COST_INDEX_TTL_MS };
+  // Not awaited: memory already has it, and a failed write only costs the
+  // next reload a refetch.
+  void writeCachedMany(GLOBAL_CACHE_CHARACTER_ID, [[key, value]], nowMs).catch(() => {});
+  return value;
 }
 
 /** One plan's worth of pricing inputs — what a single `MarketSnapshot` answers. */
@@ -156,18 +206,13 @@ export function loadMarketSnapshots(
 
   const adjustedPrices = loadAdjustedPrices();
 
-  // Distinct activities resolve in sequence, not in parallel: the raw ESI
-  // response is cached by value once it lands, so two activities racing a
-  // cold cache would fetch it twice — exactly the fan-out this function
-  // exists to remove, one endpoint over.
+  // Distinct activities can resolve side by side: `loadSystemCostIndices`
+  // shares one in-flight fetch of the raw ESI response, so two activities on
+  // a cold cache still cost one request.
   const costIndices = new Map<IndustryActivity, Promise<Map<number, number> | null>>();
-  let chain: Promise<unknown> = Promise.resolve();
   for (const request of requests) {
     const activity = request.activity ?? 'manufacturing';
-    if (costIndices.has(activity)) continue;
-    const indices = chain.then(() => loadSystemCostIndices(activity));
-    costIndices.set(activity, indices);
-    chain = indices;
+    if (!costIndices.has(activity)) costIndices.set(activity, loadSystemCostIndices(activity));
   }
 
   return requests.map(async (request) => {

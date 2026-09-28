@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import { http, HttpResponse } from 'msw';
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { http, HttpResponse, delay } from 'msw';
+import { db } from '@/db';
 import { setupServer } from 'msw/node';
 import { ESI_BASE_URL } from '@/esi/client';
 import { FUZZWORK_AGGREGATES_URL } from '@/market/fuzzwork';
@@ -285,5 +286,57 @@ describe('loadMarketSnapshots', () => {
     // No msw handlers registered: `onUnhandledRequest: 'error'` makes any
     // fetch here a failure.
     expect(await Promise.all(loadMarketSnapshots([]))).toEqual([]);
+  });
+});
+
+describe('system cost indices: sharing and persistence', () => {
+  function countingCostIndexHandler(hits: { count: number }) {
+    return http.get(`${ESI_BASE_URL}/industry/systems`, async () => {
+      hits.count += 1;
+      await delay(20);
+      return HttpResponse.json([
+        {
+          solar_system_id: DEFAULT_TRADE_HUB.systemId,
+          cost_indices: [{ activity: 'manufacturing', cost_index: 0.0464 }],
+        },
+      ]);
+    });
+  }
+
+  it('concurrent snapshot loads share one cost-index request', async () => {
+    const hits = { count: 0 };
+    server.use(fuzzworkHandler(), adjustedPricesHandler(), countingCostIndexHandler(hits));
+
+    const [a, b] = await Promise.all([
+      loadMarketSnapshot(DEFAULT_TRADE_HUB, [34]),
+      loadMarketSnapshot(DEFAULT_TRADE_HUB, [34], undefined, 'reaction'),
+    ]);
+
+    expect(hits.count).toBe(1);
+    expect(a.systemCostIndex).toBe(0.0464);
+    expect(b.systemCostIndex).toBeNull();
+  });
+
+  it('a reload inside the TTL reads the persisted indices instead of refetching', async () => {
+    await db.esiCache.clear();
+    const hits = { count: 0 };
+    server.use(fuzzworkHandler(), adjustedPricesHandler(), countingCostIndexHandler(hits));
+
+    vi.resetModules();
+    await (await import('./marketData')).loadMarketSnapshot(DEFAULT_TRADE_HUB, [34]);
+    expect(hits.count).toBe(1);
+
+    // The write behind the fetch is not awaited by its caller; let it land.
+    await vi.waitFor(async () => {
+      const keys = (await db.esiCache.toArray()).map((row) => row.key);
+      expect(keys.some((key) => key.startsWith('industryCostIndices'))).toBe(true);
+    });
+    vi.resetModules();
+    const snapshot = await (
+      await import('./marketData')
+    ).loadMarketSnapshot(DEFAULT_TRADE_HUB, [34]);
+
+    expect(snapshot.systemCostIndex).toBe(0.0464);
+    expect(hits.count).toBe(1);
   });
 });
