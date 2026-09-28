@@ -9,6 +9,7 @@ import {
   loadWalletJournal,
   loadWalletJournalWithStatus,
   loadWalletTransactions,
+  loadWalletTransactionsWithStatus,
   loadAllCharactersWalletBalances,
   totalWalletBalance,
   type CharacterWalletBalance,
@@ -290,6 +291,50 @@ describe('loadWalletTransactions', () => {
     });
     const result = await loadWalletTransactions(CHAR_ID);
     expect(result?.data.map((t) => t.transaction_id)).toEqual([3, 2, 1]);
+  });
+});
+
+describe('loadWalletTransactionsWithStatus', () => {
+  const txn = (transaction_id: number) => ({
+    transaction_id,
+    date: '2026-08-01T00:00:00Z',
+    location_id: 1,
+    type_id: 34,
+    unit_price: 5,
+    quantity: 1,
+    client_id: 1,
+    is_buy: true,
+    is_personal: true,
+    journal_ref_id: transaction_id,
+  });
+
+  it('reports needsReauth: true and null cached on a 403 with nothing cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/wallet/transactions`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    const result = await loadWalletTransactionsWithStatus(CHAR_ID);
+
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toBeNull();
+  });
+
+  it('drops a repeated fill and keeps the truncated flag, like loadWalletTransactions', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'wallet:transactions',
+      value: [txn(2), txn(2), txn(1)],
+      fetchedAt: Date.now(),
+      truncated: true,
+    });
+
+    const result = await loadWalletTransactionsWithStatus(CHAR_ID);
+
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.data.map((t) => t.transaction_id)).toEqual([2, 1]);
+    expect(result.cached?.truncated).toBe(true);
   });
 });
 
