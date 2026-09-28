@@ -409,7 +409,7 @@ describe('clearMarketPriceCache while a fetch is in flight', () => {
     server.use(
       http.get(FUZZWORK_AGGREGATES_URL, async () => {
         hits.count += 1;
-        await delay(20);
+        await delay(150);
         return HttpResponse.json({
           34: {
             buy: { min: '2.5', max: '3.71', volume: '100', orderCount: '1' },
@@ -421,7 +421,7 @@ describe('clearMarketPriceCache while a fetch is in flight', () => {
     const clock = () => 1_000_000;
 
     const straddling = getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
-    await delay(5);
+    await vi.waitFor(() => expect(hits.count).toBe(1), { interval: 5 }); // the request is on the wire
     clearMarketPriceCache();
     // Its caller still gets its answer…
     expect((await straddling).get(34)?.sellMin).toBe(3.8);
@@ -438,14 +438,14 @@ describe('invalidateHubPrices while a fetch is in flight', () => {
     server.use(
       http.get(FUZZWORK_AGGREGATES_URL, async () => {
         hits.count += 1;
-        await delay(20);
+        await delay(150);
         return HttpResponse.json({});
       })
     );
     const clock = () => 1_000_000;
 
     const before = getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
-    await delay(5);
+    await vi.waitFor(() => expect(hits.count).toBe(1), { interval: 5 }); // the request is on the wire
     invalidateHubPrices(DEFAULT_TRADE_HUB.stationId, [34]);
     await Promise.all([before, getHubPrices(DEFAULT_TRADE_HUB, [34], clock)]);
 
