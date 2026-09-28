@@ -18,7 +18,7 @@ import {
 } from '@/engine/market/appraisalShare';
 import { getTradeHub, type TradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
-import { loadMarketTypes } from '@/sde/loadMarketSde';
+import { loadMarketTypesById } from '@/sde/marketTypesById';
 import type { AppraisalOutcome } from './appraisalData';
 
 export { MAX_SHARE_ITEMS };
@@ -71,13 +71,12 @@ export async function resolveAppraisalShare(payload: string): Promise<ResolveApp
   const hub = getTradeHub(decoded.value.hub);
   if (!hub) return { ok: false, reason: 'unknown-hub' };
 
-  const types = await loadMarketTypes();
-  const nameByTypeId = new Map(types.map((type) => [type.typeId, type.name]));
+  const typesById = await loadMarketTypesById();
 
   const unresolvedTypeIds: number[] = [];
   const resolved: { typeId: number; name: string; quantity: number }[] = [];
   for (const item of decoded.value.items) {
-    const name = nameByTypeId.get(item.typeId);
+    const name = typesById.get(item.typeId)?.name;
     if (name === undefined) {
       unresolvedTypeIds.push(item.typeId);
       continue;
