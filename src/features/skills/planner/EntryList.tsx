@@ -517,22 +517,39 @@ const EntryRow = memo(function EntryRow({
   );
 
   const blockedReason = removalBlockedReason(entry.skillTypeID, entry.targetLevel);
+  // `aria-disabled`, not the native attribute (DESIGN.md's `FilterChip` rule,
+  // same reasoning as `Characters.tsx`'s refresh-all button): a natively
+  // disabled button takes no hover and no focus, so the Tooltip explaining
+  // why it's inert could never be read by either route — only a stray mouse
+  // hover would work, and unreliably even then. The click still does
+  // nothing; the guard just moved from the DOM into the handler.
   const removeButtonEl = (
     <button
       type="button"
-      className={blockedReason ? ICON_BUTTON : DANGER_ICON_BUTTON}
-      onClick={() => onRemove(entry.skillTypeID, entry.targetLevel)}
+      className={
+        blockedReason
+          ? `${ICON_BUTTON} aria-disabled:cursor-default aria-disabled:opacity-40`
+          : DANGER_ICON_BUTTON
+      }
+      onClick={() => {
+        if (blockedReason) return;
+        onRemove(entry.skillTypeID, entry.targetLevel);
+      }}
       aria-label={t('plans.removeEntry', { name: rowLabel })}
-      disabled={blockedReason !== undefined}
+      aria-disabled={blockedReason ? true : undefined}
     >
       <Icon.Close size={Icon.ICON_SIZE.sm} aria-hidden="true" />
     </button>
   );
   // Tooltip only when blocked (rare relative to a long queue's row count) —
   // every row wrapping in a Radix provider is exactly what ICON_BUTTON's own
-  // comment above says to avoid.
+  // comment above says to avoid. `openOnTap`: the tap does nothing while
+  // blocked (same as `ItemPriceAlertBell`'s disabled case), so a plain tap
+  // reveals the reason instead of needing a touch-and-hold.
   const removeButton = blockedReason ? (
-    <Tooltip content={blockedReason}>{removeButtonEl}</Tooltip>
+    <Tooltip content={blockedReason} openOnTap>
+      {removeButtonEl}
+    </Tooltip>
   ) : (
     removeButtonEl
   );

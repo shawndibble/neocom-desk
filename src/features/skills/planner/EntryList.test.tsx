@@ -729,7 +729,7 @@ describe('EntryList remove button (#2223: a later entry still needing this level
     expect(screen.getByRole('button', { name: /remove skill 1/i })).toBeEnabled();
   });
 
-  it('disables the row when removalBlockedReason names a dependent, instead of accepting a click that would silently undo itself', async () => {
+  it('marks the row blocked via aria-disabled, not the native attribute, so a click no-ops instead of accepting one that would silently undo itself', async () => {
     const removed: unknown[] = [];
     render(
       <EntryList
@@ -741,12 +741,17 @@ describe('EntryList remove button (#2223: a later entry still needing this level
       />
     );
     const button = screen.getByRole('button', { name: /remove skill 1/i });
-    expect(button).toBeDisabled();
+    // Native `disabled` would take the button out of the tab order, so the
+    // Tooltip's "focus" reveal path (its own doc comment: "hover or focus")
+    // could never fire for a keyboard user — `aria-disabled` keeps it
+    // focusable and hoverable while the click itself still does nothing.
+    expect(button).toBeEnabled();
+    expect(button).toHaveAttribute('aria-disabled', 'true');
     await userEvent.click(button);
     expect(removed).toEqual([]);
   });
 
-  it('surfaces the blocked reason as the tooltip', async () => {
+  it('surfaces the blocked reason as the tooltip on hover', async () => {
     render(
       <EntryList
         rows={[entryRow(1, [0], [4])]}
@@ -760,6 +765,22 @@ describe('EntryList remove button (#2223: a later entry still needing this level
     expect(
       await screen.findByText('Skill 2 V still needs this level — remove Skill 2 V first.')
     ).toBeInTheDocument();
+  });
+
+  it('surfaces the blocked reason on keyboard focus too, since a blocked button stays Tab-reachable', () => {
+    render(
+      <EntryList
+        rows={[entryRow(1, [0], [4])]}
+        bandsAt={new Map()}
+        {...defaultProps}
+        removalBlockedReason={() => 'Skill 2 V still needs this level — remove Skill 2 V first.'}
+      />
+    );
+    const button = screen.getByRole('button', { name: /remove skill 1/i });
+    fireEvent.focus(button);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'Skill 2 V still needs this level — remove Skill 2 V first.'
+    );
   });
 });
 
