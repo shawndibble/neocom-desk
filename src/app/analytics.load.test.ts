@@ -16,7 +16,7 @@ vi.mock('firebase/analytics', () => {
   };
 });
 
-vi.mock('@/sync/firebaseApp', () => ({ getFirebaseApp: () => ({}) }));
+vi.mock('@/sync/firebaseCore', () => ({ getFirebaseApp: () => ({}) }));
 
 describe('trackPageView when the analytics chunk fails to load', () => {
   beforeEach(() => {

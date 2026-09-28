@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { httpsCallable } from 'firebase/functions';
 import { deleteToken, getToken } from 'firebase/messaging';
 import { getValidAccessToken } from '@/auth/session';
 import { db } from '@/db';
 import {
-  webPushSupport,
+  REREGISTER_AFTER_MS,
   registerDeviceForWebPush,
   unregisterDeviceForWebPush,
 } from './deviceRegistration';
@@ -33,80 +33,11 @@ const call = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.restoreAllMocks();
+  localStorage.clear();
   vi.mocked(getDeviceId).mockReturnValue('device-1');
   vi.mocked(httpsCallable).mockReturnValue(call as never);
   call.mockResolvedValue({ data: { deviceId: 'device-1', registered: [1], rejected: [] } });
-});
-
-describe('webPushSupport', () => {
-  const originalNotification = globalThis.Notification;
-  const originalServiceWorker = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
-  const originalUserAgent = navigator.userAgent;
-  const originalMatchMedia = window.matchMedia;
-
-  function setUserAgent(value: string) {
-    Object.defineProperty(navigator, 'userAgent', { value, configurable: true });
-  }
-  function setStandalone(matches: boolean) {
-    window.matchMedia = vi.fn().mockReturnValue({ matches }) as unknown as typeof window.matchMedia;
-  }
-
-  beforeEach(() => {
-    // @ts-expect-error -- test-only stub
-    globalThis.Notification = function Notification() {};
-    Object.defineProperty(navigator, 'serviceWorker', { value: {}, configurable: true });
-    setStandalone(false);
-  });
-
-  afterEach(() => {
-    globalThis.Notification = originalNotification;
-    if (originalServiceWorker) {
-      Object.defineProperty(navigator, 'serviceWorker', originalServiceWorker);
-    }
-    setUserAgent(originalUserAgent);
-    window.matchMedia = originalMatchMedia;
-  });
-
-  it('is unsupported with no Notification API', () => {
-    // @ts-expect-error -- test-only
-    globalThis.Notification = undefined;
-    expect(webPushSupport()).toBe('unsupported');
-  });
-
-  it('is unsupported with no serviceWorker in navigator', () => {
-    Object.defineProperty(navigator, 'serviceWorker', { value: undefined, configurable: true });
-    expect(webPushSupport()).toBe('unsupported');
-  });
-
-  it('requires install on iOS Safari when not running standalone', () => {
-    setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15');
-    setStandalone(false);
-    expect(webPushSupport()).toBe('requires-install');
-  });
-
-  it('requires install on real non-installed iOS Safari, where Notification is undefined', () => {
-    // Non-installed iOS Safari has no `Notification` global at all — the
-    // iOS-not-installed check must win over the unsupported check, or the
-    // install-required explainer never renders on the one platform it exists
-    // for (see NotificationPermissionPrompt.tsx's own comment on this).
-    // @ts-expect-error -- test-only: real non-installed iOS Safari has no Notification global
-    globalThis.Notification = undefined;
-    setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15');
-    setStandalone(false);
-    expect(webPushSupport()).toBe('requires-install');
-  });
-
-  it('is supported on iOS Safari once running standalone (installed PWA)', () => {
-    setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15');
-    setStandalone(true);
-    expect(webPushSupport()).toBe('supported');
-  });
-
-  it('is supported on a non-iOS browser regardless of standalone state', () => {
-    setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120');
-    setStandalone(false);
-    expect(webPushSupport()).toBe('supported');
-  });
 });
 
 describe('registerDeviceForWebPush', () => {
@@ -249,6 +180,132 @@ describe('registerDeviceForWebPush', () => {
 
     expect(result).toBeNull();
     expect(call).not.toHaveBeenCalled();
+  });
+});
+
+describe('registerDeviceForWebPush with skipIfUnchanged (the 5-minute poll)', () => {
+  const registration = {} as ServiceWorkerRegistration;
+  const row = {
+    characterId: 1,
+    eventId: 'industryJobComplete' as const,
+    occurrenceKey: '1:industryJobComplete:987',
+    fireAt: 1_700_000_000_000,
+    title: 'Industry job complete',
+    body: 'done',
+  };
+  const poll = (rows = new Map([[1, [row]]])) =>
+    registerDeviceForWebPush('vapid-key', registration, rows, { skipIfUnchanged: true });
+
+  beforeEach(() => {
+    vi.mocked(getToken).mockResolvedValue('fcm-token');
+    vi.spyOn(db.characters, 'toArray').mockResolvedValue([
+      { characterId: 1, name: 'A', ownerHash: 'h', addedAt: 0 },
+    ] as never);
+    vi.mocked(getValidAccessToken).mockResolvedValue('token-1');
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+  });
+
+  it('skips the callable and every access-token refresh when nothing changed', async () => {
+    await poll();
+    vi.mocked(getValidAccessToken).mockClear();
+    call.mockClear();
+
+    await poll();
+
+    expect(getValidAccessToken).not.toHaveBeenCalled();
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it('ignores row and Map ordering when deciding nothing changed', async () => {
+    const other = { ...row, occurrenceKey: '1:industryJobComplete:988' };
+    await poll(new Map([[1, [row, other]]]));
+    call.mockClear();
+    await poll(new Map([[1, [other, row]]]));
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it('re-registers once the last upload is older than REREGISTER_AFTER_MS', async () => {
+    await poll();
+    call.mockClear();
+    vi.mocked(Date.now).mockReturnValue(1_700_000_000_000 + REREGISTER_AFTER_MS);
+    await poll();
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-registers when the Projection rows change', async () => {
+    await poll();
+    call.mockClear();
+    await poll(new Map([[1, [{ ...row, fireAt: row.fireAt + 60_000 }]]]));
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-registers when the FCM token rotates', async () => {
+    await poll();
+    call.mockClear();
+    vi.mocked(getToken).mockResolvedValue('rotated-token');
+    await poll();
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-registers when the roster changes', async () => {
+    await poll();
+    call.mockClear();
+    vi.spyOn(db.characters, 'toArray').mockResolvedValue([
+      { characterId: 1, name: 'A', ownerHash: 'h', addedAt: 0 },
+      { characterId: 2, name: 'B', ownerHash: 'h', addedAt: 0 },
+    ] as never);
+    await poll();
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not remember a partial registration, so the next poll retries it', async () => {
+    call.mockResolvedValueOnce({ data: { deviceId: 'device-1', registered: [], rejected: [1] } });
+    await poll();
+    call.mockClear();
+    await poll();
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not remember a registration that left a Character without a token', async () => {
+    vi.spyOn(db.characters, 'toArray').mockResolvedValue([
+      { characterId: 1, name: 'A', ownerHash: 'h', addedAt: 0 },
+      { characterId: 2, name: 'B', ownerHash: 'h', addedAt: 0 },
+    ] as never);
+    vi.mocked(getValidAccessToken).mockImplementation(async (id) => {
+      if (id === 2) throw new Error('expired');
+      return 'token-1';
+    });
+    await poll();
+    call.mockClear();
+    await poll();
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+
+  it('always registers without skipIfUnchanged (the Enable tap)', async () => {
+    await poll();
+    call.mockClear();
+    await registerDeviceForWebPush('vapid-key', registration, new Map([[1, [row]]]));
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+
+  it('forgets the last registration on unregister', async () => {
+    vi.mocked(deleteToken).mockResolvedValue(true);
+    await poll();
+    await unregisterDeviceForWebPush();
+    call.mockClear();
+    await poll();
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+
+  it('still registers when localStorage throws', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    await expect(poll()).resolves.not.toBeNull();
+    expect(call).toHaveBeenCalledTimes(1);
   });
 });
 

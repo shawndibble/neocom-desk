@@ -1,18 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readNotificationPermission } from './permission';
-import {
-  webPushSupport,
-  registerDeviceForWebPush,
-  unregisterDeviceForWebPush,
-} from '@/sync/deviceRegistration';
+import { registerDeviceForWebPush, unregisterDeviceForWebPush } from '@/sync/deviceRegistration';
+import { webPushSupport } from '@/sync/webPushSupport';
 import { uploadProjectionRows, unregisterProjectionRegistration } from './projectionUpload';
 import type { ProjectionRow } from '@/engine/projection';
 
 vi.mock('./permission', () => ({
   readNotificationPermission: vi.fn(),
 }));
-vi.mock('@/sync/deviceRegistration', () => ({
+vi.mock('@/sync/webPushSupport', () => ({
   webPushSupport: vi.fn(),
+}));
+vi.mock('@/sync/deviceRegistration', () => ({
   registerDeviceForWebPush: vi.fn(),
   unregisterDeviceForWebPush: vi.fn(),
 }));
@@ -50,7 +49,8 @@ describe('uploadProjectionRows', () => {
     expect(registerDeviceForWebPush).toHaveBeenCalledWith(
       expect.any(String),
       readyRegistration,
-      rows
+      rows,
+      { skipIfUnchanged: true }
     );
   });
 

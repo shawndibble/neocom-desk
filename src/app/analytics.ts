@@ -8,7 +8,6 @@
  * IndexedDB (some privacy modes) — analytics silently no-ops there rather
  * than throwing.
  */
-import { getFirebaseApp } from '@/sync/firebaseApp';
 import type { Analytics } from 'firebase/analytics';
 
 export interface AnalyticsEnv {
@@ -24,7 +23,10 @@ let analyticsPromise: Promise<Analytics | null> | undefined;
 
 async function loadAnalytics(): Promise<Analytics | null> {
   if (!isAnalyticsConfigured()) return null;
-  const { getAnalytics, isSupported } = await import('firebase/analytics');
+  const [{ getAnalytics, isSupported }, { getFirebaseApp }] = await Promise.all([
+    import('firebase/analytics'),
+    import('@/sync/firebaseCore'),
+  ]);
   if (!(await isSupported())) return null;
   return getAnalytics(getFirebaseApp());
 }

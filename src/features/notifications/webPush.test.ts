@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requestNotificationPermission } from './permission';
-import { webPushSupport, registerDeviceForWebPush } from '@/sync/deviceRegistration';
+import { registerDeviceForWebPush } from '@/sync/deviceRegistration';
+import { webPushSupport } from '@/sync/webPushSupport';
 import { enableWebPush } from './webPush';
 
 vi.mock('./permission', () => ({
   requestNotificationPermission: vi.fn(),
 }));
 vi.mock('@/sync/deviceRegistration', () => ({
-  webPushSupport: vi.fn(),
   registerDeviceForWebPush: vi.fn(),
+}));
+vi.mock('@/sync/webPushSupport', () => ({
+  webPushSupport: vi.fn(),
 }));
 
 const readyRegistration = {} as ServiceWorkerRegistration;
@@ -42,6 +45,14 @@ describe('enableWebPush', () => {
     expect(result).toEqual({ support: 'supported', permission: 'granted' });
     expect(requestNotificationPermission).toHaveBeenCalled();
     expect(registerDeviceForWebPush).toHaveBeenCalledWith(expect.any(String), readyRegistration);
+  });
+
+  it('asks for permission before awaiting anything, so Safari still sees the tap', () => {
+    // Not awaited: the request must already be in flight when the call
+    // returns, i.e. no dynamic import or other await sits ahead of it.
+    const pending = enableWebPush();
+    expect(requestNotificationPermission).toHaveBeenCalled();
+    return pending;
   });
 
   it('does not register the device when permission is denied', async () => {

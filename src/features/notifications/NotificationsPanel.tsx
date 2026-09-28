@@ -111,7 +111,7 @@ import {
   promptStateAfterAsk,
   notificationsBlocked,
 } from './permission';
-import { webPushSupport } from '@/sync/deviceRegistration';
+import { webPushSupport } from '@/sync/webPushSupport';
 import { enableWebPush } from './webPush';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
