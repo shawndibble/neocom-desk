@@ -77,7 +77,7 @@ import {
 } from '@/features/character/characterColumns';
 import { ATTENTION_RANK, ATTENTION_TONE as PI_ATTENTION_TONE } from '@/engine/pi/colonyStatus';
 import { type QueueState } from '@/features/skills/queueStatus';
-import { formatDuration } from '@/lib/duration';
+import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { removeCharacterAfterSync } from '@/features/character/removeCharacter';
@@ -735,7 +735,7 @@ function buildColumns(
               tabIndex={0}
               className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
             >
-              {formatDuration((row.queue.trainingFinishMs - Date.now()) / 1000)}
+              {formatCountdown((row.queue.trainingFinishMs - Date.now()) / 1000)}
             </span>
           </Tooltip>
         );

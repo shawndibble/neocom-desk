@@ -5,7 +5,7 @@ import type { SkillQueueEntry } from '@/esi/endpoints';
 import { loadCharacterSkillQueue, type CachedResult } from '../data';
 import { classifySkillQueue, isQueuePaused, type SkillQueueStatus } from '../queueStatus';
 import type { SkillCatalog } from '../skillMap';
-import { formatDuration } from '@/lib/duration';
+import { formatCountdown } from '@/lib/duration';
 
 interface CurrentQueuePanelProps {
   characterId: number;
@@ -93,7 +93,9 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
       actions={
         <span className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
           {result?.fetchedAt && <DataAgeBadge date={result.fetchedAt} />}
-          {totalSeconds > 0 && <span className="tabular-nums">{formatDuration(totalSeconds)}</span>}
+          {totalSeconds > 0 && (
+            <span className="tabular-nums">{formatCountdown(totalSeconds)}</span>
+          )}
         </span>
       }
     >
@@ -137,16 +139,16 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
                       {t(badgeKey)}
                     </span>
                   )}
-                  {/* min-w, not w: "112d 12h 26m left" is 17 characters and
-                      overran a fixed 6rem box, breaking "left" onto its own
-                      line under every long-running skill. Short values still
-                      line up at 6rem; a long one grows leftwards into the
-                      name, which truncates rather than wrapping. */}
+                  {/* min-w, not w: a long-running skill's "112d 12h left" can
+                      still overrun a fixed 6rem box, breaking "left" onto its
+                      own line. Short values still line up at 6rem; a long one
+                      grows leftwards into the name, which truncates rather
+                      than wrapping. */}
                   <span className="min-w-24 shrink-0 text-right tabular-nums whitespace-nowrap text-text-dim">
                     {secondsRemaining === null
                       ? ''
                       : t('plans.queueRemaining', {
-                          duration: formatDuration(secondsRemaining),
+                          duration: formatCountdown(secondsRemaining),
                         })}
                   </span>
                 </li>
