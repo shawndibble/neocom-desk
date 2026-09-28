@@ -1,8 +1,10 @@
 /** Renders `useModuleVariations`' rows; clicking one swaps it in. One `DataTable` — its own stacked layout below `sm` is the mobile card view. */
+import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { IskAmount, TypeIcon } from '@/components/ui';
 import { type StatChange, STAT_DIGITS } from '@/engine/fittings/variationDelta';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import type { VariationRow } from './useModuleVariations';
 
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -69,6 +71,14 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
 
   if (rows.length === 0)
     return <p className="text-xs text-text-dim">{t('fittings.variations.none')}</p>;
+
+  function rowContextMenu(row: VariationRow, tr: ReactElement) {
+    return (
+      <ItemContextMenu typeId={row.typeId} itemName={row.name}>
+        {tr}
+      </ItemContextMenu>
+    );
+  }
 
   const columns: DataTableColumn<VariationRow>[] = [
     {
@@ -149,6 +159,8 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
       density="compact"
       mobileSort
       onRowClick={(row) => onSelect(row.typeId)}
+      rowContextMenu={rowContextMenu}
+      rowMoreActions
     />
   );
 }
