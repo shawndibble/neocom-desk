@@ -277,7 +277,7 @@ export function App() {
   // them, and covers a tab that has been open long enough for another device
   // to have changed something — see backgroundSync.ts.
   const characterIds = useLiveQuery(() => db.characters.toCollection().primaryKeys(), [], []);
-  useBackgroundSync(characterIds);
+  useBackgroundSync(characterIds, activeCharacterId);
 
   // Keeps `bootShellPreload.ts`'s hint in step with Dexie, so the next cold
   // load knows to fetch the signed-in shell early. No default on the query:
