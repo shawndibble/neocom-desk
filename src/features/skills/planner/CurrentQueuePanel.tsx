@@ -27,6 +27,8 @@ const TICK_MS = 30_000;
  * inside a still-fresh window is a cheap cache hit, not a wasted round trip.
  */
 const REFETCH_MS = 5 * 60_000;
+/** Timer jitter allowance: a scheduled tick this close to a full cadence since the last fetch still counts as due. */
+const REFETCH_SLACK_MS = 5_000;
 
 const BADGE_STYLE: Record<SkillQueueStatus, string> = {
   training: 'border-accent/50 bg-accent/15 text-accent',
@@ -69,9 +71,10 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
     let lastLoadAt = Date.now();
     load();
     // A hidden tab skips the refetch, and catches up the moment it is shown
-    // again if one fell due meanwhile.
+    // again if one fell due meanwhile. A catch-up resets the clock, so the
+    // next scheduled tick skips rather than refetching seconds later.
     const id = setInterval(() => {
-      if (document.hidden) return;
+      if (document.hidden || Date.now() - lastLoadAt < REFETCH_MS - REFETCH_SLACK_MS) return;
       lastLoadAt = Date.now();
       load();
     }, REFETCH_MS);

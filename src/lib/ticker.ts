@@ -22,6 +22,15 @@ interface Ticker {
   getSnapshot: () => number;
 }
 
+/**
+ * How old the shared reading may be when a new subscriber joins before it is
+ * refreshed for everyone. Components mounting in one commit subscribe within
+ * the same millisecond, so a screenful of badges costs one refresh, not one
+ * each — while a countdown mounted mid-interval is never a whole cadence
+ * behind.
+ */
+const JOIN_FRESHNESS_MS = 1_000;
+
 const tickers = new Map<number, Ticker>();
 let subscribedTickers = 0;
 
@@ -66,16 +75,17 @@ function tickerFor(intervalMs: number): Ticker {
     listeners: new Set(),
     timer: null,
     subscribe: (listener) => {
-      if (ticker.listeners.size === 0) {
-        // Waking from idle: whatever `now` was when the last subscriber left
-        // is stale. React re-reads the snapshot after subscribing, so the
-        // fresh value reaches this first subscriber too.
-        ticker.now = Date.now();
-        if (subscribedTickers++ === 0 && typeof document !== 'undefined') {
+      if (ticker.listeners.size === 0 && subscribedTickers++ === 0) {
+        if (typeof document !== 'undefined') {
           document.addEventListener('visibilitychange', onVisibilityChange);
         }
       }
       ticker.listeners.add(listener);
+      // A joiner must not start out up to a cadence behind. Publishing (not
+      // just overwriting) keeps every subscriber on the same reading; React
+      // re-reads the snapshot after subscribing, so the joiner gets it too.
+      const current = Date.now();
+      if (Math.abs(current - ticker.now) >= JOIN_FRESHNESS_MS) publish(ticker, current);
       start(ticker);
       return () => {
         if (!ticker.listeners.delete(listener) || ticker.listeners.size > 0) return;

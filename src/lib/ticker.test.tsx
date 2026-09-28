@@ -72,6 +72,24 @@ describe('shared ticker', () => {
     expect(readTicker(4_000)).toBe(T0 + 60_000);
   });
 
+  it('refreshes the shared reading for everyone when a subscriber joins mid-interval', () => {
+    const first = vi.fn();
+    const offFirst = subscribeTicker(60_000, first);
+    vi.advanceTimersByTime(40_000);
+    expect(readTicker(60_000)).toBe(T0);
+
+    const offSecond = subscribeTicker(60_000, () => {});
+    expect(readTicker(60_000)).toBe(T0 + 40_000);
+    expect(first).toHaveBeenCalledTimes(1);
+
+    // Joining again within the freshness window does not churn subscribers.
+    const offThird = subscribeTicker(60_000, () => {});
+    expect(first).toHaveBeenCalledTimes(1);
+    offFirst();
+    offSecond();
+    offThird();
+  });
+
   it('useTicker re-renders on each tick', () => {
     const { result, unmount } = renderHook(() => useTicker(5_000));
     expect(result.current).toBe(T0);

@@ -93,6 +93,31 @@ describe('CurrentQueuePanel periodic ESI refetch (#408)', () => {
     }
   });
 
+  it('does not refetch again on the scheduled tick just after a visibility catch-up', async () => {
+    const setHidden = (hidden: boolean) => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    try {
+      render(<CurrentQueuePanel characterId={1} catalog={catalog} />);
+      await flush();
+      setHidden(true);
+      // Hidden across the 5-minute tick; shown two seconds before the 10-minute one.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10 * 60_000 - 2_000);
+      });
+      await act(async () => setHidden(false));
+      expect(loadCharacterSkillQueue).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000);
+      });
+      expect(loadCharacterSkillQueue).toHaveBeenCalledTimes(2);
+    } finally {
+      setHidden(false);
+    }
+  });
+
   it('does not refetch on becoming visible when the last fetch is still fresh', async () => {
     render(<CurrentQueuePanel characterId={1} catalog={catalog} />);
     await flush();

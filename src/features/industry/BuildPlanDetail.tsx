@@ -255,6 +255,19 @@ function parseOrKeep(current: number, raw: string, transform: (n: number) => num
   return n === undefined ? current : transform(n);
 }
 
+/**
+ * `SourcingInput.parse` for a facility tax percent. A tax is never large
+ * enough to need a thousands separator, so a lone comma followed by one or
+ * two digits ("2,5") is a decimal comma — which the old `type="number"`
+ * field honoured in comma locales — not "25". Clamped to 0–100; blank or
+ * garbage keeps `current`, like `parseOrKeep`.
+ */
+function parseTaxPct(current: number, raw: string): number {
+  const trimmed = raw.trim();
+  const normalized = /^\d*,\d{1,2}$/.test(trimmed) ? trimmed.replace(',', '.') : trimmed;
+  return parseOrKeep(current, normalized, (n) => Math.min(100, Math.max(0, n)));
+}
+
 /** Build Plan inputs (runs, ME/TE, facility, rig, security, hub, tax) + materials/results. */
 export function BuildPlanDetail({
   plan,
@@ -1389,7 +1402,7 @@ export function BuildPlanDetail({
                         label={t('industry.facilityTax')}
                         inputMode="decimal"
                         widthClassName="w-full"
-                        parse={(raw) => parseOrKeep(plan.facilityTaxPct ?? 0, raw, (n) => n)}
+                        parse={(raw) => parseTaxPct(plan.facilityTaxPct ?? 0, raw)}
                         onCommit={(facilityTaxPct) => update({ facilityTaxPct })}
                       />
                     </div>
@@ -1586,9 +1599,7 @@ export function BuildPlanDetail({
                               label={t('industry.facilityTax')}
                               inputMode="decimal"
                               widthClassName="w-full"
-                              parse={(raw) =>
-                                parseOrKeep(plan.reactionFacilityTaxPct ?? 0, raw, (n) => n)
-                              }
+                              parse={(raw) => parseTaxPct(plan.reactionFacilityTaxPct ?? 0, raw)}
                               onCommit={(reactionFacilityTaxPct) =>
                                 update({ reactionFacilityTaxPct })
                               }
