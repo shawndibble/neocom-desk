@@ -1018,19 +1018,148 @@ describe('grace period past the freshness window', () => {
     expect((await pending).cached?.data).toBe('fresh');
   });
 
-  it('never substitutes a stored row for game constants', async () => {
+  describe('game constants (STALE_AFTER.static) past their window', () => {
     const stationKey = 'station:60003760';
+    const G = GLOBAL_CACHE_CHARACTER_ID;
+    const STATIC = { staleAfterMs: STALE_AFTER.static };
+
+    async function seedLapsedStation(value = 'Jita IV - Moon 4'): Promise<void> {
+      await db.esiCache.put({
+        characterId: G,
+        key: stationKey,
+        value,
+        fetchedAt: Date.now() - STALE_AFTER.static - 60_000,
+      });
+    }
+
+    it('serves the stored row at once — no grace wait — while the refresh runs behind it', async () => {
+      await seedLapsedStation('Old Name');
+      const { fetchLive, settle } = deferredFetch('New Name');
+
+      // Resolves with fetchLive still pending and without waiting out the grace timer.
+      const started = performance.now();
+      const result = await loadWithCacheStatus<string>(G, stationKey, fetchLive, STATIC);
+
+      expect(performance.now() - started).toBeLessThan(STALE_GRACE_MS);
+      expect(result.cached?.data).toBe('Old Name');
+      expect(result.cached?.fromCache).toBe(false);
+      expect(fetchLive).toHaveBeenCalledTimes(1);
+
+      settle(true);
+      await vi.waitFor(async () => {
+        expect((await db.esiCache.get([G, stationKey]))?.value).toBe('New Name');
+      });
+      // The refreshed row is inside its window again: served with no call.
+      const next = await loadWithCacheStatus<string>(G, stationKey, fetchLive, STATIC);
+      expect(next.cached?.data).toBe('New Name');
+      expect(fetchLive).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not signal a revalidation — a re-render per location for a constant is all cost', async () => {
+      await seedLapsedStation();
+      const listener = vi.fn();
+      const off = onCacheRevalidated(listener);
+      const { fetchLive, settle } = deferredFetch('Jita IV - Moon 4');
+
+      await loadWithCacheStatus<string>(G, stationKey, fetchLive, STATIC);
+      settle(true);
+      await vi.waitFor(async () => {
+        expect((await db.esiCache.get([G, stationKey]))?.fetchedAt).toBeGreaterThan(
+          Date.now() - 60_000
+        );
+      });
+      await expireGrace();
+
+      expect(listener).not.toHaveBeenCalled();
+      off();
+    });
+
+    it('collapses concurrent reads of a lapsed constant onto one refresh', async () => {
+      await seedLapsedStation();
+      const { fetchLive, settle } = deferredFetch('Jita IV - Moon 4');
+
+      await Promise.all([
+        loadWithCacheStatus<string>(G, stationKey, fetchLive, STATIC),
+        loadWithCacheStatus<string>(G, stationKey, fetchLive, STATIC),
+      ]);
+
+      expect(fetchLive).toHaveBeenCalledTimes(1);
+      settle(true);
+    });
+
+    it('a failed refresh is reported on the next read, silently, and not retried at once', async () => {
+      await seedLapsedStation();
+      const listener = vi.fn();
+      const off = onCacheRevalidated(listener);
+      const { fetchLive, settle } = deferredFetch('never-arrives');
+
+      await loadWithCacheStatus<string>(G, stationKey, fetchLive, STATIC);
+      settle(false);
+      // Let the background call settle and record its failure.
+      await expireGrace();
+
+      // Same answer the blocking path gave for a failed call: the stored row,
+      // flagged as a fallback.
+      const reread = await loadWithCacheStatus<string>(G, stationKey, fetchLive, STATIC);
+      expect(reread.cached?.data).toBe('Jita IV - Moon 4');
+      expect(reread.cached?.fromCache).toBe(true);
+      expect(fetchLive).toHaveBeenCalledTimes(1);
+      expect(listener).not.toHaveBeenCalled();
+      off();
+    });
+
+    it('still waits when nothing is stored', async () => {
+      const result = await loadWithCacheStatus<string>(
+        G,
+        stationKey,
+        async () => 'Jita IV - Moon 4',
+        STATIC
+      );
+
+      expect(result.cached?.data).toBe('Jita IV - Moon 4');
+    });
+
+    it('applies to the paginated path too', async () => {
+      await db.esiCache.put({
+        characterId: G,
+        key: stationKey,
+        value: ['a'],
+        fetchedAt: Date.now() - STALE_AFTER.static - 60_000,
+      });
+      let settle!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        settle = resolve;
+      });
+      const fetchLive = vi.fn(async () => {
+        await gate;
+        return { items: ['a', 'b'], truncated: false };
+      });
+
+      const result = await loadPaginatedWithCacheStatus<string>(G, stationKey, fetchLive, STATIC);
+
+      expect(result.cached?.data).toEqual(['a']);
+      settle();
+      await vi.waitFor(async () => {
+        expect((await db.esiCache.get([G, stationKey]))?.value).toEqual(['a', 'b']);
+      });
+    });
+  });
+
+  it('never substitutes a stored row for a window between the default and a day, without the opt-in', async () => {
+    // Only game constants get the silent stale-serve; a 30-minute window
+    // (the synced public BPC snapshot) keeps the blocking live call.
+    const snapshotKey = 'publicBpcContracts';
     await db.esiCache.put({
       characterId: GLOBAL_CACHE_CHARACTER_ID,
-      key: stationKey,
-      value: 'Jita IV - Moon 4',
-      fetchedAt: Date.now() - STALE_AFTER.static - 60_000,
+      key: snapshotKey,
+      value: 'old',
+      fetchedAt: Date.now() - 30 * 60_000 - 60_000,
     });
-    const { fetchLive, settle } = deferredFetch('Jita IV - Moon 4');
+    const { fetchLive, settle } = deferredFetch('new');
 
     let resolved = false;
-    const pending = loadWithCacheStatus<string>(GLOBAL_CACHE_CHARACTER_ID, stationKey, fetchLive, {
-      staleAfterMs: STALE_AFTER.static,
+    const pending = loadWithCacheStatus<string>(GLOBAL_CACHE_CHARACTER_ID, snapshotKey, fetchLive, {
+      staleAfterMs: 30 * 60_000,
     }).then((r) => {
       resolved = true;
       return r;
@@ -1039,7 +1168,7 @@ describe('grace period past the freshness window', () => {
     expect(resolved).toBe(false);
 
     settle(true);
-    await pending;
+    expect((await pending).cached?.data).toBe('new');
   });
 
   it('serves the stored row for a long-window key that opts in with allowStaleServe', async () => {
