@@ -1,6 +1,7 @@
 /** One skill's status/level/[time]/[Add] row — shared by the Ships panel (Fit Check + Mastery) and Market's Required Skills, which otherwise each hand-rolled the same icon+name+bar layout. */
 import type { ReactNode } from 'react';
 import { Button, SkillBar } from '@/components/ui';
+import { openSkillDetailModal } from '@/stores/skillDetailModal';
 import type { SkillTrainingStatus } from './skillStatus';
 import { SkillStatusIcon } from './SkillStatusIcon';
 
@@ -17,6 +18,8 @@ export interface SkillRowProps {
   tags?: ReactNode;
   /** Set when the target plan already covers this row — renders as a static badge in place of the Add button. */
   inPlanLabel?: string;
+  /** When set, the name opens the shared Skill Detail popover (#400/#405) instead of rendering as inert text. */
+  skillTypeID?: number;
 }
 
 /** No outer padding/border/margin — the caller's own wrapper controls spacing, since the Ships panel and Market's Required Skills each frame this row differently (dividers vs. plain stack). */
@@ -29,6 +32,7 @@ export function SkillRow({
   addLabel,
   tags,
   inPlanLabel,
+  skillTypeID,
 }: SkillRowProps) {
   const trailing =
     status === 'trained' ? null : inPlanLabel ? (
@@ -44,7 +48,17 @@ export function SkillRow({
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
       <SkillStatusIcon status={status} />
-      <span className="flex-auto text-text">{name}</span>
+      {skillTypeID !== undefined ? (
+        <button
+          type="button"
+          onClick={() => openSkillDetailModal(skillTypeID)}
+          className="flex-auto text-left text-text hover:underline"
+        >
+          {name}
+        </button>
+      ) : (
+        <span className="flex-auto text-text">{name}</span>
+      )}
       {/* Grouped and pushed to the row's own line when there's no room beside
           `name`: `flex-auto` (not `flex-1`'s zero basis) gives `name` a real
           hypothetical width for the wrap decision, so this whole group wraps
