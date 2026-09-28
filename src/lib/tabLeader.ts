@@ -14,7 +14,7 @@
  * announced — so callers behave exactly as they did before election existed.
  *
  * Kept import-free: it sits on the boot path (`Layout`, `App`).
- * See docs/context/decisions/*-multi-tab-leadership*.md.
+ * See docs/context/decisions/20260928-165056-multi-tab-leadership-one-visible-tab-runs-background.md.
  */
 
 const LEADER_LOCK = 'neocom:leader';
