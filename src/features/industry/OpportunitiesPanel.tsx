@@ -38,6 +38,7 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { PiData } from '@/sde/types';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
@@ -304,7 +305,13 @@ export function OpportunitiesPanel({
         const verdict = productTypeID !== null ? skillGateByProductTypeID.get(productTypeID) : null;
         return (
           <span className="flex flex-wrap items-center gap-1.5">
-            {row.candidate.catalogEntry.productName}
+            {productTypeID !== null ? (
+              <MarketItemLink typeId={productTypeID}>
+                {row.candidate.catalogEntry.productName}
+              </MarketItemLink>
+            ) : (
+              row.candidate.catalogEntry.productName
+            )}
             {verdict?.gated && (
               <SkillGateMarker
                 verdict={verdict}

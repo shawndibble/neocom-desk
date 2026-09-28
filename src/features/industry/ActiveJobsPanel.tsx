@@ -24,6 +24,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { db, type BuildPlanRecord } from '@/db';
 import { loadTypes } from '@/sde/loadSde';
 import type { TypeMap } from '@/sde/types';
@@ -624,7 +625,9 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           }),
         render: (job) => (
           <span className="flex flex-wrap items-center gap-1.5">
-            <span>{nameForBlueprint(job.blueprint_type_id)}</span>
+            <MarketItemLink typeId={job.blueprint_type_id}>
+              {nameForBlueprint(job.blueprint_type_id)}
+            </MarketItemLink>
             {soon(job) && (
               <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
                 {t('industry.jobsCompletingSoon')}

@@ -634,6 +634,13 @@ function ColonyRow({
             duration: formatDuration((soonestExpiryMs - loadedAt) / 1000),
           });
 
+  const fillTimeLabel =
+    fillTimeDisplay.kind === 'soon'
+      ? t('pi.colonies.fillTimeSoon', { span: fillTimeSpan(fillTimeDisplay.hoursToFull, t) })
+      : fillTimeDisplay.kind === 'unknown'
+        ? t('pi.colonies.fillTimeUnknown')
+        : null;
+
   const rowId = `pi-colony-${characterId}-${planet.planet_id}`;
   const buttonId = `${rowId}-trigger`;
   const regionId = `${rowId}-region`;
@@ -684,7 +691,10 @@ function ColonyRow({
             )}
           </span>
           <div className="flex w-full items-center sm:contents">
-            <span className="min-w-0 flex-1 truncate text-xs text-text-dim tabular-nums sm:w-44 sm:shrink-0 sm:flex-none md:w-auto md:min-w-0">
+            <span
+              className="min-w-0 flex-1 truncate text-xs text-text-dim tabular-nums sm:w-44 sm:shrink-0 sm:flex-none md:w-auto md:min-w-0"
+              title={expiryLabel}
+            >
               {expiryLabel}
             </span>
           </div>
@@ -694,12 +704,9 @@ function ColonyRow({
                 className={`min-w-0 flex-1 truncate text-xs tabular-nums sm:w-44 sm:shrink-0 sm:flex-none md:w-auto md:min-w-0 ${
                   fillTimeDisplay.kind === 'soon' ? 'text-warning' : 'text-text-dim'
                 }`}
+                title={fillTimeLabel ?? undefined}
               >
-                {fillTimeDisplay.kind === 'soon'
-                  ? t('pi.colonies.fillTimeSoon', {
-                      span: fillTimeSpan(fillTimeDisplay.hoursToFull, t),
-                    })
-                  : t('pi.colonies.fillTimeUnknown')}
+                {fillTimeLabel}
               </span>
             </div>
           )}

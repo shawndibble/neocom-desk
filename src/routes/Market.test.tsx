@@ -1252,7 +1252,7 @@ describe('Market Browser item context menu (issue #6)', () => {
 });
 
 describe('Quickbar unavailable with no active character (issue #7)', () => {
-  it('disables Add to Quickbar with an explanatory title', async () => {
+  it('disables Add to Quickbar with a tap-reachable explanation (issue #2162)', async () => {
     // Ambient state from the outer beforeEach: no active character.
     const user = userEvent.setup();
     render(<App />);
@@ -1266,8 +1266,20 @@ describe('Quickbar unavailable with no active character (issue #7)', () => {
     // afterward (a menu click, a findBy*) that gives it room; this one must
     // too, or that settling lands outside `act`.
     const menuItem = await screen.findByRole('menuitem', { name: 'Add to Quickbar' });
-    expect(menuItem).toHaveAttribute('data-disabled');
-    expect(menuItem).toHaveAttribute('title', 'Select a character to use the Quickbar');
+    // `aria-disabled`, not the native attribute a `title=` alone would pair
+    // with: a natively disabled item takes no tap, which would leave the
+    // reason below unreachable on a touch device (#2162).
+    expect(menuItem).toHaveAttribute('aria-disabled', 'true');
+    expect(menuItem).not.toHaveAttribute('title');
+
+    fireEvent.touchStart(menuItem, {
+      touches: [{ clientX: 0, clientY: 0 }],
+      changedTouches: [{ clientX: 0, clientY: 0 }],
+    });
+    fireEvent.touchEnd(menuItem);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Select a character to use the Quickbar'
+    );
   });
 });
 
