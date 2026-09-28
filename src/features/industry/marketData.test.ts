@@ -340,3 +340,18 @@ describe('system cost indices: sharing and persistence', () => {
     expect(hits.count).toBe(1);
   });
 });
+
+describe('system cost indices: an unreadable persisted tier', () => {
+  it('is a miss, not the offline signal', async () => {
+    server.use(fuzzworkHandler(), adjustedPricesHandler(), costIndexHandler());
+    const bulkGet = vi
+      .spyOn(db.esiCache, 'bulkGet')
+      .mockRejectedValue(new Error('IndexedDB unavailable'));
+
+    const snapshot = await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34]);
+
+    expect(snapshot.systemCostIndex).toBe(0.0464);
+    expect(snapshot.adjustedPrices).toEqual({ 34: 4.2 });
+    bulkGet.mockRestore();
+  });
+});

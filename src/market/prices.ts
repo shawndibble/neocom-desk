@@ -78,6 +78,21 @@ function persist(rows: ReadonlyArray<readonly [key: string, value: unknown]>, at
   void writeCachedMany(GLOBAL_CACHE_CHARACTER_ID, keyed, at).catch(() => {});
 }
 
+/**
+ * The persisted tier, where an unreadable one (IndexedDB unavailable, a
+ * damaged store) is a miss rather than an error: these lookups never failed
+ * on a cache before it existed, and must not start to now.
+ */
+async function readPersisted<V>(
+  keys: readonly string[]
+): Promise<Map<string, { value: V; fetchedAt: number }>> {
+  try {
+    return await readCachedEntries<V>(GLOBAL_CACHE_CHARACTER_ID, keys.map(persistedKey));
+  } catch {
+    return new Map();
+  }
+}
+
 /** Test-only: production callers rely on TTL expiry instead of clearing. */
 export function clearMarketPriceCache(): void {
   hubPriceCache.clear();
@@ -139,10 +154,7 @@ export async function getStationPrices(
   const onDisk = notInMemory
     .map((typeId) => hubCacheKey(stationId, typeId))
     .filter((key) => !persistedBypass.has(key) && !hubPricesInFlight.has(key));
-  const rows = await readCachedEntries<HubAggregate>(
-    GLOBAL_CACHE_CHARACTER_ID,
-    onDisk.map(persistedKey)
-  );
+  const rows = await readPersisted<HubAggregate>(onDisk);
   for (const key of onDisk) {
     const row = rows.get(persistedKey(key));
     if (row && row.fetchedAt + HUB_PRICE_TTL_MS > nowMs) {
@@ -253,9 +265,8 @@ export async function getAdjustedPrices(
 type AdjustedPriceRow = Array<[typeId: number, adjusted: number | null, average: number | null]>;
 
 async function loadAdjustedPrices(nowMs: number): Promise<Map<number, AdjustedPrice>> {
-  const key = persistedKey(ADJUSTED_KEY);
-  const stored = await readCachedEntries<AdjustedPriceRow>(GLOBAL_CACHE_CHARACTER_ID, [key]);
-  const row = stored.get(key);
+  const stored = await readPersisted<AdjustedPriceRow>([ADJUSTED_KEY]);
+  const row = stored.get(persistedKey(ADJUSTED_KEY));
   if (row && row.fetchedAt + ADJUSTED_PRICE_TTL_MS > nowMs) {
     const value = new Map<number, AdjustedPrice>();
     for (const [typeId, adjusted, average] of row.value) value.set(typeId, { adjusted, average });

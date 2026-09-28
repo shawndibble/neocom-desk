@@ -380,3 +380,25 @@ describe('persistence across a reload', () => {
     expect(hits.count).toBe(2);
   });
 });
+
+describe('an unreadable persisted tier', () => {
+  it('is a miss, not an error: prices still come from the network', async () => {
+    const hits = { count: 0 };
+    server.use(
+      fuzzworkHandler(hits),
+      http.get(`${ESI_BASE_URL}/markets/prices`, () =>
+        HttpResponse.json([{ type_id: 34, adjusted_price: 5.5, average_price: 5.2 }])
+      )
+    );
+    const bulkGet = vi
+      .spyOn(db.esiCache, 'bulkGet')
+      .mockRejectedValue(new Error('IndexedDB unavailable'));
+
+    const hub = await getHubPrices(DEFAULT_TRADE_HUB, [34], () => 1_000_000);
+    const adjusted = await getAdjustedPrices(() => 1_000_000);
+
+    expect(hub.get(34)?.sellMin).toBe(3.8);
+    expect(adjusted.get(34)).toEqual({ adjusted: 5.5, average: 5.2 });
+    bulkGet.mockRestore();
+  });
+});

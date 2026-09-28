@@ -117,9 +117,12 @@ async function loadSystemCostIndices(
 /** The persisted row while inside its TTL, else ESI. Never rejects: `null` is the offline signal. */
 async function loadRawCostIndices(nowMs: number): Promise<SystemCostIndices[] | null> {
   const key = persistedKey();
-  const row = (await readCachedEntries<SystemCostIndices[]>(GLOBAL_CACHE_CHARACTER_ID, [key])).get(
-    key
-  );
+  let row: { value: SystemCostIndices[]; fetchedAt: number } | undefined;
+  try {
+    row = (await readCachedEntries<SystemCostIndices[]>(GLOBAL_CACHE_CHARACTER_ID, [key])).get(key);
+  } catch {
+    // An unreadable persisted tier is a miss, never the offline signal.
+  }
   if (row && row.fetchedAt + COST_INDEX_TTL_MS > nowMs) {
     rawCostIndexCache = { value: row.value, expiresAt: row.fetchedAt + COST_INDEX_TTL_MS };
     return row.value;
