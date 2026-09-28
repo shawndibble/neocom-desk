@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { phosphorWeightsPlugin } from './src/components/ui/phosphorWeightsPlugin';
 
 const { version, dependencies } = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf-8')
@@ -213,6 +214,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     copyDogmaEngineAssets(),
+    phosphorWeightsPlugin(),
     VitePWA({
       // Hand-written src/sw.ts (originally ADR 0007, issue #176; now ADR 0009)
       // — only strategy that will support a custom `push` handler (future
