@@ -13,7 +13,7 @@ import { triggerSync } from '@/sync';
 import { db } from '@/db';
 import { isSyncConfigured } from './syncStatus';
 import { useBackgroundSync } from './backgroundSync';
-import { scheduleBootPrefetch } from './bootPrefetch';
+import { scheduleBootPrefetch, scheduleCachePrune } from './bootPrefetch';
 import { Login } from '@/routes/Login';
 import { Callback } from '@/routes/Callback';
 import * as routeChunks from './routeChunks';
@@ -264,6 +264,7 @@ export function App() {
   // never surfaces as an error, so it needs reporting to exist at all.
   useEffect(() => subscribeToUpgradeBlockedReports(), []);
   useEffect(() => reloadOnDatabaseWipe(), []);
+  useEffect(() => scheduleCachePrune(), []);
 
   // Fire-and-forget, on app start (once hydration resolves an active character)
   // and every character switch. Errors (offline, no Firebase config) are
