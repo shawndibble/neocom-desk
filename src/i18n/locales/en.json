@@ -3191,6 +3191,7 @@
       "refineAssumesNoImplantsHint": "{{character}}'s refine value is calculated without their fitted implants, so a refining implant isn't counted. Grant Character details for an accurate estimate.",
       "dateColumn": "Date",
       "typeColumn": "Type",
+      "sourceColumn": "Source",
       "totalColumn": "Total",
       "otherTypes_one": "Other ({{count}} type)",
       "otherTypes_other": "Other ({{count}} types)",
