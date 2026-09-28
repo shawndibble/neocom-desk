@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sortRows } from './dataTableSort';
 
 describe('sortRows', () => {
-  it('orders text exactly as a bare localeCompare does, ties kept stable', () => {
+  it('pins the default-options collator: text orders as a bare localeCompare, ties stable', () => {
     const rows = ['b', 'Á', 'a', 'B', 'á', 'A', 'a', 'item 10', 'item 2', 'Ω'].map(
       (name, index) => ({ name, index })
     );

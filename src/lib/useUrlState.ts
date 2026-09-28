@@ -190,30 +190,6 @@ export function useUrlSort(
   return { sort: resolveSort(sort, defaultSort, columnIds), onSortChange: setSort };
 }
 
-/**
- * A filter object backed by a `useUrlParams` group, unwrapped through a
- * field-to-param-key map — plain data, so (unlike a hook taking `unwrap`/
- * `wrap` callbacks) it costs no fresh closure identity every render as long
- * as the caller passes a module-scope map.
- *
- * Resets to `emptyParams` whenever `scopeKey` changes *after* mount (a
- * division switch, an owner toggle — whatever the caller's filter should
- * not survive) — never on mount itself, so a filter delivered by the URL on
- * first load is not immediately wiped. Build `scopeKey` from the same
- * synchronous source the URL itself reads from, not from anything that
- * settles asynchronously (an access check, a fetched list): if `scopeKey`
- * can read one value on the first render and a different one a render later
- * for reasons unrelated to the field it names, that settling looks
- * indistinguishable from a real change and the filter is wiped for it.
- *
- * The third element is the same filter through `useDeferredValue`: derive
- * rows from it, never the input. The debounce above only delays the URL
- * write — the immediate value changes on every keystroke — so filtering a
- * long table off it re-renders the whole table per key. The deferred copy
- * lets the keystroke paint first and the rows follow at lower priority. The
- * first two elements stay immediate: an input or a setter built from the
- * deferred copy would write stale text back over what was just typed.
- */
 /** A filter object's fields, read off a `useUrlParams`-shaped values record. */
 export function filterFromParamValues<F extends object>(
   values: Record<string, unknown>,
@@ -240,6 +216,30 @@ export function paramsPatchFromFilter<F extends object>(
   return patch;
 }
 
+/**
+ * A filter object backed by a `useUrlParams` group, unwrapped through a
+ * field-to-param-key map — plain data, so (unlike a hook taking `unwrap`/
+ * `wrap` callbacks) it costs no fresh closure identity every render as long
+ * as the caller passes a module-scope map.
+ *
+ * Resets to `emptyParams` whenever `scopeKey` changes *after* mount (a
+ * division switch, an owner toggle — whatever the caller's filter should
+ * not survive) — never on mount itself, so a filter delivered by the URL on
+ * first load is not immediately wiped. Build `scopeKey` from the same
+ * synchronous source the URL itself reads from, not from anything that
+ * settles asynchronously (an access check, a fetched list): if `scopeKey`
+ * can read one value on the first render and a different one a render later
+ * for reasons unrelated to the field it names, that settling looks
+ * indistinguishable from a real change and the filter is wiped for it.
+ *
+ * The third element is the same filter through `useDeferredValue`: derive
+ * rows from it, never the input. The debounce above only delays the URL
+ * write — the immediate value changes on every keystroke — so filtering a
+ * long table off it re-renders the whole table per key. The deferred copy
+ * lets the keystroke paint first and the rows follow at lower priority. The
+ * first two elements stay immediate: an input or a setter built from the
+ * deferred copy would write stale text back over what was just typed.
+ */
 export function useUrlFilter<F extends object>(
   scopeKey: string,
   schema: UrlParamSchema,

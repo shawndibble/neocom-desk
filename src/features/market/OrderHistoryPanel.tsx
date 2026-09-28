@@ -380,7 +380,8 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
               hint={t('orders.noResultsHint')}
               className="py-8"
               action={
-                activeHistoryFilterCount(filter) > 0 || filter.text.trim() !== '' ? (
+                // The deferred filter, like the rows it explains — not the box's text.
+                activeHistoryFilterCount(rowsFilter) > 0 || rowsFilter.text.trim() !== '' ? (
                   <Button size="sm" onClick={() => setFilter(EMPTY_HISTORY_FILTER)}>
                     {t('common.resetFilters')}
                   </Button>
