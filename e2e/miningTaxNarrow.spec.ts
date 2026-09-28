@@ -190,6 +190,33 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
   );
 }
 
+// Re-seeds the same fixture with `options.payeeName` in place of the module's
+// `PAYEE_NAME`, since `seedPayeeBalance` closes over the constant directly.
+async function seedPayeeBalanceNamed(page: Page, payeeName: string): Promise<void> {
+  await seedPayeeBalance(page);
+  await page.evaluate(
+    async ({ payeeId, payeeName }) => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('neocom');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      await new Promise<void>((resolve, reject) => {
+        const tx = database.transaction('payees', 'readwrite');
+        const store = tx.objectStore('payees');
+        const getRequest = store.get(payeeId);
+        getRequest.onsuccess = () => {
+          store.put({ ...getRequest.result, name: payeeName });
+        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      database.close();
+    },
+    { payeeId: PAYEE_ID, payeeName }
+  );
+}
+
 test.describe('Balances strip Payee filter button — touch target', () => {
   test.beforeEach(async ({ page }) => {
     await signInAndGoto(page);
@@ -422,5 +449,56 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
     expect(await heights.settleUpHeight()).toBeCloseTo(36, 0);
     // Clear's own `sm` pointer value is untouched.
     expect(await heights.clearHeight()).toBeCloseTo(28, 0);
+  });
+});
+
+/**
+ * Ledger table Payee column — long name overflow (issue #2147): a Payee name
+ * long enough to fill the column was pushing Status and the row's edit
+ * affordance off-screen at 1024px, the narrowest width the table's `md:`
+ * layout (not the phone stacked-card) has to support. The fix truncates the
+ * `payee` column at `sm:max-w-[8rem]` with an ellipsis, same shape as
+ * Market's `location` column/`LocationCell`, so the full name stays
+ * discoverable via the app's `Tooltip` rather than being lost outright.
+ */
+test.describe('Mining Tax ledger — long Payee name overflow', () => {
+  const LONG_PAYEE_NAME = 'A Very Long Corporation Holding Name Ltd';
+  const NARROW_DESKTOP = { width: 1024, height: 768 };
+
+  test('Status column and edit affordance stay on-screen at 1024px with a long Payee name', async ({
+    page,
+  }) => {
+    await page.setViewportSize(NARROW_DESKTOP);
+    await signInAndGoto(page);
+    await seedPayeeBalanceNamed(page, LONG_PAYEE_NAME);
+    await page.goto('./mining/tax');
+
+    const statusHeader = page.getByRole('columnheader', { name: 'Status' });
+    await expect(statusHeader).toBeVisible();
+    const headerBox = await statusHeader.boundingBox();
+    expect(headerBox).not.toBeNull();
+    expect(headerBox!.x + headerBox!.width).toBeLessThanOrEqual(NARROW_DESKTOP.width);
+
+    const row = page.getByRole('row').filter({ hasText: LONG_PAYEE_NAME });
+    const statusCell = row.getByRole('cell').filter({ hasText: 'Outstanding' });
+    await expect(statusCell).toBeVisible();
+    const cellBox = await statusCell.boundingBox();
+    expect(cellBox).not.toBeNull();
+    expect(cellBox!.x + cellBox!.width).toBeLessThanOrEqual(NARROW_DESKTOP.width);
+  });
+
+  test('short Payee name at 1024px renders unchanged', async ({ page }) => {
+    await page.setViewportSize(NARROW_DESKTOP);
+    await signInAndGoto(page);
+    await seedPayeeBalance(page);
+    await page.goto('./mining/tax');
+
+    const statusHeader = page.getByRole('columnheader', { name: 'Status' });
+    await expect(statusHeader).toBeVisible();
+    const headerBox = await statusHeader.boundingBox();
+    expect(headerBox).not.toBeNull();
+    expect(headerBox!.x + headerBox!.width).toBeLessThanOrEqual(NARROW_DESKTOP.width);
+
+    await expect(page.getByRole('table').getByText(PAYEE_NAME, { exact: true })).toBeVisible();
   });
 });

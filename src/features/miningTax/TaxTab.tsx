@@ -14,6 +14,7 @@ import {
   PageHeader,
   Panel,
   Spinner,
+  Tooltip,
   type DataTableColumn,
   Checkbox,
 } from '@/components/ui';
@@ -840,8 +841,21 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     {
       id: 'payee',
       header: t('miningTax.payeeColumn'),
-      className: 'whitespace-nowrap',
-      render: (dr) => payeeDisplayName(dr),
+      // Table mode only — a long Payee name was pushing Status and the edit
+      // affordance off-screen at 1024px. Same shape as Market's
+      // `location` column/`LocationCell`: `sm:`-scoped so the stacked-card
+      // layout below `sm` still shows the full, untruncated name.
+      className: 'sm:max-w-[8rem] truncate',
+      render: (dr) => (
+        <Tooltip content={payeeDisplayName(dr)}>
+          <span
+            tabIndex={0}
+            className="sm:cursor-help sm:underline sm:decoration-dotted sm:decoration-text-dim/50 sm:underline-offset-2"
+          >
+            {payeeDisplayName(dr)}
+          </span>
+        </Tooltip>
+      ),
       sortValue: (dr) => payeeDisplayName(dr),
     },
     {
