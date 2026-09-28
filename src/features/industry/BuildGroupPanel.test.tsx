@@ -296,6 +296,18 @@ describe('BuildGroupPanel — mixed-hub multibuy', () => {
   });
 });
 
+describe('BuildGroupPanel — Members list', () => {
+  it('titles the truncated plan name with the full name (#2175)', () => {
+    const longName = 'Punisher Hull Line — bulk run for the Amarr Navy Issue reprocessing project';
+    mockedUseComparedBuildResults.mockReturnValue([
+      { ...row('a', [material(34, 100)]), planName: longName },
+    ]);
+    renderPanel([{ ...plan('a', 'jita'), name: longName }]);
+
+    expect(screen.getByText(longName)).toHaveAttribute('title', longName);
+  });
+});
+
 describe('BuildGroupPanel — Auto Build (issue #696)', () => {
   it("pre-fills Build Strategy from the group's persisted default", () => {
     mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);

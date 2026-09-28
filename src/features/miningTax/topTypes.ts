@@ -47,3 +47,41 @@ export function topTypesWithOther<T extends RankedType>(
     },
   };
 }
+
+/**
+ * Same top-N + "Other" fold as `topTypesWithOther`, for the Overview's m³ and
+ * Count chart metrics (issue #2160) — a single ranked value rather than a
+ * raw/refined pair, so it can't reuse `RankedType`'s shape.
+ */
+export interface ValueRanked {
+  typeId: number;
+  typeName: string;
+  value: number;
+}
+
+export interface OtherValues {
+  value: number;
+  /** The folded types, largest first — the chart's tooltip lists them. */
+  types: ValueRanked[];
+}
+
+export interface TopValues<T extends ValueRanked> {
+  top: T[];
+  other: OtherValues | null;
+}
+
+export function topValuesWithOther<T extends ValueRanked>(
+  types: readonly T[],
+  { limit }: { limit: number }
+): TopValues<T> {
+  const sorted = [...types].sort((a, b) => b.value - a.value);
+  if (sorted.length <= limit + 1) return { top: sorted, other: null };
+  const folded = sorted.slice(limit);
+  return {
+    top: sorted.slice(0, limit),
+    other: {
+      value: folded.reduce((sum, point) => sum + point.value, 0),
+      types: folded,
+    },
+  };
+}

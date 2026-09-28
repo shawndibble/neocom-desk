@@ -76,6 +76,7 @@ export {
 } from './DropdownMenu';
 export {
   MenuItem,
+  DisabledMenuItem,
   MenuRadioGroup,
   MenuRadioItem,
   MenuSeparator,

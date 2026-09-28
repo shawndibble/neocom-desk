@@ -195,6 +195,7 @@ describe('ProductionLogPanel', () => {
     expect(rifterRow?.textContent).toContain('20'); // units produced
 
     expect(within(byItemTable).getByText('Raven')).toBeInTheDocument();
+    expect(within(byItemTable).getByRole('link', { name: 'Rifter' })).toBeInTheDocument();
   });
 
   it('falls back to a typeID label when the catalog has no entry for it', async () => {
