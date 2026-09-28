@@ -115,8 +115,10 @@ async function signInWithMockedDeadline(page: Page) {
 async function widestLabelOverflow(page: Page) {
   return page.evaluate(() => {
     // Scoped to the strip's own `role="img"` bars container, identified by
-    // its `aria-label` (both the empty and non-empty variants start with
-    // "Deadlines per day") — a bare `[role="img"]` also matches the
+    // its `aria-label` (the non-empty variant, `strip.describe`, starts with
+    // "Deadlines per day" — the mocked structure's `fuel_expires` guarantees
+    // a non-empty strip in both tests here, so `strip.describeEmpty`'s
+    // different wording never applies) — a bare `[role="img"]` also matches the
     // character portrait `<img>` elsewhere on the page, which has no
     // `span.truncate` descendants and would silently report zero labels.
     const strip = document.querySelector('[role="img"][aria-label^="Deadlines per day"]');
