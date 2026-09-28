@@ -402,3 +402,32 @@ describe('an unreadable persisted tier', () => {
     bulkGet.mockRestore();
   });
 });
+
+describe('clearMarketPriceCache while a fetch is in flight', () => {
+  it('the fetch that lands afterwards caches nothing, in memory or on disk', async () => {
+    const hits = { count: 0 };
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, async () => {
+        hits.count += 1;
+        await delay(20);
+        return HttpResponse.json({
+          34: {
+            buy: { min: '2.5', max: '3.71', volume: '100', orderCount: '1' },
+            sell: { min: '3.8', max: '4.0', volume: '200', orderCount: '1' },
+          },
+        });
+      })
+    );
+    const clock = () => 1_000_000;
+
+    const straddling = getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
+    await delay(5);
+    clearMarketPriceCache();
+    // Its caller still gets its answer…
+    expect((await straddling).get(34)?.sellMin).toBe(3.8);
+
+    // …but the next ask after the clear starts cold.
+    await getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
+    expect(hits.count).toBe(2);
+  });
+});

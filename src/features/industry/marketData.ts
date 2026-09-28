@@ -116,6 +116,8 @@ async function loadSystemCostIndices(
 
 /** The persisted row while inside its TTL, else ESI. Never rejects: `null` is the offline signal. */
 async function loadRawCostIndices(nowMs: number): Promise<SystemCostIndices[] | null> {
+  // A clear while this runs (test-only) means cache nothing: see `persistedGeneration`.
+  const generation = persistedGeneration;
   const key = persistedKey();
   let row: { value: SystemCostIndices[]; fetchedAt: number } | undefined;
   try {
@@ -123,7 +125,7 @@ async function loadRawCostIndices(nowMs: number): Promise<SystemCostIndices[] | 
   } catch {
     // An unreadable persisted tier is a miss, never the offline signal.
   }
-  if (row && row.fetchedAt + COST_INDEX_TTL_MS > nowMs) {
+  if (generation === persistedGeneration && row && row.fetchedAt + COST_INDEX_TTL_MS > nowMs) {
     rawCostIndexCache = { value: row.value, expiresAt: row.fetchedAt + COST_INDEX_TTL_MS };
     return row.value;
   }
@@ -133,6 +135,7 @@ async function loadRawCostIndices(nowMs: number): Promise<SystemCostIndices[] | 
   } catch {
     return null;
   }
+  if (generation !== persistedGeneration) return value;
   rawCostIndexCache = { value, expiresAt: nowMs + COST_INDEX_TTL_MS };
   // Not awaited: memory already has it, and a failed write only costs the
   // next reload a refetch.

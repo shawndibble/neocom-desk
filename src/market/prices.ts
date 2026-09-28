@@ -55,6 +55,10 @@ const persistedBypass = new Set<string>();
  * Bumped by `clearMarketPriceCache` and folded into every persisted key, so
  * the (synchronous, test-only) clear also retires rows already on disk.
  * Always 0 in production, which keeps the keys stable across reloads.
+ *
+ * Also what stops a fetch or disk read still in flight at a clear from
+ * landing afterwards: each captures the generation it started under and
+ * caches nothing if it has moved on.
  */
 let persistedGeneration = 0;
 
@@ -151,11 +155,12 @@ export async function getStationPrices(
   if (notInMemory.length === 0) return result;
 
   // A reload inside the TTL: the rows the last session wrote.
+  const generation = persistedGeneration;
   const onDisk = notInMemory
     .map((typeId) => hubCacheKey(stationId, typeId))
     .filter((key) => !persistedBypass.has(key) && !hubPricesInFlight.has(key));
   const rows = await readPersisted<HubAggregate>(onDisk);
-  for (const key of onDisk) {
+  for (const key of generation === persistedGeneration ? onDisk : []) {
     const row = rows.get(persistedKey(key));
     if (row && row.fetchedAt + HUB_PRICE_TTL_MS > nowMs) {
       hubPriceCache.set(key, { value: row.value, expiresAt: row.fetchedAt + HUB_PRICE_TTL_MS });
@@ -206,6 +211,7 @@ async function fetchHubPrices(
   typeIds: number[],
   nowMs: number
 ): Promise<Map<number, HubAggregate> | null> {
+  const generation = persistedGeneration;
   let fetched: Map<number, HubAggregate>;
   try {
     // Chunked internally; a failure partway through discards earlier
@@ -215,6 +221,7 @@ async function fetchHubPrices(
   } catch {
     return null;
   }
+  if (generation !== persistedGeneration) return fetched;
   const rows: Array<readonly [string, HubAggregate]> = [];
   for (const typeId of typeIds) {
     const key = hubCacheKey(stationId, typeId);
@@ -265,15 +272,17 @@ export async function getAdjustedPrices(
 type AdjustedPriceRow = Array<[typeId: number, adjusted: number | null, average: number | null]>;
 
 async function loadAdjustedPrices(nowMs: number): Promise<Map<number, AdjustedPrice>> {
+  const generation = persistedGeneration;
   const stored = await readPersisted<AdjustedPriceRow>([ADJUSTED_KEY]);
   const row = stored.get(persistedKey(ADJUSTED_KEY));
-  if (row && row.fetchedAt + ADJUSTED_PRICE_TTL_MS > nowMs) {
+  if (generation === persistedGeneration && row && row.fetchedAt + ADJUSTED_PRICE_TTL_MS > nowMs) {
     const value = new Map<number, AdjustedPrice>();
     for (const [typeId, adjusted, average] of row.value) value.set(typeId, { adjusted, average });
     adjustedPriceCache = { value, expiresAt: row.fetchedAt + ADJUSTED_PRICE_TTL_MS };
     return value;
   }
   const value = await fetchAdjustedPrices();
+  if (generation !== persistedGeneration) return value;
   adjustedPriceCache = { value, expiresAt: nowMs + ADJUSTED_PRICE_TTL_MS };
   const tuples: AdjustedPriceRow = [];
   for (const [typeId, price] of value) tuples.push([typeId, price.adjusted, price.average]);
