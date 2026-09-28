@@ -30,6 +30,7 @@ import { getHubPrices } from '@/market/prices';
 import { checkCandidates } from './dogmaFittingEngine';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
+import { yieldToEventLoop } from './yieldToEventLoop';
 
 export interface VariationRow {
   typeId: number;
@@ -106,16 +107,27 @@ export function useModuleVariations({
         typeIds,
         variants.profile
       );
-      // `allSettled`, not `all`: one sibling's `calculate()` throwing (stale
-      // SDE variation data, a slot mismatch) must not blank every other row
-      // — each failure just leaves that row's delta/fits/canFly at null
-      // rather than wedging the whole panel on "loading" forever.
-      const settled = await Promise.allSettled(
-        members.map(async (member): Promise<[number, ComputedEntry]> => {
+      // One variant at a time, handing the main thread back between them:
+      // each `compare` is a synchronous engine calculation, and with the
+      // engine loaded its `await`s only queue microtasks — run together,
+      // every sibling's calculation would land in one long task and freeze
+      // input for all of them (26 siblings for a Medium Armor Repairer II).
+      const entries: [number, ComputedEntry][] = [];
+      for (const member of members) {
+        await yieldToEventLoop();
+        // A run gone stale (evaluator/slot changed meanwhile) stops here,
+        // without calculating the rest — the effect that superseded it
+        // already has its own run going.
+        if (cancelled) return;
+        // One sibling's `calculate()` throwing (stale SDE variation data, a
+        // slot mismatch) must not blank every other row — the failure just
+        // leaves that row's delta/fits/canFly at null rather than wedging
+        // the whole panel on "loading" forever.
+        try {
           const swapped = swapModuleType(variants.fitting, slot, slotIndex, member.typeId);
           const { before, after } = await variants.compare(swapped);
           const check = candidateChecks.get(member.typeId);
-          return [
+          entries.push([
             member.typeId,
             {
               delta: diffFittingStats(before, after),
@@ -123,16 +135,12 @@ export function useModuleVariations({
               overage: firstResourceOverage(after),
               canFly: check?.canFly ?? true,
             },
-          ];
-        })
-      );
-      // A run stale by the time it lands (evaluator/slot changed meanwhile)
-      // is simply dropped — the effect that superseded it already has its
-      // own in-flight computation.
+          ]);
+        } catch {
+          // Left out — see above.
+        }
+      }
       if (cancelled) return;
-      const entries = settled.flatMap((result) =>
-        result.status === 'fulfilled' ? [result.value] : []
-      );
       setComputed({ variants, slot, slotIndex, byTypeId: new Map(entries) });
     })();
     return () => {
