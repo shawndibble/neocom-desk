@@ -10,11 +10,18 @@
 import { db } from '@/db';
 import type { LocalTombstone } from './merge';
 import { EDITABLE_COLLECTIONS, type EditableCollection } from './syncedCollections';
+import { uidForCharacter } from './uid';
 
 export const INTERNAL_PREFIX = 'sync.__';
 
 export const ownerHashKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}ownerHash.${characterId}`;
+
+/**
+ * When this device last wrote the `lastSyncedAt` heartbeat for a sync uid
+ * (planSync.ts throttles that write to once a day).
+ */
+export const heartbeatKey = (uid: string): string => `${INTERNAL_PREFIX}heartbeatAt.${uid}`;
 /**
  * One Character's tombstone list for one editable collection:
  * `sync.__<tombstoneSegment>.<characterId>`. The segment is pinned per
@@ -97,6 +104,7 @@ export async function readTombstones(key: string): Promise<LocalTombstone[]> {
 export async function clearCharacterSyncBookkeeping(characterId: number): Promise<void> {
   await db.settings.bulkDelete([
     ownerHashKey(characterId),
+    heartbeatKey(uidForCharacter(characterId)),
     ...EDITABLE_COLLECTIONS.map((collection) => tombstoneKey(collection, characterId)),
   ]);
   await clearPullCursors(characterId);

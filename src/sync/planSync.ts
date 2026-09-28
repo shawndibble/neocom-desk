@@ -48,6 +48,7 @@ import { refreshAppBadge } from '@/features/notifications/appBadge';
 import { getSyncFirestore } from './firebaseApp';
 import {
   INTERNAL_PREFIX,
+  heartbeatKey,
   ownerHashKey,
   readTombstones,
   tombstoneKey,
@@ -111,8 +112,6 @@ const SETTINGS_TOMBSTONES_KEY = `${INTERNAL_PREFIX}settingsTombstones`;
  * without one, so a day's granularity costs it nothing.
  */
 export const HEARTBEAT_INTERVAL_MS = 24 * 3_600_000;
-/** Device-local: when this device last wrote the heartbeat, per uid. */
-const HEARTBEAT_KEY_PREFIX = `${INTERNAL_PREFIX}heartbeatAt.`;
 
 function isSyncedSettingKey(key: string): boolean {
   return key.startsWith(SYNCED_PREFIX) && !key.startsWith(INTERNAL_PREFIX);
@@ -1091,14 +1090,13 @@ async function syncCharacter(characterId: number): Promise<void> {
   // syncs daily without edits as active. The rules allow this one field only.
   // That purge is its only reader, so it is throttled to one write a day
   // rather than one per sync (every mutation and every background sweep).
-  const heartbeatKey = `${HEARTBEAT_KEY_PREFIX}${uid}`;
-  const lastHeartbeat = (await db.settings.get(heartbeatKey))?.value;
+  const lastHeartbeat = (await db.settings.get(heartbeatKey(uid)))?.value;
   if (typeof lastHeartbeat !== 'number' || now - lastHeartbeat >= HEARTBEAT_INTERVAL_MS) {
     await setDoc(
       doc(collection(firestore, 'characters'), uid),
       { lastSyncedAt: now },
       { merge: true }
     );
-    await db.settings.put({ key: heartbeatKey, value: now });
+    await db.settings.put({ key: heartbeatKey(uid), value: now });
   }
 }

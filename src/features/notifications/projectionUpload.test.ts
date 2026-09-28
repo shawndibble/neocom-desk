@@ -49,8 +49,7 @@ describe('uploadProjectionRows', () => {
     expect(registerDeviceForWebPush).toHaveBeenCalledWith(
       expect.any(String),
       readyRegistration,
-      rows,
-      { skipIfUnchanged: true }
+      rows
     );
   });
 

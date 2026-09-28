@@ -19,13 +19,20 @@ const sources = import.meta.glob<string>(
 
 const ENTRY = '/src/main.tsx';
 
-function stripComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+/**
+ * Drops whole-line `//` comments only. Block comments are deliberately left
+ * in: stripping them needs a string-aware scan (`accept="image/*"` followed by
+ * any later comment close would erase every import in between — a silent
+ * false negative), whereas leaving them costs at most a false positive, and a
+ * JSDoc line starts with `*`, which the line-anchored patterns never match.
+ */
+function stripLineComments(source: string): string {
+  return source.replace(/^\s*\/\/.*$/gm, '');
 }
 
 /** Static, value-level specifiers: `import x from`, `export … from`, `import 'x'`. */
 function staticSpecifiers(source: string): string[] {
-  const code = stripComments(source);
+  const code = stripLineComments(source);
   const out: string[] = [];
   const fromClause =
     /(?:^|[\n;])\s*(import|export)\s+(type\s+)?([^;'"]*?)\s*from\s*['"]([^'"]+)['"]/g;
@@ -117,10 +124,16 @@ describe('startup import graph', () => {
           `import {\n  h,\n  i,\n} from '@/h';`,
           `const lazy = () => import('./lazy');`,
           `// import { gone } from './comment';`,
-          `/* import { gone } from './block'; */`,
+          ` * import { gone } from './jsdoc';`,
+          // A glob inside a string must not open a "comment" that swallows
+          // the imports after it.
+          `const input = '<input accept="image/*">';`,
+          `import { j } from './j';`,
+          `/** a later comment */`,
+          `import { k } from './k';`,
         ].join('\n')
       )
-    ).toEqual(['./a', './d', './f', '@/h', './g.css']);
+    ).toEqual(['./a', './d', './f', '@/h', './j', './k', './g.css']);
   });
 
   it('reaches a real slice of the app from the entry', () => {

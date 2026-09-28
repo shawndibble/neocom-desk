@@ -3,11 +3,7 @@ import { httpsCallable } from 'firebase/functions';
 import { deleteToken, getToken } from 'firebase/messaging';
 import { getValidAccessToken } from '@/auth/session';
 import { db } from '@/db';
-import {
-  REREGISTER_AFTER_MS,
-  registerDeviceForWebPush,
-  unregisterDeviceForWebPush,
-} from './deviceRegistration';
+import { registerDeviceForWebPush, unregisterDeviceForWebPush } from './deviceRegistration';
 import { getDeviceId } from './deviceId';
 
 vi.mock('firebase/messaging', () => ({
@@ -33,8 +29,6 @@ const call = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.restoreAllMocks();
-  localStorage.clear();
   vi.mocked(getDeviceId).mockReturnValue('device-1');
   vi.mocked(httpsCallable).mockReturnValue(call as never);
   call.mockResolvedValue({ data: { deviceId: 'device-1', registered: [1], rejected: [] } });
@@ -180,132 +174,6 @@ describe('registerDeviceForWebPush', () => {
 
     expect(result).toBeNull();
     expect(call).not.toHaveBeenCalled();
-  });
-});
-
-describe('registerDeviceForWebPush with skipIfUnchanged (the 5-minute poll)', () => {
-  const registration = {} as ServiceWorkerRegistration;
-  const row = {
-    characterId: 1,
-    eventId: 'industryJobComplete' as const,
-    occurrenceKey: '1:industryJobComplete:987',
-    fireAt: 1_700_000_000_000,
-    title: 'Industry job complete',
-    body: 'done',
-  };
-  const poll = (rows = new Map([[1, [row]]])) =>
-    registerDeviceForWebPush('vapid-key', registration, rows, { skipIfUnchanged: true });
-
-  beforeEach(() => {
-    vi.mocked(getToken).mockResolvedValue('fcm-token');
-    vi.spyOn(db.characters, 'toArray').mockResolvedValue([
-      { characterId: 1, name: 'A', ownerHash: 'h', addedAt: 0 },
-    ] as never);
-    vi.mocked(getValidAccessToken).mockResolvedValue('token-1');
-    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
-  });
-
-  it('skips the callable and every access-token refresh when nothing changed', async () => {
-    await poll();
-    vi.mocked(getValidAccessToken).mockClear();
-    call.mockClear();
-
-    await poll();
-
-    expect(getValidAccessToken).not.toHaveBeenCalled();
-    expect(call).not.toHaveBeenCalled();
-  });
-
-  it('ignores row and Map ordering when deciding nothing changed', async () => {
-    const other = { ...row, occurrenceKey: '1:industryJobComplete:988' };
-    await poll(new Map([[1, [row, other]]]));
-    call.mockClear();
-    await poll(new Map([[1, [other, row]]]));
-    expect(call).not.toHaveBeenCalled();
-  });
-
-  it('re-registers once the last upload is older than REREGISTER_AFTER_MS', async () => {
-    await poll();
-    call.mockClear();
-    vi.mocked(Date.now).mockReturnValue(1_700_000_000_000 + REREGISTER_AFTER_MS);
-    await poll();
-    expect(call).toHaveBeenCalledTimes(1);
-  });
-
-  it('re-registers when the Projection rows change', async () => {
-    await poll();
-    call.mockClear();
-    await poll(new Map([[1, [{ ...row, fireAt: row.fireAt + 60_000 }]]]));
-    expect(call).toHaveBeenCalledTimes(1);
-  });
-
-  it('re-registers when the FCM token rotates', async () => {
-    await poll();
-    call.mockClear();
-    vi.mocked(getToken).mockResolvedValue('rotated-token');
-    await poll();
-    expect(call).toHaveBeenCalledTimes(1);
-  });
-
-  it('re-registers when the roster changes', async () => {
-    await poll();
-    call.mockClear();
-    vi.spyOn(db.characters, 'toArray').mockResolvedValue([
-      { characterId: 1, name: 'A', ownerHash: 'h', addedAt: 0 },
-      { characterId: 2, name: 'B', ownerHash: 'h', addedAt: 0 },
-    ] as never);
-    await poll();
-    expect(call).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not remember a partial registration, so the next poll retries it', async () => {
-    call.mockResolvedValueOnce({ data: { deviceId: 'device-1', registered: [], rejected: [1] } });
-    await poll();
-    call.mockClear();
-    await poll();
-    expect(call).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not remember a registration that left a Character without a token', async () => {
-    vi.spyOn(db.characters, 'toArray').mockResolvedValue([
-      { characterId: 1, name: 'A', ownerHash: 'h', addedAt: 0 },
-      { characterId: 2, name: 'B', ownerHash: 'h', addedAt: 0 },
-    ] as never);
-    vi.mocked(getValidAccessToken).mockImplementation(async (id) => {
-      if (id === 2) throw new Error('expired');
-      return 'token-1';
-    });
-    await poll();
-    call.mockClear();
-    await poll();
-    expect(call).toHaveBeenCalledTimes(1);
-  });
-
-  it('always registers without skipIfUnchanged (the Enable tap)', async () => {
-    await poll();
-    call.mockClear();
-    await registerDeviceForWebPush('vapid-key', registration, new Map([[1, [row]]]));
-    expect(call).toHaveBeenCalledTimes(1);
-  });
-
-  it('forgets the last registration on unregister', async () => {
-    vi.mocked(deleteToken).mockResolvedValue(true);
-    await poll();
-    await unregisterDeviceForWebPush();
-    call.mockClear();
-    await poll();
-    expect(call).toHaveBeenCalledTimes(1);
-  });
-
-  it('still registers when localStorage throws', async () => {
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new Error('blocked');
-    });
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('blocked');
-    });
-    await expect(poll()).resolves.not.toBeNull();
-    expect(call).toHaveBeenCalledTimes(1);
   });
 });
 

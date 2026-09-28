@@ -10,10 +10,10 @@
  * Gated on live permission (`webPushSupport`) rather than attempted
  * unconditionally: a device with no granted push permission has no FCM token
  * to register against, so `registerDeviceForWebPush` would just fail its own
- * `getToken` call every 5 minutes for no reason. Past that gate the upload is
- * also skipped when nothing changed since the last one (`skipIfUnchanged`),
- * so an idle poll doesn't refresh every Character's access token and call the
- * backend just to write what it already holds.
+ * `getToken` call every 5 minutes for no reason. Past that gate it uploads
+ * on every poll, unchanged or not: the backend replaces a Character's unfired
+ * rows wholesale whichever device sent them, so re-asserting this device's
+ * rows every poll is what restores them after another device overwrote them.
  *
  * Firebase-free on purpose: this module is reached statically from the
  * startup bundle (the Foreground Poller in `Layout`, and Remove / Log out), so
@@ -34,9 +34,7 @@ export async function uploadProjectionRows(
     const { registerDeviceForWebPush } = await import('@/sync/deviceRegistration');
     const registration = await navigator.serviceWorker.ready;
     const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY ?? '';
-    await registerDeviceForWebPush(vapidKey, registration, rowsByCharacter, {
-      skipIfUnchanged: true,
-    });
+    await registerDeviceForWebPush(vapidKey, registration, rowsByCharacter);
   } catch (err) {
     // Same fire-and-forget contract as sendBrowserNotification/
     // recordFeedNotification in foregroundPoller.ts: the poll itself must
