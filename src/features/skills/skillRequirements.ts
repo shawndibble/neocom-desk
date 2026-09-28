@@ -1,4 +1,5 @@
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
+import type { CharacterAttribute } from '@/sde/types';
 import type { SkillCatalog } from './skillMap';
 import { isEntryCovered } from './planner/reorder';
 import { stripEveMarkup } from './typeDisplay';
@@ -19,6 +20,13 @@ export interface SkillRequirements {
   name: string;
   /** Markup-stripped skill description, for display above the requirements. Null when the skill has none. */
   description: string | null;
+  groupName: string;
+  /** Training time multiplier. */
+  rank: number;
+  primaryAttr: CharacterAttribute;
+  secondaryAttr: CharacterAttribute;
+  /** The fixed NPC skillbook price (SDE basePrice). Null when the SDE gives none. */
+  npcPrice: number | null;
   prereqs: PrereqRow[];
   unlocks: UnlockRow[];
 }
@@ -59,6 +67,11 @@ export function buildSkillRequirements(
   return {
     name: info.name,
     description: info.description ? stripEveMarkup(info.description) : null,
+    groupName: info.groupName,
+    rank: info.rank,
+    primaryAttr: info.primaryAttr,
+    secondaryAttr: info.secondaryAttr,
+    npcPrice: info.basePrice ? info.basePrice : null,
     prereqs,
     unlocks,
   };

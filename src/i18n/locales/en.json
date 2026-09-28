@@ -1338,9 +1338,15 @@
       "planned": "Planned · Level {{level}}",
       "close": "Close",
       "priceTitle": "Price",
-      "priceSell": "Sell price",
+      "priceHubSell": "Sell at {{hub}}",
+      "priceRegionSell": "Lowest sell in {{region}}",
+      "priceNpc": "NPC price",
+      "priceNpcHint": "The fixed price NPC stations sell this skillbook at, where it's seeded — often a jump or two from a trade hub rather than in it.",
       "priceNoSellOrders": "No sell orders",
-      "openInMarket": "Open in Market"
+      "priceUnavailable": "Couldn't load",
+      "openInMarket": "Open in Market",
+      "findNearby": "Find nearby (≤{{jumps}} jumps)",
+      "facts": "{{group}} · Rank {{rank}} · {{primary}} / {{secondary}}"
     },
     "detail": {
       "title": "Skill Detail",

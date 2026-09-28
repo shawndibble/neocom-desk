@@ -13,8 +13,18 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadSkills } from '@/sde/loadSde';
 import type { SkillType } from '@/sde/types';
 
-const pricesMock = vi.hoisted(() => ({ getHubPrices: vi.fn() }));
-vi.mock('@/market/prices', () => pricesMock);
+const orderBookMock = vi.hoisted(() => ({ getOrderBook: vi.fn() }));
+vi.mock('@/features/market/orderBook', () => orderBookMock);
+
+const JITA_44 = 60003760;
+
+function sellOrder(price: number, location_id: number) {
+  return { price, location_id, is_buy_order: false };
+}
+
+function mockBook(orders: ReturnType<typeof sellOrder>[]) {
+  orderBookMock.getOrderBook.mockResolvedValue({ orders, truncated: false, fetchedAt: 0 });
+}
 
 const CHAR_ID = 91;
 
@@ -40,6 +50,7 @@ const FIXTURE_SKILLS: SkillType[] = [
     primaryAttr: 'perception',
     secondaryAttr: 'willpower',
     prereqs: [{ skillTypeID: 1, level: 3 }],
+    basePrice: 2_000_000,
   },
   {
     typeID: 3,
@@ -65,7 +76,8 @@ beforeEach(async () => {
   await db.esiCache.clear();
   useSkillDetailModalStore.setState({ request: null });
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
-  pricesMock.getHubPrices.mockReset().mockResolvedValue(new Map());
+  orderBookMock.getOrderBook.mockReset();
+  mockBook([]);
 });
 afterEach(() => {
   server.resetHandlers();
@@ -116,24 +128,81 @@ describe('SkillDetailModal', () => {
     expect(within(dialog).getByText('Trained · Level 3')).toBeInTheDocument();
   });
 
-  it('shows the trade-hub sell price and an Open in Market link', async () => {
-    pricesMock.getHubPrices.mockResolvedValue(new Map([[2, { sellMin: 1_500_000, buyMax: null }]]));
+  it("leads with the skill's facts: group, rank and training attributes", async () => {
+    renderModal();
+    act(() => useSkillDetailModalStore.getState().open(2));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      await within(dialog).findByText('Spaceship Command · Rank 1 · Perception / Willpower')
+    ).toBeInTheDocument();
+  });
+
+  it('prices the hub station and the whole hub region separately', async () => {
+    mockBook([sellOrder(1_500_000, JITA_44), sellOrder(1_200_000, 60000364)]);
 
     renderModal();
     act(() => useSkillDetailModalStore.getState().open(2));
 
     const dialog = await screen.findByRole('dialog');
     await within(dialog).findByText('Frigate');
-    expect(await within(dialog).findByText('1.5M')).toBeInTheDocument();
-    expect(within(dialog).getByRole('link', { name: 'Open in Market' })).toBeInTheDocument();
+    const hubRow = (await within(dialog).findByText('Sell at Jita')).parentElement!;
+    expect(await within(hubRow).findByText('1.5M')).toBeInTheDocument();
+    const regionRow = within(dialog).getByText('Lowest sell in The Forge').parentElement!;
+    expect(within(regionRow).getByText('1.2M')).toBeInTheDocument();
+    expect(orderBookMock.getOrderBook).toHaveBeenCalledWith(10000002, 2);
   });
 
-  it('shows no sell orders when the trade hub has none', async () => {
+  it('shows no sell orders at the hub while still pricing the rest of its region', async () => {
+    mockBook([sellOrder(2_000_000, 60000364)]);
+
     renderModal();
     act(() => useSkillDetailModalStore.getState().open(2));
 
     const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByText('No sell orders')).toBeInTheDocument();
+    const hubRow = (await within(dialog).findByText('Sell at Jita')).parentElement!;
+    expect(await within(hubRow).findByText('No sell orders')).toBeInTheDocument();
+    const regionRow = within(dialog).getByText('Lowest sell in The Forge').parentElement!;
+    expect(within(regionRow).getByText('2M')).toBeInTheDocument();
+  });
+
+  it('says the price could not load when the order book fetch fails', async () => {
+    orderBookMock.getOrderBook.mockRejectedValue(new Error('ESI down'));
+
+    renderModal();
+    act(() => useSkillDetailModalStore.getState().open(2));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findAllByText("Couldn't load")).toHaveLength(2);
+  });
+
+  it('shows the fixed NPC price when the SDE has one, and hides it when not', async () => {
+    renderModal();
+    act(() => useSkillDetailModalStore.getState().open(2));
+
+    const dialog = await screen.findByRole('dialog');
+    const npcRow = (await within(dialog).findByText('NPC price')).closest('div')!;
+    expect(within(npcRow).getByText('2M')).toBeInTheDocument();
+
+    act(() => useSkillDetailModalStore.getState().open(3));
+    await within(dialog).findByText('Solo Skill');
+    expect(within(dialog).queryByText('NPC price')).not.toBeInTheDocument();
+  });
+
+  it('links to the hub in Market and to the nearest sellers within 10 jumps', async () => {
+    renderModal();
+    act(() => useSkillDetailModalStore.getState().open(2));
+
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText('Frigate');
+    expect(within(dialog).getByRole('link', { name: 'Open in Market' })).toHaveAttribute(
+      'href',
+      '/market/browser?type=2&hub=jita'
+    );
+    expect(within(dialog).getByRole('link', { name: 'Find nearby (≤10 jumps)' })).toHaveAttribute(
+      'href',
+      '/market/browser?type=2&region=all&browser.jumps=10'
+    );
   });
 
   it('shows a prerequisite as still needed when the trained level falls short', async () => {
