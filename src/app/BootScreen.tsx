@@ -19,9 +19,10 @@ export const BOOT_STALL_MS = 10_000;
  * These gates wait on Dexie with nothing behind them to catch a read that
  * never resolves, so the screen carries its own escape hatch
  * (`bootRecovery.ts`). `gate` identifies which mounted it, and is passed
- * straight through to the Sentry report — see `bootStallReport.ts`.
+ * straight through to the Sentry report — see `bootStallReport.ts`. Without
+ * one it is only the look: no stall timer, report or escape hatch.
  */
-export function BootScreen({ gate }: { gate: BootGate }) {
+export function BootScreen({ gate }: { gate?: BootGate }) {
   const { t } = useTranslation();
   const [stalled, setStalled] = useState(false);
   const [recovering, setRecovering] = useState(false);
@@ -31,6 +32,10 @@ export function BootScreen({ gate }: { gate: BootGate }) {
   const recoveringRef = useRef(false);
 
   useEffect(() => {
+    // No gate: a wait on something other than a boot read (the signed-in
+    // shell's chunk, which has its own error boundary). Same screen, but no
+    // stall report and no recovery offer that would restart that download.
+    if (gate === undefined) return;
     const timer = setTimeout(() => {
       setStalled(true);
       reportBootStallOnce(BOOT_STALL_MS, gate);
