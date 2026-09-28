@@ -119,4 +119,38 @@ describe('buildSkillRequirements', () => {
     const result = buildSkillRequirements(catalog, new Map(), 1);
     expect(result?.description).toBeNull();
   });
+
+  it("carries the skill's group, rank and training attributes for the facts line", () => {
+    const facts = catalogOf(
+      [engineSkill({ typeID: 1 })],
+      [
+        sdeSkill({
+          typeID: 1,
+          name: 'Upwell Hauler',
+          groupName: 'Spaceship Command',
+          rank: 4,
+          primaryAttr: 'perception',
+          secondaryAttr: 'willpower',
+        }),
+      ]
+    );
+    expect(buildSkillRequirements(facts, new Map(), 1)).toMatchObject({
+      groupName: 'Spaceship Command',
+      rank: 4,
+      primaryAttr: 'perception',
+      secondaryAttr: 'willpower',
+    });
+  });
+
+  it('carries the SDE base price as the NPC price', () => {
+    const priced = catalogOf(
+      [engineSkill({ typeID: 1 })],
+      [sdeSkill({ typeID: 1, name: 'Upwell Hauler', basePrice: 2_000_000 })]
+    );
+    expect(buildSkillRequirements(priced, new Map(), 1)?.npcPrice).toBe(2_000_000);
+  });
+
+  it('has no NPC price when the SDE gives none', () => {
+    expect(buildSkillRequirements(catalog, new Map(), 1)?.npcPrice).toBeNull();
+  });
 });

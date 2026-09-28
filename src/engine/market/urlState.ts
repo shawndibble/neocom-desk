@@ -6,6 +6,7 @@
  * catalogue and falling back to the default view when it doesn't resolve.
  */
 import { ALL_REGIONS, type RegionChoice } from './locationMode';
+import type { JumpRange } from '@/engine/route/jumpRange';
 
 export interface ParsedMarketParams {
   typeId: number | null;
@@ -107,6 +108,20 @@ export function marketLinkParams(
     return buildMarketParams(typeId, { mode: 'region', regionId: parsed.regionId });
   if (parsed.hubId !== null) return buildMarketParams(typeId, { mode: 'hub', hubId: parsed.hubId });
   return { type: String(typeId) };
+}
+
+/**
+ * Query params for "where's the closest one?": `typeId` over All regions,
+ * narrowed by the order book's Jump Range (`browser.jumps`, see
+ * `useOrderBookOrchestration.ts`), which the Market Browser measures from the
+ * Current System. The Jump Range is URL-only here: the Market Browser never
+ * writes a linked filter value into the user's remembered filter default.
+ */
+export function marketNearbyParams(
+  typeId: number,
+  jumps: Exclude<JumpRange, 'any'>
+): Record<string, string> {
+  return { type: String(typeId), region: ALL_REGIONS, 'browser.jumps': jumps };
 }
 
 /** `marketLinkParams`, serialised to the `/market/browser?...` path a cross-link navigates to. */

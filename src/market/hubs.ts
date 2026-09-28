@@ -24,6 +24,8 @@ export interface TradeHub {
   stationId: number;
   systemId: number;
   regionId: number;
+  /** The hub region's name, for labels such as "Lowest in The Forge". */
+  regionName: string;
   /**
    * The hub station's NPC owner and that owner's faction, for broker-fee
    * standings. Stored rather than fetched: `GET /corporations/{id}` omits
@@ -44,7 +46,8 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     security: 'highsec',
     stationId: 60003760,
     systemId: 30000142,
-    regionId: 10000002, // The Forge
+    regionId: 10000002,
+    regionName: 'The Forge',
     ownerCorporationId: 1000035, // Caldari Navy
     ownerFactionId: 500001, // Caldari State
   },
@@ -55,7 +58,8 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     security: 'highsec',
     stationId: 60008494,
     systemId: 30002187,
-    regionId: 10000043, // Domain
+    regionId: 10000043,
+    regionName: 'Domain',
     ownerCorporationId: 1000086, // Emperor Family
     ownerFactionId: 500003, // Amarr Empire
   },
@@ -66,7 +70,8 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     security: 'highsec',
     stationId: 60011866,
     systemId: 30002659,
-    regionId: 10000032, // Sinq Laison
+    regionId: 10000032,
+    regionName: 'Sinq Laison',
     ownerCorporationId: 1000120, // Federation Navy
     ownerFactionId: 500004, // Gallente Federation
   },
@@ -77,7 +82,8 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     security: 'highsec',
     stationId: 60004588,
     systemId: 30002510,
-    regionId: 10000030, // Heimatar
+    regionId: 10000030,
+    regionName: 'Heimatar',
     ownerCorporationId: 1000049, // Brutor Tribe
     ownerFactionId: 500002, // Minmatar Republic
   },
@@ -88,7 +94,8 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     security: 'highsec',
     stationId: 60005686,
     systemId: 30002053,
-    regionId: 10000042, // Metropolis
+    regionId: 10000042,
+    regionName: 'Metropolis',
     ownerCorporationId: 1000057, // Boundless Creation
     ownerFactionId: 500002, // Minmatar Republic
   },

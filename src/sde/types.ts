@@ -22,6 +22,11 @@ export interface SkillType {
   primaryAttr: CharacterAttribute;
   secondaryAttr: CharacterAttribute;
   prereqs: SkillPrereq[];
+  /**
+   * invTypes basePrice: the fixed price NPC stations sell the skillbook at,
+   * where it is NPC-seeded. Absent when the SDE gives 0.
+   */
+  basePrice?: number;
   /** Highest level an Alpha clone can train; absent when Alphas cannot train it. */
   alphaMaxLevel?: number;
 }
