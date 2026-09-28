@@ -36,6 +36,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useAutoDismiss } from '@/lib/useAutoDismiss';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
 import {
@@ -274,6 +275,7 @@ export function PlanEditor({
     if (focusName) navigate(location.pathname, { replace: true, state: null });
   }, [focusName, location.pathname, navigate]);
   const [copyConfirm, setCopyConfirm] = useState(false);
+  const showCopyConfirm = useAutoDismiss<boolean>(setCopyConfirm, false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [importMenuOpen, setImportMenuOpen] = useState(false);
   const openImportDialogAfterMenuRef = useRef(false);
@@ -313,11 +315,14 @@ export function PlanEditor({
   // button, cleared after a couple of seconds. Additive to the full
   // Panel/Modal results those same actions already produce below.
   const [markerConfirm, setMarkerConfirm] = useState(false);
+  const showMarkerConfirm = useAutoDismiss<boolean>(setMarkerConfirm, false);
   const [reorderConfirm, setReorderConfirm] = useState<'attributes' | 'shortest' | null>(null);
+  const showReorderConfirm = useAutoDismiss<'attributes' | 'shortest' | null>(setReorderConfirm, null);
   // A promoted prereq row is a quieter change than it looks (a dimmed row
   // turns into user data), so it says so. A "that worked" note about the
   // change that just landed, so it clears on its own timer, not with the plan.
   const [promoteConfirm, setPromoteConfirm] = useState<string | null>(null);
+  const showPromoteConfirm = useAutoDismiss<string | null>(setPromoteConfirm, null);
   // Which marker's manual attribute editor (RemapMarkerModal) is open, by
   // ordinal — the same addressing `onRemoveMarker`/`markerAttributesFor` use.
   const [editingMarkerIndex, setEditingMarkerIndex] = useState<number | null>(null);
@@ -392,6 +397,7 @@ export function PlanEditor({
   const [optimizeVerdict, setOptimizeVerdict] = useScopedState<OptimizeVerdict>(costingScope);
   // Beside-the-button confirmation (#222) for Optimize Remaps.
   const [optimizeConfirm, setOptimizeConfirm] = useScopedState<string>(costingScope);
+  const showOptimizeConfirm = useAutoDismiss<string | null>(setOptimizeConfirm, null);
   // Whether the "Optimize at my markers" savings/segments panel is showing.
   // The computation itself is not state — the schedule below derives it live
   // from `plan.markers` so marker rows always have their target attributes on
@@ -929,8 +935,7 @@ export function PlanEditor({
       catalog.engineSkills
     );
     await writeToClipboard(text);
-    setCopyConfirm(true);
-    setTimeout(() => setCopyConfirm(false), 2000);
+    showCopyConfirm(true);
   }
 
   function handleExportCsv() {
@@ -1000,8 +1005,7 @@ export function PlanEditor({
       yearlyRemapAfter,
     });
     setOptimizeVerdict(verdict);
-    setOptimizeConfirm(confirmRemapOutcome(verdict, yearlyRemapAfter));
-    setTimeout(() => setOptimizeConfirm(null), 2000);
+    showOptimizeConfirm(confirmRemapOutcome(verdict, yearlyRemapAfter));
   }
 
   /**
@@ -1120,10 +1124,9 @@ export function PlanEditor({
 
   const confirmPromotion = useCallback(
     (skillTypeID: number, level: number) => {
-      setPromoteConfirm(t('plans.prereqPromoted', { name: levelLabel(skillTypeID, level) }));
-      setTimeout(() => setPromoteConfirm(null), 4000);
+      showPromoteConfirm(t('plans.prereqPromoted', { name: levelLabel(skillTypeID, level) }), 4000);
     },
-    [t, levelLabel]
+    [t, levelLabel, showPromoteConfirm]
   );
 
   /**
@@ -1260,8 +1263,7 @@ export function PlanEditor({
 
   function handleAddMarker() {
     onUpdate(addRemapMarker(editable));
-    setMarkerConfirm(true);
-    setTimeout(() => setMarkerConfirm(false), 2000);
+    showMarkerConfirm(true);
   }
 
   // Shared per-segment rendering for both optimize modes: a remapped segment
@@ -1391,8 +1393,7 @@ export function PlanEditor({
       kind: 'attributes',
       steps: suggestReorder(scheduled, catalog.engineSkills, priorityMap),
     });
-    setReorderConfirm('attributes');
-    setTimeout(() => setReorderConfirm(null), 2000);
+    showReorderConfirm('attributes');
   }
 
   /** "Shortest first": same preview/Accept-Reject flow as "Reorder only", fastest-ready-step-first instead of attribute-pair grouping. */
@@ -1407,8 +1408,7 @@ export function PlanEditor({
         priorityMap
       ),
     });
-    setReorderConfirm('shortest');
-    setTimeout(() => setReorderConfirm(null), 2000);
+    showReorderConfirm('shortest');
   }
 
   function acceptReorder() {

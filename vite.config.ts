@@ -64,6 +64,7 @@ const DOM_TS_TESTS = [
   'src/features/market/useCompareRows.test.ts',
   'src/features/skills/useAccountSkillLevels.test.ts',
   'src/features/skills/useTargetPlan.test.ts',
+  'src/lib/useAutoDismiss.test.ts',
   'src/lib/useLazyRowCache.test.ts',
   // sessionStorage / localStorage
   'src/app/loginFlow.test.ts',
