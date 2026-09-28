@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -188,6 +188,9 @@ export function OpenOrdersPanel() {
     () => filterFromParamValues<OpenOrdersFilter>(params, OPEN_ORDERS_FIELD_TO_PARAM),
     [params]
   );
+  // Rows derive from a deferred copy so a keystroke paints the box first
+  // (`useUrlFilter`'s rule); the bar, chips and setter keep the immediate one.
+  const rowsFilter = useDeferredValue(filter);
   function setFilter(next: OpenOrdersFilter) {
     setParams(paramsPatchFromFilter(next, OPEN_ORDERS_FIELD_TO_PARAM));
   }
@@ -302,8 +305,8 @@ export function OpenOrdersPanel() {
   const problemCounts = useMemo(() => openOrderProblemCounts(allRows), [allRows]);
 
   const { visibleRows, groupingRows, groups, groupSummaries, matchCountVisible } = useMemo(
-    () => buildOpenOrdersView(allRows, filter),
-    [allRows, filter]
+    () => buildOpenOrdersView(allRows, rowsFilter),
+    [allRows, rowsFilter]
   );
 
   const attentionCount = useMemo(() => needsAttentionCount(allRows), [allRows]);

@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -575,6 +582,9 @@ export function Contacts() {
     () => ({ text: filterParams.q, types: filterParams.types, standings: filterParams.standing }),
     [filterParams]
   );
+  // Rows derive from a deferred copy so a keystroke paints the box first
+  // (`useUrlFilter`'s rule); the bar and its setter keep the immediate one.
+  const rowsFilter = useDeferredValue(filter);
   const setFilter = (next: ContactsFilter) =>
     setFilterParams({ q: next.text, types: next.types, standing: next.standings });
   const [tab, setTab] = usePageTab(CONTACTS_TABS);
@@ -639,8 +649,8 @@ export function Contacts() {
   }
 
   const filteredContacts = useMemo(
-    () => filterContacts(contacts, filter, contactNames),
-    [contacts, filter, contactNames]
+    () => filterContacts(contacts, rowsFilter, contactNames),
+    [contacts, rowsFilter, contactNames]
   );
 
   // Once per load rather than per render of a cell: `alsoVia` is a lookup
@@ -948,7 +958,7 @@ export function Contacts() {
         <AcrossCharactersPanel
           lists={acrossLists}
           names={contactNames}
-          filter={filter}
+          filter={rowsFilter}
           disagreementsOnly={disagreementsOnly}
           onDisagreementCountChange={setDisagreementCount}
           isColumnVisible={acrossColumnVisibility.isVisible}

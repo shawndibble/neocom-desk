@@ -161,7 +161,7 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
   );
   // This tab has only the one filter bar, so it never needs `useUrlFilter`'s
   // scope-reset — the scope key never changes.
-  const [filter, setFilter] = useUrlFilter<HistoryFilter>(
+  const [filter, setFilter, rowsFilter] = useUrlFilter<HistoryFilter>(
     'history',
     HISTORY_FILTER_PARAMS,
     HISTORY_FIELD_TO_PARAM,
@@ -174,8 +174,8 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
   );
 
   const filteredHistory = useMemo(
-    () => filterHistory(history, filter, typeNames),
-    [history, filter, typeNames]
+    () => filterHistory(history, rowsFilter, typeNames),
+    [history, rowsFilter, typeNames]
   );
 
   const columns = useMemo<DataTableColumn<MarketOrderHistory>[]>(

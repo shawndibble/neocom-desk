@@ -26,6 +26,7 @@
 import {
   startTransition,
   useCallback,
+  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -204,6 +205,14 @@ export function useUrlSort(
  * can read one value on the first render and a different one a render later
  * for reasons unrelated to the field it names, that settling looks
  * indistinguishable from a real change and the filter is wiped for it.
+ *
+ * The third element is the same filter through `useDeferredValue`: derive
+ * rows from it, never the input. The debounce above only delays the URL
+ * write — the immediate value changes on every keystroke — so filtering a
+ * long table off it re-renders the whole table per key. The deferred copy
+ * lets the keystroke paint first and the rows follow at lower priority. The
+ * first two elements stay immediate: an input or a setter built from the
+ * deferred copy would write stale text back over what was just typed.
  */
 /** A filter object's fields, read off a `useUrlParams`-shaped values record. */
 export function filterFromParamValues<F extends object>(
@@ -236,7 +245,7 @@ export function useUrlFilter<F extends object>(
   schema: UrlParamSchema,
   fieldToParam: Record<keyof F & string, string>,
   emptyParams: Record<string, unknown>
-): [F, (next: F) => void] {
+): [F, (next: F) => void, F] {
   const [params, setParams] = useUrlParams(schema);
   const filter = useMemo(
     () => filterFromParamValues<F>(params, fieldToParam),
@@ -252,7 +261,8 @@ export function useUrlFilter<F extends object>(
     lastScopeKey.current = scopeKey;
     setParams(emptyParams);
   }, [scopeKey, setParams, emptyParams]);
-  return [filter, setFilter];
+  const rowsFilter = useDeferredValue(filter);
+  return [filter, setFilter, rowsFilter];
 }
 
 /**

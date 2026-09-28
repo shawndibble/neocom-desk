@@ -8,7 +8,7 @@
  * src/features/loyalty/useLoyaltyStoreOffers.ts for how the numbers are
  * assembled.
  */
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
@@ -371,6 +371,9 @@ export function LoyaltyStore() {
 
   const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
   const { search, affordableOnly, blueprintsOnly } = filterParams;
+  // Rows filter on a deferred copy so a keystroke paints the box first
+  // (`useUrlFilter`'s rule); the search box keeps the immediate one.
+  const rowsSearch = useDeferredValue(search);
   const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -378,14 +381,14 @@ export function LoyaltyStore() {
   const itemActions = usePageItemActions({ activeCharacterId });
 
   const filteredRows = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = rowsSearch.trim().toLowerCase();
     return rows.filter((row) => {
       if (affordableOnly && !row.profit.affordableLp) return false;
       if (blueprintsOnly && !row.isBlueprint) return false;
       if (q && !row.itemName.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [rows, search, affordableOnly, blueprintsOnly]);
+  }, [rows, rowsSearch, affordableOnly, blueprintsOnly]);
 
   const affordableCount = useMemo(
     () => rows.filter((row) => row.profit.affordableLp).length,
