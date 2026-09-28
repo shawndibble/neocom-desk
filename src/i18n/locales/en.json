@@ -4305,6 +4305,8 @@
     "blueprintsFilter": "Blueprints",
     "yourLp": "Your LP",
     "offersShown": "Offers shown",
+    "offerCount_one": "{{count}} offer",
+    "offerCount_other": "{{count}} offers",
     "colItem": "Item",
     "colProfit": "Profit",
     "colIskPerLp": "ISK / LP",
