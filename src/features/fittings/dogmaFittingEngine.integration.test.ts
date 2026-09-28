@@ -1300,8 +1300,11 @@ describe('hull fit pre-filter (real WASM + real pinned SDE)', () => {
         const typeId = Number(id);
         const full = checkOneCandidate(hull, rack, typeId, skills);
         const fast = checkHullCandidate(hull, rack, typeId, skills);
+        // An item the hull refuses outright only needs to agree on that —
+        // `fast` answers it from the no-skill bare check (the Hull icon
+        // filter's only consumer), not the full skills-aware run `full` is.
         if (full.fitsHull) expect({ typeId, fast }).toEqual({ typeId, fast: full });
-        else expect({ typeId, fast }).toEqual({ typeId, fast: null });
+        else expect({ typeId, fast: fast.fitsHull }).toEqual({ typeId, fast: false });
       }
     });
   });

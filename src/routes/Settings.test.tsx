@@ -72,6 +72,25 @@ vi.mock('@/features/notifications/projectionRebuild', () => ({
   rebuildProjection: vi.fn(async () => {}),
 }));
 
+/**
+ * `ForegroundNotificationPoller` runs a poll on every `<App/>` mount (its own
+ * doc comment: "on mount, since opening the app is itself the strongest case
+ * of 'becoming visible'"), and a poll that reaches its end unconditionally
+ * calls `rebuildProjection` too (`foregroundPoller.ts`), independent of the
+ * debounced scheduler below. Settings has nothing to do with the poller, so
+ * the real thing here was cross-contaminating `rebuildProjection`'s call
+ * count: it could still be mid-flight (real ESI/Dexie reads, not driven by
+ * this file's fake timers) when a test's own preference write and its
+ * mount's poll happened to both resolve inside the same assertion window,
+ * landing an extra, unrelated call and flaking a call-count assertion
+ * (issue #2065). Kept as a real `vi.fn()` (not a bare no-op) so a future
+ * caller expecting to assert against it still can.
+ */
+vi.mock('@/features/notifications/foregroundPoller', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/notifications/foregroundPoller')>();
+  return { ...actual, runForegroundPoll: vi.fn(async () => {}) };
+});
+
 const CHAR_ID = 91;
 
 /**
@@ -1592,7 +1611,7 @@ describe('Settings defaults', () => {
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
     await user.click(await screen.findByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('button', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
 
     expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
     await waitFor(async () => {
@@ -1781,6 +1800,7 @@ describe('Settings — sections rail', () => {
       'Permissions',
       'Industry',
       'Market',
+      'Moon Mining Tax',
       'Characters',
       // Corporation is absent: this character has no corp access.
       'Notifications',
@@ -1857,7 +1877,7 @@ describe('Settings — phone list', () => {
     }
     // Corporation is absent: this character has no corp access.
     expect(within(nav).queryByRole('link', { name: /corporation/i })).not.toBeInTheDocument();
-    expect(within(nav).getAllByRole('link')).toHaveLength(11);
+    expect(within(nav).getAllByRole('link')).toHaveLength(12);
     expect(within(nav).getByRole('link', { name: /^display/i })).toHaveTextContent(
       /default text, my local time/i
     );
@@ -1930,7 +1950,7 @@ describe('Settings — This device', () => {
     render(<App />);
 
     expect(
-      await screen.findByText(/2 characters are logged in on this browser/i)
+      await screen.findByText(/2 characters are logged in on this device/i)
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^log out$/i }));
     const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
@@ -1989,11 +2009,13 @@ describe('Settings — review follow-ups', () => {
     expect(window.location.pathname).toBe('/settings/market');
   });
 
-  it('puts the CCP data credit at the foot of Data & storage', async () => {
+  it('does not show the CCP data credit on Data & storage', async () => {
     window.history.pushState({}, '', '/settings/dataAge');
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: /data credit/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /clear cached esi data/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /clear cached esi data/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /data credit/i })).not.toBeInTheDocument();
   });
 });

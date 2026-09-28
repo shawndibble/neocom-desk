@@ -129,6 +129,24 @@ describe('sortCharacterIds', () => {
   it('keeps original relative order for ids missing from stats entirely', () => {
     expect(sortCharacterIds([9, 1], stats, 'name', 'asc')).toEqual([1, 9]);
   });
+
+  it('sorts by group name ascending, sinking an ungrouped (no groupName) character to the end', () => {
+    const withGroups = new Map<number, CharacterSortStats>([
+      [1, { name: 'Zed', groupName: 'Mains' }],
+      [2, { name: 'Amy', groupName: 'Alts' }],
+      [3, { name: 'Mid' }],
+    ]);
+    expect(sortCharacterIds([1, 2, 3], withGroups, 'group', 'asc')).toEqual([2, 1, 3]);
+  });
+
+  it('sorts by alert count descending', () => {
+    const withAlerts = new Map<number, CharacterSortStats>([
+      [1, { name: 'Zed', alertCount: 1 }],
+      [2, { name: 'Amy', alertCount: 5 }],
+      [3, { name: 'Mid', alertCount: 0 }],
+    ]);
+    expect(sortCharacterIds([1, 2, 3], withAlerts, 'alerts', 'desc')).toEqual([2, 1, 3]);
+  });
 });
 
 describe('rosterSortStats', () => {

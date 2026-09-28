@@ -39,7 +39,9 @@ export interface PublicContractOfferRow {
   /**
    * PLEX quantity the contract's issuer wants in return, when any (issue
    * #1080's PLEX-for-item barter) — the same value on every offer row of one
-   * contract, since it describes the requested side, not this one line.
+   * contract, since it describes the requested side, not this one line. Most
+   * such contracts also have `price: 0` (a pure barter), but some ask for an
+   * ISK amount and PLEX together, in which case `price` is that real ask.
    * Absent, not zero, when the contract asks for nothing PLEX.
    */
   requestedPlex?: number;

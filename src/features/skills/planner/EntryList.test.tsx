@@ -789,3 +789,73 @@ describe('EntryList Plan Milestones (CONTEXT.md)', () => {
     expect(screen.getByText('Reached')).toBeInTheDocument();
   });
 });
+
+describe("pinnedInProgress (#1701 follow-up): the row that IS the in-game queue's currently-training level shows its real remaining time", () => {
+  // Isolates the "Takes" cell this feature changes: "Done by" also reads a
+  // plain duration here only because these tests pass no `startDate` —
+  // PlanEditor always does, and that half of #1701 was already correct.
+  const takesOnly = { ...DEFAULT_COLUMN_VISIBILITY, cumulativeTime: false };
+
+  it('shows the level\'s real remaining time instead of a bare "0m" for the row it pins, on the narrow layout', () => {
+    const rows = [entryRow(1, [])]; // zero own steps, entry targets skill 1 level 1
+    render(
+      <EntryList
+        rows={rows}
+        bandsAt={new Map()}
+        {...defaultProps}
+        columns={takesOnly}
+        pinnedInProgress={{ id: entryId(entry(1, 1)), seconds: 600 }}
+      />
+    );
+    expect(screen.getByText('10m')).toBeInTheDocument();
+    expect(screen.queryByText('0m')).not.toBeInTheDocument();
+  });
+
+  it('shows it on the desktop layout too', () => {
+    const restore = mockDesktop(true);
+    try {
+      const rows = [entryRow(1, [])];
+      render(
+        <EntryList
+          rows={rows}
+          bandsAt={new Map()}
+          {...defaultProps}
+          columns={takesOnly}
+          pinnedInProgress={{ id: entryId(entry(1, 1)), seconds: 600 }}
+        />
+      );
+      expect(screen.getByText('10m')).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it('leaves every other row reading its own duration, pinned or not', () => {
+    const rows = [entryRow(1, []), entryRow(2, [0])];
+    render(
+      <EntryList
+        rows={rows}
+        bandsAt={new Map()}
+        {...defaultProps}
+        columns={takesOnly}
+        pinnedInProgress={{ id: entryId(entry(1, 1)), seconds: 600 }}
+      />
+    );
+    expect(screen.getByText('10m')).toBeInTheDocument();
+    expect(screen.getByText('1m')).toBeInTheDocument();
+  });
+
+  it('renders a plain "0m" when nothing is pinned (no in-game queue lead, or it is paused)', () => {
+    const rows = [entryRow(1, [])];
+    render(
+      <EntryList
+        rows={rows}
+        bandsAt={new Map()}
+        {...defaultProps}
+        columns={takesOnly}
+        pinnedInProgress={null}
+      />
+    );
+    expect(screen.getByText('0m')).toBeInTheDocument();
+  });
+});

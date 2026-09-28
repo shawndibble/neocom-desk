@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -14,6 +15,7 @@ import {
   PageHeader,
   Panel,
   Spinner,
+  Tooltip,
   type DataTableColumn,
   Checkbox,
 } from '@/components/ui';
@@ -29,11 +31,12 @@ import { beginGrant } from '@/app/grantAction';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
+import { formatLocalDate } from '@/lib/localDate';
 import { toggleFilterMember } from '@/lib/multiSelectFilter';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, type UrlParamCodec } from '@/lib/urlState';
 import type { TradeHub } from '@/market/hubs';
-import type { PayeeRecord } from '@/db';
+import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import {
@@ -59,11 +62,15 @@ import {
 import { loadTypeNames } from '@/features/character/typeNames';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import {
+  assignmentsSharingPayment,
   deleteAssignment,
   dismissEntry,
+  linkPaymentTransaction,
   linkRecordedPayment,
   markAssignmentsPaid,
   resolveNeedsReview,
+  unlinkPaymentTransaction,
+  unlockPaidAssignment,
 } from '@/features/miningTax/assignments';
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { TypeOverridesDialog } from '@/features/miningTax/TypeOverridesDialog';
@@ -91,9 +98,79 @@ import { SettleUpDialog, type SettleUpRow } from '@/features/miningTax/SettleUpD
 import { JoinAssignDialog } from '@/features/miningTax/JoinAssignDialog';
 import { PayeeManagerDialog } from '@/features/miningTax/PayeeManagerDialog';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
+import { type LinkedTransaction } from '@/features/miningTax/PaymentLinksCard';
+import { LinkTransactionDialog } from '@/features/miningTax/LinkTransactionDialog';
 import { SplitDialog } from '@/features/miningTax/SplitDialog';
 import { findPricingGaps, type PricingGap } from '@/features/miningTax/pricingGaps';
 import { linesOwnedBy } from '@/engine/miningTax/ownership';
+
+/**
+ * A `MadePayment`'s own timestamp as a local calendar date, falling back to
+ * today — the same rule `LinkPaymentDialog`'s `paidOnFor` uses, so a
+ * fallback payment created from a manually-linked transaction reads a
+ * `paidOn` the same way a Settle-up-recorded one does.
+ */
+function paidOnFromMadePaymentDate(isoDate: string): string {
+  const parsed = new Date(isoDate);
+  return formatLocalDate(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
+}
+
+/** A short display line for a linked ref, from the same `MadePayment[]` the Payments-to-link card already loaded — `null` when it's no longer in the cached wallet journal/contracts. */
+function labelForLinkedRef(
+  madePayments: readonly MadePayment[],
+  t: TFunction,
+  kind: 'journal' | 'contract',
+  refId: number
+): string | null {
+  const mp = madePayments.find((p) => p.key === `${kind}:${refId}`);
+  if (!mp) return null;
+  const amount =
+    mp.amount === null ? t('miningTax.linkPaymentInKind') : `${formatIsk(mp.amount)} ISK`;
+  const label = mp.label || t('miningTax.linkPaymentUntitledContract');
+  return `${amount} · ${mp.date.slice(0, 10)} — ${label}`;
+}
+
+/** The dedup'd `LinkedTransaction[]` across `assignments`' payments — the same shape whether it's one row's shared-payment group or a joined group's members. */
+function linkedTransactionsFor(
+  assignments: readonly MiningTaxAssignmentRecord[],
+  madePayments: readonly MadePayment[],
+  t: TFunction
+): LinkedTransaction[] {
+  const seen = new Set<string>();
+  const out: LinkedTransaction[] = [];
+  for (const a of assignments) {
+    if (!a.payment) continue;
+    for (const kind of ['journal', 'contract'] as const) {
+      for (const l of (kind === 'journal' ? a.payment.journalLinks : a.payment.contractLinks) ??
+        []) {
+        const key = `${kind}:${l.refId}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({
+          kind,
+          refId: l.refId,
+          source: l.source,
+          label: labelForLinkedRef(madePayments, t, kind, l.refId),
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Every Assignment a "Link transaction" action on `dr` should apply to:
+ * every member of a joined group at once (issue #540 follow-up — a joined
+ * group is billed as one obligation, so a linked transaction covers all of
+ * it), or the single row's own shared-`paymentId` group otherwise.
+ */
+function assignmentsForLinkTarget(
+  dr: DisplayRow,
+  everyAssignment: readonly MiningTaxAssignmentRecord[]
+): MiningTaxAssignmentRecord[] {
+  if (dr.groupMembers) return allMembers(dr).map((m) => m.assignment);
+  return dr.assignment ? assignmentsSharingPayment(dr.assignment, everyAssignment) : [];
+}
 
 const ALL_STATUSES: readonly MiningTaxRowStatus[] = [
   'unassigned',
@@ -270,6 +347,11 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   // the table's checkbox selection. `null` keeps it closed.
   const [settleUpRows, setSettleUpRows] = useState<SettleUpRow[] | null>(null);
   const [detailTarget, setDetailTarget] = useState<DisplayRow | null>(null);
+  // Which row's "Link transaction" picker is open — kept separate from
+  // `detailTarget` so the manual picker can sit on top of the row detail
+  // rather than replacing it (issue #540 follow-up: linking a transaction to
+  // an already-Paid row).
+  const [linkTransactionTarget, setLinkTransactionTarget] = useState<DisplayRow | null>(null);
   const [joinTarget, setJoinTarget] = useState<DisplayRow | null>(null);
   const [splitTarget, setSplitTarget] = useState<DisplayRow | null>(null);
   // Set only by the selection toolbar's Combine — pins `JoinAssignDialog`'s
@@ -697,6 +779,78 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     }
   }
 
+  const detailLinkedTransactions: LinkedTransaction[] | undefined = useMemo(() => {
+    if (!detailTarget?.assignment?.payment) return undefined;
+    return linkedTransactionsFor([detailTarget.assignment], madePayments, t);
+  }, [detailTarget, madePayments, t]);
+
+  const groupLinkedTransactions: LinkedTransaction[] | undefined = useMemo(() => {
+    if (!detailTarget?.groupMembers) return undefined;
+    return linkedTransactionsFor(
+      allMembers(detailTarget).map((m) => m.assignment),
+      madePayments,
+      t
+    );
+  }, [detailTarget, madePayments, t]);
+
+  async function handleUnlinkTransactionFromDetail(transaction: LinkedTransaction) {
+    if (!detailTarget) return;
+    setBusy(true);
+    try {
+      await unlinkPaymentTransaction(
+        assignmentsForLinkTarget(detailTarget, everyAssignment),
+        transaction.kind === 'journal'
+          ? { journalRefId: transaction.refId }
+          : { contractId: transaction.refId }
+      );
+      setDetailTarget(null);
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const linkTransactionCandidates = useMemo(() => {
+    if (!linkTransactionTarget) return [];
+    return unlinkedPayments(
+      madePayments.filter((p) => p.characterId === linkTransactionTarget.row.characterId),
+      everyAssignment
+    );
+  }, [linkTransactionTarget, madePayments, everyAssignment]);
+
+  const linkTransactionTargetAmount = useMemo(() => {
+    if (!linkTransactionTarget) return 0;
+    const targets = assignmentsForLinkTarget(linkTransactionTarget, everyAssignment);
+    const existing = targets.map((a) => a.payment?.amount).find((amount) => amount !== undefined);
+    return existing ?? targets.reduce((sum, a) => sum + a.taxOwed, 0);
+  }, [linkTransactionTarget, everyAssignment]);
+
+  async function handleConfirmLinkTransaction(payment: MadePayment, source: 'auto' | 'manual') {
+    if (!linkTransactionTarget) return;
+    const targets = assignmentsForLinkTarget(linkTransactionTarget, everyAssignment);
+    if (targets.length === 0) return;
+    setBusy(true);
+    try {
+      await linkPaymentTransaction(
+        targets,
+        payment.kind === 'journal'
+          ? { journalRefId: payment.refId }
+          : { contractId: payment.refId },
+        source,
+        {
+          paidOn: paidOnFromMadePaymentDate(payment.date),
+          method: payment.method,
+          amount: payment.amount === null ? 0 : Math.round(payment.amount),
+        }
+      );
+      setLinkTransactionTarget(null);
+      setDetailTarget(null);
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleMarkPaidFromDetail() {
     if (!detailTarget?.assignment) return;
     setBusy(true);
@@ -732,6 +886,25 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       await deleteAssignment(detailTarget.assignment);
       setDetailTarget(null);
       refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * "Unlock to edit" (AssignDialog's paid-lock banner). Deliberately does not
+   * close the modal or call `refresh()` the way every other row action does
+   * — the whole point is to reopen the *same* record for editing right away,
+   * so it swaps `detailTarget`'s assignment in place (the same pattern
+   * `GroupSummaryModal`'s `onEditMember` already uses) rather than round-
+   * tripping through the full snapshot reload.
+   */
+  async function handleUnlockFromDetail() {
+    if (!detailTarget?.assignment) return;
+    setBusy(true);
+    try {
+      const unlocked = await unlockPaidAssignment(detailTarget.assignment);
+      setDetailTarget({ ...detailTarget, assignment: unlocked, status: unlocked.status });
     } finally {
       setBusy(false);
     }
@@ -840,8 +1013,24 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     {
       id: 'payee',
       header: t('miningTax.payeeColumn'),
-      className: 'whitespace-nowrap',
-      render: (dr) => payeeDisplayName(dr),
+      // Table mode only — a long Payee name was pushing Status and the edit
+      // affordance off-screen at 1024px. Same shape as Market's
+      // `location` column/`LocationCell`: `sm:`-scoped so the stacked-card
+      // layout below `sm` still shows the full, untruncated name.
+      className: 'sm:max-w-[8rem] truncate',
+      render: (dr) => {
+        const name = payeeDisplayName(dr);
+        return (
+          <Tooltip content={name}>
+            <span
+              tabIndex={0}
+              className="sm:cursor-help sm:underline sm:decoration-dotted sm:decoration-text-dim/50 sm:underline-offset-2"
+            >
+              {name}
+            </span>
+          </Tooltip>
+        );
+      },
       sortValue: (dr) => payeeDisplayName(dr),
     },
     {
@@ -1214,10 +1403,6 @@ export function TaxTab({ tabBar }: TaxTabProps) {
 
           <div className="flex flex-wrap items-center gap-2">
             <CharacterFilterControl
-              characters={characters.map((c) => ({
-                characterId: c.characterId,
-                characterName: c.characterName,
-              }))}
               activeCharacterId={activeCharacterId}
               value={characterFilter}
               onChange={setCharacterFilter}
@@ -1372,6 +1557,13 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             })
           }
           onMarkAllPaid={() => void handleMarkGroupPaidFromDetail()}
+          linkedTransactions={groupLinkedTransactions}
+          onLinkTransaction={
+            allMembers(detailTarget).every((m) => m.assignment.status === 'paid')
+              ? () => setLinkTransactionTarget(detailTarget)
+              : undefined
+          }
+          onUnlinkTransaction={(tx) => void handleUnlinkTransactionFromDetail(tx)}
         />
       )}
 
@@ -1396,6 +1588,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           onMarkPaid={() => void handleMarkPaidFromDetail()}
           onResolve={() => void handleResolveFromDetail()}
           onUndo={() => void handleUndoFromDetail()}
+          onUnlock={handleUnlockFromDetail}
           onAddPayee={
             payeeManagerDefaultCharacterId !== null
               ? () => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)
@@ -1413,8 +1606,27 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                 }
               : undefined
           }
+          linkedTransactions={detailLinkedTransactions}
+          onLinkTransaction={
+            detailTarget.status === 'paid'
+              ? () => setLinkTransactionTarget(detailTarget)
+              : undefined
+          }
+          onUnlinkTransaction={(tx) => void handleUnlinkTransactionFromDetail(tx)}
         />
       )}
+
+      {linkTransactionTarget &&
+        assignmentsForLinkTarget(linkTransactionTarget, everyAssignment).length > 0 && (
+          <LinkTransactionDialog
+            open
+            onClose={() => setLinkTransactionTarget(null)}
+            candidates={linkTransactionCandidates}
+            targetAmount={linkTransactionTargetAmount}
+            busy={busy}
+            onConfirm={(payment, source) => void handleConfirmLinkTransaction(payment, source)}
+          />
+        )}
 
       {splitTarget && splitTarget.assignment && data && (
         <SplitDialog

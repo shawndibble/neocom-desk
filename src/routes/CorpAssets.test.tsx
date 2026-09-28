@@ -95,10 +95,19 @@ function currentLocation(): string {
   return screen.getByTestId('location').textContent ?? '';
 }
 
-/** Renders, then waits for the division list to have replaced the loading spinner. */
+/**
+ * Renders, then waits for the division list to have replaced the loading
+ * spinner. A longer timeout than the global `asyncUtilTimeout` (5000ms,
+ * `vitest.setup.dom.ts`): this chains two mocked loads
+ * (`loadCorporationId` then `loadCorporationDivisions`) before anything
+ * renders, and it was observed timing out at just over 5000ms on a loaded
+ * CI runner — the same CPU contention `vite.config.ts`'s `testTimeout`
+ * comment already gives headroom for — rather than the divisions never
+ * loading at all.
+ */
 async function divisionList(): Promise<HTMLElement> {
   renderAssets();
-  return waitFor(() => screen.getByRole('link', { name: /Division 1/ }));
+  return waitFor(() => screen.getByRole('link', { name: /Division 1/ }), { timeout: 10000 });
 }
 
 beforeEach(() => {

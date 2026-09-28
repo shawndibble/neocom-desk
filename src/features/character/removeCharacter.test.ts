@@ -4,11 +4,11 @@ import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FULL_RECORDS } from '@/sync/syncedCollectionFixtures';
 import { EDITABLE_COLLECTIONS } from '@/sync/syncedCollections';
-import { removeCharacter } from './removeCharacter';
+import { removeCharacter, removeCharacterAfterSync } from './removeCharacter';
 
 const syncMock = vi.hoisted(() => ({
   clearCharacterSyncBookkeeping: vi.fn(async () => {}),
-  purgeCharacterRemoteDataOrDefer: vi.fn(async () => true),
+  triggerSync: vi.fn<(characterId: number) => Promise<void>>(async () => {}),
 }));
 vi.mock('@/sync', () => syncMock);
 const pushMock = vi.hoisted(() => ({
@@ -112,7 +112,7 @@ async function seedCharacter(characterId: number): Promise<void> {
 beforeEach(async () => {
   vi.clearAllMocks();
   syncMock.clearCharacterSyncBookkeeping.mockImplementation(async () => {});
-  syncMock.purgeCharacterRemoteDataOrDefer.mockImplementation(async () => true);
+  syncMock.triggerSync.mockImplementation(async () => {});
   await Promise.all([
     db.characters.clear(),
     db.tokens.clear(),
@@ -135,14 +135,14 @@ describe('removeCharacter', () => {
   it('re-uploads the remaining roster, without unregistering, while Characters remain', async () => {
     await seedCharacter(1);
     await seedCharacter(2);
-    await removeCharacter(1, false);
+    await removeCharacter(1);
     expect(pushMock.scheduleProjectionRebuild).toHaveBeenCalledTimes(1);
     expect(pushMock.unregisterProjectionRegistration).not.toHaveBeenCalled();
   });
 
   it('cancels the pending rebuild and unregisters push when the last Character is removed', async () => {
     await seedCharacter(1);
-    await removeCharacter(1, false);
+    await removeCharacter(1);
     expect(pushMock.scheduleProjectionRebuild.cancel).toHaveBeenCalledTimes(1);
     expect(pushMock.unregisterProjectionRegistration).toHaveBeenCalledTimes(1);
     expect(pushMock.scheduleProjectionRebuild).not.toHaveBeenCalled();
@@ -151,7 +151,7 @@ describe('removeCharacter', () => {
   it('deletes every local row for the character', async () => {
     await seedCharacter(1);
 
-    await removeCharacter(1, true);
+    await removeCharacter(1);
 
     expect(await db.characters.get(1)).toBeUndefined();
     expect(await db.tokens.get(1)).toBeUndefined();
@@ -173,7 +173,7 @@ describe('removeCharacter', () => {
       await db.table(table).put(record);
     }
 
-    await removeCharacter(1, true);
+    await removeCharacter(1);
 
     for (const c of EDITABLE_COLLECTIONS) {
       const left = await db.table(c.table).where('characterId').equals(1).count();
@@ -185,7 +185,7 @@ describe('removeCharacter', () => {
     await seedCharacter(1);
     await seedCharacter(2);
 
-    await removeCharacter(1, true);
+    await removeCharacter(1);
 
     expect(await db.characters.get(2)).toBeDefined();
     expect(await db.skillPlans.where('characterId').equals(2).count()).toBe(1);
@@ -196,33 +196,16 @@ describe('removeCharacter', () => {
     expect(await db.miningLedgerHistory.get(2)).toBeDefined();
   });
 
-  it('attempts the remote purge and clears sync bookkeeping when configured', async () => {
+  it('leaves remote sync data to the inactivity purge: no remote call, no pending marker', async () => {
     await seedCharacter(1);
 
-    const result = await removeCharacter(1, true);
+    await removeCharacter(1);
 
-    expect(syncMock.purgeCharacterRemoteDataOrDefer).toHaveBeenCalledWith(1);
+    // The `@/sync` mock exposes no remote purge — calling one would throw.
     expect(syncMock.clearCharacterSyncBookkeeping).toHaveBeenCalledWith(1);
-    expect(result).toEqual({ remotePurged: true });
-  });
-
-  it('reports a deferred purge without failing local removal', async () => {
-    await seedCharacter(1);
-    syncMock.purgeCharacterRemoteDataOrDefer.mockResolvedValueOnce(false);
-
-    const result = await removeCharacter(1, true);
-
-    expect(result).toEqual({ remotePurged: false });
+    const keys = (await db.settings.toArray()).map((row) => row.key);
+    expect(keys.filter((key) => key.startsWith('remotePurgePending.'))).toEqual([]);
     expect(await db.characters.get(1)).toBeUndefined();
-  });
-
-  it('skips the remote purge attempt entirely when sync is not configured', async () => {
-    await seedCharacter(1);
-
-    const result = await removeCharacter(1, false);
-
-    expect(syncMock.purgeCharacterRemoteDataOrDefer).not.toHaveBeenCalled();
-    expect(result).toEqual({ remotePurged: true });
   });
 
   it('reassigns the active character when the removed one was active', async () => {
@@ -230,7 +213,7 @@ describe('removeCharacter', () => {
     await seedCharacter(2);
     await useActiveCharacter.getState().setActiveCharacter(1);
 
-    await removeCharacter(1, true);
+    await removeCharacter(1);
 
     expect(useActiveCharacter.getState().activeCharacterId).toBe(2);
   });
@@ -239,7 +222,7 @@ describe('removeCharacter', () => {
     await seedCharacter(1);
     await useActiveCharacter.getState().setActiveCharacter(1);
 
-    await removeCharacter(1, true);
+    await removeCharacter(1);
 
     expect(useActiveCharacter.getState().activeCharacterId).toBeNull();
   });
@@ -249,7 +232,7 @@ describe('removeCharacter', () => {
     await seedCharacter(2);
     await useActiveCharacter.getState().setActiveCharacter(2);
 
-    await removeCharacter(1, true);
+    await removeCharacter(1);
 
     expect(useActiveCharacter.getState().activeCharacterId).toBe(2);
   });
@@ -263,7 +246,7 @@ describe('removeCharacter', () => {
       fetchedAt: 1,
     });
 
-    await removeCharacter(1, true);
+    await removeCharacter(1);
 
     expect(
       await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, 'structure:1000000000001'])
@@ -280,10 +263,42 @@ describe('removeCharacter', () => {
       fetchedAt: 1,
     });
 
-    await removeCharacter(1, true);
+    await removeCharacter(1);
 
     expect(
       (await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, 'structure:1000000000001']))?.value
     ).toEqual({ name: 'Shared By The Roster' });
+  });
+});
+
+describe('removeCharacterAfterSync', () => {
+  it('pushes the Character once before removing it when sync is configured', async () => {
+    await seedCharacter(1);
+    syncMock.triggerSync.mockImplementation(async () => {
+      expect(await db.characters.get(1)).toBeDefined();
+    });
+
+    await removeCharacterAfterSync(1, true);
+
+    expect(syncMock.triggerSync).toHaveBeenCalledExactlyOnceWith(1);
+    expect(await db.characters.get(1)).toBeUndefined();
+  });
+
+  it('removes locally even when that push fails', async () => {
+    await seedCharacter(1);
+    syncMock.triggerSync.mockRejectedValueOnce(new Error('offline'));
+
+    await removeCharacterAfterSync(1, true);
+
+    expect(await db.characters.get(1)).toBeUndefined();
+  });
+
+  it('does not push when sync is not configured', async () => {
+    await seedCharacter(1);
+
+    await removeCharacterAfterSync(1, false);
+
+    expect(syncMock.triggerSync).not.toHaveBeenCalled();
+    expect(await db.characters.get(1)).toBeUndefined();
   });
 });

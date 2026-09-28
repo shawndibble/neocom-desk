@@ -31,11 +31,9 @@ const PRICE = { totals: { buy: 1000, sell: 2000, unpricedRows: 0 } } as Appraisa
 
 function LocationState() {
   const location = useLocation();
+  const state = location.state as { appraiseText?: string; fitImportText?: string } | null;
   return (
-    <p
-      data-testid="at"
-      data-text={(location.state as { appraiseText?: string } | null)?.appraiseText}
-    >
+    <p data-testid="at" data-text={state?.appraiseText} data-fit-import-text={state?.fitImportText}>
       {location.pathname}
     </p>
   );
@@ -105,6 +103,14 @@ describe('FittingExportMenu', () => {
     const at = await screen.findByTestId('at');
     expect(at).toHaveTextContent('/market/appraisal');
     expect(at).toHaveAttribute('data-text', 'Rifter\t1\n200mm AutoCannon II\t1');
+  });
+
+  it('hands its EFT text to Industry’s Fit Import, pre-filled', async () => {
+    setup();
+    await choose('Manufacture Plan');
+    const at = await screen.findByTestId('at');
+    expect(at).toHaveTextContent('/industry');
+    expect(at).toHaveAttribute('data-fit-import-text', '[Rifter, Brawler]\n200mm AutoCannon II');
   });
 
   it('says pricing is in flight while the price loads', async () => {
