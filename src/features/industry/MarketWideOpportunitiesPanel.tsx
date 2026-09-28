@@ -30,6 +30,7 @@ import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
@@ -119,7 +120,7 @@ export function MarketWideOpportunitiesPanel({
         const verdict = skillGateByProductTypeID.get(row.productTypeID);
         return (
           <span className="inline-flex items-center gap-1.5">
-            {row.productName}
+            <MarketItemLink typeId={row.productTypeID}>{row.productName}</MarketItemLink>
             {verdict?.gated && catalog && (
               <SkillGateMarker
                 verdict={verdict}

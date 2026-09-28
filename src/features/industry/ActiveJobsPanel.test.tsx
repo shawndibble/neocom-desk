@@ -145,6 +145,7 @@ describe('ActiveJobsPanel: rendering', () => {
     await expandJobs(user);
     expect(screen.getByText('Widget Beta')).toBeInTheDocument();
     expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Widget Beta' })).toBeInTheDocument();
 
     // Scoped to tbody: activity names also appear on the filter chips and
     // the column headers.
