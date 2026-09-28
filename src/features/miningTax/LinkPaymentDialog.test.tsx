@@ -69,6 +69,19 @@ describe('LinkPaymentDialog — value handed over', () => {
     expect(recordedAmount()).toBe(1_000_000_000);
   });
 
+  it('will not save while the typed value does not parse', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    const input = screen.getByRole('textbox', { name: 'Value handed over' });
+    await user.type(input, '1x');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('button', { name: 'Mark 1 paid' })).toBeDisabled();
+
+    await user.type(input, '{Backspace}b');
+    expect(screen.getByRole('button', { name: 'Mark 1 paid' })).toBeEnabled();
+  });
+
   it("records the ticked entries' total when left blank", async () => {
     const user = userEvent.setup();
     renderDialog();

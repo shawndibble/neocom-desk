@@ -18,6 +18,12 @@ interface IskInputProps extends Omit<
   echo?: boolean;
   /** What a blank field stands for; shown grouped as the placeholder. */
   defaultAmount?: number;
+  /**
+   * Whether the typed text currently parses (blank counts). A form that saves
+   * the committed value uses this to block saving while the field shows text
+   * that value doesn't match.
+   */
+  onParseableChange?: (parseable: boolean) => void;
 }
 
 /**
@@ -36,6 +42,7 @@ export function IskInput({
   onChange,
   echo = true,
   defaultAmount,
+  onParseableChange,
   placeholder,
   className = '',
   ...rest
@@ -52,6 +59,7 @@ export function IskInput({
     }
   }, [value]);
   const parsed = text.trim() === '' ? null : parseIskAmount(text);
+  const parseable = text.trim() === '' || parsed !== null;
   return (
     <div className={`flex flex-col gap-1 ${className}`}>
       <TextInput
@@ -62,11 +70,13 @@ export function IskInput({
           placeholder ?? (defaultAmount !== undefined ? maskIsk(defaultAmount) : undefined)
         }
         className="w-full tabular-nums"
+        aria-invalid={parseable ? undefined : true}
         value={text}
         onChange={(event) => {
           const next = event.target.value;
           setText(next);
           const amount = next.trim() === '' ? '' : parseIskAmount(next);
+          onParseableChange?.(amount !== null);
           if (amount === null) return;
           const nextValue = String(amount);
           committed.current = nextValue;

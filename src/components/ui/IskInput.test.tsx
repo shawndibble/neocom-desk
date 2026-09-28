@@ -58,6 +58,10 @@ describe('IskInput', () => {
     expect(onCommit).toHaveBeenCalledTimes(1);
     expect(onCommit).toHaveBeenLastCalledWith('1');
     expect(screen.getByRole('textbox', { name: 'Max price' })).toHaveValue('1.');
+    expect(screen.getByRole('textbox', { name: 'Max price' })).toHaveAttribute(
+      'aria-invalid',
+      'true'
+    );
   });
 
   it('commits blank as the empty string, so a caller can read it as "use the default"', async () => {
