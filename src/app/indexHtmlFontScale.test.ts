@@ -30,10 +30,14 @@ afterEach(() => {
 });
 
 describe('index.html font-scale boot script', () => {
-  it('runs before the module entry', () => {
-    expect(indexHtml.indexOf('id="font-scale-boot"')).toBeLessThan(
-      indexHtml.indexOf('type="module"')
-    );
+  it('is a classic, blocking script in <head>, so it runs before first paint', () => {
+    const head = new DOMParser().parseFromString(indexHtml, 'text/html').head;
+    const script = head.querySelector('script#font-scale-boot');
+    expect(script).not.toBeNull();
+    expect(script?.hasAttribute('type')).toBe(false);
+    expect(script?.hasAttribute('defer')).toBe(false);
+    expect(script?.hasAttribute('async')).toBe(false);
+    expect(script?.hasAttribute('src')).toBe(false);
   });
 
   it.each(FONT_SCALE_STEPS)('applies the mirrored step %s', (step) => {
