@@ -86,18 +86,20 @@ function Harness({
 }: HarnessProps) {
   const [sourcing, setSourcing] = useState<MaterialSourcingMap | undefined>(initial);
   return (
-    <MaterialsTable
-      materials={asRows(materialCostLines(MATERIALS, hubPrices, sourcing))}
-      nameFor={nameFor}
-      volumeFor={volumeFor}
-      sourcing={sourcing}
-      pricesReady={pricesReady}
-      detection={detection}
-      onSourcingChange={(typeID, patch) => {
-        onChange?.(typeID, patch);
-        setSourcing((current) => applySourcingPatch(current, typeID, patch));
-      }}
-    />
+    <MemoryRouter>
+      <MaterialsTable
+        materials={asRows(materialCostLines(MATERIALS, hubPrices, sourcing))}
+        nameFor={nameFor}
+        volumeFor={volumeFor}
+        sourcing={sourcing}
+        pricesReady={pricesReady}
+        detection={detection}
+        onSourcingChange={(typeID, patch) => {
+          onChange?.(typeID, patch);
+          setSourcing((current) => applySourcingPatch(current, typeID, patch));
+        }}
+      />
+    </MemoryRouter>
   );
 }
 
@@ -569,6 +571,12 @@ describe('MaterialsTable', () => {
     expect(within(rows[0]).getByText('Tritanium')).toBeInTheDocument();
     expect(within(rows[0]).getByText('100')).toBeInTheDocument();
     expect(within(rows[1]).getByText('Mechanical Parts')).toBeInTheDocument();
+  });
+
+  it('links the material name to its Market listing', () => {
+    renderTable();
+    const rows = screen.getAllByRole('row').slice(1);
+    expect(within(rows[0]).getByRole('link', { name: 'Tritanium' })).toBeInTheDocument();
   });
 
   it('flags a material with no hub price rather than showing a bogus total', () => {

@@ -475,6 +475,7 @@ export function BuildGroupPanel({
         id: 'stillToBuy',
         header: t('industry.stillToBuyColumn'),
         align: 'right',
+        headerClassName: 'whitespace-nowrap',
         className: 'tabular-nums',
         sortValue: (material) => material.buyToShow,
         render: (material) => (
@@ -748,7 +749,9 @@ export function BuildGroupPanel({
                       onClick={() => onOpenPlan(plan.id)}
                       className={`${tappableRowClassName} flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
                     >
-                      <span className="truncate">{plan.name}</span>
+                      <span className="truncate" title={plan.name}>
+                        {plan.name}
+                      </span>
                       <span className="shrink-0 tabular-nums text-text-dim">
                         {row?.result ? (
                           // Long press, not tap: the whole row is a button
@@ -854,6 +857,9 @@ export function BuildGroupPanel({
                 rowKey={(material) => material.typeID}
                 label={t('industry.groupMaterials')}
                 density="compact"
+                // Five figures broke to a 5-line stack at 390px; pair two per line,
+                // same fix as MaterialsTable's single-plan buy table.
+                stackColumns={2}
                 mobileSort
               />
             </div>

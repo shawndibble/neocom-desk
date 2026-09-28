@@ -254,31 +254,47 @@ export function compactContractOfferRow(
 }
 
 /**
- * Total PLEX quantity requested per contract, keyed by `contract_id` (the raw
- * CSV string, matching `eligibleContracts`' own keys) — the requested side of
- * `compactContractOfferRow`'s `is_included` split. Computed over every item
- * line up front, the same shape `distinctTypeCountByContract`
- * (`contractOffers.ts`, client-side) uses for its own contract-wide tally,
- * since a contract's requested lines are not guaranteed to sit next to its
- * offered ones in the CSV.
+ * Folds one `contract_items.csv` line into a running per-contract PLEX-requested
+ * total, keyed by `contract_id` (the raw CSV string, matching
+ * `eligibleContracts`' own keys). A no-op unless the line is on the requested
+ * (`is_included: false`) side, names PLEX, and belongs to an already-eligible
+ * contract — an ineligible or lapsed contract publishes no offer rows for this
+ * to ride along on anyway.
  *
- * Only contracts already in `eligibleContracts` are tallied — an ineligible
- * or lapsed contract publishes no offer rows for this to ride along on
- * anyway.
+ * Exposed on its own (rather than only via `requestedPlexByContract` below) so
+ * the production sync's single streaming pass over `contract_items.csv`
+ * (`index.ts`'s `syncPublicContractOffers`, which cannot hold the whole
+ * `items` array the way this module's fixture-driven join can — see
+ * `publicContractsArchive.ts`'s doc comment) can fold every line into the same
+ * small running map as it streams past, instead of needing a second pass
+ * `requestedPlexByContract` would require.
+ */
+export function accumulateRequestedPlex(
+  item: ContractItemRecord,
+  eligibleContracts: ReadonlyMap<string, EligibleContract>,
+  totals: Map<string, number>
+): void {
+  if (item.is_included === 'true') return;
+  if (Number(item.type_id) !== PLEX_TYPE_ID) return;
+  if (!eligibleContracts.has(item.contract_id)) return;
+  const quantity = Number(item.quantity);
+  if (!Number.isFinite(quantity) || quantity <= 0) return;
+  totals.set(item.contract_id, (totals.get(item.contract_id) ?? 0) + quantity);
+}
+
+/**
+ * Total PLEX quantity requested per contract, over every item line up front —
+ * the same shape `distinctTypeCountByContract` (`contractOffers.ts`,
+ * client-side) uses for its own contract-wide tally, since a contract's
+ * requested lines are not guaranteed to sit next to its offered ones in the
+ * CSV.
  */
 export function requestedPlexByContract(
   items: readonly ContractItemRecord[],
   eligibleContracts: ReadonlyMap<string, EligibleContract>
 ): Map<string, number> {
   const totals = new Map<string, number>();
-  for (const item of items) {
-    if (item.is_included === 'true') continue;
-    if (Number(item.type_id) !== PLEX_TYPE_ID) continue;
-    if (!eligibleContracts.has(item.contract_id)) continue;
-    const quantity = Number(item.quantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) continue;
-    totals.set(item.contract_id, (totals.get(item.contract_id) ?? 0) + quantity);
-  }
+  for (const item of items) accumulateRequestedPlex(item, eligibleContracts, totals);
   return totals;
 }
 

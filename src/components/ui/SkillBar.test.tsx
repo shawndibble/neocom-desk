@@ -36,4 +36,26 @@ describe('SkillBar', () => {
       expect(segment.querySelector('span')).toBeNull();
     }
   });
+
+  it('marks segments past level through plannedLevel as planned, not plain untrained', () => {
+    render(<SkillBar level={2} plannedLevel={4} />);
+    const segments = screen.getByRole('img').querySelectorAll('[aria-hidden="true"]');
+    expect(segments[2]?.className).toContain('accent-dim');
+    expect(segments[3]?.className).toContain('accent-dim');
+    expect(segments[4]?.className).not.toContain('accent-dim');
+    expect(segments[4]?.className).not.toContain('bg-accent');
+  });
+
+  it('prefers the planned style over a partial-progress fill on the same segment', () => {
+    render(<SkillBar level={2} progress={0.5} plannedLevel={4} />);
+    const segments = screen.getByRole('img').querySelectorAll('[aria-hidden="true"]');
+    expect(segments[2]?.querySelector('span')).toBeNull();
+    expect(segments[2]?.className).toContain('accent-dim');
+  });
+
+  it('ignores a plannedLevel at or below the trained level', () => {
+    render(<SkillBar level={3} plannedLevel={2} />);
+    const segments = screen.getByRole('img').querySelectorAll('[aria-hidden="true"]');
+    expect(segments[3]?.className).not.toContain('accent-dim');
+  });
 });

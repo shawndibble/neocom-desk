@@ -8,6 +8,7 @@ import {
   applyReorderSuggestion,
   entryId,
   setEntryPriority,
+  plannedLevelFor,
 } from './reorder';
 
 describe('entryId', () => {
@@ -53,6 +54,20 @@ describe('dedupeEntries', () => {
       { skillTypeID: 1, targetLevel: 3, priority: 'low' },
     ];
     expect(dedupeEntries(entries)).toEqual([{ skillTypeID: 1, targetLevel: 3, priority: 'high' }]);
+  });
+});
+
+describe('plannedLevelFor', () => {
+  it('returns null for a skill the plan never mentions', () => {
+    expect(plannedLevelFor([{ skillTypeID: 3300, targetLevel: 4 }], 3327)).toBeNull();
+  });
+
+  it('returns the highest level any row of that skill targets', () => {
+    const entries: PlanEntry[] = [
+      { skillTypeID: 3300, targetLevel: 3 },
+      { skillTypeID: 3300, targetLevel: 5 },
+    ];
+    expect(plannedLevelFor(entries, 3300)).toBe(5);
   });
 });
 

@@ -47,6 +47,13 @@ export interface TargetPlan {
   removeEntries: (planId: string, entries: readonly PlanEntry[]) => Promise<void>;
 }
 
+/** The target plan's own entries, or `[]` before it resolves or when the Character has none yet — the "is this already planned?" lookup every `TargetPlan` consumer otherwise re-derives inline. */
+export function targetPlanEntries(
+  target: Pick<TargetPlan, 'plans' | 'targetPlanId'>
+): readonly PlanEntry[] {
+  return target.plans?.find((p) => p.id === target.targetPlanId)?.entries ?? [];
+}
+
 export function useTargetPlan(characterId: number | null): TargetPlan {
   const plans = useLiveQuery(async () => {
     if (characterId === null) return [];
