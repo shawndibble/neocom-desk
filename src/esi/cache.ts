@@ -820,10 +820,20 @@ export async function isCacheFresh(
   key: string,
   staleAfterMs: number = STALE_AFTER.default
 ): Promise<boolean> {
-  const meta = await readMeta(characterId, key);
-  if (!meta || !isWithinWindow(meta, staleAfterMs, Date.now())) return false;
-  // Primary-key count: answers "is the value there?" without deserializing it.
-  return (await db.esiCache.where(':id').equals([characterId, key]).count()) > 0;
+  try {
+    const meta = await readMeta(characterId, key);
+    if (!meta || !isWithinWindow(meta, staleAfterMs, Date.now())) return false;
+    return await hasValueRow([characterId, key]);
+  } catch {
+    // Unsure is "not fresh": the caller then runs the loader, which has its
+    // own failure handling.
+    return false;
+  }
+}
+
+/** Primary-key count: "is the value there?" without deserializing it. */
+async function hasValueRow(id: [number, string]): Promise<boolean> {
+  return (await db.esiCache.where(':id').equals(id).count()) > 0;
 }
 
 /** ESI or cache, dropping the auth-failure distinction for callers that don't need it. */
@@ -1031,8 +1041,7 @@ async function backfillMeta(row: EsiCacheRecord): Promise<void> {
       // A row rewritten since (which wrote its own meta) or deleted since must
       // not be given this stale projection.
       if ((await db.esiCacheMeta.get(id)) !== undefined) return;
-      const current = await db.esiCache.where(':id').equals(id).count();
-      if (current === 0) return;
+      if (!(await hasValueRow(id))) return;
       await db.esiCacheMeta.put(metaOf(row));
     });
   } catch {
@@ -1049,7 +1058,7 @@ async function dropOrphanMeta(characterId: number, key: string): Promise<void> {
   const id: [number, string] = [characterId, key];
   try {
     await db.transaction('rw', db.esiCache, db.esiCacheMeta, async () => {
-      if ((await db.esiCache.where(':id').equals(id).count()) === 0) {
+      if (!(await hasValueRow(id))) {
         await db.esiCacheMeta.delete(id);
       }
     });

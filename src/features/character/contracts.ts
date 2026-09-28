@@ -2,7 +2,7 @@
 import { getCharacterContracts, type Contract } from '@/esi/endpoints';
 import { loadPaginatedWithCacheStatus, type StatusResult } from '@/esi/cache';
 
-const KEY = 'contracts';
+export const KEY = 'contracts';
 
 /**
  * All contracts (every page). ESI or cache, with the auth-failure state

@@ -7,7 +7,7 @@ import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurren
 
 const ASSETS_SCOPE = ESI_REGISTRY.getCharacterAssets.scope;
 
-const KEY = 'assets';
+export const KEY = 'assets';
 
 /**
  * Assets (up to MAX_ASSET_PAGES worth). ESI or cache, with the auth-failure

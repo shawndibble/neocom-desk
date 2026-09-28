@@ -15,6 +15,7 @@ import {
   type UniverseType,
 } from '@/esi/endpoints';
 import {
+  conditionalFetch,
   loadWithCache,
   loadWithCacheStatus,
   GLOBAL_CACHE_CHARACTER_ID,
@@ -35,15 +36,18 @@ export const KEYS = {
   skillqueue: 'skillqueue',
 } as const;
 
-/** Trained skills + total/unallocated SP for a character. ESI or cache. */
+/**
+ * Trained skills + total/unallocated SP for a character. ESI or cache.
+ * Revalidated by ETag: an unchanged skill sheet (the usual case between
+ * trainings) costs a 304, not a re-download and rewrite.
+ */
 export function loadCharacterSkills(
   characterId: number
 ): Promise<CachedResult<CharacterSkills> | null> {
-  return loadWithCache(
-    characterId,
-    KEYS.skills,
-    async () => (await getCharacterSkills(characterId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterSkills(characterId, options)
   );
+  return loadWithCache(characterId, KEYS.skills, fetchLive, { conditional });
 }
 
 /**
@@ -54,11 +58,10 @@ export function loadCharacterSkills(
 export function loadCharacterSkillsWithStatus(
   characterId: number
 ): Promise<StatusResult<CharacterSkills>> {
-  return loadWithCacheStatus(
-    characterId,
-    KEYS.skills,
-    async () => (await getCharacterSkills(characterId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterSkills(characterId, options)
   );
+  return loadWithCacheStatus(characterId, KEYS.skills, fetchLive, { conditional });
 }
 
 /** Base + remap attribute values for a character. ESI or cache. */

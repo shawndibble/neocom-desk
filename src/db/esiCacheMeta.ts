@@ -101,22 +101,27 @@ export const esiCacheMetaMiddleware: Middleware<DBCore> = {
         if (name !== ESI_CACHE_TABLE) return table;
         return {
           ...table,
-          async mutate(req) {
+          mutate(req) {
             // Absent only mid-upgrade from a version without the table.
             if (!hasMetaStore(req.trans)) return table.mutate(req);
             const meta: DBCoreTable = down.table(ESI_CACHE_META_TABLE);
-            const result = await table.mutate(req);
-            // Same transaction, chained straight off an IndexedDB callback, so
-            // it cannot auto-commit in between. Rows the value store refused
-            // (a colliding `add`) get no meta.
             const mirror = mirrorRequest(req);
-            if (result.numFailures > 0 && mirror.type === 'put') {
-              const values = mirror.values.filter((_, i) => !(i in result.failures));
-              if (values.length > 0) await meta.mutate({ ...mirror, values });
-            } else {
-              await meta.mutate(mirror);
+            if (req.type === 'add' && mirror.type === 'put') {
+              // An `add` can be refused per row (key collision), so its meta
+              // waits for the verdict. Chained with `.then` on the IndexedDB
+              // layer's own promise, never `await`: a native-promise hop can
+              // let the transaction auto-commit first.
+              return table.mutate(req).then((result) => {
+                const values = mirror.values.filter((_, i) => !(i in result.failures));
+                if (values.length === 0) return result;
+                return meta.mutate({ ...mirror, values }).then(() => result);
+              });
             }
-            return result;
+            // Both issued synchronously, in one transaction: they commit or
+            // roll back together.
+            const mirrored = meta.mutate(mirror);
+            const result = table.mutate(req);
+            return Promise.all([result, mirrored]).then(([valueResult]) => valueResult);
           },
         };
       },
