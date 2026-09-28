@@ -1276,7 +1276,7 @@
       "createPlanAndAdd": "Create Skill Plan and add",
       "add": "Add",
       "trained": "Trained",
-      "inPlan": "In plan",
+      "inPlan": "Planned",
       "addedToast_one": "Added {{count}} skill to {{plan}}",
       "addedToast_other": "Added {{count}} skills to {{plan}}",
       "addedToastUndo": "Undo"
@@ -2733,6 +2733,7 @@
     "retention": "This device keeps the last 300 alerts, and syncs 30 days of them between your devices."
   },
   "common": {
+    "iskAmountHint": "= {{amount}} ISK",
     "unknownType": "Type {{id}}",
     "columnsButton": "Columns",
     "columnsMenuTitle": "Columns",
@@ -6085,7 +6086,6 @@
     "destinationRegionLabel": "To region",
     "minRewardLabel": "Min reward",
     "maxCollateralLabel": "Max collateral",
-    "iskFilterHint": "= {{amount}} ISK",
     "maxVolumeLabel": "Max volume (m³)",
     "minDaysLabel": "Min days",
     "routeColumn": "Route",

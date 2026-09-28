@@ -566,14 +566,27 @@ describe('ContractSearchPanel', () => {
     await bodyRows();
 
     await user.click(screen.getByRole('button', { name: /filters/i }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Max price' }), '1');
+    await user.type(screen.getByRole('textbox', { name: 'Max price' }), '1');
 
     expect(await screen.findByText('No public contracts match your filters.')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Reset filters' }));
 
     await waitFor(async () => expect(await bodyRows()).toHaveLength(3));
-    expect(screen.getByRole('spinbutton', { name: 'Max price' })).toHaveValue(null);
+    expect(screen.getByRole('textbox', { name: 'Max price' })).toHaveValue('');
+  });
+
+  it('takes ISK shorthand in max price and echoes the exact figure (issue #2227)', async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+    expect(await bodyRows()).toHaveLength(3);
+
+    await user.click(screen.getByRole('button', { name: /filters/i }));
+    await user.type(screen.getByRole('textbox', { name: 'Max price' }), '1.5m');
+
+    // The auction is judged on its 2M buyout, so only the two Tritanium asks remain.
+    expect(screen.getByText('= 1,500,000 ISK')).toBeInTheDocument();
+    await waitFor(async () => expect(await bodyRows()).toHaveLength(2));
   });
 
   it('shows the not-configured state when the app has no sync backend', async () => {
