@@ -156,3 +156,22 @@ export async function loadWalletTransactions(
   );
   return result && { ...result, data: uniqueTransactions(result.data) };
 }
+
+/**
+ * Same data as loadWalletTransactions, with the auth-failure state exposed —
+ * Market's Transactions view shows a Grant banner for a declined or revoked
+ * Wallet Permission rather than a "reconnect" empty state (issue #2236).
+ */
+export async function loadWalletTransactionsWithStatus(
+  characterId: number
+): Promise<StatusResult<WalletTransaction[]>> {
+  const { cached, needsReauth } = await loadPaginatedWithCacheStatus(
+    characterId,
+    KEYS.transactions,
+    () => getCharacterWalletTransactions(characterId)
+  );
+  return {
+    cached: cached && { ...cached, data: uniqueTransactions(cached.data) },
+    needsReauth,
+  };
+}

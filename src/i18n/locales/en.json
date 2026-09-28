@@ -2857,6 +2857,8 @@
     "transactionsNoFilterMatches": "No transactions match this filter.",
     "transactionsNoFilterMatchesHint": "Clear the search or widen the side and date filters.",
     "transactionsTruncatedHint": "Only the most recent transactions were fetched. Older history is not shown.",
+    "transactionsReauthTitle": "Allow wallet access",
+    "transactionsReauthHint": "Log in again and grant the Wallet Permission to see this character's market transactions.",
     "corpTransactionsEmptyTitle": "No corp transactions cached",
     "corpTransactionsEmptyHint": "Reconnect to fetch this wallet division's market transactions.",
     "refTypeFilterLabel": "Ref type",

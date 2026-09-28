@@ -6,21 +6,30 @@ import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { TransactionsPanel } from './TransactionsPanel';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
-import { loadWalletJournal, loadWalletTransactions } from '@/features/character/wallet';
+import { loadWalletJournal, loadWalletTransactionsWithStatus } from '@/features/character/wallet';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { downloadCsv } from '@/lib/downloadCsv';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 
 vi.mock('@/features/character/wallet', () => ({
   loadWalletJournal: vi.fn(),
-  loadWalletTransactions: vi.fn(),
+  loadWalletTransactionsWithStatus: vi.fn(),
 }));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
 vi.mock('@/lib/downloadCsv', () => ({ downloadCsv: vi.fn() }));
+vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn() }));
 
-const mockedLoadTransactions = vi.mocked(loadWalletTransactions);
+const mockedLoadTransactions = vi.mocked(loadWalletTransactionsWithStatus);
 const mockedLoadJournal = vi.mocked(loadWalletJournal);
 const mockedTypeNames = vi.mocked(loadTypeNames);
+
+/** Resolves the transactions read with `cached`; `needsReauth` stays false unless given. */
+function mockTransactions(
+  cached: Awaited<ReturnType<typeof loadWalletTransactionsWithStatus>>['cached'],
+  needsReauth = false
+) {
+  mockedLoadTransactions.mockResolvedValue({ cached, needsReauth });
+}
 
 const TYPE_NAMES = new Map([
   [2048, 'Damage Control II'],
@@ -65,7 +74,7 @@ beforeEach(() => {
 
 describe('TransactionsPanel — the row as an item', () => {
   it('carries the item context menu on every row', async () => {
-    mockedLoadTransactions.mockResolvedValue({
+    mockTransactions({
       data: [transaction()],
       fetchedAt: new Date(),
       fromCache: false,
@@ -83,7 +92,7 @@ describe('TransactionsPanel — the row as an item', () => {
   });
 
   it('asks for the blueprint catalog the first time a row menu opens', async () => {
-    mockedLoadTransactions.mockResolvedValue({
+    mockTransactions({
       data: [transaction()],
       fetchedAt: new Date(),
       fromCache: false,
@@ -97,12 +106,12 @@ describe('TransactionsPanel — the row as an item', () => {
 });
 
 describe('TransactionsPanel — desktop filter and totals', () => {
-  function load(data: WalletTransaction[]) {
-    mockedLoadTransactions.mockResolvedValue({
+  function load(data: WalletTransaction[], truncated = false) {
+    mockTransactions({
       data,
       fetchedAt: new Date(),
       fromCache: false,
-      truncated: false,
+      truncated,
     });
   }
   const FILLS = [
@@ -155,6 +164,37 @@ describe('TransactionsPanel — desktop filter and totals', () => {
     expect(screen.queryByRole('region', { name: 'Totals for the transactions shown' })).toBeNull();
   });
 
+  it('resets a URL-seeded filter that matches nothing, bringing the rows back', async () => {
+    load(FILLS);
+    renderPanel('/market/history/transactions?txn.start=2026-09-25');
+    await screen.findByText('No transactions match this filter.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+    expect(await screen.findByRole('row', { name: /Damage Control II/ })).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /Tritanium/ })).toBeInTheDocument();
+    expect(screen.queryByText('No transactions match this filter.')).toBeNull();
+  });
+
+  it('says when the fetch stopped at the page cap, so the totals are not read as full history', async () => {
+    load(FILLS, true);
+    renderPanel();
+
+    expect(
+      await screen.findByText(/Only the most recent transactions were fetched/)
+    ).toBeInTheDocument();
+  });
+
+  it('offers the Wallet Permission grant, not the reconnect empty state, when the read needs re-auth', async () => {
+    mockTransactions(null, true);
+    renderPanel();
+
+    expect(
+      await screen.findByRole('button', { name: 'Log in again with EVE Online' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('No transactions cached')).toBeNull();
+  });
+
   it('exports the filtered rows', async () => {
     load(FILLS);
     renderPanel('/market/history/transactions?txn.side=buy');
@@ -195,7 +235,7 @@ describe('TransactionsPanel — margin', () => {
     };
   }
   function load(journal: WalletJournalEntry[] | null) {
-    mockedLoadTransactions.mockResolvedValue({
+    mockTransactions({
       data: [BUY, SALE, BUILT],
       fetchedAt: new Date(),
       fromCache: false,
@@ -257,7 +297,7 @@ describe('TransactionsPanel — phone', () => {
   });
 
   function load(data: WalletTransaction[], truncated = false) {
-    mockedLoadTransactions.mockResolvedValue({
+    mockTransactions({
       data,
       fetchedAt: new Date(),
       fromCache: false,
@@ -288,6 +328,15 @@ describe('TransactionsPanel — phone', () => {
     expect(screen.getByText('+1,282,400.00')).toBeInTheDocument();
     expect(screen.getByText('+1,382,400.00')).toBeInTheDocument();
     expect(screen.getByText('-100,000.00')).toBeInTheDocument();
+  });
+
+  it('says when the fetch stopped at the page cap', async () => {
+    load([transaction()], true);
+    renderPanel();
+
+    expect(
+      await screen.findByText(/Only the most recent transactions were fetched/)
+    ).toBeInTheDocument();
   });
 
   it('pulses the fill a notification pointed at', async () => {

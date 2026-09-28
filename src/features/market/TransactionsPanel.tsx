@@ -2,6 +2,7 @@ import { useCallback, useMemo, type ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
+  Button,
   DataAgeBadge,
   DataTable,
   CachedEmptyState,
@@ -13,13 +14,15 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { loadWalletJournal, loadWalletTransactions } from '@/features/character/wallet';
+import { GrantBanner } from '@/app/GrantNote';
+import { loadWalletJournal, loadWalletTransactionsWithStatus } from '@/features/character/wallet';
 import { ItemContextMenu } from './ItemContextMenu';
 import { TransactionsDayList } from './TransactionsDayList';
 import { TransactionsSummaryStrip } from './TransactionsSummaryStrip';
 import { TransactionsFilterBar } from '@/features/corp/CorpTransactionsPanel';
 import {
   EMPTY_TRANSACTION_FILTER_PARAMS,
+  EMPTY_WALLET_TRANSACTION_FILTER,
   filterWalletTransactions,
   TRANSACTION_FIELD_TO_PARAM,
   TRANSACTION_FILTER_PARAMS,
@@ -52,6 +55,8 @@ const NO_JOURNAL: readonly WalletJournalEntry[] = [];
 
 interface Snapshot {
   transactionsResult: CachedResult<WalletTransaction[]> | null;
+  /** 401/403 (or a failed token refresh) means "grant the Wallet Permission", not "offline". */
+  transactionsNeedsReauth: boolean;
   /** The fetch stopped at the transactions page cap; older history is missing. */
   transactionsTruncated: boolean;
   typeNames: Map<number, string>;
@@ -64,10 +69,11 @@ async function loadTransactionsSnapshot(
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
   // A journal that fails to load only blanks the Margin column, never the tab.
-  const [transactionsResult, journalResult] = await Promise.all([
-    loadWalletTransactions(characterId),
-    loadWalletJournal(characterId).catch(() => null),
-  ]);
+  const [{ cached: transactionsResult, needsReauth: transactionsNeedsReauth }, journalResult] =
+    await Promise.all([
+      loadWalletTransactionsWithStatus(characterId),
+      loadWalletJournal(characterId).catch(() => null),
+    ]);
   const transactionsTruncated = transactionsResult?.truncated ?? false;
   // Already superseded: skip the ESI name resolve, its result would be discarded.
   const typeIds = signal.cancelled
@@ -76,6 +82,7 @@ async function loadTransactionsSnapshot(
   const typeNames = await loadTypeNames(typeIds);
   return {
     transactionsResult,
+    transactionsNeedsReauth,
     transactionsTruncated,
     typeNames,
     journal: journalResult?.data ?? null,
@@ -112,6 +119,7 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
   const offlineTitleKey = refreshCount > 0 ? 'common.refreshFailedTitle' : 'common.offlineTitle';
 
   const transactionsResult = data?.transactionsResult ?? null;
+  const transactionsNeedsReauth = data?.transactionsNeedsReauth ?? false;
   const transactionsTruncated = data?.transactionsTruncated ?? false;
   const typeNames = data?.typeNames ?? NO_TYPE_NAMES;
   const nameFor = useCallback(
@@ -307,7 +315,17 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
         </span>
       }
     >
-      {!transactionsResult || transactions.length === 0 ? (
+      {transactionsNeedsReauth ? (
+        <div className="px-3 py-2">
+          <GrantBanner
+            characterId={activeCharacterId}
+            endpoints={['getCharacterWalletTransactions']}
+            title={t('wallet.transactionsReauthTitle')}
+            hint={t('wallet.transactionsReauthHint')}
+            actionLabel={t('wallet.reauthAction')}
+          />
+        </div>
+      ) : !transactionsResult || transactions.length === 0 ? (
         <CachedEmptyState
           result={transactionsResult}
           title={t('wallet.transactionsEmptyTitle')}
@@ -320,6 +338,11 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
           {transactionsResult.fromCache && (
             <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
               {t(offlineTitleKey)}
+            </p>
+          )}
+          {transactionsTruncated && (
+            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+              {t('common.incompleteTitle')} — {t('wallet.transactionsTruncatedHint')}
             </p>
           )}
           {isPhone ? (
@@ -338,6 +361,11 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
                   title={t('wallet.transactionsNoFilterMatches')}
                   hint={t('wallet.transactionsNoFilterMatchesHint')}
                   className="py-8"
+                  action={
+                    <Button size="sm" onClick={() => setFilter(EMPTY_WALLET_TRANSACTION_FILTER)}>
+                      {t('common.resetFilters')}
+                    </Button>
+                  }
                 />
               ) : (
                 <>
