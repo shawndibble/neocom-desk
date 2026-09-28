@@ -304,12 +304,20 @@ function CorpMembersView() {
           ) : undefined
         }
         actions={
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('corp.members.refresh')}
-            onClick={snapshot.refresh}
-            disabled={snapshot.loading}
-          />
+          <>
+            <IconButton
+              icon={<Icon.Download />}
+              label={t('corp.members.exportCsv')}
+              disabled={visibleRows.length === 0}
+              onClick={() => downloadCsv('corp-members', visibleRows, membersCsvColumns(t))}
+            />
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('corp.members.refresh')}
+              onClick={snapshot.refresh}
+              disabled={snapshot.loading}
+            />
+          </>
         }
       />
 
@@ -388,16 +396,7 @@ function CorpMembersView() {
           </FilterBar>
           <Panel padded={false}>
             <div className="space-y-2 p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <CorpRosterStats rows={rows} />
-                <IconButton
-                  size="sm"
-                  icon={<Icon.Download />}
-                  label={t('corp.members.exportCsv')}
-                  disabled={visibleRows.length === 0}
-                  onClick={() => downloadCsv('corp-members', visibleRows, membersCsvColumns(t))}
-                />
-              </div>
+              <CorpRosterStats rows={rows} />
               <CorpRosterSummary
                 diff={data?.diff ?? EMPTY_ROSTER_DIFF}
                 names={data?.labels.characters ?? EMPTY_MEMBER_LABELS.characters}

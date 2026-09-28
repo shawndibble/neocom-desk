@@ -161,6 +161,7 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
       {
         id: 'lastSeen',
         header: t('corp.members.columnLastSeen'),
+        align: 'right',
         className: 'whitespace-nowrap tabular-nums',
         // The one tone on the table: a member past the dark threshold. Applied
         // to this cell rather than the whole row, so the amber reads as a
