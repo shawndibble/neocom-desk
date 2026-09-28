@@ -107,6 +107,7 @@ export { NativeSelect } from './NativeSelect';
 export { Checkbox } from './Checkbox';
 export { Radio } from './Radio';
 export { TextInput } from './TextInput';
+export { IskInput } from './IskInput';
 export { TextArea } from './TextArea';
 export { SearchInput } from './SearchInput';
 export type { ControlSize } from './controlStyles';

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, TextInput, Checkbox, Radio } from '@/components/ui';
+import { Button, Modal, IskInput, Checkbox, Radio } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { PayeeRecord } from '@/db';
 import { cx } from '@/lib/cx';
@@ -217,12 +217,10 @@ export function LinkPaymentDialog({
                 <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                   {t('miningTax.linkPaymentAmountLabel')}
                 </p>
-                <TextInput
-                  type="number"
-                  min={0}
+                <IskInput
                   value={amountInKind}
-                  onChange={(e) => setAmountInKind(e.target.value)}
-                  placeholder={String(Math.round(includedTotal))}
+                  onChange={setAmountInKind}
+                  defaultAmount={Math.round(includedTotal)}
                   aria-label={t('miningTax.linkPaymentAmountLabel')}
                   className="w-full"
                 />

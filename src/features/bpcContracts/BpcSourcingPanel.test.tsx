@@ -335,6 +335,31 @@ describe('BpcSourcingPanel', () => {
     expect(iskPerRunCell).toHaveTextContent('—');
   });
 
+  it('takes ISK shorthand in max price (issue #2227)', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, typeId: 638, price: 5_000_000 }),
+        row({ contractId: 2, typeId: 870, price: 2_000_000_000 }),
+      ])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+    expect(await within(table).findByText('Caracal Blueprint')).toBeInTheDocument();
+
+    await openFilters(user);
+    await user.type(screen.getByRole('textbox', { name: 'Max price' }), '1b');
+
+    expect(screen.getByText('= 1,000,000,000 ISK')).toBeInTheDocument();
+    // Filtering re-renders the table, so look it up afresh.
+    await waitFor(() => {
+      const filtered = screen.getByRole('table', { name: 'BPC Sourcing' });
+      expect(within(filtered).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
+      expect(within(filtered).getByText('Rifter Blueprint')).toBeInTheDocument();
+    });
+  });
+
   it('narrows the table to a typed item-name search', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([
