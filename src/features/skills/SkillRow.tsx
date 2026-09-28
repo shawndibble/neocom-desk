@@ -18,6 +18,8 @@ export interface SkillRowProps {
   tags?: ReactNode;
   /** Set when the target plan already covers this row — renders as a static badge in place of the Add button. */
   inPlanLabel?: string;
+  /** The highest level the target Skill Plan already targets for this skill, past `currentLevel` — drawn on the bar itself. Omit when nothing is planned past what's trained. */
+  plannedLevel?: number | null;
   /** When set, the name opens the shared Skill Detail popover (#400/#405) instead of rendering as inert text. */
   skillTypeID?: number;
 }
@@ -32,6 +34,7 @@ export function SkillRow({
   addLabel,
   tags,
   inPlanLabel,
+  plannedLevel,
   skillTypeID,
 }: SkillRowProps) {
   const trailing =
@@ -66,7 +69,7 @@ export function SkillRow({
           word-breaks mid-word (issue: mobile Market required skills). */}
       <div className="ml-auto flex shrink-0 items-center gap-3">
         {tags !== undefined && <span className="flex gap-1">{tags}</span>}
-        <SkillBar level={currentLevel} />
+        <SkillBar level={currentLevel} plannedLevel={plannedLevel} />
         {timeLabel !== undefined && (
           <span className="w-16 text-right text-text-dim tabular-nums">{timeLabel}</span>
         )}

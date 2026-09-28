@@ -155,6 +155,31 @@ describe('Skills', () => {
     expect(screen.getByText('20')).toBeInTheDocument(); // intelligence, no bonus
   });
 
+  it('marks a skill already in a Skill Plan on its level bar, regardless of which plan it is in', async () => {
+    // Frigate (typeID 2) is trained to III; a plan targets V. The row's
+    // context menu can add to *any* of the character's plans (no single
+    // "target plan" here — see SkillRowContextMenu), so the mark reflects
+    // every plan, not just one (issue: the bar gave no indication a skill
+    // was already queued anywhere).
+    await db.skillPlans.put({
+      id: 'plan-1',
+      characterId: CHAR_ID,
+      name: 'Frigate plan',
+      entries: [{ skillTypeID: 2, targetLevel: 5 }],
+      remapCount: 0,
+      updatedAt: 1,
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText('Spaceship Command')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Spaceship Command/ }));
+
+    expect(
+      await screen.findByRole('img', { name: 'Level 3 of 5, planned to 5' })
+    ).toBeInTheDocument();
+  });
+
   it('recovers an implant name and its attribute bonus from a transient type lookup failure, instead of stalling on "#id"', async () => {
     // loadUniverseType (shared by the implant name lookup here and the
     // attribute-bonus sum) is one live call per implant with no batch to

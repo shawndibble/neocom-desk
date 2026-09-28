@@ -559,6 +559,10 @@ export function Industry() {
                   modifiers={modifiers}
                   pricingInputs={pricingInputs}
                   onDone={exitCompare}
+                  onOpenPlan={(planId) => {
+                    exitCompare();
+                    navigate(`/industry/plans/${planId}`);
+                  }}
                 />
               ) : (
                 <EmptyState

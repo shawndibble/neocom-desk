@@ -6,6 +6,7 @@ import {
   chunkRows,
   chunkDocId,
   compactContractOfferRow,
+  accumulateRequestedPlex,
   requestedPlexByContract,
   filterAndCompactPublicContractOffers,
   sortContractOfferRows,
@@ -271,6 +272,42 @@ describe('requestedPlexByContract', () => {
       itemsCsv(['"",false,2,,1000,1002,,,44992,2026-09-01T11:31:43Z,999'])
     );
     expect(requestedPlexByContract(items, eligibleContracts).size).toBe(0);
+  });
+});
+
+describe('accumulateRequestedPlex', () => {
+  // `syncPublicContractOffers` folds contract_items.csv one line at a time as
+  // it streams past (it cannot hold the whole array the way
+  // `requestedPlexByContract`'s fixture-driven callers can — see
+  // publicContractsArchive.ts). The CSV gives no guarantee a contract's
+  // offered line comes before its requested one, so the fold must reach the
+  // same total either way.
+  const eligibleContracts = new Map([
+    [
+      '1',
+      {
+        contractId: 1,
+        regionId: 10000002,
+        locationId: 60003760,
+        price: 0,
+        isAuction: false,
+        dateExpired: Date.parse(FUTURE),
+      },
+    ],
+  ]);
+
+  it('reaches the same total as requestedPlexByContract regardless of line order', () => {
+    const items = parseContractItemsCsv(
+      itemsCsv([
+        // requested-PLEX line arrives before the offered blueprint line.
+        '"",false,2,,1000,1002,,,44992,2026-09-01T11:31:43Z,1',
+        'true,true,1,10,1,1001,3,18,32858,2026-09-01T11:31:43Z,1',
+      ])
+    );
+    const totals = new Map<string, number>();
+    for (const item of items) accumulateRequestedPlex(item, eligibleContracts, totals);
+    expect(totals).toEqual(requestedPlexByContract(items, eligibleContracts));
+    expect(totals.get('1')).toBe(1000);
   });
 });
 

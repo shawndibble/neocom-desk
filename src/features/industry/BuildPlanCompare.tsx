@@ -32,6 +32,8 @@ interface BuildPlanCompareProps {
   pricingInputs: BuildPlanPricingInputs;
   /** Exits compare mode, restoring the previously open single-plan detail. */
   onDone: () => void;
+  /** Opens a plan's own detail page, exiting compare mode in the process. */
+  onOpenPlan: (planId: string) => void;
 }
 
 /**
@@ -82,6 +84,7 @@ export function BuildPlanCompare({
   modifiers,
   pricingInputs,
   onDone,
+  onOpenPlan,
 }: BuildPlanCompareProps) {
   const { t } = useTranslation();
   const rows = useComparedBuildResults({
@@ -104,7 +107,13 @@ export function BuildPlanCompare({
         const reason = row.loading ? null : unresolvedReason(row, t);
         return (
           <span className="flex items-center gap-1.5">
-            {row.planName}
+            <button
+              type="button"
+              onClick={() => onOpenPlan(row.planId)}
+              className="truncate text-left hover:underline focus-visible:underline"
+            >
+              {row.planName}
+            </button>
             {reason && (
               <InfoTooltip
                 label={t('industry.compareUnresolvedFor', { plan: row.planName })}

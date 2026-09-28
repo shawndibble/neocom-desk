@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizePlan, normalizePlanWithBoundaries } from '@/engine/plan';
+import { normalizePlan, normalizePlanWithBoundaries, findRemovalBlockers } from '@/engine/plan';
 import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
 
 function skill(
@@ -241,5 +241,75 @@ describe('normalizePlanWithBoundaries', () => {
     expect(() =>
       normalizePlanWithBoundaries([{ skillTypeID: 1, targetLevel: 1 }], skills, new Map())
     ).toThrow(/circular/i);
+  });
+});
+
+describe('findRemovalBlockers', () => {
+  it('is empty when no entry depends on another', () => {
+    const skills = skillMap(skill(1, 'A'), skill(2, 'B'));
+    const entries: PlanEntry[] = [
+      { skillTypeID: 1, targetLevel: 1 },
+      { skillTypeID: 2, targetLevel: 1 },
+    ];
+    expect(findRemovalBlockers(entries, skills, new Map())).toEqual(new Map());
+  });
+
+  it('flags a same-skill lower level still needed by a higher-level entry', () => {
+    const skills = skillMap(skill(1, 'Gunnery'));
+    const entries: PlanEntry[] = [
+      { skillTypeID: 1, targetLevel: 3 },
+      { skillTypeID: 1, targetLevel: 5 },
+    ];
+    const blockers = findRemovalBlockers(entries, skills, new Map());
+    expect(blockers.get('1:3')).toEqual({ skillTypeID: 1, targetLevel: 5 });
+    expect(blockers.has('1:5')).toBe(false);
+  });
+
+  it('flags a prerequisite entry still needed by a dependent skill, naming the dependent', () => {
+    const skills = skillMap(
+      skill(1, 'Spaceship Command'),
+      skill(2, 'Caldari Frigate', [{ typeID: 1, level: 3 }])
+    );
+    const entries: PlanEntry[] = [
+      { skillTypeID: 1, targetLevel: 3 },
+      { skillTypeID: 2, targetLevel: 1 },
+    ];
+    const blockers = findRemovalBlockers(entries, skills, new Map());
+    expect(blockers.get('1:3')).toEqual({ skillTypeID: 2, targetLevel: 1 });
+  });
+
+  it('flags every level of a cascade a later same-skill level still climbs through', () => {
+    // B needs A III; A II is also flagged, since A III alone re-creates it as a
+    // leading step the moment A II's own entry is removed.
+    const skills = skillMap(skill(1, 'A'), skill(2, 'B', [{ typeID: 1, level: 3 }]));
+    const entries: PlanEntry[] = [
+      { skillTypeID: 1, targetLevel: 2 },
+      { skillTypeID: 1, targetLevel: 3 },
+      { skillTypeID: 2, targetLevel: 1 },
+    ];
+    const blockers = findRemovalBlockers(entries, skills, new Map());
+    expect([...blockers.keys()].sort()).toEqual(['1:2', '1:3']);
+  });
+
+  it('does not flag an entry nothing else needs, even alongside flagged ones', () => {
+    const skills = skillMap(skill(1, 'A'), skill(2, 'B', [{ typeID: 1, level: 1 }]), skill(3, 'C'));
+    const entries: PlanEntry[] = [
+      { skillTypeID: 1, targetLevel: 1 },
+      { skillTypeID: 2, targetLevel: 1 },
+      { skillTypeID: 3, targetLevel: 1 },
+    ];
+    const blockers = findRemovalBlockers(entries, skills, new Map());
+    expect([...blockers.keys()]).toEqual(['1:1']);
+    expect(blockers.has('3:1')).toBe(false);
+  });
+
+  it('ignores order — an earlier entry can be required by an entry listed before it too', () => {
+    const skills = skillMap(skill(1, 'A'), skill(2, 'B', [{ typeID: 1, level: 1 }]));
+    const entries: PlanEntry[] = [
+      { skillTypeID: 2, targetLevel: 1 },
+      { skillTypeID: 1, targetLevel: 1 },
+    ];
+    const blockers = findRemovalBlockers(entries, skills, new Map());
+    expect(blockers.get('1:1')).toEqual({ skillTypeID: 2, targetLevel: 1 });
   });
 });

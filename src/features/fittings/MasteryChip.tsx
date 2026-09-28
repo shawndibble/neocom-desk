@@ -13,13 +13,13 @@ import {
 import { Skills } from '@/components/ui/icons';
 import { romanLevel } from '@/engine/projection';
 import type { PlanEntry } from '@/engine/types';
-import { formatDuration } from '@/lib/duration';
+import { formatCountdown } from '@/lib/duration';
 import { loadMasteries } from '@/sde/loadSde';
 import type { MasteryMap } from '@/sde/types';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
-import { isEntryCovered } from '@/features/skills/planner/reorder';
+import { isEntryCovered, plannedLevelFor } from '@/features/skills/planner/reorder';
 import { buildFitCheckRows } from '@/features/skills/ships/fitCheckRows';
 import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
 import {
@@ -29,7 +29,7 @@ import {
 } from '@/features/skills/ships/unifiedShipRows';
 import { SkillRow } from '@/features/skills/SkillRow';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
-import { useTargetPlan } from '@/features/skills/useTargetPlan';
+import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
 
 const TIERS = [0, 1, 2, 3, 4] as const;
 const TOAST_MS = 8000;
@@ -103,7 +103,7 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
   const visible = hideCompleted ? rows.filter((row) => row.status !== 'trained') : rows;
   const untrained = visible.filter((row) => row.status !== 'trained');
   const totalSeconds = untrained.reduce((sum, row) => sum + row.seconds, 0);
-  const planEntries = target.plans?.find((p) => p.id === target.targetPlanId)?.entries ?? [];
+  const planEntries = targetPlanEntries(target);
 
   async function add(entries: readonly PlanEntry[]) {
     const result = await target.addEntries(entries, hullName);
@@ -163,10 +163,11 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
                         timeLabel={
                           row.status === 'trained'
                             ? t('skills.fitCheck.trained')
-                            : formatDuration(row.seconds)
+                            : formatCountdown(row.seconds)
                         }
                         addLabel={t('skills.fitCheck.add')}
                         inPlanLabel={planned ? t('skills.fitCheck.inPlan') : undefined}
+                        plannedLevel={plannedLevelFor(planEntries, row.skillTypeID)}
                         onAdd={
                           planned
                             ? undefined
@@ -186,7 +187,7 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
               <div className="flex flex-wrap items-center justify-end gap-2">
                 {untrained.length > 0 && (
                   <span className="text-xs text-text-dim">
-                    {t('fittings.mastery.total', { time: formatDuration(totalSeconds) })}
+                    {t('fittings.mastery.total', { time: formatCountdown(totalSeconds) })}
                   </span>
                 )}
                 <TargetPlanPicker target={target} />

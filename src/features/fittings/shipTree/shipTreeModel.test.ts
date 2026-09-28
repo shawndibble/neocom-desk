@@ -14,7 +14,9 @@ import {
   resolveFactionID,
   searchHulls,
   techMark,
+  tierPlanned,
   traitGroups,
+  unplannedTierEntries,
 } from './shipTreeModel';
 
 function ship(over: Partial<ShipTreeShip>): ShipTreeShip {
@@ -149,6 +151,67 @@ describe('masteryTierEntries', () => {
       { skillTypeID: 1, targetLevel: 3 },
       { skillTypeID: 3, targetLevel: 4 },
     ]);
+  });
+});
+
+describe('tierPlanned', () => {
+  const trained = () => 0;
+  it('is false for an empty tier', () => {
+    expect(tierPlanned([], trained, [])).toBe(false);
+  });
+
+  it('is false when a skill the tier needs has no plan entry', () => {
+    const tier = [{ skillTypeID: 1, level: 4 }];
+    expect(tierPlanned(tier, trained, [])).toBe(false);
+  });
+
+  it('is true once every untrained skill in the tier is covered by the plan', () => {
+    const tier = [
+      { skillTypeID: 1, level: 4 },
+      { skillTypeID: 2, level: 3 },
+    ];
+    const plan = [
+      { skillTypeID: 1, targetLevel: 4 },
+      { skillTypeID: 2, targetLevel: 5 },
+    ];
+    expect(tierPlanned(tier, trained, plan)).toBe(true);
+  });
+
+  it('is false once the tier is already fully trained — nothing left to plan for', () => {
+    const tier = [{ skillTypeID: 1, level: 4 }];
+    expect(tierPlanned(tier, () => 4, [])).toBe(false);
+  });
+});
+
+describe('unplannedTierEntries', () => {
+  const tiers = [
+    [{ skillTypeID: 1, level: 2 }],
+    [
+      { skillTypeID: 1, level: 3 },
+      { skillTypeID: 2, level: 1 },
+    ],
+  ];
+  const trained = () => 0;
+
+  it('is the same as masteryTierEntries when nothing is planned yet', () => {
+    expect(unplannedTierEntries(tiers, 2, trained, [])).toEqual(
+      masteryTierEntries(tiers, 2, trained)
+    );
+  });
+
+  it('drops entries the plan already covers', () => {
+    const plan = [{ skillTypeID: 1, targetLevel: 3 }];
+    expect(unplannedTierEntries(tiers, 2, trained, plan)).toEqual([
+      { skillTypeID: 2, targetLevel: 1 },
+    ]);
+  });
+
+  it('is empty once the plan covers every untrained skill through the tier', () => {
+    const plan = [
+      { skillTypeID: 1, targetLevel: 3 },
+      { skillTypeID: 2, targetLevel: 1 },
+    ];
+    expect(unplannedTierEntries(tiers, 2, trained, plan)).toEqual([]);
   });
 });
 

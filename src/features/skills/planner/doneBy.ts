@@ -1,4 +1,4 @@
-import { formatDuration, stepFinish } from '@/lib/duration';
+import { formatCountdown, stepFinish } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 
 /**
@@ -8,6 +8,6 @@ import { formatLocalDate } from '@/lib/localDate';
  */
 export function doneByText(cumulativeSeconds: number, startDate: Date | undefined): string {
   return startDate === undefined
-    ? formatDuration(cumulativeSeconds)
+    ? formatCountdown(cumulativeSeconds)
     : formatLocalDate(stepFinish(cumulativeSeconds, startDate));
 }

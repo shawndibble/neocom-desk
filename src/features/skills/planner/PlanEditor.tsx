@@ -39,6 +39,7 @@ import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useAutoDismiss } from '@/lib/useAutoDismiss';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
+import { findRemovalBlockers, planEntryKey } from '@/engine/plan';
 import {
   milestoneKey,
   milestoneStates,
@@ -104,7 +105,7 @@ import { cloneStateFor, useCloneStates, withCloneState } from '../cloneState';
 import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
 import { queueCsvColumns } from './queueCsv';
 import { downloadCsv } from '@/lib/downloadCsv';
-import { formatDuration } from '@/lib/duration';
+import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { dedupeEntries } from './reorder';
 import { buildRows } from './markers';
@@ -532,6 +533,27 @@ export function PlanEditor({
     [plan.entries, plan.markers, plan.markerAttributes]
   );
 
+  /**
+   * Which entries the remove button must refuse (#2223): removing one that
+   * some other entry still needs would just have it reappear as a dimmed
+   * prereq row, which used to look like the removal silently did nothing.
+   */
+  const removalBlockers = useMemo(
+    () => findRemovalBlockers(editable.entries, catalog.engineSkills, trainedSkills),
+    [editable.entries, catalog.engineSkills, trainedSkills]
+  );
+
+  const removalBlockedReason = useCallback(
+    (skillTypeID: number, targetLevel: number): string | undefined => {
+      const blocker = removalBlockers.get(planEntryKey(skillTypeID, targetLevel));
+      if (!blocker) return undefined;
+      return t('plans.removeBlockedByDependent', {
+        blocker: `${nameFor(blocker.skillTypeID)} ${ROMAN[blocker.targetLevel - 1]}`,
+      });
+    },
+    [removalBlockers, nameFor, t]
+  );
+
   // Manual overrides (RemapMarkerModal), aligned to the current markers.
   const normalizedMarkerAttributes = useMemo(() => alignedMarkerAttributes(editable), [editable]);
 
@@ -955,7 +977,7 @@ export function PlanEditor({
     switch (verdict.kind) {
       case 'saves': {
         const saves = t('plans.optimizeConfirmSaves', {
-          duration: formatDuration(verdict.savingsSeconds),
+          duration: formatCountdown(verdict.savingsSeconds),
         });
         return yearlyRemapAfter ? `${saves}. ${yearlyRemapAfterNote(yearlyRemapAfter)}` : saves;
       }
@@ -1294,7 +1316,7 @@ export function PlanEditor({
               <div className="flex items-center justify-between gap-2">
                 <span className="font-semibold">{t('plans.segment', { index: index + 1 })}</span>
                 <span className="tabular-nums text-text-dim">
-                  {formatDuration(segment.seconds)}
+                  {formatCountdown(segment.seconds)}
                 </span>
               </div>
               <p className="text-text-dim">
@@ -1354,7 +1376,7 @@ export function PlanEditor({
           <div className="space-y-2 text-xs">
             {verdict.kind === 'saves' ? (
               <p className="font-semibold text-success">
-                {t('plans.remapSaves', { duration: formatDuration(verdict.savingsSeconds) })}
+                {t('plans.remapSaves', { duration: formatCountdown(verdict.savingsSeconds) })}
               </p>
             ) : (
               <p className="text-text-dim">{message}</p>
@@ -1983,6 +2005,7 @@ export function PlanEditor({
                 onReorder={handleDrop}
                 onPromotePrereq={handlePromotePrereq}
                 onRemove={requestRemoveEntry}
+                removalBlockedReason={removalBlockedReason}
                 pinnedInProgress={pinnedInProgress}
                 onRemoveMarker={handleRemoveMarker}
                 markerAttributesFor={markerAttributesFor}
@@ -2169,8 +2192,8 @@ export function PlanEditor({
           <div className="space-y-2 text-xs">
             <p className="font-semibold text-success">
               {t('plans.optimizeForMeTotal', {
-                before: formatDuration(totalSeconds),
-                after: formatDuration(optimizeForMePreview.remaps.totalSeconds),
+                before: formatCountdown(totalSeconds),
+                after: formatCountdown(optimizeForMePreview.remaps.totalSeconds),
               })}
             </p>
             <ul className="max-h-56 overflow-y-auto">

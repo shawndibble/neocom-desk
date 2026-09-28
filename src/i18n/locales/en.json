@@ -168,9 +168,12 @@
         "tiersLabel": "Mastery tiers",
         "tier": "Tier {{tier}}",
         "tierComplete": "Tier {{tier}}, complete",
+        "tierPlanned": "Tier {{tier}}, in plan",
         "tierEmpty": "This tier asks for nothing more.",
         "addTier": "Add tier {{tier}} to plan",
-        "tierTrained": "All trained"
+        "tierTrained": "All trained",
+        "tierInPlan": "In plan",
+        "tierTotalTime": "Total {{time}}"
       },
       "blueprint": {
         "none": "No blueprint — this hull isn't manufactured.",
@@ -1304,6 +1307,7 @@
     "sp": "{{value}} SP",
     "trainingChip": "Training → {{level}} · {{time}}",
     "levelOfFive": "Level {{level}} of 5",
+    "levelOfFivePlanned": "Level {{level}} of 5, planned to {{planned}}",
     "searchPlaceholder": "Search skills…",
     "noResults": "No skills match your search.",
     "noResultsHint": "Clear the search to see every skill.",
@@ -1509,6 +1513,7 @@
     "dragAnnounceCancelled": "Reordering cancelled. {{name}} stayed at its original position.",
     "dragInstructions": "To pick up an entry or remap marker, press the space bar. While dragging, use the arrow keys to move it. Press space again to drop it in its new position, or press escape to cancel. Each row's Move menu offers the same reorder without dragging.",
     "removeEntry": "Remove {{name}}",
+    "removeBlockedByDependent": "{{blocker}} still needs this level — remove {{blocker}} first.",
     "removeEntryConfirmTitle": "Remove skill",
     "removeEntryConfirm": "Remove \"{{name}}\" from this plan?",
     "removeEntryAction": "Remove",
@@ -3186,6 +3191,7 @@
       "refineAssumesNoImplantsHint": "{{character}}'s refine value is calculated without their fitted implants, so a refining implant isn't counted. Grant Character details for an accurate estimate.",
       "dateColumn": "Date",
       "typeColumn": "Type",
+      "sourceColumn": "Source",
       "totalColumn": "Total",
       "otherTypes_one": "Other ({{count}} type)",
       "otherTypes_other": "Other ({{count}} types)",

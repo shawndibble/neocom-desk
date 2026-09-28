@@ -22,6 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   EmptyState,
+  Tooltip,
   iconButtonClassName,
 } from '@/components/ui';
 import { controlHeightClassName } from '@/components/ui/controlStyles';
@@ -29,7 +30,7 @@ import * as Icon from '@/components/ui/icons';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
 import type { MilestoneState, MilestoneStatus } from '@/engine/skillPlanMilestones';
 import type { AttributeName, Attributes, Implants, PlanPriority } from '@/engine/types';
-import { formatDuration } from '@/lib/duration';
+import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { doneByText } from './doneBy';
 import type { AttributePair } from './attributePairBands';
@@ -55,8 +56,8 @@ const DANGER_ICON_BUTTON = iconButtonClassName({ size: 'sm', tone: 'danger' });
 /**
  * Every training-time cell and its desktop column header, so the two cannot
  * drift apart and leave the numbers unaligned. 6rem holds the widest duration
- * formatDuration produces ("9999d 23h 59m"); the previous 4rem ran out around
- * "99d 23h 59m", so any plan longer than a few months broke its own times
+ * formatCountdown produces ("9999d 23h"); the previous 4rem ran out around
+ * "99d 23h", so any plan longer than a few months broke its own times
  * across two lines mid-value ("123d 18h" / "58m").
  */
 const TIME_CELL = 'w-24 shrink-0 whitespace-nowrap text-right';
@@ -393,6 +394,15 @@ interface EntryRowProps {
   columns: ColumnVisibility;
   isDesktop: boolean;
   onRemove: (skillTypeID: number, targetLevel: number) => void;
+  /**
+   * Undefined when the row is freely removable. Set to a plain-language
+   * reason (naming what still needs it) when some other entry — a later
+   * level of this skill, or a dependent skill's own entry — would pull this
+   * exact level straight back in as a dimmed prereq row the instant it's
+   * removed (`findRemovalBlockers`). The remove button disables rather than
+   * accepting a click that silently undoes itself.
+   */
+  removalBlockedReason: (skillTypeID: number, targetLevel: number) => string | undefined;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
   /**
    * Set when this row IS the in-game queue's currently-training level (#1701
@@ -427,6 +437,7 @@ const EntryRow = memo(function EntryRow({
   columns,
   isDesktop,
   onRemove,
+  removalBlockedReason,
   onSetPriority,
   pinnedInProgress,
   milestoneStatus,
@@ -505,15 +516,42 @@ const EntryRow = memo(function EntryRow({
     />
   );
 
-  const removeButton = (
+  const blockedReason = removalBlockedReason(entry.skillTypeID, entry.targetLevel);
+  // `aria-disabled`, not the native attribute (DESIGN.md's `FilterChip` rule,
+  // same reasoning as `Characters.tsx`'s refresh-all button): a natively
+  // disabled button takes no hover and no focus, so the Tooltip explaining
+  // why it's inert could never be read by either route — only a stray mouse
+  // hover would work, and unreliably even then. The click still does
+  // nothing; the guard just moved from the DOM into the handler.
+  const removeButtonEl = (
     <button
       type="button"
-      className={DANGER_ICON_BUTTON}
-      onClick={() => onRemove(entry.skillTypeID, entry.targetLevel)}
+      className={
+        blockedReason
+          ? `${ICON_BUTTON} aria-disabled:cursor-default aria-disabled:opacity-40`
+          : DANGER_ICON_BUTTON
+      }
+      onClick={() => {
+        if (blockedReason) return;
+        onRemove(entry.skillTypeID, entry.targetLevel);
+      }}
       aria-label={t('plans.removeEntry', { name: rowLabel })}
+      aria-disabled={blockedReason ? true : undefined}
     >
       <Icon.Close size={Icon.ICON_SIZE.sm} aria-hidden="true" />
     </button>
+  );
+  // Tooltip only when blocked (rare relative to a long queue's row count) —
+  // every row wrapping in a Radix provider is exactly what ICON_BUTTON's own
+  // comment above says to avoid. `openOnTap`: the tap does nothing while
+  // blocked (same as `ItemPriceAlertBell`'s disabled case), so a plain tap
+  // reveals the reason instead of needing a touch-and-hold.
+  const removeButton = blockedReason ? (
+    <Tooltip content={blockedReason} openOnTap>
+      {removeButtonEl}
+    </Tooltip>
+  ) : (
+    removeButtonEl
   );
 
   /**
@@ -533,7 +571,7 @@ const EntryRow = memo(function EntryRow({
         {attributeBadge}
         {priorityControl}
         {columns.perLevelTime && (
-          <MetaValue label={t('plans.columnTakes')} value={formatDuration(takesSeconds)} />
+          <MetaValue label={t('plans.columnTakes')} value={formatCountdown(takesSeconds)} />
         )}
         {columns.cumulativeTime && (
           <MetaValue
@@ -561,7 +599,7 @@ const EntryRow = memo(function EntryRow({
           {attributeBadge}
           {priorityControl}
           {columns.perLevelTime && (
-            <TimeCell value={formatDuration(takesSeconds)} dim label={t('plans.columnTakes')} />
+            <TimeCell value={formatCountdown(takesSeconds)} dim label={t('plans.columnTakes')} />
           )}
           {columns.cumulativeTime && (
             <TimeCell
@@ -673,7 +711,7 @@ const PrereqRow = memo(function PrereqRow({
       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-6 text-[0.6875rem]">
         {attributeBadge}
         {columns.perLevelTime && (
-          <MetaValue label={t('plans.columnTakes')} value={formatDuration(row.step.seconds)} />
+          <MetaValue label={t('plans.columnTakes')} value={formatCountdown(row.step.seconds)} />
         )}
         {columns.cumulativeTime && (
           <MetaValue
@@ -698,7 +736,7 @@ const PrereqRow = memo(function PrereqRow({
           {nameSpan}
           {attributeBadge}
           {columns.perLevelTime && (
-            <TimeCell value={formatDuration(row.step.seconds)} label={t('plans.columnTakes')} />
+            <TimeCell value={formatCountdown(row.step.seconds)} label={t('plans.columnTakes')} />
           )}
           {columns.cumulativeTime && (
             <TimeCell
@@ -828,6 +866,8 @@ interface EntryListProps {
   startDate?: Date;
   onReorder: (activeId: string, overId: string) => void;
   onRemove: (skillTypeID: number, targetLevel: number) => void;
+  /** See EntryRowProps' field of the same name. */
+  removalBlockedReason: (skillTypeID: number, targetLevel: number) => string | undefined;
   onRemoveMarker: (markerIndex: number) => void;
   /** A marker's target attribute spread, once known. Undefined when no "Optimize at my markers" result covers it yet. */
   markerAttributesFor?: (markerIndex: number) => Attributes | undefined;
@@ -875,6 +915,7 @@ export function EntryList({
   startDate,
   onReorder,
   onRemove,
+  removalBlockedReason,
   onRemoveMarker,
   markerAttributesFor,
   markerImplants = EMPTY_IMPLANTS,
@@ -956,6 +997,7 @@ export function EntryList({
                       columns={columns}
                       isDesktop={isDesktop}
                       onRemove={onRemove}
+                      removalBlockedReason={removalBlockedReason}
                       onSetPriority={onSetPriority}
                       pinnedInProgress={pinnedInProgress}
                       milestoneStatus={milestoneStatusFor(

@@ -13,7 +13,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { CharacterRecord, SkillPlanRecord } from '@/db';
-import { formatDuration } from '@/lib/duration';
+import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 
 /** A plan's costed total and finish (`null` when there is nothing left to train). */
@@ -118,7 +118,7 @@ function PlanRow({
               {stats.finish === null
                 ? t('plans.listRowNothingToTrain')
                 : t('plans.listRowStats', {
-                    duration: formatDuration(stats.totalSeconds),
+                    duration: formatCountdown(stats.totalSeconds),
                     date: formatLocalDate(stats.finish),
                   })}
             </span>
