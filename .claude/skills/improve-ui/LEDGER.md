@@ -64,7 +64,7 @@ Issue number, size (tweak/rework), verdict, one line.
 - #2105 tweak, NARROW: Skill Plans list row's name span gets `title={plan.name}`; a long name has no way to be read in place otherwise.
 - #2147 tweak, NARROW: Mining Tax ledger's Payee column truncates instead of forcing the table wider than its panel; a long Payee name was pushing Status and the row's edit affordance off-screen at 1024, mirroring Market's own station-name truncation fix.
 - #2164 tweak, NARROW: Contacts has no CSV export on either tab, unlike `CorpMembers` and every other roster-shaped table; export buttons go in `PageHeader` actions beside Refresh (Calendar's and Skills' own precedent), not the filter bar — the reviewer's own narrower placement was overruled on that evidence and corrected before filing (see #2164's own Hostile review section).
-- #2165 tweak (bug), SHIP: Build Plan detail's Materials table loses its Price/Line Total columns off-screen at 1024 only (the fixed-width Costs & Revenue pane starves it); clean at 1280/1440.
+- #2165 rework (bug, ready-for-human): Build Plan detail's Materials table loses its Price/Line Total columns off-screen at 1024 only (the fixed-width Costs & Revenue pane starves it by ~189px); clean at 1280/1440. The underlying bug shipped hostile review; narrowing Costs & Revenue alone doesn't close the gap without starving it in turn, so the ticket hands a human two named directions (move the split to `xl`, or drop a Materials column at `lg`) rather than picking one.
 
 ## Killed findings
 
