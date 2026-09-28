@@ -86,10 +86,11 @@ export function FittingCompare() {
   );
 
   function addCode(code: string) {
-    setCodes([...codes, code].slice(0, MAX_COMPARE_SLOTS));
+    setCodes((prev) => [...prev, code].slice(0, MAX_COMPARE_SLOTS));
   }
   function removeSlot(index: number) {
-    setCodes(codes.filter((_, i) => i !== index));
+    // Pending adds only ever append, so a rendered index still names the same slot in `prev`.
+    setCodes((prev) => prev.filter((_, i) => i !== index));
   }
 
   const anyError = slots.some((slot) => slot?.shareError);
