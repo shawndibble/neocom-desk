@@ -60,6 +60,18 @@ export const LAZY_SECTIONS: readonly string[] = [
   'loyalty',
 ];
 
+/**
+ * Modules, relative to `src/`, that load at boot: the entry, plus the shell
+ * pieces that load right behind it even when they are split into chunks of
+ * their own (the signed-in Layout and its index route). Everything they
+ * statically reach names keys that belong in the shell.
+ */
+export const STARTUP_ROOTS: readonly string[] = [
+  'main.tsx',
+  'app/Layout.tsx',
+  'routes/Overview.tsx',
+];
+
 /** Every leaf key under `sections`, dot-joined (`market.orders.buy`). */
 export function leafPaths(tree: LocaleTree, sections: readonly string[]): string[] {
   const out: string[] = [];
@@ -125,6 +137,16 @@ export function referencedLeaves(
   return found;
 }
 
+/** 32-bit FNV-1a, hex: a short id that depends only on its input. */
+function fnv1a(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
 function getLeaf(tree: LocaleTree, path: string): string {
   let node: string | LocaleTree = tree;
   for (const key of path.split('.')) node = (node as LocaleTree)[key];
@@ -164,7 +186,7 @@ export interface LocalePlan {
 
 /**
  * `startupFiles` are the modules that load at boot anyway
- * (`staticImportClosure` from the entry). A key any of them names stays in the
+ * (`staticImportClosure` from `STARTUP_ROOTS`). A key any of them names stays in the
  * shell rather than becoming a group: at startup a group would only be one
  * more tiny chunk to fetch, since its importers are spread across the
  * startup graph's many small chunks.
@@ -199,8 +221,13 @@ export function planLocaleSplit(
   const shell = structuredClone(en);
   const groups = new Map<string, LocaleTree>();
   const importsByFile = new Map<string, string[]>();
-  [...bySignature.keys()].sort().forEach((signature, index) => {
-    const id = `locale-${index}`;
+  const taken = new Set<string>();
+  [...bySignature.keys()].sort().forEach((signature) => {
+    // Named for the files that import it, not its position: a key added
+    // elsewhere must not rename (and so re-hash) every later group's chunk.
+    let id = `locale-${fnv1a(signature.replace(/^.*?\/src\//gm, 'src/'))}`;
+    while (taken.has(id)) id += 'x';
+    taken.add(id);
     const tree: LocaleTree = {};
     for (const leaf of bySignature.get(signature)!) {
       setLeaf(tree, leaf, getLeaf(en, leaf));
@@ -226,7 +253,7 @@ export function planLocaleSplit(
  */
 export function staticImportClosure(
   sources: Readonly<Record<string, string>>,
-  entry: string,
+  entries: readonly string[],
   srcRoot: string
 ): Set<string> {
   const specifiers = (code: string) => {
@@ -257,8 +284,8 @@ export function staticImportClosure(
     }
     return undefined;
   };
-  const seen = new Set<string>([entry]);
-  const queue = [entry];
+  const seen = new Set<string>(entries);
+  const queue = [...entries];
   while (queue.length > 0) {
     const file = queue.shift()!;
     for (const specifier of specifiers(sources[file] ?? '')) {

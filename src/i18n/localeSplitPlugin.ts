@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { normalizePath, type Plugin } from 'vite';
 import {
   LAZY_SECTIONS,
+  STARTUP_ROOTS,
   planLocaleSplit,
   staticImportClosure,
   type LocalePlan,
@@ -87,7 +88,11 @@ export function localeSplitPlugin(): Plugin {
         JSON.parse(readFileSync(en, 'utf8')) as LocaleTree,
         scanned,
         LAZY_SECTIONS,
-        staticImportClosure(sources, `${srcDir}/main.tsx`, srcDir)
+        staticImportClosure(
+          sources,
+          STARTUP_ROOTS.map((file) => `${srcDir}/${file}`),
+          srcDir
+        )
       );
     },
     resolveId(source, importer) {
@@ -124,7 +129,12 @@ export function localeSplitPlugin(): Plugin {
       const chunks = Object.values(bundle).filter((o) => o.type === 'chunk');
       const byName = new Map(chunks.map((c) => [c.fileName, c]));
       const startup = new Set<string>();
-      const queue = chunks.filter((c) => c.isEntry).map((c) => c.fileName);
+      const roots = new Set(STARTUP_ROOTS.map((file) => normalizePath(join(root, 'src', file))));
+      const queue = chunks
+        .filter(
+          (c) => c.isEntry || (c.facadeModuleId && roots.has(normalizePath(c.facadeModuleId)))
+        )
+        .map((c) => c.fileName);
       while (queue.length > 0) {
         const name = queue.pop()!;
         if (startup.has(name)) continue;

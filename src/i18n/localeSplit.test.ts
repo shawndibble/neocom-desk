@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import en from './locales/en.json';
 import {
   LAZY_SECTIONS,
+  STARTUP_ROOTS,
   leafPaths,
   planLocaleSplit,
   referencedLeaves,
@@ -144,6 +145,25 @@ describe('planLocaleSplit', () => {
   });
 });
 
+describe('group ids', () => {
+  it('do not shift when an unrelated key gains or loses a group', () => {
+    const before = planLocaleSplit(EN, {
+      '/src/A.tsx': `t('market.title')`,
+      '/src/B.tsx': `t('market.orders.buy')`,
+      '/src/C.tsx': `t('industry.title')`,
+    });
+    const after = planLocaleSplit(EN, {
+      '/src/A.tsx': `t('market.title')`,
+      '/src/AA.tsx': `t('market.orders.sell')`,
+      '/src/B.tsx': `t('market.orders.buy')`,
+      '/src/C.tsx': `t('industry.title')`,
+    });
+    for (const file of ['/src/A.tsx', '/src/B.tsx', '/src/C.tsx']) {
+      expect(after.importsByFile.get(file)).toEqual(before.importsByFile.get(file));
+    }
+  });
+});
+
 describe('planLocaleSplit with startup files', () => {
   it('keeps every key a startup file names in the shell, so no group loads at boot', () => {
     const plan = planLocaleSplit(
@@ -180,13 +200,19 @@ describe('staticImportClosure', () => {
   };
 
   it('follows static value imports and re-exports, not type-only or dynamic ones', () => {
-    expect([...staticImportClosure(sources, '/src/main.tsx', '/src')].sort()).toEqual([
+    expect([...staticImportClosure(sources, ['/src/main.tsx'], '/src')].sort()).toEqual([
       '/src/b.ts',
       '/src/c.tsx',
       '/src/i18n/index.ts',
       '/src/lib/a.ts',
       '/src/main.tsx',
     ]);
+  });
+
+  it('walks from every root it is given', () => {
+    expect(
+      staticImportClosure(sources, ['/src/main.tsx', '/src/routes/Page.tsx'], '/src')
+    ).toContain('/src/routes/d.ts');
   });
 });
 
@@ -201,10 +227,12 @@ describe('the real en.json against the real sources', () => {
   const sources = Object.fromEntries(
     Object.entries(all).filter(([file]) => !file.startsWith('/src/i18n/'))
   );
-  const startup = staticImportClosure(all, '/src/main.tsx', '/src');
+  const roots = STARTUP_ROOTS.map((root) => `/src/${root}`);
+  const startup = staticImportClosure(all, roots, '/src');
   const plan = planLocaleSplit(en as LocaleTree, sources, LAZY_SECTIONS, startup);
 
-  it('walks the real startup graph', () => {
+  it('walks the real startup graph from roots that all exist', () => {
+    for (const root of roots) expect(Object.keys(all)).toContain(root);
     expect(startup).toContain('/src/i18n/index.ts');
     expect(startup).toContain('/src/app/App.tsx');
   });
