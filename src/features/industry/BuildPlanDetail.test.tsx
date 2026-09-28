@@ -202,6 +202,8 @@ interface HarnessProps {
   onDerivedFix?: (patch: PlanPatch) => void;
   corpOwnedStock?: Partial<CorpOwnedStockState>;
   corpOwnedBlueprints?: Partial<CorpOwnedBlueprintsState>;
+  /** Fields layered over the held plan on every render — stands in for a change arriving from elsewhere (another device's sync). */
+  externalPlan?: Partial<BuildPlanRecord>;
 }
 
 const CORP_OWNED_STOCK_UNAVAILABLE: CorpOwnedStockState = {
@@ -224,8 +226,10 @@ function Harness({
   onDerivedFix,
   corpOwnedStock,
   corpOwnedBlueprints,
+  externalPlan,
 }: HarnessProps) {
-  const [plan, setPlan] = useState<BuildPlanRecord>(makePlan(planOverrides));
+  const [heldPlan, setPlan] = useState<BuildPlanRecord>(makePlan(planOverrides));
+  const plan = externalPlan ? { ...heldPlan, ...externalPlan } : heldPlan;
   return (
     <MemoryRouter>
       <FakeItemActions>
@@ -329,6 +333,158 @@ describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
     await user.tab();
 
     expect(onUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('BuildPlanDetail edits pending at unmount', () => {
+  it('commits a typed Runs draft when the page unmounts mid-edit', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    const { unmount } = render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.clear(runsInput());
+    await user.type(runsInput(), '40');
+    unmount();
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith({ runs: 40 });
+  });
+
+  it('does not commit again at unmount after a blur already committed', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    const { unmount } = render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.clear(runsInput());
+    await user.type(runsInput(), '40');
+    await user.tab();
+    unmount();
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('commits nothing at unmount for an unparseable or emptied draft', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    const { unmount } = render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.clear(runsInput());
+    await user.type(runsInput(), 'abc');
+    unmount();
+
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('BuildPlanDetail facility tax fields', () => {
+  const taxInput = () => screen.getByRole('textbox', { name: 'Facility tax %' });
+
+  it('keeps every typed character and commits once on blur, not per keystroke', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={{ facility: 'raitaru', facilityTaxPct: 1 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.clear(taxInput());
+    await user.type(taxInput(), '12.75');
+
+    expect(valueOf(taxInput())).toBe('12.75');
+    expect(onUpdate).not.toHaveBeenCalled();
+
+    await user.tab();
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith({ facilityTaxPct: 12.75 });
+  });
+
+  it.each([
+    ['2,5', 2.5],
+    ['2,75', 2.75],
+    ['150', 100],
+  ])('reads %s as %s', async (typed, expected) => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={{ facility: 'raitaru', facilityTaxPct: 1 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.clear(taxInput());
+    await user.type(taxInput(), typed);
+    await user.tab();
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith({ facilityTaxPct: expected });
+  });
+
+  it('commits on Enter', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={{ facility: 'raitaru', facilityTaxPct: 1 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.clear(taxInput());
+    await user.type(taxInput(), '3{Enter}');
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith({ facilityTaxPct: 3 });
+  });
+
+  it('reverts a cleared field on blur without writing', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={{ facility: 'raitaru', facilityTaxPct: 2.5 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.clear(taxInput());
+    await user.tab();
+
+    expect(valueOf(taxInput())).toBe('2.5');
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('shows a change made elsewhere while the field is not being edited', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Harness plan={{ facility: 'raitaru', facilityTaxPct: 1 }} />);
+    await openSetup(user);
+
+    rerender(<Harness plan={{ facility: 'raitaru' }} externalPlan={{ facilityTaxPct: 7.5 }} />);
+
+    expect(valueOf(taxInput())).toBe('7.5');
+  });
+
+  it('keeps a half-typed draft when a change arrives mid-edit', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Harness plan={{ facility: 'raitaru', facilityTaxPct: 1 }} />);
+    await openSetup(user);
+
+    await user.clear(taxInput());
+    await user.type(taxInput(), '3.');
+    rerender(<Harness plan={{ facility: 'raitaru' }} externalPlan={{ facilityTaxPct: 7.5 }} />);
+
+    expect(valueOf(taxInput())).toBe('3.');
+  });
+
+  it('commits the reaction facility tax once on blur', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(
+      <Harness
+        plan={{ runs: 10, includeReactions: true, reactionFacility: 'tatara' }}
+        onUpdate={onUpdate}
+      />
+    );
+    await openSetup(user);
+
+    const reactionTax = await screen.findByRole('textbox', { name: 'Facility tax %' });
+    await user.clear(reactionTax);
+    await user.type(reactionTax, '4.25');
+    expect(onUpdate).not.toHaveBeenCalled();
+    await user.tab();
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith({ reactionFacilityTaxPct: 4.25 });
   });
 });
 

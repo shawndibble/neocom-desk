@@ -14,6 +14,7 @@ import { DEFAULT_ASSET_SORT, useAssetSort } from '@/features/character/assetSort
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { configureClipboard } from '@/lib/clipboard';
 import { App } from '@/app/App';
+import { downloadCsv } from '@/lib/downloadCsv';
 import type { TypeMap } from '@/sde/types';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -50,6 +51,9 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadGlobalMarkets: vi.fn(async () => []),
   loadAttributeDictionary: vi.fn(async () => new Map()),
 }));
+
+// The CSV export test reads the rows handed to the download rather than a file.
+vi.mock('@/lib/downloadCsv', () => ({ downloadCsv: vi.fn() }));
 
 const CHAR_ID = 91;
 const JITA = 'Jita IV - Moon 4 - Caldari Navy Assembly Plant';
@@ -1157,6 +1161,28 @@ describe('cross-character search (issue #85)', () => {
 
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(screen.getByText(/CSV export only includes this character/i)).toBeInTheDocument();
+  });
+
+  it('exports only what the search matches, and disables export when nothing does', async () => {
+    vi.mocked(downloadCsv).mockClear();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText(JITA);
+
+    await user.type(screen.getByPlaceholderText(/search items/i), 'tritanium');
+    await screen.findByText('Tritanium');
+    const exportButton = screen.getByRole('button', { name: 'Export CSV' });
+    await waitFor(() => expect(exportButton).toBeEnabled());
+    await user.click(exportButton);
+
+    expect(downloadCsv).toHaveBeenCalledTimes(1);
+    const rows = JSON.stringify(vi.mocked(downloadCsv).mock.calls[0][1]);
+    expect(rows).toContain('Tritanium');
+    expect(rows).not.toContain('Pyerite');
+
+    await user.clear(screen.getByPlaceholderText(/search items/i));
+    await user.type(screen.getByPlaceholderText(/search items/i), 'no such item');
+    await waitFor(() => expect(exportButton).toBeDisabled());
   });
 });
 
