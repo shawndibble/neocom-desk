@@ -98,7 +98,12 @@ describe('mergeRosterCore', () => {
         data: {
           total_sp: 5000,
           skills: [
-            { skill_id: 3387, trained_skill_level: 4, active_skill_level: 4, skillpoints_in_skill: 0 },
+            {
+              skill_id: 3387,
+              trained_skill_level: 4,
+              active_skill_level: 4,
+              skillpoints_in_skill: 0,
+            },
           ],
         },
         fetchedAt: new Date('2026-01-01T00:00:00Z'),
@@ -113,7 +118,12 @@ describe('mergeRosterCore', () => {
 
     // A "Refresh all" pass where this character's /skills call failed:
     // `entry.skills` comes back null, but the character isn't dropped.
-    const failedRefresh = entry({ characterId: 1, name: 'A', skills: null, correctedTotalSp: null });
+    const failedRefresh = entry({
+      characterId: 1,
+      name: 'A',
+      skills: null,
+      correctedTotalSp: null,
+    });
     const merged = mergeRosterCore(previous, failedRefresh, NOW);
 
     expect(merged.get(1)?.totalSp).toBe(5000);
