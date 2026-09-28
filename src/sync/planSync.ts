@@ -105,6 +105,15 @@ const SETTINGS_META_KEY = `${INTERNAL_PREFIX}settingsMeta`;
 // one character's sync must be visible on every other character's pass.
 const SETTINGS_TOMBSTONES_KEY = `${INTERNAL_PREFIX}settingsTombstones`;
 
+/**
+ * Smallest gap between two `lastSyncedAt` heartbeat writes for one uid. Its
+ * one reader, `functions/src/purgeStaleAccounts.ts`, purges after 90 days
+ * without one, so a day's granularity costs it nothing.
+ */
+export const HEARTBEAT_INTERVAL_MS = 24 * 3_600_000;
+/** Device-local: when this device last wrote the heartbeat, per uid. */
+const HEARTBEAT_KEY_PREFIX = `${INTERNAL_PREFIX}heartbeatAt.`;
+
 function isSyncedSettingKey(key: string): boolean {
   return key.startsWith(SYNCED_PREFIX) && !key.startsWith(INTERNAL_PREFIX);
 }
@@ -1080,9 +1089,16 @@ async function syncCharacter(characterId: number): Promise<void> {
   // Heartbeat (issue #2065): stamped only once every collection above synced,
   // so the scheduled purge of accounts idle for 90 days sees an account that
   // syncs daily without edits as active. The rules allow this one field only.
-  await setDoc(
-    doc(collection(firestore, 'characters'), uid),
-    { lastSyncedAt: now },
-    { merge: true }
-  );
+  // That purge is its only reader, so it is throttled to one write a day
+  // rather than one per sync (every mutation and every background sweep).
+  const heartbeatKey = `${HEARTBEAT_KEY_PREFIX}${uid}`;
+  const lastHeartbeat = (await db.settings.get(heartbeatKey))?.value;
+  if (typeof lastHeartbeat !== 'number' || now - lastHeartbeat >= HEARTBEAT_INTERVAL_MS) {
+    await setDoc(
+      doc(collection(firestore, 'characters'), uid),
+      { lastSyncedAt: now },
+      { merge: true }
+    );
+    await db.settings.put({ key: heartbeatKey, value: now });
+  }
 }
