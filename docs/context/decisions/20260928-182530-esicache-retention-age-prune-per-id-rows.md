@@ -17,8 +17,19 @@ _Recorded 2026-09-28._
   30x their window. Market rows (`marketPrice:`, `market-history:`,
   `structure-market:`, `marketHistory:`) go stale in 5–15 minutes, so a week
   is still generous. A new `marketHistory:<start>:<end>` key appears every
-  day. Every reader of these keys refetches on a miss, so a pruned row costs
-  at most one lookup if it is ever wanted again.
+  day. Every allowlisted key has a loader that refetches on a miss, so a
+  pruned row costs at most one lookup if it is ever wanted again. Keys that
+  some reader consults cache-only, with nothing to refill them, are excluded
+  instead (below).
+
+- **Age is the last successful fetch, not the last read.** A row served from
+  cache does not get younger. A row whose refresh keeps failing can be pruned
+  while still in use, and then shows its raw id until a fetch succeeds. One
+  example is a `/universe/names` batch that ESI rejects because of one invalid
+  id. Accepted: 30 days of failed refreshes is already a broken lookup. Also
+  `group:` rows: `loadGroupNames` fetches only missing ids and never refreshes
+  a cached one, so a group name in steady use is dropped and refetched once
+  every 30 days. That costs one GET per group.
 
 - **Mail bodies, calendar event details and contract items stay while their
   list still points at them.** `mail:<id>`, `calendar:<id>` and
@@ -28,9 +39,13 @@ _Recorded 2026-09-28._
   the id has dropped off the list, the row is unreachable from the UI and is
   pruned like any static row.
 
-- **PI rows, `corp:` rows and citadel names are excluded.** The alt-colony
-  view reads `planet:`, `planet-info:` and `schematic:` cache-only, and those
-  are bounded by the roster's colonies. Corp-owned rows already have their own
+- **Cache-only rows (PI, `system:`, citadel names) and `corp:` rows are
+  excluded.** The alt-colony view reads `planet:`, `planet-info:` and
+  `schematic:` cache-only, and those are bounded by the roster's colonies.
+  The PI Advisor reads an alt colony's system security cache-only
+  (`readCachedSystemSecurity`). A pruned lowsec or nullsec `system:` row would
+  read as highsec and apply the wrong customs rates, and nothing would refill
+  it. `system:` is bounded by the ~8k systems anyway. Corp-owned rows already have their own
   purge path (`purgeCorpScopedCache`). A citadel's `structure:<id>` row is
   ACL-gated: once a Character loses access, every refetch is a 403 that never
   rewrites it, so a pruned name could never come back. Only its 24-hour
@@ -44,6 +59,8 @@ _Recorded 2026-09-28._
 - **Ages come from `esiCacheMeta` (#2247), never from values.** No schema
   bump: meta is scanned in primary-key pages. Rows with no meta were written
   before that table existed. They are pruned by key once the persisted
-  first-run stamp is older than the rule's window. Deletes go in chunks of
+  first-run stamp is older than the rule's window. That key-only scan stops
+  for good once a run finds no allowlisted meta-less row, because none can
+  appear later. Deletes go in chunks of
   200, each in a short transaction that re-reads the chunk's meta first. A
   row refreshed after the scan is left alone.

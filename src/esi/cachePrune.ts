@@ -9,10 +9,15 @@
  * for the life of the install — storage-quota pressure, and eviction under
  * pressure would take the refresh tokens in the same database with it.
  *
- * The rule: an allowlisted per-id row whose `fetchedAt` is older than a
- * generous multiple of its staleness window is dropped. Any reader of these
- * keys refetches on a miss, so a pruned row costs at most one lookup if it is
- * ever wanted again. Scope decision:
+ * The rule: an allowlisted per-id row whose `fetchedAt` — its last
+ * *successful* fetch, not its last read — is older than a generous multiple
+ * of its staleness window is dropped. Every allowlisted key has a loader that
+ * refetches on a miss, so a pruned row costs at most one lookup if it is ever
+ * wanted again. Keys some reader consults cache-only, with nothing to refill
+ * them, are left off the allowlist instead: `system:` (the PI Advisor's alt
+ * colonies read security cache-only — a pruned lowsec system would read as
+ * highsec), PI's `planet:`/`planet-info:`/`schematic:`, and a citadel's
+ * ACL-gated `structure:<id>` name. Scope decision:
  * docs/context/decisions/20260928-182530-esicache-retention-age-prune-per-id-rows.md.
  *
  * Cost shape: ages come from `esiCacheMeta` (value-free, see
@@ -41,6 +46,12 @@ export const PRUNE_LAST_RUN_KEY = 'esiCache.pruneLastRun';
  * than a rule's window, a meta-less row under that rule is too.
  */
 export const PRUNE_FIRST_RUN_KEY = 'esiCache.pruneFirstRun';
+/**
+ * Set once a run finds no allowlisted row without meta. None can appear after
+ * that — every write since `esiCacheMeta` existed carries meta — so the
+ * key-only scan of the whole table stops running daily forever.
+ */
+export const PRUNE_LEGACY_CLEARED_KEY = 'esiCache.pruneLegacyCleared';
 
 interface Reference {
   /** The same Character's list row that can still point at this id. */
@@ -60,9 +71,10 @@ export interface PruneRule {
 /**
  * The allowlist. A key matching nothing here is never pruned. Deliberately
  * absent: every single-row-per-Character key, anything under `corp:` (its own
- * purge path), a citadel's `structure:<id>` name (see its rule), and PI's
- * `planet:`/`planet-info:`/`schematic:` — the alt-colony view reads those
- * cache-only, and they are bounded by colonies.
+ * purge path), a citadel's `structure:<id>` name (see its rule), `system:`
+ * (read cache-only for alt colonies' security; bounded by ~8k systems), and
+ * PI's `planet:`/`planet-info:`/`schematic:` — the alt-colony view reads
+ * those cache-only, and they are bounded by colonies.
  */
 export const PRUNE_RULES: readonly PruneRule[] = [
   ...[
@@ -75,7 +87,6 @@ export const PRUNE_RULES: readonly PruneRule[] = [
     'public-alliance',
     'public-employment',
     'station',
-    'system',
     'universeType',
     'type-volume',
     'corp-name',
@@ -136,6 +147,8 @@ export interface PruneOptions {
   scanPageSize?: number;
   /** Awaited before each delete chunk: the yield point (and a test seam). */
   beforeChunk?: () => Promise<unknown>;
+  /** Called when the meta-less scan ran and found no allowlisted row at all. */
+  onNoLegacyRows?: () => Promise<unknown>;
 }
 
 const yieldToMainThread = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -170,20 +183,38 @@ async function scanMeta(
   }
 }
 
-/** Key-only: `primaryKeys()` walks a key cursor, never a value. */
+/**
+ * Key-only, in pages: `primaryKeys()` walks a key cursor, never a value.
+ * Resolves to how many allowlisted meta-less rows exist (eligible or not),
+ * or `null` when no rule's window has passed yet and nothing was scanned.
+ */
 async function scanMetaless(
   now: number,
   firstRunAt: number,
+  pageSize: number,
   seen: Set<string>,
   candidates: Candidate[]
-): Promise<void> {
+): Promise<number | null> {
   const age = now - firstRunAt;
-  if (!PRUNE_RULES.some((rule) => age > rule.maxAgeMs)) return;
-  const ids = (await db.esiCache.toCollection().primaryKeys()) as CacheKey[];
-  for (const id of ids) {
-    if (seen.has(tupleId(id))) continue;
-    const rule = pruneRuleFor(id[1]);
-    if (rule && age > rule.maxAgeMs) candidates.push({ id, rule, metaless: true });
+  if (!PRUNE_RULES.some((rule) => age > rule.maxAgeMs)) return null;
+  let found = 0;
+  let last: CacheKey | undefined;
+  for (;;) {
+    const page = (await (
+      last === undefined ? db.esiCache.orderBy(':id') : db.esiCache.where(':id').above(last)
+    )
+      .limit(pageSize)
+      .primaryKeys()) as CacheKey[];
+    for (const id of page) {
+      if (seen.has(tupleId(id))) continue;
+      const rule = pruneRuleFor(id[1]);
+      if (!rule) continue;
+      found += 1;
+      if (age > rule.maxAgeMs) candidates.push({ id, rule, metaless: true });
+    }
+    if (page.length < pageSize) return found;
+    last = page[page.length - 1];
+    await yieldToMainThread();
   }
 }
 
@@ -261,7 +292,10 @@ export async function pruneEsiCache(options: PruneOptions): Promise<number> {
   const candidates: Candidate[] = [];
   const seen = new Set<string>();
   await scanMeta(now, scanPageSize, candidates, seen);
-  if (firstRunAt !== undefined) await scanMetaless(now, firstRunAt, seen, candidates);
+  if (firstRunAt !== undefined) {
+    const legacy = await scanMetaless(now, firstRunAt, scanPageSize, seen, candidates);
+    if (legacy === 0) await options.onNoLegacyRows?.();
+  }
 
   const doomed = await withoutReferenced(candidates);
   let deleted = 0;
@@ -275,18 +309,22 @@ export async function pruneEsiCache(options: PruneOptions): Promise<number> {
 /**
  * Claims today's run: read-compare-write in one transaction, so two tabs
  * booting together cannot both run. Stamped at the start, so a run that
- * throws does not retry on every boot. Resolves to the first-run stamp, or
+ * throws does not retry on every boot. Resolves to the first-run stamp
+ * (`undefined` once legacy rows are cleared: nothing left to scan for), or
  * `null` when a run already happened inside the interval.
  */
-function claimRun(now: number): Promise<number | null> {
+function claimRun(now: number): Promise<{ firstRunAt: number | undefined } | null> {
   return db.transaction('rw', db.settings, async () => {
     const last = (await db.settings.get(PRUNE_LAST_RUN_KEY))?.value;
     if (typeof last === 'number' && now - last < PRUNE_MIN_INTERVAL_MS) return null;
     await db.settings.put({ key: PRUNE_LAST_RUN_KEY, value: now });
+    if ((await db.settings.get(PRUNE_LEGACY_CLEARED_KEY))?.value === true) {
+      return { firstRunAt: undefined };
+    }
     const first = (await db.settings.get(PRUNE_FIRST_RUN_KEY))?.value;
-    if (typeof first === 'number') return first;
+    if (typeof first === 'number') return { firstRunAt: first };
     await db.settings.put({ key: PRUNE_FIRST_RUN_KEY, value: now });
-    return now;
+    return { firstRunAt: now };
   });
 }
 
@@ -298,7 +336,11 @@ function claimRun(now: number): Promise<number | null> {
 export async function runDailyEsiCachePrune(): Promise<number | null> {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return null;
   const now = Date.now();
-  const firstRunAt = await claimRun(now);
-  if (firstRunAt === null) return null;
-  return pruneEsiCache({ now, firstRunAt });
+  const claim = await claimRun(now);
+  if (claim === null) return null;
+  return pruneEsiCache({
+    now,
+    firstRunAt: claim.firstRunAt,
+    onNoLegacyRows: () => db.settings.put({ key: PRUNE_LEGACY_CLEARED_KEY, value: true }),
+  });
 }

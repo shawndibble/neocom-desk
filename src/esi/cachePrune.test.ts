@@ -11,6 +11,7 @@ import { db } from '@/db';
 import {
   MARKET_RETENTION_MS,
   PRUNE_FIRST_RUN_KEY,
+  PRUNE_LEGACY_CLEARED_KEY,
   PRUNE_LAST_RUN_KEY,
   PRUNE_MIN_INTERVAL_MS,
   STATIC_RETENTION_MS,
@@ -43,6 +44,7 @@ beforeEach(async () => {
   await db.esiCache.clear();
   await db.settings.delete(PRUNE_LAST_RUN_KEY);
   await db.settings.delete(PRUNE_FIRST_RUN_KEY);
+  await db.settings.delete(PRUNE_LEGACY_CLEARED_KEY);
 });
 
 afterEach(() => {
@@ -63,7 +65,6 @@ describe('pruneRuleFor', () => {
     'structure:1035466617946:forbidden',
     'structure:1035466617946:roster-forbidden',
     'station:60003760',
-    'system:30000142',
     'route:30000142:30002187:shortest',
     'universeType:34',
     'type-volume:34',
@@ -112,6 +113,8 @@ describe('pruneRuleFor', () => {
     'planet:40000001',
     'planet-info:40000001',
     'schematic:66',
+    // Read cache-only (PI Advisor's alt colonies): nothing would refill it.
+    'system:30000142',
     // A citadel's name: ACL-gated, so a refetch after losing access is a 403.
     'structure:1035466617946',
     // Near misses of allowlisted prefixes.
@@ -145,6 +148,16 @@ describe('pruneEsiCache', () => {
     await pruneEsiCache({ now: NOW });
 
     expect(await db.esiCacheMeta.get([G, 'name:1'])).toBeUndefined();
+  });
+
+  it('keeps the rows a cache-only reader depends on, however old', async () => {
+    const ancient = NOW - 900 * DAY;
+    for (const key of ['system:30000142', 'planet:4', 'planet-info:4', 'structure:5']) {
+      await seed(G, key, ancient);
+    }
+
+    expect(await pruneEsiCache({ now: NOW, firstRunAt: 0 })).toBe(0);
+    expect(await keys()).toHaveLength(4);
   });
 
   it('never deletes single-row-per-character keys, however old', async () => {
@@ -252,6 +265,18 @@ describe('pruneEsiCache', () => {
   });
 
   describe('rows without meta (written before esiCacheMeta existed)', () => {
+    it('are scanned in key pages', async () => {
+      for (let i = 0; i < 7; i += 1) await seedWithoutMeta(G, `name:${i}`, 0);
+
+      const deleted = await pruneEsiCache({
+        now: NOW,
+        firstRunAt: NOW - STATIC_RETENTION_MS - 1,
+        scanPageSize: 3,
+      });
+
+      expect(deleted).toBe(7);
+    });
+
     it('are skipped until the first run is older than the window', async () => {
       await seedWithoutMeta(G, 'name:1', 0);
 
@@ -325,6 +350,23 @@ describe('runDailyEsiCachePrune', () => {
     expect(await runDailyEsiCachePrune()).toBeNull();
     expect(await keys()).toHaveLength(1);
     expect(await db.settings.get(PRUNE_LAST_RUN_KEY)).toBeUndefined();
+  });
+
+  it('stops scanning for meta-less rows once a run finds none left', async () => {
+    await db.settings.put({ key: PRUNE_FIRST_RUN_KEY, value: NOW - STATIC_RETENTION_MS - 1 });
+    await seedWithoutMeta(G, 'name:1', 0);
+    await runDailyEsiCachePrune();
+    // That run still had one to delete, so the flag waits for the next.
+    expect(await db.settings.get(PRUNE_LEGACY_CLEARED_KEY)).toBeUndefined();
+
+    vi.spyOn(Date, 'now').mockReturnValue(NOW + PRUNE_MIN_INTERVAL_MS + 1);
+    await runDailyEsiCachePrune();
+    expect((await db.settings.get(PRUNE_LEGACY_CLEARED_KEY))?.value).toBe(true);
+
+    const primaryKeys = vi.spyOn(db.esiCache, 'orderBy');
+    vi.spyOn(Date, 'now').mockReturnValue(NOW + 2 * PRUNE_MIN_INTERVAL_MS + 2);
+    await runDailyEsiCachePrune();
+    expect(primaryKeys).not.toHaveBeenCalled();
   });
 
   it('applies the meta-less rule from the persisted first run', async () => {
