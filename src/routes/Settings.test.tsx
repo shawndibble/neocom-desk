@@ -1304,7 +1304,16 @@ describe('Settings — Notifications virtualization (issue #740)', () => {
     const panel = within(await notificationsPanel());
     await panel.findByText('Pilot 000');
 
-    const mailCheckbox = await panel.findByRole('checkbox', {
+    // Wait for the enabled checkbox, then query it fresh: a disabled one sits
+    // inside a Tooltip wrapper, so the flip to enabled (scopes arriving)
+    // remounts the input. A click on the detached node flips its native
+    // `checked` without reaching React — the CI flake this guards against.
+    await waitFor(() =>
+      expect(
+        panel.getByRole('checkbox', { name: 'New Mail, device notifications' })
+      ).not.toHaveAttribute('aria-disabled')
+    );
+    const mailCheckbox = panel.getByRole('checkbox', {
       name: 'New Mail, device notifications',
     });
     await user.click(mailCheckbox);
