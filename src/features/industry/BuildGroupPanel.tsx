@@ -854,6 +854,9 @@ export function BuildGroupPanel({
                 rowKey={(material) => material.typeID}
                 label={t('industry.groupMaterials')}
                 density="compact"
+                // Five figures broke to a 5-line stack at 390px; pair two per line,
+                // same fix as MaterialsTable's single-plan buy table.
+                stackColumns={2}
                 mobileSort
               />
             </div>
