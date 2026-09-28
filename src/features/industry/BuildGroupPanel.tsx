@@ -748,7 +748,9 @@ export function BuildGroupPanel({
                       onClick={() => onOpenPlan(plan.id)}
                       className={`${tappableRowClassName} flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
                     >
-                      <span className="truncate">{plan.name}</span>
+                      <span className="truncate" title={plan.name}>
+                        {plan.name}
+                      </span>
                       <span className="shrink-0 tabular-nums text-text-dim">
                         {row?.result ? (
                           // Long press, not tap: the whole row is a button
