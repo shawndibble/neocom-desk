@@ -797,12 +797,29 @@ async function readFreshRow<T>(
     void dropOrphanMeta(characterId, key);
     return null;
   }
+  // Meta that does not describe this row — rewritten behind the middleware's
+  // back (raw IndexedDB, a bundle from before it) — has no say: the row's own
+  // age decides, and meta is realigned to it.
+  const own = metaVouchesFor(meta, row) ? meta : metaOf(row);
+  if (own !== meta) {
+    void realignMeta(row, meta);
+    if (!isWithinWindow(own, staleAfterMs, Date.now())) return null;
+  }
   return {
     data: row.value as T,
-    fetchedAt: new Date(meta.fetchedAt),
+    fetchedAt: new Date(own.fetchedAt),
     fromCache: false,
-    truncated: meta.truncated === true,
+    truncated: own.truncated === true,
   };
+}
+
+/**
+ * Whether meta speaks for this value row: written with it (same `fetchedAt`),
+ * or moved forward since by a 304 that named the row's own ETag.
+ */
+function metaVouchesFor(meta: EsiCacheMetaRecord, row: EsiCacheRecord): boolean {
+  if (meta.fetchedAt === row.fetchedAt) return true;
+  return row.etag !== undefined && meta.etag === row.etag && meta.fetchedAt > row.fetchedAt;
 }
 
 /**
@@ -1035,12 +1052,34 @@ async function readMetaOrRow(
 
 /** Never rejects: a failed backfill only means the next read takes the legacy path again. */
 async function backfillMeta(row: EsiCacheRecord): Promise<void> {
+  await writeMetaFor(row, (current) => current === undefined);
+}
+
+/**
+ * Replace meta that no longer describes its row (see `metaVouchesFor`) —
+ * only if it is still the meta that was judged, so a row rewritten since
+ * (whose write brought its own meta) keeps it. Never rejects.
+ */
+async function realignMeta(row: EsiCacheRecord, judged: EsiCacheMetaRecord): Promise<void> {
+  await writeMetaFor(
+    row,
+    (current) =>
+      current !== undefined &&
+      current.fetchedAt === judged.fetchedAt &&
+      current.etag === judged.etag
+  );
+}
+
+async function writeMetaFor(
+  row: EsiCacheRecord,
+  shouldWrite: (current: EsiCacheMetaRecord | undefined) => boolean
+): Promise<void> {
   const id: [number, string] = [row.characterId, row.key];
   try {
     await db.transaction('rw', db.esiCache, db.esiCacheMeta, async () => {
-      // A row rewritten since (which wrote its own meta) or deleted since must
-      // not be given this stale projection.
-      if ((await db.esiCacheMeta.get(id)) !== undefined) return;
+      // Re-decided inside the transaction: a row rewritten since (which wrote
+      // its own meta) or deleted since must not be given this projection.
+      if (!shouldWrite(await db.esiCacheMeta.get(id))) return;
       if (!(await hasValueRow(id))) return;
       await db.esiCacheMeta.put(metaOf(row));
     });

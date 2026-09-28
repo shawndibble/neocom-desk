@@ -103,6 +103,21 @@ describe('freshness from meta', () => {
     expect(result.cached?.data).toBe('live');
   });
 
+  it('a value rewritten behind meta (raw IndexedDB, a pre-meta bundle) is judged by its own age', async () => {
+    at(T0);
+    await loadWithCacheStatus(CHAR_ID, KEY, async () => 'v');
+    // What e2e's expireCachedEsiRows does: backdate the value row through raw
+    // IndexedDB, which the Dexie middleware never sees.
+    await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'old', fetchedAt: 1 });
+    await db.esiCacheMeta.put({ characterId: CHAR_ID, key: KEY, fetchedAt: T0 });
+    const fetchLive = vi.fn(async () => 'live');
+
+    const result = await loadWithCacheStatus(CHAR_ID, KEY, fetchLive);
+
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+    expect(result.cached?.data).toBe('live');
+  });
+
   it('a partial list checks the stored row for truncation without reading its value', async () => {
     at(T0);
     await loadPaginatedWithCacheStatus(CHAR_ID, KEY, async () => ({
