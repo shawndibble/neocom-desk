@@ -529,6 +529,8 @@ export function LoyaltyStore() {
             density="compact"
             sort={offersSortProps.sort}
             onSortChange={offersSortProps.onSortChange}
+            mobileSort
+            stackSummary={t('loyaltyStore.offerCount', { count: filteredRows.length })}
             onRowClick={selectRow}
             rowContextMenu={rowContextMenu}
             selectedRowKey={selectedRow?.offer.offer_id ?? null}
