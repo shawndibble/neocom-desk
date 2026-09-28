@@ -49,6 +49,13 @@ import { useMiningYieldRange } from './yieldRangePref';
 import { useMiningPriceBasis } from './priceBasisPref';
 import { useMiningBuybackRate } from './buybackRatePref';
 import { useMiningShowRefining } from './showRefiningPref';
+import { useMiningChartMetric } from './chartMetricPref';
+import {
+  dailyVolumePoints,
+  dailyCountPoints,
+  typeVolumeComparison,
+  typeCountComparison,
+} from './chartAggregation';
 import {
   availableOverviewColumns,
   DEFAULT_VISIBLE_OVERVIEW_COLUMNS,
@@ -59,6 +66,7 @@ import {
 import { oreBreakdownSummary, sumUnits } from './oreBreakdown';
 import {
   BuybackRateInput,
+  ChartMetricControl,
   MobileSettings,
   PriceBasisOptions,
   RangeControl,
@@ -165,13 +173,24 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
   const visibleColumns = useVisibleOverviewColumns((state) => state.value);
   const setVisibleColumns = useVisibleOverviewColumns((state) => state.setValue);
   const hydrateVisibleColumns = useVisibleOverviewColumns((state) => state.hydrate);
+  const chartMetric = useMiningChartMetric((state) => state.value);
+  const setChartMetric = useMiningChartMetric((state) => state.setValue);
+  const hydrateChartMetric = useMiningChartMetric((state) => state.hydrate);
   useEffect(() => {
     void hydrateRange();
     void hydrateBasis();
     void hydrateBuybackRate();
     void hydrateShowRefining();
     void hydrateVisibleColumns();
-  }, [hydrateRange, hydrateBasis, hydrateBuybackRate, hydrateShowRefining, hydrateVisibleColumns]);
+    void hydrateChartMetric();
+  }, [
+    hydrateRange,
+    hydrateBasis,
+    hydrateBuybackRate,
+    hydrateShowRefining,
+    hydrateVisibleColumns,
+    hydrateChartMetric,
+  ]);
   const handleShowRefiningChange = useCallback(
     (next: boolean) => {
       void setShowRefining(next);
@@ -321,6 +340,36 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       ...values,
     }));
   }, [visibleRows, data]);
+
+  // Only computed for whichever metric the chart-metric select is on, so
+  // switching to m³/Count never costs the other unselected metric's fold.
+  const dailyVolume = useMemo(
+    () =>
+      chartMetric === 'volume'
+        ? dailyVolumePoints(visibleRows, rangeDates(range, today), data?.typeVolumes ?? new Map())
+        : [],
+    [chartMetric, visibleRows, range, today, data]
+  );
+  const dailyCount = useMemo(
+    () => (chartMetric === 'count' ? dailyCountPoints(visibleRows, rangeDates(range, today)) : []),
+    [chartMetric, visibleRows, range, today]
+  );
+  const typeVolumeComparisonPoints = useMemo(
+    () =>
+      chartMetric === 'volume'
+        ? typeVolumeComparison(
+            visibleRows,
+            data?.typeNames ?? new Map(),
+            data?.typeVolumes ?? new Map()
+          )
+        : [],
+    [chartMetric, visibleRows, data]
+  );
+  const typeCountComparisonPoints = useMemo(
+    () =>
+      chartMetric === 'count' ? typeCountComparison(visibleRows, data?.typeNames ?? new Map()) : [],
+    [chartMetric, visibleRows, data]
+  );
 
   function systemName(row: MiningYieldRow): string {
     return data?.systemNames.get(row.entry.solarSystemId) ?? `#${row.entry.solarSystemId}`;
@@ -475,6 +524,10 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
           <>
             <div className="hidden items-center gap-2 sm:flex">
               <RangeControl value={range} onChange={(next) => void setRange(next)} />
+              <ChartMetricControl
+                value={chartMetric}
+                onChange={(next) => void setChartMetric(next)}
+              />
               <ValueMenu basis={basis} buybackRate={buybackRate}>
                 <PriceBasisOptions value={basis} onChange={(next) => void setBasis(next)} />
                 <BuybackRateInput
@@ -487,6 +540,11 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
             <div className="sm:hidden">
               <MobileSettings range={range} basis={basis} buybackRate={buybackRate}>
                 <RangeControl value={range} onChange={(next) => void setRange(next)} fill />
+                <ChartMetricControl
+                  value={chartMetric}
+                  onChange={(next) => void setChartMetric(next)}
+                  fill
+                />
                 <PriceBasisOptions value={basis} onChange={(next) => void setBasis(next)} />
                 <BuybackRateInput
                   value={buybackRate}
@@ -648,8 +706,13 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                 }
               >
                 <LazyMiningYieldCharts
+                  metric={chartMetric}
                   dailyRate={dailyRate}
+                  dailyVolume={dailyVolume}
+                  dailyCount={dailyCount}
                   typeComparison={typeComparison}
+                  typeVolumeComparison={typeVolumeComparisonPoints}
+                  typeCountComparison={typeCountComparisonPoints}
                   showRefining={showRefining}
                 />
               </Suspense>
