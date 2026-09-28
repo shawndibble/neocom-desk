@@ -1,7 +1,13 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { normalizePath, type Plugin } from 'vite';
-import { planLocaleSplit, type LocalePlan, type LocaleTree } from './localeSplit';
+import {
+  LAZY_SECTIONS,
+  planLocaleSplit,
+  staticImportClosure,
+  type LocalePlan,
+  type LocaleTree,
+} from './localeSplit';
 
 /**
  * Build-time split of `locales/en.json` (see `localeSplit.ts` for the rule).
@@ -44,8 +50,7 @@ function sourceFiles(srcDir: string): Record<string, string> {
   for (const entry of readdirSync(srcDir, { recursive: true, encoding: 'utf8' })) {
     const rel = normalizePath(entry);
     if (!/\.tsx?$/.test(rel) || /\.test\.tsx?$/.test(rel) || rel.endsWith('.d.ts')) continue;
-    // `src/i18n/` only describes keys (in doc comments); nothing there renders one.
-    if (rel.startsWith('test/') || rel.startsWith('i18n/')) continue;
+    if (rel.startsWith('test/')) continue;
     const file = normalizePath(join(srcDir, entry));
     sources[file] = readFileSync(file, 'utf8');
   }
@@ -71,9 +76,18 @@ export function localeSplitPlugin(): Plugin {
     buildStart() {
       const { en } = paths();
       this.addWatchFile(en);
+      const srcDir = normalizePath(join(root, 'src'));
+      const sources = sourceFiles(srcDir);
+      // `src/i18n/` only describes keys (in doc comments); nothing there
+      // renders one. It still takes part in the startup graph walk.
+      const scanned = Object.fromEntries(
+        Object.entries(sources).filter(([file]) => !file.startsWith(`${srcDir}/i18n/`))
+      );
       plan = planLocaleSplit(
         JSON.parse(readFileSync(en, 'utf8')) as LocaleTree,
-        sourceFiles(normalizePath(join(root, 'src')))
+        scanned,
+        LAZY_SECTIONS,
+        staticImportClosure(sources, `${srcDir}/main.tsx`, srcDir)
       );
     },
     resolveId(source, importer) {

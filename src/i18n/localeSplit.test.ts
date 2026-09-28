@@ -5,6 +5,7 @@ import {
   leafPaths,
   planLocaleSplit,
   referencedLeaves,
+  staticImportClosure,
   type LocaleTree,
 } from './localeSplit';
 
@@ -143,20 +144,74 @@ describe('planLocaleSplit', () => {
   });
 });
 
+describe('planLocaleSplit with startup files', () => {
+  it('keeps every key a startup file names in the shell, so no group loads at boot', () => {
+    const plan = planLocaleSplit(
+      EN,
+      {
+        '/src/Shell.tsx': `t('market.title')`,
+        '/src/Market.tsx': `t('market.title'); t('market.orders.buy')`,
+      },
+      LAZY,
+      new Set(['/src/Shell.tsx'])
+    );
+    expect(plan.importsByFile.has('/src/Shell.tsx')).toBe(false);
+    expect([...plan.groups.values()]).toEqual([{ market: { orders: { buy: 'Buy' } } }]);
+    expect((plan.shell.market as LocaleTree).title).toBe('Market');
+  });
+});
+
+describe('staticImportClosure', () => {
+  const sources = {
+    '/src/main.tsx': [
+      "import './i18n';",
+      "import { a } from '@/lib/a';",
+      "import type { T } from './types';",
+      "const lazy = () => import('./routes/Page');",
+      "export { b } from './b';",
+    ].join('\n'),
+    '/src/i18n/index.ts': '',
+    '/src/lib/a.ts': "import { c } from '../c';",
+    '/src/c.tsx': '',
+    '/src/b.ts': '',
+    '/src/types.ts': '',
+    '/src/routes/Page.tsx': "import { d } from './d';",
+    '/src/routes/d.ts': '',
+  };
+
+  it('follows static value imports and re-exports, not type-only or dynamic ones', () => {
+    expect([...staticImportClosure(sources, '/src/main.tsx', '/src')].sort()).toEqual([
+      '/src/b.ts',
+      '/src/c.tsx',
+      '/src/i18n/index.ts',
+      '/src/lib/a.ts',
+      '/src/main.tsx',
+    ]);
+  });
+});
+
 describe('the real en.json against the real sources', () => {
   // Every string a build can split, so a key added on any branch is covered
   // the moment it lands: nothing it adds can fall out of both halves.
-  const sources = import.meta.glob<string>(
-    [
-      '/src/**/*.{ts,tsx}',
-      '!/src/**/*.test.{ts,tsx}',
-      '!/src/**/*.d.ts',
-      '!/src/test/**',
-      '!/src/i18n/**',
-    ],
+  // The same inputs `localeSplitPlugin.ts` gives it.
+  const all = import.meta.glob<string>(
+    ['/src/**/*.{ts,tsx}', '!/src/**/*.test.{ts,tsx}', '!/src/**/*.d.ts', '!/src/test/**'],
     { query: '?raw', import: 'default', eager: true }
   );
-  const plan = planLocaleSplit(en as LocaleTree, sources);
+  const sources = Object.fromEntries(
+    Object.entries(all).filter(([file]) => !file.startsWith('/src/i18n/'))
+  );
+  const startup = staticImportClosure(all, '/src/main.tsx', '/src');
+  const plan = planLocaleSplit(en as LocaleTree, sources, LAZY_SECTIONS, startup);
+
+  it('walks the real startup graph', () => {
+    expect(startup).toContain('/src/i18n/index.ts');
+    expect(startup).toContain('/src/app/App.tsx');
+  });
+
+  it('gives no startup file a group to import: its keys are all in the shell', () => {
+    for (const file of startup) expect(plan.importsByFile.has(file)).toBe(false);
+  });
 
   it('splits into a shell and groups that together are exactly en.json', () => {
     const union = merge({}, plan.shell);

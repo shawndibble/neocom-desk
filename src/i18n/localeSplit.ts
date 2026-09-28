@@ -151,7 +151,10 @@ function deleteLeaf(tree: LocaleTree, path: string): void {
 }
 
 export interface LocalePlan {
-  /** Loads with the app: every non-lazy section plus lazy keys nothing names. */
+  /**
+   * Loads with the app: every non-lazy section, lazy keys nothing names, and
+   * lazy keys a startup file names.
+   */
   shell: LocaleTree;
   /** Group id -> the keys named by exactly one set of files. */
   groups: Map<string, LocaleTree>;
@@ -159,10 +162,18 @@ export interface LocalePlan {
   importsByFile: Map<string, string[]>;
 }
 
+/**
+ * `startupFiles` are the modules that load at boot anyway
+ * (`staticImportClosure` from the entry). A key any of them names stays in the
+ * shell rather than becoming a group: at startup a group would only be one
+ * more tiny chunk to fetch, since its importers are spread across the
+ * startup graph's many small chunks.
+ */
 export function planLocaleSplit(
   en: LocaleTree,
   sources: Readonly<Record<string, string>>,
-  lazySections: readonly string[] = LAZY_SECTIONS
+  lazySections: readonly string[] = LAZY_SECTIONS,
+  startupFiles: ReadonlySet<string> = new Set()
 ): LocalePlan {
   const sections = lazySections.filter((s) => typeof en[s] === 'object');
   const leaves = leafPaths(en, sections);
@@ -178,6 +189,7 @@ export function planLocaleSplit(
 
   const bySignature = new Map<string, string[]>();
   for (const [leaf, files] of namedBy) {
+    if (files.some((file) => startupFiles.has(file))) continue;
     const signature = files.join('\n');
     const group = bySignature.get(signature);
     if (group) group.push(leaf);
@@ -203,4 +215,59 @@ export function planLocaleSplit(
   });
 
   return { shell, groups, importsByFile };
+}
+
+/**
+ * Every module `entry` reaches through static value imports — what loads at
+ * boot. The same regex scan as `src/app/bootImportGraph.test.ts`: `import
+ * type` and dynamic `import()` are not followed. A miss either way is safe
+ * here: it only moves keys between the shell and a group, and both load
+ * before the component naming them renders.
+ */
+export function staticImportClosure(
+  sources: Readonly<Record<string, string>>,
+  entry: string,
+  srcRoot: string
+): Set<string> {
+  const specifiers = (code: string) => {
+    const bare = code.replace(/^\s*\/\/.*$/gm, '');
+    const out: string[] = [];
+    for (const m of bare.matchAll(
+      /(?:^|[\n;])\s*(import|export)\s+(type\s+)?([^;'"]*?)\s*from\s*['"]([^'"]+)['"]/g
+    )) {
+      if (!m[2]) out.push(m[4]);
+    }
+    for (const m of bare.matchAll(/(?:^|[\n;])\s*import\s*['"]([^'"]+)['"]/g)) out.push(m[1]);
+    return out;
+  };
+  const resolve = (from: string, specifier: string): string | undefined => {
+    let base: string;
+    if (specifier.startsWith('@/')) base = `${srcRoot}/${specifier.slice(2)}`;
+    else if (specifier.startsWith('.')) {
+      const parts = from.split('/').slice(0, -1);
+      for (const segment of specifier.split('/')) {
+        if (segment === '..') parts.pop();
+        else if (segment !== '.') parts.push(segment);
+      }
+      base = parts.join('/');
+    } else return undefined;
+    base = base.replace(/\?.*$/, '');
+    for (const ext of ['', '.ts', '.tsx', '/index.ts', '/index.tsx']) {
+      if (`${base}${ext}` in sources) return `${base}${ext}`;
+    }
+    return undefined;
+  };
+  const seen = new Set<string>([entry]);
+  const queue = [entry];
+  while (queue.length > 0) {
+    const file = queue.shift()!;
+    for (const specifier of specifiers(sources[file] ?? '')) {
+      const target = resolve(file, specifier);
+      if (target && !seen.has(target)) {
+        seen.add(target);
+        queue.push(target);
+      }
+    }
+  }
+  return seen;
 }
