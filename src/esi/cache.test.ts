@@ -1108,6 +1108,27 @@ describe('grace period past the freshness window', () => {
       off();
     });
 
+    it('still blocks on the live call for a loader that opted out of stale-on-auth-failure', async () => {
+      await seedLapsedStation();
+      const { fetchLive, settle } = deferredFetch('Jita IV - Moon 4');
+
+      let resolved = false;
+      const pending = loadWithCacheStatus<string>(G, stationKey, fetchLive, {
+        ...STATIC,
+        skipCacheOnAuthFailure: true,
+      }).then((r) => {
+        resolved = true;
+        return r;
+      });
+      await expireGrace();
+      // Such a loader must not be shown a row its Character may no longer be
+      // entitled to, so it never takes the silent stale path.
+      expect(resolved).toBe(false);
+
+      settle(true);
+      expect((await pending).cached?.data).toBe('Jita IV - Moon 4');
+    });
+
     it('still waits when nothing is stored', async () => {
       const result = await loadWithCacheStatus<string>(
         G,

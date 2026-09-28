@@ -102,6 +102,22 @@ async function resolveViaEsi(typeIds: number[]): Promise<Map<number, string>> {
   return map;
 }
 
+/**
+ * Stores resolved names. A failed write (quota, IndexedDB unavailable) only
+ * costs a later lookup its cache hit — it must never cost this one the names
+ * it already has.
+ */
+async function cacheNames(
+  rows: ReadonlyArray<readonly [string, string]>,
+  fetchedAt: number
+): Promise<void> {
+  try {
+    await writeCachedMany(GLOBAL_CACHE_CHARACTER_ID, rows, fetchedAt);
+  } catch {
+    // Names stay in the returned map; only the cache misses out.
+  }
+}
+
 /** The network half: batched POST, per-id fallback on a 404, then whatever is cached. Never rejects. */
 async function fetchFromEsi(typeIds: number[]): Promise<Map<number, string>> {
   const map = new Map<number, string>();
@@ -112,8 +128,7 @@ async function fetchFromEsi(typeIds: number[]): Promise<Map<number, string>> {
       const fetchedAt = Date.now();
       const types = resolved.filter((entry) => entry.category === 'inventory_type');
       for (const entry of types) map.set(entry.id, entry.name);
-      await writeCachedMany(
-        GLOBAL_CACHE_CHARACTER_ID,
+      await cacheNames(
         types.map((entry) => [cacheKey(entry.id), entry.name] as const),
         fetchedAt
       );
@@ -138,7 +153,7 @@ async function fetchFromEsi(typeIds: number[]): Promise<Map<number, string>> {
             // the cache read below (or the caller's "Type #id" fallback).
           }
         });
-        await writeCachedMany(GLOBAL_CACHE_CHARACTER_ID, perId, fetchedAt);
+        await cacheNames(perId, fetchedAt);
         unresolved = ids.filter((id) => !map.has(id));
       }
       // Anything else (a throttle, a 5xx, an auth failure, offline):

@@ -451,3 +451,40 @@ describe('loadTypeNames — cache I/O', () => {
     get.mockRestore();
   });
 });
+
+describe('loadTypeNames — an unwritable cache', () => {
+  it('keeps names the per-id 404 fallback resolved when the bulk write fails', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${ESI_BASE_URL}/universe/types/100`, () =>
+        HttpResponse.json({
+          type_id: 100,
+          name: 'Widget 100',
+          description: '',
+          group_id: 1,
+          published: true,
+        })
+      )
+    );
+    const bulkPut = vi.spyOn(db.esiCache, 'bulkPut').mockRejectedValue(new Error('QuotaExceeded'));
+
+    const names = await loadTypeNames([100]);
+
+    expect(names.get(100)).toBe('Widget 100');
+    bulkPut.mockRestore();
+  });
+
+  it('keeps names the batch resolved when the bulk write fails', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () =>
+        HttpResponse.json([{ id: 100, name: 'Widget 100', category: 'inventory_type' }])
+      )
+    );
+    const bulkPut = vi.spyOn(db.esiCache, 'bulkPut').mockRejectedValue(new Error('QuotaExceeded'));
+
+    const names = await loadTypeNames([100]);
+
+    expect(names.get(100)).toBe('Widget 100');
+    bulkPut.mockRestore();
+  });
+});

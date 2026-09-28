@@ -342,6 +342,23 @@ describe('fetchAllPagesStatus — parallel page walk', () => {
     expect(result).toMatchObject({ items: ['item-1'], truncated: true, pagesFetched: 1 });
   });
 
+  it('an abort mid-walk rejects with the AbortError once the in-flight pages settle', async () => {
+    const controller = new AbortController();
+    const { handler, state } = slowPagedHandler(12, (page) => (page === 1 ? 0 : 200));
+    server.use(handler);
+
+    const walk = fetchAllPagesStatus<string>('/markets/10000002/orders', {
+      signal: controller.signal,
+    });
+    await vi.waitFor(() => expect(state.requested.length).toBeGreaterThan(1));
+    controller.abort();
+
+    await expect(walk).rejects.toMatchObject({ name: 'AbortError' });
+    // Nothing is dispatched after the abort; the pages already sent were the
+    // first batch only. (A stray rejection would fail the run as unhandled.)
+    expect(Math.max(...state.requested)).toBeLessThanOrEqual(1 + PAGE_FETCH_CONCURRENCY);
+  });
+
   it('never requests past maxPages', async () => {
     const { handler, state } = slowPagedHandler(20, () => 5);
     server.use(handler);

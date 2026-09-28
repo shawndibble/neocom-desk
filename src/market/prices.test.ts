@@ -431,3 +431,24 @@ describe('clearMarketPriceCache while a fetch is in flight', () => {
     expect(hits.count).toBe(2);
   });
 });
+
+describe('invalidateHubPrices while a fetch is in flight', () => {
+  it('a manual refresh does not join the request that started before the click', async () => {
+    const hits = { count: 0 };
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, async () => {
+        hits.count += 1;
+        await delay(20);
+        return HttpResponse.json({});
+      })
+    );
+    const clock = () => 1_000_000;
+
+    const before = getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
+    await delay(5);
+    invalidateHubPrices(DEFAULT_TRADE_HUB.stationId, [34]);
+    await Promise.all([before, getHubPrices(DEFAULT_TRADE_HUB, [34], clock)]);
+
+    expect(hits.count).toBe(2);
+  });
+});

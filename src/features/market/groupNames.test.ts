@@ -102,3 +102,15 @@ describe('loadGroupNames — cache I/O', () => {
     bulkPut.mockRestore();
   });
 });
+
+describe('loadGroupNames — an unwritable cache', () => {
+  it('still returns the names it resolved when the bulk write fails', async () => {
+    server.use(group(483, 'Mining Laser'));
+    const bulkPut = vi.spyOn(db.esiCache, 'bulkPut').mockRejectedValue(new Error('QuotaExceeded'));
+
+    const names = await loadGroupNames([483]);
+
+    expect(names.get(483)).toBe('Mining Laser');
+    bulkPut.mockRestore();
+  });
+});

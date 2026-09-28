@@ -54,6 +54,10 @@ export async function loadGroupNames(groupIds: readonly number[]): Promise<Map<n
       // keeps rendering its raw id.
     }
   });
-  await writeCachedMany(GLOBAL_CACHE_CHARACTER_ID, resolved, fetchedAt);
+  try {
+    await writeCachedMany(GLOBAL_CACHE_CHARACTER_ID, resolved, fetchedAt);
+  } catch {
+    // A failed write only costs a later lookup its cache hit, never this one its names.
+  }
   return names;
 }

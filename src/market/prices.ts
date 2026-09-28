@@ -123,6 +123,8 @@ export function invalidateHubPrices(stationId: number, typeIds: readonly number[
     const key = hubCacheKey(stationId, typeId);
     hubPriceCache.delete(key);
     persistedBypass.add(key);
+    // A request sent before the click is not an answer to it.
+    hubPricesInFlight.delete(key);
   }
 }
 

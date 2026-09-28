@@ -156,7 +156,9 @@ report what actually happened) or for a key whose window is longer than
 `STALE_AFTER.default` — a lapsed 24h row is a station name, and re-rendering
 for a constant is all cost. A `STALE_AFTER.static` key instead takes
 `loadLapsedConstant`: the stored row at once, refreshed behind the caller
-with **no** signal, so the fresh row is simply there for the next read. A key
+with **no** signal, so the fresh row is simply there for the next read —
+unless it opted into `skipCacheOnAuthFailure`, which keeps the blocking live
+call. A key
 whose long window encodes a _publish cadence_ rather than immutability opts
 into the grace race with `allowStaleServe`, which is how the Contract Search
 snapshots render last cycle's rows while this cycle's arrive (#963).
