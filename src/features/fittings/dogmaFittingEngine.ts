@@ -49,15 +49,34 @@ const WASM_URL = '/vendor/dogma/esf_dogma_engine_bg.wasm';
 const SDE_URL = '/vendor/dogma/sde.dat';
 
 /**
- * Bump whenever `@eveshipfit/dogma-engine` or `@eveshipfit/sde` is bumped in
- * `package.json` (ADR 0016: the two are pinned and bumped together). The
- * fetch URLs above never change, so without this a browser that already
- * cached the old files under the old cache name would keep serving them
- * forever — this forces a fresh `caches.open` bucket, and hence a fresh
- * fetch, on the next bump.
+ * Keyed on the pinned `@eveshipfit/dogma-engine` + `@eveshipfit/sde`
+ * versions (`__DOGMA_PINS__`, from `package.json` via `vite.config.ts`;
+ * ADR 0016: the two are pinned and bumped together). The fetch URLs above
+ * never change, so without a per-pin name a browser that already cached the
+ * old files would keep serving them forever — a bump is a fresh
+ * `caches.open` bucket, and hence a fresh fetch, with nothing to remember
+ * to hand-bump (it used to be a hand-maintained `-v1`).
  */
-const CACHE_VERSION = 1;
-const CACHE_NAME = `dogma-engine-assets-v${CACHE_VERSION}`;
+const CACHE_PREFIX = 'dogma-engine-assets-';
+const CACHE_NAME = `${CACHE_PREFIX}${__DOGMA_PINS__}`;
+
+/**
+ * Deletes every earlier pin's bucket — each holds ~10 MB that nothing will
+ * read again. Best-effort and off the load's critical path: a failure here
+ * only leaves the old bucket behind until the next load tries again.
+ */
+async function deleteStaleAssetCaches(): Promise<void> {
+  try {
+    const names = await caches.keys();
+    await Promise.all(
+      names
+        .filter((name) => name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME)
+        .map((name) => caches.delete(name))
+    );
+  } catch {
+    // Cache Storage unavailable or refused — see above.
+  }
+}
 
 export interface DogmaAssetProgress {
   loadedBytes: number;
@@ -139,6 +158,7 @@ export function loadDogmaEngine(
   onProgress?: (progress: DogmaAssetProgress) => void
 ): Promise<void> {
   if (!enginePromise) {
+    void deleteStaleAssetCaches();
     enginePromise = (async () => {
       let wasmLoaded = 0;
       let sdeLoaded = 0;

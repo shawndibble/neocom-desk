@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } 
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
-import { invalidateFreshness } from '@/esi/cache';
+import { invalidateFreshness, resetRevalidationState } from '@/esi/cache';
 import { db } from '@/db';
 import {
   loadCharacterSkills,
@@ -22,6 +22,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
+  resetRevalidationState();
 });
 afterEach(() => {
   server.resetHandlers();
@@ -340,13 +341,17 @@ describe('loadUniverseType', () => {
     await db.esiCache.put({ characterId: 0, key: 'universeType:9899', value: type, fetchedAt: 42 });
     server.use(http.get(`${ESI_BASE_URL}/universe/types/9899`, () => HttpResponse.error()));
 
-    const result = await loadUniverseType(9899);
+    // A lapsed game constant is served at once while the refresh runs behind it…
+    expect((await loadUniverseType(9899))?.data).toEqual(type);
 
-    expect(result).toEqual({
-      data: type,
-      fetchedAt: new Date(42),
-      fromCache: true,
-      truncated: false,
+    // …and once that refresh has failed, the next read says it is a fallback.
+    await vi.waitFor(async () => {
+      expect(await loadUniverseType(9899)).toEqual({
+        data: type,
+        fetchedAt: new Date(42),
+        fromCache: true,
+        truncated: false,
+      });
     });
   });
 

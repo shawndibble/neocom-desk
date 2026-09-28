@@ -129,3 +129,27 @@ describe('resolveNames', () => {
     expect(called).toBe(false);
   });
 });
+
+describe('resolveNames — cache writes', () => {
+  it('stores a whole resolved batch in one bulk write, not a transaction per name', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () =>
+        HttpResponse.json([
+          { id: 1, name: 'Alice', category: 'character' },
+          { id: 2, name: 'Bob', category: 'character' },
+          { id: 3, name: 'Carol', category: 'character' },
+        ])
+      )
+    );
+    const put = vi.spyOn(db.esiCache, 'put');
+    const bulkPut = vi.spyOn(db.esiCache, 'bulkPut');
+
+    await resolveNames([1, 2, 3]);
+
+    expect(put).not.toHaveBeenCalled();
+    expect(bulkPut).toHaveBeenCalledTimes(1);
+    expect((await db.esiCache.get([0, 'name:3']))?.value).toBe('Carol');
+    put.mockRestore();
+    bulkPut.mockRestore();
+  });
+});

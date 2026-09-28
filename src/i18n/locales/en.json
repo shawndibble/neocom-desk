@@ -1335,7 +1335,12 @@
       "noUnlocks": "Doesn't unlock anything yet",
       "levelNeeded": "Level {{level}}",
       "trained": "Trained · Level {{level}}",
-      "close": "Close"
+      "planned": "Planned · Level {{level}}",
+      "close": "Close",
+      "priceTitle": "Price",
+      "priceSell": "Sell price",
+      "priceNoSellOrders": "No sell orders",
+      "openInMarket": "Open in Market"
     },
     "detail": {
       "title": "Skill Detail",
@@ -1513,7 +1518,7 @@
     "dragAnnounceCancelled": "Reordering cancelled. {{name}} stayed at its original position.",
     "dragInstructions": "To pick up an entry or remap marker, press the space bar. While dragging, use the arrow keys to move it. Press space again to drop it in its new position, or press escape to cancel. Each row's Move menu offers the same reorder without dragging.",
     "removeEntry": "Remove {{name}}",
-    "removeBlockedByDependent": "{{blocker}} still needs this level — remove {{blocker}} first.",
+    "removeBlockedByDependent": "Required by {{blocker}}",
     "removeEntryConfirmTitle": "Remove skill",
     "removeEntryConfirm": "Remove \"{{name}}\" from this plan?",
     "removeEntryAction": "Remove",

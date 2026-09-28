@@ -394,6 +394,8 @@ interface EntryRowProps {
   columns: ColumnVisibility;
   isDesktop: boolean;
   onRemove: (skillTypeID: number, targetLevel: number) => void;
+  /** Opens the shared Skill Detail modal (description, prereqs, price) for this row's skill. */
+  onOpenSkillDetail: (skillTypeID: number) => void;
   /**
    * Undefined when the row is freely removable. Set to a plain-language
    * reason (naming what still needs it) when some other entry — a later
@@ -437,6 +439,7 @@ const EntryRow = memo(function EntryRow({
   columns,
   isDesktop,
   onRemove,
+  onOpenSkillDetail,
   removalBlockedReason,
   onSetPriority,
   pinnedInProgress,
@@ -478,7 +481,13 @@ const EntryRow = memo(function EntryRow({
   // them necessary.
   const nameSpan = (
     <span className={NAME_CELL}>
-      <span className="truncate">{name}</span>{' '}
+      <button
+        type="button"
+        onClick={() => onOpenSkillDetail(entry.skillTypeID)}
+        className="truncate text-left hover:underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+      >
+        {name}
+      </button>{' '}
       <span className="shrink-0">
         <span>{ROMAN[entry.targetLevel - 1]}</span>
         {boosted && <BoosterMark />}
@@ -636,6 +645,7 @@ interface PrereqRowProps {
   columns: ColumnVisibility;
   isDesktop: boolean;
   onPromote: (rowId: string) => void;
+  onOpenSkillDetail: (skillTypeID: number) => void;
 }
 
 /**
@@ -657,6 +667,7 @@ const PrereqRow = memo(function PrereqRow({
   columns,
   isDesktop,
   onPromote,
+  onOpenSkillDetail,
 }: PrereqRowProps) {
   const { t } = useTranslation();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
@@ -689,7 +700,13 @@ const PrereqRow = memo(function PrereqRow({
 
   const nameSpan = (
     <span className={NAME_CELL}>
-      <span className="truncate">{name}</span>{' '}
+      <button
+        type="button"
+        onClick={() => onOpenSkillDetail(row.step.skillTypeID)}
+        className="truncate text-left hover:underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+      >
+        {name}
+      </button>{' '}
       <span className="shrink-0">
         <span>{ROMAN[row.step.level - 1]}</span>
         <span className="ml-2 text-[0.625rem] uppercase">{t('plans.prereq')}</span>
@@ -867,6 +884,8 @@ interface EntryListProps {
   onReorder: (activeId: string, overId: string) => void;
   onRemove: (skillTypeID: number, targetLevel: number) => void;
   /** See EntryRowProps' field of the same name. */
+  onOpenSkillDetail: (skillTypeID: number) => void;
+  /** See EntryRowProps' field of the same name. */
   removalBlockedReason: (skillTypeID: number, targetLevel: number) => string | undefined;
   onRemoveMarker: (markerIndex: number) => void;
   /** A marker's target attribute spread, once known. Undefined when no "Optimize at my markers" result covers it yet. */
@@ -915,6 +934,7 @@ export function EntryList({
   startDate,
   onReorder,
   onRemove,
+  onOpenSkillDetail,
   removalBlockedReason,
   onRemoveMarker,
   markerAttributesFor,
@@ -997,6 +1017,7 @@ export function EntryList({
                       columns={columns}
                       isDesktop={isDesktop}
                       onRemove={onRemove}
+                      onOpenSkillDetail={onOpenSkillDetail}
                       removalBlockedReason={removalBlockedReason}
                       onSetPriority={onSetPriority}
                       pinnedInProgress={pinnedInProgress}
@@ -1020,6 +1041,7 @@ export function EntryList({
                       columns={columns}
                       isDesktop={isDesktop}
                       onPromote={onPromotePrereq}
+                      onOpenSkillDetail={onOpenSkillDetail}
                     />
                   )}
                   {row.kind === 'marker' && (

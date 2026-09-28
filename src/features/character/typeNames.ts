@@ -44,9 +44,8 @@ import { loadTypes } from '@/sde/loadSde';
 import {
   GLOBAL_CACHE_CHARACTER_ID,
   STALE_AFTER,
-  readCached,
   readCachedEntries,
-  writeCached,
+  writeCachedMany,
 } from '@/esi/cache';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 
@@ -103,6 +102,22 @@ async function resolveViaEsi(typeIds: number[]): Promise<Map<number, string>> {
   return map;
 }
 
+/**
+ * Stores resolved names. A failed write (quota, IndexedDB unavailable) only
+ * costs a later lookup its cache hit — it must never cost this one the names
+ * it already has.
+ */
+async function cacheNames(
+  rows: ReadonlyArray<readonly [string, string]>,
+  fetchedAt: number
+): Promise<void> {
+  try {
+    await writeCachedMany(GLOBAL_CACHE_CHARACTER_ID, rows, fetchedAt);
+  } catch {
+    // Names stay in the returned map; only the cache misses out.
+  }
+}
+
 /** The network half: batched POST, per-id fallback on a 404, then whatever is cached. Never rejects. */
 async function fetchFromEsi(typeIds: number[]): Promise<Map<number, string>> {
   const map = new Map<number, string>();
@@ -111,11 +126,12 @@ async function fetchFromEsi(typeIds: number[]): Promise<Map<number, string>> {
     try {
       const resolved = await postUniverseNames(ids);
       const fetchedAt = Date.now();
-      for (const entry of resolved) {
-        if (entry.category !== 'inventory_type') continue;
-        map.set(entry.id, entry.name);
-        await writeCached(GLOBAL_CACHE_CHARACTER_ID, cacheKey(entry.id), entry.name, fetchedAt);
-      }
+      const types = resolved.filter((entry) => entry.category === 'inventory_type');
+      for (const entry of types) map.set(entry.id, entry.name);
+      await cacheNames(
+        types.map((entry) => [cacheKey(entry.id), entry.name] as const),
+        fetchedAt
+      );
       unresolved = ids.filter((id) => !map.has(id));
     } catch (err) {
       // 404 only, and the header says why at length — the short version is
@@ -125,26 +141,32 @@ async function fetchFromEsi(typeIds: number[]): Promise<Map<number, string>> {
       // failed request with up to 1000 more.
       if (err instanceof EsiError && err.status === 404) {
         const fetchedAt = Date.now();
+        const perId: Array<readonly [string, string]> = [];
         await mapWithConcurrencyLimit(ids, ESI_FANOUT_CONCURRENCY, async (id) => {
           try {
             const { data } = await getUniverseType(id);
             if (!data) return; // 304 Not Modified: unreachable, no etag is ever sent here.
             map.set(id, data.name);
-            await writeCached(GLOBAL_CACHE_CHARACTER_ID, cacheKey(id), data.name, fetchedAt);
+            perId.push([cacheKey(id), data.name]);
           } catch {
             // Genuinely unresolvable, or offline mid-fallback: leave it to
             // the cache read below (or the caller's "Type #id" fallback).
           }
         });
+        await cacheNames(perId, fetchedAt);
         unresolved = ids.filter((id) => !map.has(id));
       }
       // Anything else (a throttle, a 5xx, an auth failure, offline):
       // `unresolved` is still the whole chunk, so every id in it falls through
       // to the cache read below and then to the caller's "Type #id".
     }
+    const cached = await readCachedEntries<string>(
+      GLOBAL_CACHE_CHARACTER_ID,
+      unresolved.map(cacheKey)
+    );
     for (const id of unresolved) {
-      const cached = await readCached<string>(GLOBAL_CACHE_CHARACTER_ID, cacheKey(id));
-      if (cached !== undefined) map.set(id, cached);
+      const row = cached.get(cacheKey(id));
+      if (row !== undefined) map.set(id, row.value);
     }
   }
   return map;
@@ -163,14 +185,17 @@ export async function readCachedTypeNames(
   const unique = [...new Set(typeIds)];
   const types = await loadTypes();
   const map = new Map<number, string>();
-  await Promise.all(
-    unique.map(async (id) => {
-      const name =
-        types[String(id)]?.name ??
-        (await readCached<string>(GLOBAL_CACHE_CHARACTER_ID, cacheKey(id)));
-      if (name) map.set(id, name);
-    })
-  );
+  const notInSde: number[] = [];
+  for (const id of unique) {
+    const name = types[String(id)]?.name;
+    if (name) map.set(id, name);
+    else notInSde.push(id);
+  }
+  const cached = await readCachedEntries<string>(GLOBAL_CACHE_CHARACTER_ID, notInSde.map(cacheKey));
+  for (const id of notInSde) {
+    const name = cached.get(cacheKey(id))?.value;
+    if (name) map.set(id, name);
+  }
   return map;
 }
 

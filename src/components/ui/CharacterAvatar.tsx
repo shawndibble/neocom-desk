@@ -38,6 +38,7 @@ export function CharacterAvatar({
   return (
     <img
       src={characterPortraitUrl(characterId, source)}
+      crossOrigin="anonymous"
       alt={alt ?? ''}
       aria-hidden={alt === undefined ? true : undefined}
       width={px}

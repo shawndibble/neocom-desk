@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
+import { GLOBAL_CACHE_CHARACTER_ID, resetRevalidationState } from '@/esi/cache';
 import { loadLoyaltyStoreOffers, loadCorporationName } from './store';
 
 const CORP_ID = 1000135;
@@ -13,6 +13,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
+  resetRevalidationState();
 });
 afterEach(() => {
   server.resetHandlers();
@@ -57,9 +58,15 @@ describe('loadLoyaltyStoreOffers', () => {
     server.use(
       http.get(`${ESI_BASE_URL}/loyalty/stores/${CORP_ID}/offers/`, () => HttpResponse.error())
     );
+    // A lapsed game constant is served at once while the refresh runs behind it…
     const result = await loadLoyaltyStoreOffers(CORP_ID);
     expect(result?.data).toEqual(payload);
-    expect(result?.fromCache).toBe(true);
+    // …and once that refresh has failed, the next read says it is a fallback.
+    await vi.waitFor(async () => {
+      const reread = await loadLoyaltyStoreOffers(CORP_ID);
+      expect(reread?.data).toEqual(payload);
+      expect(reread?.fromCache).toBe(true);
+    });
   });
 });
 

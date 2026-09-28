@@ -59,6 +59,19 @@ interface MarketWideOpportunitiesPanelProps {
 }
 
 const HIDE_SKILL_GATED = boolParam();
+
+/**
+ * The columns' sort keys, at module scope: the columns themselves close over
+ * render-time state (and `onStartPlan`, which the parent rebuilds every
+ * render), but `DataTable` keys its sort memo on the active `sortValue`, so
+ * keeping these stable is what stops a re-render from re-sorting every row.
+ */
+const SORT_VALUE = {
+  product: (row: MarketWideResultRow) => row.productName,
+  iskPerHour: (row: MarketWideResultRow) => row.iskPerHour ?? undefined,
+  buildCost: (row: MarketWideResultRow) => row.buildCost,
+  orderDepth: (row: MarketWideResultRow) => ORDER_DEPTH_RANK[row.orderDepth],
+};
 const MARKET_WIDE_DEFAULT_SORT = { columnId: 'iskPerHour', direction: 'desc' } as const;
 
 export function MarketWideOpportunitiesPanel({
@@ -106,16 +119,20 @@ export function MarketWideOpportunitiesPanel({
     () => rows.filter((row) => skillGateByProductTypeID.get(row.productTypeID)?.gated).length,
     [rows, skillGateByProductTypeID]
   );
-  const visibleRows = hideSkillGated
-    ? rows.filter((row) => !skillGateByProductTypeID.get(row.productTypeID)?.gated)
-    : rows;
+  const visibleRows = useMemo(
+    () =>
+      hideSkillGated
+        ? rows.filter((row) => !skillGateByProductTypeID.get(row.productTypeID)?.gated)
+        : rows,
+    [hideSkillGated, rows, skillGateByProductTypeID]
+  );
 
   const columns: DataTableColumn<MarketWideResultRow>[] = [
     {
       id: 'product',
       header: t('industry.product'),
       primary: true,
-      sortValue: (row) => row.productName,
+      sortValue: SORT_VALUE.product,
       render: (row) => {
         const verdict = skillGateByProductTypeID.get(row.productTypeID);
         return (
@@ -137,7 +154,7 @@ export function MarketWideOpportunitiesPanel({
       header: t('industry.iskPerHour'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: (row) => row.iskPerHour ?? undefined,
+      sortValue: SORT_VALUE.iskPerHour,
       cellClassName: (row) => (row.iskPerHour !== null ? iskToneClass(row.iskPerHour) : undefined),
       // Tap, not long press: the ranking's figures are inert — the row's only
       // actions are the button in its last cell and the row's context menu.
@@ -153,13 +170,13 @@ export function MarketWideOpportunitiesPanel({
       header: t('industry.buildCost'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: (row) => row.buildCost,
+      sortValue: SORT_VALUE.buildCost,
       render: (row) => <IskAmount value={row.buildCost} revealOn="tap" decimals={0} />,
     },
     {
       id: 'orderDepth',
       header: t('industry.opportunitiesOrderDepthLabel'),
-      sortValue: (row) => ORDER_DEPTH_RANK[row.orderDepth],
+      sortValue: SORT_VALUE.orderDepth,
       render: (row) => (
         <StatChip
           label={t('industry.opportunitiesOrderDepthLabel')}

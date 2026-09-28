@@ -19,7 +19,7 @@ import { groupSortedRows } from './dataTableGroup';
 import * as Icon from './icons';
 import { InfoTooltip } from './Tooltip';
 import { RowMoreActions } from './RowActions';
-import { nextDataTableSort, sortRows } from './dataTableSort';
+import { nextDataTableSort, sortRowsBy } from './dataTableSort';
 
 export interface DataTableSort {
   columnId: string;
@@ -485,10 +485,20 @@ export function DataTable<T>({
 
   const sortColumn = sort ? columns.find((column) => column.id === sort.columnId) : undefined;
   const activeSortId = sortColumn?.sortValue ? sortColumn.id : undefined;
+  // Keyed on the sort's fields and the one `sortValue` in play, not on the
+  // `sort` object or the column object: `useUrlSort` re-parses a fresh
+  // `sort` whenever the query string changes (every debounced filter write),
+  // and a caller rebuilding a column around a memoized `sortValue` shouldn't
+  // re-sort either. A column whose `sortValue` isn't stable still re-sorts
+  // every render — callers memoize their columns for that.
+  const sortDirection = sort?.direction;
+  const sortValue = sort
+    ? columns.find((column) => column.id === sort.columnId)?.sortValue
+    : undefined;
   const sortedRows = useMemo(() => {
-    if (!sort || !sortColumn?.sortValue) return rows;
-    return sortRows(rows, sortColumn, sort.direction);
-  }, [rows, sort, sortColumn]);
+    if (!sortDirection || !sortValue) return rows;
+    return sortRowsBy(rows, sortValue, sortDirection);
+  }, [rows, sortDirection, sortValue]);
 
   const grouping = groupBy !== undefined && isPhone;
   // Grouped over (row, index) pairs so `rowKey` still gets each row's index

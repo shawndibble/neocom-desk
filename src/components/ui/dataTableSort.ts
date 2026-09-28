@@ -1,8 +1,15 @@
 import type { DataTableColumn, DataTableSort } from './DataTable';
 
+/**
+ * Built once: `localeCompare` resolves a collator per call, and a sort makes
+ * n log n of them. Default options on purpose — the same ordering (ties
+ * included) that a bare `localeCompare` gives.
+ */
+const collator = new Intl.Collator();
+
 function compareValues(a: string | number, b: string | number): number {
   if (typeof a === 'number' && typeof b === 'number') return a - b;
-  return String(a).localeCompare(String(b));
+  return collator.compare(String(a), String(b));
 }
 
 /**
@@ -17,8 +24,15 @@ export function sortRows<T>(
   column: Pick<DataTableColumn<T>, 'sortValue'>,
   direction: 'asc' | 'desc'
 ): T[] {
-  const sortValue = column.sortValue;
-  if (!sortValue) return [...rows];
+  return column.sortValue ? sortRowsBy(rows, column.sortValue, direction) : [...rows];
+}
+
+/** `sortRows` given the one `sortValue` directly — what `DataTable` keys its memo on. */
+export function sortRowsBy<T>(
+  rows: readonly T[],
+  sortValue: (row: T) => string | number | undefined,
+  direction: 'asc' | 'desc'
+): T[] {
   const withValue: { row: T; value: string | number }[] = [];
   const withoutValue: T[] = [];
   for (const row of rows) {

@@ -40,9 +40,10 @@
  * `esi/budget.ts`'s app-wide circuit, so a sweep that meets a spent budget
  * backs off or fails fast into the cache rather than adding to the storm. The
  * nearby `heldAfterFailure` in `esi/cache.ts` does not cover the per-Character
- * case on its own: it is skipped for `STALE_AFTER.static` keys, and it needs
- * a stale row to hold, which a structure that has only ever been refused does
- * not have. (Issue #655.)
+ * case on its own: for a `STALE_AFTER.static` key it only answers once a
+ * background refresh has already failed, and it needs a stale row to hold,
+ * which a structure that has only ever been refused does not have.
+ * (Issue #655.)
  */
 import { db } from '@/db';
 import { AuthError } from '@/auth/sso';

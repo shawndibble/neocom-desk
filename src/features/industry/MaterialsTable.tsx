@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
@@ -152,6 +152,28 @@ export function SourcingInput({
 }: SourcingInputProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  // Leaving the page mid-edit (Back, a shortcut, a row scrolled out of a
+  // virtualized list) unmounts the field without a blur, which would drop the
+  // edit. The ref mirrors the uncommitted draft synchronously — cleared in the
+  // same handler that commits on blur, so an unmount right after a blur never
+  // commits twice — and the latest props, read only at unmount.
+  const pendingRef = useRef<string | null>(null);
+  const latestRef = useRef({ value, parse, onCommit });
+  useEffect(() => {
+    latestRef.current = { value, parse, onCommit };
+  });
+  useEffect(
+    () => () => {
+      const pending = pendingRef.current;
+      if (pending === null) return;
+      const { value: current, parse: parseLatest, onCommit: commit } = latestRef.current;
+      const next = parseLatest(pending);
+      // Only a real number: an emptied or unparseable box on the way out is
+      // more likely abandoned than a deliberate clear.
+      if (next !== undefined && next !== current) commit(next);
+    },
+    []
+  );
   return (
     <TextInput
       id={id}
@@ -178,9 +200,13 @@ export function SourcingInput({
       // source of truth, exactly as it was before the mask existed.
       value={draft ?? (value === undefined ? '' : editing ? String(value) : maskNumber(value))}
       onFocus={() => setEditing(true)}
-      onChange={(event) => setDraft(event.target.value)}
+      onChange={(event) => {
+        pendingRef.current = event.target.value;
+        setDraft(event.target.value);
+      }}
       onBlur={(event) => {
         const next = parse(event.target.value);
+        pendingRef.current = null;
         setDraft(null);
         setEditing(false);
         // Tabbing through an untouched field must not rewrite the record.

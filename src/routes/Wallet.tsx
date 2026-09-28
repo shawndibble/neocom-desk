@@ -1,4 +1,13 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -507,8 +516,10 @@ function CorpWalletView({
 }: CorpWalletViewProps) {
   const { t } = useTranslation();
   // Called unconditionally, above the tab branch below — a hook can't follow
-  // an early return.
-  const { filteredJournal, refTypeOptions } = useJournalFilterResult(journal, journalFilter);
+  // an early return. Rows derive from a deferred copy (see `useUrlFilter`);
+  // the filter bar below keeps the immediate one.
+  const journalRowsFilter = useDeferredValue(journalFilter);
+  const { filteredJournal, refTypeOptions } = useJournalFilterResult(journal, journalRowsFilter);
 
   if (tab === 'balance') {
     const walletsResult = balances?.walletsResult.cached ?? null;
@@ -1096,13 +1107,13 @@ export function Wallet() {
   // journal is showing (owner, or corp division) — the ref-type dropdown is
   // built from that journal's own values, so carrying a filter across the
   // switch could pin a selection that journal never had.
-  const [journalFilter, setJournalFilter] = useUrlFilter<WalletJournalFilter>(
+  const [journalFilter, setJournalFilter, journalRowsFilter] = useUrlFilter<WalletJournalFilter>(
     journalFilterScope,
     JOURNAL_FILTER_PARAMS,
     JOURNAL_FIELD_TO_PARAM,
     EMPTY_JOURNAL_FILTER_PARAMS
   );
-  const { filteredJournal, refTypeOptions } = useJournalFilterResult(journal, journalFilter);
+  const { filteredJournal, refTypeOptions } = useJournalFilterResult(journal, journalRowsFilter);
   const journalSortProps = useUrlSort('journal.sort', JOURNAL_SORT, [
     'date',
     'refType',
@@ -1134,15 +1145,16 @@ export function Wallet() {
   // corporation, so an owner flip hides it either way; but the flip *back*
   // keeps the `/wallet/transactions` path, so it would arrive carrying the
   // filter from before.
-  const [transactionFilter, setTransactionFilter] = useUrlFilter<WalletTransactionFilter>(
-    journalFilterScope,
-    TRANSACTION_FILTER_PARAMS,
-    TRANSACTION_FIELD_TO_PARAM,
-    EMPTY_TRANSACTION_FILTER_PARAMS
-  );
+  const [transactionFilter, setTransactionFilter, transactionRowsFilter] =
+    useUrlFilter<WalletTransactionFilter>(
+      journalFilterScope,
+      TRANSACTION_FILTER_PARAMS,
+      TRANSACTION_FIELD_TO_PARAM,
+      EMPTY_TRANSACTION_FILTER_PARAMS
+    );
   const filteredTransactions = useMemo(
-    () => filterWalletTransactions(corpTransactionRows, transactionFilter, nameForType),
-    [corpTransactionRows, transactionFilter, nameForType]
+    () => filterWalletTransactions(corpTransactionRows, transactionRowsFilter, nameForType),
+    [corpTransactionRows, transactionRowsFilter, nameForType]
   );
   const transactionsSortProps = useUrlSort('txn.sort', TRANSACTIONS_SORT, [
     'date',

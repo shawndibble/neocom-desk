@@ -3,6 +3,7 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
@@ -11,6 +12,9 @@ import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadSkills } from '@/sde/loadSde';
 import type { SkillType } from '@/sde/types';
+
+const pricesMock = vi.hoisted(() => ({ getHubPrices: vi.fn() }));
+vi.mock('@/market/prices', () => pricesMock);
 
 const CHAR_ID = 91;
 
@@ -61,12 +65,21 @@ beforeEach(async () => {
   await db.esiCache.clear();
   useSkillDetailModalStore.setState({ request: null });
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
+  pricesMock.getHubPrices.mockReset().mockResolvedValue(new Map());
 });
 afterEach(() => {
   server.resetHandlers();
   configureEsi({ getToken: null });
 });
 afterAll(() => server.close());
+
+function renderModal() {
+  return render(
+    <MemoryRouter>
+      <SkillDetailModal />
+    </MemoryRouter>
+  );
+}
 
 function mockSkills(
   characterId: number,
@@ -85,7 +98,7 @@ function mockSkills(
 
 describe('SkillDetailModal', () => {
   it('renders nothing when no request is open', () => {
-    render(<SkillDetailModal />);
+    renderModal();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -93,7 +106,7 @@ describe('SkillDetailModal', () => {
     useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
     mockSkills(CHAR_ID, [{ skill_id: 1, trained_skill_level: 5 }]);
 
-    render(<SkillDetailModal />);
+    renderModal();
     act(() => useSkillDetailModalStore.getState().open(2));
 
     const dialog = await screen.findByRole('dialog');
@@ -103,11 +116,31 @@ describe('SkillDetailModal', () => {
     expect(within(dialog).getByText('Trained · Level 3')).toBeInTheDocument();
   });
 
+  it('shows the trade-hub sell price and an Open in Market link', async () => {
+    pricesMock.getHubPrices.mockResolvedValue(new Map([[2, { sellMin: 1_500_000, buyMax: null }]]));
+
+    renderModal();
+    act(() => useSkillDetailModalStore.getState().open(2));
+
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText('Frigate');
+    expect(await within(dialog).findByText('1.5M')).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'Open in Market' })).toBeInTheDocument();
+  });
+
+  it('shows no sell orders when the trade hub has none', async () => {
+    renderModal();
+    act(() => useSkillDetailModalStore.getState().open(2));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('No sell orders')).toBeInTheDocument();
+  });
+
   it('shows a prerequisite as still needed when the trained level falls short', async () => {
     useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
     mockSkills(CHAR_ID, [{ skill_id: 1, trained_skill_level: 1 }]);
 
-    render(<SkillDetailModal />);
+    renderModal();
     act(() => useSkillDetailModalStore.getState().open(2));
 
     const dialog = await screen.findByRole('dialog');
@@ -115,7 +148,7 @@ describe('SkillDetailModal', () => {
   });
 
   it('handles a skill with no prerequisites and no unlocks gracefully', async () => {
-    render(<SkillDetailModal />);
+    renderModal();
     act(() => useSkillDetailModalStore.getState().open(3));
 
     const dialog = await screen.findByRole('dialog');
@@ -124,7 +157,7 @@ describe('SkillDetailModal', () => {
   });
 
   it('works with no active character, showing every prerequisite as not yet trained', async () => {
-    render(<SkillDetailModal />);
+    renderModal();
     act(() => useSkillDetailModalStore.getState().open(2));
 
     const dialog = await screen.findByRole('dialog');
@@ -132,7 +165,7 @@ describe('SkillDetailModal', () => {
   });
 
   it('shows a neutral not-found state with no retry for an unknown skill type id', async () => {
-    render(<SkillDetailModal />);
+    renderModal();
     act(() => useSkillDetailModalStore.getState().open(99999));
 
     const dialog = await screen.findByRole('dialog');
@@ -145,7 +178,7 @@ describe('SkillDetailModal', () => {
   it('shows a load failure with an in-place Try again that never mentions Refresh', async () => {
     vi.mocked(loadSkills).mockRejectedValueOnce(new Error('boom'));
 
-    render(<SkillDetailModal />);
+    renderModal();
     act(() => useSkillDetailModalStore.getState().open(3));
 
     const dialog = await screen.findByRole('dialog');
@@ -169,7 +202,7 @@ describe('SkillDetailModal', () => {
       );
     const user = userEvent.setup();
 
-    render(<SkillDetailModal />);
+    renderModal();
     act(() => useSkillDetailModalStore.getState().open(3));
 
     const dialog = await screen.findByRole('dialog');
@@ -183,7 +216,7 @@ describe('SkillDetailModal', () => {
   });
 
   it('close() from the store hides the dialog', async () => {
-    render(<SkillDetailModal />);
+    renderModal();
     act(() => useSkillDetailModalStore.getState().open(3));
     await screen.findByRole('dialog');
 
