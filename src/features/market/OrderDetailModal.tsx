@@ -436,8 +436,8 @@ function computeSellThrough(
  * The suggested bid for a beaten buy order — one legal tick over the rival
  * (issue #1421) — or null when there is no rival price in hand to quote yet.
  * Reads `orderRowSummary` directly rather than `OrderRowSummaryText`'s own
- * internal call, since the quick answer needs the bare number to hand to
- * `CopyablePrice`, not the formatted sentence.
+ * internal call, since the quick answer needs the bare number for
+ * `CopyablePrice` to copy — the formatted sentence is only its visible label.
  */
 function outbidSuggestion(row: OpenOrderRow): number | null {
   const summary = orderRowSummary(row);

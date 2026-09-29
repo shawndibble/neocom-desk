@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { PortalContainerProvider } from './portalContainer';
 import { Toast } from './Toast';
 
 describe('Toast', () => {
@@ -13,6 +14,18 @@ describe('Toast', () => {
       screen.getByRole('status')
     );
     expect(document.body).toContainElement(screen.getByRole('status'));
+  });
+
+  it("portals into a Modal's container when inside one, so it isn't hidden behind the top layer", () => {
+    const modalBody = document.createElement('div');
+    document.body.appendChild(modalBody);
+    render(
+      <PortalContainerProvider value={modalBody}>
+        <Toast message="Copied" />
+      </PortalContainerProvider>
+    );
+    expect(modalBody).toContainElement(screen.getByRole('status'));
+    modalBody.remove();
   });
 
   it('shows the message and, given undo, a working undo link', () => {

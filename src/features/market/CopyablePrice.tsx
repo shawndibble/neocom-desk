@@ -58,7 +58,7 @@ export function CopyablePrice({
         type="button"
         onClick={() => void copy()}
         title={t('market.orders.copyPrice', { price: formatted })}
-        className="cursor-copy rounded-xs font-semibold hover:text-accent focus-visible:outline-2 focus-visible:outline-accent"
+        className="cursor-copy rounded-xs text-left font-semibold hover:text-accent focus-visible:outline-2 focus-visible:outline-accent"
       >
         {children ?? formatted}
       </button>
