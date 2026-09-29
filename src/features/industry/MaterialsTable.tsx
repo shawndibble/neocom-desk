@@ -533,8 +533,22 @@ export function MaterialsTable({
                   // Blueprint Acquisition (issue #838): marks this row as the
                   // blueprint itself, not a material the blueprint consumes —
                   // the same fixed slot every other row's toggle/advice glyph
-                  // occupies, so the name column never zigzags.
-                  <Icon.Blueprint size={Icon.ICON_SIZE.sm} className="text-text-dim" />
+                  // occupies, so the name column never zigzags. With a picker
+                  // to open, the glyph is itself the way into it: the tier is a
+                  // property of which blueprint this row resolves to, so the
+                  // control that changes it sits on the mark that says so.
+                  onOpenAcquisitionPicker ? (
+                    <IconButton
+                      size="sm"
+                      variant="plain"
+                      icon={<Icon.Blueprint size={Icon.ICON_SIZE.sm} />}
+                      label={t('industry.blueprintAcquisitionOpenPicker')}
+                      tooltip={t('industry.blueprintAcquisitionOpenPicker')}
+                      onClick={() => onOpenAcquisitionPicker(material.typeID)}
+                    />
+                  ) : (
+                    <Icon.Blueprint size={Icon.ICON_SIZE.sm} className="text-text-dim" />
+                  )
                 ) : (
                   advice && (
                     <MakeOrBuyMarker advice={advice} remaining={material.remainingQuantity} />
@@ -547,20 +561,6 @@ export function MaterialsTable({
                   verdict={skillGate}
                   nameForSkill={nameFor}
                   nameForCharacter={characterNameFor}
-                />
-              )}
-              {/* Blueprint Acquisition (issue #838): opens the picker/override
-                  modal for this row's tier right beside the name it governs,
-                  rather than beside the ME/TE caption in the price column —
-                  the config is about which blueprint this row resolves to,
-                  which is a property of the row's identity, not its price. */}
-              {material.acquisitionTier && onOpenAcquisitionPicker && (
-                <IconButton
-                  variant="plain"
-                  size="sm"
-                  icon={<Icon.OptimizeRemaps />}
-                  label={t('industry.blueprintAcquisitionOpenPicker')}
-                  onClick={() => onOpenAcquisitionPicker(material.typeID)}
                 />
               )}
             </span>
@@ -732,6 +732,14 @@ export function MaterialsTable({
               : state.fullyOwned
                 ? { text: t('industry.priceSourceOwned'), tone: 'text-text-dim' }
                 : { text: t('industry.unpriced'), tone: 'text-warning' };
+          const findBlueprint =
+            material.acquisitionTier &&
+            onOpenAcquisitionPicker &&
+            !overridden &&
+            state.unitPrice === null &&
+            !state.fullyOwned
+              ? () => onOpenAcquisitionPicker(material.typeID)
+              : undefined;
           return (
             /*
              * Mirrored from `sm` up rather than just right-aligned. The header
@@ -769,7 +777,20 @@ export function MaterialsTable({
                   tall. */}
               {(tag || overridden) && (
                 <span className="inline-flex items-center gap-1">
-                  {tag && <span className={cx('text-[0.6875rem]', tag.tone)}>{tag.text}</span>}
+                  {/* An unpriced blueprint row has an errand, not just a
+                      warning: the picker is where a tier with a price gets
+                      found, so the tag is the link into it. */}
+                  {tag && findBlueprint ? (
+                    <button
+                      type="button"
+                      className={textActionClassName('whitespace-nowrap')}
+                      onClick={findBlueprint}
+                    >
+                      {t('industry.blueprintAcquisitionFind')}
+                    </button>
+                  ) : (
+                    tag && <span className={cx('text-[0.6875rem]', tag.tone)}>{tag.text}</span>
+                  )}
                   {overridden && (
                     <IconButton
                       size="sm"
@@ -786,8 +807,8 @@ export function MaterialsTable({
               {/* Blueprint Acquisition (issue #838): the tier this row
                   resolved to, distinct from whatever the price tag above
                   already says about it (owned, overridden, or unpriced). The
-                  picker button that used to sit beside it now lives next to
-                  the material name in the first column instead. */}
+                  picker itself opens from the blueprint glyph in the first
+                  column. */}
               {material.acquisitionTier && (
                 <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
                   {t('industry.blueprintAcquisitionTier', material.acquisitionTier)}

@@ -1292,11 +1292,28 @@ describe('MaterialsTable Blueprint Acquisition picker trigger (issue #839)', () 
     materialCostLines(MATERIALS, HUB_PRICES)
   ).map((row, i) => (i === 0 ? { ...row, acquisitionTier: { me: 8, te: 16 } } : row));
 
-  it('shows the picker trigger beside the material name when the caller supplied a handler', () => {
+  it('makes the blueprint glyph in the name slot the picker trigger when the caller supplied a handler', () => {
     renderTable({ materials: acquisitionRow, onOpenAcquisitionPicker: vi.fn() });
 
     expect(screen.getByText('ME 8% / TE 16%')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Choose blueprint tier' })).toBeInTheDocument();
+    const nameSlot = within(row('Tritanium')).getAllByRole('cell')[0];
+    const triggers = within(nameSlot).getAllByRole('button', { name: 'Choose blueprint tier' });
+    expect(triggers).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Choose blueprint tier' })).toHaveLength(1);
+  });
+
+  it('offers "Find blueprint" in place of "No price" on an unpriced blueprint row', () => {
+    const onOpenAcquisitionPicker = vi.fn();
+    const unpricedRow = acquisitionRow.map((r, i) =>
+      i === 0 ? { ...r, unitPrice: null, unpriced: true } : r
+    );
+    renderTable({ materials: unpricedRow, onOpenAcquisitionPicker });
+
+    const tritanium = within(row('Tritanium'));
+    expect(tritanium.queryByText('No price')).toBeNull();
+    fireEvent.click(tritanium.getByRole('button', { name: 'Find blueprint' }));
+
+    expect(onOpenAcquisitionPicker).toHaveBeenCalledWith(34);
   });
 
   it('calls the handler with the row typeID when clicked', () => {
