@@ -22,6 +22,7 @@ import {
 } from '@/esi/endpoints';
 import { EsiError } from '@/esi/client';
 import {
+  conditionalFetch,
   loadWithCacheStatus,
   readCachedRows,
   type CachedResult,
@@ -52,24 +53,26 @@ const PLANETS_AUTH_POLICY = {
 export function loadCharacterPlanets(
   characterId: number
 ): Promise<StatusResult<CharacterPlanet[]>> {
-  return loadWithCacheStatus(
-    characterId,
-    LIST_KEY,
-    async () => (await getCharacterPlanets(characterId)).data,
-    PLANETS_AUTH_POLICY
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterPlanets(characterId, options)
   );
+  return loadWithCacheStatus(characterId, LIST_KEY, fetchLive, {
+    ...PLANETS_AUTH_POLICY,
+    conditional,
+  });
 }
 
 export function loadPlanetDetail(
   characterId: number,
   planetId: number
 ): Promise<StatusResult<CharacterPlanetDetail>> {
-  return loadWithCacheStatus(
-    characterId,
-    detailKey(planetId),
-    async () => (await getCharacterPlanet(characterId, planetId)).data,
-    PLANETS_AUTH_POLICY
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterPlanet(characterId, planetId, options)
   );
+  return loadWithCacheStatus(characterId, detailKey(planetId), fetchLive, {
+    ...PLANETS_AUTH_POLICY,
+    conditional,
+  });
 }
 
 /**

@@ -4,7 +4,7 @@
  * which the app synthesizes by diffing other endpoints.
  */
 import { getCharacterNotifications, type CharacterNotification } from '@/esi/endpoints';
-import { loadWithCacheStatus, type StatusResult } from '@/esi/cache';
+import { conditionalFetch, loadWithCacheStatus, type StatusResult } from '@/esi/cache';
 
 const KEYS = {
   notifications: 'notifications:eve',
@@ -17,9 +17,8 @@ const KEYS = {
 export function loadCharacterNotifications(
   characterId: number
 ): Promise<StatusResult<CharacterNotification[]>> {
-  return loadWithCacheStatus(
-    characterId,
-    KEYS.notifications,
-    async () => (await getCharacterNotifications(characterId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterNotifications(characterId, options)
   );
+  return loadWithCacheStatus(characterId, KEYS.notifications, fetchLive, { conditional });
 }

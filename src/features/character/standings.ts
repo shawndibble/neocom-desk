@@ -15,7 +15,7 @@
  * missing token row is unknown, not "lacks the scope", and still fetches.
  */
 import { getCharacterStandings, type CharacterStanding } from '@/esi/endpoints';
-import { loadWithCache } from '@/esi/cache';
+import { conditionalFetch, loadWithCache } from '@/esi/cache';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { db } from '@/db';
 
@@ -26,11 +26,12 @@ export async function loadCharacterStandings(characterId: number): Promise<Chara
   const token = await db.tokens.get(characterId);
   // `scopes` post-dates the tokens table (app/useGrantedScopes.ts), so an old row may lack it.
   if (token && !(token.scopes ?? []).includes(STANDINGS_SCOPE)) return [];
-  const result = await loadWithCache(
-    characterId,
-    KEY,
-    async () => (await getCharacterStandings(characterId)).data,
-    { detectAuthFailure: () => false }
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterStandings(characterId, options)
   );
+  const result = await loadWithCache(characterId, KEY, fetchLive, {
+    detectAuthFailure: () => false,
+    conditional,
+  });
   return result?.data ?? [];
 }

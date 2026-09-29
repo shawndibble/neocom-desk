@@ -20,6 +20,22 @@ export interface PaginatedResult<T> extends TruncatableResult<T> {
   pagesFetched: number;
   /** Pages the first response advertised via X-Pages (1 when unpaginated). */
   pagesReported: number;
+  /**
+   * One entry per page walked, indexed by page number (entry `i` is page
+   * `i + 1`, empty bodies included) — present only when
+   * the call asked to revalidate (`pageEtags`, even empty). A 304 page's items
+   * are not in `items`: the caller restores them from what it holds.
+   */
+  pageResponses?: PageResponse<T>[];
+}
+
+/** What one page of a revalidating walk answered. */
+export interface PageResponse<T> {
+  /** The page's items; `null` for a 304 (or an empty body). */
+  items: T[] | null;
+  etag: string | null;
+  /** The server answered 304 to this page's If-None-Match. */
+  notModified: boolean;
 }
 
 export interface FetchAllPagesOptions extends Omit<EsiFetchOptions, 'page' | 'etag'> {
@@ -29,6 +45,13 @@ export interface FetchAllPagesOptions extends Omit<EsiFetchOptions, 'page' | 'et
    * than report it.
    */
   maxPages?: number;
+  /**
+   * Revalidate page by page: entry `i` is sent as page `i + 1`'s
+   * If-None-Match (a page past the end, or an `undefined` entry, goes
+   * unconditionally), and the result carries `pageResponses`. Every page is
+   * still requested — a 304 on page 1 says nothing about pages 2..N.
+   */
+  pageEtags?: ReadonlyArray<string | undefined>;
 }
 
 /**
@@ -42,7 +65,8 @@ export const PAGE_FETCH_CONCURRENCY = 4;
 /**
  * Fetch every page of an X-Pages ESI list. Page 1 goes alone (it carries the
  * page count); pages 2..N then run `PAGE_FETCH_CONCURRENCY` at a time and are
- * reassembled in page order. `page`/`etag` are ignored — always fetched fresh.
+ * reassembled in page order. `page`/`etag` are ignored; see `pageEtags` for
+ * the per-page conditional form.
  *
  * Same outcome as a strictly sequential walk: a 404 after page 1 means the
  * list shrank between the X-Pages count and that request, so it ends the data
@@ -64,18 +88,36 @@ export async function fetchAllPagesStatus<T>(
   path: string,
   options: FetchAllPagesOptions = {}
 ): Promise<PaginatedResult<T>> {
-  const { maxPages, endpointId, characterId, ...rest } = options;
+  // Each page's own `etag` below overrides any single one passed in, which
+  // could not answer for every page anyway.
+  const { maxPages, endpointId, characterId, pageEtags, ...rest } = options;
   const fetchOptions = { ...rest, characterId };
+  const fetchPage = (page: number): Promise<PageResponse<T>> =>
+    esiFetch<T[]>(path, { ...fetchOptions, page, etag: pageEtags?.[page - 1] }).then((result) => ({
+      items: result.data,
+      etag: result.etag,
+      notModified: result.notModified,
+    }));
   try {
-    const first = await esiFetch<T[]>(path, { ...fetchOptions, page: 1 });
-    const items: T[] = [...(first.data ?? [])];
-    let pagesFetched = first.data ? 1 : 0;
+    let first = await esiFetch<T[]>(path, { ...fetchOptions, page: 1, etag: pageEtags?.[0] });
+    // X-Pages is the only page count there is, and a 304 need not carry it
+    // (ESI's does; nothing guarantees it). A page-1 304 that reads as one page
+    // when more were held is asked again unconditionally, rather than letting
+    // pages 2..N silently drop off the list.
+    if (first.notModified && first.pages === 1 && (pageEtags?.length ?? 0) > 1) {
+      first = await esiFetch<T[]>(path, { ...fetchOptions, page: 1 });
+    }
+    const responses: PageResponse<T>[] = [
+      { items: first.data, etag: first.etag, notModified: first.notModified },
+    ];
     const lastPage = maxPages === undefined ? first.pages : Math.min(first.pages, maxPages);
-    for (const data of await fetchRemainingPages<T>(path, fetchOptions, lastPage)) {
-      if (data) {
-        items.push(...data);
-        pagesFetched += 1;
-      }
+    responses.push(...(await fetchRemainingPages<T>(fetchPage, lastPage)));
+    const items: T[] = [];
+    let pagesFetched = 0;
+    for (const response of responses) {
+      if (!response.items && !response.notModified) continue;
+      items.push(...(response.items ?? []));
+      pagesFetched += 1;
     }
     recordEsiActivity(endpointId, characterId, 'success');
     return {
@@ -83,6 +125,7 @@ export async function fetchAllPagesStatus<T>(
       truncated: pagesFetched < first.pages,
       pagesFetched,
       pagesReported: first.pages,
+      ...(pageEtags ? { pageResponses: responses } : {}),
     };
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') throw err;
@@ -92,7 +135,7 @@ export async function fetchAllPagesStatus<T>(
   }
 }
 
-type PageOutcome<T> = { ok: true; data: T[] | null } | { ok: false; error: unknown };
+type PageOutcome<T> = { ok: true; response: PageResponse<T> } | { ok: false; error: unknown };
 
 /**
  * Pages 2..`lastPage`, in page order, cut at the first 404. Workers never
@@ -100,10 +143,9 @@ type PageOutcome<T> = { ok: true; data: T[] | null } | { ok: false; error: unkno
  * requests running unobserved behind an early throw.
  */
 async function fetchRemainingPages<T>(
-  path: string,
-  fetchOptions: Omit<EsiFetchOptions, 'page' | 'etag'>,
+  fetchPage: (page: number) => Promise<PageResponse<T>>,
   lastPage: number
-): Promise<Array<T[] | null>> {
+): Promise<PageResponse<T>[]> {
   const outcomes = new Map<number, PageOutcome<T>>();
   let next = 2;
   let stopped = false;
@@ -113,8 +155,7 @@ async function fetchRemainingPages<T>(
       const page = next;
       next += 1;
       try {
-        const result = await esiFetch<T[]>(path, { ...fetchOptions, page });
-        outcomes.set(page, { ok: true, data: result.data });
+        outcomes.set(page, { ok: true, response: await fetchPage(page) });
       } catch (error) {
         outcomes.set(page, { ok: false, error });
         // A 404 ends the data and anything else will throw: either way no
@@ -126,7 +167,7 @@ async function fetchRemainingPages<T>(
   const workers = Math.min(PAGE_FETCH_CONCURRENCY, Math.max(0, lastPage - 1));
   await Promise.all(Array.from({ length: workers }, () => worker()));
 
-  const pages: Array<T[] | null> = [];
+  const pages: PageResponse<T>[] = [];
   for (let page = 2; page <= lastPage; page += 1) {
     const outcome = outcomes.get(page);
     // Never dispatched: an earlier page stopped the walk, and the loop below
@@ -139,7 +180,7 @@ async function fetchRemainingPages<T>(
       if (outcome.error instanceof EsiError && outcome.error.status === 404) break;
       throw outcome.error;
     }
-    pages.push(outcome.data);
+    pages.push(outcome.response);
   }
   return pages;
 }

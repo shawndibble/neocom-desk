@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '@/db';
 import {
   conditionalFetch,
+  conditionalPagedFetch,
   invalidateFreshness,
   isCacheFresh,
   loadPaginatedWithCacheStatus,
@@ -25,6 +26,7 @@ import {
   purgeCharacterCacheOrSuppress,
 } from './cachePurge';
 import type { EsiResult } from './client';
+import type { PageResponse, PaginatedResult } from './paginated';
 
 const CHAR_ID = 91;
 const KEY = 'thing';
@@ -357,5 +359,149 @@ describe('conditional revalidation (ETag / 304)', () => {
       throw new Error('offline');
     });
     expect(result.cached?.fetchedAt).toEqual(new Date(T0));
+  });
+});
+
+describe('per-page conditional revalidation of a paginated list (ETag / 304)', () => {
+  /** A server-side page: its items and the ETag it currently carries. */
+  type ServerPage = { items: string[]; etag: string };
+
+  /**
+   * Answers like `fetchAllPagesStatus` would against `server`: a page whose
+   * sent ETag still matches is a 304 (no items), anything else a 200.
+   */
+  function pagedFetch(server: ServerPage[], sent: Array<ReadonlyArray<string | undefined>> = []) {
+    return conditionalPagedFetch<string>(async ({ pageEtags }) => {
+      sent.push([...pageEtags]);
+      const pageResponses: PageResponse<string>[] = server.map((page, i) =>
+        pageEtags[i] === page.etag
+          ? { items: null, etag: page.etag, notModified: true }
+          : { items: page.items, etag: page.etag, notModified: false }
+      );
+      const result: PaginatedResult<string> = {
+        items: pageResponses.flatMap((p) => p.items ?? []),
+        truncated: false,
+        pagesFetched: server.length,
+        pagesReported: server.length,
+        pageResponses,
+      };
+      return result;
+    });
+  }
+
+  const V1: ServerPage[] = [
+    { items: ['a', 'b'], etag: '"p1"' },
+    { items: ['c', 'd'], etag: '"p2"' },
+    { items: ['e'], etag: '"p3"' },
+  ];
+
+  async function seed(server: ServerPage[] = V1): Promise<void> {
+    at(T0);
+    const { fetchLive, conditional } = pagedFetch(server);
+    await loadPaginatedWithCacheStatus(CHAR_ID, KEY, fetchLive, { conditional });
+  }
+
+  async function reload(server: ServerPage[], sent?: Array<ReadonlyArray<string | undefined>>) {
+    const { fetchLive, conditional } = pagedFetch(server, sent);
+    return loadPaginatedWithCacheStatus(CHAR_ID, KEY, fetchLive, { conditional });
+  }
+
+  it('sends each page its stored ETag; every page 304 bumps freshness without rewriting the value', async () => {
+    await seed();
+    const later = T0 + STALE_AFTER.default + 1;
+    at(later);
+    const sent: Array<ReadonlyArray<string | undefined>> = [];
+    const put = vi.spyOn(db.esiCache, 'put');
+
+    const result = await reload(V1, sent);
+
+    expect(sent).toEqual([['"p1"', '"p2"', '"p3"']]);
+    expect(put).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      cached: {
+        data: ['a', 'b', 'c', 'd', 'e'],
+        fetchedAt: new Date(later),
+        fromCache: false,
+        truncated: false,
+      },
+      needsReauth: false,
+    });
+    expect((await db.esiCacheMeta.get([CHAR_ID, KEY]))?.fetchedAt).toBe(later);
+    expect((await db.esiCache.get([CHAR_ID, KEY]))?.fetchedAt).toBe(T0);
+    expect(await isCacheFresh(CHAR_ID, KEY)).toBe(true);
+  });
+
+  it('one page 200 among 304s: rebuilds the list in page order from stored and fresh pages', async () => {
+    await seed();
+    at(T0 + STALE_AFTER.default + 1);
+    const changed = [V1[0], { items: ['c2', 'd2', 'x'], etag: '"p2b"' }, V1[2]];
+
+    const result = await reload(changed);
+
+    expect(result.cached?.data).toEqual(['a', 'b', 'c2', 'd2', 'x', 'e']);
+    expect((await db.esiCache.get([CHAR_ID, KEY]))?.value).toEqual([
+      'a',
+      'b',
+      'c2',
+      'd2',
+      'x',
+      'e',
+    ]);
+    // And the new page ETags are what the next read sends.
+    at(T0 + 2 * (STALE_AFTER.default + 1));
+    const sent: Array<ReadonlyArray<string | undefined>> = [];
+    const again = await reload(changed, sent);
+    expect(sent).toEqual([['"p1"', '"p2b"', '"p3"']]);
+    expect(again.cached?.data).toEqual(['a', 'b', 'c2', 'd2', 'x', 'e']);
+  });
+
+  it('X-Pages grew: stored pages 304, the new page is added, and the value is rewritten', async () => {
+    await seed();
+    at(T0 + STALE_AFTER.default + 1);
+    const grown = [...V1, { items: ['f'], etag: '"p4"' }];
+    const sent: Array<ReadonlyArray<string | undefined>> = [];
+
+    const result = await reload(grown, sent);
+
+    expect(sent).toEqual([['"p1"', '"p2"', '"p3"']]);
+    expect(result.cached?.data).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
+    expect((await db.esiCache.get([CHAR_ID, KEY]))?.value).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
+  });
+
+  it('X-Pages shrank: every remaining page 304 still rewrites the shorter list', async () => {
+    await seed();
+    at(T0 + STALE_AFTER.default + 1);
+
+    const result = await reload(V1.slice(0, 2));
+
+    expect(result.cached?.data).toEqual(['a', 'b', 'c', 'd']);
+    expect((await db.esiCache.get([CHAR_ID, KEY]))?.value).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('a row with no page ETags (legacy, or an old bundle) fetches unconditionally', async () => {
+    at(T0);
+    await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: ['old'], fetchedAt: T0 });
+    at(T0 + STALE_AFTER.default + 1);
+    const sent: Array<ReadonlyArray<string | undefined>> = [];
+
+    const result = await reload(V1, sent);
+
+    expect(sent).toEqual([[]]);
+    expect(result.cached?.data).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  it('a 304 page whose stored row has since changed refetches unconditionally', async () => {
+    await seed();
+    // Rewritten without page ETags behind meta's back; meta still names them.
+    const meta = await db.esiCacheMeta.get([CHAR_ID, KEY]);
+    await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: ['other'], fetchedAt: T0 });
+    await db.esiCacheMeta.put(meta!);
+    at(T0 + STALE_AFTER.default + 1);
+    const sent: Array<ReadonlyArray<string | undefined>> = [];
+
+    const result = await reload(V1, sent);
+
+    expect(sent).toEqual([['"p1"', '"p2"', '"p3"'], []]);
+    expect(result.cached?.data).toEqual(['a', 'b', 'c', 'd', 'e']);
   });
 });

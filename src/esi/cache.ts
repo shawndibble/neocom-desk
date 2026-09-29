@@ -5,13 +5,13 @@
  * response nor a cached one. One implementation for every `features/*` data
  * module (docs/ARCHITECTURE.md §3).
  */
-import { db, type EsiCacheMetaRecord, type EsiCacheRecord } from '@/db';
+import { db, type CachedPage, type EsiCacheMetaRecord, type EsiCacheRecord } from '@/db';
 import { metaOf } from '@/db/esiCacheMeta';
 import { emitEsiAuthFailure } from './authFailureSignal';
 import { EsiError, isAuthFailure, type EsiResult } from './client';
 import { isCachePurgePending } from './cachePurge';
 import { grantHoldsEndpointScope } from './grantScope';
-import type { TruncatableResult } from './paginated';
+import type { PageResponse, PaginatedResult, TruncatableResult } from './paginated';
 
 export interface CachedResult<T> {
   data: T;
@@ -114,7 +114,7 @@ export interface ExpiresCapture {
  * A 304 then costs a bump of the row's freshness in `esiCacheMeta` — no body
  * download, no JSON parse, and no rewrite of a value that did not change.
  * Single-response loaders only (`loadWithCache[Status]`): a paginated list's
- * page-1 304 says nothing about pages 2..N.
+ * page-1 304 says nothing about pages 2..N — see `PagedConditionalCapture`.
  */
 export interface ConditionalCapture {
   /** Set by the cache: the stored row's ETag, or undefined to fetch unconditionally. */
@@ -154,6 +154,49 @@ export function conditionalFetch<T>(fetch: (options: { etag?: string }) => Promi
     conditional.expires = result.expires;
     conditional.notModified = result.notModified;
     return result.data;
+  };
+  return { fetchLive, conditional };
+}
+
+/**
+ * `ConditionalCapture` for a paginated list, one ETag per page: the cache fills
+ * `ifNoneMatch` from the stored row's pages, and `fetchLive` reports every
+ * page's answer back. Build it with `conditionalPagedFetch`.
+ *
+ * Every page is still requested. Only a list whose every page is a 304, with
+ * the same page count as before, is left unwritten (a meta bump, as for a
+ * single response); otherwise it is rebuilt from the stored items of its 304
+ * pages and the fresh items of the rest.
+ */
+export interface PagedConditionalCapture<T> {
+  /** Set by the cache: the stored per-page ETags, or undefined to fetch unconditionally. */
+  ifNoneMatch: ReadonlyArray<string> | undefined;
+  /** Set by `fetchLive`: what each walked page answered, entry `i` for page `i + 1`. */
+  pageResponses: PageResponse<T>[] | undefined;
+}
+
+/**
+ * `conditionalFetch` for a paginated list:
+ *
+ *     const { fetchLive, conditional } = conditionalPagedFetch((o) => getX(id, o));
+ *     return loadPaginatedWithCacheStatus(id, KEY, fetchLive, { conditional });
+ *
+ * The same rule applies: only for a loader whose cached value is the pages'
+ * items as-is.
+ */
+export function conditionalPagedFetch<T>(
+  fetch: (options: {
+    pageEtags: ReadonlyArray<string | undefined>;
+  }) => Promise<TruncatableResult<T> & Pick<PaginatedResult<T>, 'pageResponses'>>
+): { fetchLive: () => Promise<TruncatableResult<T>>; conditional: PagedConditionalCapture<T> } {
+  const conditional: PagedConditionalCapture<T> = {
+    ifNoneMatch: undefined,
+    pageResponses: undefined,
+  };
+  const fetchLive = async (): Promise<TruncatableResult<T>> => {
+    const result = await fetch({ pageEtags: conditional.ifNoneMatch ?? [] });
+    conditional.pageResponses = result.pageResponses;
+    return result;
   };
   return { fetchLive, conditional };
 }
@@ -237,6 +280,12 @@ export interface LoadWithCacheStatusOptions {
 export interface LoadSingleWithCacheOptions extends LoadWithCacheStatusOptions {
   /** Revalidate with the stored ETag; see `conditionalFetch`. */
   conditional?: ConditionalCapture;
+}
+
+/** `loadPaginatedWithCache[Status]` only. */
+export interface LoadPaginatedWithCacheOptions<T> extends LoadWithCacheStatusOptions {
+  /** Revalidate page by page with the stored ETags; see `conditionalPagedFetch`. */
+  conditional?: PagedConditionalCapture<T>;
 }
 
 /**
@@ -663,7 +712,12 @@ async function loadWithCacheStatusLive<T>(
     if (conditional) conditional.ifNoneMatch = await revalidationEtag(characterId, key);
     let data = await fetchLive();
     if (conditional?.notModified) {
-      const revalidated = await applyNotModified<T>(characterId, key, conditional);
+      const revalidated = await applyNotModified<T>(
+        characterId,
+        key,
+        conditional.ifNoneMatch,
+        conditional.expires
+      );
       if (revalidated) return { cached: revalidated, needsReauth: false };
       // The row the ETag vouched for changed or vanished in the meantime, so
       // there is nothing for the 304 to point at: ask again, unconditionally.
@@ -735,12 +789,12 @@ async function revalidationEtag(characterId: number, key: string): Promise<strin
 async function applyNotModified<T>(
   characterId: number,
   key: string,
-  conditional: ConditionalCapture
+  sent: string | undefined,
+  expires: string | null
 ): Promise<CachedResult<T> | null> {
-  const sent = conditional.ifNoneMatch;
   if (sent === undefined || (await isCachePurgePending(characterId))) return null;
   const now = Date.now();
-  const expiresAt = parseExpiresHeader(conditional.expires);
+  const expiresAt = parseExpiresHeader(expires);
   return db.transaction('rw', db.esiCache, db.esiCacheMeta, async () => {
     const meta = await db.esiCacheMeta.get([characterId, key]);
     if (meta?.etag !== sent) return null;
@@ -906,7 +960,7 @@ export async function loadPaginatedWithCacheStatus<T>(
   characterId: number,
   key: string,
   fetchLive: () => Promise<TruncatableResult<T>>,
-  options: LoadWithCacheStatusOptions = {}
+  options: LoadPaginatedWithCacheOptions<T> = {}
 ): Promise<StatusResult<T[]>> {
   const staleAfterMs = options.staleAfterMs ?? STALE_AFTER.default;
   const fresh = await readFreshRow<T[]>(characterId, key, staleAfterMs);
@@ -922,13 +976,36 @@ async function loadPaginatedWithCacheStatusLive<T>(
   characterId: number,
   key: string,
   fetchLive: () => Promise<TruncatableResult<T>>,
-  options: LoadWithCacheStatusOptions,
+  options: LoadPaginatedWithCacheOptions<T>,
   read: RowReader
 ): Promise<StatusResult<T[]>> {
   const detectAuthFailure = options.detectAuthFailure ?? isAuthFailure;
+  const { conditional } = options;
   let needsReauth = false;
   try {
-    const { items, truncated } = await fetchLive();
+    const stored = conditional ? await revalidationPages(characterId, key) : undefined;
+    if (conditional) conditional.ifNoneMatch = stored?.map((page) => page.etag);
+    let live = await fetchLive();
+    let revalidated =
+      stored && conditional
+        ? await revalidatePages<T>(characterId, key, stored, conditional, live, options)
+        : undefined;
+    if (revalidated === null && conditional) {
+      // The row the ETags vouched for changed or vanished in the meantime, so
+      // there is nothing for a 304 page to point at: ask again, unconditionally.
+      conditional.ifNoneMatch = undefined;
+      live = await fetchLive();
+      revalidated = undefined;
+    }
+    if (revalidated && 'cached' in revalidated) {
+      return { cached: revalidated.cached, needsReauth: false };
+    }
+    const items = revalidated?.items ?? live.items;
+    const { truncated } = live;
+    const pages =
+      conditional && !truncated
+        ? pagesOf(conditional.pageResponses, revalidated?.counts)
+        : undefined;
     const fetchedAt = Date.now();
     // Whether the stored list is complete is a meta question; its value is
     // read only when it is about to be served in place of this partial one.
@@ -944,6 +1021,7 @@ async function loadPaginatedWithCacheStatusLive<T>(
         fetchedAt,
         truncated,
         ...(expiresAt !== undefined ? { expiresAt } : {}),
+        ...(pages ? { pages, etag: pagedEtag(pages) } : {}),
       });
       return {
         cached: { data: items, fetchedAt: new Date(fetchedAt), fromCache: false, truncated },
@@ -988,9 +1066,102 @@ export async function loadPaginatedWithCache<T>(
   characterId: number,
   key: string,
   fetchLive: () => Promise<TruncatableResult<T>>,
-  options: LoadWithCacheStatusOptions = {}
+  options: LoadPaginatedWithCacheOptions<T> = {}
 ): Promise<CachedResult<T[]> | null> {
   return (await loadPaginatedWithCacheStatus(characterId, key, fetchLive, options)).cached;
+}
+
+/**
+ * The single `etag` a paginated row is stored under: every page's, together,
+ * so the whole-list 304 bump (`applyNotModified`) and `metaVouchesFor` judge
+ * it exactly as they judge a single response's.
+ */
+function pagedEtag(pages: ReadonlyArray<CachedPage>): string {
+  return JSON.stringify(pages.map((page) => page.etag));
+}
+
+/** The stored pages worth revalidating, if any. Reads meta only. */
+async function revalidationPages(
+  characterId: number,
+  key: string
+): Promise<CachedPage[] | undefined> {
+  const meta = await readMeta(characterId, key);
+  // A partial list's ETags would vouch only for the part we hold.
+  if (!meta?.pages?.length || meta.truncated === true) return undefined;
+  return meta.etag === pagedEtag(meta.pages) ? meta.pages : undefined;
+}
+
+/** Each collected page's ETag and item count; undefined unless every page has an ETag. */
+function pagesOf<T>(
+  responses: ReadonlyArray<PageResponse<T>> | undefined,
+  counts: ReadonlyArray<number> | undefined
+): CachedPage[] | undefined {
+  if (!responses?.length) return undefined;
+  const pages: CachedPage[] = [];
+  for (const [i, response] of responses.entries()) {
+    if (response.etag === null) return undefined;
+    pages.push({ etag: response.etag, count: counts?.[i] ?? response.items?.length ?? 0 });
+  }
+  return pages;
+}
+
+/**
+ * Fold a per-page revalidation into one list:
+ *
+ * - `undefined`: no page was a 304 — the live items stand as they are.
+ * - `{ cached }`: every page was a 304 and the page count held; meta was
+ *   bumped and the stored value is handed back unwritten.
+ * - `{ items, counts }`: the list rebuilt in page order — stored items for the
+ *   304 pages, fresh ones for the rest — with each page's item count.
+ * - `null`: the stored row is no longer the one the ETags vouched for, so a
+ *   304 points at nothing we hold and the caller must refetch unconditionally.
+ */
+async function revalidatePages<T>(
+  characterId: number,
+  key: string,
+  stored: ReadonlyArray<CachedPage>,
+  conditional: PagedConditionalCapture<T>,
+  live: TruncatableResult<T>,
+  options: LoadWithCacheStatusOptions
+): Promise<{ cached: CachedResult<T[]> } | { items: T[]; counts: number[] } | null | undefined> {
+  const responses = conditional.pageResponses ?? [];
+  if (!responses.some((response) => response.notModified)) return undefined;
+  const sent = pagedEtag(stored);
+  if (
+    !live.truncated &&
+    responses.length === stored.length &&
+    responses.every((response) => response.notModified)
+  ) {
+    const cached = await applyNotModified<T[]>(
+      characterId,
+      key,
+      sent,
+      options.expiresCapture?.value ?? null
+    );
+    return cached ? { cached } : null;
+  }
+  if (await isCachePurgePending(characterId)) return null;
+  const row = await db.esiCache.get([characterId, key]);
+  if (row?.etag !== sent || !Array.isArray(row.value)) return null;
+  const value = row.value as T[];
+  const starts: number[] = [];
+  let offset = 0;
+  for (const page of stored) {
+    starts.push(offset);
+    offset += page.count;
+  }
+  if (offset !== value.length) return null;
+  const items: T[] = [];
+  const counts: number[] = [];
+  for (const [i, response] of responses.entries()) {
+    let page: T[];
+    if (!response.notModified) page = response.items ?? [];
+    else if (i < stored.length) page = value.slice(starts[i], starts[i] + stored[i].count);
+    else return null;
+    items.push(...page);
+    counts.push(page.length);
+  }
+  return { items, counts };
 }
 
 // ---------------------------------------------------------------------------
