@@ -182,6 +182,10 @@ const SUBJECT_URLS: Partial<Record<NotificationEventId, SubjectUrl>> = {
   // The item itself, selected via Market Browser's own `?type=` param rather
   // than a pulsed table row — there is no table on arrival to pulse.
   priceAlertTriggered: (base, subjectId) => withParam(base, 'type', String(subjectId)),
+  // The wallet division the threshold tripped on, selected via Corp Wallet's
+  // own `?division=` param — the balance or journal it is about is that
+  // division's.
+  corpWalletThreshold: (base, subjectId) => withParam(base, 'division', String(subjectId)),
 };
 
 /** The events a subject id routes for — see `SUBJECT_URLS`. */

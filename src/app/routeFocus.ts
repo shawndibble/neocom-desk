@@ -36,10 +36,15 @@ export const HEADING_WAIT_MS = 2000;
  * matched route pattern with any splat dropped — so `/assets` and
  * `/assets/60003760` are one page, `/skills/plans/1` and `/2` are one page
  * apart from the plan list, and opening a Fitting (`/ships/fittings/edit`)
- * is a page change from the library it was opened from.
+ * is a page change from the library it was opened from. A tabbed page inside
+ * a sub-nav (`/corp/wallet`) collapses both ways: its tabs to it, and it to
+ * its section.
  */
 export function focusKeyFor(pathname: string): string {
-  if (tabbedPageFor(pathname) !== null) return pageKeyFor(pathname);
+  if (tabbedPageFor(pathname) !== null) {
+    const page = pageKeyFor(pathname);
+    return SUB_NAV_PAGES[page as AppRoutePath] ?? page;
+  }
   const pattern = pagePathFor(pathname);
   if (pattern === '/*') return pathname;
   const route = pattern.replace(/\/\*$/, '') as AppRoutePath;
