@@ -134,6 +134,10 @@ export interface MarketWideCandidate {
 
 export interface MarketWideRow extends RankedOpportunity {
   productTypeID: number;
+  /** profit ÷ revenue × 100, on the same net profit `iskPerHour` uses; null when revenue is 0 (unknown, never 0%). */
+  marginPct: number | null;
+  /** The whole flattened tree's skill-adjusted job time at TE 0 — the duration `iskPerHour` divides by, not a wall-clock promise. */
+  seconds: number;
 }
 
 /**
@@ -162,6 +166,8 @@ export function computeMarketWideRows(
     id: string;
     productTypeID: number;
     iskPerHour: number;
+    marginPct: number | null;
+    seconds: number;
     buildCost: number;
     sellDepthIsk: number;
   }[] = [];
@@ -209,6 +215,8 @@ export function computeMarketWideRows(
       id: String(candidate.productTypeID),
       productTypeID: candidate.productTypeID,
       iskPerHour,
+      marginPct: revenue > 0 ? (profit / revenue) * 100 : null,
+      seconds,
       buildCost,
       sellDepthIsk: candidate.sellDepthIsk,
     });
@@ -216,5 +224,8 @@ export function computeMarketWideRows(
 
   const ranked = rankOpportunities(priced, thresholds);
   const byId = new Map(priced.map((p) => [p.id, p]));
-  return ranked.map((r) => ({ ...r, productTypeID: byId.get(r.id)!.productTypeID }));
+  return ranked.map((r) => {
+    const { productTypeID, marginPct, seconds } = byId.get(r.id)!;
+    return { ...r, productTypeID, marginPct, seconds };
+  });
 }

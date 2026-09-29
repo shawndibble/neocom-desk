@@ -193,6 +193,49 @@ describe('computeMarketWideRows', () => {
     expect(rows.map((r) => r.id)).toEqual(['2', '1']);
   });
 
+  it('carries margin (profit ÷ revenue) and the seconds ISK/hour divides by (issue #2297)', () => {
+    const rows = computeMarketWideRows(
+      [{ productTypeID: 1, tree, sellPrice: 1000, sellDepthIsk: 5_000_000 }],
+      new Map([
+        [50, 10],
+        [51, 20],
+      ]),
+      noFee
+    );
+    // profit 625 on revenue 1000 (see the first test), over 1 hour.
+    expect(rows[0]!.marginPct).toBeCloseTo(62.5);
+    expect(rows[0]!.seconds).toBe(3600);
+  });
+
+  it('reports the whole multi-tier tree time as seconds, on the same basis as ISK/hour (issue #2297)', () => {
+    // Top job 3600s plus a folded-in sub-job of 1800s — the baked tree sums them.
+    const multiTier = { ...tree, time: 3600 + 1800 };
+    const [row] = computeMarketWideRows(
+      [{ productTypeID: 1, tree: multiTier, sellPrice: 1000, sellDepthIsk: 5_000_000 }],
+      new Map([
+        [50, 10],
+        [51, 20],
+      ]),
+      noFee
+    );
+    expect(row!.seconds).toBe(5400);
+    // Same profit (625) as the single-tier case, now spread over 1.5 hours.
+    expect(row!.iskPerHour).toBeCloseTo((625 / row!.seconds) * 3600);
+  });
+
+  it('leaves margin unknown (null), never 0%, when revenue is 0', () => {
+    const [row] = computeMarketWideRows(
+      [{ productTypeID: 1, tree, sellPrice: 0, sellDepthIsk: 5_000_000 }],
+      new Map([
+        [50, 10],
+        [51, 20],
+      ]),
+      noFee
+    );
+    expect(row!.marginPct).toBeNull();
+    expect(row!.seconds).toBe(3600);
+  });
+
   it('reports the same ISK/hour as the owned-blueprint panel for an equivalent product, including time skills (issue #1230 AC2)', () => {
     // Same product/recipe/runs(1)/ME(0)/facility(NPC)/skills/prices on both
     // paths — the two panels' "ISK/hour" must agree at the same basis,
