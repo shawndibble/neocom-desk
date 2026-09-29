@@ -137,6 +137,16 @@ describe('firestore.indexes.json composite indexes', () => {
           { fieldPath: 'firedAt', order: 'ASCENDING' },
         ],
       },
+      // registerDevice's per-device replace (issue #2240, projectionStore.ts).
+      {
+        collectionGroup: 'projections',
+        queryScope: 'COLLECTION',
+        fields: [
+          { fieldPath: 'deviceId', order: 'ASCENDING' },
+          { fieldPath: 'characterId', order: 'ASCENDING' },
+          { fieldPath: 'fired', order: 'ASCENDING' },
+        ],
+      },
     ]);
   });
 });
