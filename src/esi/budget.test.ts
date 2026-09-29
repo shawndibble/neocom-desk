@@ -9,6 +9,9 @@ import {
   DEFAULT_ERROR_WINDOW_MS,
   MAX_CIRCUIT_MS,
   ESI_MAX_IN_FLIGHT,
+  ESI_FOREGROUND_RESERVE,
+  esiInFlight,
+  promoteEsiLane,
   passEsiGate,
   observeEsiResponse,
   resetEsiBudget,
@@ -505,6 +508,47 @@ describe('the app-wide gate', () => {
   it('rejects a caller whose signal is already aborted, rather than sitting out the wait', async () => {
     observeEsiResponse(429, headers({ 'retry-after': '3' }));
     await expect(passEsiGate(AbortSignal.abort())).rejects.toThrow();
+  });
+
+  it('holds background passes to the non-reserved permits, keeping the reserve for foreground (issue #2271)', async () => {
+    const backgroundCap = ESI_MAX_IN_FLIGHT - ESI_FOREGROUND_RESERVE;
+    const releases: Array<() => void> = [];
+    for (let i = 0; i < backgroundCap; i += 1) {
+      releases.push(await passEsiGate(undefined, { priority: 'low' }));
+    }
+    let backgroundAdmitted = false;
+    void passEsiGate(undefined, { priority: 'low' }).then((release) => {
+      backgroundAdmitted = true;
+      releases.push(release);
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(backgroundAdmitted).toBe(false);
+    expect(esiInFlight()).toBe(backgroundCap);
+
+    // Every reserved permit goes to foreground at once.
+    for (let i = 0; i < ESI_FOREGROUND_RESERVE; i += 1) releases.push(await passEsiGate());
+    expect(esiInFlight()).toBe(ESI_MAX_IN_FLIGHT);
+    for (const release of releases) release();
+  });
+
+  it('lets a promoted background pass through the reserve', async () => {
+    const releases: Array<() => void> = [];
+    for (let i = 0; i < ESI_MAX_IN_FLIGHT - ESI_FOREGROUND_RESERVE; i += 1) {
+      releases.push(await passEsiGate(undefined, { priority: 'low' }));
+    }
+    const lane = { priority: 'low' as 'low' | 'normal' };
+    const queued = passEsiGate(undefined, lane);
+
+    promoteEsiLane(lane);
+    releases.push(await queued);
+    expect(lane.priority).toBe('normal');
+    for (const release of releases) release();
+  });
+
+  it('reserves between two and four permits, per the issue #2271 brief', () => {
+    expect(ESI_FOREGROUND_RESERVE).toBeGreaterThanOrEqual(2);
+    expect(ESI_FOREGROUND_RESERVE).toBeLessThanOrEqual(4);
   });
 
   it('is reset to a clean slate by resetEsiBudget, so one test cannot shut the next', async () => {

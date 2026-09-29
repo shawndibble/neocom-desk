@@ -1,5 +1,6 @@
 import { esiFetch, EsiError, attachEndpointId, recordEsiActivity, outcomeForError } from './client';
 import type { EsiFetchOptions } from './client';
+import { currentEsiLane } from './lane';
 
 /**
  * Outcome of a paginated fetch: the data plus the one bit a caller cannot
@@ -91,7 +92,9 @@ export async function fetchAllPagesStatus<T>(
   // Each page's own `etag` below overrides any single one passed in, which
   // could not answer for every page anyway.
   const { maxPages, endpointId, characterId, pageEtags, ...rest } = options;
-  const fetchOptions = { ...rest, characterId };
+  // Captured now, while the caller's lane is still ambient: pages 2..N are
+  // requested after awaits, where it no longer is (`lane.ts`).
+  const fetchOptions = { ...rest, characterId, lane: rest.lane ?? currentEsiLane() };
   const fetchPage = (page: number): Promise<PageResponse<T>> =>
     esiFetch<T[]>(path, { ...fetchOptions, page, etag: pageEtags?.[page - 1] }).then((result) => ({
       items: result.data,

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse, delay } from 'msw';
 import { setupServer } from 'msw/node';
 import {
   esiFetch,
@@ -19,6 +19,7 @@ import {
   esiInFlight,
   EsiBudgetError,
   ESI_MAX_IN_FLIGHT,
+  passEsiGate,
 } from './budget';
 
 const server = setupServer();
@@ -444,6 +445,50 @@ describe('esiFetch — app-wide error budget (issue #655)', () => {
     await expect(queued).rejects.toThrow();
     await Promise.all(holders);
     expect(esiInFlight()).toBe(0);
+  });
+});
+
+describe('esiFetch — timeouts (issue #2271)', () => {
+  /** Stands in for the request scope's timeout, so the test fires it by hand. */
+  function manualTimeout(): () => void {
+    const timeout = new AbortController();
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal);
+    return () => timeout.abort();
+  }
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('marks a timeout that fired while still queued at the gate as never sent', async () => {
+    const held: Array<() => void> = [];
+    for (let i = 0; i < ESI_MAX_IN_FLIGHT; i += 1) held.push(await passEsiGate());
+    const fire = manualTimeout();
+
+    const pending = esiFetch('/status/');
+    fire();
+
+    await expect(pending).rejects.toMatchObject({ name: 'EsiTimeoutError', sent: false });
+    for (const release of held) release();
+  });
+
+  it('marks a timeout that fired once the request was on the wire as sent', async () => {
+    let reached!: () => void;
+    const onWire = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    server.use(
+      http.get(`${ESI_BASE_URL}/status/`, async () => {
+        reached();
+        await delay('infinite');
+        return HttpResponse.json({});
+      })
+    );
+    const fire = manualTimeout();
+
+    const pending = esiFetch('/status/');
+    await onWire;
+    fire();
+
+    await expect(pending).rejects.toMatchObject({ name: 'EsiTimeoutError', sent: true });
   });
 });
 

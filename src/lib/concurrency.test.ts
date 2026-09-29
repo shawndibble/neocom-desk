@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit, createSemaphore } from './concurrency';
+import {
+  ESI_FANOUT_CONCURRENCY,
+  mapWithConcurrencyLimit,
+  createSemaphore,
+  type PriorityTicket,
+} from './concurrency';
 
 /** Runs `fn` over 0..n-1, recording the highest number of overlapping calls. */
 async function runTracking(count: number, limit: number) {
@@ -132,5 +137,219 @@ describe('createSemaphore', () => {
     const semaphore = createSemaphore(1);
     await expect(semaphore.acquire(AbortSignal.abort())).rejects.toThrow();
     expect(semaphore.inFlight).toBe(0);
+  });
+});
+
+describe('createSemaphore priority lanes', () => {
+  const low = (): PriorityTicket => ({ priority: 'low' });
+
+  /** Lets every already-settled admission run its `then`. */
+  const flush = async () => {
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  };
+
+  /** Queues acquires and records, by label, the order they are admitted in (permits kept). */
+  function recorder() {
+    const order: string[] = [];
+    const track = (label: string, pending: Promise<() => void>) =>
+      pending.then(() => {
+        order.push(label);
+      });
+    return { order, track };
+  }
+
+  /** Queues acquires that give their permit straight back, recording admission order. */
+  function passer(semaphore: ReturnType<typeof createSemaphore>) {
+    const order: string[] = [];
+    const queue = (label: string, ticket?: PriorityTicket) =>
+      semaphore.acquire(undefined, ticket).then((release) => {
+        order.push(label);
+        release();
+      });
+    return { order, queue };
+  }
+
+  it('admits a foreground waiter before background waiters queued ahead of it', async () => {
+    const semaphore = createSemaphore(1);
+    const held = await semaphore.acquire(undefined, low());
+    const { order, track } = recorder();
+    void track('bg1', semaphore.acquire(undefined, low()));
+    void track('bg2', semaphore.acquire(undefined, low()));
+    void track('fg', semaphore.acquire());
+
+    held();
+    await flush();
+    expect(order).toEqual(['fg']);
+  });
+
+  it('keeps FIFO order within each lane', async () => {
+    const semaphore = createSemaphore(1);
+    const held = await semaphore.acquire();
+    const { order, queue } = passer(semaphore);
+    const waits = [
+      queue('bg1', low()),
+      queue('fg1'),
+      queue('bg2', low()),
+      queue('fg2'),
+      queue('bg3', low()),
+    ];
+
+    held();
+    await Promise.all(waits);
+    expect(order).toEqual(['fg1', 'fg2', 'bg1', 'bg2', 'bg3']);
+  });
+
+  it('never lets background hold more than `limit - lowReserve` permits', async () => {
+    const semaphore = createSemaphore(4, { lowReserve: 2 });
+    await semaphore.acquire(undefined, low());
+    await semaphore.acquire(undefined, low());
+    const { order, track } = recorder();
+    void track('bg3', semaphore.acquire(undefined, low()));
+
+    await flush();
+    expect(order).toEqual([]);
+    expect(semaphore.inFlight).toBe(2);
+    // The reserve is still there for foreground, at once.
+    await semaphore.acquire();
+    await semaphore.acquire();
+    expect(semaphore.inFlight).toBe(4);
+  });
+
+  it('lets background use every non-reserved permit when nothing else wants one', async () => {
+    const semaphore = createSemaphore(12, { lowReserve: 4 });
+    for (let i = 0; i < 8; i += 1) await semaphore.acquire(undefined, low());
+    expect(semaphore.inFlight).toBe(8);
+  });
+
+  it('admits a queued background waiter once a background permit frees under the cap', async () => {
+    const semaphore = createSemaphore(4, { lowReserve: 2 });
+    const first = await semaphore.acquire(undefined, low());
+    await semaphore.acquire(undefined, low());
+    const { order, track } = recorder();
+    void track('bg3', semaphore.acquire(undefined, low()));
+
+    first();
+    await flush();
+    expect(order).toEqual(['bg3']);
+    expect(semaphore.inFlight).toBe(2);
+  });
+
+  it('hands a released background permit to a queued foreground waiter first', async () => {
+    const semaphore = createSemaphore(2, { lowReserve: 1 });
+    const bg = await semaphore.acquire(undefined, low());
+    await semaphore.acquire();
+    const { order, track } = recorder();
+    void track('bg', semaphore.acquire(undefined, low()));
+    void track('fg', semaphore.acquire());
+
+    bg();
+    await flush();
+    expect(order).toEqual(['fg']);
+  });
+
+  it('promotes a queued background waiter into the foreground lane, in arrival order', async () => {
+    const semaphore = createSemaphore(1);
+    const held = await semaphore.acquire();
+    const promoted = low();
+    const { order, queue } = passer(semaphore);
+    const waits = [queue('bgA', low()), queue('bgB', promoted), queue('fgC')];
+
+    semaphore.promote(promoted);
+    expect(promoted.priority).toBe('normal');
+    held();
+    await Promise.all(waits);
+    expect(order).toEqual(['bgB', 'fgC', 'bgA']);
+  });
+
+  it('promotion lifts a background waiter held back only by the reserve', async () => {
+    const semaphore = createSemaphore(2, { lowReserve: 1 });
+    await semaphore.acquire(undefined, low());
+    const ticket = low();
+    const { order, track } = recorder();
+    void track('bg', semaphore.acquire(undefined, ticket));
+    await flush();
+    expect(order).toEqual([]);
+
+    semaphore.promote(ticket);
+    await flush();
+    expect(order).toEqual(['bg']);
+  });
+
+  it('queues a later acquire on a promoted ticket in the foreground lane', async () => {
+    const semaphore = createSemaphore(1);
+    const held = await semaphore.acquire();
+    const ticket = low();
+    semaphore.promote(ticket);
+    const { order, track } = recorder();
+    void track('bg', semaphore.acquire(undefined, low()));
+    void track('later', semaphore.acquire(undefined, ticket));
+
+    held();
+    await flush();
+    expect(order).toEqual(['later']);
+  });
+
+  it('releases a permit promoted while held against the lane it was admitted in', async () => {
+    const semaphore = createSemaphore(2, { lowReserve: 1 });
+    const ticket = low();
+    const release = await semaphore.acquire(undefined, ticket);
+    semaphore.promote(ticket);
+    release();
+
+    // Background's count is back to zero, so its one permit is free again.
+    const { order, track } = recorder();
+    void track('bg', semaphore.acquire(undefined, low()));
+    await flush();
+    expect(order).toEqual(['bg']);
+  });
+
+  it('frees an aborted background waiter’s place in the queue', async () => {
+    const semaphore = createSemaphore(1);
+    const held = await semaphore.acquire();
+    const controller = new AbortController();
+    const abandoned = semaphore.acquire(controller.signal, low());
+    const { order, track } = recorder();
+    const next = track('bg', semaphore.acquire(undefined, low()));
+
+    controller.abort();
+    await expect(abandoned).rejects.toThrow();
+    held();
+    await next;
+    expect(order).toEqual(['bg']);
+    expect(semaphore.inFlight).toBe(1);
+  });
+
+  it('frees an aborted foreground waiter’s place in the queue', async () => {
+    const semaphore = createSemaphore(1);
+    const held = await semaphore.acquire();
+    const controller = new AbortController();
+    const abandoned = semaphore.acquire(controller.signal);
+    const { order, track } = recorder();
+    const next = track('bg', semaphore.acquire(undefined, low()));
+
+    controller.abort();
+    await expect(abandoned).rejects.toThrow();
+    held();
+    await next;
+    expect(order).toEqual(['bg']);
+    expect(semaphore.inFlight).toBe(1);
+  });
+
+  it('removes a waiter aborted after promotion from the foreground lane', async () => {
+    const semaphore = createSemaphore(1);
+    const held = await semaphore.acquire();
+    const controller = new AbortController();
+    const ticket = low();
+    const abandoned = semaphore.acquire(controller.signal, ticket);
+    semaphore.promote(ticket);
+    const { order, track } = recorder();
+    const next = track('fg', semaphore.acquire());
+
+    controller.abort();
+    await expect(abandoned).rejects.toThrow();
+    held();
+    await next;
+    expect(order).toEqual(['fg']);
+    expect(semaphore.inFlight).toBe(1);
   });
 });

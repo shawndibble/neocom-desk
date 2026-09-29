@@ -17,6 +17,7 @@ import type {
   Contract,
   CharacterNotification,
 } from '@/esi/endpoints';
+import { currentEsiLane } from '@/esi/lane';
 import {
   runForegroundPoll,
   type DomainPollState,
@@ -418,6 +419,20 @@ describe('runForegroundPoll', () => {
     });
     await runForegroundPoll(deps);
     expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('loads every domain in the background ESI lane, so the page in view goes first (issue #2271)', async () => {
+    const lanes: Array<string | undefined> = [];
+    const deps = baseDeps({
+      loadSkillQueue: async () => {
+        lanes.push(currentEsiLane()?.priority);
+        return null;
+      },
+    });
+    await runForegroundPoll(deps);
+    expect(lanes).toEqual(['low']);
+    // The scope ends with the synchronous call: nothing after it is tagged.
+    expect(currentEsiLane()).toBeUndefined();
   });
 
   it('does not update saved state or notify when the ESI fetch fails', async () => {

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
+import { currentEsiLane } from '@/esi/lane';
 import { ESI_REGISTRY, isScopeRequired } from '@/esi/registry';
 import {
   PREFETCH_TASKS,
@@ -169,6 +170,18 @@ describe('prefetchCharacterData', () => {
       await prefetchCharacterData(CHAR_ID, { cancelled: false }, [task(run)]);
 
       expect(run).toHaveBeenCalledTimes(1);
+    });
+
+    it('runs the loader in the background ESI lane, behind the page in view (issue #2271)', async () => {
+      let lane: string | undefined;
+      const run = vi.fn(async () => {
+        lane = currentEsiLane()?.priority;
+      });
+
+      await prefetchCharacterData(CHAR_ID, { cancelled: false }, [task(run)]);
+
+      expect(lane).toBe('low');
+      expect(currentEsiLane()).toBeUndefined();
     });
   });
 });
