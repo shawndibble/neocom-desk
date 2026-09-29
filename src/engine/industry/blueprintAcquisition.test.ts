@@ -555,3 +555,94 @@ describe('claimBlueprintTier — purchases join the pool (a blueprint is bought 
     expect(pooledOwnedCopies([], pool)).toEqual([{ me: 6, te: 12, runs: 1 }]);
   });
 });
+
+describe('selectBlueprintTier — every purchasable source competes on total cost', () => {
+  const base = {
+    ownedCopies: [] as OwnedBlueprintCopy[],
+    neededRuns: 5,
+    materialCostAtMe: costAtMe,
+    bpcOffers: [],
+    bpoSellPrice: null,
+    assumedMeForUnowned: 0,
+  };
+
+  it('prices from an extra offer (an original, a market order, an LP redemption) when no hub copy is listed', () => {
+    const result = selectBlueprintTier({
+      ...base,
+      extraOffers: [{ me: 0, te: 0, runs: -1, quantity: 1, price: 2_000 }],
+    });
+    expect(result).toEqual({
+      me: 0,
+      te: 0,
+      line: { unitPrice: 2_000, owned: false },
+      purchasedRuns: Infinity,
+    });
+  });
+
+  it('prices each tier by the offer that covers the need cheapest, not the lowest sticker price', () => {
+    // Five 1-run copies at 1,000 each (5,000) lose to one 3,000 original at the same tier.
+    const result = selectBlueprintTier({
+      ...base,
+      bpcOffers: [{ me: 0, te: 0, runs: 1, quantity: 1, price: 1_000 }],
+      extraOffers: [{ me: 0, te: 0, runs: -1, quantity: 1, price: 3_000 }],
+    });
+    expect(result.line).toEqual({ unitPrice: 3_000, owned: false });
+  });
+
+  it('still lets a pricier higher-ME tier win when it makes the whole build cheaper', () => {
+    // ME0: 300 materials + 10 = 310. ME10: 100 materials + 150 = 250.
+    const result = selectBlueprintTier({
+      ...base,
+      extraOffers: [
+        { me: 0, te: 0, runs: -1, quantity: 1, price: 10 },
+        { me: 10, te: 20, runs: 5, quantity: 1, price: 150 },
+      ],
+    });
+    expect(result).toMatchObject({ me: 10, te: 20, line: { unitPrice: 150, owned: false } });
+  });
+
+  it('weighs the hub BPO sell price alongside listed copies rather than only when none are listed', () => {
+    // Copy covers 5 runs at ME0 for 5 × 100 = 500; the BPO is 200.
+    const result = selectBlueprintTier({
+      ...base,
+      bpcOffers: [{ me: 0, te: 0, runs: 1, quantity: 1, price: 100 }],
+      bpoSellPrice: 200,
+    });
+    expect(result.line).toEqual({ unitPrice: 200, owned: false });
+  });
+
+  it('an owned copy that covers the need still resolves to free', () => {
+    const result = selectBlueprintTier({
+      ...base,
+      ownedCopies: [{ me: 0, te: 0, runs: -1 }],
+      extraOffers: [{ me: 0, te: 0, runs: -1, quantity: 1, price: 1 }],
+    });
+    expect(result).toEqual({ me: 0, te: 0, line: null });
+  });
+
+  it('falls back to last-resort offers only when nothing else prices the blueprint', () => {
+    const lastResortOffers = [{ me: 2, te: 4, runs: -1, quantity: 1, price: 9_000 }];
+    expect(selectBlueprintTier({ ...base, lastResortOffers }).line).toEqual({
+      unitPrice: 9_000,
+      owned: false,
+    });
+    expect(
+      selectBlueprintTier({
+        ...base,
+        bpoSellPrice: 50_000,
+        lastResortOffers,
+      }).line
+    ).toEqual({ unitPrice: 50_000, owned: false });
+  });
+
+  it('drops malformed and zero-price extra offers the same way it drops bad listings', () => {
+    const result = selectBlueprintTier({
+      ...base,
+      extraOffers: [
+        { me: 0, te: 0, runs: 0, quantity: 1, price: 5 },
+        { me: 0, te: 0, runs: -1, quantity: 1, price: 0 },
+      ],
+    });
+    expect(result.line).toEqual({ unitPrice: null, owned: false });
+  });
+});

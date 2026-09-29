@@ -36,6 +36,7 @@ interface CacheEntry<V> {
 }
 
 const hubPriceCache = new Map<string, CacheEntry<HubAggregate>>();
+const regionSellCache = new Map<string, CacheEntry<number | null>>();
 let adjustedPriceCache: CacheEntry<Map<number, AdjustedPrice>> | null = null;
 
 /**
@@ -100,6 +101,7 @@ async function readPersisted<V>(
 /** Test-only: production callers rely on TTL expiry instead of clearing. */
 export function clearMarketPriceCache(): void {
   hubPriceCache.clear();
+  regionSellCache.clear();
   adjustedPriceCache = null;
   hubPricesInFlight.clear();
   adjustedPricesInFlight = null;
@@ -246,6 +248,43 @@ export async function getHubPrices(
   now: Clock = Date.now
 ): Promise<Map<number, HubAggregate>> {
   return getStationPrices(hub.stationId, typeIds, now);
+}
+
+/**
+ * The lowest sell order for each of `typeIds` anywhere in one region, or
+ * `null` — memory-cached on the hub TTL. For Blueprint Acquisition: an
+ * NPC-seeded blueprint original is sold at its seeding corp's stations,
+ * rarely at the hub station itself, so a hub-only price would miss it. A
+ * failed fetch reads as no price for every type, never a thrown error.
+ */
+export async function getRegionSellPrices(
+  regionId: number,
+  typeIds: readonly number[],
+  now: Clock = Date.now
+): Promise<Map<number, number | null>> {
+  const result = new Map<number, number | null>();
+  const nowMs = now();
+  const missing: number[] = [];
+  for (const typeId of new Set(typeIds)) {
+    const cached = regionSellCache.get(hubCacheKey(regionId, typeId));
+    if (cached && cached.expiresAt > nowMs) result.set(typeId, cached.value);
+    else missing.push(typeId);
+  }
+  if (missing.length === 0) return result;
+  try {
+    const fetched = await fetchAggregates(regionId, missing, 'region');
+    for (const typeId of missing) {
+      const sellMin = fetched.get(typeId)?.sellMin ?? null;
+      regionSellCache.set(hubCacheKey(regionId, typeId), {
+        value: sellMin,
+        expiresAt: nowMs + HUB_PRICE_TTL_MS,
+      });
+      result.set(typeId, sellMin);
+    }
+  } catch {
+    for (const typeId of missing) result.set(typeId, null);
+  }
+  return result;
 }
 
 /** Global adjusted/average prices (job-cost EIV), cached for an hour. */

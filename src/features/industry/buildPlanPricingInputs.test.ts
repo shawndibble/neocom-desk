@@ -206,6 +206,26 @@ describe('pricingSourcesForHub', () => {
     expect(jita(99)).toEqual([]);
   });
 
+  it('never prices from an auction or a PLEX barter — neither has an ask a buyer can just pay', () => {
+    const bpcRows = [
+      row({ typeId: 10, regionId: JITA.regionId, price: 10, isAuction: true, buyout: 20 }),
+      row({ typeId: 10, regionId: JITA.regionId, price: 30, requestedPlex: 5 }),
+      row({ typeId: 10, regionId: JITA.regionId, price: 40 }),
+    ];
+    expect(pricingSourcesForHub(inputs({ bpcRows }), JITA).bpcOffersFor(10)).toEqual([
+      expect.objectContaining({ price: 40 }),
+    ]);
+  });
+
+  it("offers every other region's listings as the last resort, never the plan's own", () => {
+    const bpcRows = [
+      row({ typeId: 10, regionId: JITA.regionId, price: 100 }),
+      row({ typeId: 10, regionId: AMARR.regionId, price: 50 }),
+    ];
+    const sources = pricingSourcesForHub(inputs({ bpcRows }), JITA);
+    expect(sources.bpcLastResortOffersFor?.(10)).toEqual([expect.objectContaining({ price: 50 })]);
+  });
+
   it('hands back the same offer lookup for the same rows and region, so a memo keyed on it does not re-run', () => {
     const bpcRows = [row({ typeId: 10, regionId: JITA.regionId })];
     const a = pricingSourcesForHub(inputs({ bpcRows }), JITA).bpcOffersFor;
@@ -227,6 +247,15 @@ describe('pricingSourcesForHub', () => {
 });
 
 describe('loadBpcContractRows', () => {
+  it('folds contract originals in beside the copies', async () => {
+    const copies = [row({ typeId: 10, regionId: JITA.regionId })];
+    const originals = [row({ typeId: 10, regionId: JITA.regionId, runs: -1 })];
+    mockedBpcContracts.mockResolvedValue({
+      data: { rows: copies, originals },
+    } as unknown as CachedResult<never>);
+    await expect(loadBpcContractRows(1)).resolves.toEqual([...copies, ...originals]);
+  });
+
   it("returns the snapshot's rows", async () => {
     const rows = [row({ typeId: 10, regionId: JITA.regionId })];
     mockedBpcContracts.mockResolvedValue(snapshotOf(rows));

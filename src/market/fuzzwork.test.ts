@@ -48,6 +48,22 @@ describe('fetchAggregates', () => {
     expect(url?.searchParams.get('types')).toBe('34,35,36');
   });
 
+  it('asks for a whole region instead of one station when scoped to it', async () => {
+    let captured: URL | null = null;
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, ({ request }) => {
+        captured = new URL(request.url);
+        return HttpResponse.json({});
+      })
+    );
+
+    await fetchAggregates(10000002, [34], 'region');
+
+    const url = captured as URL | null;
+    expect(url?.searchParams.get('region')).toBe('10000002');
+    expect(url?.searchParams.has('station')).toBe(false);
+  });
+
   it('chunks more than 200 type IDs into multiple requests', async () => {
     const requestedBatches: string[][] = [];
     server.use(

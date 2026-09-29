@@ -64,9 +64,16 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
   return chunks;
 }
 
-async function fetchBatch(stationId: number, typeIds: number[]): Promise<RawAggregatesResponse> {
+/** Whether `locationId` is one station or a whole region — Fuzzwork aggregates either. */
+export type AggregateScope = 'station' | 'region';
+
+async function fetchBatch(
+  locationId: number,
+  typeIds: number[],
+  scope: AggregateScope
+): Promise<RawAggregatesResponse> {
   const url = new URL(FUZZWORK_AGGREGATES_URL);
-  url.searchParams.set('station', String(stationId));
+  url.searchParams.set(scope, String(locationId));
   url.searchParams.set('types', typeIds.join(','));
 
   const response = await fetch(url);
@@ -83,13 +90,14 @@ async function fetchBatch(stationId: number, typeIds: number[]): Promise<RawAggr
  */
 export async function fetchAggregates(
   stationId: number,
-  typeIds: number[]
+  typeIds: number[],
+  scope: AggregateScope = 'station'
 ): Promise<Map<number, HubAggregate>> {
   const result = new Map<number, HubAggregate>();
   if (typeIds.length === 0) return result;
 
   for (const batch of chunk(typeIds, MAX_TYPES_PER_REQUEST)) {
-    const body = await fetchBatch(stationId, batch);
+    const body = await fetchBatch(stationId, batch, scope);
     for (const typeId of batch) {
       const raw = body[String(typeId)];
       const sell = parseSide(raw?.sell, 'min');

@@ -111,6 +111,7 @@ import {
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import type { CorpOwnedStockState } from './corpOwnedStock';
 import { pricingSourcesForHub, type BuildPlanPricingInputs } from './buildPlanPricingInputs';
+import { blueprintTypeIdsIn, useBlueprintPurchaseOffers } from './blueprintPurchaseOffers';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { BuildPlanAutoBuildControl } from './BuildPlanAutoBuildControl';
 import { ResultsSummary } from './ResultsSummary';
@@ -299,8 +300,14 @@ export function BuildPlanDetail({
   // through to the BPO's own hub sell price). `IndustryPlanPage` doesn't
   // mount this component until `pricingInputs.hydrated`, so these are always
   // the pilot's own settings, never the defaults (#2054).
-  const { assumedMe, includeBlueprintCost, corpBlueprints, standing, bpcOffersFor } =
-    pricingSourcesForHub(pricingInputs, hub);
+  const {
+    assumedMe,
+    includeBlueprintCost,
+    corpBlueprints,
+    standing,
+    bpcOffersFor,
+    bpcLastResortOffersFor,
+  } = pricingSourcesForHub(pricingInputs, hub);
   const facilityPreset = FACILITY_PRESETS[plan.facility];
   // Include Reactions (issue #698): meaningless for a reaction-activity plan,
   // which is always eligible via its own top-level facility regardless of
@@ -323,6 +330,14 @@ export function BuildPlanDetail({
     if (!blueprint) return [] as number[];
     return buildPlanTypeIds(blueprint, { catalog, pi });
   }, [blueprint, catalog, pi]);
+  // Region market and LP Store offers for every blueprint in the tree, so a
+  // blueprint the hub station doesn't sell still gets a price.
+  const blueprintTypeIds = useMemo(() => blueprintTypeIdsIn(typeIds, catalog), [typeIds, catalog]);
+  const blueprintPurchaseOffersFor = useBlueprintPurchaseOffers(
+    plan.characterId,
+    hub,
+    blueprintTypeIds
+  );
 
   // Pre-fills a fresh plan's Reaction Location the first time Include
   // Reactions is turned on for it (issue #698) — read here, ahead of
@@ -572,6 +587,8 @@ export function BuildPlanDetail({
           modifiers,
           standing,
           bpcOffersFor,
+          bpcLastResortOffersFor,
+          blueprintPurchaseOffersFor,
           includeBlueprintCost,
         },
         { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex }
@@ -586,6 +603,8 @@ export function BuildPlanDetail({
       modifiers,
       standing,
       bpcOffersFor,
+      bpcLastResortOffersFor,
+      blueprintPurchaseOffersFor,
       includeBlueprintCost,
       snapshot,
       reactionSnapshot?.systemCostIndex,

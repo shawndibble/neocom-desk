@@ -63,6 +63,19 @@ export interface SelectBlueprintTierInputs {
   bpcOffers: readonly BpcOffer[];
   /** The BPO's ordinary sell price at the node's hub; null if unpriced there. */
   bpoSellPrice: number | null;
+  /**
+   * Every other way to buy this blueprint the app can see — contract
+   * originals, region market sell orders, LP Store redemptions — shaped as
+   * offers. They compete on total cost with the listings above; absent is
+   * the same as none.
+   */
+  extraOffers?: readonly BpcOffer[];
+  /**
+   * Offers considered only when nothing above prices the blueprint at all —
+   * contracts in other regions, say. A plan quoted from a far-off listing
+   * beats one that opens with no blueprint price when something is for sale.
+   */
+  lastResortOffers?: readonly BpcOffer[];
   /** ME to quote when nothing is owned and nothing can be bought — mirrors `assumedMeForUnowned`. */
   assumedMeForUnowned: number;
 }
@@ -118,12 +131,6 @@ function ownedTierCandidates(copies: readonly OwnedBlueprintCopy[]): Candidate[]
   return [...byTier.values()];
 }
 
-/** Cheapest offer among `offers`, or null when there are none. */
-function cheapestOffer(offers: readonly BpcOffer[]): BpcOffer | null {
-  if (offers.length === 0) return null;
-  return offers.reduce((best, offer) => (offer.price < best.price ? offer : best));
-}
-
 function offerToExtend(offer: BpcOffer): { capacityRuns: number; price: number } {
   return {
     // A listing's combined `quantity` copies all come with the one contract
@@ -160,60 +167,99 @@ function candidateCost(
   return materialCost + shortfallCost(shortfall, candidate.extend);
 }
 
-/** Every ME/TE tier candidate for one buildable node, before pricing — the shared half of `tierOptions` and `selectBlueprintTier`. */
-function buildCandidates(inputs: SelectBlueprintTierInputs): Candidate[] {
-  const { ownedCopies, bpoSellPrice } = inputs;
-
-  // BPC Sourcing is synced, untrusted data (a public contract archive) — a
-  // listing with `runs: 0`/negative (anything but the -1 original sentinel)
-  // or `quantity <= 0` is malformed, and `Math.ceil(shortfall / 0)` would
-  // silently poison every cost this offer touches with Infinity/NaN rather
-  // than the "no price" `null` every other bad-data path in this feature
-  // falls back to. A multi-type offer (issue #1076) is not malformed — its
-  // price is a real ask — but it is equally unusable here: `price` covers
-  // the whole contract, not this blueprint, so it must not reseed a plan's
-  // ME/TE any more than a zeroed `runs` should. Neither is a zero/negative
-  // price (issue #1080): a barter contract's ISK side reads as 0, which
-  // must not win the cheapest-tier candidate over a genuine, priced BPO.
-  const bpcOffers = inputs.bpcOffers.filter(
+/**
+ * BPC Sourcing is synced, untrusted data (a public contract archive) — a
+ * listing with `runs: 0`/negative (anything but the -1 original sentinel) or
+ * `quantity <= 0` is malformed, and `Math.ceil(shortfall / 0)` would silently
+ * poison every cost this offer touches with Infinity/NaN rather than the "no
+ * price" `null` every other bad-data path in this feature falls back to. A
+ * multi-type offer (issue #1076) is not malformed — its price is a real ask —
+ * but it is equally unusable here: `price` covers the whole contract, not
+ * this blueprint, so it must not reseed a plan's ME/TE any more than a zeroed
+ * `runs` should. Neither is a zero/negative price (issue #1080): a barter
+ * contract's ISK side reads as 0, which must not win the cheapest-tier
+ * candidate over a genuine, priced BPO.
+ */
+function usableOffers(offers: readonly BpcOffer[]): BpcOffer[] {
+  return offers.filter(
     (offer) =>
       (offer.runs === -1 || offer.runs > 0) &&
       offer.quantity > 0 &&
       !offer.isMultiType &&
       offer.price > 0
   );
+}
 
-  const candidates = ownedTierCandidates(ownedCopies);
+/** The offer covering `shortfall` runs for the least ISK, or null when there are none. */
+function cheapestToCover(offers: readonly BpcOffer[], shortfall: number): BpcOffer | null {
+  let best: BpcOffer | null = null;
+  let bestCost = Infinity;
+  for (const offer of offers) {
+    const cost = shortfallCost(Math.max(1, shortfall), offerToExtend(offer));
+    if (cost < bestCost) {
+      best = offer;
+      bestCost = cost;
+    }
+  }
+  return best;
+}
+
+/** Every ME/TE tier candidate for one buildable node, before pricing — the shared half of `tierOptions` and `selectBlueprintTier`. */
+function buildCandidates(
+  inputs: SelectBlueprintTierInputs,
+  offers: readonly BpcOffer[]
+): Candidate[] {
+  const candidates = ownedTierCandidates(inputs.ownedCopies);
   // Each owned tier can only be extended by a matching-ME/TE offer — tiers
   // never mix within one node, so a differently-tiered offer cannot top one up.
   for (const candidate of candidates) {
-    const matching = bpcOffers.filter(
+    if (candidate.ownedRuns === INFINITE_RUNS) continue;
+    const matching = offers.filter(
       (offer) => offer.me === candidate.me && offer.te === candidate.te
     );
-    const best = cheapestOffer(matching);
+    const best = cheapestToCover(matching, inputs.neededRuns - candidate.ownedRuns);
     if (best) candidate.extend = offerToExtend(best);
   }
 
-  // The one additional "cheapest purchasable tier" candidate: BPC Sourcing's
-  // cheapest listing at any tier, else the BPO's own sell price at ME0/TE0.
-  const cheapestListing = cheapestOffer(bpcOffers);
-  if (cheapestListing) {
-    candidates.push({
-      me: cheapestListing.me,
-      te: cheapestListing.te,
-      ownedRuns: 0,
-      extend: offerToExtend(cheapestListing),
-    });
-  } else if (bpoSellPrice !== null) {
-    candidates.push({
-      me: 0,
-      te: 0,
-      ownedRuns: 0,
-      extend: { capacityRuns: INFINITE_RUNS, price: bpoSellPrice },
-    });
+  // One purchasable candidate per tier nothing owned already stands for, at
+  // whichever offer covers the whole need cheapest there — a stack of 1-run
+  // copies loses to one original at the same tier when the runs add up.
+  // Every tier competes on total cost below, so a pricier high-ME copy still
+  // wins when the materials it saves outweigh its price.
+  const ownedTiers = new Set(candidates.map((c) => tierKey(c.me, c.te)));
+  const byTier = new Map<string, BpcOffer[]>();
+  for (const offer of offers) {
+    const key = tierKey(offer.me, offer.te);
+    if (ownedTiers.has(key)) continue;
+    const list = byTier.get(key) ?? [];
+    list.push(offer);
+    byTier.set(key, list);
+  }
+  for (const tierOffers of byTier.values()) {
+    const best = cheapestToCover(tierOffers, inputs.neededRuns)!;
+    candidates.push({ me: best.me, te: best.te, ownedRuns: 0, extend: offerToExtend(best) });
   }
 
   return candidates;
+}
+
+/** Everything purchasable in the ordinary pass: listed copies, the extra sources, and the hub BPO sell price as an ME0 original. */
+function primaryOffers(inputs: SelectBlueprintTierInputs): BpcOffer[] {
+  const bpo: BpcOffer[] =
+    inputs.bpoSellPrice === null
+      ? []
+      : [{ me: 0, te: 0, runs: -1, quantity: 1, price: inputs.bpoSellPrice }];
+  return usableOffers([...inputs.bpcOffers, ...(inputs.extraOffers ?? []), ...bpo]);
+}
+
+function priced(
+  inputs: SelectBlueprintTierInputs,
+  offers: readonly BpcOffer[]
+): readonly TierOption[] {
+  return buildCandidates(inputs, offers).map((candidate) => ({
+    ...candidate,
+    cost: candidateCost(candidate, inputs.neededRuns, inputs.materialCostAtMe),
+  }));
 }
 
 /**
@@ -223,10 +269,10 @@ function buildCandidates(inputs: SelectBlueprintTierInputs): Candidate[] {
  * other than the cheapest, e.g. to use up a worse owned copy first).
  */
 export function tierOptions(inputs: SelectBlueprintTierInputs): readonly TierOption[] {
-  return buildCandidates(inputs).map((candidate) => ({
-    ...candidate,
-    cost: candidateCost(candidate, inputs.neededRuns, inputs.materialCostAtMe),
-  }));
+  const options = priced(inputs, primaryOffers(inputs));
+  const lastResort = usableOffers(inputs.lastResortOffers ?? []);
+  if (lastResort.length === 0 || options.some((o) => o.cost !== null)) return options;
+  return priced(inputs, [...primaryOffers(inputs), ...lastResort]);
 }
 
 /**
@@ -326,8 +372,10 @@ export function claimBlueprintTier(
 
 /**
  * Picks the cheapest overall ME/TE tier for one buildable node: every tier
- * the Character owns any runs at, plus the cheapest purchasable tier (BPC
- * Sourcing first, else the BPO's own sell price) — never mixing tiers within
+ * the Character owns any runs at, plus every tier something can be bought at
+ * (listed copies, contract originals, the market, the LP Store, the hub BPO
+ * sell price — last-resort offers only when none of those price it) — never
+ * mixing tiers within
  * one node. See docs/context/decisions/20260911-073307 for the full design.
  */
 export function selectBlueprintTier(inputs: SelectBlueprintTierInputs): BlueprintTierResult {
