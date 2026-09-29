@@ -10,6 +10,7 @@ vi.mock('@/features/character/loyalty', () => ({
 }));
 vi.mock('@/features/loyalty/store', () => ({ loadLoyaltyStoreOffers: vi.fn() }));
 vi.mock('@/sde/marketTypesById', () => ({ loadMarketTypesById: vi.fn() }));
+vi.mock('@/sde/loadMarketSde', () => ({ loadVariations: vi.fn() }));
 
 import { loadCharacterBlueprints } from './data';
 import { isSyncConfigured } from '@/app/syncStatus';
@@ -17,10 +18,19 @@ import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts'
 import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
 import { loadLoyaltyStoreOffers } from '@/features/loyalty/store';
 import { loadMarketTypesById } from '@/sde/marketTypesById';
+import { loadVariations } from '@/sde/loadMarketSde';
 
 type Resolved<F extends (...args: never[]) => unknown> = Awaited<ReturnType<F>>;
 
 const CORP = 1000180;
+
+/** Blueprint 20 builds T1 product 120; 21 builds 121, which has no market group. */
+const BUILDABLE = [
+  { blueprintTypeID: 10, productTypeID: 110 },
+  { blueprintTypeID: 20, productTypeID: 120 },
+  { blueprintTypeID: 21, productTypeID: 121 },
+];
+const T1_ON_MARKET = [{ blueprintTypeID: 20, productTypeID: 120 }];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -29,8 +39,18 @@ beforeEach(() => {
     needsReauth: false,
   } as unknown as Resolved<typeof loadCharacterBlueprints>);
   vi.mocked(loadMarketTypesById).mockResolvedValue(
-    new Map([[20, {}]]) as unknown as Resolved<typeof loadMarketTypesById>
+    new Map([
+      [20, {}],
+      [22, {}],
+    ]) as unknown as Resolved<typeof loadMarketTypesById>
   );
+  vi.mocked(loadVariations).mockResolvedValue({
+    types: {
+      120: { parentTypeId: null, metaGroupId: 1 },
+      122: { parentTypeId: 120, metaGroupId: 2 },
+    },
+    metaGroups: {},
+  } as unknown as Resolved<typeof loadVariations>);
   vi.mocked(isSyncConfigured).mockReturnValue(true);
   vi.mocked(loadPublicBpcContracts).mockResolvedValue({
     data: { rows: [{ typeId: 30 }], originals: [{ typeId: 31 }], lastSyncedAt: 1 },
@@ -51,12 +71,21 @@ beforeEach(() => {
 
 describe('loadBlueprintSourceSets', () => {
   it('collects every source’s blueprints', async () => {
-    const { sets, unavailable } = await loadBlueprintSourceSets([1], [10, 20, 21]);
+    const { sets, unavailable } = await loadBlueprintSourceSets([1], BUILDABLE);
     expect(sets.owned).toEqual(new Set([10]));
     expect(sets.market).toEqual(new Set([20]));
     expect(sets.contract).toEqual(new Set([30, 31]));
     expect(sets.lpStore).toEqual(new Set([40]));
     expect(unavailable).toEqual([]);
+  });
+
+  it('leaves a market-grouped blueprint off the NPC market when its product is not Tech I', async () => {
+    // e.g. the Vagabond Blueprint: market-grouped, but a T2 lottery BPO no NPC sells.
+    const { sets } = await loadBlueprintSourceSets(
+      [1],
+      [...T1_ON_MARKET, { blueprintTypeID: 22, productTypeID: 122 }]
+    );
+    expect(sets.market).toEqual(new Set([20]));
   });
 
   it('reads only LP stores the account holds points with', async () => {
@@ -66,7 +95,7 @@ describe('loadBlueprintSourceSets', () => {
 
   it('names contracts unavailable when sync is not configured', async () => {
     vi.mocked(isSyncConfigured).mockReturnValue(false);
-    const { sets, unavailable } = await loadBlueprintSourceSets([1], [20]);
+    const { sets, unavailable } = await loadBlueprintSourceSets([1], T1_ON_MARKET);
     expect(sets.contract.size).toBe(0);
     expect(unavailable).toEqual(['contract']);
   });
@@ -91,13 +120,13 @@ describe('loadBlueprintSourceSets', () => {
   });
 
   it('names contracts and LP stores unavailable with no Character to read them as', async () => {
-    const { unavailable } = await loadBlueprintSourceSets([], [20]);
+    const { unavailable } = await loadBlueprintSourceSets([], T1_ON_MARKET);
     expect(unavailable).toEqual(['contract', 'lpStore']);
   });
 
   it('degrades a throwing source to unavailable rather than failing the whole load', async () => {
     vi.mocked(loadMarketTypesById).mockRejectedValue(new Error('offline'));
-    const { sets, unavailable } = await loadBlueprintSourceSets([1], [20]);
+    const { sets, unavailable } = await loadBlueprintSourceSets([1], T1_ON_MARKET);
     expect(sets.market.size).toBe(0);
     expect(sets.owned).toEqual(new Set([10]));
     expect(unavailable).toEqual(['market']);

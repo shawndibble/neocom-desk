@@ -67,8 +67,11 @@ export function useMarketWideOpportunities({
     if (!trees || !catalog) return;
     const token = ++runToken.current;
     setState((prev) => ({ ...prev, loading: true, error: false }));
-    const blueprintTypeIds = [...new Set(Object.values(trees).map((t) => t.blueprintTypeID))];
-    const sources = loadBlueprintSourceSets(characterIds, blueprintTypeIds);
+    const blueprints = Object.entries(trees).map(([productTypeID, tree]) => ({
+      blueprintTypeID: tree.blueprintTypeID,
+      productTypeID: Number(productTypeID),
+    }));
+    const sources = loadBlueprintSourceSets(characterIds, blueprints);
     const sets = sources.then((loaded) => loaded.sets);
     void Promise.all([
       runMarketWideScan(hub, trees, catalog, modifiers, sets, options, standing),
