@@ -12,6 +12,11 @@ import { selectActiveEntryFromSorted, sortQueueEntries, selectQueueDepth } from 
 import type { SkillType } from '@/sde/types';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
 import {
+  SP_EXTRACTION_ENABLED_KEY,
+  useSpExtractionMonitoringEnabled,
+  useSpExtractionThresholdSp,
+} from '@/features/character/spExtractionSettings';
+import {
   OVERVIEW_CARD_KEYS,
   OVERVIEW_HIDDEN_CARDS_KEY,
   useOverviewHiddenCards,
@@ -190,6 +195,8 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useOverviewHiddenCards.setState({ value: [], hydrated: false });
+  useSpExtractionMonitoringEnabled.setState({ value: false, hydrated: false });
+  useSpExtractionThresholdSp.setState({ value: 500_000, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -796,7 +803,7 @@ function usePhoneViewport(): void {
 /** The domain cards, by the heading each one carries. */
 const DOMAINS = ['Open orders', 'Mining tax', 'Planetary industry', 'Industry jobs'] as const;
 /** Domains that are always one line on a phone rather than competing for a full card. */
-const ALWAYS_FOLDED = ['Alerts', 'Contracts', 'Coming up'] as const;
+const ALWAYS_FOLDED = ['Alerts', 'Contracts', 'Coming up', 'SP extraction'] as const;
 
 /** Which domains kept a full card — a card is a heading with its own "Open" link. */
 function fullCardDomains(): string[] {
@@ -1076,7 +1083,7 @@ describe('hiding cards from the edit menu', () => {
     await screen.findByRole('heading', { name: 'Everything else' });
 
     expect([...fullCardDomains(), ...foldedDomains()].sort()).toEqual(
-      ['Mining tax', 'Planetary industry', 'Industry jobs', 'Coming up'].sort()
+      ['Mining tax', 'Planetary industry', 'Industry jobs', 'Coming up', 'SP extraction'].sort()
     );
   });
 });
@@ -1102,6 +1109,21 @@ describe('Coming up', () => {
       expect.stringContaining('Moon pop'),
     ]);
     expect(within(card).getByRole('link', { name: /open/i })).toHaveAttribute('href', '/calendar');
+  });
+});
+
+describe('SP extraction', () => {
+  it('says monitoring is off rather than flagging anything', async () => {
+    render(<App />);
+    const card = await findCard(/sp extraction/i);
+    expect(await within(card).findByText(/monitoring is off/i)).toBeInTheDocument();
+  });
+
+  it('shows the threshold it flags at once monitoring is on', async () => {
+    await db.settings.put({ key: SP_EXTRACTION_ENABLED_KEY, value: true });
+    render(<App />);
+    const card = await findCard(/sp extraction/i);
+    expect(await within(card).findByText('Flags at 500K spare SP')).toBeInTheDocument();
   });
 });
 

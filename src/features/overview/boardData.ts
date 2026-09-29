@@ -262,3 +262,18 @@ export async function loadCalendarEventsBoard(
   const { cached, needsReauth } = await loadCalendarEvents(characterId);
   return { events: cached?.data ?? [], needsReauth, fetchedAt: cached ? cached.fetchedAt : null };
 }
+
+// --- SP extraction ----------------------------------------------------------
+
+/**
+ * Not a loader of its own: the total comes from the skills read the summary
+ * strip already makes, and the switch and threshold are the synced SP
+ * Extraction preferences (`features/character/spExtractionSettings.ts`).
+ */
+export interface SpExtractionBoardData {
+  /** Null until the skills read lands. */
+  totalSp: number | null;
+  /** Whether the pilot turned SP Extraction monitoring on. Off, nothing is ever flagged. */
+  monitoring: boolean;
+  thresholdSp: number;
+}

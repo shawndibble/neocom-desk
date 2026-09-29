@@ -17,11 +17,13 @@ import type { IndustryJob } from '@/esi/endpoints';
 import { openOrderProblemCounts } from '@/features/market/openOrdersModel';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
+import { isSpExtractionReady } from '@/engine/spExtraction';
 import type {
   CalendarEventsBoardData,
   ContractsBoardData,
   MiningTaxBoardData,
   PlanetaryBoardData,
+  SpExtractionBoardData,
 } from './boardData';
 
 /**
@@ -114,4 +116,15 @@ export function comingUpSeverity(
   if (data.needsReauth) return UNREADABLE;
   const next = upcomingCommittedEvents(data.events, nowMs)[0];
   return next !== undefined && next.atMs - nowMs <= COMING_UP_WATCH_MS ? 'watch' : 'clear';
+}
+
+/**
+ * Spare SP is an opportunity, not a fault, so ready is `watch` at most — and
+ * only when the pilot switched monitoring on. The card still shows the number
+ * with monitoring off; it just never claims anything is waiting.
+ */
+export function spExtractionSeverity(data: SpExtractionBoardData): DeadlineSeverity | null {
+  if (data.totalSp === null) return null;
+  if (!data.monitoring) return 'clear';
+  return isSpExtractionReady(data.totalSp, data.thresholdSp) ? 'watch' : 'clear';
 }

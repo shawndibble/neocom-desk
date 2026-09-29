@@ -2694,6 +2694,13 @@
         "tentative": "Tentative"
       },
       "spExtraction": "SP extraction",
+      "spareSp": "Spare SP",
+      "extractors": "Extractors",
+      "spExtractable": "{{sp}} spare SP",
+      "spExtractionReady_one": "{{count}} extractor ready",
+      "spExtractionReady_other": "{{count}} extractors ready",
+      "spExtractionThreshold": "Flags at {{sp}} spare SP",
+      "spExtractionOff": "Monitoring is off — turn it on in Settings",
       "mail": "Mail",
       "priceAlerts": "Price alerts",
       "allCardsHidden": "Every card is hidden. Use the edit button above to bring some back.",

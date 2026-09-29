@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MINING_TAX_WARNING_DAYS, comingUpSeverity, miningTaxSeverity } from './boardSeverity';
+import {
+  MINING_TAX_WARNING_DAYS,
+  comingUpSeverity,
+  miningTaxSeverity,
+  spExtractionSeverity,
+} from './boardSeverity';
 import type { CalendarEventsBoardData, MiningTaxBoardData } from './boardData';
 
 function data(overrides: Partial<MiningTaxBoardData> = {}): MiningTaxBoardData {
@@ -73,5 +78,27 @@ describe('comingUpSeverity', () => {
 
   it('is warning when the calendar cannot be read', () => {
     expect(comingUpSeverity(data([], true), NOW)).toBe('warning');
+  });
+});
+
+describe('spExtractionSeverity', () => {
+  const FLOOR = 5_000_000;
+  const data = (totalSp: number | null, monitoring = true, thresholdSp = 500_000) => ({
+    totalSp,
+    monitoring,
+    thresholdSp,
+  });
+
+  it('is null until the SP total has loaded', () => {
+    expect(spExtractionSeverity(data(null))).toBeNull();
+  });
+
+  it('is watch once the spare SP reaches the threshold', () => {
+    expect(spExtractionSeverity(data(FLOOR + 600_000))).toBe('watch');
+    expect(spExtractionSeverity(data(FLOOR + 400_000))).toBe('clear');
+  });
+
+  it('never flags anything while monitoring is switched off', () => {
+    expect(spExtractionSeverity(data(FLOOR + 9_000_000, false))).toBe('clear');
   });
 });

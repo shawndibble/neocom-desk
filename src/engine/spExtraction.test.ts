@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { SP_EXTRACTION_FLOOR_SP, extractableSp, isSpExtractionReady } from './spExtraction';
+import {
+  SP_EXTRACTION_FLOOR_SP,
+  extractableSp,
+  extractorCount,
+  isSpExtractionReady,
+} from './spExtraction';
 
 describe('extractableSp', () => {
   it('is zero at or below the floor', () => {
@@ -33,5 +38,16 @@ describe('isSpExtractionReady', () => {
   it('respects a custom (higher) threshold', () => {
     expect(isSpExtractionReady(SP_EXTRACTION_FLOOR_SP + 999_999, 1_000_000)).toBe(false);
     expect(isSpExtractionReady(SP_EXTRACTION_FLOOR_SP + 1_000_000, 1_000_000)).toBe(true);
+  });
+});
+
+describe('extractorCount', () => {
+  it('counts whole extractors above the floor', () => {
+    expect(extractorCount(SP_EXTRACTION_FLOOR_SP + 1_250_000)).toBe(2);
+  });
+
+  it('is zero at or below the floor', () => {
+    expect(extractorCount(SP_EXTRACTION_FLOOR_SP)).toBe(0);
+    expect(extractorCount(1_000_000)).toBe(0);
   });
 });

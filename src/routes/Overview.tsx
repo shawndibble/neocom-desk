@@ -53,6 +53,10 @@ import {
   isNotTrainingAlertEnabledFor,
 } from '@/features/notifications/preferences';
 import { SummaryStrip } from '@/features/overview/SummaryStrip';
+import {
+  useSpExtractionMonitoringEnabled,
+  useSpExtractionThresholdSp,
+} from '@/features/character/spExtractionSettings';
 import { CardPicker } from '@/features/overview/CardPicker';
 import {
   layoutBoard,
@@ -72,6 +76,7 @@ import {
   CONTRACTS_IN_PROGRESS_HREF,
   ComingUpCard,
   ContractsCard,
+  SpExtractionCard,
   EverythingElseCard,
   IndustryCard,
   MiningTaxCard,
@@ -93,6 +98,7 @@ import {
   miningTaxSeverity,
   ordersSeverity,
   planetarySeverity,
+  spExtractionSeverity,
 } from '@/features/overview/boardSeverity';
 import {
   alertsSummary,
@@ -103,6 +109,7 @@ import {
   miningTaxSummary,
   ordersSummary,
   planetarySummary,
+  spExtractionSummary,
 } from '@/features/overview/boardSummary';
 import { severityForRemaining, worstSeverity } from '@/engine/severity';
 import { soonestCalendarDeadline } from '@/engine/calendarDeadline';
@@ -213,9 +220,15 @@ export function Overview() {
   const hiddenCardsHydrated = useOverviewHiddenCards((state) => state.hydrated);
   const hydrateHiddenCards = useOverviewHiddenCards((state) => state.hydrate);
   const setHiddenCards = useOverviewHiddenCards((state) => state.setValue);
+  const spMonitoring = useSpExtractionMonitoringEnabled((state) => state.value);
+  const spThreshold = useSpExtractionThresholdSp((state) => state.value);
+  const hydrateSpMonitoring = useSpExtractionMonitoringEnabled((state) => state.hydrate);
+  const hydrateSpThreshold = useSpExtractionThresholdSp((state) => state.hydrate);
   useEffect(() => {
     void hydrateHiddenCards();
-  }, [hydrateHiddenCards]);
+    void hydrateSpMonitoring();
+    void hydrateSpThreshold();
+  }, [hydrateHiddenCards, hydrateSpMonitoring, hydrateSpThreshold]);
   const shown = (key: OverviewCardKey) => isCardShown(hiddenCards, key);
 
   // One `cacheKey` per card, not one for the page: they load independently, so
@@ -369,6 +382,11 @@ export function Overview() {
     .map((job) => Date.parse(job.end_date))
     .filter((ms) => !Number.isNaN(ms))
     .sort((a, b) => a - b)[0];
+  const spExtraction = {
+    totalSp: skillsQueueData?.totalSp ?? null,
+    monitoring: spMonitoring,
+    thresholdSp: spThreshold,
+  };
   const calendarEvent = soonestCalendarDeadline(calendarSnapshot.data?.events ?? [], now);
 
   /*
@@ -506,6 +524,16 @@ export function Overview() {
           }
         : null,
       render: () => <ComingUpCard data={calendarSnapshot.data} nowMs={now} />,
+    },
+    {
+      key: 'spExtraction',
+      placement: 'folded',
+      to: '/characters',
+      severity: spExtractionSeverity(spExtraction),
+      summary: spExtractionSummary(t, spExtraction),
+      // Rides on the skills read, which the strip already counts for freshness.
+      loading: false,
+      render: () => <SpExtractionCard data={spExtraction} />,
     },
     {
       key: 'alerts',

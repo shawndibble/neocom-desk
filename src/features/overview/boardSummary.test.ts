@@ -6,6 +6,7 @@ import {
   miningTaxSummary,
   ordersSummary,
   planetarySummary,
+  spExtractionSummary,
 } from './boardSummary';
 import type {
   BoardColony,
@@ -290,5 +291,33 @@ describe('comingUpSummary', () => {
   it('reports loading and a lapsed grant rather than an empty calendar', () => {
     expect(comingUpSummary(t, null, NOW)).toBe('overview.board.checking');
     expect(comingUpSummary(t, data([], true), NOW)).toBe('overview.board.reauth');
+  });
+});
+
+describe('spExtractionSummary', () => {
+  const FLOOR = 5_000_000;
+  const data = (totalSp: number | null, monitoring = true) => ({
+    totalSp,
+    monitoring,
+    thresholdSp: 500_000,
+  });
+
+  it('says how many extractors are ready once monitoring flags it', () => {
+    expect(spExtractionSummary(t, data(FLOOR + 1_200_000))).toBe(
+      'overview.board.spExtractionReady(count=2)'
+    );
+  });
+
+  it('otherwise reports the spare SP, monitored or not', () => {
+    expect(spExtractionSummary(t, data(FLOOR + 300_000))).toBe(
+      'overview.board.spExtractable(sp=300K)'
+    );
+    expect(spExtractionSummary(t, data(FLOOR + 1_200_000, false))).toBe(
+      'overview.board.spExtractable(sp=1.2M)'
+    );
+  });
+
+  it('reports loading', () => {
+    expect(spExtractionSummary(t, data(null))).toBe('overview.board.checking');
   });
 });

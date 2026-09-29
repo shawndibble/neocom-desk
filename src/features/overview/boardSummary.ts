@@ -27,12 +27,15 @@ import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import { compareSeverity } from '@/engine/severity';
 import { formatCountdown } from '@/lib/duration';
 import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
+import { extractableSp, extractorCount, isSpExtractionReady } from '@/engine/spExtraction';
+import { formatCompactNumber } from '@/lib/compactNumber';
 import type {
   CalendarEventsBoardData,
   ContractsBoardData,
   IndustryBoardData,
   MiningTaxBoardData,
   PlanetaryBoardData,
+  SpExtractionBoardData,
 } from './boardData';
 
 /**
@@ -179,5 +182,15 @@ export function comingUpSummary(
   return t('overview.board.comingUpNext', {
     title: next.title,
     when: formatCountdown((next.atMs - nowMs) / 1000),
+  });
+}
+
+export function spExtractionSummary(t: Translate, data: SpExtractionBoardData): string {
+  if (data.totalSp === null) return t(CHECKING);
+  if (data.monitoring && isSpExtractionReady(data.totalSp, data.thresholdSp)) {
+    return t('overview.board.spExtractionReady', { count: extractorCount(data.totalSp) });
+  }
+  return t('overview.board.spExtractable', {
+    sp: formatCompactNumber(extractableSp(data.totalSp)),
   });
 }

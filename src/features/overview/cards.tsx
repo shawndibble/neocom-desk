@@ -36,17 +36,21 @@ import {
   industrySeverity,
   jobSeverity,
   comingUpSeverity,
+  spExtractionSeverity,
   contractsSeverity,
   miningTaxSeverity,
   planetarySeverity,
 } from './boardSeverity';
 import { contractsDeadlineNote } from './boardSummary';
 import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
+import { extractableSp, extractorCount } from '@/engine/spExtraction';
+import { formatCompactNumber } from '@/lib/compactNumber';
 import type {
   CalendarEventsBoardData,
   ContractsBoardData,
   MiningTaxBoardData,
   PlanetaryBoardData,
+  SpExtractionBoardData,
 } from './boardData';
 
 /** The Contracts History table filtered to accepted contracts — the courier hauls the card counts. */
@@ -499,6 +503,51 @@ export function ComingUpCard({
           ))}
         </ul>
       )}
+    </BoardCard>
+  );
+}
+
+// --- SP extraction --------------------------------------------------------
+
+/**
+ * Spare SP above the 5M floor, and how many extractors it fills.
+ *
+ * Shown whether or not SP Extraction monitoring is on — the number is true
+ * either way — but only monitoring decides anything is *ready*, so with it off
+ * the tiles stay untoned and the footer says why.
+ */
+export function SpExtractionCard({ data }: { data: SpExtractionBoardData }) {
+  const { t } = useTranslation();
+  const severity = spExtractionSeverity(data);
+  const tone = severity === 'watch' ? 'watch' : 'clear';
+  return (
+    <BoardCard
+      title={t('overview.board.spExtraction')}
+      meta={<SeverityWord severity={severity} />}
+      to="/characters"
+      openLabel={t('overview.board.open')}
+      footer={
+        data.totalSp === null
+          ? t('overview.board.checking')
+          : data.monitoring
+            ? t('overview.board.spExtractionThreshold', {
+                sp: formatCompactNumber(data.thresholdSp),
+              })
+            : t('overview.board.spExtractionOff')
+      }
+    >
+      <TileRow>
+        <NumberTile
+          label={t('overview.board.spareSp')}
+          value={data.totalSp === null ? 0 : formatCompactNumber(extractableSp(data.totalSp))}
+          severity={tone}
+        />
+        <NumberTile
+          label={t('overview.board.extractors')}
+          value={data.totalSp === null ? 0 : extractorCount(data.totalSp)}
+          severity={tone}
+        />
+      </TileRow>
     </BoardCard>
   );
 }
