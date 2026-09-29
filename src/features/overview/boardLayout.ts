@@ -50,9 +50,36 @@ export function layoutBoard<T extends BoardCardSpec>(
     isPhone,
     shown,
     phoneFullCount,
-  }: { isPhone: boolean; shown: (key: OverviewCardKey) => boolean; phoneFullCount: number }
+    order = null,
+  }: {
+    isPhone: boolean;
+    shown: (key: OverviewCardKey) => boolean;
+    phoneFullCount: number;
+    /**
+     * The pilot's own order (`cardOrder.ts`), or null if they never set one.
+     * Given, it decides the desktop grid *and* a phone's full slots — the
+     * first cards in it are the full ones, urgency and placement aside.
+     */
+    order?: readonly OverviewCardKey[] | null;
+  }
 ): BoardLayout<T> {
   const visible = specs.filter((spec) => spec.available !== false && shown(spec.key));
+  if (order !== null) {
+    const rank = (key: OverviewCardKey) => {
+      const index = order.indexOf(key);
+      return index < 0 ? order.length : index;
+    };
+    const cards = visible
+      .filter((spec) => spec.placement !== 'column')
+      .sort((a, b) => rank(a.key) - rank(b.key));
+    const column = visible.find((spec) => spec.placement === 'column') ?? null;
+    if (!isPhone) return { full: cards, folded: [], column };
+    return {
+      full: cards.slice(0, phoneFullCount),
+      folded: [...(column ? [column] : []), ...cards.slice(phoneFullCount)],
+      column: null,
+    };
+  }
   if (!isPhone) {
     return {
       full: visible.filter((spec) => spec.placement !== 'column'),

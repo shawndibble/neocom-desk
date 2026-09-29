@@ -114,3 +114,34 @@ describe('soonestDeadline', () => {
     expect(soonestDeadline([spec('orders', 'ranked')], showAll, [])).toBeNull();
   });
 });
+
+describe('layoutBoard with the pilot’s own order', () => {
+  const order: OverviewCardKey[] = ['industry', 'contracts', 'orders', 'planetary', 'mining'];
+
+  it('lays the desktop grid out in that order, alerts still in its column', () => {
+    const layout = layoutBoard(BOARD, { isPhone: false, shown: showAll, phoneFullCount: 2, order });
+    expect(keys(layout.full)).toEqual(['industry', 'contracts', 'orders', 'planetary', 'mining']);
+    expect(layout.column?.key).toBe('alerts');
+  });
+
+  /*
+   * Chosen over urgency: once the pilot has placed their cards, the first two
+   * are the full ones on a phone, whatever is on fire — including a card that
+   * would otherwise always fold.
+   */
+  it('gives a phone’s full slots to the first cards in that order, urgency aside', () => {
+    const layout = layoutBoard(BOARD, { isPhone: true, shown: showAll, phoneFullCount: 2, order });
+    expect(keys(layout.full)).toEqual(['industry', 'contracts']);
+    expect(keys(layout.folded)).toEqual(['alerts', 'orders', 'planetary', 'mining']);
+  });
+
+  it('skips hidden cards when filling the slots', () => {
+    const layout = layoutBoard(BOARD, {
+      isPhone: true,
+      shown: (key) => key !== 'industry',
+      phoneFullCount: 2,
+      order,
+    });
+    expect(keys(layout.full)).toEqual(['contracts', 'orders']);
+  });
+});

@@ -186,6 +186,12 @@
 // keeps keys this build does not know so an older build cannot un-hide a
 // newer card. Never deleted via deleteSyncedSetting: showing every card again
 // writes an empty list, so the tombstone-expiry edge does not bite it.
+//
+// sync.overviewCardOrder: the order the pilot dragged those cards into from
+// the same edit menu (features/overview/cardOrder.ts). Its own key rather than
+// part of the hidden list, so hiding a card on one device cannot roll back a
+// reorder made on another. Same parse, same unknown-key rule. Never deleted
+// via deleteSyncedSetting: "Reset order" writes an empty list.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.bpcHideAuctions',
   'sync.bpcHidePlex',
@@ -209,6 +215,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.miningTaxManualMoonOreTypeIds',
   'sync.miningTaxOreValueMode',
   'sync.notificationFeedPrefs',
+  'sync.overviewCardOrder',
   'sync.overviewHiddenCards',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',

@@ -11,6 +11,7 @@ import { App } from '@/app/App';
 import { selectActiveEntryFromSorted, sortQueueEntries, selectQueueDepth } from './overviewQueue';
 import type { SkillType } from '@/sde/types';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
+import { OVERVIEW_CARD_ORDER_KEY, useOverviewCardOrder } from '@/features/overview/cardOrder';
 import { priceAlertDomain } from '@/features/notifications/pollDomains';
 import {
   SP_EXTRACTION_ENABLED_KEY,
@@ -201,6 +202,7 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useOverviewHiddenCards.setState({ value: [], hydrated: false });
+  useOverviewCardOrder.setState({ value: [], hydrated: false });
   priceAlertDomain.store.setState({ value: {}, hydrated: false });
   useSpExtractionMonitoringEnabled.setState({ value: false, hydrated: false });
   useSpExtractionThresholdSp.setState({ value: 500_000, hydrated: false });
@@ -1020,9 +1022,7 @@ describe('hiding cards from the edit menu', () => {
     await findCard(/mining tax/i);
 
     await user.click(screen.getByRole('button', { name: /choose which cards to show/i }));
-    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Mining tax' }));
-    // The menu stays open for the next toggle, and while it is open the page
-    // behind it is hidden from the accessibility tree.
+    await user.click(await screen.findByRole('checkbox', { name: 'Mining tax' }));
     await user.keyboard('{Escape}');
 
     await waitFor(() =>
@@ -1051,7 +1051,7 @@ describe('hiding cards from the edit menu', () => {
     await findCard(/industry jobs/i);
 
     await user.click(screen.getByRole('button', { name: /choose which cards to show/i }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Show all cards' }));
+    await user.click(await screen.findByRole('button', { name: 'Show all cards' }));
 
     expect(await findCard(/mining tax/i)).toBeInTheDocument();
     expect(await findCard(/open orders/i)).toBeInTheDocument();
@@ -1297,9 +1297,67 @@ describe('corp cards', () => {
     expect(screen.queryByRole('heading', { name: /^structures$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /moon extractions/i })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /choose which cards to show/i }));
-    expect(await screen.findByRole('menuitemcheckbox', { name: 'Mail' })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitemcheckbox', { name: 'Structures' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('checkbox', { name: 'Mail' })).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Structures' })).not.toBeInTheDocument();
     expect(corpRequests).not.toHaveBeenCalled();
+  });
+});
+
+describe('card order', () => {
+  afterEach(() => {
+    restoreMatchMedia?.();
+    restoreMatchMedia = undefined;
+  });
+
+  /** Card headings in document order, limited to the given domains. */
+  function headingOrder(domains: readonly string[]): string[] {
+    return screen
+      .getAllByRole('heading')
+      .map((heading) => heading.textContent ?? '')
+      .filter((text) => domains.includes(text));
+  }
+
+  it('lays the desktop grid out in the order the pilot set', async () => {
+    await db.settings.put({ key: OVERVIEW_CARD_ORDER_KEY, value: ['industry', 'orders'] });
+    render(<App />);
+    await findCard(/industry jobs/i);
+
+    expect(headingOrder(['Open orders', 'Mining tax', 'Industry jobs'])).toEqual([
+      'Industry jobs',
+      'Open orders',
+      'Mining tax',
+    ]);
+  });
+
+  it('gives a phone’s two full cards to the first two in that order', async () => {
+    usePhoneViewport();
+    await db.settings.put({ key: OVERVIEW_CARD_ORDER_KEY, value: ['mail', 'mining'] });
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Everything else' });
+
+    expect(await findCard(/^mail$/i)).toBeInTheDocument();
+    expect(fullCardDomains()).toEqual(['Mining tax']);
+    expect(foldedDomains()).not.toContain('Mail');
+  });
+
+  it('lists the cards in the edit menu in that order, and resets it on request', async () => {
+    const user = userEvent.setup();
+    await db.settings.put({ key: OVERVIEW_CARD_ORDER_KEY, value: ['mail', 'orders'] });
+    render(<App />);
+    await findCard(/^mail$/i);
+
+    await user.click(screen.getByRole('button', { name: /choose which cards to show/i }));
+    const handles = await screen.findAllByRole('button', { name: /^Move / });
+    expect(handles.slice(0, 2).map((handle) => handle.getAttribute('aria-label'))).toEqual([
+      'Move Mail',
+      'Move Open orders',
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'Reset order' }));
+    await waitFor(async () =>
+      expect((await db.settings.get(OVERVIEW_CARD_ORDER_KEY))?.value).toEqual([])
+    );
+    expect(screen.getByRole('button', { name: 'Reset order' })).toBeDisabled();
   });
 });
 

@@ -60,6 +60,7 @@ import {
   useSpExtractionThresholdSp,
 } from '@/features/character/spExtractionSettings';
 import { CardPicker } from '@/features/overview/CardPicker';
+import { effectiveCardOrder, moveCard, useOverviewCardOrder } from '@/features/overview/cardOrder';
 import {
   moonChunkSeverity,
   moonChunksDeadline,
@@ -245,15 +246,20 @@ export function Overview() {
   const hiddenCardsHydrated = useOverviewHiddenCards((state) => state.hydrated);
   const hydrateHiddenCards = useOverviewHiddenCards((state) => state.hydrate);
   const setHiddenCards = useOverviewHiddenCards((state) => state.setValue);
+  const storedOrder = useOverviewCardOrder((state) => state.value);
+  const cardOrderHydrated = useOverviewCardOrder((state) => state.hydrated);
+  const hydrateCardOrder = useOverviewCardOrder((state) => state.hydrate);
+  const setStoredOrder = useOverviewCardOrder((state) => state.setValue);
   const spMonitoring = useSpExtractionMonitoringEnabled((state) => state.value);
   const spThreshold = useSpExtractionThresholdSp((state) => state.value);
   const hydrateSpMonitoring = useSpExtractionMonitoringEnabled((state) => state.hydrate);
   const hydrateSpThreshold = useSpExtractionThresholdSp((state) => state.hydrate);
   useEffect(() => {
     void hydrateHiddenCards();
+    void hydrateCardOrder();
     void hydrateSpMonitoring();
     void hydrateSpThreshold();
-  }, [hydrateHiddenCards, hydrateSpMonitoring, hydrateSpThreshold]);
+  }, [hydrateHiddenCards, hydrateCardOrder, hydrateSpMonitoring, hydrateSpThreshold]);
   const shown = (key: OverviewCardKey) => isCardShown(hiddenCards, key);
 
   // One `cacheKey` per card, not one for the page: they load independently, so
@@ -373,9 +379,9 @@ export function Overview() {
     [visibleAlerts, t]
   );
 
-  // Waits on the hidden-card list too, a local Dexie read, so a hidden card
-  // does not flash in and back out on every visit.
-  if (!hydrated || !hiddenCardsHydrated) {
+  // Waits on the hidden list and the card order too, both local Dexie reads,
+  // so a hidden card does not flash in, or a moved one jump, on every visit.
+  if (!hydrated || !hiddenCardsHydrated || !cardOrderHydrated) {
     return (
       <div className="flex justify-center py-16">
         <Spinner label={t('common.loading')} />
@@ -669,7 +675,14 @@ export function Overview() {
     });
   }
   const soonest = soonestDeadline(specs, shown, alwaysDeadlines);
-  const layout = layoutBoard(specs, { isPhone, shown, phoneFullCount: PHONE_FULL_COUNT });
+  // Empty until the pilot drags a card: until then the board keeps its own
+  // order, and a phone its urgency ranking (`cardOrder.ts`).
+  const layout = layoutBoard(specs, {
+    isPhone,
+    shown,
+    phoneFullCount: PHONE_FULL_COUNT,
+    order: storedOrder.length > 0 ? effectiveCardOrder(storedOrder) : null,
+  });
   const visibleSpecs = specs.filter((spec) => spec.available !== false && shown(spec.key));
   const folded: FoldedDomain[] = layout.folded.map((spec) => ({
     key: spec.key,
@@ -766,9 +779,13 @@ export function Overview() {
         actions={
           <CardPicker
             cards={specs.filter((spec) => spec.available !== false).map((spec) => spec.key)}
+            order={effectiveCardOrder(storedOrder)}
             hidden={hiddenCards}
+            orderCustomised={storedOrder.length > 0}
             onToggle={(key) => void setHiddenCards(toggleHiddenCard(hiddenCards, key))}
+            onMove={(active, over) => void setStoredOrder(moveCard(storedOrder, active, over))}
             onShowAll={() => void setHiddenCards([])}
+            onResetOrder={() => void setStoredOrder([])}
           />
         }
         refreshing={walletSnapshot.loading || visibleSpecs.some((spec) => spec.loading)}

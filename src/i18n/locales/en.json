@@ -2681,6 +2681,13 @@
       "editCards": "Choose which cards to show",
       "editCardsTitle": "Cards",
       "showAllCards": "Show all cards",
+      "resetOrder": "Reset order",
+      "reorderCard": "Move {{name}}",
+      "dragInstructions": "Press space to pick up a card. Use the up and down arrow keys to move it, space again to drop it, or escape to cancel.",
+      "dragStart": "Picked up {{name}}.",
+      "dragOver": "{{name}} is at position {{position}} of {{total}}.",
+      "dragEnd": "{{name}} dropped at position {{position}} of {{total}}.",
+      "dragCancel": "Moving {{name}} cancelled.",
       "structures": "Structures",
       "structuresTimers_one": "{{count}} timer running",
       "structuresTimers_other": "{{count}} timers running",
@@ -5680,7 +5687,7 @@
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown, the courier collateral warning multiple, and whether BPC Sourcing opens set to hide auctions and hide PLEX contracts — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, whether the Moon Mining Tax ledger's Assign form edits ore values individually, which skill plan you're adding skills to from Fit Check and Market, the fitting damage profiles you made along with which one fittings are measured against, and the fitting target profiles you made along with which one applied DPS is worked out against, and which Overview cards you hid. Nothing else on this page leaves your device."
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown, the courier collateral warning multiple, and whether BPC Sourcing opens set to hide auctions and hide PLEX contracts — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, whether the Moon Mining Tax ledger's Assign form edits ore values individually, which skill plan you're adding skills to from Fit Check and Market, the fitting damage profiles you made along with which one fittings are measured against, and the fitting target profiles you made along with which one applied DPS is worked out against, and which Overview cards you hid and the order you put them in. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",
