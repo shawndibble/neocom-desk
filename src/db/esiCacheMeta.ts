@@ -29,6 +29,12 @@ import type { DBCore, DBCoreMutateRequest, DBCoreTable, Middleware } from 'dexie
 export const ESI_CACHE_TABLE = 'esiCache';
 export const ESI_CACHE_META_TABLE = 'esiCacheMeta';
 
+/** One page of a paginated `esiCache` row: its ETag, and how many items it holds. */
+export interface CachedPage {
+  etag: string;
+  count: number;
+}
+
 export interface EsiCacheMetaRecord {
   characterId: number;
   key: string;
@@ -37,6 +43,8 @@ export interface EsiCacheMetaRecord {
   expiresAt?: number;
   /** The response's ETag, sent back as If-None-Match on the next live call. */
   etag?: string;
+  /** A paginated list's per-page ETags (and item counts), sent back page by page. */
+  pages?: CachedPage[];
 }
 
 /** The meta row for one `esiCache` row — every field but `value`. */
@@ -47,6 +55,7 @@ export function metaOf(row: {
   truncated?: boolean;
   expiresAt?: number;
   etag?: string;
+  pages?: CachedPage[];
 }): EsiCacheMetaRecord {
   const meta: EsiCacheMetaRecord = {
     characterId: row.characterId,
@@ -56,6 +65,7 @@ export function metaOf(row: {
   if (row.truncated !== undefined) meta.truncated = row.truncated;
   if (row.expiresAt !== undefined) meta.expiresAt = row.expiresAt;
   if (row.etag !== undefined) meta.etag = row.etag;
+  if (row.pages !== undefined) meta.pages = row.pages;
   return meta;
 }
 

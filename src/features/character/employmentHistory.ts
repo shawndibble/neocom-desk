@@ -5,18 +5,17 @@
  * the `-Status` variant.
  */
 import { getCharacterCorporationHistory, type CorporationHistoryEntry } from '@/esi/endpoints';
-import { loadWithCache, type CachedResult } from '@/esi/cache';
+import { conditionalFetch, loadWithCache, type CachedResult } from '@/esi/cache';
 
 const KEY = 'employment-history';
 
 export function loadEmploymentHistory(
   characterId: number
 ): Promise<CachedResult<CorporationHistoryEntry[]> | null> {
-  return loadWithCache(
-    characterId,
-    KEY,
-    async () => (await getCharacterCorporationHistory(characterId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterCorporationHistory(characterId, options)
   );
+  return loadWithCache(characterId, KEY, fetchLive, { conditional });
 }
 
 export interface EmploymentHistoryRow {

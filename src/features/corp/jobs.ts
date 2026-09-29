@@ -7,6 +7,7 @@
  * (issue #293) — a corp change computes a different key and misses rather than
  * serving the previous corporation's jobs.
  */
+import { conditionalPagedFetch } from '@/esi/cache';
 import { getCorporationIndustryJobs, type CorporationIndustryJob } from '@/esi/endpoints';
 import type { StatusResult } from '@/esi/cache';
 import { loadCorpPaginatedWithCacheStatus } from './corpRead';
@@ -20,7 +21,10 @@ export function loadCorporationIndustryJobs(
   characterId: number,
   corporationId: number
 ): Promise<CorpJobsLoadResult> {
-  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, KEY, () =>
-    getCorporationIndustryJobs(characterId, corporationId, { includeCompleted: false })
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCorporationIndustryJobs(characterId, corporationId, { ...options, includeCompleted: false })
   );
+  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, KEY, fetchLive, {
+    conditional,
+  });
 }

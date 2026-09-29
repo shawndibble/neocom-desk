@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { emitUpgradeBlocked } from './blockedSignal';
-import { esiCacheMetaMiddleware, type EsiCacheMetaRecord } from './esiCacheMeta';
+import { esiCacheMetaMiddleware, type CachedPage, type EsiCacheMetaRecord } from './esiCacheMeta';
 import type { Attributes, Implants, PlanEntry, PlanMilestone } from '@/engine/types';
 import type {
   FacilityKind,
@@ -195,9 +195,15 @@ export interface EsiCacheRecord {
    * Optional and additive like `expiresAt`.
    */
   etag?: string;
+  /**
+   * A paginated list's per-page ETags and item counts, in page order, so each
+   * page revalidates on its own (`esi/cache.ts`). `etag` then holds all of
+   * them together, so a 304 bump is judged exactly like a single response's.
+   */
+  pages?: CachedPage[];
 }
 
-export type { EsiCacheMetaRecord };
+export type { CachedPage, EsiCacheMetaRecord };
 
 /** One saved shortcut in the Quickbar (CONTEXT.md). */
 export interface QuickbarItem {
