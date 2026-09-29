@@ -57,6 +57,14 @@ export default tseslint.config(
           selector: "JSXOpeningElement[name.name='textarea']",
           message: 'Use TextArea from src/components/ui instead of a raw <textarea>.',
         },
+        {
+          // A typed character is not an icon (DESIGN.md §5). Only-child, so a
+          // sign before an amount (`+<IskAmount …/>`) stays legal. Pinned by
+          // scripts/lib/typedGlyphLint.test.mjs.
+          selector: 'JSXText[value=/^\\s*(−|\\+|Aa)\\s*$/]:first-child:last-child',
+          message:
+            'A typed "−", "+" or "Aa" is not an icon — use IconButton with an Icon.* glyph (e.g. Icon.Decrease / Icon.Increase).',
+        },
       ],
       'no-restricted-imports': [
         'error',

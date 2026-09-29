@@ -8,8 +8,9 @@
 import { useGesture } from '@use-gesture/react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button, IconButton, Tooltip } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import type { ShipTreeEdge, ShipTreeHullStatus, ShipTreeLayout } from '@/engine/shipTree/types';
-import { cx } from '@/lib/cx';
 import type { ShipTreeFaction, ShipTreeShip } from '@/sde/types';
 import { ClassNode } from './ClassNode';
 import { HoverCard } from './HoverCard';
@@ -34,7 +35,6 @@ import type { FactionTree } from './useFactionTree';
 import type { ShipTreeSource } from './useShipTreeData';
 
 const BUTTON_STEP = 1.2;
-const toolButton = 'rounded-xs border border-line px-2 py-1 text-xs hover:border-line-bright';
 
 /** The faction panel's 14.5rem plus its 0.75rem inset and a gap. */
 const FACTION_PANEL_SPACE = 256;
@@ -203,54 +203,44 @@ export function ShipTreeMap({
           {t('ships.tree.flyableCount', { flyable, total })}
         </span>
         <span className="flex-1" />
-        <button
-          type="button"
+        <IconButton
+          size="sm"
+          icon={<Icon.ShowLabels />}
+          label={t('ships.tree.showNames')}
+          pressed={showNames}
           onClick={() => setShowNames((v) => !v)}
-          aria-pressed={showNames}
-          aria-label={t('ships.tree.showNames')}
-          title={t('ships.tree.showNames')}
-          className={cx(
-            'rounded-xs border px-2 py-1 text-xs',
-            showNames ? 'border-accent text-accent' : 'border-line text-text-dim'
-          )}
-        >
-          Aa
-        </button>
-        <button
-          type="button"
-          onClick={() => zoomBy(1 / BUTTON_STEP)}
+        />
+        <IconButton
+          size="sm"
+          icon={<Icon.ZoomOut />}
+          label={t('ships.tree.zoomOut')}
           disabled={cam.z <= MIN_ZOOM}
-          aria-label={t('ships.tree.zoomOut')}
-          className={toolButton}
-        >
-          −
-        </button>
+          onClick={() => zoomBy(1 / BUTTON_STEP)}
+        />
         <span
           className="w-10 text-center text-xs text-text-dim tabular-nums"
           aria-label={t('ships.tree.zoomLevel')}
         >
           {Math.round(cam.z * 100)}%
         </span>
-        <button
-          type="button"
-          onClick={() => zoomBy(BUTTON_STEP)}
+        <IconButton
+          size="sm"
+          icon={<Icon.ZoomIn />}
+          label={t('ships.tree.zoomIn')}
           disabled={cam.z >= MAX_ZOOM}
-          aria-label={t('ships.tree.zoomIn')}
-          className={toolButton}
-        >
-          +
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setFocus(null);
-            moveTo(fitCamera(world, viewport, fitInset));
-          }}
-          title={t('ships.tree.fitLabel')}
-          className={toolButton}
-        >
-          {t('ships.tree.fit')}
-        </button>
+          onClick={() => zoomBy(BUTTON_STEP)}
+        />
+        <Tooltip content={t('ships.tree.fitLabel')}>
+          <Button
+            size="sm"
+            onClick={() => {
+              setFocus(null);
+              moveTo(fitCamera(world, viewport, fitInset));
+            }}
+          >
+            {t('ships.tree.fit')}
+          </Button>
+        </Tooltip>
       </div>
 
       <div

@@ -10,7 +10,6 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
-  Button,
   IconButton,
   Select,
   SelectContent,
@@ -109,27 +108,25 @@ export function ProjectedEffectsPanel() {
                   <span className="block text-warning">{t('fittings.projected.nothing')}</span>
                 )}
               </span>
-              <Button
-                size="sm"
-                className="min-h-11 min-w-11 md:min-h-7 md:min-w-7"
-                aria-label={t('fittings.projected.fewer', { name: source.name })}
+              <IconButton
+                size="row"
+                icon={<Icon.Decrease />}
+                label={t('fittings.projected.fewer', { name: source.name })}
+                tooltip={t('fittings.projected.fewerShort')}
                 disabled={source.count <= 1}
                 onClick={() => setCount(source.id, source.count - 1)}
-              >
-                −
-              </Button>
+              />
               <span className="w-14 shrink-0 text-center tabular-nums">
                 {t('fittings.projected.count', { count: source.count })}
               </span>
-              <Button
-                size="sm"
-                className="min-h-11 min-w-11 md:min-h-7 md:min-w-7"
-                aria-label={t('fittings.projected.more', { name: source.name })}
+              <IconButton
+                size="row"
+                icon={<Icon.Increase />}
+                label={t('fittings.projected.more', { name: source.name })}
+                tooltip={t('fittings.projected.moreShort')}
                 disabled={source.count >= MAX_SHIPS}
                 onClick={() => setCount(source.id, source.count + 1)}
-              >
-                +
-              </Button>
+              />
               <IconButton
                 variant="plain"
                 size="sm"
