@@ -28,6 +28,8 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { beginGrant } from '@/app/grantAction';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { formatVolume } from '@/features/market/format';
@@ -77,6 +79,7 @@ import { basisSummary, basisUsage } from './basisLabel';
 import { countDaysBySource, weakestSource, type PriceSource } from '@/engine/miningTax/priceBasis';
 import { SOURCE_TAG_CLASS } from './priceSourceTone';
 import { YieldDetailModal } from './YieldDetailModal';
+import { yieldOverviewCsvColumns } from './yieldCsv';
 import { sumVolume, volumeDisplayMode } from './volume';
 import { VolumeDisplay } from './volumeDisplay';
 import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
@@ -485,6 +488,24 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
     columns.map((c) => c.id)
   );
 
+  // Every column the table can offer, not just the picker's selection.
+  const csvColumns = useMemo(
+    () =>
+      yieldOverviewCsvColumns(t, {
+        showCharacter: showCharacterColumn,
+        showRefining,
+        systemNames: data?.systemNames ?? new Map(),
+        typeNames: data?.typeNames ?? new Map(),
+        typeVolumes: data?.typeVolumes ?? new Map(),
+      }),
+    [t, showCharacterColumn, showRefining, data]
+  );
+  const overviewExport = useTableExport({
+    surface: 'mining-overview',
+    rows: visibleRows,
+    columns: csvColumns,
+  });
+
   return (
     <div className="space-y-4">
       {/* Same shape as `TaxTab`: this tab owns its snapshot, so it owns the
@@ -713,20 +734,27 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
               <Panel
                 padded={false}
                 actions={
-                  <ColumnPickerMenu
-                    available={availableColumnIds}
-                    visible={activeColumnIds}
-                    columnsById={columnsById}
-                    onToggle={handleToggleColumn}
-                    onReset={handleResetColumns}
-                    buttonLabel={t('miningTax.overview.columnsButton')}
-                    menuTitle={t('miningTax.overview.columnsMenuTitle')}
-                    resetLabel={t('miningTax.overview.resetColumnsAction')}
-                  />
+                  <>
+                    <ColumnPickerMenu
+                      available={availableColumnIds}
+                      visible={activeColumnIds}
+                      columnsById={columnsById}
+                      onToggle={handleToggleColumn}
+                      onReset={handleResetColumns}
+                      buttonLabel={t('miningTax.overview.columnsButton')}
+                      menuTitle={t('miningTax.overview.columnsMenuTitle')}
+                      resetLabel={t('miningTax.overview.resetColumnsAction')}
+                    />
+                    <TableActionsMenu
+                      name={t('miningTax.overviewTab')}
+                      tableExport={overviewExport}
+                    />
+                  </>
                 }
               >
                 <div className="overflow-x-auto">
                   <DataTable
+                    {...overviewExport.tableProps}
                     columns={columns}
                     rows={visibleRows}
                     rowKey={(row) =>

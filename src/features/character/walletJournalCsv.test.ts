@@ -64,9 +64,9 @@ describe('walletJournalCsvColumns', () => {
     const fields = csv.split('\r\n')[1].split(',');
     expect(fields.slice(5)).toEqual([
       '12.5',
-      'Contract collateral',
+      '"Contract collateral"',
       '555',
-      'contract_id',
+      '"contract_id"',
       '1001',
       '2002',
     ]);
@@ -76,6 +76,11 @@ describe('walletJournalCsvColumns', () => {
     const columns = walletJournalCsvColumns(t);
     const dateColumn = columns.find((c) => c.header === 'wallet.date')!;
     expect(dateColumn.value(entry({ date: '2026-08-29T12:00:00Z' }))).toBe('2026-08-29T12:00:00Z');
+  });
+
+  it('writes the date as a bare UTC timestamp a spreadsheet reads as a date', () => {
+    const csv = toCsv([entry({ date: '2026-09-28T03:32:04Z' })], walletJournalCsvColumns(t));
+    expect(csv.split('\r\n')[1].split(',')[0]).toBe('2026-09-28 03:32:04');
   });
 
   it('humanizes ref_type', () => {

@@ -19,20 +19,22 @@ import { useTranslation } from 'react-i18next';
 import { DataTable } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import { IskAmount } from '@/components/ui';
-import {
-  buildCompareMatrix,
-  type CompareAttributeGroup,
-  type CompareAttributeRow,
-  type CompareCell,
-} from '@/engine/market/attributeCompareMatrix';
+import type { UseTableExport } from '@/components/ui/useTableExport';
+import type { CompareAttributeRow, CompareCell } from '@/engine/market/attributeCompareMatrix';
 import type { CompareAttributesData } from './useCompareAttributes';
 import type { CompareRow } from './useCompareRows';
 import { formatAttributeValue } from './format';
+import { useCompareAttributeGroups } from './useCompareAttributesExport';
 
 export interface CompareAttributesMatrixProps {
   /** The drawer's own price rows — one per Compare Set item, loading state and best-sell summary included. */
   rows: readonly CompareRow[];
   data: CompareAttributesData;
+  /**
+   * The drawer's export for this matrix (`useCompareAttributesExport`), so
+   * every category's table offers the one whole-matrix export.
+   */
+  tableExport?: UseTableExport<CompareAttributeRow>;
 }
 
 /** A price is shorthand — the whole table is a side-by-side scan — with the exact figure one gesture away; an attribute keeps its own unit and precision. */
@@ -54,27 +56,12 @@ function emptyCell(kind: 'price' | 'attribute', row: CompareRow): string {
   return kind === 'price' && row.loading ? '…' : '—';
 }
 
-export function CompareAttributesMatrix({ rows, data }: CompareAttributesMatrixProps) {
+export function CompareAttributesMatrix({ rows, data, tableExport }: CompareAttributesMatrixProps) {
   const { t } = useTranslation();
 
   const rowsByTypeId = useMemo(() => new Map(rows.map((row) => [row.typeId, row])), [rows]);
 
-  const groups = useMemo<CompareAttributeGroup[]>(() => {
-    const matrixItems = rows.map((row) => ({
-      typeId: row.typeId,
-      dogmaAttributes: data.dogmaByTypeId.get(row.typeId),
-      bestSell: row.summary?.bestSell,
-    }));
-    return buildCompareMatrix(
-      matrixItems,
-      data.dictionary,
-      {
-        worth: t('market.compare.worth'),
-        estimatedPrice: t('market.compare.estimatedPrice'),
-      },
-      data.names
-    );
-  }, [rows, data, t]);
+  const groups = useCompareAttributeGroups(rows, data);
 
   const columns = useMemo<DataTableColumn<CompareAttributeRow>[]>(
     () => [
@@ -127,6 +114,7 @@ export function CompareAttributesMatrix({ rows, data }: CompareAttributesMatrixP
             {group.category}
           </h3>
           <DataTable
+            {...tableExport?.tableProps}
             columns={columns}
             rows={group.rows}
             rowKey={(row) => row.key}

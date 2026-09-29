@@ -117,6 +117,9 @@ import {
   textParam,
 } from '@/lib/urlState';
 import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
+import { charactersCsvColumns } from '@/features/character/charactersCsv';
 
 const UNGROUPED_VALUE = '__ungrouped__';
 
@@ -1339,36 +1342,65 @@ export function Characters() {
   }
 
   /**
+   * The table's rows: the whole (filtered) roster, in the roster sort. Built
+   * up here, not inside `renderTable`, because the export hook below needs
+   * them before the loading early return — which also lets card view export
+   * the same rows (the DataTable's own column sort applies only while it's
+   * mounted).
+   */
+  const tableRows: CharacterRow[] = partitionStarredFirst(
+    sortCharacterIds(
+      (characters ?? [])
+        .map((character) => character.characterId)
+        .filter((characterId) => matchesFilters(characterId)),
+      sortStatsById,
+      sortKey,
+      sortDirection
+    ),
+    starred
+  )
+    .map((characterId) => charactersById.get(characterId))
+    .filter((character): character is CharacterRecord => character !== undefined)
+    .map((character) => {
+      const core = rosterCore.get(character.characterId);
+      return {
+        character,
+        info: publicInfo[character.characterId],
+        stats: core?.stats,
+        queue: core?.queue,
+        notTrainingAlertEnabled: notTrainingAlertEnabledFor(character.characterId),
+        attention: attentionById.get(character.characterId),
+        alertCount: alertCounts.get(character.characterId) ?? 0,
+        jobSlotSkills: core?.jobSlotSkills,
+        totalSp: core?.totalSp,
+        starred: isCharacterStarred(starred, character.characterId),
+        groupId: groupIdByCharacterId.get(character.characterId) ?? null,
+      };
+    });
+  const groupList = groupsValue.groups;
+  const csvColumns = useMemo(
+    () =>
+      charactersCsvColumns(t, {
+        groupNameById: new Map(groupList.map((group) => [group.id, group.name])),
+        spExtractionEnabled,
+        spExtractionThresholdSp: spExtractionThreshold,
+        lastSynced: (row) => characterLastSynced(row.stats, row.queue),
+      }),
+    [t, groupList, spExtractionEnabled, spExtractionThreshold]
+  );
+  const charactersExport = useTableExport({
+    surface: 'characters',
+    rows: tableRows,
+    columns: csvColumns,
+  });
+
+  /**
    * Table view — one flat `DataTable` over the whole (filtered) roster, not
    * one per group section (decision 20260927-071415): the new `group` column
    * carries membership per row instead, and `GroupSectionHeader`'s
    * rename/reorder/delete stay card-view only.
    */
-  function renderTable(characterIds: readonly number[]) {
-    const filteredIds = characterIds.filter((characterId) => matchesFilters(characterId));
-    const sortedIds = partitionStarredFirst(
-      sortCharacterIds(filteredIds, sortStatsById, sortKey, sortDirection),
-      starred
-    );
-    const rows: CharacterRow[] = sortedIds
-      .map((characterId) => charactersById.get(characterId))
-      .filter((character): character is CharacterRecord => character !== undefined)
-      .map((character) => {
-        const core = rosterCore.get(character.characterId);
-        return {
-          character,
-          info: publicInfo[character.characterId],
-          stats: core?.stats,
-          queue: core?.queue,
-          notTrainingAlertEnabled: notTrainingAlertEnabledFor(character.characterId),
-          attention: attentionById.get(character.characterId),
-          alertCount: alertCounts.get(character.characterId) ?? 0,
-          jobSlotSkills: core?.jobSlotSkills,
-          totalSp: core?.totalSp,
-          starred: isCharacterStarred(starred, character.characterId),
-          groupId: groupIdByCharacterId.get(character.characterId) ?? null,
-        };
-      });
+  function renderTable(rows: readonly CharacterRow[]) {
     return (
       // Deliberate deviation from DataTable's usual `.dt-stack` collapse on
       // mobile (docs/context/decisions/20260909-130638-characters-table-
@@ -1376,6 +1408,7 @@ export function Characters() {
       // table stays a table, and scrolls sideways instead, at every width.
       <div className="overflow-x-auto">
         <DataTable
+          {...charactersExport.tableProps}
           columns={activeColumnIds.map((id) => columnsById[id])}
           rows={rows}
           rowKey={(row) => row.character.characterId}
@@ -1524,18 +1557,25 @@ export function Characters() {
                 className="min-w-40 flex-1"
               />
             }
-            // Card view has no columns to pick, so the button only exists
-            // alongside the table it acts on.
+            // Card view has no columns to pick or table to export, so these
+            // only exist alongside the table they act on.
             actions={
               viewMode === 'table' ? (
-                <ColumnPickerMenu
-                  available={availableColumnIds}
-                  visible={activeColumnIds}
-                  columnsById={columnsById}
-                  onToggle={handleToggleColumn}
-                  buttonLabel={t('characters.columnsButton')}
-                  menuTitle={t('characters.columnsMenuTitle')}
-                />
+                <>
+                  <ColumnPickerMenu
+                    available={availableColumnIds}
+                    visible={activeColumnIds}
+                    columnsById={columnsById}
+                    onToggle={handleToggleColumn}
+                    buttonLabel={t('characters.columnsButton')}
+                    menuTitle={t('characters.columnsMenuTitle')}
+                  />
+                  <TableActionsMenu
+                    name={t('characters.title')}
+                    tableExport={charactersExport}
+                    size="md"
+                  />
+                </>
               ) : undefined
             }
           >
@@ -1733,7 +1773,7 @@ export function Characters() {
             // One flat table over the whole roster, not one per group section
             // (decision 20260927-071415) — the `group` column carries
             // membership per row, and group management stays in card view.
-            renderTable(allIds)
+            renderTable(tableRows)
           ) : (
             <div className="space-y-4">
               {groupsValue.groups.map((group, index) => (

@@ -14,7 +14,7 @@ import { DEFAULT_ASSET_SORT, useAssetSort } from '@/features/character/assetSort
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { configureClipboard } from '@/lib/clipboard';
 import { App } from '@/app/App';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { exportRows } from '@/lib/downloadCsv';
 import type { TypeMap } from '@/sde/types';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -52,8 +52,11 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: vi.fn(async () => new Map()),
 }));
 
-// The CSV export test reads the rows handed to the download rather than a file.
-vi.mock('@/lib/downloadCsv', () => ({ downloadCsv: vi.fn() }));
+// The export test reads the rows handed to the export rather than a file.
+vi.mock('@/lib/downloadCsv', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/downloadCsv')>()),
+  exportRows: vi.fn(async () => {}),
+}));
 
 const CHAR_ID = 91;
 const JITA = 'Jita IV - Moon 4 - Caldari Navy Assembly Plant';
@@ -1163,26 +1166,40 @@ describe('cross-character search (issue #85)', () => {
     expect(screen.getByText(/CSV export only includes this character/i)).toBeInTheDocument();
   });
 
-  it('exports only what the search matches, and disables export when nothing does', async () => {
-    vi.mocked(downloadCsv).mockClear();
+  it('exports only what the search matches, and nothing when nothing does', async () => {
+    vi.mocked(exportRows).mockClear();
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText(JITA);
 
+    async function exportCsv() {
+      fireEvent.pointerDown(screen.getByRole('button', { name: 'Assets actions' }), {
+        button: 0,
+        pointerType: 'mouse',
+      });
+      (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
+      await user.keyboard('{ArrowRight}');
+      (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
+      await user.keyboard('{Enter}');
+    }
+
     await user.type(screen.getByPlaceholderText(/search items/i), 'tritanium');
     await screen.findByText('Tritanium');
-    const exportButton = screen.getByRole('button', { name: 'Export CSV' });
-    await waitFor(() => expect(exportButton).toBeEnabled());
-    await user.click(exportButton);
+    await exportCsv();
 
-    expect(downloadCsv).toHaveBeenCalledTimes(1);
-    const rows = JSON.stringify(vi.mocked(downloadCsv).mock.calls[0][1]);
+    await waitFor(() => expect(exportRows).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(exportRows).mock.calls[0][0]).toBe('csv');
+    expect(vi.mocked(exportRows).mock.calls[0][1]).toBe('assets');
+    const rows = JSON.stringify(vi.mocked(exportRows).mock.calls[0][2]);
     expect(rows).toContain('Tritanium');
     expect(rows).not.toContain('Pyerite');
 
     await user.clear(screen.getByPlaceholderText(/search items/i));
     await user.type(screen.getByPlaceholderText(/search items/i), 'no such item');
-    await waitFor(() => expect(exportButton).toBeDisabled());
+    await screen.findByText(/no items match/i);
+    await exportCsv();
+    await waitFor(() => expect(exportRows).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(exportRows).mock.calls[1][2]).toEqual([]);
   });
 });
 

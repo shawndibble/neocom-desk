@@ -42,13 +42,13 @@ describe('compareCsvColumns', () => {
       columns
     );
     const fields = csv.split('\r\n')[1].split(',');
-    expect(fields).toEqual(['Rifter', '12345.5', '12000', '345.5', '7']);
+    expect(fields).toEqual(['"Rifter"', '12345.5', '12000', '345.5', '7']);
   });
 
   it('exports empty cells for a row still loading or whose fetch failed', () => {
     const columns = compareCsvColumns(t);
     const csv = toCsv([row({ loading: true, summary: null })], columns);
     const fields = csv.split('\r\n')[1].split(',');
-    expect(fields).toEqual(['Rifter', '', '', '', '']);
+    expect(fields).toEqual(['"Rifter"', '', '', '', '']);
   });
 });

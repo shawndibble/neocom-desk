@@ -66,6 +66,9 @@ import {
   type ReverseLane,
 } from '@/features/contractSearch/CourierContractDetailModal';
 import { reverseLaneMatches } from '@/engine/contracts/courierReverseLane';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
+import { courierContractsCsvColumns } from './courierContractsCsv';
 import { endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { loadCharacterRegionId } from '@/features/contractSearch/characterRegion';
 import { formatIskAuto, formatIskCompact } from '@/lib/isk';
@@ -1361,6 +1364,20 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
     columns.map((column) => column.id)
   );
 
+  const courierCsvColumns = useMemo(
+    () =>
+      courierContractsCsvColumns(t, {
+        regionName: (regionId) => regionLabel(regionId, regionNames),
+        jumps: (row) => jumpsByContract.get(row.contractId) ?? null,
+      }),
+    [t, regionNames, jumpsByContract]
+  );
+  const courierExport = useTableExport({
+    surface: 'courier-contracts',
+    rows: displayRows,
+    columns: courierCsvColumns,
+  });
+
   /**
    * Phone-only lane folding. Memoised because `DataTable` regroups whenever
    * this object's identity changes, and the jump counts it reads land after
@@ -1434,14 +1451,17 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         preference={preference}
         onPreferenceChange={changePreference}
         actions={
-          <ColumnPickerMenu
-            available={COURIER_COLUMN_IDS}
-            visible={visibleColumns}
-            columnsById={courierColumnsById}
-            onToggle={toggleColumn}
-            buttonLabel={t('contractSearch.columnsButton')}
-            menuTitle={t('contractSearch.columnsMenuTitle')}
-          />
+          <>
+            <ColumnPickerMenu
+              available={COURIER_COLUMN_IDS}
+              visible={visibleColumns}
+              columnsById={courierColumnsById}
+              onToggle={toggleColumn}
+              buttonLabel={t('contractSearch.columnsButton')}
+              menuTitle={t('contractSearch.columnsMenuTitle')}
+            />
+            <TableActionsMenu name={t('contractSearch.courierTitle')} tableExport={courierExport} />
+          </>
         }
       />
       {displayRows.length === 0 ? (
@@ -1470,6 +1490,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
             </p>
           )}
           <DataTable
+            {...courierExport.tableProps}
             label={t('contractSearch.courierTitle')}
             columns={columns}
             rows={displayRows}

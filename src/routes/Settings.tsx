@@ -30,6 +30,8 @@ import {
   type DataTableColumn,
   Checkbox,
 } from '@/components/ui';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
 import {
@@ -110,6 +112,12 @@ import { exportBackupToFile, importBackup, type ImportSummary } from '@/backup/i
 import { ENDPOINT_ROUTES } from '@/esi/endpointRoutes';
 import { useActivityLog, type ActivityLogEntry } from '@/stores/activityLog';
 import type { ActivityOutcome } from '@/esi/activityLog';
+import {
+  activityLogCsvColumns,
+  characterCell,
+  dataAgeCsvColumns,
+  OUTCOME_LABEL_KEYS,
+} from './activityLogCsv';
 
 const FONT_SCALE_LABEL_KEYS = {
   0.875: 'settings.fontScaleSmall',
@@ -117,12 +125,6 @@ const FONT_SCALE_LABEL_KEYS = {
   1.125: 'settings.fontScaleLarge',
   1.25: 'settings.fontScaleExtraLarge',
 } as const satisfies Record<FontScale, string>;
-
-const OUTCOME_LABEL_KEYS = {
-  success: 'activityLog.outcomeSuccess',
-  authFailure: 'activityLog.outcomeAuthFailure',
-  error: 'activityLog.outcomeError',
-} as const satisfies Record<ActivityOutcome, string>;
 
 const OUTCOME_TONE: Record<ActivityOutcome, string> = {
   success: 'text-success',
@@ -146,17 +148,6 @@ function useCharacterNames(): Map<number, string> {
     () => new Map(characters?.map((c) => [c.characterId, c.name]) ?? []),
     [characters]
   );
-}
-
-/** Shared "Character" column render for `ActivityLogPanel` and `DataAgePanel`. */
-function characterCell(
-  characterId: number | undefined,
-  characterNames: Map<number, string>,
-  t: (key: string) => string
-): string {
-  return characterId === undefined
-    ? t('activityLog.publicCall')
-    : (characterNames.get(characterId) ?? `#${characterId}`);
 }
 
 function ActivityLogPanel() {
@@ -208,14 +199,25 @@ function ActivityLogPanel() {
     ],
     [t, characterNames, timeZone]
   );
+  const csvColumns = useMemo(() => activityLogCsvColumns(t, characterNames), [t, characterNames]);
+  const tableExport = useTableExport({
+    surface: 'activity-log',
+    rows: entries,
+    columns: csvColumns,
+  });
 
   return (
     <Panel
       title={t('activityLog.title')}
       actions={
-        <Button size="sm" onClick={handleClear} disabled={entries.length === 0}>
-          {t('activityLog.clearLog')}
-        </Button>
+        <>
+          <Button size="sm" onClick={handleClear} disabled={entries.length === 0}>
+            {t('activityLog.clearLog')}
+          </Button>
+          {entries.length > 0 && (
+            <TableActionsMenu name={t('activityLog.title')} tableExport={tableExport} />
+          )}
+        </>
       }
     >
       <div className="space-y-2">
@@ -225,6 +227,7 @@ function ActivityLogPanel() {
           <EmptyState title={t('activityLog.emptyTitle')} hint={t('activityLog.emptyHint')} />
         ) : (
           <DataTable
+            {...tableExport.tableProps}
             columns={columns}
             rows={entries}
             rowKey={(entry) => entry.id}
@@ -309,15 +312,23 @@ function DataAgePanel() {
     ],
     [t, characterNames, timeZone]
   );
+  const csvColumns = useMemo(() => dataAgeCsvColumns(t, characterNames), [t, characterNames]);
+  const tableExport = useTableExport({ surface: 'data-age', rows, columns: csvColumns });
 
   return (
-    <Panel title={t('dataAge.title')}>
+    <Panel
+      title={t('dataAge.title')}
+      actions={
+        rows.length > 0 && <TableActionsMenu name={t('dataAge.title')} tableExport={tableExport} />
+      }
+    >
       <div className="space-y-2">
         <p className="text-xs text-text-dim">{t('dataAge.hint')}</p>
         {rows.length === 0 ? (
           <EmptyState title={t('dataAge.emptyTitle')} hint={t('dataAge.emptyHint')} />
         ) : (
           <DataTable
+            {...tableExport.tableProps}
             columns={columns}
             rows={rows}
             rowKey={(entry) => entry.id}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type ProductionRunRecord } from '@/db';
@@ -40,6 +40,9 @@ import { useSaleLinking } from './useSaleLinking';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 import { useTimeZone } from '@/lib/timeFormat';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
+import { productionRunsCsvColumns } from './productionRunsCsv';
 
 interface ProductionRunsPanelProps {
   characterId: number;
@@ -96,6 +99,7 @@ export function ProductionRunsPanel({
 }: ProductionRunsPanelProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
+  const runsCsvColumns = useMemo(() => productionRunsCsvColumns(t), [t]);
   const [loggingOpen, setLoggingOpen] = useState(false);
   // Closed until asked: the table is the record, and on a plan being priced
   // the header's one-line rollup is the read that matters. Its rows are
@@ -208,6 +212,12 @@ export function ProductionRunsPanel({
     await removeProductionOrderWatch(characterId, watchId);
   }
 
+  const runsExport = useTableExport({
+    surface: 'build-plan-runs',
+    rows,
+    columns: runsCsvColumns,
+  });
+
   const columns: DataTableColumn<ProductionRunSummary>[] = [
     loggedAtColumn(t, timeZone),
     quantityColumn(t),
@@ -240,9 +250,14 @@ export function ProductionRunsPanel({
         onToggle={() => setExpanded((open) => !open)}
         labels={{ show: t('industry.runsShow'), hide: t('industry.runsHide') }}
         actions={
-          <Button size="sm" onClick={openLogProduction} disabled={productTypeID === null}>
-            <Icon.AddToPlan /> {t('industry.logProduction')}
-          </Button>
+          <span className="flex items-center gap-2">
+            {runs.length > 0 && (
+              <TableActionsMenu name={t('industry.productionRuns')} tableExport={runsExport} />
+            )}
+            <Button size="sm" onClick={openLogProduction} disabled={productTypeID === null}>
+              <Icon.AddToPlan /> {t('industry.logProduction')}
+            </Button>
+          </span>
         }
       >
         {runs.length === 0 ? (
@@ -253,6 +268,7 @@ export function ProductionRunsPanel({
           />
         ) : (
           <DataTable
+            {...runsExport.tableProps}
             columns={columns}
             rows={rows}
             rowKey={(r) => r.run.id}

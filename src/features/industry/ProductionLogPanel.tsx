@@ -35,6 +35,9 @@ import {
 } from './productionLogFilter';
 import { productionProfitHistory, productionProfitTrend } from './productionProfitHistory';
 import { summarizeProductionRun, type ProductionRunSummary } from './productionRunSummary';
+import { productionLogItemsCsvColumns, productionLogRunsCsvColumns } from './productionRunsCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import {
   loggedAtColumn,
   quantityColumn,
@@ -475,6 +478,21 @@ export function ProductionLogPanel({
     [t, timeZone, skills, standingByPlanId]
   );
 
+  const itemsCsvColumns = useMemo(() => productionLogItemsCsvColumns(t), [t]);
+  const runsCsvColumns = useMemo(() => productionLogRunsCsvColumns(t), [t]);
+  const itemsExport = useTableExport({
+    surface: 'production-log-items',
+    rows: rollup.itemRows,
+    columns: itemsCsvColumns,
+  });
+  // Folded by default, so its table is often unmounted — then the export
+  // falls back to the rollup's own order.
+  const runsExport = useTableExport({
+    surface: 'production-log-runs',
+    rows: rollup.runRows,
+    columns: runsCsvColumns,
+  });
+
   if (runs.length === 0) {
     return (
       <Panel title={t('industry.productionLog')}>
@@ -594,10 +612,14 @@ export function ProductionLogPanel({
               </Suspense>
             )}
             <div>
-              <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('industry.byItem')}
-              </h3>
+              <div className="flex items-center justify-between gap-2 border-b border-line pb-1">
+                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('industry.byItem')}
+                </h3>
+                <TableActionsMenu name={t('industry.byItem')} tableExport={itemsExport} />
+              </div>
               <DataTable
+                {...itemsExport.tableProps}
                 columns={columns}
                 rows={itemRows}
                 rowKey={(r) => r.productTypeID}
@@ -614,6 +636,9 @@ export function ProductionLogPanel({
             <CollapsiblePanel
               title={t('industry.allProductionRuns')}
               meta={<span className="text-xs tabular-nums text-text-dim">{runRows.length}</span>}
+              actions={
+                <TableActionsMenu name={t('industry.allProductionRuns')} tableExport={runsExport} />
+              }
               expanded={runsExpanded}
               onToggle={() => setRunsExpanded((open) => !open)}
               labels={{
@@ -624,6 +649,7 @@ export function ProductionLogPanel({
             >
               <div className="overflow-x-auto">
                 <DataTable
+                  {...runsExport.tableProps}
                   columns={runColumns}
                   rows={runRows}
                   rowKey={(r) => r.run.id}

@@ -51,7 +51,8 @@ import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useUrlParam } from '@/lib/useUrlState';
 import type { UrlParamCodec } from '@/lib/urlState';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { calendarCsvColumns } from '@/features/character/calendarCsv';
 import type { CalendarRsvpResponse } from '@/esi/endpoints';
 
@@ -305,6 +306,16 @@ export function Calendar() {
     setAnchor(density === 'month' ? addMonths(current, delta) : addWeeks(current, delta));
   }
 
+  // The events aren't a DataTable (the map and the rail are views over
+  // them), so the export reads `events` as given — in ESI's order.
+  const csvColumns = useMemo(() => calendarCsvColumns(t), [t]);
+  const eventsExport = useTableExport({
+    surface: 'calendar',
+    rows: events,
+    columns: csvColumns,
+    source: 'rows',
+  });
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -371,12 +382,7 @@ export function Calendar() {
               skillPlanError={data?.skillPlanError ?? null}
               onChooseSkillPlan={(planId) => void chooseSkillPlan(planId)}
             />
-            <IconButton
-              icon={<Icon.Download />}
-              label={t('calendar.exportCsv')}
-              disabled={events.length === 0}
-              onClick={() => downloadCsv('calendar', events, calendarCsvColumns(t))}
-            />
+            <TableActionsMenu name={t('calendar.title')} tableExport={eventsExport} size="md" />
             <IconButton
               icon={<Icon.Refresh />}
               label={t('calendar.refresh')}

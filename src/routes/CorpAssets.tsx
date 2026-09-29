@@ -97,8 +97,9 @@ import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useCompareSet } from '@/features/market/compareSet';
 import { writeToClipboard } from '@/lib/clipboard';
-import { downloadCsv } from '@/lib/downloadCsv';
-import { assetCsvRows, assetsCsvColumns } from '@/features/character/assetsCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import type { TableExport } from '@/components/ui/useTableExport';
+import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/character/assetsCsv';
 import { getAdjustedPrices } from '@/market/prices';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useFocusHeading } from '@/lib/useFocusHeading';
@@ -490,12 +491,17 @@ function CorpAssetsView() {
     void writeToClipboard(names.join('\n'));
   }
 
-  function handleExportCsv() {
-    if (!groups) return;
-    downloadCsv(
-      'corp-assets',
+  // Not `useTableExport`: the browse list isn't a DataTable, and `getRows`
+  // builds every group's rows lazily, only when an export actually runs.
+  const assetsCsvColumnList = useMemo(() => assetsCsvColumns(t), [t]);
+  const assetsExport: TableExport<AssetCsvRow> = {
+    surface: 'corp-assets',
+    columns: assetsCsvColumnList,
+    truncated: data?.truncated ?? false,
+    qualifier: 'corp',
+    getRows: () =>
       assetCsvRows(
-        groups.map((group) => ({
+        (groups ?? []).map((group) => ({
           label: groupLabel(t, group.id, divisionNames),
           entries: collectGroupItemIds(group).map((itemId) => {
             const asset = assetsByItemId.get(itemId);
@@ -510,12 +516,7 @@ function CorpAssetsView() {
           }),
         }))
       ),
-      assetsCsvColumns(t),
-      new Date(),
-      data?.truncated ?? false,
-      'corp'
-    );
-  }
+  };
 
   const hasAnyAssets = (groups ?? []).some((group) => group.children.length > 0);
 
@@ -561,11 +562,10 @@ function CorpAssetsView() {
                 pressed={selectMode}
                 onClick={toggleSelectMode}
               />
-              <IconButton
-                icon={<Icon.Download />}
-                label={t('assets.exportCsv')}
-                disabled={!groups || !hasAnyAssets}
-                onClick={handleExportCsv}
+              <TableActionsMenu
+                name={t('corp.assets.title')}
+                tableExport={assetsExport}
+                size="md"
               />
               <IconButton
                 icon={<Icon.Refresh />}

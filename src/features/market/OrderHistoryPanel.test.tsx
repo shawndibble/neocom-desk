@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import * as download from '@/lib/download';
 import { OrderHistoryPanel } from './OrderHistoryPanel';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import { loadOrderHistory } from '@/features/character/orders';
@@ -12,7 +13,6 @@ import type { MarketOrderHistory } from '@/esi/endpoints';
 
 vi.mock('@/features/character/orders', () => ({ loadOrderHistory: vi.fn() }));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
-vi.mock('@/lib/downloadCsv', () => ({ downloadCsv: vi.fn() }));
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn() }));
 
 const mockedLoadHistory = vi.mocked(loadOrderHistory);
@@ -78,6 +78,36 @@ describe('OrderHistoryPanel — the row as an item', () => {
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Show info' }));
     expect(actions.showInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
+  });
+
+  it('exports a truncated fetch from the title-bar menu as a -partial file', async () => {
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    const user = userEvent.setup();
+    mockedLoadHistory.mockResolvedValue({
+      cached: {
+        data: [historyOrder()],
+        fetchedAt: new Date(),
+        fromCache: false,
+        truncated: true,
+      },
+      needsReauth: false,
+    });
+    renderPanel();
+    await screen.findByRole('row', { name: /Damage Control II/ });
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Ended orders actions' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
+    await user.keyboard('{ArrowRight}');
+    (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(spy).toHaveBeenCalledOnce());
+    expect(spy.mock.calls[0][0]).toMatch(/^neocom-orders-history-\d{4}-\d{2}-\d{2}-partial\.csv$/);
+    expect(spy.mock.calls[0][1]).toContain('"Damage Control II","Sell",460800,0,3,');
+    spy.mockRestore();
   });
 
   it('asks for the blueprint catalog the first time a row menu opens', async () => {

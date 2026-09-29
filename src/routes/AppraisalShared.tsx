@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -11,13 +11,18 @@ import {
   StatChip,
   type DataTableColumn,
 } from '@/components/ui';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import type { AppraisalRow } from '@/engine/market/appraisal';
+import { appraisalCsvColumns } from '@/features/market/appraisalCsv';
 import { formatVolume } from '@/features/market/format';
 import {
   resolveAppraisalShare,
   type AppraisalShareView,
 } from '@/features/market/appraisalShareData';
 import { formatIskAuto } from '@/lib/isk';
+
+const NO_ROWS: readonly AppraisalRow[] = [];
 
 /**
  * A per-unit price, exact — same split as `AppraisalPanel`, so a share link
@@ -80,6 +85,13 @@ export function AppraisalShared() {
   }, [payload]);
 
   const state: LoadState = payload === '' ? { status: 'invalid' } : loadState;
+  const shareRows = state.status === 'ready' ? state.view.appraisal.rows : NO_ROWS;
+  const csvColumns = useMemo(() => appraisalCsvColumns(t), [t]);
+  const tableExport = useTableExport({
+    surface: 'appraisal-shared',
+    rows: shareRows,
+    columns: csvColumns,
+  });
 
   const columns: DataTableColumn<AppraisalRow>[] = [
     {
@@ -138,6 +150,11 @@ export function AppraisalShared() {
         <h1 className="text-sm font-semibold tracking-widest uppercase">
           {t('appraisalShare.title')}
         </h1>
+        {shareRows.length > 0 && (
+          <span className="ml-auto">
+            <TableActionsMenu name={t('appraisalShare.title')} tableExport={tableExport} />
+          </span>
+        )}
       </div>
 
       <p className="rounded-xs border border-warning bg-panel-2 px-3 py-2 text-xs text-warning">
@@ -215,6 +232,7 @@ export function AppraisalShared() {
             />
           ) : (
             <DataTable
+              {...tableExport.tableProps}
               columns={columns}
               rows={state.view.appraisal.rows}
               rowKey={(row) => row.typeId}

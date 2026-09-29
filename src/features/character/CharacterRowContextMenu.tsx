@@ -7,7 +7,7 @@
  * `Industry.tsx`), so getting there for a character other than the active
  * one means switching first, same as `Characters.tsx`'s own `select()`.
  */
-import type { ReactElement } from 'react';
+import { useContext, type ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -15,6 +15,7 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
+  RowMenuExtrasContext,
 } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
@@ -36,6 +37,8 @@ export function CharacterRowContextMenu({ characterId, children }: CharacterRowC
   const { t } = useTranslation();
   const navigate = useNavigate();
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
+  // The table's own additions (its "Export table" submenu).
+  const extras = useContext(RowMenuExtrasContext);
 
   async function go(path: string) {
     await setActiveCharacter(characterId);
@@ -51,6 +54,7 @@ export function CharacterRowContextMenu({ characterId, children }: CharacterRowC
             {t(destination.labelKey)}
           </ContextMenuItem>
         ))}
+        {extras}
       </ContextMenuContent>
     </ContextMenu>
   );

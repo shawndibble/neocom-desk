@@ -48,7 +48,8 @@ import { stripEveMarkup, typeDescription } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
 import { skillCsvColumns, skillCsvRows, type SkillGroup } from '@/features/skills/skillsCsv';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
 
@@ -312,6 +313,21 @@ export function Skills() {
     setExpandedGroups(new Set());
   }
 
+  // Every trained skill, grouped as the list shows them (not just the
+  // expanded or search-matched groups). Nothing while the skills scope needs
+  // re-auth — the old export button was disabled then too.
+  const csvRows = useMemo(
+    () => (skillsNeedsReauth ? [] : skillCsvRows(groups)),
+    [groups, skillsNeedsReauth]
+  );
+  const csvColumns = useMemo(() => skillCsvColumns(t), [t]);
+  const skillsExport = useTableExport({
+    surface: 'skills',
+    rows: csvRows,
+    columns: csvColumns,
+    source: 'rows',
+  });
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -328,12 +344,7 @@ export function Skills() {
         meta={fetchedAt && <DataAgeBadge date={fetchedAt} />}
         actions={
           <>
-            <IconButton
-              icon={<Icon.Download />}
-              label={t('skills.exportCsv')}
-              disabled={groups.length === 0 || skillsNeedsReauth}
-              onClick={() => downloadCsv('skills', skillCsvRows(groups), skillCsvColumns(t))}
-            />
+            <TableActionsMenu name={t('nav.skills')} tableExport={skillsExport} size="md" />
             <IconButton icon={<Icon.Refresh />} label={t('skills.refresh')} onClick={refresh} />
           </>
         }

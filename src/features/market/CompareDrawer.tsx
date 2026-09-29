@@ -43,7 +43,9 @@ import { CompareAttributesMatrix } from './CompareAttributesMatrix';
 import type { OrderBookLocation } from './orderBookView';
 import { compareCsvColumns } from './compareCsv';
 import { formatVolume } from './format';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
+import { useCompareAttributesExport } from './useCompareAttributesExport';
 import { ItemContextMenu } from './ItemContextMenu';
 import { compareMargin, type AppraisalNetFees } from '@/engine/market/appraisal';
 import { ZERO_STANDINGS, type ResolvedStandings } from '@/engine/market/standings';
@@ -173,6 +175,13 @@ export function CompareDrawer({
     [skillLevels, characterId, standing]
   );
   const attributes = useCompareAttributes(items, mode !== 'closed' && view === 'attributes');
+  const pricesCsvColumns = useMemo(() => compareCsvColumns(t), [t]);
+  const pricesExport = useTableExport({
+    surface: 'market-compare',
+    rows,
+    columns: pricesCsvColumns,
+  });
+  const attributesExport = useCompareAttributesExport(rows, attributes.data);
 
   function close() {
     setMode('closed');
@@ -403,14 +412,18 @@ export function CompareDrawer({
               )}
             </div>
             <div className="flex items-center gap-2">
-              {view === 'prices' && (
-                <IconButton
-                  size="sm"
-                  icon={<Icon.Download />}
-                  label={t('market.compare.exportCsv')}
-                  disabled={rows.length === 0}
-                  onClick={() => downloadCsv('market-compare', rows, compareCsvColumns(t))}
+              {view === 'prices' ? (
+                <TableActionsMenu
+                  name={t('market.compare.viewPrices')}
+                  tableExport={pricesExport}
                 />
+              ) : (
+                attributes.data && (
+                  <TableActionsMenu
+                    name={t('market.compare.viewAttributes')}
+                    tableExport={attributesExport}
+                  />
+                )
               )}
               <Button size="sm" onClick={() => setMode((m) => (m === 'full' ? 'open' : 'full'))}>
                 {mode === 'full' ? t('market.compare.restore') : t('market.compare.expand')}
@@ -440,7 +453,11 @@ export function CompareDrawer({
                 />
               ) : (
                 <div className="p-3">
-                  <CompareAttributesMatrix rows={rows} data={attributes.data} />
+                  <CompareAttributesMatrix
+                    rows={rows}
+                    data={attributes.data}
+                    tableExport={attributesExport}
+                  />
                 </div>
               )
             ) : rows.length === 0 ? (
@@ -456,6 +473,7 @@ export function CompareDrawer({
                   />
                 )}
                 <DataTable
+                  {...pricesExport.tableProps}
                   columns={columns}
                   rows={rows}
                   rowKey={(row) => row.typeId}

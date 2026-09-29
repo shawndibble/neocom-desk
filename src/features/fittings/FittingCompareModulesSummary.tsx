@@ -1,5 +1,4 @@
 /** "Modules that differ": one row per module type not shared identically across every compared Fitting. */
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TypeIcon } from '@/components/ui';
 import {
@@ -8,7 +7,7 @@ import {
   type FittingCompareColumn,
 } from './FittingCompareTable';
 import type { ModuleDiffEntry } from '@/engine/fittings/fittingCompare';
-import { typeName } from '@/sde/loadSde';
+import { useModuleDiffNames } from './useModuleDiffNames';
 
 export interface FittingCompareModulesSummaryProps {
   entries: readonly ModuleDiffEntry[];
@@ -21,23 +20,7 @@ export function FittingCompareModulesSummary({
   columns,
 }: FittingCompareModulesSummaryProps) {
   const { t } = useTranslation();
-  const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const resolved = await Promise.all(
-        entries.map(async (entry): Promise<[number, string]> => [
-          entry.typeId,
-          await typeName(entry.typeId),
-        ])
-      );
-      if (!cancelled) setNames(new Map(resolved));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [entries]);
+  const names = useModuleDiffNames(entries);
 
   if (entries.length === 0) {
     return <p className="text-xs text-text-dim">{t('fittings.compare.modules.none')}</p>;

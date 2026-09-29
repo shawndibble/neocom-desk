@@ -1,32 +1,15 @@
 /** Renders `useModuleVariations`' rows; clicking one swaps it in. One `DataTable` — its own stacked layout below `sm` is the mobile card view. */
-import type { ReactElement } from 'react';
+import { useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { IskAmount, TypeIcon } from '@/components/ui';
-import { type StatChange, STAT_DIGITS } from '@/engine/fittings/variationDelta';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { changeLabel, fittingVariationsCsvColumns } from './fittingVariationsCsv';
 import type { VariationRow } from './useModuleVariations';
 
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
-
-function formatDelta(change: StatChange): number {
-  const digits = STAT_DIGITS[change.key];
-  const factor = 10 ** digits;
-  return Math.round((change.after - change.before) * factor) / factor;
-}
-
-function changeLabel(change: StatChange, t: Translate): string {
-  if (change.key === 'capacitor') {
-    return change.after >= 0
-      ? t('fittings.variations.stat.capacitorStable', { pct: change.after.toFixed(0) })
-      : t('fittings.variations.stat.capacitorUnstable', {
-          seconds: (-change.after).toFixed(0),
-        });
-  }
-  const delta = formatDelta(change);
-  const value = delta > 0 ? `+${delta}` : `${delta}`;
-  return t(`fittings.variations.stat.${change.key}`, { value });
-}
 
 function ChangesCell({ row, t }: { row: VariationRow; t: Translate }) {
   if (row.delta === null) return <span className="text-text-dim">{t('common.loading')}</span>;
@@ -68,6 +51,12 @@ export interface FittingVariationsPanelProps {
 
 export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPanelProps) {
   const { t } = useTranslation();
+  const csvColumns = useMemo(() => fittingVariationsCsvColumns(t), [t]);
+  const tableExport = useTableExport({
+    surface: 'fitting-variations',
+    rows,
+    columns: csvColumns,
+  });
 
   if (rows.length === 0)
     return <p className="text-xs text-text-dim">{t('fittings.variations.none')}</p>;
@@ -150,17 +139,25 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
     },
   ];
 
+  // The section's title is the `Disclosure` toggle that wraps this panel, a
+  // button a menu can't nest inside — so the table's ⋯ sits on its own row.
   return (
-    <DataTable
-      columns={columns}
-      rows={rows}
-      rowKey={(row) => row.typeId}
-      label={t('fittings.variations.title')}
-      density="compact"
-      mobileSort
-      onRowClick={(row) => onSelect(row.typeId)}
-      rowContextMenu={rowContextMenu}
-      rowMoreActions
-    />
+    <div className="space-y-1">
+      <div className="flex justify-end">
+        <TableActionsMenu name={t('fittings.variations.title')} tableExport={tableExport} />
+      </div>
+      <DataTable
+        {...tableExport.tableProps}
+        columns={columns}
+        rows={rows}
+        rowKey={(row) => row.typeId}
+        label={t('fittings.variations.title')}
+        density="compact"
+        mobileSort
+        onRowClick={(row) => onSelect(row.typeId)}
+        rowContextMenu={rowContextMenu}
+        rowMoreActions
+      />
+    </div>
   );
 }

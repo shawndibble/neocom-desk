@@ -81,7 +81,8 @@ import { buildPlanTypeIds, recipeForLookup } from './recipes';
 import { materialPriceBasisOf } from './priceBasis';
 import { useMarketSnapshot } from './useMarketSnapshot';
 import { formatDuration } from '@/lib/duration';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { useTableExport } from '@/components/ui/useTableExport';
+import { TableActionsMenu } from '@/components/ui/TableExport';
 import { writeToClipboard } from '@/lib/clipboard';
 import { unmaskNumber } from '@/lib/numberMask';
 import { MaterialsTable, SourcingInput } from './MaterialsTable';
@@ -815,8 +816,8 @@ export function BuildPlanDetail({
 
   /**
    * What the plan still has to shop for: every leaf of the resolved tree,
-   * merged by type. Feeds the shopping-list copy and the CSV export — never
-   * the table, which shows the full tree including what it's building.
+   * merged by type. Feeds the shopping-list copy — never the table (or its
+   * export), which shows the full tree including what it's building.
    */
   const shoppingMaterials = useMemo(
     () => (result ? shoppingListMaterials(result.materials) : []),
@@ -911,6 +912,24 @@ export function BuildPlanDetail({
     }, 2000);
     return () => clearTimeout(timer);
   }, [copyState]);
+
+  // The Materials table's rows as shown, for its ⋯ menu and row menus.
+  const materialsCsv = useMemo(
+    () =>
+      materialsCsvColumns(
+        t,
+        (typeID) => nameForType(catalog, typeID),
+        plan.materialSourcing,
+        pricesReady,
+        materialAdvice
+      ),
+    [t, catalog, plan.materialSourcing, pricesReady, materialAdvice]
+  );
+  const materialsExport = useTableExport({
+    surface: 'build-materials',
+    rows: visibleMaterials,
+    columns: materialsCsv,
+  });
 
   if (!entry || !blueprint) {
     return <EmptyState title={t('industry.blueprintMissing')} className="py-8" />;
@@ -1101,21 +1120,6 @@ export function BuildPlanDetail({
     } catch {
       setCopyState('failed');
     }
-  }
-
-  function exportMaterialsCsv() {
-    if (!result) return;
-    downloadCsv(
-      'build-materials',
-      shoppingMaterials,
-      materialsCsvColumns(
-        t,
-        (typeID) => nameForType(catalog, typeID),
-        plan.materialSourcing,
-        pricesReady,
-        materialAdvice
-      )
-    );
   }
 
   const productUnitPrice =
@@ -1665,13 +1669,9 @@ export function BuildPlanDetail({
                 onClick={() => void copyShoppingList()}
                 disabled={!!error || !result || !hasShoppingList(shoppingMaterials)}
               />
-              <IconButton
-                size="sm"
-                icon={<Icon.Download />}
-                label={t('industry.exportCsvMaterials')}
-                onClick={exportMaterialsCsv}
-                disabled={!!error || !result || shoppingMaterials.length === 0}
-              />
+              {!error && result && visibleMaterials.length > 0 && (
+                <TableActionsMenu name={t('industry.materials')} tableExport={materialsExport} />
+              )}
               <IconButton
                 size="sm"
                 icon={<Icon.Refresh />}
@@ -1741,6 +1741,7 @@ export function BuildPlanDetail({
                 />
               </div>
               <MaterialsTable
+                exportProps={materialsExport.tableProps}
                 materials={visibleMaterials}
                 nameFor={(typeID) => nameForType(catalog, typeID)}
                 volumeFor={(typeID) => volumeForType(catalog, typeID)}

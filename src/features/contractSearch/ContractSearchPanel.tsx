@@ -74,6 +74,9 @@ import {
   useListedTypeNames,
   useRegionNames,
 } from '@/features/contractSearch/contractSearchNames';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
+import { contractSearchCsvColumns } from './contractSearchCsv';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { seedFromOfferRow } from '@/features/industry/planSeed';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
@@ -818,6 +821,25 @@ export function ContractSearchPanel({
     columns.map((column) => column.id)
   );
 
+  const itemsCsvColumns = useMemo(
+    () =>
+      contractSearchCsvColumns(t, {
+        typeName: (typeId) => typeNames.get(typeId) ?? `#${typeId}`,
+        regionName: (regionId) => regionNames.get(regionId) ?? `#${regionId}`,
+        systemName: (row) => offerLocations.get(row.locationId)?.systemName ?? null,
+        jumps: (row) => {
+          const cell = offerJumps(row);
+          return cell.kind === 'value' ? cell.count : null;
+        },
+      }),
+    [t, typeNames, regionNames, offerLocations, offerJumps]
+  );
+  const itemsExport = useTableExport({
+    surface: 'contract-search',
+    rows: displayRows,
+    columns: itemsCsvColumns,
+  });
+
   /**
    * Same price rule the table's own column already renders (starting bid vs.
    * buyout), spelled out as a full sentence for the modal header rather than
@@ -984,14 +1006,20 @@ export function ContractSearchPanel({
                   regionOptions={regionOptions}
                   currentSystem={currentSystem}
                   actions={
-                    <ColumnPickerMenu
-                      available={CONTRACT_SEARCH_ITEMS_COLUMN_IDS}
-                      visible={visibleItemsColumns}
-                      columnsById={itemsColumnsById}
-                      onToggle={toggleItemsColumn}
-                      buttonLabel={t('contractSearch.columnsButton')}
-                      menuTitle={t('contractSearch.columnsMenuTitle')}
-                    />
+                    <>
+                      <ColumnPickerMenu
+                        available={CONTRACT_SEARCH_ITEMS_COLUMN_IDS}
+                        visible={visibleItemsColumns}
+                        columnsById={itemsColumnsById}
+                        onToggle={toggleItemsColumn}
+                        buttonLabel={t('contractSearch.columnsButton')}
+                        menuTitle={t('contractSearch.columnsMenuTitle')}
+                      />
+                      <TableActionsMenu
+                        name={t('contractSearch.title')}
+                        tableExport={itemsExport}
+                      />
+                    </>
                   }
                 />
 
@@ -1113,6 +1141,7 @@ export function ContractSearchPanel({
                 ) : (
                   <>
                     <DataTable
+                      {...itemsExport.tableProps}
                       label={t('contractSearch.title')}
                       columns={columns}
                       rows={displayRows}

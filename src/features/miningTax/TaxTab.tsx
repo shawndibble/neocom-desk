@@ -27,6 +27,8 @@ import {
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { beginGrant } from '@/app/grantAction';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
@@ -103,6 +105,7 @@ import { LinkTransactionDialog } from '@/features/miningTax/LinkTransactionDialo
 import { SplitDialog } from '@/features/miningTax/SplitDialog';
 import { findPricingGaps, type PricingGap } from '@/features/miningTax/pricingGaps';
 import { linesOwnedBy } from '@/engine/miningTax/ownership';
+import { taxCsvColumns } from '@/features/miningTax/taxCsv';
 
 /**
  * A `MadePayment`'s own timestamp as a local calendar date, falling back to
@@ -1077,6 +1080,27 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     columns.map((c) => c.id)
   );
 
+  // The table's own cell helpers, so the export reads each row exactly as it
+  // is shown. They close over `data`, `allPayees` and `t` only.
+  const csvColumns = useMemo(
+    () =>
+      taxCsvColumns(t, {
+        showCharacter: showCharacterColumn,
+        dateLabel,
+        systemName,
+        payeeName: (dr) => (dr.assignment ? payeeDisplayName(dr) : null),
+        estimatedValue: estimatedValueOf,
+        taxOwed: (dr) => (dr.assignment ? taxOwedOf(dr) : null),
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, showCharacterColumn, data, allPayees]
+  );
+  const taxExport = useTableExport({
+    surface: 'mining-tax',
+    rows: visibleRows,
+    columns: csvColumns,
+  });
+
   const payeeManagerDefaultCharacterId =
     characters.find((c) => c.characterId === activeCharacterId)?.characterId ??
     characters[0]?.characterId ??
@@ -1472,15 +1496,19 @@ export function TaxTab({ tabBar }: TaxTabProps) {
               hiding is actually doing something: with nothing settled the
               toggle would change nothing on screen.
             */}
-            {settledCount > 0 && (
-              <FilterChip
-                size="sm"
-                className="ml-auto"
-                label={t('miningTax.settledPayeesFilter')}
-                selected={showSettled}
-                onToggle={() => setShowSettled(!showSettled)}
-              />
-            )}
+            <span className="ml-auto flex items-center gap-2">
+              {settledCount > 0 && (
+                <FilterChip
+                  size="sm"
+                  label={t('miningTax.settledPayeesFilter')}
+                  selected={showSettled}
+                  onToggle={() => setShowSettled(!showSettled)}
+                />
+              )}
+              {visibleRows.length > 0 && (
+                <TableActionsMenu name={t('miningTax.title')} tableExport={taxExport} />
+              )}
+            </span>
           </div>
 
           <SelectionToolbar
@@ -1502,6 +1530,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             <Panel padded={false}>
               <div className="overflow-x-auto">
                 <DataTable
+                  {...taxExport.tableProps}
                   columns={columns}
                   rows={visibleRows}
                   rowKey={(dr) => dr.key}

@@ -91,8 +91,11 @@ import {
 import { clampIskZero, formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport, type UseTableExport } from '@/components/ui/useTableExport';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
+import { walletBalancesCsvColumns } from '@/features/character/walletBalancesCsv';
+import { loyaltyPointsCsvColumns } from '@/features/character/loyaltyPointsCsv';
 import { JournalDescriptionCell } from '@/features/character/JournalDescriptionCell';
 import { journalTransactionLinks } from '@/features/character/journalTransactionLink';
 import {
@@ -121,11 +124,6 @@ import {
   WALLET_JOURNAL_COLUMN_IDS,
   type WalletJournalColumnId,
 } from './walletJournalColumns';
-
-/** Newest first — the one order both the table (`defaultSort`) and CSV exports agree on. */
-function byDateDesc(a: WalletJournalEntry, b: WalletJournalEntry): number {
-  return b.date.localeCompare(a.date);
-}
 
 /**
  * Dynamic import, not a static one: `WalletBalanceChart.tsx` statically
@@ -221,6 +219,8 @@ interface JournalTableProps {
   highlightRowKey?: number | null;
   sort: DataTableSort;
   onSortChange: (sort: DataTableSort) => void;
+  /** The export the panel's title-bar ⋯ menu drives, so row menus export the same rows. */
+  tableExport: UseTableExport<WalletJournalEntry>;
 }
 
 /** Module-level so the table's windowing and row memo see one stable function. */
@@ -237,6 +237,7 @@ function JournalTable({
   highlightRowKey = null,
   sort,
   onSortChange,
+  tableExport,
 }: JournalTableProps) {
   const { t } = useTranslation();
   const filteredNet = useMemo(() => journalNetTotal(filteredJournal), [filteredJournal]);
@@ -318,6 +319,7 @@ function JournalTable({
         />
       ) : (
         <DataTable
+          {...tableExport.tableProps}
           label={label}
           columns={shownColumns}
           rows={filteredJournal}
@@ -526,6 +528,14 @@ function CorpWalletView({
   // the filter bar below keeps the immediate one.
   const journalRowsFilter = useDeferredValue(journalFilter);
   const { filteredJournal, refTypeOptions } = useJournalFilterResult(journal, journalRowsFilter);
+  const journalCsvColumns = useMemo(() => walletJournalCsvColumns(t), [t]);
+  const journalExport = useTableExport({
+    surface: 'corp-wallet-journal',
+    rows: filteredJournal,
+    columns: journalCsvColumns,
+    truncated: journalResult?.truncated ?? false,
+    qualifier: division ? divisionLabel(division) : undefined,
+  });
 
   if (tab === 'balance') {
     const walletsResult = balances?.walletsResult.cached ?? null;
@@ -557,8 +567,6 @@ function CorpWalletView({
     );
   }
 
-  const divisionQualifier = division ? divisionLabel(division) : undefined;
-
   return (
     <Panel
       padded={false}
@@ -566,22 +574,7 @@ function CorpWalletView({
       actions={
         journalResult ? (
           <span className="flex items-center gap-2">
-            <IconButton
-              size="sm"
-              icon={<Icon.Download />}
-              label={t('wallet.exportCsvJournal')}
-              disabled={filteredJournal.length === 0}
-              onClick={() =>
-                downloadCsv(
-                  'corp-wallet-journal',
-                  [...filteredJournal].sort(byDateDesc),
-                  walletJournalCsvColumns(t),
-                  new Date(),
-                  journalResult.truncated,
-                  divisionQualifier
-                )
-              }
-            />
+            <TableActionsMenu name={t('wallet.journalTab')} tableExport={journalExport} />
             <DataAgeBadge date={journalResult.fetchedAt} />
           </span>
         ) : undefined
@@ -626,6 +619,7 @@ function CorpWalletView({
             label={t('wallet.journalTab')}
             sort={journalSort}
             onSortChange={onJournalSortChange}
+            tableExport={journalExport}
           />
         </>
       )}
@@ -1089,8 +1083,8 @@ export function Wallet() {
 
   // Unsorted: `DataTable`'s own controlled `sort` below is the one place
   // these rows get ordered — sorting here too was a redundant second pass
-  // over the same array on every render (issue #413). CSV export sorts its
-  // own copy at export time instead, since it bypasses `DataTable` entirely.
+  // over the same array on every render (issue #413). Export reads the
+  // table's sorted rows, so it follows the same order.
   const journal = journalResult?.data ?? EMPTY_JOURNAL;
   const walletBalancePoints = useMemo(() => walletBalanceHistory(journal), [journal]);
   const walletBalanceTrendDirection = useMemo(
@@ -1190,6 +1184,31 @@ export function Wallet() {
       ? skipped
       : skipped.filter((s) => resolvedWalletFilter.has(s.characterId));
   }, [walletBalancesSnapshot, resolvedWalletFilter]);
+
+  // Each table's title-bar ⋯ menu and its row menus export the same rows, in
+  // the order the table shows them.
+  const journalCsvColumns = useMemo(() => walletJournalCsvColumns(t), [t]);
+  const journalExport = useTableExport({
+    surface: 'wallet-journal',
+    rows: filteredJournal,
+    columns: journalCsvColumns,
+    truncated: journalTruncated,
+  });
+  const walletBalancesCsv = useMemo(() => walletBalancesCsvColumns(t), [t]);
+  const walletBalancesExport = useTableExport({
+    surface: 'wallet-balances',
+    rows: visibleWalletBalances,
+    columns: walletBalancesCsv,
+  });
+  const loyaltyCsvColumns = useMemo(
+    () => loyaltyPointsCsvColumns(t, (id) => corporationNames.get(id) ?? `#${id}`),
+    [t, corporationNames]
+  );
+  const loyaltyExport = useTableExport({
+    surface: 'loyalty-points',
+    rows: otherLoyalty,
+    columns: loyaltyCsvColumns,
+  });
 
   if (!hydrated) {
     return (
@@ -1354,13 +1373,19 @@ export function Wallet() {
                 title={t('wallet.balanceByCharacter')}
                 meta={walletCharacterFilterMeta}
                 actions={
-                  <IconButton
-                    size="sm"
-                    icon={<Icon.Refresh />}
-                    label={t('wallet.refresh')}
-                    onClick={refreshWalletBalances}
-                    disabled={walletBalancesLoading}
-                  />
+                  <span className="flex items-center gap-2">
+                    <IconButton
+                      size="sm"
+                      icon={<Icon.Refresh />}
+                      label={t('wallet.refresh')}
+                      onClick={refreshWalletBalances}
+                      disabled={walletBalancesLoading}
+                    />
+                    <TableActionsMenu
+                      name={t('wallet.balanceByCharacter')}
+                      tableExport={walletBalancesExport}
+                    />
+                  </span>
                 }
               >
                 {walletBalancesLoading ? (
@@ -1388,6 +1413,7 @@ export function Wallet() {
                       <EmptyState title={t('wallet.balanceEmpty')} className="py-8" />
                     ) : (
                       <DataTable
+                        {...walletBalancesExport.tableProps}
                         label={t('wallet.balanceByCharacter')}
                         columns={walletBalanceColumns}
                         rows={visibleWalletBalances}
@@ -1488,7 +1514,16 @@ export function Wallet() {
             <Panel
               padded={false}
               title={t('loyalty.title')}
-              actions={loyaltyResult ? <DataAgeBadge date={loyaltyResult.fetchedAt} /> : undefined}
+              actions={
+                loyaltyResult ? (
+                  <span className="flex items-center gap-2">
+                    {!loyaltyNeedsReauth && otherLoyalty.length > 0 && (
+                      <TableActionsMenu name={t('loyalty.title')} tableExport={loyaltyExport} />
+                    )}
+                    <DataAgeBadge date={loyaltyResult.fetchedAt} />
+                  </span>
+                ) : undefined
+              }
             >
               {loyaltyNeedsReauth ? (
                 <div className="p-3">
@@ -1510,6 +1545,7 @@ export function Wallet() {
                 />
               ) : (
                 <DataTable
+                  {...loyaltyExport.tableProps}
                   label={t('loyalty.title')}
                   columns={loyaltyColumns}
                   rows={otherLoyalty}
@@ -1549,21 +1585,7 @@ export function Wallet() {
                 )}
                 {journalResult && (
                   <>
-                    <IconButton
-                      size="sm"
-                      icon={<Icon.Download />}
-                      label={t('wallet.exportCsvJournal')}
-                      disabled={filteredJournal.length === 0}
-                      onClick={() =>
-                        downloadCsv(
-                          'wallet-journal',
-                          [...filteredJournal].sort(byDateDesc),
-                          walletJournalCsvColumns(t),
-                          new Date(),
-                          journalTruncated
-                        )
-                      }
-                    />
+                    <TableActionsMenu name={t('wallet.journalTab')} tableExport={journalExport} />
                     <DataAgeBadge date={journalResult.fetchedAt} />
                   </>
                 )}
@@ -1600,6 +1622,7 @@ export function Wallet() {
                   sort={journalSortProps.sort}
                   onSortChange={journalSortProps.onSortChange}
                   highlightRowKey={highlightedEntryId}
+                  tableExport={journalExport}
                 />
               </>
             )}

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import * as download from '@/lib/download';
 import { beginEveLogin } from '@/app/loginFlow';
 import { OpenOrdersPanel } from './OpenOrdersPanel';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
@@ -40,7 +41,6 @@ vi.mock('./orderCompetition', async (importOriginal) => ({
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
 vi.mock('@/sde/loadMarketSde', () => ({ loadNpcStations: vi.fn() }));
 vi.mock('@/features/skills/correctedSkills', () => ({ loadCorrectedSkills: vi.fn() }));
-vi.mock('@/lib/downloadCsv', () => ({ downloadCsv: vi.fn() }));
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn() }));
 
 const mockedLoadAll = vi.mocked(loadAllCharactersOpenOrders);
@@ -465,6 +465,43 @@ describe('OpenOrdersPanel', () => {
     expect(
       within(screen.getByTestId('order-group-healthy')).getByText('Pyerite')
     ).toBeInTheDocument();
+  });
+
+  it('exports every group from the title-bar menu as one file', async () => {
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    const user = userEvent.setup();
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [BELOW_FLOOR_ORDER, EXPIRING_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanel();
+    await screen.findByTestId('order-group-belowFloor');
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Open orders actions' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
+    await user.keyboard('{ArrowRight}');
+    (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(spy).toHaveBeenCalledOnce());
+    expect(spy.mock.calls[0][0]).toMatch(/^neocom-orders-open-\d{4}-\d{2}-\d{2}\.csv$/);
+    const csv = spy.mock.calls[0][1] as string;
+    expect(csv).toContain('"Tritanium","Sell",500,');
+    expect(csv).toContain(`"${TYPE_NAMES.get(EXPIRING_ORDER.type_id)}","Sell",`);
+    spy.mockRestore();
   });
 
   it('all-healthy: no "0 of N orders match" line, and the healthy sentence shows once', async () => {

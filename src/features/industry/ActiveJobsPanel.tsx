@@ -54,7 +54,8 @@ import {
 import { LogProductionFromJobDialog } from './LogProductionFromJobDialog';
 import { formatDuration } from '@/lib/duration';
 import { formatEveDateTime } from '@/lib/eveTime';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { jobsCsvColumns } from './jobsCsv';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
@@ -726,6 +727,15 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
     columns.map((column) => column.id)
   );
 
+  const jobsCsv = useMemo(() => jobsCsvColumns(t, nameForBlueprint), [t, nameForBlueprint]);
+  // What the table shows (filtered, in its sort order) — with the list folded
+  // there is no mounted table, so it falls back to the filtered rows.
+  const jobsExport = useTableExport({
+    surface: 'industry-jobs',
+    rows: filteredJobs,
+    columns: jobsCsv,
+  });
+
   /** Right-click any row for the shared item menu. */
   const jobContextMenu = (job: JobRow, tr: ReactElement): ReactElement => {
     const menuTypeId = contextMenuTypeId(job);
@@ -859,13 +869,9 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   const listActions = (
     <span className="flex items-center gap-2">
       {dataAgeDate && <DataAgeBadge date={dataAgeDate} />}
-      <IconButton
-        size="sm"
-        icon={<Icon.Download />}
-        label={t('industry.exportCsvJobs')}
-        disabled={jobs.length === 0}
-        onClick={() => downloadCsv('industry-jobs', jobs, jobsCsvColumns(t, nameForBlueprint))}
-      />
+      {jobs.length > 0 && (
+        <TableActionsMenu name={t('industry.jobsTitle')} tableExport={jobsExport} />
+      )}
       <IconButton
         size="sm"
         icon={<Icon.Refresh />}
@@ -1016,6 +1022,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
             // column at tablet widths; `.dt-stack` only rescues below `sm`.
             <div className="overflow-x-auto">
               <DataTable
+                {...jobsExport.tableProps}
                 columns={columns}
                 rows={filteredJobs}
                 // Bare job_id, not a character-qualified key: ESI's job ids

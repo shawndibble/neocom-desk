@@ -10,6 +10,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import type { UseTableExport } from '@/components/ui/useTableExport';
 import type { MakeMethod, MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import { rowVolume } from '@/engine/industry/materialVolume';
 import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/types';
@@ -79,6 +80,8 @@ interface MaterialsTableProps {
    */
   skillGates?: ReadonlyMap<number, SkillGateVerdict>;
   characterNameFor?: (characterId: number) => string;
+  /** `useTableExport(...).tableProps` — makes the table exportable from its row menus. */
+  exportProps?: UseTableExport<MaterialTableRow>['tableProps'];
 }
 
 /** Blank or garbage clears the field; anything real is kept as-is (the engine clamps). */
@@ -432,6 +435,7 @@ export function MaterialsTable({
   onOpenAcquisitionPicker,
   skillGates,
   characterNameFor,
+  exportProps,
 }: MaterialsTableProps) {
   const { t } = useTranslation();
 
@@ -872,6 +876,7 @@ export function MaterialsTable({
   return (
     <div className="overflow-x-auto">
       <DataTable
+        {...exportProps}
         columns={columns}
         rows={materials}
         rowKey={(material) => material.typeID}

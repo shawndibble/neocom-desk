@@ -33,9 +33,13 @@ import { formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { cloneJumpCooldown, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/cloneJump';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
+import { clonesCsvColumns } from '@/features/character/clonesCsv';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
+const NO_CLONES: readonly JumpClone[] = [];
 
 interface Snapshot {
   clonesResult: CachedResult<CharacterClones> | null;
@@ -232,6 +236,16 @@ export function Clones() {
       },
     ];
   }, [t, locationNames, implantNames, implantDescriptions]);
+  const csvColumns = useMemo(
+    () => clonesCsvColumns(t, { locationNames, implantNames }),
+    [t, locationNames, implantNames]
+  );
+  const clonesExport = useTableExport({
+    surface: 'clones',
+    // Nothing behind the re-login banner, same as the table.
+    rows: clonesNeedsReauth ? NO_CLONES : clones,
+    columns: csvColumns,
+  });
 
   if (!hydrated) {
     return (
@@ -270,6 +284,7 @@ export function Clones() {
               onClick={refresh}
               disabled={loading}
             />
+            <TableActionsMenu name={t('clones.title')} tableExport={clonesExport} />
           </span>
         }
         padded={false}
@@ -340,6 +355,7 @@ export function Clones() {
               />
             ) : (
               <DataTable
+                {...clonesExport.tableProps}
                 label={t('clones.title')}
                 columns={columns}
                 rows={clones}

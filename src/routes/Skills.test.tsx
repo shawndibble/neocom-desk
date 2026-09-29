@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -8,6 +9,7 @@ import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
+import { configureClipboard } from '@/lib/clipboard';
 import type { SkillType } from '@/sde/types';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
@@ -488,7 +490,7 @@ describe('Skills', () => {
     expect(beginEveLogin).toHaveBeenCalled();
   });
 
-  it('disables CSV export in the re-login state, so a stale cache cannot be exported behind the banner', async () => {
+  it('exports no rows in the re-login state, so a stale cache cannot be exported behind the banner', async () => {
     // The invariant: whatever the route refuses to render, export refuses to
     // hand over. loadWithCacheStatus deliberately still reads the cache on an
     // auth failure ("needsReauth never short-circuits the cache read"), so
@@ -510,7 +512,27 @@ describe('Skills', () => {
     // The route's own banner, not Layout's global auth notice — the latter
     // fires on emitEsiAuthFailure, before the snapshot settles.
     expect(await screen.findByText(/log in again to see skills/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /export csv/i })).toBeDisabled();
+
+    const copied: string[] = [];
+    configureClipboard(async (text) => {
+      copied.push(text);
+    });
+    try {
+      const user = userEvent.setup();
+      fireEvent.pointerDown(screen.getByRole('button', { name: 'Skills actions' }), {
+        button: 0,
+        pointerType: 'mouse',
+      });
+      (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
+      await user.keyboard('{ArrowRight}');
+      (await screen.findByRole('menuitem', { name: 'Copy for Google Sheets / Excel' })).focus();
+      await user.keyboard('{Enter}');
+      await waitFor(() => expect(copied).toHaveLength(1));
+      // The header row only — no skill from the stale cache.
+      expect(copied[0].trim().split('\n')).toHaveLength(1);
+    } finally {
+      configureClipboard(null);
+    }
   });
 
   it("shows a selected skill's prerequisites, marking an already-trained one distinct", async () => {

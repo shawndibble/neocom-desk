@@ -38,7 +38,8 @@ import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapsh
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import {
   transactionTotal,
   walletTransactionsCsvColumns,
@@ -149,6 +150,13 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
   );
   // The phone has no filter bar, so it lists and exports everything.
   const exportedTransactions = isPhone ? transactions : filteredTransactions;
+  const csvColumns = useMemo(() => walletTransactionsCsvColumns(t, nameFor), [t, nameFor]);
+  const transactionsExport = useTableExport({
+    surface: 'wallet-transactions',
+    rows: exportedTransactions,
+    columns: csvColumns,
+    truncated: transactionsTruncated,
+  });
 
   /**
    * The alert names the *item*; the table is keyed by transaction. Resolving
@@ -293,20 +301,10 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
             />
             {transactionsResult && (
               <>
-                <IconButton
+                <TableActionsMenu
+                  name={t('market.sections.transactions')}
+                  tableExport={transactionsExport}
                   size={isPhone ? 'md' : 'sm'}
-                  icon={<Icon.Download />}
-                  label={t('wallet.exportCsvTransactions')}
-                  disabled={exportedTransactions.length === 0}
-                  onClick={() =>
-                    downloadCsv(
-                      'wallet-transactions',
-                      exportedTransactions,
-                      walletTransactionsCsvColumns(t, (id) => typeNames.get(id) ?? `Type #${id}`),
-                      new Date(),
-                      transactionsTruncated
-                    )
-                  }
                 />
                 <DataAgeBadge date={transactionsResult.fetchedAt} />
               </>
@@ -371,6 +369,7 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
                 <>
                   <TransactionsSummaryStrip transactions={filteredTransactions} className="mb-3" />
                   <DataTable
+                    {...transactionsExport.tableProps}
                     label={t('wallet.transactionsTab')}
                     columns={columns}
                     rows={filteredTransactions}

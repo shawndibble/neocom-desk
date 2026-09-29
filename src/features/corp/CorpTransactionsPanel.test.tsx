@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { exportRows } from '@/lib/downloadCsv';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -8,7 +9,7 @@ import { EMPTY_WALLET_TRANSACTION_FILTER } from '@/features/character/walletTran
 import { fakeItemActions, withItemActions } from '@/features/market/__fixtures__/itemActions';
 import type { CorporationWalletTransaction } from '@/esi/endpoints';
 
-vi.mock('@/lib/downloadCsv', () => ({ downloadCsv: vi.fn() }));
+vi.mock('@/lib/downloadCsv', () => ({ exportRows: vi.fn().mockResolvedValue(undefined) }));
 
 function transaction(
   overrides: Partial<CorporationWalletTransaction> = {}
@@ -113,6 +114,42 @@ describe('CorpTransactionsPanel — filtered to zero', () => {
     renderPanel({ filteredTransactions: [] });
 
     expect(screen.queryByRole('button', { name: 'Reset filters' })).not.toBeInTheDocument();
+  });
+});
+
+describe('CorpTransactionsPanel — export', () => {
+  it("exports the filtered rows from the panel's ⋯ menu, named for the division", async () => {
+    const user = userEvent.setup();
+    const older = transaction({ transaction_id: 1, date: '2026-09-01T00:00:00Z' });
+    const newer = transaction({ transaction_id: 2, date: '2026-09-02T00:00:00Z' });
+    renderPanel({
+      transactions: [older, newer],
+      filteredTransactions: [older, newer],
+      divisionQualifier: 'SRP',
+      transactionsResult: {
+        data: [older, newer],
+        fetchedAt: new Date(),
+        fromCache: false,
+        truncated: true,
+      },
+    });
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Transactions actions' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
+    await user.keyboard('{ArrowRight}');
+    (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(exportRows).toHaveBeenCalledOnce());
+    const [format, surface, rows, , options] = vi.mocked(exportRows).mock.calls[0];
+    expect(format).toBe('csv');
+    expect(surface).toBe('corp-wallet-transactions');
+    // The table's own order — newest first under its date-desc sort.
+    expect((rows as CorporationWalletTransaction[]).map((r) => r.transaction_id)).toEqual([2, 1]);
+    expect(options).toEqual({ truncated: true, qualifier: 'SRP' });
   });
 });
 

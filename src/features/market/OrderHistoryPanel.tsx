@@ -29,7 +29,8 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
 import { useColumnVisibility } from '@/lib/columnVisibility';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { orderHistoryCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrderHistory } from '@/esi/endpoints';
 import { HistoryViewSelect, type HistoryView } from './HistoryViewSelect';
@@ -181,6 +182,14 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
     [history, rowsFilter, typeNames]
   );
 
+  const csvColumns = useMemo(() => orderHistoryCsvColumns(t, nameFor), [t, nameFor]);
+  const historyExport = useTableExport({
+    surface: 'orders-history',
+    rows: filteredHistory,
+    columns: csvColumns,
+    truncated: historyTruncated,
+  });
+
   const columns = useMemo<DataTableColumn<MarketOrderHistory>[]>(
     () => [
       {
@@ -311,20 +320,10 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
             />
             {historyResult && (
               <>
-                <IconButton
+                <TableActionsMenu
+                  name={t('market.sections.historyOrders')}
+                  tableExport={historyExport}
                   size={isPhone ? 'md' : 'sm'}
-                  icon={<Icon.Download />}
-                  label={t('orders.exportCsvHistory')}
-                  disabled={filteredHistory.length === 0}
-                  onClick={() =>
-                    downloadCsv(
-                      'orders-history',
-                      filteredHistory,
-                      orderHistoryCsvColumns(t, nameFor),
-                      new Date(),
-                      historyTruncated
-                    )
-                  }
                 />
                 <DataAgeBadge date={historyResult.fetchedAt} />
               </>
@@ -404,6 +403,7 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
             />
           ) : (
             <DataTable
+              {...historyExport.tableProps}
               columns={tableColumns}
               rows={filteredHistory}
               rowKey={orderHistoryRowKey}
