@@ -854,6 +854,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                 label={t('market.hauling.title')}
                 columns={visibleColumns}
                 rows={shown}
+                virtualize="auto"
                 rowKey={(row) => row.typeId}
                 density="compact"
                 stackLayout="labelled"

@@ -1221,6 +1221,7 @@ export function Market() {
                                 <DataTable
                                   columns={baseColumns}
                                   rows={sellRows}
+                                  virtualize="auto"
                                   rowKey={(o) => o.order_id}
                                   label={t('market.sell')}
                                   defaultSort={{ columnId: 'price', direction: 'asc' }}
@@ -1317,6 +1318,7 @@ export function Market() {
                                 <DataTable
                                   columns={buyColumns}
                                   rows={buyRows}
+                                  virtualize="auto"
                                   rowKey={(o) => o.order_id}
                                   label={t('market.buy')}
                                   defaultSort={{ columnId: 'price', direction: 'desc' }}
