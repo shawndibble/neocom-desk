@@ -36,6 +36,7 @@ import {
   industrySeverity,
   jobSeverity,
   comingUpSeverity,
+  priceAlertsSeverity,
   mailSeverity,
   spExtractionSeverity,
   contractsSeverity,
@@ -46,12 +47,14 @@ import { contractsDeadlineNote } from './boardSummary';
 import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
 import { extractableSp, extractorCount } from '@/engine/spExtraction';
 import { formatCompactNumber } from '@/lib/compactNumber';
+import { formatIskCompact } from '@/lib/isk';
 import type {
   CalendarEventsBoardData,
   ContractsBoardData,
   MailBoardData,
   MiningTaxBoardData,
   PlanetaryBoardData,
+  PriceAlertsBoardData,
   SpExtractionBoardData,
 } from './boardData';
 
@@ -606,6 +609,77 @@ export function MailCard({ data, nowMs }: { data: MailBoardData | null; nowMs: n
             />
           ))}
         </ul>
+      )}
+    </BoardCard>
+  );
+}
+
+// --- Price alerts ---------------------------------------------------------
+
+/**
+ * Every Quickbar target, crossed ones first, priced from the notification
+ * poller's last reading. The footer says how old that reading is, because
+ * the board never prices anything itself (`priceAlertsBoard.ts`).
+ */
+export function PriceAlertsCard({
+  data,
+  nowMs,
+}: {
+  data: PriceAlertsBoardData | null;
+  nowMs: number;
+}) {
+  const { t } = useTranslation();
+  const crossed = data?.alerts.filter((alert) => alert.crossed).length ?? 0;
+  const shown = data?.alerts.slice(0, ROW_LIMIT) ?? [];
+  return (
+    <BoardCard
+      title={t('overview.board.priceAlerts')}
+      meta={<SeverityWord severity={priceAlertsSeverity(data)} />}
+      to="/market"
+      openLabel={t('overview.board.open')}
+      footer={
+        data === null
+          ? t('overview.board.checking')
+          : data.checkedAt === null
+            ? t('overview.board.priceAlertsNotChecked')
+            : t('overview.board.priceAlertsChecked', {
+                age: formatAge(Math.max(0, nowMs - data.checkedAt), t),
+              })
+      }
+    >
+      {shown.length === 0 ? (
+        <CardEmpty>
+          {data === null ? t('overview.board.checking') : t('overview.board.priceAlertsEmpty')}
+        </CardEmpty>
+      ) : (
+        <>
+          <TileRow>
+            <NumberTile
+              label={t('overview.board.priceAlertsHit')}
+              value={crossed}
+              severity="warning"
+            />
+            <NumberTile
+              label={t('overview.board.priceAlertsWatched')}
+              value={data?.alerts.length ?? 0}
+              severity="clear"
+            />
+          </TileRow>
+          <ul>
+            {shown.map((alert) => (
+              <TriageRow
+                key={alert.typeId}
+                severity={alert.crossed ? 'warning' : 'clear'}
+                when={alert.price === null ? UNKNOWN : formatIskCompact(alert.price)}
+                subject={alert.name}
+                detail={t(`overview.board.priceAlertTarget.${alert.direction}`, {
+                  price: formatIskCompact(alert.targetPrice),
+                })}
+                to="/market"
+              />
+            ))}
+          </ul>
+        </>
       )}
     </BoardCard>
   );

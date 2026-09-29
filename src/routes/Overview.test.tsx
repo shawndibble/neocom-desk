@@ -11,6 +11,7 @@ import { App } from '@/app/App';
 import { selectActiveEntryFromSorted, sortQueueEntries, selectQueueDepth } from './overviewQueue';
 import type { SkillType } from '@/sde/types';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
+import { priceAlertDomain } from '@/features/notifications/pollDomains';
 import {
   SP_EXTRACTION_ENABLED_KEY,
   useSpExtractionMonitoringEnabled,
@@ -192,9 +193,11 @@ beforeEach(async () => {
   await db.settings.clear();
   await db.esiCache.clear();
   await db.notificationFeed.clear();
+  await db.quickbars.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useOverviewHiddenCards.setState({ value: [], hydrated: false });
+  priceAlertDomain.store.setState({ value: {}, hydrated: false });
   useSpExtractionMonitoringEnabled.setState({ value: false, hydrated: false });
   useSpExtractionThresholdSp.setState({ value: 500_000, hydrated: false });
 
@@ -803,7 +806,14 @@ function usePhoneViewport(): void {
 /** The domain cards, by the heading each one carries. */
 const DOMAINS = ['Open orders', 'Mining tax', 'Planetary industry', 'Industry jobs'] as const;
 /** Domains that are always one line on a phone rather than competing for a full card. */
-const ALWAYS_FOLDED = ['Alerts', 'Contracts', 'Coming up', 'SP extraction', 'Mail'] as const;
+const ALWAYS_FOLDED = [
+  'Alerts',
+  'Contracts',
+  'Coming up',
+  'SP extraction',
+  'Mail',
+  'Price alerts',
+] as const;
 
 /** Which domains kept a full card — a card is a heading with its own "Open" link. */
 function fullCardDomains(): string[] {
@@ -1087,9 +1097,7 @@ describe('hiding cards from the edit menu', () => {
         'Mining tax',
         'Planetary industry',
         'Industry jobs',
-        'Coming up',
-        'SP extraction',
-        'Mail',
+        ...ALWAYS_FOLDED.filter((domain) => domain !== 'Alerts' && domain !== 'Contracts'),
       ].sort()
     );
   });
@@ -1165,6 +1173,48 @@ describe('Mail', () => {
     expect(rows).toHaveLength(1);
     expect(within(rows[0]).getByText('Fleet tonight')).toBeInTheDocument();
     expect(await within(rows[0]).findByText('Fleet Boss')).toBeInTheDocument();
+  });
+});
+
+describe('Price alerts', () => {
+  it('prices each Quickbar target from the poller’s last reading, hits first', async () => {
+    await db.quickbars.put({
+      id: String(CHAR_ID),
+      characterId: CHAR_ID,
+      updatedAt: 1,
+      items: [
+        { typeId: 34, name: 'Tritanium', targetPrice: 5, targetDirection: 'below' },
+        { typeId: 44992, name: 'PLEX', targetPrice: 5_000_000, targetDirection: 'above' },
+        { typeId: 35, name: 'Pyerite' },
+      ],
+    });
+    await db.settings.put({
+      key: 'notifications.pollerState.priceAlert',
+      value: {
+        [CHAR_ID]: {
+          nowMs: Date.now() - 600_000,
+          entries: [
+            { typeId: 34, name: 'Tritanium', targetPrice: 5, direction: 'below', price: 6 },
+            {
+              typeId: 44992,
+              name: 'PLEX',
+              targetPrice: 5_000_000,
+              direction: 'above',
+              price: 5_200_000,
+            },
+          ],
+        },
+      },
+    });
+    render(<App />);
+
+    const card = await findCard(/price alerts/i);
+    const rows = await within(card).findAllByRole('listitem');
+    expect(rows.map((row) => within(row).getByRole('link').textContent)).toEqual([
+      expect.stringContaining('PLEX'),
+      expect.stringContaining('Tritanium'),
+    ]);
+    expect(within(card).getByText('Prices checked 10m ago')).toBeInTheDocument();
   });
 });
 

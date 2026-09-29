@@ -77,6 +77,7 @@ import {
   ComingUpCard,
   ContractsCard,
   MailCard,
+  PriceAlertsCard,
   SpExtractionCard,
   EverythingElseCard,
   IndustryCard,
@@ -92,6 +93,7 @@ import {
   loadMailBoard,
   loadMiningTaxBoard,
   loadPlanetaryBoard,
+  loadPriceAlertsBoard,
 } from '@/features/overview/boardData';
 import {
   comingUpSeverity,
@@ -101,6 +103,7 @@ import {
   miningTaxSeverity,
   ordersSeverity,
   planetarySeverity,
+  priceAlertsSeverity,
   spExtractionSeverity,
 } from '@/features/overview/boardSeverity';
 import {
@@ -113,6 +116,7 @@ import {
   miningTaxSummary,
   ordersSummary,
   planetarySummary,
+  priceAlertsSummary,
   spExtractionSummary,
 } from '@/features/overview/boardSummary';
 import { severityForRemaining, worstSeverity } from '@/engine/severity';
@@ -264,6 +268,9 @@ export function Overview() {
   });
   const mailSnapshot = useRouteSnapshot(loadMailBoard, undefined, {
     cacheKey: 'overview:mail',
+  });
+  const priceAlertsSnapshot = useRouteSnapshot(loadPriceAlertsBoard, undefined, {
+    cacheKey: 'overview:price-alerts',
   });
   const { hydrated, activeCharacterId } = walletSnapshot;
 
@@ -553,6 +560,16 @@ export function Overview() {
       render: () => <MailCard data={mailSnapshot.data} nowMs={now} />,
     },
     {
+      key: 'priceAlerts',
+      placement: 'folded',
+      to: '/market',
+      severity: priceAlertsSeverity(priceAlertsSnapshot.data),
+      summary: priceAlertsSummary(t, priceAlertsSnapshot.data),
+      // Prices are the poller's, so the board's own freshness says nothing about them.
+      loading: priceAlertsSnapshot.loading,
+      render: () => <PriceAlertsCard data={priceAlertsSnapshot.data} nowMs={now} />,
+    },
+    {
       key: 'alerts',
       placement: 'column',
       to: '/alerts',
@@ -660,6 +677,7 @@ export function Overview() {
             industrySnapshot,
             calendarSnapshot,
             mailSnapshot,
+            priceAlertsSnapshot,
           ]) {
             snapshot.refresh();
           }

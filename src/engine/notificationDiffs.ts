@@ -1561,7 +1561,8 @@ export interface PriceAlertTriggeredFire {
   direction: 'above' | 'below';
 }
 
-function priceAlertCrossed(entry: PriceAlertEntrySnapshot): boolean {
+/** Whether a polled price is at or past its target, in the target's direction. */
+export function priceAlertCrossed(entry: PriceAlertEntrySnapshot): boolean {
   if (entry.price === null) return false;
   return entry.direction === 'above'
     ? entry.price >= entry.targetPrice

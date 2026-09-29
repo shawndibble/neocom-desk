@@ -26,6 +26,9 @@ import { summarizeContractsBoard, type ContractsBoardSummary } from '@/engine/co
 import { loadCalendarEvents } from '@/features/character/calendar';
 import { loadMailHeaders, loadMailLabels } from '@/features/character/mail';
 import { resolveNames } from '@/features/character/names';
+import { db } from '@/db';
+import { lastPriceAlertSnapshot } from '@/features/notifications/pollDomains';
+import { buildPriceAlertRows, type BoardPriceAlert } from './priceAlertsBoard';
 import type { CalendarEventSummary } from '@/esi/endpoints';
 
 /*
@@ -340,5 +343,25 @@ export async function loadMailBoard(characterId: number): Promise<MailBoardData>
     })),
     needsReauth: headers.needsReauth || labels.needsReauth,
     fetchedAt: headers.cached ? headers.cached.fetchedAt : null,
+  };
+}
+
+// --- Price alerts -----------------------------------------------------------
+
+export interface PriceAlertsBoardData {
+  alerts: BoardPriceAlert[];
+  /** When the poller last priced these targets, or null if it never has. */
+  checkedAt: number | null;
+}
+
+/** The Quickbar's targets, priced from the poller's last reading (`priceAlertsBoard.ts`). */
+export async function loadPriceAlertsBoard(characterId: number): Promise<PriceAlertsBoardData> {
+  const [record, snapshot] = await Promise.all([
+    db.quickbars.get(String(characterId)),
+    lastPriceAlertSnapshot(characterId),
+  ]);
+  return {
+    alerts: buildPriceAlertRows(record?.items ?? [], snapshot),
+    checkedAt: snapshot?.nowMs ?? null,
   };
 }

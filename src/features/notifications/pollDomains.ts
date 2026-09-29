@@ -1532,6 +1532,20 @@ export const priceAlertDomain = defineDomain<
 });
 
 /**
+ * The price-alert poller's last reading for one Character, or null before its
+ * first poll. The Overview's Price alerts card reads prices from here rather
+ * than fetching its own, so the two can never disagree about a crossing.
+ */
+export async function lastPriceAlertSnapshot(
+  characterId: number
+): Promise<PriceAlertSnapshot | null> {
+  await priceAlertDomain.store.getState().hydrate();
+  // The store's parse already ran `isPriceAlertEntrySnapshot` over every entry.
+  const snapshot = priceAlertDomain.store.getState().value[characterId];
+  return (snapshot as PriceAlertSnapshot | undefined) ?? null;
+}
+
+/**
  * Every polled domain, in fetch order. One entry here is the whole cost of
  * adding a domain: `foregroundPoller.ts` names none of them.
  */

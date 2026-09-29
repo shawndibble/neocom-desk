@@ -36,6 +36,7 @@ import type {
   IndustryBoardData,
   MiningTaxBoardData,
   PlanetaryBoardData,
+  PriceAlertsBoardData,
   SpExtractionBoardData,
 } from './boardData';
 
@@ -202,4 +203,14 @@ export function mailSummary(t: Translate, data: MailBoardData | null): string {
   return data.unread > 0
     ? t('overview.board.mailUnread', { count: data.unread })
     : t('overview.board.mailNone');
+}
+
+export function priceAlertsSummary(t: Translate, data: PriceAlertsBoardData | null): string {
+  if (data === null) return t(CHECKING);
+  const crossed = data.alerts.filter((alert) => alert.crossed).length;
+  if (crossed > 0) return t('overview.board.priceAlertsCrossed', { count: crossed });
+  if (data.alerts.length > 0) {
+    return t('overview.board.priceAlertsWatching', { count: data.alerts.length });
+  }
+  return t('overview.board.priceAlertsNone');
 }

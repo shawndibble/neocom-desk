@@ -4,6 +4,7 @@ import {
   comingUpSeverity,
   mailSeverity,
   miningTaxSeverity,
+  priceAlertsSeverity,
   spExtractionSeverity,
 } from './boardSeverity';
 import type { CalendarEventsBoardData, MailBoardData, MiningTaxBoardData } from './boardData';
@@ -123,5 +124,25 @@ describe('mailSeverity', () => {
 
   it('is warning when the mailbox cannot be read', () => {
     expect(mailSeverity(data(0, true))).toBe('warning');
+  });
+});
+
+describe('priceAlertsSeverity', () => {
+  const alert = (crossed: boolean) => ({
+    typeId: 1,
+    name: 'Tritanium',
+    targetPrice: 5,
+    direction: 'above' as const,
+    price: crossed ? 6 : 4,
+    crossed,
+  });
+
+  it('is null until loaded, warning once a target is crossed, clear otherwise', () => {
+    expect(priceAlertsSeverity(null)).toBeNull();
+    expect(priceAlertsSeverity({ alerts: [alert(false), alert(true)], checkedAt: 0 })).toBe(
+      'warning'
+    );
+    expect(priceAlertsSeverity({ alerts: [alert(false)], checkedAt: 0 })).toBe('clear');
+    expect(priceAlertsSeverity({ alerts: [], checkedAt: null })).toBe('clear');
   });
 });

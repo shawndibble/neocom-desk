@@ -24,6 +24,7 @@ import type {
   MailBoardData,
   MiningTaxBoardData,
   PlanetaryBoardData,
+  PriceAlertsBoardData,
   SpExtractionBoardData,
 } from './boardData';
 
@@ -135,4 +136,10 @@ export function mailSeverity(data: MailBoardData | null): DeadlineSeverity | nul
   if (data === null) return null;
   if (data.needsReauth) return UNREADABLE;
   return data.unread > 0 ? 'watch' : 'clear';
+}
+
+/** A crossed target is what the pilot asked to be told about, so it is `warning`. */
+export function priceAlertsSeverity(data: PriceAlertsBoardData | null): DeadlineSeverity | null {
+  if (data === null) return null;
+  return data.alerts.some((alert) => alert.crossed) ? 'warning' : 'clear';
 }

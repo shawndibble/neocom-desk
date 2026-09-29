@@ -7,6 +7,7 @@ import {
   miningTaxSummary,
   ordersSummary,
   planetarySummary,
+  priceAlertsSummary,
   spExtractionSummary,
 } from './boardSummary';
 import type {
@@ -340,5 +341,29 @@ describe('mailSummary', () => {
   it('reports loading and a lapsed grant', () => {
     expect(mailSummary(t, null)).toBe('overview.board.checking');
     expect(mailSummary(t, data(0, true))).toBe('overview.board.reauth');
+  });
+});
+
+describe('priceAlertsSummary', () => {
+  const alert = (crossed: boolean) => ({
+    typeId: 1,
+    name: 'Tritanium',
+    targetPrice: 5,
+    direction: 'above' as const,
+    price: 4,
+    crossed,
+  });
+
+  it('leads with crossed targets, then how many are being watched', () => {
+    expect(priceAlertsSummary(t, { alerts: [alert(true), alert(false)], checkedAt: 0 })).toBe(
+      'overview.board.priceAlertsCrossed(count=1)'
+    );
+    expect(priceAlertsSummary(t, { alerts: [alert(false)], checkedAt: 0 })).toBe(
+      'overview.board.priceAlertsWatching(count=1)'
+    );
+    expect(priceAlertsSummary(t, { alerts: [], checkedAt: null })).toBe(
+      'overview.board.priceAlertsNone'
+    );
+    expect(priceAlertsSummary(t, null)).toBe('overview.board.checking');
   });
 });
