@@ -3,8 +3,8 @@ import { createContext, useContext } from 'react';
 const PortalContainerContext = createContext<HTMLElement | null>(null);
 
 /**
- * The element a Radix overlay should portal into, when the default
- * (`document.body`) is wrong.
+ * The element an overlay — a Radix popper, or a `Toast` — should portal
+ * into, when the default (`document.body`) is wrong.
  *
  * `Modal` is built on the native `<dialog>` + `showModal()`, which puts the
  * dialog in the browser's *top layer* and makes everything outside it inert. A

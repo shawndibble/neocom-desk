@@ -781,7 +781,7 @@ describe('OrderDetailModal', () => {
       // scoped to the quick-answer section, since the exits list below
       // coincidentally suggests the very same price for its own undercut row.
       const quickAnswer = screen.getByText('Quick answer').closest('section')!;
-      await user.click(within(quickAnswer).getByRole('button', { description: 'Copy 449.90' }));
+      await user.click(within(quickAnswer).getByRole('button', { name: /449\.90/ }));
       expect(written).toEqual(['449.90']);
       expect(screen.getByRole('status')).toHaveTextContent('Copied to clipboard');
 

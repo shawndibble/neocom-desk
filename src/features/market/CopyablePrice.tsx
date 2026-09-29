@@ -9,8 +9,8 @@
  * `market.orders.outbidAt`, the "→ price" relist hint) passes that sentence
  * as `children` so the whole bold phrase is the tap target; otherwise the
  * formatted price is. The visible text stays the accessible name (WCAG 2.5.3
- * Label in Name); "Copy <price>" rides along as the `title`, which is both the
- * hover hint and the accessible description. A successful copy raises a "Copied to clipboard"
+ * Label in Name); "Copy <price>" rides along as a `Tooltip`, which reaches
+ * hover, focus and touch-and-hold, and is the accessible description. A successful copy raises a "Copied to clipboard"
  * `Toast` for a couple of seconds — the toast is `role="status"`, so it
  * serves the screen reader and the pointer user alike.
  *
@@ -21,6 +21,7 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Tooltip } from '@/components/ui';
 import { Toast } from '@/components/ui/Toast';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk } from '@/lib/isk';
@@ -54,14 +55,20 @@ export function CopyablePrice({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => void copy()}
-        title={t('market.orders.copyPrice', { price: formatted })}
-        className="cursor-copy rounded-xs text-left font-semibold hover:text-accent focus-visible:outline-2 focus-visible:outline-accent"
-      >
-        {children ?? formatted}
-      </button>
+      {/* `openOnTap` stays off: the tap copies, so touch reads the bubble by
+          touch-and-hold, same as `CopyableTotal`. */}
+      <Tooltip content={t('market.orders.copyPrice', { price: formatted })}>
+        <button
+          type="button"
+          onClick={() => void copy()}
+          // The 44px touch tier (DESIGN.md §3) on a phone, where the modal's
+          // next-step and exit lines are this button alone; no extra height
+          // on a pointer, where it sits inside a dense table row.
+          className="inline-flex min-h-11 cursor-copy items-center rounded-xs text-left font-semibold hover:text-accent focus-visible:outline-2 focus-visible:outline-accent md:min-h-0"
+        >
+          {children ?? formatted}
+        </button>
+      </Tooltip>
       {copied && <Toast message={t('market.orders.priceCopied')} />}
     </>
   );
