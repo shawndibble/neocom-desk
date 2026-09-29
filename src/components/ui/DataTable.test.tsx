@@ -1123,9 +1123,27 @@ describe('DataTable virtualize', () => {
       expect(document.querySelector('[data-row-key="1"]')?.getAttribute('aria-rowindex')).toBe('2');
     });
 
+    it('leaves scroll anchoring on for a windowed table without expandable rows', () => {
+      // A newest-first ledger relies on it to hold the view when a refresh
+      // adds rows above the viewport.
+      render(
+        <DataTable
+          label="Offers"
+          columns={sortableColumns}
+          rows={rowsOf(VIRTUALIZE_THRESHOLD + 1)}
+          rowKey={byId}
+          virtualize="auto"
+        />
+      );
+
+      expect(mountedIds().length).toBeLessThan(100);
+      expect(document.querySelector('tbody')?.className).not.toContain('overflow-anchor');
+    });
+
     describe('with expandableRow', () => {
       const ROW_HEIGHT = 29; // the default-density estimate, so unmeasured rows agree
       const DETAIL_HEIGHT = 300;
+      let detailHeight = DETAIL_HEIGHT;
       const offsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')!;
       let scrollTo: ReturnType<typeof vi.spyOn>;
 
@@ -1135,7 +1153,7 @@ describe('DataTable virtualize', () => {
         Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
           configurable: true,
           get(this: HTMLElement) {
-            if (this.classList.contains('dt-row-detail')) return DETAIL_HEIGHT;
+            if (this.classList.contains('dt-row-detail')) return detailHeight;
             if (this.tagName === 'TR' && this.hasAttribute('data-index')) return ROW_HEIGHT;
             return offsetHeight.get!.call(this);
           },
@@ -1149,6 +1167,7 @@ describe('DataTable virtualize', () => {
         }) as typeof window.scrollTo);
       });
       afterEach(() => {
+        detailHeight = DETAIL_HEIGHT;
         Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeight);
         scrollTo.mockRestore();
       });
@@ -1215,6 +1234,44 @@ describe('DataTable virtualize', () => {
         // TanStack moved the page for that; the browser's scroll anchoring
         // must not move it a second time for the spacer shrinking.
         expect(document.querySelector('tbody')?.className).toContain('[overflow-anchor:none]');
+      });
+
+      it('takes up a detail that grows while the page is scrolling', async () => {
+        // A ResizeObserver whose callbacks the test can fire: jsdom's stub
+        // never calls back.
+        const observers: { callback: ResizeObserverCallback; targets: Element[] }[] = [];
+        const original = globalThis.ResizeObserver;
+        globalThis.ResizeObserver = class {
+          private entry: { callback: ResizeObserverCallback; targets: Element[] };
+          constructor(callback: ResizeObserverCallback) {
+            this.entry = { callback, targets: [] };
+            observers.push(this.entry);
+          }
+          observe(target: Element) {
+            this.entry.targets.push(target);
+          }
+          unobserve() {}
+          disconnect() {}
+        } as unknown as typeof ResizeObserver;
+        try {
+          const user = userEvent.setup();
+          render(table);
+          await user.click(rowOf(1)!.querySelector('td')!);
+          const detail = screen.getByText('Detail 1').closest('tr')!;
+          const watcher = observers.find((o) => o.targets.includes(detail));
+          expect(watcher).toBeDefined();
+
+          // Mid-scroll — TanStack's own measuring skips this — the detail's
+          // content arrives and it grows.
+          scrollPage(10);
+          detailHeight = 500;
+          watcher!.callback([], watcher as unknown as ResizeObserver);
+
+          scrollPage(5_000);
+          expect(spacerBefore()).toBe(firstMountedIndex() * ROW_HEIGHT + 500);
+        } finally {
+          globalThis.ResizeObserver = original;
+        }
       });
 
       it('keeps the focused row across expanding and collapsing it', async () => {
