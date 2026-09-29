@@ -1,5 +1,5 @@
 /**
- * The Overview board's four domain cards and its alerts column.
+ * The Overview board's domain cards and its alerts column.
  *
  * Each one is shaped by what its domain's volume actually does on a bad day —
  * see `BoardCard.tsx` for the rule. Every card renders *something* in every
