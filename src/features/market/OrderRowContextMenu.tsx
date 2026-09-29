@@ -18,6 +18,7 @@ import type { RegionOrder } from '@/esi/endpoints';
 import { formatIsk } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatOrderLocationText } from './format';
+import { priceClipboardText } from './priceClipboardText';
 import { ShowInfoMenuItem } from './ItemContextMenu';
 
 export interface OrderRowContextMenuProps {
@@ -54,7 +55,11 @@ export function OrderRowContextMenu({
           <MenuItem onSelect={() => void writeToClipboard(locationText)}>
             {t('market.contextMenu.copyLocation')}
           </MenuItem>
-          <MenuItem onSelect={() => void writeToClipboard(priceText)}>
+          {/* Plain digits, not `priceText` (#2294): this is where a trader
+              copies a rival's price to post against, and EVE's own price
+              field rejects the grouped, unit-suffixed display text. ESI
+              prices already sit on a legal tick, so nothing rounds. */}
+          <MenuItem onSelect={() => void writeToClipboard(priceClipboardText(order.price))}>
             {t('market.contextMenu.copyPrice')}
           </MenuItem>
           <ShowInfoMenuItem typeId={typeId} itemName={itemName} />

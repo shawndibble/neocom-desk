@@ -1382,7 +1382,7 @@ describe('Market Browser order row context menu (issue #6)', () => {
     );
     await user.click(await screen.findByRole('menuitem', { name: 'Copy price' }));
 
-    expect(writeText).toHaveBeenCalledWith('1,000,000.00 ISK');
+    expect(writeText).toHaveBeenCalledWith('1000000');
   });
 
   it('copies the location and price to the clipboard', async () => {
@@ -1409,7 +1409,46 @@ describe('Market Browser order row context menu (issue #6)', () => {
 
     fireEvent.contextMenu(sellRow);
     await user.click(await screen.findByRole('menuitem', { name: 'Copy price' }));
-    expect(writeText).toHaveBeenCalledWith('1,000,000.00 ISK');
+    expect(writeText).toHaveBeenCalledWith('1000000');
+  });
+
+  // Plain digits, never `formatIsk`'s grouped text (#2294): EVE's own order
+  // price field rejects "12.34 ISK" and "1,000,000.00" alike.
+  it('copies a price with cents as plain digits (#2294)', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    configureClipboard(writeText);
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${RIFTER_REGION_ID}/orders`, () =>
+        HttpResponse.json([
+          {
+            order_id: 1,
+            type_id: 587,
+            is_buy_order: false,
+            price: 12.34,
+            location_id: 60003760,
+            system_id: 30000142,
+            volume_remain: 5,
+            volume_total: 10,
+            min_volume: 1,
+            duration: 90,
+            issued: '2026-08-01T00:00:00Z',
+            range: 'region',
+          },
+        ])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    await user.click(
+      within(sellTable).getByRole('button', { name: /^More actions for 12.34 ISK, Jita IV/ })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Copy price' }));
+
+    expect(writeText).toHaveBeenCalledWith('12.34');
   });
 
   it('opens the Item Detail modal from an order row (issue #9)', async () => {
