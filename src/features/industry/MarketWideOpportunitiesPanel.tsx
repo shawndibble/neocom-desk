@@ -5,7 +5,7 @@
  * starting from nothing" answer. Opt-in: nothing runs until the pilot hits
  * "Scan".
  */
-import { useMemo, type ReactElement } from 'react';
+import { useMemo, type ReactElement, type ReactNode } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -31,6 +31,7 @@ import {
 } from '@/components/ui';
 import { db } from '@/db';
 import { iskToneClass } from '@/features/character/format';
+import { formatDuration } from '@/lib/duration';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import {
@@ -57,6 +58,7 @@ import { useMarketWideOpportunities } from './useMarketWideOpportunities';
 import { SkillGateMarker } from './SkillGateMarker';
 import { ORDER_DEPTH_RANK } from './opportunityMetrics';
 import { StartPlanButton } from './StartPlanButton';
+import { formatPercent } from './format';
 import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, defineUrlFilter, enumParam, enumSetParam } from '@/lib/urlState';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -129,6 +131,15 @@ function isKnownRarelySold(unitsPerDay: number | null | undefined): boolean {
   return unitsPerDay !== null && unitsPerDay !== undefined && isRarelySold(unitsPerDay);
 }
 
+/** Build Opportunities' own unknown-value cell, so an unpriced margin reads the same in both tables. */
+function numericCell(
+  value: number | null,
+  format: (v: number) => ReactNode,
+  unknown: string
+): ReactNode {
+  return value === null ? unknown : format(value);
+}
+
 function sameMembers<V>(a: ReadonlySet<V>, b: ReadonlySet<V>): boolean {
   return a.size === b.size && [...a].every((member) => b.has(member));
 }
@@ -150,6 +161,8 @@ function toggled<V>(set: ReadonlySet<V>, member: V): ReadonlySet<V> {
 const SORT_VALUE = {
   product: (row: MarketWideResultRow) => row.productName,
   blueprintSource: (row: MarketWideResultRow) => BLUEPRINT_SOURCE_RANK[row.blueprintSource],
+  margin: (row: MarketWideResultRow) => row.marginPct ?? undefined,
+  duration: (row: MarketWideResultRow) => row.seconds,
   iskPerHour: (row: MarketWideResultRow) => row.iskPerHour ?? undefined,
   buildCost: (row: MarketWideResultRow) => row.buildCost,
   orderDepth: (row: MarketWideResultRow) => ORDER_DEPTH_RANK[row.orderDepth],
@@ -276,6 +289,23 @@ export function MarketWideOpportunitiesPanel({
           tone={row.blueprintSource === 'owned' ? 'success' : 'default'}
         />
       ),
+    },
+    {
+      id: 'margin',
+      header: t('industry.margin'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: SORT_VALUE.margin,
+      render: (row) => numericCell(row.marginPct, formatPercent, t('common.unknown')),
+    },
+    {
+      // The whole tree's TE-0 job time: ISK/hour's denominator, not a wall-clock promise.
+      id: 'duration',
+      header: t('industry.time'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: SORT_VALUE.duration,
+      render: (row) => formatDuration(row.seconds),
     },
     {
       id: 'iskPerHour',

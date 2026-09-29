@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import '@/i18n';
+import i18n from '@/i18n';
+import { formatDuration } from '@/lib/duration';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { TradeHub } from '@/market/hubs';
 import type { BlueprintCatalog } from './blueprintCatalog';
@@ -10,7 +11,11 @@ import type { MarketWideResultRow } from './marketWideOpportunities';
 import { MarketWideOpportunitiesPanel } from './MarketWideOpportunitiesPanel';
 import { fakeItemActions, withItemActions } from '@/features/market/__fixtures__/itemActions';
 
-const row = (productTypeID: number, productName: string): MarketWideResultRow =>
+const row = (
+  productTypeID: number,
+  productName: string,
+  extra: Partial<MarketWideResultRow> = {}
+): MarketWideResultRow =>
   ({
     productTypeID,
     productName,
@@ -21,6 +26,9 @@ const row = (productTypeID: number, productName: string): MarketWideResultRow =>
     // Gamma is the expensive build, for the build-cost cap.
     buildCost: productTypeID === 300 ? 500_000_000 : 5_000_000,
     orderDepth: 'deep',
+    marginPct: 18.4,
+    seconds: 3600,
+    ...extra,
   }) as unknown as MarketWideResultRow;
 
 const hookState = vi.hoisted(() => ({
@@ -29,6 +37,7 @@ const hookState = vi.hoisted(() => ({
   loading: false,
   hasRun: true,
   isPhone: false,
+  rows: null as unknown,
 }));
 vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => hookState.isPhone }));
 // Beta sells 1 a day, Gamma 50 — once the filter asks.
@@ -45,7 +54,10 @@ vi.mock('./useDailySales', () => ({
 }));
 vi.mock('./useMarketWideOpportunities', () => ({
   useMarketWideOpportunities: () => ({
-    rows: [row(200, 'Widget Beta'), row(300, 'Widget Gamma')],
+    rows: (hookState.rows as MarketWideResultRow[] | null) ?? [
+      row(200, 'Widget Beta'),
+      row(300, 'Widget Gamma'),
+    ],
     loading: hookState.loading,
     hasRun: hookState.hasRun,
     error: false,
@@ -68,9 +80,9 @@ const catalog = {
   byProductTypeID: new Map([[200, { blueprintTypeID: 1200, productTypeID: 200 }]]),
 } as unknown as BlueprintCatalog;
 
-function renderPanel(actions = fakeItemActions()) {
+function renderPanel(actions = fakeItemActions(), initialEntries = ['/']) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       {withItemActions(
         <MarketWideOpportunitiesPanel
           hub={{ id: 'jita' } as unknown as TradeHub}
@@ -253,5 +265,52 @@ describe('MarketWideOpportunitiesPanel sales and price sanity', () => {
       within(gamma).getByRole('button', { name: /Priced at the average/ })
     ).toBeInTheDocument();
     expect(within(beta).queryByRole('button', { name: /Priced at the average/ })).toBeNull();
+  });
+});
+
+describe('MarketWideOpportunitiesPanel margin and time (issue #2297)', () => {
+  const productOrder = () =>
+    screen
+      .getAllByRole('link')
+      .map((link) => link.textContent)
+      .filter((name) => name?.startsWith('Widget'));
+
+  afterEach(() => {
+    hookState.rows = null;
+  });
+
+  it('shows Margin then Time, both before ISK/hour', () => {
+    renderPanel();
+    const headers = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
+    const at = (label: string) => headers.findIndex((h) => h.startsWith(label));
+    expect(at('Margin')).toBeGreaterThan(-1);
+    expect(at('Margin')).toBeLessThan(at('Time'));
+    expect(at('Time')).toBeLessThan(at('ISK/hour'));
+    const beta = screen.getByText('Widget Beta').closest('tr')!;
+    expect(within(beta).getByText('18.4%')).toBeInTheDocument();
+    expect(within(beta).getByText(formatDuration(3600))).toBeInTheDocument();
+  });
+
+  it('sorts by margin from the URL, with an unknown margin last', () => {
+    hookState.rows = [
+      row(200, 'Widget Beta', { marginPct: null }),
+      row(300, 'Widget Gamma', { marginPct: 40 }),
+      row(400, 'Widget Delta', { marginPct: 10 }),
+    ];
+    renderPanel(undefined, ['/?marketWide.sort=margin:desc']);
+    expect(productOrder()).toEqual(['Widget Gamma', 'Widget Delta', 'Widget Beta']);
+    expect(
+      within(screen.getByText('Widget Beta').closest('tr')!).getByText(i18n.t('common.unknown'))
+    ).toBeInTheDocument();
+  });
+
+  it('sorts by time from the URL', () => {
+    hookState.rows = [
+      row(200, 'Widget Beta', { seconds: 7200 }),
+      row(300, 'Widget Gamma', { seconds: 1800 }),
+      row(400, 'Widget Delta', { seconds: 3600 }),
+    ];
+    renderPanel(undefined, ['/?marketWide.sort=duration:asc']);
+    expect(productOrder()).toEqual(['Widget Gamma', 'Widget Delta', 'Widget Beta']);
   });
 });
