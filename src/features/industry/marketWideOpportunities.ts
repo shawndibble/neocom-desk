@@ -52,9 +52,19 @@ export const DEFAULT_LIQUIDITY_FLOOR_ISK = 50_000_000;
 /** How many candidates survive per Market Group category, by sell depth, before material pricing runs at all. */
 export const DEFAULT_TOP_N_PER_MARKET_GROUP = 5;
 
+/** Whether the pilot's filters keep a product, given how its blueprint is obtained. */
+export type MarketWideInclude = (productTypeID: number, source: BlueprintSource) => boolean;
+
 export interface MarketWideScanOptions {
   liquidityFloorIsk?: number;
   topNPerMarketGroup?: number;
+  /**
+   * The pilot's filters (tier, category, blueprint source). Applied with the
+   * blueprint gate, before the top-N cut, so a filtered-out product never
+   * takes a slot one the pilot asked for would have filled. A promise so its
+   * data loads alongside the product-price fetch.
+   */
+  include?: Promise<MarketWideInclude>;
 }
 
 export interface MarketWideResultRow extends MarketWideRow {
@@ -98,14 +108,17 @@ export async function runMarketWideScan(
   const productTypeIds = marketWideProductTypeIds(trees);
   if (productTypeIds.length === 0) return [];
 
-  const [productAggregates, sourceSets] = await Promise.all([
+  const [productAggregates, sourceSets, include] = await Promise.all([
     getHubPrices(hub, productTypeIds),
     sources,
+    options.include,
   ]);
   const sourceByProduct = new Map<number, BlueprintSource>();
   for (const productTypeID of productTypeIds) {
     const source = blueprintSource(trees[String(productTypeID)]!.blueprintTypeID, sourceSets);
-    if (source) sourceByProduct.set(productTypeID, source);
+    if (source && (!include || include(productTypeID, source))) {
+      sourceByProduct.set(productTypeID, source);
+    }
   }
   const obtainable = productTypeIds.filter((productTypeID) => sourceByProduct.has(productTypeID));
   const liquidityCandidates: LiquidityCandidate[] = obtainable.map((productTypeID) => {

@@ -17,11 +17,15 @@ const row = (productTypeID: number, productName: string): MarketWideResultRow =>
     blueprintTypeID: productTypeID + 1000,
     blueprintSource: productTypeID === 200 ? 'owned' : 'contract',
     iskPerHour: 1_000_000,
-    buildCost: 5_000_000,
+    // Gamma is the expensive build, for the build-cost cap.
+    buildCost: productTypeID === 300 ? 500_000_000 : 5_000_000,
     orderDepth: 'deep',
   }) as unknown as MarketWideResultRow;
 
-const hookState = vi.hoisted(() => ({ unavailableSources: [] as string[] }));
+const hookState = vi.hoisted(() => ({
+  unavailableSources: [] as string[],
+  run: vi.fn(),
+}));
 vi.mock('./useMarketWideOpportunities', () => ({
   useMarketWideOpportunities: () => ({
     rows: [row(200, 'Widget Beta'), row(300, 'Widget Gamma')],
@@ -29,7 +33,7 @@ vi.mock('./useMarketWideOpportunities', () => ({
     hasRun: true,
     error: false,
     unavailableSources: hookState.unavailableSources,
-    run: () => {},
+    run: hookState.run,
   }),
 }));
 vi.mock('@/features/skills/useAccountSkillLevels', () => ({
@@ -133,5 +137,33 @@ describe('MarketWideOpportunitiesPanel blueprint sources', () => {
   it('adds no note when every source was read', () => {
     renderPanel();
     expect(screen.queryByText(/Couldn't check/)).not.toBeInTheDocument();
+  });
+});
+
+describe('MarketWideOpportunitiesPanel filters', () => {
+  it('re-scans without a tier the pilot turns off', async () => {
+    hookState.run.mockClear();
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(screen.getByRole('button', { name: /Filters/ }));
+    await user.click(screen.getByRole('button', { name: 'Faction' }));
+
+    expect(hookState.run).toHaveBeenCalledTimes(1);
+    const [filters] = hookState.run.mock.calls[0]!;
+    expect(filters.tiers.has('faction')).toBe(false);
+    expect(filters.tiers.has('tech1')).toBe(true);
+  });
+
+  it('caps build cost on the ranked rows without re-scanning', async () => {
+    hookState.run.mockClear();
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(screen.getByRole('button', { name: /Filters/ }));
+    await user.click(screen.getByRole('combobox', { name: 'Max build cost' }));
+    await user.click(await screen.findByRole('option', { name: 'Build cost up to 100M' }));
+
+    expect(screen.getByText('Widget Beta')).toBeInTheDocument();
+    expect(screen.queryByText('Widget Gamma')).not.toBeInTheDocument();
+    expect(hookState.run).not.toHaveBeenCalled();
   });
 });

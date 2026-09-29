@@ -7,11 +7,16 @@
 import { useCallback, useRef, useState } from 'react';
 import type { BlueprintSource } from '@/engine/industry/blueprintObtainability';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
+import {
+  passesMarketWideFilters,
+  type MarketWideFilters,
+} from '@/engine/industry/marketWideFilters';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import type { TradeHub } from '@/market/hubs';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import { loadBlueprintSourceSets } from './blueprintSourceSets';
+import { loadMarketWideProductFacts } from './marketWideProductFacts';
 import {
   runMarketWideScan,
   type MarketWideResultRow,
@@ -28,7 +33,7 @@ export interface UseMarketWideOpportunitiesArgs {
   standing?: ResolvedStandings;
   /** Every Character on the account — whose blueprints, contracts and LP decide what the pilot can build. */
   characterIds: readonly number[];
-  options?: MarketWideScanOptions;
+  options?: Omit<MarketWideScanOptions, 'include'>;
 }
 
 export interface UseMarketWideOpportunitiesResult {
@@ -39,7 +44,12 @@ export interface UseMarketWideOpportunitiesResult {
   error: boolean;
   /** Blueprint sources the last scan couldn't read — rows needing one may be missing. */
   unavailableSources: BlueprintSource[];
-  run: () => void;
+  /**
+   * Scans with `filters` (tiers, categories, blueprint sources). They apply
+   * before the top-N cut, so a filter change needs a fresh scan rather than
+   * hiding rows from the last one; product prices are cached by then.
+   */
+  run: (filters: MarketWideFilters) => void;
 }
 
 export function useMarketWideOpportunities({
@@ -63,35 +73,54 @@ export function useMarketWideOpportunities({
   // (e.g. the pilot hits "Scan" twice in a row).
   const runToken = useRef(0);
 
-  const run = useCallback(() => {
-    if (!trees || !catalog) return;
-    const token = ++runToken.current;
-    setState((prev) => ({ ...prev, loading: true, error: false }));
-    const blueprints = Object.entries(trees).map(([productTypeID, tree]) => ({
-      blueprintTypeID: tree.blueprintTypeID,
-      productTypeID: Number(productTypeID),
-    }));
-    const sources = loadBlueprintSourceSets(characterIds, blueprints);
-    const sets = sources.then((loaded) => loaded.sets);
-    void Promise.all([
-      runMarketWideScan(hub, trees, catalog, modifiers, sets, options, standing),
-      sources,
-    ])
-      .then(([rows, loaded]) => {
-        if (runToken.current !== token) return;
-        setState({
-          rows,
-          loading: false,
-          hasRun: true,
-          error: false,
-          unavailableSources: loaded.unavailable,
+  const run = useCallback(
+    (filters: MarketWideFilters) => {
+      if (!trees || !catalog) return;
+      const token = ++runToken.current;
+      setState((prev) => ({ ...prev, loading: true, error: false }));
+      const blueprints = Object.entries(trees).map(([productTypeID, tree]) => ({
+        blueprintTypeID: tree.blueprintTypeID,
+        productTypeID: Number(productTypeID),
+      }));
+      const sources = loadBlueprintSourceSets(characterIds, blueprints);
+      const sets = sources.then((loaded) => loaded.sets);
+      // Unreadable market files filter nothing rather than failing the scan.
+      const include = loadMarketWideProductFacts(trees).then(
+        (facts) => (productTypeID: number, source: BlueprintSource) => {
+          const fact = facts.get(productTypeID);
+          return !fact || passesMarketWideFilters({ ...fact, source }, filters);
+        },
+        () => undefined
+      );
+      void Promise.all([
+        runMarketWideScan(
+          hub,
+          trees,
+          catalog,
+          modifiers,
+          sets,
+          { ...options, include: include.then((check) => check ?? (() => true)) },
+          standing
+        ),
+        sources,
+      ])
+        .then(([rows, loaded]) => {
+          if (runToken.current !== token) return;
+          setState({
+            rows,
+            loading: false,
+            hasRun: true,
+            error: false,
+            unavailableSources: loaded.unavailable,
+          });
+        })
+        .catch(() => {
+          if (runToken.current !== token) return;
+          setState({ rows: [], loading: false, hasRun: true, error: true, unavailableSources: [] });
         });
-      })
-      .catch(() => {
-        if (runToken.current !== token) return;
-        setState({ rows: [], loading: false, hasRun: true, error: true, unavailableSources: [] });
-      });
-  }, [hub, trees, catalog, modifiers, options, standing, characterIds]);
+    },
+    [hub, trees, catalog, modifiers, options, standing, characterIds]
+  );
 
   return { ...state, run };
 }

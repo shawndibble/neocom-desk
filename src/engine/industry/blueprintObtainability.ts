@@ -22,6 +22,9 @@ export interface BlueprintSourceSets {
 
 const PREFERENCE: readonly BlueprintSource[] = ['owned', 'market', 'contract', 'lpStore'];
 
+/** Every source, in `blueprintSource`'s preference order. */
+export const BLUEPRINT_SOURCES = PREFERENCE;
+
 /** Each source's position in `blueprintSource`'s preference order — a sort key for a source column. */
 export const BLUEPRINT_SOURCE_RANK = Object.fromEntries(
   PREFERENCE.map((source, index) => [source, index])

@@ -531,6 +531,17 @@ export function Industry() {
               <BpcSourcingPanel />
             ) : tab === 'opportunities' ? (
               <div className="flex flex-col gap-4">
+                {/* First: "what's profitable to build" is the question most
+                    visits here come to answer; the owned-blueprint ranking
+                    below narrows it to what you already hold. */}
+                <MarketWideOpportunitiesPanel
+                  hub={DEFAULT_TRADE_HUB}
+                  trees={marketWideTrees}
+                  catalog={catalog}
+                  modifiers={modifiers}
+                  activeCharacterId={activeCharacterId}
+                  onStartPlan={handleStartPlan}
+                />
                 {/* Waits on the pricing-settings hydration gate (issue #2054):
                     not mounting the panel until `assumedMe` has hydrated is
                     enough to stop its first pass from pricing every candidate
@@ -553,14 +564,6 @@ export function Industry() {
                     onStartPlan={handleStartPlan}
                   />
                 )}
-                <MarketWideOpportunitiesPanel
-                  hub={DEFAULT_TRADE_HUB}
-                  trees={marketWideTrees}
-                  catalog={catalog}
-                  modifiers={modifiers}
-                  activeCharacterId={activeCharacterId}
-                  onStartPlan={handleStartPlan}
-                />
               </div>
             ) : tab === 'records' ? (
               <ProductionLogPanel
