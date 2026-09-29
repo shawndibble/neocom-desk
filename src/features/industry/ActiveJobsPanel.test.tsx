@@ -265,12 +265,12 @@ describe('ActiveJobsPanel: rendering', () => {
     expect(screen.getByText('Widget Beta finishes in 30m')).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
 
-    // Export/Refresh live in the accordion body, not the title bar.
+    // The table menu/Refresh live in the accordion body, not the title bar.
     expect(screen.queryByRole('button', { name: 'Refresh' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Export jobs' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Active jobs actions' })).toBeNull();
     await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(caret);
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Export jobs' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Active jobs actions' })).toBeInTheDocument();
   });
 
   it('says "None" beside the title, with no body at all, when ESI answers with zero jobs', async () => {

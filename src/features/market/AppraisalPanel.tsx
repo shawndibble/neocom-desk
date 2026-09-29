@@ -32,6 +32,8 @@ import {
   type IskRevealGesture,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { Caret } from '@/components/ui/Disclosure';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
@@ -47,7 +49,6 @@ import { iskToneClass } from '@/features/character/format';
 import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIskAuto } from '@/lib/isk';
-import { downloadCsv } from '@/lib/downloadCsv';
 import type { TradeHub } from '@/market/hubs';
 import {
   APPRAISAL_COLUMN_IDS,
@@ -208,6 +209,8 @@ export function AppraisalPanel({
   ];
 
   const rows = result?.appraisal.rows ?? [];
+  const csvColumns = useMemo(() => appraisalCsvColumns(t), [t]);
+  const tableExport = useTableExport({ surface: 'market-appraisal', rows, columns: csvColumns });
   const totals = result?.appraisal.totals;
   const unmatched = result?.unmatched ?? [];
   const implantBonusPct = result?.implantBonusPct ?? 0;
@@ -490,14 +493,9 @@ export function AppraisalPanel({
                 disabled={!canCopySellList}
                 onClick={() => void handleCopySellList()}
               />
-              <IconButton
-                size="sm"
-                icon={<Icon.Download />}
-                label={t('market.appraisal.exportCsv')}
-                disabled={rows.length === 0}
-                onClick={() =>
-                  downloadCsv('market-appraisal', rows, appraisalCsvColumns(t), new Date())
-                }
+              <TableActionsMenu
+                name={t('market.appraisal.resultTitle')}
+                tableExport={tableExport}
               />
             </>
           }
@@ -632,6 +630,7 @@ export function AppraisalPanel({
               )}
 
               <DataTable
+                {...tableExport.tableProps}
                 columns={columns}
                 rows={rows}
                 rowKey={(row) => row.typeId}

@@ -38,6 +38,9 @@ import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurren
 import { invalidateFreshness } from '@/esi/cache';
 import type { TrainedSkill } from '@/engine/types';
 import { useUrlParams } from '@/lib/useUrlState';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
+import { skillCompareCsvColumns } from '@/features/skills/skillCompareCsv';
 import { boolParam, idListParam, nullableTextParam } from '@/lib/urlState';
 
 const FOCUS_RING =
@@ -375,6 +378,15 @@ export function SkillCompare() {
     ],
     [loadedIds, nameFor, t, groupColumnVisible]
   );
+  const csvColumns = useMemo(
+    () => skillCompareCsvColumns(t, loadedIds, nameFor),
+    [t, loadedIds, nameFor]
+  );
+  const compareExport = useTableExport({
+    surface: 'skill-compare',
+    rows: visibleRows,
+    columns: csvColumns,
+  });
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -471,6 +483,13 @@ export function SkillCompare() {
               selected={groupColumnVisible}
               onToggle={() => setCompareParams({ groupColumn: !groupColumnVisible })}
             />
+            <span className="ml-auto">
+              <TableActionsMenu
+                name={t('skillCompare.tableLabel')}
+                tableExport={compareExport}
+                size="md"
+              />
+            </span>
           </div>
           {visibleRows.length === 0 ? (
             <EmptyState
@@ -486,6 +505,7 @@ export function SkillCompare() {
             // real columns.
             <div className="overflow-x-auto">
               <DataTable
+                {...compareExport.tableProps}
                 columns={columns}
                 rows={visibleRows}
                 rowKey={(row) => row.skillTypeID}

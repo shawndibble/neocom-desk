@@ -64,6 +64,9 @@ import { boolParam, defineUrlFilter, enumParam, enumSetParam } from '@/lib/urlSt
 import { useIsPhone } from '@/lib/useIsPhone';
 import { RARELY_SOLD_PER_DAY, isRarelySold } from '@/engine/industry/marketWideSanity';
 import { useDailySales } from './useDailySales';
+import { marketWideOpportunitiesCsvColumns } from './opportunitiesCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 
 const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
   deep: 'success',
@@ -246,6 +249,13 @@ export function MarketWideOpportunitiesPanel({
       skillGateByProductTypeID,
     ]
   );
+
+  const csvColumns = useMemo(() => marketWideOpportunitiesCsvColumns(t), [t]);
+  const marketWideExport = useTableExport({
+    surface: 'market-wide-opportunities',
+    rows: visibleRows,
+    columns: csvColumns,
+  });
 
   const columns: DataTableColumn<MarketWideResultRow>[] = [
     {
@@ -486,11 +496,19 @@ export function MarketWideOpportunitiesPanel({
         />
       }
       actions={
-        <Button size="sm" onClick={() => run(filter)} disabled={loading || !trees || !catalog}>
-          {loading
-            ? t('industry.marketOpportunitiesScanning')
-            : t('industry.marketOpportunitiesRunScan')}
-        </Button>
+        <span className="flex items-center gap-2">
+          {hasRun && !loading && visibleRows.length > 0 && (
+            <TableActionsMenu
+              name={t('industry.marketOpportunitiesTitle')}
+              tableExport={marketWideExport}
+            />
+          )}
+          <Button size="sm" onClick={() => run(filter)} disabled={loading || !trees || !catalog}>
+            {loading
+              ? t('industry.marketOpportunitiesScanning')
+              : t('industry.marketOpportunitiesRunScan')}
+          </Button>
+        </span>
       }
     >
       {!filtersInSortBar && filterBar}
@@ -524,6 +542,7 @@ export function MarketWideOpportunitiesPanel({
           )}
           <div className="overflow-x-auto">
             <DataTable
+              {...marketWideExport.tableProps}
               columns={columns}
               rows={visibleRows}
               rowKey={(row) => row.productTypeID}

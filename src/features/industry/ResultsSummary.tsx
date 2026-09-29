@@ -25,6 +25,9 @@ import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { formatCostIndex, formatPercent, formatVolume } from './format';
+import { ownedSaleCsvColumns } from './ownedSaleCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 
 interface CostRowProps {
   label: string;
@@ -132,6 +135,9 @@ interface ResultsSummaryProps {
    */
   itemActionsFor?: (typeId: number) => ReactElement;
 }
+
+/** Stable empty fallback, so the export's rows don't change identity every render. */
+const NO_SALE_LINES: readonly OwnedStockSaleLine[] = [];
 
 /**
  * Job fee breakdown, cost, revenue, profit, margin, ISK/hour and break-even —
@@ -248,6 +254,13 @@ export function ResultsSummary({
     ],
     [t, nameFor, itemActionsFor]
   );
+
+  const saleCsvColumns = useMemo(() => ownedSaleCsvColumns(t, nameFor), [t, nameFor]);
+  const saleExport = useTableExport({
+    surface: 'use-or-sell',
+    rows: ownedSale?.[saleBasis].lines ?? NO_SALE_LINES,
+    columns: saleCsvColumns,
+  });
 
   if (pricesLoading) {
     return (
@@ -451,9 +464,17 @@ export function ResultsSummary({
       {/* `ownedUnits` is the same on either basis — it counts stock, not prices. */}
       {ownedSale && ownedSale.instant.ownedUnits > 0 && (
         <div className="space-y-1">
-          <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('industry.useOrSell.label')}
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('industry.useOrSell.label')}
+            </p>
+            {ownedSale[saleBasis].lines.length > 0 && (
+              <TableActionsMenu
+                name={t('industry.useOrSell.perMaterial')}
+                tableExport={saleExport}
+              />
+            )}
+          </div>
           <p className="text-xs text-text-dim">{t('industry.useOrSell.intro')}</p>
           <div
             role="group"
@@ -511,6 +532,7 @@ export function ResultsSummary({
             >
               <div className="overflow-x-auto">
                 <DataTable
+                  {...saleExport.tableProps}
                   columns={saleColumns}
                   rows={ownedSale[saleBasis].lines}
                   rowKey={(row) => row.typeID}

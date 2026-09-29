@@ -1,5 +1,7 @@
-import { toCsv, csvFilename, slugifyForFilename, type CsvColumn } from './csv';
-import { downloadTextFile } from './download';
+import { toCsv, csvFilename, exportFilename, slugifyForFilename, type CsvColumn } from './csv';
+import { downloadBlob, downloadTextFile } from './download';
+import { writeToClipboard } from './clipboard';
+import { toTsv } from './tsv';
 
 /**
  * The export surfaces, closed so a mistyped filename can't ship. Adding a
@@ -36,7 +38,46 @@ export type CsvSurface =
   | 'market-buy'
   | 'market-variations'
   | 'market-compare'
-  | 'market-appraisal';
+  | 'market-appraisal'
+  | 'market-compare-attributes'
+  | 'market-price-history'
+  | 'market-scope-orders'
+  | 'appraisal-shared'
+  | 'hauling'
+  | 'bpc-sourcing'
+  | 'contract-search'
+  | 'courier-contracts'
+  | 'contract-items'
+  | 'fitting-variations'
+  | 'fitting-compare'
+  | 'fitting-compare-modules'
+  | 'build-group-materials'
+  | 'build-plan-compare'
+  | 'build-plan-runs'
+  | 'industry-opportunities'
+  | 'market-wide-opportunities'
+  | 'production-log-items'
+  | 'production-log-runs'
+  | 'use-or-sell'
+  | 'mining-overview'
+  | 'mining-tax'
+  | 'mining-yield-ores'
+  | 'mining-yield-refines'
+  | 'pi-chain'
+  | 'pi-sensitivity'
+  | 'characters'
+  | 'clones'
+  | 'employment-history'
+  | 'lp-offers'
+  | 'lp-offer-materials'
+  | 'activity-log'
+  | 'data-age'
+  | 'skill-compare'
+  | 'wallet-balances'
+  | 'loyalty-points';
+
+/** Every surface exports in every format; the name reads better at the menu. */
+export type ExportSurface = CsvSurface;
 
 /**
  * Serialize and hand the browser a file. Composes the pure serializer with
@@ -59,6 +100,56 @@ export function downloadCsv<T>(
   truncated = false,
   qualifier?: string
 ): void {
-  const base = qualifier ? `${surface}-${slugifyForFilename(qualifier)}` : surface;
-  downloadTextFile(csvFilename(base, now, { partial: truncated }), toCsv(rows, columns));
+  downloadTextFile(
+    csvFilename(exportBase(surface, qualifier), now, { partial: truncated }),
+    toCsv(rows, columns)
+  );
+}
+
+/**
+ * The formats `TableActionsMenu` offers. `clipboard` is tab-separated text, which
+ * Google Sheets and Excel split into cells on paste; `xlsx` sidesteps every
+ * CSV import dialog.
+ */
+export type ExportFormat = 'csv' | 'xlsx' | 'clipboard';
+
+export interface ExportOptions {
+  now?: Date;
+  truncated?: boolean;
+  qualifier?: string;
+}
+
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+function exportBase(surface: ExportSurface, qualifier?: string): string {
+  return qualifier ? `${surface}-${slugifyForFilename(qualifier)}` : surface;
+}
+
+/** One entry point for every format, so every table exports identically. */
+export async function exportRows<T>(
+  format: ExportFormat,
+  surface: ExportSurface,
+  rows: readonly T[],
+  columns: readonly CsvColumn<T>[],
+  { now = new Date(), truncated = false, qualifier }: ExportOptions = {}
+): Promise<void> {
+  switch (format) {
+    case 'csv':
+      downloadCsv(surface, rows, columns, now, truncated, qualifier);
+      return;
+    case 'clipboard':
+      await writeToClipboard(toTsv(rows, columns));
+      return;
+    case 'xlsx': {
+      // Loaded on demand: the zip writer has no business in the main bundle.
+      const { toXlsx } = await import('./xlsx');
+      const base = exportBase(surface, qualifier);
+      const bytes = toXlsx(rows, columns, base);
+      downloadBlob(
+        exportFilename(base, now, 'xlsx', { partial: truncated }),
+        new Blob([bytes as Uint8Array<ArrayBuffer>], { type: XLSX_MIME })
+      );
+      return;
+    }
+  }
 }

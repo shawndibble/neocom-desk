@@ -621,6 +621,19 @@ describe('"you" tag (issue #1766)', () => {
 });
 
 describe('CSV export (issue #421, AC4)', () => {
+  /** Title-bar ⋯ menu → Export table ▸ Download CSV, by keyboard (jsdom has no hover intent). */
+  async function downloadCsvFromMenu() {
+    const user = userEvent.setup();
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Corp members actions' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
+    await user.keyboard('{ArrowRight}');
+    (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
+    await user.keyboard('{Enter}');
+  }
+
   it('exports the visible rows named neocom-corp-members-<date>.csv', async () => {
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
     mocked.loadCorporationMemberTracking.mockResolvedValue(
@@ -628,9 +641,9 @@ describe('CSV export (issue #421, AC4)', () => {
     );
     await rosterTable();
 
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Export CSV' }));
+    await downloadCsvFromMenu();
 
-    expect(spy).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
     const [filename, content] = spy.mock.calls[0];
     expect(filename).toMatch(/^neocom-corp-members-\d{4}-\d{2}-\d{2}\.csv$/);
     expect(content).toContain('Jita Local');
@@ -648,19 +661,24 @@ describe('CSV export (issue #421, AC4)', () => {
       .type(screen.getByPlaceholderText('Search name, ship, location…'), 'local');
     await waitFor(() => expect(screen.queryByText('Silent Ren')).not.toBeInTheDocument());
 
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Export CSV' }));
+    await downloadCsvFromMenu();
 
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
     const content = spy.mock.calls[0][1];
     expect(content).toContain('Jita Local');
     expect(content).not.toContain('Silent Ren');
   });
 
-  it('disables export when nothing is visible', async () => {
+  it('exports only the header row when nothing is visible', async () => {
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
     mocked.loadCorporationMemberTracking.mockResolvedValue(cached([]));
     renderMembers();
     await screen.findByText('No member activity');
 
-    expect(screen.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
+    await downloadCsvFromMenu();
+
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    expect(spy.mock.calls[0][1].trim().split('\n')).toHaveLength(1);
   });
 
   it('sits in PageHeader actions beside Refresh, not in the roster panel (issue #2188)', async () => {
@@ -669,7 +687,7 @@ describe('CSV export (issue #421, AC4)', () => {
     );
     await rosterTable();
 
-    const exportButton = screen.getByRole('button', { name: 'Export CSV' });
+    const exportButton = screen.getByRole('button', { name: 'Corp members actions' });
     const refreshButton = screen.getByRole('button', { name: 'Refresh member list' });
 
     expect(exportButton.parentElement).toBe(refreshButton.parentElement);

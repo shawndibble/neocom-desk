@@ -19,6 +19,8 @@ import {
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import {
   COMPACT_COUNT_Y_AXIS_WIDTH,
   COMPACT_ISK_Y_AXIS_WIDTH,
@@ -29,6 +31,7 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatPriceRange, formatVolume } from './format';
+import { priceHistoryCsvColumns } from './priceHistoryCsv';
 import type { MarketHistoryPoint, MovingAveragePoint } from '@/engine/market/priceHistory';
 
 interface PriceHistoryChartProps {
@@ -278,6 +281,13 @@ export default function PriceHistoryChart({
     [t]
   );
 
+  const csvColumns = useMemo(() => priceHistoryCsvColumns(t), [t]);
+  const tableExport = useTableExport<ChartRow>({
+    surface: 'market-price-history',
+    rows: chartData,
+    columns: csvColumns,
+  });
+
   // `role="img"` collapses everything inside it into one opaque image for
   // assistive tech, so the sr-only table below must be a *sibling*, not a
   // child — nesting it here would make the accessible fallback unreachable.
@@ -445,46 +455,51 @@ export default function PriceHistoryChart({
        * DESIGN.md §7 forbids colour as the only signal, and on the phone the
        * order-count line has no axis left to name it.
        */}
-      <ul className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-3 pt-2 pb-1 text-[0.6875rem] text-text-dim">
-        <li>
-          <LegendItem
-            label={t('market.priceHistory.priceRange')}
-            shape="swatch"
-            color="var(--color-accent-dim)"
-            opacity={BAND_FILL_OPACITY}
-          />
-        </li>
-        <li>
-          <LegendItem
-            label={t('market.priceHistory.average')}
-            shape="line"
-            color="var(--color-accent)"
-          />
-        </li>
-        {movingAverage.length > 0 && (
+      {/* The day table below has no heading of its own; the legend row is
+          the bar above it, so its ⋯ menu sits at this row's end. */}
+      <div className="flex items-center justify-between gap-2 pr-3">
+        <ul className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-3 pt-2 pb-1 text-[0.6875rem] text-text-dim">
           <li>
             <LegendItem
-              label={t('market.priceHistory.movingAverage')}
-              shape="dashed"
-              color="var(--color-text-dim)"
+              label={t('market.priceHistory.priceRange')}
+              shape="swatch"
+              color="var(--color-accent-dim)"
+              opacity={BAND_FILL_OPACITY}
             />
           </li>
-        )}
-        <li>
-          <LegendItem
-            label={t('market.priceHistory.volume')}
-            shape="swatch"
-            color="var(--color-line-bright)"
-          />
-        </li>
-        <li>
-          <LegendItem
-            label={t('market.priceHistory.orderCount')}
-            shape="line"
-            color="var(--color-series-order-count)"
-          />
-        </li>
-      </ul>
+          <li>
+            <LegendItem
+              label={t('market.priceHistory.average')}
+              shape="line"
+              color="var(--color-accent)"
+            />
+          </li>
+          {movingAverage.length > 0 && (
+            <li>
+              <LegendItem
+                label={t('market.priceHistory.movingAverage')}
+                shape="dashed"
+                color="var(--color-text-dim)"
+              />
+            </li>
+          )}
+          <li>
+            <LegendItem
+              label={t('market.priceHistory.volume')}
+              shape="swatch"
+              color="var(--color-line-bright)"
+            />
+          </li>
+          <li>
+            <LegendItem
+              label={t('market.priceHistory.orderCount')}
+              shape="line"
+              color="var(--color-series-order-count)"
+            />
+          </li>
+        </ul>
+        <TableActionsMenu name={t('market.tabHistory')} tableExport={tableExport} />
+      </div>
 
       {/*
        * Shown at every width, and never `sr-only`.
@@ -501,6 +516,7 @@ export default function PriceHistoryChart({
        * above, which is the same data laid out for the room available.
        */}
       <DataTable
+        {...tableExport.tableProps}
         columns={columns}
         rows={chartData}
         rowKey={(p) => p.date}

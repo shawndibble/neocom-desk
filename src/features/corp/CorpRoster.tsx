@@ -23,6 +23,7 @@ import {
   StatChip,
   type DataTableColumn,
 } from '@/components/ui';
+import type { UseTableExport } from '@/components/ui/useTableExport';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { formatAge } from '@/lib/age';
 import {
@@ -250,10 +251,13 @@ const rosterRowKey = (row: RosterRow) => row.characterId;
 export function CorpRosterTable({
   rows,
   rowContextMenu,
+  tableProps,
 }: {
   rows: readonly RosterRow[];
   /** Row context menu (issue #421): Show Info + Copy Character Name. */
   rowContextMenu?: (row: RosterRow, tr: ReactElement) => ReactElement;
+  /** `useTableExport(...).tableProps` — row menus gain "Export table ▸". */
+  tableProps?: UseTableExport<RosterRow>['tableProps'];
 }) {
   const { t } = useTranslation();
   const columns = useRosterColumns();
@@ -287,6 +291,7 @@ export function CorpRosterTable({
 
   return (
     <DataTable
+      {...tableProps}
       columns={shownColumns}
       rows={rows}
       rowContextMenu={rowContextMenu}

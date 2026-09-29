@@ -73,7 +73,8 @@ import {
   type MemberActivity,
   type RosterDiff,
 } from '@/engine/corp/members';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam, optionalIdParam, textParam } from '@/lib/urlState';
@@ -293,6 +294,12 @@ function CorpMembersView() {
       ),
     [rows, debouncedSearch, darkOnly, ship, loc]
   );
+  const csvColumns = useMemo(() => membersCsvColumns(t), [t]);
+  const membersExport = useTableExport({
+    surface: 'corp-members',
+    rows: visibleRows,
+    columns: csvColumns,
+  });
 
   if (!snapshot.hydrated) return <Spinner />;
 
@@ -308,11 +315,10 @@ function CorpMembersView() {
         }
         actions={
           <>
-            <IconButton
-              icon={<Icon.Download />}
-              label={t('corp.members.exportCsv')}
-              disabled={visibleRows.length === 0}
-              onClick={() => downloadCsv('corp-members', visibleRows, membersCsvColumns(t))}
+            <TableActionsMenu
+              name={t('corp.members.title')}
+              tableExport={membersExport}
+              size="md"
             />
             <IconButton
               icon={<Icon.Refresh />}
@@ -422,7 +428,11 @@ function CorpMembersView() {
                 }
               />
             ) : (
-              <CorpRosterTable rows={visibleRows} rowContextMenu={memberRowContextMenu} />
+              <CorpRosterTable
+                rows={visibleRows}
+                rowContextMenu={memberRowContextMenu}
+                tableProps={membersExport.tableProps}
+              />
             )}
           </Panel>
         </div>

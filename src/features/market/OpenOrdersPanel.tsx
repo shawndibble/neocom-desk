@@ -48,7 +48,9 @@ import {
 } from '@/lib/useUrlState';
 import { cx } from '@/lib/cx';
 import { formatIskAuto, formatIskCompact } from '@/lib/isk';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
+import type { CsvColumn } from '@/lib/csv';
 import { ordersCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrder } from '@/esi/endpoints';
 import type { CompetingOrder } from '@/engine/market/undercut';
@@ -351,7 +353,29 @@ export function OpenOrdersPanel() {
     return m;
   }, [snapshot]);
 
-  const nameFor = (typeId: number) => snapshot?.typeNames.get(typeId) ?? `Type #${typeId}`;
+  // Every group's visible rows (folded groups included), exported as the ESI
+  // orders behind them — hence `source: 'rows'`, and one export shared by
+  // every group's DataTable.
+  const csvRows = useMemo(
+    () => visibleRows.filter((row) => ordersByOrderId.has(row.orderId)),
+    [visibleRows, ordersByOrderId]
+  );
+  const csvColumns = useMemo<CsvColumn<OpenOrderRow>[]>(
+    () =>
+      ordersCsvColumns(t, (typeId) => snapshot?.typeNames.get(typeId) ?? `Type #${typeId}`).map(
+        (column) => ({
+          header: column.header,
+          value: (row) => column.value(ordersByOrderId.get(row.orderId)!),
+        })
+      ),
+    [t, snapshot, ordersByOrderId]
+  );
+  const ordersExport = useTableExport({
+    surface: 'orders-open',
+    rows: csvRows,
+    columns: csvColumns,
+    source: 'rows',
+  });
 
   // Whoever has a floor on screen (same rows the floor column follows): each
   // note checks that character's own grant, since each floor prices with
@@ -523,10 +547,6 @@ export function OpenOrdersPanel() {
 
   const skipped = snapshot.openOrders.skipped;
 
-  const csvOrders = visibleRows
-    .map((r) => ordersByOrderId.get(r.orderId))
-    .filter((o): o is MarketOrder => o !== undefined);
-
   // The modal loads what the order needs as it opens (`useOpenOrderDetail`).
   function openDetails(row: OpenOrderRow) {
     setDetailOrderId(row.orderId);
@@ -626,13 +646,7 @@ export function OpenOrdersPanel() {
             label={t('market.orders.refreshOrders')}
             onClick={refresh}
           />
-          <IconButton
-            size="sm"
-            icon={<Icon.Download />}
-            label={t('orders.exportCsvOpen')}
-            disabled={csvOrders.length === 0}
-            onClick={() => downloadCsv('orders-open', csvOrders, ordersCsvColumns(t, nameFor))}
-          />
+          <TableActionsMenu name={t('market.orders.tableName')} tableExport={ordersExport} />
           {oldestFetchedAt !== null && <DataAgeBadge date={new Date(oldestFetchedAt)} />}
         </span>
       }
@@ -1064,6 +1078,7 @@ export function OpenOrdersPanel() {
                     />
                   ) : (
                     <DataTable
+                      {...ordersExport.tableProps}
                       columns={visibleColumns}
                       rows={group.rows}
                       rowKey={(row) => row.orderId}

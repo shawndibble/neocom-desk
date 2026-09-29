@@ -1,3 +1,5 @@
+import { formatDateTime, guardFormula, toCell, type ExportValue } from './exportCells';
+
 /**
  * CSV serializer (RFC 4180 + Excel formula-injection guard). No library: none
  * surveyed handle the BOM or the formula-injection sanitization, so the hard
@@ -13,36 +15,32 @@ export type CsvTranslate = (key: string, options?: Record<string, unknown>) => s
 
 export interface CsvColumn<T> {
   header: string;
-  value: (row: T) => string | number | null | undefined;
+  value: (row: T) => ExportValue;
 }
 
 const BOM = '\uFEFF';
 const DELIMITER = ',';
 
 /**
- * Excel/Sheets treat a leading =, +, -, @, TAB or CR as a formula trigger.
- * Leading whitespace is skipped rather than trusted — " =cmd" is the obvious
- * way round a first-character-only check.
+ * Every text field is quoted, not just the ones holding a delimiter: an
+ * importer left splitting on spaces or semicolons (OpenOffice's Text Import
+ * dialog remembers its last separator) then still keeps "Cap Booster 200" in
+ * one cell. Numbers and dates stay bare — a quoted value lands as text, and
+ * the point of those columns is that they sort and sum. See `exportCells.ts`
+ * for how a value's kind is decided.
  */
-const FORMULA_PREFIX_RE = /^\s*[=+\-@]|^[\t\r]/;
-
-/** Delimiter, quote, CR, or LF anywhere in the field forces quoting. */
-const NEEDS_QUOTING_RE = /["\r\n,]/;
-
-function quoteIfNeeded(field: string): string {
-  return NEEDS_QUOTING_RE.test(field) ? `"${field.replace(/"/g, '""')}"` : field;
-}
-
-/**
- * `number` is emitted bare: it cannot carry a formula, and quote-prefixing
- * would land every ISK column in the spreadsheet as text. The `typeof` is the
- * seam, so a value that arrives as a string despite its declared type still
- * gets sanitized.
- */
-function renderField(value: string | number | null | undefined): string {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'number') return String(value);
-  return quoteIfNeeded(FORMULA_PREFIX_RE.test(value) ? `'${value}` : value);
+function renderField(value: ExportValue): string {
+  const cell = toCell(value);
+  switch (cell.kind) {
+    case 'empty':
+      return '';
+    case 'number':
+      return String(cell.value);
+    case 'date':
+      return formatDateTime(cell.value);
+    case 'text':
+      return `"${guardFormula(cell.value).replace(/"/g, '""')}"`;
+  }
 }
 
 export function toCsv<T>(rows: readonly T[], columns: readonly CsvColumn<T>[]): string {
@@ -64,10 +62,20 @@ export function toCsv<T>(rows: readonly T[], columns: readonly CsvColumn<T>[]): 
  * must never hand out a file that looks complete just because it opens fine.
  */
 export function csvFilename(base: string, date: Date, options?: { partial?: boolean }): string {
+  return exportFilename(base, date, 'csv', options);
+}
+
+/** `csvFilename`'s convention for any export format (`xlsx`, …). */
+export function exportFilename(
+  base: string,
+  date: Date,
+  extension: string,
+  options?: { partial?: boolean }
+): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   const stamp = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   const suffix = options?.partial ? '-partial' : '';
-  return `neocom-${base}-${stamp}${suffix}.csv`;
+  return `neocom-${base}-${stamp}${suffix}.${extension}`;
 }
 
 /**

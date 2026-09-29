@@ -14,6 +14,8 @@ import {
   Checkbox,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import {
   compareFittingStats,
   compareWindow,
@@ -44,6 +46,11 @@ import { useDamageProfiles } from '@/features/fittings/damageProfiles';
 import { TargetProfilePicker } from '@/features/fittings/TargetProfilePicker';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
+import {
+  fittingCompareCsvColumns,
+  fittingCompareModulesCsvColumns,
+} from '@/features/fittings/fittingCompareCsv';
+import { useModuleDiffNames } from '@/features/fittings/useModuleDiffNames';
 
 /**
  * Fitting vs Fitting compare: up to three Fittings, entirely in the URL
@@ -139,6 +146,43 @@ export function FittingCompare() {
     const position = okSlots.indexOf(index);
     return position === -1 ? null : position;
   };
+
+  // Exports hold every Fitting, not the phone pager's window, and the rows
+  // the Differences-only toggle leaves on screen. Raw tables, so `source: 'rows'`.
+  const csvFittings = useMemo(
+    () =>
+      slots.map((slot, index) => {
+        const position = okSlots.indexOf(index);
+        return {
+          name: slot?.fitting?.name ?? '',
+          statsIndex: position === -1 ? null : position,
+        };
+      }),
+    [slots, okSlots]
+  );
+  const statsCsvColumns = useMemo(() => fittingCompareCsvColumns(t, csvFittings), [t, csvFittings]);
+  const statsCsvRows = useMemo(
+    () =>
+      table ? (showDifferencesOnly ? table.rows.filter((row) => row.differs) : table.rows) : [],
+    [table, showDifferencesOnly]
+  );
+  const statsExport = useTableExport({
+    surface: 'fitting-compare',
+    rows: statsCsvRows,
+    columns: statsCsvColumns,
+    source: 'rows',
+  });
+  const moduleNames = useModuleDiffNames(moduleDiffs);
+  const modulesCsvColumns = useMemo(
+    () => fittingCompareModulesCsvColumns(t, moduleNames, csvFittings),
+    [t, moduleNames, csvFittings]
+  );
+  const modulesExport = useTableExport({
+    surface: 'fitting-compare-modules',
+    rows: moduleDiffs,
+    columns: modulesCsvColumns,
+    source: 'rows',
+  });
 
   function headerFor(index: number) {
     const slot = slots[index];
@@ -328,12 +372,25 @@ export function FittingCompare() {
             </Panel>
           ) : (
             <>
-              <Panel title={t('fittings.compare.statsTitle')}>
-                <FittingCompareTable
-                  rows={table!.rows}
-                  columns={columns}
-                  differencesOnly={showDifferencesOnly}
-                />
+              <Panel
+                title={t('fittings.compare.statsTitle')}
+                actions={
+                  statsCsvRows.length > 0 && (
+                    <TableActionsMenu
+                      name={t('fittings.compare.statsTitle')}
+                      tableExport={statsExport}
+                    />
+                  )
+                }
+              >
+                {/* The column headers' Fitting menus grow "Export table" too. */}
+                <TableExportProvider tableExport={statsExport}>
+                  <FittingCompareTable
+                    rows={table!.rows}
+                    columns={columns}
+                    differencesOnly={showDifferencesOnly}
+                  />
+                </TableExportProvider>
                 {!pricesReady && (
                   <p className="mt-2 text-xs text-text-dim">
                     {anyPriceFailed
@@ -344,7 +401,17 @@ export function FittingCompare() {
                 <p className="mt-2 text-xs text-text-dim">{t('fittings.appliedDps.assumptions')}</p>
               </Panel>
               {okSlots.length >= 2 && (
-                <Panel title={t('fittings.compare.modulesTitle')}>
+                <Panel
+                  title={t('fittings.compare.modulesTitle')}
+                  actions={
+                    moduleDiffs.length > 0 && (
+                      <TableActionsMenu
+                        name={t('fittings.compare.modulesTitle')}
+                        tableExport={modulesExport}
+                      />
+                    )
+                  }
+                >
                   <FittingCompareModulesSummary entries={moduleDiffs} columns={columns} />
                 </Panel>
               )}

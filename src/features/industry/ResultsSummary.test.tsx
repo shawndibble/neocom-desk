@@ -437,7 +437,7 @@ describe('ResultsSummary: use or sell the owned materials', () => {
 
   it('breaks the sale down per material behind a disclosure', async () => {
     renderSummary({ ownedSale: OWNED_SALE });
-    await userEvent.click(screen.getByRole('button', { name: /per material/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^per material(?! actions)/i }));
 
     expect(screen.getByRole('cell', { name: 'Tritanium' })).toBeTruthy();
     expect(screen.getByRole('cell', { name: '100' })).toBeTruthy();
@@ -477,7 +477,7 @@ describe('ResultsSummary: item actions button (issue #1498)', () => {
 
   it('renders a "More actions" button per owned-sale row', async () => {
     renderSummary({ ownedSale: OWNED_SALE, itemActionsFor });
-    await userEvent.click(screen.getByRole('button', { name: /per material/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^per material(?! actions)/i }));
 
     expect(screen.getByRole('button', { name: 'More actions for Tritanium' })).toBeInTheDocument();
   });

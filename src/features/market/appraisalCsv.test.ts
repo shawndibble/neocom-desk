@@ -33,12 +33,12 @@ describe('appraisalCsvColumns', () => {
   it('emits raw numbers, not formatted strings', () => {
     const csv = toCsv([row({ buyEach: 4.869, buyTotal: 606190.5 })], appraisalCsvColumns(t));
     const fields = csv.split('\r\n')[1].split(',');
-    expect(fields).toEqual(['100', 'Tritanium', '4.869', '6', '606190.5', '600']);
+    expect(fields).toEqual(['100', '"Tritanium"', '4.869', '6', '606190.5', '600']);
   });
 
   it('exports an unpriced side empty rather than as zero', () => {
     const csv = toCsv([row({ buyEach: null, buyTotal: null })], appraisalCsvColumns(t));
     const fields = csv.split('\r\n')[1].split(',');
-    expect(fields).toEqual(['100', 'Tritanium', '', '6', '', '600']);
+    expect(fields).toEqual(['100', '"Tritanium"', '', '6', '', '600']);
   });
 });

@@ -28,7 +28,6 @@ import {
   EmptyState,
   FilterBar,
   FilterField,
-  IconButton,
   Panel,
   SearchInput,
   Select,
@@ -40,7 +39,8 @@ import {
   type DataTableColumn,
   type DataTableSort,
 } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import {
@@ -54,7 +54,6 @@ import {
   walletTransactionsCsvColumns,
 } from '@/features/character/walletTransactionsCsv';
 import { iskToneClass } from '@/features/character/format';
-import { downloadCsv } from '@/lib/downloadCsv';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import type { CachedResult } from '@/esi/cache';
@@ -265,6 +264,15 @@ export function CorpTransactionsPanel({
     [columns, isVisible]
   );
 
+  const csvColumns = useMemo(() => walletTransactionsCsvColumns(t, nameFor), [t, nameFor]);
+  const tableExport = useTableExport({
+    surface: 'corp-wallet-transactions',
+    rows: filteredTransactions,
+    columns: csvColumns,
+    truncated: transactionsResult?.truncated ?? false,
+    qualifier: divisionQualifier,
+  });
+
   return (
     <Panel
       padded={false}
@@ -272,24 +280,7 @@ export function CorpTransactionsPanel({
       actions={
         transactionsResult ? (
           <span className="flex items-center gap-2">
-            <IconButton
-              size="sm"
-              icon={<Icon.Download />}
-              label={t('wallet.exportCsvTransactions')}
-              disabled={filteredTransactions.length === 0}
-              onClick={() =>
-                downloadCsv(
-                  'corp-wallet-transactions',
-                  // Newest first, the order the table opens in — the export
-                  // sorts its own copy because it bypasses `DataTable`.
-                  [...filteredTransactions].sort((a, b) => b.date.localeCompare(a.date)),
-                  walletTransactionsCsvColumns(t, nameFor),
-                  new Date(),
-                  transactionsResult.truncated,
-                  divisionQualifier
-                )
-              }
-            />
+            <TableActionsMenu name={t('wallet.transactionsTab')} tableExport={tableExport} />
             <DataAgeBadge date={transactionsResult.fetchedAt} />
           </span>
         ) : undefined
@@ -360,6 +351,7 @@ export function CorpTransactionsPanel({
             />
           ) : (
             <DataTable
+              {...tableExport.tableProps}
               label={t('wallet.transactionsTab')}
               columns={shownColumns}
               rows={filteredTransactions}

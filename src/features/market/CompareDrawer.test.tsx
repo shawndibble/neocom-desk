@@ -7,6 +7,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
+import * as download from '@/lib/download';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadSkills } from '@/sde/loadSde';
 import { useCompareSet } from './compareSet';
@@ -300,7 +301,7 @@ describe('CompareDrawer', () => {
     expect(region).toHaveStyle({ height: '380px' });
   });
 
-  it('switches to the Attributes view and shows the dogma matrix, hiding the CSV export', async () => {
+  it('switches to the Attributes view and shows the dogma matrix, swapping the export menu to it', async () => {
     const user = userEvent.setup();
     act(() => useCompareSet.setState({ items: [ITEM_A, ITEM_B] }));
     renderDrawer();
@@ -312,10 +313,32 @@ describe('CompareDrawer', () => {
     expect(await within(region).findByText('Structure Hitpoints')).toBeInTheDocument();
     expect(within(region).getByText('Worth')).toBeInTheDocument();
     expect(within(region).getByText('Estimated Price')).toBeInTheDocument();
-    expect(within(region).queryByLabelText('Export Compare Set to CSV')).not.toBeInTheDocument();
+    expect(
+      within(region).queryByRole('button', { name: 'Prices actions' })
+    ).not.toBeInTheDocument();
+
+    // One export for the whole matrix, every category in one file.
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    fireEvent.pointerDown(within(region).getByRole('button', { name: 'Attributes actions' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
+    await user.keyboard('{ArrowRight}');
+    (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(spy).toHaveBeenCalledOnce());
+    expect(spy.mock.calls[0][0]).toMatch(/^neocom-market-compare-attributes-/);
+    const csv = spy.mock.calls[0][1] as string;
+    expect(csv).toContain('"Estimated Price"');
+    expect(csv).toContain('"Structure Hitpoints"');
+    spy.mockRestore();
 
     await user.click(within(region).getByRole('button', { name: 'Prices' }));
-    expect(within(region).getByLabelText('Export Compare Set to CSV')).toBeInTheDocument();
+    expect(within(region).getByRole('button', { name: 'Prices actions' })).toBeInTheDocument();
+    expect(
+      within(region).queryByRole('button', { name: 'Attributes actions' })
+    ).not.toBeInTheDocument();
     expect(within(region).queryByText('Structure Hitpoints')).not.toBeInTheDocument();
   });
 

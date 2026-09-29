@@ -6,7 +6,7 @@
  * plan was open before compare mode started (CONTEXT.md round 25's two-pane
  * idiom: this is a state of the detail pane, not a separate route).
  */
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { Button, DataTable, InfoTooltip, IskAmount, Panel } from '@/components/ui';
@@ -21,6 +21,9 @@ import type { BlueprintCatalog } from './blueprintCatalog';
 import { formatPercent } from './format';
 import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBuildResults';
 import type { BuildPlanPricingInputs } from './buildPlanPricingInputs';
+import { buildPlanCompareCsvColumns } from './buildPlanCompareCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 
 interface BuildPlanCompareProps {
   plans: readonly BuildPlanRecord[];
@@ -96,6 +99,12 @@ export function BuildPlanCompare({
     pricingInputs,
   });
   const unknown = t('common.unknown');
+  const csvColumns = useMemo(() => buildPlanCompareCsvColumns(t), [t]);
+  const compareExport = useTableExport({
+    surface: 'build-plan-compare',
+    rows,
+    columns: csvColumns,
+  });
 
   const columns: DataTableColumn<ComparedBuildRow>[] = [
     {
@@ -218,14 +227,18 @@ export function BuildPlanCompare({
     <Panel
       title={t('industry.compareTitle')}
       actions={
-        <Button size="sm" onClick={onDone}>
-          {t('industry.compareDone')}
-        </Button>
+        <span className="flex items-center gap-2">
+          <TableActionsMenu name={t('industry.compareTitle')} tableExport={compareExport} />
+          <Button size="sm" onClick={onDone}>
+            {t('industry.compareDone')}
+          </Button>
+        </span>
       }
     >
       <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
       <div className="overflow-x-auto">
         <DataTable
+          {...compareExport.tableProps}
           columns={columns}
           rows={rows}
           rowKey={(row) => row.planId}

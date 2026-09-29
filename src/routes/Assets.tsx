@@ -65,8 +65,9 @@ import { useFocusHeading } from '@/lib/useFocusHeading';
 import type { CharacterAsset } from '@/esi/endpoints';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
-import { downloadCsv } from '@/lib/downloadCsv';
-import { assetCsvRows, assetsCsvColumns } from '@/features/character/assetsCsv';
+import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
+import type { TableExport } from '@/components/ui/useTableExport';
+import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/character/assetsCsv';
 import { getAdjustedPrices } from '@/market/prices';
 import { formatIsk, parseIskAmount } from '@/lib/isk';
 import {
@@ -231,19 +232,6 @@ function matchAssets(
     matches.push({ asset, name });
   }
   return matches;
-}
-
-/** Whether `matchAssets` would find anything — short-circuits, and builds no match list, for a cheap per-render check. */
-function hasAssetMatch(
-  assets: readonly CharacterAsset[],
-  typeNames: ReadonlyMap<number, string>,
-  query: string
-): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return assets.length > 0;
-  return assets.some((asset) =>
-    (typeNames.get(asset.type_id) ?? `Type #${asset.type_id}`).toLowerCase().includes(q)
-  );
 }
 
 /** An `AssetMatch` with its estimated value precomputed once, rather than re-derived by every sort comparison. */
@@ -816,14 +804,9 @@ export function Assets() {
   // regardless of the cross-character toggle — exporting another Character's
   // items without a character column would misattribute them.
   //
-  // The grouped/sorted rows are built only when the export actually runs —
-  // matching every asset and locale-sorting on each data/search change was waste
-  // for a button that is rarely pressed. The button's enabled state only
-  // needs to know whether anything would be exported.
-  const hasCsvRows = useMemo(
-    () => hasAssetMatch(assetsResult?.data ?? [], typeNames, debouncedSearch),
-    [assetsResult, typeNames, debouncedSearch]
-  );
+  // The grouped/sorted rows are built only when the export actually runs
+  // (`assetsExport.getRows` below) — matching every asset and locale-sorting
+  // on each data/search change was waste for a menu that is rarely opened.
   function buildCsvGroups() {
     const csvAssetsByItemId = new Map(
       (assetsResult?.data ?? []).map((asset) => [asset.item_id, asset])
@@ -1457,9 +1440,14 @@ export function Assets() {
     setSelectedIds(new Set());
   }
 
-  function handleExportCsv() {
-    downloadCsv(
-      'assets',
+  // Not `useTableExport`: this list isn't a DataTable, and `getRows` builds
+  // the grouped rows lazily, only when an export actually runs.
+  const assetsCsvColumnList = useMemo(() => assetsCsvColumns(t), [t]);
+  const assetsExport: TableExport<AssetCsvRow> = {
+    surface: 'assets',
+    columns: assetsCsvColumnList,
+    truncated: assetsTruncated,
+    getRows: () =>
       assetCsvRows(
         buildCsvGroups().map((group) => ({
           label: group.label,
@@ -1469,11 +1457,7 @@ export function Assets() {
           })),
         }))
       ),
-      assetsCsvColumns(t),
-      new Date(),
-      assetsTruncated
-    );
-  }
+  };
 
   const assetItemActions = useMemo<AssetItemActions>(
     () => ({
@@ -1565,12 +1549,7 @@ export function Assets() {
                   pressed={selectMode}
                   onClick={toggleSelectMode}
                 />
-                <IconButton
-                  icon={<Icon.Download />}
-                  label={t('assets.exportCsv')}
-                  disabled={!hasCsvRows}
-                  onClick={handleExportCsv}
-                />
+                <TableActionsMenu name={t('assets.title')} tableExport={assetsExport} size="md" />
                 <IconButton
                   icon={<Icon.Refresh />}
                   label={t('assets.refresh')}
@@ -1890,46 +1869,48 @@ export function Assets() {
                       role="presentation"
                       style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
                     >
-                      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                        const row = rows[virtualRow.index];
-                        return (
-                          <div
-                            key={virtualRow.key}
-                            data-index={virtualRow.index}
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              transform: `translateY(${virtualRow.start}px)`,
-                            }}
-                          >
-                            <BrowseRowView
-                              row={row}
-                              t={t}
-                              typeNames={mergedTypeNames}
-                              characterBadges={characterBadges}
-                              selectMode={selectMode}
-                              selectedIds={selectedIds}
-                              onToggleSelection={toggleNodeSelection}
-                              stationLabelFor={stationLabelFor}
-                              nodeLabel={nodeLabel}
-                              locationNames={mergedLocationNames}
-                              securityForStation={securityForStation}
-                              jumpsAwayFor={(locationId) =>
-                                jumpsAwayByKey.get(`${locationId}:${routePreference}`)
-                              }
-                              pinStateFor={pinStateFor}
-                              onTogglePin={(locationId) => void handleTogglePin(locationId)}
-                              pathStationId={pathStationId}
-                              pathSegments={pathSegments}
-                              trailFor={trailFor}
-                              rootStationIdFor={rootStationIdFor}
-                              query={query}
-                            />
-                          </div>
-                        );
-                      })}
+                      <TableExportProvider tableExport={assetsExport}>
+                        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                          const row = rows[virtualRow.index];
+                          return (
+                            <div
+                              key={virtualRow.key}
+                              data-index={virtualRow.index}
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                transform: `translateY(${virtualRow.start}px)`,
+                              }}
+                            >
+                              <BrowseRowView
+                                row={row}
+                                t={t}
+                                typeNames={mergedTypeNames}
+                                characterBadges={characterBadges}
+                                selectMode={selectMode}
+                                selectedIds={selectedIds}
+                                onToggleSelection={toggleNodeSelection}
+                                stationLabelFor={stationLabelFor}
+                                nodeLabel={nodeLabel}
+                                locationNames={mergedLocationNames}
+                                securityForStation={securityForStation}
+                                jumpsAwayFor={(locationId) =>
+                                  jumpsAwayByKey.get(`${locationId}:${routePreference}`)
+                                }
+                                pinStateFor={pinStateFor}
+                                onTogglePin={(locationId) => void handleTogglePin(locationId)}
+                                pathStationId={pathStationId}
+                                pathSegments={pathSegments}
+                                trailFor={trailFor}
+                                rootStationIdFor={rootStationIdFor}
+                                query={query}
+                              />
+                            </div>
+                          );
+                        })}
+                      </TableExportProvider>
                     </div>
                   </div>
                 )}

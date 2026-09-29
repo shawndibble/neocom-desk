@@ -25,12 +25,19 @@ import {
   IskAmount,
   type DataTableColumn,
 } from '@/components/ui';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import type { OreLineValuation } from '@/engine/miningTax/yieldValuation';
 import type { MiningYieldRow } from './yieldSnapshot';
 import { sumVolume } from './volume';
 import { VolumeDisplay } from './volumeDisplay';
+import {
+  yieldOreCsvColumns,
+  yieldRefinesCsvColumns,
+  type YieldRefinedRow as RefinedRow,
+} from './yieldCsv';
 
 interface YieldDetailModalProps {
   open: boolean;
@@ -46,19 +53,21 @@ interface YieldDetailModalProps {
   showRefining: boolean;
 }
 
-interface RefinedRow {
-  typeId: number;
-  quantity: number;
-  /** Null when ESI had no mined-date history for this material — never a zero standing in for "free". */
-  value: number | null;
-}
-
 const CARD = 'rounded-xs border bg-panel-2 p-2.5';
 /** Marks the exit worth more — a recommendation, not decoration, so accent is
  *  in bounds per DESIGN.md §6. Same treatment as `BuildGroupPanel`'s best row. */
 const CARD_SUGGESTED = 'border-accent-dim bg-accent/5';
 const CARD_LABEL = 'text-[0.6875rem] font-semibold tracking-widest uppercase';
 const CARD_HINT = 'mt-0.5 text-[0.6875rem] text-text-dim';
+/**
+ * A table's title strip: the title, with that table's ⋯ menu at the right.
+ * The menu's negative margin keeps the strip the height of the plain
+ * "How this is priced" one, with or without a menu in it.
+ */
+const TABLE_TITLE =
+  'flex items-center justify-between gap-2 border-b border-line bg-panel-2 py-1.5 pr-1 pl-2.5';
+const TABLE_TITLE_TEXT = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const TABLE_TITLE_MENU = '-my-1.5 flex';
 
 /**
  * Which exit this line was worth more through, or null when the two tie or
@@ -133,6 +142,24 @@ export function YieldDetailModal({
       })
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0) || b.quantity - a.quantity);
   }, [valuation, row.materialUnitPrices]);
+
+  const oreCsvColumns = useMemo(
+    () => yieldOreCsvColumns(t, typeNames, typeVolumes, showRefining),
+    [t, typeNames, typeVolumes, showRefining]
+  );
+  const oreExport = useTableExport({
+    surface: 'mining-yield-ores',
+    rows: valuation.lines,
+    columns: oreCsvColumns,
+    qualifier: entry.date,
+  });
+  const refinesCsvColumns = useMemo(() => yieldRefinesCsvColumns(t, typeNames), [t, typeNames]);
+  const refinesExport = useTableExport({
+    surface: 'mining-yield-refines',
+    rows: refinedRows,
+    columns: refinesCsvColumns,
+    qualifier: entry.date,
+  });
 
   const oreColumns: DataTableColumn<OreLineValuation>[] = [
     {
@@ -381,15 +408,22 @@ export function YieldDetailModal({
 
         <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr]">
           <div className="overflow-hidden rounded-xs border border-line">
-            <p className="border-b border-line bg-panel-2 px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('miningTax.overview.detail.oreMinedTitle')}
-            </p>
+            <div className={TABLE_TITLE}>
+              <p className={TABLE_TITLE_TEXT}>{t('miningTax.overview.detail.oreMinedTitle')}</p>
+              <span className={TABLE_TITLE_MENU}>
+                <TableActionsMenu
+                  name={t('miningTax.overview.detail.oreMinedTitle')}
+                  tableExport={oreExport}
+                />
+              </span>
+            </div>
             {/* `overflow-hidden` above is what rounds the corners, so it
                 cannot scroll — the table gets its own scroller, per
                 DESIGN.md §4a. Between `sm` and `lg` these five columns are
                 un-stacked in a narrow box and would otherwise clip. */}
             <div className="overflow-x-auto">
               <DataTable
+                {...oreExport.tableProps}
                 columns={oreColumns}
                 rows={valuation.lines}
                 rowKey={(line) => line.typeId}
@@ -407,9 +441,19 @@ export function YieldDetailModal({
           <div className="space-y-3">
             {showRefining && (
               <div className="overflow-hidden rounded-xs border border-line">
-                <p className="border-b border-line bg-panel-2 px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('miningTax.overview.detail.refinesIntoTitle')}
-                </p>
+                <div className={TABLE_TITLE}>
+                  <p className={TABLE_TITLE_TEXT}>
+                    {t('miningTax.overview.detail.refinesIntoTitle')}
+                  </p>
+                  {refinedRows.length > 0 && (
+                    <span className={TABLE_TITLE_MENU}>
+                      <TableActionsMenu
+                        name={t('miningTax.overview.detail.refinesIntoTitle')}
+                        tableExport={refinesExport}
+                      />
+                    </span>
+                  )}
+                </div>
                 {refinedRows.length === 0 ? (
                   <p className="px-2.5 py-2 text-xs text-text-dim">
                     {t('miningTax.overview.detail.refinesIntoNone')}
@@ -417,6 +461,7 @@ export function YieldDetailModal({
                 ) : (
                   <div className="overflow-x-auto">
                     <DataTable
+                      {...refinesExport.tableProps}
                       columns={refinedColumns}
                       rows={refinedRows}
                       rowKey={(material) => material.typeId}

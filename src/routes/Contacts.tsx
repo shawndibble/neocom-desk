@@ -41,7 +41,8 @@ import {
 } from './contactsColumns';
 import { GrantBanner } from '@/app/GrantNote';
 import { contactLabelNames, loadContactLabels, loadContacts } from '@/features/character/contacts';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport, type UseTableExport } from '@/components/ui/useTableExport';
 import { contactsAcrossCsvColumns, contactsCsvColumns } from '@/features/character/contactsCsv';
 import {
   ALL_CONTACT_TYPES,
@@ -375,10 +376,12 @@ interface AcrossCharactersPanelProps {
   /** Reports the count up on every change, so the lifted chip can badge it — the `ContractSearchPanel`/`onStatusChange` pattern. */
   onDisagreementCountChange: (count: number) => void;
   isColumnVisible: (id: ContactsAcrossColumnId) => boolean;
-  /** Reports the currently filtered rows up (export order, not the table's own sort — same as `CorpMembers`' own export), so the page header's CSV export (issue #2164) can read this tab's own rows without owning its fetch/merge state. */
+  /** Reports the currently filtered rows up, so the page header's export (issue #2164) can read this tab's own rows without owning its fetch/merge state. The export itself reads them in the table's on-screen sort. */
   onVisibleRowsChange: (rows: readonly AcrossCharactersRow[]) => void;
   /** Reports whether any list behind the current merge is truncated, so the CSV export's filename can carry the same "-partial" suffix the Character tab's own truncated export does. */
   onTruncatedChange: (truncated: boolean) => void;
+  /** The page header's ⋯ export for this tab, so the table's row menus export the same rows. */
+  tableExport: UseTableExport<AcrossCharactersRow>;
 }
 
 /**
@@ -399,6 +402,7 @@ function AcrossCharactersPanel({
   isColumnVisible,
   onVisibleRowsChange,
   onTruncatedChange,
+  tableExport,
 }: AcrossCharactersPanelProps) {
   const { t } = useTranslation();
   const [fetched, setFetched] = useState<readonly CharacterContactList[] | null>(null);
@@ -559,6 +563,7 @@ function AcrossCharactersPanel({
         />
       ) : (
         <DataTable
+          {...tableExport.tableProps}
           label={t('contacts.acrossLabel')}
           columns={columns}
           rows={visibleRows}
@@ -884,6 +889,28 @@ export function Contacts() {
       />
     );
 
+  // One ⋯ in the page header, exporting whichever tab's table is showing —
+  // each tab keeps its own surface so the two files never share a name.
+  const characterCsvColumns = useMemo(
+    () => contactsCsvColumns(t, contactNames, affiliationRows),
+    [t, contactNames, affiliationRows]
+  );
+  const characterExport = useTableExport({
+    surface: 'contacts',
+    rows: filteredContacts,
+    columns: characterCsvColumns,
+    truncated: contactsTruncated,
+  });
+  const acrossCsvColumns = useMemo(
+    () => contactsAcrossCsvColumns(t, contactNames),
+    [t, contactNames]
+  );
+  const acrossExport = useTableExport({
+    surface: 'contacts-across',
+    rows: acrossVisibleRows,
+    columns: acrossCsvColumns,
+    truncated: acrossTruncated,
+  });
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -900,30 +927,19 @@ export function Contacts() {
         meta={contactsResult && <DataAgeBadge date={contactsResult.fetchedAt} />}
         actions={
           <>
-            <IconButton
-              icon={<Icon.Download />}
-              label={t('contacts.exportCsv')}
-              disabled={
-                view === 'across' ? acrossVisibleRows.length === 0 : filteredContacts.length === 0
-              }
-              onClick={() =>
-                view === 'across'
-                  ? downloadCsv(
-                      'contacts-across',
-                      acrossVisibleRows,
-                      contactsAcrossCsvColumns(t, contactNames),
-                      new Date(),
-                      acrossTruncated
-                    )
-                  : downloadCsv(
-                      'contacts',
-                      filteredContacts,
-                      contactsCsvColumns(t, contactNames, affiliationRows),
-                      new Date(),
-                      contactsTruncated
-                    )
-              }
-            />
+            {view === 'across' ? (
+              <TableActionsMenu
+                name={t('contacts.tabAcrossCharacters')}
+                tableExport={acrossExport}
+                size="md"
+              />
+            ) : (
+              <TableActionsMenu
+                name={t('contacts.title')}
+                tableExport={characterExport}
+                size="md"
+              />
+            )}
             <IconButton
               icon={<Icon.Refresh />}
               label={t('contacts.refresh')}
@@ -976,6 +992,7 @@ export function Contacts() {
           isColumnVisible={acrossColumnVisibility.isVisible}
           onVisibleRowsChange={setAcrossVisibleRows}
           onTruncatedChange={setAcrossTruncated}
+          tableExport={acrossExport}
         />
       ) : contactsNeedsReauth ? (
         <GrantBanner
@@ -1021,6 +1038,7 @@ export function Contacts() {
             />
           ) : (
             <DataTable
+              {...characterExport.tableProps}
               label={t('contacts.title')}
               columns={columns}
               rows={filteredContacts}

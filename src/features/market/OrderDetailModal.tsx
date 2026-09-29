@@ -20,9 +20,11 @@
  *   `deriveSystemId`) — which must render as "not checked" too, never as
  *   "checked, clean".
  */
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, InfoTooltip, Disclosure } from '@/components/ui';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { cx } from '@/lib/cx';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { Link } from 'react-router-dom';
@@ -54,6 +56,7 @@ import { roundPriceUp } from '@/engine/market/priceTick';
 import { CopyablePrice } from './CopyablePrice';
 import { MarketItemLink } from './MarketItemLink';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
+import { scopeOrdersCsvColumns, type ScopeOrderCsvRow } from './scopeOrdersCsv';
 
 export interface OrderDetailModalProps {
   row: OpenOrderRow;
@@ -235,6 +238,47 @@ const SCOPE_PILL: Record<UndercutScope, string> = {
  */
 const CELL = 'border-t border-line px-2 py-1.5';
 
+type Translate = ReturnType<typeof useTranslation>['t'];
+
+function scopeLabelText(scope: UndercutScope, t: Translate): string {
+  return t(`market.orders.badge.undercut${scope[0].toUpperCase()}${scope.slice(1)}`);
+}
+
+/** Distance as words, the way `JumpsAwayText` renders it. */
+function jumpsText(jumps: JumpsAwayResult, t: Translate): string {
+  return jumps.kind === 'known'
+    ? t('assets.jumpsAway.value', { count: jumps.jumps })
+    : t('assets.jumpsAway.unknown');
+}
+
+/** One scope line of the grid as exported (`scopeOrdersCsv.ts`), mirroring `ScopeRow`. */
+function scopeCsvRow(
+  scope: UndercutScope,
+  state: ScopeState,
+  t: Translate,
+  where: { stationName?: string | null; distance?: string; jumps?: JumpsAwayResult }
+): ScopeOrderCsvRow {
+  const base = { scope: scopeLabelText(scope, t), price: null, gapIsk: null, gapPct: null };
+  if (state.kind !== 'rival') {
+    const seller =
+      state.kind === 'unavailable'
+        ? t('market.orders.structureMarketUnavailable')
+        : state.kind === 'notChecked'
+          ? t('market.orders.scopeNotChecked')
+          : t('market.orders.scopeClear');
+    return { ...base, seller, distance: null };
+  }
+  const { rival } = state;
+  return {
+    ...base,
+    seller: where.stationName ?? t('market.unknownStructure'),
+    price: rival.price,
+    gapIsk: rival.gapIsk,
+    gapPct: rival.gapPct,
+    distance: where.jumps ? jumpsText(where.jumps, t) : (where.distance ?? null),
+  };
+}
+
 function ScopeRow({
   scope,
   state,
@@ -259,7 +303,7 @@ function ScopeRow({
           SCOPE_PILL[scope]
         )}
       >
-        {t(`market.orders.badge.undercut${scope[0].toUpperCase()}${scope.slice(1)}`)}
+        {scopeLabelText(scope, t)}
       </span>
     </span>
   );
@@ -518,6 +562,38 @@ export function OrderDetailContent({
   // rather than a cheaper ask (#1733).
   const whoLabel = t(row.isBuyOrder ? 'market.orders.whoBidsHigher' : 'market.orders.whoIsCheaper');
 
+  // The grid below is a div table, not a DataTable, so it exports these rows
+  // as built — same order, own order last.
+  const scopeCsvRows: ScopeOrderCsvRow[] = [
+    scopeCsvRow('station', station, t, {
+      stationName: row.stationName,
+      distance: t('market.orders.scopeSameStation'),
+    }),
+    scopeCsvRow('system', system, t, {
+      stationName: system.kind === 'rival' ? stationNameFor(system.rival.locationId) : undefined,
+      distance: t('market.orders.scopeSameSystem'),
+    }),
+    scopeCsvRow('region', region, t, {
+      stationName: region.kind === 'rival' ? stationNameFor(region.rival.locationId) : undefined,
+      jumps: regionJumps,
+    }),
+    {
+      scope: t('market.orders.scopeMyOrder'),
+      seller: row.stationName ?? t('market.unknownStructure'),
+      price: row.price,
+      gapIsk: null,
+      gapPct: null,
+      distance: null,
+    },
+  ];
+  const scopeCsvColumns = useMemo(() => scopeOrdersCsvColumns(t), [t]);
+  const scopeExport = useTableExport({
+    surface: 'market-scope-orders',
+    rows: scopeCsvRows,
+    columns: scopeCsvColumns,
+    source: 'rows',
+  });
+
   // "The numbers" (issue #1428): the stat grid, past-expiry line inside its
   // own card, shared between the always-open desktop layout and the phone Disclosure.
   const numbersContent = (
@@ -748,9 +824,14 @@ export function OrderDetailContent({
             expanded={expandedSections.has('whoCheaper')}
             onToggle={() => toggleSection('whoCheaper')}
           >
-            <p className="px-2.5 pt-1.5 text-[0.6875rem] text-text-dim">
-              {t('market.orders.scopeTightestBites')}
-            </p>
+            {/* The Disclosure's own header is its toggle button, so the grid's ⋯
+                menu heads the panel it opens instead. */}
+            <div className="flex items-center justify-between gap-2 pr-1.5">
+              <p className="px-2.5 pt-1.5 text-[0.6875rem] text-text-dim">
+                {t('market.orders.scopeTightestBites')}
+              </p>
+              <TableActionsMenu name={whoLabel} tableExport={scopeExport} />
+            </div>
             {/*
             ONE grid for the whole table: header, every scope row and the
             player's own order all contribute cells to these tracks, so the

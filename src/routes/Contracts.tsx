@@ -68,7 +68,8 @@ import { useTicker } from '@/lib/ticker';
 import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { contractsCsvColumns } from '@/features/character/contractsCsv';
 import type { CharacterAffiliation, Contract } from '@/esi/endpoints';
 import { useRememberedPageTab } from '@/lib/usePageTab';
@@ -505,6 +506,16 @@ export function Contracts() {
     () => filterContracts(contracts, rowsFilter, issuerNames),
     [contracts, rowsFilter, issuerNames]
   );
+  const historyCsvColumns = useMemo(
+    () => contractsCsvColumns(t, (id) => issuerNames.get(id) ?? `#${id}`),
+    [t, issuerNames]
+  );
+  const historyExport = useTableExport({
+    surface: 'contracts',
+    rows: filteredContracts,
+    columns: historyCsvColumns,
+    truncated: contractsTruncated,
+  });
 
   if (!hydrated) {
     return (
@@ -520,7 +531,7 @@ export function Contracts() {
       {/* Both tabs read something datable and reloadable, but not the same
           thing: History is this character's own contract list, Search a shared
           public snapshot the panel below owns. So the badge and the Refresh
-          are per tab — the CSV export is History-only, because it exports that
+          are per tab — the ⋯ export menu is History-only, because it exports that
           character's contracts and nothing on Search corresponds to it. */}
       <PageHeader
         title={t('contracts.title')}
@@ -536,20 +547,7 @@ export function Contracts() {
         actions={
           tab === 'history' ? (
             <>
-              <IconButton
-                icon={<Icon.Download />}
-                label={t('contracts.exportCsv')}
-                disabled={filteredContracts.length === 0}
-                onClick={() =>
-                  downloadCsv(
-                    'contracts',
-                    filteredContracts,
-                    contractsCsvColumns(t, (id) => issuerNames.get(id) ?? `#${id}`),
-                    new Date(),
-                    contractsTruncated
-                  )
-                }
-              />
+              <TableActionsMenu name={t('contracts.title')} tableExport={historyExport} size="md" />
               <IconButton
                 icon={<Icon.Refresh />}
                 label={t('contracts.refresh')}
@@ -678,6 +676,7 @@ export function Contracts() {
             )
           ) : (
             <DataTable
+              {...historyExport.tableProps}
               label={t('contracts.title')}
               columns={columns}
               rows={filteredContracts}

@@ -44,6 +44,8 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import {
@@ -51,6 +53,7 @@ import {
   loyaltyStoreOffersColumnsStore,
   type LoyaltyStoreOffersColumnId,
 } from './loyaltyStoreColumns';
+import { loyaltyOfferCsvColumns, loyaltyOfferMaterialsCsvColumns } from './loyaltyStoreCsv';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, textParam } from '@/lib/urlState';
 import { formatIsk } from '@/lib/isk';
@@ -99,6 +102,8 @@ interface OfferDetailProps {
   onToggleUseOwnMaterials: () => void;
   onPlanInIndustry: (productTypeId: number) => void;
 }
+
+const EMPTY_MATERIALS: readonly ResolvedMaterial[] = [];
 
 function OfferDetail({
   row,
@@ -156,6 +161,19 @@ function OfferDetail({
     ],
     [t, catalog, hubId]
   );
+  const materialCsvColumns = useMemo(
+    () =>
+      loyaltyOfferMaterialsCsvColumns(t, (typeId) =>
+        catalog ? nameForType(catalog, typeId) : `#${typeId}`
+      ),
+    [t, catalog]
+  );
+  const materialsExport = useTableExport({
+    surface: 'lp-offer-materials',
+    rows: row.build?.materials ?? EMPTY_MATERIALS,
+    columns: materialCsvColumns,
+    qualifier: displayName,
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -307,14 +325,18 @@ function OfferDetail({
 
       {row.isBlueprint && row.build && (
         <div className="flex flex-col gap-2 border-t border-line pt-3">
-          <FilterChip
-            label={t('loyaltyStore.useOwnMaterials')}
-            selected={useOwnMaterials}
-            onToggle={onToggleUseOwnMaterials}
-          />
+          <div className="flex items-center justify-between gap-2">
+            <FilterChip
+              label={t('loyaltyStore.useOwnMaterials')}
+              selected={useOwnMaterials}
+              onToggle={onToggleUseOwnMaterials}
+            />
+            <TableActionsMenu name={t('loyaltyStore.materials')} tableExport={materialsExport} />
+          </div>
           <p className="text-[0.6875rem] text-text-dim">{t('loyaltyStore.useOwnMaterialsHint')}</p>
           <div className="overflow-x-auto">
             <DataTable
+              {...materialsExport.tableProps}
               label={t('loyaltyStore.materials')}
               columns={materialColumns}
               rows={row.build.materials}
@@ -529,10 +551,24 @@ export function LoyaltyStore() {
     'item',
     ...LOYALTY_STORE_OFFERS_COLUMN_IDS,
   ]);
+  // Every column, whatever the picker hides.
+  const offersCsvColumns = useMemo(() => loyaltyOfferCsvColumns(t), [t]);
+  const offersExport = useTableExport({
+    surface: 'lp-offers',
+    rows: filteredRows,
+    columns: offersCsvColumns,
+    qualifier: corpName ?? undefined,
+  });
 
   const list = (
     <Panel
       title={t('loyaltyStore.title')}
+      actions={
+        ready &&
+        filteredRows.length > 0 && (
+          <TableActionsMenu name={t('loyaltyStore.title')} tableExport={offersExport} />
+        )
+      }
       padded={false}
       className={isDesktop ? 'w-80 shrink-0' : undefined}
     >
@@ -566,6 +602,7 @@ export function LoyaltyStore() {
             />
           )}
           <DataTable
+            {...offersExport.tableProps}
             label={t('loyaltyStore.title')}
             columns={columns}
             rows={filteredRows}

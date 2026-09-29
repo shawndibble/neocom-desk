@@ -1327,7 +1327,6 @@
     "reauthTitle": "Log in again to see skills",
     "reauthHint": "Log in again to fetch this character's trained skills.",
     "reauthAction": "Log in again with EVE Online",
-    "exportCsv": "Export CSV",
     "csvGroup": "Group",
     "csvSkill": "Skill",
     "csvLevel": "Level",
@@ -1664,6 +1663,10 @@
     "groupColumnToggle": "Group column"
   },
   "industry": {
+    "csvCharacter": "Character",
+    "csvAvgMarginPct": "Avg margin (%)",
+    "csvMarginPct": "Margin (%)",
+    "csvTimeSeconds": "Time (seconds)",
     "title": "Build Plans",
     "moreActionsLabel": "More actions for {{name}}",
     "contextMenu": {
@@ -2130,8 +2133,6 @@
       "reaction": "Reaction",
       "unknown": "Activity #{{id}}"
     },
-    "exportCsvMaterials": "Export materials",
-    "exportCsvJobs": "Export jobs",
     "copyShoppingList": "Copy shopping list for multibuy",
     "copyShoppingListDone": "Shopping list copied",
     "copyShoppingListBlueprintsLeftOut_one": "{{count}} blueprint left out — buy it by contract",
@@ -2568,6 +2569,8 @@
     }
   },
   "characters": {
+    "csvPiExpires": "PI expires",
+    "csvTrainingFinishes": "Training finishes",
     "title": "Characters",
     "add": "Add character",
     "addLabel": "Add",
@@ -2810,6 +2813,15 @@
     "unknown": "—",
     "aboutLabel": "About {{label}}",
     "moreActionsLabel": "More actions for {{name}}",
+    "tableExport": {
+      "menuLabel": "{{name}} actions",
+      "exportTable": "Export table",
+      "csv": "Download CSV",
+      "xlsx": "Download Excel (.xlsx)",
+      "clipboard": "Copy for Google Sheets / Excel",
+      "copied": "Copied {{count}} rows",
+      "failed": "Export failed"
+    },
     "dataTable": {
       "sortBy": "Sort by",
       "sortLabel": "Sort: {{column}} {{arrow}}",
@@ -2883,8 +2895,6 @@
     "marginTooltip": "Sale total less the wallet buys it used up (oldest first) and its sales tax. Broker fees aren't taken off. A dash means no wallet buy covers it — stock you built, say — its tax isn't in your journal, or some of that item's stock came from outside this history.",
     "marginWorking": "Cost {{unitCost}} each from your wallet buys\nSales tax {{salesTax}}",
     "transactionsRange": "{{from}} – {{to}}",
-    "exportCsvJournal": "Export CSV",
-    "exportCsvTransactions": "Export CSV",
     "reauthTitle": "Log in again to see your wallet",
     "reauthHint": "Log in again to fetch this character's wallet balance.",
     "reauthAction": "Log in again with EVE Online",
@@ -3305,7 +3315,6 @@
     "inSpaceLabel": "In space (system #{{id}})",
     "inSpaceNamedLabel": "In space ({{name}})",
     "containerLabel": "Container",
-    "exportCsv": "Export CSV",
     "csvLocation": "Location",
     "csvItem": "Item",
     "csvQuantity": "Quantity",
@@ -3495,7 +3504,6 @@
     "responseNotResponded": "Not responded",
     "prevMonth": "Previous month",
     "nextMonth": "Next month",
-    "exportCsv": "Export CSV",
     "csvDate": "Date",
     "csvTitle": "Title",
     "csvResponse": "Response",
@@ -3598,6 +3606,7 @@
     "reauthAction": "Log in again with EVE Online"
   },
   "clones": {
+    "csvName": "Name",
     "title": "Clones",
     "refresh": "Refresh",
     "emptyTitle": "No jump clones cached",
@@ -3710,6 +3719,8 @@
     }
   },
   "piPlan": {
+    "csvExtractors": "Extractors",
+    "csvHubRead": "Hub read",
     "tabsLabel": "Planetary Industry views",
     "coloniesTab": "Colonies",
     "planTab": "Plan",
@@ -4072,6 +4083,7 @@
     "colonySlotLockedMax": "You are already running all {{total}} colonies a capsuleer can have."
   },
   "employmentHistory": {
+    "csvDurationDays": "Duration (days)",
     "title": "Employment",
     "refresh": "Refresh",
     "emptyTitle": "No employment history cached",
@@ -4100,7 +4112,6 @@
     "issued": "Issued",
     "expires": "Expires",
     "issuer": "Issuer",
-    "exportCsv": "Export CSV",
     "searchPlaceholder": "Search issuer or title…",
     "noFilterMatches": "No contracts match your filters.",
     "noFilterMatchesHint": "Clear the search or reset the status/type filters to see every contract.",
@@ -4280,7 +4291,6 @@
   "contacts": {
     "title": "Contacts",
     "refresh": "Refresh",
-    "exportCsv": "Export CSV",
     "csvYes": "yes",
     "csvNo": "no",
     "emptyTitle": "No contacts cached",
@@ -4364,6 +4374,8 @@
     "reauthAction": "Log in again with EVE Online"
   },
   "loyaltyStore": {
+    "csvIskCost": "ISK cost",
+    "csvLpCost": "LP cost",
     "back": "Loyalty Points",
     "title": "LP Store",
     "searchPlaceholder": "Search offers…",
@@ -4438,8 +4450,6 @@
     "searchPlaceholder": "Search by item…",
     "noResults": "No orders match your filters.",
     "noResultsHint": "Clear the search or reset the buy/sell and status filters to see every order.",
-    "exportCsvOpen": "Export CSV",
-    "exportCsvHistory": "Export CSV",
     "csvVolumeRemain": "Volume remaining",
     "csvVolumeTotal": "Volume total",
     "reauthTitle": "Log in again to see your orders",
@@ -4742,8 +4752,6 @@
     "selectPromptTitle": "Select an item",
     "selectPromptHint": "Search or browse the tree to see its live order book.",
     "backToFinder": "Back",
-    "exportCsvSell": "Export sell orders",
-    "exportCsvBuy": "Export buy orders",
     "loadFailedTitle": "Couldn't load the market catalogue",
     "loadFailedHint": "Press Refresh to try again.",
     "sell": "Sell Orders",
@@ -4982,7 +4990,6 @@
       "clear": "Clear",
       "resultTitle": "Appraisal",
       "atPercent": "{{pricePercent}}%",
-      "exportCsv": "Export appraisal as CSV",
       "share": "Copy Share Link",
       "shareCopied": "Share Link copied",
       "shareTooLarge": "Too large to share as a link — use Export CSV instead.",
@@ -5065,6 +5072,8 @@
       "movingAverage": "Moving average"
     },
     "compare": {
+      "unitColumn": "Unit",
+      "categoryColumn": "Category",
       "handle": "Compare ({{count}})",
       "title": "Compare",
       "columnItem": "Item",
@@ -5077,7 +5086,6 @@
       "pricesFrom": "Prices from {{place}}",
       "assumesBaseStandingsHint": "The after-fees figures use a broker fee calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
       "columnVolume": "Volume",
-      "exportCsv": "Export Compare Set to CSV",
       "remove": "Remove {{name}}",
       "clearAll": "Clear all",
       "expand": "Expand",
@@ -5119,8 +5127,7 @@
       "sell": "Sell",
       "buy": "Buy",
       "noOrders": "No orders",
-      "compare": "Compare",
-      "exportCsv": "Export Variations to CSV"
+      "compare": "Compare"
     },
     "itemDetail": {
       "volume": "Volume: {{volume}} m3",
@@ -5135,6 +5142,8 @@
       "errorHint": "Try again, or reload the page."
     },
     "orders": {
+      "tableName": "Open orders",
+      "scopeOverByPct": "I am over by (%)",
       "badge": {
         "belowFloor": "Below floor",
         "belowFloorHelp": "Your price is below what this cost you plus the fees, so every sale loses money.",
@@ -5979,7 +5988,6 @@
       "shipFilterAll": "Any ship",
       "locationFilterLabel": "Location",
       "locationFilterAll": "Any location",
-      "exportCsv": "Export CSV",
       "contextMenu": {
         "showInfo": "Show info",
         "copyName": "Copy name"

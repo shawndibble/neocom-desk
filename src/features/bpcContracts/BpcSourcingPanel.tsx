@@ -78,6 +78,9 @@ import {
 } from '@/features/bpcContracts/bpcSearchColumns';
 import { useSpaceFilter } from '@/features/bpcContracts/bpcSpaceFilterPref';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
+import { bpcSourcingCsvColumns } from '@/features/bpcContracts/bpcSourcingCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { BpoBadge } from '@/features/bpcContracts/BpoBadge';
 import { BpoCard } from '@/features/bpcContracts/BpoCard';
 import { useOfferLocations } from '@/features/contractSearch/offerLocations';
@@ -1406,6 +1409,28 @@ export function BpcSourcingPanel() {
     OFFERS_DEFAULT_SORT,
     columns.map((column) => column.id)
   );
+  // Item plus the visible columns, like the table itself.
+  const csvColumns = useMemo(
+    () =>
+      bpcSourcingCsvColumns(
+        t,
+        {
+          nameFor: (typeId) => blueprintNames.get(typeId) ?? `#${typeId}`,
+          regionName: (regionId) => regionNames.get(regionId) ?? `#${regionId}`,
+          jumpsFor: (row) => {
+            const cell = bpcRowJumps(row);
+            return cell.kind === 'value' ? cell.count : null;
+          },
+        },
+        visibleColumns
+      ),
+    [t, blueprintNames, regionNames, bpcRowJumps, visibleColumns]
+  );
+  const sourcingExport = useTableExport({
+    surface: 'bpc-sourcing',
+    rows: displayRows,
+    columns: csvColumns,
+  });
 
   if (!hydrated || activeCharacterId === null) {
     // No redirect of its own: the Industry route this sits in already sends a
@@ -1432,16 +1457,21 @@ export function BpcSourcingPanel() {
         )
       }
       actions={
-        <IconButton
-          icon={<Icon.Refresh />}
-          label={t('bpcContracts.refresh')}
-          size="sm"
-          onClick={() => {
-            refresh();
-            setMarketRefreshTick((tick) => tick + 1);
-          }}
-          disabled={loading}
-        />
+        <span className="flex items-center gap-2">
+          {displayRows.length > 0 && (
+            <TableActionsMenu name={t('bpcContracts.title')} tableExport={sourcingExport} />
+          )}
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('bpcContracts.refresh')}
+            size="sm"
+            onClick={() => {
+              refresh();
+              setMarketRefreshTick((tick) => tick + 1);
+            }}
+            disabled={loading}
+          />
+        </span>
       }
     >
       {loading && !data ? (
@@ -1712,6 +1742,7 @@ export function BpcSourcingPanel() {
           ) : (
             <>
               <DataTable
+                {...sourcingExport.tableProps}
                 label={t('bpcContracts.title')}
                 columns={columns}
                 rows={displayRows}

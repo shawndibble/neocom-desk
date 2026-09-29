@@ -13,7 +13,12 @@ export function downloadTextFile(
   text: string,
   mimeType = 'text/csv;charset=utf-8'
 ): void {
-  const url = URL.createObjectURL(new Blob([text], { type: mimeType }));
+  downloadBlob(filename, new Blob([text], { type: mimeType }));
+}
+
+/** `downloadTextFile` for any content — the binary xlsx export goes through here. */
+export function downloadBlob(filename: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob);
   let anchor: HTMLAnchorElement | undefined;
   try {
     anchor = document.createElement('a');

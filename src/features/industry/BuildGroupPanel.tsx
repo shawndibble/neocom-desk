@@ -66,6 +66,9 @@ import { hasShoppingList, shoppingListText } from './shoppingList';
 import { useComparedBuildResults } from './useComparedBuildResults';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { RetargetGroupDialog, type RetargetTarget } from './RetargetGroupDialog';
+import { groupMaterialsCsvColumns } from './groupMaterialsCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 
 /** A merged materials row still open to buying, plus the buy-list's own
  * netted remainder — see the `buyRows`/`craftedTypeIds` split below. */
@@ -495,6 +498,22 @@ export function BuildGroupPanel({
     [t, catalog, ownedStockMap, detection, setOwnedQuantity]
   );
 
+  const buyMaterialsCsv = useMemo(
+    () =>
+      groupMaterialsCsvColumns(
+        t,
+        (typeID) => nameForType(catalog, typeID),
+        (typeID) => volumeForType(catalog, typeID),
+        (typeID) => ownedStockMap.get(typeID)
+      ),
+    [t, catalog, ownedStockMap]
+  );
+  const buyMaterialsExport = useTableExport({
+    surface: 'build-group-materials',
+    rows: buyRows,
+    columns: buyMaterialsCsv,
+  });
+
   // The copy outcome is a flash, not a state the panel keeps. Cleared by an
   // effect rather than a `setTimeout` in the handler, so unmounting mid-flash
   // — or copying another hub before it fades — cancels the pending timer
@@ -806,7 +825,18 @@ export function BuildGroupPanel({
         {/* Materials and the Group Owned Overlay (issue #697) as one table:
             typing an owned quantity updates that same row's Still To Buy
             instead of a separate panel scroll-lengths away. */}
-        <Panel title={t('industry.groupMaterials')} padded={false}>
+        <Panel
+          title={t('industry.groupMaterials')}
+          padded={false}
+          actions={
+            buyRows.length > 0 ? (
+              <TableActionsMenu
+                name={t('industry.groupMaterials')}
+                tableExport={buyMaterialsExport}
+              />
+            ) : undefined
+          }
+        >
           <div className="space-y-3 p-2.5">
             <OwnedStockScopeControl
               scope={group.ownedStockScope}
@@ -852,6 +882,7 @@ export function BuildGroupPanel({
           ) : buyRows.length > 0 ? (
             <div className="overflow-x-auto">
               <DataTable
+                {...buyMaterialsExport.tableProps}
                 columns={buyMaterialColumns}
                 rows={buyRows}
                 rowKey={(material) => material.typeID}

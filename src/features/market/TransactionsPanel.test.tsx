@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
@@ -8,7 +8,7 @@ import { TransactionsPanel } from './TransactionsPanel';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import { loadWalletJournal, loadWalletTransactionsWithStatus } from '@/features/character/wallet';
 import { loadTypeNames } from '@/features/character/typeNames';
-import { downloadCsv } from '@/lib/downloadCsv';
+import * as download from '@/lib/download';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 
 vi.mock('@/features/character/wallet', () => ({
@@ -16,7 +16,6 @@ vi.mock('@/features/character/wallet', () => ({
   loadWalletTransactionsWithStatus: vi.fn(),
 }));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
-vi.mock('@/lib/downloadCsv', () => ({ downloadCsv: vi.fn() }));
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn() }));
 
 const mockedLoadTransactions = vi.mocked(loadWalletTransactionsWithStatus);
@@ -203,14 +202,30 @@ describe('TransactionsPanel — desktop filter and totals', () => {
   });
 
   it('exports the filtered rows', async () => {
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    const user = userEvent.setup();
     load(FILLS);
     renderPanel('/market/history/transactions?txn.side=buy');
     await screen.findByRole('row', { name: /Tritanium/ });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Transactions actions' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
+    await user.keyboard('{ArrowRight}');
+    (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
+    await user.keyboard('{Enter}');
 
-    const exported = vi.mocked(downloadCsv).mock.calls[0][1] as WalletTransaction[];
-    expect(exported.map((txn) => txn.transaction_id)).toEqual([2]);
+    await waitFor(() => expect(spy).toHaveBeenCalledOnce());
+    expect(spy.mock.calls[0][0]).toMatch(/^neocom-wallet-transactions-\d{4}-\d{2}-\d{2}\.csv$/);
+    const lines = (spy.mock.calls[0][1] as string).trim().split('\r\n');
+    // Header plus the one buy the filter leaves — the Damage Control II sale is gone.
+    expect(lines).toEqual([
+      expect.stringContaining('"Date"'),
+      '2026-09-10 12:00:00,"Tritanium","Buy",10,5,-50',
+    ]);
+    spy.mockRestore();
   });
 });
 

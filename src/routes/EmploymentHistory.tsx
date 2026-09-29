@@ -28,6 +28,9 @@ import { getLastKnownSpSummary, type CharacterSpSummary } from '@/stores/charact
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatDuration } from '@/lib/duration';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
+import { employmentHistoryCsvColumns } from '@/features/character/employmentHistoryCsv';
 
 interface Snapshot {
   historyResult: CachedResult<CorporationHistoryEntry[]> | null;
@@ -131,6 +134,12 @@ export function EmploymentHistory() {
     ],
     [t, corpNames, character?.corporationId]
   );
+  const csvColumns = useMemo(() => employmentHistoryCsvColumns(t, corpNames), [t, corpNames]);
+  const historyExport = useTableExport({
+    surface: 'employment-history',
+    rows,
+    columns: csvColumns,
+  });
 
   function historyRowContextMenu(row: EmploymentHistoryRow, tr: ReactElement) {
     return (
@@ -180,6 +189,7 @@ export function EmploymentHistory() {
               onClick={refresh}
               disabled={loading}
             />
+            <TableActionsMenu name={t('employmentHistory.title')} tableExport={historyExport} />
           </span>
         }
         padded={false}
@@ -203,6 +213,7 @@ export function EmploymentHistory() {
               </p>
             )}
             <DataTable
+              {...historyExport.tableProps}
               label={t('employmentHistory.title')}
               columns={columns}
               rows={rows}

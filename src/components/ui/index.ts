@@ -86,7 +86,7 @@ export {
   RowActionsMenu,
   RowMoreActions,
 } from './RowActions';
-export { RowActionsContext } from './rowActionsContext';
+export { RowActionsContext, RowMenuExtrasContext } from './rowActionsContext';
 export type { RowActions } from './rowActionsContext';
 export { ColumnPickerMenu } from './ColumnPickerMenu';
 export { MultiSelect } from './MultiSelect';

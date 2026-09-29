@@ -12,7 +12,7 @@
  * items split on `is_included` into what the issuer hands over ("Included")
  * vs what the acceptor must supply ("Requested").
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
@@ -22,7 +22,10 @@ import {
   TypeIcon,
   type DataTableColumn,
 } from '@/components/ui';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { loadContractItems } from './contractItems';
+import { contractItemsCsvColumns } from './contractItemsCsv';
 import { loadContractLocationName } from './contractLocationName';
 import { loadTypeNames } from './typeNames';
 import { loadContractMarketValue, type ContractMarketValue } from './contractMarketValue';
@@ -308,6 +311,7 @@ export function ContractDetailModal({
             <>
               {itemColumns && (
                 <ItemSection
+                  contractId={contract.contract_id}
                   title={t('contracts.detailItemsIncluded')}
                   columns={itemColumns}
                   items={included}
@@ -320,6 +324,7 @@ export function ContractDetailModal({
               )}
               {itemColumns && (
                 <ItemSection
+                  contractId={contract.contract_id}
                   title={t('contracts.detailItemsRequested')}
                   columns={itemColumns}
                   items={requested}
@@ -348,6 +353,7 @@ export function ContractDetailModal({
  * no row renders. Only a resolved `ContractMarketValue` renders one.
  */
 function ItemSection({
+  contractId,
   title,
   columns,
   items,
@@ -355,6 +361,7 @@ function ItemSection({
   marketValue,
   hubName,
 }: {
+  contractId: number;
   title: string;
   columns: DataTableColumn<ContractItem>[];
   items: ContractItem[];
@@ -362,14 +369,28 @@ function ItemSection({
   marketValue: ContractMarketValue | null | undefined;
   hubName: string;
 }) {
+  const { t } = useTranslation();
+  const csvColumns = useMemo(() => contractItemsCsvColumns(t, typeNames), [t, typeNames]);
+  // Contract id and section in the filename: exporting Included then
+  // Requested, or two contracts in a row, never overwrites the same file.
+  const tableExport = useTableExport({
+    surface: 'contract-items',
+    rows: items,
+    columns: csvColumns,
+    qualifier: `${contractId} ${title}`,
+  });
   if (items.length === 0) return null;
   return (
     <div>
-      <h3 className="flex items-center gap-1.5 border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {title}
-      </h3>
+      <div className="flex items-center justify-between gap-2 border-b border-line pb-1">
+        <h3 className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {title}
+        </h3>
+        <TableActionsMenu name={title} tableExport={tableExport} />
+      </div>
       <div className="overflow-x-auto">
         <DataTable
+          {...tableExport.tableProps}
           label={title}
           columns={columns}
           rows={items}

@@ -55,6 +55,9 @@ import { buildOpportunityCandidates, hubForCharacter, type OpportunityRow } from
 import { SkillGateMarker } from './SkillGateMarker';
 import { useOpportunities } from './useOpportunities';
 import { StartPlanButton } from './StartPlanButton';
+import { opportunitiesCsvColumns } from './opportunitiesCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 
@@ -292,6 +295,13 @@ export function OpportunitiesPanel({
   const showCharacterFilter = characterCandidates.length > 1;
   const showCharacterColumn = new Set(rows.map((r) => r.candidate.characterId)).size > 1;
 
+  const csvColumns = useMemo(() => opportunitiesCsvColumns(t), [t]);
+  const opportunitiesExport = useTableExport({
+    surface: 'industry-opportunities',
+    rows,
+    columns: csvColumns,
+  });
+
   const columns: DataTableColumn<OpportunityRow>[] = [
     {
       // Desktop-only column now (`isDesktop` gates this whole `DataTable`
@@ -501,6 +511,12 @@ export function OpportunitiesPanel({
               {t('industry.opportunitiesAddToCompare', { count: selectedRows.length })}
             </Button>
           )}
+          {rows.length > 0 && (
+            <TableActionsMenu
+              name={t('industry.opportunitiesTitle')}
+              tableExport={opportunitiesExport}
+            />
+          )}
         </span>
       }
     >
@@ -523,6 +539,7 @@ export function OpportunitiesPanel({
       ) : isDesktop ? (
         <div className="overflow-x-auto">
           <DataTable
+            {...opportunitiesExport.tableProps}
             columns={columns}
             rows={rows}
             rowKey={opportunityRowKey}

@@ -56,7 +56,10 @@ import { loadMarketGroups } from '@/sde/loadMarketSde';
 import type { MarketGroupNode } from '@/sde/marketTypes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { HAULING_THRESHOLDS } from '@/engine/market/haulingMarket';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { HaulingCargoControl } from './HaulingCargoControl';
+import { haulingCsvColumns } from './haulingCsv';
 import { HaulingRowDetail } from './HaulingRowDetail';
 import { useHaulingBudget, useHaulingCargo } from './haulingCargo';
 import {
@@ -340,18 +343,38 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     return `${unit}${t(`market.hauling.limit.${line.limitedBy}`)}`;
   };
 
-  const flagLabel: Record<HaulingFlag, { text: string; tip: string }> = {
-    crowded: { text: t('market.hauling.flags.crowded'), tip: t('market.hauling.flags.crowdedTip') },
-    thin: { text: t('market.hauling.flags.thin'), tip: t('market.hauling.flags.thinTip') },
-    outlier: {
-      text: t('market.hauling.flags.outlier'),
-      tip: t('market.hauling.flags.outlierTip'),
-    },
-    'low-margin': {
-      text: t('market.hauling.flags.lowMargin'),
-      tip: t('market.hauling.flags.lowMarginTip'),
-    },
-  };
+  const flagLabel = useMemo<Record<HaulingFlag, { text: string; tip: string }>>(
+    () => ({
+      crowded: {
+        text: t('market.hauling.flags.crowded'),
+        tip: t('market.hauling.flags.crowdedTip'),
+      },
+      thin: { text: t('market.hauling.flags.thin'), tip: t('market.hauling.flags.thinTip') },
+      outlier: {
+        text: t('market.hauling.flags.outlier'),
+        tip: t('market.hauling.flags.outlierTip'),
+      },
+      'low-margin': {
+        text: t('market.hauling.flags.lowMargin'),
+        tip: t('market.hauling.flags.lowMarginTip'),
+      },
+    }),
+    [t]
+  );
+
+  const csvColumns = useMemo(
+    () =>
+      haulingCsvColumns(t, {
+        flagText: (flag) => flagLabel[flag].text,
+        bringFor: (row) => {
+          const line = lineOf.get(row.typeId);
+          if (!line || overrides.get(row.typeId)?.selected === false) return null;
+          return line.quantity;
+        },
+      }),
+    [t, flagLabel, lineOf, overrides]
+  );
+  const tableExport = useTableExport({ surface: 'hauling', rows: shown, columns: csvColumns });
 
   // The same menu Appraisal's rows carry — a hauled item is an item like any other.
   function rowContextMenu(row: HaulingViewRow, tr: ReactElement) {
@@ -566,6 +589,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             {t('market.hauling.copyMultibuy')}
           </Button>
           {state.status === 'ready' && <DataAgeBadge date={new Date(state.scan.fetchedAt)} />}
+          <TableActionsMenu name={t('market.hauling.title')} tableExport={tableExport} />
         </div>
       }
       padded={false}
@@ -851,6 +875,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
               </div>
 
               <DataTable
+                {...tableExport.tableProps}
                 label={t('market.hauling.title')}
                 columns={visibleColumns}
                 rows={shown}

@@ -48,7 +48,8 @@ import { stripEveMarkup, typeDescription } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
 import { skillCsvColumns, skillCsvRows, type SkillGroup } from '@/features/skills/skillsCsv';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
 
@@ -312,6 +313,30 @@ export function Skills() {
     setExpandedGroups(new Set());
   }
 
+  // The skills the list shows, grouped as it shows them: a search narrows the
+  // export to its matches, exactly as it narrows the list (collapsing a group
+  // is not a filter, so collapsed groups still export). Nothing while the
+  // skills scope needs re-auth — the old export button was disabled then too.
+  const csvRows = useMemo(() => {
+    if (skillsNeedsReauth) return [];
+    if (!searching) return skillCsvRows(groups);
+    return skillCsvRows(
+      groups
+        .filter((group) => filterResult.visibleGroupNames.has(group.groupName))
+        .map((group) => ({
+          ...group,
+          skills: filterResult.matchedSkillsByGroup.get(group.groupName) ?? [],
+        }))
+    );
+  }, [groups, skillsNeedsReauth, searching, filterResult]);
+  const csvColumns = useMemo(() => skillCsvColumns(t), [t]);
+  const skillsExport = useTableExport({
+    surface: 'skills',
+    rows: csvRows,
+    columns: csvColumns,
+    source: 'rows',
+  });
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -328,12 +353,7 @@ export function Skills() {
         meta={fetchedAt && <DataAgeBadge date={fetchedAt} />}
         actions={
           <>
-            <IconButton
-              icon={<Icon.Download />}
-              label={t('skills.exportCsv')}
-              disabled={groups.length === 0 || skillsNeedsReauth}
-              onClick={() => downloadCsv('skills', skillCsvRows(groups), skillCsvColumns(t))}
-            />
+            <TableActionsMenu name={t('nav.skills')} tableExport={skillsExport} size="md" />
             <IconButton icon={<Icon.Refresh />} label={t('skills.refresh')} onClick={refresh} />
           </>
         }
@@ -462,102 +482,104 @@ export function Skills() {
               className="py-8"
             />
           ) : (
-            groups.map((group) => {
-              if (searching && !filterResult.visibleGroupNames.has(group.groupName)) return null;
-              const expanded = searching || expandedGroups.has(group.groupName);
-              const groupHasTraining =
-                training !== null &&
-                group.skills.some((skill) => skill.skillTypeID === training.skillTypeID);
-              const skillsToShow = searching
-                ? (filterResult.matchedSkillsByGroup.get(group.groupName) ?? [])
-                : group.skills;
-              return (
-                <section
-                  key={group.groupName}
-                  className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm"
-                >
-                  <h2>
-                    <button
-                      type="button"
-                      aria-expanded={expanded}
-                      disabled={searching}
-                      onClick={() => toggleGroup(group.groupName)}
-                      className={`flex min-h-11 w-full items-center justify-between gap-2 border-line px-3 py-1 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent disabled:hover:bg-transparent md:min-h-0 ${
-                        expanded ? 'border-b' : ''
-                      }`}
-                    >
-                      <span className="flex min-w-0 items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                        <Caret expanded={expanded} />
-                        <span className="truncate">{group.groupName}</span>
-                      </span>
-                      <span className="flex shrink-0 items-center gap-2">
-                        {groupHasTraining && trainingChip}
-                        <span className="text-[0.6875rem] tabular-nums text-text-dim">
-                          {skillsToShow.length}
+            <TableExportProvider tableExport={skillsExport}>
+              {groups.map((group) => {
+                if (searching && !filterResult.visibleGroupNames.has(group.groupName)) return null;
+                const expanded = searching || expandedGroups.has(group.groupName);
+                const groupHasTraining =
+                  training !== null &&
+                  group.skills.some((skill) => skill.skillTypeID === training.skillTypeID);
+                const skillsToShow = searching
+                  ? (filterResult.matchedSkillsByGroup.get(group.groupName) ?? [])
+                  : group.skills;
+                return (
+                  <section
+                    key={group.groupName}
+                    className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm"
+                  >
+                    <h2>
+                      <button
+                        type="button"
+                        aria-expanded={expanded}
+                        disabled={searching}
+                        onClick={() => toggleGroup(group.groupName)}
+                        className={`flex min-h-11 w-full items-center justify-between gap-2 border-line px-3 py-1 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent disabled:hover:bg-transparent md:min-h-0 ${
+                          expanded ? 'border-b' : ''
+                        }`}
+                      >
+                        <span className="flex min-w-0 items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                          <Caret expanded={expanded} />
+                          <span className="truncate">{group.groupName}</span>
                         </span>
-                      </span>
-                    </button>
-                  </h2>
-                  {expanded && (
-                    <div className="p-3">
-                      <ul className="divide-y divide-line">
-                        {skillsToShow.map((skill) => {
-                          const selected = selectedSkillTypeID === skill.skillTypeID;
-                          const progress =
-                            skill.sp === null
-                              ? null
-                              : progressToNextLevel(skill.rank, skill.level, skill.sp);
-                          const row = (
-                            <button
-                              type="button"
-                              aria-pressed={selected}
-                              onClick={() =>
-                                setSelectedSkillTypeID((current) =>
-                                  current === skill.skillTypeID ? null : skill.skillTypeID
-                                )
-                              }
-                              className={`${tappableRowClassName} flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
-                                selected ? 'bg-panel-2' : ''
-                              }`}
-                            >
-                              <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
-                                <span className="line-clamp-2 min-w-0 sm:line-clamp-none sm:flex-1 sm:truncate">
-                                  {skill.name}
-                                </span>
-                                {training?.skillTypeID === skill.skillTypeID && trainingChip}
-                              </span>
-                              <SkillBar
-                                level={skill.level}
-                                progress={progress}
-                                plannedLevel={plannedLevels.get(skill.skillTypeID) ?? null}
-                              />
-                              <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
-                                {skill.sp === null
-                                  ? t('common.unknown')
-                                  : t('skills.sp', { value: skill.sp.toLocaleString() })}
-                              </span>
-                            </button>
-                          );
-                          return (
-                            <li key={skill.skillTypeID}>
-                              <SkillRowContextMenu
-                                activeCharacterId={activeCharacterId}
-                                skillTypeID={skill.skillTypeID}
-                                skillName={skill.name}
-                                currentLevel={skill.level}
-                                tooltipContent={skill.description}
+                        <span className="flex shrink-0 items-center gap-2">
+                          {groupHasTraining && trainingChip}
+                          <span className="text-[0.6875rem] tabular-nums text-text-dim">
+                            {skillsToShow.length}
+                          </span>
+                        </span>
+                      </button>
+                    </h2>
+                    {expanded && (
+                      <div className="p-3">
+                        <ul className="divide-y divide-line">
+                          {skillsToShow.map((skill) => {
+                            const selected = selectedSkillTypeID === skill.skillTypeID;
+                            const progress =
+                              skill.sp === null
+                                ? null
+                                : progressToNextLevel(skill.rank, skill.level, skill.sp);
+                            const row = (
+                              <button
+                                type="button"
+                                aria-pressed={selected}
+                                onClick={() =>
+                                  setSelectedSkillTypeID((current) =>
+                                    current === skill.skillTypeID ? null : skill.skillTypeID
+                                  )
+                                }
+                                className={`${tappableRowClassName} flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
+                                  selected ? 'bg-panel-2' : ''
+                                }`}
                               >
-                                {row}
-                              </SkillRowContextMenu>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  )}
-                </section>
-              );
-            })
+                                <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                                  <span className="line-clamp-2 min-w-0 sm:line-clamp-none sm:flex-1 sm:truncate">
+                                    {skill.name}
+                                  </span>
+                                  {training?.skillTypeID === skill.skillTypeID && trainingChip}
+                                </span>
+                                <SkillBar
+                                  level={skill.level}
+                                  progress={progress}
+                                  plannedLevel={plannedLevels.get(skill.skillTypeID) ?? null}
+                                />
+                                <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
+                                  {skill.sp === null
+                                    ? t('common.unknown')
+                                    : t('skills.sp', { value: skill.sp.toLocaleString() })}
+                                </span>
+                              </button>
+                            );
+                            return (
+                              <li key={skill.skillTypeID}>
+                                <SkillRowContextMenu
+                                  activeCharacterId={activeCharacterId}
+                                  skillTypeID={skill.skillTypeID}
+                                  skillName={skill.name}
+                                  currentLevel={skill.level}
+                                  tooltipContent={skill.description}
+                                >
+                                  {row}
+                                </SkillRowContextMenu>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
+            </TableExportProvider>
           )}
         </>
       )}

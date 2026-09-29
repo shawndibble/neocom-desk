@@ -114,7 +114,7 @@ async function addRun(overrides: Partial<Parameters<typeof db.productionRuns.add
  * "Hide…", so a later call is a no-op rather than re-folding it.
  */
 async function runsTable() {
-  const toggle = await screen.findByRole('button', { name: /all production runs/i });
+  const toggle = await screen.findByRole('button', { name: /^(show|hide) all production runs$/i });
   if (toggle.getAttribute('aria-label')?.startsWith('Show')) {
     await userEvent.click(toggle);
   }

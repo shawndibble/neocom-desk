@@ -32,7 +32,8 @@ test('Journal "Transactions →" link meets the 44px touch floor at 390px, witho
   );
   expect(overflow).toBeLessThanOrEqual(0);
 
-  await expect(page.getByRole('button', { name: /export/i }).first()).toBeVisible();
+  // The journal's ⋯ table menu (Export table ▸ …) shares the header row.
+  await expect(page.getByRole('button', { name: 'Journal actions' })).toBeVisible();
 });
 
 test('Journal "Transactions →" link keeps its text-link height at 1280px', async ({ page }) => {

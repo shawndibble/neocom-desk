@@ -5,13 +5,13 @@
  * leads. Clicking a row selects it, which re-anchors this table as a side
  * effect of the route's own selection state.
  */
-import type { ReactElement, ReactNode } from 'react';
+import { useMemo, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
-import { IconButton, IskAmount, TypeIcon } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { IskAmount, TypeIcon } from '@/components/ui';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import { ItemContextMenu } from './ItemContextMenu';
 import type { VariationRow } from './variations';
@@ -60,6 +60,8 @@ function priceCell(
 
 export function VariationsTable({ rows, prices, onSelect, onCompare }: VariationsTableProps) {
   const { t } = useTranslation();
+  const csvColumns = useMemo(() => variationsCsvColumns(t, prices), [t, prices]);
+  const tableExport = useTableExport({ surface: 'market-variations', rows, columns: csvColumns });
 
   if (rows.length === 0) return null;
 
@@ -125,12 +127,7 @@ export function VariationsTable({ rows, prices, onSelect, onCompare }: Variation
           {t('market.variations.title')}
         </h2>
         <span className="flex items-center gap-2">
-          <IconButton
-            size="sm"
-            icon={<Icon.Download />}
-            label={t('market.variations.exportCsv')}
-            onClick={() => downloadCsv('market-variations', rows, variationsCsvColumns(t, prices))}
-          />
+          <TableActionsMenu name={t('market.variations.title')} tableExport={tableExport} />
           <Button size="sm" onClick={onCompare}>
             {t('market.variations.compare')}
           </Button>
@@ -138,6 +135,7 @@ export function VariationsTable({ rows, prices, onSelect, onCompare }: Variation
       </div>
       <div className="overflow-x-auto">
         <DataTable
+          {...tableExport.tableProps}
           columns={columns}
           rows={rows}
           rowKey={(row) => row.typeId}

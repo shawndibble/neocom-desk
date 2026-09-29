@@ -6,7 +6,7 @@
  * see it unchanged. It stays byte-identical.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -142,6 +142,18 @@ function findSwitch() {
   return screen.findByRole('group', { name: 'Wallet owner' });
 }
 
+/** The journal panel's title-bar ⋯ › Export table › Download CSV (jsdom has no hover intent). */
+async function exportJournalCsv(user: ReturnType<typeof userEvent.setup>) {
+  fireEvent.pointerDown(screen.getByRole('button', { name: 'Journal actions' }), {
+    button: 0,
+    pointerType: 'mouse',
+  });
+  (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
+  await user.keyboard('{ArrowRight}');
+  (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
+  await user.keyboard('{Enter}');
+}
+
 describe('Wallet: the switch is hidden without the capability (AC 1)', () => {
   it('renders no switch for a Character with no corp role', async () => {
     server.use(http.get(`${BASE}/characters/${CHAR_ID}/roles`, () => HttpResponse.json({})));
@@ -246,7 +258,8 @@ describe('Wallet: the corporation side (AC 2, AC 3)', () => {
     await user.click(screen.getByRole('tab', { name: 'Journal' }));
     await screen.findByText('Master division payout');
 
-    await user.click(screen.getByRole('button', { name: 'Export CSV' }));
+    await exportJournalCsv(user);
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
     expect(spy.mock.calls[0][0]).toMatch(
       /^neocom-corp-wallet-journal-master-wallet-\d{4}-\d{2}-\d{2}\.csv$/
     );
@@ -255,7 +268,8 @@ describe('Wallet: the corporation side (AC 2, AC 3)', () => {
     await user.click(await screen.findByRole('option', { name: 'SRP' }));
     await screen.findByText('SRP division payout');
 
-    await user.click(screen.getByRole('button', { name: 'Export CSV' }));
+    await exportJournalCsv(user);
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
     expect(spy.mock.calls[1][0]).toMatch(/^neocom-corp-wallet-journal-srp-\d{4}-\d{2}-\d{2}\.csv$/);
   });
 

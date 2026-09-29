@@ -38,6 +38,9 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatIsk } from '@/lib/isk';
 import type { TradeHub } from '@/market/hubs';
 import { taxSplit, type PlanCostResult, type PlanRow, type SensitivityRow } from './planModel';
+import { planChainCsvColumns, planSensitivityCsvColumns } from './planResultsCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 
 const RATE_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
 const PER_HOUR_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
@@ -406,13 +409,20 @@ export function PlanChainTable({ rows, productName, hubId }: PlanChainTableProps
     ],
     [t, hubId]
   );
+  const csvColumns = useMemo(() => planChainCsvColumns(t), [t]);
+  const chainExport = useTableExport({ surface: 'pi-chain', rows, columns: csvColumns });
 
   return (
-    <Panel title={t('piPlan.chainTitle')} padded={false}>
+    <Panel
+      title={t('piPlan.chainTitle')}
+      padded={false}
+      actions={<TableActionsMenu name={t('piPlan.chainTitle')} tableExport={chainExport} />}
+    >
       <p className="flex items-start gap-1.5 border-b border-line px-3 py-2 text-xs text-text-dim">
         {t('piPlan.readTooltip')}
       </p>
       <DataTable
+        {...chainExport.tableProps}
         label={t('piPlan.chainTableLabel', { product: productName })}
         columns={columns}
         rows={rows}
@@ -493,13 +503,26 @@ export function PlanSensitivity({ grid, rates }: PlanSensitivityProps) {
     }));
     return [floorColumn, footprintColumn, ...rateColumns];
   }, [t, rates, footprintText]);
+  const csvColumns = useMemo(() => planSensitivityCsvColumns(t, rates, formatRate), [t, rates]);
+  const sensitivityExport = useTableExport({
+    surface: 'pi-sensitivity',
+    rows: grid,
+    columns: csvColumns,
+  });
 
   return (
-    <Panel title={t('piPlan.sensitivityTitle')} padded={false}>
+    <Panel
+      title={t('piPlan.sensitivityTitle')}
+      padded={false}
+      actions={
+        <TableActionsMenu name={t('piPlan.sensitivityTitle')} tableExport={sensitivityExport} />
+      }
+    >
       <p className="border-b border-line px-3 py-2 text-xs text-text-dim">
         {t('piPlan.sensitivityHint')}
       </p>
       <DataTable
+        {...sensitivityExport.tableProps}
         label={t('piPlan.sensitivityTableLabel')}
         columns={columns}
         rows={grid}
