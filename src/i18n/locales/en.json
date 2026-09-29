@@ -2295,13 +2295,43 @@
     "marketOpportunitiesEmptyTitle": "Nothing scanned yet",
     "marketOpportunitiesEmptyHint": "Run a market scan to rank what's profitable to build right now, from blueprints you own or can buy.",
     "marketOpportunitiesNoResultsTitle": "Nothing to build here",
-    "marketOpportunitiesNoResultsHint": "No product whose blueprint you own or can buy cleared the liquidity floor at this hub — try a busier Trade Hub.",
+    "marketOpportunitiesNoResultsHint": "No product whose blueprint you own or can buy cleared the liquidity floor at this hub with these filters — try a busier Trade Hub or loosen the filters.",
     "marketOpportunitiesBlueprintSource": "Blueprint",
     "marketOpportunitiesBlueprintSources": {
       "owned": "Owned",
       "market": "NPC market",
       "contract": "Contract",
       "lpStore": "LP store"
+    },
+    "marketOpportunitiesFilters": {
+      "tier": "Tier",
+      "tiers": {
+        "tech1": "Tech I",
+        "tech2": "Tech II",
+        "tech3": "Tech III",
+        "faction": "Faction",
+        "special": "Officer & special"
+      },
+      "category": "Category",
+      "categories": {
+        "ships": "Ships",
+        "modules": "Modules",
+        "rigs": "Rigs & subsystems",
+        "ammo": "Ammo & charges",
+        "drones": "Drones",
+        "components": "Components",
+        "structures": "Structures",
+        "implants": "Implants & boosters",
+        "other": "Other"
+      },
+      "maxBuildCost": "Max build cost",
+      "buildCostCaps": {
+        "any": "Any build cost",
+        "10m": "Build cost up to 10M",
+        "100m": "Build cost up to 100M",
+        "1b": "Build cost up to 1B",
+        "10b": "Build cost up to 10B"
+      }
     },
     "marketOpportunitiesSourcesUnavailable": "Couldn't check {{sources}} — products whose blueprint only comes from there may be missing.",
     "marketOpportunitiesStartPlan": "Start a plan",

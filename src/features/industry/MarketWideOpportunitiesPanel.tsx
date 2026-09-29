@@ -13,10 +13,17 @@ import {
   Button,
   DataTable,
   EmptyState,
+  FilterBar,
   FilterChip,
+  FilterField,
   InfoTooltip,
   IskAmount,
   Panel,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   StatChip,
   type DataTableColumn,
@@ -26,7 +33,17 @@ import { db } from '@/db';
 import { iskToneClass } from '@/features/character/format';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
-import { BLUEPRINT_SOURCE_RANK } from '@/engine/industry/blueprintObtainability';
+import {
+  BLUEPRINT_SOURCE_RANK,
+  BLUEPRINT_SOURCES,
+  type BlueprintSource,
+} from '@/engine/industry/blueprintObtainability';
+import {
+  PRODUCT_CATEGORIES,
+  PRODUCT_TIERS,
+  type ProductCategory,
+  type ProductTier,
+} from '@/engine/industry/marketWideFilters';
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
@@ -40,8 +57,8 @@ import { useMarketWideOpportunities } from './useMarketWideOpportunities';
 import { SkillGateMarker } from './SkillGateMarker';
 import { ORDER_DEPTH_RANK } from './opportunityMetrics';
 import { StartPlanButton } from './StartPlanButton';
-import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
-import { boolParam } from '@/lib/urlState';
+import { useUrlFilter, useUrlParam, useUrlSort } from '@/lib/useUrlState';
+import { boolParam, defineUrlFilter, enumParam, enumSetParam } from '@/lib/urlState';
 
 const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
   deep: 'success',
@@ -62,6 +79,52 @@ interface MarketWideOpportunitiesPanelProps {
 }
 
 const HIDE_SKILL_GATED = boolParam();
+
+/** "Max build cost" presets — a budget cap, applied to the ranked rows since cost is only known once priced. */
+const BUILD_COST_CAPS = ['any', '10m', '100m', '1b', '10b'] as const;
+type BuildCostCap = (typeof BUILD_COST_CAPS)[number];
+const BUILD_COST_CAP_ISK: Record<BuildCostCap, number | null> = {
+  any: null,
+  '10m': 10_000_000,
+  '100m': 100_000_000,
+  '1b': 1_000_000_000,
+  '10b': 10_000_000_000,
+};
+
+interface MarketWideFilterState {
+  tiers: ReadonlySet<ProductTier>;
+  categories: ReadonlySet<ProductCategory>;
+  sources: ReadonlySet<BlueprintSource>;
+  maxBuildCost: BuildCostCap;
+}
+
+const MARKET_WIDE_FILTER = defineUrlFilter<MarketWideFilterState>({
+  tiers: { key: 'marketWide.tiers', codec: enumSetParam(PRODUCT_TIERS) },
+  categories: { key: 'marketWide.categories', codec: enumSetParam(PRODUCT_CATEGORIES) },
+  sources: { key: 'marketWide.sources', codec: enumSetParam(BLUEPRINT_SOURCES) },
+  maxBuildCost: { key: 'marketWide.maxCost', codec: enumParam(BUILD_COST_CAPS, 'any') },
+});
+
+function activeFilterCount(filter: MarketWideFilterState): number {
+  return [
+    filter.tiers.size !== PRODUCT_TIERS.length,
+    filter.categories.size !== PRODUCT_CATEGORIES.length,
+    filter.sources.size !== BLUEPRINT_SOURCES.length,
+    filter.maxBuildCost !== 'any',
+  ].filter(Boolean).length;
+}
+
+function sameMembers<V>(a: ReadonlySet<V>, b: ReadonlySet<V>): boolean {
+  return a.size === b.size && [...a].every((member) => b.has(member));
+}
+
+/** `set` with `member` flipped. */
+function toggled<V>(set: ReadonlySet<V>, member: V): ReadonlySet<V> {
+  const next = new Set(set);
+  if (next.has(member)) next.delete(member);
+  else next.add(member);
+  return next;
+}
 
 /**
  * The columns' sort keys, at module scope: the columns themselves close over
@@ -99,6 +162,12 @@ export function MarketWideOpportunitiesPanel({
     [allCharacters]
   );
   const characterIds = useMemo(() => [...characterNames.keys()], [characterNames]);
+  const [filter, setFilter] = useUrlFilter<MarketWideFilterState>(
+    '',
+    MARKET_WIDE_FILTER.schema,
+    MARKET_WIDE_FILTER.fieldToParam,
+    MARKET_WIDE_FILTER.emptyParams
+  );
   const { rows, loading, hasRun, unavailableSources, run } = useMarketWideOpportunities({
     hub,
     trees,
@@ -107,6 +176,16 @@ export function MarketWideOpportunitiesPanel({
     standing,
     characterIds,
   });
+  // A tier, category or source change re-scans (they apply before the top-N
+  // cut); the build-cost cap only narrows the rows already ranked.
+  const applyFilter = (next: MarketWideFilterState) => {
+    setFilter(next);
+    const rescan =
+      !sameMembers(next.tiers, filter.tiers) ||
+      !sameMembers(next.categories, filter.categories) ||
+      !sameMembers(next.sources, filter.sources);
+    if (hasRun && rescan) run(next);
+  };
   const accountSkills = useAccountSkillLevels(characterIds);
 
   const skillGateByProductTypeID = useMemo(() => {
@@ -125,12 +204,15 @@ export function MarketWideOpportunitiesPanel({
     () => rows.filter((row) => skillGateByProductTypeID.get(row.productTypeID)?.gated).length,
     [rows, skillGateByProductTypeID]
   );
+  const maxBuildCostIsk = BUILD_COST_CAP_ISK[filter.maxBuildCost];
   const visibleRows = useMemo(
     () =>
-      hideSkillGated
-        ? rows.filter((row) => !skillGateByProductTypeID.get(row.productTypeID)?.gated)
-        : rows,
-    [hideSkillGated, rows, skillGateByProductTypeID]
+      rows.filter(
+        (row) =>
+          !(hideSkillGated && skillGateByProductTypeID.get(row.productTypeID)?.gated) &&
+          (maxBuildCostIsk === null || row.buildCost <= maxBuildCostIsk)
+      ),
+    [hideSkillGated, maxBuildCostIsk, rows, skillGateByProductTypeID]
   );
 
   const columns: DataTableColumn<MarketWideResultRow>[] = [
@@ -256,13 +338,72 @@ export function MarketWideOpportunitiesPanel({
         />
       }
       actions={
-        <Button size="sm" onClick={run} disabled={loading || !trees || !catalog}>
+        <Button size="sm" onClick={() => run(filter)} disabled={loading || !trees || !catalog}>
           {loading
             ? t('industry.marketOpportunitiesScanning')
             : t('industry.marketOpportunitiesRunScan')}
         </Button>
       }
     >
+      <FilterBar
+        value={filter}
+        onChange={applyFilter}
+        activeCount={activeFilterCount(filter)}
+        className="mb-2"
+      >
+        {(draft, setDraft) => (
+          <>
+            <FilterField label={t('industry.marketOpportunitiesFilters.maxBuildCost')}>
+              <Select
+                value={draft.maxBuildCost}
+                onValueChange={(value) =>
+                  setDraft({ ...draft, maxBuildCost: value as BuildCostCap })
+                }
+              >
+                <SelectTrigger
+                  size="sm"
+                  aria-label={t('industry.marketOpportunitiesFilters.maxBuildCost')}
+                  className="w-52"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BUILD_COST_CAPS.map((cap) => (
+                    <SelectItem key={cap} value={cap}>
+                      {t(`industry.marketOpportunitiesFilters.buildCostCaps.${cap}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <ChipGroup
+              label={t('industry.marketOpportunitiesFilters.tier')}
+              members={PRODUCT_TIERS}
+              selected={draft.tiers}
+              labelFor={(tier) => t(`industry.marketOpportunitiesFilters.tiers.${tier}`)}
+              onToggle={(tier) => setDraft({ ...draft, tiers: toggled(draft.tiers, tier) })}
+            />
+            <ChipGroup
+              label={t('industry.marketOpportunitiesFilters.category')}
+              members={PRODUCT_CATEGORIES}
+              selected={draft.categories}
+              labelFor={(category) =>
+                t(`industry.marketOpportunitiesFilters.categories.${category}`)
+              }
+              onToggle={(category) =>
+                setDraft({ ...draft, categories: toggled(draft.categories, category) })
+              }
+            />
+            <ChipGroup
+              label={t('industry.marketOpportunitiesBlueprintSource')}
+              members={BLUEPRINT_SOURCES}
+              selected={draft.sources}
+              labelFor={(source) => t(`industry.marketOpportunitiesBlueprintSources.${source}`)}
+              onToggle={(source) => setDraft({ ...draft, sources: toggled(draft.sources, source) })}
+            />
+          </>
+        )}
+      </FilterBar>
       {loading ? (
         <div className="flex justify-center py-8">
           <Spinner label={t('industry.marketOpportunitiesScanning')} />
@@ -317,5 +458,34 @@ export function MarketWideOpportunitiesPanel({
         </div>
       )}
     </Panel>
+  );
+}
+
+/** One labelled row of on/off chips over a closed set — BPC Sourcing's filter groups, reused. */
+function ChipGroup<V extends string>({
+  label,
+  members,
+  selected,
+  labelFor,
+  onToggle,
+}: {
+  label: string;
+  members: readonly V[];
+  selected: ReadonlySet<V>;
+  labelFor: (member: V) => string;
+  onToggle: (member: V) => void;
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex flex-wrap items-center gap-2">
+      <span className="text-text-dim">{label}</span>
+      {members.map((member) => (
+        <FilterChip
+          key={member}
+          label={labelFor(member)}
+          selected={selected.has(member)}
+          onToggle={() => onToggle(member)}
+        />
+      ))}
+    </div>
   );
 }

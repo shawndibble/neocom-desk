@@ -104,6 +104,40 @@ describe('runMarketWideScan', () => {
     ]);
   });
 
+  it('drops products the filters exclude before the top-N cut, so they never take a kept one’s slot', async () => {
+    const FACTION = PRODUCT + 1;
+    const trees: MarketWideTreeMap = {
+      ...TREES,
+      [FACTION]: { ...TREES[PRODUCT]!, blueprintTypeID: 502 },
+    };
+    vi.mocked(getHubPrices).mockImplementation((_hub, typeIds) =>
+      Promise.resolve(
+        new Map(
+          typeIds.map((id) => [
+            id,
+            id === FACTION
+              ? { sellMin: 1_000_000, sellVolume: 100_000 }
+              : id === PRODUCT
+                ? { sellMin: 1_000_000, sellVolume: 1_000 }
+                : { sellMin: 5, sellVolume: 1 },
+          ])
+        ) as unknown as Awaited<ReturnType<typeof getHubPrices>>
+      )
+    );
+    const rows = await runMarketWideScan(
+      DEFAULT_TRADE_HUB,
+      trees,
+      CATALOG,
+      NO_CHARACTER_MODIFIERS,
+      Promise.resolve({ ...NO_SOURCES, market: new Set([501, 502]) }),
+      {
+        topNPerMarketGroup: 1,
+        include: Promise.resolve((productTypeID) => productTypeID !== FACTION),
+      }
+    );
+    expect(rows.map((row) => row.productTypeID)).toEqual([PRODUCT]);
+  });
+
   it('drops unobtainable products before the top-N cut, so they never take an obtainable one’s slot', async () => {
     const DEEP = PRODUCT + 1;
     const trees: MarketWideTreeMap = {
