@@ -19,6 +19,19 @@ const BLUEPRINTS: BlueprintMap = {
     skills: [],
     activity: 'manufacturing',
   },
+  // Sorts ahead of the Rifter in "Used in": the list reads by product name,
+  // not by blueprint id.
+  '691': {
+    name: 'Breacher Blueprint',
+    time: 1200,
+    materials: [
+      { typeID: 35, quantity: 500 },
+      { typeID: 34, quantity: 3000 },
+    ],
+    products: [{ typeID: 598, quantity: 1 }],
+    skills: [],
+    activity: 'manufacturing',
+  },
   // A reaction formula (issue #460): must surface through the same catalog
   // as a manufacturing blueprint, not a separate lookup, for the picker to
   // find it by product name and the facility filter to key off its activity.
@@ -35,6 +48,7 @@ const BLUEPRINTS: BlueprintMap = {
 const TYPES: TypeMap = {
   '587': { name: 'Rifter', groupID: 25, volume: 27289 },
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
+  '598': { name: 'Breacher', groupID: 25, volume: 28700 },
   '16667': { name: 'Reinforced Carbon Fiber', groupID: 428, volume: 5 },
 };
 
@@ -51,6 +65,7 @@ const {
   volumeForType,
   buildPlansByMaterialTypeID,
   planTargetForItem,
+  materialUsesFor,
 } = await import('./blueprintCatalog');
 
 function plan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
@@ -242,5 +257,50 @@ describe('volumeForType', () => {
     const catalog = await loadBlueprintCatalog();
     expect(catalog.typesById['34']!.packagedVolume).toBeUndefined();
     expect(volumeForType(catalog, 34)).toBe(0.01);
+  });
+});
+
+describe('materialUsesFor', () => {
+  it('lists every product whose blueprint consumes the item, by product name', async () => {
+    const catalog = await loadBlueprintCatalog();
+    expect(materialUsesFor(catalog, 34)).toEqual([
+      {
+        blueprintTypeID: 691,
+        productTypeID: 598,
+        productName: 'Breacher',
+        quantity: 3000,
+        activity: 'manufacturing',
+      },
+      {
+        blueprintTypeID: 638,
+        productTypeID: 587,
+        productName: 'Rifter',
+        quantity: 4500,
+        activity: 'manufacturing',
+      },
+    ]);
+  });
+
+  it('carries a reaction formula with its activity, so the row can say so', async () => {
+    const catalog = await loadBlueprintCatalog();
+    expect(materialUsesFor(catalog, 16272)).toEqual([
+      {
+        blueprintTypeID: 46157,
+        productTypeID: 16667,
+        productName: 'Reinforced Carbon Fiber',
+        quantity: 3200,
+        activity: 'reaction',
+      },
+    ]);
+  });
+
+  it('is empty for an item nothing consumes', async () => {
+    const catalog = await loadBlueprintCatalog();
+    expect(materialUsesFor(catalog, 587)).toEqual([]);
+  });
+
+  it('builds the index once per catalog', async () => {
+    const catalog = await loadBlueprintCatalog();
+    expect(materialUsesFor(catalog, 34)).toBe(materialUsesFor(catalog, 34));
   });
 });
