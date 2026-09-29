@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BOOT_PREFETCH_IDLE_TIMEOUT_MS, scheduleBootPrefetch } from './bootPrefetch';
+import {
+  BOOT_PREFETCH_IDLE_TIMEOUT_MS,
+  CACHE_PRUNE_DELAY_MS,
+  scheduleBootPrefetch,
+  scheduleCachePrune,
+} from './bootPrefetch';
 import { prefetchCharacterData, type PrefetchSignal } from './prefetch';
+import { runDailyEsiCachePrune } from '@/esi/cachePrune';
 
 vi.mock('./prefetch', () => ({ prefetchCharacterData: vi.fn(async () => {}) }));
+vi.mock('@/esi/cachePrune', () => ({ runDailyEsiCachePrune: vi.fn(async () => null) }));
 
 /** Let the dynamic `import('./prefetch')` settle. */
 const flush = () => vi.dynamicImportSettled();
@@ -73,5 +80,40 @@ describe('scheduleBootPrefetch', () => {
     cancel();
 
     expect(signal.cancelled).toBe(true);
+  });
+});
+
+describe('scheduleCachePrune', () => {
+  it('waits for boot to settle, then an idle slot', async () => {
+    let idle: IdleRequestCallback | undefined;
+    vi.stubGlobal(
+      'requestIdleCallback',
+      vi.fn((callback: IdleRequestCallback) => {
+        idle = callback;
+        return 1;
+      })
+    );
+    vi.stubGlobal('cancelIdleCallback', vi.fn());
+
+    scheduleCachePrune();
+    await vi.advanceTimersByTimeAsync(CACHE_PRUNE_DELAY_MS - 1);
+    expect(requestIdleCallback).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await flush();
+    expect(runDailyEsiCachePrune).not.toHaveBeenCalled();
+
+    idle!({ didTimeout: false, timeRemaining: () => 50 });
+    await flush();
+    expect(runDailyEsiCachePrune).toHaveBeenCalledTimes(1);
+  });
+
+  it('never starts once cancelled (the app unmounting)', async () => {
+    vi.stubGlobal('requestIdleCallback', undefined);
+    const cancel = scheduleCachePrune();
+    await vi.advanceTimersByTimeAsync(CACHE_PRUNE_DELAY_MS);
+    cancel();
+    await vi.advanceTimersByTimeAsync(BOOT_PREFETCH_IDLE_TIMEOUT_MS * 10);
+    await flush();
+    expect(runDailyEsiCachePrune).not.toHaveBeenCalled();
   });
 });

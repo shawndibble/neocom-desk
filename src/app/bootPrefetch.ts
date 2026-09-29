@@ -46,3 +46,45 @@ export function scheduleBootPrefetch(characterId: number): () => void {
     cancelWait();
   };
 }
+
+/**
+ * How long after mount the daily cache prune waits before even asking for an
+ * idle slot: past boot, the warm-up and the first route's own reads.
+ */
+export const CACHE_PRUNE_DELAY_MS = 60_000;
+
+/**
+ * Schedules the once-a-day `esiCache` prune (`@/esi/cachePrune`) — after
+ * `CACHE_PRUNE_DELAY_MS`, then an idle slot, from its own chunk — and returns
+ * its cancel. The prune itself decides whether today's run already happened.
+ */
+export function scheduleCachePrune(): () => void {
+  let cancelled = false;
+  let cancelWait = () => {};
+
+  const start = () => {
+    if (cancelled) return;
+    import('@/esi/cachePrune')
+      .then(({ runDailyEsiCachePrune }) => {
+        if (!cancelled) return runDailyEsiCachePrune();
+      })
+      // Nothing to report: a failed run only leaves old rows for tomorrow.
+      .catch(() => {});
+  };
+
+  const delay = setTimeout(() => {
+    if (typeof globalThis.requestIdleCallback === 'function') {
+      const handle = requestIdleCallback(start, { timeout: BOOT_PREFETCH_IDLE_TIMEOUT_MS * 5 });
+      cancelWait = () => cancelIdleCallback(handle);
+    } else {
+      const handle = setTimeout(start, BOOT_PREFETCH_IDLE_TIMEOUT_MS);
+      cancelWait = () => clearTimeout(handle);
+    }
+  }, CACHE_PRUNE_DELAY_MS);
+
+  return () => {
+    cancelled = true;
+    clearTimeout(delay);
+    cancelWait();
+  };
+}
