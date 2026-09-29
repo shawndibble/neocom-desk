@@ -26,6 +26,7 @@ import { db } from '@/db';
 import { iskToneClass } from '@/features/character/format';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
+import type { BlueprintSource } from '@/engine/industry/blueprintObtainability';
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
@@ -60,6 +61,13 @@ interface MarketWideOpportunitiesPanelProps {
 
 const HIDE_SKILL_GATED = boolParam();
 
+const BLUEPRINT_SOURCE_RANK: Record<BlueprintSource, number> = {
+  owned: 0,
+  market: 1,
+  contract: 2,
+  lpStore: 3,
+};
+
 /**
  * The columns' sort keys, at module scope: the columns themselves close over
  * render-time state (and `onStartPlan`, which the parent rebuilds every
@@ -68,6 +76,7 @@ const HIDE_SKILL_GATED = boolParam();
  */
 const SORT_VALUE = {
   product: (row: MarketWideResultRow) => row.productName,
+  blueprintSource: (row: MarketWideResultRow) => BLUEPRINT_SOURCE_RANK[row.blueprintSource],
   iskPerHour: (row: MarketWideResultRow) => row.iskPerHour ?? undefined,
   buildCost: (row: MarketWideResultRow) => row.buildCost,
   orderDepth: (row: MarketWideResultRow) => ORDER_DEPTH_RANK[row.orderDepth],
@@ -85,22 +94,24 @@ export function MarketWideOpportunitiesPanel({
   const { t } = useTranslation();
   const tradeHubStandings = useTradeHubStandings(activeCharacterId);
   const standing = tradeHubStanding(tradeHubStandings, hub.id);
-  const { rows, loading, hasRun, run } = useMarketWideOpportunities({
-    hub,
-    trees,
-    catalog,
-    modifiers,
-    standing,
-  });
 
   // Account-wide, not active-character: every character on the account, same
-  // precedent `OpportunitiesPanel`'s own multi-character fan-out sets.
+  // precedent `OpportunitiesPanel`'s own multi-character fan-out sets. The
+  // scan reads the same set for whose blueprints, contracts and LP count.
   const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
   const characterNames = useMemo(
     () => new Map((allCharacters ?? []).map((c) => [c.characterId, c.name])),
     [allCharacters]
   );
-  const characterIds = [...characterNames.keys()];
+  const characterIds = useMemo(() => [...characterNames.keys()], [characterNames]);
+  const { rows, loading, hasRun, unavailableSources, run } = useMarketWideOpportunities({
+    hub,
+    trees,
+    catalog,
+    modifiers,
+    standing,
+    characterIds,
+  });
   const accountSkills = useAccountSkillLevels(characterIds);
 
   const skillGateByProductTypeID = useMemo(() => {
@@ -148,6 +159,18 @@ export function MarketWideOpportunitiesPanel({
           </span>
         );
       },
+    },
+    {
+      id: 'blueprintSource',
+      header: t('industry.marketOpportunitiesBlueprintSource'),
+      sortValue: SORT_VALUE.blueprintSource,
+      render: (row) => (
+        <StatChip
+          label={t('industry.marketOpportunitiesBlueprintSource')}
+          value={t(`industry.marketOpportunitiesBlueprintSources.${row.blueprintSource}`)}
+          tone={row.blueprintSource === 'owned' ? 'success' : 'default'}
+        />
+      ),
     },
     {
       id: 'iskPerHour',
@@ -220,6 +243,17 @@ export function MarketWideOpportunitiesPanel({
     columns.map((column) => column.id)
   );
 
+  const unavailableNote =
+    hasRun && unavailableSources.length > 0 ? (
+      <p className="text-[0.6875rem] text-text-dim">
+        {t('industry.marketOpportunitiesSourcesUnavailable', {
+          sources: unavailableSources
+            .map((source) => t(`industry.marketOpportunitiesBlueprintSources.${source}`))
+            .join(', '),
+        })}
+      </p>
+    ) : null;
+
   return (
     <Panel
       title={t('industry.marketOpportunitiesTitle')}
@@ -248,13 +282,17 @@ export function MarketWideOpportunitiesPanel({
           className="py-8"
         />
       ) : rows.length === 0 ? (
-        <EmptyState
-          title={t('industry.marketOpportunitiesNoResultsTitle')}
-          hint={t('industry.marketOpportunitiesNoResultsHint')}
-          className="py-8"
-        />
+        <div className="flex flex-col gap-2">
+          <EmptyState
+            title={t('industry.marketOpportunitiesNoResultsTitle')}
+            hint={t('industry.marketOpportunitiesNoResultsHint')}
+            className="py-8"
+          />
+          {unavailableNote}
+        </div>
       ) : (
         <div className="flex flex-col gap-2">
+          {unavailableNote}
           <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
           {gatedCount > 0 && (
             <div className="flex justify-end">

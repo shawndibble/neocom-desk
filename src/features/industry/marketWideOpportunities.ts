@@ -25,6 +25,11 @@ import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { TradeHub } from '@/market/hubs';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import type { MarketWideTreeMap } from '@/sde/types';
+import {
+  blueprintSource,
+  type BlueprintSource,
+  type BlueprintSourceSets,
+} from '@/engine/industry/blueprintObtainability';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import { loadMarketSnapshot } from './marketData';
 import {
@@ -56,6 +61,8 @@ export interface MarketWideResultRow extends MarketWideRow {
   productName: string;
   /** The blueprint that builds this product, for skill-gate lookups against the catalog. */
   blueprintTypeID: number;
+  /** How the pilot gets that blueprint — every row has one; a product with none is never ranked. */
+  blueprintSource: BlueprintSource;
 }
 
 /** Every product typeID `marketWideTrees.json` carries a tree for. */
@@ -64,16 +71,23 @@ export function marketWideProductTypeIds(trees: MarketWideTreeMap): number[] {
 }
 
 /**
- * Runs the whole opt-in scan: liquidity pass over every candidate, then a
- * material-price pass over only the survivors, then ranking. Returns an empty
- * list — never a throw — when nothing clears the liquidity floor; the caller
- * reads that as "show the empty state", not an error.
+ * Runs the whole opt-in scan: liquidity pass over every candidate whose
+ * blueprint the pilot owns or can buy, then a material-price pass over only
+ * the survivors, then ranking. Returns an empty list — never a throw — when
+ * nothing clears the liquidity floor; the caller reads that as "show the
+ * empty state", not an error.
+ *
+ * `sources` is a promise so the caller can start loading it alongside the
+ * product-price fetch rather than ahead of it. The blueprint filter runs
+ * before the top-N-per-Market-Group cut, so an unobtainable product never
+ * takes a slot an obtainable one would have filled.
  */
 export async function runMarketWideScan(
   hub: TradeHub,
   trees: MarketWideTreeMap,
   catalog: BlueprintCatalog,
   modifiers: CharacterModifiers,
+  sources: Promise<BlueprintSourceSets>,
   options: MarketWideScanOptions = {},
   /** The character's standing toward `hub`'s NPC owner (issue #1238). Absent/0 = standings assumed 0. */
   standing?: ResolvedStandings
@@ -84,8 +98,17 @@ export async function runMarketWideScan(
   const productTypeIds = marketWideProductTypeIds(trees);
   if (productTypeIds.length === 0) return [];
 
-  const productAggregates = await getHubPrices(hub, productTypeIds);
-  const liquidityCandidates: LiquidityCandidate[] = productTypeIds.map((productTypeID) => {
+  const [productAggregates, sourceSets] = await Promise.all([
+    getHubPrices(hub, productTypeIds),
+    sources,
+  ]);
+  const sourceByProduct = new Map<number, BlueprintSource>();
+  for (const productTypeID of productTypeIds) {
+    const source = blueprintSource(trees[String(productTypeID)]!.blueprintTypeID, sourceSets);
+    if (source) sourceByProduct.set(productTypeID, source);
+  }
+  const obtainable = productTypeIds.filter((productTypeID) => sourceByProduct.has(productTypeID));
+  const liquidityCandidates: LiquidityCandidate[] = obtainable.map((productTypeID) => {
     const aggregate = productAggregates.get(productTypeID);
     return {
       productTypeID,
@@ -144,5 +167,6 @@ export async function runMarketWideScan(
     ...row,
     productName: catalog.typesById[String(row.productTypeID)]?.name ?? `#${row.productTypeID}`,
     blueprintTypeID: trees[String(row.productTypeID)]!.blueprintTypeID,
+    blueprintSource: sourceByProduct.get(row.productTypeID)!,
   }));
 }

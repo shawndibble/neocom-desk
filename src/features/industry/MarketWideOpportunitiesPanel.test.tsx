@@ -15,17 +15,20 @@ const row = (productTypeID: number, productName: string): MarketWideResultRow =>
     productTypeID,
     productName,
     blueprintTypeID: productTypeID + 1000,
+    blueprintSource: productTypeID === 200 ? 'owned' : 'contract',
     iskPerHour: 1_000_000,
     buildCost: 5_000_000,
     orderDepth: 'deep',
   }) as unknown as MarketWideResultRow;
 
+const hookState = vi.hoisted(() => ({ unavailableSources: [] as string[] }));
 vi.mock('./useMarketWideOpportunities', () => ({
   useMarketWideOpportunities: () => ({
     rows: [row(200, 'Widget Beta'), row(300, 'Widget Gamma')],
     loading: false,
     hasRun: true,
     error: false,
+    unavailableSources: hookState.unavailableSources,
     run: () => {},
   }),
 }));
@@ -103,5 +106,32 @@ describe('MarketWideOpportunitiesPanel row context menu', () => {
       .then((els) => els.map((el) => el.textContent));
 
     expect(buttonItems).toEqual(contextItems);
+  });
+});
+
+describe('MarketWideOpportunitiesPanel blueprint sources', () => {
+  it('names where each row’s blueprint comes from', () => {
+    renderPanel();
+    const beta = screen.getByText('Widget Beta').closest('tr')!;
+    const gamma = screen.getByText('Widget Gamma').closest('tr')!;
+    expect(within(beta).getByText('Owned')).toBeInTheDocument();
+    expect(within(gamma).getByText('Contract')).toBeInTheDocument();
+  });
+
+  it('says which sources it could not check, since their rows may be missing', () => {
+    hookState.unavailableSources = ['contract', 'lpStore'];
+    try {
+      renderPanel();
+      expect(
+        screen.getByText(/Couldn't check Contract, LP store — products whose blueprint/)
+      ).toBeInTheDocument();
+    } finally {
+      hookState.unavailableSources = [];
+    }
+  });
+
+  it('adds no note when every source was read', () => {
+    renderPanel();
+    expect(screen.queryByText(/Couldn't check/)).not.toBeInTheDocument();
   });
 });
