@@ -38,16 +38,19 @@ interface LockCounts {
   pending: Record<string, number>;
 }
 
+/**
+ * What each second tab let escape to a real host, checked in `afterEach` —
+ * the `page` fixture's own guard only covers `page`.
+ */
+let secondTabEscapes: string[][] = [];
+
 /** A second tab of the same app, with the same network guard as `page`. */
-async function openTab(
-  context: BrowserContext,
-  baseURL: string
-): Promise<{ tab: Page; escaped: string[] }> {
+async function openTab(context: BrowserContext, baseURL: string): Promise<Page> {
   const tab = await context.newPage();
-  const escaped = await installMockedNetwork(tab, baseURL);
+  secondTabEscapes.push(await installMockedNetwork(tab, baseURL));
   await tab.goto('./overview');
   await layoutMounted(tab);
-  return { tab, escaped };
+  return tab;
 }
 
 /**
@@ -150,9 +153,9 @@ async function twoTabs(page: Page, baseURL: string) {
   await joinSweep(page);
   await expect.poll(() => leadership(page)).toEqual(LEADS);
 
-  const second = await openTab(page.context(), baseURL);
-  await joinSweep(second.tab);
-  return second;
+  const tab = await openTab(page.context(), baseURL);
+  await joinSweep(tab);
+  return tab;
 }
 
 // The last test needs the back/forward cache, which Playwright's default
@@ -167,20 +170,29 @@ test.use({
   launchOptions: { ignoreDefaultArgs: ['--disable-back-forward-cache'] },
 });
 
+// Each test boots the app twice and waits for both to settle, and the close
+// handoff alone may take 15s: the default 30s is too tight on a loaded shard.
+test.describe.configure({ timeout: 60_000 });
+
+test.afterEach(() => {
+  const escaped = secondTabEscapes.flat();
+  secondTabEscapes = [];
+  expect(escaped, `Real network reached from a second tab: ${escaped.join(', ')}`).toEqual([]);
+});
+
 test.describe('Tab Leader election (real Web Locks)', () => {
   test('exactly one of two visible tabs leads each job', async ({ page, baseURL }) => {
-    const { tab, escaped } = await twoTabs(page, baseURL!);
+    const tab = await twoTabs(page, baseURL!);
 
     // The second tab's requests are queued behind the first's.
     await expect.poll(() => lockCounts(tab)).toEqual({ held: ONE_EACH, pending: ONE_EACH });
     expect(await leadership(page)).toEqual(LEADS);
     expect(await leadership(tab)).toEqual(FOLLOWS);
-    expect(escaped).toEqual([]);
   });
 
   test('a hidden leader hands both jobs to the visible tab', async ({ page, baseURL }) => {
     await page.context().addInitScript(controllableVisibility);
-    const { tab, escaped } = await twoTabs(page, baseURL!);
+    const tab = await twoTabs(page, baseURL!);
 
     await setHidden(page, true);
     await expect.poll(() => leadership(tab)).toEqual(LEADS);
@@ -193,11 +205,10 @@ test.describe('Tab Leader election (real Web Locks)', () => {
     await expect.poll(() => lockCounts(tab)).toEqual({ held: ONE_EACH, pending: ONE_EACH });
     expect(await leadership(tab)).toEqual(LEADS);
     expect(await leadership(page)).toEqual(FOLLOWS);
-    expect(escaped).toEqual([]);
   });
 
   test('closing the leader hands both jobs to the other tab', async ({ page, baseURL }) => {
-    const { tab, escaped } = await twoTabs(page, baseURL!);
+    const tab = await twoTabs(page, baseURL!);
     await expect.poll(() => lockCounts(tab)).toEqual({ held: ONE_EACH, pending: ONE_EACH });
 
     await page.close();
@@ -206,24 +217,26 @@ test.describe('Tab Leader election (real Web Locks)', () => {
     // workers — hence more than the default 5s of headroom.
     await expect.poll(() => leadership(tab), { timeout: 15_000 }).toEqual(LEADS);
     await expect.poll(() => lockCounts(tab)).toEqual({ held: ONE_EACH, pending: NONE });
-    expect(escaped).toEqual([]);
   });
 
   test('without Web Locks every tab leads', async ({ page, baseURL }) => {
     await page.context().addInitScript(() => {
       delete (Navigator.prototype as { locks?: LockManager }).locks;
     });
-    const { tab, escaped } = await twoTabs(page, baseURL!);
+    const tab = await twoTabs(page, baseURL!);
 
     expect(await tab.evaluate(() => 'locks' in navigator)).toBe(false);
     expect(await leadership(page)).toEqual(LEADS);
     expect(await leadership(tab)).toEqual(LEADS);
-    expect(escaped).toEqual([]);
   });
 });
 
 test.describe('Tab Leader across the back/forward cache', () => {
-  test('a page restored from the cache stands for leadership again', async ({ page }) => {
+  // Re-acquisition on restore, not specifically the `pageshow` handler: Chrome
+  // also fires `visibilitychange` to visible on a restore, and with the
+  // module's `pageshow` listener removed this still passes (checked by hand).
+  // The `pageshow` path itself is covered by `src/lib/tabLeader.test.ts`.
+  test('a page re-acquires leadership after a back/forward cache restore', async ({ page }) => {
     await page.addInitScript(() => {
       const w = window as unknown as { __e2ePageShows: boolean[] };
       w.__e2ePageShows = [];
