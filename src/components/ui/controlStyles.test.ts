@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { toggleChipStateClassName } from './controlStyles';
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -16,5 +17,23 @@ describe('pointer-height scale', () => {
       .flatMap((dir) => sourceFiles(dir))
       .filter((file) => /\bmd:min-(h|w)-8\b/.test(readFileSync(file, 'utf8')));
     expect(offenders).toEqual([]);
+  });
+});
+
+describe('toggleChipStateClassName', () => {
+  it('gives an on chip the accent tint: dim accent edge, 15% fill, accent text', () => {
+    expect(toggleChipStateClassName(true)).toBe('border-accent-dim bg-accent/15 text-accent');
+  });
+
+  it('gives an off chip the input fill, dim text and a line-bright hover', () => {
+    expect(toggleChipStateClassName(false)).toBe(
+      'border-line bg-panel-2 text-text-dim hover:border-line-bright hover:text-text'
+    );
+  });
+
+  it('drops the hover from an off chip that cannot be toggled', () => {
+    expect(toggleChipStateClassName(false, { hoverable: false })).toBe(
+      'border-line bg-panel-2 text-text-dim'
+    );
   });
 });
