@@ -4,12 +4,7 @@ import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import type { CorporationIndustryJob } from '@/esi/endpoints';
-import {
-  loadAccountCorpIndustryJobs,
-  pickCorpReaders,
-  unreadableCorpCharacters,
-  visibleCorpJobs,
-} from './corpJobs';
+import { loadAccountCorpIndustryJobs, pickCorpReaders, visibleCorpJobs } from './corpJobs';
 
 const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -75,17 +70,6 @@ describe('pickCorpReaders', () => {
       3
     );
     expect(readers.get(500)).toBe(2);
-  });
-});
-
-describe('unreadableCorpCharacters', () => {
-  it('lists characters whose corporation no account character can read', () => {
-    const candidates = [
-      { characterId: 1, corporationId: 500, canReadIndustry: false },
-      { characterId: 2, corporationId: 500, canReadIndustry: true },
-      { characterId: 4, corporationId: 600, canReadIndustry: false },
-    ];
-    expect(unreadableCorpCharacters(candidates, pickCorpReaders(candidates))).toEqual([4]);
   });
 });
 
@@ -214,7 +198,6 @@ describe('loadAccountCorpIndustryJobs', () => {
 
     const snapshot = await loadAccountCorpIndustryJobs(1);
     expect(snapshot.jobs.map((job) => job.job_id)).toEqual([7]);
-    expect(snapshot.unreadableCharacterIds).toEqual([]);
     expect(snapshot.fetchedAt).not.toBeNull();
   });
 
@@ -223,16 +206,5 @@ describe('loadAccountCorpIndustryJobs', () => {
     // No handlers: an ESI call would be an unhandled request.
     const snapshot = await loadAccountCorpIndustryJobs(1);
     expect(snapshot.jobs).toEqual([]);
-    expect(snapshot.unreadableCharacterIds).toEqual([]);
-  });
-
-  it('names a granted character whose corporation nobody here can read', async () => {
-    await seed(1, [CORP_SCOPE]);
-    server.use(
-      publicInfo(1),
-      http.get(`${ESI_BASE_URL}/characters/1/roles`, () => HttpResponse.json({ roles: [] }))
-    );
-    const snapshot = await loadAccountCorpIndustryJobs(1);
-    expect(snapshot.unreadableCharacterIds).toEqual([1]);
   });
 });

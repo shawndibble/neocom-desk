@@ -1615,10 +1615,9 @@ describe('ActiveJobsPanel: corp jobs by installer (issue #2302)', () => {
     };
   }
 
-  function mockCorpJobs(jobs: ReturnType<typeof corpJob>[], unreadableCharacterIds: number[] = []) {
+  function mockCorpJobs(jobs: ReturnType<typeof corpJob>[]) {
     vi.spyOn(corpJobsModule, 'loadAccountCorpIndustryJobs').mockResolvedValue({
       jobs,
-      unreadableCharacterIds,
       fetchedAt: NOW,
       fromCache: false,
     });
@@ -1669,10 +1668,11 @@ describe('ActiveJobsPanel: corp jobs by installer (issue #2302)', () => {
     expect(screen.getByRole('button', { name: 'Hide job list' })).toBeInTheDocument();
   });
 
-  it('says so when no character here can read its corporation jobs', async () => {
-    mockCorpJobs([], [CHAR_ID]);
+  it('stays a one-line header when no corp jobs are readable', async () => {
+    mockCorpJobs([]);
     renderAt('/industry');
 
-    expect(await screen.findByText(/corp jobs need the Factory Manager role/)).toBeInTheDocument();
+    expect(await screen.findByText('None')).toBeInTheDocument();
+    expect(screen.queryByText(/Factory Manager/)).not.toBeInTheDocument();
   });
 });
