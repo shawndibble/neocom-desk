@@ -29,7 +29,7 @@ import { resolveNames } from '@/features/character/names';
 import { db } from '@/db';
 import { lastPriceAlertSnapshot } from '@/features/notifications/pollDomains';
 import { buildPriceAlertRows, type BoardPriceAlert } from './priceAlertsBoard';
-import type { CorpBoardItem } from '@/engine/corp/board';
+import type { BoardStructureSource, CorpBoardItem } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
 import type { CalendarEventSummary } from '@/esi/endpoints';
 
@@ -344,7 +344,11 @@ export async function loadMailBoard(characterId: number): Promise<MailBoardData>
       atMs: Number.isNaN(atMs) ? null : atMs,
     })),
     needsReauth: headers.needsReauth || labels.needsReauth,
-    fetchedAt: headers.cached ? headers.cached.fetchedAt : null,
+    // The older of the two reads: the count is only as fresh as the labels.
+    fetchedAt:
+      [headers.cached?.fetchedAt, labels.cached?.fetchedAt]
+        .filter((date): date is Date => date instanceof Date)
+        .sort((a, b) => a.getTime() - b.getTime())[0] ?? null,
   };
 }
 
@@ -379,14 +383,21 @@ export async function loadPriceAlertsBoard(characterId: number): Promise<PriceAl
 
 export interface StructuresBoardData {
   /**
-   * The corp engine's items for this corporation's structures — reinforcement
-   * timers, fuel and offline services — or null when this Character may not
-   * read structures, which is different from owning none.
+   * The corporation's structures as the corp engine reads them, or null when
+   * this Character may not read structures — which is different from owning
+   * none. Raw sources rather than built items: the items' clocks and
+   * staleness are relative to *now*, so they are built at render time
+   * (`corpCards.ts`'s `structuresView`), never frozen at load.
    */
-  items: CorpBoardItem[] | null;
+  structures: BoardStructureSource[] | null;
   structureCount: number;
   needsReauth: boolean;
   fetchedAt: Date | null;
+}
+
+/** `StructuresBoardData` with its items built against the current instant. */
+export interface StructuresView extends Omit<StructuresBoardData, 'structures'> {
+  items: CorpBoardItem[] | null;
 }
 
 export async function loadStructuresBoard(characterId: number): Promise<StructuresBoardData> {

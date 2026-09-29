@@ -5,9 +5,30 @@
  * only counts them and picks which one may lead the summary strip.
  */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/severity';
-import type { CorpBoardItem } from '@/engine/corp/board';
+import { DAY_MS } from '@/lib/age';
+import { buildCorpBoard, type CorpBoardItem } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
-import type { MoonChunksBoardData, StructuresBoardData } from './boardData';
+import type { MoonChunksBoardData, StructuresBoardData, StructuresView } from './boardData';
+
+/** CCP caches the corp endpoints for about an hour — the Corp page's own window. */
+export const CORP_CACHE_WINDOW_MS = 3_600_000;
+
+/**
+ * The structures' board items as of `nowMs`. Built per render, not at load:
+ * `withinStaleWindow` asks whether a clock is shorter than the cache it was
+ * read from, and a timer 65 minutes out at load is 50 minutes out a quarter
+ * of an hour later — frozen, it would tick below the window as if live.
+ */
+export function structuresView(data: StructuresBoardData, nowMs: number): StructuresView {
+  const { structures, ...rest } = data;
+  return {
+    ...rest,
+    items:
+      structures === null
+        ? null
+        : buildCorpBoard({ nowMs, staleWindowMs: CORP_CACHE_WINDOW_MS, structures }),
+  };
+}
 
 export interface StructureCounts {
   /** Reinforcement (and other state) timers running. */
@@ -32,7 +53,7 @@ export function structureCounts(items: readonly CorpBoardItem[]): StructureCount
 }
 
 /** Null while loading and while unreadable — a card that could not look makes no claim. */
-export function structuresSeverity(data: StructuresBoardData | null): DeadlineSeverity | null {
+export function structuresSeverity(data: StructuresView | null): DeadlineSeverity | null {
   if (data === null || data.items === null) return null;
   return worstSeverity(data.items.map((item) => item.severity));
 }
@@ -49,12 +70,13 @@ export function structuresDeadline(
   nowMs: number
 ): {
   atMs: number;
-  kind: CorpBoardItem['kind'];
+  kind: 'structureTimer' | 'structureFuel';
   subject: string;
   severity: DeadlineSeverity;
 } | null {
   let soonest: CorpBoardItem | null = null;
   for (const item of items) {
+    if (item.kind !== 'structureTimer' && item.kind !== 'structureFuel') continue;
     if (item.timing !== 'timed' || item.deadlineMs === null) continue;
     if (item.withinStaleWindow || item.deadlineMs <= nowMs) continue;
     if (soonest === null || item.deadlineMs < (soonest.deadlineMs ?? Infinity)) soonest = item;
@@ -62,14 +84,11 @@ export function structuresDeadline(
   if (soonest === null || soonest.deadlineMs === null) return null;
   return {
     atMs: soonest.deadlineMs,
-    kind: soonest.kind,
+    kind: soonest.kind === 'structureTimer' ? 'structureTimer' : 'structureFuel',
     subject: soonest.subject,
     severity: soonest.severity,
   };
 }
-
-/** How soon an arriving chunk has to be before the card flags it. */
-const CHUNK_WATCH_MS = 86_400_000;
 
 /**
  * A chunk that has landed is waiting to be fractured and mined before it
@@ -77,7 +96,7 @@ const CHUNK_WATCH_MS = 86_400_000;
  */
 export function moonChunkSeverity(chunk: BoardClockSource, nowMs: number): DeadlineSeverity {
   if (chunk.detail === 'decay') return 'warning';
-  return chunk.deadlineMs - nowMs <= CHUNK_WATCH_MS ? 'watch' : 'clear';
+  return chunk.deadlineMs - nowMs <= DAY_MS ? 'watch' : 'clear';
 }
 
 export function moonChunksSeverity(

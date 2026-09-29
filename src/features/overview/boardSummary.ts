@@ -40,7 +40,7 @@ import type {
   PlanetaryBoardData,
   PriceAlertsBoardData,
   SpExtractionBoardData,
-  StructuresBoardData,
+  StructuresView,
 } from './boardData';
 
 /**
@@ -218,7 +218,7 @@ export function priceAlertsSummary(t: Translate, data: PriceAlertsBoardData | nu
   return t('overview.board.priceAlertsNone');
 }
 
-export function structuresSummary(t: Translate, data: StructuresBoardData | null): string {
+export function structuresSummary(t: Translate, data: StructuresView | null): string {
   if (data === null) return t(CHECKING);
   if (data.items === null) return t(data.needsReauth ? REAUTH : 'overview.board.corpUnreadable');
   const counts = structureCounts(data.items);

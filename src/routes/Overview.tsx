@@ -66,6 +66,7 @@ import {
   moonChunksSeverity,
   structuresDeadline,
   structuresSeverity,
+  structuresView,
 } from '@/features/overview/corpCards';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import {
@@ -424,9 +425,8 @@ export function Overview() {
     monitoring: spMonitoring,
     thresholdSp: spThreshold,
   };
-  const structureClock = structuresSnapshot.data?.items
-    ? structuresDeadline(structuresSnapshot.data.items, now)
-    : null;
+  const structures = structuresSnapshot.data ? structuresView(structuresSnapshot.data, now) : null;
+  const structureClock = structures?.items ? structuresDeadline(structures.items, now) : null;
   const nextChunk = moonSnapshot.data?.chunks
     ? moonChunksDeadline(moonSnapshot.data.chunks, now)
     : null;
@@ -555,8 +555,8 @@ export function Overview() {
       // that appears a beat late for a Director.
       available: corpAccess.state === 'ready' && corpAccess.capabilities.canReadStructures,
       to: '/corp',
-      severity: structuresSeverity(structuresSnapshot.data),
-      summary: structuresSummary(t, structuresSnapshot.data),
+      severity: structuresSeverity(structures),
+      summary: structuresSummary(t, structures),
       fetchedAt: structuresSnapshot.data?.fetchedAt,
       loading: structuresSnapshot.loading,
       deadline: structureClock
@@ -569,7 +569,7 @@ export function Overview() {
             to: '/corp',
           }
         : null,
-      render: () => <StructuresCard data={structuresSnapshot.data} />,
+      render: () => <StructuresCard data={structures} />,
     },
     {
       key: 'moonChunks',

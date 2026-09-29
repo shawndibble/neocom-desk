@@ -8,6 +8,7 @@ import {
   structureCounts,
   structuresDeadline,
   structuresSeverity,
+  structuresView,
 } from './corpCards';
 import { moonChunksSummary, structuresSummary } from './boardSummary';
 
@@ -40,12 +41,11 @@ function board(structures: BoardStructureSource[]) {
   return buildCorpBoard({ nowMs: NOW, staleWindowMs: HOUR, structures });
 }
 
-const data = (structures: BoardStructureSource[]) => ({
-  items: board(structures),
-  structureCount: structures.length,
-  needsReauth: false,
-  fetchedAt: null,
-});
+const data = (structures: BoardStructureSource[], nowMs = NOW) =>
+  structuresView(
+    { structures, structureCount: structures.length, needsReauth: false, fetchedAt: null },
+    nowMs
+  );
 
 describe('structureCounts', () => {
   it('counts reinforcement timers, fuel within three days, and offline services', () => {
@@ -86,7 +86,10 @@ describe('structuresSeverity and structuresSummary', () => {
   });
 
   it('say so when the structure list cannot be read', () => {
-    const d = { items: null, structureCount: 0, needsReauth: false, fetchedAt: null };
+    const d = structuresView(
+      { structures: null, structureCount: 0, needsReauth: false, fetchedAt: null },
+      NOW
+    );
     expect(structuresSeverity(d)).toBeNull();
     expect(structuresSummary(t, d)).toBe('overview.board.corpUnreadable');
   });
@@ -115,6 +118,24 @@ describe('structuresDeadline', () => {
       structure({ structureId: 2, fuelExpiresMs: null }),
     ]);
     expect(structuresDeadline(items, NOW)?.atMs).toBe(NOW + 30 * DAY);
+  });
+});
+
+describe('structuresView', () => {
+  /*
+   * A timer 65 minutes out when the structures were read is 50 minutes out a
+   * quarter of an hour later. Judged at load it would stay live and tick below
+   * the cache window; judged now, it is stale and never leads the strip.
+   */
+  it('judges the stale window against the current instant, not the load', () => {
+    const later = NOW + 15 * 60_000;
+    const view = data(
+      [structure({ state: 'armor_reinforce', stateTimerEndMs: NOW + 65 * 60_000 })],
+      later
+    );
+    const timer = view.items?.find((item) => item.kind === 'structureTimer');
+    expect(timer?.withinStaleWindow).toBe(true);
+    expect(structuresDeadline(view.items ?? [], later)?.kind).toBe('structureFuel');
   });
 });
 

@@ -15,19 +15,14 @@
  * is not part of every grant, and asking without it raises the app-wide re-auth
  * notice over a page that never needed corp data.
  */
-import { db } from '@/db';
-import { corpCapabilities } from '@/engine/corpRoles';
 import type { CorporationStructure } from '@/esi/endpoints';
 import type { StatusResult } from '@/esi/cache';
-import { ESI_REGISTRY } from '@/esi/registry';
 import {
-  loadCorporationId,
   loadCorporationMiningExtractions,
   loadCorporationStructures,
 } from '@/features/corp/boardData';
 import { structureName, toBoardExtractions } from '@/features/corp/boardSources';
-import { CORP_SCOPES_FOR_CAPABILITY } from '@/features/corp/corpScopes';
-import { corpWideRoles, loadCharacterRoles } from '@/features/corp/roles';
+import { resolveCorpReadAccess } from '@/features/corp/corpReadAccess';
 import type { BoardClockSource } from '@/engine/character/board';
 import { toMoonChunkSources } from './calendarBoardSources';
 
@@ -44,22 +39,11 @@ const NOT_READABLE: MoonChunkRead = {
 };
 
 export async function loadMoonChunks(characterId: number, nowMs: number): Promise<MoonChunkRead> {
-  const granted = new Set((await db.tokens.get(characterId))?.scopes ?? []);
-  if (!granted.has(ESI_REGISTRY.getCharacterRoles.scope)) return NOT_READABLE;
+  const access = await resolveCorpReadAccess(characterId);
+  if (access === null || !access.can('canReadMoonExtractions')) return NOT_READABLE;
+  const { corporationId } = access;
 
-  const holdsScopesFor = (capability: 'canReadMoonExtractions' | 'canReadStructures') =>
-    CORP_SCOPES_FOR_CAPABILITY[capability].every((scope) => granted.has(scope));
-
-  const corporationId = await loadCorporationId(characterId);
-  if (corporationId === null) return NOT_READABLE;
-  const roles = await loadCharacterRoles(characterId);
-  if (roles.needsReauth || roles.cached === null) return NOT_READABLE;
-
-  const capabilities = corpCapabilities(corpWideRoles(roles.cached.data));
-  if (!capabilities.canReadMoonExtractions) return NOT_READABLE;
-  if (!holdsScopesFor('canReadMoonExtractions')) return NOT_READABLE;
-
-  const canNameRefineries = capabilities.canReadStructures && holdsScopesFor('canReadStructures');
+  const canNameRefineries = access.can('canReadStructures');
   const [extractions, structures] = await Promise.all([
     loadCorporationMiningExtractions(characterId, corporationId),
     canNameRefineries ? loadCorporationStructures(characterId, corporationId) : undefined,

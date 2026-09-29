@@ -18,6 +18,7 @@ import { openOrderProblemCounts } from '@/features/market/openOrdersModel';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
 import { isSpExtractionReady } from '@/engine/spExtraction';
+import { DAY_MS } from '@/lib/age';
 import type {
   CalendarEventsBoardData,
   ContractsBoardData,
@@ -102,7 +103,12 @@ export function contractsSeverity(data: ContractsBoardData | null): DeadlineSeve
 }
 
 /** How soon a committed calendar event has to be before the card flags it. */
-const COMING_UP_WATCH_MS = 86_400_000;
+const COMING_UP_WATCH_MS = DAY_MS;
+
+/** One event's row tone: `watch` within a day, `clear` beyond. */
+export function comingUpEventSeverity(atMs: number, nowMs: number): DeadlineSeverity {
+  return atMs - nowMs <= COMING_UP_WATCH_MS ? 'watch' : 'clear';
+}
 
 /**
  * A committed event is a plan, not a problem, so this never goes past
@@ -117,7 +123,7 @@ export function comingUpSeverity(
   if (data === null) return null;
   if (data.needsReauth) return UNREADABLE;
   const next = upcomingCommittedEvents(data.events, nowMs)[0];
-  return next !== undefined && next.atMs - nowMs <= COMING_UP_WATCH_MS ? 'watch' : 'clear';
+  return next === undefined ? 'clear' : comingUpEventSeverity(next.atMs, nowMs);
 }
 
 /**

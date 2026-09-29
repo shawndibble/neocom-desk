@@ -1277,10 +1277,14 @@ describe('corp cards', () => {
     const structures = await findCard(/^structures$/i);
     expect(await within(structures).findByText('Home Astrahus')).toBeInTheDocument();
     expect(within(structures).getByText('armor reinforce')).toBeInTheDocument();
+    // Copy, not keys: a string filed under the wrong parent renders as its key.
+    expect(within(structures).getByText('Timers')).toBeInTheDocument();
+    expect(within(structures).getByText('1 structure')).toBeInTheDocument();
 
     const moon = await findCard(/moon extractions/i);
     expect(await within(moon).findByText('Home Astrahus')).toBeInTheDocument();
     expect(within(moon).getByText('Chunk arrives')).toBeInTheDocument();
+    expect(within(moon).getByText('1 drill')).toBeInTheDocument();
   });
 
   it('offers neither card, and makes no corp read, to a pilot without corp roles', async () => {

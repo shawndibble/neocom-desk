@@ -35,6 +35,7 @@ import { BoardCard, FoldedRow, NumberTile, TileRow, TriageRow } from './BoardCar
 import {
   industrySeverity,
   jobSeverity,
+  comingUpEventSeverity,
   comingUpSeverity,
   priceAlertsSeverity,
   mailSeverity,
@@ -43,7 +44,7 @@ import {
   miningTaxSeverity,
   planetarySeverity,
 } from './boardSeverity';
-import { contractsDeadlineNote } from './boardSummary';
+import { contractsDeadlineNote, mailSummary } from './boardSummary';
 import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
 import { extractableSp, extractorCount } from '@/engine/spExtraction';
 import { formatCompactNumber } from '@/lib/compactNumber';
@@ -65,7 +66,7 @@ import type {
   PlanetaryBoardData,
   PriceAlertsBoardData,
   SpExtractionBoardData,
-  StructuresBoardData,
+  StructuresView,
 } from './boardData';
 
 /** The Contracts History table filtered to accepted contracts — the courier hauls the card counts. */
@@ -509,7 +510,7 @@ export function ComingUpCard({
           {shown.map((event) => (
             <TriageRow
               key={event.eventId}
-              severity={event.atMs - nowMs <= 86_400_000 ? 'watch' : 'clear'}
+              severity={comingUpEventSeverity(event.atMs, nowMs)}
               when={formatDuration((event.atMs - nowMs) / 1000)}
               subject={event.title}
               detail={t(`overview.board.response.${event.response}`)}
@@ -588,15 +589,7 @@ export function MailCard({ data, nowMs }: { data: MailBoardData | null; nowMs: n
       }
       to="/mail"
       openLabel={t('overview.board.open')}
-      footer={
-        data === null
-          ? t('overview.board.checking')
-          : data.needsReauth
-            ? t('overview.board.reauth')
-            : data.unread > 0
-              ? t('overview.board.mailUnread', { count: data.unread })
-              : t('overview.board.mailNone')
-      }
+      footer={mailSummary(t, data)}
     >
       {data === null || data.needsReauth || data.recent.length === 0 ? (
         <CardEmpty>
@@ -712,13 +705,22 @@ function structureWhen(item: CorpBoardItem, t: (key: string) => string): string 
  * offline services, as counts and then the worst few as rows. A structure
  * whose fuel is weeks out is not a row here — the Corp page lists every one.
  */
-export function StructuresCard({ data }: { data: StructuresBoardData | null }) {
+export function StructuresCard({ data }: { data: StructuresView | null }) {
   const { t } = useTranslation();
   const items = data?.items ?? null;
   const counts = items ? structureCounts(items) : null;
-  const rows = (items ?? [])
-    .filter((item) => item.kind !== 'structureFuel' || item.severity !== 'clear')
-    .slice(0, ROW_LIMIT);
+  // Every timer gets a row — a reinforced structure is never "+1 more" —
+  // and the worst of the fuel and service rows fill what room is left.
+  const flagged = (items ?? []).filter(
+    (item) => item.kind !== 'structureFuel' || item.severity !== 'clear'
+  );
+  const timers = flagged.filter((item) => item.kind === 'structureTimer');
+  const rows = [
+    ...timers,
+    ...flagged
+      .filter((item) => item.kind !== 'structureTimer')
+      .slice(0, Math.max(0, ROW_LIMIT - timers.length)),
+  ];
   return (
     <BoardCard
       title={t('overview.board.structures')}
