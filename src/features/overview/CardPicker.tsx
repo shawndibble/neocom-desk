@@ -9,16 +9,12 @@ import {
   IconButton,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { isCardShown, OVERVIEW_CARD_KEYS, type OverviewCardKey } from './hiddenCards';
-
-const CARD_LABEL: Record<OverviewCardKey, string> = {
-  orders: 'overview.board.orders',
-  mining: 'overview.board.miningTax',
-  contracts: 'overview.board.contracts',
-  planetary: 'overview.board.planetary',
-  industry: 'overview.board.industry',
-  alerts: 'overview.board.alerts',
-};
+import {
+  isCardShown,
+  OVERVIEW_CARD_KEYS,
+  OVERVIEW_CARD_LABEL,
+  type OverviewCardKey,
+} from './hiddenCards';
 
 /**
  * The board's edit menu: one checkbox per card. A menu rather than an edit
@@ -52,7 +48,7 @@ export function CardPicker({
             onSelect={(event) => event.preventDefault()}
             onCheckedChange={() => onToggle(key)}
           >
-            {t(CARD_LABEL[key])}
+            {t(OVERVIEW_CARD_LABEL[key])}
           </DropdownMenuCheckboxItem>
         ))}
         <DropdownMenuSeparator />

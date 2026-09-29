@@ -56,8 +56,10 @@ import { SummaryStrip } from '@/features/overview/SummaryStrip';
 import { CardPicker } from '@/features/overview/CardPicker';
 import {
   isCardShown,
+  OVERVIEW_CARD_LABEL,
   toggleHiddenCard,
   useOverviewHiddenCards,
+  type OverviewCardKey,
 } from '@/features/overview/hiddenCards';
 import {
   AlertsColumn,
@@ -199,7 +201,7 @@ export function Overview() {
   useEffect(() => {
     void hydrateHiddenCards();
   }, [hydrateHiddenCards]);
-  const shown = (key: string) => isCardShown(hiddenCards, key);
+  const shown = (key: OverviewCardKey) => isCardShown(hiddenCards, key);
 
   // One `cacheKey` per card, not one for the page: they load independently, so
   // a return visit restores each as soon as that card's own last result exists
@@ -424,8 +426,8 @@ export function Overview() {
    */
   const cards = [
     {
-      key: 'orders',
-      domain: t('overview.board.orders'),
+      key: 'orders' as const,
+      domain: t(OVERVIEW_CARD_LABEL.orders),
       to: '/market/orders',
       severity: ordersSeverity(orderRows, ordersNeedReauth),
       summary: ordersSummary(t, orderRows, ordersNeedReauth),
@@ -439,24 +441,24 @@ export function Overview() {
       ),
     },
     {
-      key: 'mining',
-      domain: t('overview.board.miningTax'),
+      key: 'mining' as const,
+      domain: t(OVERVIEW_CARD_LABEL.mining),
       to: '/mining/tax',
       severity: miningTaxSeverity(miningSnapshot.data),
       summary: miningTaxSummary(t, miningSnapshot.data),
       render: () => <MiningTaxCard data={miningSnapshot.data} />,
     },
     {
-      key: 'planetary',
-      domain: t('overview.board.planetary'),
+      key: 'planetary' as const,
+      domain: t(OVERVIEW_CARD_LABEL.planetary),
       to: '/planetary-industry',
       severity: planetarySeverity(planetary),
       summary: planetarySummary(t, planetary),
       render: () => <PlanetaryCard data={planetary} />,
     },
     {
-      key: 'industry',
-      domain: t('overview.board.industry'),
+      key: 'industry' as const,
+      domain: t(OVERVIEW_CARD_LABEL.industry),
       to: '/industry',
       severity: industrySeverity(industryJobs, industrySnapshot.data?.needsReauth ?? false, now),
       summary: industrySummary(t, industrySnapshot.data, now),
@@ -483,7 +485,7 @@ export function Overview() {
    * Mining Tax. It is not a fifth domain competing for a phone's two full cards.
    */
   const contractsCard = {
-    key: 'contracts',
+    key: 'contracts' as const,
     render: () => <ContractsCard data={contracts} />,
   };
   // Hidden cards are filtered after the desktop order is built, so hiding one
@@ -508,15 +510,15 @@ export function Overview() {
   const folded: FoldedDomain[] = isPhone
     ? [
         {
-          key: 'alerts',
-          domain: t('overview.board.alerts'),
+          key: 'alerts' as const,
+          domain: t(OVERVIEW_CARD_LABEL.alerts),
           summary: alertsSummary(t, visibleAlerts.length, alertGroups.length),
           severity: worstSeverity(alertGroups.map((group) => group.severity)),
           to: '/alerts',
         },
         {
-          key: 'contracts',
-          domain: t('overview.board.contracts'),
+          key: 'contracts' as const,
+          domain: t(OVERVIEW_CARD_LABEL.contracts),
           summary: contractsSummary(t, contracts, now),
           severity: contractsSeverity(contracts),
           to: CONTRACTS_IN_PROGRESS_HREF,
@@ -621,6 +623,12 @@ export function Overview() {
         }
       />
 
+      {nothingShown && (
+        <p className="rounded-xs border border-line bg-panel/85 px-3 py-4 text-xs text-text-dim">
+          {t('overview.board.allCardsHidden')}
+        </p>
+      )}
+
       {/*
         Two columns from `xl`: the domain cards, and alerts beside them at full
         height. Below `xl` the sidebar leaves the cards too little width beside
@@ -629,11 +637,6 @@ export function Overview() {
         what gives the cards in one row a common bottom edge, and a pair at
         different heights reads as one of them having failed to load.
       */}
-      {nothingShown && (
-        <p className="rounded-xs border border-line bg-panel/85 px-3 py-4 text-xs text-text-dim">
-          {t('overview.board.allCardsHidden')}
-        </p>
-      )}
       <div
         className={`grid min-w-0 gap-4 ${alertsShown && !isPhone ? 'xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]' : ''}`}
       >
@@ -641,10 +644,11 @@ export function Overview() {
           {/* Every card renders unconditionally, mid-load included. Gating one
               on its own data would make "still loading" and "nothing here"
               look identical to "this domain does not exist" — which is the
-              failure this board was rebuilt to avoid. (A card the pilot hid
-              from the edit menu is the exception: they asked for it gone.) Folding a card on a
+              failure this board was rebuilt to avoid. Folding a card on a
               phone is not that: the domain still has its line, and says the
-              same three things it would have said in full. */}
+              same three things it would have said in full. A card the pilot
+              hid from the edit menu is the one exception: they asked for it
+              gone. */}
           {fullCards.map(({ key, render }) => (
             <Fragment key={key}>{render()}</Fragment>
           ))}

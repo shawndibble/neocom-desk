@@ -26,6 +26,19 @@ export const OVERVIEW_CARD_KEYS = [
 export type OverviewCardKey = (typeof OVERVIEW_CARD_KEYS)[number];
 
 /**
+ * Each card's name, as its own header and the edit menu both print it — one
+ * table, so the menu cannot drift from the card it switches.
+ */
+export const OVERVIEW_CARD_LABEL: Record<OverviewCardKey, string> = {
+  orders: 'overview.board.orders',
+  mining: 'overview.board.miningTax',
+  contracts: 'overview.board.contracts',
+  planetary: 'overview.board.planetary',
+  industry: 'overview.board.industry',
+  alerts: 'overview.board.alerts',
+};
+
+/**
  * Any list of strings, deduped — including keys this build has no card for.
  * The value merges last-write-wins as a whole, so a build that dropped a key
  * it did not recognise would write the shortened list back on its next
@@ -36,11 +49,11 @@ export function parseHiddenCards(raw: unknown): string[] | null {
   return [...new Set(raw.filter((key): key is string => typeof key === 'string'))];
 }
 
-export function toggleHiddenCard(hidden: readonly string[], key: string): string[] {
+export function toggleHiddenCard(hidden: readonly string[], key: OverviewCardKey): string[] {
   return hidden.includes(key) ? hidden.filter((k) => k !== key) : [...hidden, key];
 }
 
-export function isCardShown(hidden: readonly string[], key: string): boolean {
+export function isCardShown(hidden: readonly string[], key: OverviewCardKey): boolean {
   return !hidden.includes(key);
 }
 
