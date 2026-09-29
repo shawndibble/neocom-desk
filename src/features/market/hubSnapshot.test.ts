@@ -16,7 +16,7 @@ vi.mock('firebase/firestore/lite', () => ({
   documentId: () => '__name__',
 }));
 vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
-vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn(async () => undefined) }));
+vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => undefined) }));
 vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => true }));
 
 const CHARACTER_ID = 91;

@@ -17,7 +17,7 @@ vi.mock('firebase/firestore/lite', () => ({
   collection: (_db: unknown, name: string) => ({ name }),
 }));
 vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
-vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn(async () => undefined) }));
+vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => undefined) }));
 vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => true }));
 
 const STALE_AFTER_MS = 30 * 60_000;

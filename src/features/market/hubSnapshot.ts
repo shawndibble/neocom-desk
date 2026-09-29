@@ -7,7 +7,7 @@
  * character-independent public lookup makes (`syncedContracts.ts`,
  * `stations.ts`). Reading requires being signed in to Firebase as *some*
  * character (the collection's rule is `request.auth != null`), reusing
- * `ensureSignedIn` exactly as `syncedContracts.ts` already does.
+ * `ensureAnySession` exactly as `syncedContracts.ts` does.
  *
  * A day's `source` tag decides which price-basis tier it feeds
  * (`priceBasis.ts`): 'fuzzwork' is real station data, fed as `saved`
@@ -35,7 +35,7 @@ import {
   startAt,
 } from 'firebase/firestore/lite';
 import { getSyncFirestore } from '@/sync/firebaseApp';
-import { ensureSignedIn } from '@/sync/syncAuth';
+import { ensureAnySession } from '@/sync/syncAuth';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { GLOBAL_CACHE_CHARACTER_ID, STALE_AFTER, loadWithCache } from '@/esi/cache';
 import { DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
@@ -80,7 +80,7 @@ export async function loadHubSnapshotRange(
   if (!isSyncConfigured() || startDate > endDate) return EMPTY_RANGE;
 
   try {
-    await ensureSignedIn(characterId);
+    await ensureAnySession(characterId);
   } catch {
     return EMPTY_RANGE;
   }
