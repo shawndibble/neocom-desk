@@ -1123,8 +1123,37 @@ describe('DataTable virtualize', () => {
       expect(document.querySelector('[data-row-key="1"]')?.getAttribute('aria-rowindex')).toBe('2');
     });
 
-    it('never windows an expandable table, whose detail rows it could not measure', () => {
-      render(
+    describe('with expandableRow', () => {
+      const ROW_HEIGHT = 29; // the default-density estimate, so unmeasured rows agree
+      const DETAIL_HEIGHT = 300;
+      const offsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')!;
+      let scrollTo: ReturnType<typeof vi.spyOn>;
+
+      beforeEach(() => {
+        // jsdom has no layout: a main row measures one line, an open detail
+        // far more. Everything else keeps the suite-wide stand-in.
+        Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+          configurable: true,
+          get(this: HTMLElement) {
+            if (this.classList.contains('dt-row-detail')) return DETAIL_HEIGHT;
+            if (this.tagName === 'TR' && this.hasAttribute('data-index')) return ROW_HEIGHT;
+            return offsetHeight.get!.call(this);
+          },
+        });
+        // Collapsing a row above the viewport moves the page by its delta.
+        scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(((options: ScrollToOptions) => {
+          Object.defineProperty(window, 'scrollY', {
+            configurable: true,
+            value: options.top ?? 0,
+          });
+        }) as typeof window.scrollTo);
+      });
+      afterEach(() => {
+        Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeight);
+        scrollTo.mockRestore();
+      });
+
+      const table = (
         <DataTable
           label="Offers"
           columns={sortableColumns}
@@ -1134,8 +1163,73 @@ describe('DataTable virtualize', () => {
           expandableRow={{ renderDetail: (row) => `Detail ${row.id}` }}
         />
       );
+      const rowOf = (key: number) => document.querySelector<HTMLElement>(`[data-row-key="${key}"]`);
+      const firstMountedIndex = () =>
+        Number(document.querySelector('tbody tr[data-index]')?.getAttribute('data-index'));
+      const spacerBefore = () =>
+        parseFloat(document.querySelector<HTMLElement>('tbody .dt-spacer')?.style.height ?? '0');
+      const scrollPage = (top: number) => {
+        Object.defineProperty(window, 'scrollY', { configurable: true, value: top });
+        fireEvent.scroll(window);
+      };
 
-      expect(mountedIds()).toHaveLength(500);
+      it('windows past the threshold, placing the rows below an open row after its detail', async () => {
+        const user = userEvent.setup();
+        render(table);
+        expect(mountedIds().length).toBeLessThan(100);
+
+        await user.click(rowOf(1)!.querySelector('td')!);
+
+        const detail = screen.getByText('Detail 1').closest('tr');
+        expect(rowOf(1)?.nextElementSibling).toBe(detail);
+        expect(detail?.nextElementSibling).toBe(rowOf(2));
+        // The detail is a row to AT too: counted, and indexed between its
+        // own row and the next.
+        expect(screen.getByRole('table').getAttribute('aria-rowcount')).toBe('502');
+        expect(rowOf(1)?.getAttribute('aria-rowindex')).toBe('2');
+        expect(detail?.getAttribute('aria-rowindex')).toBe('3');
+        expect(rowOf(2)?.getAttribute('aria-rowindex')).toBe('4');
+
+        // Scrolled past, the open row still takes its detail's height: every
+        // row below it sits that much lower.
+        scrollPage(5_000);
+        expect(mountedIds()).not.toContain('1');
+        expect(spacerBefore()).toBe(firstMountedIndex() * ROW_HEIGHT + DETAIL_HEIGHT);
+      });
+
+      it('gives the height back when an open row out of the window closes', async () => {
+        const user = userEvent.setup();
+        render(table);
+        await user.click(rowOf(1)!.querySelector('td')!);
+        scrollPage(5_000);
+        expect(spacerBefore()).toBe(firstMountedIndex() * ROW_HEIGHT + DETAIL_HEIGHT);
+
+        // Opening another row closes the first, which isn't mounted to
+        // measure itself again.
+        const target = Number(mountedIds()[5]);
+        await user.click(rowOf(target)!.querySelector('td')!);
+
+        expect(screen.queryByText('Detail 1')).toBeNull();
+        expect(screen.getByText(`Detail ${target}`)).toBeInTheDocument();
+        expect(spacerBefore()).toBe(firstMountedIndex() * ROW_HEIGHT);
+      });
+
+      it('keeps the focused row across expanding and collapsing it', async () => {
+        const user = userEvent.setup();
+        render(table);
+        const row = rowOf(5);
+        row?.focus();
+
+        await user.keyboard('{Enter}');
+        expect(screen.getByText('Detail 5')).toBeInTheDocument();
+        expect(rowOf(5)).toBe(row);
+        expect(document.activeElement).toBe(row);
+
+        await user.keyboard('{Enter}');
+        expect(screen.queryByText('Detail 5')).toBeNull();
+        expect(rowOf(5)).toBe(row);
+        expect(document.activeElement).toBe(row);
+      });
     });
 
     it('switches between every row and a window as the rows cross the threshold', () => {
@@ -1244,6 +1338,32 @@ describe('DataTable virtualize', () => {
         expect(document.activeElement).toBe(row);
         expect(scrollTo).toHaveBeenCalled();
         expect(scrollIntoView.mock.instances).toContain(row);
+      });
+
+      it('scrolls to an open row outside the window, detail and all', async () => {
+        const user = userEvent.setup();
+        const expandable = (highlightRowKey: number | null) => (
+          <DataTable
+            label="Offers"
+            columns={sortableColumns}
+            rows={many}
+            rowKey={byId}
+            virtualize="auto"
+            highlightRowKey={highlightRowKey}
+            expandableRow={{ renderDetail: (row) => `Detail ${row.id}` }}
+          />
+        );
+        const { rerender } = render(expandable(null));
+        await user.click(document.querySelector('[data-row-key="3"] td')!);
+        scrollPageTo(20_000);
+        await waitFor(() => expect(mountedIds()).not.toContain('3'));
+
+        rerender(expandable(3));
+
+        await arrivedAt(3);
+        const row = document.querySelector<HTMLElement>('[data-row-key="3"]');
+        expect(document.activeElement).toBe(row);
+        expect(row?.nextElementSibling?.textContent).toBe('Detail 3');
       });
 
       it('scrolls to the same row again for a new link after the key cleared', async () => {
