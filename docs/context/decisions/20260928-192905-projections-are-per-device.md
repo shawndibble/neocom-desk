@@ -45,5 +45,8 @@ _Recorded 2026-09-28 · issue #2240._
   dispatch tick never sees both. The registration doc's `perDeviceProjections`
   marker stops the sweep from running again. Until a row is swept, the
   dispatcher fans it out to every device holding its Character, exactly as
-  before, so a device that was closed at deploy time loses no pushes.
-  Stragglers age out through the existing 7-day stale purge.
+  before. The sweep is per Character, not per device, and that leaves one gap,
+  accepted for the one-time switch. A device that was closed at deploy time
+  keeps its pushes until another device holding the same Character makes its
+  first per-device upload. From then until it reopens, it gets no pushes for
+  that Character. Stragglers age out through the existing 7-day stale purge.
