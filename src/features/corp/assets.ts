@@ -17,6 +17,7 @@
  * (CONTEXT.md round 41). The corp assets surface is its own ticket, and this is
  * the read it will use.
  */
+import { conditionalPagedFetch } from '@/esi/cache';
 import { getCorporationAssets, type CorporationAsset } from '@/esi/endpoints';
 import type { StatusResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
@@ -47,9 +48,12 @@ export function loadCorporationAssets(
   characterId: number,
   corporationId: number
 ): Promise<CorpAssetsLoadResult> {
-  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, CORP_ASSETS_KEY, () =>
-    getCorporationAssets(characterId, corporationId)
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCorporationAssets(characterId, corporationId, options)
   );
+  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, CORP_ASSETS_KEY, fetchLive, {
+    conditional,
+  });
 }
 
 /**

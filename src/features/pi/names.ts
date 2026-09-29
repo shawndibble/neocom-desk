@@ -5,7 +5,13 @@
  * the global sentinel, same shape as `features/character/stations.ts`.
  */
 import { getUniversePlanet, getUniverseSchematic, type UniversePlanet } from '@/esi/endpoints';
-import { loadWithCache, readCached, GLOBAL_CACHE_CHARACTER_ID, STALE_AFTER } from '@/esi/cache';
+import {
+  conditionalFetch,
+  loadWithCache,
+  readCached,
+  GLOBAL_CACHE_CHARACTER_ID,
+  STALE_AFTER,
+} from '@/esi/cache';
 
 // Both are static game data, as this module's name says — a planet does not
 // get renamed and a schematic's output does not change between patches.
@@ -16,11 +22,14 @@ function planetInfoKey(planetId: number): string {
 }
 
 async function loadPlanetInfoRow(planetId: number): Promise<UniversePlanet | null> {
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getUniversePlanet(planetId, options)
+  );
   const result = await loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
     planetInfoKey(planetId),
-    async () => (await getUniversePlanet(planetId)).data,
-    STATIC
+    fetchLive,
+    { ...STATIC, conditional }
   );
   return result?.data ?? null;
 }
@@ -75,11 +84,14 @@ function schematicKey(schematicId: number): string {
 }
 
 export async function loadSchematicName(schematicId: number): Promise<string | null> {
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getUniverseSchematic(schematicId, options)
+  );
   const result = await loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
     schematicKey(schematicId),
-    async () => (await getUniverseSchematic(schematicId)).data,
-    STATIC
+    fetchLive,
+    { ...STATIC, conditional }
   );
   return result?.data.schematic_name ?? null;
 }

@@ -1,6 +1,10 @@
 /** Fetch + cache layer for the Assets view. */
 import { getCharacterAssets, type CharacterAsset } from '@/esi/endpoints';
-import { loadPaginatedWithCacheStatus, type StatusResult } from '@/esi/cache';
+import {
+  conditionalPagedFetch,
+  loadPaginatedWithCacheStatus,
+  type StatusResult,
+} from '@/esi/cache';
 import { db } from '@/db';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -15,7 +19,10 @@ export const KEY = 'assets';
  * cached result means pages were capped or missing.
  */
 export function loadCharacterAssets(characterId: number): Promise<StatusResult<CharacterAsset[]>> {
-  return loadPaginatedWithCacheStatus(characterId, KEY, () => getCharacterAssets(characterId));
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCharacterAssets(characterId, options)
+  );
+  return loadPaginatedWithCacheStatus(characterId, KEY, fetchLive, { conditional });
 }
 
 export interface OtherCharacterAssets {

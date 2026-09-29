@@ -10,7 +10,7 @@
  * cache, and no role gate of its own.
  */
 import { getCharacterRoles, type CharacterCorporationRoles } from '@/esi/endpoints';
-import { loadWithCacheStatus, type StatusResult } from '@/esi/cache';
+import { conditionalFetch, loadWithCacheStatus, type StatusResult } from '@/esi/cache';
 
 const KEY = 'corpRoles';
 
@@ -23,11 +23,10 @@ const KEY = 'corpRoles';
 export function loadCharacterRoles(
   characterId: number
 ): Promise<StatusResult<CharacterCorporationRoles>> {
-  return loadWithCacheStatus(
-    characterId,
-    KEY,
-    async () => (await getCharacterRoles(characterId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterRoles(characterId, options)
   );
+  return loadWithCacheStatus(characterId, KEY, fetchLive, { conditional });
 }
 
 /**

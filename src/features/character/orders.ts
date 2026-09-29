@@ -6,6 +6,7 @@ import {
   type MarketOrderHistory,
 } from '@/esi/endpoints';
 import {
+  conditionalPagedFetch,
   conditionalFetch,
   loadWithCacheStatus,
   loadPaginatedWithCacheStatus,
@@ -35,7 +36,8 @@ export function loadOrders(characterId: number): Promise<StatusResult<MarketOrde
  * auth-failure state exposed. `truncated` means pages were missing.
  */
 export function loadOrderHistory(characterId: number): Promise<StatusResult<MarketOrderHistory[]>> {
-  return loadPaginatedWithCacheStatus(characterId, KEYS.history, () =>
-    getCharacterOrderHistory(characterId)
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCharacterOrderHistory(characterId, options)
   );
+  return loadPaginatedWithCacheStatus(characterId, KEYS.history, fetchLive, { conditional });
 }
