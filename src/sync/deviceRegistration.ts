@@ -38,15 +38,22 @@ const NO_PROJECTION_ROWS: readonly ProjectionRow[] = [];
  * device (issue #2240): no other device can overwrite this device's rows, so
  * the fingerprint below covers everything this device owns on the server.
  *
- * The backend drops a device doc only when a send to its token comes back
- * dead or malformed (`functions/src/projectionStore.ts`
- * `dispatchDueProjections`) — nothing expires it on `updatedAt`, and the
- * 7-day stale-unsent purge (keyed on `fireAt`) is far outside this window.
- * A dead token can't be pushed to anyway, and a rotated one changes the
- * fingerprint; clients can't read `deviceRegistrations` to notice a deletion
- * otherwise, so this cap is what bounds how long one goes unrepaired.
+ * Nothing expires a device doc on `updatedAt`, and the 7-day stale-unsent
+ * purge (keyed on `fireAt`) is far outside this window. But the client can't
+ * read `deviceRegistrations`, so server-side changes it can't see stay
+ * unrepaired until this cap forces an upload — kept short (an hour still
+ * skips all but one poll in twelve) because of two such cases:
+ *
+ * - a spurious FCM "unregistered"/"invalid token" reply for a token that is
+ *   in fact still live: `dispatchDueProjections`
+ *   (`functions/src/projectionStore.ts`) deletes the registration, then
+ *   orphan-deletes every row this device uploaded. The token is unchanged,
+ *   so the fingerprint still matches and only this cap brings it back;
+ * - a duplicated deviceId (a cloned browser profile, or copied site data):
+ *   two installs share one registration doc and one set of rows, each upload
+ *   overwriting the other's token and Projection without either noticing.
  */
-export const REREGISTER_AFTER_MS = 12 * 3_600_000;
+export const REREGISTER_AFTER_MS = 3_600_000;
 
 /** Device-local, never synced: what this device last registered, and when. */
 const LAST_REGISTRATION_KEY = 'neocom.lastPushRegistration';

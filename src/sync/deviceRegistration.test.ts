@@ -224,6 +224,20 @@ describe('registerDeviceForWebPush with skipIfUnchanged (the 5-minute poll)', ()
     expect(call).not.toHaveBeenCalled();
   });
 
+  it('trusts an unchanged registration for one hour', () => {
+    // Short on purpose: it bounds outages the client can't see (a spurious
+    // FCM UNREGISTERED deleting a live registration, a cloned deviceId).
+    expect(REREGISTER_AFTER_MS).toBe(3_600_000);
+  });
+
+  it('still skips just before REREGISTER_AFTER_MS', async () => {
+    await poll();
+    call.mockClear();
+    vi.mocked(Date.now).mockReturnValue(1_700_000_000_000 + REREGISTER_AFTER_MS - 1);
+    await poll();
+    expect(call).not.toHaveBeenCalled();
+  });
+
   it('re-registers once the last upload is older than REREGISTER_AFTER_MS', async () => {
     await poll();
     call.mockClear();
