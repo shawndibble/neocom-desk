@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { inlineLinkClassName } from './controlStyles';
+import { usePortalContainer } from './portalContainer';
 
 export interface ToastProps {
   message: ReactNode;
@@ -19,8 +20,14 @@ export interface ToastProps {
  * long `Panel` — Hauling's Copy Multibuy button, at the very top of a list
  * that scrolls the page well past the viewport — pinned the toast off-screen
  * at the bottom of that panel instead of the bottom of the screen.
+ *
+ * Inside a `Modal` it portals into the modal's own container instead
+ * (`portalContainer.ts`): the native `<dialog>` sits in the browser's top
+ * layer, so a toast on `document.body` would render behind its backdrop. That
+ * container has no transformed ancestor, so `fixed` still pins to the viewport.
  */
 export function Toast({ message, undo }: ToastProps) {
+  const portalContainer = usePortalContainer();
   return createPortal(
     <div
       role="status"
@@ -33,6 +40,6 @@ export function Toast({ message, undo }: ToastProps) {
         </button>
       )}
     </div>,
-    document.body
+    portalContainer ?? document.body
   );
 }

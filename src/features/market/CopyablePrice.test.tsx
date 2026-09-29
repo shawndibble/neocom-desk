@@ -33,49 +33,40 @@ describe('CopyablePrice', () => {
     expect(screen.getByText('449.90')).toBeInTheDocument();
   });
 
-  it('copies the plain-digit legal price, not the on-screen grouped text, and confirms it', async () => {
+  it('copies the plain-digit legal price when the price itself is clicked, and toasts', async () => {
     const written: string[] = [];
     configureClipboard(async (text) => {
       written.push(text);
     });
     render(<CopyablePrice price={1_233_000} />);
 
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Copy 1,233,000.00' }));
+    await userEvent.setup().click(screen.getByText('1,233,000.00'));
 
     expect(written).toEqual(['1233000']);
     expect(screen.getByRole('status')).toHaveTextContent('Copied to clipboard');
-    // The button's own accessible name never changes — the live region is
-    // what a screen reader hears, same as `CopyableTotal`'s own pattern.
-    expect(screen.getByRole('button', { name: 'Copy 1,233,000.00' })).toBeInTheDocument();
   });
 
-  it("names the price in the button's accessible name", () => {
+  it('has no separate copy icon button — the price text is the only control', async () => {
     render(<CopyablePrice price={12.34} />);
-    expect(screen.getByRole('button', { name: 'Copy 12.34' })).toBeInTheDocument();
+    const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]).toHaveTextContent('12.34');
+    expect(buttons[0].querySelector('svg')).toBeNull();
+
+    // The copy hint is a Tooltip, so keyboard focus reveals it too.
+    await userEvent.setup().tab();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Copy 12.34');
   });
 
-  it('drops the visible price text with showValue={false}, keeping the accessible name', () => {
-    render(<CopyablePrice price={449.9} showValue={false} />);
-    expect(screen.queryByText('449.90')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Copy 449.90' })).toBeInTheDocument();
-  });
+  it('renders caller-supplied text as the clickable content', async () => {
+    const written: string[] = [];
+    configureClipboard(async (text) => {
+      written.push(text);
+    });
+    render(<CopyablePrice price={520.1}>Outbid at 520.10</CopyablePrice>);
 
-  it('swaps the icon glyph while the copied confirmation is up, for a sighted pointer user', async () => {
-    configureClipboard(async () => {});
-    render(<CopyablePrice price={449.9} />);
-    const button = screen.getByRole('button', { name: 'Copy 449.90' });
-    const iconBefore = button.querySelector('svg')?.outerHTML;
-    expect(iconBefore).toBeTruthy();
+    await userEvent.setup().click(screen.getByText('Outbid at 520.10'));
 
-    const user = userEvent.setup();
-    await user.click(button);
-
-    // A different glyph renders (copy icon -> checkmark) — the live region
-    // is `sr-only`, so this is the only visible confirmation a pointer user
-    // gets that the copy actually happened.
-    expect(button.querySelector('svg')?.outerHTML).not.toBe(iconBefore);
-    // The accessible name and tooltip never change — only the decorative icon.
-    expect(screen.getByRole('button', { name: 'Copy 449.90' })).toBeInTheDocument();
+    expect(written).toEqual(['520.10']);
   });
 });
