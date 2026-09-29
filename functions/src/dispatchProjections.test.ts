@@ -64,8 +64,26 @@ describe('shouldDeleteDeviceToken', () => {
     expect(shouldDeleteDeviceToken('messaging/registration-token-not-registered')).toBe(true);
   });
 
-  it('deletes on INVALID_ARGUMENT', () => {
-    expect(shouldDeleteDeviceToken('messaging/invalid-argument')).toBe(true);
+  it('deletes on a malformed registration token', () => {
+    expect(shouldDeleteDeviceToken('messaging/invalid-registration-token')).toBe(true);
+  });
+
+  it('deletes on INVALID_ARGUMENT only when FCM blames the registration token', () => {
+    expect(
+      shouldDeleteDeviceToken(
+        'messaging/invalid-argument',
+        'The registration token is not a valid FCM registration token'
+      )
+    ).toBe(true);
+  });
+
+  it('leaves the token alone on an INVALID_ARGUMENT about the payload', () => {
+    // FCM v1 reports a bad payload with the same code as a bad token; deleting
+    // the registration then would orphan every row that device has.
+    expect(
+      shouldDeleteDeviceToken('messaging/invalid-argument', 'Message payload is too big')
+    ).toBe(false);
+    expect(shouldDeleteDeviceToken('messaging/invalid-argument')).toBe(false);
   });
 
   it('leaves the token alone on any other error', () => {

@@ -91,11 +91,17 @@ export async function writeDeviceRegistration(
   const registrationRef = db.collection(DEVICE_REGISTRATIONS_COLLECTION).doc(write.deviceId);
 
   const previous = (await registrationRef.get()).data();
-  const sweepLegacy = previous?.[PER_DEVICE_MARKER] !== true;
+  const marked = previous?.[PER_DEVICE_MARKER] === true;
   const previousIds = Array.isArray(previous?.characterIds)
     ? (previous.characterIds as number[])
     : [];
   const droppedIds = previousIds.filter((id) => !write.characterIds.includes(id));
+  // Once per Character per device: on the device's first per-device upload,
+  // and again for any Character it adds later, which may still carry another
+  // (not yet upgraded) device's legacy rows — left alone, those would fan out
+  // to this device on top of its own row.
+  const sweepLegacy = (characterId: number): boolean =>
+    !marked || !previousIds.includes(characterId);
 
   const ownUnfired = (characterId: number): Promise<Doc[]> =>
     projections
@@ -107,7 +113,7 @@ export async function writeDeviceRegistration(
 
   // Firestore cannot query for a missing field, so the legacy sweep reads
   // the Character's unfired rows and keeps those without a deviceId. It runs
-  // once per device, not on every upload.
+  // once per Character per device (`sweepLegacy`), not on every upload.
   const legacyUnfired = (characterId: number): Promise<Doc[]> =>
     projections
       .where('characterId', '==', characterId)
@@ -115,17 +121,21 @@ export async function writeDeviceRegistration(
       .get()
       .then((s) => s.docs.filter((d) => d.data().deviceId === undefined));
 
+  // The registration lands first, without the marker: the dispatcher's
+  // drift check then never sees a fresh row for a Character the registration
+  // does not list yet, and if a batch below fails, the next upload still
+  // sweeps. The marker is set only once every batch has committed.
+  await registrationRef.set({
+    fcmToken: write.fcmToken,
+    characterIds: write.characterIds,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
   await Promise.all([
-    registrationRef.set({
-      fcmToken: write.fcmToken,
-      characterIds: write.characterIds,
-      [PER_DEVICE_MARKER]: true,
-      updatedAt: FieldValue.serverTimestamp(),
-    }),
     ...write.projections.map(async ({ characterId, rows }) => {
       const stale = [
         ...(await ownUnfired(characterId)),
-        ...(sweepLegacy ? await legacyUnfired(characterId) : []),
+        ...(sweepLegacy(characterId) ? await legacyUnfired(characterId) : []),
       ];
       const ops: ((b: WriteBatch) => void)[] = stale.map((doc) => (b) => b.delete(doc.ref));
       for (const row of rows) {
@@ -154,6 +164,8 @@ export async function writeDeviceRegistration(
       );
     }),
   ]);
+
+  await registrationRef.update({ [PER_DEVICE_MARKER]: true });
 }
 
 interface Registration {
@@ -166,8 +178,9 @@ interface Registration {
 /**
  * Fire every due row, then purge fired rows past retention. Per row, in
  * order: stale (>7 days past fireAt) → delete unsent; a device-scoped row
- * whose device has no registration → delete (orphan: logged out, token
- * deleted); whose device no longer lists its Character → delete (roster
+ * whose device has no registration → delete (orphan: its token was deleted
+ * after FCM reported it dead — e.g. the device logged out, which deletes its
+ * FCM token, and the next send came back UNREGISTERED); whose device no longer lists its Character → delete (roster
  * drift); otherwise push to that one device's token. A legacy row with no
  * `deviceId` is still fanned out to every device holding its Character, as
  * before #2240, until an upload sweeps it or it goes stale.
@@ -217,12 +230,15 @@ export async function dispatchDueProjections(
       return true;
     } catch (err) {
       const code = err instanceof Error && 'code' in err ? String(err.code) : '';
-      if (shouldDeleteDeviceToken(code)) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (shouldDeleteDeviceToken(code, message)) {
+        // Later rows this tick then see the device as an orphan.
+        byDevice.set(device.id, Promise.resolve(null));
         await device.ref.delete();
       } else {
         logError('Scheduled Push: send failed', {
           deviceId: device.id,
-          error: code || (err instanceof Error ? err.message : String(err)),
+          error: code || message,
         });
       }
       return false;

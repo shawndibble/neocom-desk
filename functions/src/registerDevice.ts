@@ -106,6 +106,14 @@ function parseProjectionRow(raw: unknown, path: string): ProjectionRowInput {
   };
 }
 
+/**
+ * A deviceId becomes a `deviceRegistrations` doc id and the prefix of every
+ * projection row id (issue #2240), so it must be a safe Firestore id: no `/`,
+ * no `.`/`..`, bounded length. The client's `crypto.randomUUID()` and its
+ * base36 fallback (`src/sync/deviceId.ts`) both fit.
+ */
+const DEVICE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+
 /** Validate the callable's raw `request.data`. Throws a plain Error on any shape violation. */
 export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
   if (!isRecord(data)) throw new Error('Request body must be an object');
@@ -113,6 +121,9 @@ export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
   const { deviceId, fcmToken, characters } = data;
   if (typeof deviceId !== 'string' || deviceId.length === 0) {
     throw new Error('deviceId (non-empty string) is required');
+  }
+  if (!DEVICE_ID_PATTERN.test(deviceId)) {
+    throw new Error('deviceId must be 1-128 characters of A-Z, a-z, 0-9, _ or -');
   }
   if (typeof fcmToken !== 'string' || fcmToken.length === 0) {
     throw new Error('fcmToken (non-empty string) is required');

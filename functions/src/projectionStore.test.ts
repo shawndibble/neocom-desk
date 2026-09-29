@@ -19,6 +19,8 @@ type Op = '==' | '<=' | '<' | 'array-contains';
 
 class FakeFirestore {
   readonly collections = new Map<string, Map<string, Data>>();
+  /** Batch commits left to fail before they start succeeding again. */
+  failCommits = 0;
 
   private store(name: string): Map<string, Data> {
     let s = this.collections.get(name);
@@ -102,6 +104,10 @@ class FakeFirestore {
         return batch;
       },
       commit: async () => {
+        if (this.failCommits > 0) {
+          this.failCommits -= 1;
+          throw new Error('batch commit failed');
+        }
         for (const op of ops) await op();
       },
     };
@@ -271,6 +277,52 @@ describe('writeDeviceRegistration', () => {
     expect(unfiredRowsOf(db, 'A')).toEqual([projectionDocId('A', legacy.occurrenceKey)]);
   });
 
+  it('sweeps legacy rows for a Character the marked device newly adds', async () => {
+    const db = new FakeFirestore();
+    await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
+    // Character 2's legacy rows come from a device that has not upgraded yet.
+    const legacy = { ...row('industryJobComplete'), occurrenceKey: '2:job:1' };
+    db.seed('projections', legacy.occurrenceKey, {
+      ...legacy,
+      characterId: 2,
+      fired: false,
+      firedAt: null,
+    });
+
+    await upload(db, 'A', [
+      { characterId: CHAR, rows: [] },
+      { characterId: 2, rows: [legacy] },
+    ]);
+
+    expect(db.get('projections', legacy.occurrenceKey)).toBeUndefined();
+    expect(unfiredRowsOf(db, 'A')).toEqual([projectionDocId('A', legacy.occurrenceKey)]);
+  });
+
+  it('still sweeps on the retry when the first per-device upload failed part-way', async () => {
+    const db = new FakeFirestore();
+    const legacy = row('industryJobComplete');
+    const legacyOther = row('planetExtractorExpired');
+    for (const r of [legacy, legacyOther]) {
+      db.seed('projections', r.occurrenceKey, {
+        ...r,
+        characterId: CHAR,
+        fired: false,
+        firedAt: null,
+      });
+    }
+    db.failCommits = 1;
+
+    await expect(upload(db, 'A', [{ characterId: CHAR, rows: [legacy] }])).rejects.toThrow();
+    // The registration landed without the marker, so the retry still sweeps.
+    expect(db.get('deviceRegistrations', 'A')?.perDeviceProjections).toBeUndefined();
+
+    await upload(db, 'A', [{ characterId: CHAR, rows: [legacy] }]);
+
+    expect(db.get('projections', legacy.occurrenceKey)).toBeUndefined();
+    expect(db.get('projections', legacyOther.occurrenceKey)).toBeUndefined();
+    expect(db.get('deviceRegistrations', 'A')?.perDeviceProjections).toBe(true);
+  });
+
   it('skips the legacy sweep once the device has uploaded per-device before', async () => {
     const db = new FakeFirestore();
     await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
@@ -397,6 +449,18 @@ describe('dispatchDueProjections', () => {
     await dispatchDueProjections(asFirestore(db), messaging, NOW);
 
     expect(db.get('deviceRegistrations', 'A')).toBeUndefined();
+    expect(db.get('projections', projectionDocId('A', due.occurrenceKey))?.fired).toBe(false);
+  });
+
+  it('keeps the registration when FCM rejects the payload rather than the token', async () => {
+    const db = new FakeFirestore();
+    const messaging = new FakeMessaging();
+    messaging.failures.set('token-A', 'messaging/invalid-argument');
+    await upload(db, 'A', [{ characterId: CHAR, rows: [due] }]);
+
+    await dispatchDueProjections(asFirestore(db), messaging, NOW, () => {});
+
+    expect(db.get('deviceRegistrations', 'A')).toBeDefined();
     expect(db.get('projections', projectionDocId('A', due.occurrenceKey))?.fired).toBe(false);
   });
 
