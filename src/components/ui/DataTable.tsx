@@ -25,7 +25,7 @@ import { InfoTooltip } from './Tooltip';
 import { RowMoreActions } from './RowActions';
 import { nextDataTableSort, sortRowsBy } from './dataTableSort';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from './ContextMenu';
-import { ExportTableSub, TableExportProvider } from './TableExport';
+import { ExportTableItems, TableExportProvider } from './TableExport';
 import {
   type DataTableExportHandle,
   type TableExport,
@@ -384,7 +384,7 @@ interface DataTableProps<T> {
    * Makes the table exportable from its menus: every row menu
    * (`rowContextMenu`, and its "More actions" button) gains an "Export
    * table" submenu, and a table without row menus gets a table-wide
-   * right-click menu holding just that. Exports the rows as sorted on
+   * right-click menu holding just the export formats. Exports the rows as sorted on
    * screen. Usually spread from `useTableExport(...).tableProps` together
    * with `exportRef`, so the title bar's `TableActionsMenu` agrees.
    */
@@ -1315,8 +1315,8 @@ export function DataTable<T>({
   );
 
   // Exportable: row menus grow the submenu through context; a table with no
-  // row menus gets a right-click menu of its own (the trigger is `asChild`,
-  // so still no wrapper element).
+  // row menus gets a right-click menu of its own holding just the export
+  // formats (the trigger is `asChild`, so still no wrapper element).
   const body = !tableExport ? (
     table
   ) : rowContextMenu ? (
@@ -1325,7 +1325,7 @@ export function DataTable<T>({
     <ContextMenu>
       <ContextMenuTrigger asChild>{table}</ContextMenuTrigger>
       <ContextMenuContent>
-        <ExportTableSub tableExport={tableExport} />
+        <ExportTableItems tableExport={tableExport} />
       </ContextMenuContent>
     </ContextMenu>
   );

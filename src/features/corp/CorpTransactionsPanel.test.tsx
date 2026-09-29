@@ -118,7 +118,7 @@ describe('CorpTransactionsPanel — filtered to zero', () => {
 });
 
 describe('CorpTransactionsPanel — export', () => {
-  it("exports the filtered rows from the panel's ⋯ menu, named for the division", async () => {
+  it("exports the filtered rows from the panel's export button, named for the division", async () => {
     const user = userEvent.setup();
     const older = transaction({ transaction_id: 1, date: '2026-09-01T00:00:00Z' });
     const newer = transaction({ transaction_id: 2, date: '2026-09-02T00:00:00Z' });
@@ -134,12 +134,10 @@ describe('CorpTransactionsPanel — export', () => {
       },
     });
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Transactions actions' }), {
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Transactions' }), {
       button: 0,
       pointerType: 'mouse',
     });
-    (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
-    await user.keyboard('{ArrowRight}');
     (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
     await user.keyboard('{Enter}');
 

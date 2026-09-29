@@ -95,12 +95,10 @@ describe('OrderHistoryPanel — the row as an item', () => {
     renderPanel();
     await screen.findByRole('row', { name: /Damage Control II/ });
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Ended orders actions' }), {
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Ended orders' }), {
       button: 0,
       pointerType: 'mouse',
     });
-    (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
-    await user.keyboard('{ArrowRight}');
     (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
     await user.keyboard('{Enter}');
 

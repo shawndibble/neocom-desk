@@ -1173,12 +1173,10 @@ describe('cross-character search (issue #85)', () => {
     await screen.findByText(JITA);
 
     async function exportCsv() {
-      fireEvent.pointerDown(screen.getByRole('button', { name: 'Assets actions' }), {
+      fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Assets' }), {
         button: 0,
         pointerType: 'mouse',
       });
-      (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
-      await user.keyboard('{ArrowRight}');
       (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
       await user.keyboard('{Enter}');
     }

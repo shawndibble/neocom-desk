@@ -186,14 +186,12 @@ function divisionButton(name: string) {
   });
 }
 
-/** The journal panel's title-bar ⋯ › Export table › Download CSV (jsdom has no hover intent). */
+/** The journal panel's title-bar export button › Download CSV (jsdom has no hover intent). */
 async function exportJournalCsv(user: ReturnType<typeof userEvent.setup>) {
-  fireEvent.pointerDown(screen.getByRole('button', { name: 'Journal actions' }), {
+  fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Journal' }), {
     button: 0,
     pointerType: 'mouse',
   });
-  (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
-  await user.keyboard('{ArrowRight}');
   (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
   await user.keyboard('{Enter}');
 }

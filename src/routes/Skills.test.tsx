@@ -519,12 +519,10 @@ describe('Skills', () => {
     });
     try {
       const user = userEvent.setup();
-      fireEvent.pointerDown(screen.getByRole('button', { name: 'Skills actions' }), {
+      fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Skills' }), {
         button: 0,
         pointerType: 'mouse',
       });
-      (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
-      await user.keyboard('{ArrowRight}');
       (await screen.findByRole('menuitem', { name: 'Copy for Google Sheets / Excel' })).focus();
       await user.keyboard('{Enter}');
       await waitFor(() => expect(copied).toHaveLength(1));
@@ -549,12 +547,10 @@ describe('Skills', () => {
     });
     try {
       const user = userEvent.setup();
-      fireEvent.pointerDown(screen.getByRole('button', { name: 'Skills actions' }), {
+      fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Skills' }), {
         button: 0,
         pointerType: 'mouse',
       });
-      (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
-      await user.keyboard('{ArrowRight}');
       (await screen.findByRole('menuitem', { name: 'Copy for Google Sheets / Excel' })).focus();
       await user.keyboard('{Enter}');
       await waitFor(() => expect(copied).toHaveLength(1));

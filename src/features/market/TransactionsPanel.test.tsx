@@ -208,12 +208,10 @@ describe('TransactionsPanel — desktop filter and totals', () => {
     renderPanel('/market/history/transactions?txn.side=buy');
     await screen.findByRole('row', { name: /Tritanium/ });
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Transactions actions' }), {
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Transactions' }), {
       button: 0,
       pointerType: 'mouse',
     });
-    (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
-    await user.keyboard('{ArrowRight}');
     (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
     await user.keyboard('{Enter}');
 
