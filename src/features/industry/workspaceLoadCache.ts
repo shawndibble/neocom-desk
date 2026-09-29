@@ -8,10 +8,14 @@
  * ones waiting out a revalidation whenever their cache row was past its
  * window. A page mounting for the same Character now starts from what the
  * last one had and refreshes behind it.
+ *
+ * Kept in `lib/routeSnapshotCache.ts`, so a Character's load is forgotten
+ * with the rest of its cache (removal, sign-out) and reset between tests.
  */
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { PiData } from '@/sde/types';
+import { readRouteSnapshot, writeRouteSnapshot } from '@/lib/routeSnapshotCache';
 import type { BlueprintCatalog } from './blueprintCatalog';
 
 export interface WorkspaceLoad {
@@ -23,20 +27,15 @@ export interface WorkspaceLoad {
   modifiers: CharacterModifiers;
 }
 
-let last: WorkspaceLoad | null = null;
+const SNAPSHOT_NAME = 'industryWorkspace';
 
 /** The last load for `characterId`, or null when there is none for that Character. */
 export function lastWorkspaceLoad(characterId: number | null): WorkspaceLoad | null {
-  return last !== null && last.characterId === characterId ? last : null;
+  return characterId === null ? null : readRouteSnapshot<WorkspaceLoad>(SNAPSHOT_NAME, characterId);
 }
 
 export function rememberWorkspaceLoad(load: WorkspaceLoad): void {
-  last = load;
-}
-
-/** Test-only: forgets the last load. */
-export function clearWorkspaceLoadCache(): void {
-  last = null;
+  writeRouteSnapshot(SNAPSHOT_NAME, load.characterId, load);
 }
 
 /**

@@ -18,30 +18,25 @@ import { resolveLocationStandings } from './locationStandings';
 import { ZERO_STANDINGS, type ResolvedStandings } from '@/engine/market/standings';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { useWarmLoad } from '@/lib/useWarmLoad';
 
 export type TradeHubStandingsMap = ReadonlyMap<TradeHub['id'], ResolvedStandings>;
 
+const NO_STANDINGS: TradeHubStandingsMap = new Map();
+
+async function loadTradeHubStandings(characterId: number): Promise<TradeHubStandingsMap> {
+  const entries = await loadCharacterStandings(characterId);
+  const resolved = await Promise.all(
+    TRADE_HUBS.map(
+      async (hub) => [hub.id, await resolveLocationStandings(hub.stationId, entries)] as const
+    )
+  );
+  return new Map(resolved);
+}
+
+/** Starts from the last load for this Character (`useWarmLoad`), so opening a page doesn't re-price on arrival. */
 export function useTradeHubStandings(characterId: number | null): TradeHubStandingsMap {
-  const [standings, setStandings] = useState<TradeHubStandingsMap>(new Map());
-
-  useEffect(() => {
-    if (characterId === null) return;
-    let cancelled = false;
-    void (async () => {
-      const entries = await loadCharacterStandings(characterId);
-      const resolved = await Promise.all(
-        TRADE_HUBS.map(
-          async (hub) => [hub.id, await resolveLocationStandings(hub.stationId, entries)] as const
-        )
-      );
-      if (!cancelled) setStandings(new Map(resolved));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId]);
-
-  return standings;
+  return useWarmLoad('tradeHubStandings', characterId, loadTradeHubStandings, NO_STANDINGS);
 }
 
 /**

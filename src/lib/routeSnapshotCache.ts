@@ -28,6 +28,13 @@ import { onCachePurged } from '@/esi/cachePurge';
  */
 const byCharacter = new Map<number, Map<string, unknown>>();
 
+/**
+ * The owner id for a value pooled across every Character on the account (all
+ * their assets, their skills). Never a real Character id, and forgotten along
+ * with any one Character's snapshots, since it carries that Character's data.
+ */
+export const ACCOUNT_SNAPSHOT_ID = 0;
+
 export function readRouteSnapshot<T>(name: string, characterId: number): T | null {
   const found = byCharacter.get(characterId)?.get(name);
   return found === undefined ? null : (found as T);
@@ -53,6 +60,8 @@ export function writeRouteSnapshot<T>(name: string, characterId: number, data: T
  */
 export function forgetRouteSnapshots(characterId: number): void {
   byCharacter.delete(characterId);
+  // Account-wide values pool every Character, the purged one included.
+  byCharacter.delete(ACCOUNT_SNAPSHOT_ID);
 }
 
 /** Every Character's, for the cache-wide `db.esiCache.clear()` fallback tier. */
