@@ -33,7 +33,11 @@ export interface ProjectionRowInput {
 export interface DeviceCharacterInput {
   characterId: number;
   accessToken: string;
-  /** This Character's whole 72-hour Projection window — replaces the previous one wholesale (round 45). */
+  /**
+   * This Character's whole 72-hour Projection window, as this device sees it —
+   * replaces this device's previous rows for the Character wholesale, never
+   * another device's (issue #2240).
+   */
   projectionRows: ProjectionRowInput[];
 }
 

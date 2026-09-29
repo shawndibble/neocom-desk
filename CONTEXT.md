@@ -736,7 +736,10 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   already-rendered title and body. A Projection is a statement about the
   future made from data the device has read, not a copy of that data: the
   backend never learns what a Character's skill queue contains, only that
-  something called "Gunnery V" comes due at a given instant.
+  something called "Gunnery V" comes due at a given instant. A Projection is
+  per device: it is built from that device's own notification preferences,
+  an upload replaces only that device's rows, and each row is pushed only
+  to that device (issue #2240).
 - **Projection Horizon**: How far ahead a Projection reaches — 72 hours. A
   device that has not been opened inside that window stops receiving Scheduled
   Pushes until it is, which is the accepted consequence of holding no tokens

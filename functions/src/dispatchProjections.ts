@@ -4,18 +4,28 @@
 // — this module never touches Firestore or FCM directly, so it's unit
 // testable without an emulator.
 //
-// A `projections/{occurrenceKey}` doc is one row, not one Character's whole
-// window: Firestore cannot query inside an array of maps, and the dispatcher
-// needs an indexed `where(fired == false, fireAt <= now)` every run, plus a
-// second indexed query to purge long-fired rows. registerDevice.ts's
-// wholesale replace becomes, at the storage layer, "delete this character's
-// unfired rows, then batch-write the new set" (index.ts).
+// A `projections/{deviceId}:{occurrenceKey}` doc is one device's row, not
+// one Character's whole window: Firestore cannot query inside an array of
+// maps, and the dispatcher needs an indexed `where(fired == false, fireAt <=
+// now)` every run, plus a second indexed query to purge long-fired rows. A
+// device's upload replaces only its own unfired rows for each Character
+// (issue #2240) — see projectionStore.ts, which holds the Firestore side.
 
 import { ProjectionRowInput } from './registerDevice.js';
 
-/** One row as stored in the `projections` collection, doc id === occurrenceKey. */
+/**
+ * One row as stored in the `projections` collection, doc id
+ * `${deviceId}:${occurrenceKey}` (projectionStore.ts's `projectionDocId`).
+ */
 export interface StoredProjectionRow extends ProjectionRowInput {
   characterId: number;
+  /**
+   * The device that uploaded the row, and the only one it is pushed to
+   * (issue #2240). Absent on legacy rows written before that, whose doc id is
+   * the bare occurrenceKey; the dispatcher still fans those out to every
+   * device holding the Character until they are swept or go stale.
+   */
+  deviceId?: string;
 }
 
 /** A row still unfired more than this long past its `fireAt` is deleted unsent, not sent late (CONTEXT round 45). */
