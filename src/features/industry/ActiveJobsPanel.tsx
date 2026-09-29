@@ -544,21 +544,6 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
     corpJobs,
     highlightedJobId,
   ]);
-  // Selected Characters who opted into corp access but whose corporation no
-  // Character here holds the role to read (issue #2302) — said once each, so
-  // their missing corp jobs don't read as a bug. Not shown for a Character who
-  // never granted the corp scope: that is a choice, not a gap.
-  const corpUnreadable = useMemo(
-    () =>
-      corpJobs.unreadableCharacterIds
-        .filter((id) =>
-          needsJobSlotFanOut
-            ? resolvedJobsFilter === 'all' || resolvedJobsFilter.has(id)
-            : id === characterId
-        )
-        .map((id) => ({ characterId: id, name: characterNameById.get(id) ?? '' })),
-    [corpJobs, needsJobSlotFanOut, resolvedJobsFilter, characterId, characterNameById]
-  );
   const summary = useMemo(() => summarizeJobs(jobs, now), [jobs, now]);
   const blockingNeedsReauth = !needsJobSlotFanOut && (result?.needsReauth ?? false);
   // Loading, re-auth and the empty states are the whole story; only a real
@@ -583,8 +568,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   // saying with the list folded — so the body is only genuinely empty, and the
   // panel only genuinely one line, when these are absent too.
   const hasFanOutNotices =
-    (needsJobSlotFanOut && (jobsFanOutReauth.length > 0 || jobsFanOutSkipped.length > 0)) ||
-    corpUnreadable.length > 0;
+    needsJobSlotFanOut && (jobsFanOutReauth.length > 0 || jobsFanOutSkipped.length > 0);
   /**
    * Hidden outright for a one-Character account: "This character" and "All
    * characters" then resolve to the same pilot, so the picker is a control
@@ -1052,11 +1036,6 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                 {s.name} — {t('industry.jobsCharacterNotShared')}
               </p>
             ))}
-          {corpUnreadable.map((s) => (
-            <p key={`corp-${s.characterId}`} className="text-xs text-text-dim">
-              {s.name} — {t('industry.jobsCorpNotReadable')}
-            </p>
-          ))}
         </div>
       )}
       {!showBody ? null : listLoading ? (

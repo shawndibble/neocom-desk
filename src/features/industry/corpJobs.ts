@@ -51,16 +51,6 @@ export function pickCorpReaders(
   return readers;
 }
 
-/** Candidates whose corporation has no reader — their corp jobs cannot be listed. */
-export function unreadableCorpCharacters(
-  candidates: readonly CorpReaderCandidate[],
-  readers: ReadonlyMap<number, number>
-): number[] {
-  return candidates
-    .filter((candidate) => !readers.has(candidate.corporationId))
-    .map((candidate) => candidate.characterId);
-}
-
 export interface VisibleCorpJobsOptions {
   /** Every Character on this device — a corpmate's job is never "mine". */
   accountCharacterIds: ReadonlySet<number>;
@@ -95,8 +85,6 @@ export function visibleCorpJobs<T extends Pick<CorporationIndustryJob, 'job_id' 
 
 export interface CorpJobsSnapshot {
   jobs: CorporationIndustryJob[];
-  /** Characters who granted the corp jobs scope but whose corporation no account Character can read (missing role). */
-  unreadableCharacterIds: number[];
   /** Oldest read among the corporations, null when none was read. */
   fetchedAt: Date | null;
   fromCache: boolean;
@@ -104,7 +92,6 @@ export interface CorpJobsSnapshot {
 
 export const EMPTY_CORP_JOBS: CorpJobsSnapshot = {
   jobs: [],
-  unreadableCharacterIds: [],
   fetchedAt: null,
   fromCache: false,
 };
@@ -131,8 +118,7 @@ export async function loadAccountCorpIndustryJobs(
         const corporationId = await loadCorporationId(characterId);
         if (corporationId === null) return;
         const roles = await loadCharacterRoles(characterId);
-        // Roles unknown (offline, no cache) is not the same as roles missing:
-        // left out, so the panel never blames a role it could not read.
+        // Roles unknown (offline, no cache): not a candidate.
         if (roles.needsReauth || roles.cached === null) return;
         const canReadIndustry = corpCapabilities(corpWideRoles(roles.cached.data)).canReadIndustry;
         candidates.push({ characterId, corporationId, canReadIndustry });
@@ -165,7 +151,6 @@ export async function loadAccountCorpIndustryJobs(
     );
     return {
       jobs,
-      unreadableCharacterIds: unreadableCorpCharacters(candidates, readers),
       fetchedAt: fetchedAts.length > 0 ? new Date(Math.min(...fetchedAts)) : null,
       fromCache,
     };
