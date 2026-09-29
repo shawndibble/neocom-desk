@@ -27,6 +27,7 @@
  */
 import { db } from '@/db';
 import { isCacheFresh } from '@/esi/cache';
+import { inBackgroundLane } from '@/esi/lane';
 import type { EsiEndpointId } from '@/esi/registry';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { usePrefetch } from '@/stores/prefetch';
@@ -276,7 +277,9 @@ export async function prefetchCharacterData(
       try {
         const fresh =
           task.cacheKey !== undefined && (await isCacheFresh(characterId, task.cacheKey));
-        if (!fresh) await task.run(characterId);
+        // Background at the ESI gate (issue #2271): the warm-up yields to
+        // whatever the visible page is loading.
+        if (!fresh) await inBackgroundLane(() => task.run(characterId));
       } catch {
         // Swallowed by design; see the doc comment above.
       }

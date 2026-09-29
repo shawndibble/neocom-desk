@@ -10,6 +10,8 @@ import { metaOf } from '@/db/esiCacheMeta';
 import { emitEsiAuthFailure } from './authFailureSignal';
 import { EsiError, isAuthFailure, type EsiResult } from './client';
 import { isCachePurgePending } from './cachePurge';
+import { promoteEsiLane } from './budget';
+import { laneForLoad, withEsiLane, type EsiLane } from './lane';
 import { grantHoldsEndpointScope } from './grantScope';
 import type { PageResponse, PaginatedResult, TruncatableResult } from './paginated';
 
@@ -344,8 +346,11 @@ function parseExpiresHeader(expires: string | null | undefined): number | undefi
  * concurrent identical reads (same characterId + key) collapse onto the one
  * in-flight promise instead of racing separate ESI calls. Deleted in a
  * `finally` so a rejection never poisons the entry for the next call.
+ *
+ * Each entry keeps the gate lane its load runs in (`lane.ts`), so a view
+ * joining a load background work started can promote it.
  */
-const inFlightLoads = new Map<string, Promise<unknown>>();
+const inFlightLoads = new Map<string, { promise: Promise<unknown>; lane: EsiLane | undefined }>();
 
 function dedupeKey(characterId: number, key: string): string {
   return `${characterId}:${key}`;
@@ -357,13 +362,24 @@ function dedupeKey(characterId: number, key: string): string {
  * callers, so the cast on a dedupe hit is unavoidable without two maps; this
  * is the one place it happens rather than one per caller.
  */
-async function withDedupe<R>(characterId: number, key: string, run: () => Promise<R>): Promise<R> {
+async function withDedupe<R>(
+  characterId: number,
+  key: string,
+  lane: EsiLane | undefined,
+  run: () => Promise<R>
+): Promise<R> {
   const dkey = dedupeKey(characterId, key);
   const existing = inFlightLoads.get(dkey);
-  if (existing) return existing as Promise<R>;
+  if (existing) {
+    // A foreground caller is now waiting on a background load: what of it is
+    // still queued at the gate stops queueing behind background work (#2271).
+    // Never the other way — a background joiner leaves a view's load alone.
+    if (lane === undefined && existing.lane !== undefined) promoteEsiLane(existing.lane);
+    return existing.promise as Promise<R>;
+  }
 
   const promise = run();
-  inFlightLoads.set(dkey, promise);
+  inFlightLoads.set(dkey, { promise, lane });
   try {
     return await promise;
   } finally {
@@ -476,20 +492,21 @@ async function loadPastWindow<T>(
   staleAfterMs: number,
   options: LoadWithCacheStatusOptions,
   read: RowReader,
+  lane: EsiLane | undefined,
   runLive: () => Promise<StatusResult<T>>
 ): Promise<StatusResult<T>> {
   const dkey = dedupeKey(characterId, key);
   if (staleAfterMs > STALE_AFTER.default && options.allowStaleServe !== true) {
     if (staleAfterMs >= STALE_AFTER.static && options.skipCacheOnAuthFailure !== true) {
-      return loadLapsedConstant(characterId, key, staleAfterMs, options, dkey, read, runLive);
+      return loadLapsedConstant(characterId, key, staleAfterMs, options, dkey, read, lane, runLive);
     }
-    return withDedupe(characterId, key, runLive);
+    return withDedupe(characterId, key, lane, runLive);
   }
 
   const held = await heldAfterFailure<T>(staleAfterMs, options, dkey, read);
   if (held) return held;
 
-  const live = withDedupe(characterId, key, runLive);
+  const live = withDedupe(characterId, key, lane, runLive);
   let graceTimer: ReturnType<typeof setTimeout> | undefined;
   const grace = new Promise<typeof GRACE>((resolve) => {
     graceTimer = setTimeout(() => resolve(GRACE), STALE_GRACE_MS);
@@ -551,13 +568,14 @@ async function loadLapsedConstant<T>(
   options: LoadWithCacheStatusOptions,
   dkey: string,
   read: RowReader,
+  lane: EsiLane | undefined,
   runLive: () => Promise<StatusResult<T>>
 ): Promise<StatusResult<T>> {
   const held = await heldAfterFailure<T>(staleAfterMs, options, dkey, read);
   if (held) return held;
 
   const stale = await readStaleRow<T>(read, staleAfterMs);
-  const live = withDedupe(characterId, key, runLive);
+  const live = withDedupe(characterId, key, lane, runLive);
   // Nothing to show in the meantime, so there is no choice but to wait.
   if (!stale) return live;
 
@@ -664,13 +682,15 @@ export async function loadWithCacheStatus<T>(
   fetchLive: () => Promise<T | null>,
   options: LoadSingleWithCacheOptions = {}
 ): Promise<StatusResult<T>> {
+  // Before the first await, while a background caller's lane is still ambient.
+  const lane = laneForLoad();
   const staleAfterMs = options.staleAfterMs ?? STALE_AFTER.default;
   const fresh = await readFreshRow<T>(characterId, key, staleAfterMs);
   if (fresh) return { cached: fresh, needsReauth: false };
 
   const read = rowReader(characterId, key);
-  return loadPastWindow<T>(characterId, key, staleAfterMs, options, read, () =>
-    loadWithCacheStatusLive(characterId, key, fetchLive, options, read)
+  return loadPastWindow<T>(characterId, key, staleAfterMs, options, read, lane, () =>
+    loadWithCacheStatusLive(characterId, key, fetchLive, options, read, lane)
   );
 }
 
@@ -703,14 +723,16 @@ async function loadWithCacheStatusLive<T>(
   key: string,
   fetchLive: () => Promise<T | null>,
   options: LoadSingleWithCacheOptions,
-  read: RowReader
+  read: RowReader,
+  lane: EsiLane | undefined
 ): Promise<StatusResult<T>> {
   const detectAuthFailure = options.detectAuthFailure ?? isAuthFailure;
   const { conditional } = options;
   let needsReauth = false;
   try {
     if (conditional) conditional.ifNoneMatch = await revalidationEtag(characterId, key);
-    let data = await fetchLive();
+    // Every `fetchLive()` runs in this load's lane, past the awaits above.
+    let data = await withEsiLane(lane, fetchLive);
     if (conditional?.notModified) {
       const revalidated = await applyNotModified<T>(
         characterId,
@@ -722,7 +744,7 @@ async function loadWithCacheStatusLive<T>(
       // The row the ETag vouched for changed or vanished in the meantime, so
       // there is nothing for the 304 to point at: ask again, unconditionally.
       conditional.ifNoneMatch = undefined;
-      data = await fetchLive();
+      data = await withEsiLane(lane, fetchLive);
     }
     if (data !== null && conditional?.notModified !== true) {
       const fetchedAt = Date.now();
@@ -962,13 +984,15 @@ export async function loadPaginatedWithCacheStatus<T>(
   fetchLive: () => Promise<TruncatableResult<T>>,
   options: LoadPaginatedWithCacheOptions<T> = {}
 ): Promise<StatusResult<T[]>> {
+  // Before the first await, while a background caller's lane is still ambient.
+  const lane = laneForLoad();
   const staleAfterMs = options.staleAfterMs ?? STALE_AFTER.default;
   const fresh = await readFreshRow<T[]>(characterId, key, staleAfterMs);
   if (fresh) return { cached: fresh, needsReauth: false };
 
   const read = rowReader(characterId, key);
-  return loadPastWindow<T[]>(characterId, key, staleAfterMs, options, read, () =>
-    loadPaginatedWithCacheStatusLive(characterId, key, fetchLive, options, read)
+  return loadPastWindow<T[]>(characterId, key, staleAfterMs, options, read, lane, () =>
+    loadPaginatedWithCacheStatusLive(characterId, key, fetchLive, options, read, lane)
   );
 }
 
@@ -977,7 +1001,8 @@ async function loadPaginatedWithCacheStatusLive<T>(
   key: string,
   fetchLive: () => Promise<TruncatableResult<T>>,
   options: LoadPaginatedWithCacheOptions<T>,
-  read: RowReader
+  read: RowReader,
+  lane: EsiLane | undefined
 ): Promise<StatusResult<T[]>> {
   const detectAuthFailure = options.detectAuthFailure ?? isAuthFailure;
   const { conditional } = options;
@@ -985,7 +1010,8 @@ async function loadPaginatedWithCacheStatusLive<T>(
   try {
     const stored = conditional ? await revalidationPages(characterId, key) : undefined;
     if (conditional) conditional.ifNoneMatch = stored?.map((page) => page.etag);
-    let live = await fetchLive();
+    // Every `fetchLive()` runs in this load's lane, past the awaits above.
+    let live = await withEsiLane(lane, fetchLive);
     let revalidated =
       stored && conditional
         ? await revalidatePages<T>(characterId, key, stored, conditional, live, options)
@@ -994,7 +1020,7 @@ async function loadPaginatedWithCacheStatusLive<T>(
       // The row the ETags vouched for changed or vanished in the meantime, so
       // there is nothing for a 304 page to point at: ask again, unconditionally.
       conditional.ifNoneMatch = undefined;
-      live = await fetchLive();
+      live = await withEsiLane(lane, fetchLive);
       revalidated = undefined;
     }
     if (revalidated && 'cached' in revalidated) {

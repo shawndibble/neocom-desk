@@ -15,6 +15,7 @@ import { AuthError } from '@/auth/sso';
 import { emitEsiActivity } from './activityLog';
 import { passEsiGate, observeEsiResponse } from './budget';
 import { EsiError, EsiBudgetError, EsiTimeoutError } from './errors';
+import { currentEsiLane, type EsiLane } from './lane';
 import type { EsiEndpointId } from './registry';
 
 // `EsiError` lives in `./errors` so the budget can throw one without importing
@@ -80,6 +81,13 @@ export interface EsiFetchOptions {
    * direct `esiFetch` callers (tests) that don't need an entry.
    */
   endpointId?: EsiEndpointId;
+  /**
+   * The gate lane to queue in (issue #2271). Omitted, it is whatever lane was
+   * ambient when `esiFetch` was called (`lane.ts`) — foreground unless a
+   * background caller set one. Passed explicitly only inside `src/esi`, where
+   * a lane has to outlive an `await` (a paginated walk's later pages).
+   */
+  lane?: EsiLane;
 }
 
 export interface EsiResult<T> {
@@ -180,8 +188,13 @@ function openRequestScope(caller?: AbortSignal): RequestScope {
  * budget uses that to tell a genuine recovery from a straggler that was already
  * on the wire when the circuit shut.
  */
-async function gatedFetch(url: URL, init: RequestInit, signal: AbortSignal): Promise<Response> {
-  const release = await passEsiGate(signal);
+async function gatedFetch(
+  url: URL,
+  init: RequestInit,
+  signal: AbortSignal,
+  lane: EsiLane | undefined
+): Promise<Response> {
+  const release = await passEsiGate(signal, lane);
   const startedAt = Date.now();
   try {
     const response = await fetch(url, { ...init, signal });
@@ -235,6 +248,8 @@ export async function esiFetch<T>(
   options: EsiFetchOptions = {}
 ): Promise<EsiResult<T>> {
   const { characterId, query, page, etag, signal, method = 'GET', body, endpointId } = options;
+  // Read before the token await below, which ends the ambient lane's scope.
+  const lane = options.lane ?? currentEsiLane();
   const url = buildUrl(path, query, page);
 
   const headers: Record<string, string> = {
@@ -255,14 +270,14 @@ export async function esiFetch<T>(
   try {
     const requestBody = body !== undefined ? JSON.stringify(body) : undefined;
     const init: RequestInit = { method, headers, body: requestBody };
-    let response = await gatedFetch(url, init, scope.signal);
+    let response = await gatedFetch(url, init, scope.signal, lane);
     if (response.status === 429 || response.status === 420) {
       // The response has already been folded into the budget, so re-entering
       // the gate *is* the backoff: it waits out a short reset the server named
       // and refuses a long one. Refused, we keep the server's own error rather
       // than swapping in a synthetic one — this caller did reach ESI.
       try {
-        response = await gatedFetch(url, init, scope.signal);
+        response = await gatedFetch(url, init, scope.signal, lane);
       } catch (retryErr) {
         if (!(retryErr instanceof EsiBudgetError)) throw retryErr;
         throw await errorFromResponse(response, endpointId);

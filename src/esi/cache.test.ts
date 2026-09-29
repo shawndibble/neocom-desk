@@ -23,6 +23,9 @@ import {
 } from './cache';
 import { clearCachePurgePending, purgeCharacterCacheOrSuppress } from './cachePurge';
 import { onEsiAuthFailure } from './authFailureSignal';
+import { resetEsiBudget } from './budget';
+import { currentEsiLane, inBackgroundLane } from './lane';
+import type { PriorityTicket } from '@/lib/concurrency';
 
 const CHAR_ID = 91;
 const KEY = 'thing';
@@ -614,6 +617,98 @@ describe('in-flight dedupe', () => {
     expect(fetchLive).toHaveBeenCalledTimes(1);
     expect(a.cached?.data).toEqual(['a', 'b']);
     expect(b.cached?.data).toEqual(['a', 'b']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ESI priority lanes (issue #2271): a load started by background work runs its
+// live call in the low lane — past the cache's own awaits — and a view that
+// joins it through the dedupe above promotes it rather than waiting behind the
+// background queue.
+// ---------------------------------------------------------------------------
+
+describe('ESI priority lanes', () => {
+  afterEach(() => resetEsiBudget());
+
+  /** A `fetchLive` that records its lane and waits until `finish` is called. */
+  function heldFetch<R>(value: R) {
+    const seen: { lane: PriorityTicket | undefined } = { lane: undefined };
+    let finish: () => void = () => {};
+    const done = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const fetchLive = vi.fn(async () => {
+      seen.lane = currentEsiLane();
+      await done;
+      return value;
+    });
+    return { seen, fetchLive, finish };
+  }
+
+  it('runs a background load’s live call in a low lane, past the cache’s own awaits', async () => {
+    const { seen, fetchLive, finish } = heldFetch('v');
+    const load = inBackgroundLane(() => loadWithCacheStatus(CHAR_ID, KEY, fetchLive));
+    await vi.waitFor(() => expect(fetchLive).toHaveBeenCalled());
+    finish();
+    await load;
+    expect(seen.lane?.priority).toBe('low');
+  });
+
+  it('runs a foreground load’s live call in no lane at all', async () => {
+    const { seen, fetchLive, finish } = heldFetch('v');
+    const load = loadWithCacheStatus(CHAR_ID, KEY, fetchLive);
+    await vi.waitFor(() => expect(fetchLive).toHaveBeenCalled());
+    finish();
+    await load;
+    expect(seen.lane).toBeUndefined();
+  });
+
+  it('promotes an in-flight background load when a foreground caller joins it', async () => {
+    const { seen, fetchLive, finish } = heldFetch('v');
+    const background = inBackgroundLane(() => loadWithCacheStatus(CHAR_ID, KEY, fetchLive));
+    await vi.waitFor(() => expect(fetchLive).toHaveBeenCalled());
+    expect(seen.lane?.priority).toBe('low');
+
+    const foreground = loadWithCacheStatus(
+      CHAR_ID,
+      KEY,
+      vi.fn(async () => 'other')
+    );
+    await vi.waitFor(() => expect(seen.lane?.priority).toBe('normal'));
+    finish();
+    const [a, b] = await Promise.all([background, foreground]);
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+    expect(b).toEqual(a);
+  });
+
+  it('leaves an in-flight background load low when another background caller joins it', async () => {
+    const { seen, fetchLive, finish } = heldFetch('v');
+    const first = inBackgroundLane(() => loadWithCacheStatus(CHAR_ID, KEY, fetchLive));
+    await vi.waitFor(() => expect(fetchLive).toHaveBeenCalled());
+    const second = inBackgroundLane(() => loadWithCacheStatus(CHAR_ID, KEY, fetchLive));
+    // Let the joiner reach the dedupe (it reads the cache first).
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(seen.lane?.priority).toBe('low');
+    finish();
+    await Promise.all([first, second]);
+  });
+
+  it('promotes an in-flight paginated background load when a foreground caller joins it', async () => {
+    const { seen, fetchLive, finish } = heldFetch({ items: ['a'], truncated: false });
+    const background = inBackgroundLane(() =>
+      loadPaginatedWithCacheStatus(CHAR_ID, KEY, fetchLive)
+    );
+    await vi.waitFor(() => expect(fetchLive).toHaveBeenCalled());
+    expect(seen.lane?.priority).toBe('low');
+
+    const foreground = loadPaginatedWithCacheStatus(
+      CHAR_ID,
+      KEY,
+      vi.fn(async () => ({ items: ['b'], truncated: false }))
+    );
+    await vi.waitFor(() => expect(seen.lane?.priority).toBe('normal'));
+    finish();
+    await Promise.all([background, foreground]);
   });
 });
 

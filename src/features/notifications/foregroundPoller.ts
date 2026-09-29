@@ -13,6 +13,7 @@
  * drives all live in `pollDomains.ts`; this file names none of them (#273).
  */
 import { db } from '@/db';
+import { inBackgroundLane } from '@/esi/lane';
 import { occurrenceKey, occurrenceFiredAt } from '@/engine/occurrenceKey';
 import type { ProjectionRow } from '@/engine/projection';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
@@ -307,7 +308,10 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
       // Nothing this domain could fire is both in scope and switched on for a
       // live channel: no fetch at all (AC5).
       if (enabledEvents.size === 0) continue;
-      const rows = await deps.loadDomain(run.domain, character.characterId);
+      // Background at the ESI gate (issue #2271): a poll across every
+      // Character must not queue the page in view behind it. Wraps only the
+      // synchronous call — the lane cannot outlive an `await` (`esi/lane.ts`).
+      const rows = await inBackgroundLane(() => deps.loadDomain(run.domain, character.characterId));
       // A failed — or deliberately skipped, as the truncation guards do —
       // load persists no snapshot and fires nothing, leaving the previous
       // baseline for the next complete poll.

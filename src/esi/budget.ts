@@ -36,6 +36,23 @@
  *    named. Queued and subsequent callers read that one shared verdict instead
  *    of each firing its own blind retry into a closed door.
  *
+ * ## Two lanes at the ceiling
+ *
+ * Every freed permit goes first to a waiting **foreground** request, then to a
+ * **background** one (`lane.ts` says which is which, and how a view promotes a
+ * background load it joins). Background work never holds more than
+ * `ESI_MAX_IN_FLIGHT - ESI_FOREGROUND_RESERVE` permits. This orders the
+ * ceiling's queue only; the brake and the circuit below treat both lanes
+ * alike, and `Retry-After` shuts the door on both.
+ *
+ * Background is not starved: with no foreground demand it may use every
+ * non-reserved permit, and it waits only while views are actually queued —
+ * a bounded burst (one navigation's reads), with `client.ts`'s
+ * `REQUEST_TIMEOUT_MS` as the backstop that turns an unusually long wait into
+ * a cache fallback rather than a hang. A floor or an ageing rule for background
+ * was deliberately left out: either would sometimes hand a permit to a poll
+ * while a view waits, which is the one thing the lanes exist to stop.
+ *
  * ## Wait, or fail fast into the cache?
  *
  * Both, split at a bound: **we absorb a hiccup, we do not absorb an outage.**
@@ -66,14 +83,15 @@
  * across exactly one `fetch`. No permit holder ever waits on another permit:
  * `paginated.ts` acquires and releases per page, the 429/420 retry releases
  * before it waits, and `src/auth` reaches SSO, never ESI (verified: no
- * `esiFetch` import there). So the holder set always drains, and nesting
+ * `esiFetch` import there). So the holder set always drains — a lane only
+ * decides who is admitted next, it never makes a holder wait — and nesting
  * `mapWithConcurrencyLimit` — `ownedStockDetection.ts` caps an inner map inside
  * a capped outer one — is safe.
  *
  * Everything above the `--- gate ---` marker is pure and clock-injected, so the
  * policy is unit-tested without timers.
  */
-import { createSemaphore, type Release } from '@/lib/concurrency';
+import { createSemaphore, type PriorityTicket, type Release } from '@/lib/concurrency';
 import { EsiBudgetError, type ThrottleStatus, type BudgetRefusal } from './errors';
 
 /**
@@ -83,6 +101,22 @@ import { EsiBudgetError, type ThrottleStatus, type BudgetRefusal } from './error
  * a Corp page and a name resolution is held to this instead of their sum.
  */
 export const ESI_MAX_IN_FLIGHT = 12;
+
+/**
+ * Permits background work — the Foreground Poller's fan-out and the boot
+ * prefetch (`lane.ts`) — may never hold, so a view opened mid-poll has
+ * somewhere to go at once (issue #2271). Background still gets
+ * `ESI_MAX_IN_FLIGHT - 4` = 8 whenever no view wants them.
+ *
+ * Four, not two: a lone poller tick fills all twelve permits (its
+ * per-Character fan-out of `ESI_FANOUT_CONCURRENCY` plus paginated and
+ * multi-read domains), and a reserve of two would leave a view landing on it
+ * two permits — every other read waits a full ESI round trip (300–500 ms),
+ * already past `STALE_GRACE_MS`. Four covers the first wave of the active
+ * Character's board reads. More would slow a tick that has the gate to itself
+ * for no gain a view can see: queued views take every freed permit anyway.
+ */
+export const ESI_FOREGROUND_RESERVE = 4;
 
 /**
  * Errors left in the window below which requests start being spaced out. 30 of
@@ -348,7 +382,7 @@ export function planRequest(
 // Everything below owns the singleton, the clock and the timers.
 
 let budget: BudgetState = INITIAL_BUDGET;
-let semaphore = createSemaphore(ESI_MAX_IN_FLIGHT);
+let semaphore = createSemaphore(ESI_MAX_IN_FLIGHT, { lowReserve: ESI_FOREGROUND_RESERVE });
 
 /**
  * Fold a real response into the app-wide budget. `startedAt` is when its
@@ -375,7 +409,7 @@ export function esiInFlight(): number {
  */
 export function resetEsiBudget(): void {
   budget = INITIAL_BUDGET;
-  semaphore = createSemaphore(ESI_MAX_IN_FLIGHT);
+  semaphore = createSemaphore(ESI_MAX_IN_FLIGHT, { lowReserve: ESI_FOREGROUND_RESERVE });
 }
 
 function aborted(signal: AbortSignal): unknown {
@@ -423,12 +457,22 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
  * `REQUEST_TIMEOUT_MS` is aborted here with an `EsiTimeoutError` rather than
  * waiting on a permit forever. Nothing in this module waits without an end.
  */
-export async function passEsiGate(signal?: AbortSignal): Promise<Release> {
+export async function passEsiGate(signal?: AbortSignal, lane?: PriorityTicket): Promise<Release> {
   const { plan, state } = planRequest(budget, Date.now());
   budget = state;
   if (plan.kind === 'refuse') throw new EsiBudgetError(plan.reason, plan.retryAfterMs);
   // Waited once, then acted on. Re-planning here would loop under a clock the
   // caller cannot advance (and, in tests, one that does not move at all).
   await sleep(plan.waitMs, signal);
-  return semaphore.acquire(signal);
+  // The lane is read at acquire, after the policy wait: a load promoted while
+  // it slept queues foreground.
+  return semaphore.acquire(signal, lane);
+}
+
+/**
+ * Move `lane`'s queued requests — and its later ones — into the foreground
+ * lane. `cache.ts` calls it when a view joins a load background work started.
+ */
+export function promoteEsiLane(lane: PriorityTicket): void {
+  semaphore.promote(lane);
 }
