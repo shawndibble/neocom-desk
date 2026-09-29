@@ -202,8 +202,8 @@ describe('SkillCompare', () => {
 
     await user.click(within(await picker()).getByRole('button', { name: /Pilot One/ }));
     await user.click(within(await picker()).getByRole('button', { name: /Pilot Two/ }));
-    await screen.findByRole('table', { name: 'Skill comparison' });
-    await user.click(screen.getByRole('button', { name: 'Differing only' }));
+    // The chip shows once both characters have loaded, not with the first.
+    await user.click(await screen.findByRole('button', { name: 'Differing only' }));
     await waitFor(() => {
       expect(new URLSearchParams(window.location.search).get('ids')).toBe(`${CHAR_A},${CHAR_B}`);
       expect(window.location.search).toContain('differingOnly=1');
@@ -220,7 +220,7 @@ describe('SkillCompare', () => {
       'aria-pressed',
       'true'
     );
-    expect(screen.getByRole('button', { name: 'Differing only' })).toHaveAttribute(
+    expect(await screen.findByRole('button', { name: 'Differing only' })).toHaveAttribute(
       'aria-pressed',
       'true'
     );
