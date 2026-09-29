@@ -28,8 +28,11 @@ import { ProductionLogPanel } from '@/features/industry/ProductionLogPanel';
 import { BpcSourcingPanel } from '@/features/bpcContracts/BpcSourcingPanel';
 import { mostRecentlyUpdatedPlan, newBuildPlan } from '@/features/industry/newBuildPlan';
 import {
+  blueprintPriceSourcing,
   clearPlanSeed,
+  hasBlueprintPricePick,
   matchesPlanSeed,
+  parseBlueprintPriceSeed,
   parsePlanSeed,
   type BuildPlanSeed,
 } from '@/features/industry/planSeed';
@@ -39,6 +42,7 @@ import {
   applyBuildPlanChange,
   createBuildPlans,
   duplicateBuildPlan,
+  patchBuildPlans,
   moveBuildPlan,
   removeBuildPlan,
 } from '@/features/industry/buildPlanStore';
@@ -167,7 +171,8 @@ export function Industry() {
   const createPlan = useCallback(
     async (
       entry: BlueprintCatalogEntry,
-      seed: BuildPlanSeed | null = null
+      seed: BuildPlanSeed | null = null,
+      blueprintPrice: number | null = null
     ): Promise<string | null> => {
       if (activeCharacterId === null) return null;
       const owned = findOwnedBlueprint(ownedBlueprints, entry.blueprintTypeID);
@@ -195,8 +200,21 @@ export function Industry() {
             : {}),
         }
       );
-      await createBuildPlans([plan]);
-      return plan.id;
+      // An LP Store "Plan in Industry": the redemption is the plan's
+      // Blueprint Acquisition, written as the tier modal's own LP pick.
+      const seeded =
+        blueprintPrice === null
+          ? plan
+          : {
+              ...plan,
+              name: t('industry.lpSeededPlanName', { name: entry.productName }),
+              materialSourcing: {
+                ...plan.materialSourcing,
+                [entry.blueprintTypeID]: blueprintPriceSourcing(blueprintPrice),
+              },
+            };
+      await createBuildPlans([seeded]);
+      return seeded.id;
     },
     [activeCharacterId, ownedBlueprints, plans, facilityDefaults, assumedMe, assumedTe, t]
   );
@@ -211,6 +229,7 @@ export function Industry() {
   const productParam = searchParams.get('product');
   const materialParam = searchParams.get('material');
   const planSeed = useMemo(() => parsePlanSeed(searchParams), [searchParams]);
+  const blueprintPriceSeed = useMemo(() => parseBlueprintPriceSeed(searchParams), [searchParams]);
   useEffect(() => {
     if (activeCharacterId === null || !plans || !catalog) return;
     if (productParam) {
@@ -219,15 +238,30 @@ export function Industry() {
         ? (plans.find(
             (p) =>
               p.blueprintTypeID === entry.blueprintTypeID &&
-              (planSeed === null || matchesPlanSeed(p, planSeed))
+              (planSeed === null || matchesPlanSeed(p, planSeed)) &&
+              (blueprintPriceSeed === null || hasBlueprintPricePick(p))
           ) ?? null)
         : null;
       if (existing) {
-        navigate(`/industry/plans/${existing.id}`, { replace: true });
+        const open = () => navigate(`/industry/plans/${existing.id}`, { replace: true });
+        // An LP plan opened again: the redemption's price has likely moved
+        // (hub prices, LP Value, what the pilot now owns) — refresh it.
+        const stalePrice =
+          blueprintPriceSeed !== null &&
+          existing.materialSourcing?.[existing.blueprintTypeID]?.overridePrice !==
+            blueprintPriceSeed;
+        if (stalePrice) {
+          void patchBuildPlans([existing.id], {
+            materialSourcing: {
+              ...existing.materialSourcing,
+              [existing.blueprintTypeID]: blueprintPriceSourcing(blueprintPriceSeed),
+            },
+          }).then(open);
+        } else open();
         return;
       }
       if (entry) {
-        void createPlan(entry, planSeed).then((id) => {
+        void createPlan(entry, planSeed, blueprintPriceSeed).then((id) => {
           if (id) navigate(`/industry/plans/${id}`, { replace: true });
         });
         return;
@@ -256,6 +290,7 @@ export function Industry() {
     productParam,
     materialParam,
     planSeed,
+    blueprintPriceSeed,
     searchParams,
     setSearchParams,
     createPlan,

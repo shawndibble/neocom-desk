@@ -252,9 +252,14 @@ export interface LpOfferRow {
   lpCost: number;
   /** Copies one redemption hands over. */
   quantity: number;
-  /** Turn-in items the offer also demands — not priced here. */
+  /** Turn-in items the offer also demands. */
   requiredItemCount: number;
-  /** `lpPickPrice` at the pilot's rate. */
+  /**
+   * What the turn-ins the pilot doesn't already own cost at the hub
+   * (`loadLpTurnInPricer`); 0 with none to buy, `null` when unpriceable.
+   */
+  turnInCost: number | null;
+  /** `lpPickPrice` at the pilot's rate, plus `turnInCost` when it is known. */
   price: number;
   /** False when the rate is zero: `price` is the ISK cost only. */
   lpPriced: boolean;
@@ -263,23 +268,32 @@ export interface LpOfferRow {
   pickable: true;
 }
 
-export function lpOfferRows(matches: readonly LpOfferMatch[], iskPerLp: number): LpOfferRow[] {
+export function lpOfferRows(
+  matches: readonly LpOfferMatch[],
+  iskPerLp: number,
+  /** Turn-in cost per offer (`loadLpTurnInPricer`); absent while it loads, which prices none. */
+  turnInCostFor: (offer: LpOfferMatch['offer']) => number | null = () => 0
+): LpOfferRow[] {
   return byCheapest(
-    matches.map((m): LpOfferRow => ({
-      kind: 'lp',
-      corporationId: m.corporationId,
-      offerId: m.offer.offer_id,
-      corpName: m.corpName,
-      iskCost: m.offer.isk_cost,
-      lpCost: m.offer.lp_cost,
-      quantity: m.offer.quantity,
-      requiredItemCount: m.offer.required_items.length,
-      price: lpPickPrice(m.offer.isk_cost, m.offer.lp_cost, iskPerLp),
-      lpPriced: usableRate(iskPerLp) > 0 && m.offer.lp_cost > 0,
-      me: 0,
-      te: 0,
-      pickable: true,
-    }))
+    matches.map((m): LpOfferRow => {
+      const turnInCost = m.offer.required_items.length === 0 ? 0 : turnInCostFor(m.offer);
+      return {
+        kind: 'lp',
+        corporationId: m.corporationId,
+        offerId: m.offer.offer_id,
+        corpName: m.corpName,
+        iskCost: m.offer.isk_cost,
+        lpCost: m.offer.lp_cost,
+        quantity: m.offer.quantity,
+        requiredItemCount: m.offer.required_items.length,
+        turnInCost,
+        price: lpPickPrice(m.offer.isk_cost, m.offer.lp_cost, iskPerLp) + (turnInCost ?? 0),
+        lpPriced: usableRate(iskPerLp) > 0 && m.offer.lp_cost > 0,
+        me: 0,
+        te: 0,
+        pickable: true,
+      };
+    })
   );
 }
 
@@ -331,10 +345,10 @@ export type AcquisitionSourceRow = OwnedTierRow | ContractOfferRow | MarketSellR
  * An owned tier sets no price: `acquisitionForLookup` (recipes.ts) finds that
  * tier among its own `tierOptions` and costs any shortfall itself.
  *
- * Every other row forces its tier *and* its price, since the engine cannot
- * reproduce either — it only ever considers the single cheapest contract
- * listing at the plan's own hub, and a hub BPO sell price, never a specific
- * listing, another region's order, or an LP offer.
+ * Every other row forces its tier *and* its price. Automatic selection
+ * weighs the same sources, but it prices each tier by whichever offer covers
+ * a node's runs cheapest — a pick is the pilot choosing one specific listing,
+ * order or redemption instead, which only a forced price can say.
  *
  * Unit: `overridePrice` on a Blueprint Acquisition line is the ISK for the
  * whole line — `acquisitionMaterialFor` (materialResolution.ts) books it as

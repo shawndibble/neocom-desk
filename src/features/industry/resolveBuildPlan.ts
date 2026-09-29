@@ -81,6 +81,10 @@ export interface BuildPlanSources {
   standing?: ResolvedStandings;
   /** BPC Sourcing offers already narrowed to the plan's own Trade Hub region. */
   bpcOffersFor: (blueprintTypeID: number) => readonly BpcOffer[];
+  /** Public-contract offers in every other region — priced from only when nothing else prices the blueprint. */
+  bpcLastResortOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
+  /** Region market sell orders and LP Store redemptions, as offers (`useBlueprintPurchaseOffers`). */
+  blueprintPurchaseOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
   /** `useIncludeBlueprintCost`: off still resolves each tier, but prices no acquisition line. */
   includeBlueprintCost: boolean;
 }
@@ -202,6 +206,8 @@ export function resolveBuildPlan(
     assumedMeForUnowned: sources.assumedMe,
     blueprintAcquisition: {
       offersFor: sources.bpcOffersFor,
+      extraOffersFor: sources.blueprintPurchaseOffersFor,
+      lastResortOffersFor: sources.bpcLastResortOffersFor,
       hubPrices: snapshot?.hubPrices ?? {},
       sourcing: plan.materialSourcing,
     },

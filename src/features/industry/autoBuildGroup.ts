@@ -207,6 +207,7 @@ export async function applyGroupAutoBuild(
     members.map(async (member, index) => {
       const snapshot = await snapshots[index]!.snapshot;
       const reactionSnapshot = await snapshots[index]!.reactionSnapshot;
+      const blueprintPurchaseOffersFor = await snapshots[index]!.blueprintOffers;
       // Same gate as the member's own page (`resolveBuildPlan`'s
       // `makeOrBuyContext`): without real fees every verdict would read
       // "build", so a member whose prices never landed is left untouched.
@@ -222,6 +223,8 @@ export async function applyGroupAutoBuild(
         assumedMeForUnowned: assumedMe,
         blueprintAcquisition: {
           offersFor: offersForRegion(bpcRows, hub.regionId),
+          extraOffersFor: blueprintPurchaseOffersFor,
+          lastResortOffersFor: offersForRegion(bpcRows, hub.regionId, true),
           hubPrices: snapshot.hubPrices,
           sourcing: member.plan.materialSourcing,
         },

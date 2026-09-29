@@ -129,10 +129,11 @@ async function computeRow(
   try {
     const snapshot = await priced.snapshot;
     const reactionSnapshot = await priced.reactionSnapshot;
+    const blueprintPurchaseOffersFor = await priced.blueprintOffers;
     const hub: TradeHub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
     const { result, error, groupResult, groupError } = resolveBuildPlan(
       plan,
-      { ...sources, ...pricingSourcesForHub(pricing, hub), catalog },
+      { ...sources, ...pricingSourcesForHub(pricing, hub), blueprintPurchaseOffersFor, catalog },
       { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex },
       { withGroupResult: computeGroupResult }
     );

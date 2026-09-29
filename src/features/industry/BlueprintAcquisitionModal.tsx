@@ -85,6 +85,7 @@ import {
   type MarketSellRow,
   type OfferGroup,
 } from './blueprintAcquisitionSources';
+import { loadLpTurnInPricer } from './blueprintPurchaseOffers';
 
 export type { AcquisitionOwnedCopy } from './blueprintAcquisitionSources';
 
@@ -274,9 +275,20 @@ export function BlueprintAcquisitionModal({
     [marketView, hub.stationId]
   );
   const marketSection = sectionRows(marketGroups, (g) => g.row.pickable);
+  // Turn-ins priced as automatic selection prices them — owned ones free,
+  // the rest at this modal's hub — so a picked LP row writes the same price
+  // the plan would have chosen for it.
+  const lpOffers = lp.status === 'ready' ? lp.data.map((m) => m.offer) : [];
+  const turnIns = useLoad(
+    () => loadLpTurnInPricer(hub, lpOffers),
+    `${hub.id}:${lpOffers.map((o) => o.offer_id).join(',')}`
+  );
   const lpRows = useMemo(
-    () => (lp.status === 'ready' ? lpOfferRows(lp.data, lpValue) : []),
-    [lp, lpValue]
+    () =>
+      lp.status === 'ready'
+        ? lpOfferRows(lp.data, lpValue, turnIns.status === 'ready' ? turnIns.data : () => null)
+        : [],
+    [lp, lpValue, turnIns]
   );
   const lpSection = sectionRows(lpRows, (r) => r.pickable);
   const contractRows = contractSection.shown.map((g) => g.row);
@@ -380,7 +392,10 @@ export function BlueprintAcquisitionModal({
       parts.push(t('industry.blueprintAcquisitionLpQuantity', { count: row.quantity }));
     if (row.requiredItemCount > 0)
       parts.push(
-        t('industry.blueprintAcquisitionLpRequiredItems', { count: row.requiredItemCount })
+        t('industry.blueprintAcquisitionLpRequiredItems', { count: row.requiredItemCount }),
+        row.turnInCost === null
+          ? t('industry.blueprintAcquisitionLpTurnInsUnpriced')
+          : t('industry.blueprintAcquisitionLpTurnInsToBuy', { isk: formatIsk(row.turnInCost) })
       );
     return parts.join(' · ');
   }

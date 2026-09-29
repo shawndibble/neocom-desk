@@ -36,6 +36,9 @@ interface CacheEntry<V> {
 }
 
 const hubPriceCache = new Map<string, CacheEntry<HubAggregate>>();
+const regionSellCache = new Map<string, CacheEntry<number | null>>();
+/** Region fetches in flight, keyed like the cache, so concurrent askers share one request. */
+const regionSellInFlight = new Map<string, Promise<number | null>>();
 let adjustedPriceCache: CacheEntry<Map<number, AdjustedPrice>> | null = null;
 
 /**
@@ -100,6 +103,8 @@ async function readPersisted<V>(
 /** Test-only: production callers rely on TTL expiry instead of clearing. */
 export function clearMarketPriceCache(): void {
   hubPriceCache.clear();
+  regionSellCache.clear();
+  regionSellInFlight.clear();
   adjustedPriceCache = null;
   hubPricesInFlight.clear();
   adjustedPricesInFlight = null;
@@ -246,6 +251,52 @@ export async function getHubPrices(
   now: Clock = Date.now
 ): Promise<Map<number, HubAggregate>> {
   return getStationPrices(hub.stationId, typeIds, now);
+}
+
+/**
+ * The lowest sell order for each of `typeIds` anywhere in one region, or
+ * `null` — memory-cached on the hub TTL. For Blueprint Acquisition: an
+ * NPC-seeded blueprint original is sold at its seeding corp's stations,
+ * rarely at the hub station itself, so a hub-only price would miss it. A
+ * failed fetch reads as no price for every type, never a thrown error.
+ */
+export async function getRegionSellPrices(
+  regionId: number,
+  typeIds: readonly number[],
+  now: Clock = Date.now
+): Promise<Map<number, number | null>> {
+  const result = new Map<number, number | null>();
+  const nowMs = now();
+  const pending = new Map<number, Promise<number | null>>();
+  const missing: number[] = [];
+  for (const typeId of new Set(typeIds)) {
+    const key = hubCacheKey(regionId, typeId);
+    const cached = regionSellCache.get(key);
+    const inFlight = regionSellInFlight.get(key);
+    if (cached && cached.expiresAt > nowMs) result.set(typeId, cached.value);
+    else if (inFlight) pending.set(typeId, inFlight);
+    else missing.push(typeId);
+  }
+  if (missing.length > 0) {
+    const fetch = fetchAggregates(regionId, missing, 'region').then(
+      (fetched) => fetched,
+      () => null
+    );
+    for (const typeId of missing) {
+      const key = hubCacheKey(regionId, typeId);
+      const price = fetch.then((fetched) => {
+        regionSellInFlight.delete(key);
+        if (!fetched) return null;
+        const sellMin = fetched.get(typeId)?.sellMin ?? null;
+        regionSellCache.set(key, { value: sellMin, expiresAt: nowMs + HUB_PRICE_TTL_MS });
+        return sellMin;
+      });
+      regionSellInFlight.set(key, price);
+      pending.set(typeId, price);
+    }
+  }
+  for (const [typeId, price] of pending) result.set(typeId, await price);
+  return result;
 }
 
 /** Global adjusted/average prices (job-cost EIV), cached for an hour. */

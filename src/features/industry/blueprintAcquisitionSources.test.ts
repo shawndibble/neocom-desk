@@ -323,6 +323,11 @@ const LP_OFFER: LoyaltyStoreOffer = {
   required_items: [],
 };
 
+const WITH_TURN_IN: LoyaltyStoreOffer = {
+  ...LP_OFFER,
+  required_items: [{ type_id: 587, quantity: 1 }],
+};
+
 function lpMatch(overrides: Partial<LpOfferMatch> = {}): LpOfferMatch {
   return {
     corporationId: 1000125,
@@ -364,6 +369,16 @@ describe('lpOfferRows', () => {
 
   it('says the price is ISK only when no rate is set', () => {
     expect(lpOfferRows([lpMatch()], 0)[0]).toMatchObject({ price: 12_000_000, lpPriced: false });
+  });
+
+  it('adds the turn-ins still to buy, so the row costs what automatic pricing charges', () => {
+    const [row] = lpOfferRows([lpMatch({ offer: WITH_TURN_IN })], 0, () => 300_000);
+    expect(row).toMatchObject({ price: 12_300_000, turnInCost: 300_000 });
+  });
+
+  it('prices the ISK/LP side alone when the turn-ins cannot be priced, and says so', () => {
+    const [row] = lpOfferRows([lpMatch({ offer: WITH_TURN_IN })], 0, () => null);
+    expect(row).toMatchObject({ price: 12_000_000, turnInCost: null });
   });
 });
 

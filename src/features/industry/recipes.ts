@@ -69,6 +69,10 @@ export interface BlueprintAcquisitionSources {
    * Hub concept this module stays decoupled from.
    */
   offersFor: (blueprintTypeID: number) => readonly BpcOffer[];
+  /** Every other way to buy it the app can see — region market, LP Store — as offers. Absent = none. */
+  extraOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
+  /** Offers priced from only when nothing else prices the blueprint (other regions' contracts). */
+  lastResortOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
   /** Hub sell prices, for a BPO's own ordinary sell price when no BPC offer covers it. */
   hubPrices: HubPrices;
   /**
@@ -259,8 +263,10 @@ export function acquisitionForLookup(
 
     const blueprint = toIndustryBlueprint(entry.blueprint);
     const blueprintTypeID = entry.blueprintTypeID;
-    // Reaction formulas cannot be copied — never search BPC Sourcing for one.
+    // Reaction formulas cannot be copied — only an original is ever for sale.
     const isReaction = entry.blueprint.activity === 'reaction';
+    const purchasable = (offers: readonly BpcOffer[]) =>
+      isReaction ? offers.filter((offer) => offer.runs === -1) : offers;
 
     let pool = blueprintPools.get(blueprintTypeID);
     if (!pool) {
@@ -279,7 +285,11 @@ export function acquisitionForLookup(
       ),
       neededRuns,
       materialCostAtMe: materialCostAtMeFor(blueprint, needed, ctx, materialPrices),
-      bpcOffers: isReaction ? [] : acquisitionSources.offersFor(blueprintTypeID),
+      bpcOffers: purchasable(acquisitionSources.offersFor(blueprintTypeID)),
+      extraOffers: purchasable(acquisitionSources.extraOffersFor?.(blueprintTypeID) ?? []),
+      lastResortOffers: purchasable(
+        acquisitionSources.lastResortOffersFor?.(blueprintTypeID) ?? []
+      ),
       bpoSellPrice: acquisitionSources.hubPrices[blueprintTypeID] ?? null,
       assumedMeForUnowned: sources.assumedMeForUnowned ?? 0,
     };

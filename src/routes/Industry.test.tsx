@@ -459,6 +459,70 @@ describe('Industry: a Build Plan seeded from a BPC listing (issue #637)', () => 
   });
 });
 
+describe('Industry: a Build Plan seeded from an LP Store offer', () => {
+  const LP_SEEDED = '/industry?product=587&bpPrice=1500000';
+
+  it('opens a plan whose blueprint is the LP pick at that price, then clears the seed', async () => {
+    window.history.pushState({}, '', LP_SEEDED);
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Rifter' })).toBeInTheDocument();
+    await waitFor(() => expect(window.location.search).toBe(''));
+    const created = await db.buildPlans.where('characterId').equals(CHAR_ID).first();
+    expect(created?.name).toBe('Rifter (LP Store)');
+    expect(created?.materialSourcing?.[638]).toEqual({
+      acquisitionTierOverride: { me: 0, te: 0 },
+      overridePrice: 1_500_000,
+    });
+  });
+
+  it('creates the LP plan beside a plain plan for the same blueprint, not over it', async () => {
+    await db.buildPlans.add(seedPlan());
+    window.history.pushState({}, '', LP_SEEDED);
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Rifter' });
+    await waitFor(() => expect(window.location.search).toBe(''));
+    expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
+    expect((await db.buildPlans.get('bp-1'))?.materialSourcing?.[638]).toBeUndefined();
+  });
+
+  it('reuses an LP plan opened again and refreshes its price rather than adding a twin', async () => {
+    await db.buildPlans.add(
+      seedPlan({
+        id: 'bp-lp',
+        materialSourcing: {
+          638: { acquisitionTierOverride: { me: 0, te: 0 }, overridePrice: 1_000_000 },
+        },
+      })
+    );
+    window.history.pushState({}, '', LP_SEEDED);
+    render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/industry/plans/bp-lp'));
+    expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
+    expect((await db.buildPlans.get('bp-lp'))?.materialSourcing?.[638]?.overridePrice).toBe(
+      1_500_000
+    );
+  });
+
+  it('reuses a plan already carrying that exact pick', async () => {
+    await db.buildPlans.add(
+      seedPlan({
+        id: 'bp-lp',
+        materialSourcing: {
+          638: { acquisitionTierOverride: { me: 0, te: 0 }, overridePrice: 1_500_000 },
+        },
+      })
+    );
+    window.history.pushState({}, '', LP_SEEDED);
+    render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/industry/plans/bp-lp'));
+    expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
+  });
+});
+
 describe('Industry: "View in Industry as material" from Assets (issue #414)', () => {
   it("opens the character's existing plan whose blueprint consumes the material, then clears the query param", async () => {
     await db.buildPlans.add(seedPlan());

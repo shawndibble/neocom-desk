@@ -55,7 +55,12 @@ export interface BuildPlanPricingInputs {
 /** The part of `BuildPlanSources` this module supplies for one plan. */
 export type HubPricingSources = Pick<
   BuildPlanSources,
-  'assumedMe' | 'includeBlueprintCost' | 'corpBlueprints' | 'standing' | 'bpcOffersFor'
+  | 'assumedMe'
+  | 'includeBlueprintCost'
+  | 'corpBlueprints'
+  | 'standing'
+  | 'bpcOffersFor'
+  | 'bpcLastResortOffersFor'
 >;
 
 /** What `pricingSourcesForHub` reads. Corp blueprints may be withheld, which reads as unavailable. */
@@ -67,18 +72,22 @@ export type HubPricingSourceArgs = Pick<
 const NO_BPC_ROWS: readonly BpcContractRow[] = [];
 
 /**
- * BPC Sourcing offers for one blueprint type, in one region — the per-node
- * lookup `acquisitionForLookup` reads. No offers (BPC Sourcing not synced, or
- * nothing listed) lets `selectBlueprintTier`'s price cascade fall straight
- * through to the BPO's own hub sell price.
+ * Public-contract offers for one blueprint type, in one region (or, with
+ * `outside`, every region but it) — the per-node lookups
+ * `acquisitionForLookup` reads. Copies and originals alike; never an auction
+ * (its price is a bid, not an ask anyone can pay) or a contract asking for
+ * PLEX in exchange. No offers (BPC Sourcing not synced, or nothing listed)
+ * leaves `selectBlueprintTier` to its other sources.
  */
 export function offersForRegion(
   bpcRows: readonly BpcContractRow[],
-  regionId: number
+  regionId: number,
+  outside = false
 ): (blueprintTypeID: number) => readonly BpcOffer[] {
   const byType = new Map<number, BpcOffer[]>();
   for (const row of bpcRows) {
-    if (row.regionId !== regionId) continue;
+    if ((row.regionId === regionId) === outside) continue;
+    if (row.isAuction || row.requestedPlex) continue;
     const list = byType.get(row.typeId) ?? [];
     list.push({
       me: row.me,
@@ -104,7 +113,11 @@ export async function loadBpcContractRows(
 ): Promise<readonly BpcContractRow[] | null> {
   try {
     const cached = await loadPublicBpcContracts(characterId);
-    return cached?.data.rows ?? null;
+    if (!cached) return null;
+    const { rows, originals } = cached.data;
+    // Originals ride beside the copies (`runs: -1`), so automatic selection
+    // can price a blueprint only ever listed as an original.
+    return originals?.length ? [...rows, ...originals] : rows;
   } catch {
     return null;
   }
@@ -155,22 +168,24 @@ export function isPricingReady(inputs: Pick<BuildPlanPricingInputs, 'hydrated'>)
 // memo keyed on `bpcOffersFor` only re-runs when the offers actually change.
 const offersCache = new WeakMap<
   readonly BpcContractRow[],
-  Map<number, HubPricingSources['bpcOffersFor']>
+  Map<string, HubPricingSources['bpcOffersFor']>
 >();
 
 function offersFor(
   bpcRows: readonly BpcContractRow[],
-  regionId: number
+  regionId: number,
+  outside = false
 ): (blueprintTypeID: number) => readonly BpcOffer[] {
   let byRegion = offersCache.get(bpcRows);
   if (!byRegion) {
     byRegion = new Map();
     offersCache.set(bpcRows, byRegion);
   }
-  let lookup = byRegion.get(regionId);
+  const key = `${outside ? '!' : ''}${regionId}`;
+  let lookup = byRegion.get(key);
   if (!lookup) {
-    lookup = offersForRegion(bpcRows, regionId);
-    byRegion.set(regionId, lookup);
+    lookup = offersForRegion(bpcRows, regionId, outside);
+    byRegion.set(key, lookup);
   }
   return lookup;
 }
@@ -186,5 +201,6 @@ export function pricingSourcesForHub(
     corpBlueprints: inputs.corpBlueprints,
     standing: tradeHubStanding(inputs.standings, hub.id),
     bpcOffersFor: offersFor(inputs.bpcRows, hub.regionId),
+    bpcLastResortOffersFor: offersFor(inputs.bpcRows, hub.regionId, true),
   };
 }

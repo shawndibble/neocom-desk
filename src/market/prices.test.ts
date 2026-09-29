@@ -9,6 +9,7 @@ import {
   getHubPrices,
   getStationPrices,
   getAdjustedPrices,
+  getRegionSellPrices,
   clearMarketPriceCache,
   invalidateHubPrices,
   HUB_PRICE_TTL_MS,
@@ -160,6 +161,54 @@ describe('getHubPrices', () => {
     await getHubPrices(DEFAULT_TRADE_HUB, [34, 35], clock);
 
     expect(requestedTypes).toEqual(['34', '35']);
+  });
+});
+
+describe('getRegionSellPrices', () => {
+  it("reads each type's lowest sell across the whole region, cached", async () => {
+    const hits = { count: 0 };
+    let region: string | null = null;
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, ({ request }) => {
+        hits.count += 1;
+        region = new URL(request.url).searchParams.get('region');
+        return HttpResponse.json({
+          34: { sell: { min: '3.8', volume: '200', orderCount: '1' } },
+        });
+      })
+    );
+
+    const first = await getRegionSellPrices(10000002, [34, 35]);
+    const second = await getRegionSellPrices(10000002, [34, 35]);
+
+    expect(region).toBe('10000002');
+    expect(first.get(34)).toBe(3.8);
+    expect(first.get(35)).toBeNull();
+    expect(second).toEqual(first);
+    expect(hits.count).toBe(1);
+  });
+
+  it('shares one request between concurrent askers', async () => {
+    const hits = { count: 0 };
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, () => {
+        hits.count += 1;
+        return HttpResponse.json({ 34: { sell: { min: '3.8', volume: '1', orderCount: '1' } } });
+      })
+    );
+    const [a, b] = await Promise.all([
+      getRegionSellPrices(10000002, [34]),
+      getRegionSellPrices(10000002, [34]),
+    ]);
+    expect(a.get(34)).toBe(3.8);
+    expect(b.get(34)).toBe(3.8);
+    expect(hits.count).toBe(1);
+  });
+
+  it('reads as no prices, not an error, when Fuzzwork is down', async () => {
+    server.use(http.get(FUZZWORK_AGGREGATES_URL, () => new HttpResponse(null, { status: 500 })));
+    const prices = await getRegionSellPrices(10000002, [34]);
+    expect(prices.get(34)).toBeNull();
   });
 });
 
