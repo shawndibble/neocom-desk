@@ -10,7 +10,7 @@
  * "this character / all characters / pick some" — this ticket adds no new
  * account-level alt-linking, just this feature's own scoped selector.
  */
-import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useCharacterModifiersByCharacter } from '@/features/character/characterModifiers';
 import { useTradeHubStandingsByCharacter } from '@/features/market/useTradeHubStandings';
 import { useTranslation } from 'react-i18next';
@@ -46,7 +46,7 @@ import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
 import { loadCharacterBlueprints } from './data';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
-import { formatPercent } from './format';
+import { formatPercent, numericCell } from './format';
 import { MobileOpportunityList } from './MobileOpportunityList';
 import { OPPORTUNITIES_DEFAULT_SORT, OPPORTUNITIES_SORT_KEY } from './opportunitiesUrl';
 import { ORDER_DEPTH_RANK, ORDER_DEPTH_TONE, unitMargin } from './opportunityMetrics';
@@ -74,14 +74,6 @@ interface OpportunitiesPanelProps {
   onAddToCompare: (rows: readonly OpportunityRow[]) => void;
   /** Resolves true once it has opened the new plan (see `StartPlanButton`). */
   onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
-}
-
-function numericCell(
-  value: number | null,
-  format: (v: number) => ReactNode,
-  unknown: string
-): ReactNode {
-  return value === null ? unknown : format(value);
 }
 
 /** `'current'`, not the synced default: this panel has always opened on the active pilot. */

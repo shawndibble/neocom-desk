@@ -5,7 +5,7 @@
  * starting from nothing" answer. Opt-in: nothing runs until the pilot hits
  * "Scan".
  */
-import { useMemo, type ReactElement, type ReactNode } from 'react';
+import { useMemo, type ReactElement } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -58,7 +58,7 @@ import { useMarketWideOpportunities } from './useMarketWideOpportunities';
 import { SkillGateMarker } from './SkillGateMarker';
 import { ORDER_DEPTH_RANK } from './opportunityMetrics';
 import { StartPlanButton } from './StartPlanButton';
-import { formatPercent } from './format';
+import { formatPercent, numericCell } from './format';
 import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, defineUrlFilter, enumParam, enumSetParam } from '@/lib/urlState';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -129,15 +129,6 @@ function activeFilterCount(filter: MarketWideFilterState): number {
 /** Only a product whose sales were read and fall short is hidden; an unreadable one stays. */
 function isKnownRarelySold(unitsPerDay: number | null | undefined): boolean {
   return unitsPerDay !== null && unitsPerDay !== undefined && isRarelySold(unitsPerDay);
-}
-
-/** Build Opportunities' own unknown-value cell, so an unpriced margin reads the same in both tables. */
-function numericCell(
-  value: number | null,
-  format: (v: number) => ReactNode,
-  unknown: string
-): ReactNode {
-  return value === null ? unknown : format(value);
 }
 
 function sameMembers<V>(a: ReadonlySet<V>, b: ReadonlySet<V>): boolean {

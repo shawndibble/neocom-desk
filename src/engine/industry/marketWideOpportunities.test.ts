@@ -219,8 +219,8 @@ describe('computeMarketWideRows', () => {
       noFee
     );
     expect(row!.seconds).toBe(5400);
-    const profit = (row!.marginPct! / 100) * 1000;
-    expect(row!.iskPerHour).toBeCloseTo((profit / row!.seconds) * 3600);
+    // Same profit (625) as the single-tier case, now spread over 1.5 hours.
+    expect(row!.iskPerHour).toBeCloseTo((625 / row!.seconds) * 3600);
   });
 
   it('leaves margin unknown (null), never 0%, when revenue is 0', () => {

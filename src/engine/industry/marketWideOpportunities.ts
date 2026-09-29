@@ -136,7 +136,7 @@ export interface MarketWideRow extends RankedOpportunity {
   productTypeID: number;
   /** profit ÷ revenue × 100, on the same net profit `iskPerHour` uses; null when revenue is 0 (unknown, never 0%). */
   marginPct: number | null;
-  /** The whole flattened tree's job time at TE 0 — the duration `iskPerHour` divides by, not a wall-clock promise. */
+  /** The whole flattened tree's skill-adjusted job time at TE 0 — the duration `iskPerHour` divides by, not a wall-clock promise. */
   seconds: number;
 }
 
