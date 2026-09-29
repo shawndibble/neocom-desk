@@ -26,7 +26,7 @@ import { db } from '@/db';
 import { iskToneClass } from '@/features/character/format';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
-import type { BlueprintSource } from '@/engine/industry/blueprintObtainability';
+import { BLUEPRINT_SOURCE_RANK } from '@/engine/industry/blueprintObtainability';
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
@@ -60,13 +60,6 @@ interface MarketWideOpportunitiesPanelProps {
 }
 
 const HIDE_SKILL_GATED = boolParam();
-
-const BLUEPRINT_SOURCE_RANK: Record<BlueprintSource, number> = {
-  owned: 0,
-  market: 1,
-  contract: 2,
-  lpStore: 3,
-};
 
 /**
  * The columns' sort keys, at module scope: the columns themselves close over

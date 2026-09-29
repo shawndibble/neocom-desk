@@ -22,6 +22,11 @@ export interface BlueprintSourceSets {
 
 const PREFERENCE: readonly BlueprintSource[] = ['owned', 'market', 'contract', 'lpStore'];
 
+/** Each source's position in `blueprintSource`'s preference order — a sort key for a source column. */
+export const BLUEPRINT_SOURCE_RANK = Object.fromEntries(
+  PREFERENCE.map((source, index) => [source, index])
+) as Record<BlueprintSource, number>;
+
 /**
  * The first source carrying `blueprintTypeID`, or null when none does. Owned
  * wins (it costs nothing more), then the NPC market (a fixed, always-stocked

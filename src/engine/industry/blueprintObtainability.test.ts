@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { blueprintSource, type BlueprintSourceSets } from './blueprintObtainability';
+import {
+  BLUEPRINT_SOURCE_RANK,
+  blueprintSource,
+  type BlueprintSourceSets,
+} from './blueprintObtainability';
 
 const NONE: BlueprintSourceSets = {
   owned: new Set(),
@@ -31,6 +35,10 @@ describe('blueprintSource', () => {
       'market'
     );
     expect(blueprintSource(501, { ...NONE, contract: all, lpStore: all })).toBe('contract');
+  });
+
+  it('ranks sources in the order blueprintSource prefers them', () => {
+    expect(BLUEPRINT_SOURCE_RANK).toEqual({ owned: 0, market: 1, contract: 2, lpStore: 3 });
   });
 
   it('ignores other blueprints in a source', () => {

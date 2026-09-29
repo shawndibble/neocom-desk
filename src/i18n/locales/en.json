@@ -2298,7 +2298,7 @@
     "marketOpportunitiesBlueprintSource": "Blueprint",
     "marketOpportunitiesBlueprintSources": {
       "owned": "Owned",
-      "market": "Market",
+      "market": "NPC market",
       "contract": "Contract",
       "lpStore": "LP store"
     },

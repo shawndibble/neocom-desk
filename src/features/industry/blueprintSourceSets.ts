@@ -51,13 +51,20 @@ async function marketBlueprints(blueprintTypeIds: readonly number[]): Promise<So
   return { ids: new Set(blueprintTypeIds.filter((id) => index.has(id))), ok: true };
 }
 
+/**
+ * The snapshot is shared, not per-Character — any Character's Firebase
+ * session can read it, so each is tried in turn until one does. A snapshot
+ * the backend has never synced lists nothing and counts as unread.
+ */
 async function contractBlueprints(characterIds: readonly number[]): Promise<SourceResult> {
-  const characterId = characterIds[0];
-  if (characterId === undefined || !isSyncConfigured()) return FAILED;
-  const snapshot = await loadPublicBpcContracts(characterId);
-  if (!snapshot) return FAILED;
-  const { rows, originals = [] } = snapshot.data;
-  return { ids: new Set([...rows, ...originals].map((row) => row.typeId)), ok: true };
+  if (!isSyncConfigured()) return FAILED;
+  for (const characterId of characterIds) {
+    const snapshot = await loadPublicBpcContracts(characterId).catch(() => null);
+    if (!snapshot || snapshot.data.lastSyncedAt === null) continue;
+    const { rows, originals = [] } = snapshot.data;
+    return { ids: new Set([...rows, ...originals].map((row) => row.typeId)), ok: true };
+  }
+  return FAILED;
 }
 
 /**

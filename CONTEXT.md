@@ -468,9 +468,11 @@ here — they go one per file in `docs/context/decisions/`.
   `hasTypes` hold items; the rest are branches.
 - **Market-Wide Build Opportunities**: The Opportunities tab's second panel
   (issue #819) — ranks manufacturable products across the whole SDE by
-  ISK/hour, independent of ownership or material overlap with anything the
-  chosen Character owns; **Build Opportunities** itself only ever ranks
-  blueprints the Character(s) already hold. Reactions and PI stay excluded,
+  ISK/hour, not limited to blueprints the chosen Character(s) already hold
+  the way **Build Opportunities** is — but only products whose blueprint is
+  obtainable: owned by any account Character, or buyable on the NPC market,
+  a public contract, or an LP store the account holds points with. Each row
+  names that source. Reactions and PI stay excluded,
   same as **Build Opportunities**. Opt-in ("Run market scan"), never
   auto-computed. Candidates are bounded by a **Liquidity Floor** and a fixed
   top-N per **Market Group**, computed against material trees precomputed at

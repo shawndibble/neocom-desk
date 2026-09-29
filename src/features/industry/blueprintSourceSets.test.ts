@@ -33,7 +33,7 @@ beforeEach(() => {
   );
   vi.mocked(isSyncConfigured).mockReturnValue(true);
   vi.mocked(loadPublicBpcContracts).mockResolvedValue({
-    data: { rows: [{ typeId: 30 }], originals: [{ typeId: 31 }], lastSyncedAt: null },
+    data: { rows: [{ typeId: 30 }], originals: [{ typeId: 31 }], lastSyncedAt: 1 },
   } as unknown as Resolved<typeof loadPublicBpcContracts>);
   vi.mocked(loadCharacterLoyaltyPoints).mockResolvedValue({
     cached: {
@@ -68,6 +68,25 @@ describe('loadBlueprintSourceSets', () => {
     vi.mocked(isSyncConfigured).mockReturnValue(false);
     const { sets, unavailable } = await loadBlueprintSourceSets([1], [20]);
     expect(sets.contract.size).toBe(0);
+    expect(unavailable).toEqual(['contract']);
+  });
+
+  it('falls back to the next Character when one cannot read the contract snapshot', async () => {
+    vi.mocked(loadPublicBpcContracts)
+      .mockRejectedValueOnce(new Error('revoked'))
+      .mockResolvedValueOnce({
+        data: { rows: [{ typeId: 32 }], lastSyncedAt: 1 },
+      } as unknown as Resolved<typeof loadPublicBpcContracts>);
+    const { sets, unavailable } = await loadBlueprintSourceSets([1, 2], []);
+    expect(sets.contract).toEqual(new Set([32]));
+    expect(unavailable).toEqual([]);
+  });
+
+  it('names contracts unavailable when the snapshot has never synced', async () => {
+    vi.mocked(loadPublicBpcContracts).mockResolvedValue({
+      data: { rows: [], lastSyncedAt: null },
+    } as unknown as Resolved<typeof loadPublicBpcContracts>);
+    const { unavailable } = await loadBlueprintSourceSets([1], []);
     expect(unavailable).toEqual(['contract']);
   });
 
