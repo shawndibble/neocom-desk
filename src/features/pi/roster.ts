@@ -56,6 +56,16 @@ export interface RosterColony {
   planet: CharacterPlanet;
   /** Null when this colony's pin detail isn't cached yet — listed, but unknown. */
   detail: CharacterPlanetDetail | null;
+  /**
+   * When this Character's colony data was fetched: the OLDEST of its cached
+   * planet list and every cached colony-detail row, so one fresh read can't
+   * vouch for a days-old one beside it (the same "oldest wins" rule
+   * Opportunities uses across Characters). Per Character, not per colony —
+   * every colony of one alt carries the same value, which is what its group
+   * header's `DataAgeBadge` shows. These rows are cache-only and exempt from
+   * the age prune, so this can be arbitrarily old.
+   */
+  fetchedAt: Date;
 }
 
 export interface PiRosterSnapshot {
@@ -101,22 +111,32 @@ export async function loadPiRosterSnapshot(activeCharacterId: number): Promise<P
 
   const notLoaded: RosterCharacter[] = [];
   const noColonies: RosterCharacter[] = [];
-  const withColonies: { character: CharacterRecord; planets: CharacterPlanet[] }[] = [];
+  const withColonies: {
+    character: CharacterRecord;
+    planets: CharacterPlanet[];
+    listFetchedAt: Date;
+  }[] = [];
   for (const character of scoped) {
-    const planets = lists.get(character.characterId)?.data;
+    const list = lists.get(character.characterId);
     // Absent row vs. empty array: "we have never read this Character's
     // colonies" is not the same claim as "this Character has none".
-    if (planets === undefined) notLoaded.push(ref(character));
-    else if (planets.length === 0) noColonies.push(ref(character));
-    else withColonies.push({ character, planets });
+    if (list === undefined) notLoaded.push(ref(character));
+    else if (list.data.length === 0) noColonies.push(ref(character));
+    else withColonies.push({ character, planets: list.data, listFetchedAt: list.fetchedAt });
   }
 
   const colonies: RosterColony[] = [];
   await Promise.all(
-    withColonies.map(async ({ character, planets }) => {
+    withColonies.map(async ({ character, planets, listFetchedAt }) => {
       const details = await readCachedColonyDetails(
         character.characterId,
         planets.map((planet) => planet.planet_id)
+      );
+      const fetchedAt = new Date(
+        Math.min(
+          listFetchedAt.getTime(),
+          ...[...details.values()].map((row) => row.fetchedAt.getTime())
+        )
       );
       for (const planet of planets) {
         colonies.push({
@@ -124,6 +144,7 @@ export async function loadPiRosterSnapshot(activeCharacterId: number): Promise<P
           characterName: character.name,
           planet,
           detail: details.get(planet.planet_id)?.data ?? null,
+          fetchedAt,
         });
       }
     })
