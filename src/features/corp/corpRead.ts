@@ -16,13 +16,15 @@ import {
   corpCacheKey,
   loadPaginatedWithCacheStatus,
   loadWithCacheStatus,
-  type LoadWithCacheStatusOptions,
+  type LoadPaginatedWithCacheOptions,
+  type LoadSingleWithCacheOptions,
   type StatusResult,
 } from '@/esi/cache';
 import type { TruncatableResult } from '@/esi/paginated';
 import { detectCorpAuthFailure } from './corpAuthFailure';
 
-type CorpReadOptions = Omit<LoadWithCacheStatusOptions, 'detectAuthFailure'>;
+type CorpReadOptions = Omit<LoadSingleWithCacheOptions, 'detectAuthFailure'>;
+type CorpPaginatedReadOptions<T> = Omit<LoadPaginatedWithCacheOptions<T>, 'detectAuthFailure'>;
 
 /** `loadWithCacheStatus`, corp-keyed and corp-auth-aware. */
 export function loadCorpWithCacheStatus<T>(
@@ -44,7 +46,7 @@ export function loadCorpPaginatedWithCacheStatus<T>(
   corporationId: number,
   key: string,
   fetchLive: () => Promise<TruncatableResult<T>>,
-  options: CorpReadOptions = {}
+  options: CorpPaginatedReadOptions<T> = {}
 ): Promise<StatusResult<T[]>> {
   return loadPaginatedWithCacheStatus(characterId, corpCacheKey(corporationId, key), fetchLive, {
     ...options,

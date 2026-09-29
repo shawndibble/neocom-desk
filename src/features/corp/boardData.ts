@@ -34,7 +34,7 @@ import {
   type CorporationMiningExtraction,
   type CorporationStructure,
 } from '@/esi/endpoints';
-import { loadWithCacheStatus } from '@/esi/cache';
+import { conditionalPagedFetch, loadWithCacheStatus } from '@/esi/cache';
 import type { StatusResult } from '@/esi/cache';
 import { recordCharacterCorporation } from '@/auth/session';
 import { db } from '@/db';
@@ -83,17 +83,27 @@ export function loadCorporationStructures(
   characterId: number,
   corporationId: number
 ): Promise<StatusResult<CorporationStructure[]>> {
-  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, 'structures', () =>
-    getCorporationStructures(characterId, corporationId)
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCorporationStructures(characterId, corporationId, options)
   );
+  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, 'structures', fetchLive, {
+    conditional,
+  });
 }
 
 export function loadCorporationMiningExtractions(
   characterId: number,
   corporationId: number
 ): Promise<StatusResult<CorporationMiningExtraction[]>> {
-  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, 'miningExtractions', () =>
-    getCorporationMiningExtractions(characterId, corporationId)
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCorporationMiningExtractions(characterId, corporationId, options)
+  );
+  return loadCorpPaginatedWithCacheStatus(
+    characterId,
+    corporationId,
+    'miningExtractions',
+    fetchLive,
+    { conditional }
   );
 }
 

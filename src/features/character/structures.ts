@@ -50,6 +50,7 @@ import { AuthError } from '@/auth/sso';
 import { getUniverseStructure, type UniverseStructure } from '@/esi/endpoints';
 import { EsiError } from '@/esi/client';
 import {
+  conditionalFetch,
   loadWithCache,
   readCached,
   readCachedEntries,
@@ -169,32 +170,29 @@ async function loadOwnStructure(
   if (memo.forbidden) return { structure: memo.name ?? null, forbidden: true };
 
   let forbidden = false;
-  const result = await loadWithCache(
-    characterId,
-    cacheKey(structureId),
-    async () => {
-      try {
-        return (await getUniverseStructure(characterId, structureId)).data;
-      } catch (err) {
-        // Only a 403. A 5xx, a timeout or an offline device says nothing about
-        // the ACL, and memoizing one as a refusal would hide a name for a day
-        // over a blip.
-        if (err instanceof EsiError && err.status === 403) {
-          forbidden = true;
-          await writeCached(characterId, forbiddenKey(structureId), true, Date.now());
-        }
-        throw err;
+  const { fetchLive, conditional } = conditionalFetch(async (options) => {
+    try {
+      return await getUniverseStructure(characterId, structureId, options);
+    } catch (err) {
+      // Only a 403. A 5xx, a timeout or an offline device says nothing about
+      // the ACL, and memoizing one as a refusal would hide a name for a day
+      // over a blip.
+      if (err instanceof EsiError && err.status === 403) {
+        forbidden = true;
+        await writeCached(characterId, forbiddenKey(structureId), true, Date.now());
       }
-    },
-    {
-      detectAuthFailure: (err) =>
-        err instanceof AuthError || (err instanceof EsiError && err.status === 401),
-      // A structure can be renamed, but rarely, and the Assets tree resolves
-      // one per distinct location — refetching them on the 10-minute cadence
-      // would make every Assets visit a fan-out for names that did not move.
-      staleAfterMs: STALE_AFTER.static,
+      throw err;
     }
-  );
+  });
+  const result = await loadWithCache(characterId, cacheKey(structureId), fetchLive, {
+    conditional,
+    detectAuthFailure: (err) =>
+      err instanceof AuthError || (err instanceof EsiError && err.status === 401),
+    // A structure can be renamed, but rarely, and the Assets tree resolves
+    // one per distinct location — refetching them on the 10-minute cadence
+    // would make every Assets visit a fan-out for names that did not move.
+    staleAfterMs: STALE_AFTER.static,
+  });
   return { structure: result?.data ?? null, forbidden };
 }
 

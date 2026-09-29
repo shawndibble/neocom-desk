@@ -37,7 +37,7 @@
 import { fetchAggregates, type HubAggregate } from '@/market/fuzzwork';
 import { getOrderBook } from './orderBook';
 import { getRoute, getStructureMarketOrders, type StructureMarketOrder } from '@/esi/endpoints';
-import { loadPaginatedWithCache } from '@/esi/cache';
+import { conditionalPagedFetch, loadPaginatedWithCache } from '@/esi/cache';
 import { AuthError } from '@/auth/sso';
 import { EsiError } from '@/esi/client';
 import { jumpsAwayFromRoute, type JumpsAwayResult } from '@/engine/jumpsAway';
@@ -154,11 +154,15 @@ export async function loadStructureCompetition(
   characterId: number,
   structureId: number
 ): Promise<StructureCompetition | null> {
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getStructureMarketOrders(characterId, structureId, options)
+  );
   const result = await loadPaginatedWithCache<StructureMarketOrder>(
     characterId,
     structureMarketCacheKey(structureId),
-    () => getStructureMarketOrders(characterId, structureId),
+    fetchLive,
     {
+      conditional,
       staleAfterMs: STRUCTURE_MARKET_STALE_AFTER_MS,
       detectAuthFailure: (err) =>
         err instanceof AuthError || (err instanceof EsiError && err.status === 401),

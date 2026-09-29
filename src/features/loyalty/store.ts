@@ -10,6 +10,7 @@ import {
   type LoyaltyStoreOffer,
 } from '@/esi/endpoints';
 import {
+  conditionalFetch,
   loadWithCache,
   GLOBAL_CACHE_CHARACTER_ID,
   STALE_AFTER,
@@ -28,23 +29,29 @@ function corpNameCacheKey(corporationId: number): string {
 export async function loadLoyaltyStoreOffers(
   corporationId: number
 ): Promise<CachedResult<LoyaltyStoreOffer[]> | null> {
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getLoyaltyStoreOffers(corporationId, options)
+  );
   return loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
     offersCacheKey(corporationId),
-    async () => (await getLoyaltyStoreOffers(corporationId)).data,
+    fetchLive,
     // Offers change with balance passes / new content, not minute to minute —
     // same cadence as a station or universe type.
-    { staleAfterMs: STALE_AFTER.static }
+    { staleAfterMs: STALE_AFTER.static, conditional }
   );
 }
 
 /** A corporation's display name, or null if unresolvable (offline + uncached). */
 export async function loadCorporationName(corporationId: number): Promise<string | null> {
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCorporationPublicInfo(corporationId, options)
+  );
   const result = await loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
     corpNameCacheKey(corporationId),
-    async () => (await getCorporationPublicInfo(corporationId)).data,
-    { staleAfterMs: STALE_AFTER.static }
+    fetchLive,
+    { staleAfterMs: STALE_AFTER.static, conditional }
   );
   return result?.data.name ?? null;
 }

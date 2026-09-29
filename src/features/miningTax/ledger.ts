@@ -10,7 +10,12 @@
  */
 import { db, type CharacterRecord } from '@/db';
 import { getCharacterMining } from '@/esi/endpoints';
-import { loadPaginatedWithCacheStatus, type CachedResult, type StatusResult } from '@/esi/cache';
+import {
+  conditionalPagedFetch,
+  loadPaginatedWithCacheStatus,
+  type CachedResult,
+  type StatusResult,
+} from '@/esi/cache';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { groupMiningLedger } from '@/engine/miningTax/groupLedger';
 import { groupMiningYield, type MiningYieldEntry } from '@/engine/miningTax/yieldGrouping';
@@ -23,9 +28,10 @@ export const KEYS = { ledger: 'miningTax:ledger' } as const;
 
 /** One character's raw mining ledger. ESI or cache. */
 export function loadMiningLedger(characterId: number): Promise<StatusResult<MiningLedgerRow[]>> {
-  return loadPaginatedWithCacheStatus(characterId, KEYS.ledger, () =>
-    getCharacterMining(characterId)
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCharacterMining(characterId, options)
   );
+  return loadPaginatedWithCacheStatus(characterId, KEYS.ledger, fetchLive, { conditional });
 }
 
 /**
