@@ -54,6 +54,7 @@ import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { buildOpportunityCandidates, hubForCharacter, type OpportunityRow } from './opportunities';
 import { SkillGateMarker } from './SkillGateMarker';
 import { useOpportunities } from './useOpportunities';
+import { StartPlanButton } from './StartPlanButton';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 
@@ -71,7 +72,8 @@ interface OpportunitiesPanelProps {
    */
   assumedMe: number;
   onAddToCompare: (rows: readonly OpportunityRow[]) => void;
-  onStartPlan: (entry: BlueprintCatalogEntry) => void;
+  /** Resolves true once it has opened the new plan (see `StartPlanButton`). */
+  onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
 }
 
 function numericCell(
@@ -447,11 +449,7 @@ export function OpportunitiesPanel({
       // Compare button, which needs 2+ selected rows to do anything.
       id: 'action',
       header: '',
-      render: (row) => (
-        <Button size="sm" onClick={() => onStartPlan(row.candidate.catalogEntry)}>
-          {t('industry.marketOpportunitiesStartPlan')}
-        </Button>
-      ),
+      render: (row) => <StartPlanButton onStart={() => onStartPlan(row.candidate.catalogEntry)} />,
     },
   ];
   // A row whose product type is unknown has no item to open a menu for, so it

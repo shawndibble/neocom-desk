@@ -39,6 +39,7 @@ import type { MarketWideResultRow } from './marketWideOpportunities';
 import { useMarketWideOpportunities } from './useMarketWideOpportunities';
 import { SkillGateMarker } from './SkillGateMarker';
 import { ORDER_DEPTH_RANK } from './opportunityMetrics';
+import { StartPlanButton } from './StartPlanButton';
 import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { boolParam } from '@/lib/urlState';
 
@@ -56,7 +57,8 @@ interface MarketWideOpportunitiesPanelProps {
   modifiers: CharacterModifiers;
   /** For the standing toward `hub`'s NPC owner (issue #1238). Null while no character is active. */
   activeCharacterId: number | null;
-  onStartPlan: (entry: BlueprintCatalogEntry) => void;
+  /** Resolves true once it has opened the new plan (see `StartPlanButton`). */
+  onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
 }
 
 const HIDE_SKILL_GATED = boolParam();
@@ -205,15 +207,12 @@ export function MarketWideOpportunitiesPanel({
       id: 'action',
       header: '',
       render: (row) => (
-        <Button
-          size="sm"
-          onClick={() => {
+        <StartPlanButton
+          onStart={() => {
             const entry = catalog?.byProductTypeID.get(row.productTypeID);
-            if (entry) onStartPlan(entry);
+            return entry ? onStartPlan(entry) : Promise.resolve(false);
           }}
-        >
-          {t('industry.marketOpportunitiesStartPlan')}
-        </Button>
+        />
       ),
     },
   ];

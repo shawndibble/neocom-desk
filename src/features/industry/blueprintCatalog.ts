@@ -1,11 +1,13 @@
 /**
  * Adapts SDE blueprint + type data (src/sde) to a searchable catalog for the
  * Build Plan blueprint picker, and to the shape src/engine/industry expects.
- * Not memoized: callers hold the result in component state (see
- * src/features/skills/skillMap.ts for the same convention).
+ * Callers hold the result in component state, so `loadBlueprintCatalog` hands
+ * back the same catalog for as long as the SDE files it is built from are the
+ * same: a rebuilt copy is a new identity, which re-renders and re-prices an
+ * open Build Plan although nothing in it changed. Read-only to callers.
  */
 import { loadBlueprints, loadTypes } from '@/sde/loadSde';
-import type { BlueprintType, TypeMap } from '@/sde/types';
+import type { BlueprintMap, BlueprintType, TypeMap } from '@/sde/types';
 import type { IndustryBlueprint } from '@/engine/industry/types';
 import type { BuildPlanRecord } from '@/db';
 
@@ -33,8 +35,17 @@ export interface BlueprintCatalog {
   typesById: TypeMap;
 }
 
+let built: { blueprints: BlueprintMap; types: TypeMap; catalog: BlueprintCatalog } | null = null;
+
 export async function loadBlueprintCatalog(): Promise<BlueprintCatalog> {
   const [blueprints, types] = await Promise.all([loadBlueprints(), loadTypes()]);
+  if (built && built.blueprints === blueprints && built.types === types) return built.catalog;
+  const catalog = buildCatalog(blueprints, types);
+  built = { blueprints, types, catalog };
+  return catalog;
+}
+
+function buildCatalog(blueprints: BlueprintMap, types: TypeMap): BlueprintCatalog {
   const entries: BlueprintCatalogEntry[] = [];
   const byBlueprintTypeID = new Map<number, BlueprintCatalogEntry>();
   const byProductTypeID = new Map<number, BlueprintCatalogEntry>();
