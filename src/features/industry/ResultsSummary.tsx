@@ -8,6 +8,7 @@ import {
   EmptyState,
   FilterChip,
   InfoTooltip,
+  IskAmount,
   Spinner,
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
@@ -83,7 +84,7 @@ interface RevenueRow {
   name: string;
   quantity: number;
   unitPrice: number;
-  lineTotal: number;
+  total: number;
 }
 
 interface ResultsSummaryProps {
@@ -123,10 +124,11 @@ interface ResultsSummaryProps {
   /** Wraps the revenue (product) and owned-sale (material) rows in the item context menu; omitted where the caller has none to offer. */
   itemMenuFor?: ItemMenuFor;
   /**
-   * Visible "More actions" button for the revenue and owned-sale rows (WCAG
-   * 2.1.1, issue #1498) — the same item menu `itemMenuFor` opens on
-   * right-click/long-press, reachable by keyboard. Omitted where the caller
-   * has none to offer.
+   * Visible "More actions" button for the owned-sale rows (WCAG 2.1.1, issue
+   * #1498) — the same item menu `itemMenuFor` opens on right-click/long-press,
+   * reachable by keyboard. The revenue row has none of its own: the product's
+   * button already sits in the hero's corner. Omitted where the caller has
+   * none to offer.
    */
   itemActionsFor?: (typeId: number) => ReactElement;
 }
@@ -138,12 +140,14 @@ interface ResultsSummaryProps {
  * which are cached locally) — materials + time stay visible in the sibling
  * panel regardless.
  *
- * Every figure here stays on `formatIsk` at full precision, deliberately
+ * Every ledger figure here stays on `formatIsk` at full precision, deliberately
  * (issue #948): this is the ledger a player reads line by line to reconcile a
  * plan's working — material cost, each job-fee component, tax, broker fee,
  * break-even — where a rounded "1.3B" would hide the digits the arithmetic is
- * being checked against. The shorthand read of the same numbers is one panel
- * up, in `PlanVerdictHero`.
+ * being checked against. The one exception is the product line's unit price
+ * and total, which read as shorthand (`IskAmount`, exact figure on hover or
+ * long-press): the table is a glance at what the run sells for, and the
+ * full-precision figures it feeds are the ledger rows right beneath it.
  */
 export function ResultsSummary({
   result,
@@ -185,28 +189,17 @@ export function ResultsSummary({
         header: t('industry.unitPrice'),
         align: 'right',
         className: 'tabular-nums',
-        render: (row) => formatIsk(row.unitPrice),
+        render: (row) => <IskAmount value={row.unitPrice} revealOn="longPress" decimals={0} />,
       },
       {
-        id: 'lineTotal',
-        header: t('industry.lineTotal'),
+        id: 'total',
+        header: t('industry.total'),
         align: 'right',
         className: 'tabular-nums',
-        render: (row) => formatIsk(row.lineTotal),
+        render: (row) => <IskAmount value={row.total} revealOn="longPress" decimals={0} />,
       },
-      ...(itemActionsFor && productTypeID !== null
-        ? [
-            {
-              id: 'actions',
-              header: '',
-              align: 'right',
-              cardActions: true,
-              render: () => itemActionsFor(productTypeID),
-            } satisfies DataTableColumn<RevenueRow>,
-          ]
-        : []),
     ],
-    [t, itemActionsFor, productTypeID]
+    [t]
   );
 
   const saleColumns = useMemo<DataTableColumn<OwnedStockSaleLine>[]>(
@@ -371,7 +364,7 @@ export function ResultsSummary({
                     name: productName,
                     quantity: productQuantity,
                     unitPrice: productUnitPrice,
-                    lineTotal: result.revenue,
+                    total: result.revenue,
                   },
                 ]}
                 rowKey={() => 'revenue'}

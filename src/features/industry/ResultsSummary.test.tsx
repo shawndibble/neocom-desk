@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import '@/i18n';
@@ -270,15 +270,18 @@ describe('ResultsSummary: split Acquisition Verdict / Sale Profitability, break-
 });
 
 describe('ResultsSummary: Revenue block (#117)', () => {
-  it('renders the product line as name, qty produced, unit price, and line total', () => {
+  it('renders the product line as name, qty produced, and shorthand unit price and total', () => {
     renderSummary();
 
-    expect(screen.getByText('Rifter')).toBeInTheDocument();
-    expect(screen.getByText('10')).toBeInTheDocument();
-    // also appears in the break-even section's "Current market price" comparison row
-    expect(screen.getAllByText('100,000').length).toBeGreaterThan(0);
-    // line total = revenue (1000), not unitPrice x qty (1_000_000) — pulled from the engine, not recomputed
-    expect(screen.getByText('1,000')).toBeInTheDocument();
+    const row = screen.getByText('Rifter').closest('tr')!;
+    expect(screen.getByRole('columnheader', { name: 'Total' })).toBeInTheDocument();
+    expect(within(row).getByText('10')).toBeInTheDocument();
+    const [, , unitPrice, total] = within(row)
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent);
+    expect(unitPrice).toBe('100K 100,000 ISK');
+    // total = revenue (1000), not unitPrice x qty (1_000_000) — pulled from the engine, not recomputed
+    expect(total).toBe('1K 1,000 ISK');
   });
 
   it('shows Sales Tax and Broker Fee as negative deductions, then an emphasized Net Revenue total', () => {
@@ -461,30 +464,15 @@ describe('ResultsSummary: use or sell the owned materials', () => {
 });
 
 describe('ResultsSummary: item actions button (issue #1498)', () => {
-  it('renders a focusable "More actions" button on the revenue row', () => {
-    renderSummary({ itemActionsFor });
-    expect(screen.getByRole('button', { name: 'More actions for Rifter' })).toBeInTheDocument();
+  it('gives the revenue row no "More actions" button — the hero carries the product’s', () => {
+    renderSummary({ itemMenuFor, itemActionsFor });
+    expect(screen.queryByRole('button', { name: 'More actions for Rifter' })).toBeNull();
   });
 
-  it('opens the identical item menu the revenue row’s right-click path opens', async () => {
-    const user = userEvent.setup();
+  it('keeps the revenue row’s right-click item menu', () => {
     renderSummary({ itemMenuFor, itemActionsFor });
-
-    const revenueRow = screen.getByText('Rifter').closest('tr')!;
-    fireEvent.contextMenu(revenueRow);
-    const contextMenuItems = screen
-      .getAllByRole('menuitem')
-      .map((item) => item.textContent)
-      .sort();
-    await user.keyboard('{Escape}');
-
-    await user.click(screen.getByRole('button', { name: 'More actions for Rifter' }));
-    const buttonMenuItems = screen
-      .getAllByRole('menuitem')
-      .map((item) => item.textContent)
-      .sort();
-
-    expect(buttonMenuItems).toEqual(contextMenuItems);
+    fireEvent.contextMenu(screen.getByText('Rifter').closest('tr')!);
+    expect(screen.getAllByRole('menuitem').length).toBeGreaterThan(0);
   });
 
   it('renders a "More actions" button per owned-sale row', async () => {
