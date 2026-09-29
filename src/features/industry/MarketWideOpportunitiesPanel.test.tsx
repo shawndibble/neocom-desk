@@ -25,12 +25,16 @@ const row = (productTypeID: number, productName: string): MarketWideResultRow =>
 const hookState = vi.hoisted(() => ({
   unavailableSources: [] as string[],
   run: vi.fn(),
+  loading: false,
+  hasRun: true,
+  isPhone: false,
 }));
+vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => hookState.isPhone }));
 vi.mock('./useMarketWideOpportunities', () => ({
   useMarketWideOpportunities: () => ({
     rows: [row(200, 'Widget Beta'), row(300, 'Widget Gamma')],
-    loading: false,
-    hasRun: true,
+    loading: hookState.loading,
+    hasRun: hookState.hasRun,
     error: false,
     unavailableSources: hookState.unavailableSources,
     run: hookState.run,
@@ -165,5 +169,51 @@ describe('MarketWideOpportunitiesPanel filters', () => {
     expect(screen.getByText('Widget Beta')).toBeInTheDocument();
     expect(screen.queryByText('Widget Gamma')).not.toBeInTheDocument();
     expect(hookState.run).not.toHaveBeenCalled();
+  });
+});
+
+describe('MarketWideOpportunitiesPanel filters: skill gate, mid-scan, phone', () => {
+  it('keeps "Hide skill-gated" among the filters, and toggling it does not re-scan', async () => {
+    hookState.run.mockClear();
+    const user = userEvent.setup();
+    renderPanel();
+    const skills = screen.queryByRole('group', { name: 'Skills' });
+    expect(skills).toBeNull();
+    await user.click(screen.getByRole('button', { name: /Filters/ }));
+    await user.click(
+      within(screen.getByRole('group', { name: 'Skills' })).getByRole('button', {
+        name: 'Hide skill-gated',
+      })
+    );
+    expect(hookState.run).not.toHaveBeenCalled();
+  });
+
+  it('re-scans on a tier change while the first scan is still running', async () => {
+    hookState.run.mockClear();
+    hookState.loading = true;
+    hookState.hasRun = false;
+    try {
+      const user = userEvent.setup();
+      renderPanel();
+      await user.click(screen.getByRole('button', { name: /Filters/ }));
+      await user.click(screen.getByRole('button', { name: 'Faction' }));
+      expect(hookState.run).toHaveBeenCalledTimes(1);
+    } finally {
+      hookState.loading = false;
+      hookState.hasRun = true;
+    }
+  });
+
+  it('puts the filter button beside the sort picker on a phone', () => {
+    hookState.isPhone = true;
+    try {
+      renderPanel();
+      const sortPicker = screen.getByRole('combobox', { name: 'Sort by' });
+      const sortBar = sortPicker.closest('label')!.parentElement!;
+      expect(within(sortBar).getByRole('button', { name: /Filters/ })).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: /Filters/ })).toHaveLength(1);
+    } finally {
+      hookState.isPhone = false;
+    }
   });
 });

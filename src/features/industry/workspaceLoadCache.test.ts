@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { BlueprintCatalog } from './blueprintCatalog';
+import { forgetRouteSnapshots, resetRouteSnapshots } from '@/lib/routeSnapshotCache';
 import {
-  clearWorkspaceLoadCache,
   lastWorkspaceLoad,
   rememberWorkspaceLoad,
   reuseIfUnchanged,
@@ -18,7 +18,7 @@ const load = (characterId: number): WorkspaceLoad => ({
   modifiers: { skills: {} } as unknown as CharacterModifiers,
 });
 
-beforeEach(() => clearWorkspaceLoadCache());
+beforeEach(() => resetRouteSnapshots());
 
 describe('lastWorkspaceLoad', () => {
   it('is null before anything loads', () => {
@@ -34,6 +34,12 @@ describe('lastWorkspaceLoad', () => {
   it('never hands one Character’s load to another', () => {
     rememberWorkspaceLoad(load(1));
     expect(lastWorkspaceLoad(2)).toBeNull();
+  });
+
+  it('is forgotten with the Character’s cache', () => {
+    rememberWorkspaceLoad(load(1));
+    forgetRouteSnapshots(1);
+    expect(lastWorkspaceLoad(1)).toBeNull();
   });
 
   it('is null with no active Character', () => {

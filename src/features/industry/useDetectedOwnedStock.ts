@@ -19,6 +19,8 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { ACCOUNT_SNAPSHOT_ID } from '@/lib/routeSnapshotCache';
+import { useWarmLoad } from '@/lib/useWarmLoad';
 import {
   detectOwnedStock,
   type DetectedOwnedStockMap,
@@ -48,25 +50,20 @@ export interface DetectedOwnedStockResult {
  * boundary switches plans, and pass its result into `useDetectedOwnedStock`
  * for each plan.
  */
+/**
+ * Every account Character's assets, starting from the last load
+ * (`useWarmLoad`) so opening a plan from the index doesn't re-detect stock
+ * the index just detected. A detection that cannot load is simply no
+ * suggestion: the plan is fully usable without it, so nothing here surfaces
+ * an error state.
+ */
 export function useOwnedStockSnapshot(): OwnedStockSnapshot {
-  const [snapshot, setSnapshot] = useState<OwnedStockSnapshot>(EMPTY_OWNED_STOCK_SNAPSHOT);
-
-  useEffect(() => {
-    let cancelled = false;
-    // A detection that cannot load is simply no suggestion: the plan is fully
-    // usable without it, so nothing here surfaces an error state.
-    void loadOwnedStockSnapshot().then(
-      (loaded) => {
-        if (!cancelled) setSnapshot(loaded);
-      },
-      () => {}
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return snapshot;
+  return useWarmLoad(
+    'ownedStockSnapshot',
+    ACCOUNT_SNAPSHOT_ID,
+    () => loadOwnedStockSnapshot(),
+    EMPTY_OWNED_STOCK_SNAPSHOT
+  );
 }
 
 /**

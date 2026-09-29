@@ -21,7 +21,7 @@
  * Opportunities wait on it too (#2054), just by not mounting until it clears
  * rather than by reading `isPricingReady` themselves — see their own callers.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
 import { effectivePrice, type BpcContractRow } from '@/engine/contracts/bpcSearch';
 import type { BpcOffer } from '@/engine/industry/blueprintAcquisition';
@@ -31,6 +31,7 @@ import {
   useTradeHubStandings,
   type TradeHubStandingsMap,
 } from '@/features/market/useTradeHubStandings';
+import { useWarmLoad } from '@/lib/useWarmLoad';
 import { useAssumedMe } from './assumedMe';
 import { useIncludeBlueprintCost } from './includeBlueprintCost';
 import { useCorpOwnedBlueprints, type CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
@@ -109,21 +110,15 @@ export async function loadBpcContractRows(
   }
 }
 
-function useBpcContractRows(characterId: number | null): readonly BpcContractRow[] {
-  const [rows, setRows] = useState<readonly BpcContractRow[]>(NO_BPC_ROWS);
-  useEffect(() => {
-    if (characterId === null) return;
-    let cancelled = false;
-    // Left as-is when there's nothing to replace it with — the same
-    // stale-while-loading rule `useTradeHubStandings` states.
-    void loadBpcContractRows(characterId).then((loaded) => {
-      if (!cancelled && loaded) setRows(loaded);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId]);
+/** A missing snapshot rejects, which `useWarmLoad` reads as "keep what is showing". */
+async function loadBpcContractRowsOrKeep(characterId: number): Promise<readonly BpcContractRow[]> {
+  const rows = await loadBpcContractRows(characterId);
+  if (!rows) throw new Error('no BPC contract snapshot');
   return rows;
+}
+
+function useBpcContractRows(characterId: number | null): readonly BpcContractRow[] {
+  return useWarmLoad('bpcContractRows', characterId, loadBpcContractRowsOrKeep, NO_BPC_ROWS);
 }
 
 /** Hydrates and reads every Build Plan pricing input for one Character. */
