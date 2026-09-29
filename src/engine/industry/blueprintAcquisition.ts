@@ -37,7 +37,16 @@ export interface BpcOffer {
 }
 
 /** `AcquisitionResolution` minus `blueprintTypeID` — this module has no typeID of its own to report, only the caller (`recipes.ts`) knows it. */
-export type BlueprintTierResult = Omit<AcquisitionResolution, 'blueprintTypeID'>;
+export type BlueprintTierResult = Omit<AcquisitionResolution, 'blueprintTypeID'> & {
+  /**
+   * Runs the line's purchase brings in — Infinity for a BPO, every run of
+   * every copy for BPCs. Set only when something is actually bought;
+   * `claimBlueprintTier` credits whatever this node doesn't use back to the
+   * pool, so a later node building with the same blueprint type uses what
+   * the plan already paid for instead of buying it again.
+   */
+  purchasedRuns?: number;
+};
 
 export interface SelectBlueprintTierInputs {
   /** Every copy of this blueprint type the Character owns, at any ME/TE. */
@@ -127,8 +136,13 @@ function offerToExtend(offer: BpcOffer): { capacityRuns: number; price: number }
 
 /** Whole copies needed to cover `shortfall` runs at `extend`'s capacity/price — never a fractional-copy price. */
 function shortfallCost(shortfall: number, extend: { capacityRuns: number; price: number }): number {
-  if (extend.capacityRuns === INFINITE_RUNS) return extend.price;
-  return Math.ceil(shortfall / extend.capacityRuns) * extend.price;
+  return copiesToCover(shortfall, extend) * extend.price;
+}
+
+/** Whole copies it takes to cover `shortfall` runs — one for a BPO. */
+function copiesToCover(shortfall: number, extend: { capacityRuns: number }): number {
+  if (extend.capacityRuns === INFINITE_RUNS) return 1;
+  return Math.ceil(shortfall / extend.capacityRuns);
 }
 
 /** This candidate's total plan cost, or null when unpriceable (bad ME price, or a shortfall nothing can cover). */
@@ -236,7 +250,16 @@ export function resolveTierOption(option: TierOption, neededRuns: number): Bluep
     price === null && option.ownedRuns > 0
       ? { coveredRuns: option.ownedRuns, neededRuns }
       : undefined;
-  return { me: option.me, te: option.te, line: { unitPrice: price, owned: false }, coverage };
+  const purchasedRuns = option.extend
+    ? copiesToCover(shortfall, option.extend) * option.extend.capacityRuns
+    : undefined;
+  return {
+    me: option.me,
+    te: option.te,
+    line: { unitPrice: price, owned: false },
+    coverage,
+    ...(purchasedRuns !== undefined ? { purchasedRuns } : {}),
+  };
 }
 
 /**
@@ -276,8 +299,13 @@ export function pooledOwnedCopies(
  * the next node needing this same blueprint type sees the reduced remainder
  * instead of the same stock two branches both think they can use for free.
  * A BPO tier (`INFINITE_RUNS`) is never decremented — one original covers
- * every branch that reaches it. A no-op for a tier `pool` never seeded (an
- * unmatched override, or nothing owned) — nothing to claim from.
+ * every branch that reaches it.
+ *
+ * Whatever `resolved` bought (`purchasedRuns`) joins the pool too, less the
+ * runs this node spends: once a plan has paid for a BPO, or for a BPC with
+ * runs to spare, a later node needing the same blueprint builds with it
+ * rather than buying it a second time. A no-op when nothing is owned at this
+ * tier and nothing was bought (an unmatched override, say).
  */
 export function claimBlueprintTier(
   pool: OwnedBlueprintPool,
@@ -285,9 +313,15 @@ export function claimBlueprintTier(
   neededRuns: number
 ): void {
   const key = tierKey(resolved.me, resolved.te);
-  const remaining = pool.get(key);
-  if (remaining === undefined || remaining === INFINITE_RUNS) return;
-  pool.set(key, remaining - Math.min(neededRuns, remaining));
+  const owned = pool.get(key);
+  const purchased = resolved.purchasedRuns ?? 0;
+  if (owned === undefined && purchased === 0) return;
+  const available = (owned ?? 0) + purchased;
+  if (available === INFINITE_RUNS) {
+    pool.set(key, INFINITE_RUNS);
+    return;
+  }
+  pool.set(key, available - Math.min(neededRuns, available));
 }
 
 /**

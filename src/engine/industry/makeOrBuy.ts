@@ -15,6 +15,7 @@ import type {
   FacilityPreset,
   HubPrices,
   IndustryBlueprint,
+  IndustryInputs,
   MaterialCostLine,
   QuantityEntry,
   ReactionFacilityContext,
@@ -91,6 +92,16 @@ export interface MakeOrBuyContext {
    * never affects them.
    */
   accountSkills?: ReadonlyMap<number, SkillLevels>;
+  /**
+   * Blueprint Acquisition — the same lookup the plan's own resolution uses
+   * for a built node (`ResolveMaterialOptions.acquisitionFor`), so a verdict
+   * quotes the tier and blueprint purchase that clicking "build" will
+   * actually charge. Absent = the recipe's own ME and no blueprint cost.
+   *
+   * Called once per verdict and must not claim from a pool shared with
+   * anything else: a verdict is a what-if, not a step of a real resolution.
+   */
+  acquisitionFor?: NonNullable<IndustryInputs['acquisitionFor']>;
 }
 
 export interface MakeOrBuy {
@@ -102,10 +113,24 @@ export interface MakeOrBuy {
   buyUnitPrice: number;
   /** What the verdict is worth across the units still to be acquired; 0 for a fully owned row. */
   savings: number;
-  /** ME the manufacturing quote assumes; null for a planetary one, which has no equivalent. */
+  /** ME the manufacturing quote assumes; null for a planetary or reaction one, which has no equivalent. */
   me: number | null;
+  /**
+   * ISK the blueprint purchase adds to building, already folded into
+   * `makeUnitPrice` — whole, never pro-rated: the plan pays for the
+   * BPO/BPCs whatever share of their runs it uses. 0 when owned runs cover
+   * the job or Include Blueprint Cost is off.
+   */
+  blueprintCost: number;
   /** Set only when `ctx.accountSkills` forced this verdict to 'buy' — why. */
   skillGate?: Extract<SkillGateVerdict, { gated: true }>;
+}
+
+/** One job's all-in quote: per-unit cost, the ME it ran at, and what the blueprint purchase added. */
+interface JobQuote {
+  unitCost: number;
+  me: number;
+  blueprintCost: number;
 }
 
 /**
@@ -118,18 +143,27 @@ export interface MakeOrBuy {
  * fee is a fixed proportion of EIV, so quoting a single run would overstate a
  * material the plan needs hundreds of. `null` when an input has no price —
  * a partial cost would read as a suspiciously cheap build.
+ *
+ * With `ctx.acquisitionFor`, the job runs at the Blueprint Acquisition tier
+ * and carries that tier's purchase, the way `resolveSubBuild` bills it: a
+ * blueprint that must be bought but has no price is unpriceable too.
  */
 function jobUnitCost(
   blueprint: IndustryBlueprint,
-  me: number,
+  recipeMe: number,
   needed: number,
   ctx: MakeOrBuyContext
-): number | null {
+): JobQuote | null {
   const product = blueprint.products[0];
   if (!product) return null;
   const sizing = sizeRuns(needed, product.quantity);
   if (!sizing) return null;
   const { runs } = sizing;
+  const acquisition = ctx.acquisitionFor?.(product.typeID, needed, ctx, ctx.materialPrices) ?? null;
+  const me = acquisition?.me ?? recipeMe;
+  const line = acquisition?.line;
+  const blueprintCost = !line || line.owned ? 0 : line.unitPrice;
+  if (blueprintCost === null) return null;
   // TE is irrelevant to cost, so the cheapest honest value is passed.
   const result = buildVsBuy({
     blueprint,
@@ -148,7 +182,11 @@ function jobUnitCost(
   // Not `unpriceable`: that also trips when the *product* — the material we
   // are pricing — has no hub listing, which says nothing about build cost.
   if (result.unpricedMaterials.length > 0) return null;
-  return result.totalCost / (product.quantity * runs);
+  return {
+    unitCost: (result.totalCost + blueprintCost) / (product.quantity * runs),
+    me,
+    blueprintCost,
+  };
 }
 
 /**
@@ -178,7 +216,7 @@ function reactionUnitCost(
   blueprint: IndustryBlueprint,
   needed: number,
   ctx: MakeOrBuyContext
-): number | null {
+): JobQuote | null {
   const location = ctx.reactionFacility;
   const ownFacilityIsReaction = ctx.facility.activity === 'reaction';
   return jobUnitCost(blueprint, 0, needed, {
@@ -232,20 +270,24 @@ export function makeOrBuy(
   // stockpiling this the right call", it just has no money riding on it.
   const needed = material.remainingQuantity > 0 ? material.remainingQuantity : material.quantity;
 
-  let makeUnitPrice: number | null;
+  let quote: JobQuote | null;
   try {
-    makeUnitPrice =
-      recipe.method === 'manufacturing'
-        ? jobUnitCost(recipe.blueprint, recipe.me, needed, ctx)
-        : recipe.method === 'reaction'
-          ? reactionUnitCost(recipe.blueprint, needed, ctx)
-          : planetaryUnitCost(recipe.inputs, recipe.outputQuantity, ctx.materialPrices);
+    if (recipe.method === 'planetary') {
+      const unitCost = planetaryUnitCost(recipe.inputs, recipe.outputQuantity, ctx.materialPrices);
+      quote = unitCost === null ? null : { unitCost, me: 0, blueprintCost: 0 };
+    } else {
+      quote =
+        recipe.method === 'manufacturing'
+          ? jobUnitCost(recipe.blueprint, recipe.me, needed, ctx)
+          : reactionUnitCost(recipe.blueprint, needed, ctx);
+    }
   } catch {
     // The engine range-checks ME and runs. A blueprint or an owned-ME value
     // outside those bounds is bad data, not a reason to fail the whole table.
     return null;
   }
-  if (makeUnitPrice === null || !Number.isFinite(makeUnitPrice)) return null;
+  if (quote === null || !Number.isFinite(quote.unitCost)) return null;
+  const makeUnitPrice = quote.unitCost;
 
   const blueprintSkills = recipe.method !== 'planetary' ? recipe.blueprint.skills : undefined;
   const skillGateVerdict =
@@ -260,7 +302,8 @@ export function makeOrBuy(
     makeUnitPrice,
     buyUnitPrice,
     savings: Math.abs(buyUnitPrice - makeUnitPrice) * material.remainingQuantity,
-    me: recipe.method === 'manufacturing' ? recipe.me : null,
+    me: recipe.method === 'manufacturing' ? quote.me : null,
+    blueprintCost: quote.blueprintCost,
     ...(skillGate ? { skillGate } : {}),
   };
 }

@@ -270,6 +270,11 @@ function makeOrBuyReason(advice: MakeOrBuy, remaining: number, t: Translate): st
       me: advice.me,
     }),
   ];
+  // Already inside the build price above — named so a "buy" verdict on a
+  // cheap recipe reads as the blueprint's doing, not a pricing error.
+  if (advice.blueprintCost > 0) {
+    parts.push(t('industry.makeOrBuy.blueprintCost', { amount: formatIsk(advice.blueprintCost) }));
+  }
   // Nothing is riding on a fully owned row: there is no remainder to spend
   // the difference on either way.
   if (remaining > 0 && advice.savings > 0) {
