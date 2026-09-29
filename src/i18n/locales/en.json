@@ -2678,7 +2678,7 @@
     "board": {
       "open": "Open",
       "refresh": "Refresh the board",
-      "editCards": "Choose which cards to show",
+      "editCards": "Choose and arrange cards",
       "editCardsTitle": "Cards",
       "showAllCards": "Show all cards",
       "resetOrder": "Reset order",

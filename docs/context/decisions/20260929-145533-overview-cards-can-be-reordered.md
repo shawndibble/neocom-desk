@@ -10,13 +10,17 @@ _Recorded 2026-09-29. Builds on 20260929-114130-overview-cards-can-be-hidden-by-
   reader hears each card's name and position.
 - **The edit menu is a popover now, not a dropdown menu.** A menu's arrow-key
   item navigation would fight the drag handles' own keyboard moves.
-- **Once the pilot sets an order, it applies on phones as well.** The pilot
-  chose this over keeping urgency ranking on phones: their first two cards
-  are always the full ones, whatever is on fire, including a card that would
-  otherwise always fold to one line.
-- **Until the pilot reorders, nothing changes.** An empty stored order means
-  the built-in desktop order and the phone's urgency ranking. "Reset order"
-  empties it and returns to both.
+- **The order applies on phones as well, always.** The pilot chose this over
+  keeping urgency ranking on phones: the first two cards in the list are
+  always a phone's full ones, whatever is on fire. A critical card further
+  down still shows its news, in its folded line. The phone's urgency ranking
+  is gone entirely, including for pilots who never open the menu.
+- **No hidden second mode.** An earlier draft kept urgency ranking until the
+  pilot first dragged a card. Review caught that dragging a card and dragging
+  it back would leave an identical-looking list but a different phone. The
+  pilot chose "always my order" instead, so what the menu lists is what every
+  screen shows. "Reset order" returns the built-in order, and is disabled
+  while the list already matches it.
 - **One synced list for the whole account** (`sync.overviewCardOrder`). Its
   own key, separate from the hidden list, so hiding a card on one device
   cannot roll back a reorder made on another. Like the hidden list, it keeps

@@ -945,12 +945,12 @@ export interface FoldedDomain {
 }
 
 /**
- * The phone's tail end: every domain that did not earn a full card, one line
+ * The phone's tail end: every domain past the pilot's first two, one line
  * each.
  *
- * Below `sm` about three cards fit above the fold, so a board of four cards
- * plus an alerts column is four screens of scrolling on the day it matters
- * least — and the two that matter are already at the top, ranked. This says
+ * Below `sm` about three cards fit above the fold, so a board of every card
+ * plus an alerts column is screens of scrolling — and the two the pilot put
+ * first are already at the top, whole. This says
  * what the rest are up to without asking for the room to show it, and each row
  * leads to the page that would.
  *

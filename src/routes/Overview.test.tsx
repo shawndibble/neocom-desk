@@ -918,7 +918,12 @@ describe('the board on a phone', () => {
     expect(screen.getByText('1 haul in progress · 1 overdue').className).toContain('text-danger');
   });
 
-  it('gives the full cards to the worst domains', async () => {
+  /*
+   * The pilot's order decides a phone's full cards, not urgency: they chose
+   * that, and a phone reshuffling by severity would be a second order nobody
+   * set. A critical domain further down still says so, in its folded line.
+   */
+  it('keeps the first two cards in the order whole, even with a later one on fire', async () => {
     // Two colonies whose extractors stopped six hours ago: `expired` is the
     // one batch kind that is unconditionally critical, so planetary cannot
     // lose the top slot to a threshold changing under this test.
@@ -943,11 +948,9 @@ describe('the board on a phone', () => {
     );
     render(<App />);
     await screen.findByRole('heading', { name: 'Everything else' });
-    await waitFor(() => expect(fullCardDomains()).toContain('Planetary industry'));
-
-    // And what it says when folded is its own worst news, not a generic count.
-    const card = await findCard(/planetary industry/i);
-    expect(within(card).getByText(/2 colonies have stopped/i)).toBeInTheDocument();
+    const panel = screen.getByRole('heading', { name: 'Everything else' }).closest('section')!;
+    expect(await within(panel).findByText(/2 colonies have stopped/i)).toBeInTheDocument();
+    expect(fullCardDomains()).toEqual(['Open orders', 'Mining tax']);
   });
 
   /*
@@ -1021,7 +1024,7 @@ describe('hiding cards from the edit menu', () => {
     render(<App />);
     await findCard(/mining tax/i);
 
-    await user.click(screen.getByRole('button', { name: /choose which cards to show/i }));
+    await user.click(screen.getByRole('button', { name: /choose and arrange cards/i }));
     await user.click(await screen.findByRole('checkbox', { name: 'Mining tax' }));
     await user.keyboard('{Escape}');
 
@@ -1050,7 +1053,7 @@ describe('hiding cards from the edit menu', () => {
     render(<App />);
     await findCard(/industry jobs/i);
 
-    await user.click(screen.getByRole('button', { name: /choose which cards to show/i }));
+    await user.click(screen.getByRole('button', { name: /choose and arrange cards/i }));
     await user.click(await screen.findByRole('button', { name: 'Show all cards' }));
 
     expect(await findCard(/mining tax/i)).toBeInTheDocument();
@@ -1296,7 +1299,7 @@ describe('corp cards', () => {
 
     expect(screen.queryByRole('heading', { name: /^structures$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /moon extractions/i })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /choose which cards to show/i }));
+    await user.click(screen.getByRole('button', { name: /choose and arrange cards/i }));
     expect(await screen.findByRole('checkbox', { name: 'Mail' })).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Structures' })).not.toBeInTheDocument();
     expect(corpRequests).not.toHaveBeenCalled();
@@ -1346,7 +1349,7 @@ describe('card order', () => {
     render(<App />);
     await findCard(/^mail$/i);
 
-    await user.click(screen.getByRole('button', { name: /choose which cards to show/i }));
+    await user.click(screen.getByRole('button', { name: /choose and arrange cards/i }));
     const handles = await screen.findAllByRole('button', { name: /^Move / });
     expect(handles.slice(0, 2).map((handle) => handle.getAttribute('aria-label'))).toEqual([
       'Move Mail',

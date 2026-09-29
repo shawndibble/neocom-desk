@@ -2,10 +2,11 @@
  * The order the pilot dragged the Overview's cards into from the edit menu.
  *
  * Synced, one list for the whole account, for the same reason as the hidden
- * list beside it (`hiddenCards.ts`). Empty means "never reordered": the board
- * keeps its built-in order, and on a phone its urgency ranking. Once the pilot
- * reorders, their order holds everywhere, phone included — the two first
- * cards are the full ones whatever is on fire. "Reset order" empties it.
+ * list beside it (`hiddenCards.ts`). The order always decides the board,
+ * phone included: the first two cards in it are a phone's full ones whatever
+ * is on fire — the pilot chose that over urgency ranking, and a list in the
+ * menu that the phone did not follow would be a second, hidden order. Empty
+ * means the built-in order, and "Reset order" empties it.
  *
  * Alerts is not part of it: on desktop it is a column beside the grid, not a
  * slot in it, so there is no position for it to take.
@@ -33,17 +34,25 @@ export function effectiveCardOrder(stored: readonly string[]): OverviewCardKey[]
   return [...placed, ...SORTABLE_CARD_KEYS.filter((key) => !placedSet.has(key))];
 }
 
+/** Whether the stored list puts every card where the built-in order already does. */
+export function isDefaultOrder(stored: readonly string[]): boolean {
+  const order = effectiveCardOrder(stored);
+  return order.every((key, index) => key === SORTABLE_CARD_KEYS[index]);
+}
+
 /**
  * The stored list after dragging `active` onto `over`. Keys this build does
- * not know stay on the end: the list merges last-write-wins as a whole, and
- * dropping them would reset a newer build's card on every device.
+ * not know stay exactly where they were: the list merges last-write-wins as a
+ * whole, and moving or dropping them would shift a newer build's card on
+ * every device the next time an older build reorders anything.
  */
 export function moveCard(stored: readonly string[], active: string, over: string): string[] {
-  const order = effectiveCardOrder(stored);
-  const from = order.indexOf(active as OverviewCardKey);
-  const to = order.indexOf(over as OverviewCardKey);
-  const moved = from < 0 || to < 0 ? order : arrayMove(order, from, to);
-  return [...moved, ...stored.filter((key) => !SORTABLE.has(key) && key !== 'alerts')];
+  const kept = stored.filter((key) => key !== 'alerts');
+  const keptSet = new Set(kept);
+  const full = [...kept, ...SORTABLE_CARD_KEYS.filter((key) => !keptSet.has(key))];
+  const from = full.indexOf(active);
+  const to = full.indexOf(over);
+  return from < 0 || to < 0 ? full : arrayMove(full, from, to);
 }
 
 export const useOverviewCardOrder = createSyncedSetting<string[]>({

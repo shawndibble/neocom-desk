@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveCardOrder, moveCard, SORTABLE_CARD_KEYS } from './cardOrder';
+import { effectiveCardOrder, isDefaultOrder, moveCard, SORTABLE_CARD_KEYS } from './cardOrder';
 
 describe('effectiveCardOrder', () => {
   it('is the default order when nothing is stored', () => {
@@ -33,13 +33,24 @@ describe('moveCard', () => {
    * a newer build's key on its next move would reset that card's place on
    * every device. Unknown keys ride along at the end.
    */
-  it('keeps keys this build does not know', () => {
+  it('keeps keys this build does not know, where they were', () => {
     const next = moveCard(['someFutureCard', 'mining', 'orders'], 'orders', 'mining');
-    expect(next.slice(0, 2)).toEqual(['orders', 'mining']);
-    expect(next).toContain('someFutureCard');
+    expect(next.slice(0, 3)).toEqual(['someFutureCard', 'orders', 'mining']);
   });
 
   it('leaves the order alone for a drop on itself', () => {
     expect(moveCard(['mining'], 'mining', 'mining')).toEqual(effectiveCardOrder(['mining']));
+  });
+});
+
+describe('isDefaultOrder', () => {
+  it('is true for nothing stored, or a stored list that places cards where they already were', () => {
+    expect(isDefaultOrder([])).toBe(true);
+    expect(isDefaultOrder(['someFutureCard'])).toBe(true);
+    expect(isDefaultOrder([...SORTABLE_CARD_KEYS])).toBe(true);
+  });
+
+  it('is false once a card has moved', () => {
+    expect(isDefaultOrder(['mail'])).toBe(false);
   });
 });

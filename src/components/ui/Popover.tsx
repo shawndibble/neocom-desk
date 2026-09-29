@@ -8,7 +8,9 @@ import { menuContentClassName } from './menuStyles';
  * Click-triggered informational overlay, on the same surface as the menus but
  * with a `dialog` role rather than `menu` — it holds prose and figures, not
  * commands, and a menu role would promise arrow-key item navigation that isn't
- * there. Radix (docs/adr/0004) owns dismissal, focus return and collision-aware
+ * there. It also hosts a small form a menu cannot: the Overview's card editor
+ * (`features/overview/CardPicker.tsx`) is checkboxes and drag handles whose
+ * own arrow-key moves a menu's item navigation would fight. Radix (docs/adr/0004) owns dismissal, focus return and collision-aware
  * placement, exactly as it does for `DropdownMenu`.
  */
 export const Popover = PopoverPrimitive.Root;
