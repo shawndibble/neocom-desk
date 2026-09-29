@@ -353,3 +353,113 @@ describe('createSemaphore priority lanes', () => {
     expect(semaphore.inFlight).toBe(1);
   });
 });
+
+describe('createSemaphore high lane', () => {
+  const low = (): PriorityTicket => ({ priority: 'low' });
+  const high = (): PriorityTicket => ({ priority: 'high' });
+
+  function passer(semaphore: ReturnType<typeof createSemaphore>) {
+    const order: string[] = [];
+    const queue = (label: string, ticket?: PriorityTicket) =>
+      semaphore.acquire(undefined, ticket).then((release) => {
+        order.push(label);
+        release();
+      });
+    return { order, queue };
+  }
+
+  it('admits high waiters before normal and low ones queued ahead of them, FIFO within each', async () => {
+    const semaphore = createSemaphore(1);
+    const held = await semaphore.acquire();
+    const { order, queue } = passer(semaphore);
+    const waits = [
+      queue('bg1', low()),
+      queue('fg1'),
+      queue('hi1', high()),
+      queue('fg2'),
+      queue('hi2', high()),
+    ];
+
+    held();
+    await Promise.all(waits);
+    expect(order).toEqual(['hi1', 'hi2', 'fg1', 'fg2', 'bg1']);
+  });
+
+  it('keeps high waiters out of the low cap, so the reserve is unchanged', async () => {
+    const semaphore = createSemaphore(3, { lowReserve: 1 });
+    await semaphore.acquire(undefined, low());
+    await semaphore.acquire(undefined, low());
+    await semaphore.acquire(undefined, high());
+    expect(semaphore.inFlight).toBe(3);
+  });
+
+  it('promotes a low ticket straight to high, merging by arrival order', async () => {
+    const semaphore = createSemaphore(1);
+    const held = await semaphore.acquire();
+    const ticket = low();
+    const { order, queue } = passer(semaphore);
+    const waits = [queue('bgA', ticket), queue('fgB'), queue('hiC', high())];
+
+    semaphore.promote(ticket, 'high');
+    expect(ticket.priority).toBe('high');
+    held();
+    await Promise.all(waits);
+    expect(order).toEqual(['bgA', 'hiC', 'fgB']);
+  });
+
+  it('promotes a normal-promoted ticket on to high', async () => {
+    const semaphore = createSemaphore(1);
+    const held = await semaphore.acquire();
+    const ticket = low();
+    const { order, queue } = passer(semaphore);
+    const waits = [queue('fgA'), queue('bgB', ticket)];
+
+    semaphore.promote(ticket);
+    semaphore.promote(ticket, 'high');
+    held();
+    await Promise.all(waits);
+    expect(order).toEqual(['bgB', 'fgA']);
+  });
+
+  it('never demotes: promoting a high ticket to normal leaves it high', async () => {
+    const semaphore = createSemaphore(1);
+    const held = await semaphore.acquire();
+    const ticket = high();
+    const { order, queue } = passer(semaphore);
+    const waits = [queue('fgA'), queue('hiB', ticket)];
+
+    semaphore.promote(ticket, 'normal');
+    expect(ticket.priority).toBe('high');
+    held();
+    await Promise.all(waits);
+    expect(order).toEqual(['hiB', 'fgA']);
+  });
+
+  it('still drains normal and low once the high lane empties', async () => {
+    const semaphore = createSemaphore(1, { lowReserve: 0 });
+    const held = await semaphore.acquire(undefined, high());
+    const { order, queue } = passer(semaphore);
+    const waits = [queue('bg', low()), queue('fg'), queue('hi', high())];
+
+    held();
+    await Promise.all(waits);
+    expect(order).toEqual(['hi', 'fg', 'bg']);
+    expect(semaphore.inFlight).toBe(0);
+  });
+
+  it('frees an aborted high waiter’s place in the queue', async () => {
+    const semaphore = createSemaphore(1);
+    const held = await semaphore.acquire();
+    const controller = new AbortController();
+    const abandoned = semaphore.acquire(controller.signal, high());
+    const { order, queue } = passer(semaphore);
+    const next = queue('fg');
+
+    controller.abort();
+    await expect(abandoned).rejects.toThrow();
+    held();
+    await next;
+    expect(order).toEqual(['fg']);
+    expect(semaphore.inFlight).toBe(0);
+  });
+});

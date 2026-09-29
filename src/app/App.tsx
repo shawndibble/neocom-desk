@@ -9,6 +9,7 @@ import { subscribeToUpgradeBlockedReports } from './upgradeBlockedReport';
 import { reloadOnDatabaseWipe } from './databaseWipe';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { configureEsi } from '@/esi/client';
+import { configureActiveCharacter } from '@/esi/lane';
 import { triggerSync } from '@/sync';
 import { db } from '@/db';
 import { isSyncConfigured } from './syncStatus';
@@ -47,6 +48,8 @@ import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 // (tokenProvider.ts) so a dead refresh grant is reported centrally instead of
 // surfacing as an empty view in whichever feature happened to ask first.
 configureEsi({ getToken: (characterId) => getAccessTokenReportingFailures(characterId) });
+// The active Character's reads queue ahead of every other Character's (#2281).
+configureActiveCharacter(() => useActiveCharacter.getState().activeCharacterId);
 
 // Code-split routes (`routeChunks.ts`). Login, Callback and NotFound stay
 // eager above: a signed-out cold load can land on them before any choice.

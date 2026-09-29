@@ -15,7 +15,7 @@ import { AuthError } from '@/auth/sso';
 import { emitEsiActivity } from './activityLog';
 import { passEsiGate, observeEsiResponse } from './budget';
 import { EsiError, EsiBudgetError, EsiTimeoutError } from './errors';
-import { currentEsiLane, type EsiLane } from './lane';
+import { currentEsiLane, gateLane, type EsiLane } from './lane';
 import type { EsiEndpointId } from './registry';
 
 // `EsiError` lives in `./errors` so the budget can throw one without importing
@@ -256,7 +256,8 @@ export async function esiFetch<T>(
 ): Promise<EsiResult<T>> {
   const { characterId, query, page, etag, signal, method = 'GET', body, endpointId } = options;
   // Read before the token await below, which ends the ambient lane's scope.
-  const lane = options.lane ?? currentEsiLane();
+  // Foreground reads for the active Character queue ahead of the rest (#2281).
+  const lane = gateLane(options.lane ?? currentEsiLane(), characterId);
   const url = buildUrl(path, query, page);
 
   const headers: Record<string, string> = {
