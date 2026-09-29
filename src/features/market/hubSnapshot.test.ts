@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
-import { resetRevalidationState } from '@/esi/cache';
+import { GLOBAL_CACHE_CHARACTER_ID, resetRevalidationState } from '@/esi/cache';
+import { ensureAnySession } from '@/sync/syncAuth';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { loadHubSnapshotRange } from './hubSnapshot';
 
@@ -16,7 +17,7 @@ vi.mock('firebase/firestore/lite', () => ({
   documentId: () => '__name__',
 }));
 vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
-vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn(async () => undefined) }));
+vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => undefined) }));
 vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => true }));
 
 const CHARACTER_ID = 91;
@@ -30,6 +31,7 @@ beforeEach(async () => {
   await db.esiCache.clear();
   resetRevalidationState();
   getDocs.mockReset();
+  vi.mocked(ensureAnySession).mockClear();
 });
 
 describe('loadHubSnapshotRange', () => {
@@ -119,6 +121,35 @@ describe('loadHubSnapshotRange', () => {
     const result = await loadHubSnapshotRange(CHARACTER_ID, '2026-09-24', '2026-09-24', amarr);
 
     expect(result.saved.get('2026-09-24')?.get(34)).toEqual({ buy: 3.4, sell: 3.7 });
+  });
+
+  it('serves a cached range without waiting on a Firebase sign-in', async () => {
+    await db.esiCache.put({
+      characterId: GLOBAL_CACHE_CHARACTER_ID,
+      key: 'marketHistory:2026-09-24:2026-09-24',
+      value: {
+        '2026-09-24': {
+          source: 'fuzzwork',
+          hubs: { [STATION_KEY]: { '34': { buy: 1, sell: 2 } } },
+        },
+      },
+      fetchedAt: Date.now(),
+    });
+
+    const result = await loadHubSnapshotRange(CHARACTER_ID, '2026-09-24', '2026-09-24');
+
+    expect(result.saved.get('2026-09-24')?.get(34)).toEqual({ buy: 1, sell: 2 });
+    expect(ensureAnySession).not.toHaveBeenCalled();
+    expect(getDocs).not.toHaveBeenCalled();
+  });
+
+  it('is empty when signing in fails and nothing is cached', async () => {
+    vi.mocked(ensureAnySession).mockRejectedValueOnce(new Error('offline'));
+
+    const result = await loadHubSnapshotRange(CHARACTER_ID, '2026-09-24', '2026-09-24');
+
+    expect(result.saved.size).toBe(0);
+    expect(result.historical.size).toBe(0);
   });
 
   it('is empty without hitting Firestore when the range is backwards', async () => {

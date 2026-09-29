@@ -1878,6 +1878,7 @@
       "reasonManufacturing": "Build {{make}}/u at ME {{me}}% · Buy {{buy}}/u",
       "reasonReaction": "React {{make}}/u at an unfitted Athanor · Buy {{buy}}/u",
       "reasonPlanetary": "PI inputs {{make}}/u · Buy {{buy}}/u",
+      "blueprintCost": "(incl. {{amount}} to buy the blueprint)",
       "savings": "Saves {{amount}} on {{quantity}}",
       "suggestion": "Suggestion: {{verdict}}",
       "clickBuild": "Click to Build",

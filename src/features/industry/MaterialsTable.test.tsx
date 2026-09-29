@@ -857,6 +857,7 @@ describe('MaterialsTable make-or-buy marker', () => {
     buyUnitPrice: 50,
     savings: 70.4,
     me: 0,
+    blueprintCost: 0,
   };
 
   function advise(advice: MakeOrBuy, typeID = 9840) {
@@ -1104,6 +1105,7 @@ describe('MaterialsTable build-here control', () => {
       buyUnitPrice: 50,
       savings: 70.4,
       me: 0,
+      blueprintCost: 0,
     };
     renderTable({
       canBuildHere: buildable,
@@ -1122,6 +1124,30 @@ describe('MaterialsTable build-here control', () => {
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent(/Build 42\.96\/u at ME 0%/);
     expect(tooltip).toHaveTextContent(/Saves 70 on 10/);
+  });
+
+  it('names the blueprint purchase a buy verdict’s build price includes', async () => {
+    const advice: MakeOrBuy = {
+      method: 'manufacturing',
+      verdict: 'buy',
+      makeUnitPrice: 700_000,
+      buyUnitPrice: 50,
+      savings: 6_999_500,
+      me: 0,
+      blueprintCost: 7_000_000,
+    };
+    renderTable({
+      canBuildHere: buildable,
+      onToggleBuildHere: vi.fn(),
+      makeOrBuy: new Map([[9840, advice]]),
+    });
+    const control = within(row('Mechanical Parts')).getByRole('button', {
+      name: 'Build Mechanical Parts here instead of buying it',
+    });
+    fireEvent.pointerMove(control);
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent(/Suggestion: Buy It/);
+    expect(tooltip).toHaveTextContent(/incl\. 7,000,000 to buy the blueprint/);
   });
 
   it('replaces a built material’s price with what the job costs a unit', () => {

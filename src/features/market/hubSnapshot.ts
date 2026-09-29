@@ -7,7 +7,7 @@
  * character-independent public lookup makes (`syncedContracts.ts`,
  * `stations.ts`). Reading requires being signed in to Firebase as *some*
  * character (the collection's rule is `request.auth != null`), reusing
- * `ensureSignedIn` exactly as `syncedContracts.ts` already does.
+ * `ensureAnySession` exactly as `syncedContracts.ts` does.
  *
  * A day's `source` tag decides which price-basis tier it feeds
  * (`priceBasis.ts`): 'fuzzwork' is real station data, fed as `saved`
@@ -35,7 +35,7 @@ import {
   startAt,
 } from 'firebase/firestore/lite';
 import { getSyncFirestore } from '@/sync/firebaseApp';
-import { ensureSignedIn } from '@/sync/syncAuth';
+import { ensureAnySession } from '@/sync/syncAuth';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { GLOBAL_CACHE_CHARACTER_ID, STALE_AFTER, loadWithCache } from '@/esi/cache';
 import { DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
@@ -79,17 +79,14 @@ export async function loadHubSnapshotRange(
 ): Promise<HubSnapshotRange> {
   if (!isSyncConfigured() || startDate > endDate) return EMPTY_RANGE;
 
-  try {
-    await ensureSignedIn(characterId);
-  } catch {
-    return EMPTY_RANGE;
-  }
-
   const cacheKey = `marketHistory:${startDate}:${endDate}`;
   const cached = await loadWithCache<Record<string, MarketHistoryDocData>>(
     GLOBAL_CACHE_CHARACTER_ID,
     cacheKey,
     async () => {
+      // Only the live read needs a session: a cached range shouldn't wait on
+      // the sign-in queue, and an offline sign-in failure falls back to it.
+      await ensureAnySession(characterId);
       const snapshot = await getDocs(
         query(
           collection(getSyncFirestore(), COLLECTION),

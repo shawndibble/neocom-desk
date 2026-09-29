@@ -53,7 +53,12 @@ describe('selectBlueprintTier', () => {
       bpoSellPrice: null,
       assumedMeForUnowned: 0,
     });
-    expect(result).toEqual({ me: 10, te: 20, line: { unitPrice: 1, owned: false } });
+    expect(result).toEqual({
+      me: 10,
+      te: 20,
+      line: { unitPrice: 1, owned: false },
+      purchasedRuns: 5,
+    });
   });
 
   it('nets an owned BPC against its own tier and shows the free/owned line when it fully covers the need', () => {
@@ -82,7 +87,12 @@ describe('selectBlueprintTier', () => {
       bpoSellPrice: null,
       assumedMeForUnowned: 0,
     });
-    expect(result).toEqual({ me: 6, te: 12, line: { unitPrice: 20, owned: false } });
+    expect(result).toEqual({
+      me: 6,
+      te: 12,
+      line: { unitPrice: 20, owned: false },
+      purchasedRuns: 4,
+    });
   });
 
   it('treats an owned tier with an unmatched shortfall as unusable and falls back to a priceable candidate', () => {
@@ -95,7 +105,12 @@ describe('selectBlueprintTier', () => {
       bpoSellPrice: 30, // ME0 fallback is still priceable
       assumedMeForUnowned: 0,
     });
-    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 30, owned: false } });
+    expect(result).toEqual({
+      me: 0,
+      te: 0,
+      line: { unitPrice: 30, owned: false },
+      purchasedRuns: Infinity,
+    });
   });
 
   it('an offer selling an original via contract (runs -1) fully covers any shortfall as one copy', () => {
@@ -107,7 +122,12 @@ describe('selectBlueprintTier', () => {
       bpoSellPrice: 10_000,
       assumedMeForUnowned: 0,
     });
-    expect(result).toEqual({ me: 3, te: 6, line: { unitPrice: 500, owned: false } });
+    expect(result).toEqual({
+      me: 3,
+      te: 6,
+      line: { unitPrice: 500, owned: false },
+      purchasedRuns: Infinity,
+    });
   });
 
   it('ignores a candidate tier whose material cost is itself unpriceable', () => {
@@ -120,7 +140,12 @@ describe('selectBlueprintTier', () => {
       assumedMeForUnowned: 0,
     });
     // 5 runs needed, this offer covers 1 run per copy at 5 ISK: 5 copies = 25.
-    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 25, owned: false } });
+    expect(result).toEqual({
+      me: 0,
+      te: 0,
+      line: { unitPrice: 25, owned: false },
+      purchasedRuns: 5,
+    });
   });
 
   it('discards a malformed offer with zero runs rather than dividing by it', () => {
@@ -133,7 +158,12 @@ describe('selectBlueprintTier', () => {
       assumedMeForUnowned: 0,
     });
     // The zero-runs offer is unusable; falls through to the BPO sell price.
-    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 30, owned: false } });
+    expect(result).toEqual({
+      me: 0,
+      te: 0,
+      line: { unitPrice: 30, owned: false },
+      purchasedRuns: Infinity,
+    });
   });
 
   it('discards a malformed offer with negative runs (anything but the -1 original sentinel)', () => {
@@ -145,7 +175,12 @@ describe('selectBlueprintTier', () => {
       bpoSellPrice: 30,
       assumedMeForUnowned: 0,
     });
-    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 30, owned: false } });
+    expect(result).toEqual({
+      me: 0,
+      te: 0,
+      line: { unitPrice: 30, owned: false },
+      purchasedRuns: Infinity,
+    });
   });
 
   it('discards a malformed offer with zero or negative quantity', () => {
@@ -157,7 +192,12 @@ describe('selectBlueprintTier', () => {
       bpoSellPrice: 30,
       assumedMeForUnowned: 0,
     });
-    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 30, owned: false } });
+    expect(result).toEqual({
+      me: 0,
+      te: 0,
+      line: { unitPrice: 30, owned: false },
+      purchasedRuns: Infinity,
+    });
   });
 
   it("discards a multi-type offer — its price is the whole contract's, not this blueprint's (issue #1076)", () => {
@@ -170,7 +210,12 @@ describe('selectBlueprintTier', () => {
       bpoSellPrice: 30,
       assumedMeForUnowned: 0,
     });
-    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 30, owned: false } });
+    expect(result).toEqual({
+      me: 0,
+      te: 0,
+      line: { unitPrice: 30, owned: false },
+      purchasedRuns: Infinity,
+    });
   });
 
   it('a multi-type offer cannot extend an owned tier either, not just the new-tier candidate', () => {
@@ -186,7 +231,12 @@ describe('selectBlueprintTier', () => {
     });
     // Falls straight to the ME0 BPO price — the owned ME6 tier has no usable
     // extension, same as "unmatched shortfall" above.
-    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 30, owned: false } });
+    expect(result).toEqual({
+      me: 0,
+      te: 0,
+      line: { unitPrice: 30, owned: false },
+      purchasedRuns: Infinity,
+    });
   });
 
   it('discards a zero-price offer — a barter contract, not a genuinely free blueprint (issue #1080)', () => {
@@ -199,7 +249,12 @@ describe('selectBlueprintTier', () => {
       bpoSellPrice: 30,
       assumedMeForUnowned: 0,
     });
-    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 30, owned: false } });
+    expect(result).toEqual({
+      me: 0,
+      te: 0,
+      line: { unitPrice: 30, owned: false },
+      purchasedRuns: Infinity,
+    });
   });
 
   it('a zero-price offer cannot extend an owned tier either, not just the new-tier candidate', () => {
@@ -212,7 +267,12 @@ describe('selectBlueprintTier', () => {
       bpoSellPrice: 30,
       assumedMeForUnowned: 0,
     });
-    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 30, owned: false } });
+    expect(result).toEqual({
+      me: 0,
+      te: 0,
+      line: { unitPrice: 30, owned: false },
+      purchasedRuns: Infinity,
+    });
   });
 
   it("nets a multi-copy listing's whole bundle, not one copy, against the shortfall", () => {
@@ -229,7 +289,12 @@ describe('selectBlueprintTier', () => {
       bpoSellPrice: null,
       assumedMeForUnowned: 0,
     });
-    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 10, owned: false } });
+    expect(result).toEqual({
+      me: 0,
+      te: 0,
+      line: { unitPrice: 10, owned: false },
+      purchasedRuns: 6,
+    });
   });
 });
 
@@ -350,7 +415,12 @@ describe('pooledOwnedCopies / claimBlueprintTier (issue #860)', () => {
       bpoSellPrice: 200,
       assumedMeForUnowned: 0,
     });
-    expect(resolvedB).toEqual({ me: 0, te: 0, line: { unitPrice: 200, owned: false } });
+    expect(resolvedB).toEqual({
+      me: 0,
+      te: 0,
+      line: { unitPrice: 200, owned: false },
+      purchasedRuns: Infinity,
+    });
   });
 
   it('never decrements a BPO (infinite-runs) tier — one original covers every branch', () => {
@@ -447,5 +517,41 @@ describe('selectBlueprintTier coverage (issue #1775)', () => {
       selectBlueprintTier({ ...needed, ownedCopies: [{ me: 6, te: 12, runs: 20 }] }).coverage
     ).toBeUndefined();
     expect(selectBlueprintTier({ ...needed, ownedCopies: [] }).coverage).toBeUndefined();
+  });
+});
+
+describe('claimBlueprintTier — purchases join the pool (a blueprint is bought once per plan)', () => {
+  it('a bought BPO covers every later node for free', () => {
+    const pool: OwnedBlueprintPool = new Map();
+    pooledOwnedCopies([], pool);
+    claimBlueprintTier(
+      pool,
+      { me: 0, te: 0, line: { unitPrice: 200, owned: false }, purchasedRuns: Infinity },
+      5
+    );
+    expect(pooledOwnedCopies([], pool)).toEqual([{ me: 0, te: 0, runs: -1 }]);
+  });
+
+  it('a bought BPC leaves its unused runs for the next node', () => {
+    const pool: OwnedBlueprintPool = new Map();
+    pooledOwnedCopies([], pool);
+    claimBlueprintTier(
+      pool,
+      { me: 10, te: 20, line: { unitPrice: 100, owned: false }, purchasedRuns: 10 },
+      3
+    );
+    expect(pooledOwnedCopies([], pool)).toEqual([{ me: 10, te: 20, runs: 7 }]);
+  });
+
+  it('tops up an owned tier with the runs bought to extend it', () => {
+    const pool: OwnedBlueprintPool = new Map();
+    pooledOwnedCopies([{ me: 6, te: 12, runs: 2 }], pool);
+    // 2 owned + 4 bought (two 2-run copies) against 5 needed leaves 1.
+    claimBlueprintTier(
+      pool,
+      { me: 6, te: 12, line: { unitPrice: 20, owned: false }, purchasedRuns: 4 },
+      5
+    );
+    expect(pooledOwnedCopies([], pool)).toEqual([{ me: 6, te: 12, runs: 1 }]);
   });
 });

@@ -597,6 +597,23 @@ describe('IndustryPlanPage: make-or-buy marker on materials', () => {
   }
 
   it('marks a material this plan is better off building, priced against its own job', async () => {
+    // An owned ME0 BPO: nothing to buy before building, so the verdict is the
+    // job alone. Unowned and unpriced, the blueprint would leave the verdict
+    // unpriceable — no advice, the same as the plan's own total once built.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/blueprints`, () =>
+        HttpResponse.json([
+          {
+            item_id: 1,
+            type_id: 9841,
+            runs: -1,
+            material_efficiency: 0,
+            time_efficiency: 0,
+            quantity: -1,
+          },
+        ])
+      )
+    );
     await db.buildPlans.add(seedPlan());
     render(<App />);
 

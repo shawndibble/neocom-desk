@@ -60,6 +60,7 @@ describe('makeOrBuy', () => {
       buyUnitPrice: 100,
       savings: (100 - 322.2 / 15) * 12,
       me: 0,
+      blueprintCost: 0,
     });
   });
 
@@ -109,6 +110,52 @@ describe('makeOrBuy', () => {
     expect(result?.savings).toBe(0);
   });
 
+  describe('Blueprint Acquisition', () => {
+    const acquiring = (resolution: {
+      me: number;
+      line: { unitPrice: number | null; owned: boolean } | null;
+    }): MakeOrBuyContext => ({
+      ...ctx,
+      acquisitionFor: (productTypeID, needed) => {
+        expect(productTypeID).toBe(9840);
+        expect(needed).toBe(12);
+        return { ...resolution, te: 0, blueprintTypeID: 9841 };
+      },
+    });
+
+    it('adds the whole blueprint purchase to the build side, spread over the units made', () => {
+      const result = makeOrBuy(
+        line(),
+        manufacturing,
+        acquiring({ me: 0, line: { unitPrice: 3000, owned: false } })
+      );
+      expect(result?.blueprintCost).toBe(3000);
+      expect(result?.makeUnitPrice).toBeCloseTo((322.2 + 3000) / 15, 10);
+      expect(result?.verdict).toBe('buy');
+    });
+
+    it('builds at the acquired tier’s ME and charges nothing for an owned copy', () => {
+      const result = makeOrBuy(
+        line(),
+        manufacturing,
+        acquiring({ me: 10, line: { unitPrice: 0, owned: true } })
+      );
+      expect(result?.me).toBe(10);
+      expect(result?.blueprintCost).toBe(0);
+      expect(result?.makeUnitPrice).toBeCloseTo((54 * 5 + 22.2) / 15, 10);
+    });
+
+    it('gives no advice when the blueprint must be bought but nothing prices it', () => {
+      expect(
+        makeOrBuy(
+          line(),
+          manufacturing,
+          acquiring({ me: 0, line: { unitPrice: null, owned: false } })
+        )
+      ).toBeNull();
+    });
+  });
+
   it('uses the researched ME of a blueprint the character owns', () => {
     // ME10 on 3 runs: ceil(round(60 x 0.9, 2)) = 54 Tritanium, not 60.
     const researched = makeOrBuy(line(), { ...manufacturing, me: 10 }, ctx);
@@ -142,6 +189,7 @@ describe('makeOrBuy', () => {
         buyUnitPrice: 100,
         savings: (100 - 321.6 / 15) * 12,
         me: null,
+        blueprintCost: 0,
       });
     });
 
@@ -274,6 +322,7 @@ describe('makeOrBuy', () => {
         buyUnitPrice: 90,
         savings: (90 - 75) * 12,
         me: null,
+        blueprintCost: 0,
       });
     });
 

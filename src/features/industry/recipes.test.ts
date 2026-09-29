@@ -458,8 +458,9 @@ describe('acquisitionForLookup', () => {
       blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
     });
 
-    // Branch A calls first — the owned copy fully covers its 5 runs.
-    const branchA = acquisitionFor(9840, 5, ctx, { 34: 10 });
+    // Branch A calls first — 25 parts at 5 a run is 5 runs, which the owned
+    // copy fully covers. `needed` is units, never runs.
+    const branchA = acquisitionFor(9840, 25, ctx, { 34: 10 });
     expect(branchA).toEqual({
       me: 6,
       te: 12,
@@ -470,12 +471,40 @@ describe('acquisitionForLookup', () => {
     // Branch B needs the same 5 runs of the same blueprint type — the owned
     // copy is already claimed by Branch A, so Branch B must fall back to the
     // BPO sell-price cascade instead of also reporting itself as free.
-    const branchB = acquisitionFor(9840, 5, ctx, { 34: 10 });
+    const branchB = acquisitionFor(9840, 25, ctx, { 34: 10 });
     expect(branchB).toEqual({
       me: 0,
       te: 0,
       blueprintTypeID: 9841,
       line: { unitPrice: 777, owned: false },
+    });
+
+    // Branch B bought the BPO, so a third branch builds with it for free.
+    expect(acquisitionFor(9840, 25, ctx, { 34: 10 })?.line).toBeNull();
+  });
+
+  it('counts the runs a node needs, not its units, against an owned copy', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      // 2 runs: covers 10 parts at 5 a run, which a units-as-runs count would miss.
+      ownedBlueprints: [
+        {
+          item_id: 1,
+          type_id: 9841,
+          runs: 2,
+          material_efficiency: 6,
+          time_efficiency: 12,
+          quantity: 1,
+          location_id: 1,
+          location_flag: 'Hangar',
+        },
+      ],
+      blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
+    });
+    expect(acquisitionFor(9840, 10, ctx, { 34: 10 })?.line).toEqual({
+      unitPrice: 0,
+      owned: true,
     });
   });
 

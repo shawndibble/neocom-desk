@@ -51,6 +51,7 @@ import {
   acquisitionForLookup,
   cloneBlueprintPools,
   recipeForLookup,
+  verdictAcquisitionFor,
   withoutAcquisitionCost,
   type BlueprintTierPools,
   type RecipeSources,
@@ -172,7 +173,12 @@ export function resolveTopLevelTier(
   const product = blueprint.products[0];
   const acquisition =
     product && ctx
-      ? acquisitionFor(product.typeID, clampInt(plan.runs, 1, MAX_JOB_RUNS), ctx, materialPrices)
+      ? acquisitionFor(
+          product.typeID,
+          clampInt(plan.runs, 1, MAX_JOB_RUNS) * product.quantity,
+          ctx,
+          materialPrices
+        )
       : null;
   return { me: acquisition?.me ?? plan.me, te: acquisition?.te ?? plan.te, acquisition };
 }
@@ -212,6 +218,7 @@ export function resolveBuildPlan(
           materialPrices,
           modifiers: sources.modifiers,
           reactionFacility,
+          acquisitionFor: verdictAcquisitionFor(recipeSources, sources.includeBlueprintCost),
         }
       : null;
 

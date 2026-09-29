@@ -13,15 +13,16 @@
  * `GLOBAL_CACHE_CHARACTER_ID` sentinel — the same trade every other
  * character-independent public lookup makes. Reading still requires being
  * signed in to Firebase as *some* character (each collection's rule is
- * `request.auth != null`), which `ensureSignedIn` already is on every
- * character switch. Cache-through the way every ESI-backed view loads
- * (`fromCache` for the offline banner, a manual refresh re-fetches) even
+ * `request.auth != null`), so `ensureAnySession` reuses whichever session
+ * the sync feature already holds rather than swapping it (issue #2262).
+ * Cache-through the way every ESI-backed view loads (`fromCache` for the
+ * offline banner, a manual refresh re-fetches) even
  * though the live side is Firestore, not ESI — `loadWithCache` only needs a
  * `fetchLive`.
  */
 import { collection, getDocs } from 'firebase/firestore/lite';
 import { getSyncFirestore } from '@/sync/firebaseApp';
-import { ensureSignedIn } from '@/sync/syncAuth';
+import { ensureAnySession } from '@/sync/syncAuth';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID, type CachedResult } from '@/esi/cache';
 
@@ -74,7 +75,7 @@ async function fetchSnapshot<TRow>(
   characterId: number
 ): Promise<ChunkedSnapshot<TRow> | null> {
   if (!isSyncConfigured()) return null;
-  await ensureSignedIn(characterId);
+  await ensureAnySession(characterId);
 
   const snapshot = await getDocs(collection(getSyncFirestore(), source.collectionName));
   const rows: TRow[] = [];

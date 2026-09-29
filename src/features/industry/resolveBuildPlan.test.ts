@@ -7,6 +7,8 @@ import type { ResolvedMaterial } from '@/engine/industry/materialResolution';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import type { MarketSnapshot } from './marketData';
+import { makeOrBuy } from '@/engine/industry/makeOrBuy';
+import { materialRecipe } from './recipes';
 import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
 
 function entry(
@@ -284,5 +286,122 @@ describe('resolveBuildPlan', () => {
     expect(acquisitionRows(resolved.result, 100)).toEqual([
       expect.objectContaining({ remainingQuantity: 0 }),
     ]);
+  });
+});
+
+describe('make-or-buy advice agrees with the plan it advises (blueprint cost)', () => {
+  // Plan product 1 <- bp 100 needs one 300; 300 <- bp 200 from one Tritanium.
+  // Materials plus fee make 300 far cheaper to build than its hub price of
+  // 100 — until the bp 200 BPO (hub price 1,000) has to be bought first.
+  const catalog = catalogOf([
+    entry(100, 1, [{ typeID: 300, quantity: 1 }]),
+    entry(200, 300, [{ typeID: 34, quantity: 1 }]),
+  ]);
+  const market = { snapshot: snapshot({ 1: 1000, 300: 100, 34: 5, 200: 1000 }) };
+
+  function adviceFor(src: BuildPlanSources) {
+    const bought = resolveBuildPlan(plan(), src, market);
+    const built = resolveBuildPlan(plan({ buildHere: [300] }), src, market);
+    const row = bought.result!.materials.find((m) => m.typeID === 300)!;
+    const verdict = makeOrBuy(
+      row,
+      materialRecipe(300, {
+        catalog,
+        pi: null,
+        ownedBlueprints: src.ownedBlueprints,
+        assumedMeForUnowned: src.assumedMe,
+      }),
+      bought.makeOrBuyContext!
+    );
+    return {
+      verdict,
+      boughtCost: bought.result!.totalCost,
+      builtCost: built.result!.totalCost,
+    };
+  }
+
+  it('says buy when the blueprint that would have to be bought makes building dearer', () => {
+    const { verdict, boughtCost, builtCost } = adviceFor(sources(catalog));
+    expect(builtCost).toBeGreaterThan(boughtCost);
+    expect(verdict?.verdict).toBe('buy');
+    expect(verdict?.blueprintCost).toBe(1000);
+  });
+
+  it('says build when an owned BPO leaves nothing to buy', () => {
+    const { verdict, boughtCost, builtCost } = adviceFor(
+      sources(catalog, { ownedBlueprints: [owned(200, -1)] })
+    );
+    expect(builtCost).toBeLessThan(boughtCost);
+    expect(verdict?.verdict).toBe('build');
+    expect(verdict?.blueprintCost).toBe(0);
+    expect(verdict?.me).toBe(10);
+  });
+
+  it('leaves the blueprint out when Include Blueprint Cost is off, same as the plan total', () => {
+    const { verdict, boughtCost, builtCost } = adviceFor(
+      sources(catalog, { includeBlueprintCost: false })
+    );
+    expect(builtCost).toBeLessThan(boughtCost);
+    expect(verdict?.verdict).toBe('build');
+    expect(verdict?.blueprintCost).toBe(0);
+  });
+});
+
+describe('blueprint purchases are charged once per plan, not once per node', () => {
+  // Same shape as `branching` above: 300 and 310 both consume one 400 (bp 401).
+  const branching = catalogOf([
+    entry(100, 1, [
+      { typeID: 300, quantity: 1 },
+      { typeID: 310, quantity: 1 },
+    ]),
+    entry(200, 300, [{ typeID: 400, quantity: 1 }]),
+    entry(210, 310, [{ typeID: 400, quantity: 1 }]),
+    entry(401, 400, [{ typeID: 34, quantity: 1 }]),
+  ]);
+  const ownsComponentBpos = [owned(200, -1), owned(210, -1)];
+  const branchingPlan = plan({ buildHere: [300, 310, 400] });
+
+  function chargedFor(result: BuildResult | null, blueprintTypeID: number): number {
+    return acquisitionRows(result, blueprintTypeID).reduce((sum, row) => sum + row.lineCost, 0);
+  }
+
+  it('buys one BPO for two branches that both build with it', () => {
+    const resolved = resolveBuildPlan(
+      branchingPlan,
+      sources(branching, { ownedBlueprints: ownsComponentBpos }),
+      { snapshot: snapshot({ 1: 1000, 300: 100, 310: 100, 400: 50, 34: 5, 401: 1000 }) }
+    );
+    expect(chargedFor(resolved.result, 401)).toBe(1000);
+  });
+
+  it('spends a bought BPC’s leftover runs on the next branch before buying another', () => {
+    const resolved = resolveBuildPlan(
+      branchingPlan,
+      sources(branching, {
+        ownedBlueprints: ownsComponentBpos,
+        bpcOffersFor: (id) =>
+          id === 401 ? [{ me: 10, te: 20, runs: 10, quantity: 1, price: 100 }] : [],
+      }),
+      { snapshot: snapshot({ 1: 1000, 300: 100, 310: 100, 400: 50, 34: 5 }) }
+    );
+    expect(chargedFor(resolved.result, 401)).toBe(100);
+  });
+
+  it('counts BPC runs, not units, for a recipe that makes several units per run', () => {
+    // 20 of 300 at 10 per run is 2 runs — one 2-run BPC, not ten of them.
+    const catalog = catalogOf([
+      entry(100, 1, [{ typeID: 300, quantity: 20 }]),
+      entry(200, 300, [{ typeID: 34, quantity: 1 }], { productQuantity: 10 }),
+    ]);
+    const resolved = resolveBuildPlan(
+      plan({ buildHere: [300] }),
+      sources(catalog, {
+        ownedBlueprints: [owned(100, -1)],
+        bpcOffersFor: (id) =>
+          id === 200 ? [{ me: 10, te: 20, runs: 2, quantity: 1, price: 100 }] : [],
+      }),
+      { snapshot: snapshot({ 1: 1000, 300: 100, 34: 5 }) }
+    );
+    expect(chargedFor(resolved.result, 200)).toBe(100);
   });
 });
