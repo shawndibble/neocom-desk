@@ -112,14 +112,24 @@ export async function ensureSignedIn(characterId: number): Promise<string> {
  */
 export async function ensureAnySession(fallbackCharacterId: number): Promise<string> {
   const auth = getSyncAuth();
-  // Read through a call each time: the session can land during the await.
+  // Read through a call each time: the session can land while this waits.
   const currentUid = (): string | undefined => auth.currentUser?.uid;
-  const before = currentUid();
-  if (before) return before;
-  if (inflight.size > 0) {
-    await signInChain;
+  const existing = currentUid();
+  if (existing) return existing;
+
+  // Decide inside the chain, not before it: a sign-in queued ahead of this one
+  // (an alt's sync) may land while this waits, and must not then be replaced.
+  return runSerialized(async () => {
+    const landed = currentUid();
+    if (landed) return landed;
+    const uid = uidForCharacter(fallbackCharacterId);
+    await mintAndSignIn(auth, fallbackCharacterId, uid);
     const after = currentUid();
-    if (after) return after;
-  }
-  return ensureSignedIn(fallbackCharacterId);
+    if (after !== uid) {
+      throw new Error(
+        `Firebase session was taken over by ${after ?? 'nobody'} while signing in as ${uid}`
+      );
+    }
+    return uid;
+  });
 }

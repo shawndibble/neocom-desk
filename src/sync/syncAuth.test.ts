@@ -239,6 +239,21 @@ describe('ensureAnySession', () => {
     expect(fakeAuth.currentUser?.uid).toBe('char:1');
   });
 
+  it('does not replace a session another sign-in took while it waited its turn', async () => {
+    // Alt 3's sign-in fails with the reader queued behind it and alt 2 behind
+    // that. The reader may sign in as 1 into the empty slot, but only before
+    // alt 2's turn: once alt 2 lands, its pass must keep the session.
+    mint.mockRejectedValueOnce(new Error('mint failed'));
+    const failed = ensureSignedIn(3).catch(() => undefined);
+    const any = ensureAnySession(1);
+    const alt = ensureSignedIn(2);
+
+    await Promise.all([failed, any, alt]);
+
+    expect(fakeAuth.currentUser?.uid).toBe('char:2');
+    expect(vi.mocked(signInWithCustomToken).mock.calls.at(-1)?.[1]).toBe('token-2');
+  });
+
   it('falls back when the in-flight sign-in failed and left no session', async () => {
     mint.mockRejectedValueOnce(new Error('mint failed'));
     const alt = ensureSignedIn(2);
