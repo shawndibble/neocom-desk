@@ -61,6 +61,12 @@ import {
 } from '@/features/character/spExtractionSettings';
 import { CardPicker } from '@/features/overview/CardPicker';
 import {
+  effectiveCardOrder,
+  isDefaultOrder,
+  moveCard,
+  useOverviewCardOrder,
+} from '@/features/overview/cardOrder';
+import {
   moonChunkSeverity,
   moonChunksDeadline,
   moonChunksSeverity,
@@ -245,15 +251,20 @@ export function Overview() {
   const hiddenCardsHydrated = useOverviewHiddenCards((state) => state.hydrated);
   const hydrateHiddenCards = useOverviewHiddenCards((state) => state.hydrate);
   const setHiddenCards = useOverviewHiddenCards((state) => state.setValue);
+  const storedOrder = useOverviewCardOrder((state) => state.value);
+  const cardOrderHydrated = useOverviewCardOrder((state) => state.hydrated);
+  const hydrateCardOrder = useOverviewCardOrder((state) => state.hydrate);
+  const setStoredOrder = useOverviewCardOrder((state) => state.setValue);
   const spMonitoring = useSpExtractionMonitoringEnabled((state) => state.value);
   const spThreshold = useSpExtractionThresholdSp((state) => state.value);
   const hydrateSpMonitoring = useSpExtractionMonitoringEnabled((state) => state.hydrate);
   const hydrateSpThreshold = useSpExtractionThresholdSp((state) => state.hydrate);
   useEffect(() => {
     void hydrateHiddenCards();
+    void hydrateCardOrder();
     void hydrateSpMonitoring();
     void hydrateSpThreshold();
-  }, [hydrateHiddenCards, hydrateSpMonitoring, hydrateSpThreshold]);
+  }, [hydrateHiddenCards, hydrateCardOrder, hydrateSpMonitoring, hydrateSpThreshold]);
   const shown = (key: OverviewCardKey) => isCardShown(hiddenCards, key);
 
   // One `cacheKey` per card, not one for the page: they load independently, so
@@ -310,8 +321,8 @@ export function Overview() {
   const orderRows = useMemo(() => {
     const snapshot = ordersSnapshot.data;
     // Null, not `[]`: "no open orders" and "the read has not landed" are the
-    // same empty list, and the card's severity ranks the phone's stack on the
-    // difference.
+    // same empty list, and the card's severity must not say "clear" for the
+    // second.
     if (!snapshot) return null;
     /*
      * Narrowed to the active Character below. `loadOpenOrdersSnapshot` fans out
@@ -373,9 +384,9 @@ export function Overview() {
     [visibleAlerts, t]
   );
 
-  // Waits on the hidden-card list too, a local Dexie read, so a hidden card
-  // does not flash in and back out on every visit.
-  if (!hydrated || !hiddenCardsHydrated) {
+  // Waits on the hidden list and the card order too, both local Dexie reads,
+  // so a hidden card does not flash in, or a moved one jump, on every visit.
+  if (!hydrated || !hiddenCardsHydrated || !cardOrderHydrated) {
     return (
       <div className="flex justify-center py-16">
         <Spinner label={t('common.loading')} />
@@ -437,23 +448,18 @@ export function Overview() {
    * phone's two full slots, the folded list) and which clock leads the
    * summary strip are derived from this list (`features/overview/boardLayout`).
    *
-   * Worst first, but only where it pays. On a phone the cards stack in one
-   * column and about three fit above the fold, so the thing on fire has to
-   * lead — and everything past `PHONE_FULL_COUNT` folds to a single line in
-   * "Everything else". From `sm` up the whole grid is on screen at once, and a
-   * position that stays put between visits is worth more than a ranking nobody
-   * has to scroll to: there the declaration order below is what renders.
+   * Where they go is the pilot's order (`cardOrder.ts`), everywhere: the
+   * desktop grid, and on a phone the first `PHONE_FULL_COUNT` in it keep
+   * their full shape while the rest fold to a line in "Everything else". The
+   * pilot chose their order over urgency ranking; a phone that reshuffled by
+   * severity would be a second order nobody set. Declaration order below is
+   * only the built-in default the pilot starts from.
    *
-   * Contracts is `folded`: on a phone it is always a folded row (a courier is
-   * one line), and on desktop it takes the slot after Mining Tax. It is not a
-   * domain competing for a phone's two full cards.
-   *
-   * Alerts leads the folded list instead of competing for a full card, and is
-   * never ranked against the others. It is the one row here that is
-   * device-wide rather than this Character's, and its volume class is
-   * different from everything else on the board — the reason it has a column
-   * of its own rather than a card. Letting it into the ranking would mean one
-   * loud evening pushes both genuine deadlines off the top of a phone.
+   * Alerts is a column rather than a card, and takes no place in the order.
+   * It is the one row here that is device-wide rather than this Character's,
+   * and its volume class is different from everything else on the board — a
+   * loud evening must not push a real deadline around. On a phone, with no
+   * column to sit in, it leads the folded list.
    *
    * The next deadline is drawn from these cards rather than computed on its
    * own: it is the soonest live clock on the board, so clicking it lands on
@@ -462,7 +468,7 @@ export function Overview() {
   const specs: RouteCard[] = [
     {
       key: 'orders',
-      placement: 'ranked',
+      placement: 'card',
       to: '/market/orders',
       severity: ordersSeverity(orderRows, ordersNeedReauth),
       summary: ordersSummary(t, orderRows, ordersNeedReauth),
@@ -478,7 +484,7 @@ export function Overview() {
     },
     {
       key: 'mining',
-      placement: 'ranked',
+      placement: 'card',
       to: '/mining/tax',
       severity: miningTaxSeverity(miningSnapshot.data),
       summary: miningTaxSummary(t, miningSnapshot.data),
@@ -488,7 +494,7 @@ export function Overview() {
     },
     {
       key: 'contracts',
-      placement: 'folded',
+      placement: 'card',
       to: CONTRACTS_IN_PROGRESS_HREF,
       severity: contractsSeverity(contracts),
       summary: contractsSummary(t, contracts, now),
@@ -508,7 +514,7 @@ export function Overview() {
     },
     {
       key: 'planetary',
-      placement: 'ranked',
+      placement: 'card',
       to: '/planetary-industry',
       severity: planetarySeverity(planetary),
       summary: planetarySummary(t, planetary),
@@ -526,7 +532,7 @@ export function Overview() {
     },
     {
       key: 'industry',
-      placement: 'ranked',
+      placement: 'card',
       to: '/industry',
       severity: industrySeverity(industryJobs, industrySnapshot.data?.needsReauth ?? false, now),
       summary: industrySummary(t, industrySnapshot.data, now),
@@ -547,7 +553,7 @@ export function Overview() {
     },
     {
       key: 'structures',
-      placement: 'ranked',
+      placement: 'card',
       // Offered only to a Character whose corp roles and grant cover it, the
       // rule every corp surface follows (`features/corp/useCorpAccess`). While
       // that is still resolving the card is absent rather than loading: a corp
@@ -573,7 +579,7 @@ export function Overview() {
     },
     {
       key: 'moonChunks',
-      placement: 'ranked',
+      placement: 'card',
       available: corpAccess.state === 'ready' && corpAccess.capabilities.canReadMoonExtractions,
       to: '/corp',
       severity: moonChunksSeverity(moonSnapshot.data, now),
@@ -597,7 +603,7 @@ export function Overview() {
     },
     {
       key: 'comingUp',
-      placement: 'folded',
+      placement: 'card',
       to: '/calendar',
       severity: comingUpSeverity(calendarSnapshot.data, now),
       summary: comingUpSummary(t, calendarSnapshot.data, now),
@@ -620,7 +626,7 @@ export function Overview() {
     },
     {
       key: 'spExtraction',
-      placement: 'folded',
+      placement: 'card',
       to: '/characters',
       severity: spExtractionSeverity(spExtraction),
       summary: spExtractionSummary(t, spExtraction),
@@ -630,7 +636,7 @@ export function Overview() {
     },
     {
       key: 'mail',
-      placement: 'folded',
+      placement: 'card',
       to: '/mail',
       severity: mailSeverity(mailSnapshot.data),
       summary: mailSummary(t, mailSnapshot.data),
@@ -640,7 +646,7 @@ export function Overview() {
     },
     {
       key: 'priceAlerts',
-      placement: 'folded',
+      placement: 'card',
       to: '/market',
       severity: priceAlertsSeverity(priceAlertsSnapshot.data),
       summary: priceAlertsSummary(t, priceAlertsSnapshot.data),
@@ -669,7 +675,13 @@ export function Overview() {
     });
   }
   const soonest = soonestDeadline(specs, shown, alwaysDeadlines);
-  const layout = layoutBoard(specs, { isPhone, shown, phoneFullCount: PHONE_FULL_COUNT });
+  const cardOrder = effectiveCardOrder(storedOrder);
+  const layout = layoutBoard(specs, {
+    isPhone,
+    shown,
+    phoneFullCount: PHONE_FULL_COUNT,
+    order: cardOrder,
+  });
   const visibleSpecs = specs.filter((spec) => spec.available !== false && shown(spec.key));
   const folded: FoldedDomain[] = layout.folded.map((spec) => ({
     key: spec.key,
@@ -766,9 +778,13 @@ export function Overview() {
         actions={
           <CardPicker
             cards={specs.filter((spec) => spec.available !== false).map((spec) => spec.key)}
+            order={cardOrder}
             hidden={hiddenCards}
+            orderCustomised={!isDefaultOrder(storedOrder)}
             onToggle={(key) => void setHiddenCards(toggleHiddenCard(hiddenCards, key))}
+            onMove={(active, over) => void setStoredOrder(moveCard(storedOrder, active, over))}
             onShowAll={() => void setHiddenCards([])}
+            onResetOrder={() => void setStoredOrder([])}
           />
         }
         refreshing={walletSnapshot.loading || visibleSpecs.some((spec) => spec.loading)}

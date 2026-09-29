@@ -1,11 +1,10 @@
 /**
  * How urgent each card is — one answer per domain, read twice.
  *
- * The card's own header wears it as a word, and on a phone the board sorts by
- * it so the thing on fire is above the fold on a screen that holds three cards.
- * Two independent judgements would drift the first time either changed, and
- * they would drift *silently*, because a card can only be compared against its
- * neighbours on the one screen narrow enough to reorder them.
+ * The card's own header wears it as a word, and on a phone its folded row in
+ * "Everything else" wears it as a glyph. Two independent judgements would
+ * drift the first time either changed. It never reorders anything: where a
+ * card sits is the pilot's order (`cardOrder.ts`).
  *
  * `null` means "not loaded yet", and is deliberately not `clear`: a card whose
  * read has not landed printing "Clear" beside a footer saying "Checking…" is
@@ -41,8 +40,8 @@ const UNREADABLE: DeadlineSeverity = 'warning';
 /**
  * Null while the snapshot is still in flight, like every other domain here.
  * An empty row list is what both "no orders" and "not fetched yet" look like,
- * and the second one answering `clear` would rank the card to the bottom of
- * the phone's stack and then shuffle it back up as the read lands.
+ * and the second one answering `clear` would claim an all-clear the card has
+ * not checked yet.
  */
 export function ordersSeverity(
   rows: readonly OpenOrderRow[] | null,

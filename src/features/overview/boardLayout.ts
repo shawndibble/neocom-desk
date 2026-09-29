@@ -4,11 +4,11 @@
  *
  * The route declares every card once, as a spec, and everything positional is
  * derived here. Before this each card was wired into the grid, the phone's
- * ranking, the folded list, the deadline hero, the freshness badge and the
+ * full slots, the folded list, the deadline hero, the freshness badge and the
  * refresh spinner by hand, and a hidden card had to be filtered out of each of
  * those separately.
  */
-import { compareSeverity, type DeadlineSeverity } from '@/engine/severity';
+import type { DeadlineSeverity } from '@/engine/severity';
 import type { OverviewCardKey } from './hiddenCards';
 
 export interface BoardDeadline {
@@ -21,16 +21,11 @@ export interface BoardDeadline {
 export interface BoardCardSpec {
   key: OverviewCardKey;
   /**
-   * - `ranked`: competes on severity for a phone's full-card slots.
-   * - `folded`: always one line on a phone — a domain whose news fits in one
-   *   (a courier, an unread count) must not take a card from a real deadline.
+   * - `card`: a slot in the grid, placed by the pilot's order.
    * - `column`: Alerts. Beside the grid on desktop, first folded row on a phone.
-   *
-   * On desktop every placement but `column` renders in the grid, in
-   * declaration order, so a card stays where it was between visits.
    */
-  placement: 'ranked' | 'folded' | 'column';
-  /** Null while the card is still loading — it sorts last rather than guessing. */
+  placement: 'card' | 'column';
+  /** Null while the card is still loading. Tones its folded row; never reorders anything. */
   severity: DeadlineSeverity | null;
   /** False when this Character cannot read the domain at all (a corp card without roles). */
   available?: boolean;
@@ -44,36 +39,40 @@ export interface BoardLayout<T extends BoardCardSpec> {
   column: T | null;
 }
 
+/**
+ * The pilot's order (`cardOrder.ts`) decides everything positional: the
+ * desktop grid, and on a phone which cards keep their full shape — the first
+ * `phoneFullCount` in it, whatever is on fire (the pilot chose that over
+ * urgency ranking). The rest fold to a line under "Everything else", Alerts
+ * first, because on a phone it has no column to sit in.
+ */
 export function layoutBoard<T extends BoardCardSpec>(
   specs: readonly T[],
   {
     isPhone,
     shown,
     phoneFullCount,
-  }: { isPhone: boolean; shown: (key: OverviewCardKey) => boolean; phoneFullCount: number }
+    order,
+  }: {
+    isPhone: boolean;
+    shown: (key: OverviewCardKey) => boolean;
+    phoneFullCount: number;
+    order: readonly OverviewCardKey[];
+  }
 ): BoardLayout<T> {
   const visible = specs.filter((spec) => spec.available !== false && shown(spec.key));
-  if (!isPhone) {
-    return {
-      full: visible.filter((spec) => spec.placement !== 'column'),
-      folded: [],
-      column: visible.find((spec) => spec.placement === 'column') ?? null,
-    };
-  }
-  const ranked = visible
-    .filter((spec) => spec.placement === 'ranked')
-    .sort((a, b) =>
-      a.severity === null || b.severity === null
-        ? Number(a.severity === null) - Number(b.severity === null)
-        : compareSeverity(a.severity, b.severity)
-    );
+  const rank = (key: OverviewCardKey) => {
+    const index = order.indexOf(key);
+    return index < 0 ? order.length : index;
+  };
+  const cards = visible
+    .filter((spec) => spec.placement === 'card')
+    .sort((a, b) => rank(a.key) - rank(b.key));
+  const column = visible.find((spec) => spec.placement === 'column') ?? null;
+  if (!isPhone) return { full: cards, folded: [], column };
   return {
-    full: ranked.slice(0, phoneFullCount),
-    folded: [
-      ...visible.filter((spec) => spec.placement === 'column'),
-      ...visible.filter((spec) => spec.placement === 'folded'),
-      ...ranked.slice(phoneFullCount),
-    ],
+    full: cards.slice(0, phoneFullCount),
+    folded: [...(column ? [column] : []), ...cards.slice(phoneFullCount)],
     column: null,
   };
 }
