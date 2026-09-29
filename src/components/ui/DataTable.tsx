@@ -357,9 +357,9 @@ interface DataTableProps<T> {
    * A windowed `highlightRowKey` is scrolled to through the virtualizer, so
    * the row mounts before it is focused and pulsed. Phone `groupBy` renders
    * unwindowed: collapsed groups mount nothing, and the toggle rows would
-   * need their own measuring. So does `expandableRow` under `'auto'` (and it
-   * is unsupported under `true`): its detail is a second `<tr>` the
-   * virtualizer would have to measure as part of the row above it.
+   * need their own measuring. An `expandableRow` detail is measured as part
+   * of the row it opens beneath, so expanding one moves the rows below it
+   * down rather than under it.
    */
   virtualize?: boolean | 'auto';
 }
@@ -370,6 +370,11 @@ interface DataTableRowProps<T> {
   rowKeyValue: string | number;
   /** Position in the whole sorted set when windowed; `undefined` otherwise. */
   windowIndex: number | undefined;
+  /**
+   * `aria-rowindex` when windowed: past `windowIndex` by the header row, and
+   * by one more below an expanded row, whose detail row counts too.
+   */
+  ariaRowIndex: number | undefined;
   member: boolean;
   columns: readonly DataTableColumn<T>[];
   cellClass: readonly string[];
@@ -398,6 +403,12 @@ interface DataTableRowProps<T> {
   compact: boolean;
   trailingColumns: number;
   measureRef: ((node: HTMLTableRowElement | null) => void) | undefined;
+  /**
+   * Windowed: sizes this (mounted) row again, even mid-scroll — where
+   * `measureRef` defers to TanStack, which skips measuring while the page
+   * scrolls and would drop a detail that grew then. Stable.
+   */
+  remeasure: ((node: HTMLTableRowElement) => void) | undefined;
 }
 
 /**
@@ -412,6 +423,7 @@ function DataTableRowImpl<T>({
   row,
   rowKeyValue: key,
   windowIndex,
+  ariaRowIndex,
   member,
   columns,
   cellClass,
@@ -438,7 +450,36 @@ function DataTableRowImpl<T>({
   compact,
   trailingColumns,
   measureRef,
+  remeasure,
 }: DataTableRowProps<T>) {
+  // Windowed, the virtualizer sizes this row as the main row plus its detail
+  // row (see `DataTable`'s `measureElement`). Its own observer only watches
+  // the main row, so a toggle — or a detail whose content arrives late, an
+  // order book loading — is measured again from here.
+  const rowRef = useRef<HTMLTableRowElement | null>(null);
+  const detailRef = useRef<HTMLTableRowElement | null>(null);
+  const attachRow = useCallback(
+    (node: HTMLTableRowElement | null) => {
+      rowRef.current = node;
+      measureRef?.(node);
+    },
+    [measureRef]
+  );
+  const measuredExpanded = useRef(expanded);
+  useLayoutEffect(() => {
+    const node = rowRef.current;
+    if (!remeasure || !node) return;
+    // Mounting measured already (the ref above); only a toggle needs it.
+    if (measuredExpanded.current !== expanded) {
+      measuredExpanded.current = expanded;
+      remeasure(node);
+    }
+    const detail = detailRef.current;
+    if (!expanded || !detail) return;
+    const observer = new ResizeObserver(() => remeasure(node));
+    observer.observe(detail);
+    return () => observer.disconnect();
+  }, [expanded, remeasure]);
   const tr = (
     <tr
       role="row"
@@ -449,8 +490,8 @@ function DataTableRowImpl<T>({
       data-row-key={key}
       data-index={windowIndex}
       // Header row is 1; tells AT where this row sits in the whole set.
-      aria-rowindex={windowIndex === undefined ? undefined : windowIndex + 2}
-      ref={measureRef}
+      aria-rowindex={ariaRowIndex}
+      ref={attachRow}
       aria-expanded={expandable ? expanded : undefined}
       aria-current={selected ? 'true' : undefined}
       className={cx(
@@ -543,7 +584,12 @@ function DataTableRowImpl<T>({
     <>
       {mainRow}
       {expanded && renderDetail && (
-        <tr role="row" className="dt-row-detail">
+        <tr
+          ref={detailRef}
+          role="row"
+          className="dt-row-detail"
+          aria-rowindex={ariaRowIndex === undefined ? undefined : ariaRowIndex + 1}
+        >
           <td
             role="cell"
             colSpan={columns.length + trailingColumns}
@@ -731,10 +777,8 @@ export function DataTable<T>({
 
   const windowed =
     !grouping &&
-    (virtualize === true ||
-      (virtualize === 'auto' &&
-        expandableRow === undefined &&
-        sortedRows.length > VIRTUALIZE_THRESHOLD));
+    (virtualize === true || (virtualize === 'auto' && sortedRows.length > VIRTUALIZE_THRESHOLD));
+  const expandable = expandableRow !== undefined;
   // Rough per-layout heights; each mounted row is then measured, so these
   // only have to be close enough to size the rows not yet seen.
   const estimatedRowHeight =
@@ -781,8 +825,24 @@ export function DataTable<T>({
     // A laid-out row never measures 0 — only jsdom (no layout) or a hidden
     // container reports that — so 0 keeps the estimate instead of collapsing
     // every row and mounting the whole list.
-    measureElement: (element, entry, instance) =>
-      measureElement(element, entry, instance) || estimatedRowHeight,
+    //
+    // An expandable row's size is its own `<tr>` plus the detail `<tr>`
+    // beneath it when open. Re-measured by the row itself on a toggle, which
+    // is why that path reads the row fresh: TanStack's default answers a
+    // measure without a ResizeObserver entry from its cache, which would
+    // still hold the detail's height after a collapse.
+    measureElement: (element, entry, instance) => {
+      if (!expandable) return measureElement(element, entry, instance) || estimatedRowHeight;
+      const own = entry
+        ? measureElement(element, entry, instance)
+        : (element as HTMLElement).offsetHeight;
+      const next = element.nextElementSibling;
+      const detail =
+        next instanceof HTMLElement && next.classList.contains('dt-row-detail')
+          ? next.offsetHeight
+          : 0;
+      return (own || estimatedRowHeight) + detail;
+    },
     scrollMargin,
     overscan: 10,
     // The viewport's size before the virtualizer has observed it. Its
@@ -799,6 +859,47 @@ export function DataTable<T>({
   useEffect(() => {
     if (windowed) rowVirtualizer.measure();
   }, [isPhone, windowed, rowVirtualizer]);
+
+  // A row's own re-measure (see `DataTableRow`'s `remeasure`): straight to
+  // `resizeItem`, through the same `measureElement` the virtualizer uses.
+  // Its options are read at call time, so this stays stable.
+  const remeasureRow = useCallback(
+    (node: HTMLTableRowElement) => {
+      const index = Number(node.getAttribute('data-index'));
+      if (!Number.isInteger(index)) return;
+      rowVirtualizer.resizeItem(
+        index,
+        rowVirtualizer.options.measureElement(node, undefined, rowVirtualizer)
+      );
+    },
+    [rowVirtualizer]
+  );
+
+  // Windowed, where the open row sits in the whole set: the rows below it
+  // shift one `aria-rowindex` down for its detail row.
+  const expandedIndex = useMemo(
+    () =>
+      windowed && expandedRowKey !== null
+        ? sortedRows.findIndex((row, index) => rowKey(row, index) === expandedRowKey)
+        : -1,
+    [windowed, expandedRowKey, sortedRows, rowKey]
+  );
+  // Opening a row closes the previous one, which may have been scrolled out
+  // of the window: nothing mounted is left to re-measure it, and its cached
+  // size would keep its detail's height until it next mounts. Its main row's
+  // own size is only known by measuring, so the estimate stands in. TanStack
+  // compensates the scroll position for a row entirely above the viewport.
+  // Tracked by key, not index: a re-sort moves the open row without closing it.
+  const previousExpandedKey = useRef(expandedRowKey);
+  useLayoutEffect(() => {
+    const previous = previousExpandedKey.current;
+    if (previous === expandedRowKey) return;
+    previousExpandedKey.current = expandedRowKey;
+    if (!windowed || previous === null) return;
+    const index = sortedRows.findIndex((row, i) => rowKey(row, i) === previous);
+    if (index < 0 || rowVirtualizer.getVirtualItems().some((item) => item.index === index)) return;
+    rowVirtualizer.resizeItem(index, estimatedRowHeight);
+  }, [expandedRowKey, windowed, sortedRows, rowKey, rowVirtualizer, estimatedRowHeight]);
 
   // A highlighted row outside the window isn't in the DOM for
   // `useScrollToRowKey` to find, so the virtualizer scrolls to it first —
@@ -849,7 +950,6 @@ export function DataTable<T>({
   // Cells after the caller's columns: the disclosure chevron and the More
   // actions button. Full-width rows span them too.
   const trailingColumns = (expandableRow ? 1 : 0) + (rowMoreActions ? 1 : 0);
-  const expandable = expandableRow !== undefined;
   const clickable = Boolean(onRowClick) || expandable;
   const focusable = Boolean(rowContextMenu) || clickable;
 
@@ -876,6 +976,11 @@ export function DataTable<T>({
         row={row}
         rowKeyValue={key}
         windowIndex={windowIndex}
+        ariaRowIndex={
+          windowIndex === undefined
+            ? undefined
+            : windowIndex + (expandedIndex >= 0 && windowIndex > expandedIndex ? 3 : 2)
+        }
         member={member}
         columns={columns}
         cellClass={cellClass}
@@ -902,6 +1007,7 @@ export function DataTable<T>({
         compact={density === 'compact'}
         trailingColumns={trailingColumns}
         measureRef={windowIndex === undefined ? undefined : rowVirtualizer.measureElement}
+        remeasure={windowIndex === undefined ? undefined : remeasureRow}
       />
     );
   }
@@ -993,7 +1099,8 @@ export function DataTable<T>({
       role="table"
       aria-label={label}
       // With most rows unmounted, AT would otherwise count only the window.
-      aria-rowcount={windowed ? sortedRows.length + 1 : undefined}
+      // An open row's detail is a row too.
+      aria-rowcount={windowed ? sortedRows.length + 1 + (expandedIndex >= 0 ? 1 : 0) : undefined}
       className={cx(
         'w-full text-xs',
         responsive === 'stack' && 'dt-stack',
@@ -1100,7 +1207,17 @@ export function DataTable<T>({
           )}
         </tr>
       </thead>
-      <tbody ref={bodyRef} role="rowgroup" className="divide-y divide-line">
+      <tbody
+        ref={bodyRef}
+        role="rowgroup"
+        // Windowed and expandable, TanStack Virtual already moves the page
+        // when a row above the viewport changes size (a far-off open row
+        // closing), and the browser's scroll anchoring would move it a second
+        // time for the spacer row shrinking with it. Only there: a
+        // newest-first ledger relies on anchoring to hold the view steady
+        // when a refresh adds rows above it, which TanStack doesn't correct.
+        className={cx('divide-y divide-line', windowed && expandable && '[overflow-anchor:none]')}
+      >
         {groups
           ? groups.map((group) => {
               const first = group.rows[0];
