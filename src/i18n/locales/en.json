@@ -2289,7 +2289,7 @@
     "opportunitiesViewHistory": "View {{name}} price history",
     "opportunitiesPriceHistoryTitle": "{{name}} — Price History",
     "marketOpportunitiesTitle": "What's profitable to build",
-    "marketOpportunitiesLiquidityTooltip": "Only products you can actually build are scanned: the blueprint is one your characters own, or one you can buy from the NPC market, a public contract, or an LP store you hold points with. Of those, only products with enough sell-order value at the hub to matter count, and only the top few per Market Group category.",
+    "marketOpportunitiesLiquidityTooltip": "Only products you can actually build are scanned: the blueprint is one your characters own, or one you can buy from the NPC market, a public contract, or an LP store you hold points with. Of those, only products with enough sell-order value at the hub to matter count, and only the top few per Market Group category. A sell price far above what the item actually trades for is treated as a troll order and replaced by that average.",
     "marketOpportunitiesRunScan": "Scan",
     "marketOpportunitiesScanning": "Scanning…",
     "marketOpportunitiesEmptyTitle": "Nothing scanned yet",
@@ -2325,6 +2325,8 @@
         "other": "Other"
       },
       "skills": "Skills",
+      "sales": "Sales",
+      "hideRarelySold": "Hide rarely sold (under {{limit}}/day)",
       "maxBuildCost": "Max build cost",
       "buildCostCaps": {
         "any": "Any build cost",
@@ -2334,6 +2336,9 @@
         "10b": "Build cost up to 10B"
       }
     },
+    "marketOpportunitiesPriceCapped": "Priced at the average it trades for: the cheapest sell order at the hub is far above what this item actually sells at.",
+    "marketOpportunitiesCheckingSales_one": "Checking daily sales across the trade-hub regions… {{count}} product left.",
+    "marketOpportunitiesCheckingSales_other": "Checking daily sales across the trade-hub regions… {{count}} products left.",
     "marketOpportunitiesSourcesUnavailable": "Couldn't check {{sources}} — products whose blueprint only comes from there may be missing.",
     "marketOpportunitiesStartPlan": "Start a plan",
     "marketOpportunitiesStartingPlan": "Starting…",

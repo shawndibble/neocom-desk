@@ -16,6 +16,7 @@ const row = (productTypeID: number, productName: string): MarketWideResultRow =>
     productName,
     blueprintTypeID: productTypeID + 1000,
     blueprintSource: productTypeID === 200 ? 'owned' : 'contract',
+    priceCapped: productTypeID === 300,
     iskPerHour: 1_000_000,
     // Gamma is the expensive build, for the build-cost cap.
     buildCost: productTypeID === 300 ? 500_000_000 : 5_000_000,
@@ -30,6 +31,18 @@ const hookState = vi.hoisted(() => ({
   isPhone: false,
 }));
 vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => hookState.isPhone }));
+// Beta sells 1 a day, Gamma 50 — once the filter asks.
+vi.mock('./useDailySales', () => ({
+  useDailySales: (_ids: readonly number[], enabled: boolean) => ({
+    sales: enabled
+      ? new Map([
+          [200, 1],
+          [300, 50],
+        ])
+      : new Map(),
+    pending: 0,
+  }),
+}));
 vi.mock('./useMarketWideOpportunities', () => ({
   useMarketWideOpportunities: () => ({
     rows: [row(200, 'Widget Beta'), row(300, 'Widget Gamma')],
@@ -215,5 +228,30 @@ describe('MarketWideOpportunitiesPanel filters: skill gate, mid-scan, phone', ()
     } finally {
       hookState.isPhone = false;
     }
+  });
+});
+
+describe('MarketWideOpportunitiesPanel sales and price sanity', () => {
+  it('hides products that rarely sell once the filter is on, and re-scans nothing', async () => {
+    hookState.run.mockClear();
+    const user = userEvent.setup();
+    renderPanel();
+    expect(screen.getByText('Widget Beta')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Filters/ }));
+    await user.click(screen.getByRole('button', { name: 'Hide rarely sold (under 5/day)' }));
+
+    expect(screen.queryByText('Widget Beta')).not.toBeInTheDocument();
+    expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
+    expect(hookState.run).not.toHaveBeenCalled();
+  });
+
+  it('marks a row priced at the average instead of a troll sell order', () => {
+    renderPanel();
+    const gamma = screen.getByText('Widget Gamma').closest('tr')!;
+    const beta = screen.getByText('Widget Beta').closest('tr')!;
+    expect(
+      within(gamma).getByRole('button', { name: /Priced at the average/ })
+    ).toBeInTheDocument();
+    expect(within(beta).queryByRole('button', { name: /Priced at the average/ })).toBeNull();
   });
 });

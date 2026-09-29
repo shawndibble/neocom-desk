@@ -472,8 +472,9 @@ here — they go one per file in `docs/context/decisions/`.
   the way **Build Opportunities** is — but only products whose blueprint is
   obtainable: owned by any account Character, or buyable on the NPC market,
   a public contract, or an LP store the account holds points with. Each row
-  names that source. Filterable by tier, category, blueprint source and a
-  max build cost. Reactions and PI stay excluded,
+  names that source. Filterable by tier, category, blueprint source, a
+  max build cost and how often it sells. A troll sell order is priced at
+  CCP's average traded price instead. Reactions and PI stay excluded,
   same as **Build Opportunities**. Opt-in ("Run market scan"), never
   auto-computed. Candidates are bounded by a **Liquidity Floor** and a fixed
   top-N per **Market Group**, computed against material trees precomputed at
