@@ -1212,6 +1212,9 @@ describe('DataTable virtualize', () => {
         expect(screen.queryByText('Detail 1')).toBeNull();
         expect(screen.getByText(`Detail ${target}`)).toBeInTheDocument();
         expect(spacerBefore()).toBe(firstMountedIndex() * ROW_HEIGHT);
+        // TanStack moved the page for that; the browser's scroll anchoring
+        // must not move it a second time for the spacer shrinking.
+        expect(document.querySelector('tbody')?.className).toContain('[overflow-anchor:none]');
       });
 
       it('keeps the focused row across expanding and collapsing it', async () => {
