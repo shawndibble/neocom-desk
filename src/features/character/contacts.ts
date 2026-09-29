@@ -4,7 +4,13 @@ import {
   getCharacterContacts,
   type CharacterContact,
 } from '@/esi/endpoints';
-import { loadPaginatedWithCacheStatus, loadWithCacheStatus, type StatusResult } from '@/esi/cache';
+import {
+  conditionalPagedFetch,
+  conditionalFetch,
+  loadPaginatedWithCacheStatus,
+  loadWithCacheStatus,
+  type StatusResult,
+} from '@/esi/cache';
 
 const KEY = 'contacts';
 
@@ -15,7 +21,10 @@ const KEY = 'contacts';
  * means pages were missing.
  */
 export function loadContacts(characterId: number): Promise<StatusResult<CharacterContact[]>> {
-  return loadPaginatedWithCacheStatus(characterId, KEY, () => getCharacterContacts(characterId));
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCharacterContacts(characterId, options)
+  );
+  return loadPaginatedWithCacheStatus(characterId, KEY, fetchLive, { conditional });
 }
 
 const LABELS_KEY = 'contactLabels';
@@ -27,11 +36,12 @@ const LABELS_KEY = 'contactLabels';
  */
 export async function loadContactLabels(characterId: number): Promise<Map<number, string>> {
   try {
-    const { cached } = await loadWithCacheStatus(
-      characterId,
-      LABELS_KEY,
-      async () => (await getCharacterContactLabels(characterId)).data
+    const { fetchLive, conditional } = conditionalFetch((options) =>
+      getCharacterContactLabels(characterId, options)
     );
+    const { cached } = await loadWithCacheStatus(characterId, LABELS_KEY, fetchLive, {
+      conditional,
+    });
     return new Map((cached?.data ?? []).map((label) => [label.label_id, label.label_name]));
   } catch {
     return new Map();

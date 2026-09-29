@@ -27,7 +27,12 @@
  * `loadStructureName`.
  */
 import { getUniverseStation, type UniverseStation } from '@/esi/endpoints';
-import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID, STALE_AFTER } from '@/esi/cache';
+import {
+  conditionalFetch,
+  loadWithCache,
+  GLOBAL_CACHE_CHARACTER_ID,
+  STALE_AFTER,
+} from '@/esi/cache';
 import { lookupNpcStation } from '@/sde/npcStations';
 
 function cacheKey(stationId: number): string {
@@ -35,12 +40,15 @@ function cacheKey(stationId: number): string {
 }
 
 async function loadStation(stationId: number): Promise<UniverseStation | null> {
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getUniverseStation(stationId, options)
+  );
   const result = await loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
     cacheKey(stationId),
-    async () => (await getUniverseStation(stationId)).data,
+    fetchLive,
     // An NPC station's name and system do not change.
-    { staleAfterMs: STALE_AFTER.static }
+    { staleAfterMs: STALE_AFTER.static, conditional }
   );
   return result?.data ?? null;
 }

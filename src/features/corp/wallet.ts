@@ -18,6 +18,7 @@
  * only asks for a `TruncatableResult`, so `truncated` means the same thing to
  * the view either way — "there is older history this list does not have".
  */
+import { conditionalPagedFetch, conditionalFetch } from '@/esi/cache';
 import {
   getCorporationDivisions,
   getCorporationWalletJournal,
@@ -46,12 +47,12 @@ export function loadCorporationWallets(
   characterId: number,
   corporationId: number
 ): Promise<StatusResult<CorporationWalletDivision[]>> {
-  return loadCorpWithCacheStatus(
-    characterId,
-    corporationId,
-    KEYS.wallets,
-    async () => (await getCorporationWallets(characterId, corporationId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCorporationWallets(characterId, corporationId, options)
   );
+  return loadCorpWithCacheStatus(characterId, corporationId, KEYS.wallets, fetchLive, {
+    conditional,
+  });
 }
 
 /** The names the corporation gave its hangar and wallet divisions. */
@@ -59,12 +60,12 @@ export function loadCorporationDivisions(
   characterId: number,
   corporationId: number
 ): Promise<StatusResult<CorporationDivisions>> {
-  return loadCorpWithCacheStatus(
-    characterId,
-    corporationId,
-    KEYS.divisions,
-    async () => (await getCorporationDivisions(characterId, corporationId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCorporationDivisions(characterId, corporationId, options)
   );
+  return loadCorpWithCacheStatus(characterId, corporationId, KEYS.divisions, fetchLive, {
+    conditional,
+  });
 }
 
 /** One division's journal. `truncated` on the result means pages were missing. */
@@ -73,8 +74,15 @@ export function loadCorporationWalletJournal(
   corporationId: number,
   division: number
 ): Promise<StatusResult<WalletJournalEntry[]>> {
-  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, KEYS.journal(division), () =>
-    getCorporationWalletJournal(characterId, corporationId, division)
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCorporationWalletJournal(characterId, corporationId, division, options)
+  );
+  return loadCorpPaginatedWithCacheStatus(
+    characterId,
+    corporationId,
+    KEYS.journal(division),
+    fetchLive,
+    { conditional }
   );
 }
 

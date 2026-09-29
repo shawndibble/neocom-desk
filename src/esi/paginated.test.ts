@@ -370,3 +370,85 @@ describe('fetchAllPagesStatus — parallel page walk', () => {
     expect(result.items).toEqual(['item-1', 'item-2', 'item-3', 'item-4', 'item-5', 'item-6']);
   });
 });
+
+describe('fetchAllPagesStatus — per-page ETag revalidation', () => {
+  /** Three pages whose ETag is `"p<page>"`; a matching If-None-Match gets a 304. */
+  function etaggedHandler(pages: number, changed: ReadonlySet<number> = new Set()) {
+    const sent: Array<[number, string | null]> = [];
+    const handler = http.get(`${ESI_BASE_URL}/markets/10000002/orders`, ({ request }) => {
+      const page = Number(new URL(request.url).searchParams.get('page'));
+      const ifNoneMatch = request.headers.get('if-none-match');
+      sent.push([page, ifNoneMatch]);
+      const etag = changed.has(page) ? `"p${page}-new"` : `"p${page}"`;
+      const headers = { 'X-Pages': String(pages), ETag: etag };
+      if (ifNoneMatch === etag) return new HttpResponse(null, { status: 304, headers });
+      return HttpResponse.json([`item-${page}`], { headers });
+    });
+    return { handler, sent };
+  }
+
+  it('reports each page’s ETag when asked to revalidate, even with nothing to send', async () => {
+    const { handler, sent } = etaggedHandler(3);
+    server.use(handler);
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders', {
+      pageEtags: [],
+    });
+
+    expect(sent.every(([, etag]) => etag === null)).toBe(true);
+    expect(result.items).toEqual(['item-1', 'item-2', 'item-3']);
+    expect(result.pageResponses).toEqual([
+      { items: ['item-1'], etag: '"p1"', notModified: false },
+      { items: ['item-2'], etag: '"p2"', notModified: false },
+      { items: ['item-3'], etag: '"p3"', notModified: false },
+    ]);
+  });
+
+  it('sends each page its own If-None-Match and fetches every page, even when page 1 is a 304', async () => {
+    const { handler, sent } = etaggedHandler(3, new Set([2]));
+    server.use(handler);
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders', {
+      pageEtags: ['"p1"', '"p2"', '"p3"'],
+    });
+
+    expect([...sent].sort((a, b) => a[0] - b[0])).toEqual([
+      [1, '"p1"'],
+      [2, '"p2"'],
+      [3, '"p3"'],
+    ]);
+    expect(result).toMatchObject({ truncated: false, pagesFetched: 3, pagesReported: 3 });
+    // A 304 page contributes nothing to `items`; the caller restores it from what it holds.
+    expect(result.items).toEqual(['item-2']);
+    expect(result.pageResponses).toEqual([
+      { items: null, etag: '"p1"', notModified: true },
+      { items: ['item-2'], etag: '"p2-new"', notModified: false },
+      { items: null, etag: '"p3"', notModified: true },
+    ]);
+  });
+
+  it('sends no ETag for a page it has none for (the list grew)', async () => {
+    const { handler, sent } = etaggedHandler(3);
+    server.use(handler);
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders', {
+      pageEtags: ['"p1"', '"p2"'],
+    });
+
+    expect([...sent].sort((a, b) => a[0] - b[0])).toEqual([
+      [1, '"p1"'],
+      [2, '"p2"'],
+      [3, null],
+    ]);
+    expect(result.pageResponses?.map((p) => p.notModified)).toEqual([true, true, false]);
+  });
+
+  it('leaves pageResponses off when not revalidating', async () => {
+    const { handler } = etaggedHandler(2);
+    server.use(handler);
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders');
+
+    expect(result.pageResponses).toBeUndefined();
+  });
+});

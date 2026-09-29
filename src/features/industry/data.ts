@@ -1,6 +1,10 @@
 /** Fetch + cache layer for owned blueprints: read-through against ESI via the shared `esi/cache` helpers. */
 import { getCharacterBlueprints, type CharacterBlueprint } from '@/esi/endpoints';
-import { loadPaginatedWithCacheStatus, type StatusResult } from '@/esi/cache';
+import {
+  conditionalPagedFetch,
+  loadPaginatedWithCacheStatus,
+  type StatusResult,
+} from '@/esi/cache';
 
 export const KEY = 'blueprints';
 
@@ -12,7 +16,10 @@ export const KEY = 'blueprints';
 export function loadCharacterBlueprints(
   characterId: number
 ): Promise<StatusResult<CharacterBlueprint[]>> {
-  return loadPaginatedWithCacheStatus(characterId, KEY, () => getCharacterBlueprints(characterId));
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCharacterBlueprints(characterId, options)
+  );
+  return loadPaginatedWithCacheStatus(characterId, KEY, fetchLive, { conditional });
 }
 
 /**

@@ -1,6 +1,10 @@
 /** Fetch + cache layer for the Contracts view. */
 import { getCharacterContracts, type Contract } from '@/esi/endpoints';
-import { loadPaginatedWithCacheStatus, type StatusResult } from '@/esi/cache';
+import {
+  conditionalPagedFetch,
+  loadPaginatedWithCacheStatus,
+  type StatusResult,
+} from '@/esi/cache';
 
 export const KEY = 'contracts';
 
@@ -11,7 +15,10 @@ export const KEY = 'contracts';
  * result means pages were missing.
  */
 export function loadContracts(characterId: number): Promise<StatusResult<Contract[]>> {
-  return loadPaginatedWithCacheStatus(characterId, KEY, () => getCharacterContracts(characterId));
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCharacterContracts(characterId, options)
+  );
+  return loadPaginatedWithCacheStatus(characterId, KEY, fetchLive, { conditional });
 }
 
 // Re-exported rather than defined here: the predicate is pure and now lives

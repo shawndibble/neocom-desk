@@ -8,6 +8,8 @@ import {
 } from '@/esi/endpoints';
 import { uniqueTransactions } from '@/esi/uniqueTransactions';
 import {
+  conditionalPagedFetch,
+  conditionalFetch,
   loadWithCache,
   loadWithCacheStatus,
   loadPaginatedWithCache,
@@ -29,11 +31,10 @@ const WALLET_SCOPE = ESI_REGISTRY.getCharacterWallet.scope;
 
 /** ISK balance. ESI or cache. */
 export function loadWalletBalance(characterId: number): Promise<CachedResult<number> | null> {
-  return loadWithCache(
-    characterId,
-    KEYS.balance,
-    async () => (await getCharacterWallet(characterId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterWallet(characterId, options)
   );
+  return loadWithCache(characterId, KEYS.balance, fetchLive, { conditional });
 }
 
 /**
@@ -41,11 +42,10 @@ export function loadWalletBalance(characterId: number): Promise<CachedResult<num
  * that show a re-login affordance instead of a silent "offline" state.
  */
 export function loadWalletBalanceWithStatus(characterId: number): Promise<StatusResult<number>> {
-  return loadWithCacheStatus(
-    characterId,
-    KEYS.balance,
-    async () => (await getCharacterWallet(characterId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterWallet(characterId, options)
   );
+  return loadWithCacheStatus(characterId, KEYS.balance, fetchLive, { conditional });
 }
 
 export interface CharacterWalletBalance {
@@ -118,9 +118,10 @@ export function totalWalletBalance(entries: readonly CharacterWalletBalance[]): 
 export function loadWalletJournal(
   characterId: number
 ): Promise<CachedResult<WalletJournalEntry[]> | null> {
-  return loadPaginatedWithCache(characterId, KEYS.journal, () =>
-    getCharacterWalletJournal(characterId)
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCharacterWalletJournal(characterId, options)
   );
+  return loadPaginatedWithCache(characterId, KEYS.journal, fetchLive, { conditional });
 }
 
 /**
@@ -132,9 +133,10 @@ export function loadWalletJournal(
 export function loadWalletJournalWithStatus(
   characterId: number
 ): Promise<StatusResult<WalletJournalEntry[]>> {
-  return loadPaginatedWithCacheStatus(characterId, KEYS.journal, () =>
-    getCharacterWalletJournal(characterId)
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCharacterWalletJournal(characterId, options)
   );
+  return loadPaginatedWithCacheStatus(characterId, KEYS.journal, fetchLive, { conditional });
 }
 
 /** Whether the character granted the wallet scope — checked up front so callers never provoke a live 403. */
