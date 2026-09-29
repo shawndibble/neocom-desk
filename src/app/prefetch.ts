@@ -194,7 +194,9 @@ export const PREFETCH_TASKS: readonly PrefetchTask[] = [
       const { cached } = await loadCharacterPlanets(characterId);
       const planetIds = (cached?.data ?? []).map((planet) => planet.planet_id);
       if (planetIds.length === 0) return;
-      await loadAllColonyDetails(characterId, planetIds);
+      // After an await, so the lane `task.run` was started in has ended: the
+      // colony fan-out re-enters it, or it would run foreground (issue #2271).
+      await inBackgroundLane(() => loadAllColonyDetails(characterId, planetIds));
     },
   },
   {

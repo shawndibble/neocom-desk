@@ -117,10 +117,18 @@ export class EsiBudgetError extends EsiError {
  */
 export class EsiTimeoutError extends EsiError {
   readonly timeoutMs: number;
+  /**
+   * Whether the request had left the gate. `false` means the clock ran out
+   * while it was still queued for a permit (or sitting out the brake): ESI was
+   * never asked, so the timeout says the app was busy, not that ESI is down —
+   * and `esi/cache.ts` must not hold the key as failed on its account.
+   */
+  readonly sent: boolean;
 
-  constructor(timeoutMs: number) {
-    super(0, `ESI request timed out after ${timeoutMs}ms`);
+  constructor(timeoutMs: number, sent = true) {
+    super(0, `ESI request timed out after ${timeoutMs}ms${sent ? '' : ' waiting at the gate'}`);
     this.name = 'EsiTimeoutError';
     this.timeoutMs = timeoutMs;
+    this.sent = sent;
   }
 }

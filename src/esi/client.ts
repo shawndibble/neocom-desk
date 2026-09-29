@@ -194,7 +194,14 @@ async function gatedFetch(
   signal: AbortSignal,
   lane: EsiLane | undefined
 ): Promise<Response> {
-  const release = await passEsiGate(signal, lane);
+  let release: () => void;
+  try {
+    release = await passEsiGate(signal, lane);
+  } catch (err) {
+    // Timed out before a permit came free: nothing went to ESI (issue #2271).
+    if (err instanceof EsiTimeoutError) throw new EsiTimeoutError(err.timeoutMs, false);
+    throw err;
+  }
   const startedAt = Date.now();
   try {
     const response = await fetch(url, { ...init, signal });

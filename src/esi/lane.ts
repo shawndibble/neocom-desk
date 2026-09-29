@@ -35,6 +35,12 @@
  * now waiting on it, so `cache.ts` promotes the ticket: its queued gate waits
  * move to the foreground lane, and its later ones (pages 2..N, a 304 re-ask)
  * queue there too.
+ *
+ * Promotion is per load, not per call tree. A cache load started from inside
+ * a background load's `fetchLive` (a loader that reads another key on the
+ * way) mints a ticket of its own and is **not** promoted with its parent: a
+ * view joining the parent waits on the child too, but the child keeps queuing
+ * low unless a view joins it directly.
  */
 import type { PriorityTicket } from '@/lib/concurrency';
 

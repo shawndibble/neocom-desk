@@ -8,7 +8,7 @@
 import { db, type CachedPage, type EsiCacheMetaRecord, type EsiCacheRecord } from '@/db';
 import { metaOf } from '@/db/esiCacheMeta';
 import { emitEsiAuthFailure } from './authFailureSignal';
-import { EsiError, isAuthFailure, type EsiResult } from './client';
+import { EsiError, EsiTimeoutError, isAuthFailure, type EsiResult } from './client';
 import { isCachePurgePending } from './cachePurge';
 import { promoteEsiLane } from './budget';
 import { laneForLoad, withEsiLane, type EsiLane } from './lane';
@@ -432,6 +432,21 @@ interface RevalidationFailure {
 const revalidationFailures = new Map<string, RevalidationFailure>();
 
 /**
+ * Fallback results whose live call timed out still queued at the ESI gate
+ * (`EsiTimeoutError.sent === false`, issue #2271). ESI was never asked, so
+ * the call proves nothing about it — the app was busy, most often a
+ * background load held in the low lane behind a view. Such a result is not
+ * recorded as a failure: holding the key would hand the next foreground read
+ * a stale row under the offline banner while ESI is healthy.
+ */
+const unsentResults = new WeakSet<object>();
+
+/** A live call that timed out before its request left the gate. */
+function timedOutAtGate(err: unknown): boolean {
+  return err instanceof EsiTimeoutError && !err.sent;
+}
+
+/**
  * A failed revalidation is not retried until the row would have gone stale
  * again anyway. Reusing the window rather than inventing a second constant:
  * retrying sooner cannot produce a fresher row than waiting would, and the
@@ -581,6 +596,7 @@ async function loadLapsedConstant<T>(
 
   void live.then(
     (result) => {
+      if (unsentResults.has(result)) return;
       if (succeededLive(result)) revalidationFailures.delete(dkey);
       else revalidationFailures.set(dkey, { at: Date.now(), needsReauth: result.needsReauth });
     },
@@ -603,6 +619,8 @@ async function recordLateOutcome<T>(
   settled: Promise<{ ok: true; result: StatusResult<T> } | { ok: false; error: unknown }>
 ): Promise<void> {
   const outcome = await settled;
+  // Nothing was learned, so nothing is recorded — and nothing changed to re-read.
+  if (outcome.ok && unsentResults.has(outcome.result)) return;
   if (outcome.ok && succeededLive(outcome.result)) {
     revalidationFailures.delete(dkey);
   } else {
@@ -729,6 +747,7 @@ async function loadWithCacheStatusLive<T>(
   const detectAuthFailure = options.detectAuthFailure ?? isAuthFailure;
   const { conditional } = options;
   let needsReauth = false;
+  let unsent = false;
   try {
     if (conditional) conditional.ifNoneMatch = await revalidationEtag(characterId, key);
     // Every `fetchLive()` runs in this load's lane, past the awaits above.
@@ -765,6 +784,7 @@ async function loadWithCacheStatusLive<T>(
       };
     }
   } catch (err) {
+    unsent = timedOutAtGate(err);
     if (detectAuthFailure(err)) {
       needsReauth = true;
       // The shell renders one notice (src/app/Layout.tsx). Covers the window
@@ -779,16 +799,19 @@ async function loadWithCacheStatusLive<T>(
     }
   }
   const cached = await read();
-  if (!cached) return { cached: null, needsReauth };
-  return {
-    cached: {
-      data: cached.value as T,
-      fetchedAt: new Date(cached.fetchedAt),
-      fromCache: true,
-      truncated: cached.truncated,
-    },
-    needsReauth,
-  };
+  const fallback: StatusResult<T> = cached
+    ? {
+        cached: {
+          data: cached.value as T,
+          fetchedAt: new Date(cached.fetchedAt),
+          fromCache: true,
+          truncated: cached.truncated,
+        },
+        needsReauth,
+      }
+    : { cached: null, needsReauth };
+  if (unsent) unsentResults.add(fallback);
+  return fallback;
 }
 
 /** The stored ETag worth sending as If-None-Match, if any. Reads meta only. */
@@ -1007,6 +1030,7 @@ async function loadPaginatedWithCacheStatusLive<T>(
   const detectAuthFailure = options.detectAuthFailure ?? isAuthFailure;
   const { conditional } = options;
   let needsReauth = false;
+  let unsent: boolean;
   try {
     const stored = conditional ? await revalidationPages(characterId, key) : undefined;
     if (conditional) conditional.ifNoneMatch = stored?.map((page) => page.etag);
@@ -1064,6 +1088,7 @@ async function loadPaginatedWithCacheStatusLive<T>(
       needsReauth: false,
     };
   } catch (err) {
+    unsent = timedOutAtGate(err);
     // Offline/5xx: fall back to cache, as loadWithCacheStatus does. An auth
     // failure additionally sets needsReauth so a revoked scope offers a
     // re-login instead of a silent empty list (issue #14).
@@ -1075,16 +1100,19 @@ async function loadPaginatedWithCacheStatusLive<T>(
     }
   }
   const cached = await read();
-  if (!cached) return { cached: null, needsReauth };
-  return {
-    cached: {
-      data: cached.value as T[],
-      fetchedAt: new Date(cached.fetchedAt),
-      fromCache: true,
-      truncated: cached.truncated,
-    },
-    needsReauth,
-  };
+  const fallback: StatusResult<T[]> = cached
+    ? {
+        cached: {
+          data: cached.value as T[],
+          fetchedAt: new Date(cached.fetchedAt),
+          fromCache: true,
+          truncated: cached.truncated,
+        },
+        needsReauth,
+      }
+    : { cached: null, needsReauth };
+  if (unsent) unsentResults.add(fallback);
+  return fallback;
 }
 
 /** Paginated read-through, dropping the auth-failure distinction. */

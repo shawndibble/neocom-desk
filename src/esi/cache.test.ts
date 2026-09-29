@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '@/db';
 import { AuthError } from '@/auth/sso';
-import { EsiError } from './client';
+import { EsiError, EsiTimeoutError, REQUEST_TIMEOUT_MS } from './client';
 import {
   invalidateFreshness,
   onCacheRevalidated,
@@ -682,15 +682,33 @@ describe('ESI priority lanes', () => {
   });
 
   it('leaves an in-flight background load low when another background caller joins it', async () => {
+    // A Character no other test touches, so no module state it left behind
+    // (a pending cache purge, a recorded failure) changes the read path below.
+    const charId = 2271;
     const { seen, fetchLive, finish } = heldFetch('v');
-    const first = inBackgroundLane(() => loadWithCacheStatus(CHAR_ID, KEY, fetchLive));
-    await vi.waitFor(() => expect(fetchLive).toHaveBeenCalled());
-    const second = inBackgroundLane(() => loadWithCacheStatus(CHAR_ID, KEY, fetchLive));
-    // Let the joiner reach the dedupe (it reads the cache first).
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(seen.lane?.priority).toBe('low');
-    finish();
-    await Promise.all([first, second]);
+    const rowReads = vi.spyOn(db.esiCache, 'get');
+    try {
+      const first = inBackgroundLane(() => loadWithCacheStatus(charId, KEY, fetchLive));
+      await vi.waitFor(() => expect(fetchLive).toHaveBeenCalled());
+      const readsBefore = rowReads.mock.calls.length;
+      const second = inBackgroundLane(() => loadWithCacheStatus(charId, KEY, fetchLive));
+      // The joiner's last await before `withDedupe` is its row read (no row,
+      // no meta, no purge, no recorded failure); past it the path is microtasks
+      // only, which one macrotask drains. So by here it has joined, or started
+      // a load of its own — which the call count below would catch.
+      await vi.waitFor(() => expect(rowReads.mock.calls.length).toBeGreaterThan(readsBefore));
+      await rowReads.mock.results[readsBefore].value;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(seen.lane?.priority).toBe('low');
+      finish();
+      const [a, b] = await Promise.all([first, second]);
+      expect(fetchLive).toHaveBeenCalledTimes(1);
+      expect(b).toBe(a);
+    } finally {
+      finish();
+      rowReads.mockRestore();
+    }
   });
 
   it('promotes an in-flight paginated background load when a foreground caller joins it', async () => {
@@ -1052,6 +1070,30 @@ describe('grace period past the freshness window', () => {
     expect(fetchLive).toHaveBeenCalledTimes(1);
   });
 
+  it('does not hold a key after a timeout that never left the ESI gate (issue #2271)', async () => {
+    await seedStaleRow('two-days-old');
+    // A background load queued behind a view until its clock ran out: ESI was
+    // never asked, so nothing says it is down.
+    const { fetchLive, settle } = deferredFetch(
+      'never-arrives',
+      new EsiTimeoutError(REQUEST_TIMEOUT_MS, false)
+    );
+
+    const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    await expireGrace();
+    await pending;
+    settle(false);
+
+    // Once the timed-out load has settled, the next read goes to ESI rather
+    // than being answered from disk with the offline flag.
+    const fresh = vi.fn(async () => 'fresh');
+    await vi.waitFor(async () => {
+      const reread = await loadWithCacheStatus<string>(CHAR_ID, KEY, fresh);
+      expect(reread.cached?.data).toBe('fresh');
+      expect(reread.cached?.fromCache).toBe(false);
+    });
+  });
+
   it('does not start another slow call after a late failure, so the signal cannot loop', async () => {
     await seedStaleRow('two-days-old');
     const { fetchLive, settle } = deferredFetch('never-arrives');
@@ -1167,6 +1209,23 @@ describe('grace period past the freshness window', () => {
 
       expect(listener).not.toHaveBeenCalled();
       off();
+    });
+
+    it('does not hold a lapsed constant after a refresh that timed out at the gate (issue #2271)', async () => {
+      await seedLapsedStation('Old Name');
+      const { fetchLive, settle } = deferredFetch(
+        'never-arrives',
+        new EsiTimeoutError(REQUEST_TIMEOUT_MS, false)
+      );
+
+      await loadWithCacheStatus<string>(G, stationKey, fetchLive, STATIC);
+      settle(false);
+
+      const fresh = vi.fn(async () => 'New Name');
+      await vi.waitFor(async () => {
+        await loadWithCacheStatus<string>(G, stationKey, fresh, STATIC);
+        expect(fresh).toHaveBeenCalled();
+      });
     });
 
     it('collapses concurrent reads of a lapsed constant onto one refresh', async () => {
