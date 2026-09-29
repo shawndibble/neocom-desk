@@ -6,7 +6,7 @@ _Recorded 2026-09-28._
 
 - **The filter runs before the top-N-per-Market-Group cut.** Otherwise an unobtainable product with deeper sell orders takes the slot an obtainable one would have filled, and the group shows nothing.
 
-- **"On the NPC market" means the blueprint is market-grouped (`market/types.json`), not that the hub has a live sell order.** CCP only market-groups the blueprints NPCs sell (T1, capital components, Upwell), and T2 and faction blueprints never are. An order-book check would be one ESI request per blueprint, per scan. Rules out a live check.
+- **"On the NPC market" means the blueprint is market-grouped (`market/types.json`) _and_ builds a Tech I or Structure Tech I product (`market/variations.json` metaGroup 1 or 54, or none), not that the hub has a live sell order.** Market-grouping alone is not enough: CCP also market-groups the old T2 lottery BPOs (Vagabond, Crow, Sabre…) and some faction/limited-time blueprints, none of which an NPC sells — treating those as market-bought kept T2 ships in the scan. An order-book check would be one ESI request per blueprint, per scan. Rules out a live check.
 
 - **"Owned" means Character blueprints, not corporation blueprints.** Reading a corporation's blueprints needs director roles. **Build Opportunities** doesn't read them either. A product whose only blueprint sits in a corp hangar drops out.
 

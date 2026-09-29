@@ -9,14 +9,16 @@
  * `unavailable`, so the panel can say its list may be missing rows rather
  * than implying they aren't profitable.
  */
-import type {
-  BlueprintSource,
-  BlueprintSourceSets,
+import {
+  isNpcSeededProduct,
+  type BlueprintSource,
+  type BlueprintSourceSets,
 } from '@/engine/industry/blueprintObtainability';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
 import { loadCharacterLoyaltyPoints, PARAGON_CORPORATION_ID } from '@/features/character/loyalty';
 import { loadLoyaltyStoreOffers } from '@/features/loyalty/store';
+import { loadVariations } from '@/sde/loadMarketSde';
 import { loadMarketTypesById } from '@/sde/marketTypesById';
 import { loadCharacterBlueprints } from './data';
 
@@ -41,14 +43,26 @@ async function ownedBlueprints(characterIds: readonly number[]): Promise<SourceR
   return { ids, ok };
 }
 
+/** A blueprint and the product it builds. */
+export interface BlueprintProduct {
+  blueprintTypeID: number;
+  productTypeID: number;
+}
+
 /**
- * A market-grouped blueprint is an NPC-seeded original: CCP only puts
- * blueprints the NPC market sells into a Market Group, so T2, faction and
- * other drop/LP-only blueprints never appear here.
+ * NPC-seeded blueprint originals: market-grouped, and building a Tech I (or
+ * Structure Tech I) product. Market-grouping alone lets through the T2
+ * lottery BPOs and some faction blueprints, which CCP groups but no NPC sells.
  */
-async function marketBlueprints(blueprintTypeIds: readonly number[]): Promise<SourceResult> {
-  const index = await loadMarketTypesById();
-  return { ids: new Set(blueprintTypeIds.filter((id) => index.has(id))), ok: true };
+async function marketBlueprints(blueprints: readonly BlueprintProduct[]): Promise<SourceResult> {
+  const [index, variations] = await Promise.all([loadMarketTypesById(), loadVariations()]);
+  const ids = new Set<number>();
+  for (const { blueprintTypeID, productTypeID } of blueprints) {
+    if (!index.has(blueprintTypeID)) continue;
+    if (!isNpcSeededProduct(variations.types[productTypeID]?.metaGroupId)) continue;
+    ids.add(blueprintTypeID);
+  }
+  return { ids, ok: true };
 }
 
 /**
@@ -98,16 +112,16 @@ function settle(load: Promise<SourceResult>): Promise<SourceResult> {
 }
 
 /**
- * Reads every source for the account's Characters. `blueprintTypeIds` bounds
- * the market lookup to the blueprints the scan could rank at all.
+ * Reads every source for the account's Characters. `blueprints` bounds the
+ * market lookup to the blueprints the scan could rank at all.
  */
 export async function loadBlueprintSourceSets(
   characterIds: readonly number[],
-  blueprintTypeIds: readonly number[]
+  blueprints: readonly BlueprintProduct[]
 ): Promise<LoadedBlueprintSources> {
   const [owned, market, contract, lpStore] = await Promise.all([
     settle(ownedBlueprints(characterIds)),
-    settle(marketBlueprints(blueprintTypeIds)),
+    settle(marketBlueprints(blueprints)),
     settle(contractBlueprints(characterIds)),
     settle(lpStoreBlueprints(characterIds)),
   ]);
