@@ -22,7 +22,8 @@ vi.doMock('./budget', async (importOriginal) => {
 });
 const { esiFetch, configureEsi, ESI_BASE_URL } = await import('./client');
 const { fetchAllPagesStatus } = await import('./paginated');
-const { currentEsiLane, inBackgroundLane, withEsiLane, laneForLoad } = await import('./lane');
+const { currentEsiLane, inBackgroundLane, withEsiLane, laneForLoad, configureActiveCharacter } =
+  await import('./lane');
 
 const server = setupServer();
 
@@ -30,6 +31,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   server.resetHandlers();
   configureEsi({ getToken: null });
+  configureActiveCharacter(null);
   gate.lanes = [];
 });
 afterAll(() => server.close());
@@ -116,5 +118,59 @@ describe('esiFetch carries its lane to the gate', () => {
     const [first, ...rest] = gate.lanes;
     expect(first?.priority).toBe('low');
     for (const lane of rest) expect(lane).toBe(first);
+  });
+});
+
+describe('esiFetch queues the active Character’s reads first (issue #2281)', () => {
+  function serveCharacter(id: number): void {
+    server.use(http.get(`${ESI_BASE_URL}/characters/${id}/wallet`, () => HttpResponse.json(1)));
+  }
+
+  it('gives a foreground read for the active Character a high ticket', async () => {
+    configureEsi({ getToken: async () => 'token' });
+    configureActiveCharacter(() => 1);
+    serveCharacter(1);
+    await esiFetch('/characters/1/wallet', { characterId: 1 });
+    expect(gate.lanes).toHaveLength(1);
+    expect(gate.lanes[0]?.priority).toBe('high');
+  });
+
+  it('leaves a foreground read for any other Character in the normal lane', async () => {
+    configureEsi({ getToken: async () => 'token' });
+    configureActiveCharacter(() => 1);
+    serveCharacter(2);
+    await esiFetch('/characters/2/wallet', { characterId: 2 });
+    expect(gate.lanes).toEqual([undefined]);
+  });
+
+  it('leaves background work for the active Character low', async () => {
+    configureEsi({ getToken: async () => 'token' });
+    configureActiveCharacter(() => 1);
+    serveCharacter(1);
+    await inBackgroundLane(() => esiFetch('/characters/1/wallet', { characterId: 1 }));
+    expect(gate.lanes[0]?.priority).toBe('low');
+  });
+
+  it('queues nothing high when no active Character is configured', async () => {
+    configureEsi({ getToken: async () => 'token' });
+    serveCharacter(1);
+    await esiFetch('/characters/1/wallet', { characterId: 1 });
+    expect(gate.lanes).toEqual([undefined]);
+  });
+
+  it('queues every page of the active Character’s paginated walk high', async () => {
+    configureEsi({ getToken: async () => 'token' });
+    configureActiveCharacter(() => 1);
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/1/assets`, ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page') ?? '1');
+        return HttpResponse.json([page], { headers: { 'X-Pages': '3' } });
+      })
+    );
+
+    await fetchAllPagesStatus<number>('/characters/1/assets', { characterId: 1 });
+
+    expect(gate.lanes).toHaveLength(3);
+    for (const lane of gate.lanes) expect(lane?.priority).toBe('high');
   });
 });

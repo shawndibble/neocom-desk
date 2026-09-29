@@ -24,7 +24,7 @@ import {
 import { clearCachePurgePending, purgeCharacterCacheOrSuppress } from './cachePurge';
 import { onEsiAuthFailure } from './authFailureSignal';
 import { resetEsiBudget } from './budget';
-import { currentEsiLane, inBackgroundLane } from './lane';
+import { configureActiveCharacter, currentEsiLane, inBackgroundLane } from './lane';
 import type { PriorityTicket } from '@/lib/concurrency';
 
 const CHAR_ID = 91;
@@ -727,6 +727,27 @@ describe('ESI priority lanes', () => {
     await vi.waitFor(() => expect(seen.lane?.priority).toBe('normal'));
     finish();
     await Promise.all([background, foreground]);
+  });
+
+  it('promotes a background load for the active Character straight to high when a view joins it (issue #2281)', async () => {
+    configureActiveCharacter(() => CHAR_ID);
+    try {
+      const { seen, fetchLive, finish } = heldFetch('v');
+      const background = inBackgroundLane(() => loadWithCacheStatus(CHAR_ID, KEY, fetchLive));
+      await vi.waitFor(() => expect(fetchLive).toHaveBeenCalled());
+      expect(seen.lane?.priority).toBe('low');
+
+      const foreground = loadWithCacheStatus(
+        CHAR_ID,
+        KEY,
+        vi.fn(async () => 'other')
+      );
+      await vi.waitFor(() => expect(seen.lane?.priority).toBe('high'));
+      finish();
+      await Promise.all([background, foreground]);
+    } finally {
+      configureActiveCharacter(null);
+    }
   });
 });
 

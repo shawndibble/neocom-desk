@@ -31,17 +31,26 @@ export async function mapWithConcurrencyLimit<T>(
 export type Release = () => void;
 
 /**
- * Which lane an `acquire` queues in. `low` is for work nobody is watching —
- * background polling and prefetching — and yields to `normal` at every
- * admission.
+ * Which lane an `acquire` queues in, highest first. `high` is for the one
+ * Character the user is looking at (issue #2281); `low` is for work nobody is
+ * watching — background polling and prefetching. Every admission goes to the
+ * highest non-empty lane.
  */
-export type Priority = 'normal' | 'low';
+export type Priority = 'high' | 'normal' | 'low';
+
+/** Lanes in admission order. */
+const PRIORITIES: readonly Priority[] = ['high', 'normal', 'low'];
+
+/** True when `a` is admitted ahead of `b`. */
+function outranks(a: Priority, b: Priority): boolean {
+  return PRIORITIES.indexOf(a) < PRIORITIES.indexOf(b);
+}
 
 /**
  * A priority shared by a group of acquires, so the group can be promoted as
- * one: `promote` moves every queued waiter holding this ticket into the
- * `normal` lane, and any later `acquire` with it queues there too. Mutable on
- * purpose — the semaphore flips `priority`; callers only create tickets.
+ * one: `promote` moves every queued waiter holding this ticket into a higher
+ * lane, and any later `acquire` with it queues there too. Mutable on purpose —
+ * the semaphore raises `priority`; callers only create tickets.
  */
 export interface PriorityTicket {
   priority: Priority;
@@ -49,8 +58,8 @@ export interface PriorityTicket {
 
 export interface SemaphoreOptions {
   /**
-   * Permits `low` acquires may never take, kept free for `normal` ones: `low`
-   * holders are capped at `limit - lowReserve`. Defaults to 0.
+   * Permits `low` acquires may never take, kept free for the lanes above it:
+   * `low` holders are capped at `limit - lowReserve`. Defaults to 0.
    */
   lowReserve?: number;
 }
@@ -59,16 +68,15 @@ export interface Semaphore {
   /**
    * Resolves with a release function once a permit is free. Rejects — without
    * taking a permit — if `signal` aborts first, so an abandoned waiter can
-   * never wedge the pool. With no `ticket` (or a `normal` one) it queues in
-   * the `normal` lane.
+   * never wedge the pool. With no `ticket` it queues in the `normal` lane.
    */
   acquire(signal?: AbortSignal, ticket?: PriorityTicket): Promise<Release>;
   /**
-   * Raise `ticket` to `normal`: its queued waiters move into the `normal`
-   * lane, in the order they first arrived. Permits it already holds are
-   * unaffected. Never demotes.
+   * Raise `ticket` to `to` (default `normal`): its queued waiters move into
+   * that lane, in the order they first arrived. Permits it already holds are
+   * unaffected. Never demotes — a ticket already at or above `to` is left alone.
    */
-  promote(ticket: PriorityTicket): void;
+  promote(ticket: PriorityTicket, to?: Priority): void;
   /** Permits currently held. Diagnostics and tests only. */
   readonly inFlight: number;
 }
@@ -82,7 +90,7 @@ interface Waiter {
 }
 
 /**
- * A counting semaphore with two FIFO lanes.
+ * A counting semaphore with three FIFO lanes.
  *
  * `mapWithConcurrencyLimit` caps one call site's fan-out; this caps a *shared*
  * resource across call sites that cannot see each other — `esi/budget.ts`'s
@@ -90,13 +98,14 @@ interface Waiter {
  * there: a fan-out over a thousand type ids must not starve the one request a
  * user is watching. The lanes matter for the same reason one level up: a
  * background poll across every Character must not make the page the user is
- * looking at queue behind it (issue #2271).
+ * looking at queue behind it (issue #2271), and a page's reads for every other
+ * Character must not make its reads for the active one wait (issue #2281).
  *
- * Every freed permit goes to the oldest `normal` waiter, and only then to the
- * oldest `low` one — and only while `low` holders are under
- * `limit - lowReserve`. With no `normal` demand, `low` work uses every
- * non-reserved permit, so a lane is never starved by the reserve alone; it
- * waits only while `normal` work is actually queued, which is bounded.
+ * Every freed permit goes to the oldest waiter in the highest non-empty lane —
+ * `high`, then `normal`, then `low`, the last only while `low` holders are
+ * under `limit - lowReserve`. With nothing queued above it, a lane uses every
+ * permit it may hold, so no lane is starved by the others alone; it waits only
+ * while higher work is actually queued, which is bounded.
  *
  * Safe to acquire from inside a `mapWithConcurrencyLimit` callback **only**
  * while no permit holder waits on another permit — see `esi/budget.ts`'s header
@@ -107,7 +116,7 @@ export function createSemaphore(limit: number, options: SemaphoreOptions = {}): 
   let held = 0;
   let lowHeld = 0;
   let seq = 0;
-  const lanes: Record<Priority, Waiter[]> = { normal: [], low: [] };
+  const lanes: Record<Priority, Waiter[]> = { high: [], normal: [], low: [] };
 
   /**
    * A release that is idempotent — a double call must not free two permits —
@@ -125,15 +134,17 @@ export function createSemaphore(limit: number, options: SemaphoreOptions = {}): 
     };
   }
 
-  /** Admit as many waiters as the permits allow: `normal` first, then `low` under its cap. */
+  /** The lane the next free permit goes to, or `null` if no waiter may take one. */
+  function nextLane(): Priority | null {
+    const lane = PRIORITIES.find((priority) => lanes[priority].length > 0);
+    if (lane === 'low' && lowHeld >= lowLimit) return null;
+    return lane ?? null;
+  }
+
+  /** Admit as many waiters as the permits allow, highest lane first. */
   function drain(): void {
     while (held < limit) {
-      const lane: Priority | null =
-        lanes.normal.length > 0
-          ? 'normal'
-          : lanes.low.length > 0 && lowHeld < lowLimit
-            ? 'low'
-            : null;
+      const lane = nextLane();
       if (lane === null) return;
       const waiter = lanes[lane].shift() as Waiter;
       held += 1;
@@ -152,7 +163,8 @@ export function createSemaphore(limit: number, options: SemaphoreOptions = {}): 
       }
       return new Promise<Release>((resolve, reject) => {
         const onAbort = (): void => {
-          for (const queue of [lanes.normal, lanes.low]) {
+          for (const priority of PRIORITIES) {
+            const queue = lanes[priority];
             const index = queue.indexOf(waiter);
             if (index >= 0) queue.splice(index, 1);
           }
@@ -171,13 +183,14 @@ export function createSemaphore(limit: number, options: SemaphoreOptions = {}): 
         drain();
       });
     },
-    promote(ticket: PriorityTicket): void {
-      if (ticket.priority === 'normal') return;
-      ticket.priority = 'normal';
-      const moving = lanes.low.filter((waiter) => waiter.ticket === ticket);
+    promote(ticket: PriorityTicket, to: Priority = 'normal'): void {
+      const from = ticket.priority;
+      if (!outranks(to, from)) return;
+      ticket.priority = to;
+      const moving = lanes[from].filter((waiter) => waiter.ticket === ticket);
       if (moving.length === 0) return;
-      lanes.low = lanes.low.filter((waiter) => waiter.ticket !== ticket);
-      lanes.normal = [...lanes.normal, ...moving].sort((a, b) => a.seq - b.seq);
+      lanes[from] = lanes[from].filter((waiter) => waiter.ticket !== ticket);
+      lanes[to] = [...lanes[to], ...moving].sort((a, b) => a.seq - b.seq);
       drain();
     },
   };

@@ -11,7 +11,7 @@ import { emitEsiAuthFailure } from './authFailureSignal';
 import { EsiError, EsiTimeoutError, isAuthFailure, type EsiResult } from './client';
 import { isCachePurgePending } from './cachePurge';
 import { promoteEsiLane } from './budget';
-import { laneForLoad, withEsiLane, type EsiLane } from './lane';
+import { laneForLoad, viewPriority, withEsiLane, type EsiLane } from './lane';
 import { grantHoldsEndpointScope } from './grantScope';
 import type { PageResponse, PaginatedResult, TruncatableResult } from './paginated';
 
@@ -372,9 +372,13 @@ async function withDedupe<R>(
   const existing = inFlightLoads.get(dkey);
   if (existing) {
     // A foreground caller is now waiting on a background load: what of it is
-    // still queued at the gate stops queueing behind background work (#2271).
-    // Never the other way — a background joiner leaves a view's load alone.
-    if (lane === undefined && existing.lane !== undefined) promoteEsiLane(existing.lane);
+    // still queued at the gate stops queueing behind background work (#2271),
+    // and queues where the view's own read would have — ahead of every other
+    // Character's when this is the active one (#2281). Never the other way — a
+    // background joiner leaves a view's load alone.
+    if (lane === undefined && existing.lane !== undefined) {
+      promoteEsiLane(existing.lane, viewPriority(characterId));
+    }
     return existing.promise as Promise<R>;
   }
 

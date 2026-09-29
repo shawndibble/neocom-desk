@@ -36,22 +36,25 @@
  *    named. Queued and subsequent callers read that one shared verdict instead
  *    of each firing its own blind retry into a closed door.
  *
- * ## Two lanes at the ceiling
+ * ## Three lanes at the ceiling
  *
- * Every freed permit goes first to a waiting **foreground** request, then to a
+ * Every freed permit goes first to a waiting foreground request for the
+ * **active** Character, then to any other **foreground** request, then to a
  * **background** one (`lane.ts` says which is which, and how a view promotes a
  * background load it joins). Background work never holds more than
- * `ESI_MAX_IN_FLIGHT - ESI_FOREGROUND_RESERVE` permits. This orders the
- * ceiling's queue only; the brake and the circuit below treat both lanes
- * alike, and `Retry-After` shuts the door on both.
+ * `ESI_MAX_IN_FLIGHT - ESI_FOREGROUND_RESERVE` permits; the two foreground
+ * lanes share the rest with no split of their own. This orders the ceiling's
+ * queue only; the brake and the circuit below treat every lane alike, and
+ * `Retry-After` shuts the door on all of them.
  *
- * Background is not starved: with no foreground demand it may use every
- * non-reserved permit, and it waits only while views are actually queued —
- * a bounded burst (one navigation's reads), with `client.ts`'s
- * `REQUEST_TIMEOUT_MS` as the backstop that turns an unusually long wait into
- * a cache fallback rather than a hang. A floor or an ageing rule for background
- * was deliberately left out: either would sometimes hand a permit to a poll
- * while a view waits, which is the one thing the lanes exist to stop.
+ * No lane is starved: with nothing queued above it a lane may use every permit
+ * it is allowed, and it waits only while higher work is actually queued — a
+ * bounded burst (one navigation's reads for the active Character, or for every
+ * Character), with `client.ts`'s `REQUEST_TIMEOUT_MS` as the backstop that
+ * turns an unusually long wait into a cache fallback rather than a hang. A
+ * floor or an ageing rule for a lower lane was deliberately left out: either
+ * would sometimes hand a permit to less-watched work while the active
+ * Character's reads wait, which is the one thing the lanes exist to stop.
  *
  * ## Wait, or fail fast into the cache?
  *
@@ -91,7 +94,12 @@
  * Everything above the `--- gate ---` marker is pure and clock-injected, so the
  * policy is unit-tested without timers.
  */
-import { createSemaphore, type PriorityTicket, type Release } from '@/lib/concurrency';
+import {
+  createSemaphore,
+  type Priority,
+  type PriorityTicket,
+  type Release,
+} from '@/lib/concurrency';
 import { EsiBudgetError, type ThrottleStatus, type BudgetRefusal } from './errors';
 
 /**
@@ -470,9 +478,10 @@ export async function passEsiGate(signal?: AbortSignal, lane?: PriorityTicket): 
 }
 
 /**
- * Move `lane`'s queued requests — and its later ones — into the foreground
- * lane. `cache.ts` calls it when a view joins a load background work started.
+ * Move `lane`'s queued requests — and its later ones — up into the `to` lane;
+ * never down. `cache.ts` calls it when a view joins a load
+ * background work started, with the lane that view's own read would take.
  */
-export function promoteEsiLane(lane: PriorityTicket): void {
-  semaphore.promote(lane);
+export function promoteEsiLane(lane: PriorityTicket, to: Priority): void {
+  semaphore.promote(lane, to);
 }
