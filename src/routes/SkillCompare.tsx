@@ -17,7 +17,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { controlHeightClassName } from '@/components/ui/controlStyles';
+import { controlHeightClassName, toggleChipStateClassName } from '@/components/ui/controlStyles';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
@@ -192,11 +192,18 @@ export function SkillCompare() {
   useEffect(() => {
     skillsByCharacterRef.current = skillsByCharacter;
   });
-  // The selection (+ manual-refresh generation) last fully fetched, so
-  // "loading" is derived rather than a separately-set flag that could drift.
-  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  // Characters whose fetch has settled at least once. Only these get a
+  // column: one still waiting on its first fetch would otherwise read as a
+  // column of zeros — "has not trained this", a confident false answer
+  // (DESIGN §6a). A refresh keeps them settled, so their current levels stay
+  // on screen until the new data replaces them. A failed fetch settles too
+  // and still contributes zeros, as before — surfacing per-character
+  // failures is its own gap, not this loading contract's.
+  const [settledIds, setSettledIds] = useState<ReadonlySet<number>>(new Set());
   const [refreshNonce, setRefreshNonce] = useState(0);
-  const lastRefreshNonceRef = useRef(refreshNonce);
+  // The refresh generation last committed; `refreshNonce` ahead of it means a
+  // manual refresh is still in flight.
+  const [committedRefreshNonce, setCommittedRefreshNonce] = useState(refreshNonce);
   const [degradedNotice, setDegradedNotice] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -211,32 +218,30 @@ export function SkillCompare() {
     // of stale data left in `skillsByCharacter` from a prior selection.
     if (selectedIds.length === 0) return;
     let cancelled = false;
-    const key = selectionKey;
     // A manual refresh forces every selected character to re-fetch (it also
     // calls invalidateFreshness()); otherwise only characters not already
     // held in skillsByCharacter need a request — reselecting one costs
-    // nothing extra. lastRefreshNonceRef only advances once a run actually
+    // nothing extra. committedRefreshNonce only advances once a run actually
     // commits (below), not here: advancing it eagerly would let a refresh
     // interrupted by a mid-flight selection change look already-handled to
     // the next run, silently downgrading it from a forced refetch to a
     // dedup-only one.
-    const forceAll = refreshNonce !== lastRefreshNonceRef.current;
+    const forceAll = refreshNonce !== committedRefreshNonce;
     const idsToFetch = idsNeedingFetch(
       selectedIds,
       new Set(skillsByCharacterRef.current.keys()),
       forceAll
     );
     if (idsToFetch.length === 0) {
-      lastRefreshNonceRef.current = refreshNonce;
-      setLoadedFor(key);
+      setCommittedRefreshNonce(refreshNonce);
       return;
     }
     void loadSkillsForCharacters(idsToFetch).then((result) => {
       if (cancelled) return;
-      lastRefreshNonceRef.current = refreshNonce;
+      setCommittedRefreshNonce(refreshNonce);
       setSkillsByCharacter((prev) => new Map([...prev, ...result.skillsByCharacter]));
       setFetchedAtByCharacter((prev) => new Map([...prev, ...result.fetchedAtByCharacter]));
-      setLoadedFor(key);
+      setSettledIds((prev) => new Set([...prev, ...idsToFetch]));
     });
     return () => {
       cancelled = true;
@@ -244,7 +249,17 @@ export function SkillCompare() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on selectionKey, selectedIds/refreshNonce are its inputs
   }, [selectionKey]);
 
-  const loading = selectedIds.length > 0 && loadedFor !== selectionKey;
+  // The selection minus anyone still waiting on a first fetch: the columns
+  // actually drawn, and what "Differing only" compares across.
+  const loadedIds = useMemo(
+    () => selectedIds.filter((id) => settledIds.has(id)),
+    [selectedIds, settledIds]
+  );
+  const pendingIds = useMemo(
+    () => new Set(selectedIds.filter((id) => !settledIds.has(id))),
+    [selectedIds, settledIds]
+  );
+  const refreshing = refreshNonce !== committedRefreshNonce;
 
   const oldestFetchedAt = useMemo(() => {
     let oldest: Date | null = null;
@@ -311,9 +326,8 @@ export function SkillCompare() {
   }
 
   const rows = useMemo<ComparisonRow[]>(
-    () =>
-      catalog ? buildComparisonRows(selectedIds, skillsByCharacter, catalog.bySkillTypeID) : [],
-    [catalog, selectedIds, skillsByCharacter]
+    () => (catalog ? buildComparisonRows(loadedIds, skillsByCharacter, catalog.bySkillTypeID) : []),
+    [catalog, loadedIds, skillsByCharacter]
   );
 
   const visibleRows = useMemo(
@@ -345,7 +359,7 @@ export function SkillCompare() {
             } satisfies DataTableColumn<ComparisonRow>,
           ]
         : []),
-      ...selectedIds.map((characterId): DataTableColumn<ComparisonRow> => ({
+      ...loadedIds.map((characterId): DataTableColumn<ComparisonRow> => ({
         id: `character-${characterId}`,
         header: nameFor(characterId),
         align: 'right',
@@ -359,22 +373,39 @@ export function SkillCompare() {
         render: (row) => row.levels.get(characterId) ?? 0,
       })),
     ],
-    [selectedIds, nameFor, t, groupColumnVisible]
+    [loadedIds, nameFor, t, groupColumnVisible]
   );
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader
         title={t('nav.skills')}
+        meta={oldestFetchedAt && <DataAgeBadge date={oldestFetchedAt} />}
         actions={
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={selectedIds.length === 0}
-            onClick={handleSave}
-          >
-            {t('skillCompare.saveComparison')}
-          </Button>
+          <>
+            {selectedIds.length > 0 && (
+              <IconButton
+                icon={<Icon.Refresh />}
+                label={t('skillCompare.refresh')}
+                disabled={refreshing}
+                onClick={() => {
+                  // loadCorrectedSkills reads the skill queue through the
+                  // windowed path (issue #41); a manual refresh here must
+                  // bypass it the same way useRouteSnapshot's refresh does.
+                  invalidateFreshness();
+                  setRefreshNonce((n) => n + 1);
+                }}
+              />
+            )}
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={selectedIds.length === 0}
+              onClick={handleSave}
+            >
+              {t('skillCompare.saveComparison')}
+            </Button>
+          </>
         }
       />
       <SkillsSubNav />
@@ -386,18 +417,23 @@ export function SkillCompare() {
         <ul className="flex flex-wrap gap-2">
           {(characters ?? []).map((character) => {
             const selected = selectedIds.includes(character.characterId);
+            const pending = pendingIds.has(character.characterId);
             return (
               <li key={character.characterId}>
                 <button
                   type="button"
                   aria-pressed={selected}
                   onClick={() => toggleCharacter(character.characterId)}
-                  className={`flex items-center gap-1.5 rounded-xs border px-2.5 text-xs ${controlHeightClassName.sm} ${FOCUS_RING} ${
-                    selected ? 'border-accent bg-panel-2' : 'border-line'
-                  }`}
+                  className={`flex items-center gap-1.5 rounded-xs border px-2.5 text-xs ${controlHeightClassName.sm} ${FOCUS_RING} ${toggleChipStateClassName(selected)}`}
                 >
                   <CharacterAvatar characterId={character.characterId} size="sm" />
                   {character.name}
+                  {pending && (
+                    <Spinner
+                      size="sm"
+                      label={t('skillCompare.characterLoading', { name: character.name })}
+                    />
+                  )}
                 </button>
               </li>
             );
@@ -414,7 +450,7 @@ export function SkillCompare() {
           title={t('skillCompare.noneSelectedTitle')}
           hint={t('skillCompare.noneSelectedHint')}
         />
-      ) : loading || !catalog ? (
+      ) : !catalog || (rows.length === 0 && pendingIds.size > 0) ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('skillCompare.loading')} />
         </div>
@@ -422,35 +458,19 @@ export function SkillCompare() {
         <EmptyState title={t('skillCompare.noDataTitle')} hint={t('skillCompare.noDataHint')} />
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              {selectedIds.length > 1 && (
-                <FilterChip
-                  label={t('skillCompare.differingOnly')}
-                  selected={differingOnly}
-                  onToggle={() => setCompareParams({ differingOnly: !differingOnly })}
-                />
-              )}
+          <div className="flex flex-wrap items-center gap-2">
+            {loadedIds.length > 1 && (
               <FilterChip
-                label={t('skillCompare.groupColumnToggle')}
-                selected={groupColumnVisible}
-                onToggle={() => setCompareParams({ groupColumn: !groupColumnVisible })}
+                label={t('skillCompare.differingOnly')}
+                selected={differingOnly}
+                onToggle={() => setCompareParams({ differingOnly: !differingOnly })}
               />
-            </div>
-            <div className="flex items-center gap-2">
-              {oldestFetchedAt && <DataAgeBadge date={oldestFetchedAt} />}
-              <IconButton
-                icon={<Icon.Refresh />}
-                label={t('skillCompare.refresh')}
-                onClick={() => {
-                  // loadCorrectedSkills reads the skill queue through the
-                  // windowed path (issue #41); a manual refresh here must
-                  // bypass it the same way useRouteSnapshot's refresh does.
-                  invalidateFreshness();
-                  setRefreshNonce((n) => n + 1);
-                }}
-              />
-            </div>
+            )}
+            <FilterChip
+              label={t('skillCompare.groupColumnToggle')}
+              selected={groupColumnVisible}
+              onToggle={() => setCompareParams({ groupColumn: !groupColumnVisible })}
+            />
           </div>
           {visibleRows.length === 0 ? (
             <EmptyState
