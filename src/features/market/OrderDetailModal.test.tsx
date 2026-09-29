@@ -781,13 +781,14 @@ describe('OrderDetailModal', () => {
       // scoped to the quick-answer section, since the exits list below
       // coincidentally suggests the very same price for its own undercut row.
       const quickAnswer = screen.getByText('Quick answer').closest('section')!;
-      await user.click(within(quickAnswer).getByRole('button', { name: 'Copy 449.90' }));
+      await user.click(within(quickAnswer).getByRole('button', { description: 'Copy 449.90' }));
       expect(written).toEqual(['449.90']);
+      expect(screen.getByRole('status')).toHaveTextContent('Copied to clipboard');
 
       configureClipboard(null);
     });
 
-    it('offers a suggested bid for an outbid buy order, with its own copy button', async () => {
+    it('offers a suggested bid for an outbid buy order, clicked to copy', async () => {
       const written: string[] = [];
       configureClipboard(async (text) => {
         written.push(text);
@@ -803,9 +804,8 @@ describe('OrderDetailModal', () => {
       renderModal({ row, stationChecked: true });
 
       // outbidPrice(520) = 520.10 — one legal tick over the rival bid.
-      expect(screen.getByText('Outbid at 520.10')).toBeInTheDocument();
       const user = userEvent.setup();
-      await user.click(screen.getByRole('button', { name: 'Copy 520.10' }));
+      await user.click(screen.getByRole('button', { name: 'Outbid at 520.10' }));
       expect(written).toEqual(['520.10']);
 
       configureClipboard(null);
