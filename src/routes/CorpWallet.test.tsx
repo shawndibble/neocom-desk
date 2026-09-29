@@ -416,6 +416,22 @@ describe('Wallet no longer carries the corporation', () => {
     expect(window.location.search).toBe('?view=transactions');
     expect(await screen.findByRole('table', { name: 'Transactions' })).toBeInTheDocument();
   });
+
+  it('keeps the division, and any filter, alongside the Transactions view', async () => {
+    window.history.pushState(
+      {},
+      '',
+      '/wallet/transactions?owner=corporation&division=2&txn.q=Pyerite'
+    );
+    render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/corp/wallet'));
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get('division')).toBe('2');
+    expect(params.get('view')).toBe('transactions');
+    expect(params.get('txn.q')).toBe('Pyerite');
+    expect(params.has('owner')).toBe(false);
+  });
 });
 
 /**

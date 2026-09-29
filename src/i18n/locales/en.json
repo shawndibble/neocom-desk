@@ -5950,7 +5950,7 @@
       "runwayDays_other": "{{count}} days",
       "runwayUnknown": "Unknown",
       "runwayHint": "How long division {{division}} lasts: its own balance divided by its own average daily spending over the last {{days}} days. EVE publishes no all-divisions journal, so this covers that one wallet. Income is ignored, so this is what is already banked.",
-      "viewInWallet": "View {{division}} in Wallet"
+      "viewInWallet": "View {{division}} in Corp wallet"
     },
     "people": {
       "viewRoster": "Roster",

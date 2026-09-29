@@ -94,8 +94,8 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 const DIVISION_PARAM = intParam(1, { min: 1, max: 7 });
 
 /** Which table the page shows for the selected division. */
-export type CorpWalletView = 'journal' | 'transactions';
-const VIEW_PARAM = enumParam<CorpWalletView>(['journal', 'transactions'], 'journal');
+type WalletTable = 'journal' | 'transactions';
+const VIEW_PARAM = enumParam<WalletTable>(['journal', 'transactions'], 'journal');
 
 const TRANSACTIONS_SORT = { columnId: 'date', direction: 'desc' } as const;
 

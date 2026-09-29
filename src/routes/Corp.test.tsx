@@ -288,15 +288,15 @@ describe('per-panel capability gating (AC3)', () => {
     renderCorp();
 
     await waitFor(() => expect(screen.getByText('SRP')).toBeInTheDocument());
-    expect(screen.getByRole('link', { name: 'View SRP in Wallet' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'View SRP in Corp wallet' })).toHaveAttribute(
       'href',
       '/corp/wallet?division=3'
     );
     // The label replaces the row's text, so the balance rides on the description.
-    expect(screen.getByRole('link', { name: 'View SRP in Wallet' })).toHaveAccessibleDescription(
-      '250.00'
-    );
-    expect(screen.getByRole('link', { name: 'View Division 1 in Wallet' })).toHaveAttribute(
+    expect(
+      screen.getByRole('link', { name: 'View SRP in Corp wallet' })
+    ).toHaveAccessibleDescription('250.00');
+    expect(screen.getByRole('link', { name: 'View Division 1 in Corp wallet' })).toHaveAttribute(
       'href',
       '/corp/wallet?division=1'
     );

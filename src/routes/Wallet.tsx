@@ -234,8 +234,7 @@ export function Wallet() {
       />
     ) : undefined;
 
-  // Nothing fetched until the picker actually leaves "current" — nothing
-  // here is fetched until the Character filter actually asks for more than
+  // Nothing fetched until the Character filter actually asks for more than
   // the active Character. No separate "loading" state: `walletBalancesSnapshot
   // === null` already means "nothing to show yet," and a manual refresh
   // deliberately leaves the previous snapshot in place while it re-fetches —

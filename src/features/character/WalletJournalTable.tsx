@@ -50,7 +50,6 @@ interface JournalFilterBarProps {
   actions?: ReactNode;
 }
 
-/** The ref-type / date-range / text filter row above a journal table (issue #413). */
 /**
  * "Any ref type" sentinel. Prefixed so it cannot collide with a real ESI
  * `ref_type`, which is what fills the rest of the list; Radix needs some value
@@ -58,6 +57,7 @@ interface JournalFilterBarProps {
  */
 const ALL_REF_TYPES = '__all';
 
+/** The ref-type / date-range / text filter row above a journal table (issue #413). */
 function JournalFilterBar({ filter, onChange, refTypeOptions, actions }: JournalFilterBarProps) {
   const { t } = useTranslation();
   return (
@@ -120,9 +120,9 @@ interface JournalTableProps {
   journalColumns: DataTableColumn<WalletJournalEntry>[];
   label: string;
   /**
-   * The journal line a wallet alert pointed at. Passed by the *personal*
-   * panel only — `walletBalanceChanged` is a character event, and the corp
-   * journal beside it has its own rows with their own ids.
+   * The journal line a wallet alert pointed at. Passed by `/wallet` only —
+   * `walletBalanceChanged` is a character event, and the corp journal has its
+   * own rows with their own ids.
    */
   highlightRowKey?: number | null;
   sort: DataTableSort;
