@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { IconButton } from '@/components/ui';
 import type { AlphaBlocker } from '@/engine/fittings/alphaClone';
 import { romanLevel } from '@/engine/projection';
+import { HeaderBadgeSlot } from './HeaderBadgeSlot';
 
 /** Skill levels named in the tooltip before the rest are summed up. */
 const BLOCKERS_NAMED = 4;
@@ -18,11 +19,13 @@ interface AlphaCloneChipProps {
  * Character too. An icon, so the header stays one row: α in green when an
  * Alpha can fly it, Ω in warning yellow when it needs Omega. The verdict is
  * its accessible name; the tooltip (a tap on touch) explains it and names the
- * skill levels that keep an Alpha out.
+ * skill levels that keep an Alpha out. While loading it holds the badge's
+ * place with an empty slot (issue #2255).
  */
 export function AlphaCloneChip({ blockers, skillName }: AlphaCloneChipProps) {
   const { t } = useTranslation();
-  if (blockers === null) return null;
+  // Holds the badge's place until the verdict lands, so the header doesn't reflow.
+  if (blockers === null) return <HeaderBadgeSlot />;
   const ok = blockers.length === 0;
   const lines = ok
     ? [t('fittings.alpha.okTooltip')]

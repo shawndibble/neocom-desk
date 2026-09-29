@@ -59,8 +59,15 @@ describe('AlphaCloneChip', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('By skill caps');
   });
 
-  it('shows nothing while the requirements load', () => {
+  it("holds the badge's place, silently, while the requirements load", () => {
+    // Issue #2255: an empty slot the badge's size, so the header's action
+    // group doesn't jump rows when the verdict lands.
     const { container } = render(<AlphaCloneChip blockers={null} skillName={skillName} />);
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole('button')).toBeNull();
+    const slot = container.firstElementChild!;
+    expect(slot).toHaveAttribute('aria-hidden', 'true');
+    expect(slot).not.toHaveAttribute('tabindex');
+    expect(slot).toBeEmptyDOMElement();
+    expect(slot).toHaveClass('size-11', 'md:size-9');
   });
 });

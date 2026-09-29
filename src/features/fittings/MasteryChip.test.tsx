@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { EngineSkill, PlanEntry } from '@/engine/types';
 import type { TargetPlan } from '@/features/skills/useTargetPlan';
+import { loadMasteries } from '@/sde/loadSde';
+import type { MasteryMap } from '@/sde/types';
 import { MasteryChip } from './MasteryChip';
 
 const GUNNERY: EngineSkill = {
@@ -107,7 +109,33 @@ describe('MasteryChip', () => {
   });
 
   it('renders nothing for a hull with no Mastery data', async () => {
-    render(<MasteryChip hullTypeId={999} hullName="Nothing" characterId={1} />);
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Mastery' })).toBeNull());
+    const { container } = render(
+      <MasteryChip hullTypeId={999} hullName="Nothing" characterId={1} />
+    );
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
+  });
+
+  it("holds the badge's place, silently, while the Mastery data loads", async () => {
+    // Issue #2255: the slot keeps the header's action group from jumping rows.
+    let release: (value: MasteryMap) => void = () => {};
+    vi.mocked(loadMasteries).mockImplementationOnce(
+      () => new Promise<MasteryMap>((resolve) => (release = resolve))
+    );
+    const { container } = render(<MasteryChip hullTypeId={626} hullName="Vexor" characterId={1} />);
+    expect(screen.queryByRole('button')).toBeNull();
+    const slot = container.firstElementChild!;
+    expect(slot).toHaveAttribute('aria-hidden', 'true');
+    expect(slot).toBeEmptyDOMElement();
+    expect(slot).toHaveClass('size-11', 'md:size-9');
+
+    release({ '626': [[{ skillTypeID: 3300, level: 2 }], [], [], [], []] });
+    expect(await screen.findByRole('button', { name: 'Mastery' })).toBeInTheDocument();
+    expect(container.querySelector('[aria-hidden="true"]:empty')).toBeNull();
+  });
+
+  it('gives up the slot when the Mastery data fails to load', async () => {
+    vi.mocked(loadMasteries).mockImplementationOnce(() => Promise.reject(new Error('offline')));
+    const { container } = render(<MasteryChip hullTypeId={626} hullName="Vexor" characterId={1} />);
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 });

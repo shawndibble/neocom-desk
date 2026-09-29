@@ -30,6 +30,7 @@ import {
 import { SkillRow } from '@/features/skills/SkillRow';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
+import { HeaderBadgeSlot } from './HeaderBadgeSlot';
 
 const TIERS = [0, 1, 2, 3, 4] as const;
 const TOAST_MS = 8000;
@@ -45,7 +46,9 @@ interface MasteryChipProps {
  * take at the active Character's attributes and implants, no fit required.
  * The tier picker shows the union of tiers I..N deduped by skill; Add All puts
  * exactly the untrained rows on screen into a Skill Plan. Renders nothing for
- * a hull `masteries.json` carries no data for.
+ * a hull `masteries.json` carries no data for; until that is known, and
+ * while the skill catalogue loads, it holds the badge's place with an empty
+ * slot so the header doesn't reflow when it lands (issue #2255).
  */
 export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipProps) {
   const { t } = useTranslation();
@@ -68,7 +71,10 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
   const cloneState = cloneStateFor(cloneStates, characterId);
 
   useEffect(() => {
-    void loadMasteries().then(setMasteries);
+    // A failed load is treated as no data, so the slot below gives its place up.
+    loadMasteries()
+      .then(setMasteries)
+      .catch(() => setMasteries({}));
   }, []);
   useEffect(() => {
     if (!added) return;
@@ -98,6 +104,7 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
     );
   }, [catalog, tiers, tier, trainedSkills, attributes, implants, cloneState]);
 
+  if (masteries === null || (hasData && !rows)) return <HeaderBadgeSlot />;
   if (!hasData || !rows) return null;
 
   const visible = hideCompleted ? rows.filter((row) => row.status !== 'trained') : rows;
