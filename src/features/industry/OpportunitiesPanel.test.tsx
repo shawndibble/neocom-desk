@@ -237,7 +237,7 @@ describe('OpportunitiesPanel', () => {
     });
 
     it('gives the row a "Start a plan" button that fires onStartPlan with its catalog entry (issue #1781)', async () => {
-      const onStartPlan = vi.fn();
+      const onStartPlan = vi.fn(() => Promise.resolve(false));
       const { row } = await renderWithRow(1000, { onStartPlan });
       fireEvent.click(within(row).getByRole('button', { name: 'Start a plan' }));
       expect(onStartPlan).toHaveBeenCalledWith(entry(1000, 'Widget Alpha'));

@@ -72,6 +72,12 @@ function plan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
 }
 
 describe('loadBlueprintCatalog', () => {
+  it('hands back the same catalog while the SDE files it is built from are unchanged', async () => {
+    // Pages hold it in state: a rebuilt copy re-renders and re-prices an open
+    // plan even though nothing in it changed.
+    expect(await loadBlueprintCatalog()).toBe(await loadBlueprintCatalog());
+  });
+
   it('keys entries by blueprint typeID and resolves the product name via types.json', async () => {
     const catalog = await loadBlueprintCatalog();
     const entry = catalog.byBlueprintTypeID.get(638);

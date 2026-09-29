@@ -17,7 +17,6 @@ import {
   type BuildGroupsValue,
 } from '@/features/industry/buildGroups';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
-import { clearWorkspaceLoadCache } from '@/features/industry/workspaceLoadCache';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -148,8 +147,6 @@ afterEach(() => {
   clearCostIndexCache();
 });
 beforeEach(async () => {
-  // Each test mocks its own catalog; a page must not start from the last test's.
-  clearWorkspaceLoadCache();
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
