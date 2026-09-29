@@ -23,9 +23,14 @@ _Recorded 2026-09-28 · issue #2240._
   wholesale and never merged, for the reasons round 45 gave.
 
 - **Each row is pushed only to its own device.** The dispatcher reads the
-  row's device registration by id. If the registration is gone (logged out,
-  or the token was deleted after an UNREGISTERED send), the row is deleted
-  there and then instead of waiting for the 7-day stale purge. If the
+  row's device registration by id. If the registration is gone, the row is deleted
+  there and then instead of waiting for the 7-day stale purge. A registration
+  goes away only when a send comes back saying the token itself is dead or
+  malformed. Logging out does not delete it directly: logout deletes the FCM
+  token on the device, and the next send to that token comes back
+  UNREGISTERED. An FCM error about the payload rather than the token leaves
+  the registration alone, since deleting it would orphan every row that
+  device has. If the
   registration no longer lists the row's Character, the row is deleted
   unsent. Two devices that project the same occurrence each get their own row
   and their own push.
@@ -40,10 +45,14 @@ _Recorded 2026-09-28 · issue #2240._
 
 - **Legacy rows are swept lazily, with no migration.** A row written before
   this change has no `deviceId` and uses the bare Occurrence Key as its doc
-  id. On a device's first per-device upload, each Character it holds has its
-  legacy unfired rows deleted in the same batch that writes the new rows, so a
-  dispatch tick never sees both. The registration doc's `perDeviceProjections`
-  marker stops the sweep from running again. Until a row is swept, the
+  id. The first time a device uploads per-device rows for a Character, that
+  Character's legacy unfired rows are deleted in the same batch that writes
+  the new rows, so a dispatch tick never sees both. That includes a Character
+  the device adds later, whose legacy rows may come from a device that has not
+  upgraded yet. The registration doc's `perDeviceProjections` marker, together
+  with its previous Character list, stops the sweep from running again. The
+  marker is set only after every batch has committed, so a failed upload
+  sweeps again on its retry. Until a row is swept, the
   dispatcher fans it out to every device holding its Character, exactly as
   before. The sweep is per Character, not per device, and that leaves one gap,
   accepted for the one-time switch. A device that was closed at deploy time
