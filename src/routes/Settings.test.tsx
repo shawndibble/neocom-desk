@@ -97,7 +97,10 @@ vi.mock('@/features/notifications/foregroundPoller', async (importOriginal) => {
  * remounts and the click hits a detached checkbox. Settings reads nothing it
  * warms.
  */
-vi.mock('@/app/bootPrefetch', () => ({ scheduleBootPrefetch: () => () => {} }));
+vi.mock('@/app/bootPrefetch', () => ({
+  scheduleBootPrefetch: () => () => {},
+  scheduleCachePrune: () => () => {},
+}));
 
 const CHAR_ID = 91;
 

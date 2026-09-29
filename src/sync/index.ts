@@ -46,9 +46,16 @@ export async function haltSync(): Promise<void> {
 /**
  * Debounced sync — call after each edit. Fire-and-forget: a failed driver load
  * (offline before the chunk is precached) is swallowed and no sync happens.
+ * `priority: 'background'` is for the sweep only (planSync.ts `SyncPriority`).
  */
-export function scheduleSync(characterId: number, debounceMs?: number): void {
-  void import('./planSync').then((m) => m.scheduleSync(characterId, debounceMs)).catch(() => {});
+export function scheduleSync(
+  characterId: number,
+  debounceMs?: number,
+  priority?: 'foreground' | 'background'
+): void {
+  void import('./planSync')
+    .then((m) => m.scheduleSync(characterId, debounceMs, priority))
+    .catch(() => {});
 }
 
 /**
