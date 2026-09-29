@@ -267,9 +267,12 @@ describe('PlanVerdictHero: calculation breakdown', () => {
 });
 
 describe('PlanVerdictHero: heading actions button (issue #1498)', () => {
-  it('renders a focusable "More actions" button beside the heading', () => {
+  it('renders a focusable "More actions" button in the panel’s corner, not beside the heading', () => {
     renderHeroWithRouter({ productTypeID: 587, itemActionsFor });
-    expect(screen.getByRole('button', { name: 'More actions for Rifter' })).toBeInTheDocument();
+    const button = screen.getByRole('button', { name: 'More actions for Rifter' });
+    const heading = screen.getByRole('heading', { name: 'Rifter' });
+    expect(heading.parentElement).not.toContainElement(button);
+    expect(button.closest('.absolute')).toHaveClass('top-1', 'right-1');
   });
 
   it('opens the identical item menu the heading’s right-click path opens', async () => {
