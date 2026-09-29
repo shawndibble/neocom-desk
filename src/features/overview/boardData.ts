@@ -24,6 +24,8 @@ import { loadContracts } from '@/features/character/contracts';
 import { loadContractLocationName } from '@/features/character/contractLocationName';
 import { summarizeContractsBoard, type ContractsBoardSummary } from '@/engine/contractsBoard';
 import { loadCalendarEvents } from '@/features/character/calendar';
+import { loadMailHeaders, loadMailLabels } from '@/features/character/mail';
+import { resolveNames } from '@/features/character/names';
 import type { CalendarEventSummary } from '@/esi/endpoints';
 
 /*
@@ -276,4 +278,67 @@ export interface SpExtractionBoardData {
   /** Whether the pilot turned SP Extraction monitoring on. Off, nothing is ever flagged. */
   monitoring: boolean;
   thresholdSp: number;
+}
+
+// --- Mail -------------------------------------------------------------------
+
+export interface BoardMail {
+  mailId: number;
+  subject: string;
+  /** Null when the sender's name did not resolve; the row leaves it out. */
+  from: string | null;
+  atMs: number | null;
+}
+
+export interface MailBoardData {
+  /** ESI's own unread total across the mailbox, not just the 50 newest headers. */
+  unread: number;
+  /** The newest unread mails, newest first — a few rows, not the inbox. */
+  recent: BoardMail[];
+  needsReauth: boolean;
+  fetchedAt: Date | null;
+}
+
+/**
+ * The count comes from the labels read, whose `total_unread_count` covers the
+ * whole mailbox; the headers only reach the 50 newest, so counting unread
+ * among them would under-report a backlog. The headers supply the rows.
+ */
+export async function loadMailBoard(characterId: number): Promise<MailBoardData> {
+  const [labels, headers] = await Promise.all([
+    loadMailLabels(characterId),
+    loadMailHeaders(characterId),
+  ]);
+  const unreadHeaders = (headers.cached?.data ?? [])
+    .filter((header) => header.is_read === false)
+    .map((header) => ({
+      header,
+      atMs: header.timestamp ? Date.parse(header.timestamp) : Number.NaN,
+    }))
+    .sort((a, b) => (Number.isNaN(b.atMs) ? -1 : b.atMs) - (Number.isNaN(a.atMs) ? -1 : a.atMs))
+    .slice(0, 4);
+  const senderIds = unreadHeaders.flatMap(({ header }) =>
+    header.from === undefined ? [] : [header.from]
+  );
+  let names = new Map<number, string>();
+  if (senderIds.length > 0) {
+    try {
+      names = await resolveNames(senderIds);
+    } catch {
+      // A courtesy: a row without a sender still names the mail.
+    }
+  }
+  return {
+    unread:
+      labels.cached?.data.total_unread_count ??
+      (headers.cached?.data ?? []).filter((header) => header.is_read === false).length,
+    recent: unreadHeaders.map(({ header, atMs }) => ({
+      mailId: header.mail_id,
+      subject: header.subject ?? '',
+      from: header.from === undefined ? null : (names.get(header.from) ?? null),
+      atMs: Number.isNaN(atMs) ? null : atMs,
+    })),
+    needsReauth: headers.needsReauth || labels.needsReauth,
+    fetchedAt: headers.cached ? headers.cached.fetchedAt : null,
+  };
 }

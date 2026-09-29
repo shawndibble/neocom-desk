@@ -21,6 +21,7 @@ import { isSpExtractionReady } from '@/engine/spExtraction';
 import type {
   CalendarEventsBoardData,
   ContractsBoardData,
+  MailBoardData,
   MiningTaxBoardData,
   PlanetaryBoardData,
   SpExtractionBoardData,
@@ -127,4 +128,11 @@ export function spExtractionSeverity(data: SpExtractionBoardData): DeadlineSever
   if (data.totalSp === null) return null;
   if (!data.monitoring) return 'clear';
   return isSpExtractionReady(data.totalSp, data.thresholdSp) ? 'watch' : 'clear';
+}
+
+/** Unread mail is worth a look, never an emergency. */
+export function mailSeverity(data: MailBoardData | null): DeadlineSeverity | null {
+  if (data === null) return null;
+  if (data.needsReauth) return UNREADABLE;
+  return data.unread > 0 ? 'watch' : 'clear';
 }

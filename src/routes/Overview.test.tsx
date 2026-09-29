@@ -803,7 +803,7 @@ function usePhoneViewport(): void {
 /** The domain cards, by the heading each one carries. */
 const DOMAINS = ['Open orders', 'Mining tax', 'Planetary industry', 'Industry jobs'] as const;
 /** Domains that are always one line on a phone rather than competing for a full card. */
-const ALWAYS_FOLDED = ['Alerts', 'Contracts', 'Coming up', 'SP extraction'] as const;
+const ALWAYS_FOLDED = ['Alerts', 'Contracts', 'Coming up', 'SP extraction', 'Mail'] as const;
 
 /** Which domains kept a full card — a card is a heading with its own "Open" link. */
 function fullCardDomains(): string[] {
@@ -1083,7 +1083,14 @@ describe('hiding cards from the edit menu', () => {
     await screen.findByRole('heading', { name: 'Everything else' });
 
     expect([...fullCardDomains(), ...foldedDomains()].sort()).toEqual(
-      ['Mining tax', 'Planetary industry', 'Industry jobs', 'Coming up', 'SP extraction'].sort()
+      [
+        'Mining tax',
+        'Planetary industry',
+        'Industry jobs',
+        'Coming up',
+        'SP extraction',
+        'Mail',
+      ].sort()
     );
   });
 });
@@ -1124,6 +1131,40 @@ describe('SP extraction', () => {
     render(<App />);
     const card = await findCard(/sp extraction/i);
     expect(await within(card).findByText('Flags at 500K spare SP')).toBeInTheDocument();
+  });
+});
+
+describe('Mail', () => {
+  it('counts the whole mailbox’s unread, and lists the newest unread with its sender', async () => {
+    await grantScopes(['esi-mail.read_mail.v1']);
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/labels`, () =>
+        HttpResponse.json({ labels: [], total_unread_count: 12 })
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json([
+          { mail_id: 1, subject: 'Old news', from: 77, is_read: true, timestamp: hoursFromNow(-9) },
+          {
+            mail_id: 2,
+            subject: 'Fleet tonight',
+            from: 77,
+            is_read: false,
+            timestamp: hoursFromNow(-2),
+          },
+        ])
+      ),
+      http.post('https://esi.evetech.net/universe/names', () =>
+        HttpResponse.json([{ id: 77, name: 'Fleet Boss', category: 'character' }])
+      )
+    );
+    render(<App />);
+
+    const card = await findCard(/^mail$/i);
+    expect(await within(card).findByText('12 unread')).toBeInTheDocument();
+    const rows = await within(card).findAllByRole('listitem');
+    expect(rows).toHaveLength(1);
+    expect(within(rows[0]).getByText('Fleet tonight')).toBeInTheDocument();
+    expect(await within(rows[0]).findByText('Fleet Boss')).toBeInTheDocument();
   });
 });
 

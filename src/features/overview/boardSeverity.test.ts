@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   MINING_TAX_WARNING_DAYS,
   comingUpSeverity,
+  mailSeverity,
   miningTaxSeverity,
   spExtractionSeverity,
 } from './boardSeverity';
-import type { CalendarEventsBoardData, MiningTaxBoardData } from './boardData';
+import type { CalendarEventsBoardData, MailBoardData, MiningTaxBoardData } from './boardData';
 
 function data(overrides: Partial<MiningTaxBoardData> = {}): MiningTaxBoardData {
   return {
@@ -100,5 +101,27 @@ describe('spExtractionSeverity', () => {
 
   it('never flags anything while monitoring is switched off', () => {
     expect(spExtractionSeverity(data(FLOOR + 9_000_000, false))).toBe('clear');
+  });
+});
+
+describe('mailSeverity', () => {
+  const data = (unread: number, needsReauth = false): MailBoardData => ({
+    unread,
+    recent: [],
+    needsReauth,
+    fetchedAt: null,
+  });
+
+  it('is null until the mailbox has loaded', () => {
+    expect(mailSeverity(null)).toBeNull();
+  });
+
+  it('is watch with anything unread, clear with nothing', () => {
+    expect(mailSeverity(data(3))).toBe('watch');
+    expect(mailSeverity(data(0))).toBe('clear');
+  });
+
+  it('is warning when the mailbox cannot be read', () => {
+    expect(mailSeverity(data(0, true))).toBe('warning');
   });
 });

@@ -32,6 +32,7 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import type {
   CalendarEventsBoardData,
   ContractsBoardData,
+  MailBoardData,
   IndustryBoardData,
   MiningTaxBoardData,
   PlanetaryBoardData,
@@ -193,4 +194,12 @@ export function spExtractionSummary(t: Translate, data: SpExtractionBoardData): 
   return t('overview.board.spExtractable', {
     sp: formatCompactNumber(extractableSp(data.totalSp)),
   });
+}
+
+export function mailSummary(t: Translate, data: MailBoardData | null): string {
+  if (data === null) return t(CHECKING);
+  if (data.needsReauth) return t(REAUTH);
+  return data.unread > 0
+    ? t('overview.board.mailUnread', { count: data.unread })
+    : t('overview.board.mailNone');
 }

@@ -76,6 +76,7 @@ import {
   CONTRACTS_IN_PROGRESS_HREF,
   ComingUpCard,
   ContractsCard,
+  MailCard,
   SpExtractionCard,
   EverythingElseCard,
   IndustryCard,
@@ -88,6 +89,7 @@ import {
   loadCalendarEventsBoard,
   loadContractsBoard,
   loadIndustryBoard,
+  loadMailBoard,
   loadMiningTaxBoard,
   loadPlanetaryBoard,
 } from '@/features/overview/boardData';
@@ -95,6 +97,7 @@ import {
   comingUpSeverity,
   contractsSeverity,
   industrySeverity,
+  mailSeverity,
   miningTaxSeverity,
   ordersSeverity,
   planetarySeverity,
@@ -106,6 +109,7 @@ import {
   contractsDeadlineNote,
   contractsSummary,
   industrySummary,
+  mailSummary,
   miningTaxSummary,
   ordersSummary,
   planetarySummary,
@@ -257,6 +261,9 @@ export function Overview() {
   });
   const calendarSnapshot = useRouteSnapshot(loadCalendarEventsBoard, undefined, {
     cacheKey: 'overview:calendar',
+  });
+  const mailSnapshot = useRouteSnapshot(loadMailBoard, undefined, {
+    cacheKey: 'overview:mail',
   });
   const { hydrated, activeCharacterId } = walletSnapshot;
 
@@ -536,6 +543,16 @@ export function Overview() {
       render: () => <SpExtractionCard data={spExtraction} />,
     },
     {
+      key: 'mail',
+      placement: 'folded',
+      to: '/mail',
+      severity: mailSeverity(mailSnapshot.data),
+      summary: mailSummary(t, mailSnapshot.data),
+      fetchedAt: mailSnapshot.data?.fetchedAt,
+      loading: mailSnapshot.loading,
+      render: () => <MailCard data={mailSnapshot.data} nowMs={now} />,
+    },
+    {
       key: 'alerts',
       placement: 'column',
       to: '/alerts',
@@ -642,6 +659,7 @@ export function Overview() {
             planetarySnapshot,
             industrySnapshot,
             calendarSnapshot,
+            mailSnapshot,
           ]) {
             snapshot.refresh();
           }

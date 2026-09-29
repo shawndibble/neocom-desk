@@ -3,6 +3,7 @@ import {
   alertsSummary,
   comingUpSummary,
   industrySummary,
+  mailSummary,
   miningTaxSummary,
   ordersSummary,
   planetarySummary,
@@ -12,6 +13,7 @@ import type {
   BoardColony,
   CalendarEventsBoardData,
   IndustryBoardData,
+  MailBoardData,
   MiningTaxBoardData,
   PlanetaryBoardData,
 } from './boardData';
@@ -319,5 +321,24 @@ describe('spExtractionSummary', () => {
 
   it('reports loading', () => {
     expect(spExtractionSummary(t, data(null))).toBe('overview.board.checking');
+  });
+});
+
+describe('mailSummary', () => {
+  const data = (unread: number, needsReauth = false): MailBoardData => ({
+    unread,
+    recent: [],
+    needsReauth,
+    fetchedAt: null,
+  });
+
+  it('counts unread mail, or says there is none', () => {
+    expect(mailSummary(t, data(4))).toBe('overview.board.mailUnread(count=4)');
+    expect(mailSummary(t, data(0))).toBe('overview.board.mailNone');
+  });
+
+  it('reports loading and a lapsed grant', () => {
+    expect(mailSummary(t, null)).toBe('overview.board.checking');
+    expect(mailSummary(t, data(0, true))).toBe('overview.board.reauth');
   });
 });

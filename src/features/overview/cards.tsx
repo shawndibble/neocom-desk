@@ -36,6 +36,7 @@ import {
   industrySeverity,
   jobSeverity,
   comingUpSeverity,
+  mailSeverity,
   spExtractionSeverity,
   contractsSeverity,
   miningTaxSeverity,
@@ -48,6 +49,7 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import type {
   CalendarEventsBoardData,
   ContractsBoardData,
+  MailBoardData,
   MiningTaxBoardData,
   PlanetaryBoardData,
   SpExtractionBoardData,
@@ -548,6 +550,63 @@ export function SpExtractionCard({ data }: { data: SpExtractionBoardData }) {
           severity={tone}
         />
       </TileRow>
+    </BoardCard>
+  );
+}
+
+// --- Mail -----------------------------------------------------------------
+
+/**
+ * The unread count, and the newest few unread mails as rows. A mail is
+ * genuinely its own thing (who sent it, about what), so a handful of rows
+ * says more than the number alone — but only a handful: the inbox is the
+ * Mail page's job.
+ */
+export function MailCard({ data, nowMs }: { data: MailBoardData | null; nowMs: number }) {
+  const { t } = useTranslation();
+  return (
+    <BoardCard
+      title={t('overview.board.mail')}
+      meta={
+        <SeverityWord
+          severity={mailSeverity(data)}
+          warningLabel={data?.needsReauth ? REAUTH_WORD : undefined}
+        />
+      }
+      to="/mail"
+      openLabel={t('overview.board.open')}
+      footer={
+        data === null
+          ? t('overview.board.checking')
+          : data.needsReauth
+            ? t('overview.board.reauth')
+            : data.unread > 0
+              ? t('overview.board.mailUnread', { count: data.unread })
+              : t('overview.board.mailNone')
+      }
+    >
+      {data === null || data.needsReauth || data.recent.length === 0 ? (
+        <CardEmpty>
+          {data === null
+            ? t('overview.board.checking')
+            : data.needsReauth
+              ? t('overview.board.reauth')
+              : t('overview.board.mailEmpty')}
+        </CardEmpty>
+      ) : (
+        <ul>
+          {data.recent.map((mail) => (
+            <TriageRow
+              key={mail.mailId}
+              severity="watch"
+              when={mail.atMs === null ? '—' : formatAge(Math.max(0, nowMs - mail.atMs), t)}
+              subject={mail.subject || t('overview.board.mailNoSubject')}
+              detail={mail.from ?? undefined}
+              to="/mail"
+            />
+          ))}
+        </ul>
+      )}
     </BoardCard>
   );
 }
