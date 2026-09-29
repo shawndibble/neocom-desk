@@ -57,8 +57,9 @@ import { useMarketWideOpportunities } from './useMarketWideOpportunities';
 import { SkillGateMarker } from './SkillGateMarker';
 import { ORDER_DEPTH_RANK } from './opportunityMetrics';
 import { StartPlanButton } from './StartPlanButton';
-import { useUrlFilter, useUrlParam, useUrlSort } from '@/lib/useUrlState';
+import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, defineUrlFilter, enumParam, enumSetParam } from '@/lib/urlState';
+import { useIsPhone } from '@/lib/useIsPhone';
 
 const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
   deep: 'success',
@@ -78,8 +79,6 @@ interface MarketWideOpportunitiesPanelProps {
   onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
 }
 
-const HIDE_SKILL_GATED = boolParam();
-
 /** "Max build cost" presets — a budget cap, applied to the ranked rows since cost is only known once priced. */
 const BUILD_COST_CAPS = ['any', '10m', '100m', '1b', '10b'] as const;
 type BuildCostCap = (typeof BUILD_COST_CAPS)[number];
@@ -96,6 +95,8 @@ interface MarketWideFilterState {
   categories: ReadonlySet<ProductCategory>;
   sources: ReadonlySet<BlueprintSource>;
   maxBuildCost: BuildCostCap;
+  /** Hides rows no Character on the account has the skills to build. */
+  hideSkillGated: boolean;
 }
 
 const MARKET_WIDE_FILTER = defineUrlFilter<MarketWideFilterState>({
@@ -103,6 +104,8 @@ const MARKET_WIDE_FILTER = defineUrlFilter<MarketWideFilterState>({
   categories: { key: 'marketWide.categories', codec: enumSetParam(PRODUCT_CATEGORIES) },
   sources: { key: 'marketWide.sources', codec: enumSetParam(BLUEPRINT_SOURCES) },
   maxBuildCost: { key: 'marketWide.maxCost', codec: enumParam(BUILD_COST_CAPS, 'any') },
+  // The key the standalone chip used, so links saved before the move still apply.
+  hideSkillGated: { key: 'marketWide.hideGated', codec: boolParam() },
 });
 
 function activeFilterCount(filter: MarketWideFilterState): number {
@@ -111,6 +114,7 @@ function activeFilterCount(filter: MarketWideFilterState): number {
     filter.categories.size !== PRODUCT_CATEGORIES.length,
     filter.sources.size !== BLUEPRINT_SOURCES.length,
     filter.maxBuildCost !== 'any',
+    filter.hideSkillGated,
   ].filter(Boolean).length;
 }
 
@@ -150,6 +154,7 @@ export function MarketWideOpportunitiesPanel({
   onStartPlan,
 }: MarketWideOpportunitiesPanelProps) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
   const tradeHubStandings = useTradeHubStandings(activeCharacterId);
   const standing = tradeHubStanding(tradeHubStandings, hub.id);
 
@@ -184,7 +189,8 @@ export function MarketWideOpportunitiesPanel({
       !sameMembers(next.tiers, filter.tiers) ||
       !sameMembers(next.categories, filter.categories) ||
       !sameMembers(next.sources, filter.sources);
-    if (hasRun && rescan) run(next);
+    // Mid-scan too: otherwise the scan already running lands with the old filters.
+    if ((hasRun || loading) && rescan) run(next);
   };
   const accountSkills = useAccountSkillLevels(characterIds);
 
@@ -199,7 +205,7 @@ export function MarketWideOpportunitiesPanel({
     return verdicts;
   }, [rows, catalog, accountSkills]);
 
-  const [hideSkillGated, setHideSkillGated] = useUrlParam('marketWide.hideGated', HIDE_SKILL_GATED);
+  const hideSkillGated = filter.hideSkillGated;
   const gatedCount = useMemo(
     () => rows.filter((row) => skillGateByProductTypeID.get(row.productTypeID)?.gated).length,
     [rows, skillGateByProductTypeID]
@@ -317,6 +323,83 @@ export function MarketWideOpportunitiesPanel({
     columns.map((column) => column.id)
   );
 
+  // On a phone with results, the funnel sits beside the table's sort picker
+  // rather than on a row of its own above it.
+  const filtersInSortBar = isPhone && hasRun && !loading && rows.length > 0;
+  const filterBar = (
+    <FilterBar
+      value={filter}
+      onChange={applyFilter}
+      activeCount={activeFilterCount(filter)}
+      className={filtersInSortBar ? undefined : 'mb-2'}
+    >
+      {(draft, setDraft) => (
+        <>
+          <FilterField label={t('industry.marketOpportunitiesFilters.maxBuildCost')}>
+            <Select
+              value={draft.maxBuildCost}
+              onValueChange={(value) => setDraft({ ...draft, maxBuildCost: value as BuildCostCap })}
+            >
+              <SelectTrigger
+                size="sm"
+                aria-label={t('industry.marketOpportunitiesFilters.maxBuildCost')}
+                className="w-52"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {BUILD_COST_CAPS.map((cap) => (
+                  <SelectItem key={cap} value={cap}>
+                    {t(`industry.marketOpportunitiesFilters.buildCostCaps.${cap}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+          <ChipGroup
+            label={t('industry.marketOpportunitiesFilters.tier')}
+            members={PRODUCT_TIERS}
+            selected={draft.tiers}
+            labelFor={(tier) => t(`industry.marketOpportunitiesFilters.tiers.${tier}`)}
+            onToggle={(tier) => setDraft({ ...draft, tiers: toggled(draft.tiers, tier) })}
+          />
+          <ChipGroup
+            label={t('industry.marketOpportunitiesFilters.category')}
+            members={PRODUCT_CATEGORIES}
+            selected={draft.categories}
+            labelFor={(category) => t(`industry.marketOpportunitiesFilters.categories.${category}`)}
+            onToggle={(category) =>
+              setDraft({ ...draft, categories: toggled(draft.categories, category) })
+            }
+          />
+          <ChipGroup
+            label={t('industry.marketOpportunitiesBlueprintSource')}
+            members={BLUEPRINT_SOURCES}
+            selected={draft.sources}
+            labelFor={(source) => t(`industry.marketOpportunitiesBlueprintSources.${source}`)}
+            onToggle={(source) => setDraft({ ...draft, sources: toggled(draft.sources, source) })}
+          />
+          <div
+            role="group"
+            aria-label={t('industry.marketOpportunitiesFilters.skills')}
+            className="flex flex-wrap items-center gap-2"
+          >
+            <span className="text-text-dim">{t('industry.marketOpportunitiesFilters.skills')}</span>
+            <FilterChip
+              label={t('industry.skillGateFilterChip')}
+              selected={draft.hideSkillGated}
+              onToggle={() => setDraft({ ...draft, hideSkillGated: !draft.hideSkillGated })}
+              {...(gatedCount > 0 && {
+                count: gatedCount,
+                countLabel: t('industry.skillGateFilterChipCount', { count: gatedCount }),
+              })}
+            />
+          </div>
+        </>
+      )}
+    </FilterBar>
+  );
+
   const unavailableNote =
     hasRun && unavailableSources.length > 0 ? (
       <p className="text-[0.6875rem] text-text-dim">
@@ -345,65 +428,7 @@ export function MarketWideOpportunitiesPanel({
         </Button>
       }
     >
-      <FilterBar
-        value={filter}
-        onChange={applyFilter}
-        activeCount={activeFilterCount(filter)}
-        className="mb-2"
-      >
-        {(draft, setDraft) => (
-          <>
-            <FilterField label={t('industry.marketOpportunitiesFilters.maxBuildCost')}>
-              <Select
-                value={draft.maxBuildCost}
-                onValueChange={(value) =>
-                  setDraft({ ...draft, maxBuildCost: value as BuildCostCap })
-                }
-              >
-                <SelectTrigger
-                  size="sm"
-                  aria-label={t('industry.marketOpportunitiesFilters.maxBuildCost')}
-                  className="w-52"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {BUILD_COST_CAPS.map((cap) => (
-                    <SelectItem key={cap} value={cap}>
-                      {t(`industry.marketOpportunitiesFilters.buildCostCaps.${cap}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <ChipGroup
-              label={t('industry.marketOpportunitiesFilters.tier')}
-              members={PRODUCT_TIERS}
-              selected={draft.tiers}
-              labelFor={(tier) => t(`industry.marketOpportunitiesFilters.tiers.${tier}`)}
-              onToggle={(tier) => setDraft({ ...draft, tiers: toggled(draft.tiers, tier) })}
-            />
-            <ChipGroup
-              label={t('industry.marketOpportunitiesFilters.category')}
-              members={PRODUCT_CATEGORIES}
-              selected={draft.categories}
-              labelFor={(category) =>
-                t(`industry.marketOpportunitiesFilters.categories.${category}`)
-              }
-              onToggle={(category) =>
-                setDraft({ ...draft, categories: toggled(draft.categories, category) })
-              }
-            />
-            <ChipGroup
-              label={t('industry.marketOpportunitiesBlueprintSource')}
-              members={BLUEPRINT_SOURCES}
-              selected={draft.sources}
-              labelFor={(source) => t(`industry.marketOpportunitiesBlueprintSources.${source}`)}
-              onToggle={(source) => setDraft({ ...draft, sources: toggled(draft.sources, source) })}
-            />
-          </>
-        )}
-      </FilterBar>
+      {!filtersInSortBar && filterBar}
       {loading ? (
         <div className="flex justify-center py-8">
           <Spinner label={t('industry.marketOpportunitiesScanning')} />
@@ -427,17 +452,6 @@ export function MarketWideOpportunitiesPanel({
         <div className="flex flex-col gap-2">
           {unavailableNote}
           <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
-          {gatedCount > 0 && (
-            <div className="flex justify-end">
-              <FilterChip
-                label={t('industry.skillGateFilterChip')}
-                selected={hideSkillGated}
-                onToggle={() => setHideSkillGated(!hideSkillGated)}
-                count={gatedCount}
-                countLabel={t('industry.skillGateFilterChipCount', { count: gatedCount })}
-              />
-            </div>
-          )}
           <div className="overflow-x-auto">
             <DataTable
               columns={columns}
@@ -447,6 +461,7 @@ export function MarketWideOpportunitiesPanel({
               rowMoreActions
               label={t('industry.marketOpportunitiesTitle')}
               mobileSort
+              stackActions={filtersInSortBar ? filterBar : undefined}
               {...sortProps}
             />
           </div>

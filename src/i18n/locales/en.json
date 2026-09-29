@@ -2324,6 +2324,7 @@
         "implants": "Implants & boosters",
         "other": "Other"
       },
+      "skills": "Skills",
       "maxBuildCost": "Max build cost",
       "buildCostCaps": {
         "any": "Any build cost",

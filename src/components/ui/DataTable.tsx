@@ -334,6 +334,8 @@ interface DataTableProps<T> {
   mobileSort?: boolean;
   /** Phone-only text left of the sort picker (e.g. "214 offers"). Only rendered with `mobileSort`. */
   stackSummary?: ReactNode;
+  /** Phone-only controls right of the sort picker (e.g. a filter trigger). Only rendered with `mobileSort`. */
+  stackActions?: ReactNode;
   /**
    * Phone-only grouping of equal-keyed rows behind a toggle row — see
    * `DataTableGroupBy`. Never applied at `sm` and up, where the rows have the
@@ -662,6 +664,7 @@ export function DataTable<T>({
   stackLayout = 'labelled',
   mobileSort = false,
   stackSummary,
+  stackActions,
   groupBy,
   virtualize = false,
 }: DataTableProps<T>) {
@@ -1090,6 +1093,7 @@ export function DataTable<T>({
           )}
         </select>
       </label>
+      {stackActions}
     </div>
   );
 
