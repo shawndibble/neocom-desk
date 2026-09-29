@@ -13,7 +13,9 @@
  * precache) and only reaches for ESI for ids no local payload covers. A
  * planetary commodity also gets its schematic (pi.json, precached the same
  * way): for those, "how is this made" is the question the modal is opened to
- * answer, and no dogma attribute carries it.
+ * answer, and no dogma attribute carries it. Anything a blueprint or
+ * reaction consumes gets "Used in" (`UsedInSection`), off the blueprint
+ * catalog — the same SDE files Build Plan reads, not ESI.
  */
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -55,6 +57,7 @@ import {
 } from './orderBookView';
 import { RequiredSkillsSection } from './RequiredSkillsSection';
 import { skillNameOrFallback } from './skillNameOrFallback';
+import { UsedInSection } from './UsedInSection';
 
 export interface ItemDetailModalProps {
   typeId: number;
@@ -209,11 +212,15 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
           <Spinner label={t('common.loading')} />
         </div>
       ) : error || !data ? (
-        <EmptyState
-          title={t('market.itemDetail.errorTitle')}
-          hint={t('market.itemDetail.errorHint')}
-          className="py-8"
-        />
+        <div className="space-y-4">
+          <EmptyState
+            title={t('market.itemDetail.errorTitle')}
+            hint={t('market.itemDetail.errorHint')}
+            className="py-8"
+          />
+          {/* Local SDE data, so it outlives an ESI failure. */}
+          <UsedInSection typeId={typeId} onNavigate={onClose} />
+        </div>
       ) : (
         <div className="space-y-4">
           <div className="flex items-start gap-3">
@@ -268,6 +275,8 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
           />
 
           <PlanetaryProduction pi={data.pi} typeId={typeId} />
+
+          <UsedInSection typeId={typeId} onNavigate={onClose} />
 
           {data.groups.length === 0 ? (
             <p className="text-xs text-text-dim">{t('market.itemDetail.noAttributes')}</p>

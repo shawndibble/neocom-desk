@@ -153,6 +153,55 @@ export function buildPlansByMaterialTypeID(
   return map;
 }
 
+/** One product an item goes into — a row of Item Detail's "Used in". */
+export interface MaterialUse {
+  blueprintTypeID: number;
+  productTypeID: number;
+  productName: string;
+  /** Units of the item one run consumes, before ME. */
+  quantity: number;
+  activity: BlueprintType['activity'];
+}
+
+const materialUsesByCatalog = new WeakMap<BlueprintCatalog, Map<number, MaterialUse[]>>();
+const NO_USES: readonly MaterialUse[] = [];
+
+/**
+ * Every product whose blueprint or reaction formula consumes `typeID`, by
+ * product name — Item Detail's "Used in". Unlike `buildPlansByMaterialTypeID`
+ * this is the full-SDE reverse index: the question is "what is this for", not
+ * "which of my plans needs it". Built once per catalog on first ask (a mineral
+ * feeds thousands of blueprints). One row per product, from the blueprint
+ * `byProductTypeID` holds — the one Build Plan opens — so the quantity per
+ * run is that blueprint's.
+ */
+export function materialUsesFor(catalog: BlueprintCatalog, typeID: number): readonly MaterialUse[] {
+  let index = materialUsesByCatalog.get(catalog);
+  if (!index) {
+    index = new Map();
+    for (const entry of catalog.entries) {
+      const productTypeID = entry.productTypeID;
+      if (productTypeID === null || catalog.byProductTypeID.get(productTypeID) !== entry) continue;
+      for (const material of entry.blueprint.materials) {
+        let uses = index.get(material.typeID);
+        if (!uses) index.set(material.typeID, (uses = []));
+        uses.push({
+          blueprintTypeID: entry.blueprintTypeID,
+          productTypeID,
+          productName: entry.productName,
+          quantity: material.quantity,
+          activity: entry.blueprint.activity,
+        });
+      }
+    }
+    for (const uses of index.values()) {
+      uses.sort((a, b) => a.productName.localeCompare(b.productName));
+    }
+    materialUsesByCatalog.set(catalog, index);
+  }
+  return index.get(typeID) ?? NO_USES;
+}
+
 /** Adapt an SDE BlueprintType to the shape src/engine/industry consumes. */
 export function toIndustryBlueprint(blueprint: BlueprintType): IndustryBlueprint {
   return {

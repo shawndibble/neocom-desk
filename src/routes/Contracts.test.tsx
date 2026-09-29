@@ -35,6 +35,17 @@ vi.mock('@/sde/loadSde', () => ({
   loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
+// Turning `isSyncConfigured` on lets `App` fire a real sync at boot (and the
+// background sweep), which initializes Firebase; its heartbeat then opens
+// IndexedDB and can call back after jsdom has torn down ("self is not
+// defined", an unhandled error that fails the shard). The UI under test only
+// needs the flag, not a sync.
+vi.mock('@/sync', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/sync')>()),
+  triggerSync: vi.fn(async () => {}),
+  scheduleSync: vi.fn(),
+}));
+
 // The Search tab reads a Firestore snapshot. Forced off here so this file
 // stays about the tab strip and the character-contracts table: whether a sync
 // backend is configured otherwise depends on whether a `.env` happens to sit

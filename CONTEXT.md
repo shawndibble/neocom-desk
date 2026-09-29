@@ -389,6 +389,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **Item Detail**: The modal view of one item's own properties — fitting cost,
   volume, bonuses, description. Read live from ESI per item, not from the SDE
   snapshot, so it is the one Market Browser panel that needs the network.
+  Its **Used in** section lists the products whose blueprint or reaction
+  consumes the item, each with the full item menu.
 - **Item Actions**: What an item menu can do on the page it's on — add to the
   Quickbar, find the blueprint behind Build Plan, and open the page's one
   Item Detail (Show info). One set per page, shared by every item menu on it

@@ -5231,6 +5231,13 @@
       "planetaryCycle": "{{quantity}} per {{duration}} cycle",
       "planetaryInput": "{{quantity}} x {{name}}",
       "planetaryRaw": "Extracted straight off a planet with an Extractor Control Unit — no schematic produces it.",
+      "usedInTitle_one": "Used in ({{formatted}})",
+      "usedInTitle_other": "Used in ({{formatted}})",
+      "usedInFilter": "Filter products",
+      "usedInNoMatch": "No products match.",
+      "usedInPerRun": "{{quantity}} / run",
+      "usedInReaction": "Reaction",
+      "usedInShowMore": "Show more ({{shown}} of {{total}})",
       "noAttributes": "No fitting attributes for this item.",
       "errorTitle": "Couldn't load item info",
       "errorHint": "Try again, or reload the page."
