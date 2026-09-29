@@ -42,7 +42,12 @@ test('picking a Character from the More sheet returns to the page you switched f
   // has somewhere other than Overview to prove it returns to.
   await mobileNav.getByRole('button', { name: 'More' }).click();
   await page.getByRole('dialog', { name: 'More' }).getByRole('link', { name: 'Wallet' }).click();
-  await expect(page).toHaveURL(/\/wallet(\/|$)/);
+  // The link targets bare `/wallet`, which `TabRoute` then replaces with its
+  // default tab. Wait for that redirect to settle before recording where we
+  // are: matching the transient `/wallet` and reading `page.url()` raced the
+  // redirect, so the recorded origin was sometimes `/wallet` while the app
+  // (correctly) returned to `/wallet/balance`.
+  await expect(page).toHaveURL(/\/wallet\/balance$/);
   const walletUrl = page.url();
 
   // Switch characters via the More sheet's portrait+name row.
