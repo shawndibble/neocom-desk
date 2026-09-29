@@ -38,3 +38,17 @@ export function blueprintSource(
 ): BlueprintSource | null {
   return PREFERENCE.find((source) => sets[source].has(blueprintTypeID)) ?? null;
 }
+
+/** Tech I and Structure Tech I (`variations.json` metaGroups) — the only tiers NPCs sell blueprints for. */
+const NPC_SEEDED_META_GROUPS: ReadonlySet<number> = new Set([1, 54]);
+
+/**
+ * Whether NPCs sell the blueprint for a product of this meta group.
+ * Market-grouping alone isn't enough: CCP market-groups the old T2 lottery
+ * BPOs (Vagabond, Crow, Sabre…) and some faction LP blueprints too, and no
+ * NPC seeds any of those. A product with no meta group is a T1 root —
+ * components, capitals, fuel blocks, structures.
+ */
+export function isNpcSeededProduct(productMetaGroupId: number | undefined): boolean {
+  return productMetaGroupId === undefined || NPC_SEEDED_META_GROUPS.has(productMetaGroupId);
+}
