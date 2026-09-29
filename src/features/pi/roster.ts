@@ -65,7 +65,7 @@ export interface RosterColony {
    * header's `DataAgeBadge` shows. These rows are cache-only and exempt from
    * the age prune, so this can be arbitrarily old.
    */
-  fetchedAt: Date;
+  oldestFetchedAt: Date;
 }
 
 export interface PiRosterSnapshot {
@@ -132,7 +132,7 @@ export async function loadPiRosterSnapshot(activeCharacterId: number): Promise<P
         character.characterId,
         planets.map((planet) => planet.planet_id)
       );
-      const fetchedAt = new Date(
+      const oldestFetchedAt = new Date(
         Math.min(
           listFetchedAt.getTime(),
           ...[...details.values()].map((row) => row.fetchedAt.getTime())
@@ -144,7 +144,7 @@ export async function loadPiRosterSnapshot(activeCharacterId: number): Promise<P
           characterName: character.name,
           planet,
           detail: details.get(planet.planet_id)?.data ?? null,
-          fetchedAt,
+          oldestFetchedAt,
         });
       }
     })

@@ -3,6 +3,7 @@ import { setupServer } from 'msw/node';
 import { db } from '@/db';
 import { configureEsi } from '@/esi/client';
 import { writeCached } from '@/esi/cache';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { loadPiRosterSnapshot } from './roster';
 
 vi.mock('@/sde/loadSde', () => ({
@@ -175,9 +176,8 @@ describe('loadPiRosterSnapshot', () => {
   });
 
   it("stamps every alt colony with that alt's oldest cached fetch, list or detail", async () => {
-    const HOUR = 3_600_000;
-    const threeDaysOld = FETCHED_AT - 72 * HOUR;
-    const hourOld = FETCHED_AT - HOUR;
+    const threeDaysOld = FETCHED_AT - 3 * DAY_MS;
+    const hourOld = FETCHED_AT - HOUR_MS;
     await addCharacter(ACTIVE_ID, 'Active Pilot', [PLANETS_SCOPE]);
     await addCharacter(91, 'Old List', [PLANETS_SCOPE]);
     await addCharacter(92, 'Old Detail', [PLANETS_SCOPE]);
@@ -193,7 +193,7 @@ describe('loadPiRosterSnapshot', () => {
 
     expect(snapshot.colonies).toHaveLength(4);
     for (const colony of snapshot.colonies) {
-      expect(colony.fetchedAt.getTime()).toBe(threeDaysOld);
+      expect(colony.oldestFetchedAt.getTime()).toBe(threeDaysOld);
     }
   });
 });

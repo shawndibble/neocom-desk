@@ -803,7 +803,7 @@ describe('PlanetaryIndustry', () => {
       characterId: ALT_ID,
       key: `planet:${ALT_PLANET_ID}`,
       value: detailPayload,
-      fetchedAt: Date.now() - 3_600_000,
+      fetchedAt: Date.now() - DAY_MS / 24,
     });
 
     render(<App />);

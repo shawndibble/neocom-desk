@@ -1121,15 +1121,13 @@ export function PlanetaryIndustry() {
         loadedAt
       );
       const group = byCharacter.get(colony.characterId);
-      if (group) {
-        group.colonies.push({ colony, status });
-        // Oldest wins. The roster already stamps one value per Character, so
-        // this only matters if that ever stops being true.
-        if (colony.fetchedAt < group.fetchedAt) group.fetchedAt = colony.fetchedAt;
-      } else
+      if (group) group.colonies.push({ colony, status });
+      else
         byCharacter.set(colony.characterId, {
           characterName: colony.characterName,
-          fetchedAt: colony.fetchedAt,
+          // One value per Character — the roster stamps every colony of an
+          // alt with that alt's oldest fetch, so the first colony's will do.
+          fetchedAt: colony.oldestFetchedAt,
           colonies: [{ colony, status }],
         });
     }
