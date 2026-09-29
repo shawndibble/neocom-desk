@@ -93,7 +93,8 @@ export function IndustryGroupPage() {
       pricingInputs.assumedMe,
       options,
       pricingInputs.corpBlueprints,
-      bpcRows
+      bpcRows,
+      pricingInputs.includeBlueprintCost
     );
     if (picks.size === 0) return;
     await patchBuildPlans([...picks.keys()], (p) => {
