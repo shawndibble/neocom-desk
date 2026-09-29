@@ -6,6 +6,7 @@ import type { BuildResult } from '@/engine/industry/types';
 import { compareUseOrSell, type OwnedStockSale } from '@/engine/industry/ownedStockSale';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { formatDuration } from '@/lib/duration';
+import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import { formatPercent } from './format';
@@ -183,8 +184,12 @@ export function PlanVerdictHero({
         its column — three fixed-width blocks side by side used to force the
         whole page to scroll sideways at ordinary desktop widths.
       */}
+      {/* The right padding clears the corner button: 44px on touch below `md`, 28px above. */}
       <div
-        className={`flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between ${hasItemActions ? 'pr-8' : ''}`}
+        className={cx(
+          'flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between',
+          hasItemActions && 'pr-10 md:pr-6'
+        )}
       >
         <div className="flex min-w-0 flex-1 flex-col gap-4 md:flex-row md:items-start md:gap-6">
           <div className="min-w-0 space-y-1 md:flex-1">
