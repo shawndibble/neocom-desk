@@ -86,7 +86,10 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // Corp events (issue #299): the board and the roster are the only two
   // corp routes the app serves (`app/routeScopes.ts`).
   structureFuelLow: '/corp',
-  corpIndustryJobReady: '/corp',
+  // Not the corp board (issue #2302): that shows the job with nothing pointing
+  // at it, and not at all once delivered. Active Jobs lists corp jobs and
+  // keeps the one `?highlight=` names, whoever installed it.
+  corpIndustryJobReady: '/industry',
   corpMemberJoined: '/corp/members',
   corpMemberLeft: '/corp/members',
   corpWalletThreshold: '/corp',
@@ -175,6 +178,7 @@ const SUBJECT_URLS: Partial<Record<NotificationEventId, SubjectUrl>> = {
   contractFailed: highlightRow,
   courierDeliveryDue: highlightRow,
   industryJobComplete: highlightRow,
+  corpIndustryJobReady: highlightRow,
   corpMemberJoined: highlightRow,
   // The item itself, selected via Market Browser's own `?type=` param rather
   // than a pulsed table row — there is no table on arrival to pulse.

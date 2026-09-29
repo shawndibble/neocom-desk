@@ -2023,6 +2023,8 @@
     "jobsReauthHint": "This character logged in before industry job tracking was added. Log this character in again to grant the new permission.",
     "jobsReauthAction": "Log in again with EVE Online",
     "jobsCharacterNotShared": "This character hasn't granted industry-jobs access",
+    "jobsCorpNotReadable": "corp jobs need the Factory Manager role on a character here",
+    "jobsCorpBadge": "Corp",
     "jobsDone": "Done",
     "jobsCompletingSoon": "Completing soon",
     "jobsProgress": "{{name}} progress",

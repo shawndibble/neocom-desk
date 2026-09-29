@@ -11,6 +11,7 @@ import type { BlueprintMap, TypeMap } from '@/sde/types';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
+import * as corpJobsModule from './corpJobs';
 import { FakeItemActions, fakeItemActions } from '@/features/market/__fixtures__/itemActions';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
@@ -793,8 +794,10 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
         '/industry/plans?jobs.activity=11&jobs.status=done&jobs.chars=current&highlight=1&tab=keep'
       );
 
-      await expandJobs(user);
-      expect(screen.getByText('No jobs match these filters')).toBeInTheDocument();
+      // No expand click: `?highlight=` naming a listed job opens the panel
+      // itself (issue #2302), or the pulse would land inside a folded list.
+      expect(await screen.findByText('No jobs match these filters')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Hide job list' })).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Reset filters' }));
 
       expect(await screen.findByText('Widget Alpha')).toBeInTheDocument();
@@ -1587,5 +1590,89 @@ describe('ActiveJobsPanel: open job-slot header (issue #679)', () => {
     expect(summaryTrigger.textContent).toBe('Free slots—/—/—');
     fireEvent.focus(summaryTrigger);
     expect(screen.getByRole('tooltip')).toHaveTextContent('Mfg — · Sci — · Rxn —');
+  });
+});
+
+describe('ActiveJobsPanel: corp jobs by installer (issue #2302)', () => {
+  const CORPMATE = 777;
+
+  function corpJob(overrides: Record<string, unknown> = {}) {
+    return {
+      job_id: 500,
+      installer_id: CHAR_ID,
+      activity_id: 1,
+      blueprint_id: 9000,
+      blueprint_type_id: 300,
+      blueprint_location_id: 60003760,
+      output_location_id: 60003760,
+      facility_id: 60003760,
+      location_id: 60003760,
+      runs: 2,
+      start_date: new Date(NOW.getTime() - 30 * 60_000).toISOString(),
+      end_date: new Date(NOW.getTime() + 90 * 60_000).toISOString(),
+      status: 'active' as const,
+      ...overrides,
+    };
+  }
+
+  function mockCorpJobs(jobs: ReturnType<typeof corpJob>[], unreadableCharacterIds: number[] = []) {
+    vi.spyOn(corpJobsModule, 'loadAccountCorpIndustryJobs').mockResolvedValue({
+      jobs,
+      unreadableCharacterIds,
+      fetchedAt: NOW,
+      fromCache: false,
+    });
+  }
+
+  function renderAt(url: string) {
+    render(
+      <MemoryRouter initialEntries={[url]}>
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+  }
+
+  beforeEach(async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    await db.characters.clear();
+    await db.characters.put({
+      characterId: CHAR_ID,
+      name: 'Pilot One',
+      ownerHash: 'oh1',
+      addedAt: 1,
+    });
+    // The pilot from the report: no personal jobs at all.
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([])));
+  });
+
+  it('lists a corp job the character installed, badged Corp, when it has no personal jobs', async () => {
+    mockCorpJobs([corpJob(), corpJob({ job_id: 501, installer_id: CORPMATE })]);
+    renderAt('/industry');
+
+    expect(await screen.findByText('1 running · 0 done')).toBeInTheDocument();
+    await expandJobs();
+    const row = screen.getByText('Widget Gamma').closest('tr')!;
+    expect(within(row).getByText('Corp')).toBeInTheDocument();
+    // The corpmate's job is theirs, not this pilot's.
+    expect(screen.getAllByRole('row')).toHaveLength(2);
+  });
+
+  it("opens itself on the job a corp alert named, even a corpmate's", async () => {
+    mockCorpJobs([corpJob({ job_id: 501, installer_id: CORPMATE })]);
+    renderAt('/industry?highlight=501');
+
+    const name = await screen.findByText('Widget Gamma');
+    expect(name.closest('tr')).toHaveClass('row-pulse');
+    expect(screen.getByRole('button', { name: 'Hide job list' })).toBeInTheDocument();
+  });
+
+  it('says so when no character here can read its corporation jobs', async () => {
+    mockCorpJobs([], [CHAR_ID]);
+    renderAt('/industry');
+
+    expect(await screen.findByText(/corp jobs need the Factory Manager role/)).toBeInTheDocument();
   });
 });
