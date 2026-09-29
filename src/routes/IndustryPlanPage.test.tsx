@@ -14,6 +14,7 @@ import { clearCostIndexCache } from '@/features/industry/marketData';
 import { useBuildGroups } from '@/features/industry/buildGroups';
 import { useAssumedMe } from '@/features/industry/assumedMe';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
+import { clearWorkspaceLoadCache } from '@/features/industry/workspaceLoadCache';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -200,6 +201,8 @@ afterEach(() => {
   window.matchMedia = realMatchMedia;
 });
 beforeEach(async () => {
+  // Each test mocks its own catalog; a page must not start from the last test's.
+  clearWorkspaceLoadCache();
   useDesktopViewport();
   await db.characters.clear();
   await db.tokens.clear();

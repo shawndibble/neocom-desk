@@ -48,7 +48,8 @@ interface MobileOpportunityListProps {
   showCharacterColumn: boolean;
   selectedIds: ReadonlySet<string>;
   onToggleSelected: (id: string) => void;
-  onStartPlan: (entry: BlueprintCatalogEntry) => void;
+  /** Resolves true once it has opened the new plan (see `StartPlanButton`). */
+  onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
   onViewHistory: (typeId: number, itemName: string, regionId: number) => void;
   /** Account-wide skill gate for a row's product (issue #1231). */
   skillGateFor: (productTypeID: number) => SkillGateVerdict | undefined;
@@ -264,7 +265,9 @@ export function MobileOpportunityList({
                       />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => onStartPlan(row.candidate.catalogEntry)}>
+                      <DropdownMenuItem
+                        onSelect={() => void onStartPlan(row.candidate.catalogEntry)}
+                      >
                         {t('industry.marketOpportunitiesStartPlan')}
                       </DropdownMenuItem>
                     </DropdownMenuContent>

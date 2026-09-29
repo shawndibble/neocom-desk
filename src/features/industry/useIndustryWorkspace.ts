@@ -4,9 +4,10 @@
  * extracted from what used to be one `Industry.tsx` mounting all three at
  * once. Each page calls this independently rather than sharing a layout
  * route: this codebase's routes are a flat path -> element map (see
- * `App.tsx`), not a nested `<Route>`/`<Outlet>` tree, and every load here
- * (`loadBlueprintCatalog`, `loadPi`, ...) is already cache-backed, so paying
- * for it again on navigation between Industry pages is cheap.
+ * `App.tsx`), not a nested `<Route>`/`<Outlet>` tree. A page mounting for the
+ * same Character starts from the last page's load (`workspaceLoadCache.ts`)
+ * and refreshes behind it, so opening a plan never waits on loads the index
+ * just finished.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { hydrateActivityFacilityDefaults, useFacilityDefaults } from './facilityDefaults';
@@ -24,6 +25,7 @@ import { loadCharacterModifiers } from '@/features/character/characterModifiers'
 import { loadBlueprintCatalog, type BlueprintCatalog } from './blueprintCatalog';
 import { loadCharacterBlueprints } from './data';
 import { useOwnedStockSnapshot } from './useDetectedOwnedStock';
+import { lastWorkspaceLoad, rememberWorkspaceLoad, reuseIfUnchanged } from './workspaceLoadCache';
 import { useCorpOwnedStockSource, type CorpOwnedStockState } from './corpOwnedStock';
 import { useBuildGroups } from './buildGroups';
 import { useBuildPlanPricingInputs, type BuildPlanPricingInputs } from './buildPlanPricingInputs';
@@ -84,11 +86,19 @@ export function useIndustryWorkspace(): IndustryWorkspace {
     void hydrateAssumedTe();
   }, [hydrateBuildGroups, hydrateAssumedTe]);
 
-  const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
-  const [pi, setPi] = useState<PiData | null>(null);
-  const [ownedBlueprints, setOwnedBlueprints] = useState<CharacterBlueprint[]>([]);
-  const [blueprintsNeedsReauth, setBlueprintsNeedsReauth] = useState(false);
-  const [modifiers, setModifiers] = useState<CharacterModifiers>(NO_CHARACTER_MODIFIERS);
+  // Read once, on mount: every field below starts from the same load.
+  const [initial] = useState(() => lastWorkspaceLoad(activeCharacterId));
+  const [catalog, setCatalog] = useState<BlueprintCatalog | null>(initial?.catalog ?? null);
+  const [pi, setPi] = useState<PiData | null>(initial?.pi ?? null);
+  const [ownedBlueprints, setOwnedBlueprints] = useState<CharacterBlueprint[]>(
+    initial?.ownedBlueprints ?? []
+  );
+  const [blueprintsNeedsReauth, setBlueprintsNeedsReauth] = useState(
+    initial?.blueprintsNeedsReauth ?? false
+  );
+  const [modifiers, setModifiers] = useState<CharacterModifiers>(
+    initial?.modifiers ?? NO_CHARACTER_MODIFIERS
+  );
 
   useEffect(() => {
     if (activeCharacterId === null) return;
@@ -108,11 +118,23 @@ export function useIndustryWorkspace(): IndustryWorkspace {
         }),
       ]);
       if (cancelled) return;
-      setCatalog(cat);
-      setPi(planetary);
-      setOwnedBlueprints(owned.cached?.data ?? []);
-      setBlueprintsNeedsReauth(owned.needsReauth);
-      setModifiers(loadedModifiers);
+      // Diffed against the load this mount started from, so a refresh that
+      // changed nothing keeps each value's identity and doesn't re-price.
+      const previous = lastWorkspaceLoad(activeCharacterId);
+      const load = {
+        characterId: activeCharacterId,
+        catalog: cat,
+        pi: planetary,
+        ownedBlueprints: reuseIfUnchanged(previous?.ownedBlueprints, owned.cached?.data ?? []),
+        blueprintsNeedsReauth: owned.needsReauth,
+        modifiers: reuseIfUnchanged(previous?.modifiers, loadedModifiers),
+      };
+      rememberWorkspaceLoad(load);
+      setCatalog(load.catalog);
+      setPi(load.pi);
+      setOwnedBlueprints(load.ownedBlueprints);
+      setBlueprintsNeedsReauth(load.blueprintsNeedsReauth);
+      setModifiers(load.modifiers);
     })();
     return () => {
       cancelled = true;

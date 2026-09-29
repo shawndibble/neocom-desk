@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { Button, EmptyState, Modal, Spinner } from '@/components/ui';
+import { preloadRouteChunk } from '@/app/routeChunks';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { IndustryHeader } from '@/features/industry/IndustryHeader';
 import {
@@ -121,6 +122,11 @@ export function Industry() {
   useEffect(() => {
     void hydrateExpandedGroups();
   }, [hydrateExpandedGroups]);
+  // Opening a plan (a row, "Start a plan", a deep link) leaves for its own
+  // page; fetch that page's chunk now so the click doesn't wait on it.
+  useEffect(() => {
+    preloadRouteChunk('/industry/plans/:planId');
+  }, []);
 
   const [fitImportOpen, setFitImportOpen] = useState(false);
   // EFT text a Fitting's Export menu ("Manufacture Plan") arrived with, to
@@ -152,6 +158,11 @@ export function Industry() {
     if (!compareMode) setCompareSelectedIds(new Set());
   }
   const [comparing, setComparing] = useState(false);
+
+  // One plan per "Start a plan": set from the click until this page leaves
+  // for the new plan, so a second tap while the first is still saving (the
+  // phone list's menu item has no busy state of its own) can't add a twin.
+  const startingPlanRef = useRef(false);
 
   const createPlan = useCallback(
     async (
@@ -468,14 +479,24 @@ export function Industry() {
     setTab('plans');
   }
 
-  function handleStartPlan(entry: BlueprintCatalogEntry) {
+  async function handleStartPlan(entry: BlueprintCatalogEntry): Promise<boolean> {
     // Distinct from the plain search-box create: picking a scan result or an
     // owned Opportunities row is an explicit "go build this" choice, same as
     // opening a `?product=` deep link, so it opens the new plan's own page
     // rather than leaving the pilot on the Opportunities tab.
-    void createPlan(entry).then((id) => {
-      if (id) navigate(`/industry/plans/${id}`);
-    });
+    if (startingPlanRef.current) return false;
+    startingPlanRef.current = true;
+    try {
+      const id = await createPlan(entry);
+      if (id) {
+        navigate(`/industry/plans/${id}`);
+        return true;
+      }
+    } catch {
+      // Nothing opened; the button comes back for another try.
+    }
+    startingPlanRef.current = false;
+    return false;
   }
 
   function exitCompare() {

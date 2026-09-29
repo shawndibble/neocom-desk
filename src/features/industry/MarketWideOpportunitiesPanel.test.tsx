@@ -57,7 +57,7 @@ function renderPanel(actions = fakeItemActions()) {
           catalog={catalog}
           modifiers={{} as CharacterModifiers}
           activeCharacterId={null}
-          onStartPlan={() => {}}
+          onStartPlan={() => Promise.resolve(false)}
         />,
         actions
       )}

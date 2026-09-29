@@ -105,7 +105,7 @@ describe('OpportunitiesPanel', () => {
           ownedStockSnapshot={SNAPSHOT}
           assumedMe={0}
           onAddToCompare={() => {}}
-          onStartPlan={() => {}}
+          onStartPlan={() => Promise.resolve(false)}
         />
       ),
       { wrapper: MemoryRouter }
@@ -176,7 +176,7 @@ describe('OpportunitiesPanel', () => {
             ownedStockSnapshot={SNAPSHOT}
             assumedMe={0}
             onAddToCompare={() => {}}
-            onStartPlan={() => {}}
+            onStartPlan={() => Promise.resolve(false)}
             {...handlers}
           />,
           actions
@@ -278,7 +278,7 @@ describe('OpportunitiesPanel', () => {
           ownedStockSnapshot={SNAPSHOT}
           assumedMe={0}
           onAddToCompare={() => {}}
-          onStartPlan={() => {}}
+          onStartPlan={() => Promise.resolve(false)}
         />
       ),
       { wrapper: MemoryRouter }
@@ -344,7 +344,7 @@ describe('OpportunitiesPanel', () => {
             ownedStockSnapshot={SNAPSHOT}
             assumedMe={0}
             onAddToCompare={() => {}}
-            onStartPlan={() => {}}
+            onStartPlan={() => Promise.resolve(false)}
           />
         ),
         { wrapper: MemoryRouter }
