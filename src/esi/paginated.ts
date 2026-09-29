@@ -98,7 +98,14 @@ export async function fetchAllPagesStatus<T>(
       notModified: result.notModified,
     }));
   try {
-    const first = await esiFetch<T[]>(path, { ...fetchOptions, page: 1, etag: pageEtags?.[0] });
+    let first = await esiFetch<T[]>(path, { ...fetchOptions, page: 1, etag: pageEtags?.[0] });
+    // X-Pages is the only page count there is, and a 304 need not carry it
+    // (ESI's does; nothing guarantees it). A page-1 304 that reads as one page
+    // when more were held is asked again unconditionally, rather than letting
+    // pages 2..N silently drop off the list.
+    if (first.notModified && first.pages === 1 && (pageEtags?.length ?? 0) > 1) {
+      first = await esiFetch<T[]>(path, { ...fetchOptions, page: 1 });
+    }
     const responses: PageResponse<T>[] = [
       { items: first.data, etag: first.etag, notModified: first.notModified },
     ];

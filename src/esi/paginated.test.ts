@@ -443,6 +443,38 @@ describe('fetchAllPagesStatus — per-page ETag revalidation', () => {
     expect(result.pageResponses?.map((p) => p.notModified)).toEqual([true, true, false]);
   });
 
+  it('a page-1 304 without X-Pages is asked again unconditionally, so pages 2..N are not lost', async () => {
+    const sent: Array<[number, string | null]> = [];
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/10000002/orders`, ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page'));
+        const ifNoneMatch = request.headers.get('if-none-match');
+        sent.push([page, ifNoneMatch]);
+        const etag = `"p${page}"`;
+        // A 304 that leaves X-Pages off would otherwise read as a 1-page list.
+        if (ifNoneMatch === etag)
+          return new HttpResponse(null, { status: 304, headers: { ETag: etag } });
+        return HttpResponse.json([`item-${page}`], { headers: { 'X-Pages': '3', ETag: etag } });
+      })
+    );
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders', {
+      pageEtags: ['"p1"', '"p2"', '"p3"'],
+    });
+
+    expect([...sent].sort((a, b) => a[0] - b[0] || (a[1] ?? '').localeCompare(b[1] ?? ''))).toEqual(
+      [
+        [1, null],
+        [1, '"p1"'],
+        [2, '"p2"'],
+        [3, '"p3"'],
+      ]
+    );
+    expect(result).toMatchObject({ truncated: false, pagesFetched: 3, pagesReported: 3 });
+    expect(result.pageResponses?.map((p) => p.notModified)).toEqual([false, true, true]);
+    expect(result.items).toEqual(['item-1']);
+  });
+
   it('leaves pageResponses off when not revalidating', async () => {
     const { handler } = etaggedHandler(2);
     server.use(handler);
