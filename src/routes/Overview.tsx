@@ -576,13 +576,17 @@ export function Overview() {
             ? null
             : { label: `${formatIsk(walletBalance, 2)} ${t('overview.isk')}`, to: '/wallet' }
         }
+        // A hidden card's read is still made, but it is not the board's
+        // freshness: a stale Mining read nobody can see must not mark the
+        // whole board offline. Refresh below still reloads every card, so one
+        // switched back on is not stale either.
         fetchedAt={stalest([
           walletSnapshot.data?.result?.fetchedAt,
           skillsQueueSnapshot.data?.queueResult?.fetchedAt,
-          planetarySnapshot.data?.fetchedAt,
-          industrySnapshot.data?.fetchedAt,
-          miningSnapshot.data?.fetchedAt,
-          contractsSnapshot.data?.fetchedAt,
+          shown('planetary') ? planetarySnapshot.data?.fetchedAt : null,
+          shown('industry') ? industrySnapshot.data?.fetchedAt : null,
+          shown('mining') ? miningSnapshot.data?.fetchedAt : null,
+          shown('contracts') ? contractsSnapshot.data?.fetchedAt : null,
           calendarSnapshot.data?.fetchedAt,
         ])}
         now={now}
@@ -608,11 +612,11 @@ export function Overview() {
         }
         refreshing={
           walletSnapshot.loading ||
-          planetarySnapshot.loading ||
-          industrySnapshot.loading ||
-          ordersSnapshot.loading ||
-          miningSnapshot.loading ||
-          contractsSnapshot.loading ||
+          (shown('planetary') && planetarySnapshot.loading) ||
+          (shown('industry') && industrySnapshot.loading) ||
+          (shown('orders') && ordersSnapshot.loading) ||
+          (shown('mining') && miningSnapshot.loading) ||
+          (shown('contracts') && contractsSnapshot.loading) ||
           calendarSnapshot.loading
         }
       />
