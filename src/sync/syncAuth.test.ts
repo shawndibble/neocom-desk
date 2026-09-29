@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { signInWithCustomToken, signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
@@ -151,17 +151,17 @@ describe('ensureSignedIn under concurrent sign-ins', () => {
     await flush();
     landings.get('token-1')?.resolve();
 
-    const results = await Promise.allSettled([a, b]);
-    for (const [key, result, expected] of [
-      ['a', results[0], 'char:1'],
-      ['b', results[1], 'char:2'],
-    ] as const) {
-      if (result.status === 'fulfilled') {
-        expect(result.value).toBe(expected);
-        expect(ownerWhenResolved[key]).toBe(expected);
-      }
-    }
+    // Serialized, so neither overtakes the other: both resolve, each while it
+    // owns the session.
+    await expect(a).resolves.toBe('char:1');
+    await expect(b).resolves.toBe('char:2');
+    expect(ownerWhenResolved).toEqual({ a: 'char:1', b: 'char:2' });
   });
+
+  // The two tests below make `currentUser` change under a sign-in without any
+  // `ensureSignedIn` call: in-app sign-ins are serialized, so this models the
+  // cross-tab case, where another tab's sign-in swaps the shared persisted
+  // session.
 
   it('retries once when a concurrent sign-in overtook it, then resolves as itself', async () => {
     let calls = 0;
@@ -261,5 +261,52 @@ describe('ensureAnySession', () => {
 
     await expect(alt).rejects.toThrow(/mint failed/);
     await expect(any).resolves.toBe('char:1');
+  });
+});
+
+describe('sign-in bounds and restored sessions', () => {
+  beforeEach(async () => {
+    await signOutOfSync();
+    fakeAuth.currentUser = null;
+    vi.clearAllMocks();
+    mintPerCharacter();
+    vi.mocked(signInWithCustomToken).mockImplementation(async (_auth, token) => {
+      const user = { uid: token.replace('token-', 'char:') };
+      fakeAuth.currentUser = user;
+      return { user } as never;
+    });
+  });
+
+  afterEach(() => {
+    delete (fakeAuth as { authStateReady?: unknown }).authStateReady;
+  });
+
+  it('bounds the mint callable so one slow mint cannot stall the sign-in queue', async () => {
+    await ensureSignedIn(1);
+    expect(httpsCallable).toHaveBeenCalledWith({}, 'mintFirebaseToken', { timeout: 20_000 });
+  });
+
+  it('ensureAnySession reuses a persisted session Firebase has not restored yet', async () => {
+    // The session is on disk but `currentUser` is null until restore lands.
+    Object.assign(fakeAuth, {
+      authStateReady: async () => {
+        fakeAuth.currentUser = { uid: 'char:2' };
+      },
+    });
+
+    await expect(ensureAnySession(1)).resolves.toBe('char:2');
+    expect(signInWithCustomToken).not.toHaveBeenCalled();
+    expect(fakeAuth.currentUser?.uid).toBe('char:2');
+  });
+
+  it('ensureSignedIn skips the mint when the restored session is already this character', async () => {
+    Object.assign(fakeAuth, {
+      authStateReady: async () => {
+        fakeAuth.currentUser = { uid: 'char:1' };
+      },
+    });
+
+    await expect(ensureSignedIn(1)).resolves.toBe('char:1');
+    expect(mint).not.toHaveBeenCalled();
   });
 });

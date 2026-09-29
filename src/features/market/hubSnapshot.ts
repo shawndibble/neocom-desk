@@ -79,17 +79,14 @@ export async function loadHubSnapshotRange(
 ): Promise<HubSnapshotRange> {
   if (!isSyncConfigured() || startDate > endDate) return EMPTY_RANGE;
 
-  try {
-    await ensureAnySession(characterId);
-  } catch {
-    return EMPTY_RANGE;
-  }
-
   const cacheKey = `marketHistory:${startDate}:${endDate}`;
   const cached = await loadWithCache<Record<string, MarketHistoryDocData>>(
     GLOBAL_CACHE_CHARACTER_ID,
     cacheKey,
     async () => {
+      // Only the live read needs a session: a cached range shouldn't wait on
+      // the sign-in queue, and an offline sign-in failure falls back to it.
+      await ensureAnySession(characterId);
       const snapshot = await getDocs(
         query(
           collection(getSyncFirestore(), COLLECTION),

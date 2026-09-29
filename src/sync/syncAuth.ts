@@ -4,8 +4,9 @@
 // Sync docs are per character, so the client signs in as the ACTIVE character
 // and re-authenticates on character switch (ensureSignedIn is a no-op when the
 // session already matches). Reads that only need *a* session (the public
-// snapshots) use ensureAnySession instead, so they never swap it mid-sync. Cross-device: the same character always maps to
-// the same uid, so its docs converge across devices.
+// snapshots) use ensureAnySession instead, so they never swap it mid-sync.
+// Cross-device: the same character always maps to the same uid, so its docs
+// converge across devices.
 //
 // The EVE refresh token never leaves the device: only the current short-lived
 // access token is sent to the mintFirebaseToken callable, which verifies it
@@ -52,11 +53,31 @@ export async function signOutOfSync(): Promise<void> {
   await signOut(getSyncAuth());
 }
 
+/**
+ * Bound on the mint callable. Sign-ins run one at a time, so the callable's own
+ * 70 s default (per attempt, twice over) would stall every queued sign-in
+ * behind one slow mint. Deliberately not a timeout around the whole queued
+ * task: that would free the queue while an abandoned `signInWithCustomToken`
+ * could still land and swap the session.
+ */
+const MINT_TIMEOUT_MS = 20_000;
+
+/**
+ * Wait for Firebase to restore the persisted session (IndexedDB) before
+ * reading `currentUser`, which is null until then. Without this, a call made
+ * at boot would mint and replace a session that was about to be restored.
+ */
+async function whenAuthRestored(auth: Auth): Promise<void> {
+  // Test doubles of `Auth` may not implement it.
+  if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+}
+
 async function mintAndSignIn(auth: Auth, characterId: number, uid: string): Promise<void> {
   const accessToken = await getValidAccessToken(characterId);
   const mint = httpsCallable<{ accessToken: string }, MintResponse>(
     getSyncFunctions(),
-    'mintFirebaseToken'
+    'mintFirebaseToken',
+    { timeout: MINT_TIMEOUT_MS }
   );
   const result = await mint({ accessToken });
   const credential = await signInWithCustomToken(auth, result.data.token);
@@ -78,6 +99,7 @@ async function mintAndSignIn(auth: Auth, characterId: number, uid: string): Prom
 export async function ensureSignedIn(characterId: number): Promise<string> {
   const uid = uidForCharacter(characterId);
   const auth = getSyncAuth();
+  await whenAuthRestored(auth);
   if (auth.currentUser?.uid === uid) return uid;
   const existing = inflight.get(characterId);
   if (existing) return existing;
@@ -112,6 +134,7 @@ export async function ensureSignedIn(characterId: number): Promise<string> {
  */
 export async function ensureAnySession(fallbackCharacterId: number): Promise<string> {
   const auth = getSyncAuth();
+  await whenAuthRestored(auth);
   // Read through a call each time: the session can land while this waits.
   const currentUid = (): string | undefined => auth.currentUser?.uid;
   const existing = currentUid();
