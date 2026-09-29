@@ -29,6 +29,8 @@ import { resolveNames } from '@/features/character/names';
 import { db } from '@/db';
 import { lastPriceAlertSnapshot } from '@/features/notifications/pollDomains';
 import { buildPriceAlertRows, type BoardPriceAlert } from './priceAlertsBoard';
+import type { CorpBoardItem } from '@/engine/corp/board';
+import type { BoardClockSource } from '@/engine/character/board';
 import type { CalendarEventSummary } from '@/esi/endpoints';
 
 /*
@@ -364,4 +366,43 @@ export async function loadPriceAlertsBoard(characterId: number): Promise<PriceAl
     alerts: buildPriceAlertRows(record?.items ?? [], snapshot),
     checkedAt: snapshot?.nowMs ?? null,
   };
+}
+
+// --- Corp: structures and moon extractions -----------------------------------
+
+/*
+ * Both corp cards load through `./corpBoard`, behind `import()` like
+ * `miningTax/snapshot`: the corp reads, role checks and board engine are for
+ * the few pilots with corp roles, and the landing route's first paint should
+ * not carry them for everyone else.
+ */
+
+export interface StructuresBoardData {
+  /**
+   * The corp engine's items for this corporation's structures — reinforcement
+   * timers, fuel and offline services — or null when this Character may not
+   * read structures, which is different from owning none.
+   */
+  items: CorpBoardItem[] | null;
+  structureCount: number;
+  needsReauth: boolean;
+  fetchedAt: Date | null;
+}
+
+export async function loadStructuresBoard(characterId: number): Promise<StructuresBoardData> {
+  const { loadStructuresBoardData } = await import('./corpBoard');
+  return loadStructuresBoardData(characterId);
+}
+
+export interface MoonChunksBoardData {
+  /** One clock per drill (arrival, or decay once landed), or null when unreadable. */
+  chunks: BoardClockSource[] | null;
+  needsReauth: boolean;
+  fetchedAt: Date | null;
+  loadedAt: number;
+}
+
+export async function loadMoonChunksBoard(characterId: number): Promise<MoonChunksBoardData> {
+  const { loadMoonChunksBoardData } = await import('./corpBoard');
+  return loadMoonChunksBoardData(characterId);
 }

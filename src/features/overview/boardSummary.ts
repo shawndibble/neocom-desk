@@ -29,15 +29,18 @@ import { formatCountdown } from '@/lib/duration';
 import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
 import { extractableSp, extractorCount, isSpExtractionReady } from '@/engine/spExtraction';
 import { formatCompactNumber } from '@/lib/compactNumber';
+import { structureCounts } from './corpCards';
 import type {
   CalendarEventsBoardData,
   ContractsBoardData,
   MailBoardData,
   IndustryBoardData,
   MiningTaxBoardData,
+  MoonChunksBoardData,
   PlanetaryBoardData,
   PriceAlertsBoardData,
   SpExtractionBoardData,
+  StructuresBoardData,
 } from './boardData';
 
 /**
@@ -213,4 +216,32 @@ export function priceAlertsSummary(t: Translate, data: PriceAlertsBoardData | nu
     return t('overview.board.priceAlertsWatching', { count: data.alerts.length });
   }
   return t('overview.board.priceAlertsNone');
+}
+
+export function structuresSummary(t: Translate, data: StructuresBoardData | null): string {
+  if (data === null) return t(CHECKING);
+  if (data.items === null) return t(data.needsReauth ? REAUTH : 'overview.board.corpUnreadable');
+  const counts = structureCounts(data.items);
+  if (counts.timers > 0) return t('overview.board.structuresTimers', { count: counts.timers });
+  if (counts.lowFuel > 0) return t('overview.board.structuresLowFuel', { count: counts.lowFuel });
+  if (counts.offline > 0) return t('overview.board.structuresOffline', { count: counts.offline });
+  return t('overview.board.structuresFine', { count: data.structureCount });
+}
+
+export function moonChunksSummary(
+  t: Translate,
+  data: MoonChunksBoardData | null,
+  nowMs: number
+): string {
+  if (data === null) return t(CHECKING);
+  if (data.chunks === null) return t(data.needsReauth ? REAUTH : 'overview.board.corpUnreadable');
+  const ready = data.chunks.filter((chunk) => chunk.detail === 'decay').length;
+  if (ready > 0) return t('overview.board.moonChunksReady', { count: ready });
+  const next = data.chunks
+    .filter((chunk) => chunk.detail === 'arrival' && chunk.deadlineMs > nowMs)
+    .sort((a, b) => a.deadlineMs - b.deadlineMs)[0];
+  if (next === undefined) return t('overview.board.moonChunksNone');
+  return t('overview.board.moonChunksNext', {
+    when: formatCountdown((next.deadlineMs - nowMs) / 1000),
+  });
 }

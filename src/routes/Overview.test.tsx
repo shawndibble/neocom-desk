@@ -154,6 +154,10 @@ const server = setupServer(
     HttpResponse.json({ type_id: 3300, name: 'Gunnery', group_id: 10, published: true })
   ),
   http.post('https://esi.evetech.net/universe/names', () => HttpResponse.json([])),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () => HttpResponse.json([])),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/labels`, () =>
+    HttpResponse.json({ labels: [], total_unread_count: 0 })
+  ),
   // An order's cost basis is read out of the character's own transaction
   // history; both are empty here, which is what "no cost basis known" means.
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/transactions`, () =>
@@ -1215,6 +1219,83 @@ describe('Price alerts', () => {
       expect.stringContaining('Tritanium'),
     ]);
     expect(within(card).getByText('Prices checked 10m ago')).toBeInTheDocument();
+  });
+});
+
+describe('corp cards', () => {
+  const CORP = 'https://esi.evetech.net/corporations/1001';
+  const corpRequests = vi.fn();
+
+  function corpHandlers(roles: string[]) {
+    return [
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/roles`, () =>
+        HttpResponse.json({ roles })
+      ),
+      http.get(`${CORP}/structures`, () => {
+        corpRequests();
+        return HttpResponse.json([
+          {
+            structure_id: 5001,
+            name: 'Home Astrahus',
+            corporation_id: 1001,
+            system_id: 30000142,
+            type_id: 35832,
+            profile_id: 1,
+            fuel_expires: hoursFromNow(24 * 30),
+            state: 'armor_reinforce',
+            state_timer_end: hoursFromNow(20),
+            services: [],
+          },
+        ]);
+      }),
+      http.get(`https://esi.evetech.net/corporation/1001/mining/extractions`, () => {
+        corpRequests();
+        return HttpResponse.json([
+          {
+            structure_id: 5001,
+            moon_id: 40000001,
+            extraction_start_time: hoursFromNow(-100),
+            chunk_arrival_time: hoursFromNow(6),
+            natural_decay_time: hoursFromNow(9),
+          },
+        ]);
+      }),
+    ];
+  }
+
+  beforeEach(() => corpRequests.mockReset());
+
+  it('shows structure timers and moon chunks to a Station Manager', async () => {
+    await grantScopes([
+      'esi-characters.read_corporation_roles.v1',
+      'esi-corporations.read_structures.v1',
+      'esi-industry.read_corporation_mining.v1',
+    ]);
+    server.use(...corpHandlers(['Station_Manager']));
+    render(<App />);
+
+    const structures = await findCard(/^structures$/i);
+    expect(await within(structures).findByText('Home Astrahus')).toBeInTheDocument();
+    expect(within(structures).getByText('armor reinforce')).toBeInTheDocument();
+
+    const moon = await findCard(/moon extractions/i);
+    expect(await within(moon).findByText('Home Astrahus')).toBeInTheDocument();
+    expect(within(moon).getByText('Chunk arrives')).toBeInTheDocument();
+  });
+
+  it('offers neither card, and makes no corp read, to a pilot without corp roles', async () => {
+    const user = userEvent.setup();
+    await grantScopes(['esi-characters.read_corporation_roles.v1']);
+    server.use(...corpHandlers([]));
+    render(<App />);
+    await findCard(/open orders/i);
+
+    expect(screen.queryByRole('heading', { name: /^structures$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /moon extractions/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /choose which cards to show/i }));
+    expect(await screen.findByRole('menuitemcheckbox', { name: 'Mail' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'Structures' })).not.toBeInTheDocument();
+    expect(corpRequests).not.toHaveBeenCalled();
   });
 });
 

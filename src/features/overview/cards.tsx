@@ -48,14 +48,24 @@ import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
 import { extractableSp, extractorCount } from '@/engine/spExtraction';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIskCompact } from '@/lib/isk';
+import type { CorpBoardItem } from '@/engine/corp/board';
+import { structureStateLabel } from '@/features/corp/boardSources';
+import {
+  moonChunkSeverity,
+  moonChunksSeverity,
+  structureCounts,
+  structuresSeverity,
+} from './corpCards';
 import type {
   CalendarEventsBoardData,
   ContractsBoardData,
   MailBoardData,
   MiningTaxBoardData,
+  MoonChunksBoardData,
   PlanetaryBoardData,
   PriceAlertsBoardData,
   SpExtractionBoardData,
+  StructuresBoardData,
 } from './boardData';
 
 /** The Contracts History table filtered to accepted contracts — the courier hauls the card counts. */
@@ -680,6 +690,152 @@ export function PriceAlertsCard({
             ))}
           </ul>
         </>
+      )}
+    </BoardCard>
+  );
+}
+
+// --- Structures -----------------------------------------------------------
+
+/** What a structure row's clock column says, for each kind of clock. */
+function structureWhen(item: CorpBoardItem, t: (key: string) => string): string {
+  if (item.timing === 'passed') return t('overview.board.structureDry');
+  if (item.timing === 'untimed') return t('overview.board.structureOffline');
+  // A clock shorter than CCP's hour-long cache may already be over, so it is
+  // not ticked down — the Corp page makes the same call.
+  if (item.withinStaleWindow) return t('overview.board.structureSoon');
+  return formatDuration(Math.max(0, item.remainingMs ?? 0) / 1000);
+}
+
+/**
+ * Only what needs doing: reinforcement timers, fuel within three days, and
+ * offline services, as counts and then the worst few as rows. A structure
+ * whose fuel is weeks out is not a row here — the Corp page lists every one.
+ */
+export function StructuresCard({ data }: { data: StructuresBoardData | null }) {
+  const { t } = useTranslation();
+  const items = data?.items ?? null;
+  const counts = items ? structureCounts(items) : null;
+  const rows = (items ?? [])
+    .filter((item) => item.kind !== 'structureFuel' || item.severity !== 'clear')
+    .slice(0, ROW_LIMIT);
+  return (
+    <BoardCard
+      title={t('overview.board.structures')}
+      meta={
+        <SeverityWord
+          severity={structuresSeverity(data)}
+          warningLabel={data?.needsReauth ? REAUTH_WORD : undefined}
+        />
+      }
+      to="/corp"
+      openLabel={t('overview.board.open')}
+      footer={
+        data === null
+          ? t('overview.board.checking')
+          : items === null
+            ? t(data.needsReauth ? 'overview.board.reauth' : 'overview.board.corpUnreadable')
+            : t('overview.board.structureCount', { count: data.structureCount })
+      }
+    >
+      <TileRow>
+        <NumberTile
+          label={t('overview.board.reinforced')}
+          value={counts === null ? UNKNOWN : counts.timers}
+          severity="critical"
+        />
+        <NumberTile
+          label={t('overview.board.lowFuel')}
+          value={counts === null ? UNKNOWN : counts.lowFuel}
+          severity="warning"
+        />
+        <NumberTile
+          label={t('overview.board.servicesOffline')}
+          value={counts === null ? UNKNOWN : counts.offline}
+          severity="warning"
+        />
+      </TileRow>
+      {rows.length > 0 && (
+        <ul>
+          {rows.map((item) => (
+            <TriageRow
+              key={item.id}
+              severity={item.severity}
+              when={structureWhen(item, t)}
+              subject={item.subject}
+              detail={
+                item.kind === 'structureTimer'
+                  ? structureStateLabel(item.detail)
+                  : item.kind === 'serviceOffline'
+                    ? t('overview.board.serviceOffline', { service: item.detail })
+                    : t('overview.board.fuelRunsOut')
+              }
+              to="/corp"
+            />
+          ))}
+        </ul>
+      )}
+    </BoardCard>
+  );
+}
+
+// --- Moon extractions ------------------------------------------------------
+
+/**
+ * One row per moon drill: the chunk's arrival while it is still coming, and
+ * its natural decay once it has landed and is waiting to be fractured.
+ */
+export function MoonChunksCard({
+  data,
+  nowMs,
+}: {
+  data: MoonChunksBoardData | null;
+  nowMs: number;
+}) {
+  const { t } = useTranslation();
+  const chunks = [...(data?.chunks ?? [])]
+    .sort((a, b) => a.deadlineMs - b.deadlineMs)
+    .slice(0, ROW_LIMIT);
+  return (
+    <BoardCard
+      title={t('overview.board.moonChunks')}
+      meta={
+        <SeverityWord
+          severity={moonChunksSeverity(data, nowMs)}
+          warningLabel={data?.needsReauth ? REAUTH_WORD : 'overview.board.word.ready'}
+        />
+      }
+      to="/corp"
+      openLabel={t('overview.board.open')}
+      footer={
+        data === null
+          ? t('overview.board.checking')
+          : data.chunks === null
+            ? t(data.needsReauth ? 'overview.board.reauth' : 'overview.board.corpUnreadable')
+            : t('overview.board.drillCount', { count: data.chunks.length })
+      }
+    >
+      {chunks.length === 0 ? (
+        <CardEmpty>
+          {data === null
+            ? t('overview.board.checking')
+            : data.chunks === null
+              ? t(data.needsReauth ? 'overview.board.reauth' : 'overview.board.corpUnreadable')
+              : t('overview.board.moonChunksEmpty')}
+        </CardEmpty>
+      ) : (
+        <ul>
+          {chunks.map((chunk) => (
+            <TriageRow
+              key={chunk.id}
+              severity={moonChunkSeverity(chunk, nowMs)}
+              when={formatDuration(Math.max(0, chunk.deadlineMs - nowMs) / 1000)}
+              subject={chunk.subject}
+              detail={t(`overview.board.chunk.${chunk.detail === 'decay' ? 'decay' : 'arrival'}`)}
+              to="/corp"
+            />
+          ))}
+        </ul>
       )}
     </BoardCard>
   );

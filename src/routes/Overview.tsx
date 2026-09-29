@@ -59,6 +59,14 @@ import {
 } from '@/features/character/spExtractionSettings';
 import { CardPicker } from '@/features/overview/CardPicker';
 import {
+  moonChunkSeverity,
+  moonChunksDeadline,
+  moonChunksSeverity,
+  structuresDeadline,
+  structuresSeverity,
+} from '@/features/overview/corpCards';
+import { useCorpAccess } from '@/features/corp/useCorpAccess';
+import {
   layoutBoard,
   soonestDeadline,
   type BoardCardSpec,
@@ -77,6 +85,8 @@ import {
   ComingUpCard,
   ContractsCard,
   MailCard,
+  MoonChunksCard,
+  StructuresCard,
   PriceAlertsCard,
   SpExtractionCard,
   EverythingElseCard,
@@ -91,6 +101,8 @@ import {
   loadContractsBoard,
   loadIndustryBoard,
   loadMailBoard,
+  loadMoonChunksBoard,
+  loadStructuresBoard,
   loadMiningTaxBoard,
   loadPlanetaryBoard,
   loadPriceAlertsBoard,
@@ -113,6 +125,8 @@ import {
   contractsSummary,
   industrySummary,
   mailSummary,
+  moonChunksSummary,
+  structuresSummary,
   miningTaxSummary,
   ordersSummary,
   planetarySummary,
@@ -272,6 +286,13 @@ export function Overview() {
   const priceAlertsSnapshot = useRouteSnapshot(loadPriceAlertsBoard, undefined, {
     cacheKey: 'overview:price-alerts',
   });
+  const structuresSnapshot = useRouteSnapshot(loadStructuresBoard, undefined, {
+    cacheKey: 'overview:structures',
+  });
+  const moonSnapshot = useRouteSnapshot(loadMoonChunksBoard, undefined, {
+    cacheKey: 'overview:moon-chunks',
+  });
+  const corpAccess = useCorpAccess();
   const { hydrated, activeCharacterId } = walletSnapshot;
 
   const queueEntries = skillsQueueSnapshot.data?.queueResult?.data ?? null;
@@ -401,6 +422,12 @@ export function Overview() {
     monitoring: spMonitoring,
     thresholdSp: spThreshold,
   };
+  const structureClock = structuresSnapshot.data?.items
+    ? structuresDeadline(structuresSnapshot.data.items, now)
+    : null;
+  const nextChunk = moonSnapshot.data?.chunks
+    ? moonChunksDeadline(moonSnapshot.data.chunks, now)
+    : null;
   const calendarEvent = soonestCalendarDeadline(calendarSnapshot.data?.events ?? [], now);
 
   /*
@@ -515,6 +542,56 @@ export function Overview() {
           nowMs={now}
         />
       ),
+    },
+    {
+      key: 'structures',
+      placement: 'ranked',
+      // Offered only to a Character whose corp roles and grant cover it, the
+      // rule every corp surface follows (`features/corp/useCorpAccess`). While
+      // that is still resolving the card is absent rather than loading: a corp
+      // card flickering in and out for a pilot with no roles is worse than one
+      // that appears a beat late for a Director.
+      available: corpAccess.state === 'ready' && corpAccess.capabilities.canReadStructures,
+      to: '/corp',
+      severity: structuresSeverity(structuresSnapshot.data),
+      summary: structuresSummary(t, structuresSnapshot.data),
+      fetchedAt: structuresSnapshot.data?.fetchedAt,
+      loading: structuresSnapshot.loading,
+      deadline: structureClock
+        ? {
+            at: structureClock.atMs,
+            note: t(`overview.board.structureDeadline.${structureClock.kind}`, {
+              subject: structureClock.subject,
+            }),
+            severity: structureClock.severity,
+            to: '/corp',
+          }
+        : null,
+      render: () => <StructuresCard data={structuresSnapshot.data} />,
+    },
+    {
+      key: 'moonChunks',
+      placement: 'ranked',
+      available: corpAccess.state === 'ready' && corpAccess.capabilities.canReadMoonExtractions,
+      to: '/corp',
+      severity: moonChunksSeverity(moonSnapshot.data, now),
+      summary: moonChunksSummary(t, moonSnapshot.data, now),
+      fetchedAt: moonSnapshot.data?.fetchedAt,
+      loading: moonSnapshot.loading,
+      deadline: nextChunk
+        ? {
+            at: nextChunk.deadlineMs,
+            note: t(
+              `overview.board.chunkDeadline.${nextChunk.detail === 'decay' ? 'decay' : 'arrival'}`,
+              {
+                subject: nextChunk.subject,
+              }
+            ),
+            severity: moonChunkSeverity(nextChunk, now),
+            to: '/corp',
+          }
+        : null,
+      render: () => <MoonChunksCard data={moonSnapshot.data} nowMs={now} />,
     },
     {
       key: 'comingUp',
@@ -678,6 +755,8 @@ export function Overview() {
             calendarSnapshot,
             mailSnapshot,
             priceAlertsSnapshot,
+            structuresSnapshot,
+            moonSnapshot,
           ]) {
             snapshot.refresh();
           }
