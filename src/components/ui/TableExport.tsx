@@ -14,15 +14,15 @@
  * a table-wide right-click menu — grow the submenu) and a ref back to its
  * sorted rows, so every entry point exports exactly what is on screen.
  */
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { exportRows, type ExportFormat } from '@/lib/downloadCsv';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './DropdownMenu';
 import { IconButton } from './IconButton';
 import * as Icon from './icons';
 import { MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger } from './RowActions';
-import { MenuKindContext } from './rowActionsContext';
-import { useTableExportContext, type TableExport } from './useTableExport';
+import { MenuKindContext, RowMenuExtrasContext } from './rowActionsContext';
+import { TableExportContext, useTableExportContext, type TableExport } from './useTableExport';
 
 async function run<T>(tableExport: TableExport<T>, format: ExportFormat): Promise<number> {
   const rows = tableExport.getRows();
@@ -71,6 +71,27 @@ export function ExportTableSub<T>({
   );
 }
 
+/**
+ * What `DataTable`'s `exportable` does for its rows, for a table that isn't a
+ * DataTable (a virtualized list, a raw `<table>`): every `RowActionsMenu`
+ * under it gains the "Export table" submenu.
+ */
+export function TableExportProvider<T>({
+  tableExport,
+  children,
+}: {
+  tableExport: TableExport<T>;
+  children: ReactNode;
+}) {
+  return (
+    <TableExportContext.Provider value={tableExport}>
+      <RowMenuExtrasContext.Provider value={ROW_EXPORT_ITEMS}>
+        {children}
+      </RowMenuExtrasContext.Provider>
+    </TableExportContext.Provider>
+  );
+}
+
 /** Appends the submenu (after a separator) to a row menu inside an exportable table. */
 export function RowExportItems() {
   const tableExport = useTableExportContext();
@@ -82,6 +103,12 @@ export function RowExportItems() {
     </>
   );
 }
+
+/**
+ * One element for every provider: a fresh one per render would change the
+ * context value and re-render every row menu in a long (virtualized) list.
+ */
+const ROW_EXPORT_ITEMS = <RowExportItems />;
 
 /**
  * The table block's own ⋯ menu, for its title bar. `children` are any
@@ -101,6 +128,8 @@ export function TableActionsMenu<T>({
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState<number | null>(null);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(copiedTimer.current), []);
   const label = t('common.tableExport.menuLabel', { name });
   return (
     <DropdownMenu>
@@ -126,7 +155,8 @@ export function TableActionsMenu<T>({
             onDone={(format, count) => {
               if (format !== 'clipboard') return;
               setCopied(count);
-              setTimeout(() => setCopied(null), 2000);
+              clearTimeout(copiedTimer.current);
+              copiedTimer.current = setTimeout(() => setCopied(null), 2000);
             }}
           />
         </MenuKindContext.Provider>

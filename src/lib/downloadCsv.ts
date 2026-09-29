@@ -107,7 +107,7 @@ export function downloadCsv<T>(
 }
 
 /**
- * The formats `ExportMenu` offers. `clipboard` is tab-separated text, which
+ * The formats `TableActionsMenu` offers. `clipboard` is tab-separated text, which
  * Google Sheets and Excel split into cells on paste; `xlsx` sidesteps every
  * CSV import dialog.
  */

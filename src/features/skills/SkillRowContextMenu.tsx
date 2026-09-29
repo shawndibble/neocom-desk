@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { useContext, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -10,6 +10,7 @@ import {
   MenuSubContent,
   MenuSubTrigger,
   RowActionsContext,
+  RowMenuExtrasContext,
   RowMoreActions,
   Tooltip,
 } from '@/components/ui';
@@ -90,6 +91,9 @@ export function SkillRowContextMenu({
     [activeCharacterId]
   );
   const maxed = currentLevel >= 5;
+  // The list's own additions (its "Export table" submenu). `RowMoreActions`
+  // reads the same context itself, so only the right-click menu adds it here.
+  const extras = useContext(RowMenuExtrasContext);
   const targetLevel = Math.min(currentLevel + 1, 5);
 
   const withMenu = <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>;
@@ -134,7 +138,10 @@ export function SkillRowContextMenu({
         <div className="min-w-0 flex-1">
           <ContextMenu>
             {trigger}
-            <ContextMenuContent>{items}</ContextMenuContent>
+            <ContextMenuContent>
+              {items}
+              {extras}
+            </ContextMenuContent>
           </ContextMenu>
         </div>
         <RowMoreActions />

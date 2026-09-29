@@ -535,6 +535,37 @@ describe('Skills', () => {
     }
   });
 
+  it('exports only the skills a search leaves on screen', async () => {
+    render(<App />);
+    await screen.findByRole('button', { name: /Spaceship Command/ });
+    fireEvent.change(screen.getByPlaceholderText('Search skills…'), {
+      target: { value: 'frigate' },
+    });
+    await screen.findByRole('button', { name: /^Frigate/ });
+
+    const copied: string[] = [];
+    configureClipboard(async (text) => {
+      copied.push(text);
+    });
+    try {
+      const user = userEvent.setup();
+      fireEvent.pointerDown(screen.getByRole('button', { name: 'Skills actions' }), {
+        button: 0,
+        pointerType: 'mouse',
+      });
+      (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
+      await user.keyboard('{ArrowRight}');
+      (await screen.findByRole('menuitem', { name: 'Copy for Google Sheets / Excel' })).focus();
+      await user.keyboard('{Enter}');
+      await waitFor(() => expect(copied).toHaveLength(1));
+      const dataLines = copied[0].trim().split('\n').slice(1);
+      expect(dataLines.length).toBeGreaterThan(0);
+      for (const line of dataLines) expect(line.toLowerCase()).toContain('frigate');
+    } finally {
+      configureClipboard(null);
+    }
+  });
+
   it("shows a selected skill's prerequisites, marking an already-trained one distinct", async () => {
     render(<App />);
 

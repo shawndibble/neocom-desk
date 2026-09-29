@@ -65,7 +65,7 @@ import { useFocusHeading } from '@/lib/useFocusHeading';
 import type { CharacterAsset } from '@/esi/endpoints';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
-import { TableActionsMenu } from '@/components/ui/TableExport';
+import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
 import type { TableExport } from '@/components/ui/useTableExport';
 import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/character/assetsCsv';
 import { getAdjustedPrices } from '@/market/prices';
@@ -1869,46 +1869,48 @@ export function Assets() {
                       role="presentation"
                       style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
                     >
-                      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                        const row = rows[virtualRow.index];
-                        return (
-                          <div
-                            key={virtualRow.key}
-                            data-index={virtualRow.index}
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              transform: `translateY(${virtualRow.start}px)`,
-                            }}
-                          >
-                            <BrowseRowView
-                              row={row}
-                              t={t}
-                              typeNames={mergedTypeNames}
-                              characterBadges={characterBadges}
-                              selectMode={selectMode}
-                              selectedIds={selectedIds}
-                              onToggleSelection={toggleNodeSelection}
-                              stationLabelFor={stationLabelFor}
-                              nodeLabel={nodeLabel}
-                              locationNames={mergedLocationNames}
-                              securityForStation={securityForStation}
-                              jumpsAwayFor={(locationId) =>
-                                jumpsAwayByKey.get(`${locationId}:${routePreference}`)
-                              }
-                              pinStateFor={pinStateFor}
-                              onTogglePin={(locationId) => void handleTogglePin(locationId)}
-                              pathStationId={pathStationId}
-                              pathSegments={pathSegments}
-                              trailFor={trailFor}
-                              rootStationIdFor={rootStationIdFor}
-                              query={query}
-                            />
-                          </div>
-                        );
-                      })}
+                      <TableExportProvider tableExport={assetsExport}>
+                        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                          const row = rows[virtualRow.index];
+                          return (
+                            <div
+                              key={virtualRow.key}
+                              data-index={virtualRow.index}
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                transform: `translateY(${virtualRow.start}px)`,
+                              }}
+                            >
+                              <BrowseRowView
+                                row={row}
+                                t={t}
+                                typeNames={mergedTypeNames}
+                                characterBadges={characterBadges}
+                                selectMode={selectMode}
+                                selectedIds={selectedIds}
+                                onToggleSelection={toggleNodeSelection}
+                                stationLabelFor={stationLabelFor}
+                                nodeLabel={nodeLabel}
+                                locationNames={mergedLocationNames}
+                                securityForStation={securityForStation}
+                                jumpsAwayFor={(locationId) =>
+                                  jumpsAwayByKey.get(`${locationId}:${routePreference}`)
+                                }
+                                pinStateFor={pinStateFor}
+                                onTogglePin={(locationId) => void handleTogglePin(locationId)}
+                                pathStationId={pathStationId}
+                                pathSegments={pathSegments}
+                                trailFor={trailFor}
+                                rootStationIdFor={rootStationIdFor}
+                                query={query}
+                              />
+                            </div>
+                          );
+                        })}
+                      </TableExportProvider>
                     </div>
                   </div>
                 )}

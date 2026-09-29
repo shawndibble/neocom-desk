@@ -14,7 +14,7 @@ import {
   Checkbox,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { TableActionsMenu } from '@/components/ui/TableExport';
+import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import {
   compareFittingStats,
@@ -383,11 +383,14 @@ export function FittingCompare() {
                   )
                 }
               >
-                <FittingCompareTable
-                  rows={table!.rows}
-                  columns={columns}
-                  differencesOnly={showDifferencesOnly}
-                />
+                {/* The column headers' Fitting menus grow "Export table" too. */}
+                <TableExportProvider tableExport={statsExport}>
+                  <FittingCompareTable
+                    rows={table!.rows}
+                    columns={columns}
+                    differencesOnly={showDifferencesOnly}
+                  />
+                </TableExportProvider>
                 {!pricesReady && (
                   <p className="mt-2 text-xs text-text-dim">
                     {anyPriceFailed

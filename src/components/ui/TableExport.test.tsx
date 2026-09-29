@@ -6,7 +6,7 @@ import { configureClipboard } from '@/lib/clipboard';
 import * as download from '@/lib/download';
 import { DataTable, type DataTableColumn } from './DataTable';
 import { MenuItem, RowActionsMenu, RowMoreActions } from './RowActions';
-import { TableActionsMenu } from './TableExport';
+import { TableActionsMenu, TableExportProvider } from './TableExport';
 import { useTableExport } from './useTableExport';
 
 interface Row {
@@ -125,6 +125,70 @@ describe('TableActionsMenu', () => {
     await choose(user, 'Download Excel (.xlsx)');
     await waitFor(() => expect(spy).toHaveBeenCalledOnce());
     expect(spy.mock.calls[0][0]).toMatch(/\.xlsx$/);
+  });
+});
+
+describe('TableExportProvider', () => {
+  it("gives a non-DataTable list's row menus the Export submenu, exporting the whole list", async () => {
+    const user = userEvent.setup();
+    render(
+      <TableExportProvider
+        tableExport={{ surface: 'assets', columns: csvColumns, getRows: () => rows }}
+      >
+        <RowActionsMenu name="Tritanium" items={<MenuItem>Show info</MenuItem>}>
+          <div>Tritanium</div>
+        </RowActionsMenu>
+      </TableExportProvider>
+    );
+    fireEvent.contextMenu(screen.getByText('Tritanium'));
+    await openExportSub(user);
+    await choose(user, 'Copy for Google Sheets / Excel');
+    await waitFor(() => expect(copied).toHaveLength(1));
+    expect(copied[0].trim().split('\n')).toHaveLength(3);
+  });
+});
+
+describe("useTableExport source: 'sorted-rows'", () => {
+  const all: Row[] = [
+    { id: 1, item: 'Tritanium', amount: 250 },
+    { id: 2, item: 'Cap Booster 200', amount: 80 },
+    { id: 3, item: 'Pyerite', amount: 5 },
+  ];
+
+  /** Mounts only the first two rows, as a "Show all"-capped table does. */
+  function Capped() {
+    const tableExport = useTableExport({
+      surface: 'market-sell',
+      rows: all,
+      columns: csvColumns,
+      source: 'sorted-rows',
+    });
+    return (
+      <>
+        <TableActionsMenu name="Sell orders" tableExport={tableExport} />
+        <DataTable
+          {...tableExport.tableProps}
+          label="Sell orders"
+          rows={all.slice(0, 2)}
+          rowKey={(r) => r.id}
+          columns={columns}
+          defaultSort={{ columnId: 'amount', direction: 'asc' }}
+        />
+      </>
+    );
+  }
+
+  it("exports every row, not just the mounted ones, in the table's current sort", async () => {
+    const user = userEvent.setup();
+    render(<Capped />);
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Sell orders actions' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    await openExportSub(user);
+    await choose(user, 'Copy for Google Sheets / Excel');
+    await waitFor(() => expect(copied).toHaveLength(1));
+    expect(copied[0]).toBe('Item\tAmount\nPyerite\t5\nCap Booster 200\t80\nTritanium\t250\n');
   });
 });
 

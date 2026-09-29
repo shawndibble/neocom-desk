@@ -97,7 +97,7 @@ import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useCompareSet } from '@/features/market/compareSet';
 import { writeToClipboard } from '@/lib/clipboard';
-import { TableActionsMenu } from '@/components/ui/TableExport';
+import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
 import type { TableExport } from '@/components/ui/useTableExport';
 import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/character/assetsCsv';
 import { getAdjustedPrices } from '@/market/prices';
@@ -715,38 +715,40 @@ function CorpAssetsView() {
                 >
                   {showItemColumns && <ItemColumnLabels t={t} />}
                   <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
-                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                      const row = rows[virtualRow.index];
-                      return (
-                        <div
-                          key={virtualRow.key}
-                          data-index={virtualRow.index}
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            transform: `translateY(${virtualRow.start}px)`,
-                          }}
-                        >
-                          <BrowseRowView
-                            row={row}
-                            t={t}
-                            typeNames={typeNames}
-                            locationNames={locationNames}
-                            divisionNames={divisionNames}
-                            selectMode={selectMode}
-                            selectedIds={selectedIds}
-                            onToggleSelection={toggleNodeSelection}
-                            pathGroupId={pathGroupId}
-                            pathSegments={pathSegments}
-                            query={query}
-                            priceByTypeId={data?.priceByTypeId ?? EMPTY_PRICES}
-                            volumeByTypeId={data?.volumeByTypeId ?? EMPTY_VOLUMES}
-                          />
-                        </div>
-                      );
-                    })}
+                    <TableExportProvider tableExport={assetsExport}>
+                      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                        const row = rows[virtualRow.index];
+                        return (
+                          <div
+                            key={virtualRow.key}
+                            data-index={virtualRow.index}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              transform: `translateY(${virtualRow.start}px)`,
+                            }}
+                          >
+                            <BrowseRowView
+                              row={row}
+                              t={t}
+                              typeNames={typeNames}
+                              locationNames={locationNames}
+                              divisionNames={divisionNames}
+                              selectMode={selectMode}
+                              selectedIds={selectedIds}
+                              onToggleSelection={toggleNodeSelection}
+                              pathGroupId={pathGroupId}
+                              pathSegments={pathSegments}
+                              query={query}
+                              priceByTypeId={data?.priceByTypeId ?? EMPTY_PRICES}
+                              volumeByTypeId={data?.volumeByTypeId ?? EMPTY_VOLUMES}
+                            />
+                          </div>
+                        );
+                      })}
+                    </TableExportProvider>
                   </div>
                 </div>
               )}

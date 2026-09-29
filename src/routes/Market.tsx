@@ -738,7 +738,7 @@ export function Market() {
   const buyRows = buyShowAll ? sortedBuy : sortedBuy.slice(0, ROW_CAP);
 
   // Every row, not the ROW_CAP the tables mount before "Show all" — hence
-  // `source: 'rows'` (sortedSell/sortedBuy are already in book order).
+  // `source: 'sorted-rows'` (every row, in the order the table is sorted by).
   const sellCsvColumns = useMemo(
     () =>
       orderBookCsvColumns(t, {
@@ -762,14 +762,14 @@ export function Market() {
     rows: sortedSell,
     columns: sellCsvColumns,
     truncated: loadedView?.truncated ?? false,
-    source: 'rows',
+    source: 'sorted-rows',
   });
   const buyExport = useTableExport({
     surface: 'market-buy',
     rows: sortedBuy,
     columns: buyCsvColumns,
     truncated: loadedView?.truncated ?? false,
-    source: 'rows',
+    source: 'sorted-rows',
   });
 
   const { itemSkills, trainedSkills, targetPlan } = useOrderRowSkills(

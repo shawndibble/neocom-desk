@@ -25,9 +25,12 @@ import { InfoTooltip } from './Tooltip';
 import { RowMoreActions } from './RowActions';
 import { nextDataTableSort, sortRowsBy } from './dataTableSort';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from './ContextMenu';
-import { RowMenuExtrasContext } from './rowActionsContext';
-import { ExportTableSub, RowExportItems } from './TableExport';
-import { TableExportContext, type TableExport, type TableExportConfig } from './useTableExport';
+import { ExportTableSub, TableExportProvider } from './TableExport';
+import {
+  type DataTableExportHandle,
+  type TableExport,
+  type TableExportConfig,
+} from './useTableExport';
 
 export interface DataTableSort {
   columnId: string;
@@ -386,11 +389,6 @@ interface DataTableProps<T> {
    * with `exportRef`, so the title bar's `TableActionsMenu` agrees.
    */
   exportable?: TableExportConfig<T>;
-}
-
-/** What `exportRef` exposes: the table's rows, filtered by the caller and sorted as displayed. */
-export interface DataTableExportHandle<T> {
-  getRows: () => readonly T[];
 }
 
 interface DataTableRowProps<T> {
@@ -795,13 +793,21 @@ export function DataTable<T>({
     if (!sortDirection || !sortValue) return rows;
     return sortRowsBy(rows, sortValue, sortDirection);
   }, [rows, sortDirection, sortValue]);
-  useImperativeHandle(exportRef, () => ({ getRows: () => sortedRows }), [sortedRows]);
+  useImperativeHandle(
+    exportRef,
+    () => ({
+      getRows: () => sortedRows,
+      sortRows: (all) =>
+        sortDirection && sortValue ? sortRowsBy(all, sortValue, sortDirection) : all,
+    }),
+    [sortedRows, sortDirection, sortValue]
+  );
   const tableExport = useMemo<TableExport<T> | null>(
     () =>
       exportable
         ? {
             ...exportable,
-            getRows: (exportable.getRows as (() => readonly T[]) | undefined) ?? (() => sortedRows),
+            getRows: exportable.getRows ?? (() => sortedRows),
           }
         : null,
     [exportable, sortedRows]
@@ -1313,21 +1319,15 @@ export function DataTable<T>({
   // so still no wrapper element).
   const body = !tableExport ? (
     table
+  ) : rowContextMenu ? (
+    <TableExportProvider tableExport={tableExport}>{table}</TableExportProvider>
   ) : (
-    <TableExportContext.Provider value={tableExport}>
-      {rowContextMenu ? (
-        <RowMenuExtrasContext.Provider value={<RowExportItems />}>
-          {table}
-        </RowMenuExtrasContext.Provider>
-      ) : (
-        <ContextMenu>
-          <ContextMenuTrigger asChild>{table}</ContextMenuTrigger>
-          <ContextMenuContent>
-            <ExportTableSub tableExport={tableExport} />
-          </ContextMenuContent>
-        </ContextMenu>
-      )}
-    </TableExportContext.Provider>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{table}</ContextMenuTrigger>
+      <ContextMenuContent>
+        <ExportTableSub tableExport={tableExport} />
+      </ContextMenuContent>
+    </ContextMenu>
   );
 
   // No wrapper element either way, so `className` and every caller's layout
