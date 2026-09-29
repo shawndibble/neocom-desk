@@ -475,6 +475,29 @@ describe('fetchAllPagesStatus — per-page ETag revalidation', () => {
     expect(result.items).toEqual(['item-1']);
   });
 
+  it('keeps pageResponses aligned to page numbers when a page comes back empty', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/10000002/orders`, ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page'));
+        const etag = `"p${page}"`;
+        const headers = { 'X-Pages': '3', ETag: etag };
+        if (page === 2) return new HttpResponse(null, { status: 204, headers });
+        if (request.headers.get('if-none-match') === etag) {
+          return new HttpResponse(null, { status: 304, headers });
+        }
+        return HttpResponse.json([`item-${page}`], { headers });
+      })
+    );
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders', {
+      pageEtags: [undefined, undefined, '"p3"'],
+    });
+
+    expect(result).toMatchObject({ truncated: true, pagesFetched: 2, pagesReported: 3 });
+    expect(result.pageResponses?.map((p) => p.notModified)).toEqual([false, false, true]);
+    expect(result.pageResponses?.[1].items).toBeNull();
+  });
+
   it('leaves pageResponses off when not revalidating', async () => {
     const { handler } = etaggedHandler(2);
     server.use(handler);

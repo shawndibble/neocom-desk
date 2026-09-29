@@ -171,7 +171,7 @@ export function conditionalFetch<T>(fetch: (options: { etag?: string }) => Promi
 export interface PagedConditionalCapture<T> {
   /** Set by the cache: the stored per-page ETags, or undefined to fetch unconditionally. */
   ifNoneMatch: ReadonlyArray<string> | undefined;
-  /** Set by `fetchLive`: what each collected page answered, in page order. */
+  /** Set by `fetchLive`: what each walked page answered, entry `i` for page `i + 1`. */
   pageResponses: PageResponse<T>[] | undefined;
 }
 
@@ -988,7 +988,7 @@ async function loadPaginatedWithCacheStatusLive<T>(
     let live = await fetchLive();
     let revalidated =
       stored && conditional
-        ? await revalidatePages<T>(characterId, key, stored, conditional, live)
+        ? await revalidatePages<T>(characterId, key, stored, conditional, live, options)
         : undefined;
     if (revalidated === null && conditional) {
       // The row the ETags vouched for changed or vanished in the meantime, so
@@ -1121,7 +1121,8 @@ async function revalidatePages<T>(
   key: string,
   stored: ReadonlyArray<CachedPage>,
   conditional: PagedConditionalCapture<T>,
-  live: TruncatableResult<T>
+  live: TruncatableResult<T>,
+  options: LoadWithCacheStatusOptions
 ): Promise<{ cached: CachedResult<T[]> } | { items: T[]; counts: number[] } | null | undefined> {
   const responses = conditional.pageResponses ?? [];
   if (!responses.some((response) => response.notModified)) return undefined;
@@ -1131,7 +1132,12 @@ async function revalidatePages<T>(
     responses.length === stored.length &&
     responses.every((response) => response.notModified)
   ) {
-    const cached = await applyNotModified<T[]>(characterId, key, sent, null);
+    const cached = await applyNotModified<T[]>(
+      characterId,
+      key,
+      sent,
+      options.expiresCapture?.value ?? null
+    );
     return cached ? { cached } : null;
   }
   if (await isCachePurgePending(characterId)) return null;

@@ -21,7 +21,8 @@ export interface PaginatedResult<T> extends TruncatableResult<T> {
   /** Pages the first response advertised via X-Pages (1 when unpaginated). */
   pagesReported: number;
   /**
-   * One entry per page in `pagesFetched`, in page order — present only when
+   * One entry per page walked, indexed by page number (entry `i` is page
+   * `i + 1`, empty bodies included) — present only when
    * the call asked to revalidate (`pageEtags`, even empty). A 304 page's items
    * are not in `items`: the caller restores them from what it holds.
    */
@@ -112,19 +113,19 @@ export async function fetchAllPagesStatus<T>(
     const lastPage = maxPages === undefined ? first.pages : Math.min(first.pages, maxPages);
     responses.push(...(await fetchRemainingPages<T>(fetchPage, lastPage)));
     const items: T[] = [];
-    const collected: PageResponse<T>[] = [];
+    let pagesFetched = 0;
     for (const response of responses) {
       if (!response.items && !response.notModified) continue;
       items.push(...(response.items ?? []));
-      collected.push(response);
+      pagesFetched += 1;
     }
     recordEsiActivity(endpointId, characterId, 'success');
     return {
       items,
-      truncated: collected.length < first.pages,
-      pagesFetched: collected.length,
+      truncated: pagesFetched < first.pages,
+      pagesFetched,
       pagesReported: first.pages,
-      ...(pageEtags ? { pageResponses: collected } : {}),
+      ...(pageEtags ? { pageResponses: responses } : {}),
     };
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') throw err;
