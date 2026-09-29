@@ -26,11 +26,21 @@ import { needsAttentionCount, openOrderProblemCounts } from '@/features/market/o
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import { compareSeverity } from '@/engine/severity';
 import { formatCountdown } from '@/lib/duration';
+import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
+import { extractableSp, extractorCount, isSpExtractionReady } from '@/engine/spExtraction';
+import { formatCompactNumber } from '@/lib/compactNumber';
+import { structureCounts } from './corpCards';
 import type {
+  CalendarEventsBoardData,
   ContractsBoardData,
+  MailBoardData,
   IndustryBoardData,
   MiningTaxBoardData,
+  MoonChunksBoardData,
   PlanetaryBoardData,
+  PriceAlertsBoardData,
+  SpExtractionBoardData,
+  StructuresView,
 } from './boardData';
 
 /**
@@ -163,4 +173,75 @@ export function contractsSummary(
     );
   }
   return parts.length > 0 ? parts.join(' · ') : t('overview.board.contractsNothingDue');
+}
+
+export function comingUpSummary(
+  t: Translate,
+  data: CalendarEventsBoardData | null,
+  nowMs: number
+): string {
+  if (data === null) return t(CHECKING);
+  if (data.needsReauth) return t(REAUTH);
+  const next = upcomingCommittedEvents(data.events, nowMs)[0];
+  if (next === undefined) return t('overview.board.comingUpNone');
+  return t('overview.board.comingUpNext', {
+    title: next.title,
+    when: formatCountdown((next.atMs - nowMs) / 1000),
+  });
+}
+
+export function spExtractionSummary(t: Translate, data: SpExtractionBoardData): string {
+  if (data.totalSp === null) return t(CHECKING);
+  if (data.monitoring && isSpExtractionReady(data.totalSp, data.thresholdSp)) {
+    return t('overview.board.spExtractionReady', { count: extractorCount(data.totalSp) });
+  }
+  return t('overview.board.spExtractable', {
+    sp: formatCompactNumber(extractableSp(data.totalSp)),
+  });
+}
+
+export function mailSummary(t: Translate, data: MailBoardData | null): string {
+  if (data === null) return t(CHECKING);
+  if (data.needsReauth) return t(REAUTH);
+  return data.unread > 0
+    ? t('overview.board.mailUnread', { count: data.unread })
+    : t('overview.board.mailNone');
+}
+
+export function priceAlertsSummary(t: Translate, data: PriceAlertsBoardData | null): string {
+  if (data === null) return t(CHECKING);
+  const crossed = data.alerts.filter((alert) => alert.crossed).length;
+  if (crossed > 0) return t('overview.board.priceAlertsCrossed', { count: crossed });
+  if (data.alerts.length > 0) {
+    return t('overview.board.priceAlertsWatching', { count: data.alerts.length });
+  }
+  return t('overview.board.priceAlertsNone');
+}
+
+export function structuresSummary(t: Translate, data: StructuresView | null): string {
+  if (data === null) return t(CHECKING);
+  if (data.items === null) return t(data.needsReauth ? REAUTH : 'overview.board.corpUnreadable');
+  const counts = structureCounts(data.items);
+  if (counts.timers > 0) return t('overview.board.structuresTimers', { count: counts.timers });
+  if (counts.lowFuel > 0) return t('overview.board.structuresLowFuel', { count: counts.lowFuel });
+  if (counts.offline > 0) return t('overview.board.structuresOffline', { count: counts.offline });
+  return t('overview.board.structuresFine', { count: data.structureCount });
+}
+
+export function moonChunksSummary(
+  t: Translate,
+  data: MoonChunksBoardData | null,
+  nowMs: number
+): string {
+  if (data === null) return t(CHECKING);
+  if (data.chunks === null) return t(data.needsReauth ? REAUTH : 'overview.board.corpUnreadable');
+  const ready = data.chunks.filter((chunk) => chunk.detail === 'decay').length;
+  if (ready > 0) return t('overview.board.moonChunksReady', { count: ready });
+  const next = data.chunks
+    .filter((chunk) => chunk.detail === 'arrival' && chunk.deadlineMs > nowMs)
+    .sort((a, b) => a.deadlineMs - b.deadlineMs)[0];
+  if (next === undefined) return t('overview.board.moonChunksNone');
+  return t('overview.board.moonChunksNext', {
+    when: formatCountdown((next.deadlineMs - nowMs) / 1000),
+  });
 }

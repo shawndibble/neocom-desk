@@ -24,6 +24,13 @@ import { loadContracts } from '@/features/character/contracts';
 import { loadContractLocationName } from '@/features/character/contractLocationName';
 import { summarizeContractsBoard, type ContractsBoardSummary } from '@/engine/contractsBoard';
 import { loadCalendarEvents } from '@/features/character/calendar';
+import { loadMailHeaders, loadMailLabels } from '@/features/character/mail';
+import { resolveNames } from '@/features/character/names';
+import { db } from '@/db';
+import { lastPriceAlertSnapshot } from '@/features/notifications/pollDomains';
+import { buildPriceAlertRows, type BoardPriceAlert } from './priceAlertsBoard';
+import type { BoardStructureSource, CorpBoardItem } from '@/engine/corp/board';
+import type { BoardClockSource } from '@/engine/character/board';
 import type { CalendarEventSummary } from '@/esi/endpoints';
 
 /*
@@ -261,4 +268,152 @@ export async function loadCalendarEventsBoard(
 ): Promise<CalendarEventsBoardData> {
   const { cached, needsReauth } = await loadCalendarEvents(characterId);
   return { events: cached?.data ?? [], needsReauth, fetchedAt: cached ? cached.fetchedAt : null };
+}
+
+// --- SP extraction ----------------------------------------------------------
+
+/**
+ * Not a loader of its own: the total comes from the skills read the summary
+ * strip already makes, and the switch and threshold are the synced SP
+ * Extraction preferences (`features/character/spExtractionSettings.ts`).
+ */
+export interface SpExtractionBoardData {
+  /** Null until the skills read lands. */
+  totalSp: number | null;
+  /** Whether the pilot turned SP Extraction monitoring on. Off, nothing is ever flagged. */
+  monitoring: boolean;
+  thresholdSp: number;
+}
+
+// --- Mail -------------------------------------------------------------------
+
+export interface BoardMail {
+  mailId: number;
+  subject: string;
+  /** Null when the sender's name did not resolve; the row leaves it out. */
+  from: string | null;
+  atMs: number | null;
+}
+
+export interface MailBoardData {
+  /** ESI's own unread total across the mailbox, not just the 50 newest headers. */
+  unread: number;
+  /** The newest unread mails, newest first — a few rows, not the inbox. */
+  recent: BoardMail[];
+  needsReauth: boolean;
+  fetchedAt: Date | null;
+}
+
+/**
+ * The count comes from the labels read, whose `total_unread_count` covers the
+ * whole mailbox; the headers only reach the 50 newest, so counting unread
+ * among them would under-report a backlog. The headers supply the rows.
+ */
+export async function loadMailBoard(characterId: number): Promise<MailBoardData> {
+  const [labels, headers] = await Promise.all([
+    loadMailLabels(characterId),
+    loadMailHeaders(characterId),
+  ]);
+  const unreadHeaders = (headers.cached?.data ?? [])
+    .filter((header) => header.is_read === false)
+    .map((header) => ({
+      header,
+      atMs: header.timestamp ? Date.parse(header.timestamp) : Number.NaN,
+    }))
+    .sort((a, b) => (Number.isNaN(b.atMs) ? -1 : b.atMs) - (Number.isNaN(a.atMs) ? -1 : a.atMs))
+    .slice(0, 4);
+  const senderIds = unreadHeaders.flatMap(({ header }) =>
+    header.from === undefined ? [] : [header.from]
+  );
+  let names = new Map<number, string>();
+  if (senderIds.length > 0) {
+    try {
+      names = await resolveNames(senderIds);
+    } catch {
+      // A courtesy: a row without a sender still names the mail.
+    }
+  }
+  return {
+    unread:
+      labels.cached?.data.total_unread_count ??
+      (headers.cached?.data ?? []).filter((header) => header.is_read === false).length,
+    recent: unreadHeaders.map(({ header, atMs }) => ({
+      mailId: header.mail_id,
+      subject: header.subject ?? '',
+      from: header.from === undefined ? null : (names.get(header.from) ?? null),
+      atMs: Number.isNaN(atMs) ? null : atMs,
+    })),
+    needsReauth: headers.needsReauth || labels.needsReauth,
+    // The older of the two reads: the count is only as fresh as the labels.
+    fetchedAt:
+      [headers.cached?.fetchedAt, labels.cached?.fetchedAt]
+        .filter((date): date is Date => date instanceof Date)
+        .sort((a, b) => a.getTime() - b.getTime())[0] ?? null,
+  };
+}
+
+// --- Price alerts -----------------------------------------------------------
+
+export interface PriceAlertsBoardData {
+  alerts: BoardPriceAlert[];
+  /** When the poller last priced these targets, or null if it never has. */
+  checkedAt: number | null;
+}
+
+/** The Quickbar's targets, priced from the poller's last reading (`priceAlertsBoard.ts`). */
+export async function loadPriceAlertsBoard(characterId: number): Promise<PriceAlertsBoardData> {
+  const [record, snapshot] = await Promise.all([
+    db.quickbars.get(String(characterId)),
+    lastPriceAlertSnapshot(characterId),
+  ]);
+  return {
+    alerts: buildPriceAlertRows(record?.items ?? [], snapshot),
+    checkedAt: snapshot?.nowMs ?? null,
+  };
+}
+
+// --- Corp: structures and moon extractions -----------------------------------
+
+/*
+ * Both corp cards load through `./corpBoard`, behind `import()` like
+ * `miningTax/snapshot`: the corp reads, role checks and board engine are for
+ * the few pilots with corp roles, and the landing route's first paint should
+ * not carry them for everyone else.
+ */
+
+export interface StructuresBoardData {
+  /**
+   * The corporation's structures as the corp engine reads them, or null when
+   * this Character may not read structures — which is different from owning
+   * none. Raw sources rather than built items: the items' clocks and
+   * staleness are relative to *now*, so they are built at render time
+   * (`corpCards.ts`'s `structuresView`), never frozen at load.
+   */
+  structures: BoardStructureSource[] | null;
+  structureCount: number;
+  needsReauth: boolean;
+  fetchedAt: Date | null;
+}
+
+/** `StructuresBoardData` with its items built against the current instant. */
+export interface StructuresView extends Omit<StructuresBoardData, 'structures'> {
+  items: CorpBoardItem[] | null;
+}
+
+export async function loadStructuresBoard(characterId: number): Promise<StructuresBoardData> {
+  const { loadStructuresBoardData } = await import('./corpBoard');
+  return loadStructuresBoardData(characterId);
+}
+
+export interface MoonChunksBoardData {
+  /** One clock per drill (arrival, or decay once landed), or null when unreadable. */
+  chunks: BoardClockSource[] | null;
+  needsReauth: boolean;
+  fetchedAt: Date | null;
+  loadedAt: number;
+}
+
+export async function loadMoonChunksBoard(characterId: number): Promise<MoonChunksBoardData> {
+  const { loadMoonChunksBoardData } = await import('./corpBoard');
+  return loadMoonChunksBoardData(characterId);
 }

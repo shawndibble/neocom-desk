@@ -11,7 +11,17 @@ import { App } from '@/app/App';
 import { selectActiveEntryFromSorted, sortQueueEntries, selectQueueDepth } from './overviewQueue';
 import type { SkillType } from '@/sde/types';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
-import { OVERVIEW_HIDDEN_CARDS_KEY, useOverviewHiddenCards } from '@/features/overview/hiddenCards';
+import { priceAlertDomain } from '@/features/notifications/pollDomains';
+import {
+  SP_EXTRACTION_ENABLED_KEY,
+  useSpExtractionMonitoringEnabled,
+  useSpExtractionThresholdSp,
+} from '@/features/character/spExtractionSettings';
+import {
+  OVERVIEW_CARD_KEYS,
+  OVERVIEW_HIDDEN_CARDS_KEY,
+  useOverviewHiddenCards,
+} from '@/features/overview/hiddenCards';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -144,6 +154,10 @@ const server = setupServer(
     HttpResponse.json({ type_id: 3300, name: 'Gunnery', group_id: 10, published: true })
   ),
   http.post('https://esi.evetech.net/universe/names', () => HttpResponse.json([])),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () => HttpResponse.json([])),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/labels`, () =>
+    HttpResponse.json({ labels: [], total_unread_count: 0 })
+  ),
   // An order's cost basis is read out of the character's own transaction
   // history; both are empty here, which is what "no cost basis known" means.
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/transactions`, () =>
@@ -183,9 +197,13 @@ beforeEach(async () => {
   await db.settings.clear();
   await db.esiCache.clear();
   await db.notificationFeed.clear();
+  await db.quickbars.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useOverviewHiddenCards.setState({ value: [], hydrated: false });
+  priceAlertDomain.store.setState({ value: {}, hydrated: false });
+  useSpExtractionMonitoringEnabled.setState({ value: false, hydrated: false });
+  useSpExtractionThresholdSp.setState({ value: 500_000, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -791,6 +809,15 @@ function usePhoneViewport(): void {
 
 /** The domain cards, by the heading each one carries. */
 const DOMAINS = ['Open orders', 'Mining tax', 'Planetary industry', 'Industry jobs'] as const;
+/** Domains that are always one line on a phone rather than competing for a full card. */
+const ALWAYS_FOLDED = [
+  'Alerts',
+  'Contracts',
+  'Coming up',
+  'SP extraction',
+  'Mail',
+  'Price alerts',
+] as const;
 
 /** Which domains kept a full card — a card is a heading with its own "Open" link. */
 function fullCardDomains(): string[] {
@@ -839,9 +866,7 @@ describe('the board on a phone', () => {
     expect(full).toHaveLength(2);
     // Every domain still has a place, and none has two. A fold that quietly
     // dropped the fourth card would look exactly like a fold that worked.
-    expect([...full, ...foldedDomains()].sort()).toEqual(
-      [...DOMAINS, 'Alerts', 'Contracts'].sort()
-    );
+    expect([...full, ...foldedDomains()].sort()).toEqual([...DOMAINS, ...ALWAYS_FOLDED].sort());
   });
 
   it('folds contracts into a row that names the haul and its clock', async () => {
@@ -1033,7 +1058,7 @@ describe('hiding cards from the edit menu', () => {
   });
 
   it('says so rather than showing a blank board when every card is hidden', async () => {
-    await hide(['orders', 'mining', 'contracts', 'planetary', 'industry', 'alerts']);
+    await hide([...OVERVIEW_CARD_KEYS]);
     render(<App />);
 
     expect(await screen.findByText(/every card is hidden/i)).toBeInTheDocument();
@@ -1072,8 +1097,209 @@ describe('hiding cards from the edit menu', () => {
     await screen.findByRole('heading', { name: 'Everything else' });
 
     expect([...fullCardDomains(), ...foldedDomains()].sort()).toEqual(
-      ['Mining tax', 'Planetary industry', 'Industry jobs'].sort()
+      [
+        'Mining tax',
+        'Planetary industry',
+        'Industry jobs',
+        ...ALWAYS_FOLDED.filter((domain) => domain !== 'Alerts' && domain !== 'Contracts'),
+      ].sort()
     );
+  });
+});
+
+describe('Coming up', () => {
+  it('lists the committed events ahead, and leaves out the ones not answered', async () => {
+    await grantScopes([CALENDAR_SCOPE]);
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/calendar`, () =>
+        HttpResponse.json([
+          { ...calendarEvent({ id: 1, hours: 30, response: 'tentative' }), title: 'Moon pop' },
+          { ...calendarEvent({ id: 2, hours: 5, response: 'accepted' }), title: 'Home defense' },
+          { ...calendarEvent({ id: 3, hours: 2, response: 'not_responded' }), title: 'Roam' },
+        ])
+      )
+    );
+    render(<App />);
+
+    const card = await findCard(/coming up/i);
+    const rows = await within(card).findAllByRole('listitem');
+    expect(rows.map((row) => within(row).getByRole('link').textContent)).toEqual([
+      expect.stringContaining('Home defense'),
+      expect.stringContaining('Moon pop'),
+    ]);
+    expect(within(card).getByRole('link', { name: /open/i })).toHaveAttribute('href', '/calendar');
+  });
+});
+
+describe('SP extraction', () => {
+  it('says monitoring is off rather than flagging anything', async () => {
+    render(<App />);
+    const card = await findCard(/sp extraction/i);
+    expect(await within(card).findByText(/monitoring is off/i)).toBeInTheDocument();
+  });
+
+  it('shows the threshold it flags at once monitoring is on', async () => {
+    await db.settings.put({ key: SP_EXTRACTION_ENABLED_KEY, value: true });
+    render(<App />);
+    const card = await findCard(/sp extraction/i);
+    expect(await within(card).findByText('Flags at 500K spare SP')).toBeInTheDocument();
+  });
+});
+
+describe('Mail', () => {
+  it('counts the whole mailbox’s unread, and lists the newest unread with its sender', async () => {
+    await grantScopes(['esi-mail.read_mail.v1']);
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/labels`, () =>
+        HttpResponse.json({ labels: [], total_unread_count: 12 })
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json([
+          { mail_id: 1, subject: 'Old news', from: 77, is_read: true, timestamp: hoursFromNow(-9) },
+          {
+            mail_id: 2,
+            subject: 'Fleet tonight',
+            from: 77,
+            is_read: false,
+            timestamp: hoursFromNow(-2),
+          },
+        ])
+      ),
+      http.post('https://esi.evetech.net/universe/names', () =>
+        HttpResponse.json([{ id: 77, name: 'Fleet Boss', category: 'character' }])
+      )
+    );
+    render(<App />);
+
+    const card = await findCard(/^mail$/i);
+    expect(await within(card).findByText('12 unread')).toBeInTheDocument();
+    const rows = await within(card).findAllByRole('listitem');
+    expect(rows).toHaveLength(1);
+    expect(within(rows[0]).getByText('Fleet tonight')).toBeInTheDocument();
+    expect(await within(rows[0]).findByText('Fleet Boss')).toBeInTheDocument();
+  });
+});
+
+describe('Price alerts', () => {
+  it('prices each Quickbar target from the poller’s last reading, hits first', async () => {
+    await db.quickbars.put({
+      id: String(CHAR_ID),
+      characterId: CHAR_ID,
+      updatedAt: 1,
+      items: [
+        { typeId: 34, name: 'Tritanium', targetPrice: 5, targetDirection: 'below' },
+        { typeId: 44992, name: 'PLEX', targetPrice: 5_000_000, targetDirection: 'above' },
+        { typeId: 35, name: 'Pyerite' },
+      ],
+    });
+    await db.settings.put({
+      key: 'notifications.pollerState.priceAlert',
+      value: {
+        [CHAR_ID]: {
+          nowMs: Date.now() - 600_000,
+          entries: [
+            { typeId: 34, name: 'Tritanium', targetPrice: 5, direction: 'below', price: 6 },
+            {
+              typeId: 44992,
+              name: 'PLEX',
+              targetPrice: 5_000_000,
+              direction: 'above',
+              price: 5_200_000,
+            },
+          ],
+        },
+      },
+    });
+    render(<App />);
+
+    const card = await findCard(/price alerts/i);
+    const rows = await within(card).findAllByRole('listitem');
+    expect(rows.map((row) => within(row).getByRole('link').textContent)).toEqual([
+      expect.stringContaining('PLEX'),
+      expect.stringContaining('Tritanium'),
+    ]);
+    expect(within(card).getByText('Prices checked 10m ago')).toBeInTheDocument();
+  });
+});
+
+describe('corp cards', () => {
+  const CORP = 'https://esi.evetech.net/corporations/1001';
+  const corpRequests = vi.fn();
+
+  function corpHandlers(roles: string[]) {
+    return [
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/roles`, () =>
+        HttpResponse.json({ roles })
+      ),
+      http.get(`${CORP}/structures`, () => {
+        corpRequests();
+        return HttpResponse.json([
+          {
+            structure_id: 5001,
+            name: 'Home Astrahus',
+            corporation_id: 1001,
+            system_id: 30000142,
+            type_id: 35832,
+            profile_id: 1,
+            fuel_expires: hoursFromNow(24 * 30),
+            state: 'armor_reinforce',
+            state_timer_end: hoursFromNow(20),
+            services: [],
+          },
+        ]);
+      }),
+      http.get(`https://esi.evetech.net/corporation/1001/mining/extractions`, () => {
+        corpRequests();
+        return HttpResponse.json([
+          {
+            structure_id: 5001,
+            moon_id: 40000001,
+            extraction_start_time: hoursFromNow(-100),
+            chunk_arrival_time: hoursFromNow(6),
+            natural_decay_time: hoursFromNow(9),
+          },
+        ]);
+      }),
+    ];
+  }
+
+  beforeEach(() => corpRequests.mockReset());
+
+  it('shows structure timers and moon chunks to a Station Manager', async () => {
+    await grantScopes([
+      'esi-characters.read_corporation_roles.v1',
+      'esi-corporations.read_structures.v1',
+      'esi-industry.read_corporation_mining.v1',
+    ]);
+    server.use(...corpHandlers(['Station_Manager']));
+    render(<App />);
+
+    const structures = await findCard(/^structures$/i);
+    expect(await within(structures).findByText('Home Astrahus')).toBeInTheDocument();
+    expect(within(structures).getByText('armor reinforce')).toBeInTheDocument();
+    // Copy, not keys: a string filed under the wrong parent renders as its key.
+    expect(within(structures).getByText('Timers')).toBeInTheDocument();
+    expect(within(structures).getByText('1 structure')).toBeInTheDocument();
+
+    const moon = await findCard(/moon extractions/i);
+    expect(await within(moon).findByText('Home Astrahus')).toBeInTheDocument();
+    expect(within(moon).getByText('Chunk arrives')).toBeInTheDocument();
+    expect(within(moon).getByText('1 drill')).toBeInTheDocument();
+  });
+
+  it('offers neither card, and makes no corp read, to a pilot without corp roles', async () => {
+    const user = userEvent.setup();
+    await grantScopes(['esi-characters.read_corporation_roles.v1']);
+    server.use(...corpHandlers([]));
+    render(<App />);
+    await findCard(/open orders/i);
+
+    expect(screen.queryByRole('heading', { name: /^structures$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /moon extractions/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /choose which cards to show/i }));
+    expect(await screen.findByRole('menuitemcheckbox', { name: 'Mail' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'Structures' })).not.toBeInTheDocument();
+    expect(corpRequests).not.toHaveBeenCalled();
   });
 });
 

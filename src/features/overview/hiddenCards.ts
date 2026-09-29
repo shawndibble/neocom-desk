@@ -20,6 +20,12 @@ export const OVERVIEW_CARD_KEYS = [
   'contracts',
   'planetary',
   'industry',
+  'structures',
+  'moonChunks',
+  'comingUp',
+  'spExtraction',
+  'mail',
+  'priceAlerts',
   'alerts',
 ] as const;
 
@@ -35,6 +41,12 @@ export const OVERVIEW_CARD_LABEL: Record<OverviewCardKey, string> = {
   contracts: 'overview.board.contracts',
   planetary: 'overview.board.planetary',
   industry: 'overview.board.industry',
+  structures: 'overview.board.structures',
+  moonChunks: 'overview.board.moonChunks',
+  comingUp: 'overview.board.comingUp',
+  spExtraction: 'overview.board.spExtraction',
+  mail: 'overview.board.mail',
+  priceAlerts: 'overview.board.priceAlerts',
   alerts: 'overview.board.alerts',
 };
 

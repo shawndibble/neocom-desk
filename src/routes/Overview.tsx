@@ -23,10 +23,12 @@
  * from the edit menu (`features/overview/hiddenCards.ts`) — a choice they made,
  * synced across devices and Characters, not a state the board guessed at.
  *
- * Scoped to the active Character, with one exception: the alert feed is
- * device-wide, because the poller is (`features/notifications/`).
+ * Scoped to the active Character, with two exceptions: the alert feed is
+ * device-wide, because the poller is (`features/notifications/`), and the
+ * Structures and Moon extractions cards are the Character's corporation's,
+ * read through that Character's roles.
  */
-import { Fragment, useEffect, useMemo } from 'react';
+import { Fragment, useEffect, useMemo, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -53,7 +55,26 @@ import {
   isNotTrainingAlertEnabledFor,
 } from '@/features/notifications/preferences';
 import { SummaryStrip } from '@/features/overview/SummaryStrip';
+import {
+  useSpExtractionMonitoringEnabled,
+  useSpExtractionThresholdSp,
+} from '@/features/character/spExtractionSettings';
 import { CardPicker } from '@/features/overview/CardPicker';
+import {
+  moonChunkSeverity,
+  moonChunksDeadline,
+  moonChunksSeverity,
+  structuresDeadline,
+  structuresSeverity,
+  structuresView,
+} from '@/features/overview/corpCards';
+import { useCorpAccess } from '@/features/corp/useCorpAccess';
+import {
+  layoutBoard,
+  soonestDeadline,
+  type BoardCardSpec,
+  type BoardDeadline,
+} from '@/features/overview/boardLayout';
 import {
   isCardShown,
   OVERVIEW_CARD_LABEL,
@@ -64,7 +85,13 @@ import {
 import {
   AlertsColumn,
   CONTRACTS_IN_PROGRESS_HREF,
+  ComingUpCard,
   ContractsCard,
+  MailCard,
+  MoonChunksCard,
+  StructuresCard,
+  PriceAlertsCard,
+  SpExtractionCard,
   EverythingElseCard,
   IndustryCard,
   MiningTaxCard,
@@ -76,36 +103,56 @@ import {
   loadCalendarEventsBoard,
   loadContractsBoard,
   loadIndustryBoard,
+  loadMailBoard,
+  loadMoonChunksBoard,
+  loadStructuresBoard,
   loadMiningTaxBoard,
   loadPlanetaryBoard,
+  loadPriceAlertsBoard,
 } from '@/features/overview/boardData';
 import {
+  comingUpSeverity,
   contractsSeverity,
   industrySeverity,
+  mailSeverity,
   miningTaxSeverity,
   ordersSeverity,
   planetarySeverity,
+  priceAlertsSeverity,
+  spExtractionSeverity,
 } from '@/features/overview/boardSeverity';
 import {
   alertsSummary,
+  comingUpSummary,
   contractsDeadlineNote,
   contractsSummary,
   industrySummary,
+  mailSummary,
+  moonChunksSummary,
+  structuresSummary,
   miningTaxSummary,
   ordersSummary,
   planetarySummary,
+  priceAlertsSummary,
+  spExtractionSummary,
 } from '@/features/overview/boardSummary';
-import {
-  compareSeverity,
-  severityForRemaining,
-  worstSeverity,
-  type DeadlineSeverity,
-} from '@/engine/severity';
+import { severityForRemaining, worstSeverity } from '@/engine/severity';
 import { soonestCalendarDeadline } from '@/engine/calendarDeadline';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { isJobDone } from '@/features/industry/jobs';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { sortQueueEntries, selectActiveEntryFromSorted, selectQueueDepth } from './overviewQueue';
+
+/** A card as the route declares it: the layout's spec plus what the page renders. */
+interface RouteCard extends BoardCardSpec {
+  to: string;
+  summary: string;
+  danger?: boolean;
+  /** Absent for Alerts, whose desktop form is the column rather than a card. */
+  render?: () => ReactNode;
+  fetchedAt?: Date | null;
+  loading: boolean;
+}
 
 /** Stable identity, so the industry card does not re-render on every parent render before its load lands. */
 const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
@@ -198,9 +245,15 @@ export function Overview() {
   const hiddenCardsHydrated = useOverviewHiddenCards((state) => state.hydrated);
   const hydrateHiddenCards = useOverviewHiddenCards((state) => state.hydrate);
   const setHiddenCards = useOverviewHiddenCards((state) => state.setValue);
+  const spMonitoring = useSpExtractionMonitoringEnabled((state) => state.value);
+  const spThreshold = useSpExtractionThresholdSp((state) => state.value);
+  const hydrateSpMonitoring = useSpExtractionMonitoringEnabled((state) => state.hydrate);
+  const hydrateSpThreshold = useSpExtractionThresholdSp((state) => state.hydrate);
   useEffect(() => {
     void hydrateHiddenCards();
-  }, [hydrateHiddenCards]);
+    void hydrateSpMonitoring();
+    void hydrateSpThreshold();
+  }, [hydrateHiddenCards, hydrateSpMonitoring, hydrateSpThreshold]);
   const shown = (key: OverviewCardKey) => isCardShown(hiddenCards, key);
 
   // One `cacheKey` per card, not one for the page: they load independently, so
@@ -230,6 +283,19 @@ export function Overview() {
   const calendarSnapshot = useRouteSnapshot(loadCalendarEventsBoard, undefined, {
     cacheKey: 'overview:calendar',
   });
+  const mailSnapshot = useRouteSnapshot(loadMailBoard, undefined, {
+    cacheKey: 'overview:mail',
+  });
+  const priceAlertsSnapshot = useRouteSnapshot(loadPriceAlertsBoard, undefined, {
+    cacheKey: 'overview:price-alerts',
+  });
+  const structuresSnapshot = useRouteSnapshot(loadStructuresBoard, undefined, {
+    cacheKey: 'overview:structures',
+  });
+  const moonSnapshot = useRouteSnapshot(loadMoonChunksBoard, undefined, {
+    cacheKey: 'overview:moon-chunks',
+  });
+  const corpAccess = useCorpAccess();
   const { hydrated, activeCharacterId } = walletSnapshot;
 
   const queueEntries = skillsQueueSnapshot.data?.queueResult?.data ?? null;
@@ -345,74 +411,32 @@ export function Overview() {
   const planetary = planetarySnapshot.data;
   const industryJobs = industrySnapshot.data?.jobs ?? [];
 
-  /*
-   * The next deadline is drawn from the cards below rather than computed on its
-   * own: it is the soonest live clock on the board, so clicking it lands on
-   * whichever card owns it. A fourth independent countdown here would be a
-   * number the rest of the page could contradict. For the same reason a card
-   * the pilot hid contributes no deadline: the link would land on nothing.
-   */
-  const deadlines: { at: number; note: string; severity: DeadlineSeverity; to: string }[] = [];
+  const contracts = contractsSnapshot.data;
+  const contractsNote = contracts ? contractsDeadlineNote(t, contracts) : null;
+  const soonestContract = contracts?.summary.soonest;
   const nextBatch = planetary?.batches.find((batch) => batch.kind === 'running');
-  if (nextBatch?.expiryMs && shown('planetary')) {
-    deadlines.push({
-      at: nextBatch.expiryMs,
-      note: t('overview.board.batch.running', { count: nextBatch.colonies.length }),
-      severity: nextBatch.severity,
-      to: '/planetary-industry',
-    });
-  }
   const nextJobMs = industryJobs
     .filter((job) => !isJobDone(job, now))
     .map((job) => Date.parse(job.end_date))
     .filter((ms) => !Number.isNaN(ms))
     .sort((a, b) => a - b)[0];
-  if (nextJobMs !== undefined && shown('industry')) {
-    deadlines.push({
-      at: nextJobMs,
-      note: t('overview.board.nextJob'),
-      severity: 'watch',
-      to: '/industry',
-    });
-  }
-  if (trainingFinishMs !== null && trainingFinishMs > now) {
-    deadlines.push({
-      at: trainingFinishMs,
-      note: t('overview.board.nextSkill'),
-      severity: 'clear',
-      to: '/skills/plans',
-    });
-  }
-  const contracts = contractsSnapshot.data;
-  const contractsNote = contracts ? contractsDeadlineNote(t, contracts) : null;
-  const soonestContract = contracts?.summary.soonest;
-  if (contracts && soonestContract && contractsNote !== null && shown('contracts')) {
-    deadlines.push({
-      at: soonestContract.atMs,
-      note: contractsNote,
-      severity: soonestContract.overdue ? 'critical' : 'warning',
-      to: CONTRACTS_IN_PROGRESS_HREF,
-    });
-  }
-  /*
-   * Only events the pilot has actually committed to — `accepted` or
-   * `tentative` — so a fleet op nobody has answered yet cannot lead the board
-   * (`engine/calendarDeadline`).
-   */
+  const spExtraction = {
+    totalSp: skillsQueueData?.totalSp ?? null,
+    monitoring: spMonitoring,
+    thresholdSp: spThreshold,
+  };
+  const structures = structuresSnapshot.data ? structuresView(structuresSnapshot.data, now) : null;
+  const structureClock = structures?.items ? structuresDeadline(structures.items, now) : null;
+  const nextChunk = moonSnapshot.data?.chunks
+    ? moonChunksDeadline(moonSnapshot.data.chunks, now)
+    : null;
   const calendarEvent = soonestCalendarDeadline(calendarSnapshot.data?.events ?? [], now);
-  if (calendarEvent) {
-    deadlines.push({
-      at: calendarEvent.atMs,
-      note: calendarEvent.title,
-      severity: severityForRemaining(calendarEvent.atMs - now),
-      to: '/calendar',
-    });
-  }
-  const soonest = deadlines.sort((a, b) => a.at - b.at)[0] ?? null;
-
-  const walletBalance = walletSnapshot.data?.result?.data ?? null;
 
   /*
+   * Every card, declared once. Where each one goes (the desktop grid, a
+   * phone's two full slots, the folded list) and which clock leads the
+   * summary strip are derived from this list (`features/overview/boardLayout`).
+   *
    * Worst first, but only where it pays. On a phone the cards stack in one
    * column and about three fit above the fold, so the thing on fire has to
    * lead — and everything past `PHONE_FULL_COUNT` folds to a single line in
@@ -420,17 +444,29 @@ export function Overview() {
    * position that stays put between visits is worth more than a ranking nobody
    * has to scroll to: there the declaration order below is what renders.
    *
-   * A null severity (still loading) sorts last rather than as `clear`: a card
-   * that has made no claim yet must not jump the queue on a guess and
-   * reshuffle the stack under the reader's thumb as each load lands.
+   * Contracts is `folded`: on a phone it is always a folded row (a courier is
+   * one line), and on desktop it takes the slot after Mining Tax. It is not a
+   * domain competing for a phone's two full cards.
+   *
+   * Alerts leads the folded list instead of competing for a full card, and is
+   * never ranked against the others. It is the one row here that is
+   * device-wide rather than this Character's, and its volume class is
+   * different from everything else on the board — the reason it has a column
+   * of its own rather than a card. Letting it into the ranking would mean one
+   * loud evening pushes both genuine deadlines off the top of a phone.
+   *
+   * The next deadline is drawn from these cards rather than computed on its
+   * own: it is the soonest live clock on the board, so clicking it lands on
+   * whichever card owns it. A card the pilot hid contributes none.
    */
-  const cards = [
+  const specs: RouteCard[] = [
     {
-      key: 'orders' as const,
-      domain: t(OVERVIEW_CARD_LABEL.orders),
+      key: 'orders',
+      placement: 'ranked',
       to: '/market/orders',
       severity: ordersSeverity(orderRows, ordersNeedReauth),
       summary: ordersSummary(t, orderRows, ordersNeedReauth),
+      loading: ordersSnapshot.loading,
       render: () => (
         <OrdersCard
           rows={orderRows ?? []}
@@ -441,27 +477,65 @@ export function Overview() {
       ),
     },
     {
-      key: 'mining' as const,
-      domain: t(OVERVIEW_CARD_LABEL.mining),
+      key: 'mining',
+      placement: 'ranked',
       to: '/mining/tax',
       severity: miningTaxSeverity(miningSnapshot.data),
       summary: miningTaxSummary(t, miningSnapshot.data),
+      fetchedAt: miningSnapshot.data?.fetchedAt,
+      loading: miningSnapshot.loading,
       render: () => <MiningTaxCard data={miningSnapshot.data} />,
     },
     {
-      key: 'planetary' as const,
-      domain: t(OVERVIEW_CARD_LABEL.planetary),
+      key: 'contracts',
+      placement: 'folded',
+      to: CONTRACTS_IN_PROGRESS_HREF,
+      severity: contractsSeverity(contracts),
+      summary: contractsSummary(t, contracts, now),
+      danger: (contracts?.summary.overdue ?? 0) > 0,
+      fetchedAt: contractsSnapshot.data?.fetchedAt,
+      loading: contractsSnapshot.loading,
+      deadline:
+        soonestContract && contractsNote !== null
+          ? {
+              at: soonestContract.atMs,
+              note: contractsNote,
+              severity: soonestContract.overdue ? 'critical' : 'warning',
+              to: CONTRACTS_IN_PROGRESS_HREF,
+            }
+          : null,
+      render: () => <ContractsCard data={contracts} />,
+    },
+    {
+      key: 'planetary',
+      placement: 'ranked',
       to: '/planetary-industry',
       severity: planetarySeverity(planetary),
       summary: planetarySummary(t, planetary),
+      fetchedAt: planetarySnapshot.data?.fetchedAt,
+      loading: planetarySnapshot.loading,
+      deadline: nextBatch?.expiryMs
+        ? {
+            at: nextBatch.expiryMs,
+            note: t('overview.board.batch.running', { count: nextBatch.colonies.length }),
+            severity: nextBatch.severity,
+            to: '/planetary-industry',
+          }
+        : null,
       render: () => <PlanetaryCard data={planetary} />,
     },
     {
-      key: 'industry' as const,
-      domain: t(OVERVIEW_CARD_LABEL.industry),
+      key: 'industry',
+      placement: 'ranked',
       to: '/industry',
       severity: industrySeverity(industryJobs, industrySnapshot.data?.needsReauth ?? false, now),
       summary: industrySummary(t, industrySnapshot.data, now),
+      fetchedAt: industrySnapshot.data?.fetchedAt,
+      loading: industrySnapshot.loading,
+      deadline:
+        nextJobMs !== undefined
+          ? { at: nextJobMs, note: t('overview.board.nextJob'), severity: 'watch', to: '/industry' }
+          : null,
       render: () => (
         <IndustryCard
           jobs={industryJobs}
@@ -471,63 +545,143 @@ export function Overview() {
         />
       ),
     },
+    {
+      key: 'structures',
+      placement: 'ranked',
+      // Offered only to a Character whose corp roles and grant cover it, the
+      // rule every corp surface follows (`features/corp/useCorpAccess`). While
+      // that is still resolving the card is absent rather than loading: a corp
+      // card flickering in and out for a pilot with no roles is worse than one
+      // that appears a beat late for a Director.
+      available: corpAccess.state === 'ready' && corpAccess.capabilities.canReadStructures,
+      to: '/corp',
+      severity: structuresSeverity(structures),
+      summary: structuresSummary(t, structures),
+      fetchedAt: structuresSnapshot.data?.fetchedAt,
+      loading: structuresSnapshot.loading,
+      deadline: structureClock
+        ? {
+            at: structureClock.atMs,
+            note: t(`overview.board.structureDeadline.${structureClock.kind}`, {
+              subject: structureClock.subject,
+            }),
+            severity: structureClock.severity,
+            to: '/corp',
+          }
+        : null,
+      render: () => <StructuresCard data={structures} />,
+    },
+    {
+      key: 'moonChunks',
+      placement: 'ranked',
+      available: corpAccess.state === 'ready' && corpAccess.capabilities.canReadMoonExtractions,
+      to: '/corp',
+      severity: moonChunksSeverity(moonSnapshot.data, now),
+      summary: moonChunksSummary(t, moonSnapshot.data, now),
+      fetchedAt: moonSnapshot.data?.fetchedAt,
+      loading: moonSnapshot.loading,
+      deadline: nextChunk
+        ? {
+            at: nextChunk.deadlineMs,
+            note: t(
+              `overview.board.chunkDeadline.${nextChunk.detail === 'decay' ? 'decay' : 'arrival'}`,
+              {
+                subject: nextChunk.subject,
+              }
+            ),
+            severity: moonChunkSeverity(nextChunk, now),
+            to: '/corp',
+          }
+        : null,
+      render: () => <MoonChunksCard data={moonSnapshot.data} nowMs={now} />,
+    },
+    {
+      key: 'comingUp',
+      placement: 'folded',
+      to: '/calendar',
+      severity: comingUpSeverity(calendarSnapshot.data, now),
+      summary: comingUpSummary(t, calendarSnapshot.data, now),
+      fetchedAt: calendarSnapshot.data?.fetchedAt,
+      loading: calendarSnapshot.loading,
+      /*
+       * Only events the pilot has actually committed to — `accepted` or
+       * `tentative` — so a fleet op nobody has answered yet cannot lead the
+       * board (`engine/calendarDeadline`).
+       */
+      deadline: calendarEvent
+        ? {
+            at: calendarEvent.atMs,
+            note: calendarEvent.title,
+            severity: severityForRemaining(calendarEvent.atMs - now),
+            to: '/calendar',
+          }
+        : null,
+      render: () => <ComingUpCard data={calendarSnapshot.data} nowMs={now} />,
+    },
+    {
+      key: 'spExtraction',
+      placement: 'folded',
+      to: '/characters',
+      severity: spExtractionSeverity(spExtraction),
+      summary: spExtractionSummary(t, spExtraction),
+      // Rides on the skills read, which the strip already counts for freshness.
+      loading: false,
+      render: () => <SpExtractionCard data={spExtraction} />,
+    },
+    {
+      key: 'mail',
+      placement: 'folded',
+      to: '/mail',
+      severity: mailSeverity(mailSnapshot.data),
+      summary: mailSummary(t, mailSnapshot.data),
+      fetchedAt: mailSnapshot.data?.fetchedAt,
+      loading: mailSnapshot.loading,
+      render: () => <MailCard data={mailSnapshot.data} nowMs={now} />,
+    },
+    {
+      key: 'priceAlerts',
+      placement: 'folded',
+      to: '/market',
+      severity: priceAlertsSeverity(priceAlertsSnapshot.data),
+      summary: priceAlertsSummary(t, priceAlertsSnapshot.data),
+      // Prices are the poller's, so the board's own freshness says nothing about them.
+      loading: priceAlertsSnapshot.loading,
+      render: () => <PriceAlertsCard data={priceAlertsSnapshot.data} nowMs={now} />,
+    },
+    {
+      key: 'alerts',
+      placement: 'column',
+      to: '/alerts',
+      severity: worstSeverity(alertGroups.map((group) => group.severity)),
+      summary: alertsSummary(t, visibleAlerts.length, alertGroups.length),
+      loading: false,
+    },
   ];
-  const ranked = cards
-    .filter((card) => shown(card.key))
-    .sort((a, b) =>
-      a.severity === null || b.severity === null
-        ? Number(a.severity === null) - Number(b.severity === null)
-        : compareSeverity(a.severity, b.severity)
-    );
-  /*
-   * Contracts sits outside the ranking, like Alerts: on a phone it is always a
-   * folded row (a courier is one line), and on desktop it takes the slot after
-   * Mining Tax. It is not a fifth domain competing for a phone's two full cards.
-   */
-  const contractsCard = {
-    key: 'contracts' as const,
-    render: () => <ContractsCard data={contracts} />,
-  };
-  // Hidden cards are filtered after the desktop order is built, so hiding one
-  // never shifts where Contracts sits among the rest.
-  const fullCards = isPhone
-    ? ranked.slice(0, PHONE_FULL_COUNT)
-    : [...cards.slice(0, 2), contractsCard, ...cards.slice(2)].filter((card) => shown(card.key));
-  const alertsShown = shown('alerts');
 
-  /*
-   * Alerts leads the folded list instead of competing for a full card, and is
-   * never ranked against the others.
-   *
-   * It is the one row here that is device-wide rather than this Character's,
-   * and its volume class is different from everything else on the board — the
-   * reason it has a column of its own rather than a card. Letting it into the
-   * ranking would mean one loud evening pushes both genuine deadlines off the
-   * top of a phone, which is the failure the column was built to prevent. The
-   * mockup does the same: it folds a 70-unread alerts row while planetary and
-   * orders keep their cards.
-   */
-  const folded: FoldedDomain[] = isPhone
-    ? [
-        {
-          key: 'alerts' as const,
-          domain: t(OVERVIEW_CARD_LABEL.alerts),
-          summary: alertsSummary(t, visibleAlerts.length, alertGroups.length),
-          severity: worstSeverity(alertGroups.map((group) => group.severity)),
-          to: '/alerts',
-        },
-        {
-          key: 'contracts' as const,
-          domain: t(OVERVIEW_CARD_LABEL.contracts),
-          summary: contractsSummary(t, contracts, now),
-          severity: contractsSeverity(contracts),
-          to: CONTRACTS_IN_PROGRESS_HREF,
-          danger: (contracts?.summary.overdue ?? 0) > 0,
-        },
-        ...ranked.slice(PHONE_FULL_COUNT),
-      ].filter((domain) => shown(domain.key))
-    : [];
-  const nothingShown = fullCards.length === 0 && folded.length === 0 && !(alertsShown && !isPhone);
+  /* The one clock that belongs to no card: skill training lives in the strip itself. */
+  const alwaysDeadlines: BoardDeadline[] = [];
+  if (trainingFinishMs !== null && trainingFinishMs > now) {
+    alwaysDeadlines.push({
+      at: trainingFinishMs,
+      note: t('overview.board.nextSkill'),
+      severity: 'clear',
+      to: '/skills/plans',
+    });
+  }
+  const soonest = soonestDeadline(specs, shown, alwaysDeadlines);
+  const layout = layoutBoard(specs, { isPhone, shown, phoneFullCount: PHONE_FULL_COUNT });
+  const visibleSpecs = specs.filter((spec) => spec.available !== false && shown(spec.key));
+  const folded: FoldedDomain[] = layout.folded.map((spec) => ({
+    key: spec.key,
+    domain: t(OVERVIEW_CARD_LABEL[spec.key]),
+    summary: spec.summary,
+    severity: spec.severity,
+    to: spec.to,
+    danger: spec.danger,
+  }));
+  const nothingShown = visibleSpecs.length === 0;
+
+  const walletBalance = walletSnapshot.data?.result?.data ?? null;
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -585,42 +739,39 @@ export function Overview() {
         fetchedAt={stalest([
           walletSnapshot.data?.result?.fetchedAt,
           skillsQueueSnapshot.data?.queueResult?.fetchedAt,
-          shown('planetary') ? planetarySnapshot.data?.fetchedAt : null,
-          shown('industry') ? industrySnapshot.data?.fetchedAt : null,
-          shown('mining') ? miningSnapshot.data?.fetchedAt : null,
-          shown('contracts') ? contractsSnapshot.data?.fetchedAt : null,
-          calendarSnapshot.data?.fetchedAt,
+          ...visibleSpecs.map((spec) => spec.fetchedAt),
         ])}
         now={now}
         fromCache={Boolean(
           walletSnapshot.data?.result?.fromCache || skillsQueueSnapshot.data?.queueResult?.fromCache
         )}
         onRefresh={() => {
-          walletSnapshot.refresh();
-          skillsQueueSnapshot.refresh();
-          ordersSnapshot.refresh();
-          miningSnapshot.refresh();
-          contractsSnapshot.refresh();
-          planetarySnapshot.refresh();
-          industrySnapshot.refresh();
-          calendarSnapshot.refresh();
+          for (const snapshot of [
+            walletSnapshot,
+            skillsQueueSnapshot,
+            ordersSnapshot,
+            miningSnapshot,
+            contractsSnapshot,
+            planetarySnapshot,
+            industrySnapshot,
+            calendarSnapshot,
+            mailSnapshot,
+            priceAlertsSnapshot,
+            structuresSnapshot,
+            moonSnapshot,
+          ]) {
+            snapshot.refresh();
+          }
         }}
         actions={
           <CardPicker
+            cards={specs.filter((spec) => spec.available !== false).map((spec) => spec.key)}
             hidden={hiddenCards}
             onToggle={(key) => void setHiddenCards(toggleHiddenCard(hiddenCards, key))}
             onShowAll={() => void setHiddenCards([])}
           />
         }
-        refreshing={
-          walletSnapshot.loading ||
-          (shown('planetary') && planetarySnapshot.loading) ||
-          (shown('industry') && industrySnapshot.loading) ||
-          (shown('orders') && ordersSnapshot.loading) ||
-          (shown('mining') && miningSnapshot.loading) ||
-          (shown('contracts') && contractsSnapshot.loading) ||
-          calendarSnapshot.loading
-        }
+        refreshing={walletSnapshot.loading || visibleSpecs.some((spec) => spec.loading)}
       />
 
       {nothingShown && (
@@ -638,7 +789,7 @@ export function Overview() {
         different heights reads as one of them having failed to load.
       */}
       <div
-        className={`grid min-w-0 gap-4 ${alertsShown && !isPhone ? 'xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]' : ''}`}
+        className={`grid min-w-0 gap-4 ${layout.column ? 'xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]' : ''}`}
       >
         <div className="grid min-w-0 gap-3 sm:grid-cols-2">
           {/* Every card renders unconditionally, mid-load included. Gating one
@@ -649,12 +800,12 @@ export function Overview() {
               same three things it would have said in full. A card the pilot
               hid from the edit menu is the one exception: they asked for it
               gone. */}
-          {fullCards.map(({ key, render }) => (
-            <Fragment key={key}>{render()}</Fragment>
+          {layout.full.map(({ key, render }) => (
+            <Fragment key={key}>{render?.()}</Fragment>
           ))}
           <EverythingElseCard domains={folded} />
         </div>
-        {!isPhone && alertsShown && (
+        {layout.column && (
           <AlertsColumn
             groups={alertGroups}
             unread={visibleAlerts.length}

@@ -35,3 +35,27 @@ export function soonestCalendarDeadline(
   }
   return soonest;
 }
+
+export interface CommittedCalendarEvent extends CalendarDeadlineItem {
+  response: 'accepted' | 'tentative';
+}
+
+/**
+ * Every committed event still ahead, soonest first — the Overview's Coming up
+ * card. The same `accepted`/`tentative` rule as the deadline above, so the
+ * card's first row and the strip's calendar candidate are the same event.
+ */
+export function upcomingCommittedEvents(
+  events: readonly CalendarEventSummary[],
+  nowMs: number
+): CommittedCalendarEvent[] {
+  const upcoming: CommittedCalendarEvent[] = [];
+  for (const event of events) {
+    const response = event.event_response;
+    if (response !== 'accepted' && response !== 'tentative') continue;
+    const atMs = parseInstant(event.event_date);
+    if (atMs === null || atMs <= nowMs) continue;
+    upcoming.push({ eventId: event.event_id, atMs, title: event.title, response });
+  }
+  return upcoming.sort((a, b) => a.atMs - b.atMs);
+}

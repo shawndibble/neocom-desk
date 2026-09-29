@@ -1,5 +1,5 @@
 /**
- * The Overview board's four domain cards and its alerts column.
+ * The Overview board's domain cards and its alerts column.
  *
  * Each one is shaped by what its domain's volume actually does on a bad day —
  * see `BoardCard.tsx` for the rule. Every card renders *something* in every
@@ -35,12 +35,39 @@ import { BoardCard, FoldedRow, NumberTile, TileRow, TriageRow } from './BoardCar
 import {
   industrySeverity,
   jobSeverity,
+  comingUpEventSeverity,
+  comingUpSeverity,
+  priceAlertsSeverity,
+  mailSeverity,
+  spExtractionSeverity,
   contractsSeverity,
   miningTaxSeverity,
   planetarySeverity,
 } from './boardSeverity';
-import { contractsDeadlineNote } from './boardSummary';
-import type { ContractsBoardData, MiningTaxBoardData, PlanetaryBoardData } from './boardData';
+import { contractsDeadlineNote, mailSummary } from './boardSummary';
+import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
+import { extractableSp, extractorCount } from '@/engine/spExtraction';
+import { formatCompactNumber } from '@/lib/compactNumber';
+import { formatIskCompact } from '@/lib/isk';
+import type { CorpBoardItem } from '@/engine/corp/board';
+import { structureStateLabel } from '@/features/corp/boardSources';
+import {
+  moonChunkSeverity,
+  moonChunksSeverity,
+  structureCounts,
+  structuresSeverity,
+} from './corpCards';
+import type {
+  CalendarEventsBoardData,
+  ContractsBoardData,
+  MailBoardData,
+  MiningTaxBoardData,
+  MoonChunksBoardData,
+  PlanetaryBoardData,
+  PriceAlertsBoardData,
+  SpExtractionBoardData,
+  StructuresView,
+} from './boardData';
 
 /** The Contracts History table filtered to accepted contracts — the courier hauls the card counts. */
 export const CONTRACTS_IN_PROGRESS_HREF = '/contracts/history?history.status=in_progress';
@@ -423,6 +450,391 @@ export function IndustryCard({
               })}
               detail={t(activityI18nKey(job.activity_id), { id: job.activity_id })}
               to="/industry"
+            />
+          ))}
+        </ul>
+      )}
+    </BoardCard>
+  );
+}
+
+// --- Coming up ------------------------------------------------------------
+
+/**
+ * The next few calendar events the pilot said yes (or maybe) to.
+ *
+ * Only committed events, and only the calendar. The Calendar page's Coming Up
+ * rail also carries jobs, colonies and contracts, but each of those already
+ * has a card here, and a second row for the same clock would be a number the
+ * board could contradict.
+ */
+export function ComingUpCard({
+  data,
+  nowMs,
+}: {
+  data: CalendarEventsBoardData | null;
+  nowMs: number;
+}) {
+  const { t } = useTranslation();
+  const upcoming = data ? upcomingCommittedEvents(data.events, nowMs) : [];
+  const shown = upcoming.slice(0, ROW_LIMIT);
+  return (
+    <BoardCard
+      title={t('overview.board.comingUp')}
+      meta={
+        <SeverityWord
+          severity={comingUpSeverity(data, nowMs)}
+          warningLabel={data?.needsReauth ? REAUTH_WORD : undefined}
+        />
+      }
+      to="/calendar"
+      openLabel={t('overview.board.open')}
+      footer={
+        data === null
+          ? t('overview.board.checking')
+          : data.needsReauth
+            ? t('overview.board.reauth')
+            : t('overview.board.comingUpFooter', { count: upcoming.length })
+      }
+    >
+      {shown.length === 0 ? (
+        <CardEmpty>
+          {data === null
+            ? t('overview.board.checking')
+            : data.needsReauth
+              ? t('overview.board.reauth')
+              : t('overview.board.comingUpEmpty')}
+        </CardEmpty>
+      ) : (
+        <ul>
+          {shown.map((event) => (
+            <TriageRow
+              key={event.eventId}
+              severity={comingUpEventSeverity(event.atMs, nowMs)}
+              when={formatDuration((event.atMs - nowMs) / 1000)}
+              subject={event.title}
+              detail={t(`overview.board.response.${event.response}`)}
+              to="/calendar"
+            />
+          ))}
+        </ul>
+      )}
+    </BoardCard>
+  );
+}
+
+// --- SP extraction --------------------------------------------------------
+
+/**
+ * Spare SP above the 5M floor, and how many extractors it fills.
+ *
+ * Shown whether or not SP Extraction monitoring is on — the number is true
+ * either way — but only monitoring decides anything is *ready*, so with it off
+ * the tiles stay untoned and the footer says why.
+ */
+export function SpExtractionCard({ data }: { data: SpExtractionBoardData }) {
+  const { t } = useTranslation();
+  const severity = spExtractionSeverity(data);
+  const tone = severity === 'watch' ? 'watch' : 'clear';
+  return (
+    <BoardCard
+      title={t('overview.board.spExtraction')}
+      meta={<SeverityWord severity={severity} />}
+      to="/characters"
+      openLabel={t('overview.board.open')}
+      footer={
+        data.totalSp === null
+          ? t('overview.board.checking')
+          : data.monitoring
+            ? t('overview.board.spExtractionThreshold', {
+                sp: formatCompactNumber(data.thresholdSp),
+              })
+            : t('overview.board.spExtractionOff')
+      }
+    >
+      <TileRow>
+        <NumberTile
+          label={t('overview.board.spareSp')}
+          value={data.totalSp === null ? 0 : formatCompactNumber(extractableSp(data.totalSp))}
+          severity={tone}
+        />
+        <NumberTile
+          label={t('overview.board.extractors')}
+          value={data.totalSp === null ? 0 : extractorCount(data.totalSp)}
+          severity={tone}
+        />
+      </TileRow>
+    </BoardCard>
+  );
+}
+
+// --- Mail -----------------------------------------------------------------
+
+/**
+ * The unread count, and the newest few unread mails as rows. A mail is
+ * genuinely its own thing (who sent it, about what), so a handful of rows
+ * says more than the number alone — but only a handful: the inbox is the
+ * Mail page's job.
+ */
+export function MailCard({ data, nowMs }: { data: MailBoardData | null; nowMs: number }) {
+  const { t } = useTranslation();
+  return (
+    <BoardCard
+      title={t('overview.board.mail')}
+      meta={
+        <SeverityWord
+          severity={mailSeverity(data)}
+          warningLabel={data?.needsReauth ? REAUTH_WORD : undefined}
+        />
+      }
+      to="/mail"
+      openLabel={t('overview.board.open')}
+      footer={mailSummary(t, data)}
+    >
+      {data === null || data.needsReauth || data.recent.length === 0 ? (
+        <CardEmpty>
+          {data === null
+            ? t('overview.board.checking')
+            : data.needsReauth
+              ? t('overview.board.reauth')
+              : t('overview.board.mailEmpty')}
+        </CardEmpty>
+      ) : (
+        <ul>
+          {data.recent.map((mail) => (
+            <TriageRow
+              key={mail.mailId}
+              severity="watch"
+              when={mail.atMs === null ? '—' : formatAge(Math.max(0, nowMs - mail.atMs), t)}
+              subject={mail.subject || t('overview.board.mailNoSubject')}
+              detail={mail.from ?? undefined}
+              to="/mail"
+            />
+          ))}
+        </ul>
+      )}
+    </BoardCard>
+  );
+}
+
+// --- Price alerts ---------------------------------------------------------
+
+/**
+ * Every Quickbar target, crossed ones first, priced from the notification
+ * poller's last reading. The footer says how old that reading is, because
+ * the board never prices anything itself (`priceAlertsBoard.ts`).
+ */
+export function PriceAlertsCard({
+  data,
+  nowMs,
+}: {
+  data: PriceAlertsBoardData | null;
+  nowMs: number;
+}) {
+  const { t } = useTranslation();
+  const crossed = data?.alerts.filter((alert) => alert.crossed).length ?? 0;
+  const shown = data?.alerts.slice(0, ROW_LIMIT) ?? [];
+  return (
+    <BoardCard
+      title={t('overview.board.priceAlerts')}
+      meta={<SeverityWord severity={priceAlertsSeverity(data)} />}
+      to="/market"
+      openLabel={t('overview.board.open')}
+      footer={
+        data === null
+          ? t('overview.board.checking')
+          : data.checkedAt === null
+            ? t('overview.board.priceAlertsNotChecked')
+            : t('overview.board.priceAlertsChecked', {
+                age: formatAge(Math.max(0, nowMs - data.checkedAt), t),
+              })
+      }
+    >
+      {shown.length === 0 ? (
+        <CardEmpty>
+          {data === null ? t('overview.board.checking') : t('overview.board.priceAlertsEmpty')}
+        </CardEmpty>
+      ) : (
+        <>
+          <TileRow>
+            <NumberTile
+              label={t('overview.board.priceAlertsHit')}
+              value={crossed}
+              severity="warning"
+            />
+            <NumberTile
+              label={t('overview.board.priceAlertsWatched')}
+              value={data?.alerts.length ?? 0}
+              severity="clear"
+            />
+          </TileRow>
+          <ul>
+            {shown.map((alert) => (
+              <TriageRow
+                key={alert.typeId}
+                severity={alert.crossed ? 'warning' : 'clear'}
+                when={alert.price === null ? UNKNOWN : formatIskCompact(alert.price)}
+                subject={alert.name}
+                detail={t(`overview.board.priceAlertTarget.${alert.direction}`, {
+                  price: formatIskCompact(alert.targetPrice),
+                })}
+                to="/market"
+              />
+            ))}
+          </ul>
+        </>
+      )}
+    </BoardCard>
+  );
+}
+
+// --- Structures -----------------------------------------------------------
+
+/** What a structure row's clock column says, for each kind of clock. */
+function structureWhen(item: CorpBoardItem, t: (key: string) => string): string {
+  if (item.timing === 'passed') return t('overview.board.structureDry');
+  if (item.timing === 'untimed') return t('overview.board.structureOffline');
+  // A clock shorter than CCP's hour-long cache may already be over, so it is
+  // not ticked down — the Corp page makes the same call.
+  if (item.withinStaleWindow) return t('overview.board.structureSoon');
+  return formatDuration(Math.max(0, item.remainingMs ?? 0) / 1000);
+}
+
+/**
+ * Only what needs doing: reinforcement timers, fuel within three days, and
+ * offline services, as counts and then the worst few as rows. A structure
+ * whose fuel is weeks out is not a row here — the Corp page lists every one.
+ */
+export function StructuresCard({ data }: { data: StructuresView | null }) {
+  const { t } = useTranslation();
+  const items = data?.items ?? null;
+  const counts = items ? structureCounts(items) : null;
+  // Every timer gets a row — a reinforced structure is never "+1 more" —
+  // and the worst of the fuel and service rows fill what room is left.
+  const flagged = (items ?? []).filter(
+    (item) => item.kind !== 'structureFuel' || item.severity !== 'clear'
+  );
+  const timers = flagged.filter((item) => item.kind === 'structureTimer');
+  const rows = [
+    ...timers,
+    ...flagged
+      .filter((item) => item.kind !== 'structureTimer')
+      .slice(0, Math.max(0, ROW_LIMIT - timers.length)),
+  ];
+  return (
+    <BoardCard
+      title={t('overview.board.structures')}
+      meta={
+        <SeverityWord
+          severity={structuresSeverity(data)}
+          warningLabel={data?.needsReauth ? REAUTH_WORD : undefined}
+        />
+      }
+      to="/corp"
+      openLabel={t('overview.board.open')}
+      footer={
+        data === null
+          ? t('overview.board.checking')
+          : items === null
+            ? t(data.needsReauth ? 'overview.board.reauth' : 'overview.board.corpUnreadable')
+            : t('overview.board.structureCount', { count: data.structureCount })
+      }
+    >
+      <TileRow>
+        <NumberTile
+          label={t('overview.board.reinforced')}
+          value={counts === null ? UNKNOWN : counts.timers}
+          severity="critical"
+        />
+        <NumberTile
+          label={t('overview.board.lowFuel')}
+          value={counts === null ? UNKNOWN : counts.lowFuel}
+          severity="warning"
+        />
+        <NumberTile
+          label={t('overview.board.servicesOffline')}
+          value={counts === null ? UNKNOWN : counts.offline}
+          severity="warning"
+        />
+      </TileRow>
+      {rows.length > 0 && (
+        <ul>
+          {rows.map((item) => (
+            <TriageRow
+              key={item.id}
+              severity={item.severity}
+              when={structureWhen(item, t)}
+              subject={item.subject}
+              detail={
+                item.kind === 'structureTimer'
+                  ? structureStateLabel(item.detail)
+                  : item.kind === 'serviceOffline'
+                    ? t('overview.board.serviceOffline', { service: item.detail })
+                    : t('overview.board.fuelRunsOut')
+              }
+              to="/corp"
+            />
+          ))}
+        </ul>
+      )}
+    </BoardCard>
+  );
+}
+
+// --- Moon extractions ------------------------------------------------------
+
+/**
+ * One row per moon drill: the chunk's arrival while it is still coming, and
+ * its natural decay once it has landed and is waiting to be fractured.
+ */
+export function MoonChunksCard({
+  data,
+  nowMs,
+}: {
+  data: MoonChunksBoardData | null;
+  nowMs: number;
+}) {
+  const { t } = useTranslation();
+  const chunks = [...(data?.chunks ?? [])]
+    .sort((a, b) => a.deadlineMs - b.deadlineMs)
+    .slice(0, ROW_LIMIT);
+  return (
+    <BoardCard
+      title={t('overview.board.moonChunks')}
+      meta={
+        <SeverityWord
+          severity={moonChunksSeverity(data, nowMs)}
+          warningLabel={data?.needsReauth ? REAUTH_WORD : 'overview.board.word.ready'}
+        />
+      }
+      to="/corp"
+      openLabel={t('overview.board.open')}
+      footer={
+        data === null
+          ? t('overview.board.checking')
+          : data.chunks === null
+            ? t(data.needsReauth ? 'overview.board.reauth' : 'overview.board.corpUnreadable')
+            : t('overview.board.drillCount', { count: data.chunks.length })
+      }
+    >
+      {chunks.length === 0 ? (
+        <CardEmpty>
+          {data === null
+            ? t('overview.board.checking')
+            : data.chunks === null
+              ? t(data.needsReauth ? 'overview.board.reauth' : 'overview.board.corpUnreadable')
+              : t('overview.board.moonChunksEmpty')}
+        </CardEmpty>
+      ) : (
+        <ul>
+          {chunks.map((chunk) => (
+            <TriageRow
+              key={chunk.id}
+              severity={moonChunkSeverity(chunk, nowMs)}
+              when={formatDuration(Math.max(0, chunk.deadlineMs - nowMs) / 1000)}
+              subject={chunk.subject}
+              detail={t(`overview.board.chunk.${chunk.detail === 'decay' ? 'decay' : 'arrival'}`)}
+              to="/corp"
             />
           ))}
         </ul>

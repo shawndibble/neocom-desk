@@ -24,3 +24,8 @@ export function extractableSp(totalSp: number): number {
 export function isSpExtractionReady(totalSp: number, thresholdSp: number): boolean {
   return extractableSp(totalSp) >= thresholdSp;
 }
+
+/** How many whole Skill Extractors the character could fill right now. */
+export function extractorCount(totalSp: number): number {
+  return Math.floor(extractableSp(totalSp) / SP_EXTRACTION_CHUNK_SP);
+}

@@ -16,7 +16,18 @@ import { isCompletingSoon, isJobDone } from '@/features/industry/jobs';
 import type { IndustryJob } from '@/esi/endpoints';
 import { openOrderProblemCounts } from '@/features/market/openOrdersModel';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
-import type { ContractsBoardData, MiningTaxBoardData, PlanetaryBoardData } from './boardData';
+import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
+import { isSpExtractionReady } from '@/engine/spExtraction';
+import { DAY_MS } from '@/lib/age';
+import type {
+  CalendarEventsBoardData,
+  ContractsBoardData,
+  MailBoardData,
+  MiningTaxBoardData,
+  PlanetaryBoardData,
+  PriceAlertsBoardData,
+  SpExtractionBoardData,
+} from './boardData';
 
 /**
  * A lapsed grant is `warning`, never `clear`.
@@ -89,4 +100,52 @@ export function contractsSeverity(data: ContractsBoardData | null): DeadlineSeve
   if (data.needsReauth) return UNREADABLE;
   if (data.summary.overdue > 0) return 'critical';
   return data.summary.dueSoon > 0 ? 'warning' : 'clear';
+}
+
+/** How soon a committed calendar event has to be before the card flags it. */
+const COMING_UP_WATCH_MS = DAY_MS;
+
+/** One event's row tone: `watch` within a day, `clear` beyond. */
+export function comingUpEventSeverity(atMs: number, nowMs: number): DeadlineSeverity {
+  return atMs - nowMs <= COMING_UP_WATCH_MS ? 'watch' : 'clear';
+}
+
+/**
+ * A committed event is a plan, not a problem, so this never goes past
+ * `watch`: one starting within a day is worth a glance, and anything further
+ * out is clear. The strip's Next deadline still rates the same event on the
+ * full ladder, because there it is competing with real deadlines.
+ */
+export function comingUpSeverity(
+  data: CalendarEventsBoardData | null,
+  nowMs: number
+): DeadlineSeverity | null {
+  if (data === null) return null;
+  if (data.needsReauth) return UNREADABLE;
+  const next = upcomingCommittedEvents(data.events, nowMs)[0];
+  return next === undefined ? 'clear' : comingUpEventSeverity(next.atMs, nowMs);
+}
+
+/**
+ * Spare SP is an opportunity, not a fault, so ready is `watch` at most — and
+ * only when the pilot switched monitoring on. The card still shows the number
+ * with monitoring off; it just never claims anything is waiting.
+ */
+export function spExtractionSeverity(data: SpExtractionBoardData): DeadlineSeverity | null {
+  if (data.totalSp === null) return null;
+  if (!data.monitoring) return 'clear';
+  return isSpExtractionReady(data.totalSp, data.thresholdSp) ? 'watch' : 'clear';
+}
+
+/** Unread mail is worth a look, never an emergency. */
+export function mailSeverity(data: MailBoardData | null): DeadlineSeverity | null {
+  if (data === null) return null;
+  if (data.needsReauth) return UNREADABLE;
+  return data.unread > 0 ? 'watch' : 'clear';
+}
+
+/** A crossed target is what the pilot asked to be told about, so it is `warning`. */
+export function priceAlertsSeverity(data: PriceAlertsBoardData | null): DeadlineSeverity | null {
+  if (data === null) return null;
+  return data.alerts.some((alert) => alert.crossed) ? 'warning' : 'clear';
 }

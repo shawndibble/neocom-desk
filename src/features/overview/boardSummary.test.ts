@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
   alertsSummary,
+  comingUpSummary,
   industrySummary,
+  mailSummary,
   miningTaxSummary,
   ordersSummary,
   planetarySummary,
+  priceAlertsSummary,
+  spExtractionSummary,
 } from './boardSummary';
 import type {
   BoardColony,
+  CalendarEventsBoardData,
   IndustryBoardData,
+  MailBoardData,
   MiningTaxBoardData,
   PlanetaryBoardData,
 } from './boardData';
@@ -253,5 +259,111 @@ describe('alertsSummary', () => {
 
   it('says nothing is new rather than printing two zeroes', () => {
     expect(alertsSummary(t, 0, 0)).toBe('overview.board.alertsEmpty');
+  });
+});
+
+describe('comingUpSummary', () => {
+  const NOW = Date.parse('2026-01-01T00:00:00Z');
+  const data = (events: CalendarEventsBoardData['events'], needsReauth = false) => ({
+    events,
+    needsReauth,
+    fetchedAt: null,
+  });
+
+  it('names the next committed event and how far off it is', () => {
+    const summary = comingUpSummary(
+      t,
+      data([
+        {
+          event_id: 1,
+          event_date: new Date(NOW + 2 * 3_600_000).toISOString(),
+          title: 'Moon pop',
+          importance: 0,
+          event_response: 'tentative',
+        },
+      ]),
+      NOW
+    );
+    expect(summary).toBe('overview.board.comingUpNext(title=Moon pop,when=2h 0m)');
+  });
+
+  it('says so when nothing is scheduled', () => {
+    expect(comingUpSummary(t, data([]), NOW)).toBe('overview.board.comingUpNone');
+  });
+
+  it('reports loading and a lapsed grant rather than an empty calendar', () => {
+    expect(comingUpSummary(t, null, NOW)).toBe('overview.board.checking');
+    expect(comingUpSummary(t, data([], true), NOW)).toBe('overview.board.reauth');
+  });
+});
+
+describe('spExtractionSummary', () => {
+  const FLOOR = 5_000_000;
+  const data = (totalSp: number | null, monitoring = true) => ({
+    totalSp,
+    monitoring,
+    thresholdSp: 500_000,
+  });
+
+  it('says how many extractors are ready once monitoring flags it', () => {
+    expect(spExtractionSummary(t, data(FLOOR + 1_200_000))).toBe(
+      'overview.board.spExtractionReady(count=2)'
+    );
+  });
+
+  it('otherwise reports the spare SP, monitored or not', () => {
+    expect(spExtractionSummary(t, data(FLOOR + 300_000))).toBe(
+      'overview.board.spExtractable(sp=300K)'
+    );
+    expect(spExtractionSummary(t, data(FLOOR + 1_200_000, false))).toBe(
+      'overview.board.spExtractable(sp=1.2M)'
+    );
+  });
+
+  it('reports loading', () => {
+    expect(spExtractionSummary(t, data(null))).toBe('overview.board.checking');
+  });
+});
+
+describe('mailSummary', () => {
+  const data = (unread: number, needsReauth = false): MailBoardData => ({
+    unread,
+    recent: [],
+    needsReauth,
+    fetchedAt: null,
+  });
+
+  it('counts unread mail, or says there is none', () => {
+    expect(mailSummary(t, data(4))).toBe('overview.board.mailUnread(count=4)');
+    expect(mailSummary(t, data(0))).toBe('overview.board.mailNone');
+  });
+
+  it('reports loading and a lapsed grant', () => {
+    expect(mailSummary(t, null)).toBe('overview.board.checking');
+    expect(mailSummary(t, data(0, true))).toBe('overview.board.reauth');
+  });
+});
+
+describe('priceAlertsSummary', () => {
+  const alert = (crossed: boolean) => ({
+    typeId: 1,
+    name: 'Tritanium',
+    targetPrice: 5,
+    direction: 'above' as const,
+    price: 4,
+    crossed,
+  });
+
+  it('leads with crossed targets, then how many are being watched', () => {
+    expect(priceAlertsSummary(t, { alerts: [alert(true), alert(false)], checkedAt: 0 })).toBe(
+      'overview.board.priceAlertsCrossed(count=1)'
+    );
+    expect(priceAlertsSummary(t, { alerts: [alert(false)], checkedAt: 0 })).toBe(
+      'overview.board.priceAlertsWatching(count=1)'
+    );
+    expect(priceAlertsSummary(t, { alerts: [], checkedAt: null })).toBe(
+      'overview.board.priceAlertsNone'
+    );
+    expect(priceAlertsSummary(t, null)).toBe('overview.board.checking');
   });
 });
