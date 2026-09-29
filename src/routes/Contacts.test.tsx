@@ -638,15 +638,13 @@ describe('Contacts standing filter chips (issue #403)', () => {
   });
 });
 
-/** The page header's ⋯ › Export table › Download CSV (jsdom has no hover intent). */
+/** The page header's export button › Download CSV (jsdom has no hover intent). */
 async function exportCsv(menuName: string) {
   const user = userEvent.setup();
   fireEvent.pointerDown(screen.getByRole('button', { name: menuName }), {
     button: 0,
     pointerType: 'mouse',
   });
-  (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
-  await user.keyboard('{ArrowRight}');
   (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
   await user.keyboard('{Enter}');
   await waitFor(() => expect(vi.mocked(download.downloadTextFile)).toHaveBeenCalled());
@@ -658,7 +656,7 @@ describe('CSV export (issue #2164)', () => {
     render(<App />);
     await screen.findByText('Good Friend');
 
-    await exportCsv('Contacts actions');
+    await exportCsv('Export Contacts');
 
     expect(spy).toHaveBeenCalledTimes(1);
     const [filename, content] = spy.mock.calls[0];
@@ -676,7 +674,7 @@ describe('CSV export (issue #2164)', () => {
     await userEvent.setup().type(screen.getByRole('searchbox', { name: 'Name' }), 'friend');
     await waitFor(() => expect(screen.queryByText('Neutral Corp')).not.toBeInTheDocument());
 
-    await exportCsv('Contacts actions');
+    await exportCsv('Export Contacts');
 
     const content = spy.mock.calls[0][1];
     expect(content).toContain('Good Friend');
@@ -695,7 +693,7 @@ describe('CSV export (issue #2164)', () => {
     render(<App />);
     await screen.findByText('Good Friend');
 
-    await exportCsv('Contacts actions');
+    await exportCsv('Export Contacts');
 
     expect(spy.mock.calls[0][0]).toMatch(/-partial\.csv$/);
   });
@@ -714,7 +712,7 @@ describe('CSV export (issue #2164)', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
     await screen.findByRole('table', { name: /across/i });
 
-    await exportCsv('Across characters actions');
+    await exportCsv('Export Across characters');
 
     expect(spy).toHaveBeenCalledTimes(1);
     const [filename, content] = spy.mock.calls[0];
@@ -746,7 +744,7 @@ describe('CSV export (issue #2164)', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
     await screen.findByRole('table', { name: /across/i });
 
-    await exportCsv('Across characters actions');
+    await exportCsv('Export Across characters');
 
     expect(spy.mock.calls[0][0]).toMatch(/^neocom-contacts-across-\d{4}-\d{2}-\d{2}-partial\.csv$/);
   });
@@ -757,7 +755,7 @@ describe('CSV export (issue #2164)', () => {
     render(<App />);
     await screen.findByText('No contacts');
 
-    await exportCsv('Contacts actions');
+    await exportCsv('Export Contacts');
 
     expect(spy.mock.calls[0][1].trim().split('\r\n')).toHaveLength(1);
   });

@@ -140,7 +140,7 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
   ];
 
   // The section's title is the `Disclosure` toggle that wraps this panel, a
-  // button a menu can't nest inside — so the table's ⋯ sits on its own row.
+  // button a menu can't nest inside — so the table's export button sits on its own row.
   return (
     <div className="space-y-1">
       <div className="flex justify-end">

@@ -60,7 +60,7 @@ const CARD_SUGGESTED = 'border-accent-dim bg-accent/5';
 const CARD_LABEL = 'text-[0.6875rem] font-semibold tracking-widest uppercase';
 const CARD_HINT = 'mt-0.5 text-[0.6875rem] text-text-dim';
 /**
- * A table's title strip: the title, with that table's ⋯ menu at the right.
+ * A table's title strip: the title, with that table's export button at the right.
  * The menu's negative margin keeps the strip the height of the plain
  * "How this is priced" one, with or without a menu in it.
  */

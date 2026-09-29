@@ -934,7 +934,7 @@ export function BuildPlanDetail({
     return () => clearTimeout(timer);
   }, [copyState]);
 
-  // The Materials table's rows as shown, for its ⋯ menu and row menus.
+  // The Materials table's rows as shown, for its export button and row menus.
   const materialsCsv = useMemo(
     () =>
       materialsCsvColumns(

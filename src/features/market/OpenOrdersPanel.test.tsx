@@ -487,12 +487,10 @@ describe('OpenOrdersPanel', () => {
     renderPanel();
     await screen.findByTestId('order-group-belowFloor');
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Open orders actions' }), {
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Open orders' }), {
       button: 0,
       pointerType: 'mouse',
     });
-    (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
-    await user.keyboard('{ArrowRight}');
     (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
     await user.keyboard('{Enter}');
 

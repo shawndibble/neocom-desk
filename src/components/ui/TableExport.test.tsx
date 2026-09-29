@@ -85,14 +85,46 @@ async function choose(user: ReturnType<typeof userEvent.setup>, name: string) {
 }
 
 describe('TableActionsMenu', () => {
-  it('copies the table as TSV, in on-screen sort order', async () => {
-    const user = userEvent.setup();
+  it('is a download button holding just the formats when export is its only job', async () => {
     render(<Harness />);
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Sell orders' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    expect(await screen.findByRole('menuitem', { name: 'Download CSV' })).toBeInTheDocument();
+    expect(screen.getAllByRole('menuitem')).toHaveLength(3);
+    expect(screen.queryByRole('menuitem', { name: 'Export table' })).not.toBeInTheDocument();
+  });
+
+  it('becomes a ⋯ menu with Export in a submenu once it has other actions', async () => {
+    const user = userEvent.setup();
+    function WithActions() {
+      const tableExport = useTableExport({ surface: 'market-sell', rows, columns: csvColumns });
+      return (
+        <TableActionsMenu name="Sell orders" tableExport={tableExport}>
+          <MenuItem>Refresh</MenuItem>
+        </TableActionsMenu>
+      );
+    }
+    render(<WithActions />);
+    expect(screen.queryByRole('button', { name: 'Export Sell orders' })).not.toBeInTheDocument();
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Sell orders actions' }), {
       button: 0,
       pointerType: 'mouse',
     });
+    expect(await screen.findByRole('menuitem', { name: 'Refresh' })).toBeInTheDocument();
     await openExportSub(user);
+    await choose(user, 'Copy for Google Sheets / Excel');
+    await waitFor(() => expect(copied).toHaveLength(1));
+  });
+
+  it('copies the table as TSV, in on-screen sort order', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Sell orders' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
     await choose(user, 'Copy for Google Sheets / Excel');
     await waitFor(() => expect(copied).toHaveLength(1));
     expect(copied[0]).toBe('Item\tAmount\nCap Booster 200\t80\nTritanium\t250\n');
@@ -102,11 +134,10 @@ describe('TableActionsMenu', () => {
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
     const user = userEvent.setup();
     render(<Harness />);
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Sell orders actions' }), {
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Sell orders' }), {
       button: 0,
       pointerType: 'mouse',
     });
-    await openExportSub(user);
     await choose(user, 'Download CSV');
     await waitFor(() => expect(spy).toHaveBeenCalledOnce());
     expect(spy.mock.calls[0][0]).toMatch(/^neocom-market-sell-\d{4}-\d{2}-\d{2}\.csv$/);
@@ -117,11 +148,10 @@ describe('TableActionsMenu', () => {
     const spy = vi.spyOn(download, 'downloadBlob').mockImplementation(() => {});
     const user = userEvent.setup();
     render(<Harness />);
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Sell orders actions' }), {
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Sell orders' }), {
       button: 0,
       pointerType: 'mouse',
     });
-    await openExportSub(user);
     await choose(user, 'Download Excel (.xlsx)');
     await waitFor(() => expect(spy).toHaveBeenCalledOnce());
     expect(spy.mock.calls[0][0]).toMatch(/\.xlsx$/);
@@ -181,11 +211,10 @@ describe("useTableExport source: 'sorted-rows'", () => {
   it("exports every row, not just the mounted ones, in the table's current sort", async () => {
     const user = userEvent.setup();
     render(<Capped />);
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Sell orders actions' }), {
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Sell orders' }), {
       button: 0,
       pointerType: 'mouse',
     });
-    await openExportSub(user);
     await choose(user, 'Copy for Google Sheets / Excel');
     await waitFor(() => expect(copied).toHaveLength(1));
     expect(copied[0]).toBe('Item\tAmount\nPyerite\t5\nCap Booster 200\t80\nTritanium\t250\n');
@@ -193,11 +222,12 @@ describe("useTableExport source: 'sorted-rows'", () => {
 });
 
 describe('DataTable exportable', () => {
-  it('gives a table without row menus a right-click Export submenu', async () => {
+  it('gives a table without row menus a right-click menu of just the formats', async () => {
     const user = userEvent.setup();
     render(<Harness />);
     fireEvent.contextMenu(screen.getByRole('table'));
-    await openExportSub(user);
+    expect(await screen.findByRole('menuitem', { name: 'Download CSV' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Export table' })).not.toBeInTheDocument();
     await choose(user, 'Copy for Google Sheets / Excel');
     await waitFor(() => expect(copied).toHaveLength(1));
   });

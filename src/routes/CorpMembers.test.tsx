@@ -621,15 +621,13 @@ describe('"you" tag (issue #1766)', () => {
 });
 
 describe('CSV export (issue #421, AC4)', () => {
-  /** Title-bar ⋯ menu → Export table ▸ Download CSV, by keyboard (jsdom has no hover intent). */
+  /** Title-bar export button → Download CSV, by keyboard (jsdom has no hover intent). */
   async function downloadCsvFromMenu() {
     const user = userEvent.setup();
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Corp members actions' }), {
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Corp members' }), {
       button: 0,
       pointerType: 'mouse',
     });
-    (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
-    await user.keyboard('{ArrowRight}');
     (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
     await user.keyboard('{Enter}');
   }
@@ -687,7 +685,7 @@ describe('CSV export (issue #421, AC4)', () => {
     );
     await rosterTable();
 
-    const exportButton = screen.getByRole('button', { name: 'Corp members actions' });
+    const exportButton = screen.getByRole('button', { name: 'Export Corp members' });
     const refreshButton = screen.getByRole('button', { name: 'Refresh member list' });
 
     expect(exportButton.parentElement).toBe(refreshButton.parentElement);

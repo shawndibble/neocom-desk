@@ -1,8 +1,11 @@
 /**
- * One export entry point for every table: an "Export table ▸" submenu
- * (CSV / Excel / copy-for-Sheets) that renders the same in a right-click
- * menu, a row's "More actions" dropdown, and the table block's own ⋯
- * `TableActionsMenu` in its title bar.
+ * One export entry point for every table: CSV / Excel / copy-for-Sheets.
+ * Where export is a menu's only job — the title bar's `TableActionsMenu`
+ * with no other table actions, a table's own right-click menu — the three
+ * formats are the menu, behind a download button. Where it shares the menu
+ * with other actions (a row's right-click menu and "More actions" dropdown,
+ * a `TableActionsMenu` given `children`) they sit in an "Export table ▸"
+ * submenu.
  *
  * Wiring a DataTable:
  *
@@ -33,18 +36,21 @@ async function run<T>(tableExport: TableExport<T>, format: ExportFormat): Promis
   return rows.length;
 }
 
-/**
- * The submenu itself. Kind-agnostic (`MenuSub`/`MenuItem`), so it drops into
- * a context menu or a dropdown alike. `onDone` hears the format and row count
- * after a successful export — the header button uses it to confirm a copy.
- */
-export function ExportTableSub<T>({
-  tableExport,
-  onDone,
-}: {
+interface ExportItemsProps<T> {
   tableExport: TableExport<T>;
+  /**
+   * Hears the format and row count after a successful export — the header
+   * button uses it to confirm a copy.
+   */
   onDone?: (format: ExportFormat, rowCount: number) => void;
-}) {
+}
+
+/**
+ * The three formats as flat items, for a menu whose only job is export.
+ * Kind-agnostic (`MenuItem`), so it drops into a context menu or a dropdown
+ * alike.
+ */
+export function ExportTableItems<T>({ tableExport, onDone }: ExportItemsProps<T>) {
   const { t } = useTranslation();
   const select = (format: ExportFormat) => {
     // Started inside the select handler, while the document still has focus:
@@ -55,17 +61,25 @@ export function ExportTableSub<T>({
     );
   };
   return (
+    <>
+      <MenuItem onSelect={() => select('csv')}>{t('common.tableExport.csv')}</MenuItem>
+      <MenuItem onSelect={() => select('xlsx')}>{t('common.tableExport.xlsx')}</MenuItem>
+      <MenuItem onSelect={() => select('clipboard')}>{t('common.tableExport.clipboard')}</MenuItem>
+    </>
+  );
+}
+
+/** The same items in an "Export table ▸" submenu, for a menu that has other actions too. */
+export function ExportTableSub<T>(props: ExportItemsProps<T>) {
+  const { t } = useTranslation();
+  return (
     <MenuSub>
       <MenuSubTrigger>
         <Icon.Download aria-hidden="true" size={Icon.ICON_SIZE.sm} />
         {t('common.tableExport.exportTable')}
       </MenuSubTrigger>
       <MenuSubContent>
-        <MenuItem onSelect={() => select('csv')}>{t('common.tableExport.csv')}</MenuItem>
-        <MenuItem onSelect={() => select('xlsx')}>{t('common.tableExport.xlsx')}</MenuItem>
-        <MenuItem onSelect={() => select('clipboard')}>
-          {t('common.tableExport.clipboard')}
-        </MenuItem>
+        <ExportTableItems {...props} />
       </MenuSubContent>
     </MenuSub>
   );
@@ -111,8 +125,10 @@ export function RowExportItems() {
 const ROW_EXPORT_ITEMS = <RowExportItems />;
 
 /**
- * The table block's own ⋯ menu, for its title bar. `children` are any
- * table-level items that belong above Export (a caller's existing actions).
+ * The table block's own menu, for its title bar. With no `children` it is an
+ * export button: a download icon opening the three formats. `children` are
+ * table-level actions that belong above Export; with them it becomes a ⋯
+ * menu and Export moves into its submenu.
  */
 export function TableActionsMenu<T>({
   name,
@@ -120,7 +136,7 @@ export function TableActionsMenu<T>({
   children,
   size = 'sm',
 }: {
-  /** What the table is, for the button's accessible name ("Open orders actions"). */
+  /** What the table is, for the button's accessible name ("Export Open orders"). */
   name: string;
   tableExport: TableExport<T>;
   children?: ReactNode;
@@ -130,16 +146,27 @@ export function TableActionsMenu<T>({
   const [copied, setCopied] = useState<number | null>(null);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
-  const label = t('common.tableExport.menuLabel', { name });
+  const exportOnly = !children;
+  const label = exportOnly
+    ? t('common.tableExport.exportButtonLabel', { name })
+    : t('common.tableExport.menuLabel', { name });
+  const onDone = (format: ExportFormat, count: number) => {
+    if (format !== 'clipboard') return;
+    setCopied(count);
+    clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(null), 2000);
+  };
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <IconButton
           icon={
-            copied === null ? (
-              <Icon.More size={Icon.ICON_SIZE.sm} />
-            ) : (
+            copied !== null ? (
               <Icon.Done size={Icon.ICON_SIZE.sm} />
+            ) : exportOnly ? (
+              <Icon.Download size={Icon.ICON_SIZE.sm} />
+            ) : (
+              <Icon.More size={Icon.ICON_SIZE.sm} />
             )
           }
           label={copied === null ? label : t('common.tableExport.copied', { count: copied })}
@@ -148,17 +175,15 @@ export function TableActionsMenu<T>({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <MenuKindContext.Provider value="dropdown">
-          {children}
-          {children ? <MenuSeparator /> : null}
-          <ExportTableSub
-            tableExport={tableExport}
-            onDone={(format, count) => {
-              if (format !== 'clipboard') return;
-              setCopied(count);
-              clearTimeout(copiedTimer.current);
-              copiedTimer.current = setTimeout(() => setCopied(null), 2000);
-            }}
-          />
+          {exportOnly ? (
+            <ExportTableItems tableExport={tableExport} onDone={onDone} />
+          ) : (
+            <>
+              {children}
+              <MenuSeparator />
+              <ExportTableSub tableExport={tableExport} onDone={onDone} />
+            </>
+          )}
         </MenuKindContext.Provider>
       </DropdownMenuContent>
     </DropdownMenu>

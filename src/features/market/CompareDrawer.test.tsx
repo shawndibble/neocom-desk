@@ -313,18 +313,14 @@ describe('CompareDrawer', () => {
     expect(await within(region).findByText('Structure Hitpoints')).toBeInTheDocument();
     expect(within(region).getByText('Worth')).toBeInTheDocument();
     expect(within(region).getByText('Estimated Price')).toBeInTheDocument();
-    expect(
-      within(region).queryByRole('button', { name: 'Prices actions' })
-    ).not.toBeInTheDocument();
+    expect(within(region).queryByRole('button', { name: 'Export Prices' })).not.toBeInTheDocument();
 
     // One export for the whole matrix, every category in one file.
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
-    fireEvent.pointerDown(within(region).getByRole('button', { name: 'Attributes actions' }), {
+    fireEvent.pointerDown(within(region).getByRole('button', { name: 'Export Attributes' }), {
       button: 0,
       pointerType: 'mouse',
     });
-    (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
-    await user.keyboard('{ArrowRight}');
     (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
     await user.keyboard('{Enter}');
     await waitFor(() => expect(spy).toHaveBeenCalledOnce());
@@ -335,9 +331,9 @@ describe('CompareDrawer', () => {
     spy.mockRestore();
 
     await user.click(within(region).getByRole('button', { name: 'Prices' }));
-    expect(within(region).getByRole('button', { name: 'Prices actions' })).toBeInTheDocument();
+    expect(within(region).getByRole('button', { name: 'Export Prices' })).toBeInTheDocument();
     expect(
-      within(region).queryByRole('button', { name: 'Attributes actions' })
+      within(region).queryByRole('button', { name: 'Export Attributes' })
     ).not.toBeInTheDocument();
     expect(within(region).queryByText('Structure Hitpoints')).not.toBeInTheDocument();
   });
