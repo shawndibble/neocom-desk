@@ -2,7 +2,7 @@
 import { getCharacterClones, type CharacterClones } from '@/esi/endpoints';
 import { loadUniverseType } from '@/features/skills/data';
 import { typeDescription } from '@/features/skills/typeDisplay';
-import { loadWithCacheStatus, type StatusResult } from '@/esi/cache';
+import { conditionalFetch, loadWithCacheStatus, type StatusResult } from '@/esi/cache';
 
 const KEY = 'clones';
 
@@ -12,11 +12,10 @@ const KEY = 'clones';
  * silent empty state when the clones scope was revoked.
  */
 export function loadCharacterClones(characterId: number): Promise<StatusResult<CharacterClones>> {
-  return loadWithCacheStatus(
-    characterId,
-    KEY,
-    async () => (await getCharacterClones(characterId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterClones(characterId, options)
   );
+  return loadWithCacheStatus(characterId, KEY, fetchLive, { conditional });
 }
 
 /**

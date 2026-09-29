@@ -14,6 +14,7 @@ import {
   type MailRecipient,
 } from '@/esi/endpoints';
 import {
+  conditionalFetch,
   loadWithCache,
   loadWithCacheStatus,
   readCached,
@@ -90,21 +91,21 @@ export async function loadMoreMailHeaders(
 
 /** System + Custom Labels with unread counts — the tab bar's four buckets (CONTEXT.md round 18) and the custom-label filter chips (round 22). ESI or cache. */
 export function loadMailLabels(characterId: number): Promise<StatusResult<MailLabels>> {
-  return loadWithCacheStatus(
-    characterId,
-    KEYS.labels,
-    async () => (await getCharacterMailLabels(characterId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterMailLabels(characterId, options)
   );
+  return loadWithCacheStatus(characterId, KEYS.labels, fetchLive, { conditional });
 }
 
 /** A character's mailing-list memberships — resolves a `mailing_list` recipient's real name (issue #416). Membership changes rarely, so it gets the `static` freshness tier, same as a mail body. */
 export function loadMailingLists(characterId: number): Promise<StatusResult<MailingList[]>> {
-  return loadWithCacheStatus(
-    characterId,
-    KEYS.lists,
-    async () => (await getCharacterMailingLists(characterId)).data,
-    { staleAfterMs: STALE_AFTER.static }
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterMailingLists(characterId, options)
   );
+  return loadWithCacheStatus(characterId, KEYS.lists, fetchLive, {
+    staleAfterMs: STALE_AFTER.static,
+    conditional,
+  });
 }
 
 /** One mail's full body, fetched on open. ESI or cache. */
@@ -112,14 +113,17 @@ export function loadMailBody(
   characterId: number,
   mailId: number
 ): Promise<CachedResult<MailBody> | null> {
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterMail(characterId, mailId, options)
+  );
   return loadWithCache(
     characterId,
     KEYS.body(mailId),
-    async () => (await getCharacterMail(characterId, mailId)).data,
+    fetchLive,
     // A delivered mail's body never changes. Not even the `read` flag moves
     // it — that lives on the header, and its write goes through ESI, not
     // through this cache, so a stale body is never the reason it drifts.
-    { staleAfterMs: STALE_AFTER.static }
+    { staleAfterMs: STALE_AFTER.static, conditional }
   );
 }
 

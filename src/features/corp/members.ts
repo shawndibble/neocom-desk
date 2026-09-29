@@ -27,6 +27,7 @@
  * thins nothing. Those go out capped rather than all at once (issue #655): the
  * cap bounds how many are in flight, not how many are asked for.
  */
+import { conditionalPagedFetch, conditionalFetch } from '@/esi/cache';
 import {
   getCorporationMemberRoles,
   getCorporationMembers,
@@ -54,9 +55,12 @@ export function loadCorporationMemberIds(
   characterId: number,
   corporationId: number
 ): Promise<StatusResult<number[]>> {
-  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, KEYS.members, () =>
-    getCorporationMembers(characterId, corporationId)
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCorporationMembers(characterId, corporationId, options)
   );
+  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, KEYS.members, fetchLive, {
+    conditional,
+  });
 }
 
 /** Per-member session dates, ship and location. Director-only, server-side. */
@@ -64,12 +68,12 @@ export function loadCorporationMemberTracking(
   characterId: number,
   corporationId: number
 ): Promise<StatusResult<CorporationMemberTracking[]>> {
-  return loadCorpWithCacheStatus(
-    characterId,
-    corporationId,
-    KEYS.tracking,
-    async () => (await getCorporationMemberTracking(characterId, corporationId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCorporationMemberTracking(characterId, corporationId, options)
   );
+  return loadCorpWithCacheStatus(characterId, corporationId, KEYS.tracking, fetchLive, {
+    conditional,
+  });
 }
 
 /** Every member's in-game roles, for the roster's optional roles column. */
@@ -77,12 +81,12 @@ export function loadCorporationMemberRoles(
   characterId: number,
   corporationId: number
 ): Promise<StatusResult<CorporationMemberRoles[]>> {
-  return loadCorpWithCacheStatus(
-    characterId,
-    corporationId,
-    KEYS.roles,
-    async () => (await getCorporationMemberRoles(characterId, corporationId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCorporationMemberRoles(characterId, corporationId, options)
   );
+  return loadCorpWithCacheStatus(characterId, corporationId, KEYS.roles, fetchLive, {
+    conditional,
+  });
 }
 
 /**

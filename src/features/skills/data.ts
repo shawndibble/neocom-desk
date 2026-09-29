@@ -21,7 +21,6 @@ import {
   GLOBAL_CACHE_CHARACTER_ID,
   STALE_AFTER,
   type CachedResult,
-  type ExpiresCapture,
   type StatusResult,
 } from '@/esi/cache';
 import type { Implants } from '@/engine/types';
@@ -68,47 +67,37 @@ export function loadCharacterSkillsWithStatus(
 export function loadCharacterAttributes(
   characterId: number
 ): Promise<CachedResult<CharacterAttributes> | null> {
-  return loadWithCache(
-    characterId,
-    KEYS.attributes,
-    async () => (await getCharacterAttributes(characterId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterAttributes(characterId, options)
   );
+  return loadWithCache(characterId, KEYS.attributes, fetchLive, { conditional });
 }
 
 /** Implant type IDs plugged into the active clone. ESI or cache. */
 export function loadCharacterImplants(characterId: number): Promise<CachedResult<number[]> | null> {
-  return loadWithCache(
-    characterId,
-    KEYS.implants,
-    async () => (await getCharacterImplants(characterId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterImplants(characterId, options)
   );
+  return loadWithCache(characterId, KEYS.implants, fetchLive, { conditional });
 }
 
 /**
- * Fetches the skill queue, capturing that response's own `Expires` header so
- * the shared cache can size a freshness window from it (issue #41) — read on
- * four routes (Overview, Skills, Plans, Industry), so a window here is what
- * turns a page-to-page nav into one round trip instead of four.
+ * Fetches the skill queue by ETag. The capture also carries that response's
+ * own `Expires` header, so the shared cache sizes a freshness window from it
+ * (issue #41) — read on four routes (Overview, Skills, Plans, Industry), so a
+ * window here is what turns a page-to-page nav into one round trip instead of
+ * four.
  */
-function fetchSkillQueue(
-  characterId: number,
-  expiresCapture: ExpiresCapture
-): () => Promise<SkillQueueEntry[] | null> {
-  return async () => {
-    const result = await getCharacterSkillQueue(characterId);
-    expiresCapture.value = result.expires;
-    return result.data;
-  };
+function fetchSkillQueue(characterId: number) {
+  return conditionalFetch((options) => getCharacterSkillQueue(characterId, options));
 }
 
 /** In-game skill training queue. ESI or cache. */
 export function loadCharacterSkillQueue(
   characterId: number
 ): Promise<CachedResult<SkillQueueEntry[]> | null> {
-  const expiresCapture: ExpiresCapture = { value: null };
-  return loadWithCache(characterId, KEYS.skillqueue, fetchSkillQueue(characterId, expiresCapture), {
-    expiresCapture,
-  });
+  const { fetchLive, conditional } = fetchSkillQueue(characterId);
+  return loadWithCache(characterId, KEYS.skillqueue, fetchLive, { conditional });
 }
 
 /**
@@ -119,13 +108,8 @@ export function loadCharacterSkillQueue(
 export function loadCharacterSkillQueueWithStatus(
   characterId: number
 ): Promise<StatusResult<SkillQueueEntry[]>> {
-  const expiresCapture: ExpiresCapture = { value: null };
-  return loadWithCacheStatus(
-    characterId,
-    KEYS.skillqueue,
-    fetchSkillQueue(characterId, expiresCapture),
-    { expiresCapture }
-  );
+  const { fetchLive, conditional } = fetchSkillQueue(characterId);
+  return loadWithCacheStatus(characterId, KEYS.skillqueue, fetchLive, { conditional });
 }
 
 const TYPE_LOOKUP_RETRY_DELAY_MS = 750;
@@ -156,13 +140,16 @@ function universeTypeCacheKey(typeId: number): string {
 }
 
 function loadUniverseTypeOnce(typeId: number): Promise<CachedResult<UniverseType> | null> {
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getUniverseType(typeId, options)
+  );
   return loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
     universeTypeCacheKey(typeId),
-    async () => (await getUniverseType(typeId)).data,
+    fetchLive,
     // An item type's name, description and dogma attributes change only when
     // CCP patches them — not on the app's 10-minute cadence.
-    { staleAfterMs: STALE_AFTER.static }
+    { staleAfterMs: STALE_AFTER.static, conditional }
   );
 }
 

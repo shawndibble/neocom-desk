@@ -1,6 +1,6 @@
 /** Fetch + cache layer for the Loyalty Points view. */
 import { getCharacterLoyaltyPoints, type CharacterLoyaltyPoints } from '@/esi/endpoints';
-import { loadWithCacheStatus, type StatusResult } from '@/esi/cache';
+import { conditionalFetch, loadWithCacheStatus, type StatusResult } from '@/esi/cache';
 
 const KEY = 'loyalty';
 
@@ -12,11 +12,10 @@ const KEY = 'loyalty';
 export function loadCharacterLoyaltyPoints(
   characterId: number
 ): Promise<StatusResult<CharacterLoyaltyPoints[]>> {
-  return loadWithCacheStatus(
-    characterId,
-    KEY,
-    async () => (await getCharacterLoyaltyPoints(characterId)).data
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterLoyaltyPoints(characterId, options)
   );
+  return loadWithCacheStatus(characterId, KEY, fetchLive, { conditional });
 }
 
 /**

@@ -9,6 +9,7 @@
  * (`engine/corpRoles.ts`'s `canReadBlueprints` — Director-only) rather than
  * an expired session.
  */
+import { conditionalPagedFetch } from '@/esi/cache';
 import { getCorporationBlueprints, type CorporationBlueprint } from '@/esi/endpoints';
 import type { StatusResult } from '@/esi/cache';
 import { loadCorpPaginatedWithCacheStatus } from './corpRead';
@@ -23,7 +24,14 @@ export function loadCorporationBlueprints(
   characterId: number,
   corporationId: number
 ): Promise<CorpBlueprintsLoadResult> {
-  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, CORP_BLUEPRINTS_KEY, () =>
-    getCorporationBlueprints(characterId, corporationId)
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCorporationBlueprints(characterId, corporationId, options)
+  );
+  return loadCorpPaginatedWithCacheStatus(
+    characterId,
+    corporationId,
+    CORP_BLUEPRINTS_KEY,
+    fetchLive,
+    { conditional }
   );
 }
