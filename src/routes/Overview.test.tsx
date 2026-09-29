@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -10,6 +11,7 @@ import { App } from '@/app/App';
 import { selectActiveEntryFromSorted, sortQueueEntries, selectQueueDepth } from './overviewQueue';
 import type { SkillType } from '@/sde/types';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
+import { OVERVIEW_HIDDEN_CARDS_KEY, useOverviewHiddenCards } from '@/features/overview/hiddenCards';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -183,6 +185,7 @@ beforeEach(async () => {
   await db.notificationFeed.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
+  useOverviewHiddenCards.setState({ value: [], hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -973,6 +976,104 @@ describe('the board on a phone', () => {
     );
     expect(Number(/(\d+) unread/.exec(label)![1])).toBeGreaterThanOrEqual(90);
     expect(fullCardDomains()).not.toContain('Alerts');
+  });
+});
+
+describe('hiding cards from the edit menu', () => {
+  afterEach(() => {
+    restoreMatchMedia?.();
+    restoreMatchMedia = undefined;
+  });
+
+  async function hide(keys: string[]) {
+    await db.settings.put({ key: OVERVIEW_HIDDEN_CARDS_KEY, value: keys });
+  }
+
+  it('drops a card the pilot switches off, and stores the choice to sync', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await findCard(/mining tax/i);
+
+    await user.click(screen.getByRole('button', { name: /choose which cards to show/i }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Mining tax' }));
+    // The menu stays open for the next toggle, and while it is open the page
+    // behind it is hidden from the accessibility tree.
+    await user.keyboard('{Escape}');
+
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: /mining tax/i })).not.toBeInTheDocument()
+    );
+    expect(await findCard(/open orders/i)).toBeInTheDocument();
+    await waitFor(async () =>
+      expect((await db.settings.get(OVERVIEW_HIDDEN_CARDS_KEY))?.value).toEqual(['mining'])
+    );
+  });
+
+  it('opens with the cards hidden last time already gone, alerts column included', async () => {
+    await hide(['mining', 'alerts']);
+    render(<App />);
+    await findCard(/open orders/i);
+
+    expect(screen.queryByRole('heading', { name: /mining tax/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /^alerts$/i })).not.toBeInTheDocument();
+    expect(await findCard(/industry jobs/i)).toBeInTheDocument();
+  });
+
+  it('brings every card back from "Show all cards"', async () => {
+    const user = userEvent.setup();
+    await hide(['mining', 'orders']);
+    render(<App />);
+    await findCard(/industry jobs/i);
+
+    await user.click(screen.getByRole('button', { name: /choose which cards to show/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Show all cards' }));
+
+    expect(await findCard(/mining tax/i)).toBeInTheDocument();
+    expect(await findCard(/open orders/i)).toBeInTheDocument();
+  });
+
+  it('says so rather than showing a blank board when every card is hidden', async () => {
+    await hide(['orders', 'mining', 'contracts', 'planetary', 'industry', 'alerts']);
+    render(<App />);
+
+    expect(await screen.findByText(/every card is hidden/i)).toBeInTheDocument();
+  });
+
+  it('takes no deadline from a hidden card', async () => {
+    await grantScopes([PLANETS_SCOPE, INDUSTRY_SCOPE]);
+    await hide(['planetary']);
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/planets`, () =>
+        HttpResponse.json(COLONIES.map((c) => c.planet))
+      ),
+      ...COLONIES.map((c) =>
+        http.get(
+          `https://esi.evetech.net/characters/${CHAR_ID}/planets/${c.planet.planet_id}`,
+          () => HttpResponse.json(c.detail)
+        )
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/industry/jobs`, () =>
+        HttpResponse.json([industryJob({ jobId: 7, endsInHours: 48 })])
+      )
+    );
+    render(<App />);
+
+    const cell = (await screen.findByText('Next deadline')).parentElement as HTMLElement;
+    // The colony three hours out would lead; hidden, the job two days out does.
+    await waitFor(() => {
+      expect(within(cell).getByRole('link')).toHaveAttribute('href', '/industry');
+    });
+  });
+
+  it('leaves a hidden domain out of the phone’s folded list too', async () => {
+    usePhoneViewport();
+    await hide(['alerts', 'contracts', 'orders']);
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Everything else' });
+
+    expect([...fullCardDomains(), ...foldedDomains()].sort()).toEqual(
+      ['Mining tax', 'Planetary industry', 'Industry jobs'].sort()
+    );
   });
 });
 

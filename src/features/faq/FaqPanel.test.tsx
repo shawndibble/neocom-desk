@@ -49,6 +49,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.bpcHideAuctions': /hide auctions/i,
   'sync.bpcHidePlex': /hide PLEX contracts/i,
   'sync.targetSkillPlan': /which skill plan you're adding skills to/i,
+  'sync.overviewHiddenCards': /Overview cards you hid/i,
 };
 
 function syncedItemIds(): Set<string> {

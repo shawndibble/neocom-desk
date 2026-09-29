@@ -54,6 +54,8 @@ export interface SummaryStripProps {
   /** The board's clock, so the age line ticks with the countdowns instead of reading its own. */
   now: number;
   onRefresh: () => void;
+  /** Extra controls beside Refresh — the board's card picker. */
+  actions?: ReactNode;
   refreshing: boolean;
 }
 
@@ -70,6 +72,7 @@ export function SummaryStrip({
   now,
   onRefresh,
   refreshing,
+  actions,
 }: SummaryStripProps) {
   const { t } = useTranslation();
   const ageMs = fetchedAt ? Math.max(0, now - fetchedAt.getTime()) : 0;
@@ -123,6 +126,7 @@ export function SummaryStrip({
 
         <span className="ml-auto flex shrink-0 items-center gap-2">
           {fetchedAt && <DataAgeBadge date={fetchedAt} />}
+          {actions}
           <IconButton
             size="sm"
             icon={<Icon.Refresh />}

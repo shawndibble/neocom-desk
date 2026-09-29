@@ -28,6 +28,7 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.miningTaxManualMoonOreTypeIds',
   'sync.miningTaxOreValueMode',
   'sync.notificationFeedPrefs',
+  'sync.overviewHiddenCards',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
   'sync.skillCloneStates',
