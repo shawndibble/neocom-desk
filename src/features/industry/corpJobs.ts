@@ -131,10 +131,10 @@ export async function loadAccountCorpIndustryJobs(
         const corporationId = await loadCorporationId(characterId);
         if (corporationId === null) return;
         const roles = await loadCharacterRoles(characterId);
-        const canReadIndustry =
-          !roles.needsReauth &&
-          roles.cached !== null &&
-          corpCapabilities(corpWideRoles(roles.cached.data)).canReadIndustry;
+        // Roles unknown (offline, no cache) is not the same as roles missing:
+        // left out, so the panel never blames a role it could not read.
+        if (roles.needsReauth || roles.cached === null) return;
+        const canReadIndustry = corpCapabilities(corpWideRoles(roles.cached.data)).canReadIndustry;
         candidates.push({ characterId, corporationId, canReadIndustry });
       } catch {
         // Unknown standing reads as "not a candidate" — never as a hint.

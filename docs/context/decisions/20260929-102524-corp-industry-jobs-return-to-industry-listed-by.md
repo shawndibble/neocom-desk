@@ -34,13 +34,21 @@ _Recorded 2026-09-29 · issue #2302._
   highlighted job is in its list, for personal alerts too; a pulsed row
   inside a folded panel is a pulse nobody sees. A job that has already been
   delivered is not listed, same as the personal alert.
+- **The job-slot readout counts corp jobs against their installer.** EVE
+  does, and without it a corp-only pilot's header read every slot open beside
+  a list full of running jobs. The Characters page's slot column is still
+  personal-only; bringing it in line is a follow-up, not a reason to undo
+  this.
+- **A Character whose roles cannot be read right now (offline, no cache) is
+  left out rather than counted as lacking the role**, so the note never
+  blames a role nobody could check.
 - **Out of scope, unchanged:** "Log production…" stays personal-only (the
   production log has no corp dimension,
   `20260905-181537-production-log-row-per-allocation-sync-accept-wallet.md`).
-  The job-slot readout stays personal-only for now, even though EVE counts a
-  corp job against its installer's slots; the Characters page's readout is
-  personal-only too, and changing one without the other would make them
-  disagree. Delivered job history is not fetched for either owner.
+  Delivered job history is not fetched for either owner.
+- **Do not move corp jobs back off Industry, or the corp alert back to
+  `/corp`, without superseding this decision.** Both were tried (#952), and
+  that change is what hid corp-only pilots' jobs from them.
 - **Supersedes `20260912-131802-corp-industry-jobs-live-only-on-the-corporation.md`'s
   first bullet.** Its second bullet (the folded header shows counts rather
   than a bar per job) still holds, and the My jobs / Corp jobs toggle stays

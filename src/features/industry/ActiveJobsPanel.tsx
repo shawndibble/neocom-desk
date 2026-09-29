@@ -52,6 +52,7 @@ import {
   visibleCorpJobs,
   type CorpJobsSnapshot,
 } from './corpJobs';
+import type { CorporationIndustryJob } from '@/esi/endpoints';
 import {
   findMatchingBuildPlans,
   createBuildPlanForJob,
@@ -316,7 +317,6 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   // elsewhere in this app, and the only way to give the effect below no
   // synchronous `setState` call of its own (`react-hooks/set-state-in-effect`).
   const [jobsFanOut, setJobsFanOut] = useState<JobsFanOutSnapshot | null>(null);
-  const [jobsFanOutCorpJobs, setJobsFanOutCorpJobs] = useState<CorpJobsSnapshot>(EMPTY_CORP_JOBS);
   // The per-Character ESI reads are caught inside `loadAllCharactersIndustryJobs`,
   // so only its own Dexie reads can reject it — and `jobsFanOut === null` alone
   // would then mean "still loading" forever, spinner and all. This flag ends the
@@ -328,11 +328,10 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   useEffect(() => {
     if (!needsJobSlotFanOut) return;
     let cancelled = false;
-    void Promise.all([loadAllCharactersIndustryJobs(), loadAccountCorpIndustryJobs(characterId)])
-      .then(([snapshot, corpJobs]) => {
+    void loadAllCharactersIndustryJobs()
+      .then((snapshot) => {
         if (cancelled) return;
         setJobsFanOut(snapshot);
-        setJobsFanOutCorpJobs(corpJobs);
         // Cleared here rather than at the top of the effect: a synchronous
         // `setState` in the effect body is what the retained-snapshot shape
         // above exists to avoid (`react-hooks/set-state-in-effect`).
@@ -344,7 +343,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [needsJobSlotFanOut, jobsFanOutRefreshCount, characterId]);
+  }, [needsJobSlotFanOut, jobsFanOutRefreshCount]);
   const refreshJobsFanOut = useCallback(() => setJobsFanOutRefreshCount((c) => c + 1), []);
   const jobsFanOutLoading = jobsFanOut === null && !jobsFanOutFailed;
 
@@ -403,13 +402,20 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   const types = useMemo(() => data?.types ?? {}, [data]);
   const result: JobsLoadResult | null = data?.result ?? null;
   const listLoading = needsJobSlotFanOut
-    ? jobsFanOutLoading
+    ? // The snapshot carries the corp jobs in this mode too.
+      jobsFanOutLoading || (loading && !data)
     : // `&& !…data`: with a retained snapshot the panel keeps its rows while
       // the re-read runs, so the spinner is only for having nothing at all
       // to show.
       loading && !data;
   const listRefreshCount = needsJobSlotFanOut ? jobsFanOutRefreshCount : refreshCount;
-  const listRefresh = needsJobSlotFanOut ? refreshJobsFanOut : refresh;
+  // Corp jobs ride the snapshot above in both modes — one read per load, not
+  // a second copy in the fan-out — so a fan-out refresh re-reads it too.
+  const listRefresh = useCallback(() => {
+    refresh();
+    if (needsJobSlotFanOut) refreshJobsFanOut();
+  }, [refresh, needsJobSlotFanOut, refreshJobsFanOut]);
+  const corpJobs = data?.corpJobs ?? EMPTY_CORP_JOBS;
 
   // Every derived note/badge below reads only the Characters the picker
   // actually selected — narrowing to two of five must not still show a
@@ -425,20 +431,46 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   // (loaded unconditionally above), the multi-character branch reuses the
   // fan-out state above, gated on the same `needsJobSlotFanOut` that drives
   // both.
+  // A corp job occupies its installer's slot like a personal one (issue
+  // #2302) — without these, a corp-only pilot's header read every slot open
+  // beside a list full of running jobs.
+  const corpJobsByInstaller = useMemo(() => {
+    const byInstaller = new Map<number, CorporationIndustryJob[]>();
+    const seen = new Set<number>();
+    for (const job of corpJobs.jobs) {
+      if (seen.has(job.job_id)) continue;
+      seen.add(job.job_id);
+      byInstaller.set(job.installer_id, [...(byInstaller.get(job.installer_id) ?? []), job]);
+    }
+    return byInstaller;
+  }, [corpJobs]);
   const jobSlotCharacterInputs = useMemo<JobSlotCharacterInput[]>(() => {
+    const withCorp = (id: number, personal: readonly ActiveJob[] | undefined) => {
+      if (personal === undefined) return undefined;
+      const ids = new Set(personal.map((job) => job.job_id));
+      const corp = (corpJobsByInstaller.get(id) ?? []).filter((job) => !ids.has(job.job_id));
+      return toJobSlotJobs([...personal, ...corp]);
+    };
     if (needsJobSlotFanOut) {
       return jobsFanOutSelectedEntries.map((entry) => ({
         skills: jobsFanOutSkills.get(entry.characterId),
-        jobs: entry.result.cached ? toJobSlotJobs(entry.result.cached.data) : undefined,
+        jobs: withCorp(entry.characterId, entry.result.cached?.data),
       }));
     }
     return [
       {
         skills: data?.skills,
-        jobs: data?.result.cached ? toJobSlotJobs(data.result.cached.data) : undefined,
+        jobs: withCorp(characterId, data?.result.cached?.data),
       },
     ];
-  }, [needsJobSlotFanOut, jobsFanOutSelectedEntries, jobsFanOutSkills, data]);
+  }, [
+    needsJobSlotFanOut,
+    jobsFanOutSelectedEntries,
+    jobsFanOutSkills,
+    data,
+    characterId,
+    corpJobsByInstaller,
+  ]);
   const jobSlotSummary = useMemo(
     () => aggregateJobSlotSummary(jobSlotCharacterInputs, now),
     [jobSlotCharacterInputs, now]
@@ -468,7 +500,6 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       .filter((t): t is number => t !== undefined);
     return times.length > 0 ? new Date(Math.min(...times)) : null;
   }, [jobsFanOutSelectedEntries]);
-  const corpJobs = needsJobSlotFanOut ? jobsFanOutCorpJobs : (data?.corpJobs ?? EMPTY_CORP_JOBS);
   const personalDataAgeDate = needsJobSlotFanOut
     ? jobsFanOutOldestFetchedAt
     : (result?.cached?.fetchedAt ?? null);
@@ -722,7 +753,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
             )}
             {/* Only once more than one Character's jobs are on screen (`showCharacterColumn`) — same gate as `OpenOrdersPanel`'s `showCharacterStrip`. */}
             {job.owner === 'corporation' && (
-              <span className="rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <span className="shrink-0 rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('industry.jobsCorpBadge')}
               </span>
             )}
