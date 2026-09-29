@@ -635,13 +635,28 @@ describe('selectBlueprintTier — every purchasable source competes on total cos
     ).toEqual({ unitPrice: 50_000, owned: false });
   });
 
-  it('drops malformed and zero-price extra offers the same way it drops bad listings', () => {
+  it('drops a malformed extra offer the same way it drops a bad listing', () => {
     const result = selectBlueprintTier({
       ...base,
-      extraOffers: [
-        { me: 0, te: 0, runs: 0, quantity: 1, price: 5 },
-        { me: 0, te: 0, runs: -1, quantity: 1, price: 0 },
-      ],
+      extraOffers: [{ me: 0, te: 0, runs: 0, quantity: 1, price: 5 }],
+    });
+    expect(result.line).toEqual({ unitPrice: null, owned: false });
+  });
+
+  it('prices a genuinely free extra offer at 0 — an LP redemption with no ISK side at LP Value 0', () => {
+    // Unlike a zero-ISK contract (a barter), an LP offer's 0 is its real price.
+    const result = selectBlueprintTier({
+      ...base,
+      extraOffers: [{ me: 0, te: 0, runs: 1, quantity: 1, price: 0 }],
+    });
+    expect(result.line).toEqual({ unitPrice: 0, owned: false });
+  });
+
+  it('still never prices a zero-ISK contract listing', () => {
+    const result = selectBlueprintTier({
+      ...base,
+      bpcOffers: [{ me: 0, te: 0, runs: -1, quantity: 1, price: 0 }],
+      lastResortOffers: [{ me: 0, te: 0, runs: -1, quantity: 1, price: 0 }],
     });
     expect(result.line).toEqual({ unitPrice: null, owned: false });
   });

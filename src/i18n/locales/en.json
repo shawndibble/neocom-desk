@@ -1804,6 +1804,8 @@
     "blueprintAcquisitionLpQuantity_other": "{{count}} copies per redemption",
     "blueprintAcquisitionLpRequiredItems_one": "plus {{count}} turn-in item",
     "blueprintAcquisitionLpRequiredItems_other": "plus {{count}} turn-in items",
+    "blueprintAcquisitionLpTurnInsToBuy": "{{isk}} ISK of turn-ins still to buy, included",
+    "blueprintAcquisitionLpTurnInsUnpriced": "turn-ins not priced",
     "blueprintAcquisitionManualHeading": "Manual tier",
     "blueprintAcquisitionManualHint": "For a copy this app can't see — a private contract or in-person trade.",
     "blueprintAcquisitionManualMe": "ME",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lpRedemptionOffer, marketSellOffer } from './blueprintPurchaseOffers';
+import { lpRedemptionOffer, marketSellOffer, turnInCost } from './blueprintPurchaseOffers';
 
 const noneOwned = () => 0;
 
@@ -56,6 +56,29 @@ describe('lpRedemptionOffer', () => {
     expect(
       lpRedemptionOffer({ quantity: 4, requiredItems: [] }, 10, () => undefined, noneOwned)
     ).toMatchObject({ quantity: 4 });
+  });
+});
+
+describe('turnInCost', () => {
+  it('is 0 with no turn-ins', () => {
+    expect(turnInCost([], () => undefined, noneOwned)).toBe(0);
+  });
+
+  it('prices only the units still to buy', () => {
+    expect(
+      turnInCost(
+        [
+          { typeId: 34, quantity: 3 },
+          { typeId: 35, quantity: 1 },
+        ],
+        (typeId) => (typeId === 34 ? 200 : 50),
+        (typeId) => (typeId === 34 ? 1 : 5)
+      )
+    ).toBe(400);
+  });
+
+  it('is null when a unit still to buy has no price', () => {
+    expect(turnInCost([{ typeId: 34, quantity: 1 }], () => undefined, noneOwned)).toBeNull();
   });
 });
 

@@ -30,7 +30,7 @@ import { mostRecentlyUpdatedPlan, newBuildPlan } from '@/features/industry/newBu
 import {
   blueprintPriceSourcing,
   clearPlanSeed,
-  matchesBlueprintPriceSeed,
+  hasBlueprintPricePick,
   matchesPlanSeed,
   parseBlueprintPriceSeed,
   parsePlanSeed,
@@ -42,6 +42,7 @@ import {
   applyBuildPlanChange,
   createBuildPlans,
   duplicateBuildPlan,
+  patchBuildPlans,
   moveBuildPlan,
   removeBuildPlan,
 } from '@/features/industry/buildPlanStore';
@@ -238,11 +239,25 @@ export function Industry() {
             (p) =>
               p.blueprintTypeID === entry.blueprintTypeID &&
               (planSeed === null || matchesPlanSeed(p, planSeed)) &&
-              (blueprintPriceSeed === null || matchesBlueprintPriceSeed(p, blueprintPriceSeed))
+              (blueprintPriceSeed === null || hasBlueprintPricePick(p))
           ) ?? null)
         : null;
       if (existing) {
-        navigate(`/industry/plans/${existing.id}`, { replace: true });
+        const open = () => navigate(`/industry/plans/${existing.id}`, { replace: true });
+        // An LP plan opened again: the redemption's price has likely moved
+        // (hub prices, LP Value, what the pilot now owns) — refresh it.
+        const stalePrice =
+          blueprintPriceSeed !== null &&
+          existing.materialSourcing?.[existing.blueprintTypeID]?.overridePrice !==
+            blueprintPriceSeed;
+        if (stalePrice) {
+          void patchBuildPlans([existing.id], {
+            materialSourcing: {
+              ...existing.materialSourcing,
+              [existing.blueprintTypeID]: blueprintPriceSourcing(blueprintPriceSeed),
+            },
+          }).then(open);
+        } else open();
         return;
       }
       if (entry) {

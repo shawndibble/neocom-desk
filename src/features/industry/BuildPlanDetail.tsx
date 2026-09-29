@@ -333,11 +333,8 @@ export function BuildPlanDetail({
   // Region market and LP Store offers for every blueprint in the tree, so a
   // blueprint the hub station doesn't sell still gets a price.
   const blueprintTypeIds = useMemo(() => blueprintTypeIdsIn(typeIds, catalog), [typeIds, catalog]);
-  const blueprintPurchaseOffersFor = useBlueprintPurchaseOffers(
-    plan.characterId,
-    hub,
-    blueprintTypeIds
-  );
+  const { offersFor: blueprintPurchaseOffersFor, ready: blueprintOffersReady } =
+    useBlueprintPurchaseOffers(plan.characterId, hub, blueprintTypeIds);
 
   // Pre-fills a fresh plan's Reaction Location the first time Include
   // Reactions is turned on for it (issue #698) — read here, ahead of
@@ -635,8 +632,13 @@ export function BuildPlanDetail({
     };
   }, [result, snapshot, modifiers, standing]);
 
+  // Blueprint prices are provisional until the market/LP offers land, so the
+  // page doesn't offer to "find" a blueprint the next render prices.
   const pricesReady =
-    snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
+    snapshot !== null &&
+    snapshot.adjustedPrices !== null &&
+    snapshot.systemCostIndex !== null &&
+    blueprintOffersReady;
 
   /**
    * Auto Build's own depth range (issue #695): the plan's actual tree

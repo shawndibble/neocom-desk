@@ -34,15 +34,30 @@ export function lpRedemptionOffer(
   unitPriceFor: (typeId: number) => number | undefined,
   ownedFor: (typeId: number) => number
 ): BpcOffer | null {
-  let price = baseIskPrice;
-  for (const item of redemption.requiredItems) {
+  const turnIns = turnInCost(redemption.requiredItems, unitPriceFor, ownedFor);
+  if (turnIns === null) return null;
+  return { me: 0, te: 0, runs: 1, quantity: redemption.quantity, price: baseIskPrice + turnIns };
+}
+
+/**
+ * What an LP redemption's turn-ins cost the pilot: every unit they don't
+ * already own (`ownedFor`), at `unitPriceFor`. `null` when a unit still to
+ * buy has no price — the offer's true cost is then unknown.
+ */
+export function turnInCost(
+  requiredItems: LpBlueprintRedemption['requiredItems'],
+  unitPriceFor: (typeId: number) => number | undefined,
+  ownedFor: (typeId: number) => number
+): number | null {
+  let cost = 0;
+  for (const item of requiredItems) {
     const toBuy = Math.max(0, item.quantity - Math.max(0, ownedFor(item.typeId)));
     if (toBuy === 0) continue;
     const unitPrice = unitPriceFor(item.typeId);
     if (unitPrice === undefined) return null;
-    price += unitPrice * toBuy;
+    cost += unitPrice * toBuy;
   }
-  return { me: 0, te: 0, runs: 1, quantity: redemption.quantity, price };
+  return cost;
 }
 
 /**

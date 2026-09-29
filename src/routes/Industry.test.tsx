@@ -487,6 +487,25 @@ describe('Industry: a Build Plan seeded from an LP Store offer', () => {
     expect((await db.buildPlans.get('bp-1'))?.materialSourcing?.[638]).toBeUndefined();
   });
 
+  it('reuses an LP plan opened again and refreshes its price rather than adding a twin', async () => {
+    await db.buildPlans.add(
+      seedPlan({
+        id: 'bp-lp',
+        materialSourcing: {
+          638: { acquisitionTierOverride: { me: 0, te: 0 }, overridePrice: 1_000_000 },
+        },
+      })
+    );
+    window.history.pushState({}, '', LP_SEEDED);
+    render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/industry/plans/bp-lp'));
+    expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
+    expect((await db.buildPlans.get('bp-lp'))?.materialSourcing?.[638]?.overridePrice).toBe(
+      1_500_000
+    );
+  });
+
   it('reuses a plan already carrying that exact pick', async () => {
     await db.buildPlans.add(
       seedPlan({

@@ -58,7 +58,7 @@ import { iskToneClass } from '@/features/character/format';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { useMarketHub } from '@/features/market/hub';
 import { usePriceBasis, type PriceBasis } from '@/features/loyalty/priceBasis';
-import { TRADE_HUBS } from '@/market/hubs';
+import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS } from '@/market/hubs';
 import { nameForType } from '@/features/industry/blueprintCatalog';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useLoyaltyStoreOffers } from '@/features/loyalty/useLoyaltyStoreOffers';
@@ -99,7 +99,7 @@ interface OfferDetailProps {
   playerLp: number;
   useOwnMaterials: boolean;
   onToggleUseOwnMaterials: () => void;
-  onPlanInIndustry: (row: LoyaltyOfferRow) => void;
+  onPlanInIndustry: (row: LoyaltyOfferRow) => Promise<void>;
 }
 
 function OfferDetail({
@@ -180,7 +180,7 @@ function OfferDetail({
           </MarketItemLink>
         )}
         {row.isBlueprint && row.productTypeId !== null && (
-          <Button variant="ghost" size="sm" onClick={() => onPlanInIndustry(row)}>
+          <Button variant="ghost" size="sm" onClick={() => void onPlanInIndustry(row)}>
             <span className="inline-flex items-center gap-1.5">
               <Icon.Industry size={Icon.ICON_SIZE.sm} aria-hidden="true" />
               {t('loyaltyStore.planInIndustry')}
@@ -431,7 +431,10 @@ export function LoyaltyStore() {
   async function planInIndustry(row: LoyaltyOfferRow) {
     if (row.productTypeId === null) return;
     const params = new URLSearchParams({ product: String(row.productTypeId) });
-    applyBlueprintPriceSeed(params, await lpBlueprintPickPrice(row.offer, row.requiredItems));
+    applyBlueprintPriceSeed(
+      params,
+      await lpBlueprintPickPrice(row.offer, getTradeHub(hubId) ?? DEFAULT_TRADE_HUB)
+    );
     navigate(`${industryTabHref('plans')}?${params.toString()}`);
   }
 

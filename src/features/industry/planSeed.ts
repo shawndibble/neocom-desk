@@ -134,13 +134,15 @@ export function matchesPlanSeed(plan: BuildPlanSeed, seed: BuildPlanSeed): boole
  * The blueprint's own ISK price, carried from an LP Store offer's "Plan in
  * Industry" so the plan it opens is quoted with that redemption as its
  * Blueprint Acquisition — the pilot is looking at the LP Store, so that is
- * where the blueprint comes from. A positive finite number or no seed.
+ * where the blueprint comes from. A finite, non-negative number or no seed —
+ * 0 is a real price for a redemption with no ISK side at the default LP
+ * Value of 0.
  */
 export function parseBlueprintPriceSeed(params: ParamReader): number | null {
   const raw = params.get(BLUEPRINT_PRICE_KEY);
   if (raw === null || raw.trim() === '') return null;
   const value = Number(raw);
-  return Number.isFinite(value) && value > 0 ? value : null;
+  return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 export function applyBlueprintPriceSeed(params: URLSearchParams, price: number | null): void {
@@ -151,19 +153,26 @@ export function applyBlueprintPriceSeed(params: URLSearchParams, price: number |
 /**
  * The `MaterialSourcing` a price seed writes on the plan's blueprint: an
  * ME0/TE0 tier (an LP Store copy is issued unresearched) at that price — the
- * same patch picking the LP offer in the Blueprint Acquisition modal writes
- * (`overridePatchFor`), so it reads as a pick and resets the same way.
+ * same shape picking the LP offer in the Blueprint Acquisition modal writes
+ * (`overridePatchFor`), priced the same way (`lpBlueprintPickPrice`), so it
+ * reads as a pick and resets the same way.
  */
 export function blueprintPriceSourcing(price: number): MaterialSourcing {
   return { acquisitionTierOverride: { me: 0, te: 0 }, overridePrice: price };
 }
 
-/** Whether `plan` already carries exactly the pick a price seed would write. */
-export function matchesBlueprintPriceSeed(
-  plan: { blueprintTypeID: number; materialSourcing?: MaterialSourcingMap },
-  price: number
-): boolean {
+/**
+ * Whether `plan` is one a price seed already made: an ME0/TE0 pick with a
+ * price on its blueprint. Matched on the shape, not the exact price — the
+ * price moves with hub prices, the LP Value and the pilot's assets, and
+ * matching it exactly would pile up a new plan every time it drifted. The
+ * caller refreshes the price on the plan it reuses.
+ */
+export function hasBlueprintPricePick(plan: {
+  blueprintTypeID: number;
+  materialSourcing?: MaterialSourcingMap;
+}): boolean {
   const sourcing = plan.materialSourcing?.[plan.blueprintTypeID];
   const tier = sourcing?.acquisitionTierOverride;
-  return tier?.me === 0 && tier.te === 0 && sourcing?.overridePrice === price;
+  return tier?.me === 0 && tier.te === 0 && sourcing?.overridePrice !== undefined;
 }

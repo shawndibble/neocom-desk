@@ -180,13 +180,13 @@ function candidateCost(
  * contract's ISK side reads as 0, which must not win the cheapest-tier
  * candidate over a genuine, priced BPO.
  */
-function usableOffers(offers: readonly BpcOffer[]): BpcOffer[] {
+function usableOffers(offers: readonly BpcOffer[], allowFree = false): BpcOffer[] {
   return offers.filter(
     (offer) =>
       (offer.runs === -1 || offer.runs > 0) &&
       offer.quantity > 0 &&
       !offer.isMultiType &&
-      offer.price > 0
+      (offer.price > 0 || (allowFree && offer.price === 0))
   );
 }
 
@@ -243,13 +243,21 @@ function buildCandidates(
   return candidates;
 }
 
-/** Everything purchasable in the ordinary pass: listed copies, the extra sources, and the hub BPO sell price as an ME0 original. */
+/**
+ * Everything purchasable in the ordinary pass: listed copies, the extra
+ * sources, and the hub BPO sell price as an ME0 original. An extra offer may
+ * be genuinely free — an LP redemption with no ISK side, at the default LP
+ * Value of 0 — where a zero-ISK contract is a barter, not a price.
+ */
 function primaryOffers(inputs: SelectBlueprintTierInputs): BpcOffer[] {
   const bpo: BpcOffer[] =
     inputs.bpoSellPrice === null
       ? []
       : [{ me: 0, te: 0, runs: -1, quantity: 1, price: inputs.bpoSellPrice }];
-  return usableOffers([...inputs.bpcOffers, ...(inputs.extraOffers ?? []), ...bpo]);
+  return [
+    ...usableOffers([...inputs.bpcOffers, ...bpo]),
+    ...usableOffers(inputs.extraOffers ?? [], true),
+  ];
 }
 
 function priced(
@@ -269,10 +277,11 @@ function priced(
  * other than the cheapest, e.g. to use up a worse owned copy first).
  */
 export function tierOptions(inputs: SelectBlueprintTierInputs): readonly TierOption[] {
-  const options = priced(inputs, primaryOffers(inputs));
+  const primary = primaryOffers(inputs);
+  const options = priced(inputs, primary);
   const lastResort = usableOffers(inputs.lastResortOffers ?? []);
   if (lastResort.length === 0 || options.some((o) => o.cost !== null)) return options;
-  return priced(inputs, [...primaryOffers(inputs), ...lastResort]);
+  return priced(inputs, [...primary, ...lastResort]);
 }
 
 /**

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getTradeHub } from '@/market/hubs';
 import { getHubPrices, getRegionSellPrices } from '@/market/prices';
+import { db } from '@/db';
+import { loadGlobalMarketOverrides } from '@/features/market/orderBookView';
 import { findLpOfferMatches } from '@/features/market/appraisalLpAcquisition';
 import { loadOwnedStockSnapshot } from './ownedStockDetection';
 import {
@@ -10,6 +12,8 @@ import {
 } from './blueprintPurchaseOffers';
 
 vi.mock('@/market/prices', () => ({ getHubPrices: vi.fn(), getRegionSellPrices: vi.fn() }));
+vi.mock('@/features/market/orderBookView', () => ({ loadGlobalMarketOverrides: vi.fn() }));
+vi.mock('@/db', () => ({ db: { characters: { toArray: vi.fn() } } }));
 vi.mock('@/features/market/appraisalLpAcquisition', () => ({ findLpOfferMatches: vi.fn() }));
 vi.mock('./ownedStockDetection', () => ({
   EMPTY_OWNED_STOCK_SNAPSHOT: { sources: [], characterNames: new Map(), incompleteCharacters: [] },
@@ -83,6 +87,8 @@ beforeEach(() => {
   );
   vi.mocked(findLpOfferMatches).mockResolvedValue(lpMatch(0) as never);
   vi.mocked(loadOwnedStockSnapshot).mockResolvedValue(ownedHulls(0) as never);
+  vi.mocked(loadGlobalMarketOverrides).mockResolvedValue(new Map());
+  vi.mocked(db.characters.toArray).mockResolvedValue([{ characterId: 7 }] as never);
 });
 
 describe('loadBlueprintPurchaseOffers', () => {
@@ -108,26 +114,57 @@ describe('loadBlueprintPurchaseOffers', () => {
     expect(offersFor(BLUEPRINT)).toEqual([expect.objectContaining({ price: 1_200 })]);
   });
 
-  it('reads no LP Store without a Character', async () => {
-    const offersFor = await loadBlueprintPurchaseOffers(null, JITA, [BLUEPRINT]);
-    expect(findLpOfferMatches).not.toHaveBeenCalled();
-    expect(offersFor(BLUEPRINT)).toEqual([]);
+  it("counts an alt's LP Store offers, once per distinct corp offer", async () => {
+    vi.mocked(db.characters.toArray).mockResolvedValue([
+      { characterId: 7 },
+      { characterId: 8 },
+    ] as never);
+    const offersFor = await loadBlueprintPurchaseOffers(7, JITA, [BLUEPRINT]);
+    expect(findLpOfferMatches).toHaveBeenCalledWith(8, [BLUEPRINT]);
+    // Both Characters see the same corp offer — it is one offer, not two.
+    expect(offersFor(BLUEPRINT)).toHaveLength(1);
+  });
+
+  it("reads a blueprint's Global Market Region instead of the hub's", async () => {
+    vi.mocked(loadGlobalMarketOverrides).mockResolvedValue(
+      new Map([[BLUEPRINT, { regionId: 10000001, regionName: 'Derelik' }]])
+    );
+    await loadBlueprintPurchaseOffers(7, JITA, [BLUEPRINT]);
+    expect(getRegionSellPrices).toHaveBeenCalledWith(10000001, [BLUEPRINT]);
+  });
+
+  it('prices a zero-ISK redemption at 0 with the default LP Value, not as no offer', async () => {
+    vi.mocked(findLpOfferMatches).mockResolvedValue({
+      ...lpMatch(0),
+      matchesByTypeId: new Map([
+        [
+          BLUEPRINT,
+          [
+            {
+              ...lpMatch(0).matchesByTypeId.get(BLUEPRINT)![0]!,
+              offer: { ...lpMatch(0).matchesByTypeId.get(BLUEPRINT)![0]!.offer, isk_cost: 0 },
+            },
+          ],
+        ],
+      ]),
+    } as never);
+    const offersFor = await loadBlueprintPurchaseOffers(7, JITA, [BLUEPRINT]);
+    expect(offersFor(BLUEPRINT)).toEqual([expect.objectContaining({ price: 0 })]);
   });
 });
 
 describe('lpBlueprintPickPrice', () => {
-  it('prices one redemption with owned turn-ins free and the rest at the row price', async () => {
+  it('prices one redemption with owned turn-ins free and the rest at the hub price', async () => {
     vi.mocked(loadOwnedStockSnapshot).mockResolvedValue(ownedHulls(1) as never);
-    const price = await lpBlueprintPickPrice({ isk_cost: 1_000, lp_cost: 500, quantity: 1 }, [
-      { typeId: HULL, quantity: 3, unitPrice: 200 },
-    ]);
+    const offer = lpMatch(3).matchesByTypeId.get(BLUEPRINT)![0]!.offer;
+    const price = await lpBlueprintPickPrice(offer as never, JITA);
     expect(price).toBe(1_400);
   });
 
   it('is no price when a turn-in still to buy is unpriced', async () => {
-    const price = await lpBlueprintPickPrice({ isk_cost: 1_000, lp_cost: 500, quantity: 1 }, [
-      { typeId: HULL, quantity: 1, unitPrice: null },
-    ]);
+    vi.mocked(getHubPrices).mockResolvedValue(new Map());
+    const offer = lpMatch(1).matchesByTypeId.get(BLUEPRINT)![0]!.offer;
+    const price = await lpBlueprintPickPrice(offer as never, JITA);
     expect(price).toBeNull();
   });
 });

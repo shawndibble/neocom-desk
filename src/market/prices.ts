@@ -37,6 +37,8 @@ interface CacheEntry<V> {
 
 const hubPriceCache = new Map<string, CacheEntry<HubAggregate>>();
 const regionSellCache = new Map<string, CacheEntry<number | null>>();
+/** Region fetches in flight, keyed like the cache, so concurrent askers share one request. */
+const regionSellInFlight = new Map<string, Promise<number | null>>();
 let adjustedPriceCache: CacheEntry<Map<number, AdjustedPrice>> | null = null;
 
 /**
@@ -102,6 +104,7 @@ async function readPersisted<V>(
 export function clearMarketPriceCache(): void {
   hubPriceCache.clear();
   regionSellCache.clear();
+  regionSellInFlight.clear();
   adjustedPriceCache = null;
   hubPricesInFlight.clear();
   adjustedPricesInFlight = null;
@@ -264,26 +267,35 @@ export async function getRegionSellPrices(
 ): Promise<Map<number, number | null>> {
   const result = new Map<number, number | null>();
   const nowMs = now();
+  const pending = new Map<number, Promise<number | null>>();
   const missing: number[] = [];
   for (const typeId of new Set(typeIds)) {
-    const cached = regionSellCache.get(hubCacheKey(regionId, typeId));
+    const key = hubCacheKey(regionId, typeId);
+    const cached = regionSellCache.get(key);
+    const inFlight = regionSellInFlight.get(key);
     if (cached && cached.expiresAt > nowMs) result.set(typeId, cached.value);
+    else if (inFlight) pending.set(typeId, inFlight);
     else missing.push(typeId);
   }
-  if (missing.length === 0) return result;
-  try {
-    const fetched = await fetchAggregates(regionId, missing, 'region');
+  if (missing.length > 0) {
+    const fetch = fetchAggregates(regionId, missing, 'region').then(
+      (fetched) => fetched,
+      () => null
+    );
     for (const typeId of missing) {
-      const sellMin = fetched.get(typeId)?.sellMin ?? null;
-      regionSellCache.set(hubCacheKey(regionId, typeId), {
-        value: sellMin,
-        expiresAt: nowMs + HUB_PRICE_TTL_MS,
+      const key = hubCacheKey(regionId, typeId);
+      const price = fetch.then((fetched) => {
+        regionSellInFlight.delete(key);
+        if (!fetched) return null;
+        const sellMin = fetched.get(typeId)?.sellMin ?? null;
+        regionSellCache.set(key, { value: sellMin, expiresAt: nowMs + HUB_PRICE_TTL_MS });
+        return sellMin;
       });
-      result.set(typeId, sellMin);
+      regionSellInFlight.set(key, price);
+      pending.set(typeId, price);
     }
-  } catch {
-    for (const typeId of missing) result.set(typeId, null);
   }
+  for (const [typeId, price] of pending) result.set(typeId, await price);
   return result;
 }
 

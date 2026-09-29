@@ -89,7 +89,7 @@ async function fetchBatch(
  * the returned map, even when Fuzzwork has no data for it.
  */
 export async function fetchAggregates(
-  stationId: number,
+  locationId: number,
   typeIds: number[],
   scope: AggregateScope = 'station'
 ): Promise<Map<number, HubAggregate>> {
@@ -97,7 +97,7 @@ export async function fetchAggregates(
   if (typeIds.length === 0) return result;
 
   for (const batch of chunk(typeIds, MAX_TYPES_PER_REQUEST)) {
-    const body = await fetchBatch(stationId, batch, scope);
+    const body = await fetchBatch(locationId, batch, scope);
     for (const typeId of batch) {
       const raw = body[String(typeId)];
       const sell = parseSide(raw?.sell, 'min');

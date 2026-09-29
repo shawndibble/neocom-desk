@@ -188,6 +188,23 @@ describe('getRegionSellPrices', () => {
     expect(hits.count).toBe(1);
   });
 
+  it('shares one request between concurrent askers', async () => {
+    const hits = { count: 0 };
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, () => {
+        hits.count += 1;
+        return HttpResponse.json({ 34: { sell: { min: '3.8', volume: '1', orderCount: '1' } } });
+      })
+    );
+    const [a, b] = await Promise.all([
+      getRegionSellPrices(10000002, [34]),
+      getRegionSellPrices(10000002, [34]),
+    ]);
+    expect(a.get(34)).toBe(3.8);
+    expect(b.get(34)).toBe(3.8);
+    expect(hits.count).toBe(1);
+  });
+
   it('reads as no prices, not an error, when Fuzzwork is down', async () => {
     server.use(http.get(FUZZWORK_AGGREGATES_URL, () => new HttpResponse(null, { status: 500 })));
     const prices = await getRegionSellPrices(10000002, [34]);

@@ -3,7 +3,7 @@ import {
   applyBlueprintPriceSeed,
   applyPlanSeed,
   blueprintPriceSourcing,
-  matchesBlueprintPriceSeed,
+  hasBlueprintPricePick,
   parseBlueprintPriceSeed,
   clearPlanSeed,
   matchesPlanSeed,
@@ -202,12 +202,13 @@ describe('seedFromOfferRow', () => {
 describe('blueprint price seed (an LP Store pick)', () => {
   const priceOf = (search: string) => parseBlueprintPriceSeed(new URLSearchParams(search));
 
-  it('reads a positive ISK price', () => {
+  it('reads an ISK price, including a genuinely free 0', () => {
     expect(priceOf('product=587&bpPrice=1250000.5')).toBe(1_250_000.5);
+    expect(priceOf('bpPrice=0')).toBe(0);
   });
 
   it('is no seed when absent, blank, zero, negative or not a number', () => {
-    for (const search of ['product=587', 'bpPrice=', 'bpPrice=0', 'bpPrice=-5', 'bpPrice=abc']) {
+    for (const search of ['product=587', 'bpPrice=', 'bpPrice=-5', 'bpPrice=abc']) {
       expect(priceOf(search)).toBeNull();
     }
   });
@@ -228,10 +229,15 @@ describe('blueprint price seed (an LP Store pick)', () => {
     });
   });
 
-  it('matches only a plan already carrying that exact pick on its blueprint', () => {
+  it('recognises a plan a price seed made, whatever price it carries now', () => {
     const seeded = { blueprintTypeID: 9, materialSourcing: { 9: blueprintPriceSourcing(42) } };
-    expect(matchesBlueprintPriceSeed(seeded, 42)).toBe(true);
-    expect(matchesBlueprintPriceSeed(seeded, 43)).toBe(false);
-    expect(matchesBlueprintPriceSeed({ blueprintTypeID: 9 }, 42)).toBe(false);
+    expect(hasBlueprintPricePick(seeded)).toBe(true);
+    expect(hasBlueprintPricePick({ blueprintTypeID: 9 })).toBe(false);
+    expect(
+      hasBlueprintPricePick({
+        blueprintTypeID: 9,
+        materialSourcing: { 9: { acquisitionTierOverride: { me: 10, te: 20 } } },
+      })
+    ).toBe(false);
   });
 });
