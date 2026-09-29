@@ -1642,6 +1642,7 @@
     "noneSelectedTitle": "No characters selected",
     "noneSelectedHint": "Select characters to compare their trained skills.",
     "loading": "Loading skills…",
+    "characterLoading": "Loading {{name}}'s skills…",
     "noDataTitle": "No skill data cached",
     "noDataHint": "Reconnect to fetch trained skills for these characters.",
     "refresh": "Refresh",
