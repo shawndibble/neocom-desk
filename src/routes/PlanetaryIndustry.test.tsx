@@ -786,6 +786,47 @@ describe('PlanetaryIndustry', () => {
     expect(within(coloniesPanel()).getByText(/^1 stopped · next \d+m$/)).toBeInTheDocument();
   });
 
+  it("badges an alt colony group's header with that alt's own cache age, not the active Character's", async () => {
+    const ALT_ID = 92;
+    const ALT_PLANET_ID = 40000002;
+    const threeDaysAgo = Date.now() - 3 * DAY_MS;
+    await addAlt(ALT_ID, 'Alt Two', [PLANETS_SCOPE]);
+    // The list is the stale read; its detail was fetched recently. The
+    // header reports the older of the two.
+    await db.esiCache.put({
+      characterId: ALT_ID,
+      key: 'planets',
+      value: [{ ...planetsPayload[0], planet_id: ALT_PLANET_ID, owner_id: ALT_ID }],
+      fetchedAt: threeDaysAgo,
+    });
+    await db.esiCache.put({
+      characterId: ALT_ID,
+      key: `planet:${ALT_PLANET_ID}`,
+      value: detailPayload,
+      fetchedAt: Date.now() - DAY_MS / 24,
+    });
+
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
+
+    // The header is the row holding the alt's Switch action.
+    const altHeader = screen
+      .getByRole('button', { name: 'Switch to Alt Two' })
+      .closest('[data-character-group-header]');
+    if (!(altHeader instanceof HTMLElement)) throw new Error('no alt group header');
+    const badge = altHeader.querySelector('time');
+    expect(badge).toHaveAttribute('dateTime', new Date(threeDaysAgo).toISOString());
+
+    // The active Character's own group keeps the page-header badge only.
+    const activeHeader = within(coloniesPanel())
+      .getByText('Pilot One')
+      .closest('[data-character-group-header]');
+    if (!(activeHeader instanceof HTMLElement)) throw new Error('no active group header');
+    expect(activeHeader.querySelector('time')).toBeNull();
+  });
+
   it("resolves an alt colony's unresolved planet and product names via a public lookup, not raw ids", async () => {
     const ALT_ID = 92;
     const ALT_PLANET_ID = 40000002;

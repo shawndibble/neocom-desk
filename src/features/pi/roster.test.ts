@@ -3,6 +3,7 @@ import { setupServer } from 'msw/node';
 import { db } from '@/db';
 import { configureEsi } from '@/esi/client';
 import { writeCached } from '@/esi/cache';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { loadPiRosterSnapshot } from './roster';
 
 vi.mock('@/sde/loadSde', () => ({
@@ -172,5 +173,27 @@ describe('loadPiRosterSnapshot', () => {
     expect(snapshot.colonies).toHaveLength(2);
     const undetailed = snapshot.colonies.find((c) => c.planet.planet_id === 40000002);
     expect(undetailed?.detail).toBeNull();
+  });
+
+  it("stamps every alt colony with that alt's oldest cached fetch, list or detail", async () => {
+    const threeDaysOld = FETCHED_AT - 3 * DAY_MS;
+    const hourOld = FETCHED_AT - HOUR_MS;
+    await addCharacter(ACTIVE_ID, 'Active Pilot', [PLANETS_SCOPE]);
+    await addCharacter(91, 'Old List', [PLANETS_SCOPE]);
+    await addCharacter(92, 'Old Detail', [PLANETS_SCOPE]);
+    // 91: the planet list is the stale read, its detail is recent.
+    await writeCached(91, 'planets', [planet(40000001), planet(40000002)], threeDaysOld);
+    await writeCached(91, 'planet:40000001', extractorDetail(1), hourOld);
+    // 92: the other way round — one detail row is older than the list.
+    await writeCached(92, 'planets', [planet(40000003), planet(40000004)], hourOld);
+    await writeCached(92, 'planet:40000003', extractorDetail(3), hourOld);
+    await writeCached(92, 'planet:40000004', extractorDetail(4), threeDaysOld);
+
+    const snapshot = await loadPiRosterSnapshot(ACTIVE_ID);
+
+    expect(snapshot.colonies).toHaveLength(4);
+    for (const colony of snapshot.colonies) {
+      expect(colony.oldestFetchedAt.getTime()).toBe(threeDaysOld);
+    }
   });
 });

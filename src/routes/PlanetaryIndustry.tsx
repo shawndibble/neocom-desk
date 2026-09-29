@@ -847,26 +847,44 @@ function ColonyRow({
  * than one character's colonies are on screen (the alt-colonies toggle is
  * on). `summary` is the alt-only one-line status ("1 stopped · next 59m",
  * from `altGroupSummary`) — never passed for the active Character's own
- * heading, which has no group of alts to summarise.
+ * heading, which has no group of alts to summarise. `fetchedAt` is likewise
+ * alt-only: an alt's rows are cache-only and can be days old, so its group
+ * carries its own `DataAgeBadge` rather than borrowing the page header's,
+ * which only vouches for the active Character's live read.
  */
 function CharacterGroupHeader({
   name,
   summary,
+  fetchedAt,
   onSwitch,
 }: {
   name: string;
   summary?: string;
+  fetchedAt?: Date;
   onSwitch?: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+    <div
+      data-character-group-header
+      className="flex items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+    >
       <div className="flex min-w-0 items-baseline gap-2">
         <span className="truncate">{name}</span>
         {summary && (
           <span className="shrink-0 font-normal normal-case tracking-normal">{summary}</span>
         )}
       </div>
-      {onSwitch && <SwitchToButton name={name} onSwitch={onSwitch} />}
+      {(fetchedAt || onSwitch) && (
+        <div className="flex shrink-0 items-center gap-2">
+          {fetchedAt && (
+            <DataAgeBadge
+              date={fetchedAt}
+              className="shrink-0 font-normal normal-case tracking-normal"
+            />
+          )}
+          {onSwitch && <SwitchToButton name={name} onSwitch={onSwitch} />}
+        </div>
+      )}
     </div>
   );
 }
@@ -1091,7 +1109,11 @@ export function PlanetaryIndustry() {
   const altGroups = useMemo(() => {
     const byCharacter = new Map<
       number,
-      { characterName: string; colonies: { colony: RosterColony; status: ColonyStatus }[] }
+      {
+        characterName: string;
+        fetchedAt: Date;
+        colonies: { colony: RosterColony; status: ColonyStatus }[];
+      }
     >();
     for (const colony of roster.colonies) {
       const status = colonyStatus(
@@ -1103,12 +1125,16 @@ export function PlanetaryIndustry() {
       else
         byCharacter.set(colony.characterId, {
           characterName: colony.characterName,
+          // One value per Character — the roster stamps every colony of an
+          // alt with that alt's oldest fetch, so the first colony's will do.
+          fetchedAt: colony.oldestFetchedAt,
           colonies: [{ colony, status }],
         });
     }
     return [...byCharacter.entries()].map(([characterId, group]) => ({
       characterId,
       characterName: group.characterName,
+      fetchedAt: group.fetchedAt,
       colonies: sortColoniesByAttention(
         group.colonies,
         (entry) => entry.status,
@@ -1382,6 +1408,7 @@ export function PlanetaryIndustry() {
                         <CharacterGroupHeader
                           name={group.characterName}
                           summary={summaryParts.length > 0 ? summaryParts.join(' · ') : undefined}
+                          fetchedAt={group.fetchedAt}
                           onSwitch={() => void setActiveCharacter(group.characterId)}
                         />
                         {group.colonies.map(({ colony, status }) => {

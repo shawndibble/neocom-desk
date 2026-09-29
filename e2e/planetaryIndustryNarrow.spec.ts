@@ -431,3 +431,112 @@ test.describe('PI Colonies — Switch to an alt (issue #1770)', () => {
     expect(new URL(page.url()).pathname).toContain('/planetary-industry');
   });
 });
+
+test.describe('PI Colonies — alt group data age (issue #2291)', () => {
+  const ALT_ID = 90000003;
+  const ALT_PLANET_ID = 40009999;
+  /** EVE's longest allowed Character name: 37 characters. */
+  const LONG_NAME = 'Abcdefghij Klmnopqrstuvwxy Zabcdefghi';
+  const LAPTOP = { width: 1024, height: 768 };
+
+  /** An alt whose colony list was cached three days ago, detail an hour ago. */
+  async function seedCachedAlt(page: Page): Promise<number> {
+    return page.evaluate(
+      async ({ id, planetId, name, scopes }) => {
+        const database = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open('neocom');
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        const listFetchedAt = Date.now() - 3 * 86_400_000;
+        await new Promise<void>((resolve, reject) => {
+          const tx = database.transaction(['characters', 'tokens', 'esiCache'], 'readwrite');
+          tx.objectStore('characters').put({
+            characterId: id,
+            name,
+            ownerHash: 'OWNERHASH3',
+            addedAt: Date.now(),
+          });
+          tx.objectStore('tokens').put({
+            characterId: id,
+            accessToken: 'alt-access',
+            refreshToken: 'fake-refresh',
+            expiresAt: Date.now() + 3_600_000,
+            scopes,
+          });
+          tx.objectStore('esiCache').put({
+            characterId: id,
+            key: 'planets',
+            value: [
+              {
+                solar_system_id: 30000142,
+                planet_id: planetId,
+                planet_type: 'temperate',
+                owner_id: id,
+                last_update: new Date(listFetchedAt).toISOString(),
+                upgrade_level: 3,
+                num_pins: 0,
+              },
+            ],
+            fetchedAt: listFetchedAt,
+          });
+          tx.objectStore('esiCache').put({
+            characterId: id,
+            key: `planet:${planetId}`,
+            value: { links: [], routes: [], pins: [] },
+            fetchedAt: Date.now() - 3_600_000,
+          });
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+        database.close();
+        return listFetchedAt;
+      },
+      { id: ALT_ID, planetId: ALT_PLANET_ID, name: LONG_NAME, scopes: [...SCOPES] }
+    );
+  }
+
+  test('badges the alt header with its cache age, on one line with a 37-character name at 1024px', async ({
+    page,
+  }) => {
+    await page.setViewportSize(LAPTOP);
+    await signInAndGoto(page, './planetary-industry');
+    const listFetchedAt = await seedCachedAlt(page);
+    // Alts are cache-only; a 404 keeps any stray live read from overwriting the seeded rows.
+    await page.route(`https://esi.evetech.net/characters/${ALT_ID}/**`, (route) =>
+      route.fulfill({ status: 404, contentType: 'application/json', body: '{}' })
+    );
+    await page.route(`https://esi.evetech.net/universe/planets/${ALT_PLANET_ID}**`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          planet_id: ALT_PLANET_ID,
+          name: 'Jita IV',
+          system_id: 30000142,
+          type_id: 11,
+          position: { x: 0, y: 0, z: 0 },
+        }),
+      })
+    );
+    await page.reload();
+
+    await page.getByRole('button', { name: /show \d+ alt/i }).click();
+    const header = page.locator('[data-character-group-header]', {
+      has: page.getByRole('button', { name: `Switch to ${LONG_NAME}` }),
+    });
+    const badge = header.locator('time');
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveAttribute('datetime', new Date(listFetchedAt).toISOString());
+
+    // One row: the badge and the Switch action sit level with the name,
+    // which truncates rather than pushing either onto a second line.
+    const nameBox = (await header.getByText(LONG_NAME, { exact: true }).boundingBox())!;
+    const badgeBox = (await badge.boundingBox())!;
+    const switchBox = (await header.getByRole('button').boundingBox())!;
+    const midline = (box: { y: number; height: number }) => box.y + box.height / 2;
+    expect(Math.abs(midline(badgeBox) - midline(nameBox))).toBeLessThan(4);
+    expect(Math.abs(midline(switchBox) - midline(nameBox))).toBeLessThan(4);
+    await assertNoOverflow(page);
+  });
+});
