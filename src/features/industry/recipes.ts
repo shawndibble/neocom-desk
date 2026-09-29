@@ -268,7 +268,10 @@ export function acquisitionForLookup(
       blueprintPools.set(blueprintTypeID, pool);
     }
 
-    const neededRuns = sizeRuns(needed, blueprint.products[0]?.quantity ?? 0)?.runs ?? needed;
+    // Nothing to size means nothing to build — no tier to resolve either.
+    const sizing = sizeRuns(needed, blueprint.products[0]?.quantity ?? 0);
+    if (!sizing) return null;
+    const neededRuns = sizing.runs;
     const tierInputs = {
       ownedCopies: pooledOwnedCopies(
         ownedCopiesFor(blueprintTypeID, sources.ownedBlueprints),

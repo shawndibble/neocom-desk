@@ -3,16 +3,17 @@
 _Recorded 2026-09-28._
 
 - **A make-or-buy verdict charges the full Blueprint Acquisition cost to the
-  build side — never pro-rated.** The verdict used to compare materials plus
+  build side — not a share of the blueprint's runs.** The verdict used to compare materials plus
   job fee against the buy price, while clicking "build" made the plan resolve
   and charge a Blueprint Acquisition tier. A component whose blueprint had to
   be bought read "build" and then deepened the plan's loss (a Pacifier's
   Sustained Shield Emitter: -6.4M to -13.4M). The pilot still has to buy the
   blueprint to build at all, so the whole price counts, even for a BPO
   that would outlive this plan. Quoted at the acquired tier's ME, honoring
-  Include Blueprint Cost and a blueprint override price exactly as the plan
-  total does, so the verdict predicts which way clicking moves the total.
-  Cost-effective Auto Build inherits this, since it reuses the same verdict.
+  the include-blueprint-cost setting and a blueprint override price exactly
+  as the plan total does, so the verdict predicts which way clicking moves
+  the total. An **Auto Build** with the `cost-effective` **Build Strategy**
+  inherits this, since it reuses the same verdict.
 
 - **A blueprint is bought once per plan, not once per node.** Supersedes the
   "independently of every other node's" clause of
@@ -31,3 +32,5 @@ _Recorded 2026-09-28._
   Build applies, and each verdict (and each Auto Build node) is quoted
   against its own fresh blueprint pool, so a blueprint reached from two
   branches can be charged in both verdicts even though the plan pays once.
+  A pilot-forced tier the app can't see (priced by override) is still
+  charged at every node that needs it — nothing records it as bought.

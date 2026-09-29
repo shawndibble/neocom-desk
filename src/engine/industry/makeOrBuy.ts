@@ -25,6 +25,7 @@ import type {
 } from '@/engine/industry/types';
 import { EMPTY_RIG_FIT, FACILITY_PRESETS } from '@/engine/industry/types';
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
+import { acquisitionMaterialFor } from '@/engine/industry/materialResolution';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { sizeRuns } from '@/engine/industry/runSizing';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
@@ -117,8 +118,9 @@ export interface MakeOrBuy {
   me: number | null;
   /**
    * ISK the blueprint purchase adds to building, already folded into
-   * `makeUnitPrice` — whole, never pro-rated: the plan pays for the
-   * BPO/BPCs whatever share of their runs it uses. 0 when owned runs cover
+   * `makeUnitPrice` — the full price, not a share of the blueprint's runs:
+   * the plan pays for the whole BPO/BPC whatever it uses. (Spread over
+   * every unit the job makes, like the rest of the job's cost.) 0 when owned runs cover
    * the job or Include Blueprint Cost is off.
    */
   blueprintCost: number;
@@ -129,7 +131,8 @@ export interface MakeOrBuy {
 /** One job's all-in quote: per-unit cost, the ME it ran at, and what the blueprint purchase added. */
 interface JobQuote {
   unitCost: number;
-  me: number;
+  /** null for a planetary quote, which has no ME. */
+  me: number | null;
   blueprintCost: number;
 }
 
@@ -161,9 +164,12 @@ function jobUnitCost(
   const { runs } = sizing;
   const acquisition = ctx.acquisitionFor?.(product.typeID, needed, ctx, ctx.materialPrices) ?? null;
   const me = acquisition?.me ?? recipeMe;
-  const line = acquisition?.line;
-  const blueprintCost = !line || line.owned ? 0 : line.unitPrice;
-  if (blueprintCost === null) return null;
+  // The same acquisition row `resolveSubBuild` adds, so the verdict charges
+  // exactly what the build would. Any override price is already on the line
+  // (`verdictAcquisitionFor`).
+  const row = acquisition ? acquisitionMaterialFor(acquisition, undefined) : null;
+  if (row?.unpriced) return null;
+  const blueprintCost = row?.lineCost ?? 0;
   // TE is irrelevant to cost, so the cheapest honest value is passed.
   const result = buildVsBuy({
     blueprint,
@@ -274,7 +280,7 @@ export function makeOrBuy(
   try {
     if (recipe.method === 'planetary') {
       const unitCost = planetaryUnitCost(recipe.inputs, recipe.outputQuantity, ctx.materialPrices);
-      quote = unitCost === null ? null : { unitCost, me: 0, blueprintCost: 0 };
+      quote = unitCost === null ? null : { unitCost, me: null, blueprintCost: 0 };
     } else {
       quote =
         recipe.method === 'manufacturing'
