@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { toggleChipStateClassName } from './controlStyles';
 import { FilterChip } from './FilterChip';
 
 describe('FilterChip', () => {
@@ -12,6 +13,22 @@ describe('FilterChip', () => {
 
     rerender(<FilterChip label="Ships" selected onToggle={() => undefined} />);
     expect(screen.getByRole('button', { name: /Ships/ })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('draws its on and off state from the shared toggle-chip helper', () => {
+    const { rerender } = render(
+      <FilterChip label="Ships" selected={false} onToggle={() => undefined} />
+    );
+    const chip = () => screen.getByRole('button', { name: /Ships/ });
+    for (const cls of toggleChipStateClassName(false).split(' ')) {
+      expect(chip()).toHaveClass(cls);
+    }
+
+    rerender(<FilterChip label="Ships" selected onToggle={() => undefined} />);
+    for (const cls of toggleChipStateClassName(true).split(' ')) {
+      expect(chip()).toHaveClass(cls);
+    }
+    expect(chip()).not.toHaveClass('bg-panel-2');
   });
 
   it('calls onToggle on click', async () => {

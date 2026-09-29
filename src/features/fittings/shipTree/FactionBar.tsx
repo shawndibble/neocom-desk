@@ -6,7 +6,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { controlHeightClassName } from '@/components/ui/controlStyles';
+import { controlHeightClassName, toggleChipStateClassName } from '@/components/ui/controlStyles';
 import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import { cx } from '@/lib/cx';
 import type { ShipTreeData } from '@/sde/types';
@@ -57,9 +57,7 @@ export function FactionBar({
               className={cx(
                 controlHeightClassName.md,
                 'flex shrink-0 items-center rounded-xs border px-2 text-left text-xs whitespace-nowrap',
-                current
-                  ? 'border-accent bg-accent/10 text-accent'
-                  : 'border-line text-text-dim hover:border-line-bright'
+                toggleChipStateClassName(current)
               )}
             >
               {emblem && (

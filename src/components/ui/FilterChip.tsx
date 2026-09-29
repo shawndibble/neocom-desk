@@ -1,5 +1,9 @@
 import { cx } from '@/lib/cx';
-import { controlHeightClassName, type ControlSize } from './controlStyles';
+import {
+  controlHeightClassName,
+  toggleChipStateClassName,
+  type ControlSize,
+} from './controlStyles';
 import { Tooltip } from './Tooltip';
 
 interface FilterChipProps {
@@ -88,11 +92,8 @@ export function FilterChip({
       className={cx(
         'inline-flex items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40 aria-disabled:cursor-default aria-disabled:opacity-40',
         controlHeightClassName[size],
-        selected
-          ? 'border-accent-dim bg-accent/15 text-accent'
-          : 'border-line bg-panel-2 text-text-dim',
         // No hover affordance on a chip that cannot be toggled.
-        !selected && !explained && 'hover:border-line-bright hover:text-text',
+        toggleChipStateClassName(selected, { hoverable: !explained }),
         className
       )}
     >

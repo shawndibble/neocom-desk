@@ -63,3 +63,24 @@ export const tappableRowClassName = 'min-h-11 md:min-h-7';
 
 /** An inline text action beside a status message — an Undo, a "jump to it". */
 export const inlineLinkClassName = 'text-accent font-medium underline';
+
+/**
+ * A bordered toggle chip's on/off state, per DESIGN.md §4: `FilterChip`'s
+ * accent tint when on, the input fill with dim text when off. `FilterChip`
+ * takes it from here, and so does any hand-built toggle chip whose content
+ * `FilterChip` can't carry (an avatar, a spinner, an emblem) — Skill Compare's
+ * character picker, the Ship Tree's `FactionBar` — so the three can't drift
+ * apart again (issue #2287).
+ *
+ * `hoverable: false` drops the off state's hover for a chip that can't
+ * currently be toggled. Not for `SegmentedControl`, whose segments have no
+ * border of their own.
+ */
+export function toggleChipStateClassName(
+  selected: boolean,
+  { hoverable = true }: { hoverable?: boolean } = {}
+): string {
+  if (selected) return 'border-accent-dim bg-accent/15 text-accent';
+  const off = 'border-line bg-panel-2 text-text-dim';
+  return hoverable ? `${off} hover:border-line-bright hover:text-text` : off;
+}
