@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
@@ -891,10 +891,17 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     await db.buildPlans.clear();
   });
 
+  const realSetActiveCharacter = useActiveCharacter.getState().setActiveCharacter;
+
   afterEach(() => {
-    // The cross-character test switches these globals; reset so later
-    // describe blocks in this file see the usual single-character defaults.
-    useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
+    // The cross-character test switches these globals (and gates the store's
+    // setter); reset so later describe blocks in this file see the usual
+    // single-character defaults.
+    useActiveCharacter.setState({
+      activeCharacterId: null,
+      hydrated: false,
+      setActiveCharacter: realSetActiveCharacter,
+    });
     useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
   });
 
@@ -1040,6 +1047,18 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     const targetPlan = plan({ id: 'plan-b-owned', characterId: CHAR_B });
     await db.buildPlans.add(targetPlan);
 
+    // Hold the character switch open so the test can prove navigation waits
+    // for it, rather than inferring order from timing.
+    let releaseSwitch!: () => void;
+    const switchGate = new Promise<void>((resolve) => {
+      releaseSwitch = resolve;
+    });
+    const gatedSetActiveCharacter = vi.fn(async (characterId: number) => {
+      await switchGate;
+      await realSetActiveCharacter(characterId);
+    });
+    useActiveCharacter.setState({ setActiveCharacter: gatedSetActiveCharacter });
+
     let location: ReturnType<typeof useLocation> | undefined;
     renderPanel((loc) => {
       location = loc;
@@ -1050,8 +1069,18 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     fireEvent.contextMenu(row);
     fireEvent.click(await screen.findByText('Log production…'));
 
-    await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_B));
-    expect(location?.pathname).toBe('/industry/plans/plan-b-owned');
+    await waitFor(() => expect(gatedSetActiveCharacter).toHaveBeenCalledWith(CHAR_B));
+    // Flush every pending React update (including router transitions): with
+    // the switch still pending, nothing may have navigated yet.
+    await act(async () => {});
+    expect(location?.pathname).toBe('/');
+
+    releaseSwitch();
+    // Wait on the location itself, not the store: MemoryRouter applies a
+    // navigate() inside React.startTransition, so useLocation() lags the
+    // store's activeCharacterId flip by at least one scheduler task.
+    await waitFor(() => expect(location?.pathname).toBe('/industry/plans/plan-b-owned'));
+    expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_B);
   });
 });
 
