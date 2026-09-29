@@ -1219,6 +1219,7 @@ describe('copy wiring', () => {
           jobId: 1,
           memberCharacterId: 1,
           orderId: 1,
+          division: 1,
         } as never) !== undefined
     );
     expect([...routed].sort()).toEqual([...SUBJECT_ROUTED_EVENT_IDS].sort());

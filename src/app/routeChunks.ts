@@ -106,6 +106,7 @@ export const loadFittingCompare = named(() => import('@/routes/FittingCompare'),
 export const loadCorp = named(() => import('@/routes/Corp'), 'Corp');
 export const loadCorpMembers = named(() => import('@/routes/CorpMembers'), 'CorpMembers');
 export const loadCorpAssets = named(() => import('@/routes/CorpAssets'), 'CorpAssets');
+export const loadCorpWallet = named(() => import('@/routes/CorpWallet'), 'CorpWallet');
 export const loadMarket = named(() => import('@/routes/Market'), 'Market');
 export const loadWallet = named(() => import('@/routes/Wallet'), 'Wallet');
 export const loadMoonMiningTax = named(() => import('@/routes/MoonMiningTax'), 'MoonMiningTax');
@@ -164,6 +165,7 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/employment-history': loadEmploymentHistory,
   '/corp': loadCorp,
   '/corp/members': loadCorpMembers,
+  '/corp/wallet': loadCorpWallet,
   '/corp/assets': loadCorpAssets,
   '/corp/assets/*': loadCorpAssets,
   '/assets': loadAssets,

@@ -2,10 +2,10 @@
  * Lifecycle for a corp-owned read that is *opt-in per page* (issue #298).
  *
  * `useRouteSnapshot` is the wrong shape here for one reason: it loads on mount.
- * The corp side of Wallet and Industry is behind a switch most visits never
- * flip, and a corp endpoint is both rate-limited and role-gated — so nothing
- * may be fetched until the user actually asks for it. That is what `key ===
- * null` means below: no load, no spinner, no request.
+ * A corp endpoint is both rate-limited and role-gated, so a page may hold a
+ * corp read back until the user actually asks for it (or until its inputs —
+ * the corporation id — are known). That is what `key === null` means below:
+ * no load, no spinner, no request.
  *
  * The key is also the identity of the load. It carries every input the load
  * closes over — the Character, the corporation, and anything else the caller
