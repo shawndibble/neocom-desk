@@ -61,4 +61,17 @@ describe('CorpSubNav (AC1)', () => {
     renderNav();
     expect(screen.queryByRole('link', { name: 'Assets' })).not.toBeInTheDocument();
   });
+
+  it('offers Wallet to a character with the wallet capability', () => {
+    mockedAccess.mockReturnValue(access({ canReadWallet: true }));
+    renderNav();
+    expect(screen.getByRole('link', { name: 'Wallet' })).toHaveAttribute('href', '/corp/wallet');
+  });
+
+  /** Same hide rule again: a Director-only view's reader need not hold a wallet role. */
+  it('hides Wallet from a ready character without it', () => {
+    mockedAccess.mockReturnValue(access({ canReadMembers: true }));
+    renderNav();
+    expect(screen.queryByRole('link', { name: 'Wallet' })).not.toBeInTheDocument();
+  });
 });

@@ -463,6 +463,8 @@ export const corpRosterCopy: DomainCopy<CorpMemberJoinedFire | CorpMemberLeftFir
 /* Corp wallet ------------------------------------------------------------- */
 
 export const corpWalletCopy: DomainCopy<CorpWalletThresholdFire, NoNames> = {
+  // The division, not a row: `/corp/wallet` opens on it via `?division=`.
+  subjectOf: (fire) => fire.division,
   poll: (fire, character) => ({
     title: fired('corpWalletThreshold', 'title'),
     body:

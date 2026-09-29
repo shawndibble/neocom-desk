@@ -259,12 +259,10 @@ here — they go one per file in `docs/context/decisions/`.
   never hold a second opinion about what dark means. A member who joined and
   has never logged in is counted from the day they joined, not excluded.
 - **Data Age**: Timestamp shown on every API-derived view; how old the cached data is. Refresh happens on app open + manual button only.
-- **Data Owner**: Whose rows a page's table is showing — `personal` or
-  `corporation`. Selected per page by the Personal / Corporation switch,
-  device-local, never synced, and reset to Personal on a Character switch.
-  `features/corp/owner.ts` owns the term and the rule; a page asks it for
-  `available` rather than composing Corp Access, a Corp Capability and a
-  corporation id itself.
+- **Data Owner** (retired): Whose rows a page's table showed — `personal` or
+  `corporation` — picked by a Personal / Corporation switch. No page has one
+  any more: corp data lives only on `/corp*` routes (Industry dropped its
+  switch on 2026-09-12, Wallet on 2026-09-29 — see `docs/context/decisions/`).
 - **Detected Accelerator** — a cerebral accelerator inferred from a base sheet
   that is over budget, by the size of the excess. Prefilled into the Booster
   control; not a separate mechanism.

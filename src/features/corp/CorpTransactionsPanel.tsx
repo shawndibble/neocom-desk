@@ -1,16 +1,15 @@
 /**
- * The corp wallet's Transactions tab (issue #570).
+ * The corp wallet's Transactions view (issue #570).
  *
- * The corp side of `/wallet` could say that 4.2b left the SRP division and not
- * what it bought: the journal names a market escrow, the fills are a separate
- * ESI read, and only the character's were registered. This panel is the other
+ * The corp journal could say that 4.2b left the SRP division and not what it
+ * bought: the journal names a market escrow, the fills are a separate ESI
+ * read, and only the character's were registered. This panel is the other
  * half of that reconciliation, one division at a time like everything else on
- * this page.
+ * `/corp/wallet`.
  *
- * Its own module rather than another branch inside `routes/Wallet.tsx`, which
- * is already the longest route in the app. It owns no fetching and no filter
- * state — the route holds both, so a division switch resets the filter in the
- * same place it resets the journal's (see `Wallet.tsx`).
+ * It owns no fetching and no filter state — the route holds both, so a
+ * division switch resets the filter in the same place it resets the journal's
+ * (see `routes/CorpWallet.tsx`).
  *
  * A filter bar, unlike the character panel in Market. That asymmetry is
  * deliberate for now: a corp division's fills are the many-Characters case, so

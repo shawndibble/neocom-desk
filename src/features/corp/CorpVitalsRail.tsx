@@ -84,13 +84,11 @@ export function CorpVitalsRail({
             const label =
               division.name ?? t('corp.vitals.division', { division: division.division });
             return (
-              // The whole row is the link (issue #419) — the matching Wallet
-              // division view, not a second read of it. `owner=corporation`
-              // is what actually opens Wallet's corp side; `division` alone
-              // would land on Personal with the param unused.
+              // The whole row is the link (issue #419) — the matching Corp
+              // Wallet division view, not a second read of it.
               <Link
                 key={division.division}
-                to={`/wallet?owner=corporation&division=${division.division}`}
+                to={`/corp/wallet?division=${division.division}`}
                 className="flex items-baseline justify-between gap-3 border-b border-line py-2 last:border-b-0 hover:underline"
                 aria-label={t('corp.vitals.viewInWallet', { division: label })}
                 // The label names where the link goes and so replaces the

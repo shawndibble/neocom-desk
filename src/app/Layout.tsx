@@ -260,9 +260,9 @@ function NavItem({ to, label, locked, badge, presentation = 'rail', onClick }: N
  * The route itself takes the opposite view of `unknown` and waits, so a
  * deep-linked Director is not bounced (`routes/Corp.tsx`).
  *
- * The corporation id is part of the gate rather than an extra, the same
- * composition `owner.ts` makes for the Personal / Corporation switch: it is
- * written by the public-info read, so on a cold device it is simply absent, and
+ * The corporation id is part of the gate rather than an extra
+ * (`useActiveCorporationId`, `features/corp/owner.ts`): it is written by the
+ * public-info read, so on a cold device it is simply absent, and
  * an entry into a section with no corporation behind it is one that must not be
  * on screen yet. It is self-healing — the first visit to `/corp` learns and
  * records the id, and this is a `useLiveQuery`.
