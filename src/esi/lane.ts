@@ -60,21 +60,21 @@ let ambient: EsiLane | undefined;
 /** Reads the active Character's id. `src/esi` cannot import `stores/`, so the app injects it. */
 export type GetActiveCharacterId = () => number | null;
 
-let activeCharacterId: GetActiveCharacterId | null = null;
+let getActiveCharacterId: GetActiveCharacterId | null = null;
 
 /**
  * Inject (or clear) where the active Character's id is read from. Unset, no
  * read queues high — every foreground read is `normal`, as before #2281.
  */
 export function configureActiveCharacter(get: GetActiveCharacterId | null): void {
-  activeCharacterId = get;
+  getActiveCharacterId = get;
 }
 
 /** The lane a view's read for `characterId` queues in: high for the active Character. */
 export function viewPriority(characterId: number | undefined): Priority {
   return characterId !== undefined &&
-    activeCharacterId !== null &&
-    characterId === activeCharacterId()
+    getActiveCharacterId !== null &&
+    characterId === getActiveCharacterId()
     ? 'high'
     : 'normal';
 }

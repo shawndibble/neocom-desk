@@ -136,10 +136,9 @@ export function createSemaphore(limit: number, options: SemaphoreOptions = {}): 
 
   /** The lane the next free permit goes to, or `null` if no waiter may take one. */
   function nextLane(): Priority | null {
-    if (lanes.high.length > 0) return 'high';
-    if (lanes.normal.length > 0) return 'normal';
-    if (lanes.low.length > 0 && lowHeld < lowLimit) return 'low';
-    return null;
+    const lane = PRIORITIES.find((priority) => lanes[priority].length > 0);
+    if (lane === 'low' && lowHeld >= lowLimit) return null;
+    return lane ?? null;
   }
 
   /** Admit as many waiters as the permits allow, highest lane first. */

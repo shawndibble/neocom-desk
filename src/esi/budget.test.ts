@@ -540,7 +540,7 @@ describe('the app-wide gate', () => {
     const lane = { priority: 'low' as 'low' | 'normal' };
     const queued = passEsiGate(undefined, lane);
 
-    promoteEsiLane(lane);
+    promoteEsiLane(lane, 'normal');
     releases.push(await queued);
     expect(lane.priority).toBe('normal');
     for (const release of releases) release();

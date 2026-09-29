@@ -478,10 +478,10 @@ export async function passEsiGate(signal?: AbortSignal, lane?: PriorityTicket): 
 }
 
 /**
- * Move `lane`'s queued requests — and its later ones — up into the `to` lane
- * (default `normal`); never down. `cache.ts` calls it when a view joins a load
+ * Move `lane`'s queued requests — and its later ones — up into the `to` lane;
+ * never down. `cache.ts` calls it when a view joins a load
  * background work started, with the lane that view's own read would take.
  */
-export function promoteEsiLane(lane: PriorityTicket, to: Priority = 'normal'): void {
+export function promoteEsiLane(lane: PriorityTicket, to: Priority): void {
   semaphore.promote(lane, to);
 }
