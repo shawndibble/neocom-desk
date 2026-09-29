@@ -543,7 +543,6 @@ export function MaterialsTable({
                       variant="plain"
                       icon={<Icon.Blueprint size={Icon.ICON_SIZE.sm} />}
                       label={t('industry.blueprintAcquisitionOpenPicker')}
-                      tooltip={t('industry.blueprintAcquisitionOpenPicker')}
                       onClick={() => onOpenAcquisitionPicker(material.typeID)}
                     />
                   ) : (
@@ -725,6 +724,7 @@ export function MaterialsTable({
           // that survive are the exceptions — a price the player typed, a row
           // that costs nothing because they own it, and a row the market has
           // no number for.
+          const unpriced = !overridden && state.unitPrice === null && !state.fullyOwned;
           const tag = overridden
             ? { text: t('industry.priceSourceOverride'), tone: 'text-accent' }
             : state.unitPrice !== null
@@ -732,12 +732,11 @@ export function MaterialsTable({
               : state.fullyOwned
                 ? { text: t('industry.priceSourceOwned'), tone: 'text-text-dim' }
                 : { text: t('industry.unpriced'), tone: 'text-warning' };
-          const findBlueprint =
-            material.acquisitionTier &&
-            onOpenAcquisitionPicker &&
-            !overridden &&
-            state.unitPrice === null &&
-            !state.fullyOwned
+          // Only once prices have landed: before then every row reads as
+          // unpriced, and a call to go find a blueprint that already has a
+          // price would be an errand invented by a loading state.
+          const onFindBlueprint =
+            unpriced && pricesReady && material.acquisitionTier && onOpenAcquisitionPicker
               ? () => onOpenAcquisitionPicker(material.typeID)
               : undefined;
           return (
@@ -780,11 +779,12 @@ export function MaterialsTable({
                   {/* An unpriced blueprint row has an errand, not just a
                       warning: the picker is where a tier with a price gets
                       found, so the tag is the link into it. */}
-                  {tag && findBlueprint ? (
+                  {onFindBlueprint ? (
                     <button
                       type="button"
+                      aria-label={t('industry.blueprintAcquisitionFindFor', { material: name })}
                       className={textActionClassName('whitespace-nowrap')}
-                      onClick={findBlueprint}
+                      onClick={onFindBlueprint}
                     >
                       {t('industry.blueprintAcquisitionFind')}
                     </button>

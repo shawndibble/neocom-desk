@@ -1297,8 +1297,8 @@ describe('MaterialsTable Blueprint Acquisition picker trigger (issue #839)', () 
 
     expect(screen.getByText('ME 8% / TE 16%')).toBeInTheDocument();
     const nameSlot = within(row('Tritanium')).getAllByRole('cell')[0];
-    const triggers = within(nameSlot).getAllByRole('button', { name: 'Choose blueprint tier' });
-    expect(triggers).toHaveLength(1);
+    expect(within(nameSlot).getByRole('button', { name: 'Choose blueprint tier' })).toBeTruthy();
+    // The one trigger — the old config icon beside the name is gone.
     expect(screen.getAllByRole('button', { name: 'Choose blueprint tier' })).toHaveLength(1);
   });
 
@@ -1311,7 +1311,7 @@ describe('MaterialsTable Blueprint Acquisition picker trigger (issue #839)', () 
 
     const tritanium = within(row('Tritanium'));
     expect(tritanium.queryByText('No price')).toBeNull();
-    fireEvent.click(tritanium.getByRole('button', { name: 'Find blueprint' }));
+    fireEvent.click(tritanium.getByRole('button', { name: 'Find blueprint: Tritanium' }));
 
     expect(onOpenAcquisitionPicker).toHaveBeenCalledWith(34);
   });
@@ -1323,6 +1323,17 @@ describe('MaterialsTable Blueprint Acquisition picker trigger (issue #839)', () 
     fireEvent.click(screen.getByRole('button', { name: 'Choose blueprint tier' }));
 
     expect(onOpenAcquisitionPicker).toHaveBeenCalledWith(34);
+  });
+
+  it('keeps "No price" while prices are still loading — nothing to go find yet', () => {
+    const unpricedRow = acquisitionRow.map((r, i) =>
+      i === 0 ? { ...r, unitPrice: null, unpriced: true } : r
+    );
+    renderTable({ materials: unpricedRow, onOpenAcquisitionPicker: vi.fn(), pricesReady: false });
+
+    const tritanium = within(row('Tritanium'));
+    expect(tritanium.queryByRole('button', { name: /Find blueprint/ })).toBeNull();
+    expect(tritanium.getByText('No price')).toBeTruthy();
   });
 
   it('drops the trigger when the caller has no picker to open', () => {

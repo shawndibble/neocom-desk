@@ -1811,6 +1811,7 @@
     "blueprintAcquisitionManualError": "Enter a number for ME and TE.",
     "blueprintAcquisitionOpenPicker": "Choose blueprint tier",
     "blueprintAcquisitionFind": "Find blueprint",
+    "blueprintAcquisitionFindFor": "Find blueprint: {{material}}",
     "bpAcqHubLabel": "Compare at trade hub",
     "bpAcqHubHint": "Contracts and market orders are read for this hub's region. Changing it here doesn't change the plan's trade hub.",
     "bpAcqHubRegion": "{{hub}}'s region",
