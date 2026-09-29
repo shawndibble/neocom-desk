@@ -88,7 +88,7 @@ export function CorpVitalsRail({
               // Wallet division view, not a second read of it.
               <Link
                 key={division.division}
-                to={`/corp/wallet/balance?division=${division.division}`}
+                to={`/corp/wallet?division=${division.division}`}
                 className="flex items-baseline justify-between gap-3 border-b border-line py-2 last:border-b-0 hover:underline"
                 aria-label={t('corp.vitals.viewInWallet', { division: label })}
                 // The label names where the link goes and so replaces the

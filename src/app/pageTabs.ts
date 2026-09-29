@@ -79,13 +79,6 @@ export const WALLET_TABS = definePageTabs('/wallet', [
   { id: 'transactions', labelKey: 'market.sections.transactions' },
 ]);
 
-/** The corporation's wallet, one division at a time (`routes/CorpWallet.tsx`). */
-export const CORP_WALLET_TABS = definePageTabs('/corp/wallet', [
-  { id: 'balance', labelKey: 'wallet.balanceTab' },
-  { id: 'journal', labelKey: 'wallet.journalTab' },
-  { id: 'transactions', labelKey: 'corp.wallet.transactionsTab' },
-]);
-
 /**
  * Search has its own Items/Courier sub-tab, so each leaf's id is the full
  * path suffix below `/contracts` rather than one segment (see `lib/pageTabs.ts`).
@@ -133,7 +126,6 @@ export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/planetary-industry': PI_TABS,
   '/mining': MINING_TABS,
   '/wallet': WALLET_TABS,
-  '/corp/wallet': CORP_WALLET_TABS,
 };
 
 const TABBED_PAGES = Object.values(PAGE_TABS);

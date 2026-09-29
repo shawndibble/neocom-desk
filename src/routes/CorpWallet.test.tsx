@@ -174,9 +174,16 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/corp/wallet');
 });
 
-/** The division selector, once the roles, scopes and balances have all resolved. */
-function findDivisionSelect() {
-  return screen.findByRole('combobox', { name: 'Wallet division' });
+/** The division strip, once the roles, scopes and balances have all resolved. */
+function findDivisions() {
+  return screen.findByRole('group', { name: 'Wallet division' });
+}
+
+/** One division's button in the strip, by its name. */
+function divisionButton(name: string) {
+  return within(screen.getByRole('group', { name: 'Wallet division' })).getByRole('button', {
+    name: new RegExp(name),
+  });
 }
 
 /** The journal panel's title-bar ⋯ › Export table › Download CSV (jsdom has no hover intent). */
@@ -202,12 +209,12 @@ describe('Corp Wallet: the gate', () => {
     render(<App />);
 
     expect(await screen.findByText('Corp wallet needs Accountant')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Wallet division')).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Wallet division' })).toBeNull();
   });
 
   it('is an entry in the Corp section nav for a Character who can read the wallet', async () => {
     render(<App />);
-    await findDivisionSelect();
+    await findDivisions();
 
     const nav = screen.getByRole('navigation', { name: 'Corporation' });
     expect(within(nav).getByRole('link', { name: 'Wallet' })).toHaveAttribute(
@@ -215,34 +222,42 @@ describe('Corp Wallet: the gate', () => {
       '/corp/wallet'
     );
   });
+
+  /** One level of tabs: the Corp sub-nav. The page switches its table with a view control. */
+  it('has no tab bar of its own', async () => {
+    render(<App />);
+    await findDivisions();
+
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(screen.getByRole('group', { name: 'Wallet view' })).toBeInTheDocument();
+  });
 });
 
-describe('Corp Wallet: balances, journal and divisions (AC 2, AC 3)', () => {
-  it('shows the selected division balance, named from read_divisions', async () => {
+describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
+  it('shows every division’s balance at once, named from read_divisions, the first selected', async () => {
     render(<App />);
+    await findDivisions();
 
-    // Scoped to the balance heading: the same name is also the division
-    // selector's value.
-    expect(await screen.findByText('Master Wallet', { selector: 'p' })).toBeInTheDocument();
-    expect(screen.getByText(/1,000,000\.00/)).toBeInTheDocument();
+    expect(divisionButton('Master Wallet')).toHaveTextContent(/1,000,000\.00/);
+    expect(divisionButton('Master Wallet')).toHaveAttribute('aria-pressed', 'true');
+    expect(divisionButton('SRP')).toHaveTextContent(/250\.00/);
+    expect(divisionButton('SRP')).toHaveAttribute('aria-pressed', 'false');
     // The Character's own balance and EverMarks are not on this page.
     expect(screen.queryByText(/4,500\.00/)).toBeNull();
     expect(screen.queryByText('EverMarks')).toBeNull();
   });
 
-  it('switches division, and the journal below follows it', async () => {
+  it('opens on the journal, and it follows the selected division', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByText(/1,000,000\.00/);
 
-    await user.click(screen.getByRole('tab', { name: 'Journal' }));
     expect(await screen.findByText('Master division payout')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('combobox', { name: 'Wallet division' }));
-    await user.click(await screen.findByRole('option', { name: 'SRP' }));
+    await user.click(divisionButton('SRP'));
 
     expect(await screen.findByText('SRP division payout')).toBeInTheDocument();
     expect(screen.queryByText('Master division payout')).toBeNull();
+    expect(divisionButton('SRP')).toHaveAttribute('aria-pressed', 'true');
     // The same journal table `/wallet` draws. Scoped to the table: "Insurance"
     // also names an <option> in the ref-type filter (issue #413).
     const table = screen.getByRole('table', { name: 'Journal' });
@@ -251,7 +266,7 @@ describe('Corp Wallet: balances, journal and divisions (AC 2, AC 3)', () => {
     expect(screen.queryByText('My bounty')).toBeNull();
   });
 
-  it('does not re-page the journal when the tab is toggled away and back (issue #413)', async () => {
+  it('does not re-page the journal when the view is switched away and back (issue #413)', async () => {
     let journalRequests = 0;
     server.use(
       http.get(`${BASE}/corporations/${CORP_ID}/wallets/:division/journal`, ({ params }) => {
@@ -261,15 +276,13 @@ describe('Corp Wallet: balances, journal and divisions (AC 2, AC 3)', () => {
     );
     const user = userEvent.setup();
     render(<App />);
-    await findDivisionSelect();
 
-    await user.click(screen.getByRole('tab', { name: 'Journal' }));
     expect(await screen.findByText('Master division payout')).toBeInTheDocument();
     expect(journalRequests).toBe(1);
 
-    await user.click(screen.getByRole('tab', { name: 'Balance' }));
-    await screen.findByText('Master Wallet', { selector: 'p' });
-    await user.click(screen.getByRole('tab', { name: 'Journal' }));
+    await user.click(screen.getByRole('button', { name: 'Transactions' }));
+    await screen.findByRole('table', { name: 'Transactions' });
+    await user.click(screen.getByRole('button', { name: 'Journal' }));
 
     expect(await screen.findByText('Master division payout')).toBeInTheDocument();
     expect(journalRequests).toBe(1);
@@ -278,7 +291,6 @@ describe('Corp Wallet: balances, journal and divisions (AC 2, AC 3)', () => {
   it('names the journal CSV export after the division, so exporting two divisions never overwrites the same file (issue #413)', async () => {
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
     const user = userEvent.setup();
-    window.history.pushState({}, '', '/corp/wallet/journal');
     render(<App />);
     await screen.findByText('Master division payout');
 
@@ -288,8 +300,7 @@ describe('Corp Wallet: balances, journal and divisions (AC 2, AC 3)', () => {
       /^neocom-corp-wallet-journal-master-wallet-\d{4}-\d{2}-\d{2}\.csv$/
     );
 
-    await user.click(screen.getByRole('combobox', { name: 'Wallet division' }));
-    await user.click(await screen.findByRole('option', { name: 'SRP' }));
+    await user.click(divisionButton('SRP'));
     await screen.findByText('SRP division payout');
 
     await exportJournalCsv(user);
@@ -312,7 +323,7 @@ describe('Corp Wallet: balances, journal and divisions (AC 2, AC 3)', () => {
       fetchedAt: corpFetchedAt,
     });
     const { container } = render(<App />);
-    await screen.findByText('Master Wallet', { selector: 'p' });
+    await findDivisions();
 
     expect(container.querySelector('section header time')?.getAttribute('dateTime')).toBe(
       new Date(corpFetchedAt).toISOString()
@@ -325,7 +336,6 @@ describe('Corp Wallet: balances, journal and divisions (AC 2, AC 3)', () => {
         HttpResponse.error()
       )
     );
-    window.history.pushState({}, '', '/corp/wallet/journal');
     render(<App />);
 
     expect(await screen.findByText('Could not load')).toBeInTheDocument();
@@ -351,11 +361,12 @@ describe('Corp Wallet: balances, journal and divisions (AC 2, AC 3)', () => {
   });
 
   it('opens straight to the division a ?division= deep link names (issue #419)', async () => {
-    window.history.pushState({}, '', '/corp/wallet/balance?division=2');
+    window.history.pushState({}, '', '/corp/wallet?division=2');
     render(<App />);
+    await findDivisions();
 
-    expect(await findDivisionSelect()).toHaveTextContent('SRP');
-    expect(screen.getByText(/250\.00/)).toBeInTheDocument();
+    expect(divisionButton('SRP')).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByText('SRP division payout')).toBeInTheDocument();
   });
 
   /**
@@ -364,11 +375,12 @@ describe('Corp Wallet: balances, journal and divisions (AC 2, AC 3)', () => {
    * is what a bare `Number.isInteger` check would let through.
    */
   it('falls back to the first division for an out-of-range ?division= deep link', async () => {
-    window.history.pushState({}, '', '/corp/wallet/balance?division=0');
+    window.history.pushState({}, '', '/corp/wallet?division=0');
     render(<App />);
+    await findDivisions();
 
-    expect(await findDivisionSelect()).toHaveTextContent('Master Wallet');
-    expect(screen.getByText(/1,000,000\.00/)).toBeInTheDocument();
+    expect(divisionButton('Master Wallet')).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByText('Master division payout')).toBeInTheDocument();
   });
 });
 
@@ -387,24 +399,33 @@ describe('Wallet no longer carries the corporation', () => {
   });
 
   /** The old vitals-rail link, and any bookmark of the Corporation side (issue #419). */
-  it('sends a /wallet?owner=corporation link on to the same division and tab on /corp/wallet', async () => {
+  it('sends a /wallet?owner=corporation link on to the same division on /corp/wallet', async () => {
     window.history.pushState({}, '', '/wallet/journal?owner=corporation&division=2');
     render(<App />);
 
-    await waitFor(() => expect(window.location.pathname).toBe('/corp/wallet/journal'));
+    await waitFor(() => expect(window.location.pathname).toBe('/corp/wallet'));
     expect(window.location.search).toBe('?division=2');
     expect(await screen.findByText('SRP division payout')).toBeInTheDocument();
+  });
+
+  it('sends the old corp Transactions tab on to the Transactions view', async () => {
+    window.history.pushState({}, '', '/wallet/transactions?owner=corporation');
+    render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/corp/wallet'));
+    expect(window.location.search).toBe('?view=transactions');
+    expect(await screen.findByRole('table', { name: 'Transactions' })).toBeInTheDocument();
   });
 });
 
 /**
- * The Transactions tab (issue #570): fetch, draw and filter the selected
+ * The Transactions view (issue #570): fetch, draw and filter the selected
  * division's own fills.
  */
 describe('Corp Wallet: transactions', () => {
   it('lists a division’s fills, and filters them by side', async () => {
     const user = userEvent.setup();
-    window.history.pushState({}, '', '/corp/wallet/transactions');
+    window.history.pushState({}, '', '/corp/wallet?view=transactions');
     render(<App />);
 
     const table = await screen.findByRole('table', { name: 'Transactions' });
@@ -427,7 +448,7 @@ describe('Corp Wallet: transactions', () => {
    * they finished loading.
    */
   it('keeps a transaction filter carried in the URL, even while corp access is still resolving', async () => {
-    window.history.pushState({}, '', '/corp/wallet/transactions?txn.q=Pyerite');
+    window.history.pushState({}, '', '/corp/wallet?view=transactions&txn.q=Pyerite');
     render(<App />);
 
     const table = await screen.findByRole('table', { name: 'Transactions' });
@@ -442,17 +463,15 @@ describe('Corp Wallet: transactions', () => {
    */
   it('drops the filter when the division switches away and back', async () => {
     const user = userEvent.setup();
-    window.history.pushState({}, '', '/corp/wallet/transactions');
+    window.history.pushState({}, '', '/corp/wallet?view=transactions');
     render(<App />);
 
     const search = await screen.findByPlaceholderText('Search item…');
     await user.type(search, 'Megacyte');
     expect(await screen.findByText('No transactions match this filter.')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('combobox', { name: 'Wallet division' }));
-    await user.click(await screen.findByRole('option', { name: 'SRP' }));
-    await user.click(screen.getByRole('combobox', { name: 'Wallet division' }));
-    await user.click(await screen.findByRole('option', { name: 'Master Wallet' }));
+    await user.click(divisionButton('SRP'));
+    await user.click(divisionButton('Master Wallet'));
 
     const table = await screen.findByRole('table', { name: 'Transactions' });
     expect(await within(table).findByText('Tritanium')).toBeInTheDocument();
@@ -461,7 +480,7 @@ describe('Corp Wallet: transactions', () => {
 
   it('says so when the filter, not the division, is why the table is empty', async () => {
     const user = userEvent.setup();
-    window.history.pushState({}, '', '/corp/wallet/transactions');
+    window.history.pushState({}, '', '/corp/wallet?view=transactions');
     render(<App />);
 
     const search = await screen.findByPlaceholderText('Search item…');

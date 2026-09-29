@@ -6003,7 +6003,9 @@
     },
     "wallet": {
       "title": "Corp wallet",
-      "transactionsTab": "Transactions",
+      "divisionsTitle": "Divisions",
+      "viewLabel": "Wallet view",
+      "transactionsView": "Transactions",
       "noAccessTitle": "Corp wallet needs Accountant",
       "noAccessHint": "EVE only opens the corporation wallet to a Director, Accountant or Junior Accountant. Roles can only be changed in game, and granting access here will not change that."
     },

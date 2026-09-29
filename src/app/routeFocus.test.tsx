@@ -20,9 +20,7 @@ describe('focusKeyFor', () => {
   it('collapses a sub-nav’s sibling routes to one page', () => {
     expect(focusKeyFor('/skills/trained')).toBe(focusKeyFor('/skills/plans'));
     expect(focusKeyFor('/corp/members')).toBe(focusKeyFor('/corp'));
-    // A tabbed page inside the sub-nav: its tabs collapse to it, and it to `/corp`.
     expect(focusKeyFor('/corp/wallet')).toBe(focusKeyFor('/corp'));
-    expect(focusKeyFor('/corp/wallet/journal')).toBe(focusKeyFor('/corp'));
     expect(focusKeyFor('/clones')).toBe(focusKeyFor('/overview'));
     expect(focusKeyFor('/overview')).not.toBe(focusKeyFor('/mail'));
   });

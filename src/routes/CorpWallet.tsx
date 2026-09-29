@@ -12,12 +12,17 @@
  * Accountant sees it and a Director with no wallet role does not, and the
  * `CorpSubNav` entry is hidden by the same capability.
  *
+ * No tab bar of its own: the Corp sub-nav is the one level of tabs, so the
+ * page is a strip of every division's balance (clicking one selects it) above
+ * one table, switched between Journal and Transactions by a
+ * `SegmentedControl` (`?view=`). Both reads load for the selected division
+ * either way — the journal's market lines name their item from the fills — so
+ * switching the view never re-pages anything (issue #413).
+ *
  * The journal is the same table `/wallet` draws (`WalletJournalTable.tsx`) —
- * ESI returns the same schema for both. Each read is fetched only once its tab
- * is opened, and kept alive once visited so a tab toggle does not re-page it
- * (issue #413).
+ * ESI returns the same schema for both.
  */
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
@@ -25,20 +30,14 @@ import {
   IconButton,
   PageHeader,
   Panel,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  SegmentedControl,
   Spinner,
-  Tabs,
   type DataTableColumn,
   type DataTableSort,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { CORP_WALLET_TABS } from '@/app/pageTabs';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import type {
   CorporationDivisions,
@@ -87,13 +86,16 @@ import {
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { formatIsk } from '@/lib/isk';
-import { usePageTab } from '@/lib/usePageTab';
-import { intParam } from '@/lib/urlState';
+import { enumParam, intParam } from '@/lib/urlState';
 import { useUrlFilter, useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 /** `?division=` (issue #419, #1302). ESI divisions are 1-7. */
 const DIVISION_PARAM = intParam(1, { min: 1, max: 7 });
+
+/** Which table the page shows for the selected division. */
+export type CorpWalletView = 'journal' | 'transactions';
+const VIEW_PARAM = enumParam<CorpWalletView>(['journal', 'transactions'], 'journal');
 
 const TRANSACTIONS_SORT = { columnId: 'date', direction: 'desc' } as const;
 
@@ -101,8 +103,6 @@ const TRANSACTIONS_SORT = { columnId: 'date', direction: 'desc' } as const;
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const EMPTY_JOURNAL: readonly WalletJournalEntry[] = [];
 const EMPTY_TRANSACTIONS: readonly CorporationWalletTransaction[] = [];
-
-export type CorpWalletTab = 'balance' | 'journal' | 'transactions';
 
 /** Balances and the division names, which need two separate reads and two separate scopes. */
 interface CorpBalancesSnapshot {
@@ -149,42 +149,73 @@ async function loadCorpTransactions(
   return { transactionsResult, typeNames };
 }
 
-interface CorpBalancePanelProps {
+interface CorpDivisionsPanelProps {
   balances: CorpBalancesSnapshot | null;
   loading: boolean;
-  division: WalletDivision | null;
+  divisions: readonly WalletDivision[];
+  selected: number;
+  onSelect: (division: number) => void;
   divisionLabel: (entry: WalletDivision) => string;
   offlineTitleKey: string;
 }
 
-function CorpBalancePanel({
+/**
+ * Every division's balance at once, each a button that selects the division
+ * the table below reads — the division picker and the balance in one.
+ */
+function CorpDivisionsPanel({
   balances,
   loading,
-  division,
+  divisions,
+  selected,
+  onSelect,
   divisionLabel,
   offlineTitleKey,
-}: CorpBalancePanelProps) {
+}: CorpDivisionsPanelProps) {
   const { t } = useTranslation();
   const walletsResult = balances?.walletsResult.cached ?? null;
   return (
     <Panel
-      title={t('wallet.balanceTab')}
+      title={t('corp.wallet.divisionsTitle')}
       actions={walletsResult ? <DataAgeBadge date={walletsResult.fetchedAt} /> : undefined}
     >
       {loading ? (
         <div className="flex justify-center py-8">
           <Spinner label={t('common.loading')} />
         </div>
-      ) : !walletsResult || division === null ? (
+      ) : !walletsResult || divisions.length === 0 ? (
         <EmptyState title={t('wallet.corpBalanceEmpty')} className="py-4" />
       ) : (
         <>
-          <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {divisionLabel(division)}
-          </p>
-          <p className={`text-xl font-medium tabular-nums ${iskToneClass(division.balance)}`}>
-            {formatIsk(division.balance, 2)}
-          </p>
+          <div
+            role="group"
+            aria-label={t('wallet.corpDivisionLabel')}
+            className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4"
+          >
+            {divisions.map((entry) => {
+              const isSelected = entry.division === selected;
+              return (
+                <button
+                  key={entry.division}
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => onSelect(entry.division)}
+                  className={`min-h-11 rounded-xs border px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
+                    isSelected ? 'border-accent bg-accent/15' : 'border-line hover:border-text-dim'
+                  }`}
+                >
+                  <span className="block text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {divisionLabel(entry)}
+                  </span>
+                  <span
+                    className={`block text-lg font-medium tabular-nums ${iskToneClass(entry.balance)}`}
+                  >
+                    {formatIsk(entry.balance, 2)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
           {walletsResult.fromCache && (
             <p className="mt-3 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
           )}
@@ -303,8 +334,7 @@ function CorpWalletView() {
   const corporationIdState = useActiveCorporationIdState();
   const corporationId = corporationIdState ?? null;
   const corpPending = corporationIdState === undefined;
-  const [tab, setTab] = usePageTab(CORP_WALLET_TABS);
-  const walletTab = tab as CorpWalletTab;
+  const [view, setView] = useUrlParam('view', VIEW_PARAM);
 
   // Corp Transactions' item context menu (issue #817) — same Quickbar/Item
   // Detail plumbing as every other item table.
@@ -348,21 +378,11 @@ function CorpWalletView() {
   const selectedDivision = divisions.find((entry) => entry.division === effectiveDivision) ?? null;
 
   // Its own key, division included: ESI publishes no all-divisions journal and
-  // each division caches separately (features/corp/wallet.ts). Gated on the
-  // tab as well, so opening Balance doesn't page a whole journal nobody asked
-  // to see — but only until the Journal tab has been opened once for this
-  // division. After that, `visitedJournalKey` keeps the key alive across a tab
-  // toggle so flipping back to Balance and back to Journal doesn't re-page a
-  // journal already fetched this session (issue #413).
+  // each division caches separately (features/corp/wallet.ts). A division or
+  // corporation change resets it.
   const divisionKey = corpKey !== null ? `${corpKey}:${effectiveDivision}` : null;
-  const [visitedJournalKey, setVisitedJournalKey] = useState<string | null>(null);
-  if (walletTab === 'journal' && divisionKey !== null && visitedJournalKey !== divisionKey) {
-    setVisitedJournalKey(divisionKey);
-  }
   const corpJournal = useCorpSnapshot<StatusResult<WalletJournalEntry[]> | null>(
-    divisionKey !== null && (walletTab === 'journal' || visitedJournalKey === divisionKey)
-      ? divisionKey
-      : null,
+    divisionKey,
     async () =>
       activeCharacterId === null || corporationId === null
         ? null
@@ -370,19 +390,10 @@ function CorpWalletView() {
     { name: 'corp-wallet:journal', characterId: activeCharacterId }
   );
 
-  // Same opt-in shape as the journal, and for the same two reasons: one cursor
-  // walk per division is a real cost on a rate-limited corp endpoint, and a
-  // tab toggle must not walk it again. The Journal tab opens it too: its
-  // market lines name their item from these same fills.
-  const [visitedTransactionsKey, setVisitedTransactionsKey] = useState<string | null>(null);
-  const transactionsWanted = walletTab === 'transactions' || walletTab === 'journal';
-  if (transactionsWanted && divisionKey !== null && visitedTransactionsKey !== divisionKey) {
-    setVisitedTransactionsKey(divisionKey);
-  }
+  // Loaded for both views: Transactions draws it, and the journal's market
+  // lines name their item from these same fills.
   const corpTransactions = useCorpSnapshot<CorpTransactionsSnapshot | null>(
-    divisionKey !== null && (transactionsWanted || visitedTransactionsKey === divisionKey)
-      ? divisionKey
-      : null,
+    divisionKey,
     async () =>
       activeCharacterId === null || corporationId === null
         ? null
@@ -394,11 +405,7 @@ function CorpWalletView() {
     entry.name ?? t('wallet.corpDivisionFallback', { division: entry.division });
   const divisionQualifier = selectedDivision ? divisionLabel(selectedDivision) : undefined;
 
-  /**
-   * One Refresh button for every read this page has enabled — a tab visited
-   * once this visit stays enabled (#413), so Refresh on Balance also reloads a
-   * journal already opened. Bounded: one read per division per visit.
-   */
+  /** One Refresh button for every read on the page. */
   const handleRefresh = () => {
     corpBalances.refresh();
     corpJournal.refresh();
@@ -474,42 +481,31 @@ function CorpWalletView() {
           }
         />
 
-        {divisions.length > 0 && (
-          <Select
-            value={String(effectiveDivision)}
-            onValueChange={(value) => setDivision(Number(value))}
-          >
-            <SelectTrigger size="sm" aria-label={t('wallet.corpDivisionLabel')} className="w-56">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {divisions.map((entry) => (
-                <SelectItem key={entry.division} value={String(entry.division)}>
-                  {divisionLabel(entry)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        <Tabs
-          label={t('corp.wallet.title')}
-          value={walletTab}
-          onChange={(id) => setTab(id as CorpWalletTab)}
-          tabs={CORP_WALLET_TABS.tabs.map((entry) => ({ id: entry.id, label: t(entry.labelKey) }))}
+        <CorpDivisionsPanel
+          balances={corpBalances.data}
+          loading={corpPending || (corpBalances.loading && corpBalances.data === null)}
+          divisions={divisions}
+          selected={effectiveDivision}
+          onSelect={setDivision}
+          divisionLabel={divisionLabel}
+          offlineTitleKey={
+            corpBalances.refreshCount > 0 ? 'common.refreshFailedTitle' : 'common.offlineTitle'
+          }
         />
 
-        {walletTab === 'balance' ? (
-          <CorpBalancePanel
-            balances={corpBalances.data}
-            loading={corpPending || (corpBalances.loading && corpBalances.data === null)}
-            division={selectedDivision}
-            divisionLabel={divisionLabel}
-            offlineTitleKey={
-              corpBalances.refreshCount > 0 ? 'common.refreshFailedTitle' : 'common.offlineTitle'
-            }
-          />
-        ) : walletTab === 'journal' ? (
+        {/* A view switch, not a second tab bar: the Corp sub-nav is the one level of tabs. */}
+        <SegmentedControl
+          label={t('corp.wallet.viewLabel')}
+          size="sm"
+          options={[
+            { value: 'journal', label: t('wallet.journalTab') },
+            { value: 'transactions', label: t('corp.wallet.transactionsView') },
+          ]}
+          value={view}
+          onChange={setView}
+        />
+
+        {view === 'journal' ? (
           <CorpJournalPanel
             journalResult={corpJournalResult}
             journal={corpJournalEntries}
