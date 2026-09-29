@@ -34,7 +34,13 @@ import {
   type PlanFacilityContext,
 } from './planFacilityContext';
 import { materialPricesFor } from './priceBasis';
-import { acquisitionForLookup, recipeForLookup, type RecipeCatalog } from './recipes';
+import {
+  acquisitionForLookup,
+  recipeForLookup,
+  verdictAcquisitionFor,
+  type RecipeCatalog,
+  type RecipeSources,
+} from './recipes';
 import { planOwnedBlueprints, reactionFacilityFor, resolveTopLevelTier } from './resolveBuildPlan';
 import { offersForRegion } from './buildPlanPricingInputs';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
@@ -178,7 +184,9 @@ export async function applyGroupAutoBuild(
   options: { strategy: BuildStrategy; depth: number },
   corpOwnedBlueprints?: CorpOwnedBlueprintsState,
   /** BPC Sourcing rows (all regions) — narrowed to each member's own Trade Hub region. */
-  bpcRows: readonly BpcContractRow[] = []
+  bpcRows: readonly BpcContractRow[] = [],
+  /** `useIncludeBlueprintCost` — whether a cost-effective verdict counts the blueprint purchase, as the member's own total does. */
+  includeBlueprintCost = true
 ): Promise<Map<string, Set<number>>> {
   const members = plans.flatMap((plan) => {
     const member = resolveMember(plan, catalog);
@@ -206,18 +214,8 @@ export async function applyGroupAutoBuild(
       const reactionFacility = reactionFacilityFor(member.plan, reactionSnapshot?.systemCostIndex);
       const recipeFor = memberRecipeFor(member.plan, recipeSources);
       const materialPrices = materialPricesFor(snapshot, member.plan.materialPriceBasis);
-      const ctx: MakeOrBuyContext = {
-        ...member.facilityContext,
-        systemCostIndex: snapshot.systemCostIndex,
-        adjustedPrices: snapshot.adjustedPrices,
-        materialPrices,
-        modifiers,
-        reactionFacility,
-      };
-      // The ME the member's own page walks at: its top-level Blueprint
-      // Acquisition tier, resolved against a fresh pool per member.
       const hub = getTradeHub(member.plan.hubId) ?? DEFAULT_TRADE_HUB;
-      const acquisitionFor = acquisitionForLookup({
+      const acquisitionSources: RecipeSources = {
         catalog,
         pi,
         ownedBlueprints: planOwnedBlueprints(member.plan, ownedBlueprints, corpOwnedBlueprints),
@@ -227,7 +225,20 @@ export async function applyGroupAutoBuild(
           hubPrices: snapshot.hubPrices,
           sourcing: member.plan.materialSourcing,
         },
-      });
+      };
+      const ctx: MakeOrBuyContext = {
+        ...member.facilityContext,
+        systemCostIndex: snapshot.systemCostIndex,
+        adjustedPrices: snapshot.adjustedPrices,
+        materialPrices,
+        modifiers,
+        reactionFacility,
+        // Same blueprint cost the member's own page quotes a verdict with.
+        acquisitionFor: verdictAcquisitionFor(acquisitionSources, includeBlueprintCost),
+      };
+      // The ME the member's own page walks at: its top-level Blueprint
+      // Acquisition tier, resolved against a fresh pool per member.
+      const acquisitionFor = acquisitionForLookup(acquisitionSources);
       const { me } = resolveTopLevelTier(
         member.plan,
         member.blueprint,

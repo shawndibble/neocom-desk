@@ -29,6 +29,24 @@
       ]
     },
     {
+      "collectionGroup": "projections",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "deviceId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "characterId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fired",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "plans",
       "queryScope": "COLLECTION",
       "fields": [

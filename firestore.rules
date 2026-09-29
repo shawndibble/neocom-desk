@@ -164,7 +164,8 @@ service cloud.firestore {
     }
 
     // Projection rows (issue #358, ADR 0010, CONTEXT.md round 45): one doc
-    // per occurrence, doc id === Occurrence Key. Written by registerDevice
+    // per device per occurrence, doc id `{deviceId}:{Occurrence Key}` (issue
+    // #2240; legacy rows keep the bare Occurrence Key). Written by registerDevice
     // (upload) and dispatchProjections (fire/purge), both admin-privileged —
     // same reasoning as deviceRegistrations above: a per-device upload covers
     // every Character it holds at once, which the ownerHash/uid pattern

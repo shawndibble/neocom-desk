@@ -15,7 +15,7 @@ import type {
   QuantityEntry,
 } from '@/engine/industry/types';
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
-import { MAX_SUB_BUILD_DEPTH } from '@/engine/industry/materialResolution';
+import { MAX_SUB_BUILD_DEPTH, usable } from '@/engine/industry/materialResolution';
 import { effectiveMaterials } from '@/engine/industry/materials';
 import { sizeRuns } from '@/engine/industry/runSizing';
 import type { SubBuildContext } from '@/engine/industry/subBuild';
@@ -166,8 +166,8 @@ function ownedCopiesFor(
 }
 
 /**
- * This blueprint's own material cost at a candidate ME, for `neededRuns`
- * runs, priced at `materialPrices` — one level deep, the same simplification
+ * This blueprint's own material cost at a candidate ME, for the runs that
+ * cover `neededUnits`, priced at `materialPrices` — one level deep, the same simplification
  * `makeOrBuy.ts`'s `jobUnitCost` already makes for a cost comparison (its own
  * doc comment: recursing further would make the comparison itself as
  * expensive as building the whole tree, for a number only used to pick a
@@ -176,12 +176,12 @@ function ownedCopiesFor(
  */
 function materialCostAtMeFor(
   blueprint: IndustryBlueprint,
-  neededRuns: number,
+  neededUnits: number,
   ctx: SubBuildContext,
   materialPrices: HubPrices
 ): (me: number) => number | null {
   const product = blueprint.products[0];
-  const sizing = product ? sizeRuns(neededRuns, product.quantity) : null;
+  const sizing = product ? sizeRuns(neededUnits, product.quantity) : null;
   return (me) => {
     if (!sizing) return null;
     try {
@@ -236,6 +236,11 @@ export function cloneBlueprintPools(pools: BlueprintTierPools): BlueprintTierPoo
  * fresh pool per resolution, and a separate one per independent pass (the
  * Group Owned Overlay), the same way `buildVsBuy.ts` creates its own fresh
  * `ownedPool` every call.
+ *
+ * `needed` is units of the product, never runs: a blueprint's runs are what
+ * a BPC is sold by, so they are sized here (`sizeRuns`) the same way the job
+ * itself is, rather than trusting each caller to have converted — a recipe
+ * making ten units a run otherwise shopped for ten times the BPC runs.
  */
 export function acquisitionForLookup(
   sources: RecipeSources,
@@ -263,12 +268,16 @@ export function acquisitionForLookup(
       blueprintPools.set(blueprintTypeID, pool);
     }
 
+    // Nothing to size means nothing to build — no tier to resolve either.
+    const sizing = sizeRuns(needed, blueprint.products[0]?.quantity ?? 0);
+    if (!sizing) return null;
+    const neededRuns = sizing.runs;
     const tierInputs = {
       ownedCopies: pooledOwnedCopies(
         ownedCopiesFor(blueprintTypeID, sources.ownedBlueprints),
         pool
       ),
-      neededRuns: needed,
+      neededRuns,
       materialCostAtMe: materialCostAtMeFor(blueprint, needed, ctx, materialPrices),
       bpcOffers: isReaction ? [] : acquisitionSources.offersFor(blueprintTypeID),
       bpoSellPrice: acquisitionSources.hubPrices[blueprintTypeID] ?? null,
@@ -288,12 +297,12 @@ export function acquisitionForLookup(
         (o) => o.me === override.me && o.te === override.te
       );
       resolved = matched
-        ? resolveTierOption(matched, needed)
+        ? resolveTierOption(matched, neededRuns)
         : { me: override.me, te: override.te, line: { unitPrice: null, owned: false } };
     } else {
       resolved = selectBlueprintTier(tierInputs);
     }
-    claimBlueprintTier(pool, resolved, needed);
+    claimBlueprintTier(pool, resolved, neededRuns);
 
     return {
       me: resolved.me,
@@ -320,6 +329,33 @@ export function withoutAcquisitionCost(
   return (...args) => {
     const resolved = acquisitionFor(...args);
     return resolved ? { ...resolved, line: null } : null;
+  };
+}
+
+/**
+ * The `acquisitionFor` a make-or-buy verdict (`MakeOrBuyContext`) takes: the
+ * same tier choice and blueprint price the plan's own resolution would bill
+ * that node — `includeBlueprintCost` off drops the price exactly as
+ * `withoutAcquisitionCost` does there, and a blueprint override price
+ * replaces the market one exactly as `acquisitionMaterialFor` does. Every
+ * call resolves against its own fresh tier pool: a verdict is a what-if for
+ * one material, so it must neither claim owned copies another verdict then
+ * can't see nor inherit claims from one.
+ */
+export function verdictAcquisitionFor(
+  sources: RecipeSources,
+  includeBlueprintCost: boolean
+): ReturnType<typeof acquisitionForLookup> {
+  return (...args) => {
+    const fresh = acquisitionForLookup(sources);
+    const resolved = (includeBlueprintCost ? fresh : withoutAcquisitionCost(fresh))(...args);
+    if (!resolved?.line || resolved.line.owned) return resolved;
+    const override = usable(
+      sources.blueprintAcquisition?.sourcing?.[resolved.blueprintTypeID]?.overridePrice
+    );
+    return override === undefined
+      ? resolved
+      : { ...resolved, line: { ...resolved.line, unitPrice: override } };
   };
 }
 

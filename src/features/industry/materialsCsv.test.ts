@@ -48,6 +48,7 @@ describe('materialsCsvColumns', () => {
             buyUnitPrice: 100,
             savings: 960,
             me: 0,
+            blueprintCost: 0,
           } as const,
         ],
       ])
