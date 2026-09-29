@@ -13,7 +13,9 @@ _Recorded 2026-09-29._
 - **Blueprints and reactions only, not PI schematics.** Planetary commodities
   already get "Planetary production" (how it's made); a PI "used in" is a
   separate ask.
-- **Capped at 50 rows behind "Show all", with a name filter past 10.** A
+- **50 rows at a time behind "Show more", with a name filter past 10.** A
   mineral feeds thousands of blueprints and every row is a full item menu.
+- **One row per product, from the blueprint Build Plan opens for it**
+  (`byProductTypeID`), so the quantity per run matches the plan.
 - **The section loads the blueprint catalog itself** and renders nothing if it
   fails, or on a surface without Item Actions (a shared, read-only view).

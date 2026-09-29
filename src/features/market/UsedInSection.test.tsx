@@ -11,7 +11,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
 
-const { UsedInSection, USED_IN_CAP } = await import('./UsedInSection');
+const { UsedInSection, USED_IN_PAGE } = await import('./UsedInSection');
 
 const TRITANIUM = 34;
 
@@ -47,12 +47,12 @@ function catalogOf(entries: BlueprintCatalogEntry[]): BlueprintCatalog {
   };
 }
 
-function renderSection(catalog: BlueprintCatalog, typeId = TRITANIUM) {
+function renderSection(catalog: BlueprintCatalog, typeId = TRITANIUM, onNavigate = vi.fn()) {
   const actions = fakeItemActions({ blueprints: catalog });
   render(
     <MemoryRouter>
       <FakeItemActions actions={actions}>
-        <UsedInSection typeId={typeId} />
+        <UsedInSection typeId={typeId} onNavigate={onNavigate} />
       </FakeItemActions>
     </MemoryRouter>
   );
@@ -95,11 +95,50 @@ describe('UsedInSection', () => {
     expect(screen.getByRole('button', { name: 'More actions for Rifter' })).toBeInTheDocument();
   });
 
+  it('closes the modal once a row action navigates away', async () => {
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+    renderSection(catalogOf([entry(638, 587, 'Rifter', 4500)]), TRITANIUM, onNavigate);
+    expect(onNavigate).not.toHaveBeenCalled();
+
+    fireEvent.contextMenu(screen.getByText('Rifter').closest('li')!);
+    await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
+    expect(onNavigate).toHaveBeenCalledOnce();
+  });
+
+  it('clears the filter when Show info swaps the modal to another item', async () => {
+    const user = userEvent.setup();
+    const many = Array.from({ length: 12 }, (_, i) =>
+      entry(10_000 + i, 20_000 + i, `Product ${String(i).padStart(2, '0')}`, 1)
+    );
+    const catalog = catalogOf([...many, entry(30_000, 30_001, 'Hull', 7)]);
+    catalog.entries[12].blueprint.materials = [{ typeID: 20_000, quantity: 7 }];
+    const actions = fakeItemActions({ blueprints: catalog });
+    const { rerender } = render(
+      <MemoryRouter>
+        <FakeItemActions actions={actions}>
+          <UsedInSection typeId={TRITANIUM} onNavigate={() => {}} />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    await user.type(screen.getByRole('searchbox', { name: 'Filter products' }), 'nothing');
+    expect(screen.getByText('No products match.')).toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <FakeItemActions actions={actions}>
+          <UsedInSection typeId={20_000} onNavigate={() => {}} />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    expect(screen.getByText('Hull')).toBeInTheDocument();
+  });
+
   it('renders nothing for an item no blueprint consumes', () => {
     const { container } = render(
       <MemoryRouter>
         <FakeItemActions actions={fakeItemActions({ blueprints: catalogOf([]) })}>
-          <UsedInSection typeId={587} />
+          <UsedInSection typeId={587} onNavigate={() => {}} />
         </FakeItemActions>
       </MemoryRouter>
     );
@@ -107,20 +146,23 @@ describe('UsedInSection', () => {
   });
 
   it('renders nothing outside a page with Item Actions', () => {
-    const { container } = render(<UsedInSection typeId={TRITANIUM} />);
+    const { container } = render(<UsedInSection typeId={TRITANIUM} onNavigate={() => {}} />);
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('caps a long list behind "Show all" and filters it by product name', async () => {
+  it('pages a long list behind "Show more" and filters it by product name', async () => {
     const user = userEvent.setup();
-    const many = Array.from({ length: USED_IN_CAP + 5 }, (_, i) =>
+    const many = Array.from({ length: USED_IN_PAGE + 5 }, (_, i) =>
       entry(10_000 + i, 20_000 + i, `Product ${String(i).padStart(3, '0')}`, 1)
     );
     renderSection(catalogOf(many));
 
-    expect(screen.getAllByRole('listitem')).toHaveLength(USED_IN_CAP);
-    await user.click(screen.getByRole('button', { name: `Show all ${USED_IN_CAP + 5}` }));
-    expect(screen.getAllByRole('listitem')).toHaveLength(USED_IN_CAP + 5);
+    expect(screen.getAllByRole('listitem')).toHaveLength(USED_IN_PAGE);
+    await user.click(
+      screen.getByRole('button', { name: `Show more (${USED_IN_PAGE} of ${USED_IN_PAGE + 5})` })
+    );
+    expect(screen.getAllByRole('listitem')).toHaveLength(USED_IN_PAGE + 5);
+    expect(screen.queryByRole('button', { name: /Show more/ })).not.toBeInTheDocument();
 
     await user.type(screen.getByRole('searchbox', { name: 'Filter products' }), 'product 05');
     expect(screen.getAllByRole('listitem').map((li) => li.textContent)).toEqual([

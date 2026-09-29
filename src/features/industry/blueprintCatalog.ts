@@ -171,21 +171,18 @@ const NO_USES: readonly MaterialUse[] = [];
  * product name — Item Detail's "Used in". Unlike `buildPlansByMaterialTypeID`
  * this is the full-SDE reverse index: the question is "what is this for", not
  * "which of my plans needs it". Built once per catalog on first ask (a mineral
- * feeds thousands of blueprints), first blueprint wins per product, like
- * `byProductTypeID`.
+ * feeds thousands of blueprints). One row per product, from the blueprint
+ * `byProductTypeID` holds — the one Build Plan opens — so the quantity per
+ * run is that blueprint's.
  */
 export function materialUsesFor(catalog: BlueprintCatalog, typeID: number): readonly MaterialUse[] {
   let index = materialUsesByCatalog.get(catalog);
   if (!index) {
     index = new Map();
-    const seen = new Set<string>();
     for (const entry of catalog.entries) {
       const productTypeID = entry.productTypeID;
-      if (productTypeID === null) continue;
+      if (productTypeID === null || catalog.byProductTypeID.get(productTypeID) !== entry) continue;
       for (const material of entry.blueprint.materials) {
-        const key = `${material.typeID}:${productTypeID}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
         let uses = index.get(material.typeID);
         if (!uses) index.set(material.typeID, (uses = []));
         uses.push({

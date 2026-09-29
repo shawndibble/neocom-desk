@@ -6,31 +6,45 @@
  * to nothing, like the modal's other nice-to-have sections.
  *
  * A mineral feeds thousands of blueprints, and every row is a full item menu,
- * so the list renders a capped slice with a filter and a "Show all".
+ * so the list renders a page at a time — "Show more" adds another — with a
+ * filter to reach anything further down. The row's "More actions" button
+ * opens the menu `ItemContextMenu` publishes rather than building its own.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, SearchInput, TypeIcon } from '@/components/ui';
+import { useLocation } from 'react-router-dom';
+import { Button, RowMoreActions, SearchInput, TypeIcon } from '@/components/ui';
 import {
   loadBlueprintCatalog,
   materialUsesFor,
   type BlueprintCatalog,
 } from '@/features/industry/blueprintCatalog';
-import { ItemContextMenu, ItemMoreActions } from './ItemContextMenu';
+import { ItemContextMenu } from './ItemContextMenu';
 import { useOptionalItemActions } from './itemActions';
 
-/** Rows shown before "Show all" — enough for anything but a mineral or common component. */
-export const USED_IN_CAP = 50;
+/** Rows per page — the whole list for anything but a mineral or common component. */
+export const USED_IN_PAGE = 50;
 
 /** Only this many uses and the filter box would be more chrome than list. */
 const FILTER_THRESHOLD = 10;
 
-export function UsedInSection({ typeId }: { typeId: number }) {
+export function UsedInSection({
+  typeId,
+  onNavigate,
+}: {
+  typeId: number;
+  /**
+   * Closes the modal once a row's menu navigates (Build Plan, View in
+   * Market…). Market and Industry keep their page mounted across tabs, so
+   * otherwise the modal would stay open over the page it just sent you to.
+   */
+  onNavigate: () => void;
+}) {
   const { t } = useTranslation();
   const actions = useOptionalItemActions();
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(actions?.blueprints ?? null);
   const [query, setQuery] = useState('');
-  const [showAll, setShowAll] = useState(false);
+  const [pages, setPages] = useState(1);
 
   const hasActions = actions !== null;
   useEffect(() => {
@@ -53,7 +67,7 @@ export function UsedInSection({ typeId }: { typeId: number }) {
   if (shownFor !== typeId) {
     setShownFor(typeId);
     setQuery('');
-    setShowAll(false);
+    setPages(1);
   }
 
   const uses = useMemo(() => (catalog ? materialUsesFor(catalog, typeId) : []), [catalog, typeId]);
@@ -65,12 +79,16 @@ export function UsedInSection({ typeId }: { typeId: number }) {
   // Every row is an item menu, which needs the page's Item Actions.
   if (!actions || uses.length === 0) return null;
 
-  const visible = showAll ? filtered : filtered.slice(0, USED_IN_CAP);
+  const visible = filtered.slice(0, pages * USED_IN_PAGE);
 
   return (
     <section>
+      <CloseOnNavigate onNavigate={onNavigate} />
       <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {t('market.itemDetail.usedInTitle', { count: uses.length })}
+        {t('market.itemDetail.usedInTitle', {
+          count: uses.length,
+          formatted: uses.length.toLocaleString(),
+        })}
       </h3>
       {uses.length > FILTER_THRESHOLD && (
         <SearchInput
@@ -117,22 +135,31 @@ export function UsedInSection({ typeId }: { typeId: number }) {
                       quantity: use.quantity.toLocaleString(),
                     })}
                   </span>
-                  <ItemMoreActions
-                    typeId={use.productTypeID}
-                    itemName={use.productName}
-                    blueprintTypeID={use.blueprintTypeID}
-                  />
+                  <RowMoreActions />
                 </span>
               </li>
             </ItemContextMenu>
           ))}
         </ul>
       )}
-      {!showAll && filtered.length > USED_IN_CAP && (
-        <Button size="sm" variant="ghost" className="mt-1" onClick={() => setShowAll(true)}>
-          {t('market.itemDetail.usedInShowAll', { count: filtered.length })}
+      {visible.length < filtered.length && (
+        <Button size="sm" variant="ghost" className="mt-1" onClick={() => setPages((n) => n + 1)}>
+          {t('market.itemDetail.usedInShowMore', {
+            shown: visible.length.toLocaleString(),
+            total: filtered.length.toLocaleString(),
+          })}
         </Button>
       )}
     </section>
   );
+}
+
+/** Calls `onNavigate` on the first location change after mount. */
+function CloseOnNavigate({ onNavigate }: { onNavigate: () => void }) {
+  const { key } = useLocation();
+  const mountedAt = useRef(key);
+  useEffect(() => {
+    if (key !== mountedAt.current) onNavigate();
+  }, [key, onNavigate]);
+  return null;
 }

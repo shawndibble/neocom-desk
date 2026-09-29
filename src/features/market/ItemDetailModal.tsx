@@ -212,11 +212,15 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
           <Spinner label={t('common.loading')} />
         </div>
       ) : error || !data ? (
-        <EmptyState
-          title={t('market.itemDetail.errorTitle')}
-          hint={t('market.itemDetail.errorHint')}
-          className="py-8"
-        />
+        <div className="space-y-4">
+          <EmptyState
+            title={t('market.itemDetail.errorTitle')}
+            hint={t('market.itemDetail.errorHint')}
+            className="py-8"
+          />
+          {/* Local SDE data, so it outlives an ESI failure. */}
+          <UsedInSection typeId={typeId} onNavigate={onClose} />
+        </div>
       ) : (
         <div className="space-y-4">
           <div className="flex items-start gap-3">
@@ -272,7 +276,7 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
 
           <PlanetaryProduction pi={data.pi} typeId={typeId} />
 
-          <UsedInSection typeId={typeId} />
+          <UsedInSection typeId={typeId} onNavigate={onClose} />
 
           {data.groups.length === 0 ? (
             <p className="text-xs text-text-dim">{t('market.itemDetail.noAttributes')}</p>
