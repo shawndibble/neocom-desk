@@ -148,31 +148,29 @@ export function FittingFightersPanel({
                     </span>
                   )}
                 </span>
-                <Button
-                  size="sm"
-                  className="min-h-11 min-w-11 md:min-h-7 md:min-w-7"
-                  aria-label={t('fittings.fighters.fewer', { name })}
+                <IconButton
+                  size="row"
+                  icon={<Icon.Decrease />}
+                  label={t('fittings.fighters.fewer', { name })}
+                  tooltip={t('fittings.fighters.fewerShort')}
                   disabled={squadron.quantity <= 1}
                   onClick={() =>
                     onChange((f) => setSquadron(f, index, { quantity: squadron.quantity - 1 }))
                   }
-                >
-                  −
-                </Button>
+                />
                 <span className="w-10 shrink-0 text-center tabular-nums">
                   {t('fittings.fighters.size', { count: squadron.quantity, full })}
                 </span>
-                <Button
-                  size="sm"
-                  className="min-h-11 min-w-11 md:min-h-7 md:min-w-7"
-                  aria-label={t('fittings.fighters.more', { name })}
+                <IconButton
+                  size="row"
+                  icon={<Icon.Increase />}
+                  label={t('fittings.fighters.more', { name })}
+                  tooltip={t('fittings.fighters.moreShort')}
                   disabled={squadron.quantity >= full}
                   onClick={() =>
                     onChange((f) => setSquadron(f, index, { quantity: squadron.quantity + 1 }))
                   }
-                >
-                  +
-                </Button>
+                />
                 <label
                   className={`flex cursor-pointer items-center gap-1.5 ${tappableRowClassName}`}
                 >

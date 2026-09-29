@@ -515,6 +515,9 @@ Rules:
   is decorative, `aria-hidden="true"`, no separate label needed.
 - Never emoji or dingbat characters as icons — SVG only, matching the rest of
   this system's illustration style (DESIGN.md's brand assets, §2b).
+- A typed character ("+", "−", "Aa", "✓") is not an icon; icon-only controls
+  take an `Icon.*` glyph (`Icon.Decrease` / `Icon.Increase` for a stepper). Lint
+  rejects JSX text that is only "−", "+" or "Aa".
 
 **Exception — the Fitting Add panel's three filter icons.** The module
 browser's Hull/Resources/Skills toggles (`FittingAddPanel.tsx`) use CCP's own

@@ -77,6 +77,7 @@ import { Info as InfoGlyph } from '@phosphor-icons/react/dist/csr/Info';
 import { ListBullets } from '@phosphor-icons/react/dist/csr/ListBullets';
 import { LockKey } from '@phosphor-icons/react/dist/csr/LockKey';
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
+import { Minus } from '@phosphor-icons/react/dist/csr/Minus';
 import { Moon } from '@phosphor-icons/react/dist/csr/Moon';
 import { Package } from '@phosphor-icons/react/dist/csr/Package';
 import { PaperPlaneRight } from '@phosphor-icons/react/dist/csr/PaperPlaneRight';
@@ -99,6 +100,7 @@ import { Stack } from '@phosphor-icons/react/dist/csr/Stack';
 import { Star } from '@phosphor-icons/react/dist/csr/Star';
 import { Table as TableGlyph } from '@phosphor-icons/react/dist/csr/Table';
 import { Target } from '@phosphor-icons/react/dist/csr/Target';
+import { TextAa } from '@phosphor-icons/react/dist/csr/TextAa';
 import { Tray } from '@phosphor-icons/react/dist/csr/Tray';
 import { UsersFour } from '@phosphor-icons/react/dist/csr/UsersFour';
 import { UserPlus } from '@phosphor-icons/react/dist/csr/UserPlus';
@@ -259,6 +261,16 @@ export const Reaction = withWeight(Flask);
 export const AddToPlan = withWeight(Plus);
 /** Append a new row to an editable list, e.g. another Booster (#1407). */
 export const AddRow = withWeight(Plus);
+/** Steps a count down by one, e.g. a fighter squadron's size (#2278). */
+export const Decrease = withWeight(Minus);
+/** Steps a count up by one — `Decrease`'s partner. */
+export const Increase = withWeight(Plus);
+/** Zooms a map out. Plus/minus rather than magnifiers: the Ship Tree map's toolbar already opens with `Search`'s magnifier. */
+export const ZoomOut = withWeight(Minus);
+/** Zooms a map in — `ZoomOut`'s partner. */
+export const ZoomIn = withWeight(Plus);
+/** Toggles text labels drawn over a map, e.g. the Ship Tree's hull names. */
+export const ShowLabels = withWeight(TextAa);
 /** A row's browser-notification channel is currently on (issue #364). */
 export const BrowserNotifyOn = withWeight(Bell);
 
