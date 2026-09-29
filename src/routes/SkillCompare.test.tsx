@@ -515,7 +515,7 @@ describe('SkillCompare', () => {
       server.use(
         http.get(`https://esi.evetech.net/characters/${CHAR_C}/skills`, () => {
           requests += 1;
-          return HttpResponse.json({ skills: [], total_sp: 0, unallocated_sp: 0 });
+          return HttpResponse.json({ error: 'Character not found' }, { status: 404 });
         })
       );
       const user = userEvent.setup();

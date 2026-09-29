@@ -192,11 +192,13 @@ export function SkillCompare() {
   useEffect(() => {
     skillsByCharacterRef.current = skillsByCharacter;
   });
-  // Characters whose fetch has settled at least once (success or failure).
-  // Only these get a column: one still waiting on its first fetch would
-  // otherwise read as a column of zeros — "has not trained this", a confident
-  // false answer (DESIGN §6a). A refresh keeps them settled, so their current
-  // levels stay on screen until the new data replaces them.
+  // Characters whose fetch has settled at least once. Only these get a
+  // column: one still waiting on its first fetch would otherwise read as a
+  // column of zeros — "has not trained this", a confident false answer
+  // (DESIGN §6a). A refresh keeps them settled, so their current levels stay
+  // on screen until the new data replaces them. A failed fetch settles too
+  // and still contributes zeros, as before — surfacing per-character
+  // failures is its own gap, not this loading contract's.
   const [settledIds, setSettledIds] = useState<ReadonlySet<number>>(new Set());
   const [refreshNonce, setRefreshNonce] = useState(0);
   // The refresh generation last committed; `refreshNonce` ahead of it means a
@@ -459,7 +461,7 @@ export function SkillCompare() {
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            {selectedIds.length > 1 && (
+            {loadedIds.length > 1 && (
               <FilterChip
                 label={t('skillCompare.differingOnly')}
                 selected={differingOnly}
