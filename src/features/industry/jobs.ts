@@ -14,7 +14,7 @@
  */
 import { getCharacterIndustryJobs, type IndustryJob } from '@/esi/endpoints';
 import { EsiError } from '@/esi/client';
-import { loadWithCacheStatus, type StatusResult } from '@/esi/cache';
+import { conditionalFetch, loadWithCacheStatus, type StatusResult } from '@/esi/cache';
 import { db } from '@/db';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -30,15 +30,14 @@ export type JobsLoadResult = StatusResult<IndustryJob[]>;
 
 /** Active (non-completed) industry jobs for a character. ESI or cache, with a distinct reauth state. */
 export function loadCharacterIndustryJobs(characterId: number): Promise<JobsLoadResult> {
-  return loadWithCacheStatus(
-    characterId,
-    KEY,
-    async () => (await getCharacterIndustryJobs(characterId, { includeCompleted: false })).data,
-    {
-      detectAuthFailure: (err) => err instanceof EsiError && err.status === 403,
-      skipCacheOnAuthFailure: true,
-    }
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterIndustryJobs(characterId, { ...options, includeCompleted: false })
   );
+  return loadWithCacheStatus(characterId, KEY, fetchLive, {
+    detectAuthFailure: (err) => err instanceof EsiError && err.status === 403,
+    skipCacheOnAuthFailure: true,
+    conditional,
+  });
 }
 
 export interface JobsFanOutEntry {

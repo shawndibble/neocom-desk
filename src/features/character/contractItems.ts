@@ -6,7 +6,7 @@
  * nobody opens.
  */
 import { getCharacterContractItems, type ContractItem } from '@/esi/endpoints';
-import { loadWithCache, STALE_AFTER, type CachedResult } from '@/esi/cache';
+import { conditionalFetch, loadWithCache, STALE_AFTER, type CachedResult } from '@/esi/cache';
 
 function cacheKey(contractId: number): string {
   return `contract-items:${contractId}`;
@@ -17,12 +17,15 @@ export function loadContractItems(
   characterId: number,
   contractId: number
 ): Promise<CachedResult<ContractItem[]> | null> {
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterContractItems(characterId, contractId, options)
+  );
   return loadWithCache(
     characterId,
     cacheKey(contractId),
-    async () => (await getCharacterContractItems(characterId, contractId)).data,
+    fetchLive,
     // A contract's item lines are fixed when it is issued; only its *status*
     // moves, and that lives on the contract row, not here.
-    { staleAfterMs: STALE_AFTER.static }
+    { staleAfterMs: STALE_AFTER.static, conditional }
   );
 }
