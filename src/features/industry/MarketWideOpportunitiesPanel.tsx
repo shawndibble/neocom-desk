@@ -60,6 +60,8 @@ import { StartPlanButton } from './StartPlanButton';
 import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, defineUrlFilter, enumParam, enumSetParam } from '@/lib/urlState';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { RARELY_SOLD_PER_DAY, isRarelySold } from '@/engine/industry/marketWideSanity';
+import { useDailySales } from './useDailySales';
 
 const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
   deep: 'success',
@@ -97,6 +99,8 @@ interface MarketWideFilterState {
   maxBuildCost: BuildCostCap;
   /** Hides rows no Character on the account has the skills to build. */
   hideSkillGated: boolean;
+  /** Hides products selling fewer than `RARELY_SOLD_PER_DAY` a day across the trade-hub regions. */
+  hideRarelySold: boolean;
 }
 
 const MARKET_WIDE_FILTER = defineUrlFilter<MarketWideFilterState>({
@@ -106,6 +110,7 @@ const MARKET_WIDE_FILTER = defineUrlFilter<MarketWideFilterState>({
   maxBuildCost: { key: 'marketWide.maxCost', codec: enumParam(BUILD_COST_CAPS, 'any') },
   // The key the standalone chip used, so links saved before the move still apply.
   hideSkillGated: { key: 'marketWide.hideGated', codec: boolParam() },
+  hideRarelySold: { key: 'marketWide.hideRare', codec: boolParam() },
 });
 
 function activeFilterCount(filter: MarketWideFilterState): number {
@@ -115,7 +120,13 @@ function activeFilterCount(filter: MarketWideFilterState): number {
     filter.sources.size !== BLUEPRINT_SOURCES.length,
     filter.maxBuildCost !== 'any',
     filter.hideSkillGated,
+    filter.hideRarelySold,
   ].filter(Boolean).length;
+}
+
+/** Only a product whose sales were read and fall short is hidden; an unreadable one stays. */
+function isKnownRarelySold(unitsPerDay: number | null | undefined): boolean {
+  return unitsPerDay !== null && unitsPerDay !== undefined && isRarelySold(unitsPerDay);
 }
 
 function sameMembers<V>(a: ReadonlySet<V>, b: ReadonlySet<V>): boolean {
@@ -211,14 +222,25 @@ export function MarketWideOpportunitiesPanel({
     [rows, skillGateByProductTypeID]
   );
   const maxBuildCostIsk = BUILD_COST_CAP_ISK[filter.maxBuildCost];
+  const hideRarelySold = filter.hideRarelySold;
+  const rowTypeIds = useMemo(() => rows.map((row) => row.productTypeID), [rows]);
+  const dailySales = useDailySales(rowTypeIds, hideRarelySold);
   const visibleRows = useMemo(
     () =>
       rows.filter(
         (row) =>
           !(hideSkillGated && skillGateByProductTypeID.get(row.productTypeID)?.gated) &&
-          (maxBuildCostIsk === null || row.buildCost <= maxBuildCostIsk)
+          (maxBuildCostIsk === null || row.buildCost <= maxBuildCostIsk) &&
+          !(hideRarelySold && isKnownRarelySold(dailySales.sales.get(row.productTypeID)))
       ),
-    [hideSkillGated, maxBuildCostIsk, rows, skillGateByProductTypeID]
+    [
+      hideSkillGated,
+      maxBuildCostIsk,
+      hideRarelySold,
+      dailySales.sales,
+      rows,
+      skillGateByProductTypeID,
+    ]
   );
 
   const columns: DataTableColumn<MarketWideResultRow>[] = [
@@ -268,7 +290,15 @@ export function MarketWideOpportunitiesPanel({
         row.iskPerHour === null ? (
           t('common.unknown')
         ) : (
-          <IskAmount value={row.iskPerHour} revealOn="tap" decimals={0} />
+          <span className="inline-flex items-center justify-end gap-1">
+            <IskAmount value={row.iskPerHour} revealOn="tap" decimals={0} />
+            {row.priceCapped && (
+              <InfoTooltip
+                label={t('industry.marketOpportunitiesPriceCapped')}
+                content={t('industry.marketOpportunitiesPriceCapped')}
+              />
+            )}
+          </span>
         ),
     },
     {
@@ -395,6 +425,20 @@ export function MarketWideOpportunitiesPanel({
               })}
             />
           </div>
+          <div
+            role="group"
+            aria-label={t('industry.marketOpportunitiesFilters.sales')}
+            className="flex flex-wrap items-center gap-2"
+          >
+            <span className="text-text-dim">{t('industry.marketOpportunitiesFilters.sales')}</span>
+            <FilterChip
+              label={t('industry.marketOpportunitiesFilters.hideRarelySold', {
+                limit: RARELY_SOLD_PER_DAY,
+              })}
+              selected={draft.hideRarelySold}
+              onToggle={() => setDraft({ ...draft, hideRarelySold: !draft.hideRarelySold })}
+            />
+          </div>
         </>
       )}
     </FilterBar>
@@ -452,6 +496,11 @@ export function MarketWideOpportunitiesPanel({
         <div className="flex flex-col gap-2">
           {unavailableNote}
           <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
+          {hideRarelySold && dailySales.pending > 0 && (
+            <p className="text-[0.6875rem] text-text-dim">
+              {t('industry.marketOpportunitiesCheckingSales', { count: dailySales.pending })}
+            </p>
+          )}
           <div className="overflow-x-auto">
             <DataTable
               columns={columns}

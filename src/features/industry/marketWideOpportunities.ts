@@ -20,7 +20,8 @@
  * index — the same fallback `loadMarketSnapshot` already documents for a
  * caller with no plan (LP store, planetary plans).
  */
-import { getHubPrices } from '@/market/prices';
+import { getAdjustedPrices, getHubPrices } from '@/market/prices';
+import { reliableSellPrice } from '@/engine/industry/marketWideSanity';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { TradeHub } from '@/market/hubs';
 import type { ResolvedStandings } from '@/engine/market/standings';
@@ -73,6 +74,11 @@ export interface MarketWideResultRow extends MarketWideRow {
   blueprintTypeID: number;
   /** How the pilot gets that blueprint — every row has one; a product with none is never ranked. */
   blueprintSource: BlueprintSource;
+  /**
+   * True when the hub's cheapest sell order was a troll price and the row is
+   * priced at CCP's average traded price instead (`reliableSellPrice`).
+   */
+  priceCapped: boolean;
 }
 
 /** Every product typeID `marketWideTrees.json` carries a tree for. */
@@ -108,10 +114,13 @@ export async function runMarketWideScan(
   const productTypeIds = marketWideProductTypeIds(trees);
   if (productTypeIds.length === 0) return [];
 
-  const [productAggregates, sourceSets, include] = await Promise.all([
+  const [productAggregates, sourceSets, include, globalPrices] = await Promise.all([
     getHubPrices(hub, productTypeIds),
     sources,
     options.include,
+    // CCP's average traded prices, to catch troll sell orders. Unreachable,
+    // the check is skipped rather than failing the scan.
+    getAdjustedPrices().catch(() => null),
   ]);
   const sourceByProduct = new Map<number, BlueprintSource>();
   for (const productTypeID of productTypeIds) {
@@ -121,12 +130,22 @@ export async function runMarketWideScan(
     }
   }
   const obtainable = productTypeIds.filter((productTypeID) => sourceByProduct.has(productTypeID));
+  // Priced before the liquidity pass, so a troll price inflates neither the
+  // revenue nor the sell depth the floor and top-N cut read.
+  const capped = new Set<number>();
   const liquidityCandidates: LiquidityCandidate[] = obtainable.map((productTypeID) => {
     const aggregate = productAggregates.get(productTypeID);
+    const sellMin = aggregate?.sellMin ?? null;
+    let sellPrice = sellMin;
+    if (globalPrices) {
+      const reliable = reliableSellPrice(sellMin, globalPrices.get(productTypeID)?.average ?? null);
+      sellPrice = reliable?.price ?? null;
+      if (reliable?.capped) capped.add(productTypeID);
+    }
     return {
       productTypeID,
       marketGroupID: trees[String(productTypeID)]!.marketGroupID,
-      sellPrice: aggregate?.sellMin ?? null,
+      sellPrice,
       sellVolume: aggregate ? aggregate.sellVolume : null,
     };
   });
@@ -181,5 +200,6 @@ export async function runMarketWideScan(
     productName: catalog.typesById[String(row.productTypeID)]?.name ?? `#${row.productTypeID}`,
     blueprintTypeID: trees[String(row.productTypeID)]!.blueprintTypeID,
     blueprintSource: sourceByProduct.get(row.productTypeID)!,
+    priceCapped: capped.has(row.productTypeID),
   }));
 }
