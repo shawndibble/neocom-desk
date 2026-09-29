@@ -1,0 +1,34 @@
+# Scope decisions — Corp wallet moves to the Corp section
+
+_Recorded 2026-09-29._
+
+- **Wallet shows only the pilot's own ISK.** Its Personal / Corporation
+  `OwnerSwitch` is gone: `/wallet` is the active Character's balance and
+  journal, or every Character's balances when the character filter asks for
+  it (`?char=`), and nothing corporate. A pilot holding a corp wallet role no
+  longer gets a second owner on a page named for their own money. Same move
+  Industry made for corp jobs in
+  `20260912-131802-corp-industry-jobs-live-only-on-the-corporation.md`; with
+  Wallet gone, nothing uses `OwnerSwitch` or `useCorpOwner`, and both are
+  deleted.
+- **The corporation's wallet is `/corp/wallet`, a Corp sub-nav entry.**
+  Balance, Journal and Transactions tabs for one division at a time, with the
+  division selector above them — the same panels the switch used to show,
+  now beside Members and Assets. Gated like `/corp/members`:
+  `useCorpRouteGate` with `canReadWallet`, and the `CorpSubNav` entry is hidden
+  (not locked) for a Character without it.
+- **Supersedes round 38's Wallet bullets** in
+  `20260903-154003-the-personal-corporation-switch.md` ("The switch adds a data
+  source and a control", "No capability, no control", "Wallet's Transactions
+  tab is personal-only"). The rest of that decision still holds on the new
+  page: corp reads are fetched only once their tab is opened, a 403 on a corp
+  endpoint is the in-game role gate and never a re-login prompt, and the corp
+  journal caches per division. Both journals still share one table component
+  and one column-visibility setting (`features/character/WalletJournalTable.tsx`).
+- **Old links still land.** `/wallet[/<tab>]?owner=corporation&division=N` —
+  the vitals rail's old href, and any bookmark of the Corporation side —
+  redirects to `/corp/wallet/<tab>?division=N`. `/wallet/transactions` still
+  redirects to Market › History › Transactions.
+- **The corp wallet threshold alert lands on `/corp/wallet`**, not the ops
+  board: that is the page that shows the balance or the journal line it is
+  about.

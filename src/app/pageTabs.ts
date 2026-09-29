@@ -66,10 +66,24 @@ export const MINING_TABS = definePageTabs('/mining', [
   { id: 'tax', labelKey: 'miningTax.taxTab' },
 ]);
 
+/**
+ * `transactions` is not a tab Wallet shows: the Character's fills live on
+ * Market's History › Transactions view, and the corporation's on
+ * `/corp/wallet`. The entry exists only so an old `/wallet/transactions` link
+ * reaches `Wallet.tsx`, which sends it on to Market, instead of `TabRoute`
+ * bouncing it to Balance.
+ */
 export const WALLET_TABS = definePageTabs('/wallet', [
   { id: 'balance', labelKey: 'wallet.balanceTab' },
   { id: 'journal', labelKey: 'wallet.journalTab' },
-  { id: 'transactions', labelKey: 'wallet.corpTransactionsTab' },
+  { id: 'transactions', labelKey: 'market.sections.transactions' },
+]);
+
+/** The corporation's wallet, one division at a time (`routes/CorpWallet.tsx`). */
+export const CORP_WALLET_TABS = definePageTabs('/corp/wallet', [
+  { id: 'balance', labelKey: 'wallet.balanceTab' },
+  { id: 'journal', labelKey: 'wallet.journalTab' },
+  { id: 'transactions', labelKey: 'corp.wallet.transactionsTab' },
 ]);
 
 /**
@@ -119,6 +133,7 @@ export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/planetary-industry': PI_TABS,
   '/mining': MINING_TABS,
   '/wallet': WALLET_TABS,
+  '/corp/wallet': CORP_WALLET_TABS,
 };
 
 const TABBED_PAGES = Object.values(PAGE_TABS);

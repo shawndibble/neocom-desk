@@ -44,6 +44,8 @@ const ROUTE_TITLE_KEYS = {
   '/employment-history': ['employmentHistory.title'],
   '/corp': ['corp.title'],
   '/corp/members': ['corp.title', 'corp.members.title'],
+  // A tabbed page titles from its first key alone, so this names the page.
+  '/corp/wallet': ['corp.wallet.title'],
   '/corp/assets': ['corp.title', 'corp.assets.title'],
   '/corp/assets/*': ['corp.title', 'corp.assets.title'],
   '/assets': ['assets.title'],

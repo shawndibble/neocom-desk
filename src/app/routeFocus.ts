@@ -21,6 +21,7 @@ const SUB_NAV_PAGES: Partial<Record<AppRoutePath, AppRoutePath>> = {
   '/skills/plans': '/skills',
   '/skills/compare': '/skills',
   '/corp/members': '/corp',
+  '/corp/wallet': '/corp',
   '/corp/assets': '/corp',
   '/clones': '/overview',
   '/employment-history': '/overview',

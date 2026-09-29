@@ -1,46 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useState } from 'react';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { db } from '@/db';
-import { NO_CORP_CAPABILITIES, type CorpCapabilities } from '@/engine/corpRoles';
-import type { CorpCapability } from '@/engine/corpRoles';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useCorpAccess, type CorpAccess, type CorpAccessState } from './useCorpAccess';
-import { useActiveCorporationId, useCorpOwner, type DataOwner } from './owner';
-
-/**
- * `useCorpOwner` no longer owns its `owner` state (issue #1302 — `Wallet.tsx`
- * backs it with the `?owner=` query param instead). This harness supplies the
- * plain `useState` the hook used to keep internally, so these tests still
- * exercise exactly the two rules the hook itself is responsible for.
- */
-function useTestCorpOwner(capability: CorpCapability, initialOwner: DataOwner = 'personal') {
-  const [owner, setOwner] = useState<DataOwner>(initialOwner);
-  return useCorpOwner(capability, owner, setOwner);
-}
-
-vi.mock('./useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
-
-const mockedAccess = vi.mocked(useCorpAccess);
+import { useActiveCorporationId } from './owner';
 
 const CHARACTER_ID = 91;
-const OTHER_CHARACTER_ID = 92;
 const CORPORATION_ID = 98000001;
 
-function accessOf(state: CorpAccessState, capabilities: Partial<CorpCapabilities>): CorpAccess {
-  return {
-    state,
-    capabilities: { ...NO_CORP_CAPABILITIES, ...capabilities },
-    missingScopes: [],
-    roles: [],
-  };
-}
-
 beforeEach(async () => {
-  vi.clearAllMocks();
   await db.characters.clear();
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
-  mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
 });
 
 describe('useActiveCorporationId', () => {
@@ -65,116 +34,5 @@ describe('useActiveCorporationId', () => {
     });
     const { result } = renderHook(() => useActiveCorporationId());
     await waitFor(() => expect(result.current).toBe(CORPORATION_ID));
-  });
-});
-
-describe('useCorpOwner', () => {
-  beforeEach(async () => {
-    await db.characters.put({
-      characterId: CHARACTER_ID,
-      name: 'Pilot',
-      ownerHash: 'h',
-      addedAt: 0,
-      corporationId: CORPORATION_ID,
-    });
-  });
-
-  it('starts on Personal', async () => {
-    const { result } = renderHook(() => useTestCorpOwner('canReadWallet'));
-    await waitFor(() => expect(result.current.corporationId).toBe(CORPORATION_ID));
-    expect(result.current.owner).toBe('personal');
-  });
-
-  /**
-   * The vitals rail's division link (issue #419) lands `/wallet` straight on
-   * Corporation rather than making the user flip the switch a second time.
-   */
-  it('starts on Corporation when given an initial owner, while available', async () => {
-    const { result } = renderHook(() => useTestCorpOwner('canReadWallet', 'corporation'));
-    await waitFor(() => expect(result.current.corporationId).toBe(CORPORATION_ID));
-    expect(result.current.owner).toBe('corporation');
-  });
-
-  /**
-   * The same forced-Personal guarantee as a lost capability: an initial owner
-   * of Corporation must not survive when the capability was never held —
-   * a bad or unreachable deep link degrades to the page's normal default.
-   */
-  it('ignores an initial owner of Corporation without the capability', async () => {
-    mockedAccess.mockReturnValue(accessOf('ready', {}));
-    const { result } = renderHook(() => useTestCorpOwner('canReadWallet', 'corporation'));
-    await waitFor(() => expect(result.current.corporationId).toBe(CORPORATION_ID));
-    expect(result.current.owner).toBe('personal');
-  });
-
-  it('is unavailable without the capability, even with a known corporation', async () => {
-    mockedAccess.mockReturnValue(accessOf('ready', {}));
-    const { result } = renderHook(() => useTestCorpOwner('canReadWallet'));
-    await waitFor(() => expect(result.current.corporationId).toBe(CORPORATION_ID));
-    expect(result.current.available).toBe(false);
-  });
-
-  it('is unavailable with the capability but no known corporation', async () => {
-    await db.characters.put({
-      characterId: CHARACTER_ID,
-      name: 'Pilot',
-      ownerHash: 'h',
-      addedAt: 0,
-    });
-    const { result } = renderHook(() => useTestCorpOwner('canReadWallet'));
-    await waitFor(() => expect(result.current.corporationId).toBeNull());
-    expect(result.current.available).toBe(false);
-  });
-
-  it('flips to Corporation and back via setOwner, while available', async () => {
-    const { result } = renderHook(() => useTestCorpOwner('canReadWallet'));
-    await waitFor(() => expect(result.current.available).toBe(true));
-
-    result.current.setOwner('corporation');
-    await waitFor(() => expect(result.current.owner).toBe('corporation'));
-
-    result.current.setOwner('personal');
-    await waitFor(() => expect(result.current.owner).toBe('personal'));
-  });
-
-  /**
-   * The rule the module's own comment states: a state change that removed the
-   * capability (a revoked grant, a lost role) must not leave a corp view on
-   * screen with no switch left to get back to Personal.
-   */
-  it('forces back to Personal when the capability is lost while showing corp', async () => {
-    const { result, rerender } = renderHook(() => useTestCorpOwner('canReadWallet'));
-    await waitFor(() => expect(result.current.available).toBe(true));
-    result.current.setOwner('corporation');
-    await waitFor(() => expect(result.current.owner).toBe('corporation'));
-
-    mockedAccess.mockReturnValue(accessOf('ready', {}));
-    rerender();
-
-    expect(result.current.available).toBe(false);
-    expect(result.current.owner).toBe('personal');
-  });
-
-  /**
-   * The other named guarantee: a Character switch resets the selection, since
-   * the next Character may hold no corp role at all.
-   */
-  it('resets to Personal when the active character changes', async () => {
-    const { result, rerender } = renderHook(() => useTestCorpOwner('canReadWallet'));
-    await waitFor(() => expect(result.current.available).toBe(true));
-    result.current.setOwner('corporation');
-    await waitFor(() => expect(result.current.owner).toBe('corporation'));
-
-    await db.characters.put({
-      characterId: OTHER_CHARACTER_ID,
-      name: 'Alt',
-      ownerHash: 'h2',
-      addedAt: 0,
-      corporationId: CORPORATION_ID,
-    });
-    useActiveCharacter.setState({ activeCharacterId: OTHER_CHARACTER_ID, hydrated: true });
-    rerender();
-
-    expect(result.current.owner).toBe('personal');
   });
 });

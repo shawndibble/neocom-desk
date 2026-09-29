@@ -2867,7 +2867,6 @@
     "balanceTab": "Balance",
     "journalTab": "Journal",
     "transactionsTab": "Transactions",
-    "corpTransactionsTab": "Corp Transactions",
     "transactionsLink": "Transactions →",
     "refresh": "Refresh",
     "isk": "ISK",
@@ -2909,9 +2908,6 @@
     "reauthTitle": "Log in again to see your wallet",
     "reauthHint": "Log in again to fetch this character's wallet balance.",
     "reauthAction": "Log in again with EVE Online",
-    "ownerLabel": "Wallet owner",
-    "ownerPersonal": "Personal",
-    "ownerCorporation": "Corporation",
     "corpDivisionLabel": "Wallet division",
     "corpDivisionFallback": "Division {{division}}",
     "corpBalanceEmpty": "No corporation wallet data cached. Reconnect to fetch it.",
@@ -5906,6 +5902,7 @@
     "overviewTab": "Overview",
     "membersTab": "Members",
     "assetsTab": "Assets",
+    "walletTab": "Wallet",
     "refresh": "Refresh corp data",
     "boardTitle": "Ops board",
     "dataAgeNote": "EVE caches corporation data for about an hour, so anything due sooner than that may already have happened — check the game client before acting on a short timer.",
@@ -6003,6 +6000,12 @@
         "showInfo": "Show info",
         "copyName": "Copy name"
       }
+    },
+    "wallet": {
+      "title": "Corp wallet",
+      "transactionsTab": "Transactions",
+      "noAccessTitle": "Corp wallet needs Accountant",
+      "noAccessHint": "EVE only opens the corporation wallet to a Director, Accountant or Junior Accountant. Roles can only be changed in game, and granting access here will not change that."
     },
     "assets": {
       "title": "Corp assets",

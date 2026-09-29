@@ -83,8 +83,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // the list of every structure-under-attack alert, which is the closest thing
   // to a page these types have.
   eveNotification: '/alerts',
-  // Corp events (issue #299): the board and the roster are the only two
-  // corp routes the app serves (`app/routeScopes.ts`).
+  // Corp events (issue #299): each lands on the corp route that shows it.
   structureFuelLow: '/corp',
   // Not the corp board (issue #2302): that shows the job with nothing pointing
   // at it, and not at all once delivered. Active Jobs lists corp jobs and
@@ -92,7 +91,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   corpIndustryJobReady: '/industry',
   corpMemberJoined: '/corp/members',
   corpMemberLeft: '/corp/members',
-  corpWalletThreshold: '/corp',
+  corpWalletThreshold: '/corp/wallet',
   // `notificationUrlForSubject` adds `?type=` below — Market Browser's own
   // item-selection param (`engine/market/urlState.ts`'s `buildMarketParams`),
   // not `HIGHLIGHT_PARAM`: Market Browser selects an item by that param on
