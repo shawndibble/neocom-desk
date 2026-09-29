@@ -23,8 +23,10 @@
  * from the edit menu (`features/overview/hiddenCards.ts`) — a choice they made,
  * synced across devices and Characters, not a state the board guessed at.
  *
- * Scoped to the active Character, with one exception: the alert feed is
- * device-wide, because the poller is (`features/notifications/`).
+ * Scoped to the active Character, with two exceptions: the alert feed is
+ * device-wide, because the poller is (`features/notifications/`), and the
+ * Structures and Moon extractions cards are the Character's corporation's,
+ * read through that Character's roles.
  */
 import { Fragment, useEffect, useMemo, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
