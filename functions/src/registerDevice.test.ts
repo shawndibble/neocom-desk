@@ -45,6 +45,33 @@ describe('parseRegisterDeviceInput', () => {
     expect(input.characters[0].projectionRows).toEqual([PROJECTION_ROW]);
   });
 
+  it.each([
+    ['a slash', 'device/1'],
+    ['a dot path segment', '..'],
+    ['an over-long id', 'a'.repeat(129)],
+  ])(
+    'rejects a deviceId containing %s — it becomes a Firestore doc id and a row id prefix',
+    (_, deviceId) => {
+      expect(() =>
+        parseRegisterDeviceInput({
+          deviceId,
+          fcmToken: 'fcm-token',
+          characters: [{ characterId: 1, accessToken: 'a', projectionRows: [] }],
+        })
+      ).toThrow(/deviceId/);
+    }
+  );
+
+  it('accepts the client fallback deviceId shape (base36 time + random)', () => {
+    expect(
+      parseRegisterDeviceInput({
+        deviceId: 'lz3k9x2a-4fzyo82mw5l',
+        fcmToken: 'fcm-token',
+        characters: [{ characterId: 1, accessToken: 'a', projectionRows: [] }],
+      }).deviceId
+    ).toBe('lz3k9x2a-4fzyo82mw5l');
+  });
+
   it('rejects a character entry missing projectionRows', () => {
     expect(() =>
       parseRegisterDeviceInput({

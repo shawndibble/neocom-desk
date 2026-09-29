@@ -66,14 +66,24 @@ export function isPastRetention(
 }
 
 /**
- * A device token is deleted only on these two FCM error codes — any other
- * error (rate limiting, a transient server error) leaves it alone, since it
- * says nothing about whether the token is still valid (CONTEXT round 45).
+ * A device token is deleted only when FCM says the token itself is dead or
+ * malformed — any other error (rate limiting, a transient server error) leaves
+ * it alone, since it says nothing about whether the token is still valid
+ * (CONTEXT round 45).
+ *
+ * FCM v1 reports a malformed token as `INVALID_ARGUMENT`, which the Admin SDK
+ * surfaces as `messaging/invalid-argument` — the same code as a bad payload
+ * (too big, a bad data key). Deleting the registration on a payload error
+ * would orphan, and so delete at the next dispatch, every row that device has
+ * (issue #2240), so that code counts only when FCM's message blames the
+ * registration token ("The registration token is not a valid FCM registration
+ * token").
  */
-export function shouldDeleteDeviceToken(errorCode: string): boolean {
+export function shouldDeleteDeviceToken(errorCode: string, errorMessage = ''): boolean {
   return (
     errorCode === 'messaging/registration-token-not-registered' ||
-    errorCode === 'messaging/invalid-argument'
+    errorCode === 'messaging/invalid-registration-token' ||
+    (errorCode === 'messaging/invalid-argument' && /registration token/i.test(errorMessage))
   );
 }
 
