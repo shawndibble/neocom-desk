@@ -99,8 +99,13 @@ describe('CustomizePermissionsDialog', () => {
 
     render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
 
-    expect(await screen.findByRole('checkbox', { name: 'Mail' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Wallet' })).not.toBeChecked();
+    // Mail is on in the pre-hydration default too, so it proves nothing about
+    // the stored selection having loaded. Wait for hydration to unlock the
+    // checkboxes before reading them.
+    const wallet = await screen.findByRole('checkbox', { name: 'Wallet' });
+    await waitFor(() => expect(wallet).toBeEnabled());
+    expect(wallet).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Mail' })).toBeChecked();
     expect(screen.getByText('Optional · 1 of 14')).toBeInTheDocument();
   });
 
