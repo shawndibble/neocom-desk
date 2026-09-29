@@ -217,6 +217,8 @@ export const SeverityClear = withWeight(CheckCircle);
 export const Close = withWeight(X);
 /** Edit a name in place — the rename affordance on a saved-plan row. */
 export const Rename = withWeight(PencilSimple);
+/** Choose which cards a board shows — the Overview's edit menu. */
+export const EditBoard = withWeight(PencilSimple);
 /**
  * Grab a row to drag it. The six-dot grip is the near-universal handle mark,
  * and DESIGN.md §5 wants an SVG here rather than the `⠿` braille dingbat the

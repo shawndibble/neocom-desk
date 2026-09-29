@@ -19,12 +19,14 @@
  *
  * Every card renders in every state, including the boring one. A card that
  * disappears when there is nothing wrong is a card you cannot tell from a card
- * that failed to load.
+ * that failed to load. The one way a card leaves is the pilot switching it off
+ * from the edit menu (`features/overview/hiddenCards.ts`) — a choice they made,
+ * synced across devices and Characters, not a state the board guessed at.
  *
  * Scoped to the active Character, with one exception: the alert feed is
  * device-wide, because the poller is (`features/notifications/`).
  */
-import { Fragment, useMemo } from 'react';
+import { Fragment, useEffect, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -51,6 +53,12 @@ import {
   isNotTrainingAlertEnabledFor,
 } from '@/features/notifications/preferences';
 import { SummaryStrip } from '@/features/overview/SummaryStrip';
+import { CardPicker } from '@/features/overview/CardPicker';
+import {
+  isCardShown,
+  toggleHiddenCard,
+  useOverviewHiddenCards,
+} from '@/features/overview/hiddenCards';
 import {
   AlertsColumn,
   CONTRACTS_IN_PROGRESS_HREF,
@@ -184,6 +192,14 @@ export function Overview() {
   const { t } = useTranslation();
   const prefsValue = useNotificationPreferences((state) => state.value);
   const isPhone = useIsPhone();
+  const hiddenCards = useOverviewHiddenCards((state) => state.value);
+  const hiddenCardsHydrated = useOverviewHiddenCards((state) => state.hydrated);
+  const hydrateHiddenCards = useOverviewHiddenCards((state) => state.hydrate);
+  const setHiddenCards = useOverviewHiddenCards((state) => state.setValue);
+  useEffect(() => {
+    void hydrateHiddenCards();
+  }, [hydrateHiddenCards]);
+  const shown = (key: string) => isCardShown(hiddenCards, key);
 
   // One `cacheKey` per card, not one for the page: they load independently, so
   // a return visit restores each as soon as that card's own last result exists
@@ -289,7 +305,9 @@ export function Overview() {
     [visibleAlerts, t]
   );
 
-  if (!hydrated) {
+  // Waits on the hidden-card list too, a local Dexie read, so a hidden card
+  // does not flash in and back out on every visit.
+  if (!hydrated || !hiddenCardsHydrated) {
     return (
       <div className="flex justify-center py-16">
         <Spinner label={t('common.loading')} />
@@ -329,11 +347,12 @@ export function Overview() {
    * The next deadline is drawn from the cards below rather than computed on its
    * own: it is the soonest live clock on the board, so clicking it lands on
    * whichever card owns it. A fourth independent countdown here would be a
-   * number the rest of the page could contradict.
+   * number the rest of the page could contradict. For the same reason a card
+   * the pilot hid contributes no deadline: the link would land on nothing.
    */
   const deadlines: { at: number; note: string; severity: DeadlineSeverity; to: string }[] = [];
   const nextBatch = planetary?.batches.find((batch) => batch.kind === 'running');
-  if (nextBatch?.expiryMs) {
+  if (nextBatch?.expiryMs && shown('planetary')) {
     deadlines.push({
       at: nextBatch.expiryMs,
       note: t('overview.board.batch.running', { count: nextBatch.colonies.length }),
@@ -346,7 +365,7 @@ export function Overview() {
     .map((job) => Date.parse(job.end_date))
     .filter((ms) => !Number.isNaN(ms))
     .sort((a, b) => a - b)[0];
-  if (nextJobMs !== undefined) {
+  if (nextJobMs !== undefined && shown('industry')) {
     deadlines.push({
       at: nextJobMs,
       note: t('overview.board.nextJob'),
@@ -365,7 +384,7 @@ export function Overview() {
   const contracts = contractsSnapshot.data;
   const contractsNote = contracts ? contractsDeadlineNote(t, contracts) : null;
   const soonestContract = contracts?.summary.soonest;
-  if (contracts && soonestContract && contractsNote !== null) {
+  if (contracts && soonestContract && contractsNote !== null && shown('contracts')) {
     deadlines.push({
       at: soonestContract.atMs,
       note: contractsNote,
@@ -451,11 +470,13 @@ export function Overview() {
       ),
     },
   ];
-  const ranked = [...cards].sort((a, b) =>
-    a.severity === null || b.severity === null
-      ? Number(a.severity === null) - Number(b.severity === null)
-      : compareSeverity(a.severity, b.severity)
-  );
+  const ranked = cards
+    .filter((card) => shown(card.key))
+    .sort((a, b) =>
+      a.severity === null || b.severity === null
+        ? Number(a.severity === null) - Number(b.severity === null)
+        : compareSeverity(a.severity, b.severity)
+    );
   /*
    * Contracts sits outside the ranking, like Alerts: on a phone it is always a
    * folded row (a courier is one line), and on desktop it takes the slot after
@@ -465,9 +486,12 @@ export function Overview() {
     key: 'contracts',
     render: () => <ContractsCard data={contracts} />,
   };
+  // Hidden cards are filtered after the desktop order is built, so hiding one
+  // never shifts where Contracts sits among the rest.
   const fullCards = isPhone
     ? ranked.slice(0, PHONE_FULL_COUNT)
-    : [...cards.slice(0, 2), contractsCard, ...cards.slice(2)];
+    : [...cards.slice(0, 2), contractsCard, ...cards.slice(2)].filter((card) => shown(card.key));
+  const alertsShown = shown('alerts');
 
   /*
    * Alerts leads the folded list instead of competing for a full card, and is
@@ -499,8 +523,9 @@ export function Overview() {
           danger: (contracts?.summary.overdue ?? 0) > 0,
         },
         ...ranked.slice(PHONE_FULL_COUNT),
-      ]
+      ].filter((domain) => shown(domain.key))
     : [];
+  const nothingShown = fullCards.length === 0 && folded.length === 0 && !(alertsShown && !isPhone);
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -574,6 +599,13 @@ export function Overview() {
           industrySnapshot.refresh();
           calendarSnapshot.refresh();
         }}
+        actions={
+          <CardPicker
+            hidden={hiddenCards}
+            onToggle={(key) => void setHiddenCards(toggleHiddenCard(hiddenCards, key))}
+            onShowAll={() => void setHiddenCards([])}
+          />
+        }
         refreshing={
           walletSnapshot.loading ||
           planetarySnapshot.loading ||
@@ -593,12 +625,20 @@ export function Overview() {
         what gives the cards in one row a common bottom edge, and a pair at
         different heights reads as one of them having failed to load.
       */}
-      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      {nothingShown && (
+        <p className="rounded-xs border border-line bg-panel/85 px-3 py-4 text-xs text-text-dim">
+          {t('overview.board.allCardsHidden')}
+        </p>
+      )}
+      <div
+        className={`grid min-w-0 gap-4 ${alertsShown && !isPhone ? 'xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]' : ''}`}
+      >
         <div className="grid min-w-0 gap-3 sm:grid-cols-2">
           {/* Every card renders unconditionally, mid-load included. Gating one
               on its own data would make "still loading" and "nothing here"
               look identical to "this domain does not exist" — which is the
-              failure this board was rebuilt to avoid. Folding a card on a
+              failure this board was rebuilt to avoid. (A card the pilot hid
+              from the edit menu is the exception: they asked for it gone.) Folding a card on a
               phone is not that: the domain still has its line, and says the
               same three things it would have said in full. */}
           {fullCards.map(({ key, render }) => (
@@ -606,7 +646,7 @@ export function Overview() {
           ))}
           <EverythingElseCard domains={folded} />
         </div>
-        {!isPhone && (
+        {!isPhone && alertsShown && (
           <AlertsColumn
             groups={alertGroups}
             unread={visibleAlerts.length}

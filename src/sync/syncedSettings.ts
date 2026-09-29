@@ -178,6 +178,14 @@
 // value, never unset" shape as the Defaults-panel preferences above (off is
 // a value, not an absence), so the tombstone-expiry edge does not bite it.
 // No `legacyKey`: new, with no device-local life to seed from.
+//
+// sync.overviewHiddenCards: which Overview board cards the pilot switched off
+// from the board's edit menu — a list of hidden card keys, one for the whole
+// account rather than per Character, because "I don't do mining tax" is about
+// the pilot, not one alt. See features/overview/hiddenCards.ts, whose parse
+// keeps keys this build does not know so an older build cannot un-hide a
+// newer card. Never deleted via deleteSyncedSetting: showing every card again
+// writes an empty list, so the tombstone-expiry edge does not bite it.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.bpcHideAuctions',
   'sync.bpcHidePlex',
@@ -201,6 +209,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.miningTaxManualMoonOreTypeIds',
   'sync.miningTaxOreValueMode',
   'sync.notificationFeedPrefs',
+  'sync.overviewHiddenCards',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
   'sync.skillCloneStates',
