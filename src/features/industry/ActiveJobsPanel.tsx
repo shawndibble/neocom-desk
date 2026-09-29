@@ -47,6 +47,13 @@ import {
   type JobsFanOutSnapshot,
 } from './jobs';
 import {
+  EMPTY_CORP_JOBS,
+  loadAccountCorpIndustryJobs,
+  visibleCorpJobs,
+  type CorpJobsSnapshot,
+} from './corpJobs';
+import type { CorporationIndustryJob } from '@/esi/endpoints';
+import {
   findMatchingBuildPlans,
   createBuildPlanForJob,
   jobProductionSeed,
@@ -82,8 +89,18 @@ import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { enumSetParam, idListParam } from '@/lib/urlState';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 
-/** A row on the table, tagged with its owning Character even in the single-character view — so `rowKey` and the optional character column need no branch. */
-type JobRow = ActiveJob & { characterId: number; characterName: string };
+/**
+ * A row on the table, tagged with its Character even in the single-character
+ * view — so `rowKey` and the optional character column need no branch. For a
+ * corp job (issue #2302) that Character is the installer, and `characterName`
+ * is empty when the installer is a corpmate outside this account (only ever
+ * the job an alert pointed at).
+ */
+type JobRow = ActiveJob & {
+  characterId: number;
+  characterName: string;
+  owner: 'personal' | 'corporation';
+};
 
 /** The two derived job states this panel's Status filter offers — not ESI's raw `status` enum, just what the list already highlights. */
 type JobStatusFilter = 'completingSoon' | 'done';
@@ -156,6 +173,8 @@ interface ActiveJobsPanelProps {
 
 interface Snapshot {
   result: JobsLoadResult;
+  /** Corp-owned jobs (issue #2302), loaded alongside so a corp-only pilot never sees "no active jobs" first. */
+  corpJobs: CorpJobsSnapshot;
   types: TypeMap;
   /** Undefined: skills not cached/fetched yet — the job-slot header reads this as "unknown", never a guessed 0. */
   skills: JobSlotSkills | undefined;
@@ -167,13 +186,17 @@ const TICK_MS = 30_000;
 async function loadActiveJobsSnapshot(characterId: number): Promise<Snapshot> {
   try {
     const nowMs = Date.now();
-    const [result, types, corrected] = await Promise.all([
+    const [result, types, corrected, corpJobs] = await Promise.all([
       loadCharacterIndustryJobs(characterId),
       loadTypes(),
       loadCorrectedSkills(characterId, nowMs, { skipQueueWithoutScope: true }),
+      // Never rejects (`corpJobs.ts`), so it cannot take the personal list
+      // down into the catch below with it.
+      loadAccountCorpIndustryJobs(characterId),
     ]);
     return {
       result,
+      corpJobs,
       types,
       skills: corrected.skillsResult
         ? jobSlotSkillsFromCharacterSkills(
@@ -187,7 +210,12 @@ async function loadActiveJobsSnapshot(characterId: number): Promise<Snapshot> {
     // `loadTypes()` throws when the SDE fetch fails. Resolving with an empty
     // snapshot rather than rejecting is what clears the spinner — a rejected
     // load would strand the panel with no data-cached branch to fall into.
-    return { result: { cached: null, needsReauth: false }, types: {}, skills: undefined };
+    return {
+      result: { cached: null, needsReauth: false },
+      corpJobs: EMPTY_CORP_JOBS,
+      types: {},
+      skills: undefined,
+    };
   }
 }
 
@@ -198,9 +226,10 @@ async function loadActiveJobsSnapshot(characterId: number): Promise<Snapshot> {
  * Independent of the blueprint catalog/build-plan state: fetches its own
  * jobs + SDE type names, so it isn't blocked on that load.
  *
- * Personal jobs only: this panel is chrome on every Industry page, and a
- * corporation's industry jobs belong to the Corporation page, which loads
- * them itself.
+ * Corp-owned jobs are listed too, by installer (issue #2302): the Characters
+ * the filter selects are "whose jobs", whoever owns them. ESI's character
+ * endpoint never returns a corp job, so a pilot who only runs corp jobs
+ * otherwise saw an empty panel.
  */
 export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   const { t } = useTranslation();
@@ -222,7 +251,14 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   // The list is folded away by default: the header's one-line read (how many
   // run, what finishes next) is what a pilot glancing at the page wants, and
   // the six-column table is one click away when they don't.
-  const [expanded, setExpanded] = useState(false);
+  // `null` until the pilot toggles it: folded, unless an alert sent them here
+  // to a job in the list (`listExpanded` below) — a pulsed row inside a folded
+  // panel is a pulse nobody sees.
+  const [expanded, setExpanded] = useState<boolean | null>(null);
+  // The job an `industryJobComplete`/`corpIndustryJobReady` alert pointed at,
+  // if any. It stays in this list until it is delivered, which is exactly
+  // what the alert is about.
+  const highlightedJobId = useHighlightParam();
   const { data, loading, refreshCount, refresh } = useRouteSnapshot(
     loadActiveJobsSnapshot,
     characterId,
@@ -366,13 +402,20 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   const types = useMemo(() => data?.types ?? {}, [data]);
   const result: JobsLoadResult | null = data?.result ?? null;
   const listLoading = needsJobSlotFanOut
-    ? jobsFanOutLoading
+    ? // The snapshot carries the corp jobs in this mode too.
+      jobsFanOutLoading || (loading && !data)
     : // `&& !…data`: with a retained snapshot the panel keeps its rows while
       // the re-read runs, so the spinner is only for having nothing at all
       // to show.
       loading && !data;
   const listRefreshCount = needsJobSlotFanOut ? jobsFanOutRefreshCount : refreshCount;
-  const listRefresh = needsJobSlotFanOut ? refreshJobsFanOut : refresh;
+  // Corp jobs ride the snapshot above in both modes — one read per load, not
+  // a second copy in the fan-out — so a fan-out refresh re-reads it too.
+  const listRefresh = useCallback(() => {
+    refresh();
+    if (needsJobSlotFanOut) refreshJobsFanOut();
+  }, [refresh, needsJobSlotFanOut, refreshJobsFanOut]);
+  const corpJobs = data?.corpJobs ?? EMPTY_CORP_JOBS;
 
   // Every derived note/badge below reads only the Characters the picker
   // actually selected — narrowing to two of five must not still show a
@@ -388,20 +431,46 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   // (loaded unconditionally above), the multi-character branch reuses the
   // fan-out state above, gated on the same `needsJobSlotFanOut` that drives
   // both.
+  // A corp job occupies its installer's slot like a personal one (issue
+  // #2302) — without these, a corp-only pilot's header read every slot open
+  // beside a list full of running jobs.
+  const corpJobsByInstaller = useMemo(() => {
+    const byInstaller = new Map<number, CorporationIndustryJob[]>();
+    const seen = new Set<number>();
+    for (const job of corpJobs.jobs) {
+      if (seen.has(job.job_id)) continue;
+      seen.add(job.job_id);
+      byInstaller.set(job.installer_id, [...(byInstaller.get(job.installer_id) ?? []), job]);
+    }
+    return byInstaller;
+  }, [corpJobs]);
   const jobSlotCharacterInputs = useMemo<JobSlotCharacterInput[]>(() => {
+    const withCorp = (id: number, personal: readonly ActiveJob[] | undefined) => {
+      if (personal === undefined) return undefined;
+      const ids = new Set(personal.map((job) => job.job_id));
+      const corp = (corpJobsByInstaller.get(id) ?? []).filter((job) => !ids.has(job.job_id));
+      return toJobSlotJobs([...personal, ...corp]);
+    };
     if (needsJobSlotFanOut) {
       return jobsFanOutSelectedEntries.map((entry) => ({
         skills: jobsFanOutSkills.get(entry.characterId),
-        jobs: entry.result.cached ? toJobSlotJobs(entry.result.cached.data) : undefined,
+        jobs: withCorp(entry.characterId, entry.result.cached?.data),
       }));
     }
     return [
       {
         skills: data?.skills,
-        jobs: data?.result.cached ? toJobSlotJobs(data.result.cached.data) : undefined,
+        jobs: withCorp(characterId, data?.result.cached?.data),
       },
     ];
-  }, [needsJobSlotFanOut, jobsFanOutSelectedEntries, jobsFanOutSkills, data]);
+  }, [
+    needsJobSlotFanOut,
+    jobsFanOutSelectedEntries,
+    jobsFanOutSkills,
+    data,
+    characterId,
+    corpJobsByInstaller,
+  ]);
   const jobSlotSummary = useMemo(
     () => aggregateJobSlotSummary(jobSlotCharacterInputs, now),
     [jobSlotCharacterInputs, now]
@@ -431,29 +500,73 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       .filter((t): t is number => t !== undefined);
     return times.length > 0 ? new Date(Math.min(...times)) : null;
   }, [jobsFanOutSelectedEntries]);
-  const dataAgeDate = needsJobSlotFanOut
+  const personalDataAgeDate = needsJobSlotFanOut
     ? jobsFanOutOldestFetchedAt
     : (result?.cached?.fetchedAt ?? null);
-  const fromCacheAny = needsJobSlotFanOut
-    ? jobsFanOutFromCacheAny
-    : (result?.cached?.fromCache ?? false);
+  // The oldest of the two reads, like the fan-out's own oldest-Character rule.
+  const dataAgeDate =
+    personalDataAgeDate && corpJobs.fetchedAt
+      ? new Date(Math.min(personalDataAgeDate.getTime(), corpJobs.fetchedAt.getTime()))
+      : (personalDataAgeDate ?? corpJobs.fetchedAt);
+  const fromCacheAny =
+    (needsJobSlotFanOut ? jobsFanOutFromCacheAny : (result?.cached?.fromCache ?? false)) ||
+    corpJobs.fromCache;
 
   const jobs = useMemo<JobRow[]>(() => {
-    const unsorted: JobRow[] = needsJobSlotFanOut
-      ? flattenJobsWithCharacter(jobsFanOut?.entries ?? [], resolvedJobsFilter)
-      : (result?.cached?.data ?? []).map((job) => ({
-          ...job,
-          characterId,
-          characterName: characterNameById.get(characterId) ?? '',
-        }));
-    return sortJobsBySoonest(unsorted);
-  }, [needsJobSlotFanOut, jobsFanOut, resolvedJobsFilter, result, characterId, characterNameById]);
+    const personal: JobRow[] = (
+      needsJobSlotFanOut
+        ? flattenJobsWithCharacter(jobsFanOut?.entries ?? [], resolvedJobsFilter)
+        : (result?.cached?.data ?? []).map((job) => ({
+            ...job,
+            characterId,
+            characterName: characterNameById.get(characterId) ?? '',
+          }))
+    ).map((job) => ({ ...job, owner: 'personal' as const }));
+    const corp: JobRow[] = visibleCorpJobs(corpJobs.jobs, {
+      accountCharacterIds: new Set(characterNameById.keys()),
+      filter: needsJobSlotFanOut ? resolvedJobsFilter : new Set([characterId]),
+      highlightJobId: highlightedJobId,
+      personalJobIds: new Set(personal.map((job) => job.job_id)),
+    }).map((job) => ({
+      ...job,
+      characterId: job.installer_id,
+      characterName: characterNameById.get(job.installer_id) ?? '',
+      owner: 'corporation' as const,
+    }));
+    return sortJobsBySoonest([...personal, ...corp]);
+  }, [
+    needsJobSlotFanOut,
+    jobsFanOut,
+    resolvedJobsFilter,
+    result,
+    characterId,
+    characterNameById,
+    corpJobs,
+    highlightedJobId,
+  ]);
+  // Selected Characters who opted into corp access but whose corporation no
+  // Character here holds the role to read (issue #2302) — said once each, so
+  // their missing corp jobs don't read as a bug. Not shown for a Character who
+  // never granted the corp scope: that is a choice, not a gap.
+  const corpUnreadable = useMemo(
+    () =>
+      corpJobs.unreadableCharacterIds
+        .filter((id) =>
+          needsJobSlotFanOut
+            ? resolvedJobsFilter === 'all' || resolvedJobsFilter.has(id)
+            : id === characterId
+        )
+        .map((id) => ({ characterId: id, name: characterNameById.get(id) ?? '' })),
+    [corpJobs, needsJobSlotFanOut, resolvedJobsFilter, characterId, characterNameById]
+  );
   const summary = useMemo(() => summarizeJobs(jobs, now), [jobs, now]);
   const blockingNeedsReauth = !needsJobSlotFanOut && (result?.needsReauth ?? false);
   // Loading, re-auth and the empty states are the whole story; only a real
   // list has anything to fold.
   const collapsible = jobs.length > 0 && !listLoading && !blockingNeedsReauth;
-  const showList = !collapsible || expanded;
+  const listExpanded =
+    expanded ?? (highlightedJobId !== null && jobs.some((job) => job.job_id === highlightedJobId));
+  const showList = !collapsible || listExpanded;
   // Whether more than one Character's jobs are actually on screen — the
   // character column and its badges only earn their place once they'd
   // disambiguate something (`OpenOrdersPanel`'s `showCharacterStrip` precedent).
@@ -470,7 +583,8 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   // saying with the list folded — so the body is only genuinely empty, and the
   // panel only genuinely one line, when these are absent too.
   const hasFanOutNotices =
-    needsJobSlotFanOut && (jobsFanOutReauth.length > 0 || jobsFanOutSkipped.length > 0);
+    (needsJobSlotFanOut && (jobsFanOutReauth.length > 0 || jobsFanOutSkipped.length > 0)) ||
+    corpUnreadable.length > 0;
   /**
    * Hidden outright for a one-Character account: "This character" and "All
    * characters" then resolve to the same pilot, so the picker is a control
@@ -500,10 +614,6 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   // `jobs.some(isJobDone)` scan of the same list.
   const showStatusFilter =
     statusFilter.size > 0 || summary.done > 0 || jobs.some((job) => isCompletingSoon(job, now));
-
-  // The job an `industryJobComplete` alert pointed at, if any. It stays in
-  // this list until it is delivered, which is exactly what the alert is about.
-  const highlightedJobId = useHighlightParam();
 
   const filteredJobs = useMemo(
     () =>
@@ -565,7 +675,12 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
     job: JobRow;
     matches: BuildPlanRecord[];
   } | null>(null);
-  const canLog = useCallback((job: ActiveJob) => canLogProductionFromJob(job, now), [now]);
+  // Personal jobs only: the production log has no corp dimension yet
+  // (`20260905-181537-production-log-row-per-allocation-sync-accept-wallet.md`).
+  const canLog = useCallback(
+    (job: JobRow) => job.owner === 'personal' && canLogProductionFromJob(job, now),
+    [now]
+  );
   const navigateToPlanWithSeed = useCallback(
     async (planId: string, job: Pick<ActiveJob, 'runs' | 'cost'> & { characterId: number }) => {
       // Active Jobs' cross-character view (issue #607) can surface a done
@@ -637,7 +752,14 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
               </span>
             )}
             {/* Only once more than one Character's jobs are on screen (`showCharacterColumn`) — same gate as `OpenOrdersPanel`'s `showCharacterStrip`. */}
-            {showCharacterColumn && <CharacterBadge characterName={job.characterName} t={t} />}
+            {job.owner === 'corporation' && (
+              <span className="shrink-0 rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('industry.jobsCorpBadge')}
+              </span>
+            )}
+            {showCharacterColumn && job.characterName !== '' && (
+              <CharacterBadge characterName={job.characterName} t={t} />
+            )}
           </span>
         ),
       },
@@ -897,10 +1019,10 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           {collapsible && (
             <IconButton
               size="sm"
-              icon={<Caret expanded={expanded} />}
-              label={expanded ? t('industry.jobsHideList') : t('industry.jobsShowList')}
-              aria-expanded={expanded}
-              onClick={() => setExpanded((open) => !open)}
+              icon={<Caret expanded={listExpanded} />}
+              label={listExpanded ? t('industry.jobsHideList') : t('industry.jobsShowList')}
+              aria-expanded={listExpanded}
+              onClick={() => setExpanded(!listExpanded)}
             />
           )}
         </span>
@@ -911,21 +1033,28 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
     >
       {hasFanOutNotices && (
         <div className="mb-2 space-y-2">
-          {jobsFanOutReauth.map((entry) => (
-            <GrantBanner
-              key={entry.characterId}
-              characterId={entry.characterId}
-              characterName={entry.characterName}
-              endpoints={['getCharacterIndustryJobs']}
-              variant="ghost"
-              title={t('industry.jobsReauthTitle')}
-              hint={t('industry.jobsReauthHint')}
-              actionLabel={t('industry.jobsReauthAction')}
-            />
-          ))}
-          {jobsFanOutSkipped.map((s) => (
-            <p key={s.characterId} className="text-xs text-text-dim">
-              {s.name} — {t('industry.jobsCharacterNotShared')}
+          {needsJobSlotFanOut &&
+            jobsFanOutReauth.map((entry) => (
+              <GrantBanner
+                key={entry.characterId}
+                characterId={entry.characterId}
+                characterName={entry.characterName}
+                endpoints={['getCharacterIndustryJobs']}
+                variant="ghost"
+                title={t('industry.jobsReauthTitle')}
+                hint={t('industry.jobsReauthHint')}
+                actionLabel={t('industry.jobsReauthAction')}
+              />
+            ))}
+          {needsJobSlotFanOut &&
+            jobsFanOutSkipped.map((s) => (
+              <p key={s.characterId} className="text-xs text-text-dim">
+                {s.name} — {t('industry.jobsCharacterNotShared')}
+              </p>
+            ))}
+          {corpUnreadable.map((s) => (
+            <p key={`corp-${s.characterId}`} className="text-xs text-text-dim">
+              {s.name} — {t('industry.jobsCorpNotReadable')}
             </p>
           ))}
         </div>

@@ -438,6 +438,9 @@ export const corpIndustryJobCopy: DomainCopy<CorpIndustryJobNotificationFire, It
       character,
       item: names.item ?? `#${industryItemTypeId(fire)}`,
     }),
+  // Industry's Active Jobs lists corp jobs by installer (issue #2302), and
+  // keeps the one an alert names whoever installed it.
+  subjectOf: (fire) => fire.jobId,
 };
 
 /* Corp roster ------------------------------------------------------------- */
