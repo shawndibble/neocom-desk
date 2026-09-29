@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyBlueprintPriceSeed,
   applyPlanSeed,
+  blueprintPriceSourcing,
+  matchesBlueprintPriceSeed,
+  parseBlueprintPriceSeed,
   clearPlanSeed,
   matchesPlanSeed,
   parsePlanSeed,
@@ -192,5 +196,42 @@ describe('seedFromOfferRow', () => {
         runs: 5,
       })
     );
+  });
+});
+
+describe('blueprint price seed (an LP Store pick)', () => {
+  const priceOf = (search: string) => parseBlueprintPriceSeed(new URLSearchParams(search));
+
+  it('reads a positive ISK price', () => {
+    expect(priceOf('product=587&bpPrice=1250000.5')).toBe(1_250_000.5);
+  });
+
+  it('is no seed when absent, blank, zero, negative or not a number', () => {
+    for (const search of ['product=587', 'bpPrice=', 'bpPrice=0', 'bpPrice=-5', 'bpPrice=abc']) {
+      expect(priceOf(search)).toBeNull();
+    }
+  });
+
+  it('round-trips through a query, and clearPlanSeed drops it with the rest', () => {
+    const params = new URLSearchParams({ product: '587' });
+    applyBlueprintPriceSeed(params, 42);
+    expect(parseBlueprintPriceSeed(params)).toBe(42);
+    clearPlanSeed(params);
+    expect(params.has('bpPrice')).toBe(false);
+    expect(params.get('product')).toBe('587');
+  });
+
+  it('writes the same ME0/TE0 pick with its price that choosing it in the tier modal writes', () => {
+    expect(blueprintPriceSourcing(42)).toEqual({
+      acquisitionTierOverride: { me: 0, te: 0 },
+      overridePrice: 42,
+    });
+  });
+
+  it('matches only a plan already carrying that exact pick on its blueprint', () => {
+    const seeded = { blueprintTypeID: 9, materialSourcing: { 9: blueprintPriceSourcing(42) } };
+    expect(matchesBlueprintPriceSeed(seeded, 42)).toBe(true);
+    expect(matchesBlueprintPriceSeed(seeded, 43)).toBe(false);
+    expect(matchesBlueprintPriceSeed({ blueprintTypeID: 9 }, 42)).toBe(false);
   });
 });

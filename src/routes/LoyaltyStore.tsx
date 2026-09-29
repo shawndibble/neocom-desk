@@ -69,6 +69,8 @@ import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { applyBlueprintPriceSeed } from '@/features/industry/planSeed';
+import { lpBlueprintPickPrice } from '@/features/industry/blueprintPurchaseOffers';
 
 function iskPerLpTone(value: number | null): string {
   return value === null ? 'text-text-dim' : iskToneClass(value);
@@ -97,7 +99,7 @@ interface OfferDetailProps {
   playerLp: number;
   useOwnMaterials: boolean;
   onToggleUseOwnMaterials: () => void;
-  onPlanInIndustry: (productTypeId: number) => void;
+  onPlanInIndustry: (row: LoyaltyOfferRow) => void;
 }
 
 function OfferDetail({
@@ -178,7 +180,7 @@ function OfferDetail({
           </MarketItemLink>
         )}
         {row.isBlueprint && row.productTypeId !== null && (
-          <Button variant="ghost" size="sm" onClick={() => onPlanInIndustry(row.productTypeId!)}>
+          <Button variant="ghost" size="sm" onClick={() => onPlanInIndustry(row)}>
             <span className="inline-flex items-center gap-1.5">
               <Icon.Industry size={Icon.ICON_SIZE.sm} aria-hidden="true" />
               {t('loyaltyStore.planInIndustry')}
@@ -420,8 +422,17 @@ export function LoyaltyStore() {
     if (!isDesktop) setSheetOpen(true);
   }
 
-  function planInIndustry(productTypeId: number) {
-    navigate(`${industryTabHref('plans')}?product=${productTypeId}`);
+  /**
+   * Opens the product's Build Plan with this redemption as its Blueprint
+   * Acquisition — the pilot is in the LP Store looking at it, so that is
+   * where the blueprint comes from. A redemption that can't be priced (a
+   * turn-in with no hub price) opens the plan unseeded, to price itself.
+   */
+  async function planInIndustry(row: LoyaltyOfferRow) {
+    if (row.productTypeId === null) return;
+    const params = new URLSearchParams({ product: String(row.productTypeId) });
+    applyBlueprintPriceSeed(params, await lpBlueprintPickPrice(row.offer, row.requiredItems));
+    navigate(`${industryTabHref('plans')}?${params.toString()}`);
   }
 
   // Stable, so the offers table's memoized rows skip re-rendering on every page render.

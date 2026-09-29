@@ -110,6 +110,37 @@ export async function loadBlueprintPurchaseOffers(
 }
 
 /**
+ * What one LP Store redemption costs as a blueprint pick — the price an LP
+ * Store "Plan in Industry" seeds the plan with (`parseBlueprintPriceSeed`).
+ * Priced exactly as automatic selection prices it: ISK + LP × LP Value +
+ * the turn-ins the pilot doesn't already own, at `unitPrice` (the row's own
+ * hub price). `null` when a turn-in still to buy has no price.
+ */
+export async function lpBlueprintPickPrice(
+  offer: { isk_cost: number; lp_cost: number; quantity: number },
+  requiredItems: readonly { typeId: number; quantity: number; unitPrice: number | null }[]
+): Promise<number | null> {
+  const [rate, owned] = await Promise.all([
+    lpValue(),
+    requiredItems.length === 0
+      ? EMPTY_OWNED_STOCK_SNAPSHOT
+      : loadOwnedStockSnapshot().catch(() => EMPTY_OWNED_STOCK_SNAPSHOT),
+  ]);
+  const ownedStock = detectOwnedStock(
+    owned.sources,
+    new Set(requiredItems.map((item) => item.typeId))
+  );
+  const unitPrices = new Map(requiredItems.map((item) => [item.typeId, item.unitPrice]));
+  const redemption = lpRedemptionOffer(
+    { quantity: offer.quantity, requiredItems },
+    lpPickPrice(offer.isk_cost, offer.lp_cost, rate),
+    (typeId) => unitPrices.get(typeId) ?? undefined,
+    (typeId) => ownedStock.get(typeId)?.quantity ?? 0
+  );
+  return redemption?.price ?? null;
+}
+
+/**
  * `loadBlueprintPurchaseOffers` for a page: no offers until the load lands,
  * then a lookup that stays the same object until the inputs change, so a
  * pricing memo keyed on it re-runs once.

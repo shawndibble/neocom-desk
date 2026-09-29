@@ -3,7 +3,11 @@ import { getTradeHub } from '@/market/hubs';
 import { getHubPrices, getRegionSellPrices } from '@/market/prices';
 import { findLpOfferMatches } from '@/features/market/appraisalLpAcquisition';
 import { loadOwnedStockSnapshot } from './ownedStockDetection';
-import { blueprintTypeIdsIn, loadBlueprintPurchaseOffers } from './blueprintPurchaseOffers';
+import {
+  blueprintTypeIdsIn,
+  loadBlueprintPurchaseOffers,
+  lpBlueprintPickPrice,
+} from './blueprintPurchaseOffers';
 
 vi.mock('@/market/prices', () => ({ getHubPrices: vi.fn(), getRegionSellPrices: vi.fn() }));
 vi.mock('@/features/market/appraisalLpAcquisition', () => ({ findLpOfferMatches: vi.fn() }));
@@ -108,6 +112,23 @@ describe('loadBlueprintPurchaseOffers', () => {
     const offersFor = await loadBlueprintPurchaseOffers(null, JITA, [BLUEPRINT]);
     expect(findLpOfferMatches).not.toHaveBeenCalled();
     expect(offersFor(BLUEPRINT)).toEqual([]);
+  });
+});
+
+describe('lpBlueprintPickPrice', () => {
+  it('prices one redemption with owned turn-ins free and the rest at the row price', async () => {
+    vi.mocked(loadOwnedStockSnapshot).mockResolvedValue(ownedHulls(1) as never);
+    const price = await lpBlueprintPickPrice({ isk_cost: 1_000, lp_cost: 500, quantity: 1 }, [
+      { typeId: HULL, quantity: 3, unitPrice: 200 },
+    ]);
+    expect(price).toBe(1_400);
+  });
+
+  it('is no price when a turn-in still to buy is unpriced', async () => {
+    const price = await lpBlueprintPickPrice({ isk_cost: 1_000, lp_cost: 500, quantity: 1 }, [
+      { typeId: HULL, quantity: 1, unitPrice: null },
+    ]);
+    expect(price).toBeNull();
   });
 });
 

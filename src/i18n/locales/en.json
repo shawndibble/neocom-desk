@@ -1673,6 +1673,7 @@
     },
     "copySuffix": "{{name}} (copy)",
     "seededPlanName": "{{name}} {{me}}/{{te}} ×{{runs}}",
+    "lpSeededPlanName": "{{name}} (LP Store)",
     "duplicate": "Duplicate",
     "delete": "Delete",
     "rename": "Rename",

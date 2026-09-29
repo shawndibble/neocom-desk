@@ -11,6 +11,8 @@
  * as it did before.
  */
 
+import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/types';
+
 /** ME/TE/runs to open a Build Plan at, in place of every default. */
 export interface BuildPlanSeed {
   me: number;
@@ -18,8 +20,11 @@ export interface BuildPlanSeed {
   runs: number;
 }
 
+/** Query key for a blueprint price seed (`parseBlueprintPriceSeed`). */
+const BLUEPRINT_PRICE_KEY = 'bpPrice';
+
 /** Query keys a seed occupies. Nothing else on `/industry` uses these. */
-const SEED_KEYS = ['me', 'te', 'runs'] as const;
+const SEED_KEYS = ['me', 'te', 'runs', BLUEPRINT_PRICE_KEY] as const;
 
 /** The subset of `URLSearchParams` a read needs — so a caller can pass one directly. */
 type ParamReader = Pick<URLSearchParams, 'get'>;
@@ -123,4 +128,42 @@ export function seedFromOfferRow(row: {
  */
 export function matchesPlanSeed(plan: BuildPlanSeed, seed: BuildPlanSeed): boolean {
   return plan.me === seed.me && plan.te === seed.te && plan.runs === seed.runs;
+}
+
+/**
+ * The blueprint's own ISK price, carried from an LP Store offer's "Plan in
+ * Industry" so the plan it opens is quoted with that redemption as its
+ * Blueprint Acquisition — the pilot is looking at the LP Store, so that is
+ * where the blueprint comes from. A positive finite number or no seed.
+ */
+export function parseBlueprintPriceSeed(params: ParamReader): number | null {
+  const raw = params.get(BLUEPRINT_PRICE_KEY);
+  if (raw === null || raw.trim() === '') return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+export function applyBlueprintPriceSeed(params: URLSearchParams, price: number | null): void {
+  if (price === null) return;
+  params.set(BLUEPRINT_PRICE_KEY, String(price));
+}
+
+/**
+ * The `MaterialSourcing` a price seed writes on the plan's blueprint: an
+ * ME0/TE0 tier (an LP Store copy is issued unresearched) at that price — the
+ * same patch picking the LP offer in the Blueprint Acquisition modal writes
+ * (`overridePatchFor`), so it reads as a pick and resets the same way.
+ */
+export function blueprintPriceSourcing(price: number): MaterialSourcing {
+  return { acquisitionTierOverride: { me: 0, te: 0 }, overridePrice: price };
+}
+
+/** Whether `plan` already carries exactly the pick a price seed would write. */
+export function matchesBlueprintPriceSeed(
+  plan: { blueprintTypeID: number; materialSourcing?: MaterialSourcingMap },
+  price: number
+): boolean {
+  const sourcing = plan.materialSourcing?.[plan.blueprintTypeID];
+  const tier = sourcing?.acquisitionTierOverride;
+  return tier?.me === 0 && tier.te === 0 && sourcing?.overridePrice === price;
 }
