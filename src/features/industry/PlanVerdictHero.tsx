@@ -6,6 +6,7 @@ import type { BuildResult } from '@/engine/industry/types';
 import { compareUseOrSell, type OwnedStockSale } from '@/engine/industry/ownedStockSale';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { formatDuration } from '@/lib/duration';
+import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import { formatPercent } from './format';
@@ -168,15 +169,28 @@ export function PlanVerdictHero({
       ? { verdict: compareUseOrSell(result.profit, ownedSale.instant) }
       : null;
 
+  const hasItemActions = itemActionsFor !== undefined && productTypeID != null;
+
   return (
-    <Panel className="border-line-bright">
+    <Panel className="relative border-line-bright">
+      {/* The product's "More actions" button sits in the panel's own corner, as
+          item cards do elsewhere, rather than trailing the heading. */}
+      {hasItemActions && (
+        <div className="absolute top-1 right-1">{itemActionsFor(productTypeID)}</div>
+      )}
       {/*
         Figure and pills share a row from `md`; the buttons join it only from
         `xl`. Below that they wrap under, so the panel can never be wider than
         its column — three fixed-width blocks side by side used to force the
         whole page to scroll sideways at ordinary desktop widths.
       */}
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      {/* The right padding clears the corner button: 44px on touch below `md`, 28px above. */}
+      <div
+        className={cx(
+          'flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between',
+          hasItemActions && 'pr-10 md:pr-6'
+        )}
+      >
         <div className="flex min-w-0 flex-1 flex-col gap-4 md:flex-row md:items-start md:gap-6">
           <div className="min-w-0 space-y-1 md:flex-1">
             <p className="flex flex-wrap items-baseline gap-x-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -189,7 +203,6 @@ export function PlanVerdictHero({
               ) : (
                 <h2 className="text-text">{productName}</h2>
               )}
-              {itemActionsFor && productTypeID != null && itemActionsFor(productTypeID)}
               {skillGate?.gated && nameForSkill && nameForCharacter && (
                 <SkillGateMarker
                   verdict={skillGate}
