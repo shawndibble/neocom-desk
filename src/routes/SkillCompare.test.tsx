@@ -154,6 +154,25 @@ function rowByFirstCell(table: HTMLElement, text: string): HTMLElement {
   return row;
 }
 
+/** A promise the test resolves by hand, to hold an ESI response in flight. */
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((r) => (resolve = r));
+  return { promise, resolve };
+}
+
+/** The route's own `PageHeader`, found from its heading. */
+function pageHeader(): HTMLElement {
+  return screen.getByRole('heading', { level: 1, name: 'Skills' }).closest('header')!;
+}
+
+function characterHeaders(table: HTMLElement): string[] {
+  return within(table)
+    .getAllByRole('columnheader')
+    .map((header) => header.textContent ?? '')
+    .filter((text) => text.startsWith('Pilot'));
+}
+
 describe('SkillCompare', () => {
   it('shows each selected character trained levels side by side, gaps dimmed', async () => {
     const user = userEvent.setup();
@@ -163,6 +182,9 @@ describe('SkillCompare', () => {
     await user.click(within(await picker()).getByRole('button', { name: /Pilot Two/ }));
 
     const table = await screen.findByRole('table', { name: 'Skill comparison' });
+    // The table is on screen as soon as Pilot One lands; Pilot Two's column
+    // joins when its own fetch does.
+    await waitFor(() => expect(characterHeaders(table)).toEqual(['Pilot One', 'Pilot Two']));
     const gunneryRow = rowByFirstCell(table, 'Gunnery');
     const cells = within(gunneryRow).getAllByRole('cell');
     // skill, group, Pilot One (3), Pilot Two (5)
@@ -368,6 +390,7 @@ describe('SkillCompare', () => {
     await user.click(within(await picker()).getByRole('button', { name: /Pilot Two/ }));
 
     const table = await screen.findByRole('table', { name: 'Skill comparison' });
+    await waitFor(() => expect(characterHeaders(table)).toEqual(['Pilot One', 'Pilot Two']));
     expect(rowByFirstCell(table, 'Gunnery')).toBeInTheDocument();
     expect(rowByFirstCell(table, 'Spaceship Command')).toBeInTheDocument();
 
@@ -408,5 +431,121 @@ describe('SkillCompare', () => {
       expect(stored.items).toHaveLength(1);
     });
     expect(screen.getAllByText('Untitled comparison')).toHaveLength(1);
+  });
+
+  describe('loading contract (DESIGN §6a)', () => {
+    it('keeps the table while an added character loads, with no column until its skills land', async () => {
+      await seedCharacter(CHAR_C, 'Pilot Three');
+      const held = deferred();
+      server.use(
+        http.get(`https://esi.evetech.net/characters/${CHAR_C}/skills`, async () => {
+          await held.promise;
+          return HttpResponse.json({
+            skills: [{ skill_id: GUNNERY, trained_skill_level: 1, skillpoints_in_skill: 250 }],
+            total_sp: 250,
+            unallocated_sp: 0,
+          });
+        })
+      );
+      const user = userEvent.setup();
+      render(<App />);
+
+      await user.click(within(await picker()).getByRole('button', { name: /Pilot One/ }));
+      await user.click(within(await picker()).getByRole('button', { name: /Pilot Two/ }));
+      const table = await screen.findByRole('table', { name: 'Skill comparison' });
+      await waitFor(() => expect(characterHeaders(table)).toEqual(['Pilot One', 'Pilot Two']));
+
+      const pendingChip = within(await picker()).getByRole('button', { name: /Pilot Three/ });
+      await user.click(pendingChip);
+
+      expect(screen.getByRole('table', { name: 'Skill comparison' })).toBe(table);
+      expect(characterHeaders(table)).toEqual(['Pilot One', 'Pilot Two']);
+      expect(within(pendingChip).getByRole('status')).toBeInTheDocument();
+      expect(within(rowByFirstCell(table, 'Gunnery')).getAllByRole('cell')).toHaveLength(4);
+
+      held.resolve();
+      await waitFor(() =>
+        expect(characterHeaders(table)).toEqual(['Pilot One', 'Pilot Two', 'Pilot Three'])
+      );
+      expect(within(pendingChip).queryByRole('status')).not.toBeInTheDocument();
+    });
+
+    it('keeps the table and the header Refresh on screen while a refresh is in flight', async () => {
+      const user = userEvent.setup();
+      render(<App />);
+
+      await user.click(within(await picker()).getByRole('button', { name: /Pilot One/ }));
+      const table = await screen.findByRole('table', { name: 'Skill comparison' });
+      // The data age sits in the header's meta, once any character has data.
+      await waitFor(() => expect(pageHeader().querySelector('time')).not.toBeNull());
+
+      const held = deferred();
+      server.use(
+        http.get(`https://esi.evetech.net/characters/${CHAR_A}/skills`, async () => {
+          await held.promise;
+          return HttpResponse.json({
+            skills: [{ skill_id: GUNNERY, trained_skill_level: 4, skillpoints_in_skill: 45_255 }],
+            total_sp: 45_255,
+            unallocated_sp: 0,
+          });
+        })
+      );
+
+      const refresh = within(pageHeader()).getByRole('button', { name: 'Refresh' });
+      await user.click(refresh);
+
+      expect(screen.getByRole('table', { name: 'Skill comparison' })).toBe(table);
+      expect(within(pageHeader()).getByRole('button', { name: 'Refresh' })).toBeDisabled();
+      expect(within(rowByFirstCell(table, 'Gunnery')).getAllByRole('cell')[2]).toHaveTextContent(
+        '3'
+      );
+
+      held.resolve();
+      await waitFor(() =>
+        expect(within(rowByFirstCell(table, 'Gunnery')).getAllByRole('cell')[2]).toHaveTextContent(
+          '4'
+        )
+      );
+      expect(within(pageHeader()).getByRole('button', { name: 'Refresh' })).toBeEnabled();
+    });
+
+    it('offers Refresh on the no-data empty state, and it re-requests the skills', async () => {
+      await seedCharacter(CHAR_C, 'Pilot Three');
+      let requests = 0;
+      server.use(
+        http.get(`https://esi.evetech.net/characters/${CHAR_C}/skills`, () => {
+          requests += 1;
+          return HttpResponse.json({ skills: [], total_sp: 0, unallocated_sp: 0 });
+        })
+      );
+      const user = userEvent.setup();
+      render(<App />);
+
+      await user.click(within(await picker()).getByRole('button', { name: /Pilot Three/ }));
+      expect(await screen.findByText('No skill data cached')).toBeInTheDocument();
+      const before = requests;
+
+      const refresh = within(pageHeader()).getByRole('button', { name: 'Refresh' });
+      await waitFor(() => expect(refresh).toBeEnabled());
+      await user.click(refresh);
+
+      await waitFor(() => expect(requests).toBeGreaterThan(before));
+    });
+
+    it('drops a deselected character column without a loading frame', async () => {
+      const user = userEvent.setup();
+      render(<App />);
+
+      await user.click(within(await picker()).getByRole('button', { name: /Pilot One/ }));
+      await user.click(within(await picker()).getByRole('button', { name: /Pilot Two/ }));
+      const table = await screen.findByRole('table', { name: 'Skill comparison' });
+      await waitFor(() => expect(characterHeaders(table)).toEqual(['Pilot One', 'Pilot Two']));
+
+      await user.click(within(await picker()).getByRole('button', { name: /Pilot Two/ }));
+
+      // Named: the app shell can carry an unrelated status banner of its own.
+      expect(screen.queryByRole('status', { name: /Loading/ })).not.toBeInTheDocument();
+      expect(characterHeaders(table)).toEqual(['Pilot One']);
+    });
   });
 });
