@@ -33,6 +33,114 @@ interface RegisterDeviceResponse {
 const NO_PROJECTION_ROWS: readonly ProjectionRow[] = [];
 
 /**
+ * How long an unchanged registration is trusted before the poll re-sends it
+ * anyway (issue #2265). Skipping is safe only because Projections are per
+ * device (issue #2240): no other device can overwrite this device's rows, so
+ * the fingerprint below covers everything this device owns on the server.
+ *
+ * The backend drops a device doc only when a send to its token comes back
+ * dead or malformed (`functions/src/projectionStore.ts`
+ * `dispatchDueProjections`) — nothing expires it on `updatedAt`, and the
+ * 7-day stale-unsent purge (keyed on `fireAt`) is far outside this window.
+ * A dead token can't be pushed to anyway, and a rotated one changes the
+ * fingerprint; clients can't read `deviceRegistrations` to notice a deletion
+ * otherwise, so this cap is what bounds how long one goes unrepaired.
+ */
+export const REREGISTER_AFTER_MS = 12 * 3_600_000;
+
+/** Device-local, never synced: what this device last registered, and when. */
+const LAST_REGISTRATION_KEY = 'neocom.lastPushRegistration';
+
+interface LastRegistration {
+  fingerprint: string;
+  at: number;
+}
+
+function readLastRegistration(): LastRegistration | undefined {
+  try {
+    const raw = localStorage.getItem(LAST_REGISTRATION_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as Partial<LastRegistration>;
+    return typeof parsed.fingerprint === 'string' && typeof parsed.at === 'number'
+      ? { fingerprint: parsed.fingerprint, at: parsed.at }
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeLastRegistration(value: LastRegistration | undefined): void {
+  try {
+    if (value) localStorage.setItem(LAST_REGISTRATION_KEY, JSON.stringify(value));
+    else localStorage.removeItem(LAST_REGISTRATION_KEY);
+  } catch {
+    // Storage blocked (private mode): every poll just re-registers, as before.
+  }
+}
+
+/** cyrb53 — a short, stable digest so a 72-hour Projection isn't stored verbatim. */
+function digest(text: string): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+/**
+ * Everything the callable would change on the backend: which token reaches
+ * which Characters, and each one's Projection. Order-insensitive, so a rebuild
+ * that finds the same rows in another order doesn't count as a change.
+ */
+function registrationFingerprint(
+  fcmToken: string,
+  characterIds: readonly number[],
+  projectionsByCharacter: ReadonlyMap<number, readonly ProjectionRow[]>
+): string {
+  const characters = [...characterIds]
+    .sort((a, b) => a - b)
+    .map((characterId) => [
+      characterId,
+      [...(projectionsByCharacter.get(characterId) ?? NO_PROJECTION_ROWS)]
+        .sort((a, b) =>
+          a.occurrenceKey < b.occurrenceKey ? -1 : a.occurrenceKey > b.occurrenceKey ? 1 : 0
+        )
+        .map((row) => [
+          row.occurrenceKey,
+          row.eventId,
+          row.fireAt,
+          row.title,
+          row.body,
+          row.eveType ?? null,
+        ]),
+    ]);
+  return digest(JSON.stringify([getDeviceId(), fcmToken, characters]));
+}
+
+/**
+ * Uploads from this tab currently awaiting the callable, and whether two of
+ * them have overlapped since the count was last zero.
+ */
+let inFlight = 0;
+let overlapped = false;
+
+export interface RegisterDeviceOptions {
+  /**
+   * Skip the whole registration — every Character's access-token refresh and
+   * the callable — when this device already registered the same FCM token,
+   * roster and Projections within {@link REREGISTER_AFTER_MS}. The 5-minute
+   * Foreground Poller sets this; the Enable tap does not, so a user-initiated
+   * enable always reaches the backend.
+   */
+  skipIfUnchanged?: boolean;
+}
+
+/**
  * Acquire an FCM token and register this device against every Character
  * currently stored on it. Returns `null` (not an error) when there is
  * nothing to register — no FCM token available, or no Character stored yet —
@@ -49,7 +157,8 @@ const NO_PROJECTION_ROWS: readonly ProjectionRow[] = [];
 export async function registerDeviceForWebPush(
   vapidKey: string,
   serviceWorkerRegistration: ServiceWorkerRegistration,
-  projectionsByCharacter: ReadonlyMap<number, readonly ProjectionRow[]> = new Map()
+  projectionsByCharacter: ReadonlyMap<number, readonly ProjectionRow[]> = new Map(),
+  { skipIfUnchanged = false }: RegisterDeviceOptions = {}
 ): Promise<RegisterDeviceResponse | null> {
   // Checked before `getToken`: a late rebuild on an emptied roster (after
   // Remove / Log out) must not mint a fresh FCM token just to discard it.
@@ -65,6 +174,17 @@ export async function registerDeviceForWebPush(
   if ((await db.characters.toArray()).length === 0) {
     await deleteToken(messaging).catch(() => {});
     return null;
+  }
+
+  const fingerprint = registrationFingerprint(
+    fcmToken,
+    characters.map((character) => character.characterId),
+    projectionsByCharacter
+  );
+  const now = Date.now();
+  if (skipIfUnchanged) {
+    const last = readLastRegistration();
+    if (last?.fingerprint === fingerprint && now - last.at < REREGISTER_AFTER_MS) return null;
   }
 
   // A stale/expired token for one Character must not stop the others from
@@ -98,15 +218,40 @@ export async function registerDeviceForWebPush(
     RegisterDeviceResponse
   >(getSyncFunctions(), 'registerDevice');
 
-  const result = await call({
-    deviceId: getDeviceId(),
-    fcmToken,
-    characters: withAccessTokens.map((character) => ({
-      ...character,
-      projectionRows: projectionsByCharacter.get(character.characterId) ?? NO_PROJECTION_ROWS,
-    })),
-  });
-  return result.data;
+  // Forgotten before the call, whatever its outcome: this upload replaces
+  // this device's rows, so once it may have landed the previous fingerprint
+  // no longer describes the server. An Enable tap (empty Projection) that
+  // came back partial or threw after committing would otherwise let the next
+  // polls skip over a server holding none of this device's rows.
+  writeLastRegistration(undefined);
+  inFlight += 1;
+  if (inFlight > 1) overlapped = true;
+  try {
+    const result = await call({
+      deviceId: getDeviceId(),
+      fcmToken,
+      characters: withAccessTokens.map((character) => ({
+        ...character,
+        projectionRows: projectionsByCharacter.get(character.characterId) ?? NO_PROJECTION_ROWS,
+      })),
+    });
+    // Remembered only when every Character landed: one that couldn't get a
+    // token, or that the backend rejected, must be retried on the next poll
+    // rather than left unregistered for REREGISTER_AFTER_MS. Nor when another
+    // upload overlapped this one — the server may have committed them in
+    // either order, so neither fingerprint is known to be the one it holds.
+    if (
+      !overlapped &&
+      withAccessTokens.length === characters.length &&
+      result.data.rejected.length === 0
+    ) {
+      writeLastRegistration({ fingerprint, at: now });
+    }
+    return result.data;
+  } finally {
+    inFlight -= 1;
+    if (inFlight === 0) overlapped = false;
+  }
 }
 
 /**
@@ -116,5 +261,6 @@ export async function registerDeviceForWebPush(
  * is touched; other devices keep theirs.
  */
 export async function unregisterDeviceForWebPush(): Promise<void> {
+  writeLastRegistration(undefined);
   await deleteToken(getMessaging(getFirebaseApp()));
 }
