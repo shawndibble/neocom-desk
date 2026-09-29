@@ -2810,6 +2810,15 @@
     "unknown": "—",
     "aboutLabel": "About {{label}}",
     "moreActionsLabel": "More actions for {{name}}",
+    "tableExport": {
+      "menuLabel": "{{name}} actions",
+      "exportTable": "Export table",
+      "csv": "Download CSV",
+      "xlsx": "Download Excel (.xlsx)",
+      "clipboard": "Copy for Google Sheets / Excel",
+      "copied": "Copied {{count}} rows",
+      "failed": "Export failed"
+    },
     "dataTable": {
       "sortBy": "Sort by",
       "sortLabel": "Sort: {{column}} {{arrow}}",

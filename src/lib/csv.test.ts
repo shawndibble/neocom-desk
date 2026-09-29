@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toCsv, csvFilename, slugifyForFilename } from './csv';
+import { toCsv, csvFilename, exportFilename, slugifyForFilename } from './csv';
 
 interface Row {
   name: string;
@@ -10,6 +10,8 @@ const columns = [
   { header: 'Name', value: (r: Row) => r.name },
   { header: 'Qty', value: (r: Row) => r.qty },
 ];
+
+const CRLF = '\r\n';
 
 describe('toCsv', () => {
   it('prefixes formula-injection-triggering string fields (=, +, -, @, tab, CR) with a single quote', () => {
@@ -37,7 +39,7 @@ describe('toCsv', () => {
 
   it('leaves a negative number bare, so numeric columns stay numeric in Excel', () => {
     const csv = toCsv([{ name: 'fee', qty: -1500 }], columns);
-    expect(csv).toContain('fee,-1500');
+    expect(csv).toContain('"fee",-1500');
     expect(csv).not.toContain("'-1500");
   });
 
@@ -62,6 +64,17 @@ describe('toCsv', () => {
     expect(csv).toContain('"multi\nline"');
   });
 
+  it('quotes every text field, so an importer splitting on spaces still keeps a name in one cell', () => {
+    const csv = toCsv([{ name: 'Cap Booster 200', qty: 3993 }], columns);
+    expect(csv.split(CRLF)[1]).toBe('"Cap Booster 200",3993');
+  });
+
+  it('writes an ISO timestamp as a bare UTC date-time spreadsheets parse as a date', () => {
+    const dated = [{ header: 'Issued', value: () => '2026-09-28T03:32:04Z' }];
+    const csv = toCsv([{ name: 'a', qty: 1 }], dated);
+    expect(csv.split(CRLF)[1]).toBe('2026-09-28 03:32:04');
+  });
+
   it('terminates rows with CRLF', () => {
     const csv = toCsv([{ name: 'a', qty: 1 }], columns);
     expect(csv).toContain('\r\n');
@@ -81,12 +94,12 @@ describe('toCsv', () => {
   it('emits a header row from columns[].header, sanitized/quoted by the same rules', () => {
     const dangerousColumns = [{ header: '=HEADER', value: (r: Row) => r.name }];
     const csv = toCsv([{ name: 'a', qty: 1 }], dangerousColumns);
-    expect(csv.split('\r\n')[0]).toBe("﻿'=HEADER");
+    expect(csv.split(CRLF)[0]).toBe('﻿"\'=HEADER"');
   });
 
   it('emits only the header row for empty rows', () => {
     const csv = toCsv([], columns);
-    expect(csv).toBe('﻿Name,Qty\r\n');
+    expect(csv).toBe('﻿"Name","Qty"\r\n');
   });
 });
 
@@ -113,6 +126,17 @@ describe('csvFilename', () => {
       'neocom-assets-2026-08-05.csv'
     );
     expect(csvFilename('assets', new Date(2026, 7, 5))).toBe('neocom-assets-2026-08-05.csv');
+  });
+});
+
+describe('exportFilename', () => {
+  it('uses the same convention as csvFilename with the given extension', () => {
+    expect(exportFilename('orders-open', new Date(2026, 8, 29), 'xlsx')).toBe(
+      'neocom-orders-open-2026-09-29.xlsx'
+    );
+    expect(exportFilename('assets', new Date(2026, 7, 5), 'xlsx', { partial: true })).toBe(
+      'neocom-assets-2026-08-05-partial.xlsx'
+    );
   });
 });
 

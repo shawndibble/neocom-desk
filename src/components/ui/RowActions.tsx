@@ -38,7 +38,12 @@ import {
 } from './DropdownMenu';
 import { IconButton } from './IconButton';
 import * as Icon from './icons';
-import { MenuKindContext, RowActionsContext, type RowActions } from './rowActionsContext';
+import {
+  MenuKindContext,
+  RowActionsContext,
+  RowMenuExtrasContext,
+  type RowActions,
+} from './rowActionsContext';
 import { Tooltip } from './Tooltip';
 import { TooltipHoldContext } from './tooltipHold';
 
@@ -140,6 +145,10 @@ export function RowActionsMenu({
   children,
 }: RowActions & { tooltip?: string; children: ReactElement }) {
   const trigger = <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>;
+  // Anything the surrounding table adds (DataTable's "Export table").
+  // `RowMoreActions` appends the same itself, so the context value stays
+  // the row's own items and a hand-rolled wrapper gets the extras too.
+  const extras = useContext(RowMenuExtrasContext);
   return (
     <RowActionsContext.Provider value={{ name, items, onOpenChange }}>
       <TooltipHoldContext.Provider value={false}>
@@ -151,7 +160,10 @@ export function RowActionsMenu({
             // props), never inside it: a component there would drop them.
             <Tooltip content={tooltip}>{trigger}</Tooltip>
           )}
-          <ContextMenuContent>{items}</ContextMenuContent>
+          <ContextMenuContent>
+            {items}
+            {extras}
+          </ContextMenuContent>
         </ContextMenu>
       </TooltipHoldContext.Provider>
     </RowActionsContext.Provider>
@@ -169,6 +181,7 @@ export function RowActionsMenu({
 export function RowMoreActions({ className }: { className?: string }) {
   const { t } = useTranslation();
   const actions = useContext(RowActionsContext);
+  const extras = useContext(RowMenuExtrasContext);
   if (!actions) return null;
   return (
     <DropdownMenu onOpenChange={actions.onOpenChange}>
@@ -184,7 +197,10 @@ export function RowMoreActions({ className }: { className?: string }) {
       {/* Stops a right-click on an item bubbling (through the React tree,
           portal or not) to the row's own context-menu trigger. */}
       <DropdownMenuContent align="end" onContextMenu={(event) => event.stopPropagation()}>
-        <MenuKindContext.Provider value="dropdown">{actions.items}</MenuKindContext.Provider>
+        <MenuKindContext.Provider value="dropdown">
+          {actions.items}
+          {extras}
+        </MenuKindContext.Provider>
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { usePageTab } from '@/lib/usePageTab';
@@ -77,7 +77,8 @@ import { ALL_REGIONS } from '@/engine/market/locationMode';
 import type { RegionOrder } from '@/esi/endpoints';
 import type { MarketAppraiseState, MarketFocusSearchState } from '@/lib/shortcuts';
 import { buttonClassName } from '@/components/ui/buttonClassName';
-import { downloadCsv } from '@/lib/downloadCsv';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
 import { orderBookCsvColumns } from '@/features/market/orderBookCsv';
 import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
 import { OrderHistoryPanel } from '@/features/market/OrderHistoryPanel';
@@ -736,6 +737,41 @@ export function Market() {
   const sellRows = sellShowAll ? sortedSell : sortedSell.slice(0, ROW_CAP);
   const buyRows = buyShowAll ? sortedBuy : sortedBuy.slice(0, ROW_CAP);
 
+  // Every row, not the ROW_CAP the tables mount before "Show all" — hence
+  // `source: 'rows'` (sortedSell/sortedBuy are already in book order).
+  const sellCsvColumns = useMemo(
+    () =>
+      orderBookCsvColumns(t, {
+        npcStations: npcStationMap,
+        solarSystems: solarSystemMap,
+        isBuy: false,
+      }),
+    [t, npcStationMap, solarSystemMap]
+  );
+  const buyCsvColumns = useMemo(
+    () =>
+      orderBookCsvColumns(t, {
+        npcStations: npcStationMap,
+        solarSystems: solarSystemMap,
+        isBuy: true,
+      }),
+    [t, npcStationMap, solarSystemMap]
+  );
+  const sellExport = useTableExport({
+    surface: 'market-sell',
+    rows: sortedSell,
+    columns: sellCsvColumns,
+    truncated: loadedView?.truncated ?? false,
+    source: 'rows',
+  });
+  const buyExport = useTableExport({
+    surface: 'market-buy',
+    rows: sortedBuy,
+    columns: buyCsvColumns,
+    truncated: loadedView?.truncated ?? false,
+    source: 'rows',
+  });
+
   const { itemSkills, trainedSkills, targetPlan } = useOrderRowSkills(
     selectedTypeId,
     activeCharacterId
@@ -1168,25 +1204,7 @@ export function Market() {
                                 menuTitle={t('market.columnsMenuTitle')}
                                 size="sm"
                               />
-                              <IconButton
-                                size="sm"
-                                icon={<Icon.Download />}
-                                label={t('market.exportCsvSell')}
-                                disabled={sortedSell.length === 0}
-                                onClick={() =>
-                                  downloadCsv(
-                                    'market-sell',
-                                    sortedSell,
-                                    orderBookCsvColumns(t, {
-                                      npcStations: npcStationMap,
-                                      solarSystems: solarSystemMap,
-                                      isBuy: false,
-                                    }),
-                                    new Date(),
-                                    loadedView?.truncated ?? false
-                                  )
-                                }
-                              />
+                              <TableActionsMenu name={t('market.sell')} tableExport={sellExport} />
                             </span>
                           </div>
                           {sortedSell.length === 0 ? (
@@ -1219,6 +1237,7 @@ export function Market() {
                             <>
                               <div className="overflow-x-auto">
                                 <DataTable
+                                  {...sellExport.tableProps}
                                   columns={baseColumns}
                                   rows={sellRows}
                                   virtualize="auto"
@@ -1279,25 +1298,7 @@ export function Market() {
                                 menuTitle={t('market.columnsMenuTitle')}
                                 size="sm"
                               />
-                              <IconButton
-                                size="sm"
-                                icon={<Icon.Download />}
-                                label={t('market.exportCsvBuy')}
-                                disabled={sortedBuy.length === 0}
-                                onClick={() =>
-                                  downloadCsv(
-                                    'market-buy',
-                                    sortedBuy,
-                                    orderBookCsvColumns(t, {
-                                      npcStations: npcStationMap,
-                                      solarSystems: solarSystemMap,
-                                      isBuy: true,
-                                    }),
-                                    new Date(),
-                                    loadedView?.truncated ?? false
-                                  )
-                                }
-                              />
+                              <TableActionsMenu name={t('market.buy')} tableExport={buyExport} />
                             </span>
                           </div>
                           {sortedBuy.length === 0 ? (
@@ -1316,6 +1317,7 @@ export function Market() {
                             <>
                               <div className="overflow-x-auto">
                                 <DataTable
+                                  {...buyExport.tableProps}
                                   columns={buyColumns}
                                   rows={buyRows}
                                   virtualize="auto"

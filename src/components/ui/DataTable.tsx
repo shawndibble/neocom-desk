@@ -4,6 +4,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -11,6 +12,7 @@ import {
   type MouseEvent,
   type ReactElement,
   type ReactNode,
+  type Ref,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
@@ -22,6 +24,10 @@ import * as Icon from './icons';
 import { InfoTooltip } from './Tooltip';
 import { RowMoreActions } from './RowActions';
 import { nextDataTableSort, sortRowsBy } from './dataTableSort';
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from './ContextMenu';
+import { RowMenuExtrasContext } from './rowActionsContext';
+import { ExportTableSub, RowExportItems } from './TableExport';
+import { TableExportContext, type TableExport, type TableExportConfig } from './useTableExport';
 
 export interface DataTableSort {
   columnId: string;
@@ -364,6 +370,27 @@ interface DataTableProps<T> {
    * down rather than under it.
    */
   virtualize?: boolean | 'auto';
+  /**
+   * Hands the caller the rows in on-screen order — the table sorts
+   * internally, so an export that wants to match what the reader sees reads
+   * them through this rather than re-sorting its own copy. Usually spread
+   * from `useTableExport(...).tableProps` (see `TableExport.tsx`).
+   */
+  exportRef?: Ref<DataTableExportHandle<T>>;
+  /**
+   * Makes the table exportable from its menus: every row menu
+   * (`rowContextMenu`, and its "More actions" button) gains an "Export
+   * table" submenu, and a table without row menus gets a table-wide
+   * right-click menu holding just that. Exports the rows as sorted on
+   * screen. Usually spread from `useTableExport(...).tableProps` together
+   * with `exportRef`, so the title bar's `TableActionsMenu` agrees.
+   */
+  exportable?: TableExportConfig<T>;
+}
+
+/** What `exportRef` exposes: the table's rows, filtered by the caller and sorted as displayed. */
+export interface DataTableExportHandle<T> {
+  getRows: () => readonly T[];
 }
 
 interface DataTableRowProps<T> {
@@ -667,6 +694,8 @@ export function DataTable<T>({
   stackActions,
   groupBy,
   virtualize = false,
+  exportRef,
+  exportable,
 }: DataTableProps<T>) {
   const { t } = useTranslation();
   const [internalSort, setInternalSort] = useState<DataTableSort | null>(defaultSort ?? null);
@@ -766,6 +795,17 @@ export function DataTable<T>({
     if (!sortDirection || !sortValue) return rows;
     return sortRowsBy(rows, sortValue, sortDirection);
   }, [rows, sortDirection, sortValue]);
+  useImperativeHandle(exportRef, () => ({ getRows: () => sortedRows }), [sortedRows]);
+  const tableExport = useMemo<TableExport<T> | null>(
+    () =>
+      exportable
+        ? {
+            ...exportable,
+            getRows: (exportable.getRows as (() => readonly T[]) | undefined) ?? (() => sortedRows),
+          }
+        : null,
+    [exportable, sortedRows]
+  );
 
   const grouping = groupBy !== undefined && isPhone;
   // Grouped over (row, index) pairs so `rowKey` still gets each row's index
@@ -1268,14 +1308,36 @@ export function DataTable<T>({
     </table>
   );
 
+  // Exportable: row menus grow the submenu through context; a table with no
+  // row menus gets a right-click menu of its own (the trigger is `asChild`,
+  // so still no wrapper element).
+  const body = !tableExport ? (
+    table
+  ) : (
+    <TableExportContext.Provider value={tableExport}>
+      {rowContextMenu ? (
+        <RowMenuExtrasContext.Provider value={<RowExportItems />}>
+          {table}
+        </RowMenuExtrasContext.Provider>
+      ) : (
+        <ContextMenu>
+          <ContextMenuTrigger asChild>{table}</ContextMenuTrigger>
+          <ContextMenuContent>
+            <ExportTableSub tableExport={tableExport} />
+          </ContextMenuContent>
+        </ContextMenu>
+      )}
+    </TableExportContext.Provider>
+  );
+
   // No wrapper element either way, so `className` and every caller's layout
   // (a flex/grid parent sizing the table) see the same `<table>` child.
   return sortBar ? (
     <>
       {sortBar}
-      {table}
+      {body}
     </>
   ) : (
-    table
+    body
   );
 }
