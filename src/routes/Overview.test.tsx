@@ -11,7 +11,11 @@ import { App } from '@/app/App';
 import { selectActiveEntryFromSorted, sortQueueEntries, selectQueueDepth } from './overviewQueue';
 import type { SkillType } from '@/sde/types';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
-import { OVERVIEW_HIDDEN_CARDS_KEY, useOverviewHiddenCards } from '@/features/overview/hiddenCards';
+import {
+  OVERVIEW_CARD_KEYS,
+  OVERVIEW_HIDDEN_CARDS_KEY,
+  useOverviewHiddenCards,
+} from '@/features/overview/hiddenCards';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -791,6 +795,8 @@ function usePhoneViewport(): void {
 
 /** The domain cards, by the heading each one carries. */
 const DOMAINS = ['Open orders', 'Mining tax', 'Planetary industry', 'Industry jobs'] as const;
+/** Domains that are always one line on a phone rather than competing for a full card. */
+const ALWAYS_FOLDED = ['Alerts', 'Contracts', 'Coming up'] as const;
 
 /** Which domains kept a full card — a card is a heading with its own "Open" link. */
 function fullCardDomains(): string[] {
@@ -839,9 +845,7 @@ describe('the board on a phone', () => {
     expect(full).toHaveLength(2);
     // Every domain still has a place, and none has two. A fold that quietly
     // dropped the fourth card would look exactly like a fold that worked.
-    expect([...full, ...foldedDomains()].sort()).toEqual(
-      [...DOMAINS, 'Alerts', 'Contracts'].sort()
-    );
+    expect([...full, ...foldedDomains()].sort()).toEqual([...DOMAINS, ...ALWAYS_FOLDED].sort());
   });
 
   it('folds contracts into a row that names the haul and its clock', async () => {
@@ -1033,7 +1037,7 @@ describe('hiding cards from the edit menu', () => {
   });
 
   it('says so rather than showing a blank board when every card is hidden', async () => {
-    await hide(['orders', 'mining', 'contracts', 'planetary', 'industry', 'alerts']);
+    await hide([...OVERVIEW_CARD_KEYS]);
     render(<App />);
 
     expect(await screen.findByText(/every card is hidden/i)).toBeInTheDocument();
@@ -1072,8 +1076,32 @@ describe('hiding cards from the edit menu', () => {
     await screen.findByRole('heading', { name: 'Everything else' });
 
     expect([...fullCardDomains(), ...foldedDomains()].sort()).toEqual(
-      ['Mining tax', 'Planetary industry', 'Industry jobs'].sort()
+      ['Mining tax', 'Planetary industry', 'Industry jobs', 'Coming up'].sort()
     );
+  });
+});
+
+describe('Coming up', () => {
+  it('lists the committed events ahead, and leaves out the ones not answered', async () => {
+    await grantScopes([CALENDAR_SCOPE]);
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/calendar`, () =>
+        HttpResponse.json([
+          { ...calendarEvent({ id: 1, hours: 30, response: 'tentative' }), title: 'Moon pop' },
+          { ...calendarEvent({ id: 2, hours: 5, response: 'accepted' }), title: 'Home defense' },
+          { ...calendarEvent({ id: 3, hours: 2, response: 'not_responded' }), title: 'Roam' },
+        ])
+      )
+    );
+    render(<App />);
+
+    const card = await findCard(/coming up/i);
+    const rows = await within(card).findAllByRole('listitem');
+    expect(rows.map((row) => within(row).getByRole('link').textContent)).toEqual([
+      expect.stringContaining('Home defense'),
+      expect.stringContaining('Moon pop'),
+    ]);
+    expect(within(card).getByRole('link', { name: /open/i })).toHaveAttribute('href', '/calendar');
   });
 });
 

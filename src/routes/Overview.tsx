@@ -70,6 +70,7 @@ import {
 import {
   AlertsColumn,
   CONTRACTS_IN_PROGRESS_HREF,
+  ComingUpCard,
   ContractsCard,
   EverythingElseCard,
   IndustryCard,
@@ -86,6 +87,7 @@ import {
   loadPlanetaryBoard,
 } from '@/features/overview/boardData';
 import {
+  comingUpSeverity,
   contractsSeverity,
   industrySeverity,
   miningTaxSeverity,
@@ -94,6 +96,7 @@ import {
 } from '@/features/overview/boardSeverity';
 import {
   alertsSummary,
+  comingUpSummary,
   contractsDeadlineNote,
   contractsSummary,
   industrySummary,
@@ -366,11 +369,6 @@ export function Overview() {
     .map((job) => Date.parse(job.end_date))
     .filter((ms) => !Number.isNaN(ms))
     .sort((a, b) => a - b)[0];
-  /*
-   * Only events the pilot has actually committed to — `accepted` or
-   * `tentative` — so a fleet op nobody has answered yet cannot lead the board
-   * (`engine/calendarDeadline`).
-   */
   const calendarEvent = soonestCalendarDeadline(calendarSnapshot.data?.events ?? [], now);
 
   /*
@@ -487,6 +485,29 @@ export function Overview() {
       ),
     },
     {
+      key: 'comingUp',
+      placement: 'folded',
+      to: '/calendar',
+      severity: comingUpSeverity(calendarSnapshot.data, now),
+      summary: comingUpSummary(t, calendarSnapshot.data, now),
+      fetchedAt: calendarSnapshot.data?.fetchedAt,
+      loading: calendarSnapshot.loading,
+      /*
+       * Only events the pilot has actually committed to — `accepted` or
+       * `tentative` — so a fleet op nobody has answered yet cannot lead the
+       * board (`engine/calendarDeadline`).
+       */
+      deadline: calendarEvent
+        ? {
+            at: calendarEvent.atMs,
+            note: calendarEvent.title,
+            severity: severityForRemaining(calendarEvent.atMs - now),
+            to: '/calendar',
+          }
+        : null,
+      render: () => <ComingUpCard data={calendarSnapshot.data} nowMs={now} />,
+    },
+    {
       key: 'alerts',
       placement: 'column',
       to: '/alerts',
@@ -496,10 +517,7 @@ export function Overview() {
     },
   ];
 
-  /*
-   * Clocks that belong to no card: skill training lives in the strip itself,
-   * and calendar has no card of its own.
-   */
+  /* The one clock that belongs to no card: skill training lives in the strip itself. */
   const alwaysDeadlines: BoardDeadline[] = [];
   if (trainingFinishMs !== null && trainingFinishMs > now) {
     alwaysDeadlines.push({
@@ -507,14 +525,6 @@ export function Overview() {
       note: t('overview.board.nextSkill'),
       severity: 'clear',
       to: '/skills/plans',
-    });
-  }
-  if (calendarEvent) {
-    alwaysDeadlines.push({
-      at: calendarEvent.atMs,
-      note: calendarEvent.title,
-      severity: severityForRemaining(calendarEvent.atMs - now),
-      to: '/calendar',
     });
   }
   const soonest = soonestDeadline(specs, shown, alwaysDeadlines);
@@ -588,7 +598,6 @@ export function Overview() {
         fetchedAt={stalest([
           walletSnapshot.data?.result?.fetchedAt,
           skillsQueueSnapshot.data?.queueResult?.fetchedAt,
-          calendarSnapshot.data?.fetchedAt,
           ...visibleSpecs.map((spec) => spec.fetchedAt),
         ])}
         now={now}
@@ -617,11 +626,7 @@ export function Overview() {
             onShowAll={() => void setHiddenCards([])}
           />
         }
-        refreshing={
-          walletSnapshot.loading ||
-          calendarSnapshot.loading ||
-          visibleSpecs.some((spec) => spec.loading)
-        }
+        refreshing={walletSnapshot.loading || visibleSpecs.some((spec) => spec.loading)}
       />
 
       {nothingShown && (

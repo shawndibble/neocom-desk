@@ -26,7 +26,9 @@ import { needsAttentionCount, openOrderProblemCounts } from '@/features/market/o
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import { compareSeverity } from '@/engine/severity';
 import { formatCountdown } from '@/lib/duration';
+import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
 import type {
+  CalendarEventsBoardData,
   ContractsBoardData,
   IndustryBoardData,
   MiningTaxBoardData,
@@ -163,4 +165,19 @@ export function contractsSummary(
     );
   }
   return parts.length > 0 ? parts.join(' · ') : t('overview.board.contractsNothingDue');
+}
+
+export function comingUpSummary(
+  t: Translate,
+  data: CalendarEventsBoardData | null,
+  nowMs: number
+): string {
+  if (data === null) return t(CHECKING);
+  if (data.needsReauth) return t(REAUTH);
+  const next = upcomingCommittedEvents(data.events, nowMs)[0];
+  if (next === undefined) return t('overview.board.comingUpNone');
+  return t('overview.board.comingUpNext', {
+    title: next.title,
+    when: formatCountdown((next.atMs - nowMs) / 1000),
+  });
 }

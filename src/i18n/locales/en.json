@@ -2684,6 +2684,15 @@
       "structures": "Structures",
       "moonChunks": "Moon extractions",
       "comingUp": "Coming up",
+      "comingUpNone": "Nothing scheduled",
+      "comingUpNext": "{{title}} in {{when}}",
+      "comingUpEmpty": "No accepted or tentative events ahead.",
+      "comingUpFooter_one": "{{count}} event ahead",
+      "comingUpFooter_other": "{{count}} events ahead",
+      "response": {
+        "accepted": "Accepted",
+        "tentative": "Tentative"
+      },
       "spExtraction": "SP extraction",
       "mail": "Mail",
       "priceAlerts": "Price alerts",

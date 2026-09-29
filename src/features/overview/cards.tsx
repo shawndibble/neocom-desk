@@ -35,12 +35,19 @@ import { BoardCard, FoldedRow, NumberTile, TileRow, TriageRow } from './BoardCar
 import {
   industrySeverity,
   jobSeverity,
+  comingUpSeverity,
   contractsSeverity,
   miningTaxSeverity,
   planetarySeverity,
 } from './boardSeverity';
 import { contractsDeadlineNote } from './boardSummary';
-import type { ContractsBoardData, MiningTaxBoardData, PlanetaryBoardData } from './boardData';
+import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
+import type {
+  CalendarEventsBoardData,
+  ContractsBoardData,
+  MiningTaxBoardData,
+  PlanetaryBoardData,
+} from './boardData';
 
 /** The Contracts History table filtered to accepted contracts — the courier hauls the card counts. */
 export const CONTRACTS_IN_PROGRESS_HREF = '/contracts/history?history.status=in_progress';
@@ -423,6 +430,71 @@ export function IndustryCard({
               })}
               detail={t(activityI18nKey(job.activity_id), { id: job.activity_id })}
               to="/industry"
+            />
+          ))}
+        </ul>
+      )}
+    </BoardCard>
+  );
+}
+
+// --- Coming up ------------------------------------------------------------
+
+/**
+ * The next few calendar events the pilot said yes (or maybe) to.
+ *
+ * Only committed events, and only the calendar. The Calendar page's Coming Up
+ * rail also carries jobs, colonies and contracts, but each of those already
+ * has a card here, and a second row for the same clock would be a number the
+ * board could contradict.
+ */
+export function ComingUpCard({
+  data,
+  nowMs,
+}: {
+  data: CalendarEventsBoardData | null;
+  nowMs: number;
+}) {
+  const { t } = useTranslation();
+  const upcoming = data ? upcomingCommittedEvents(data.events, nowMs) : [];
+  const shown = upcoming.slice(0, ROW_LIMIT);
+  return (
+    <BoardCard
+      title={t('overview.board.comingUp')}
+      meta={
+        <SeverityWord
+          severity={comingUpSeverity(data, nowMs)}
+          warningLabel={data?.needsReauth ? REAUTH_WORD : undefined}
+        />
+      }
+      to="/calendar"
+      openLabel={t('overview.board.open')}
+      footer={
+        data === null
+          ? t('overview.board.checking')
+          : data.needsReauth
+            ? t('overview.board.reauth')
+            : t('overview.board.comingUpFooter', { count: upcoming.length })
+      }
+    >
+      {shown.length === 0 ? (
+        <CardEmpty>
+          {data === null
+            ? t('overview.board.checking')
+            : data.needsReauth
+              ? t('overview.board.reauth')
+              : t('overview.board.comingUpEmpty')}
+        </CardEmpty>
+      ) : (
+        <ul>
+          {shown.map((event) => (
+            <TriageRow
+              key={event.eventId}
+              severity={event.atMs - nowMs <= 86_400_000 ? 'watch' : 'clear'}
+              when={formatDuration((event.atMs - nowMs) / 1000)}
+              subject={event.title}
+              detail={t(`overview.board.response.${event.response}`)}
+              to="/calendar"
             />
           ))}
         </ul>
