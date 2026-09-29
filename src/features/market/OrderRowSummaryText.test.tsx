@@ -37,15 +37,17 @@ const BASE_ROW: OpenOrderRow = {
 describe('OrderRowSummaryText relist price', () => {
   afterEach(() => configureClipboard(null));
 
-  it('shows the relist price with a copy button that copies the legal price', async () => {
+  it('copies the legal price when the bold relist price is clicked, and toasts', async () => {
     const written: string[] = [];
     configureClipboard(async (text) => {
       written.push(text);
     });
     render(<OrderRowSummaryText row={BASE_ROW} copyRelistPrice />);
-    expect(screen.getByText(/→ 439,900\.00/)).toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole('button', { name: /Copy 439,900/ }));
+    const price = screen.getByRole('button', { name: '→ 439,900.00' });
+    expect(price.querySelector('svg')).toBeNull();
+    await userEvent.setup().click(price);
     expect(written).toEqual(['439900']);
+    expect(screen.getByRole('status')).toHaveTextContent('Copied to clipboard');
   });
 
   it('shows no copy control unless asked (phone list)', () => {

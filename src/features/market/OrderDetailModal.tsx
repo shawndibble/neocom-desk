@@ -436,8 +436,8 @@ function computeSellThrough(
  * The suggested bid for a beaten buy order — one legal tick over the rival
  * (issue #1421) — or null when there is no rival price in hand to quote yet.
  * Reads `orderRowSummary` directly rather than `OrderRowSummaryText`'s own
- * internal call, since the quick answer needs the bare number to hand to
- * `CopyablePrice`, not the formatted sentence.
+ * internal call, since the quick answer needs the bare number for
+ * `CopyablePrice` to copy — the formatted sentence is only its visible label.
  */
 function outbidSuggestion(row: OpenOrderRow): number | null {
   const summary = orderRowSummary(row);
@@ -726,9 +726,10 @@ export function OrderDetailContent({
                   {t('market.orders.nextStep')}
                 </p>
                 <p className="mt-0.5 flex items-center gap-1.5 text-sm font-semibold text-text">
-                  <span>{nextActionText}</span>
-                  {(nextAction.kind === 'raisePrice' || nextAction.kind === 'matchThem') && (
-                    <CopyablePrice price={nextAction.price} showValue={false} />
+                  {nextAction.kind === 'raisePrice' || nextAction.kind === 'matchThem' ? (
+                    <CopyablePrice price={nextAction.price}>{nextActionText}</CopyablePrice>
+                  ) : (
+                    <span>{nextActionText}</span>
                   )}
                 </p>
               </div>
@@ -792,11 +793,9 @@ export function OrderDetailContent({
             {/* Outbid buy orders get their own suggested bid — `orderVerdict` is a sell-side idea only, so this is the one place a buy order sees a suggested price. */}
             {outbidSuggestedPrice !== null && (
               <p className="mt-1.5 flex items-center gap-1.5 text-sm">
-                <span>
+                <CopyablePrice price={outbidSuggestedPrice}>
                   {t('market.orders.outbidAt', { price: formatIsk(outbidSuggestedPrice, 2) })}
-                </span>
-                {/* Icon-only: the sentence above already states this price. */}
-                <CopyablePrice price={outbidSuggestedPrice} showValue={false} />
+                </CopyablePrice>
               </p>
             )}
           </section>
@@ -1145,44 +1144,48 @@ export function OrderDetailContent({
                   {exits.length === 0 ? (
                     <p className="text-text-dim">{t('market.orders.exitsNoFloor')}</p>
                   ) : (
-                    exits.map((exit) => (
-                      <p key={exit.kind} className="flex items-baseline justify-between gap-3">
-                        <span className="text-text-dim">
-                          {exit.kind === 'hold' && sell.kind === 'known'
-                            ? t('market.orders.exitHoldSellsIn', {
+                    exits.map((exit) => {
+                      const exitLabel =
+                        exit.kind === 'hold' && sell.kind === 'known'
+                          ? t('market.orders.exitHoldSellsIn', {
+                              price: formatIsk(exit.price, 2),
+                              days: sell.daysToClear,
+                            })
+                          : t(
+                              `market.orders.exit${exit.kind[0].toUpperCase()}${exit.kind.slice(1)}`,
+                              {
                                 price: formatIsk(exit.price, 2),
-                                days: sell.daysToClear,
-                              })
-                            : t(
-                                `market.orders.exit${exit.kind[0].toUpperCase()}${exit.kind.slice(1)}`,
-                                {
-                                  price: formatIsk(exit.price, 2),
-                                }
-                              )}
-                        </span>
-                        <span className="flex shrink-0 items-center gap-1.5">
-                          {/*
+                              }
+                            );
+                      return (
+                        <p key={exit.kind} className="flex items-baseline justify-between gap-3">
+                          <span className="text-text-dim">
+                            {/*
                         Only the undercut exit is a price to TYPE somewhere —
                         hold, dump and reprocess are all facts already true,
-                        not suggestions. Icon-only: the sentence to the left
-                        (`exitUndercutStation`) already states this price.
+                        not suggestions — so only its label is click-to-copy.
                       */}
-                          {exit.kind === 'undercutStation' && (
-                            <CopyablePrice price={exit.price} showValue={false} />
-                          )}
-                          <span
-                            className={cx(
-                              'tabular-nums',
-                              exit.netPerUnit >= 0 ? 'text-isk-pos' : 'text-isk-neg'
+                            {exit.kind === 'undercutStation' ? (
+                              <CopyablePrice price={exit.price}>{exitLabel}</CopyablePrice>
+                            ) : (
+                              exitLabel
                             )}
-                          >
-                            {t('market.orders.exitPerUnit', {
-                              amount: signedIsk(exit.netPerUnit),
-                            })}
                           </span>
-                        </span>
-                      </p>
-                    ))
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            <span
+                              className={cx(
+                                'tabular-nums',
+                                exit.netPerUnit >= 0 ? 'text-isk-pos' : 'text-isk-neg'
+                              )}
+                            >
+                              {t('market.orders.exitPerUnit', {
+                                amount: signedIsk(exit.netPerUnit),
+                              })}
+                            </span>
+                          </span>
+                        </p>
+                      );
+                    })
                   )}
                   {/*
                 Hauling is a gap and a distance, never a net: what a hub pays

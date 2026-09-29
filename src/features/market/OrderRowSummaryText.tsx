@@ -45,9 +45,10 @@ export function OrderRowSummaryText({
   const relistNode = relistPrice !== null && (
     <>
       {' '}
-      <span className="font-semibold text-text">
-        {t('market.orders.relistTo', { price: formatIsk(relistPrice, 2) })}
-        <CopyablePrice price={relistPrice} showValue={false} />
+      <span className="text-text">
+        <CopyablePrice price={relistPrice}>
+          {t('market.orders.relistTo', { price: formatIsk(relistPrice, 2) })}
+        </CopyablePrice>
       </span>
     </>
   );
