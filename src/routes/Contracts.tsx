@@ -531,7 +531,7 @@ export function Contracts() {
       {/* Both tabs read something datable and reloadable, but not the same
           thing: History is this character's own contract list, Search a shared
           public snapshot the panel below owns. So the badge and the Refresh
-          are per tab — the ⋯ export menu is History-only, because it exports that
+          are per tab — the export button is History-only, because it exports that
           character's contracts and nothing on Search corresponds to it. */}
       <PageHeader
         title={t('contracts.title')}

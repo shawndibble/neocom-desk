@@ -438,7 +438,7 @@ export function Wallet() {
       : skipped.filter((s) => resolvedWalletFilter.has(s.characterId));
   }, [walletBalancesSnapshot, resolvedWalletFilter]);
 
-  // Each table's title-bar ⋯ menu and its row menus export the same rows, in
+  // Each table's title-bar export button and its row menus export the same rows, in
   // the order the table shows them.
   const journalCsvColumns = useMemo(() => walletJournalCsvColumns(t), [t]);
   const journalExport = useTableExport({

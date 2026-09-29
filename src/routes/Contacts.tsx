@@ -380,7 +380,7 @@ interface AcrossCharactersPanelProps {
   onVisibleRowsChange: (rows: readonly AcrossCharactersRow[]) => void;
   /** Reports whether any list behind the current merge is truncated, so the CSV export's filename can carry the same "-partial" suffix the Character tab's own truncated export does. */
   onTruncatedChange: (truncated: boolean) => void;
-  /** The page header's ⋯ export for this tab, so the table's row menus export the same rows. */
+  /** The page header's export button for this tab, so the table's row menus export the same rows. */
   tableExport: UseTableExport<AcrossCharactersRow>;
 }
 
@@ -889,7 +889,7 @@ export function Contacts() {
       />
     );
 
-  // One ⋯ in the page header, exporting whichever tab's table is showing —
+  // One export button in the page header, exporting whichever tab's table is showing —
   // each tab keeps its own surface so the two files never share a name.
   const characterCsvColumns = useMemo(
     () => contactsCsvColumns(t, contactNames, affiliationRows),

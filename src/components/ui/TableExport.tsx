@@ -146,9 +146,10 @@ export function TableActionsMenu<T>({
   const [copied, setCopied] = useState<number | null>(null);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
-  const label = children
-    ? t('common.tableExport.menuLabel', { name })
-    : t('common.tableExport.exportLabel', { name });
+  const exportOnly = !children;
+  const label = exportOnly
+    ? t('common.tableExport.exportButtonLabel', { name })
+    : t('common.tableExport.menuLabel', { name });
   const onDone = (format: ExportFormat, count: number) => {
     if (format !== 'clipboard') return;
     setCopied(count);
@@ -162,10 +163,10 @@ export function TableActionsMenu<T>({
           icon={
             copied !== null ? (
               <Icon.Done size={Icon.ICON_SIZE.sm} />
-            ) : children ? (
-              <Icon.More size={Icon.ICON_SIZE.sm} />
-            ) : (
+            ) : exportOnly ? (
               <Icon.Download size={Icon.ICON_SIZE.sm} />
+            ) : (
+              <Icon.More size={Icon.ICON_SIZE.sm} />
             )
           }
           label={copied === null ? label : t('common.tableExport.copied', { count: copied })}
@@ -174,14 +175,14 @@ export function TableActionsMenu<T>({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <MenuKindContext.Provider value="dropdown">
-          {children ? (
+          {exportOnly ? (
+            <ExportTableItems tableExport={tableExport} onDone={onDone} />
+          ) : (
             <>
               {children}
               <MenuSeparator />
               <ExportTableSub tableExport={tableExport} onDone={onDone} />
             </>
-          ) : (
-            <ExportTableItems tableExport={tableExport} onDone={onDone} />
           )}
         </MenuKindContext.Provider>
       </DropdownMenuContent>

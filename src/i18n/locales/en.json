@@ -2826,7 +2826,7 @@
     "moreActionsLabel": "More actions for {{name}}",
     "tableExport": {
       "menuLabel": "{{name}} actions",
-      "exportLabel": "Export {{name}}",
+      "exportButtonLabel": "Export {{name}}",
       "exportTable": "Export table",
       "csv": "Download CSV",
       "xlsx": "Download Excel (.xlsx)",

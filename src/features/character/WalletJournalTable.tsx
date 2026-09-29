@@ -127,7 +127,7 @@ interface JournalTableProps {
   highlightRowKey?: number | null;
   sort: DataTableSort;
   onSortChange: (sort: DataTableSort) => void;
-  /** The export the panel's title-bar ⋯ menu drives, so row menus export the same rows. */
+  /** The export the panel's title-bar export button drives, so row menus export the same rows. */
   tableExport: UseTableExport<WalletJournalEntry>;
 }
 
