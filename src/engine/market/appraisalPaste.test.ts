@@ -62,6 +62,14 @@ describe('parseAppraisalPaste', () => {
     ]);
   });
 
+  it('parses an x N quantity with a space between the x and the count', () => {
+    expect(parseAppraisalPaste('Tritanium x 1000\nNocxium X 1,200\n1MN Afterburner I x1')).toEqual([
+      { name: 'Tritanium', quantity: 1000, lines: [1] },
+      { name: 'Nocxium', quantity: 1200, lines: [2] },
+      { name: '1MN Afterburner I', quantity: 1, lines: [3] },
+    ]);
+  });
+
   /**
    * The trap a naive `/(.+)\s+(\d+)$/` falls into: plenty of real type names
    * end in a number, and eating it leaves a name that resolves to nothing.
