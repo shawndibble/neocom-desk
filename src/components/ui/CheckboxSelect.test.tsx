@@ -30,13 +30,13 @@ describe('CheckboxSelect', () => {
     [['a', 'c'], 'Letters: 2 selected'],
   ])('summarises %j on the trigger as "%s"', (selected, text) => {
     renderSelect(selected);
-    expect(screen.getByRole('button', { name: 'Letters' })).toHaveTextContent(text);
+    expect(screen.getByRole('button', { name: text })).toHaveTextContent(text);
   });
 
   it('ticks the selected options and toggles one without closing the menu', async () => {
     const user = userEvent.setup();
     const onToggle = renderSelect(['a']);
-    await user.click(screen.getByRole('button', { name: 'Letters' }));
+    await user.click(screen.getByRole('button', { name: 'Letters: Alpha' }));
 
     expect(screen.getByRole('menuitemcheckbox', { name: 'Alpha' })).toHaveAttribute(
       'aria-checked',

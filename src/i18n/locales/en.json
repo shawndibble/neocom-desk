@@ -2374,7 +2374,7 @@
     "marketOpportunitiesRunScan": "Scan",
     "marketOpportunitiesScanning": "Scanning…",
     "marketOpportunitiesEmptyTitle": "Nothing scanned yet",
-    "marketOpportunitiesEmptyHint": "Run a market scan to rank what's profitable to build right now, from blueprints you own or can buy.",
+    "marketOpportunitiesEmptyHint": "Run a market scan to rank what's profitable right now, from blueprints you own or can buy.",
     "marketOpportunitiesNoResultsTitle": "Nothing to build here",
     "marketOpportunitiesNoResultsHint": "No product whose blueprint you own or can buy cleared the liquidity floor at this hub with these filters — try a busier Trade Hub or loosen the filters.",
     "marketOpportunitiesBlueprintSource": "Blueprint",

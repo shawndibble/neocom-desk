@@ -325,7 +325,7 @@ async function openFilterOption(
 ) {
   // The trigger, not the table's same-named column header.
   const trigger = scope
-    .getAllByRole('button', { name: FILTER_FIELD[option] })
+    .getAllByRole('button', { name: new RegExp(`^${FILTER_FIELD[option]}:`) })
     .find((button) => button.getAttribute('aria-haspopup') === 'menu');
   await user.click(trigger!);
   // `^`: an option with a description line carries it in its accessible name.
@@ -1234,8 +1234,8 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       render(<App />);
       await screen.findByRole('table', { name: 'BPC Sourcing' });
 
-      expect(screen.queryByRole('button', { name: 'Source' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Space' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Source:/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Space:/ })).not.toBeInTheDocument();
       // The column picker is a display preference, not a filter — it stays in
       // the row rather than collapsing with Source/Space.
       expect(screen.getByRole('button', { name: 'Columns' })).toBeInTheDocument();
@@ -1243,9 +1243,9 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       await user.click(screen.getByRole('button', { name: /^Filters/ }));
 
       const dialog = screen.getByRole('dialog', { name: 'Filters' });
-      expect(within(dialog).getByRole('button', { name: 'Source' })).toBeInTheDocument();
-      expect(within(dialog).getByRole('button', { name: 'Exclude' })).toBeInTheDocument();
-      expect(within(dialog).getByRole('button', { name: 'Space' })).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: /^Source:/ })).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: /^Exclude:/ })).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: /^Space:/ })).toBeInTheDocument();
     } finally {
       restore();
     }

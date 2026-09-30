@@ -218,8 +218,8 @@ export function OpportunitiesPanel({
   const oldestFetchedMs = oldestFetchedAt?.getTime() ?? null;
   useEffect(() => {
     onDataAgeChange?.(oldestFetchedMs === null ? null : new Date(oldestFetchedMs));
+    return () => onDataAgeChange?.(null);
   }, [oldestFetchedMs, onDataAgeChange]);
-  useEffect(() => () => onDataAgeChange?.(null), [onDataAgeChange]);
 
   const candidates = useMemo(
     () => buildOpportunityCandidates(ownedByCharacter, characterNames, catalog),

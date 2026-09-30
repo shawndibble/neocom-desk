@@ -13,12 +13,12 @@ import * as Icon from './icons';
 export interface CheckboxSelectOption<V> {
   value: V;
   label: string;
-  /** A dim second line under the label — what a chip's tooltip used to say. */
+  /** A dim second line under the label, for an option whose name needs explaining. */
   description?: string;
 }
 
 export interface CheckboxSelectProps<V> {
-  /** The field's name: the trigger's accessible name, and its visible prefix in an inline filter row (where `FilterField` draws no caption). */
+  /** The field's name: it leads the trigger's accessible name, and its visible text in an inline filter row (where `FilterField` draws no caption). */
   label: string;
   options: readonly CheckboxSelectOption<V>[];
   selected: ReadonlySet<V>;
@@ -47,6 +47,8 @@ export function CheckboxSelect<V extends string | number>({
 }: CheckboxSelectProps<V>) {
   const { t } = useTranslation();
   const inline = useFilterSurface() === 'inline';
+  // Named with the summary too, so a screen reader hears "Source: 2 selected",
+  // not just "Source" — the narrowing must not be visual-only.
   const chosen = options.filter((option) => selected.has(option.value));
   const summary =
     chosen.length === options.length
@@ -60,7 +62,7 @@ export function CheckboxSelect<V extends string | number>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label={label}
+        aria-label={t('common.checkboxSelect.labelled', { label, value: summary })}
         className={cx(
           fieldBaseClassName,
           fieldSizeClassName.sm,
