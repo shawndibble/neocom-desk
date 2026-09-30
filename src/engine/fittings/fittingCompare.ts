@@ -17,6 +17,7 @@ import type { CapacitorStatus, Fitting, FittingStats } from './types';
 const STAT_DIRECTION: Readonly<Partial<Record<FittingStatKey, 'higher' | 'lower'>>> = {
   totalDps: 'higher',
   totalVolley: 'higher',
+  sustainedDps: 'higher',
   overheatedDps: 'higher',
   burstTank: 'higher',
   sustainedTank: 'higher',

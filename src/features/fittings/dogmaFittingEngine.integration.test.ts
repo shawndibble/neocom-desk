@@ -69,6 +69,11 @@ const REACTIVE_ARMOR_HARDENER = 4403;
 const CARACAL = 621;
 const HEAVY_MISSILE_LAUNCHER_II = 2410;
 const SCOURGE_HEAVY_MISSILE = 209;
+// Looked up by exact name in `public/data/types.json`, 2026-09-29.
+const OMEN = 2006;
+const HEAVY_PULSE_LASER_II = 3520;
+const MULTIFREQUENCY_M = 254;
+const SCORCH_M = 12818;
 // Looked up by exact name in the pinned `sde.dat`, 2026-09-25.
 const HURRICANE = 24702;
 const MAELSTROM = 24694;
@@ -442,6 +447,66 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(offense.weapons[0].overheated?.volley).toBeCloseTo(365.148, 2);
     expect(offense.weapons[1].overheated).toBeNull();
     expect(offense.overheated?.dps).toBeCloseTo(170.946, 2);
+  });
+
+  it('averages launchers and blasters over their reload, but never lasers or drones', () => {
+    const fit = (shipTypeId: number, typeId: number, chargeTypeId: number): Fitting => ({
+      name: 'Integration Test sustained DPS',
+      shipTypeId,
+      modules: [0, 1].map((slotIndex) => ({
+        slot: 'high' as const,
+        slotIndex,
+        typeId,
+        state: 'active' as const,
+        chargeTypeId,
+      })),
+      drones: [{ typeId: WARRIOR_II, quantity: 2, state: 'active' }],
+      cargo: [],
+    });
+    const offenseOf = (fitting: Fitting) => {
+      const items = [
+        ...fitting.modules.map((module) => ({
+          typeId: module.typeId,
+          chargeTypeId: module.chargeTypeId,
+          quantity: 1,
+          isDrone: false,
+        })),
+        { typeId: WARRIOR_II, quantity: 2, isDrone: true },
+      ];
+      const calculation = calculate(
+        fittingToDogmaFit(fitting, buildAllVProfile([...SUPPORT_SKILL_IDS, 3436, 3442]))
+      );
+      return { offense: extractOffense(items, calculation.items, null), calculation };
+    };
+
+    for (const [ship, weapon, charge] of [
+      [CARACAL, HEAVY_MISSILE_LAUNCHER_II, SCOURGE_HEAVY_MISSILE],
+      [VEXOR_NAVY_ISSUE, NEUTRON_BLASTER_CANNON_II, ANTIMATTER_CHARGE_M],
+    ]) {
+      const { offense, calculation } = offenseOf(fit(ship, weapon, charge));
+      const read = (id: number) => calculation.items[0].attributes.get(id)?.value ?? 0;
+      // The engine fills in a weapon's magazine, not only a booster's or AAR's
+      // — in single precision (160 antimatter rounds read 159.9999976).
+      const shots = Math.round(read(-8));
+      expect(shots).toBeGreaterThan(1);
+      const firing = (shots * read(51)) / 1000;
+      const duty = firing / (firing + read(1795) / 1000);
+      expect(duty).toBeLessThan(1);
+
+      const [guns, drones] = offense.weapons;
+      expect(guns.typeId).toBe(weapon);
+      expect(guns.dps).toBeGreaterThan(0);
+      expect(guns.sustainedDps).toBeCloseTo(guns.dps * duty, 6);
+      expect(drones.sustainedDps).toBe(drones.dps);
+      expect(offense.sustainedDps).toBeCloseTo(guns.dps * duty + drones.dps, 6);
+    }
+
+    // A frequency crystal is never spent per shot, damaged kind (Scorch) or not.
+    for (const crystal of [MULTIFREQUENCY_M, SCORCH_M]) {
+      const { offense } = offenseOf(fit(OMEN, HEAVY_PULSE_LASER_II, crystal));
+      expect(offense.weapons[0].dps).toBeGreaterThan(0);
+      expect(offense.weapons[0].sustainedDps).toBe(offense.weapons[0].dps);
+    }
   });
 
   it('measures EHP against a damage profile and adapts a Reactive Armor Hardener to it', () => {

@@ -73,7 +73,14 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     applied: { weapons: [], droneControlRange: 20000 },
     slotCounts: { high: 3, medium: 3, low: 4, rig: 3, subsystem: 0 },
     modules: [],
-    offense: { weapons: [], dps: 0, volley: 0, overheated: null, chargelessWeaponCount: 0 },
+    offense: {
+      weapons: [],
+      dps: 0,
+      sustainedDps: 0,
+      volley: 0,
+      overheated: null,
+      chargelessWeaponCount: 0,
+    },
     repair: { shield: 0, armor: 0, hull: 0 },
     overheated: null,
     ...neutralExtendedStats(),
@@ -101,14 +108,24 @@ function heatedStats(): FittingStats {
           isDrone: false,
           count: 2,
           dps: 53.7,
+          sustainedDps: 50.1,
           volley: 304,
-          overheated: { dps: 61.7, volley: 350 },
+          overheated: { dps: 61.7, sustainedDps: 61.7, volley: 350 },
         },
-        { typeId: 2488, isDrone: true, count: 5, dps: 120, volley: 480, overheated: null },
+        {
+          typeId: 2488,
+          isDrone: true,
+          count: 5,
+          dps: 120,
+          sustainedDps: 120,
+          volley: 480,
+          overheated: null,
+        },
       ],
       dps: 173.7,
+      sustainedDps: 170.1,
       volley: 784,
-      overheated: { dps: 181.7, volley: 830 },
+      overheated: { dps: 181.7, sustainedDps: 181.7, volley: 830 },
       chargelessWeaponCount: 0,
     },
     repair: { shield: 0, armor: 63.2, hull: 0 },
@@ -300,6 +317,31 @@ describe('FittingStatsSections offense', () => {
     expect(offense.getByText('784 volley')).toBeInTheDocument();
   });
 
+  it('shows sustained DPS with reload under the total and on a reloading row, never on drones', () => {
+    renderSections(heatedStats());
+    const offense = within(sectionBody('Offense'));
+
+    expect(offense.getByText('Sustained with reload: 170.1 DPS')).toBeInTheDocument();
+    const blasters = offense.getByText('53.7 DPS').closest('[title]');
+    expect(blasters).toHaveAttribute('title', 'Sustained with reload: 50.1 DPS');
+    expect(blasters).toHaveTextContent('(Sustained with reload: 50.1 DPS)');
+    expect(offense.getByText('120.0 DPS').closest('[title]')).toBeNull();
+  });
+
+  it('shows no sustained figure when reloading costs nothing', () => {
+    const base = heatedStats();
+    renderSections({
+      ...base,
+      offense: {
+        ...base.offense,
+        weapons: base.offense.weapons.map((row) => ({ ...row, sustainedDps: row.dps })),
+        sustainedDps: base.offense.dps,
+      },
+    });
+
+    expect(within(sectionBody('Offense')).queryByText(/Sustained/)).toBeNull();
+  });
+
   it('shows no overheated values beside weapons — "Overheat all" does that — and says drones do not', () => {
     renderSections(heatedStats());
     const offense = within(sectionBody('Offense'));
@@ -317,7 +359,14 @@ describe('FittingStatsSections offense', () => {
   it('blames the missing charge, not activation, when weapons are active but empty', () => {
     renderSections(
       stats({
-        offense: { weapons: [], dps: 0, volley: 0, overheated: null, chargelessWeaponCount: 3 },
+        offense: {
+          weapons: [],
+          dps: 0,
+          sustainedDps: 0,
+          volley: 0,
+          overheated: null,
+          chargelessWeaponCount: 3,
+        },
       })
     );
     const offense = within(sectionBody('Offense'));
@@ -525,7 +574,14 @@ describe('FittingStatsSections — Applied DPS', () => {
     renderSections(
       stats({
         applied: { weapons: [], droneControlRange: 20000 },
-        offense: { weapons: [], dps: 0, volley: 0, overheated: null, chargelessWeaponCount: 3 },
+        offense: {
+          weapons: [],
+          dps: 0,
+          sustainedDps: 0,
+          volley: 0,
+          overheated: null,
+          chargelessWeaponCount: 3,
+        },
       }),
       damageProfiles()
     );

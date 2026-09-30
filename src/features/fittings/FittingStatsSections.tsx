@@ -191,17 +191,29 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
 /**
  * A row's DPS and volley — under "Overheat all", in the warning tone where
  * heat changed them. `figures` picks the same row out of either calculation.
+ * Sustained DPS (with reload), where reloading costs anything, is a dim
+ * `line` under the figures (the total) or their `tooltip` (a weapon row).
  */
 function DamageFigures({
   stats,
   figures,
+  sustained = 'tooltip',
 }: {
   stats: FittingStats;
   figures: (stats: FittingStats) => DamageFiguresValue;
+  sustained?: 'tooltip' | 'line';
 }) {
   const { t } = useTranslation();
-  return (
-    <span className="ml-auto shrink-0 text-right tabular-nums">
+  const sustainedLabel = (s: FittingStats) => {
+    const { dps, sustainedDps } = figures(s);
+    return sustainedDps.toFixed(1) === dps.toFixed(1)
+      ? ''
+      : t('fittings.stats.sustainedDps', { value: sustainedDps.toFixed(1) });
+  };
+  const label = sustainedLabel(stats);
+  const tooltip = sustained === 'tooltip' && label !== '' ? label : undefined;
+  const numbers = (
+    <span className="ml-auto shrink-0 text-right tabular-nums" title={tooltip}>
       <span>
         <HeatFigure
           stats={stats}
@@ -215,7 +227,17 @@ function DamageFigures({
           format={(s) => t('fittings.stats.weaponVolley', { value: figures(s).volley.toFixed(0) })}
         />
       </span>
+      {tooltip && <span className="sr-only"> ({tooltip})</span>}
     </span>
+  );
+  if (sustained === 'tooltip' || label === '') return numbers;
+  return (
+    <>
+      {numbers}
+      <span className="basis-full text-right text-[0.6875rem] font-normal text-text-dim tabular-nums">
+        <HeatFigure stats={stats} format={sustainedLabel} />
+      </span>
+    </>
   );
 }
 
@@ -459,9 +481,9 @@ function OffenseRows({
           </li>
         );
       })}
-      <li className="flex justify-between gap-x-2 border-t border-line pt-1 font-semibold">
+      <li className="flex flex-wrap justify-between gap-x-2 border-t border-line pt-1 font-semibold">
         <span>{t('fittings.stats.offenseTotal')}</span>
-        <DamageFigures stats={stats} figures={(s) => s.offense} />
+        <DamageFigures stats={stats} figures={(s) => s.offense} sustained="line" />
       </li>
     </ul>
   );

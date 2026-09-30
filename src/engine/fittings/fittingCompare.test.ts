@@ -58,7 +58,14 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     unknownItemTypeIds: [],
     slotCounts: { high: 4, medium: 4, low: 4, rig: 3, subsystem: 0 },
     modules: [],
-    offense: { weapons: [], dps: 0, volley: 0, overheated: null, chargelessWeaponCount: 0 },
+    offense: {
+      weapons: [],
+      dps: 0,
+      sustainedDps: 0,
+      volley: 0,
+      overheated: null,
+      chargelessWeaponCount: 0,
+    },
     applied: { weapons: [], droneControlRange: 20000 },
     repair: { shield: 0, armor: 0, hull: 0 },
     overheated: null,
@@ -77,19 +84,28 @@ describe('compareFittingStats', () => {
           weapons: [],
           chargelessWeaponCount: 0,
           dps: 100,
+          sustainedDps: 95,
           volley: 0,
-          overheated: { dps: 120, volley: 0 },
+          overheated: { dps: 120, sustainedDps: 120, volley: 0 },
         },
       }),
       stats({
         tank: { ...tank, sustainedEffective: 80, burstEffective: 80 },
-        offense: { weapons: [], chargelessWeaponCount: 0, dps: 110, volley: 0, overheated: null },
+        offense: {
+          weapons: [],
+          chargelessWeaponCount: 0,
+          dps: 110,
+          sustainedDps: 110,
+          volley: 0,
+          overheated: null,
+        },
       }),
     ]);
     const row = (key: string) => table.rows.find((r) => r.key === key)!;
     expect(row('sustainedTank')).toMatchObject({ values: [50, 80], bestIndices: [1] });
     expect(row('burstTank')).toMatchObject({ values: [90, 80], bestIndices: [0] });
     // A fit with nothing to overheat reads its plain DPS as its overheated DPS.
+    expect(row('sustainedDps')).toMatchObject({ values: [95, 110], bestIndices: [1] });
     expect(row('overheatedDps')).toMatchObject({ values: [120, 110], bestIndices: [0] });
     expect(row('capacitorDelta').differs).toBe(false);
     expect(row('cargoCapacity').differs).toBe(false);
@@ -147,6 +163,7 @@ describe('compareFittingStats', () => {
         offense: {
           weapons: [],
           dps: 250.04,
+          sustainedDps: 250.04,
           volley: 1200,
           overheated: null,
           chargelessWeaponCount: 0,
@@ -156,6 +173,7 @@ describe('compareFittingStats', () => {
         offense: {
           weapons: [],
           dps: 310.26,
+          sustainedDps: 310.26,
           volley: 900,
           overheated: null,
           chargelessWeaponCount: 0,

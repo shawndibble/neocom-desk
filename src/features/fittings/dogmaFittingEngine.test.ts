@@ -404,7 +404,7 @@ describe('computeFittingStats overheated values', () => {
         typeId: 3186,
         count: 1,
         dps: 10,
-        overheated: { dps: 12, volley: 50 },
+        overheated: { dps: 12, sustainedDps: 12, volley: 50 },
       }),
       expect.objectContaining({ typeId: 2488, count: 5, dps: 20, overheated: null }),
     ]);

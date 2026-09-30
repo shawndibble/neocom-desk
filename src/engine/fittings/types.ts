@@ -332,13 +332,21 @@ export interface WeaponRow {
   count: number;
   /** Without reload. */
   dps: number;
+  /** Averaged over each module's reloads, summed per module. */
+  sustainedDps: number;
   volley: number;
   /** Null when the row can't overheat — drones never do. */
   overheated: DamageFigures | null;
 }
 
 export interface DamageFigures {
+  /** Without reload. */
   dps: number;
+  /**
+   * Averaged over the magazine and its reload — `dps` for drones, fighters,
+   * lasers and anything that never reloads.
+   */
+  sustainedDps: number;
   volley: number;
 }
 
@@ -346,6 +354,7 @@ export interface OffenseStats {
   weapons: WeaponRow[];
   /** Sum of the rows. */
   dps: number;
+  sustainedDps: number;
   volley: number;
   /** Null when no row can overheat. */
   overheated: DamageFigures | null;
