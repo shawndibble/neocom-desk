@@ -3500,6 +3500,12 @@
     },
     "crossCharacterLoading": "Searching other characters…",
     "crossCharacterBadge": "From {{character}}",
+    "blueprintBadge": {
+      "original": "BPO",
+      "originalTitle": "Blueprint original",
+      "copy": "BPC",
+      "copyTitle": "Blueprint copy"
+    },
     "crossCharacterCsvNote": "CSV export only includes this character's own items.",
     "bay": {
       "cargoHold": "Cargo Hold",

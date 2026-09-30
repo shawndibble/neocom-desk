@@ -24,6 +24,7 @@ import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import type { PinState } from '@/features/character/stationPins';
 import type { SelectionState } from '@/features/character/assetSelection';
 import { SelectionCheckbox } from './SelectionCheckbox';
+import type { BlueprintKind } from '@/engine/blueprintKind';
 
 export type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -87,6 +88,40 @@ export function CharacterBadge({ characterName, t }: CharacterBadgeProps) {
       title={t('assets.crossCharacterBadge', { character: characterName })}
     >
       {characterName}
+    </span>
+  );
+}
+
+interface BlueprintBadgeProps {
+  kind: BlueprintKind;
+  t: Translate;
+}
+
+/**
+ * Marks a blueprint stack as a **BPO** or a **BPC** (CONTEXT.md) — the one
+ * distinction the item name can't carry, since a copy shares its original's
+ * typeID and name. Same accent-for-original convention as Industry's owned
+ * blueprints; the written label, not the colour, is the signal (DESIGN.md §7),
+ * and the full word is there for a screen reader.
+ */
+export function BlueprintBadge({ kind, t }: BlueprintBadgeProps) {
+  const original = kind === 'original';
+  return (
+    <span
+      className={cx(
+        'ml-1.5 shrink-0 rounded-xs border px-1 py-0.5 text-[0.6875rem] font-semibold',
+        original ? 'border-accent-dim text-accent' : 'border-line bg-panel-2 text-text-dim'
+      )}
+      title={t(
+        original ? 'assets.blueprintBadge.originalTitle' : 'assets.blueprintBadge.copyTitle'
+      )}
+    >
+      <span aria-hidden="true">
+        {t(original ? 'assets.blueprintBadge.original' : 'assets.blueprintBadge.copy')}
+      </span>
+      <span className="sr-only">
+        {t(original ? 'assets.blueprintBadge.originalTitle' : 'assets.blueprintBadge.copyTitle')}
+      </span>
     </span>
   );
 }
@@ -313,6 +348,10 @@ interface ItemRowProps {
   unitVolume: number | undefined;
   estimatedValue: number;
   characterBadge: string | null;
+  /** Set on a blueprint stack: a BPO or BPC badge beside the name. */
+  blueprintKind?: BlueprintKind | null;
+  /** Makes the name a button opening Show info — the row menu's first action, one click closer. */
+  onShowInfo?: () => void;
   /** Wraps the row in the shared item context menu — supplied by the route. */
   wrap: (children: ReactElement) => ReactNode;
   selectMode: boolean;
@@ -329,7 +368,10 @@ interface ItemRowProps {
  *
  * Full item detail (icon, volume, location, jumps-away) lives behind the
  * row's menu's "Show info" action — right-click, or the More actions button
- * the menu publishes into the row — not on the row itself.
+ * the menu publishes into the row — not on the row itself. With `onShowInfo`
+ * the name opens it directly too: a real button inside the menu's trigger,
+ * never wrapping another control, so right-click and long-press still reach
+ * the menu from it.
  */
 export function ItemRow({
   name,
@@ -337,6 +379,8 @@ export function ItemRow({
   unitVolume,
   estimatedValue,
   characterBadge,
+  blueprintKind = null,
+  onShowInfo,
   wrap,
   selectMode,
   selectionState,
@@ -362,9 +406,21 @@ export function ItemRow({
               above). */}
           <span className="flex min-w-0 flex-1 flex-col gap-0.5 md:contents">
             <span className="flex min-w-0 items-center md:flex-1">
-              <span className="truncate text-sm" title={name}>
-                {name}
-              </span>
+              {onShowInfo ? (
+                <button
+                  type="button"
+                  className="min-w-0 cursor-pointer truncate text-left text-sm underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  title={name}
+                  onClick={onShowInfo}
+                >
+                  {name}
+                </button>
+              ) : (
+                <span className="truncate text-sm" title={name}>
+                  {name}
+                </span>
+              )}
+              {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
               {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
             </span>
             <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-dim tabular-nums md:contents md:text-xs">
@@ -401,6 +457,8 @@ interface SearchResultRowProps {
   security: number | null | undefined;
   href: string;
   characterBadge: string | null;
+  /** Set on a blueprint stack: a BPO or BPC badge beside the name. */
+  blueprintKind?: BlueprintKind | null;
   t: Translate;
 }
 
@@ -408,7 +466,9 @@ interface SearchResultRowProps {
  * A search hit. Search deliberately leaves the drill-down and reports across
  * every location at once — filtering only the level you happen to be standing
  * in would make "Search all characters" meaningless — so each hit has to say
- * where it lives, and links straight to that place.
+ * where it lives, and links straight to that place. The whole row is that
+ * link, so its name stays plain text — a Show info button there would nest
+ * one control inside another; the hit's own place has it one tap away.
  */
 export function SearchResultRow({
   name,
@@ -418,6 +478,7 @@ export function SearchResultRow({
   security,
   href,
   characterBadge,
+  blueprintKind = null,
   t,
 }: SearchResultRowProps) {
   return (
@@ -429,6 +490,7 @@ export function SearchResultRow({
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="flex min-w-0 flex-1 items-center">
             <span className="truncate text-sm font-medium">{name}</span>
+            {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
             {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
           </span>
           <span className="shrink-0 text-sm tabular-nums">×{quantity.toLocaleString()}</span>

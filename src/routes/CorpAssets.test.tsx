@@ -27,6 +27,21 @@ vi.mock('@/features/corp/assets', async (importOriginal) => ({
   loadCorporationAssets: vi.fn(),
   loadCorpAssetLabels: vi.fn(),
 }));
+// Show info's modal fetches the type's dogma/market data; a stub that names
+// its item is all the name-button tests need to see it opened.
+vi.mock('@/features/market/ItemDetailModal', () => ({
+  ItemDetailModal: ({ itemName }: { itemName: string }) => (
+    <div role="dialog" aria-label={`Item detail: ${itemName}`} />
+  ),
+}));
+vi.mock('@/sde/loadSde', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/sde/loadSde')>()),
+  loadBlueprints: vi.fn(async () => ({})),
+}));
+// Copy valuation reaches Firestore; these tests only need a copy's badge.
+vi.mock('@/features/character/assetCopyValues', () => ({
+  loadAssetCopyValues: vi.fn(async () => new Map()),
+}));
 vi.mock('@/features/corp/wallet', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/corp/wallet')>()),
   loadCorporationDivisions: vi.fn(),
@@ -399,6 +414,64 @@ describe('row context menu (issue #420)', () => {
     // the blueprint catalog, so this must resolve instantly rather than
     // dangling in "checking…" forever.
     expect(screen.getByRole('menuitem', { name: 'No blueprint options' })).toBeInTheDocument();
+  });
+});
+
+describe('item name and blueprint badge', () => {
+  const RIFTER_BLUEPRINT = {
+    name: 'Rifter Blueprint',
+    time: 6000,
+    materials: [],
+    products: [{ typeID: 587, quantity: 1 }],
+    skills: [],
+    activity: 'manufacturing' as const,
+  };
+
+  beforeEach(async () => {
+    const { loadBlueprints } = await import('@/sde/loadSde');
+    vi.mocked(loadBlueprints).mockResolvedValue({ '691': RIFTER_BLUEPRINT });
+    mocked.loadCorporationAssets.mockResolvedValue(
+      cached([
+        asset({ item_id: 1, type_id: 34 }),
+        asset({ item_id: 2, type_id: 691 }),
+        asset({ item_id: 3, type_id: 691, is_blueprint_copy: true }),
+      ])
+    );
+    mocked.loadCorpAssetLabels.mockResolvedValue({
+      types: new Map([
+        [34, 'Tritanium'],
+        [691, 'Rifter Blueprint'],
+      ]),
+      locations: new Map([[60003760, 'Jita IV - Moon 4']]),
+    });
+  });
+
+  it('opens Show info from the item name', async () => {
+    const user = userEvent.setup();
+    renderAssets();
+    await user.click(await screen.findByRole('link', { name: /Division 1/ }));
+
+    await user.click(await screen.findByRole('button', { name: 'Tritanium' }));
+
+    expect(screen.getByRole('dialog', { name: 'Item detail: Tritanium' })).toBeInTheDocument();
+  });
+
+  it('badges a corp BPO and BPC, and leaves an ordinary item bare', async () => {
+    const user = userEvent.setup();
+    renderAssets();
+    await user.click(await screen.findByRole('link', { name: /Division 1/ }));
+
+    expect(await screen.findByTitle('Blueprint original')).toHaveTextContent('BPO');
+    expect(screen.getByTitle('Blueprint copy')).toHaveTextContent('BPC');
+    expect(screen.getAllByTitle(/^Blueprint (original|copy)$/)).toHaveLength(2);
+  });
+
+  it('badges a blueprint search hit, whose row stays a link', async () => {
+    renderAssets('/corp/assets?q=Rifter');
+
+    expect(await screen.findByTitle('Blueprint original')).toHaveTextContent('BPO');
+    expect(screen.getByTitle('Blueprint copy')).toHaveTextContent('BPC');
+    expect(screen.queryByRole('button', { name: 'Rifter Blueprint' })).not.toBeInTheDocument();
   });
 });
 

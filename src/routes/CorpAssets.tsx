@@ -96,6 +96,9 @@ import { loadTypeVolumes } from '@/features/character/typeNames';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
+import { useItemActions } from '@/features/market/itemActions';
+import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
+import { assetBlueprintKind, mayBeBlueprintName } from '@/engine/blueprintKind';
 import { useCompareSet } from '@/features/market/compareSet';
 import { writeToClipboard } from '@/lib/clipboard';
 import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
@@ -379,6 +382,13 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
   const typeNames = data?.labels.types ?? EMPTY_CORP_ASSET_LABELS.types;
   const locationNames = data?.labels.locations ?? EMPTY_CORP_ASSET_LABELS.locations;
   const divisionNames = data?.divisionNames ?? EMPTY_DIVISION_NAMES;
+  // The BPO badge's blueprint set, fetched only once a listed name could be a
+  // blueprint's — most hangars hold none, and the catalog is 1.6 MB.
+  const mayHoldBlueprints = useMemo(
+    () => [...typeNames.values()].some(mayBeBlueprintName),
+    [typeNames]
+  );
+  const blueprintTypeIds = useBlueprintTypeIds(mayHoldBlueprints);
 
   const resolved = useMemo(
     () => resolveCorpAssetPath(groups ?? [], pathGroupId, pathSegments),
@@ -760,6 +770,7 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
                               query={query}
                               priceByTypeId={data?.priceByTypeId ?? EMPTY_PRICES}
                               copyValueByItemId={data?.copyValueByItemId ?? EMPTY_PRICES}
+                              blueprintTypeIds={blueprintTypeIds}
                               volumeByTypeId={data?.volumeByTypeId ?? EMPTY_VOLUMES}
                             />
                           </div>
@@ -793,6 +804,8 @@ interface BrowseRowViewProps {
   priceByTypeId: ReadonlyMap<number, number>;
   copyValueByItemId: ReadonlyMap<number, number>;
   volumeByTypeId: ReadonlyMap<number, number>;
+  /** Blueprint typeIDs for the BPO badge; null until loaded, or when nothing listed can be a blueprint. */
+  blueprintTypeIds: ReadonlySet<number> | null;
 }
 
 /** Dispatches one virtualized row to the right presentation component. */
@@ -838,6 +851,7 @@ function BrowseRowView(props: BrowseRowViewProps) {
       security={undefined}
       href={corpAssetHref(match.groupId, match.segments, props.query)}
       characterBadge={null}
+      blueprintKind={assetBlueprintKind(match.node.asset, props.blueprintTypeIds)}
       t={t}
     />
   );
@@ -857,7 +871,9 @@ function NodeRowView({
   priceByTypeId,
   copyValueByItemId,
   volumeByTypeId,
+  blueprintTypeIds,
 }: BrowseRowViewProps & { node: AssetTreeNode }) {
+  const { showInfo } = useItemActions();
   const label = nodeLabel(node, typeNames, locationNames, t);
 
   if (node.kind !== 'item') {
@@ -885,6 +901,8 @@ function NodeRowView({
       unitVolume={volumeByTypeId.get(asset.type_id)}
       estimatedValue={assetStackValue(asset, priceByTypeId, copyValueByItemId)}
       characterBadge={null}
+      blueprintKind={assetBlueprintKind(asset, blueprintTypeIds)}
+      onShowInfo={() => showInfo(asset.type_id, label)}
       selectMode={selectMode}
       selectionState={selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
       onToggleSelection={() => onToggleSelection([asset.item_id])}

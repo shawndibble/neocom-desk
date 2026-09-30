@@ -29,7 +29,16 @@ const TYPES: TypeMap = {
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
   '35': { name: 'Pyerite', groupID: 18, volume: 0.01 },
   '650': { name: 'Drake', groupID: 27, volume: 92150 },
+  '691': { name: 'Rifter Blueprint', groupID: 105, volume: 0.01 },
 };
+
+// Show info's modal fetches the type's dogma/market data; a stub that names
+// its item is all the name-button tests need to see it opened.
+vi.mock('@/features/market/ItemDetailModal', () => ({
+  ItemDetailModal: ({ itemName }: { itemName: string }) => (
+    <div role="dialog" aria-label={`Item detail: ${itemName}`} />
+  ),
+}));
 
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
@@ -760,6 +769,58 @@ describe('station pins (issue #84)', () => {
     await waitFor(() => {
       expect(locationOrder()).toEqual([STRUCTURE, JITA]);
     });
+  });
+});
+
+describe('item name and blueprint badge', () => {
+  it('opens Show info from the item name', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await openLocation(user, JITA);
+
+    const name = await screen.findByRole('button', { name: 'Tritanium' });
+    await user.click(name);
+    expect(screen.getByRole('dialog', { name: 'Item detail: Tritanium' })).toBeInTheDocument();
+  });
+
+  it('keeps right-click on the name opening the row menu, not Show info', async () => {
+    render(<App />);
+    const user = userEvent.setup();
+    await openLocation(user, JITA);
+    const name = await screen.findByRole('button', { name: 'Tritanium' });
+    fireEvent.contextMenu(name);
+
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Item detail: Tritanium' })).toBeNull();
+    await user.keyboard('{Escape}');
+  });
+
+  it('badges a blueprint original as BPO once the blueprint set loads', async () => {
+    const { loadBlueprints } = await import('@/sde/loadSde');
+    vi.mocked(loadBlueprints).mockResolvedValueOnce({
+      '691': {
+        name: 'Rifter Blueprint',
+        time: 6000,
+        materials: [],
+        products: [{ typeID: 587, quantity: 1 }],
+        skills: [],
+        activity: 'manufacturing',
+      },
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json([
+          ...assetPage1,
+          { ...assetPage1[0], item_id: 3, type_id: 691, quantity: 1 },
+        ])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await openLocation(user, JITA);
+
+    expect(await screen.findByTitle('Blueprint original')).toHaveTextContent('BPO');
+    expect(screen.getAllByTitle(/^Blueprint (original|copy)$/)).toHaveLength(1);
   });
 });
 
