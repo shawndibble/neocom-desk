@@ -51,6 +51,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.targetSkillPlan': /which skill plan you're adding skills to/i,
   'sync.overviewHiddenCards': /Overview cards you hid/i,
   'sync.overviewCardOrder': /order you put them in/i,
+  'sync.avoidedSystems': /systems you avoid/i,
 };
 
 function syncedItemIds(): Set<string> {

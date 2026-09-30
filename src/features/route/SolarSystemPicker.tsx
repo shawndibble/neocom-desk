@@ -8,6 +8,7 @@
 import { useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Popover, PopoverContent, PopoverTrigger, SearchInput } from '@/components/ui';
+import { SecurityStatus } from '@/components/SecurityStatus';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
 import { rankedSearch } from '@/lib/rankedSearch';
@@ -32,6 +33,10 @@ export interface SolarSystemPickerProps {
   hint?: ReactNode;
   /** Below the results; `close` shuts the popover. */
   footer?: (close: () => void) => ReactNode;
+  /** Systems left out of the results, such as ones already on a list. */
+  exclude?: ReadonlySet<number>;
+  /** Each result also shows its security status. */
+  showSecurity?: boolean;
 }
 
 export function SolarSystemPicker({
@@ -43,6 +48,8 @@ export function SolarSystemPicker({
   disabled = false,
   hint,
   footer,
+  exclude,
+  showSecurity = false,
 }: SolarSystemPickerProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -54,8 +61,13 @@ export function SolarSystemPicker({
 
   const matches = useMemo(
     () =>
-      systems ? rankedSearch(systems, query, { primary: (s) => s.name, limit: MATCH_LIMIT }) : [],
-    [systems, query]
+      systems
+        ? rankedSearch(exclude?.size ? systems.filter((s) => !exclude.has(s.id)) : systems, query, {
+            primary: (s) => s.name,
+            limit: MATCH_LIMIT,
+          })
+        : [],
+    [systems, query, exclude]
   );
 
   function close() {
@@ -122,7 +134,14 @@ export function SolarSystemPicker({
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => choose(system)}
                 >
-                  {system.name}
+                  {showSecurity ? (
+                    <span className="flex items-center justify-between gap-2">
+                      {system.name}
+                      <SecurityStatus security={system.security} />
+                    </span>
+                  ) : (
+                    system.name
+                  )}
                 </li>
               ))}
             </ul>

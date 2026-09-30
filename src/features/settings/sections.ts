@@ -24,7 +24,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
     id: 'defaults',
     labelKey: 'settings.groups.defaults',
-    sections: ['industry', 'market', 'miningTax', 'characters', 'corporation'],
+    sections: ['industry', 'market', 'miningTax', 'characters', 'corporation', 'travel'],
   },
   { id: 'alerts', labelKey: 'settings.groups.alerts', sections: ['notifications'] },
   {

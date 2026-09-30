@@ -1824,6 +1824,7 @@ describe('Settings — sections rail', () => {
       'Moon Mining Tax',
       'Characters',
       // Corporation is absent: this character has no corp access.
+      'Travel',
       'Notifications',
       'Data & storage',
       'Activity Log',
@@ -1898,7 +1899,7 @@ describe('Settings — phone list', () => {
     }
     // Corporation is absent: this character has no corp access.
     expect(within(nav).queryByRole('link', { name: /corporation/i })).not.toBeInTheDocument();
-    expect(within(nav).getAllByRole('link')).toHaveLength(12);
+    expect(within(nav).getAllByRole('link')).toHaveLength(13);
     expect(within(nav).getByRole('link', { name: /^display/i })).toHaveTextContent(
       /default text, my local time/i
     );
@@ -1907,6 +1908,9 @@ describe('Settings — phone list', () => {
     expect(within(nav).getByRole('link', { name: /^market/i })).toHaveTextContent(/jita/i);
     expect(within(nav).getByRole('link', { name: /^characters/i })).toHaveTextContent(
       /current character/i
+    );
+    expect(within(nav).getByRole('link', { name: /^travel/i })).toHaveTextContent(
+      /0 avoided systems/i
     );
     expect(within(nav).getByRole('link', { name: /^faq$/i })).toBeInTheDocument();
     // Log out lives in Data & storage, not as a row of its own.

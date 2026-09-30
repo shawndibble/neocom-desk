@@ -13,6 +13,8 @@ import {
 import { SettingsBackLink, SettingsIndex, SettingsNav } from '@/features/settings/SettingsNav';
 import { DevicePanel } from '@/features/settings/DevicePanel';
 import { UpdatePanel } from '@/features/settings/UpdatePanel';
+import { AvoidedSystemsPanel } from '@/features/settings/AvoidedSystemsPanel';
+import { useAvoidedSystems } from '@/features/route/avoidedSystems';
 import {
   Button,
   DataTable,
@@ -1236,6 +1238,7 @@ function usePhoneSummaries(): Partial<Record<SettingsSectionId, string>> {
   const hub = useMarketHub((state) => state.value);
   const characterFilter = useDefaultCharacterFilter((state) => state.value);
   const darkAfterDays = useDarkThreshold((state) => state.value);
+  const avoidedCount = useAvoidedSystems((state) => state.value.length);
 
   return {
     display: t('settings.summary.display', {
@@ -1256,6 +1259,7 @@ function usePhoneSummaries(): Partial<Record<SettingsSectionId, string>> {
           ? t('settings.summary.charactersAll')
           : t('settings.summary.charactersSome', { count: characterFilter.length }),
     corporation: t('settings.summary.corporation', { count: darkAfterDays }),
+    travel: t('settings.summary.travel', { count: avoidedCount }),
   };
 }
 
@@ -1429,6 +1433,7 @@ export function Settings() {
           {section === 'miningTax' && <MiningTaxDefaultsPanel />}
           {section === 'characters' && <CharacterDefaultsPanel />}
           {section === 'corporation' && <CorpDefaultsPanel />}
+          {section === 'travel' && <AvoidedSystemsPanel />}
           {/* The Overview feed's "Settings" link targets `/settings/notifications` directly. */}
           {section === 'notifications' && <NotificationsPanel />}
           {section === 'dataAge' && (

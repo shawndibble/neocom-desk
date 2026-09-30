@@ -452,6 +452,11 @@ here — they go one per file in `docs/context/decisions/`.
   Numbers, never a verdict: no pilot is called hostile or safe. "No
   zKillboard history" and "zKillboard couldn't be reached" are different
   answers.
+- **Avoided Systems**: The solar systems a pilot keeps off their routes,
+  entered by hand in Settings → Travel — ESI cannot read the game client's own
+  autopilot avoidance list. Synced across devices as ids; shown with each
+  system's security. Not a **Route Preference**, and not yet applied to any
+  route.
 - **Route Preference**: Which trip a distance describes — prefer highsec,
   shortest, or avoid highsec, the three the local jump graph supports
   (`engine/route/jumpRoute.ts`, issue #942). A reader's choice rather than a

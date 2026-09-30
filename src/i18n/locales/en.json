@@ -5787,6 +5787,7 @@
       "miningTax": "Moon Mining Tax",
       "characters": "Characters",
       "corporation": "Corporation",
+      "travel": "Travel",
       "notifications": "Notifications",
       "data": "Data & storage",
       "activity": "Activity Log",
@@ -5811,10 +5812,19 @@
       "charactersSome_one": "{{count}} character",
       "charactersSome_other": "{{count}} characters",
       "corporation_one": "Dark after {{count}} day",
-      "corporation_other": "Dark after {{count}} days"
+      "corporation_other": "Dark after {{count}} days",
+      "travel_one": "{{count}} avoided system",
+      "travel_other": "{{count}} avoided systems"
     },
     "industryDefaultsTitle": "Industry defaults",
     "marketDefaultsTitle": "Market defaults",
+    "avoidedSystems": {
+      "title": "Avoided systems",
+      "hint": "Systems you keep off your routes. The game doesn't share its own autopilot avoidance list, so enter yours here. Kept across your devices.",
+      "add": "Add system",
+      "remove": "Remove {{name}}",
+      "empty": "No systems avoided yet."
+    },
     "miningTaxDefaultsTitle": "Moon Mining Tax defaults",
     "miningTaxOreValueModeLabel": "Edit ore values individually",
     "miningTaxOreValueModeHint": "When assigning or correcting a row, enter each ore's own total ISK value instead of one whole-row total — useful for matching a corp's moon-tax tool line by line. Estimated Value and Tax Owed become calculated totals rather than fields you type into directly.",
@@ -5870,7 +5880,7 @@
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown, the courier collateral warning multiple, and whether BPC Sourcing opens set to hide auctions and hide PLEX contracts — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, whether the Moon Mining Tax ledger's Assign form edits ore values individually, which skill plan you're adding skills to from Fit Check and Market, the fitting damage profiles you made along with which one fittings are measured against, and the fitting target profiles you made along with which one applied DPS is worked out against, and which Overview cards you hid and the order you put them in. Nothing else on this page leaves your device."
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown, the courier collateral warning multiple, and whether BPC Sourcing opens set to hide auctions and hide PLEX contracts — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, whether the Moon Mining Tax ledger's Assign form edits ore values individually, which skill plan you're adding skills to from Fit Check and Market, the fitting damage profiles you made along with which one fittings are measured against, and the fitting target profiles you made along with which one applied DPS is worked out against, and which Overview cards you hid and the order you put them in, and the systems you avoid. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",

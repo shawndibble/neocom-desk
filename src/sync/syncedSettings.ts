@@ -192,7 +192,14 @@
 // part of the hidden list, so hiding a card on one device cannot roll back a
 // reorder made on another. Same parse, same unknown-key rule. Never deleted
 // via deleteSyncedSetting: "Reset order" writes an empty list.
+//
+// sync.avoidedSystems: the solar system ids the pilot keeps off their routes,
+// managed from Settings → Travel (features/route/avoidedSystems.ts). One list
+// for the whole account — "I never fly through Uedama" is about the pilot, not
+// one machine or one alt. Never deleted via deleteSyncedSetting: removing the
+// last system writes an empty list, so the tombstone-expiry edge does not bite.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
+  'sync.avoidedSystems',
   'sync.bpcHideAuctions',
   'sync.bpcHidePlex',
   'sync.corpDarkAfterDays',
