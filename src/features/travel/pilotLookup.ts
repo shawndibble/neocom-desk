@@ -22,6 +22,8 @@ export interface PilotProfile {
   corporationName: string | null;
   allianceId: number | null;
   allianceName: string | null;
+  /** Null when ESI left it out of the public record. */
+  securityStatus: number | null;
 }
 
 /**
@@ -95,5 +97,6 @@ export async function loadPilotProfile(characterId: number): Promise<PilotProfil
     corporationName: names.get(corporationId) ?? null,
     allianceId,
     allianceName: allianceId === null ? null : (names.get(allianceId) ?? null),
+    securityStatus: info.security_status ?? null,
   };
 }

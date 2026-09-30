@@ -56,6 +56,7 @@ const PROFILE = {
   corporationName: 'Some Corp',
   allianceId: 300,
   allianceName: 'Some Alliance',
+  securityStatus: -2.345,
 };
 
 const STATS = {
@@ -127,7 +128,7 @@ describe('PilotLookupTab', () => {
     expect(mocks.resolvePilotByName).toHaveBeenCalledWith('some pilot');
     expect(mocks.searchMailRecipients).not.toHaveBeenCalled();
     expect(probe.search).toBe('?pilot=42');
-    expect(screen.getByText('1,043')).toBeTruthy();
+    expect(await screen.findByText('1,043')).toBeTruthy();
     expect(screen.getByText('99.2%')).toBeTruthy();
     expect(screen.getByText('68%')).toBeTruthy();
     expect(await screen.findByText('Kronos')).toBeTruthy();
@@ -164,6 +165,7 @@ describe('PilotLookupTab', () => {
     renderTab('/travel/pilot?pilot=42');
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
     expect(mocks.loadPilotProfile).toHaveBeenCalledWith(42);
+    expect(screen.getByText('-2.3')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'zKillboard' }).getAttribute('href')).toBe(
       'https://zkillboard.com/character/42/'
     );

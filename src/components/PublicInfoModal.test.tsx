@@ -1,8 +1,18 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { useEffect } from 'react';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
+
+// The Character tab is Pilot Lookup's view; its zKillboard reads and type catalog are stubbed.
+vi.mock('@/lib/zkillboard', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/zkillboard')>()),
+  fetchPilotStats: vi.fn(async () => ({ kind: 'no-history' })),
+  fetchPilotKillmails: vi.fn(async () => ({ ok: true, entries: [] })),
+}));
+vi.mock('@/sde/loadSde', () => ({ loadTypes: vi.fn(async () => ({})) }));
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { PublicInfoModal } from './PublicInfoModal';
@@ -14,6 +24,11 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   await db.esiCache.clear();
   usePublicInfoModalStore.setState({ request: null });
+  // No live affiliation by default, so a character's public record decides its corp and alliance.
+  server.use(
+    http.post(`${ESI_BASE_URL}/characters/affiliation`, () => HttpResponse.json([])),
+    http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.json([]))
+  );
 });
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
@@ -27,6 +42,25 @@ function mockCorporation(id: number, body: Record<string, unknown>) {
 function mockAlliance(id: number, body: Record<string, unknown>) {
   server.use(http.get(`${ESI_BASE_URL}/alliances/${id}`, () => HttpResponse.json(body)));
 }
+const probe: { navigate: (path: string) => void } = { navigate: () => {} };
+function NavigateProbe() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    probe.navigate = navigate;
+  }, [navigate]);
+  return null;
+}
+const navigateTo = (path: string) => probe.navigate(path);
+
+function renderModal() {
+  render(
+    <MemoryRouter initialEntries={['/contacts']}>
+      <PublicInfoModal />
+      <NavigateProbe />
+    </MemoryRouter>
+  );
+}
+
 function mockNames(entries: { id: number; name: string }[]) {
   server.use(
     http.post(`${ESI_BASE_URL}/universe/names`, () =>
@@ -37,7 +71,7 @@ function mockNames(entries: { id: number; name: string }[]) {
 
 describe('PublicInfoModal', () => {
   it('renders nothing when no request is open', () => {
-    render(<PublicInfoModal />);
+    renderModal();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -70,7 +104,7 @@ describe('PublicInfoModal', () => {
     });
     mockNames([{ id: 99, name: 'CEO Pilot' }]);
 
-    render(<PublicInfoModal />);
+    renderModal();
     act(() => usePublicInfoModalStore.getState().open('character', 91));
 
     const dialog = await screen.findByRole('dialog');
@@ -113,9 +147,13 @@ describe('PublicInfoModal', () => {
       creator_id: 102,
       date_founded: '2019-01-01T00:00:00Z',
     });
-    mockNames([{ id: 102, name: 'Linked CEO' }]);
+    mockNames([
+      { id: 102, name: 'Linked CEO' },
+      { id: 7, name: 'Linked Corp' },
+      { id: 8, name: 'Linked Alliance' },
+    ]);
 
-    render(<PublicInfoModal />);
+    renderModal();
     act(() => usePublicInfoModalStore.getState().open('character', 95));
 
     const dialog = await screen.findByRole('dialog');
@@ -137,7 +175,7 @@ describe('PublicInfoModal', () => {
     });
     mockNames([{ id: 99, name: 'CEO Pilot' }]);
 
-    render(<PublicInfoModal />);
+    renderModal();
     act(() => usePublicInfoModalStore.getState().open('corporation', 2));
 
     const dialog = await screen.findByRole('dialog');
@@ -164,7 +202,7 @@ describe('PublicInfoModal', () => {
     });
     mockNames([{ id: 100, name: 'Solo CEO' }]);
 
-    render(<PublicInfoModal />);
+    renderModal();
     act(() => usePublicInfoModalStore.getState().open('character', 92));
 
     const dialog = await screen.findByRole('dialog');
@@ -185,7 +223,7 @@ describe('PublicInfoModal', () => {
     });
     server.use(http.get(`${ESI_BASE_URL}/corporations/5`, () => HttpResponse.error()));
 
-    render(<PublicInfoModal />);
+    renderModal();
     act(() => usePublicInfoModalStore.getState().open('character', 93));
 
     await screen.findByText('Pilot With Broken Corp');
@@ -219,7 +257,7 @@ describe('PublicInfoModal', () => {
     );
     mockNames([{ id: 101, name: 'Once CEO' }]);
 
-    render(<PublicInfoModal />);
+    renderModal();
     act(() => usePublicInfoModalStore.getState().open('character', 94));
 
     const dialog = await screen.findByRole('dialog');
@@ -266,7 +304,7 @@ describe('PublicInfoModal', () => {
     });
     mockNames([{ id: 102, name: 'Killboard CEO' }]);
 
-    render(<PublicInfoModal />);
+    renderModal();
     act(() => usePublicInfoModalStore.getState().open('character', 95));
 
     const dialog = await screen.findByRole('dialog');
@@ -296,6 +334,121 @@ describe('PublicInfoModal', () => {
         'https://zkillboard.com/alliance/700/'
       )
     );
+  });
+
+  it("shows Pilot Lookup's view on the Character tab, its links switching tabs", async () => {
+    mockCharacter(96, {
+      name: 'Lookup Pilot',
+      corporation_id: 9,
+      birthday: '2020-01-01T00:00:00Z',
+      bloodline_id: 1,
+      gender: 'male',
+      race_id: 1,
+      security_status: -4.56,
+    });
+    mockCorporation(9, {
+      name: 'Lookup Corp',
+      ticker: 'LOOK',
+      ceo_id: 103,
+      creator_id: 103,
+      member_count: 5,
+      tax_rate: 0,
+    });
+    mockNames([
+      { id: 9, name: 'Lookup Corp' },
+      { id: 103, name: 'Lookup CEO' },
+    ]);
+
+    renderModal();
+    act(() => usePublicInfoModalStore.getState().open('character', 96));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('No kills or losses on zKillboard')).toBeInTheDocument();
+    expect(within(dialog).getByText('-4.6')).toBeInTheDocument();
+    expect(within(dialog).getByText('Character age')).toBeInTheDocument();
+    expect(within(dialog).getByText('Recent kills and losses')).toBeInTheDocument();
+    // The modal is the public info already; no link back to itself.
+    expect(within(dialog).queryByRole('button', { name: 'Public Info' })).not.toBeInTheDocument();
+
+    within(dialog).getByRole('button', { name: 'Lookup Corp' }).click();
+    expect(await within(dialog).findByText('LOOK')).toBeInTheDocument();
+    expect(within(dialog).getByRole('tab', { name: 'Corporation' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+  });
+
+  it("follows the live affiliation, not a stale public record's corporation", async () => {
+    mockCharacter(97, {
+      name: 'Moved Pilot',
+      corporation_id: 10,
+      birthday: '2020-01-01T00:00:00Z',
+      bloodline_id: 1,
+      gender: 'male',
+      race_id: 1,
+    });
+    server.use(
+      http.post(`${ESI_BASE_URL}/characters/affiliation`, () =>
+        HttpResponse.json([{ character_id: 97, corporation_id: 11 }])
+      )
+    );
+    mockCorporation(11, {
+      name: 'New Home',
+      ticker: 'NEW',
+      ceo_id: 104,
+      creator_id: 104,
+      member_count: 2,
+      tax_rate: 0,
+    });
+    mockNames([
+      { id: 11, name: 'New Home' },
+      { id: 104, name: 'New CEO' },
+    ]);
+
+    renderModal();
+    act(() => usePublicInfoModalStore.getState().open('character', 97));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByRole('button', { name: 'New Home' })).toBeInTheDocument();
+    (await within(dialog).findByRole('tab', { name: 'Corporation' })).click();
+    expect(await within(dialog).findByText('NEW')).toBeInTheDocument();
+  });
+
+  it('says a character EVE has no record of was not found, apart from a load failure', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/98`, () =>
+        HttpResponse.json({ error: 'Character not found' }, { status: 404 })
+      )
+    );
+
+    renderModal();
+    act(() => usePublicInfoModalStore.getState().open('character', 98));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText("This character couldn't be found")).toBeInTheDocument();
+    expect(within(dialog).queryByRole('tab', { name: 'Corporation' })).not.toBeInTheDocument();
+  });
+
+  it('closes when a link inside it changes page, but not for a query-only change', async () => {
+    mockCorporation(2, {
+      name: 'Some Corp',
+      ticker: 'SOME',
+      ceo_id: 99,
+      creator_id: 99,
+      member_count: 42,
+      tax_rate: 0.1,
+    });
+
+    renderModal();
+    act(() => usePublicInfoModalStore.getState().open('corporation', 2));
+    await screen.findByText('SOME');
+
+    act(() => navigateTo('/contacts?tab=all'));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    act(() => navigateTo('/fittings/edit'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(usePublicInfoModalStore.getState().request).toBeNull();
   });
 
   describe('Employment tab', () => {
@@ -336,7 +489,7 @@ describe('PublicInfoModal', () => {
         { id: 99, name: 'CEO Pilot' },
       ]);
 
-      render(<PublicInfoModal />);
+      renderModal();
       act(() => usePublicInfoModalStore.getState().open('character', 91));
 
       const dialog = await screen.findByRole('dialog');
@@ -359,7 +512,7 @@ describe('PublicInfoModal', () => {
         http.get(`${ESI_BASE_URL}/characters/91/corporationhistory`, () => HttpResponse.json([]))
       );
 
-      render(<PublicInfoModal />);
+      renderModal();
       act(() => usePublicInfoModalStore.getState().open('character', 91));
 
       const dialog = await screen.findByRole('dialog');
@@ -376,7 +529,7 @@ describe('PublicInfoModal', () => {
         http.get(`${ESI_BASE_URL}/characters/91/corporationhistory`, () => HttpResponse.error())
       );
 
-      render(<PublicInfoModal />);
+      renderModal();
       act(() => usePublicInfoModalStore.getState().open('character', 91));
 
       const dialog = await screen.findByRole('dialog');
@@ -389,7 +542,7 @@ describe('PublicInfoModal', () => {
       mockCorporation(2, corp);
       mockNames([{ id: 99, name: 'CEO Pilot' }]);
 
-      render(<PublicInfoModal />);
+      renderModal();
       act(() => usePublicInfoModalStore.getState().open('corporation', 2));
 
       const dialog = await screen.findByRole('dialog');
