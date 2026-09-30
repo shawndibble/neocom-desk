@@ -446,9 +446,11 @@ here — they go one per file in `docs/context/decisions/`.
 - **Pilot Lookup**: Travel's view of one pilot, found by name — portrait,
   corporation, alliance and character age from public ESI, and the all-time
   kills, losses, ISK, solo kills, danger and gang ratios and most-used hulls
-  zKillboard states. Numbers, never a verdict: no pilot is called hostile or
-  safe. "No zKillboard history" and "zKillboard couldn't be reached" are
-  different answers.
+  zKillboard states, then their newest 25 kills and losses, each expanding to
+  the victim's fit with Open in Fittings (the killmail is read only then).
+  Numbers, never a verdict: no pilot is called hostile or safe. "No
+  zKillboard history" and "zKillboard couldn't be reached" are different
+  answers.
 - **Route Preference**: Which trip a distance describes — prefer highsec,
   shortest, or avoid highsec, the three the local jump graph supports
   (`engine/route/jumpRoute.ts`, issue #942). A reader's choice rather than a

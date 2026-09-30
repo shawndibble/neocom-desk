@@ -43,7 +43,7 @@ import { useUrlParams } from '@/lib/useUrlState';
 import { characterZkillUrl, fetchPilotStats, type PilotStatsResult } from '@/lib/zkillboard';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { openPublicInfoModal } from '@/stores/publicInfoModal';
-import { PilotKillmailsSection } from './PilotRecentKills';
+import { PilotKillmailsSection } from './PilotKillmailsSection';
 import {
   loadPilotProfile,
   pilotAge,

@@ -3,7 +3,7 @@
  * `PILOT_KILLMAIL_LIMIT` from zKillboard, each row expanding to the victim's
  * fit with Open in Fittings. A killmail is read only when its row expands.
  */
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button, Caret, Spinner, TypeIcon } from '@/components/ui';
@@ -33,8 +33,9 @@ type TypeLabel = (typeId: number) => string;
 type Expanded = 'loading' | KillmailFitResult;
 
 /** Every id a row's names come from: pilots, corporations and the system. */
-function nameIds(detail: KillmailDetail): number[] {
+function nameIds(detail: KillmailDetail | null): number[] {
   const ids: number[] = [];
+  if (detail === null) return ids;
   for (const party of [detail.victimParty, detail.finalBlow]) {
     if (party?.characterId != null) ids.push(party.characterId);
     if (party?.corporationId != null) ids.push(party.corporationId);
@@ -50,6 +51,9 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set());
   const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
   const [typeLabel, setTypeLabel] = useState<TypeLabel | null>(null);
+  /** Killmails read or being read; a ref, so a quick double-click can't start a second read. */
+  const reading = useRef(new Set<number>());
+  const headingId = useId();
 
   useEffect(() => {
     let cancelled = false;
@@ -67,7 +71,10 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
       .then((types) => {
         if (!cancelled) setTypeLabel(() => (id: number) => types[String(id)]?.name ?? `#${id}`);
       })
-      .catch(() => {});
+      .catch(() => {
+        // No type catalog: ids stand in for names rather than a spinner that never ends.
+        if (!cancelled) setTypeLabel(() => (id: number) => `#${id}`);
+      });
     return () => {
       cancelled = true;
     };
@@ -80,9 +87,7 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
       entry.detail ?? (read !== undefined && read !== 'loading' && read.ok ? read.detail : null)
     );
   };
-  const idKey = [
-    ...new Set(entries.flatMap((entry) => nameIds(detailOf(entry) ?? EMPTY_DETAIL))),
-  ].join(',');
+  const idKey = [...new Set(entries.flatMap((entry) => nameIds(detailOf(entry))))].join(',');
 
   useEffect(() => {
     if (idKey === '') return;
@@ -99,28 +104,33 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
 
   function toggle(entry: PilotKillmail) {
     const id = entry.killmailId;
-    const next = new Set(open);
-    if (next.has(id)) {
-      next.delete(id);
-      setOpen(next);
-      return;
-    }
-    next.add(id);
-    setOpen(next);
-    // A read that already landed (or is landing) is kept, so collapsing and re-expanding never refetches.
-    const prior = expanded.get(id);
-    if (prior === 'loading' || prior?.ok) return;
+    const opening = !open.has(id);
+    setOpen((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    // A read that landed or is landing is kept, so collapsing and re-expanding never refetches; a failed one retries.
+    if (!opening || reading.current.has(id)) return;
+    reading.current.add(id);
     setExpanded((current) => new Map(current).set(id, 'loading'));
-    void loadKillmailFit(entry).then((read) =>
-      setExpanded((current) => new Map(current).set(id, read))
-    );
+    void loadKillmailFit(entry).then((read) => {
+      if (!read.ok) reading.current.delete(id);
+      setExpanded((current) => new Map(current).set(id, read));
+    });
   }
 
   const title = t('travel.pilot.recent.title');
   return (
-    <section aria-label={title} className="space-y-2">
+    <section aria-labelledby={headingId} className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-xs font-semibold tracking-widest text-text-dim uppercase">{title}</h3>
+        <h3
+          id={headingId}
+          className="text-xs font-semibold tracking-widest text-text-dim uppercase"
+        >
+          {title}
+        </h3>
         <a
           href={characterZkillUrl(characterId)}
           target="_blank"
@@ -141,7 +151,7 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
       ) : entries.length === 0 ? (
         <p className="text-xs text-text-dim">{t('travel.pilot.recent.empty')}</p>
       ) : (
-        <ul aria-label={title} className="divide-y divide-line border border-line">
+        <ul aria-labelledby={headingId} className="divide-y divide-line border border-line">
           {entries.map((entry) => (
             <KillmailRow
               key={entry.killmailId}
@@ -159,14 +169,6 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
     </section>
   );
 }
-
-const EMPTY_DETAIL: KillmailDetail = {
-  time: null,
-  systemId: null,
-  victim: { ship_type_id: 0 },
-  victimParty: { characterId: null, corporationId: null, shipTypeId: null },
-  finalBlow: null,
-};
 
 interface KillmailRowProps {
   entry: PilotKillmail;
