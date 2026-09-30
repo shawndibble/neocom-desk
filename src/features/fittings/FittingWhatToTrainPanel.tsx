@@ -387,6 +387,7 @@ function WhatToTrainItem({
               skill={skill}
               rows={prerequisiteRows}
               plannedLevels={plannedLevels}
+              planEntries={plan?.entries}
               totalSeconds={time.seconds}
             />
           )}

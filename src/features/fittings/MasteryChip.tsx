@@ -165,6 +165,7 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
                       <SkillRow
                         name={row.name}
                         skillTypeID={row.skillTypeID}
+                        planEntries={planEntries}
                         status={row.status}
                         currentLevel={row.currentLevel}
                         timeLabel={

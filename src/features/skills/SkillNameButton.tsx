@@ -6,6 +6,7 @@
  */
 import type { ReactNode } from 'react';
 import type { PlanEntry } from '@/engine/types';
+import { cx } from '@/lib/cx';
 import { openSkillDetailModal } from '@/stores/skillDetailModal';
 
 export interface SkillNameButtonProps {
@@ -19,14 +20,17 @@ export interface SkillNameButtonProps {
 export function SkillNameButton({
   skillTypeID,
   planEntries,
-  className = '',
+  className,
   children,
 }: SkillNameButtonProps) {
   return (
     <button
       type="button"
-      onClick={() => openSkillDetailModal(skillTypeID, planEntries ? { planEntries } : undefined)}
-      className={`text-left hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${className}`}
+      onClick={() => openSkillDetailModal(skillTypeID, { planEntries })}
+      className={cx(
+        'text-left hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+        className
+      )}
     >
       {children}
     </button>
