@@ -85,7 +85,7 @@ describe('createLpStoresProvider', () => {
     await search(p, 'si');
     await search(p, 'sis');
     expect(loadBalances).toHaveBeenCalledTimes(1);
-    // The snapshot loader memoises itself; the provider still only asks once.
+    // The provider holds the list itself, whatever the loader caches.
     expect(loadCorporations).toHaveBeenCalledTimes(1);
   });
 

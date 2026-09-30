@@ -15,13 +15,11 @@ import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
 import { loadLpCorporations } from '@/sde/loadMarketSde';
 import { readCachedLoyaltyBalances } from '@/features/character/loyalty';
 import { createCharactersProvider, createCommandsProvider, createPagesProvider } from './providers';
-import { createLpStoresProvider } from './lpStoresProvider';
+import { createLpStoresProvider, NO_BALANCES } from './lpStoresProvider';
 import type { PaletteProvider, PaletteResult } from './types';
 import { usePaletteSearch } from './usePaletteSearch';
 
 const NO_CHARACTERS: readonly { characterId: number; name: string }[] = [];
-
-const NO_BALANCES: ReadonlyMap<number, number> = new Map();
 
 /** The live reads behind the shipped groups, turned into providers. */
 function useShippedProviders(): PaletteProvider[] {

@@ -13,7 +13,8 @@ export interface LpStoresProviderOptions {
   /**
    * The active Character's LP per corporation id, from the already-cached
    * loyalty points — never a fresh ESI call. Read once per provider, so a
-   * keystroke never re-reads it.
+   * keystroke never re-reads it. LP cached after that first read shows from
+   * the next opening (the palette remounts on every open).
    */
   readonly loadBalances: () => Promise<ReadonlyMap<number, number>>;
   readonly navigate: (path: string) => void;
@@ -21,7 +22,8 @@ export interface LpStoresProviderOptions {
   readonly balanceHint: (loyaltyPoints: number) => string;
 }
 
-const NO_BALANCES: ReadonlyMap<number, number> = new Map();
+/** No active Character, or nothing cached yet: every row goes without a hint. */
+export const NO_BALANCES: ReadonlyMap<number, number> = new Map();
 
 export function createLpStoresProvider({
   loadCorporations,

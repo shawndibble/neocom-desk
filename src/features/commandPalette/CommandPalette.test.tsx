@@ -223,7 +223,9 @@ describe('CommandPalette', () => {
       expect(
         within(pages).getByRole('option', { name: 'Industry › Opportunities' })
       ).toHaveAttribute('aria-selected', 'true');
-      expect(within(screen.getByRole('group', { name: 'LP Stores' })).getByText('Searching…'));
+      expect(
+        within(screen.getByRole('group', { name: 'LP Stores' })).getByText('Searching…')
+      ).toBeInTheDocument();
     });
   });
 });
