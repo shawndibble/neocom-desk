@@ -331,7 +331,7 @@ export function CompareDrawer({
         align: 'right',
         render: (row) => (
           <IconButton
-            size="sm"
+            size="row"
             variant="plain"
             icon={<Icon.Close />}
             label={t('market.compare.remove', { name: row.itemName })}

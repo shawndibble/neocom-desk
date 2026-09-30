@@ -18,8 +18,9 @@
  * every category, rather than atop each category's table: a matrix with a
  * dozen categories otherwise repeated every name a dozen times. Each
  * category table keeps its own header row for assistive tech (visually
- * hidden), and every table is `table-fixed` at the same widths so the
- * columns line up under the one header.
+ * hidden), and every table takes the same explicit column widths (the
+ * `--compare-*-width` variables below) so the columns line up under the one
+ * header.
  */
 import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -47,9 +48,9 @@ export interface CompareAttributesMatrixProps {
   onRemove?: (typeId: number) => void;
 }
 
-/** Column widths (rem), shared by the header row and every category table so they line up. */
-const ATTRIBUTE_WIDTH_REM = 12;
-const ITEM_WIDTH_REM = 8;
+/** Column widths, shared through CSS variables by the header row and every category table so they line up. */
+const ATTRIBUTE_WIDTH = '12rem';
+const ITEM_WIDTH = '8rem';
 
 /** A price is shorthand — the whole table is a side-by-side scan — with the exact figure one gesture away; an attribute keeps its own unit and precision. */
 function formatCell(kind: 'price' | 'attribute', cell: CompareCell): ReactNode {
@@ -94,18 +95,14 @@ export function CompareAttributesMatrix({
         // beside its values. Once it titles a card instead, dim would make
         // the one line naming the card the quietest thing on it.
         className:
-          'whitespace-nowrap sm:sticky sm:left-0 sm:z-10 sm:w-48 sm:bg-panel sm:whitespace-normal sm:text-text-dim',
-        // `table-fixed` sizes columns off the first row, which is this
-        // (visually hidden) header — so the widths go here too.
-        headerClassName: 'sm:w-48',
+          'whitespace-nowrap sm:sticky sm:left-0 sm:z-10 sm:w-(--compare-attribute-width) sm:bg-panel sm:whitespace-normal sm:wrap-anywhere sm:text-text-dim',
         render: (row) => row.name,
       },
       ...rows.map((row): DataTableColumn<CompareAttributeRow> => ({
         id: `item-${row.typeId}`,
         header: row.itemName,
         align: 'right',
-        className: 'tabular-nums sm:w-32',
-        headerClassName: 'sm:w-32',
+        className: 'tabular-nums sm:w-(--compare-item-width)',
         render: (attrRow) => {
           const cell = attrRow.cells.get(row.typeId);
           const compareRow = rowsByTypeId.get(row.typeId);
@@ -124,7 +121,9 @@ export function CompareAttributesMatrix({
       className="space-y-3"
       style={
         {
-          '--compare-matrix-width': `${ATTRIBUTE_WIDTH_REM + rows.length * ITEM_WIDTH_REM}rem`,
+          '--compare-attribute-width': ATTRIBUTE_WIDTH,
+          '--compare-item-width': ITEM_WIDTH,
+          '--compare-matrix-width': `calc(${ATTRIBUTE_WIDTH} + ${rows.length} * ${ITEM_WIDTH})`,
         } as CSSProperties
       }
     >
@@ -138,7 +137,7 @@ export function CompareAttributesMatrix({
           <tr className="text-text-dim">
             <th
               scope="col"
-              className="sticky left-0 z-10 w-48 bg-panel px-2 py-1 text-left align-bottom font-semibold uppercase"
+              className="sticky left-0 z-10 w-(--compare-attribute-width) bg-panel px-2 py-1 text-left align-bottom font-semibold uppercase"
             >
               {t('market.compare.attributeColumn')}
             </th>
@@ -146,21 +145,22 @@ export function CompareAttributesMatrix({
               <th
                 key={row.typeId}
                 scope="col"
-                className={`group relative w-32 px-2 pb-1 text-right align-bottom font-semibold uppercase ${onRemove ? 'pt-6' : 'pt-1'}`}
+                className={`group relative w-(--compare-item-width) px-2 pb-1 text-right align-bottom font-semibold uppercase ${onRemove ? 'pt-6' : 'pt-1'}`}
               >
                 <span className="inline-block max-w-28 break-words">{row.itemName}</span>
                 {onRemove && (
                   // In a strip of its own above the name (`pt-6`), so neither
                   // squeezes the name's width nor covers a long name's first
                   // line; revealed on hover or keyboard focus, never removed
-                  // from the tab order.
+                  // from the tab order — and always shown on a touch screen,
+                  // which has no hover to reveal it.
                   <IconButton
                     size="sm"
                     variant="plain"
                     icon={<Icon.Close />}
                     label={t('market.compare.remove', { name: row.itemName })}
                     onClick={() => onRemove(row.typeId)}
-                    className="absolute top-0.5 right-0.5 bg-panel opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                    className="absolute top-0.5 right-0.5 bg-panel opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
                   />
                 )}
               </th>
