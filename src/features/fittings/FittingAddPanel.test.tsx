@@ -91,7 +91,9 @@ describe('FittingAddPanel', () => {
     // The hull check runs in the background; browsing waits for it. The
     // skill filter starts on, hiding Damage Control II (no skills for it)
     // until it's off.
-    const skillFilter = await screen.findByRole('button', { name: 'Skills' });
+    // Pressed only once the hull check lands; before that it is disabled and
+    // a click does nothing (the CI flake this used to be).
+    const skillFilter = await screen.findByRole('button', { name: 'Skills', pressed: true });
     expect(screen.queryByRole('button', { name: /Damage Control II/ })).not.toBeInTheDocument();
     await user.click(skillFilter);
     const dc2 = await screen.findByRole('button', { name: /Damage Control II/ });
@@ -113,7 +115,7 @@ describe('FittingAddPanel', () => {
     });
     renderPanel({ target: null });
 
-    await screen.findByRole('button', { name: 'Skills' });
+    await screen.findByRole('button', { name: 'Skills', pressed: true });
     await user.type(screen.getByLabelText('Search items to add'), 'Damage Control II');
     expect(screen.queryByText('No matching items.')).toBeInTheDocument();
     await user.click(
@@ -132,7 +134,7 @@ describe('FittingAddPanel', () => {
     });
     renderPanel({ target: null });
 
-    await screen.findByRole('button', { name: 'Skills' });
+    await screen.findByRole('button', { name: 'Skills', pressed: true });
     await user.type(screen.getByLabelText('Search items to add'), 'zzzz');
     expect(screen.getByText('No matching items.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /hidden by filters/ })).not.toBeInTheDocument();
