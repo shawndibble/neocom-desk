@@ -19,6 +19,11 @@ import {
   loadPaletteContacts,
   type PaletteContact,
 } from './contactsProvider';
+import {
+  createMarketItemsProvider,
+  marketItemCatalogue,
+  type ShownMarketItem,
+} from './marketItems';
 import { loadLpCorporations } from '@/sde/loadMarketSde';
 import { readCachedLoyaltyBalances } from '@/features/character/loyalty';
 import { createCharactersProvider, createCommandsProvider, createPagesProvider } from './providers';
@@ -34,7 +39,7 @@ function signedStanding(standing: number): string {
 }
 
 /** The live reads behind the shipped groups, turned into providers. */
-function useShippedProviders(): PaletteProvider[] {
+function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): PaletteProvider[] {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const locked = useLockedRoutes(NAV_LOCK_PATHS);
@@ -98,6 +103,7 @@ function useShippedProviders(): PaletteProvider[] {
           ].join(' · '),
       }),
       lpStores,
+      createMarketItemsProvider({ catalogue: marketItemCatalogue, onSelect: onShowItem }),
     ],
     [
       destinations,
@@ -108,17 +114,21 @@ function useShippedProviders(): PaletteProvider[] {
       setActiveCharacter,
       contacts,
       lpStores,
+      onShowItem,
     ]
   );
 }
 
 interface CommandPaletteProps {
   onClose: () => void;
+  /** A Market Items pick: Item Detail over the current page, owned by the host so it outlives the palette. */
+  onShowItem: (item: ShownMarketItem) => void;
 }
 
 /**
  * The Command Palette (#2318): one search box over grouped results — Pages,
- * Commands, Characters, LP Stores — each group a provider (`types.ts`).
+ * Commands, Characters, LP Stores, Market Items (#2319) — each group a
+ * provider (`types.ts`).
  *
  * A hand-built ARIA combobox (decision 20260905-114550), after
  * `BuildLocationPicker`: DOM focus stays in the input, and the highlighted
@@ -130,12 +140,12 @@ interface CommandPaletteProps {
  * Rendered only while open (`CommandPaletteHost`), so each opening starts
  * with an empty query and the first result highlighted.
  */
-export function CommandPalette({ onClose }: CommandPaletteProps) {
+export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
   const { t } = useTranslation();
   const baseId = useId();
   const listboxId = `${baseId}-listbox`;
   const inputRef = useRef<HTMLInputElement>(null);
-  const providers = useShippedProviders();
+  const providers = useShippedProviders(onShowItem);
   const [query, setQuery] = useState('');
   const groups = usePaletteSearch(providers, query);
 
@@ -160,6 +170,14 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
   // (a child's effects run first), so the input takes focus from there.
   useEffect(() => {
     inputRef.current?.focus();
+  }, []);
+
+  // The item catalogue starts loading as the palette opens, not at the third
+  // keystroke — and off the render path, so typing never waits on it. Each
+  // opening retries a failed load once; a failure is the Market Items
+  // group's to report.
+  useEffect(() => {
+    marketItemCatalogue.load({ retry: true }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -202,6 +220,8 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
 
   let optionIndex = 0;
   const trimmed = query.trim();
+  // The error row is not an option, so the live count alone would hide it.
+  const groupFailed = groups.some((group) => group.status === 'error');
 
   return (
     <Modal open onClose={onClose} title={t('commandPalette.title')}>
@@ -239,7 +259,11 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
                   >
                     {t(group.provider.labelKey)}
                   </div>
-                  {group.status === 'loading' ? (
+                  {group.status === 'error' ? (
+                    <div className="px-2 py-1.5 text-sm text-danger">
+                      {t('commandPalette.groupError')}
+                    </div>
+                  ) : group.status === 'loading' ? (
                     <div
                       aria-hidden="true"
                       className="flex items-center gap-2 px-2 py-1.5 text-text-dim"
@@ -300,7 +324,9 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
           )
         )}
         <span role="status" aria-live="polite" className="sr-only">
-          {trimmed === '' ? '' : t('commandPalette.resultsCount', { count: options.length })}
+          {trimmed === ''
+            ? ''
+            : `${t('commandPalette.resultsCount', { count: options.length })}${groupFailed ? `. ${t('commandPalette.groupError')}` : ''}`}
         </span>
       </div>
     </Modal>

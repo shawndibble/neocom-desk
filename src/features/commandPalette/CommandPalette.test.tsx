@@ -7,15 +7,70 @@ import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
+import type { MarketTypeEntry } from '@/sde/marketTypes';
 import { CommandPaletteHost, CommandPaletteTrigger } from './CommandPaletteHost';
+import { createMarketItemCatalogue, type MarketItemCatalogue } from './marketItems';
 import { useCommandPalette } from './store';
 import { GLOBAL_CACHE_CHARACTER_ID, writeCached } from '@/esi/cache';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { loadPaletteContacts } from './contactsProvider';
 
+// The session catalogue is module-level; each test gets a fresh one behind it.
+const catalogueHolder = vi.hoisted(() => ({ current: null as MarketItemCatalogue | null }));
+vi.mock('./marketItems', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./marketItems')>();
+  return {
+    ...actual,
+    marketItemCatalogue: {
+      load: () => catalogueHolder.current!.load(),
+      peek: () => catalogueHolder.current!.peek(),
+    },
+  };
+});
+const CATALOGUE: MarketTypeEntry[] = [
+  { typeId: 34, name: 'Tritanium', marketGroupId: 1 },
+  { typeId: 35, name: 'Pyerite', marketGroupId: 1 },
+  { typeId: 587, name: 'Rifter', marketGroupId: 2 },
+];
+function installCatalogue(load: () => Promise<MarketTypeEntry[]>) {
+  catalogueHolder.current = createMarketItemCatalogue(load);
+}
+function lateCatalogue() {
+  let resolve!: (catalogue: MarketTypeEntry[]) => void;
+  const load = vi.fn(() => new Promise<MarketTypeEntry[]>((res) => (resolve = res)));
+  installCatalogue(load);
+  return { load, resolve: (catalogue: MarketTypeEntry[]) => resolve(catalogue) };
+}
+
+// The real modal reads ESI; this stand-in is a real `Modal`, so focus
+// hand-back is the real thing.
+vi.mock('@/features/market/ItemDetailModal', async () => {
+  const { Modal } = await import('@/components/ui');
+  return {
+    ItemDetailModal: ({
+      typeId,
+      itemName,
+      onClose,
+      showOpenInMarket,
+    }: {
+      typeId: number;
+      itemName: string;
+      onClose: () => void;
+      showOpenInMarket?: boolean;
+    }) => (
+      <Modal open onClose={onClose} title={itemName}>
+        <p>{`Item Detail ${typeId}${showOpenInMarket ? ' with market link' : ''}`}</p>
+      </Modal>
+    ),
+  };
+});
+
+// One Set, as the real hook memoises it: a fresh one per render would be a
+// fresh search per render, and a failing async group would never settle.
+const LOCKED = new Set(['/assets']);
 vi.mock('@/app/useGrantedScopes', () => ({
   useGrantedScopes: () => undefined,
-  useLockedRoutes: () => new Set(['/assets']),
+  useLockedRoutes: () => LOCKED,
 }));
 vi.mock('@/features/corp/useCorpNavVisible', () => ({ useCorpNavVisible: () => false }));
 vi.mock('@/features/corp/useCorpAccess', () => ({
@@ -45,6 +100,7 @@ function renderShell() {
 }
 
 beforeEach(async () => {
+  installCatalogue(async () => CATALOGUE);
   await db.characters.clear();
   await db.characters.bulkPut([
     { characterId: 1, name: 'Alpha Pilot', ownerHash: 'a', addedAt: 1 },
@@ -72,7 +128,7 @@ describe('CommandPalette', () => {
 
     await user.keyboard('{Control>}k{/Control}');
     const input = await screen.findByRole('combobox', {
-      name: 'Search pages, commands and characters',
+      name: 'Search pages, commands, characters and items',
     });
     expect(input).toHaveFocus();
 
@@ -170,6 +226,73 @@ describe('CommandPalette', () => {
     const characters = await screen.findByRole('group', { name: 'Characters' });
     await user.click(within(characters).getByRole('option', { name: 'Beta Pilot' }));
     await vi.waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(2));
+  });
+
+  it('starts loading the item catalogue on open and fills Market Items in for the latest query', async () => {
+    const catalogue = lateCatalogue();
+    const user = userEvent.setup();
+    renderShell();
+    await user.keyboard('{Control>}k{/Control}');
+    const input = await screen.findByRole('combobox');
+    expect(catalogue.load).toHaveBeenCalledTimes(1);
+
+    await user.type(input, 'rif');
+    expect(input).toHaveValue('rif');
+    expect(screen.getByText('Searching…')).toBeInTheDocument();
+    await user.type(input, 't');
+    expect(input).toHaveValue('rift');
+
+    await act(async () => catalogue.resolve(CATALOGUE));
+    const items = await screen.findByRole('group', { name: 'Market items' });
+    expect(
+      within(items)
+        .getAllByRole('option')
+        .map((option) => option.textContent)
+    ).toEqual(['Rifter']);
+    expect(screen.queryByText('Searching…')).not.toBeInTheDocument();
+    expect(catalogue.load).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a catalogue failure inside Market Items only; the other groups keep working', async () => {
+    installCatalogue(() => Promise.reject(new Error('offline')));
+    const user = userEvent.setup();
+    renderShell();
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(await screen.findByRole('combobox'), 'settings');
+
+    const items = await screen.findByRole('group', { name: 'Market items' });
+    expect(await within(items).findByText("Couldn't load these results.")).toBeInTheDocument();
+    expect(within(items).queryByRole('option')).not.toBeInTheDocument();
+    const pages = screen.getByRole('group', { name: 'Pages' });
+    // Announced too: the error row is not an option, so the count alone would miss it.
+    expect(screen.getByText(/results?\. Couldn't load these results\.$/)).toHaveAttribute(
+      'aria-live',
+      'polite'
+    );
+    // The error row is never highlighted; the best page still is.
+    expect(within(pages).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
+    await user.keyboard('{Enter}');
+    expect(screen.getByTestId('where')).toHaveTextContent('/settings');
+  });
+
+  it('opens Item Detail over the current page and hands focus back on close', async () => {
+    const user = userEvent.setup();
+    renderShell();
+    const pageSearch = screen.getByRole('textbox', { name: 'Page search' });
+    await user.click(pageSearch);
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(await screen.findByRole('combobox'), 'rifter');
+    const items = await screen.findByRole('group', { name: 'Market items' });
+    await user.click(within(items).getByRole('option', { name: 'Rifter' }));
+
+    const detail = await screen.findByRole('dialog', { name: 'Rifter' });
+    expect(within(detail).getByText('Item Detail 587 with market link')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.getByTestId('where')).toHaveTextContent('/overview');
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Rifter' })).not.toBeInTheDocument();
+    expect(pageSearch).toHaveFocus();
   });
 
   it('runs the Add character command through the login flow', async () => {
