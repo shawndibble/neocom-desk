@@ -6075,8 +6075,8 @@
   },
   "commandPalette": {
     "title": "Command palette",
-    "placeholder": "Go to a page, run a command, switch character, find an item…",
-    "inputLabel": "Search pages, commands, characters and items",
+    "placeholder": "Go to a page, run a command, switch character, find an asset or item…",
+    "inputLabel": "Search pages, commands, characters, assets and items",
     "resultsLabel": "Results",
     "noResults": "Nothing matches.",
     "loadingGroup": "Searching…",
@@ -6086,10 +6086,13 @@
     "activeCharacter": "Active",
     "contactStanding": "{{standing}} {{character}}",
     "lpBalance": "{{lp}} LP",
+    "assetHolder": "{{character}} ×{{quantity}}",
+    "assetQuantity": "×{{quantity}}",
     "groups": {
       "pages": "Pages",
       "commands": "Commands",
       "characters": "Characters",
+      "assets": "Assets",
       "contacts": "Contacts",
       "lpStores": "LP Stores",
       "marketItems": "Market items"

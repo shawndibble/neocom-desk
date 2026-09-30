@@ -19,6 +19,7 @@ import {
   loadPaletteContacts,
   type PaletteContact,
 } from './contactsProvider';
+import { createAssetsProvider, loadPaletteAssets, type PaletteAsset } from './assetsProvider';
 import {
   createMarketItemsProvider,
   marketItemCatalogue,
@@ -33,6 +34,7 @@ import { usePaletteSearch } from './usePaletteSearch';
 
 const NO_CHARACTERS: readonly { characterId: number; name: string }[] = [];
 const NO_CONTACTS: readonly PaletteContact[] = [];
+const NO_ASSETS: readonly PaletteAsset[] = [];
 
 function signedStanding(standing: number): string {
   return standing > 0 ? `+${standing}` : String(standing);
@@ -51,6 +53,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
   // Cache-only and live (Dexie re-reads it on a cache or grant change), never
   // per keystroke: typing neither waits on it nor fetches.
   const contacts = useLiveQuery(loadPaletteContacts, [], NO_CONTACTS);
+  const assets = useLiveQuery(loadPaletteAssets, [], NO_ASSETS);
 
   const destinations = useMemo(
     () => listNavDestinations({ locked, corpVisible, corpCapabilities: capabilities, t }),
@@ -102,6 +105,22 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
             ),
           ].join(' · '),
       }),
+      createAssetsProvider({
+        assets,
+        activeCharacterId,
+        navigate: (path) => void navigate(path),
+        describe: (asset) =>
+          asset.holders
+            .map((holder) =>
+              t('commandPalette.assetHolder', {
+                quantity: holder.quantity.toLocaleString(),
+                character: holder.characterName,
+              })
+            )
+            .join(' · '),
+        quantityHint: (quantity) =>
+          t('commandPalette.assetQuantity', { quantity: quantity.toLocaleString() }),
+      }),
       lpStores,
       createMarketItemsProvider({ catalogue: marketItemCatalogue, onSelect: onShowItem }),
     ],
@@ -113,6 +132,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
       activeCharacterId,
       setActiveCharacter,
       contacts,
+      assets,
       lpStores,
       onShowItem,
     ]
@@ -127,8 +147,8 @@ interface CommandPaletteProps {
 
 /**
  * The Command Palette (#2318): one search box over grouped results — Pages,
- * Commands, Characters, LP Stores, Market Items (#2319) — each group a
- * provider (`types.ts`).
+ * Commands, Characters, Assets, Market Items (#2319), LP Stores, Contacts —
+ * each group a provider (`types.ts`).
  *
  * A hand-built ARIA combobox (decision 20260905-114550), after
  * `BuildLocationPicker`: DOM focus stays in the input, and the highlighted
