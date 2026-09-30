@@ -216,6 +216,126 @@ export async function fetchPilotStats(characterId: number): Promise<PilotStatsRe
   }
 }
 
+/** How many of a pilot's most recent kills and losses Pilot Lookup lists. */
+export const PILOT_KILLMAIL_LIMIT = 25;
+
+/** Who was on one side of a killmail; any part null when the killmail doesn't say (an NPC, a structure). */
+export interface KillmailParty {
+  characterId: number | null;
+  corporationId: number | null;
+  shipTypeId: number | null;
+}
+
+/** What a killmail body states: from zKillboard's inline entry or ESI's killmail, same shape. */
+export interface KillmailDetail {
+  time: string | null;
+  systemId: number | null;
+  victim: KillmailVictim;
+  victimParty: KillmailParty;
+  /** The final-blow attacker (else the first listed); null when none is listed. */
+  finalBlow: KillmailParty | null;
+}
+
+/** One of a pilot's kills or losses. `detail` is null for zKillboard's hash-only shape. */
+export interface PilotKillmail {
+  killmailId: number;
+  hash: string;
+  side: 'kill' | 'loss';
+  /** zKillboard's total value of the loss; null when absent. */
+  value: number | null;
+  detail: KillmailDetail | null;
+}
+
+export type PilotKillmailsResult = { ok: true; entries: PilotKillmail[] } | { ok: false };
+
+function readParty(value: Record<string, unknown>): KillmailParty {
+  return {
+    characterId: finiteOrNull(value.character_id),
+    corporationId: finiteOrNull(value.corporation_id),
+    shipTypeId: finiteOrNull(value.ship_type_id),
+  };
+}
+
+/** Reads a killmail body (zKillboard inline or ESI) defensively; null without a readable victim. */
+export function readKillmailDetail(body: unknown): KillmailDetail | null {
+  if (!isRecord(body) || !isRecord(body.victim)) return null;
+  const victim = parseVictim(body.victim);
+  if (victim === null) return null;
+  const attackers = Array.isArray(body.attackers) ? body.attackers.filter(isRecord) : [];
+  const finalBlow = attackers.find((attacker) => attacker.final_blow === true) ?? attackers[0];
+  return {
+    time: typeof body.killmail_time === 'string' ? body.killmail_time : null,
+    systemId: finiteOrNull(body.solar_system_id),
+    victim,
+    victimParty: readParty(body.victim),
+    finalBlow: finalBlow === undefined ? null : readParty(finalBlow),
+  };
+}
+
+/** Reads a `kills/` or `losses/characterID` body defensively; entries without an id or hash are dropped. */
+export function parsePilotKillmails(body: unknown, side: PilotKillmail['side']): PilotKillmail[] {
+  if (!Array.isArray(body)) return [];
+  const entries: PilotKillmail[] = [];
+  for (const entry of body) {
+    if (!isRecord(entry) || typeof entry.killmail_id !== 'number') continue;
+    const zkb = isRecord(entry.zkb) ? entry.zkb : null;
+    if (typeof zkb?.hash !== 'string') continue;
+    entries.push({
+      killmailId: entry.killmail_id,
+      hash: zkb.hash,
+      side,
+      value: finiteOrNull(zkb.totalValue),
+      detail: readKillmailDetail(entry),
+    });
+  }
+  return entries;
+}
+
+const pilotKillmailsCache = new Map<number, { at: number; entries: PilotKillmail[] }>();
+
+/** Test seam: forget every cached pilot's kills and losses. */
+export function resetPilotKillmailsCache(): void {
+  pilotKillmailsCache.clear();
+}
+
+async function fetchPilotSide(
+  characterId: number,
+  side: PilotKillmail['side']
+): Promise<PilotKillmail[] | null> {
+  const path = side === 'kill' ? 'kills' : 'losses';
+  const response = await fetch(`https://zkillboard.com/api/${path}/characterID/${characterId}/`);
+  if (!response.ok) return null;
+  return parsePilotKillmails(await response.json(), side);
+}
+
+/**
+ * A pilot's most recent kills and losses, merged newest first (killmail ids
+ * rise with time), for Pilot Lookup. A browser fetch with no custom headers,
+ * as `fetchKillmailHash` (scope decision `20260924-195833`). Either list
+ * failing fails the whole answer — kills alone would misstate the record.
+ * Answers are reused for `PILOT_STATS_CACHE_MS`; a failure never is.
+ */
+export async function fetchPilotKillmails(characterId: number): Promise<PilotKillmailsResult> {
+  const cached = pilotKillmailsCache.get(characterId);
+  if (cached && Date.now() - cached.at < PILOT_STATS_CACHE_MS) {
+    return { ok: true, entries: cached.entries };
+  }
+  try {
+    const [kills, losses] = await Promise.all([
+      fetchPilotSide(characterId, 'kill'),
+      fetchPilotSide(characterId, 'loss'),
+    ]);
+    if (kills === null || losses === null) return { ok: false };
+    const entries = [...kills, ...losses]
+      .sort((a, b) => b.killmailId - a.killmailId)
+      .slice(0, PILOT_KILLMAIL_LIMIT);
+    pilotKillmailsCache.set(characterId, { at: Date.now(), entries });
+    return { ok: true, entries };
+  } catch {
+    return { ok: false };
+  }
+}
+
 /** `ok: false` when zKillboard failed or rate-limited, so "no kills" and "couldn't load" differ. */
 export type SystemRecentKillsResult = { ok: true; kills: RecentKill[] } | { ok: false };
 

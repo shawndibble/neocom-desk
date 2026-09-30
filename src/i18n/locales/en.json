@@ -6610,7 +6610,24 @@
       "statsSource": "All-time figures as zKillboard states them. The danger and gang ratios are zKillboard's own 0–100% figures.",
       "topShips": "Ships used most on kills",
       "shipKills_one": "{{formatted}} kill",
-      "shipKills_other": "{{formatted}} kills"
+      "shipKills_other": "{{formatted}} kills",
+      "recent": {
+        "title": "Recent kills and losses",
+        "more": "More on zKillboard",
+        "loading": "Loading recent kills and losses…",
+        "failed": "Recent kills and losses couldn't be loaded",
+        "empty": "zKillboard lists no recent kills or losses.",
+        "kill": "Kill",
+        "loss": "Loss",
+        "victim": "Victim:",
+        "finalBlow": "Final blow:",
+        "fitLoading": "Loading the fit…",
+        "fitFailed": "This killmail couldn't be read from EVE. Try again in a minute.",
+        "noFit": "This victim wasn't in a ship that can be fitted.",
+        "emptyFit": "Nothing was fitted.",
+        "openInFittings": "Open in Fittings",
+        "openFailed": "This fit couldn't be opened in Fittings."
+      }
     },
     "fromLabel": "From",
     "toLabel": "To",

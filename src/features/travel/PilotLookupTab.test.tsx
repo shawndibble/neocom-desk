@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import en from '@/i18n/locales/en.json';
@@ -13,6 +13,11 @@ const mocks = vi.hoisted(() => ({
   fetchPilotStats: vi.fn(),
   loadTypeNames: vi.fn(),
   openPublicInfoModal: vi.fn(),
+  fetchPilotKillmails: vi.fn(),
+  loadKillmailFit: vi.fn(),
+  resolveNames: vi.fn(),
+  loadTypes: vi.fn(),
+  encodeFittingShare: vi.fn(),
 }));
 
 vi.mock('@/app/useGrantedScopes', () => ({ useEndpointsGranted: () => mocks.granted }));
@@ -29,7 +34,12 @@ vi.mock('@/stores/publicInfoModal', () => ({ openPublicInfoModal: mocks.openPubl
 vi.mock('@/lib/zkillboard', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/zkillboard')>()),
   fetchPilotStats: mocks.fetchPilotStats,
+  fetchPilotKillmails: mocks.fetchPilotKillmails,
 }));
+vi.mock('./pilotKillmailFit', () => ({ loadKillmailFit: mocks.loadKillmailFit }));
+vi.mock('@/features/character/names', () => ({ resolveNames: mocks.resolveNames }));
+vi.mock('@/sde/loadSde', () => ({ loadTypes: mocks.loadTypes }));
+vi.mock('@/engine/fitting/fittingShare', () => ({ encodeFittingShare: mocks.encodeFittingShare }));
 vi.mock('./pilotLookup', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./pilotLookup')>()),
   resolvePilotByName: mocks.resolvePilotByName,
@@ -63,12 +73,13 @@ const STATS = {
   },
 };
 
-const probe = { search: '' };
+const probe = { pathname: '', search: '' };
 function LocationProbe() {
-  const { search } = useLocation();
+  const { pathname, search } = useLocation();
   useEffect(() => {
+    probe.pathname = pathname;
     probe.search = search;
-  }, [search]);
+  }, [pathname, search]);
   return null;
 }
 
@@ -88,6 +99,20 @@ describe('PilotLookupTab', () => {
     mocks.loadTypeNames.mockResolvedValue(new Map([[19724, 'Kronos']]));
     mocks.loadPilotProfile.mockResolvedValue(PROFILE);
     mocks.fetchPilotStats.mockResolvedValue(STATS);
+    mocks.fetchPilotKillmails.mockResolvedValue({ ok: true, entries: [] });
+    mocks.resolveNames.mockResolvedValue(
+      new Map([
+        [900, 'Victim Pilot'],
+        [901, 'Final Blower'],
+        [30000142, 'Jita'],
+      ])
+    );
+    mocks.loadTypes.mockResolvedValue({
+      626: { name: 'Vexor' },
+      587: { name: 'Rifter' },
+      100: { name: 'Small Autocannon' },
+    });
+    mocks.encodeFittingShare.mockResolvedValue({ ok: true, payload: 'CODE' });
   });
 
   it('resolves an exact name without the search scope and shows the stats card', async () => {
@@ -180,5 +205,105 @@ describe('PilotLookupTab', () => {
     for (const word of ['safe', 'hostile', 'threat', 'avoid', 'dangerous']) {
       expect(copy).not.toContain(word);
     }
+  });
+
+  describe('recent kills and losses', () => {
+    const INLINE_KILL = {
+      killmailId: 20,
+      hash: 'aa',
+      side: 'kill' as const,
+      value: 12_500_000,
+      detail: {
+        time: '2026-09-01T12:00:00Z',
+        systemId: 30000142,
+        victim: { ship_type_id: 626, items: [] },
+        victimParty: { characterId: 900, corporationId: 901, shipTypeId: 626 },
+        finalBlow: { characterId: 42, corporationId: 200, shipTypeId: 11 },
+      },
+    };
+    const HASH_ONLY_LOSS = {
+      killmailId: 10,
+      hash: 'bb',
+      side: 'loss' as const,
+      value: 3_000_000,
+      detail: null,
+    };
+    const FIT = {
+      ok: true as const,
+      detail: {
+        time: '2026-08-30T08:00:00Z',
+        systemId: 30000142,
+        victim: { ship_type_id: 587, items: [] },
+        victimParty: { characterId: 42, corporationId: 200, shipTypeId: 587 },
+        finalBlow: { characterId: 901, corporationId: 902, shipTypeId: 626 },
+      },
+      fitting: {
+        name: 'Rifter',
+        shipTypeId: 587,
+        modules: [{ slot: 'high' as const, slotIndex: 0, typeId: 100, state: 'active' as const }],
+        drones: [],
+        cargo: [],
+      },
+    };
+
+    beforeEach(() => {
+      mocks.fetchPilotKillmails.mockResolvedValue({
+        ok: true,
+        entries: [INLINE_KILL, HASH_ONLY_LOSS],
+      });
+    });
+
+    it('lists kills and losses without reading any killmail', async () => {
+      renderTab('/travel/pilot?pilot=42');
+      const list = await screen.findByRole('list', { name: 'Recent kills and losses' });
+      expect(mocks.fetchPilotKillmails).toHaveBeenCalledWith(42);
+      expect(await within(list).findByText('Victim Pilot')).toBeTruthy();
+      expect(within(list).getByText('Jita')).toBeTruthy();
+      expect(within(list).getByText('Vexor')).toBeTruthy();
+      expect(within(list).getByText('Kill')).toBeTruthy();
+      expect(within(list).getByText('Loss')).toBeTruthy();
+      expect(within(list).getByText('12.5M')).toBeTruthy();
+      expect(mocks.loadKillmailFit).not.toHaveBeenCalled();
+      expect(screen.getByRole('link', { name: 'More on zKillboard' }).getAttribute('href')).toBe(
+        'https://zkillboard.com/character/42/'
+      );
+    });
+
+    it('reads a hash-only row on expand, once, and opens its fit in Fittings', async () => {
+      mocks.loadKillmailFit.mockResolvedValue(FIT);
+      renderTab('/travel/pilot?pilot=42');
+      await screen.findByRole('list', { name: 'Recent kills and losses' });
+      const [, lossRow] = screen.getAllByRole('button', { expanded: false });
+      fireEvent.click(lossRow!);
+
+      expect(await screen.findByText('High slots')).toBeTruthy();
+      expect(screen.getByText('Small Autocannon')).toBeTruthy();
+      expect(mocks.loadKillmailFit).toHaveBeenCalledWith(HASH_ONLY_LOSS);
+      // The row fills in from the killmail it read: the final blow, not "—".
+      expect(await screen.findByText('Final Blower')).toBeTruthy();
+
+      fireEvent.click(lossRow!);
+      fireEvent.click(lossRow!);
+      await screen.findByText('High slots');
+      expect(mocks.loadKillmailFit).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Open in Fittings' }));
+      await waitFor(() => expect(probe.pathname).toBe('/ships/fittings/edit'));
+      expect(probe.search).toBe('?f=CODE');
+    });
+
+    it('says so when a killmail cannot be read', async () => {
+      mocks.loadKillmailFit.mockResolvedValue({ ok: false });
+      renderTab('/travel/pilot?pilot=42');
+      await screen.findByRole('list', { name: 'Recent kills and losses' });
+      fireEvent.click(screen.getAllByRole('button', { expanded: false })[1]!);
+      expect(await screen.findByText(/killmail couldn't be read/i)).toBeTruthy();
+    });
+
+    it('shows a zKillboard failure apart from an empty list', async () => {
+      mocks.fetchPilotKillmails.mockResolvedValue({ ok: false });
+      renderTab('/travel/pilot?pilot=42');
+      expect(await screen.findByText("Recent kills and losses couldn't be loaded")).toBeTruthy();
+    });
   });
 });
