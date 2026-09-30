@@ -68,8 +68,10 @@ export function AvoidedSystemsPanel() {
                 const name = system?.name ?? `#${id}`;
                 return (
                   <li key={id} className="flex items-center gap-2 px-2 py-1">
-                    {system && <SecurityStatus security={system.security} className="w-8" />}
-                    <span className="flex-1 truncate">{name}</span>
+                    <span className="flex-1 truncate">
+                      {name}
+                      {system && <SecurityStatus security={system.security} className="ml-1" />}
+                    </span>
                     <IconButton
                       size="sm"
                       variant="plain"

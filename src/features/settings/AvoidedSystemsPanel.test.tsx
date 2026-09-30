@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
@@ -29,9 +29,13 @@ describe('AvoidedSystemsPanel', () => {
     render(<AvoidedSystemsPanel />);
 
     const list = await screen.findByRole('list', { name: 'Avoided systems' });
-    const rows = await within(list).findAllByRole('listitem');
-    await within(rows[0]).findByText('Tama');
-    expect(rows.map((row) => row.textContent)).toEqual(['0.3Tama', '0.5Uedama']);
+    await waitFor(() =>
+      expect(
+        within(list)
+          .getAllByRole('listitem')
+          .map((row) => row.textContent)
+      ).toEqual(['Tama0.3', 'Uedama0.5'])
+    );
   });
 
   it('adds a system from the search, showing security in the results', async () => {
@@ -45,7 +49,7 @@ describe('AvoidedSystemsPanel', () => {
     await user.click(option);
 
     const list = await screen.findByRole('list', { name: 'Avoided systems' });
-    expect(within(list).getByText('Uedama')).toBeInTheDocument();
+    expect(list).toHaveTextContent('Uedama0.5');
     expect(useAvoidedSystems.getState().value).toEqual([30045328]);
   });
 
@@ -68,7 +72,7 @@ describe('AvoidedSystemsPanel', () => {
     await user.click(await screen.findByRole('button', { name: 'Remove Uedama' }));
 
     expect(useAvoidedSystems.getState().value).toEqual([30002813]);
-    expect(screen.queryByText('Uedama')).not.toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Avoided systems' })).not.toHaveTextContent('Uedama');
   });
 
   it('still lists, and can remove, a system the snapshot cannot name', async () => {

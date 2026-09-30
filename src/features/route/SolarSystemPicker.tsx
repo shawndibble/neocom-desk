@@ -134,14 +134,8 @@ export function SolarSystemPicker({
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => choose(system)}
                 >
-                  {showSecurity ? (
-                    <span className="flex items-center justify-between gap-2">
-                      {system.name}
-                      <SecurityStatus security={system.security} />
-                    </span>
-                  ) : (
-                    system.name
-                  )}
+                  {system.name}
+                  {showSecurity && <SecurityStatus security={system.security} className="ml-1" />}
                 </li>
               ))}
             </ul>

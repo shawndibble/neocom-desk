@@ -1239,6 +1239,8 @@ function usePhoneSummaries(): Partial<Record<SettingsSectionId, string>> {
   const characterFilter = useDefaultCharacterFilter((state) => state.value);
   const darkAfterDays = useDarkThreshold((state) => state.value);
   const avoidedCount = useAvoidedSystems((state) => state.value.length);
+  // Only the Travel panel hydrates this otherwise, and the phone list does not mount it.
+  useHydratedStore(useAvoidedSystems);
 
   return {
     display: t('settings.summary.display', {
