@@ -20,43 +20,24 @@
  * hand-kept lists eventually leave a route in neither, which on a phone means
  * unreachable.
  */
-import type { AppRoutePath } from '@/app/routeScopes';
+import { NAV_PAGES, navPageLabelKey } from '@/app/navDestinations';
 import { createLocalSetting } from './useLocalSetting';
 
 export const MOBILE_TABS_KEY = 'mobileTabs';
 
+type MobileTabPage = Extract<(typeof NAV_PAGES)[number], { mobileTab: true }>;
+
+export type MobileTabPath = MobileTabPage['path'];
+
 /**
  * Every path that may take a tab, in the desktop rail's order — which is also
- * the order the More sheet lists whatever is left.
- *
- * Deliberately its own list rather than a reuse of `Layout`'s `NAV_PATHS`:
- * that one answers "does this draw a lock dot", and the two questions will
- * drift. `/corp` is absent from both, for the same reason in each — corp UI
- * hides rather than locks, so a chosen `/corp` would leave a hole in the bar
- * on every Character without corp access. It keeps its permanent sheet row.
+ * the order the More sheet lists whatever is left. Derived from the shared
+ * nav descriptor (`app/navDestinations.ts`), whose `mobileTab` flag says why
+ * `/corp` and `/settings` are absent: each keeps a permanent sheet row.
  */
-export const MOBILE_TAB_CHOICES = [
-  '/overview',
-  '/alerts',
-  '/skills',
-  '/industry',
-  '/ships',
-  '/mining',
-  '/planetary-industry',
-  '/market',
-  '/wallet',
-  '/assets',
-  '/contracts',
-  '/mail',
-  '/calendar',
-  '/contacts',
-  // Last, not the desktop rail's order (it has none there — reached only via
-  // `CharacterFooterLink`'s portrait): this is a fresh call, and last matches
-  // where it already sits at the end of the More sheet today (#1764).
-  '/characters',
-] as const satisfies readonly AppRoutePath[];
-
-export type MobileTabPath = (typeof MOBILE_TAB_CHOICES)[number];
+export const MOBILE_TAB_CHOICES: readonly MobileTabPath[] = NAV_PAGES.filter(
+  (page): page is MobileTabPage => page.mobileTab
+).map((page) => page.path);
 
 /** Tabs in the bar, beside the "More" button that is always the fifth item. */
 export const MOBILE_TAB_COUNT = 4;
@@ -70,23 +51,9 @@ export const DEFAULT_MOBILE_TABS: readonly MobileTabPath[] = [
 ];
 
 /** `nav.*` i18n key per path — the one name each destination goes by, read by the rail, the bar, the sheet and the picker. */
-export const NAV_LABEL_KEYS: Record<MobileTabPath, string> = {
-  '/overview': 'nav.overview',
-  '/alerts': 'nav.alerts',
-  '/skills': 'nav.skills',
-  '/industry': 'nav.industry',
-  '/ships': 'nav.ships',
-  '/mining': 'nav.miningTax',
-  '/planetary-industry': 'nav.pi',
-  '/market': 'nav.market',
-  '/wallet': 'nav.wallet',
-  '/assets': 'nav.assets',
-  '/contracts': 'nav.contracts',
-  '/mail': 'nav.mail',
-  '/calendar': 'nav.calendar',
-  '/contacts': 'nav.contacts',
-  '/characters': 'nav.characters',
-};
+export const NAV_LABEL_KEYS = Object.fromEntries(
+  MOBILE_TAB_CHOICES.map((path) => [path, navPageLabelKey(path)])
+) as Record<MobileTabPath, string>;
 
 function isMobileTabPath(value: unknown): value is MobileTabPath {
   return (MOBILE_TAB_CHOICES as readonly string[]).includes(value as string);
