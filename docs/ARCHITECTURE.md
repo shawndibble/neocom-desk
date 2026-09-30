@@ -31,7 +31,7 @@ Auth is browser-only OAuth2 PKCE against `login.eveonline.com`; refresh
 tokens never leave the device. Market prices come from Fuzzwork aggregates,
 ESI as fallback (ADR 0002). The item/skill/blueprint catalog (SDE) is
 snapshotted at build time into `public/data/*.json` by `scripts/build-sde.mjs`
-— no SDE calls at runtime.
+— no SDE calls at runtime. The large single-feature files are not precached: they are fetched on first use or by an idle, connection-gated background warm (`src/sde/warmLazySde.ts`, also the dogma engine assets), cached by the service worker's `sde-data` route.
 
 External dependencies: `esi.evetech.net`, `login.eveonline.com`,
 `market.fuzzwork.co.uk`, `data.everef.net` (public BPC contract search, ADR
