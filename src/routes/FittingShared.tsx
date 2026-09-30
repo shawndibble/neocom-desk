@@ -4,11 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { BootScreen } from '@/app/BootScreen';
-import { buttonClassName, EmptyState, LogoMark, Panel, Spinner, TypeIcon } from '@/components/ui';
+import { buttonClassName, EmptyState, LogoMark, Spinner, TypeIcon } from '@/components/ui';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import { writeToClipboard } from '@/lib/clipboard';
 import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { resolveFittingShareView } from '@/features/fittings/resolveFittingShareView';
+import { FittingModuleList } from '@/features/fittings/FittingModuleList';
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
@@ -16,7 +17,6 @@ import { useFittingHardpoints } from '@/features/fittings/useFittingHardpoints';
 import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
 import { useFittingEvaluation } from '@/features/fittings/useFittingEvaluation';
 import { fittingToEft } from '@/engine/fittings/eftExport';
-import { FITTING_SLOT_KINDS } from '@/engine/fittings/types';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 import { loadTypes } from '@/sde/loadSde';
 
@@ -211,7 +211,13 @@ export function FittingShared() {
             damageProfiles={damageProfiles}
             targetProfiles={targetProfiles}
           />
-          <ModuleList fitting={state.fitting} typeName={typeName} />
+          {typeName !== null && (
+            <FittingModuleList
+              fitting={state.fitting}
+              typeName={typeName}
+              title={t('fittingShare.moduleListTitle')}
+            />
+          )}
         </>
       )}
 
@@ -239,70 +245,5 @@ export function FittingShared() {
         )}
       </div>
     </main>
-  );
-}
-
-/** Plain-text module/drone list — nothing editable, doubling as an accessible reading of the same data `FittingRing`'s icons show. */
-function ModuleList({ fitting, typeName }: { fitting: Fitting; typeName: TypeName | null }) {
-  const { t } = useTranslation();
-  if (typeName === null) return null;
-
-  const groups = FITTING_SLOT_KINDS.map((rack) => ({
-    rack,
-    modules: fitting.modules.filter((module) => module.slot === rack),
-  })).filter((group) => group.modules.length > 0);
-
-  if (groups.length === 0 && fitting.drones.length === 0 && fitting.cargo.length === 0) {
-    return null;
-  }
-
-  return (
-    <Panel title={t('fittingShare.moduleListTitle')}>
-      <div className="space-y-3 text-xs">
-        {groups.map(({ rack, modules }) => (
-          <div key={rack}>
-            <p className="font-semibold tracking-widest text-text-dim uppercase">
-              {t(`fittings.list.rack.${rack}`)}
-            </p>
-            <ul>
-              {modules.map((module, index) => (
-                <li key={index}>
-                  {typeName(module.typeId)}
-                  {module.chargeTypeId !== undefined && ` — ${typeName(module.chargeTypeId)}`}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-        {fitting.drones.length > 0 && (
-          <div>
-            <p className="font-semibold tracking-widest text-text-dim uppercase">
-              {t('fittings.list.drones')}
-            </p>
-            <ul>
-              {fitting.drones.map((drone, index) => (
-                <li key={index}>
-                  {typeName(drone.typeId)} x{drone.quantity}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {fitting.cargo.length > 0 && (
-          <div>
-            <p className="font-semibold tracking-widest text-text-dim uppercase">
-              {t('fittings.list.cargo')}
-            </p>
-            <ul>
-              {fitting.cargo.map((item, index) => (
-                <li key={index}>
-                  {typeName(item.typeId)} x{item.quantity}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    </Panel>
   );
 }
