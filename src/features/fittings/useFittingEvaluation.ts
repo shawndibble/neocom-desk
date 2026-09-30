@@ -36,12 +36,16 @@ import { useDamageProfiles, type DamageProfiles } from './damageProfiles';
 import {
   computeFittingStats,
   explainModule,
+  fittingSkillSources,
   isDogmaEngineReady,
   type DogmaAssetProgress,
   type StatsOptions,
 } from './dogmaFittingEngine';
 import type { AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { loadFittingPrice } from './fittingPrice';
+import { NO_SKILL_OVERRIDES, withSkillLevel } from '@/engine/fittings/skillOverrides';
+import { allVSkillLevels } from '@/engine/fittings/pilotProfile';
+import { loadSkills } from '@/sde/loadSde';
 
 /**
  * Changes to the open Fitting (Variations' swap candidates), worked out
@@ -56,6 +60,23 @@ export interface VariantEvaluator {
   profile: PilotProfile;
   /** A variant's stats beside the open Fitting's own, both without overheat. */
   compare: (variant: Fitting) => Promise<{ before: FittingStats; after: FittingStats }>;
+}
+
+/**
+ * "What to train" for the open Fitting (`useSkillGains`): the open Fitting
+ * with one skill at another level, beside its own stats — the same cached
+ * baseline Variations compares against.
+ */
+export interface SkillGainEvaluator {
+  /** The pilot the stats run under; its skill levels are the ones a +1 builds on. */
+  profile: PilotProfile;
+  /** Every skill that modifies anything on the Fitting, found with every skill at V. */
+  skillSources: () => Promise<number[]>;
+  /** The Fitting's stats with `skillTypeId` at `level`, beside its own, both without overheat. */
+  compare: (
+    skillTypeId: number,
+    level: number
+  ) => Promise<{ before: FittingStats; after: FittingStats }>;
 }
 
 export interface FittingEvaluationInput {
@@ -95,6 +116,8 @@ export interface FittingEvaluation {
    * out under. Null until the pilot, the Damage Profile and the engine are ready.
    */
   explainModule: ((moduleIndex: number) => Promise<AffectedAttribute[]>) | null;
+  /** "What to train"; null until the pilot, the Damage Profile and the engine are ready. */
+  skillGains: SkillGainEvaluator | null;
 }
 
 /**
@@ -138,23 +161,75 @@ function statsUnder(
   );
 }
 
-function variantEvaluator(fitting: Fitting, basis: EvaluationBasis): VariantEvaluator {
+/** `fitting`'s own stats without overheat, worked out once on first ask and shared by every compare. */
+function sharedBaseline(fitting: Fitting, basis: EvaluationBasis): () => Promise<FittingStats> {
   // Dropped on failure so a transient error doesn't wedge every later compare.
   let baseline: Promise<FittingStats> | null = null;
+  return () => {
+    if (baseline === null) {
+      const pending = statsUnder(fitting, basis, { overheated: false });
+      baseline = pending;
+      pending.catch(() => {
+        if (baseline === pending) baseline = null;
+      });
+    }
+    return baseline;
+  };
+}
+
+function variantEvaluator(
+  fitting: Fitting,
+  basis: EvaluationBasis,
+  baseline: () => Promise<FittingStats>
+): VariantEvaluator {
   return {
     fitting,
     profile: basis.pilot,
     async compare(variant) {
-      if (baseline === null) {
-        const pending = statsUnder(fitting, basis, { overheated: false });
-        baseline = pending;
-        pending.catch(() => {
-          if (baseline === pending) baseline = null;
-        });
-      }
       const [before, after] = await Promise.all([
-        baseline,
+        baseline(),
         statsUnder(variant, basis, { overheated: false }),
+      ]);
+      return { before, after };
+    },
+  };
+}
+
+function skillGainEvaluator(
+  fitting: Fitting,
+  basis: EvaluationBasis,
+  baseline: () => Promise<FittingStats>
+): SkillGainEvaluator {
+  return {
+    profile: basis.pilot,
+    async skillSources() {
+      // At V, so an untrained skill — which the engine gives no modifiers —
+      // is still found when it would change something.
+      const all = await loadSkills();
+      const pilot = {
+        ...basis.pilot,
+        skillLevels: allVSkillLevels(all.map((skill) => skill.typeID)),
+      };
+      return fittingSkillSources(
+        fitting,
+        pilot,
+        basis.damageProfile,
+        statsOptions(basis.conditions)
+      );
+    },
+    async compare(skillTypeId, level) {
+      const skills = withSkillLevel(
+        basis.conditions.skills ?? NO_SKILL_OVERRIDES,
+        skillTypeId,
+        level
+      );
+      const [before, after] = await Promise.all([
+        baseline(),
+        statsUnder(
+          fitting,
+          { ...basis, conditions: { ...basis.conditions, skills } },
+          { overheated: false }
+        ),
       ]);
       return { before, after };
     },
@@ -272,13 +347,16 @@ export function useFittingEvaluation({
     };
   }, [fitting, hubId, hubHydrated]);
 
-  const variants = useMemo(
-    () =>
-      fitting === null || pilot === null || damageProfile === null || !engineReady
-        ? null
-        : variantEvaluator(fitting, { pilot, damageProfile, conditions }),
-    [fitting, pilot, damageProfile, conditions, engineReady]
-  );
+  // One baseline for Variations and "What to train" alike.
+  const evaluators = useMemo(() => {
+    if (fitting === null || pilot === null || damageProfile === null || !engineReady) return null;
+    const basis = { pilot, damageProfile, conditions };
+    const baseline = sharedBaseline(fitting, basis);
+    return {
+      variants: variantEvaluator(fitting, basis, baseline),
+      skillGains: skillGainEvaluator(fitting, basis, baseline),
+    };
+  }, [fitting, pilot, damageProfile, conditions, engineReady]);
 
   const explain = useMemo(
     () =>
@@ -301,7 +379,8 @@ export function useFittingEvaluation({
     engineReady,
     damageProfiles,
     price,
-    variants,
+    variants: evaluators?.variants ?? null,
     explainModule: explain,
+    skillGains: evaluators?.skillGains ?? null,
   };
 }

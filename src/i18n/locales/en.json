@@ -608,6 +608,7 @@
         "offense": "Offense",
         "appliedDps": "Applied DPS",
         "assumptions": "Implants & skills",
+        "whatToTrain": "What to train",
         "defense": "Defense",
         "targeting": "Targeting",
         "navigation": "Navigation",
@@ -815,6 +816,28 @@
         "fillTime": "{{time}} ({{capacity}} m³)"
       },
       "fightersNoOverheat": "Fighters don't overheat"
+    },
+    "whatToTrain": {
+      "noCharacter": "Log in a Character to see which skill to train next for this fit.",
+      "overridesOn": "Clear the skill overrides to rank skills: a +1 level builds on the Character's real skills.",
+      "loading": "Working out each skill's next level…",
+      "failed": "Couldn't work out which skills affect this fit.",
+      "none": "No single skill level would change this fit — every skill that affects it is trained to V.",
+      "rankBy": "Rank by",
+      "skill": "Skill",
+      "changes": "Whole-fitting change",
+      "time": "Training time",
+      "withPrerequisites": "incl. prerequisites",
+      "sort": {
+        "overall": "Overall",
+        "dps": "DPS",
+        "ehp": "EHP",
+        "activeTank": "Active tank",
+        "speed": "Speed",
+        "align": "Align time",
+        "capacitor": "Capacitor",
+        "lockRange": "Lock range"
+      }
     },
     "variations": {
       "title": "Variations",

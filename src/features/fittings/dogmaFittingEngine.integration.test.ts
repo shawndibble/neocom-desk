@@ -25,6 +25,7 @@ import {
 import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes } from '@/engine/fittings/affectedBy';
+import { skillSourceTypeIds } from '@/engine/fittings/skillGains';
 import { extractMining, miningYield } from '@/engine/fittings/mining';
 import { capacitorStatusAtDrain } from '@/engine/fittings/tank';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
@@ -995,6 +996,39 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     );
     // Nothing negative: the patched, derived ids are never listed.
     expect(rows.every((row) => row.attributeId > 0)).toBe(true);
+  });
+
+  it("finds the skills that modify a fit (What to train's candidates), and only trained ones", () => {
+    const fitting: Fitting = {
+      name: 'Rifter',
+      shipTypeId: RIFTER,
+      modules: [
+        { slot: 'high', slotIndex: 0, typeId: 2889, state: 'active', chargeTypeId: 185 },
+        { slot: 'low', slotIndex: 0, typeId: GYROSTABILIZER_II, state: 'online' },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const sourcesUnder = (skills: Map<number, number>) => {
+      const calculation = calculate(fittingToDogmaFit(fitting, buildPilotProfile(skills, [])), {
+        sources: true,
+      });
+      return skillSourceTypeIds([calculation.ship, calculation.character, ...calculation.items]);
+    };
+
+    const trained = sourcesUnder(
+      new Map([
+        [3300, 5],
+        [3310, 5],
+        [3315, 5],
+      ])
+    );
+    // Rapid Firing (rate of fire) and Surgical Strike (damage) on the gun.
+    expect(trained).toContain(3310);
+    expect(trained).toContain(3315);
+    // Untrained skills give no modifiers — why the panel looks at All V.
+    const untrained = sourcesUnder(new Map([[3300, 5]]));
+    expect(untrained).not.toContain(3315);
   });
 
   it('takes in what another Fitting projects: its web, its remote reps, its command burst', () => {

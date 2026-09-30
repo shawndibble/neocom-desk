@@ -25,6 +25,7 @@ import {
 import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes, type AffectedAttribute } from '@/engine/fittings/affectedBy';
+import { skillSourceTypeIds } from '@/engine/fittings/skillGains';
 import { extractMining, miningYield } from '@/engine/fittings/mining';
 import { projectsNothing } from '@/engine/fittings/projection';
 import {
@@ -489,6 +490,34 @@ export async function explainModule(
     chargeTypeIds: dogmaFit.items.map((item) => item.charge?.type_id),
     projectedTypeIds: (dogmaFit.incoming?.effects ?? []).map((effect) => effect.type_id),
   });
+}
+
+/**
+ * Every skill that modifies anything on `fitting` under `profile` — the
+ * ship, its mode, the character, each item and its charge ("What to train"'s
+ * candidates, `engine/fittings/skillGains.ts`). The same fit the stats
+ * work out, asked once for its sources; on demand only, like `explainModule`.
+ */
+export async function fittingSkillSources(
+  fitting: Fitting,
+  profile: PilotProfile,
+  damageProfile?: DamageProfile,
+  { weatherTypeId, incoming }: StatsOptions = {}
+): Promise<number[]> {
+  await loadDogmaEngine();
+  const dogmaFit = withIncoming(
+    withWeather(fittingToDogmaFit(fitting, profile, damageProfile), weatherTypeId),
+    incoming
+  );
+  const calculation = calculate(dogmaFit, { sources: true });
+  return [
+    ...skillSourceTypeIds([
+      calculation.ship,
+      calculation.character,
+      ...(calculation.mode ? [calculation.mode] : []),
+      ...calculation.items,
+    ]),
+  ];
 }
 
 export interface CandidateCheck {
