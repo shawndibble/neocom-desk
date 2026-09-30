@@ -82,11 +82,18 @@ import {
   type HaulingViewRow,
 } from './haulingView';
 import { useMarketHub } from './hub';
-import { haulingHubDefaults, pickHaulingHub } from './haulingHubs';
+import {
+  ANY_HUB,
+  anyEndOf,
+  HAULING_HUB_CHOICES,
+  haulingEnd,
+  haulingHubDefaults,
+  hubAtAnyEnd,
+  pickHaulingHub,
+  type HaulingHubChoice,
+} from './haulingHubs';
 import { useHaulingFees, useHaulingScan } from './useHaulingScan';
 import { HAUL_MODES, type HaulMode } from './haulingData';
-
-const HUB_IDS = TRADE_HUBS.map((h) => h.id);
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 const MARGIN_CHOICES = [0, 3, 5, 10] as const;
 
@@ -103,8 +110,8 @@ const HAULING_URL_FILTERS = {
 function haulingUrl(hubId: TradeHub['id']) {
   const defaults = haulingHubDefaults(hubId);
   return {
-    from: enumParam(HUB_IDS, defaults.from),
-    to: enumParam(HUB_IDS, defaults.to),
+    from: enumParam(HAULING_HUB_CHOICES, defaults.from),
+    to: enumParam(HAULING_HUB_CHOICES, defaults.to),
     ...HAULING_URL_FILTERS,
   };
 }
@@ -164,10 +171,6 @@ const DEMAND_DOT: Record<DemandKind, string> = {
   rarely: 'bg-danger',
 };
 
-function hubFor(id: TradeHub['id']): TradeHub {
-  return TRADE_HUBS.find((h) => h.id === id) ?? TRADE_HUBS[0]!;
-}
-
 function signed(value: number, fractionDigits: number): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(fractionDigits)}`;
 }
@@ -224,8 +227,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     [haulingFilterPref]
   );
   const [params, setParams] = useRememberedUrlParams(haulingSchema, rememberedFilter);
-  const from = hubFor(params.from);
-  const to = hubFor(params.to);
+  const from = haulingEnd(params.from);
+  const to = haulingEnd(params.to);
+  // The end set to Any hub, if one is: the table then says which hub each row uses there.
+  const anyEnd = anyEndOf(params);
   const categoryId = isHaulingCategoryId(params.cat) ? params.cat : DEFAULT_HAULING_CATEGORY_ID;
   const mode: HaulMode = params.mode;
   const instant = mode === 'instant';
@@ -264,7 +269,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     void hydrateIntro();
   }, [hydrateCargo, hydrateBudget, hydrateIntro]);
 
-  const sameHub = from.id === to.id;
+  // The pickers never leave Any at both ends (`pickHaulingHub` swaps), but a hand-written link can.
+  const bothAny = params.from === ANY_HUB && params.to === ANY_HUB;
+  const sameHub = !bothAny && params.from === params.to;
   const { state, refresh } = useHaulingScan(
     from,
     to,
@@ -272,9 +279,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     mode,
     // Not before the default hub has loaded: until then the lane is the
     // fallback one, and scanning it would spend ESI budget on the wrong route.
-    defaultHubHydrated && from.id !== to.id
+    defaultHubHydrated && !sameHub && !bothAny
   );
-  const fees = useHaulingFees(activeCharacterId, to);
+  const fees = useHaulingFees(activeCharacterId);
 
   const refreshDisabled = state.status !== 'ready';
   useEffect(() => {
@@ -283,7 +290,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   }, [onRefreshInfoChange, refresh, refreshDisabled]);
 
   const viewRows = useMemo(
-    () => (state.status === 'ready' ? toViewRows(state.scan.rows, fees) : []),
+    () => (state.status === 'ready' ? toViewRows(state.scan.rows, fees.at) : []),
     [state, fees]
   );
   const { shown, hidden } = useMemo(
@@ -298,7 +305,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
   // The user's edits belong to one scan: a new route, category or mode starts a fresh plan.
   const [overrides, setOverrides] = useState<ReadonlyMap<number, TripOverride>>(new Map());
-  const scanKey = `${from.id}>${to.id}:${categoryId}:${mode}`;
+  const scanKey = `${params.from}>${params.to}:${categoryId}:${mode}`;
   const [overridesFor, setOverridesFor] = useState(scanKey);
   if (overridesFor !== scanKey) {
     setOverridesFor(scanKey);
@@ -311,7 +318,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         candidates: shown.map((r) => r.candidate),
         cargoM3: cargo?.m3 ?? null,
         budgetIsk: budget,
-        fees,
+        // Every candidate carries its own destination's fees; this is only the fallback.
+        fees: fees.at(TRADE_HUBS[0]!),
         overrides,
       }),
     [shown, cargo, budget, fees, overrides]
@@ -377,6 +385,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     () =>
       haulingCsvColumns(t, {
         mode,
+        anyEnd,
         flagText: (flag) => flagLabel[flag].text,
         bringFor: (row) => {
           const line = lineOf.get(row.typeId);
@@ -384,7 +393,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           return line.quantity;
         },
       }),
-    [t, mode, flagLabel, lineOf, overrides]
+    [t, mode, anyEnd, flagLabel, lineOf, overrides]
   );
   const tableExport = useTableExport({ surface: 'hauling', rows: shown, columns: csvColumns });
 
@@ -437,6 +446,23 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         </span>
       ),
     },
+    ...(anyEnd === null
+      ? []
+      : [
+          {
+            id: 'hub',
+            header: t('market.hauling.columns.hub'),
+            headerTooltip: t(
+              anyEnd === 'from'
+                ? 'market.hauling.columns.hubFromTip'
+                : 'market.hauling.columns.hubToTip'
+            ),
+            headerClassName: 'whitespace-nowrap',
+            className: 'whitespace-nowrap',
+            sortValue: (row: HaulingViewRow) => hubAtAnyEnd(row, anyEnd).systemName,
+            render: (row: HaulingViewRow) => hubAtAnyEnd(row, anyEnd).systemName,
+          },
+        ]),
     {
       id: 'buy',
       headerClassName: 'whitespace-nowrap',
@@ -661,8 +687,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           <>
             <HubField
               label={t('market.hauling.from')}
-              value={from.id}
-              onChange={(id) => setParams(pickHaulingHub({ from: from.id, to: to.id }, 'from', id))}
+              value={params.from}
+              onChange={(id) =>
+                setParams(pickHaulingHub({ from: params.from, to: params.to }, 'from', id))
+              }
             />
             {/* `self-center`: the row's own `items-end` lines the labelled
                 fields and icon buttons up by their bottom edge, but this
@@ -674,8 +702,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             </span>
             <HubField
               label={t('market.hauling.to')}
-              value={to.id}
-              onChange={(id) => setParams(pickHaulingHub({ from: from.id, to: to.id }, 'to', id))}
+              value={params.to}
+              onChange={(id) =>
+                setParams(pickHaulingHub({ from: params.from, to: params.to }, 'to', id))
+              }
             />
             <label className="flex flex-col gap-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('market.hauling.category')}
@@ -821,7 +851,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         </div>
       )}
 
-      {sameHub ? (
+      {bothAny ? (
+        <EmptyState
+          title={t('market.hauling.bothAnyTitle')}
+          hint={t('market.hauling.bothAnyHint')}
+        />
+      ) : sameHub ? (
         <EmptyState
           title={t('market.hauling.sameHubTitle')}
           hint={t('market.hauling.sameHubHint')}
@@ -949,9 +984,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                 rowContextMenu={rowContextMenu}
                 rowMoreActions
                 expandableRow={{
-                  renderDetail: (row) => (
-                    <HaulingRowDetail row={row} from={from} to={to} fees={fees} />
-                  ),
+                  renderDetail: (row) => <HaulingRowDetail row={row} />,
                   hideIcon: true,
                 }}
                 rowClassName={(row) =>
@@ -1017,13 +1050,14 @@ function HubField({
   onChange,
 }: {
   label: string;
-  value: TradeHub['id'];
-  onChange: (id: TradeHub['id']) => void;
+  value: HaulingHubChoice;
+  onChange: (id: HaulingHubChoice) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <label className="flex flex-col gap-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
       {label}
-      <Select value={value} onValueChange={(next) => onChange(next as TradeHub['id'])}>
+      <Select value={value} onValueChange={(next) => onChange(next as HaulingHubChoice)}>
         <SelectTrigger size="sm" aria-label={label} className="w-32">
           <SelectValue />
         </SelectTrigger>
@@ -1033,6 +1067,7 @@ function HubField({
               {h.systemName}
             </SelectItem>
           ))}
+          <SelectItem value={ANY_HUB}>{t('market.hauling.anyHub')}</SelectItem>
         </SelectContent>
       </Select>
     </label>

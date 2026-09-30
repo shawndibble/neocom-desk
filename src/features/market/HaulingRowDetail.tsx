@@ -18,23 +18,19 @@
  */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AppraisalNetFees } from '@/engine/market/appraisal';
 import { HAULING_THRESHOLDS, lotEconomics } from '@/engine/market/haulingMarket';
 import { formatIsk } from '@/lib/isk';
-import type { TradeHub } from '@/market/hubs';
 import type { InstantHaulingScanRow, ListHaulingScanRow } from './haulingData';
 import { formatDaysToSell, type HaulingViewRow } from './haulingView';
 
 const ORDER_LEVELS = 8;
 
+/** The row carries its own lane and fees: with Any hub at one end, each row may use a different hub. */
 interface HaulingRowDetailProps {
   row: HaulingViewRow;
-  from: TradeHub;
-  to: TradeHub;
-  fees: AppraisalNetFees;
 }
 
-interface DetailProps<Row> extends Omit<HaulingRowDetailProps, 'row'> {
+interface DetailProps<Row> {
   row: Row;
 }
 
@@ -84,21 +80,13 @@ function Line({
   );
 }
 
-export function HaulingRowDetail({ row, ...rest }: HaulingRowDetailProps) {
-  return row.mode === 'instant' ? (
-    <InstantDetail row={row} {...rest} />
-  ) : (
-    <ListingDetail row={row} {...rest} />
-  );
+export function HaulingRowDetail({ row }: HaulingRowDetailProps) {
+  return row.mode === 'instant' ? <InstantDetail row={row} /> : <ListingDetail row={row} />;
 }
 
-function InstantDetail({
-  row,
-  from,
-  to,
-  fees,
-}: DetailProps<HaulingViewRow & InstantHaulingScanRow>) {
+function InstantDetail({ row }: DetailProps<HaulingViewRow & InstantHaulingScanRow>) {
   const { t } = useTranslation();
+  const { fromHub: from, toHub: to, fees } = row;
   const lot = lotEconomics({
     buyLadder: row.buyLadder,
     expectedPrice: 0,
@@ -211,8 +199,9 @@ function InstantDetail({
   );
 }
 
-function ListingDetail({ row, from, to, fees }: DetailProps<HaulingViewRow & ListHaulingScanRow>) {
+function ListingDetail({ row }: DetailProps<HaulingViewRow & ListHaulingScanRow>) {
   const { t } = useTranslation();
+  const { fromHub: from, toHub: to, fees } = row;
   const { sale } = row;
 
   const lot = lotEconomics({

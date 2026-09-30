@@ -7,7 +7,11 @@
 import type { AppraisalNetFees } from '@/engine/market/appraisal';
 import { haulingFlags, lotEconomics, type HaulingFlag } from '@/engine/market/haulingMarket';
 import { profitableDepth, type TripCandidate } from '@/engine/market/haulingPlan';
+import type { TradeHub } from '@/market/hubs';
 import type { HaulingScanRow } from './haulingData';
+
+/** The fee rates a sale at `hub` pays: the broker fee follows the standing toward that hub's owner. */
+export type HaulingFeesAt = (hub: TradeHub) => AppraisalNetFees;
 
 /** A scan row priced at this Character's fees. An intersection, not an `interface`: the scan row is a union over the two modes. */
 export type HaulingViewRow = HaulingScanRow & {
@@ -30,12 +34,15 @@ export type HaulingViewRow = HaulingScanRow & {
    * profitable to. The plan sizes from the same figure.
    */
   suggestedUnits: number;
+  /** The fee rates this row's sale pays, at its own destination hub. */
+  fees: AppraisalNetFees;
   /** What the trip planner sizes. */
   candidate: TripCandidate;
 };
 
-function toCandidate(row: HaulingScanRow): TripCandidate {
+function toCandidate(row: HaulingScanRow, fees: AppraisalNetFees): TripCandidate {
   const base = {
+    fees,
     typeId: row.typeId,
     name: row.name,
     unitVolumeM3: row.unitVolumeM3,
@@ -53,10 +60,11 @@ function toCandidate(row: HaulingScanRow): TripCandidate {
 
 export function toViewRows(
   rows: readonly HaulingScanRow[],
-  fees: AppraisalNetFees
+  feesAt: HaulingFeesAt
 ): HaulingViewRow[] {
   return rows.map((row) => {
-    const candidate = toCandidate(row);
+    const fees = feesAt(row.toHub);
+    const candidate = toCandidate(row, fees);
     const depth = profitableDepth(candidate, fees);
     const suggestedUnits =
       candidate.demandCapUnits === null ? depth : Math.min(candidate.demandCapUnits, depth);
@@ -81,6 +89,7 @@ export function toViewRows(
       profitPerUnit,
       iskPerM3: profitPerUnit / row.unitVolumeM3,
       price,
+      fees,
       flags: haulingFlags({
         ladder: row.mode === 'list' ? row.destLadder : [],
         demand: row.mode === 'list' ? row.demand.demand : null,
