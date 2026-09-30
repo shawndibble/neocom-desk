@@ -253,6 +253,55 @@ describe('Market Browser: All regions', () => {
     expect(screen.queryByText('Only orders in this region are checked.')).not.toBeInTheDocument();
   });
 
+  it('in Trade Hub mode, a Jump Range reaches past the hub into every region in range', async () => {
+    await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
+    loadCharacterSolarSystemId.mockResolvedValue(JITA);
+    localJumpDistances.mockResolvedValue({
+      kind: 'known',
+      jumps: new Map([
+        [JITA, 0],
+        [AMARR, 4],
+        [RENS, 12],
+      ]),
+    });
+    const hits = new Map<number, number>();
+    server.use(regionOrdersHandler(hits));
+    window.history.pushState({}, '', `/market/browser?type=${RIFTER}&browser.jumps=5`);
+    render(<App />);
+
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    // Amarr's order isn't at the hub station: only a range that drops the
+    // hub's one-station filter shows it.
+    expect(await within(sellTable).findByText('1,100,000.00')).toBeInTheDocument();
+    expect(within(sellTable).getByText('1,000,000.00')).toBeInTheDocument();
+    expect(within(sellTable).queryByText('1,200,000.00')).not.toBeInTheDocument();
+    expect(hits.get(HEIMATAR)).toBeUndefined();
+    expect(hits.get(THE_FORGE)).toBe(1);
+    expect(hits.get(DOMAIN)).toBe(1);
+    expect(screen.getByText(/use Jita — only the order book reaches/)).toBeInTheDocument();
+  });
+
+  it('offers the Distance filter before any item is picked, named after the header scope', async () => {
+    await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
+    loadCharacterSolarSystemId.mockResolvedValue(JITA);
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/market/browser');
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Filters' }));
+    const distance = screen.getByRole('combobox', { name: 'Distance' });
+    // No range: the book reads the header's hub, so that is what it says.
+    expect(distance).toHaveTextContent('Jita');
+    expect(screen.queryByRole('button', { name: /Change current system/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Security' })).not.toBeInTheDocument();
+
+    await user.click(distance);
+    await user.click(await screen.findByRole('option', { name: 'Within 5 jumps' }));
+
+    expect(screen.getByRole('button', { name: /Change current system/ })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Security' })).toBeInTheDocument();
+  });
+
   it('with a persisted Jump Range and no matching query param, fetches only the in-range regions from the first request', async () => {
     await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
     // Seeded in Dexie, store left unhydrated (as `beforeEach` sets it) — the

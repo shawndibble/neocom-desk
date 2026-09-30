@@ -1581,7 +1581,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     expect(within(sellTable).queryByText('2,000,000.00')).not.toBeInTheDocument();
   });
 
-  it('shows Distance, Security and NPC-only filters only in Region mode; Min quantity in both', async () => {
+  it('shows Distance and Min quantity in both modes; Security and NPC-only only once the book spans stations', async () => {
     const hits = { count: 0 };
     server.use(ordersHandler(hits));
     const user = userEvent.setup();
@@ -1594,7 +1594,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     expect(screen.queryByRole('spinbutton', { name: 'Min quantity' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Filters' }));
     expect(screen.getByRole('spinbutton', { name: 'Min quantity' })).toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: 'Distance' })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Distance' })).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Security' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'NPC stations only' })).not.toBeInTheDocument();
 

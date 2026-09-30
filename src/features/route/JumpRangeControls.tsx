@@ -38,9 +38,19 @@ interface JumpRangeSelectProps {
   value: JumpRange;
   onChange: (next: JumpRange) => void;
   className?: string;
+  /**
+   * What "no range" reads as. Market Browser names the scope its book falls
+   * back to (the header's hub or region); elsewhere it is "Any distance".
+   */
+  anyLabel?: string;
 }
 
-export function JumpRangeSelect({ value, onChange, className = 'w-40' }: JumpRangeSelectProps) {
+export function JumpRangeSelect({
+  value,
+  onChange,
+  className = 'w-40',
+  anyLabel,
+}: JumpRangeSelectProps) {
   const { t } = useTranslation();
   return (
     <Select value={value} onValueChange={(next) => onChange(next as JumpRange)}>
@@ -50,7 +60,7 @@ export function JumpRangeSelect({ value, onChange, className = 'w-40' }: JumpRan
       <SelectContent>
         {JUMP_RANGES.map((range) => (
           <SelectItem key={range} value={range}>
-            {t(`jumpRange.option.${range}`)}
+            {range === 'any' && anyLabel !== undefined ? anyLabel : t(`jumpRange.option.${range}`)}
           </SelectItem>
         ))}
       </SelectContent>

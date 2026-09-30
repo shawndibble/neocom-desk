@@ -35,6 +35,7 @@ import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
 import { SPACE_KINDS } from '@/engine/space';
 import type { CurrentSystemState } from '@/features/route/currentSystem';
 import {
@@ -242,11 +243,13 @@ interface BrowserFilterBarProps {
   value: BrowserFilterValue;
   onChange: (next: BrowserFilterValue) => void;
   activeCount: number;
-  /** Distance, Security and NPC stations only are Region mode only; Hub mode is one NPC station. */
+  /** Security and NPC stations only need a book of many stations: Region mode, or a set Jump Range. */
   regionMode: boolean;
+  /** The header's hub or region: what the book reads while no Jump Range is set. */
+  scopeLabel: string;
   currentSystem: CurrentSystemState;
   /** The item tabs: the funnel sits at the end of their line rather than a row of its own. */
-  leading: ReactNode;
+  leading?: ReactNode;
   className?: string;
 }
 
@@ -260,6 +263,7 @@ function BrowserFilterBar({
   onChange,
   activeCount,
   regionMode,
+  scopeLabel,
   currentSystem,
   leading,
   className,
@@ -275,17 +279,20 @@ function BrowserFilterBar({
     >
       {(draft, setDraft) => (
         <>
-          {regionMode && (
-            <FilterField label={t('jumpRange.label')}>
-              <div className="flex flex-wrap items-center gap-2">
-                <JumpRangeSelect
-                  value={draft.jumps}
-                  onChange={(jumps) => setDraft({ ...draft, jumps })}
-                />
+          {/* Keyed on the draft, so the picker and the many-station filters
+              appear as soon as a distance is picked, before it is applied. */}
+          <FilterField label={t('jumpRange.label')}>
+            <div className="flex flex-wrap items-center gap-2">
+              <JumpRangeSelect
+                value={draft.jumps}
+                onChange={(jumps) => setDraft({ ...draft, jumps })}
+                anyLabel={scopeLabel}
+              />
+              {draft.jumps !== DEFAULT_JUMP_RANGE && (
                 <CurrentSystemPicker current={currentSystem} />
-              </div>
-            </FilterField>
-          )}
+              )}
+            </div>
+          </FilterField>
           <FilterField label={t('market.filterMinQuantity')}>
             <TextInput
               type="number"
@@ -300,7 +307,7 @@ function BrowserFilterBar({
               }
             />
           </FilterField>
-          {regionMode && (
+          {(regionMode || draft.jumps !== DEFAULT_JUMP_RANGE) && (
             <div
               role="group"
               aria-label={t('market.filterSecurity')}
@@ -322,7 +329,7 @@ function BrowserFilterBar({
               ))}
             </div>
           )}
-          {regionMode && (
+          {(regionMode || draft.jumps !== DEFAULT_JUMP_RANGE) && (
             <FilterChip
               label={t('market.filterNpcOnly')}
               selected={draft.npcOnly}
@@ -677,6 +684,7 @@ export function Market() {
     currentSystem,
     jumpRangeFilter,
     regionMode,
+    rangeAcross,
     stationFilter,
     setStationFilter,
     stationFilterLabel,
@@ -832,6 +840,23 @@ export function Market() {
       onClick={handleBackToFinderAndRestoreFocus}
     />
   ) : undefined;
+
+  // The header's hub or region, as the Distance select's "no range" option:
+  // with no range set, that is what the book reads.
+  const scopeLabel =
+    effectiveLocation.mode === 'hub'
+      ? effectiveHub.systemName
+      : allRegions
+        ? t('market.allRegions')
+        : (marketRegions?.find((region) => region.id === chosenRegionId)?.name ?? hubRegionName);
+  const browserFilterBarProps = {
+    value: browserFilterValue,
+    onChange: handleBrowserFiltersChange,
+    activeCount: activeFilterCount,
+    regionMode,
+    scopeLabel,
+    currentSystem,
+  };
 
   const itemTabs = (
     <Tabs
@@ -1088,24 +1113,24 @@ export function Market() {
                   </span>
                 )
               }
-              padded={selectedTypeId === null}
+              padded={false}
               leading={itemPanelLeading}
             >
               {selectedTypeId === null ? (
-                <EmptyState
-                  title={t('market.selectPromptTitle')}
-                  hint={t('market.selectPromptHint')}
-                  className="py-8"
-                />
+                <>
+                  {/* Set before searching: the range is where to look, not a property of one item. */}
+                  <BrowserFilterBar {...browserFilterBarProps} className="px-3 pt-2" />
+                  <EmptyState
+                    title={t('market.selectPromptTitle')}
+                    hint={t('market.selectPromptHint')}
+                    className="px-3 py-8"
+                  />
+                </>
               ) : (
                 <>
                   {itemTab === 'orders' ? (
                     <BrowserFilterBar
-                      value={browserFilterValue}
-                      onChange={handleBrowserFiltersChange}
-                      activeCount={activeFilterCount}
-                      regionMode={regionMode}
-                      currentSystem={currentSystem}
+                      {...browserFilterBarProps}
                       leading={itemTabs}
                       className="px-3 pt-2"
                     />
@@ -1113,10 +1138,16 @@ export function Market() {
                     <div className="px-3 pt-2">{itemTabs}</div>
                   )}
                   {/* Above both tabs: Price History is one of the readers it names. */}
-                  {allRegions && (
+                  {allRegions ? (
                     <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
                       {t('market.allRegionsSecondaryNote', { regionName: hubRegionName })}
                     </p>
+                  ) : (
+                    rangeAcross && (
+                      <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                        {t('market.rangeSecondaryNote', { scope: scopeLabel })}
+                      </p>
+                    )
                   )}
                   {itemTab === 'history' ? (
                     resolvedRegion && (
