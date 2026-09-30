@@ -222,6 +222,7 @@ function DamageFigures({
 /** Stable ids — the remembered layout (`statsSectionsPreference.ts`) is keyed on them. */
 type Section =
   | 'assumptions'
+  | 'whatToTrain'
   | 'offense'
   | 'appliedDps'
   | 'defense'
@@ -336,6 +337,8 @@ interface FittingStatsSectionsProps {
   conditions?: ReactNode;
   /** The implant controls, grouped with the skills override under "Implants & skills" — absent where a Fitting has no implants to choose. */
   implants?: ReactNode;
+  /** "What to train" (`FittingWhatToTrainPanel`) — absent where there's no Character to train. Collapsed by default: it only works anything out once opened. */
+  whatToTrain?: ReactNode;
   /** The hull takes drones (`showsDrones`) — else there is no Drones section. */
   showDrones?: boolean;
   /**
@@ -488,6 +491,7 @@ export function FittingStatsSections({
   heading,
   conditions,
   implants,
+  whatToTrain,
   showDrones = true,
   fitting = null,
   moduleResults = null,
@@ -726,6 +730,8 @@ export function FittingStatsSections({
             <SkillOverridesControl />
           </div>
         )}
+
+      {stats && whatToTrain && section('whatToTrain', undefined, whatToTrain)}
 
       {section(
         'offense',
