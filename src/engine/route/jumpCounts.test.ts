@@ -119,3 +119,22 @@ describe('jumpCountsForRoutes', () => {
     expect(counts).toEqual([null, null]);
   });
 });
+
+describe('jumpCountsForRoutes with avoided systems', () => {
+  it('agrees with itself whether an origin is asked once or many times', () => {
+    const avoid = new Set([LOW]);
+    const alone = jumpCountsForRoutes(GRAPH, [{ originSystemId: HUB, destinationSystemId: FAR }], {
+      avoid,
+    });
+    const grouped = jumpCountsForRoutes(
+      GRAPH,
+      [
+        { originSystemId: HUB, destinationSystemId: FAR },
+        { originSystemId: HUB, destinationSystemId: C },
+      ],
+      { avoid }
+    );
+    expect(alone).toEqual([4]);
+    expect(grouped).toEqual([4, 3]);
+  });
+});

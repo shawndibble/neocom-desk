@@ -48,6 +48,14 @@ export interface FindJumpRouteOptions {
    * of counting jumps.
    */
   securityOf?: (systemId: number) => number | undefined;
+  /**
+   * The pilot's Avoided Systems. Like the security bias, a cost rather than
+   * a wall: a destination only reachable through one still gets a route, and
+   * the route crosses as few of them as it can. Reaching one is not crossing
+   * it — an avoided origin or destination changes nothing, since every route
+   * between the same two ends pays for it alike.
+   */
+  avoid?: ReadonlySet<number>;
 }
 
 /**
@@ -60,6 +68,13 @@ export interface FindJumpRouteOptions {
 const UNWANTED_PENALTY = 10_000;
 
 /**
+ * What entering an Avoided System costs: far above `UNWANTED_PENALTY`, so
+ * crossing one fewer avoided system beats any number of security penalties.
+ * The pilot named those systems; the security bias is only a default.
+ */
+const AVOIDED_PENALTY = 100_000_000;
+
+/**
  * An unknown security is treated as *not* highsec. The conservative reading
  * is the only honest one: a `prefer-highsec` route must never claim safety
  * for a system the snapshot cannot vouch for.
@@ -69,7 +84,7 @@ function isHighsec(systemId: number, securityOf: (id: number) => number | undefi
   return security !== undefined && securityBand(security) === 'highsec';
 }
 
-function stepCostFor(
+function securityStepCost(
   preference: RoutePreferenceKind,
   securityOf: FindJumpRouteOptions['securityOf']
 ): (systemId: number) => number {
@@ -77,6 +92,13 @@ function stepCostFor(
   const avoidHighsec = preference === 'avoid-highsec';
   return (systemId) =>
     isHighsec(systemId, securityOf) === avoidHighsec ? 1 + UNWANTED_PENALTY : 1;
+}
+
+function stepCostFor(options: FindJumpRouteOptions): (systemId: number) => number {
+  const base = securityStepCost(options.preference ?? 'shortest', options.securityOf);
+  const avoid = options.avoid;
+  if (!avoid?.size) return base;
+  return (systemId) => base(systemId) + (avoid.has(systemId) ? AVOIDED_PENALTY : 0);
 }
 
 /**
@@ -205,7 +227,7 @@ export function findJumpRoute(
     return { kind: 'route', systems: [originSystemId] };
   }
 
-  const stepCost = stepCostFor(options.preference ?? 'shortest', options.securityOf);
+  const stepCost = stepCostFor(options);
   const { cameFrom, reachedStopAt } = search(graph, originSystemId, stepCost, destinationSystemId);
   if (!reachedStopAt) return { kind: 'no-route' };
   return { kind: 'route', systems: reconstruct(cameFrom, destinationSystemId) };
@@ -232,6 +254,6 @@ export function jumpDistancesFrom(
   options: FindJumpRouteOptions = {}
 ): ReadonlyMap<number, number> {
   if (!graph.has(originSystemId)) return new Map();
-  const stepCost = stepCostFor(options.preference ?? 'shortest', options.securityOf);
+  const stepCost = stepCostFor(options);
   return search(graph, originSystemId, stepCost).jumps;
 }

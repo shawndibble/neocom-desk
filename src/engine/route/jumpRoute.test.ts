@@ -192,3 +192,47 @@ describe('jumpDistancesFrom', () => {
     }
   });
 });
+
+describe('avoided systems', () => {
+  it('detours around an avoided system', () => {
+    const route = findJumpRoute(GRAPH, HUB, FAR, { avoid: new Set([LOW]) });
+    expect(route).toEqual({ kind: 'route', systems: [HUB, A, B, C, FAR] });
+  });
+
+  /*
+   * The same rule the security bias follows: a cost, never a wall. A
+   * destination only reachable through an avoided system still has a route,
+   * or every haul past a chokepoint would read as unreachable.
+   */
+  it('still goes through an avoided system when it is the only way', () => {
+    const route = findJumpRoute(GRAPH, HUB, UNCHARTED, { avoid: new Set([FAR]) });
+    expect(route.kind === 'route' && route.systems).toContain(FAR);
+  });
+
+  it('crosses as few avoided systems as it can', () => {
+    const route = findJumpRoute(GRAPH, HUB, FAR, { avoid: new Set([A, B, LOW]) });
+    expect(route).toEqual({ kind: 'route', systems: [HUB, LOW, FAR] });
+  });
+
+  it('outranks the security preference', () => {
+    const route = findJumpRoute(GRAPH, HUB, FAR, {
+      preference: 'prefer-highsec',
+      securityOf,
+      avoid: new Set([B]),
+    });
+    expect(route).toEqual({ kind: 'route', systems: [HUB, LOW, FAR] });
+  });
+
+  it('routes to and from an avoided system as though it were not', () => {
+    const avoid = new Set([HUB, FAR]);
+    expect(findJumpRoute(GRAPH, HUB, FAR, { avoid })).toEqual(findJumpRoute(GRAPH, HUB, FAR));
+    expect(findJumpRoute(GRAPH, FAR, HUB, { avoid })).toEqual(findJumpRoute(GRAPH, FAR, HUB));
+  });
+
+  it('counts the detour in a sweep', () => {
+    const jumps = jumpDistancesFrom(GRAPH, HUB, { avoid: new Set([LOW]) });
+    expect(jumps.get(FAR)).toBe(4);
+    // LOW itself is still one jump away: reaching it is not passing through it.
+    expect(jumps.get(LOW)).toBe(1);
+  });
+});
