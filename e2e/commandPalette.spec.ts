@@ -60,6 +60,10 @@ for (const viewport of [
     await page.setViewportSize(viewport);
     await signInAndGoto(page, './overview');
     await expect(page.getByRole('link', { name: 'Overview' }).first()).toBeAttached();
+    // Neither the old "Search" row nor any other opener advertising the chord.
     await expect(page.getByRole('button', { name: /^Search/ })).toHaveCount(0);
+    await expect(
+      page.locator('[aria-keyshortcuts="Control+K"], [aria-keyshortcuts="Meta+K"]')
+    ).toHaveCount(0);
   });
 }

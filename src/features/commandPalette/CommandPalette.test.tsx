@@ -134,12 +134,6 @@ describe('CommandPalette', () => {
     expect(pageSearch).toHaveFocus();
   });
 
-  it('shows nothing until the shortcut opens it', () => {
-    renderShell();
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Search/ })).not.toBeInTheDocument();
-  });
-
   it('does not stack over another open dialog', async () => {
     const user = userEvent.setup();
     renderShell();
