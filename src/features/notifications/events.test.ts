@@ -10,13 +10,14 @@ import {
 import { isEventEnabledFor, isEveTypeEnabledFor } from './eventSelection';
 
 describe('NOTIFICATION_EVENTS', () => {
-  it('lists exactly the 10 synthesized events from CONTEXT.md round 20, plus eveNotification (issue #274), planetaryExtractorExpiring (issue #310), spExtractionReady (grilling session, 2026-09-09), the five corp events (issue #299), contractCompleted/contractFailed (issue #1091), skillQueueEnding (issue #1410), and marketOrderUndercut (issue #1423), in order', () => {
+  it('lists exactly the 10 synthesized events from CONTEXT.md round 20, plus eveNotification (issue #274), planetaryExtractorExpiring (issue #310), spExtractionReady (grilling session, 2026-09-09), the five corp events (issue #299), contractCompleted/contractFailed (issue #1091), skillQueueEnding (issue #1410), marketOrderUndercut (issue #1423), and cloneJumpReady (issue #2316), in order', () => {
     expect(NOTIFICATION_EVENT_IDS).toEqual([
       'skillLevelComplete',
       'characterNotTraining',
       'skillQueueEnding',
       'spExtractionReady',
       'industryJobComplete',
+      'cloneJumpReady',
       'newMail',
       'planetaryExtractionDone',
       'planetaryExtractorExpiring',

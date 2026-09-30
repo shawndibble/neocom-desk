@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { flattenMarketWideTree, MARKET_WIDE_MAX_DEPTH } from './lib/flattenMarketWideTree.mjs';
 import { buildShipTree } from './lib/shipTree.mjs';
 import { npcCorpFactions, stationOwnerFields } from './lib/stationOwners.mjs';
+import { npcCorporations, probeLpStores } from './lib/lpCorporations.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -421,10 +422,16 @@ function probeRetryWaitMs(res) {
   return Math.min(Math.max(ms, 0), PROBE_MAX_RETRY_WAIT_MS);
 }
 
-/** Fetches one page of regionId's market-types listing, retrying on rate limits/errors. */
-async function fetchMarketTypesPage(regionId, page) {
-  const url = `${ESI_BASE}/markets/${regionId}/types/?page=${page}`;
-  for (let attempt = 1; attempt <= 3; attempt++) {
+/**
+ * GETs one ESI URL for a build-time probe, retrying rate limits and transient
+ * errors. Resolves to the response when it is ok or a 404 (callers decide
+ * what a 404 means); throws after the third failed attempt. A build-time probe
+ * is still an ESI client, so it sends the same headers as src/esi/client.ts,
+ * waits exactly as long as ESI asks on a 429/420, and backs off before either
+ * budget (the legacy error limit, or the X-Ratelimit token bucket) runs dry.
+ */
+async function fetchEsiProbe(url) {
+  for (let attempt = 1; ; attempt++) {
     try {
       const res = await fetch(url, {
         headers: {
@@ -433,31 +440,37 @@ async function fetchMarketTypesPage(regionId, page) {
           'X-User-Agent': ESI_USER_AGENT,
         },
       });
-      // Respect ESI's rate limiting (429) and error-budget throttling (420):
-      // wait exactly as long as the server asks before the one retry below.
       if (res.status === 429 || res.status === 420) {
         if (attempt === 3) throw new Error(`HTTP ${res.status} for ${url} (rate limited)`);
         await new Promise((r) => setTimeout(r, probeRetryWaitMs(res)));
         continue;
       }
-      if (res.status === 404) return { typeIds: [], pages: 1 };
-      if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-      // Proactively back off well before the error budget runs out, rather
-      // than waiting to be told — ~150 sequential probes is enough traffic
-      // that a plain fetch loop could otherwise trip the limiter.
-      const remaining = Number(res.headers.get('x-esi-error-limit-remain'));
-      if (Number.isFinite(remaining) && remaining > 0 && remaining < 20) {
+      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status} for ${url}`);
+      const errorsLeft = Number(res.headers.get('x-esi-error-limit-remain'));
+      const tokensLeft = res.headers.has('x-ratelimit-remaining')
+        ? Number(res.headers.get('x-ratelimit-remaining'))
+        : NaN;
+      if (
+        (Number.isFinite(errorsLeft) && errorsLeft > 0 && errorsLeft < 20) ||
+        (Number.isFinite(tokensLeft) && tokensLeft < 20)
+      ) {
         await new Promise((r) => setTimeout(r, 1000));
       }
-      const body = await res.json();
-      const pages = Number(res.headers.get('x-pages')) || 1;
-      return { typeIds: Array.isArray(body) ? body : [], pages };
+      return res;
     } catch (err) {
       if (attempt === 3) throw err;
       await new Promise((r) => setTimeout(r, 500 * attempt));
     }
   }
-  return { typeIds: [], pages: 1 };
+}
+
+/** Fetches one page of regionId's market-types listing. */
+async function fetchMarketTypesPage(regionId, page) {
+  const res = await fetchEsiProbe(`${ESI_BASE}/markets/${regionId}/types/?page=${page}`);
+  if (res.status === 404) return { typeIds: [], pages: 1 };
+  const body = await res.json();
+  const pages = Number(res.headers.get('x-pages')) || 1;
+  return { typeIds: Array.isArray(body) ? body : [], pages };
 }
 
 /** True if regionId's market-types listing (a lightweight endpoint) is non-empty. */
@@ -521,34 +534,12 @@ const PACKAGED_VOLUME_CACHE_FILE = join(CACHE_DIR, 'packaged-volume-probe.json')
 const PACKAGED_VOLUME_CONTROL_TYPE_ID = 603; // Merlin
 const PACKAGED_VOLUME_CONTROL_EXPECTED = 2500;
 
-/** Fetches one type's ESI record, retrying on rate limits/errors like `fetchMarketTypesPage`. */
+/** Fetches one type's ESI record. */
 async function fetchTypeInfo(typeID) {
   const url = `${ESI_BASE}/universe/types/${typeID}/?datasource=tranquility`;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const res = await fetch(url, {
-        headers: {
-          Accept: 'application/json',
-          'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
-          'X-User-Agent': ESI_USER_AGENT,
-        },
-      });
-      if (res.status === 429 || res.status === 420) {
-        if (attempt === 3) throw new Error(`HTTP ${res.status} for ${url} (rate limited)`);
-        await new Promise((r) => setTimeout(r, probeRetryWaitMs(res)));
-        continue;
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-      const remaining = Number(res.headers.get('x-esi-error-limit-remain'));
-      if (Number.isFinite(remaining) && remaining > 0 && remaining < 20) {
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-      return await res.json();
-    } catch (err) {
-      if (attempt === 3) throw err;
-      await new Promise((r) => setTimeout(r, 500 * attempt));
-    }
-  }
+  const res = await fetchEsiProbe(url);
+  if (res.status === 404) throw new Error(`HTTP 404 for ${url}`);
+  return res.json();
 }
 
 /**
@@ -609,6 +600,59 @@ async function probePackagedVolumes(typeIds) {
     `  packaged volume: ${result.size} of ${typeIds.length} resolved${failed > 0 ? ` (${failed} probe failures)` : ''}`
   );
   return result;
+}
+
+const LP_STORE_CACHE_FILE = join(CACHE_DIR, 'lp-store-probe.json');
+
+// Checked after the probe; see the sanity checks in `main`.
+const LP_STORE_CONTROL_CORPORATIONS = [
+  [1000120, 'Federation Navy'],
+  [1000130, 'Sisters of EVE'],
+  [1000128, "Mordu's Legion"],
+  [1000125, 'CONCORD'],
+  [1000127, 'Guristas'],
+  [1000135, 'Serpentis Corporation'],
+];
+
+/** True if corporationId's LP Store lists at least one offer. */
+async function fetchLpStoreHasOffers(corporationId) {
+  const res = await fetchEsiProbe(`${ESI_BASE}/loyalty/stores/${corporationId}/offers/`);
+  // An id ESI doesn't know as a store is simply a corp without one.
+  if (res.status === 404) return false;
+  const body = await res.json();
+  return Array.isArray(body) && body.length > 0;
+}
+
+/**
+ * The NPC corps with an LP Store, cached to disk per corporation id like
+ * `probePackagedVolumes`, so a rebuild doesn't re-probe ~280 corps against ESI.
+ */
+async function probeLpStoreCorporations(corps) {
+  let diskCache = {};
+  try {
+    diskCache = JSON.parse(await readFile(LP_STORE_CACHE_FILE, 'utf8'));
+  } catch {
+    /* no cache yet */
+  }
+  const { lpCorporations, cache, probed, failed } = await probeLpStores(corps, {
+    cache: diskCache,
+    hasOffers: fetchLpStoreHasOffers,
+  });
+  await mkdir(CACHE_DIR, { recursive: true });
+  await writeFile(LP_STORE_CACHE_FILE, JSON.stringify(cache));
+  console.log(
+    `  LP stores: ${lpCorporations.length} of ${corps.length} corps (${probed} probed, ${corps.length - probed - failed.length} cached${failed.length > 0 ? `, ${failed.length} failed` : ''})`
+  );
+  // A corp whose probe failed is missing from the list, not known to lack a
+  // store, so shipping it would silently hide that store. Fail the build; the
+  // next run re-probes only the failures (they are never cached).
+  if (failed.length > 0) {
+    console.error(
+      `  FAIL: LP store probe failed for ${failed.length} corporation(s): ${failed.join(', ')}`
+    );
+    process.exitCode = 1;
+  }
+  return lpCorporations;
 }
 
 async function main() {
@@ -1811,6 +1855,14 @@ async function main() {
     npcStations.sort((a, b) => a.id - b.id);
   }
 
+  // --- market/lpCorporations.json: NPC corps with an LP Store (issue #2320) ---
+  //
+  // The SDE has no "has an LP store" flag, so each NPC corp is probed against
+  // ESI's public offers endpoint and kept only if its store lists an offer.
+  const npcCorps = npcCorporations(raw['crpNPCCorporations.csv']);
+  console.log(`Probing ${npcCorps.length} NPC corporations against ESI for LP stores...`);
+  const lpCorporations = await probeLpStoreCorporations(npcCorps);
+
   // --- market/regions.json: mapRegions, probed live against ESI for orders ---
   const regionCandidates = [];
   {
@@ -1992,6 +2044,7 @@ async function main() {
     ['globalMarkets.json', globalMarkets],
     ['attributes.json', attributeDictionary],
     ['variations.json', variations],
+    ['lpCorporations.json', lpCorporations],
   ];
   for (const [name, data] of marketOutputs) {
     const json = JSON.stringify(data);
@@ -2035,6 +2088,20 @@ async function main() {
     if (typeof resolved !== 'number' || Math.abs(resolved - PACKAGED_VOLUME_CONTROL_EXPECTED) > 1) {
       console.error(
         `  FAIL: packaged volume control type ${PACKAGED_VOLUME_CONTROL_TYPE_ID} (Merlin) resolved to ${resolved ?? 'missing'}, expected ~${PACKAGED_VOLUME_CONTROL_EXPECTED} — the ESI type endpoint's packaged_volume field may have changed`
+      );
+      process.exitCode = 1;
+    }
+  }
+  console.log(`  LP store corporations: ${lpCorporations.length}`);
+  {
+    // Well-known stores across empire navies, independents, CONCORD and the
+    // pirate factions. A missing one means the probe (or the offers
+    // endpoint's shape) broke, not that the store went away.
+    const ids = new Set(lpCorporations.map((c) => c.id));
+    const missing = LP_STORE_CONTROL_CORPORATIONS.filter(([id]) => !ids.has(id));
+    if (missing.length > 0) {
+      console.error(
+        `  FAIL: LP store probe is missing well-known stores: ${missing.map(([, name]) => name).join(', ')}`
       );
       process.exitCode = 1;
     }

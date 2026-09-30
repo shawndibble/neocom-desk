@@ -287,6 +287,52 @@ export function diffSpExtractionReady(
   return [{ eventId: 'spExtractionReady', characterId }];
 }
 
+/* -------------------------------------------------------------------------- */
+/* Clone jump                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * At most one entry — none for a Character who has never jumped (ESI omits
+ * `last_clone_jump_date`), so there is no cooldown to end. `readyAtMs` is
+ * baked in at fetch time (`pollDomains.ts`'s `cloneJumpDomain`), from the
+ * last jump and the effective Infomorph Synchronizing level.
+ */
+export interface CloneJumpEntrySnapshot {
+  lastJumpMs: number;
+  readyAtMs: number;
+}
+
+export interface CloneJumpSnapshot {
+  entries: readonly CloneJumpEntrySnapshot[];
+  nowMs: number;
+}
+
+export interface CloneJumpReadyFire {
+  eventId: 'cloneJumpReady';
+  characterId: number;
+  lastJumpMs: number;
+  readyAtMs: number;
+}
+
+/**
+ * Fires once when the jump-clone cooldown's end falls in `(prev.nowMs,
+ * next.nowMs]` — `diffJobReady`'s window rule below. No baseline, no fire:
+ * a first poll long after the cooldown ended is not news.
+ */
+export function diffCloneJumpReady(
+  characterId: number,
+  prev: CloneJumpSnapshot | undefined,
+  next: CloneJumpSnapshot
+): CloneJumpReadyFire[] {
+  if (!prev) return [];
+  const fires: CloneJumpReadyFire[] = [];
+  for (const { lastJumpMs, readyAtMs } of next.entries) {
+    if (readyAtMs > next.nowMs || readyAtMs <= prev.nowMs) continue;
+    fires.push({ eventId: 'cloneJumpReady', characterId, lastJumpMs, readyAtMs });
+  }
+  return fires;
+}
+
 export interface IndustryJobEntrySnapshot {
   jobId: number;
   /** Epoch ms this job finishes (ESI's `end_date`, fixed once the job is started). */

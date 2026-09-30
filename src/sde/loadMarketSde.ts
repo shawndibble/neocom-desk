@@ -15,6 +15,7 @@ import type {
   GlobalMarketEntry,
   AttributeDictionary,
   VariationData,
+  LpCorporationEntry,
 } from './marketTypes';
 import { sdeDataUrl } from './sdeDataUrl';
 
@@ -44,3 +45,5 @@ export const loadMarketRegions = cached<MarketRegionEntry[]>('regions.json');
 export const loadGlobalMarkets = cached<GlobalMarketEntry[]>('globalMarkets.json');
 export const loadAttributeDictionary = cached<AttributeDictionary>('attributes.json');
 export const loadVariations = cached<VariationData>('variations.json');
+/** Every NPC corporation with an LP Store, for searching stores offline (issue #2320). */
+export const loadLpCorporations = cached<LpCorporationEntry[]>('lpCorporations.json');

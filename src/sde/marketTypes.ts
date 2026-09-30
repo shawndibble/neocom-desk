@@ -61,6 +61,18 @@ export interface NpcStationEntry {
   ownerFactionId?: number;
 }
 
+/**
+ * One entry in public/data/market/lpCorporations.json — an NPC corporation
+ * that runs an LP Store (issue #2320). Probed live at build time: the SDE has
+ * no "has an LP store" flag, so only corps whose store lists an offer are kept.
+ */
+export interface LpCorporationEntry {
+  id: number;
+  name: string;
+  /** `crpNPCCorporations.factionID`; absent for a factionless corp (e.g. Sisters of EVE). */
+  factionId?: number;
+}
+
 /** One entry in public/data/market/regions.json — a region probed to actually carry orders. */
 export interface MarketRegionEntry {
   id: number;

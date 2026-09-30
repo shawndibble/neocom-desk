@@ -36,7 +36,7 @@
  * functions of their arguments — no i18next, no lookups — which keeps this
  * module as pure as before.
  *
- * 10 of the 23 Notification Events carry a timestamp fixed far enough in
+ * 11 of the 25 Notification Events carry a timestamp fixed far enough in
  * advance to be worth projecting; the rest are inherently "as it happens"
  * (new mail, a filled order, a wallet change) and have no seat here. EVE's
  * own notifications are mostly the same "as it happens" case — except a
@@ -47,6 +47,8 @@
 import {
   type SkillQueueEntrySnapshot,
   type IndustryJobEntrySnapshot,
+  type CloneJumpEntrySnapshot,
+  type CloneJumpReadyFire,
   type ContractEntrySnapshot,
   type ContractNotificationFire,
   type ColonySnapshotEntry,
@@ -87,6 +89,7 @@ export const PROJECTABLE_EVENT_IDS = [
   'skillQueueEnding',
   'courierDeliveryDue',
   'industryJobComplete',
+  'cloneJumpReady',
   'planetaryExtractionDone',
   'planetaryExtractorExpiring',
   'calendarEventStarting',
@@ -137,6 +140,7 @@ export function projectionWording(eventId: ProjectableEventId): ProjectionWordin
     case 'skillLevelComplete':
     case 'characterNotTraining':
     case 'industryJobComplete':
+    case 'cloneJumpReady':
     case 'calendarEventStarting':
     case 'eveNotification':
       return 'assert';
@@ -452,6 +456,35 @@ export function projectContracts(
     };
     rows.push(
       buildRow(characterId, 'courierDeliveryDue', fire, fireAt, copy(fire, characterName, {}))
+    );
+  }
+  return rows;
+}
+
+/**
+ * `cloneJumpReady` (issue #2316): one row at the jump-clone cooldown's end,
+ * already baked into the entry (`pollDomains.ts`'s `cloneJumpDomain`). A
+ * Character who has never jumped has no entry, so projects nothing.
+ */
+export function projectCloneJump(
+  characterId: number,
+  characterName: string,
+  entries: readonly CloneJumpEntrySnapshot[],
+  copy: PushCopy<CloneJumpReadyFire, Record<string, never>>,
+  nowMs: number,
+  horizonMs: number = PROJECTION_HORIZON_MS
+): ProjectionRow[] {
+  const rows: ProjectionRow[] = [];
+  for (const { lastJumpMs, readyAtMs } of entries) {
+    if (!inHorizon(readyAtMs, nowMs, horizonMs)) continue;
+    const fire: CloneJumpReadyFire = {
+      eventId: 'cloneJumpReady',
+      characterId,
+      lastJumpMs,
+      readyAtMs,
+    };
+    rows.push(
+      buildRow(characterId, 'cloneJumpReady', fire, readyAtMs, copy(fire, characterName, {}))
     );
   }
   return rows;

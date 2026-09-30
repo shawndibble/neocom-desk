@@ -277,6 +277,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     corpRoster: async () => [],
     corpWallet: async () => [],
     spExtraction: async () => [],
+    cloneJump: async () => [],
     priceAlert: async () => [],
     marketOrderUndercut: loadMarketOrderUndercut,
   };
@@ -295,6 +296,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     corpRoster: domainState(undefined, undefined),
     corpWallet: domainState(undefined, undefined),
     spExtraction: domainState(undefined, undefined),
+    cloneJump: domainState(undefined, undefined),
     priceAlert: domainState(undefined, undefined),
     marketOrderUndercut: domainState(undefined, undefined),
   };
