@@ -3,8 +3,11 @@ import type { PaletteProvider, PaletteResult } from './types';
 
 export interface PaletteGroup {
   readonly provider: PaletteProvider;
-  /** `loading` only for an async provider whose answer for this query has not landed. */
-  readonly status: 'ready' | 'loading';
+  /**
+   * `loading`: an async provider whose answer for this query has not landed.
+   * `error`: its search rejected — shown in its own group, never the others.
+   */
+  readonly status: 'ready' | 'loading' | 'error';
   readonly results: readonly PaletteResult[];
 }
 
@@ -18,7 +21,8 @@ interface SearchRun {
 
 interface Settled {
   readonly run: SearchRun | null;
-  readonly results: ReadonlyMap<string, readonly PaletteResult[]>;
+  /** `null` is a rejected search. */
+  readonly results: ReadonlyMap<string, readonly PaletteResult[] | null>;
 }
 
 const NOTHING_SETTLED: Settled = { run: null, results: new Map() };
@@ -59,7 +63,14 @@ export function usePaletteSearch(
     const entries = [...providers]
       .sort((a, b) => a.order - b.order)
       .filter((provider) => trimmed.length >= (provider.minQueryLength ?? 0))
-      .map((provider) => ({ provider, answer: provider.search(trimmed, controller.signal) }));
+      .map((provider) => {
+        const answer = provider.search(trimmed, controller.signal);
+        // Handled at once, not only by the effect below: a run React renders
+        // but never commits (a render-phase restart, StrictMode's rehearsal)
+        // never reaches that effect, and its rejection would go unhandled.
+        if (isPending(answer)) answer.then(undefined, () => {});
+        return { provider, answer };
+      });
     return { controller, entries };
   }, [providers, trimmed]);
 
@@ -75,7 +86,7 @@ export function usePaletteSearch(
     if (previousRun.current !== run) previousRun.current?.controller.abort();
     previousRun.current = run;
     let active = true;
-    const land = (id: string, results: readonly PaletteResult[]) => {
+    const land = (id: string, results: readonly PaletteResult[] | null) => {
       if (!active) return;
       setSettled((previous) => ({
         run,
@@ -86,8 +97,8 @@ export function usePaletteSearch(
       if (!isPending(answer)) continue;
       answer.then(
         (results) => land(provider.id, results),
-        // A failed search hides its group rather than taking the palette down.
-        () => land(provider.id, [])
+        // A failed search errors its own group rather than taking the palette down.
+        () => land(provider.id, null)
       );
     }
     return () => {
@@ -105,6 +116,7 @@ export function usePaletteSearch(
     }
     const results = settled.run === run ? settled.results.get(provider.id) : undefined;
     if (results === undefined) groups.push({ provider, status: 'loading', results: [] });
+    else if (results === null) groups.push({ provider, status: 'error', results: [] });
     else if (results.length > 0) groups.push({ provider, status: 'ready', results });
   }
   return groups;
