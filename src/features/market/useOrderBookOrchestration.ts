@@ -135,8 +135,6 @@ export interface OrderBookOrchestration {
   currentSystem: CurrentSystemState;
   jumpRangeFilter: JumpRangeFilter;
   regionMode: boolean;
-  /** Region mode, or a set Jump Range: the book holds more than one station, so Security and NPC stations only apply. */
-  spansStations: boolean;
   /** A set, measurable Jump Range: the book spans every region in reach, not the header's hub or region. */
   rangeAcross: boolean;
 
@@ -664,7 +662,6 @@ export function useOrderBookOrchestration({
     currentSystem,
     jumpRangeFilter,
     regionMode,
-    spansStations,
     rangeAcross,
     stationFilter,
     setStationFilter,

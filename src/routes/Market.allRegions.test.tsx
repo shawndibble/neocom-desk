@@ -275,6 +275,7 @@ describe('Market Browser: All regions', () => {
     expect(await within(sellTable).findByText('1,100,000.00')).toBeInTheDocument();
     expect(within(sellTable).getByText('1,000,000.00')).toBeInTheDocument();
     expect(within(sellTable).queryByText('1,200,000.00')).not.toBeInTheDocument();
+    expect(within(sellTable).getByText(/Emperor Family Academy/)).toBeInTheDocument();
     expect(hits.get(HEIMATAR)).toBeUndefined();
     expect(hits.get(THE_FORGE)).toBe(1);
     expect(hits.get(DOMAIN)).toBe(1);
