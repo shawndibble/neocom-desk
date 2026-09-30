@@ -9,11 +9,11 @@ import {
 } from './marketItems';
 
 const CATALOGUE: MarketTypeEntry[] = [
-  { typeId: 1, name: 'Tritanium Bar', marketGroupId: 1 },
-  { typeId: 2, name: 'Compressed Tritanium', marketGroupId: 1 },
-  { typeId: 3, name: 'Tritanium', marketGroupId: 1 },
-  { typeId: 4, name: 'Pyerite', marketGroupId: 1 },
-  { typeId: 5, name: 'Atritanium Widget', marketGroupId: 1 },
+  { typeId: 1, name: 'Tritanium Bar', marketGroupId: 1, volume: 1 },
+  { typeId: 2, name: 'Compressed Tritanium', marketGroupId: 1, volume: 1 },
+  { typeId: 3, name: 'Tritanium', marketGroupId: 1, volume: 1 },
+  { typeId: 4, name: 'Pyerite', marketGroupId: 1, volume: 1 },
+  { typeId: 5, name: 'Atritanium Widget', marketGroupId: 1, volume: 1 },
 ];
 
 function deferred<T>() {

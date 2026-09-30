@@ -107,13 +107,13 @@ const KESTREL_TYPE_ID = 609;
 const CORMORANT_TYPE_ID = 610;
 const CORAX_TYPE_ID = 611;
 const TYPES: MarketTypeEntry[] = [
-  { typeId: 587, name: 'Rifter', marketGroupId: 2 },
-  { typeId: 34, name: 'Tritanium', marketGroupId: 3 },
-  { typeId: PLEX_TYPE_ID, name: 'PLEX', marketGroupId: 3 },
-  { typeId: MERLIN_TYPE_ID, name: 'Merlin', marketGroupId: 4 },
-  { typeId: KESTREL_TYPE_ID, name: 'Kestrel', marketGroupId: 4 },
-  { typeId: CORMORANT_TYPE_ID, name: 'Cormorant', marketGroupId: 4 },
-  { typeId: CORAX_TYPE_ID, name: 'Corax', marketGroupId: 4 },
+  { typeId: 587, name: 'Rifter', marketGroupId: 2, volume: 1 },
+  { typeId: 34, name: 'Tritanium', marketGroupId: 3, volume: 1 },
+  { typeId: PLEX_TYPE_ID, name: 'PLEX', marketGroupId: 3, volume: 1 },
+  { typeId: MERLIN_TYPE_ID, name: 'Merlin', marketGroupId: 4, volume: 1 },
+  { typeId: KESTREL_TYPE_ID, name: 'Kestrel', marketGroupId: 4, volume: 1 },
+  { typeId: CORMORANT_TYPE_ID, name: 'Cormorant', marketGroupId: 4, volume: 1 },
+  { typeId: CORAX_TYPE_ID, name: 'Corax', marketGroupId: 4, volume: 1 },
 ];
 const STATIONS: NpcStationEntry[] = [
   { id: 60003760, name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant', systemId: 30000142 },
@@ -1039,11 +1039,13 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
       typeId: 1999,
       name: 'Selected Widget',
       marketGroupId: bigGroupId,
+      volume: 1,
     };
     const many: MarketTypeEntry[] = Array.from({ length: 25 }, (_, i) => ({
       typeId: 2000 + i,
       name: `Widget ${i}`,
       marketGroupId: bigGroupId,
+      volume: 1,
     }));
     vi.mocked(loadMarketGroups).mockResolvedValueOnce([
       ...GROUPS,
@@ -1073,11 +1075,13 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
       typeId: 1999,
       name: 'Selected Widget',
       marketGroupId: bigGroupId,
+      volume: 1,
     };
     const many: MarketTypeEntry[] = Array.from({ length: 25 }, (_, i) => ({
       typeId: 2000 + i,
       name: `Widget ${i}`,
       marketGroupId: bigGroupId,
+      volume: 1,
     }));
     vi.mocked(loadMarketGroups).mockResolvedValueOnce([
       ...GROUPS,
@@ -1927,7 +1931,7 @@ describe('Market search focus (issue #25 "jump to search" shortcut)', () => {
     // rendered until the empty book asked for it.
     vi.mocked(loadMarketTypes).mockResolvedValueOnce([
       ...TYPES,
-      { typeId: 638, name: 'Rifter Blueprint', marketGroupId: 2 },
+      { typeId: 638, name: 'Rifter Blueprint', marketGroupId: 2, volume: 1 },
     ]);
     server.use(
       http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, () =>
@@ -1950,7 +1954,7 @@ describe('Market search focus (issue #25 "jump to search" shortcut)', () => {
   it('does not point a blueprint at the BPC search when its order book failed to load', async () => {
     vi.mocked(loadMarketTypes).mockResolvedValueOnce([
       ...TYPES,
-      { typeId: 638, name: 'Rifter Blueprint', marketGroupId: 2 },
+      { typeId: 638, name: 'Rifter Blueprint', marketGroupId: 2, volume: 1 },
     ]);
     server.use(
       http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, () =>

@@ -16,11 +16,11 @@ const groups = [
 ];
 
 const types = [
-  { typeId: 626, name: 'Vexor', marketGroupId: 801 },
-  { typeId: 17843, name: 'Vexor Navy Issue', marketGroupId: 801 },
-  { typeId: 12005, name: 'Ishtar', marketGroupId: 811 },
-  { typeId: 593, name: 'Tristan', marketGroupId: 511 },
-  { typeId: 12056, name: '10MN Afterburner II', marketGroupId: 91 },
+  { typeId: 626, name: 'Vexor', marketGroupId: 801, volume: 1 },
+  { typeId: 17843, name: 'Vexor Navy Issue', marketGroupId: 801, volume: 1 },
+  { typeId: 12005, name: 'Ishtar', marketGroupId: 811, volume: 1 },
+  { typeId: 593, name: 'Tristan', marketGroupId: 511, volume: 1 },
+  { typeId: 12056, name: '10MN Afterburner II', marketGroupId: 91, volume: 1 },
 ];
 
 describe('buildHullCatalogue', () => {

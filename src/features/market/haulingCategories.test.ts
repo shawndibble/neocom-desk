@@ -9,9 +9,9 @@ const groups = [
   { id: 200, name: 'Turrets', parentId: 9, hasTypes: true },
 ];
 const types = [
-  { typeId: 30, name: 'C', marketGroupId: 101 },
-  { typeId: 10, name: 'A', marketGroupId: 100 },
-  { typeId: 20, name: 'B', marketGroupId: 200 },
+  { typeId: 30, name: 'C', marketGroupId: 101, volume: 1 },
+  { typeId: 10, name: 'A', marketGroupId: 100, volume: 1 },
+  { typeId: 20, name: 'B', marketGroupId: 200, volume: 1 },
 ];
 
 describe('typeIdsInCategory', () => {

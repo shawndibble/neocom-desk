@@ -13,7 +13,7 @@ import { Market } from './Market';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 
 const GROUPS: MarketGroupNode[] = [{ id: 18, name: 'Minerals', parentId: null, hasTypes: true }];
-const TYPES: MarketTypeEntry[] = [{ typeId: 34, name: 'Tritanium', marketGroupId: 18 }];
+const TYPES: MarketTypeEntry[] = [{ typeId: 34, name: 'Tritanium', marketGroupId: 18, volume: 1 }];
 
 vi.mock('@/sde/loadSde', () => ({
   loadBlueprints: vi.fn(async () => ({})),
