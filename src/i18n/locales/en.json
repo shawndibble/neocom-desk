@@ -829,7 +829,7 @@
       "time": "Training time",
       "withPrerequisites": "incl. prerequisites",
       "sort": {
-        "primary": "Overall",
+        "overall": "Overall",
         "dps": "DPS",
         "ehp": "EHP",
         "activeTank": "Active tank",

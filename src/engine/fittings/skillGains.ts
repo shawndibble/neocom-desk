@@ -58,7 +58,7 @@ export function skillGainCandidates(
   return candidates.sort((a, b) => a.skillTypeId - b.skillTypeId);
 }
 
-/** The stats a pilot ranks by; `primary` is all of them together. */
+/** The stats a pilot ranks by; `overall` is all of them together. */
 export const GAIN_METRICS = [
   'dps',
   'ehp',
@@ -69,9 +69,9 @@ export const GAIN_METRICS = [
   'lockRange',
 ] as const;
 export type GainMetric = (typeof GAIN_METRICS)[number];
-export type GainSort = 'primary' | GainMetric;
+export type GainSort = 'overall' | GainMetric;
 
-/** Each metric's improvement (positive: better), plus `primary`, their sum. */
+/** Each metric's improvement (positive: better), plus `overall`, their sum. */
 export type GainMetrics = Record<GainSort, number>;
 
 /** `(after − before) / |before|`, with something from nothing counting as a whole gain. */
@@ -108,8 +108,8 @@ export function gainMetrics(before: FittingStats, after: FittingStats): GainMetr
     capacitor: capacitorGain(before.capacitor, after.capacitor),
     lockRange: relative(before.targeting.maxTargetRange, after.targeting.maxTargetRange),
   };
-  const primary = GAIN_METRICS.reduce((sum, metric) => sum + metrics[metric], 0);
-  return { primary, ...metrics };
+  const overall = GAIN_METRICS.reduce((sum, metric) => sum + metrics[metric], 0);
+  return { overall, ...metrics };
 }
 
 export interface SkillGain extends SkillGainCandidate {
@@ -127,7 +127,7 @@ export interface EvaluateSkillGainsOptions {
 
 /**
  * Works out each candidate at its next level (`compare`), one at a time,
- * and keeps those that change at least one displayed stat, in candidate
+ * and keeps those that change at least one tracked stat (`GAIN_METRICS`), in candidate
  * order. A candidate whose calculation throws is left out, not the run.
  */
 export async function evaluateSkillGains(
@@ -144,9 +144,11 @@ export async function evaluateSkillGains(
     if (cancelled?.()) return null;
     try {
       const { before, after } = await compare(candidate.skillTypeId, candidate.toLevel);
-      const delta = diffFittingStats(before, after);
-      if (delta.count === 0) continue;
-      gains.push({ ...candidate, delta, metrics: gainMetrics(before, after) });
+      // Only a change to a stat the pilot ranks by counts: a skill that
+      // just moves CPU use or the cargo hold isn't "what to train" for a fit.
+      const metrics = gainMetrics(before, after);
+      if (GAIN_METRICS.every((metric) => metrics[metric] === 0)) continue;
+      gains.push({ ...candidate, delta: diffFittingStats(before, after), metrics });
     } catch {
       // Left out — see above.
     }

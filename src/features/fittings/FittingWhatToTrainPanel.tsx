@@ -29,7 +29,7 @@ import { useSkillOverrides } from './statsConditions';
 import type { SkillGainEvaluator } from './useFittingEvaluation';
 import { useSkillGains } from './useSkillGains';
 
-const SORTS: readonly GainSort[] = ['primary', ...GAIN_METRICS];
+const SORTS: readonly GainSort[] = ['overall', ...GAIN_METRICS];
 
 interface WhatToTrainRow extends SkillGain {
   name: string;
@@ -61,9 +61,10 @@ function WhatToTrainRanking({
   characterId: number;
 }) {
   const { t } = useTranslation();
-  const [sort, setSort] = useState<GainSort>('primary');
+  const [sort, setSort] = useState<GainSort>('overall');
   const { gains, loading, failed } = useSkillGains(evaluator);
-  const { catalog, trainedSkills, attributes, implants } = usePlanEditorData(characterId);
+  const { catalog, trainedSkills, trainedSkillsKnown, attributes, implants } =
+    usePlanEditorData(characterId);
   const cloneStates = useCloneStates((state) => state.value);
   const hydrateCloneStates = useCloneStates((state) => state.hydrate);
   useEffect(() => {
@@ -77,20 +78,22 @@ function WhatToTrainRanking({
     return gains.map((gain) => ({
       ...gain,
       name: catalog?.engineSkills.get(gain.skillTypeId)?.name ?? `#${gain.skillTypeId}`,
-      time: catalog
-        ? trainingTimeFor(
-            scheduleEntries([{ skillTypeID: gain.skillTypeId, targetLevel: gain.toLevel }], {
-              skills: catalog.engineSkills,
-              trainedSkills,
-              attributes,
-              implants,
-              cloneState,
-            }),
-            gain.skillTypeId
-          )
-        : null,
+      // Not before the Character's skills are in, or every row would time from level 0.
+      time:
+        catalog && trainedSkillsKnown
+          ? trainingTimeFor(
+              scheduleEntries([{ skillTypeID: gain.skillTypeId, targetLevel: gain.toLevel }], {
+                skills: catalog.engineSkills,
+                trainedSkills,
+                attributes,
+                implants,
+                cloneState,
+              }),
+              gain.skillTypeId
+            )
+          : null,
     }));
-  }, [gains, catalog, trainedSkills, attributes, implants, cloneState]);
+  }, [gains, catalog, trainedSkills, trainedSkillsKnown, attributes, implants, cloneState]);
   const ranked = useMemo(() => (rows === null ? null : rankSkillGains(rows, sort)), [rows, sort]);
 
   if (evaluator === null || loading)
@@ -149,7 +152,13 @@ function WhatToTrainRanking({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
         <span className="text-text-dim">{rankByLabel}</span>
-        <Select value={sort} onValueChange={(value) => setSort(value as GainSort)}>
+        <Select
+          value={sort}
+          onValueChange={(value) => {
+            const picked = SORTS.find((option) => option === value);
+            if (picked) setSort(picked);
+          }}
+        >
           <SelectTrigger aria-label={rankByLabel} size="sm" className="w-40">
             <SelectValue />
           </SelectTrigger>

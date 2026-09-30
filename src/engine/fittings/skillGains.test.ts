@@ -132,7 +132,7 @@ describe('gainMetrics', () => {
     expect(metrics.dps).toBeCloseTo(0.1);
     expect(metrics.align).toBeCloseTo(0.1);
     expect(metrics.ehp).toBe(0);
-    expect(metrics.primary).toBeCloseTo(0.2);
+    expect(metrics.overall).toBeCloseTo(0.2);
   });
 
   it('scores active tank from all three repairs, and a new rep from zero as a whole gain', () => {
@@ -159,7 +159,7 @@ describe('evaluateSkillGains', () => {
     { skillTypeId: 3, fromLevel: 4, toLevel: 5 },
   ];
 
-  it('keeps only the skills whose next level changes a displayed stat', async () => {
+  it('keeps only the skills whose next level changes a tracked stat', async () => {
     const compare = vi.fn(async (skillTypeId: number) => ({
       before: baseStats,
       after:
@@ -167,7 +167,8 @@ describe('evaluateSkillGains', () => {
           ? withStats({ offense: { ...baseStats.offense, dps: 105 } })
           : skillTypeId === 3
             ? withStats({ ehp: 22000 })
-            : baseStats,
+            : // A CPU-only change is displayed but not ranked on.
+              withStats({ cpuTotal: 440 }),
     }));
     const gains = await evaluateSkillGains(candidates, compare);
     expect(compare).toHaveBeenCalledWith(1, 4);
@@ -211,7 +212,7 @@ describe('rankSkillGains', () => {
       toLevel: 2,
       delta: { changes: [], count: 1 },
       metrics: {
-        primary: 0,
+        overall: 0,
         dps: 0,
         ehp: 0,
         activeTank: 0,
@@ -226,11 +227,11 @@ describe('rankSkillGains', () => {
 
   it('orders by the chosen stat, largest gain first, ties by skill id', () => {
     const gains = [
-      gain(3, { primary: 0.3, dps: 0 }),
-      gain(1, { primary: 0.1, dps: 0.1 }),
-      gain(2, { primary: 0.1, dps: 0.2 }),
+      gain(3, { overall: 0.3, dps: 0 }),
+      gain(1, { overall: 0.1, dps: 0.1 }),
+      gain(2, { overall: 0.1, dps: 0.2 }),
     ];
-    expect(rankSkillGains(gains, 'primary').map((g) => g.skillTypeId)).toEqual([3, 1, 2]);
+    expect(rankSkillGains(gains, 'overall').map((g) => g.skillTypeId)).toEqual([3, 1, 2]);
     expect(rankSkillGains(gains, 'dps').map((g) => g.skillTypeId)).toEqual([2, 1, 3]);
     // Not in place.
     expect(gains.map((g) => g.skillTypeId)).toEqual([3, 1, 2]);
