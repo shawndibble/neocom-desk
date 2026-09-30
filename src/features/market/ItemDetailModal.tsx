@@ -19,8 +19,10 @@
  */
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Button,
+  buttonClassName,
   EmptyState,
   IskAmount,
   Modal,
@@ -32,6 +34,7 @@ import {
 } from '@/components/ui';
 import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAttributes';
 import { parseItemDescription, type DescriptionRun } from '@/engine/market/itemDescription';
+import { marketItemUrl } from '@/engine/market/urlState';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import {
   findModifyingSkills,
@@ -71,6 +74,12 @@ export interface ItemDetailModalProps {
    * give for the item there.
    */
   location?: OrderBookLocation;
+  /**
+   * An "Open in Market" link in the header, for an Item Detail opened away
+   * from the Market Browser (the Command Palette, #2319). Opt-in: on the
+   * Market Browser itself it would link to the page already open.
+   */
+  showOpenInMarket?: boolean;
 }
 
 interface DetailData {
@@ -97,7 +106,13 @@ type PriceState =
   { status: 'loading' } | { status: 'ready'; summary: OrderBookSummary } | { status: 'error' };
 
 /** Mounted only while open (ImportClipboardDialog's pattern) — mounting is the open signal. */
-export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDetailModalProps) {
+export function ItemDetailModal({
+  typeId,
+  itemName,
+  onClose,
+  location,
+  showOpenInMarket = false,
+}: ItemDetailModalProps) {
   const { t } = useTranslation();
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -206,7 +221,14 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
   const requiredSkillTypeIds = new Set((data?.requiredSkills ?? []).map((r) => r.skillTypeID));
 
   return (
-    <Modal open onClose={onClose} title={itemName}>
+    <Modal
+      open
+      onClose={onClose}
+      title={itemName}
+      titleActions={
+        showOpenInMarket ? <OpenInMarketLink typeId={typeId} onNavigate={onClose} /> : undefined
+      }
+    >
       {loading ? (
         <div className="flex justify-center py-8">
           <Spinner label={t('common.loading')} />
@@ -326,6 +348,24 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
         </div>
       )}
     </Modal>
+  );
+}
+
+/**
+ * Its own component so the router read happens only when asked for: the
+ * Market Browser's modal (and its router-less tests) never render it.
+ */
+function OpenInMarketLink({ typeId, onNavigate }: { typeId: number; onNavigate: () => void }) {
+  const { t } = useTranslation();
+  const { search } = useLocation();
+  return (
+    <Link
+      to={marketItemUrl(typeId, search)}
+      onClick={onNavigate}
+      className={buttonClassName({ size: 'sm' })}
+    >
+      {t('market.itemDetail.openInMarket')}
+    </Link>
   );
 }
 

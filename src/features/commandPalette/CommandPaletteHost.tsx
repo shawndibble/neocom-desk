@@ -1,9 +1,18 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { isApplePlatform, isCommandPaletteShortcut } from '@/lib/shortcuts';
 import { CommandPalette } from './CommandPalette';
+import type { ShownMarketItem } from './marketItems';
 import { useCommandPalette } from './store';
 
 const APPLE = isApplePlatform();
+
+// Lazy: the shell mounts this host on every page, and Item Detail brings ESI,
+// SDE and skills code the shell chunk should not carry until an item is picked.
+const ItemDetailModal = lazy(() =>
+  import('@/features/market/ItemDetailModal').then((module) => ({
+    default: module.ItemDetailModal,
+  }))
+);
 
 /**
  * The Ctrl+K / Cmd+K listener and the palette itself, mounted once from
@@ -22,10 +31,14 @@ const APPLE = isApplePlatform();
  *
  * The palette mounts only while open, so its live reads (Characters, corp
  * access) cost nothing the rest of the time and every opening starts clean.
+ * A Market Items pick opens Item Detail here rather than in the palette,
+ * which closes as it is picked: the modal sits over the current page — no
+ * navigation — and hands focus back to it on close.
  */
 export function CommandPaletteHost() {
   const open = useCommandPalette((state) => state.open);
   const hide = useCommandPalette((state) => state.hide);
+  const [shownItem, setShownItem] = useState<ShownMarketItem | null>(null);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -44,5 +57,19 @@ export function CommandPaletteHost() {
   // Signing out unmounts the shell; the next shell must not open pre-opened.
   useEffect(() => () => useCommandPalette.getState().hide(), []);
 
-  return open ? <CommandPalette onClose={hide} /> : null;
+  return (
+    <>
+      {open && <CommandPalette onClose={hide} onShowItem={setShownItem} />}
+      {shownItem && (
+        <Suspense fallback={null}>
+          <ItemDetailModal
+            typeId={shownItem.typeId}
+            itemName={shownItem.name}
+            showOpenInMarket
+            onClose={() => setShownItem(null)}
+          />
+        </Suspense>
+      )}
+    </>
+  );
 }

@@ -23,7 +23,9 @@ test('Ctrl+K opens the palette, searches and navigates', async ({ page }) => {
   await shellReady(page);
 
   await page.keyboard.press('Control+k');
-  const input = page.getByRole('combobox', { name: 'Search pages, commands and characters' });
+  const input = page.getByRole('combobox', {
+    name: 'Search pages, commands, characters and items',
+  });
   await expect(input).toBeFocused();
 
   await input.fill('opp');

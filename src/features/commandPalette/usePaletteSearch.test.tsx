@@ -86,16 +86,20 @@ describe('usePaletteSearch', () => {
     expect(hook.current[0].results.map((r) => r.id)).toEqual(['fresh']);
   });
 
-  it('drops a group whose async search fails', async () => {
+  it('shows a failed async search as an error in its own group only', async () => {
     const failing: PaletteProvider = {
       id: 'broken',
       labelKey: 'broken',
       order: 0,
       search: () => Promise.reject(new Error('offline')),
     };
-    const providers = [failing];
+    const providers = [failing, syncProvider('fine', 1)];
     const { result: hook } = renderHook(() => usePaletteSearch(providers, 'x'));
     await act(async () => {});
-    expect(hook.current).toEqual([]);
+    expect(hook.current.map((group) => [group.provider.id, group.status])).toEqual([
+      ['broken', 'error'],
+      ['fine', 'ready'],
+    ]);
+    expect(hook.current[0].results).toEqual([]);
   });
 });
