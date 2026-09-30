@@ -38,6 +38,10 @@ import {
 } from '@/lib/mobileTabs';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
+import {
+  CommandPaletteHost,
+  CommandPaletteTrigger,
+} from '@/features/commandPalette/CommandPaletteHost';
 import { NAV_LOCK_PATHS, navPageLabelKey, railGroups } from './navDestinations';
 import type { AppRoutePath } from './routeScopes';
 
@@ -590,6 +594,9 @@ export const Layout = memo(function Layout() {
           <PrefetchIndicator />
           {isSyncConfigured() && <SyncStatusIndicator />}
         </div>
+        <div className="border-b border-line p-2">
+          <CommandPaletteTrigger presentation="rail" />
+        </div>
         {/* `overflow-y-auto` is what makes the character menu below actually
             pinned: the rail is `h-screen`, so without it a tall list (large
             text scale) would push the footer off the bottom instead of
@@ -628,6 +635,8 @@ export const Layout = memo(function Layout() {
       </aside>
 
       <main className="min-w-0 flex-1 px-2 py-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-4 md:pb-4">
+        {/* The phone has no rail, so the palette's way in heads the page. */}
+        <CommandPaletteTrigger presentation="bar" className="mb-3 md:hidden" />
         <AlertCharacterSwitch />
         <AuthFailureNotice />
         <StandingsScopeNotice />
@@ -668,6 +677,7 @@ export const Layout = memo(function Layout() {
       </nav>
 
       <KeyboardShortcuts />
+      <CommandPaletteHost />
       <NotificationPermissionPrompt />
       {/*
         In the shell rather than in `App`, unlike the install and reload

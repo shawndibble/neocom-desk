@@ -1,5 +1,49 @@
 import { describe, it, expect, vi } from 'vitest';
-import { SHORTCUTS } from './shortcuts';
+import {
+  SHORTCUTS,
+  commandPaletteDisplayKey,
+  isCommandPaletteShortcut,
+  type ChordEvent,
+} from './shortcuts';
+
+describe('isCommandPaletteShortcut', () => {
+  const press = (init: Partial<ChordEvent> & { key: string }): ChordEvent => ({
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    shiftKey: false,
+    ...init,
+  });
+
+  it('matches Ctrl+K off Apple platforms and Cmd+K on them, whatever the case', () => {
+    expect(isCommandPaletteShortcut(press({ key: 'k', ctrlKey: true }), false)).toBe(true);
+    expect(isCommandPaletteShortcut(press({ key: 'K', ctrlKey: true }), false)).toBe(true);
+    expect(isCommandPaletteShortcut(press({ key: 'k', metaKey: true }), true)).toBe(true);
+  });
+
+  it('leaves the other platform’s chord alone (Ctrl+K is kill-line on a Mac)', () => {
+    expect(isCommandPaletteShortcut(press({ key: 'k', ctrlKey: true }), true)).toBe(false);
+    expect(isCommandPaletteShortcut(press({ key: 'k', metaKey: true }), false)).toBe(false);
+  });
+
+  it('ignores a bare K and any other chord', () => {
+    expect(isCommandPaletteShortcut(press({ key: 'k' }), false)).toBe(false);
+    expect(isCommandPaletteShortcut(press({ key: 'k', ctrlKey: true, altKey: true }), false)).toBe(
+      false
+    );
+    expect(
+      isCommandPaletteShortcut(press({ key: 'k', ctrlKey: true, shiftKey: true }), false)
+    ).toBe(false);
+    expect(isCommandPaletteShortcut(press({ key: 'j', ctrlKey: true }), false)).toBe(false);
+  });
+});
+
+describe('commandPaletteDisplayKey', () => {
+  it('shows the Command key on Apple platforms and Ctrl elsewhere', () => {
+    expect(commandPaletteDisplayKey(true)).toBe('⌘K');
+    expect(commandPaletteDisplayKey(false)).toBe('Ctrl K');
+  });
+});
 
 describe('SHORTCUTS', () => {
   it('has unique ids and keys, so the dispatch table never double-matches', () => {

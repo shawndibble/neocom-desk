@@ -5985,8 +5985,33 @@
       "corpRolesUnknown": "Corporation roles show once granted."
     }
   },
+  "commandPalette": {
+    "title": "Command palette",
+    "trigger": "Search",
+    "triggerLong": "Search pages, commands and characters",
+    "placeholder": "Go to a page, run a command, switch character…",
+    "inputLabel": "Search pages, commands and characters",
+    "resultsLabel": "Results",
+    "noResults": "Nothing matches.",
+    "loadingGroup": "Searching…",
+    "resultsCount_one": "{{count}} result",
+    "resultsCount_other": "{{count}} results",
+    "activeCharacter": "Active",
+    "groups": {
+      "pages": "Pages",
+      "commands": "Commands",
+      "characters": "Characters"
+    },
+    "commands": {
+      "openSettings": "Open settings",
+      "keyboardShortcuts": "Keyboard shortcuts",
+      "addCharacter": "Add character",
+      "notificationFeed": "Open notification feed"
+    }
+  },
   "shortcuts": {
     "title": "Keyboard shortcuts",
+    "openCommandPalette": "Open the command palette",
     "jumpToSearch": "Jump to search",
     "switchCharacter": "Switch character",
     "goToOverview": "Go to Overview",

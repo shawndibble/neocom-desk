@@ -51,6 +51,37 @@ export const KEYBOARD_OVERLAY_ATTRIBUTE = 'data-keyboard-overlay';
  */
 export const OVERLAY_SELECTOR = `dialog[open], [role="menu"], [role="listbox"], [role="dialog"], [${KEYBOARD_OVERLAY_ATTRIBUTE}]`;
 
+/**
+ * Ctrl+K / Cmd+K, the Command Palette (#2318). Not a `SHORTCUTS` row: that
+ * table is single unmodified keys, dispatched by a listener that ignores
+ * modifiers and is switched off entirely with single-key shortcuts (WCAG
+ * 2.1.4). A modified chord is not what that criterion is about, so this one
+ * stays live regardless — its listener is `CommandPaletteHost`'s
+ * (`features/commandPalette`), and it fires from inside a text field too.
+ *
+ * Shift and Alt narrow rather than widen, as in the single-key table.
+ */
+export type ChordEvent = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>;
+
+export function isCommandPaletteShortcut(event: ChordEvent, apple: boolean): boolean {
+  // One modifier per platform: Ctrl+K on a Mac is the text fields' kill-line
+  // (Emacs keys), and Win+K elsewhere is the OS's own Cast panel.
+  const modifier = apple ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+  if (!modifier || event.altKey || event.shiftKey) return false;
+  return event.key.toLowerCase() === 'k';
+}
+
+/** The chord as the pilot's own keyboard labels it. */
+export function commandPaletteDisplayKey(apple: boolean): string {
+  return apple ? '⌘K' : 'Ctrl K';
+}
+
+/** macOS, iOS and iPadOS, where the chord is Cmd rather than Ctrl. */
+export function isApplePlatform(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+}
+
 export interface ShortcutDef {
   readonly id: string;
   /** Matches `KeyboardEvent.key` exactly. Ctrl/Meta/Alt never reach a match; Shift does, via `allowsShift`. */

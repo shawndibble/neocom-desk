@@ -53,7 +53,7 @@ import { useIsNarrow } from '@/lib/useIsNarrow';
 import { formatAge } from '@/lib/age';
 import { useTicker } from '@/lib/ticker';
 import { formatTimestamp } from '@/lib/timestamp';
-import { SHORTCUTS } from '@/lib/shortcuts';
+import { SHORTCUTS, commandPaletteDisplayKey, isApplePlatform } from '@/lib/shortcuts';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import {
   FACILITY_PRESETS,
@@ -1389,6 +1389,16 @@ export function Settings() {
                 </p>
               </div>
               <dl className="max-w-md divide-y divide-line text-xs">
+                {/* First, and outside `SHORTCUTS`: a modified chord, live
+                    whatever the single-key switch above says (`lib/shortcuts.ts`). */}
+                <div className="flex items-center justify-between gap-4 py-2">
+                  <dt className="text-text-dim">{t('shortcuts.openCommandPalette')}</dt>
+                  <dd>
+                    <kbd className="rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 font-mono text-[0.6875rem] text-text">
+                      {commandPaletteDisplayKey(isApplePlatform())}
+                    </kbd>
+                  </dd>
+                </div>
                 {SHORTCUTS.map((shortcut) => (
                   <div key={shortcut.id} className="flex items-center justify-between gap-4 py-2">
                     <dt className="text-text-dim">{t(shortcut.descriptionKey)}</dt>
