@@ -8,7 +8,7 @@ import { writeCached } from '@/esi/cache';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
-import { CommandPaletteHost, CommandPaletteTrigger } from './CommandPaletteHost';
+import { CommandPaletteHost } from './CommandPaletteHost';
 import { useCommandPalette } from './store';
 
 vi.mock('@/app/useGrantedScopes', () => ({
@@ -35,7 +35,6 @@ function renderShell() {
         Page search
         <input />
       </label>
-      <CommandPaletteTrigger presentation="rail" />
       <CommandPaletteHost />
       <Where />
     </MemoryRouter>
@@ -79,11 +78,10 @@ describe('CommandPalette', () => {
     expect(pageSearch).toHaveFocus();
   });
 
-  it('opens from the visible trigger', async () => {
-    const user = userEvent.setup();
+  it('shows nothing until the shortcut opens it', () => {
     renderShell();
-    await user.click(screen.getByRole('button', { name: /Search/ }));
-    expect(await screen.findByRole('combobox')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Search/ })).not.toBeInTheDocument();
   });
 
   it('does not stack over another open dialog', async () => {

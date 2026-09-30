@@ -6012,8 +6012,6 @@
   },
   "commandPalette": {
     "title": "Command palette",
-    "trigger": "Search",
-    "triggerLong": "Search pages, commands and characters",
     "placeholder": "Go to a page, run a command, switch character…",
     "inputLabel": "Search pages, commands and characters",
     "resultsLabel": "Results",
