@@ -21,6 +21,8 @@ vi.mock('@/features/corp/useCorpNavVisible', () => ({ useCorpNavVisible: () => f
 vi.mock('@/features/corp/useCorpAccess', () => ({
   useCorpAccess: () => ({ state: 'none', capabilities: NO_CORP_CAPABILITIES }),
 }));
+const loadLpCorporations = vi.hoisted(() => vi.fn());
+vi.mock('@/sde/loadMarketSde', () => ({ loadLpCorporations }));
 const beginAddCharacterLogin = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@/app/loginFlow', () => ({ beginAddCharacterLogin }));
 
@@ -49,6 +51,11 @@ beforeEach(async () => {
     { characterId: 2, name: 'Beta Pilot', ownerHash: 'b', addedAt: 2 },
   ] as never);
   await useActiveCharacter.getState().setActiveCharacter(1);
+  await db.esiCache.clear();
+  loadLpCorporations.mockResolvedValue([
+    { id: 1000130, name: 'Sisters of EVE' },
+    { id: 1000125, name: 'CONCORD' },
+  ]);
 });
 
 afterEach(() => {
@@ -232,6 +239,56 @@ describe('CommandPalette', () => {
       });
       expect(screen.queryByRole('group', { name: 'Contacts' })).not.toBeInTheDocument();
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('LP Stores', () => {
+    it('finds "Sisters of EVE" for "sisters" and Enter opens its store', async () => {
+      const user = userEvent.setup();
+      renderShell();
+      await user.keyboard('{Control>}k{/Control}');
+      await user.type(await screen.findByRole('combobox'), 'sisters');
+      const stores = await screen.findByRole('group', { name: 'LP Stores' });
+      const option = await within(stores).findByRole('option', { name: 'Sisters of EVE' });
+      expect(option).toHaveAttribute('aria-selected', 'true');
+      await user.keyboard('{Enter}');
+      expect(screen.getByTestId('where')).toHaveTextContent('/wallet/loyalty/1000130');
+    });
+
+    it('shows the balance only for a corp the active Character holds LP with', async () => {
+      await writeCached(1, 'loyalty', [{ corporation_id: 1000130, loyalty_points: 12500 }], 1);
+      const user = userEvent.setup();
+      renderShell();
+      await user.keyboard('{Control>}k{/Control}');
+      await user.type(await screen.findByRole('combobox'), 'co');
+      const stores = await screen.findByRole('group', { name: 'LP Stores' });
+      expect(await within(stores).findByRole('option', { name: 'CONCORD' })).not.toHaveTextContent(
+        'LP'
+      );
+
+      await user.clear(screen.getByRole('combobox'));
+      await user.type(screen.getByRole('combobox'), 'sisters');
+      const sisters = await within(
+        await screen.findByRole('group', { name: 'LP Stores' })
+      ).findByRole('option', { name: /Sisters of EVE/ });
+      expect(sisters).toHaveTextContent((12500).toLocaleString() + ' LP');
+    });
+
+    it('never blocks typing or the other groups while the corporation list loads', async () => {
+      loadLpCorporations.mockReturnValue(new Promise(() => {}));
+      const user = userEvent.setup();
+      renderShell();
+      await user.keyboard('{Control>}k{/Control}');
+      const input = await screen.findByRole('combobox');
+      await user.type(input, 'opp');
+      expect(input).toHaveValue('opp');
+      const pages = screen.getByRole('group', { name: 'Pages' });
+      expect(
+        within(pages).getByRole('option', { name: 'Industry › Opportunities' })
+      ).toHaveAttribute('aria-selected', 'true');
+      expect(
+        within(screen.getByRole('group', { name: 'LP Stores' })).getByText('Searching…')
+      ).toBeInTheDocument();
     });
   });
 });

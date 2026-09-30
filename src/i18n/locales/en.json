@@ -6023,11 +6023,13 @@
     "resultsCount_other": "{{count}} results",
     "activeCharacter": "Active",
     "contactStanding": "{{standing}} {{character}}",
+    "lpBalance": "{{lp}} LP",
     "groups": {
       "pages": "Pages",
       "commands": "Commands",
       "characters": "Characters",
-      "contacts": "Contacts"
+      "contacts": "Contacts",
+      "lpStores": "LP Stores"
     },
     "commands": {
       "openSettings": "Open settings",
