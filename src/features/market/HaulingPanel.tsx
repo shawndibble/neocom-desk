@@ -84,13 +84,16 @@ import {
 import { useMarketHub } from './hub';
 import {
   ANY_HUB,
+  anyEndOf,
   HAULING_HUB_CHOICES,
+  haulingEnd,
   haulingHubDefaults,
+  hubAtAnyEnd,
   pickHaulingHub,
   type HaulingHubChoice,
 } from './haulingHubs';
 import { useHaulingFees, useHaulingScan } from './useHaulingScan';
-import { HAUL_MODES, type HaulingEnd, type HaulMode } from './haulingData';
+import { HAUL_MODES, type HaulMode } from './haulingData';
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 const MARGIN_CHOICES = [0, 3, 5, 10] as const;
 
@@ -168,10 +171,6 @@ const DEMAND_DOT: Record<DemandKind, string> = {
   rarely: 'bg-danger',
 };
 
-function endFor(id: HaulingHubChoice): HaulingEnd {
-  return id === ANY_HUB ? ANY_HUB : (TRADE_HUBS.find((h) => h.id === id) ?? TRADE_HUBS[0]!);
-}
-
 function signed(value: number, fractionDigits: number): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(fractionDigits)}`;
 }
@@ -228,10 +227,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     [haulingFilterPref]
   );
   const [params, setParams] = useRememberedUrlParams(haulingSchema, rememberedFilter);
-  const from = endFor(params.from);
-  const to = endFor(params.to);
-  /** The end set to Any hub, if one is: the table then says which hub each row uses there. */
-  const anyEnd = params.from === ANY_HUB ? 'from' : params.to === ANY_HUB ? 'to' : null;
+  const from = haulingEnd(params.from);
+  const to = haulingEnd(params.to);
+  // The end set to Any hub, if one is: the table then says which hub each row uses there.
+  const anyEnd = anyEndOf(params);
   const categoryId = isHaulingCategoryId(params.cat) ? params.cat : DEFAULT_HAULING_CATEGORY_ID;
   const mode: HaulMode = params.mode;
   const instant = mode === 'instant';
@@ -460,10 +459,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             ),
             headerClassName: 'whitespace-nowrap',
             className: 'whitespace-nowrap',
-            sortValue: (row: HaulingViewRow) =>
-              (anyEnd === 'from' ? row.fromHub : row.toHub).systemName,
-            render: (row: HaulingViewRow) =>
-              (anyEnd === 'from' ? row.fromHub : row.toHub).systemName,
+            sortValue: (row: HaulingViewRow) => hubAtAnyEnd(row, anyEnd).systemName,
+            render: (row: HaulingViewRow) => hubAtAnyEnd(row, anyEnd).systemName,
           },
         ]),
     {

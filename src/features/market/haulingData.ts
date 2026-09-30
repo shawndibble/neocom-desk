@@ -41,7 +41,7 @@ import { loadPriceHistory } from '@/features/market/priceHistory';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { getHubPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
-import { ANY_HUB, expandHaulingLane, type HaulingHubChoice, type HubLane } from './haulingHubs';
+import { expandHaulingLane, haulingEndId, type HaulingEnd, type HubLane } from './haulingHubs';
 import {
   estimateSale,
   hubLadders,
@@ -121,13 +121,6 @@ export interface HaulingScan {
   /** How many items were looked at in the first pass. */
   scanned: number;
   fetchedAt: number;
-}
-
-/** One end of a scanned lane: a hub, or Any hub (at most one end). */
-export type HaulingEnd = TradeHub | typeof ANY_HUB;
-
-export function haulingEndId(end: HaulingEnd): HaulingHubChoice {
-  return end === ANY_HUB ? ANY_HUB : end.id;
 }
 
 export interface HaulingScanRequest {

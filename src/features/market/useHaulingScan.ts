@@ -16,11 +16,11 @@ import { typeIdsInCategory } from './haulingCategories';
 import {
   clearHaulingScanCache,
   runHaulingScan,
-  type HaulingEnd,
   type HaulMode,
   type HaulingProgress,
   type HaulingScan,
 } from './haulingData';
+import type { HaulingEnd } from './haulingHubs';
 import type { HaulingFeesAt } from './haulingView';
 import { tradeHubStanding, useTradeHubStandings } from './useTradeHubStandings';
 

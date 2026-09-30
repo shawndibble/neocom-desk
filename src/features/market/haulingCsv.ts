@@ -1,6 +1,7 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { HaulingFlag } from '@/engine/market/haulingMarket';
 import type { HaulMode } from './haulingData';
+import { hubAtAnyEnd, type HaulingAnyEnd } from './haulingHubs';
 import type { HaulingViewRow } from './haulingView';
 
 export interface HaulingCsvOptions {
@@ -11,7 +12,7 @@ export interface HaulingCsvOptions {
   /** Selling into buy orders drops Days to Sell and demand, as the table does. Defaults to `list`. */
   mode?: HaulMode;
   /** The end set to Any hub: adds a Hub column naming the hub each row uses there. */
-  anyEnd?: 'from' | 'to' | null;
+  anyEnd?: HaulingAnyEnd;
 }
 
 /**
@@ -44,7 +45,7 @@ export function haulingCsvColumns(
       : [
           {
             header: t('market.hauling.columns.hub'),
-            value: (row) => (anyEnd === 'from' ? row.fromHub : row.toHub).systemName,
+            value: (row) => hubAtAnyEnd(row, anyEnd).systemName,
           },
         ];
   return [

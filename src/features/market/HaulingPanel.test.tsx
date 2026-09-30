@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { TRADE_HUBS } from '@/market/hubs';
@@ -174,6 +175,15 @@ describe('HaulingPanel, Any hub', () => {
     expect(screen.getByRole('combobox', { name: 'From' })).toHaveTextContent('Any hub');
     expect(screen.getByRole('columnheader', { name: /^Hub/ })).toBeInTheDocument();
     expect(screen.getByRole('row', { name: /Damage Control II/ })).toHaveTextContent('Dodixie');
+  });
+
+  it('picking Any hub writes it to the link and rescans with it', async () => {
+    const user = userEvent.setup();
+    renderPanel('from=jita&to=amarr');
+    await user.click(screen.getByRole('combobox', { name: 'From' }));
+    await user.click(screen.getByRole('option', { name: 'Any hub' }));
+    expect(scanCalls.at(-1)).toMatchObject({ from: 'any', to: AMARR });
+    expect(screen.getByRole('combobox', { name: 'From' })).toHaveTextContent('Any hub');
   });
 
   it('shows no Hub column on a plain lane', () => {

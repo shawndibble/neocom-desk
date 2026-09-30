@@ -5055,8 +5055,8 @@
       "columns": {
         "item": "Item",
         "hub": "Hub",
-        "hubFromTip": "The trade hub each item is bought at: the one of the five with the best price gap to your destination.",
-        "hubToTip": "The trade hub each item is sold at: the one of the five with the best price gap from your origin.",
+        "hubFromTip": "The trade hub each item is bought at: the other hub with the best price gap to your destination.",
+        "hubToTip": "The trade hub each item is sold at: the other hub with the best price gap from your origin.",
         "buy": "Buy",
         "expected": "Sell",
         "expectedTip": "Expected sell price: what you should get per unit if you list to sell. The lower of one tick under the cheapest listing and what it recently sold for. Click a row to see how.",

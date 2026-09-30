@@ -31,6 +31,33 @@ export interface HaulingLane {
   to: HaulingHubChoice;
 }
 
+/** One end of a lane as the scan takes it: a hub, or Any hub. */
+export type HaulingEnd = TradeHub | typeof ANY_HUB;
+
+export function haulingEnd(id: HaulingHubChoice): HaulingEnd {
+  return id === ANY_HUB ? ANY_HUB : (TRADE_HUBS.find((h) => h.id === id) ?? TRADE_HUBS[0]!);
+}
+
+export function haulingEndId(end: HaulingEnd): HaulingHubChoice {
+  return end === ANY_HUB ? ANY_HUB : end.id;
+}
+
+/** Which end of the lane is on Any hub, if one is. */
+export type HaulingAnyEnd = 'from' | 'to' | null;
+
+export function anyEndOf(lane: HaulingLane): HaulingAnyEnd {
+  if (lane.from === ANY_HUB) return 'from';
+  return lane.to === ANY_HUB ? 'to' : null;
+}
+
+/** The hub a scanned row uses at the Any end — what its Hub column shows. */
+export function hubAtAnyEnd(
+  row: { fromHub: TradeHub; toHub: TradeHub },
+  end: 'from' | 'to'
+): TradeHub {
+  return end === 'from' ? row.fromHub : row.toHub;
+}
+
 /** A lane between two real hubs. */
 export interface HubLane {
   from: TradeHub;
