@@ -57,6 +57,8 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
     'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
   const escapeHandlers = new WeakMap<HTMLDialogElement, (event: KeyboardEvent) => void>();
+  /** Open modal dialogs, oldest first: Escape cancels only the topmost, as in a browser. */
+  const modalStack: HTMLDialogElement[] = [];
 
   function open(dialog: HTMLDialogElement, modal: boolean): void {
     if (dialog.open) return;
@@ -70,6 +72,7 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || !dialog.open) return;
+      if (modalStack.at(-1) !== dialog) return;
       // A browser skips the close request when the keydown was already
       // cancelled — as a Radix menu or select open inside the dialog does when
       // Escape dismisses it — so the one Escape closes that layer, not the
@@ -80,6 +83,7 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
       if (!cancelled) dialog.close();
     };
     escapeHandlers.set(dialog, onKeyDown);
+    modalStack.push(dialog);
     dialog.ownerDocument.addEventListener('keydown', onKeyDown);
   }
 
@@ -102,6 +106,8 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
       this.ownerDocument.removeEventListener('keydown', onKeyDown);
       escapeHandlers.delete(this);
     }
+    const stackIndex = modalStack.indexOf(this);
+    if (stackIndex !== -1) modalStack.splice(stackIndex, 1);
     this.removeAttribute('open');
     if (returnValue !== undefined) this.returnValue = returnValue;
     this.dispatchEvent(new Event('close'));
