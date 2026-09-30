@@ -13,6 +13,7 @@ import { isCachePurgePending } from './cachePurge';
 import { promoteEsiLane } from './budget';
 import { laneForLoad, viewPriority, withEsiLane, type EsiLane } from './lane';
 import { grantHoldsEndpointScope } from './grantScope';
+import { beginCacheMiss, type CacheMissReason } from './cacheMissSignal';
 import type { PageResponse, PaginatedResult, TruncatableResult } from './paginated';
 
 export interface CachedResult<T> {
@@ -90,6 +91,22 @@ export const CORP_CACHE_KEY_PREFIX = 'corp:';
  */
 export function corpCacheKey(corporationId: number, key: string): string {
   return `${CORP_CACHE_KEY_PREFIX}${corporationId}:${key}`;
+}
+
+/**
+ * A key with its ids taken out, for telemetry (`cacheMissSignal.ts`):
+ * `market-history:10000002:34` → `market-history`, and a `corpCacheKey` loses
+ * its corporation id. Any digits left in the family itself are masked.
+ */
+export function cacheKeyFamily(key: string): string {
+  let rest = key;
+  let scope = '';
+  if (rest.startsWith(CORP_CACHE_KEY_PREFIX)) {
+    scope = CORP_CACHE_KEY_PREFIX;
+    rest = rest.slice(CORP_CACHE_KEY_PREFIX.length).replace(/^\d+:/, '');
+  }
+  const head = rest.split(':', 1)[0] ?? rest;
+  return scope + head.replace(/\d+/g, '*');
 }
 
 /**
@@ -366,6 +383,7 @@ async function withDedupe<R>(
   characterId: number,
   key: string,
   lane: EsiLane | undefined,
+  reason: CacheMissReason,
   run: () => Promise<R>
 ): Promise<R> {
   const dkey = dedupeKey(characterId, key);
@@ -382,12 +400,19 @@ async function withDedupe<R>(
     return existing.promise as Promise<R>;
   }
 
-  const promise = run();
-  inFlightLoads.set(dkey, { promise, lane });
+  // Only a load that actually starts is a miss: a joiner adds no request.
+  const endMiss = beginCacheMiss({
+    family: cacheKeyFamily(key),
+    reason,
+    global: characterId === GLOBAL_CACHE_CHARACTER_ID,
+  });
   try {
+    const promise = run();
+    inFlightLoads.set(dkey, { promise, lane });
     return await promise;
   } finally {
     inFlightLoads.delete(dkey);
+    endMiss();
   }
 }
 
@@ -512,20 +537,31 @@ async function loadPastWindow<T>(
   options: LoadWithCacheStatusOptions,
   read: RowReader,
   lane: EsiLane | undefined,
+  reason: CacheMissReason,
   runLive: () => Promise<StatusResult<T>>
 ): Promise<StatusResult<T>> {
   const dkey = dedupeKey(characterId, key);
   if (staleAfterMs > STALE_AFTER.default && options.allowStaleServe !== true) {
     if (staleAfterMs >= STALE_AFTER.static && options.skipCacheOnAuthFailure !== true) {
-      return loadLapsedConstant(characterId, key, staleAfterMs, options, dkey, read, lane, runLive);
+      return loadLapsedConstant(
+        characterId,
+        key,
+        staleAfterMs,
+        options,
+        dkey,
+        read,
+        lane,
+        reason,
+        runLive
+      );
     }
-    return withDedupe(characterId, key, lane, runLive);
+    return withDedupe(characterId, key, lane, reason, runLive);
   }
 
   const held = await heldAfterFailure<T>(staleAfterMs, options, dkey, read);
   if (held) return held;
 
-  const live = withDedupe(characterId, key, lane, runLive);
+  const live = withDedupe(characterId, key, lane, reason, runLive);
   let graceTimer: ReturnType<typeof setTimeout> | undefined;
   const grace = new Promise<typeof GRACE>((resolve) => {
     graceTimer = setTimeout(() => resolve(GRACE), STALE_GRACE_MS);
@@ -588,13 +624,14 @@ async function loadLapsedConstant<T>(
   dkey: string,
   read: RowReader,
   lane: EsiLane | undefined,
+  reason: CacheMissReason,
   runLive: () => Promise<StatusResult<T>>
 ): Promise<StatusResult<T>> {
   const held = await heldAfterFailure<T>(staleAfterMs, options, dkey, read);
   if (held) return held;
 
   const stale = await readStaleRow<T>(read, staleAfterMs);
-  const live = withDedupe(characterId, key, lane, runLive);
+  const live = withDedupe(characterId, key, lane, reason, runLive);
   // Nothing to show in the meantime, so there is no choice but to wait.
   if (!stale) return live;
 
@@ -708,10 +745,10 @@ export async function loadWithCacheStatus<T>(
   const lane = laneForLoad();
   const staleAfterMs = options.staleAfterMs ?? STALE_AFTER.default;
   const fresh = await readFreshRow<T>(characterId, key, staleAfterMs);
-  if (fresh) return { cached: fresh, needsReauth: false };
+  if (!isMiss(fresh)) return { cached: fresh, needsReauth: false };
 
   const read = rowReader(characterId, key);
-  return loadPastWindow<T>(characterId, key, staleAfterMs, options, read, lane, () =>
+  return loadPastWindow<T>(characterId, key, staleAfterMs, options, read, lane, fresh, () =>
     loadWithCacheStatusLive(characterId, key, fetchLive, options, read, lane)
   );
 }
@@ -871,8 +908,26 @@ async function applyNotModified<T>(
  * opt into `expiresCapture` had no window at all.
  */
 function isWithinWindow(meta: EsiCacheMetaRecord, staleAfterMs: number, now: number): boolean {
-  if (Math.max(meta.expiresAt ?? 0, meta.fetchedAt + staleAfterMs) <= now) return false;
+  if (isPastWindow(meta, staleAfterMs, now)) return false;
   return !isRefreshInvalidated(meta.fetchedAt, staleAfterMs, now);
+}
+
+function isPastWindow(meta: EsiCacheMetaRecord, staleAfterMs: number, now: number): boolean {
+  return Math.max(meta.expiresAt ?? 0, meta.fetchedAt + staleAfterMs) <= now;
+}
+
+/** Why a stored row `isWithinWindow` rejected is going live: its age, or a manual Refresh. */
+function pastWindowReason(
+  meta: EsiCacheMetaRecord,
+  staleAfterMs: number,
+  now: number
+): CacheMissReason {
+  return isPastWindow(meta, staleAfterMs, now) ? 'expired' : 'refresh';
+}
+
+/** `readFreshRow` found nothing it could serve. */
+function isMiss<T>(fresh: CachedResult<T> | CacheMissReason): fresh is CacheMissReason {
+  return typeof fresh === 'string';
 }
 
 /**
@@ -890,15 +945,16 @@ async function readFreshRow<T>(
   characterId: number,
   key: string,
   staleAfterMs: number
-): Promise<CachedResult<T> | null> {
+): Promise<CachedResult<T> | CacheMissReason> {
   const found = await readMetaOrRow(characterId, key);
-  if (!found) return null;
+  if (!found) return 'cold';
   const { meta } = found;
-  if (!isWithinWindow(meta, staleAfterMs, Date.now())) return null;
+  const now = Date.now();
+  if (!isWithinWindow(meta, staleAfterMs, now)) return pastWindowReason(meta, staleAfterMs, now);
   const row = found.row ?? (await db.esiCache.get([characterId, key]));
   if (!row) {
     void dropOrphanMeta(characterId, key);
-    return null;
+    return 'cold';
   }
   // Meta that does not describe this row — rewritten behind the middleware's
   // back (raw IndexedDB, a bundle from before it) — has no say: the row's own
@@ -906,7 +962,7 @@ async function readFreshRow<T>(
   const own = metaVouchesFor(meta, row) ? meta : metaOf(row);
   if (own !== meta) {
     void realignMeta(row, meta);
-    if (!isWithinWindow(own, staleAfterMs, Date.now())) return null;
+    if (!isWithinWindow(own, staleAfterMs, now)) return pastWindowReason(own, staleAfterMs, now);
   }
   return {
     data: row.value as T,
@@ -1015,10 +1071,10 @@ export async function loadPaginatedWithCacheStatus<T>(
   const lane = laneForLoad();
   const staleAfterMs = options.staleAfterMs ?? STALE_AFTER.default;
   const fresh = await readFreshRow<T[]>(characterId, key, staleAfterMs);
-  if (fresh) return { cached: fresh, needsReauth: false };
+  if (!isMiss(fresh)) return { cached: fresh, needsReauth: false };
 
   const read = rowReader(characterId, key);
-  return loadPastWindow<T[]>(characterId, key, staleAfterMs, options, read, lane, () =>
+  return loadPastWindow<T[]>(characterId, key, staleAfterMs, options, read, lane, fresh, () =>
     loadPaginatedWithCacheStatusLive(characterId, key, fetchLive, options, read, lane)
   );
 }
