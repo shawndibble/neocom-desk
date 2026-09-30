@@ -29,6 +29,7 @@ import {
   StatChip,
   type DataTableColumn,
   Checkbox,
+  SegmentedControl,
 } from '@/components/ui';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
@@ -60,6 +61,8 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
+import { enumParam } from '@/lib/urlState';
+import { OwnedBlueprintsPanel } from './OwnedBlueprintsPanel';
 
 interface OpportunitiesPanelProps {
   catalog: BlueprintCatalog;
@@ -102,6 +105,11 @@ const SORT_VALUE = {
   orderDepth: (row: OpportunityRow) => ORDER_DEPTH_RANK[row.orderDepth],
 };
 const OPPORTUNITIES_CHARACTERS_KEY = 'opps.chars';
+/**
+ * Ranked (the default) or "All owned" (issue #2335): the same owned
+ * blueprints and Character filter, either priced and ranked or listed whole.
+ */
+const VIEW_PARAM = enumParam(['ranked', 'owned'] as const, 'ranked');
 
 /** Module-level so the table's windowing sees one stable function. */
 const opportunityRowKey = (row: OpportunityRow) => row.candidate.id;
@@ -130,6 +138,7 @@ export function OpportunitiesPanel({
     [allCharacters]
   );
 
+  const [view, setView] = useUrlParam('opps.view', VIEW_PARAM);
   const [characterFilter, setCharacterFilter] = useUrlParam(
     OPPORTUNITIES_CHARACTERS_KEY,
     CHARACTER_FILTER
@@ -477,6 +486,16 @@ export function OpportunitiesPanel({
 
   const meta = (
     <span className="flex flex-wrap items-center gap-2">
+      <SegmentedControl
+        label={t('industry.opportunitiesView')}
+        size="sm"
+        value={view}
+        onChange={setView}
+        options={[
+          { value: 'ranked', label: t('industry.opportunitiesViewRanked') },
+          { value: 'owned', label: t('industry.opportunitiesViewOwned') },
+        ]}
+      />
       {showCharacterFilter && (
         <CharacterFilterControl
           activeCharacterId={activeCharacterId}
@@ -489,6 +508,22 @@ export function OpportunitiesPanel({
   );
 
   const showProgress = loading && progress.total > 0;
+
+  if (view === 'owned') {
+    return (
+      <OwnedBlueprintsPanel
+        catalog={catalog}
+        activeCharacterId={activeCharacterId}
+        ownedByCharacter={ownedByCharacter}
+        characterNames={characterNames}
+        rankedRows={rows}
+        ownedStockSnapshot={ownedStockSnapshot}
+        loading={blueprintsLoading}
+        meta={meta}
+        onStartPlan={onStartPlan}
+      />
+    );
+  }
 
   return (
     <Panel
