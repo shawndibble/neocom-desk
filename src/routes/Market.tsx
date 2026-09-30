@@ -248,15 +248,16 @@ interface BrowserFilterBarProps {
   /** The header's hub or region: what the book reads while no Jump Range is set. */
   scopeLabel: string;
   currentSystem: CurrentSystemState;
-  /** The item tabs: the funnel sits at the end of their line rather than a row of its own. */
-  leading?: ReactNode;
+  /** The item search: the funnel sits at the end of its line rather than a row of its own. */
+  search: ReactNode;
   className?: string;
 }
 
 /**
- * The order book's filters behind a funnel, like the other search pages
- * (BPC Sourcing, Courier): collapsed, since the item search that would
- * normally sit beside it lives in the finder column instead.
+ * The order book's filters behind a funnel beside the item search, like the
+ * other search pages (BPC Sourcing, Courier). They sit in the finder column
+ * rather than over the book: the range is where to look, set before searching,
+ * not a property of one item.
  */
 function BrowserFilterBar({
   value,
@@ -265,7 +266,7 @@ function BrowserFilterBar({
   regionMode,
   scopeLabel,
   currentSystem,
-  leading,
+  search,
   className,
 }: BrowserFilterBarProps) {
   const { t } = useTranslation();
@@ -274,7 +275,7 @@ function BrowserFilterBar({
       value={value}
       onChange={onChange}
       activeCount={activeCount}
-      search={leading}
+      search={search}
       className={className}
     >
       {(draft, setDraft) => (
@@ -867,7 +868,6 @@ export function Market() {
       value={itemTab}
       onChange={(id) => setItemTab(id as 'orders' | 'history')}
       label={t('market.itemTabsLabel')}
-      className="min-w-0 flex-1"
     />
   );
 
@@ -1020,12 +1020,18 @@ export function Market() {
               ref={finderPanelRef}
               className={isDesktop || selectedTypeId === null ? '' : 'hidden'}
             >
-              <SearchInput
-                ref={searchInputRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={t('market.searchPlaceholder')}
-                aria-label={t('market.searchLabel')}
+              <BrowserFilterBar
+                {...browserFilterBarProps}
+                search={
+                  <SearchInput
+                    ref={searchInputRef}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={t('market.searchPlaceholder')}
+                    aria-label={t('market.searchLabel')}
+                    className="min-w-0 flex-1"
+                  />
+                }
               />
 
               {query.trim().length > 0 && query.trim().length < MARKET_TREE_MIN_QUERY_LENGTH && (
@@ -1117,26 +1123,14 @@ export function Market() {
               leading={itemPanelLeading}
             >
               {selectedTypeId === null ? (
-                <>
-                  {/* Set before searching: the range is where to look, not a property of one item. */}
-                  <BrowserFilterBar {...browserFilterBarProps} className="px-3 pt-2" />
-                  <EmptyState
-                    title={t('market.selectPromptTitle')}
-                    hint={t('market.selectPromptHint')}
-                    className="px-3 py-8"
-                  />
-                </>
+                <EmptyState
+                  title={t('market.selectPromptTitle')}
+                  hint={t('market.selectPromptHint')}
+                  className="px-3 py-8"
+                />
               ) : (
                 <>
-                  {itemTab === 'orders' ? (
-                    <BrowserFilterBar
-                      {...browserFilterBarProps}
-                      leading={itemTabs}
-                      className="px-3 pt-2"
-                    />
-                  ) : (
-                    <div className="px-3 pt-2">{itemTabs}</div>
-                  )}
+                  <div className="px-3 pt-2">{itemTabs}</div>
                   {/* Above both tabs: Price History is one of the readers it names. */}
                   {allRegions ? (
                     <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
@@ -1188,7 +1182,7 @@ export function Market() {
                         </p>
                       )}
                       <div className="divide-y divide-line">
-                        {/* Outside the funnel, so a collapsed bar can't hide why a range isn't applying. */}
+                        {/* In the book, not the finder's funnel, so a collapsed bar can't hide why a range isn't applying. */}
                         {(jumpNoteShown || failedRegionCount > 0) && (
                           <div className="flex flex-col items-end gap-1 px-3 py-2 text-xs text-text-dim">
                             {jumpNoteShown && <JumpRangeNote status={jumpRangeFilter.status} />}
