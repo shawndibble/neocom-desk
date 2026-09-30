@@ -14,7 +14,9 @@
  * the one that applied so a hauler can see why (`limitedBy`):
  * - `sales`: a week of expected sales (`demandCapUnits`),
  * - `supply`: the units that are profitable to buy at all — the origin's
- *   ladder past the break-even price only loses money,
+ *   ladder past the break-even price only loses money. Sold straight into the
+ *   destination's buy orders there is no sales horizon, and this is the depth
+ *   both books keep a unit profitable to (`walkInstant`),
  * - `space`: what fits in the remaining hold,
  * - `budget`: what the remaining ISK buys through the origin's ladder.
  *
@@ -22,7 +24,7 @@
  */
 import { brokerFeePct, salesTaxPct } from '@/engine/industry/fees';
 import type { AppraisalNetFees } from './appraisal';
-import { lotEconomics, walkLadder, type LadderLevel } from './haulingMarket';
+import { lotEconomics, walkInstant, walkLadder, type LadderLevel } from './haulingMarket';
 
 export interface TripCandidate {
   typeId: number;
@@ -31,10 +33,15 @@ export interface TripCandidate {
   unitVolumeM3: number;
   /** The origin's sell ladder: what buying units costs. */
   buyLadder: readonly LadderLevel[];
-  /** Expected Sell Price at the destination. */
+  /** Expected Sell Price at the destination (ignored when `destBuyLadder` is set). */
   expectedPrice: number;
-  /** A week of expected sales, from `estimateSale`. */
-  demandCapUnits: number;
+  /**
+   * A week of expected sales, from `estimateSale`; null when the lot is sold
+   * straight into buy orders, where there is no sales horizon — only book depth.
+   */
+  demandCapUnits: number | null;
+  /** The destination's buy ladder, dearest first: set when the lot is sold into it instead of listed. */
+  destBuyLadder?: readonly LadderLevel[];
 }
 
 /** A user's change to one suggested line. `quantity` wins over the suggestion; `selected: false` removes the line. */
@@ -77,6 +84,13 @@ export interface PlanTripInput {
 /** Units of `ladder` that cost less than a unit is worth after fees — past this every further unit loses money. */
 export function profitableDepth(candidate: TripCandidate, fees: AppraisalNetFees): number {
   const { accountingLevel, brokerRelationsLevel, standing } = fees;
+  if (candidate.destBuyLadder !== undefined) {
+    return walkInstant({
+      originLadder: candidate.buyLadder,
+      destBuyLadder: candidate.destBuyLadder,
+      accountingLevel,
+    }).units;
+  }
   const feeRate =
     (salesTaxPct(accountingLevel) +
       brokerFeePct(brokerRelationsLevel, standing.factionStanding, standing.corpStanding)) /
@@ -109,6 +123,7 @@ function lineFor(
     expectedPrice: candidate.expectedPrice,
     quantity,
     fees,
+    destBuyLadder: candidate.destBuyLadder,
   });
   return {
     typeId: candidate.typeId,
@@ -153,14 +168,18 @@ export function planTrip(input: PlanTripInput): TripPlan {
 
   // 2. Rank what is left by profit per share of the scarcest resource, then fill in that order.
   const sized = auto.map((candidate) => {
-    const salesCap = Math.max(0, Math.floor(candidate.demandCapUnits));
     const supplyCap = profitableDepth(candidate, fees);
+    const salesCap =
+      candidate.demandCapUnits === null
+        ? Infinity
+        : Math.max(0, Math.floor(candidate.demandCapUnits));
     const cap = Math.min(salesCap, supplyCap);
     const atCap = lotEconomics({
       buyLadder: candidate.buyLadder,
       expectedPrice: candidate.expectedPrice,
       quantity: cap,
       fees,
+      destBuyLadder: candidate.destBuyLadder,
     });
     let scarcity = 0;
     if (remainingM3 !== null && remainingM3 > 0) {
