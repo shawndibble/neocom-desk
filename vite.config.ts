@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { phosphorWeightsPlugin } from './src/components/ui/phosphorWeightsPlugin';
 import { localeSplitPlugin } from './src/i18n/localeSplitPlugin';
@@ -19,6 +20,25 @@ const { version, dependencies } = JSON.parse(
 
 // The dogma engine and its SDE snapshot are pinned exactly and bumped together
 // (ADR 0016); anything saved from their answers is keyed on this.
+/**
+ * The Sentry release: package version plus the commit it was built from. The
+ * package version alone never changes between deploys, so every issue read
+ * `0.1.0` and nothing could say whether a report predates a fix. Shared by
+ * `define` and the sourcemap upload below — the two must name the same release
+ * or the uploaded maps attach to a release no event reports.
+ */
+const release = `neocom-desk@${version}+${buildCommit()}`;
+
+function buildCommit(): string {
+  const fromCi = process.env.GITHUB_SHA;
+  if (fromCi) return fromCi.slice(0, 12);
+  try {
+    return execFileSync('git', ['rev-parse', '--short=12', 'HEAD'], { encoding: 'utf-8' }).trim();
+  } catch {
+    return 'dev';
+  }
+}
+
 const dogmaPins = `${dependencies['@eveshipfit/dogma-engine']}+${dependencies['@eveshipfit/sde']}`;
 
 /**
@@ -228,10 +248,11 @@ export default defineConfig({
   // Port pinned: the EVE SSO dev callback URL must match exactly, so the
   // port cannot be allowed to drift when 5173 happens to be busy.
   server: { port: 5173, strictPort: true },
-  // Read once at build/dev/test start, not hand-maintained in source — it is
-  // the release tag Sentry reports, so it must match the shipped build.
+  // Read once at build/dev/test start, not hand-maintained in source.
   define: {
     __APP_VERSION__: JSON.stringify(version),
+    // The release tag Sentry reports, so it must match the shipped build.
+    __APP_RELEASE__: JSON.stringify(release),
     __DOGMA_PINS__: JSON.stringify(dogmaPins),
     __SDE_DATA_VERSIONS__: JSON.stringify(sdeDataVersions()),
   },
@@ -321,7 +342,7 @@ export default defineConfig({
             org: process.env.SENTRY_ORG,
             project: process.env.SENTRY_PROJECT,
             authToken: sentryAuthToken,
-            release: { name: `neocom-desk@${version}` },
+            release: { name: release },
             sourcemaps: { filesToDeleteAfterUpload: ['dist/**/*.map'] },
           }),
         ]

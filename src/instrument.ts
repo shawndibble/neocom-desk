@@ -7,6 +7,8 @@ import {
 } from 'react-router-dom';
 import * as Sentry from '@sentry/react';
 import { scrubBreadcrumb, scrubEvent } from './observability/scrub';
+import { visitorTags } from './observability/visitor';
+import { onCacheMiss } from './esi/cacheMissSignal';
 
 /**
  * Sentry's `init`, in a sidecar imported first by `main.tsx` — it has to run
@@ -26,8 +28,9 @@ if (dsn) {
     dsn,
     environment: import.meta.env.MODE,
     // Must match the shipped build, so an issue points at a release that
-    // exists — and at the sourcemaps uploaded for it.
-    release: `neocom-desk@${__APP_VERSION__}`,
+    // exists — and at the sourcemaps uploaded for it. Carries the commit, so
+    // a report can be placed before or after a given fix.
+    release: __APP_RELEASE__,
 
     /**
      * ADR 0001 is a browser-only app with no backend, and CLAUDE.md keeps
@@ -72,5 +75,32 @@ if (dsn) {
     beforeSend: scrubEvent,
     beforeSendTransaction: scrubEvent,
     beforeBreadcrumb: scrubBreadcrumb,
+  });
+
+  Sentry.setTags({ ...visitorTags(() => localStorage, Date.now()) });
+
+  /**
+   * One span per read-through load that goes to ESI, saying why the cache did
+   * not answer (`cacheMissSignal.ts`). Sentry's "N+1 API Call" detector sees
+   * only the requests; this is what tells a first visit's cold fan-out from a
+   * cache that should have answered.
+   *
+   * `onlyIfParent`: a miss outside a page transaction (notification polls,
+   * background sweeps) would otherwise start its own trace and spend quota.
+   * The browser SDK has no async context, so the `http.client` spans sit
+   * beside this one in the trace rather than under it.
+   */
+  onCacheMiss((miss) => {
+    const span = Sentry.startInactiveSpan({
+      name: `cache miss ${miss.family}`,
+      op: 'cache.miss',
+      onlyIfParent: true,
+      attributes: {
+        'cache.key_family': miss.family,
+        'cache.reason': miss.reason,
+        'cache.global': miss.global,
+      },
+    });
+    return () => span.end();
   });
 }
