@@ -33,6 +33,7 @@
 import type {
   NotificationFire,
   SpExtractionFire,
+  CloneJumpReadyFire,
   IndustryJobNotificationFire,
   PlanetaryNotificationFire,
   MailNotificationFire,
@@ -63,6 +64,7 @@ import type {
 export type OccurrenceFire =
   | NotificationFire
   | SpExtractionFire
+  | CloneJumpReadyFire
   | IndustryJobNotificationFire
   | PlanetaryNotificationFire
   | MailNotificationFire
@@ -118,6 +120,12 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     case 'industryJobComplete':
     case 'corpIndustryJobReady':
       return [characterId, fire.eventId, fire.jobId].join(':');
+    // Keyed on the jump, not the ready time: `readyAtMs` depends on the
+    // Infomorph Synchronizing level each device read, and one that could not
+    // read skills falls back to level 0 — the same cooldown must still be one
+    // occurrence.
+    case 'cloneJumpReady':
+      return [characterId, fire.eventId, fire.lastJumpMs].join(':');
     case 'planetaryExtractionDone':
       return [characterId, fire.eventId, fire.planetId, fire.expiryTimeMs].join(':');
     case 'planetaryExtractorExpiring':
@@ -205,6 +213,9 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     // the diff fires (`isCompleted`). Null when the queue carried no date.
     case 'skillLevelComplete':
       return fire.finishMs ?? nowMs;
+    // The cooldown's end, already in the past by the time the diff fires.
+    case 'cloneJumpReady':
+      return fire.readyAtMs;
     // ESI's own `timestamp` for the notification, as an ISO string.
     case 'eveNotification': {
       const sentAt = Date.parse(fire.timestamp);

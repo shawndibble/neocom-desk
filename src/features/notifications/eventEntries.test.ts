@@ -77,6 +77,23 @@ describe('one event through its entry', () => {
     expect(entry.thresholds).toBeNull();
   });
 
+  it('cloneJumpReady: the cooldown ending between polls fires once and projects', () => {
+    const entry = NOTIFICATION_EVENT_ENTRIES.cloneJumpReady;
+    const cooldown = { lastJumpMs: T0 - 20 * 3_600_000, readyAtMs: T0 + 1000 };
+    const fires = entry.diff(
+      C,
+      { entries: [cooldown], nowMs: T0 },
+      { entries: [cooldown], nowMs: T0 + 2000 }
+    );
+    expect(fires).toEqual([{ eventId: 'cloneJumpReady', characterId: C, ...cooldown }]);
+    expect(entry.copy.poll(fires[0], PILOT, {})).toEqual({
+      title: 'Clone jump ready',
+      body: 'Kestrel can jump clones again.',
+    });
+    expect(entry.projection.push(fires[0], PILOT, {}).title).toBe('Clone jump ready');
+    expect(entry.projection.everyOccurrence).toBe(true);
+  });
+
   it('contractAccepted: routes to the contract row', () => {
     const entry = NOTIFICATION_EVENT_ENTRIES.contractAccepted;
     const contract = { contractId: 7, issuerId: C, acceptorId: 2 };

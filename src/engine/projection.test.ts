@@ -45,6 +45,7 @@ describe('projectionWording', () => {
       'skillLevelComplete',
       'characterNotTraining',
       'industryJobComplete',
+      'cloneJumpReady',
       'calendarEventStarting',
       'eveNotification',
     ];

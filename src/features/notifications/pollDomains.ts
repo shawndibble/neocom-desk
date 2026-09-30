@@ -30,6 +30,9 @@ import {
   useSpExtractionThresholdSp,
 } from '@/features/character/spExtractionSettings';
 import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
+import { loadCharacterClones } from '@/features/character/clones';
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { cloneJumpCooldown, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/cloneJump';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { extractorProgramsFromPins } from '@/features/pi/adapters';
 import { loadMailHeaders } from '@/features/character/mail';
@@ -76,6 +79,9 @@ import {
   type SpExtractionEntrySnapshot,
   type SpExtractionSnapshot,
   type SpExtractionFire,
+  type CloneJumpEntrySnapshot,
+  type CloneJumpSnapshot,
+  type CloneJumpReadyFire,
   type IndustryJobSnapshot,
   type IndustryJobEntrySnapshot,
   type IndustryJobNotificationFire,
@@ -130,6 +136,7 @@ import {
 import {
   projectSkillQueue,
   projectIndustryJobs,
+  projectCloneJump,
   projectColonies,
   projectCalendar,
   projectContracts,
@@ -499,6 +506,64 @@ export const spExtractionDomain = defineDomain<
     return [{ totalSp: result.cached.data.total_sp, thresholdSp }];
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
+});
+
+/* -------------------------------------------------------------------------- */
+/* Clone jump (issue #2316)                                                   */
+/* -------------------------------------------------------------------------- */
+
+function isCloneJumpEntrySnapshot(raw: unknown): raw is CloneJumpEntrySnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return typeof r.lastJumpMs === 'number' && typeof r.readyAtMs === 'number';
+}
+
+/**
+ * The effective Infomorph Synchronizing level, exactly as the Clones route
+ * reads it (#1236). Unreadable skills fall back to level 0 — the longest
+ * cooldown — so the alert can arrive late, never early.
+ */
+async function infomorphSynchronizingLevel(characterId: number, nowMs: number): Promise<number> {
+  try {
+    const corrected = await loadCorrectedSkills(characterId, nowMs, {
+      skipQueueWithoutScope: true,
+    });
+    return corrected.effective.get(INFOMORPH_SYNCHRONIZING_SKILL_ID) ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+export const cloneJumpDomain = defineDomain<
+  CloneJumpEntrySnapshot,
+  CloneJumpSnapshot,
+  CloneJumpReadyFire
+>({
+  source: SNAPSHOT_SOURCES.cloneJump,
+  stateKey: 'notifications.pollerState.cloneJump',
+  entriesKey: 'entries',
+  isEntry: isCloneJumpEntrySnapshot,
+  load: async (characterId) => {
+    const result = await loadCharacterClones(characterId);
+    if (result.needsReauth || result.cached === null) return null;
+    const last = result.cached.data.last_clone_jump_date;
+    const lastJumpMs = last ? Date.parse(last) : NaN;
+    // Never jumped: no cooldown to end, so no entry — and no skills fetch.
+    if (!Number.isFinite(lastJumpMs)) return [];
+    const now = new Date();
+    const level = await infomorphSynchronizingLevel(characterId, now.getTime());
+    const { readyAt } = cloneJumpCooldown(last, level, now);
+    return readyAt ? [{ lastJumpMs, readyAtMs: readyAt.getTime() }] : [];
+  },
+  toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
+  projection: async (characterId, characterName, snapshot, nowMs) =>
+    projectCloneJump(
+      characterId,
+      characterName,
+      snapshot.entries,
+      NOTIFICATION_EVENT_ENTRIES.cloneJumpReady.projection.push,
+      nowMs
+    ),
 });
 
 /* -------------------------------------------------------------------------- */
@@ -1553,6 +1618,7 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   skillQueueDomain,
   spExtractionDomain,
   industryJobDomain,
+  cloneJumpDomain,
   colonyDomain,
   mailDomain,
   calendarDomain,

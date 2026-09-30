@@ -4611,6 +4611,10 @@
         "title": "New mail",
         "body": "{{character}} has new mail."
       },
+      "cloneJumpReady": {
+        "title": "Clone jump ready",
+        "body": "{{character}} can jump clones again."
+      },
       "spExtractionReady": {
         "title": "SP extraction ready",
         "body": "{{character}} has enough spare skill points to use a Skill Extractor."
@@ -5760,6 +5764,7 @@
         "skillQueueEnding": "Skill Queue Ending",
         "spExtractionReady": "SP Extraction Ready",
         "industryJobComplete": "Industry Job Complete",
+        "cloneJumpReady": "Clone Jump Ready",
         "newMail": "New Mail",
         "planetaryExtractionDone": "Planetary Extraction Done",
         "planetaryExtractorExpiring": "Planetary Extractor Expiring",

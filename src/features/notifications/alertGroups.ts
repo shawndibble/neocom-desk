@@ -110,6 +110,7 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   // Waiting on you, but nothing is burning.
   spExtractionReady: 'watch',
   industryJobComplete: 'watch',
+  cloneJumpReady: 'watch',
   corpIndustryJobReady: 'watch',
   planetaryExtractionDone: 'watch',
   skillLevelComplete: 'watch',

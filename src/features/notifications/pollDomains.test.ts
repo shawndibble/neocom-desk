@@ -5,6 +5,7 @@ import {
   calendarDomain,
   skillQueueDomain,
   industryJobDomain,
+  cloneJumpDomain,
   colonyDomain,
   contractDomain,
   walletDomain,
@@ -46,6 +47,8 @@ import { loadCorporationMemberIds } from '@/features/corp/members';
 import { loadCorporationWallets, loadCorporationWalletJournal } from '@/features/corp/wallet';
 import { loadCharacterRoles } from '@/features/corp/roles';
 import { loadUniverseType } from '@/features/skills/data';
+import { loadCharacterClones } from '@/features/character/clones';
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadPlanetName } from '@/features/pi/names';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { db } from '@/db';
@@ -97,6 +100,8 @@ vi.mock('@/features/pi/data', () => ({
 vi.mock('@/market/prices', () => ({ getHubPrices: vi.fn(), getStationPrices: vi.fn() }));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
 vi.mock('@/features/character/names', () => ({ resolveNames: vi.fn() }));
+vi.mock('@/features/character/clones', () => ({ loadCharacterClones: vi.fn() }));
+vi.mock('@/features/skills/correctedSkills', () => ({ loadCorrectedSkills: vi.fn() }));
 
 function statusResult<T>(data: T, truncated: boolean): StatusResult<T> {
   return {
@@ -172,6 +177,7 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
       skillQueue: ['skillLevelComplete', 'characterNotTraining', 'skillQueueEnding'],
       spExtraction: ['spExtractionReady'],
       industryJobs: ['industryJobComplete'],
+      cloneJump: ['cloneJumpReady'],
       colonies: ['planetaryExtractionDone', 'planetaryExtractorExpiring'],
       mail: ['newMail'],
       calendar: ['newCalendarEvent', 'calendarEventStarting'],
@@ -441,13 +447,14 @@ describe('projection wiring', () => {
     });
   });
 
-  it('gives exactly the seven fixed-future-timestamp domains a projection', () => {
+  it('gives exactly the eight fixed-future-timestamp domains a projection', () => {
     const withProjection = POLL_DOMAINS.filter((domain) => domain.projection !== undefined).map(
       (domain) => domain.id
     );
     expect([...withProjection].sort()).toEqual(
       [
         'calendar',
+        'cloneJump',
         'colonies',
         'contracts',
         'eveNotification',
@@ -1114,6 +1121,76 @@ describe('corp domains', () => {
         balanceFloorIsk: 50_000_000,
         transactionCeilingIsk: 100_000_000,
       },
+    ]);
+  });
+});
+
+describe('cloneJumpDomain', () => {
+  const HOUR_MS = 3_600_000;
+  const LAST_JUMP = '2026-09-01T00:00:00Z';
+  const LAST_JUMP_MS = Date.parse(LAST_JUMP);
+
+  function clones(last_clone_jump_date?: string) {
+    vi.mocked(loadCharacterClones).mockResolvedValue(
+      statusResult(
+        { jump_clones: [], ...(last_clone_jump_date ? { last_clone_jump_date } : {}) },
+        false
+      )
+    );
+  }
+
+  function infomorphLevel(level: number | null) {
+    vi.mocked(loadCorrectedSkills).mockResolvedValue({
+      effective: new Map(level === null ? [] : [[33399, level]]),
+    } as Awaited<ReturnType<typeof loadCorrectedSkills>>);
+  }
+
+  beforeEach(() => {
+    vi.mocked(loadCharacterClones).mockReset();
+    vi.mocked(loadCorrectedSkills).mockReset();
+  });
+
+  it('bakes the ready time from the last jump and the effective Infomorph Synchronizing level', async () => {
+    clones(LAST_JUMP);
+    infomorphLevel(5);
+    expect(await cloneJumpDomain.load(7)).toEqual([
+      { lastJumpMs: LAST_JUMP_MS, readyAtMs: LAST_JUMP_MS + 19 * HOUR_MS },
+    ]);
+  });
+
+  it('falls back to level 0 when skills are missing or fail to load, so it is late, never early', async () => {
+    clones(LAST_JUMP);
+    infomorphLevel(null);
+    const expected = [{ lastJumpMs: LAST_JUMP_MS, readyAtMs: LAST_JUMP_MS + 24 * HOUR_MS }];
+    expect(await cloneJumpDomain.load(7)).toEqual(expected);
+    vi.mocked(loadCorrectedSkills).mockRejectedValue(new Error('offline'));
+    expect(await cloneJumpDomain.load(7)).toEqual(expected);
+  });
+
+  it('has no entry for a Character who has never jumped', async () => {
+    clones(undefined);
+    expect(await cloneJumpDomain.load(7)).toEqual([]);
+    expect(loadCorrectedSkills).not.toHaveBeenCalled();
+  });
+
+  it('skips the poll when clones are unavailable', async () => {
+    vi.mocked(loadCharacterClones).mockResolvedValue({ needsReauth: true, cached: null });
+    expect(await cloneJumpDomain.load(7)).toBeNull();
+  });
+
+  it('projects the ready time', async () => {
+    const snapshot = {
+      entries: [{ lastJumpMs: LAST_JUMP_MS, readyAtMs: LAST_JUMP_MS + 19 * HOUR_MS }],
+      nowMs: LAST_JUMP_MS,
+    };
+    const rows = await cloneJumpDomain.projection!(7, 'Kestrel', snapshot, LAST_JUMP_MS);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        eventId: 'cloneJumpReady',
+        fireAt: LAST_JUMP_MS + 19 * HOUR_MS,
+        title: 'Clone jump ready',
+        body: 'Kestrel can jump clones again.',
+      }),
     ]);
   });
 });
