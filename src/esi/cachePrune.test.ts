@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '@/db';
 import {
+  AVOID_ROUTE_RETENTION_MS,
   MARKET_RETENTION_MS,
   PRUNE_FIRST_RUN_KEY,
   PRUNE_LEGACY_CLEARED_KEY,
@@ -66,6 +67,8 @@ describe('pruneRuleFor', () => {
     'structure:1035466617946:roster-forbidden',
     'station:60003760',
     'route:30000142:30002187:shortest',
+    'route:30000142:30002187:safest',
+    'route:30000142:30002187:prefer-highsec:p50',
     'universeType:34',
     'type-volume:34',
     'corp-name:1000035',
@@ -86,6 +89,18 @@ describe('pruneRuleFor', () => {
     'marketHistory:2026-09-01:2026-09-28',
   ])('%s is a market-tier per-id key', (key) => {
     expect(pruneRuleFor(key)?.maxAgeMs).toBe(MARKET_RETENTION_MS);
+  });
+
+  /*
+   * A route asked around an avoid list is keyed by that list, and pod-kill
+   * avoidance changes it hourly — so those rows are rarely read twice and
+   * go after two days rather than thirty.
+   */
+  it.each([
+    'route:30000142:30002187:shortest:a3:1x2y3z',
+    'route:30000142:30002187:avoid-highsec:p0:a165:k9d0ax',
+  ])('%s is a short-lived rules-keyed route', (key) => {
+    expect(pruneRuleFor(key)?.maxAgeMs).toBe(AVOID_ROUTE_RETENTION_MS);
   });
 
   it.each(['mail:12345', 'calendar:777', 'contract-items:200000001'])(

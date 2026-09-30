@@ -76,9 +76,11 @@ describe('TravelSettingsPanel', () => {
     const user = userEvent.setup();
     render(<TravelSettingsPanel />);
 
-    const threshold = await screen.findByRole('spinbutton', { name: 'Pod kills in the last hour' });
+    const threshold = await screen.findByRole('spinbutton', {
+      name: 'Pod kills in the last hour that count as recent',
+    });
     expect(threshold).toBeDisabled();
-    await user.click(screen.getByRole('checkbox', { name: 'Systems with at least' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Systems with recent pod kills' }));
 
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/kill report/));
     expect(threshold).toBeEnabled();

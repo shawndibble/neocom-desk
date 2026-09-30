@@ -155,3 +155,26 @@ describe('loadJumpsAway with Avoided Systems', () => {
     });
   });
 });
+
+describe('loadJumpsAway past ESI’s avoid cap', () => {
+  it('falls back to the plain route when ESI refuses the list as too long', async () => {
+    answerWith((body) =>
+      body.avoid_systems
+        ? HttpResponse.json(
+            {
+              status: 422,
+              error: 'validation failed',
+              details: [{ message: 'expected array length <= 1000' }],
+            },
+            { status: 422 }
+          )
+        : HttpResponse.json({ route: [JITA, UEDAMA, AMARR] })
+    );
+
+    const avoid = Array.from({ length: 1001 }, (_, i) => 30010000 + i);
+    expect(await loadJumpsAway(JITA, AMARR, { ...SHORTEST, avoid })).toEqual({
+      kind: 'known',
+      jumps: 2,
+    });
+  });
+});

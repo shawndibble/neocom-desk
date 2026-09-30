@@ -642,7 +642,8 @@ type CourierFilterParams = UrlParamValues<typeof COURIER_FILTER_PARAMS>;
  * The remembered filter (issue #1719, `courierFilterPref.ts`) as the URL
  * group's own fields — the stored default `useRememberedUrlParams` falls back
  * to for each field a link leaves out. `courier.q` and `courier.pref` are
- * absent: neither is remembered.
+ * absent: neither is remembered here — an absent `courier.pref` falls to the
+ * pilot's Travel default instead.
  */
 function rememberedParams(stored: StoredCourierFilter): Partial<CourierFilterParams> {
   return {

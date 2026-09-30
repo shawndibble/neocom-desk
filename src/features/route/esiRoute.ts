@@ -4,10 +4,12 @@
  * a cost, never a wall.
  *
  * ESI's own avoid list is a hard filter — verified live, it answers 404 "No
- * route found" when the only way runs through an avoided system. So the two
- * ends are left out of the list, and a 404 under a non-empty list is asked
- * again without it: the trip still exists, it just has to cross a system the
- * pilot would rather not.
+ * route found" when the only way runs through an avoided system, and 422 past
+ * its 1000-system cap. So the two ends are left out of the list, and either
+ * answer is asked again without it: the trip still exists, it just crosses
+ * systems the pilot would rather not. That retry drops the whole list, where
+ * the local graph would still cross as few as it can — the two can differ
+ * only for a trip with no clean way through.
  */
 import { postRoute } from '@/esi/endpoints';
 import type { EsiResult } from '@/esi/client';
@@ -48,10 +50,26 @@ export function avoidFor(
     .sort((a, b) => a - b);
 }
 
+/** FNV-1a over the ids, base 36 — a short, stable name for one avoid list. */
+function hashIds(ids: readonly number[]): string {
+  let hash = 0x811c9dc5;
+  for (const id of ids) {
+    for (const char of `${id},`) {
+      hash ^= char.charCodeAt(0);
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+  }
+  return hash.toString(36);
+}
+
 /**
  * The part of a pair's cache key the rules decide: distinct for every set of
  * rules that could route differently. Shorter ignores the penalty, so it is
  * left out there rather than splitting one answer across 101 keys.
+ *
+ * The avoid list goes in as its size and a hash, not its ids: with EDENCOM on
+ * it runs past 137, and every route row would carry them all. `esi/cachePrune.ts`
+ * matches this shape — keep the two in step.
  */
 export function rulesCacheKey(
   originSystemId: number,
@@ -60,8 +78,15 @@ export function rulesCacheKey(
 ): string {
   const penalty = rules.preference === 'shortest' ? '' : `:p${rules.securityPenalty}`;
   const avoid = avoidFor(originSystemId, destinationSystemId, rules.avoid);
-  return `${rules.preference}${penalty}${avoid.length ? `:avoid=${avoid.join(',')}` : ''}`;
+  return `${rules.preference}${penalty}${avoid.length ? `:a${avoid.length}:${hashIds(avoid)}` : ''}`;
 }
+
+/**
+ * The answers that mean "not with this avoid list" rather than "not at all":
+ * 404 "No route found" when every way runs through one, and 422 when the list
+ * is past ESI's 1000-system cap (both verified live).
+ */
+const AVOID_REFUSED = new Set([404, 422]);
 
 export async function getRouteUnderRules(
   originSystemId: number,
@@ -79,7 +104,7 @@ export async function getRouteUnderRules(
   try {
     return await postRoute(originSystemId, destinationSystemId, { ...base, avoid });
   } catch (error) {
-    if (!(error instanceof EsiError) || error.status !== 404) throw error;
+    if (!(error instanceof EsiError) || !AVOID_REFUSED.has(error.status)) throw error;
     return postRoute(originSystemId, destinationSystemId, base);
   }
 }

@@ -140,14 +140,15 @@ export function TravelSettingsPanel() {
                   count: TRIGLAVIAN_MINOR_VICTORY_SYSTEMS.length,
                 })}
               </label>
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <label className="flex items-center gap-2">
-                  <Checkbox
-                    checked={avoidPodKills}
-                    onChange={() => void setAvoidPodKills(!avoidPodKills)}
-                  />
-                  {t('settings.travel.avoidPodKills')}
-                </label>
+              <label className="flex items-center gap-2 text-xs">
+                <Checkbox
+                  checked={avoidPodKills}
+                  onChange={() => void setAvoidPodKills(!avoidPodKills)}
+                />
+                {t('settings.travel.avoidPodKills')}
+              </label>
+              <div className="flex flex-wrap items-center gap-2 pl-6 text-xs">
+                <span>{t('settings.travel.podKillsAtLeast')}</span>
                 <TextInput
                   type="number"
                   className="w-16"

@@ -8,9 +8,9 @@
  * - **The free-text route search** (`courier.q`) — a stale typed query
  *   silently narrowing a fresh visit is a search box's own bad habit, not
  *   the numeric/chip filters this issue is about.
- * - **Route preference** (`courier.pref`) — `CourierResults.tsx`'s own
- *   comment on `ROUTE_PREFERENCES` already rules out persisting it before
- *   its vocabulary is unified with the Assets page's `RoutePreference`.
+ * - **Route preference** (`courier.pref`) — the pilot's default lives in
+ *   Settings → Travel (`features/route/routeRules.ts`); the URL holds only a
+ *   one-view override of it.
  *
  * One record, rejected as a whole if any field is unusable — same rule
  * `pi/planControlsPref.ts` and `market/locationMode.ts` follow for a combined
