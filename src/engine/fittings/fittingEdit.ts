@@ -455,15 +455,16 @@ export interface DroneLaunchLimits {
   bandwidthOf: (typeId: number) => number;
 }
 
+type LaunchLimitStats = Pick<
+  FittingStats,
+  'droneBandwidthTotal' | 'maxActiveDrones' | 'droneBandwidthByType'
+>;
+
 /**
  * The launch limits off a Fitting's stats; null before they're known. A
  * drone type the engine gave no bandwidth for draws an infinite amount, so it
  * stays in the bay rather than launching unlimited.
  */
-type LaunchLimitStats = Pick<
-  FittingStats,
-  'droneBandwidthTotal' | 'maxActiveDrones' | 'droneBandwidthByType'
->;
 export function launchLimitsFrom(stats: LaunchLimitStats): DroneLaunchLimits;
 export function launchLimitsFrom(stats: LaunchLimitStats | null): DroneLaunchLimits | null;
 export function launchLimitsFrom(stats: LaunchLimitStats | null): DroneLaunchLimits | null {
@@ -476,17 +477,20 @@ export function launchLimitsFrom(stats: LaunchLimitStats | null): DroneLaunchLim
 }
 
 /** Bandwidth and drone count the drones already in space leave free. */
-function launchHeadroom(
-  groups: readonly DroneGroup[],
-  limits: DroneLaunchLimits
-): { bandwidthLeft: number; countLeft: number } {
-  // Only drones already out draw bandwidth — and skipping the rest keeps an
-  // unknown (infinite) one in the bay from turning the sum into NaN.
-  const bandwidthUsed = groups.reduce(
-    (sum, group) =>
-      group.inSpace > 0 ? sum + group.inSpace * limits.bandwidthOf(group.typeId) : sum,
-    0
-  );
+interface LaunchHeadroom {
+  bandwidthLeft: number;
+  countLeft: number;
+}
+
+function launchHeadroom(groups: readonly DroneGroup[], limits: DroneLaunchLimits): LaunchHeadroom {
+  // Only drones already out draw bandwidth. One whose bandwidth isn't known
+  // yet (just dropped into space, before the engine recalculates) counts as
+  // none rather than infinite, so it doesn't freeze every other launch; the
+  // bandwidth bar shows its real draw once calculated.
+  const bandwidthUsed = groups.reduce((sum, group) => {
+    const each = limits.bandwidthOf(group.typeId);
+    return group.inSpace > 0 && Number.isFinite(each) ? sum + group.inSpace * each : sum;
+  }, 0);
   return {
     bandwidthLeft: limits.bandwidthTotal - bandwidthUsed,
     countLeft: limits.maxActive - groups.reduce((sum, group) => sum + group.inSpace, 0),
@@ -494,7 +498,7 @@ function launchHeadroom(
 }
 
 /** How many of a drone drawing `each` Mbit/s the headroom takes, never below zero. */
-function launchable(each: number, headroom: { bandwidthLeft: number; countLeft: number }): number {
+function launchable(each: number, headroom: LaunchHeadroom): number {
   const byBandwidth = !Number.isFinite(each)
     ? 0
     : each > 0
@@ -552,8 +556,9 @@ export function launchDrones(
  * A drone from the Add panel dropped on the Drones rack: any of its type in
  * the bay launch, then it goes straight into space too — it never passes
  * through the bay, so a full bay doesn't stop it. A type new to the Fitting
- * has no bandwidth from the engine yet, so only the pilot's drone count
- * holds it back; the bandwidth bar shows any overage once it's calculated.
+ * has no bandwidth from the engine yet, so it launches while any bandwidth
+ * and a drone of the pilot's count are left; the bandwidth bar shows any
+ * overage once it's calculated.
  * When it can't launch it goes in the bay instead, if it fits. The same
  * Fitting when neither can.
  */
@@ -563,13 +568,15 @@ export function launchNewDrone(
   bay: DroneBay | null,
   limits: DroneLaunchLimits | null
 ): Fitting {
-  const launched = limits === null ? fitting : launchDrones(fitting, limits, typeId);
-  const room =
-    limits === null
-      ? 0
-      : Number.isFinite(limits.bandwidthOf(typeId))
-        ? droneLaunchRoom(launched, typeId, limits)
-        : launchHeadroom(droneGroups(launched), limits).countLeft;
+  if (limits === null) return addDronesWithinBay(fitting, typeId, 1, bay);
+  const launched = launchDrones(fitting, limits, typeId);
+  const headroom = launchHeadroom(droneGroups(launched), limits);
+  const each = limits.bandwidthOf(typeId);
+  const isNew = !fitting.drones.some((drone) => drone.typeId === typeId);
+  let room = launchable(each, headroom);
+  if (isNew && !Number.isFinite(each) && headroom.bandwidthLeft > 0) {
+    room = Math.max(0, headroom.countLeft);
+  }
   if (room >= 1) {
     const group = droneGroups(launched).find((entry) => entry.typeId === typeId);
     return setDroneCounts(launched, typeId, {
@@ -580,15 +587,20 @@ export function launchNewDrone(
   return addDronesWithinBay(launched, typeId, 1, bay);
 }
 
+/** How many of `typeId` in space the bay has room to take back. */
+export function droneRecallRoom(fitting: Fitting, typeId: number, bay: DroneBay | null): number {
+  const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
+  return group ? Math.min(group.inSpace, droneRoom(fitting, typeId, bay)) : 0;
+}
+
 /**
  * Brings `typeId` back from space into the bay, as many as the bay has room
  * for — the rest stay out. The same Fitting when none is out or none fits.
  */
 export function recallDrones(fitting: Fitting, typeId: number, bay: DroneBay | null): Fitting {
   const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
-  if (!group) return fitting;
-  const recalled = Math.min(group.inSpace, droneRoom(fitting, typeId, bay));
-  if (recalled === 0) return fitting;
+  const recalled = droneRecallRoom(fitting, typeId, bay);
+  if (!group || recalled === 0) return fitting;
   return setDroneCounts(fitting, typeId, {
     inSpace: group.inSpace - recalled,
     inBay: group.inBay + recalled,

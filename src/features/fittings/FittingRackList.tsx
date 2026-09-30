@@ -16,7 +16,7 @@ import {
   droneBayUsed,
   droneCountMax,
   droneGroups,
-  droneRoom,
+  droneRecallRoom,
   launchLimitsFrom,
   setDroneCountWithinLimits,
   type DroneBay,
@@ -669,7 +669,7 @@ export function DroneSection({
                   items: (
                     <DroneMenuItems
                       typeId={group.typeId}
-                      recallable={Math.min(group.inSpace, droneRoom(fitting, group.typeId, bay))}
+                      recallable={droneRecallRoom(fitting, group.typeId, bay)}
                       inBay={group.inBay}
                     />
                   ),

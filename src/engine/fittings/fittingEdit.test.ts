@@ -14,6 +14,7 @@ import {
   droneBayUsed,
   droneCountMax,
   droneLaunchRoom,
+  droneRecallRoom,
   droneRoom,
   droneGroups,
   droneTotals,
@@ -492,6 +493,16 @@ describe('droneLaunchRoom', () => {
   it('does not cap before the limits are known', () => {
     expect(droneLaunchRoom(fit, 2454, null)).toBe(Infinity);
   });
+
+  it('does not let a drone of not-yet-known bandwidth in space freeze every other launch', () => {
+    const out = setDroneCounts(fit, 999, { inSpace: 1, inBay: 0 });
+    const limits = {
+      bandwidthTotal: 25,
+      maxActive: 5,
+      bandwidthOf: (id: number) => (id === 999 ? Infinity : bandwidthOf(id)),
+    };
+    expect(droneLaunchRoom(out, 2454, limits)).toBe(3);
+  });
 });
 
 describe('launchLimitsFrom', () => {
@@ -534,6 +545,14 @@ describe('launchNewDrone', () => {
       inSpace: 1,
       inBay: 0,
     });
+    // No bandwidth left: it can't launch, though drones are to spare.
+    const spent = setDroneCounts(fit, 2185, { inSpace: 2, inBay: 0 });
+    const tight = launchLimitsFrom({
+      droneBandwidthTotal: 20,
+      maxActiveDrones: 5,
+      droneBandwidthByType: { 2185: 10 },
+    });
+    expect(launchNewDrone(spent, 2454, { capacity: 0, volumeOf }, tight)).toBe(spent);
     // Five out already: it can't launch, and the full bay can't take it.
     const flight = setDroneCounts(fit, 2185, { inSpace: 5, inBay: 2 });
     expect(launchNewDrone(flight, 2454, full, fresh)).toBe(flight);
@@ -1006,6 +1025,9 @@ describe('launching and recalling one drone type', () => {
       inBay: 4,
     });
     expect(recallDrones(out, 2454, { capacity: 30, volumeOf })).toBe(out);
+    expect(droneRecallRoom(out, 2454, { capacity: 40, volumeOf })).toBe(2);
+    expect(droneRecallRoom(out, 2454, null)).toBe(3);
+    expect(droneRecallRoom(fit, 2454, null)).toBe(0);
   });
 });
 
