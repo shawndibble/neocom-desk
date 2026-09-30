@@ -13,7 +13,8 @@
 
 /**
  * - `cold`: nothing stored for the key.
- * - `expired`: a row is stored but past its freshness window.
+ * - `expired`: a row is stored but past its freshness window. Includes a
+ *   conditional revalidation that ESI answers 304 — still a request.
  * - `refresh`: a row inside its window, forced live by a manual Refresh.
  */
 export type CacheMissReason = 'cold' | 'expired' | 'refresh';

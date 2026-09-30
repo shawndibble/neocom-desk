@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { SIGNED_IN_SHELL_HINT_KEY } from '@/app/signedInShellHint';
-import { FIRST_SEEN_KEY, visitorTags } from './visitor';
+import { FIRST_SEEN_KEY, FIRST_SESSION_KEY, visitorTags } from './visitor';
 
 const DAY = 86_400_000;
 const NOW = 100 * DAY;
@@ -19,33 +19,69 @@ function memoryStorage(entries: Record<string, string> = {}): Storage {
   };
 }
 
+const noSession = (): Storage => memoryStorage();
+
 describe('visitorTags', () => {
   it('tags a browser with no trace of the app as new, and stamps it', () => {
     const storage = memoryStorage();
 
-    expect(visitorTags(() => storage, NOW)).toEqual({ visitor: 'new', 'visitor.age_days': '0' });
+    expect(visitorTags(() => storage, noSession, NOW)).toEqual({
+      visitor: 'new',
+      'visitor.age_days': '0',
+    });
     expect(storage.getItem(FIRST_SEEN_KEY)).toBe(String(NOW));
   });
 
+  // The EVE SSO redirect back to /callback is a second page load in the same
+  // tab — the one a first sign-in fans out from — and must still read new.
+  it('keeps tagging new for the rest of the first session', () => {
+    const storage = memoryStorage();
+    const session = memoryStorage();
+    visitorTags(
+      () => storage,
+      () => session,
+      NOW
+    );
+
+    expect(session.getItem(FIRST_SESSION_KEY)).toBe('1');
+    expect(
+      visitorTags(
+        () => storage,
+        () => session,
+        NOW + 60_000
+      )
+    ).toEqual({
+      visitor: 'new',
+      'visitor.age_days': '0',
+    });
+    // A later session (a new tab) is a return visit.
+    expect(visitorTags(() => storage, noSession, NOW + 2 * DAY)).toEqual({
+      visitor: 'returning',
+      'visitor.age_days': '1-7',
+    });
+  });
+
   it('tags a stamped browser as returning, bucketed by age', () => {
-    expect(visitorTags(() => memoryStorage({ [FIRST_SEEN_KEY]: String(NOW) }), NOW)).toEqual({
+    expect(
+      visitorTags(() => memoryStorage({ [FIRST_SEEN_KEY]: String(NOW) }), noSession, NOW)
+    ).toEqual({
       visitor: 'returning',
       'visitor.age_days': '0',
     });
     expect(
-      visitorTags(() => memoryStorage({ [FIRST_SEEN_KEY]: String(NOW - 3 * DAY) }), NOW)
+      visitorTags(() => memoryStorage({ [FIRST_SEEN_KEY]: String(NOW - 3 * DAY) }), noSession, NOW)
     ).toEqual({
       visitor: 'returning',
       'visitor.age_days': '1-7',
     });
     expect(
-      visitorTags(() => memoryStorage({ [FIRST_SEEN_KEY]: String(NOW - 20 * DAY) }), NOW)
+      visitorTags(() => memoryStorage({ [FIRST_SEEN_KEY]: String(NOW - 20 * DAY) }), noSession, NOW)
     ).toEqual({
       visitor: 'returning',
       'visitor.age_days': '8-30',
     });
     expect(
-      visitorTags(() => memoryStorage({ [FIRST_SEEN_KEY]: String(NOW - 90 * DAY) }), NOW)
+      visitorTags(() => memoryStorage({ [FIRST_SEEN_KEY]: String(NOW - 90 * DAY) }), noSession, NOW)
     ).toEqual({
       visitor: 'returning',
       'visitor.age_days': '30+',
@@ -57,20 +93,22 @@ describe('visitorTags', () => {
   it('tags an unstamped browser that already holds a Character as returning, age unknown', () => {
     const storage = memoryStorage({ [SIGNED_IN_SHELL_HINT_KEY]: '1' });
 
-    expect(visitorTags(() => storage, NOW)).toEqual({
+    expect(visitorTags(() => storage, noSession, NOW)).toEqual({
       visitor: 'returning',
       'visitor.age_days': 'unknown',
     });
     expect(storage.getItem(FIRST_SEEN_KEY)).toBe(`legacy:${NOW}`);
     // Later loads keep saying "unknown" rather than counting from the stamp.
-    expect(visitorTags(() => storage, NOW + 40 * DAY)).toEqual({
+    expect(visitorTags(() => storage, noSession, NOW + 40 * DAY)).toEqual({
       visitor: 'returning',
       'visitor.age_days': 'unknown',
     });
   });
 
   it('treats an unreadable stamp as unknown age', () => {
-    expect(visitorTags(() => memoryStorage({ [FIRST_SEEN_KEY]: 'garbage' }), NOW)).toEqual({
+    expect(
+      visitorTags(() => memoryStorage({ [FIRST_SEEN_KEY]: 'garbage' }), noSession, NOW)
+    ).toEqual({
       visitor: 'returning',
       'visitor.age_days': 'unknown',
     });
@@ -81,7 +119,7 @@ describe('visitorTags', () => {
       throw new Error('SecurityError');
     };
 
-    expect(visitorTags(blocked, NOW)).toEqual({
+    expect(visitorTags(blocked, noSession, NOW)).toEqual({
       visitor: 'unknown',
       'visitor.age_days': 'unknown',
     });

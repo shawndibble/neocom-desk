@@ -77,7 +77,13 @@ if (dsn) {
     beforeBreadcrumb: scrubBreadcrumb,
   });
 
-  Sentry.setTags({ ...visitorTags(() => localStorage, Date.now()) });
+  Sentry.setTags({
+    ...visitorTags(
+      () => localStorage,
+      () => sessionStorage,
+      Date.now()
+    ),
+  });
 
   /**
    * One span per read-through load that goes to ESI, saying why the cache did

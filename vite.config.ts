@@ -18,8 +18,6 @@ const { version, dependencies } = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf-8')
 ) as { version: string; dependencies: Record<string, string> };
 
-// The dogma engine and its SDE snapshot are pinned exactly and bumped together
-// (ADR 0016); anything saved from their answers is keyed on this.
 /**
  * The Sentry release: package version plus the commit it was built from. The
  * package version alone never changes between deploys, so every issue read
@@ -33,12 +31,18 @@ function buildCommit(): string {
   const fromCi = process.env.GITHUB_SHA;
   if (fromCi) return fromCi.slice(0, 12);
   try {
-    return execFileSync('git', ['rev-parse', '--short=12', 'HEAD'], { encoding: 'utf-8' }).trim();
+    return execFileSync('git', ['rev-parse', '--short=12', 'HEAD'], {
+      encoding: 'utf-8',
+      // No git (a source tarball): fall back quietly rather than print its error.
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
   } catch {
     return 'dev';
   }
 }
 
+// The dogma engine and its SDE snapshot are pinned exactly and bumped together
+// (ADR 0016); anything saved from their answers is keyed on this.
 const dogmaPins = `${dependencies['@eveshipfit/dogma-engine']}+${dependencies['@eveshipfit/sde']}`;
 
 /**

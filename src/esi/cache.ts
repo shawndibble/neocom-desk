@@ -383,8 +383,8 @@ async function withDedupe<R>(
   characterId: number,
   key: string,
   lane: EsiLane | undefined,
-  run: () => Promise<R>,
-  reason: CacheMissReason
+  reason: CacheMissReason,
+  run: () => Promise<R>
 ): Promise<R> {
   const dkey = dedupeKey(characterId, key);
   const existing = inFlightLoads.get(dkey);
@@ -406,9 +406,9 @@ async function withDedupe<R>(
     reason,
     global: characterId === GLOBAL_CACHE_CHARACTER_ID,
   });
-  const promise = run();
-  inFlightLoads.set(dkey, { promise, lane });
   try {
+    const promise = run();
+    inFlightLoads.set(dkey, { promise, lane });
     return await promise;
   } finally {
     inFlightLoads.delete(dkey);
@@ -555,13 +555,13 @@ async function loadPastWindow<T>(
         runLive
       );
     }
-    return withDedupe(characterId, key, lane, runLive, reason);
+    return withDedupe(characterId, key, lane, reason, runLive);
   }
 
   const held = await heldAfterFailure<T>(staleAfterMs, options, dkey, read);
   if (held) return held;
 
-  const live = withDedupe(characterId, key, lane, runLive, reason);
+  const live = withDedupe(characterId, key, lane, reason, runLive);
   let graceTimer: ReturnType<typeof setTimeout> | undefined;
   const grace = new Promise<typeof GRACE>((resolve) => {
     graceTimer = setTimeout(() => resolve(GRACE), STALE_GRACE_MS);
@@ -631,7 +631,7 @@ async function loadLapsedConstant<T>(
   if (held) return held;
 
   const stale = await readStaleRow<T>(read, staleAfterMs);
-  const live = withDedupe(characterId, key, lane, runLive, reason);
+  const live = withDedupe(characterId, key, lane, reason, runLive);
   // Nothing to show in the meantime, so there is no choice but to wait.
   if (!stale) return live;
 
@@ -962,9 +962,7 @@ async function readFreshRow<T>(
   const own = metaVouchesFor(meta, row) ? meta : metaOf(row);
   if (own !== meta) {
     void realignMeta(row, meta);
-    if (!isWithinWindow(own, staleAfterMs, Date.now())) {
-      return pastWindowReason(own, staleAfterMs, Date.now());
-    }
+    if (!isWithinWindow(own, staleAfterMs, now)) return pastWindowReason(own, staleAfterMs, now);
   }
   return {
     data: row.value as T,
