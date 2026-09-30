@@ -45,10 +45,7 @@ export interface ZkillHullLoss {
 }
 
 /** `ok: false` when zKillboard failed or rate-limited, so "no losses" and "couldn't load" differ. */
-export interface HullLossesResult {
-  ok: boolean;
-  losses: ZkillHullLoss[];
-}
+export type HullLossesResult = { ok: true; losses: ZkillHullLoss[] } | { ok: false; losses: [] };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

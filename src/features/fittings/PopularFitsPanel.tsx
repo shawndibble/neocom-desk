@@ -11,6 +11,8 @@ interface PopularFitsPanelProps {
   shipTypeId: number;
   hullName: string;
   onOpen: (loaded: LoadedFitting) => void;
+  /** An open already under way: Open waits for it. */
+  busy?: boolean;
 }
 
 /** Distinct modules, in rack order, for a row's icon strip. */
@@ -23,7 +25,12 @@ function distinctModuleTypeIds(fit: PopularFit): number[] {
  * into distinct fits, any of which opens in the editor. A zKillboard or ESI
  * failure is a one-line note — the rest of the page works without it.
  */
-export function PopularFitsPanel({ shipTypeId, hullName, onOpen }: PopularFitsPanelProps) {
+export function PopularFitsPanel({
+  shipTypeId,
+  hullName,
+  onOpen,
+  busy = false,
+}: PopularFitsPanelProps) {
   const { t } = useTranslation();
   const result = usePopularFits(shipTypeId);
   const now = useNow();
@@ -34,7 +41,7 @@ export function PopularFitsPanel({ shipTypeId, hullName, onOpen }: PopularFitsPa
         {t('fittings.popular.title')}
       </h3>
       {result === null ? (
-        <Spinner size="sm" label={t('fittings.popular.loading')} />
+        <Spinner size="sm" delayMs={200} label={t('fittings.popular.loading')} />
       ) : !result.ok ? (
         <p role="status" className="text-xs text-warning">
           {t('fittings.popular.failed')}
@@ -68,6 +75,7 @@ export function PopularFitsPanel({ shipTypeId, hullName, onOpen }: PopularFitsPa
               </div>
               <Button
                 size="sm"
+                disabled={busy}
                 onClick={() =>
                   onOpen(
                     popularFitLoad(

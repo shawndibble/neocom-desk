@@ -155,7 +155,8 @@
         "unskilledNote": "Base values, before your skills.",
         "subsystems": "A Tech III hull's slots and hardpoints come from the subsystems fitted to it.",
         "simulate": "Simulate",
-        "simulateFailed": "Couldn't open this hull in the editor."
+        "simulateFailed": "Couldn't open this hull in the editor.",
+        "popularFailed": "Couldn't open that fit in the editor."
       },
       "skills": {
         "masteryTitle": "Mastery",

@@ -62,10 +62,10 @@ describe('PopularFitsPanel', () => {
     expect(screen.getByRole('status').textContent).toMatch(/Couldn't load popular fits/);
   });
 
-  it('shows a spinner while loading', () => {
+  it('shows a spinner while loading', async () => {
     renderPanel(null);
     expect(
-      screen.getByRole('status', { name: 'Loading popular fits from zKillboard…' })
+      await screen.findByRole('status', { name: 'Loading popular fits from zKillboard…' })
     ).toBeTruthy();
   });
 

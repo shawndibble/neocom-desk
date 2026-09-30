@@ -26,7 +26,8 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  /** Which open failed: the bare hull (Simulate) or a Popular fit. */
+  const [failed, setFailed] = useState<'hull' | 'popular' | null>(null);
   const s = ship.stats;
 
   const rows: [string, string][] = [];
@@ -72,15 +73,15 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
     ]
   );
 
-  async function openInEditor(fitting: Fitting) {
+  async function openInEditor(fitting: Fitting, kind: 'hull' | 'popular') {
     setBusy(true);
-    setFailed(false);
+    setFailed(null);
     try {
       const encoded = await encodeFittingShare(fittingToShareInput(fitting));
       if (encoded.ok) navigate(fittingEditLocation(encoded.payload));
-      else setFailed(true);
+      else setFailed(kind);
     } catch {
-      setFailed(true);
+      setFailed(kind);
     } finally {
       setBusy(false);
     }
@@ -102,20 +103,25 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
       <p className="text-text-dim">{t('ships.info.fitting.unskilledNote')}</p>
       <Button
         variant="primary"
-        onClick={() => void openInEditor(newFitting(ship.typeID, ship.name))}
+        onClick={() => void openInEditor(newFitting(ship.typeID, ship.name), 'hull')}
         disabled={busy}
       >
         {t('ships.info.fitting.simulate')}
       </Button>
-      {failed && (
+      {failed !== null && (
         <p role="alert" className="text-danger">
-          {t('ships.info.fitting.simulateFailed')}
+          {t(
+            failed === 'hull'
+              ? 'ships.info.fitting.simulateFailed'
+              : 'ships.info.fitting.popularFailed'
+          )}
         </p>
       )}
       <PopularFitsPanel
         shipTypeId={ship.typeID}
         hullName={ship.name}
-        onOpen={(loaded) => void openInEditor(loaded.fitting)}
+        busy={busy}
+        onOpen={(loaded) => void openInEditor(loaded.fitting, 'popular')}
       />
     </div>
   );

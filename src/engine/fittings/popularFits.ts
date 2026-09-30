@@ -95,6 +95,6 @@ export function popularFitLoad(fit: PopularFit, name: string): LoadedFitting {
       cargo: [],
       ...(parts.fighters?.length ? { fighters: parts.fighters } : {}),
     },
-    unresolved: [],
+    unresolved: parts.unresolved,
   };
 }
