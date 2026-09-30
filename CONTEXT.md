@@ -481,6 +481,7 @@ here — they go one per file in `docs/context/decisions/`.
   SDE-build time (`public/data/marketWideTrees.json`,
   `scripts/build-sde.mjs`) rather than resolved live — an ME-0 approximation;
   selecting a row still opens a real Build Plan for exact numbers.
+- **LP Store**: An NPC corporation's loyalty-point store: offers that trade LP earned with that corporation (plus ISK and sometimes items) for goods. Every NPC corporation that runs one — navies, independents, CONCORD, pirate factions — ships in the static snapshot `market/lpCorporations.json` (id, name, faction), so any store can be searched offline, not only those of corporations a Character already holds LP with. Membership is probed at build time (a corp is kept when its ESI store lists at least one offer); the offers themselves are read live.
 - **LP Value**: What the pilot counts one loyalty point as worth, in ISK per LP — typed in the Blueprint Acquisition modal's LP Store section and synced (`sync.loyaltyLpValue`). Prices an LP Store pick as ISK cost + LP cost × LP Value. Default 0, meaning the pick is priced on its ISK cost alone and says so; the app never guesses a rate. Distinct from an LP Store offer's ISK/LP profit figure, which is what an offer _earns_ per LP spent, not what the pilot values LP at.
 - **Liquidity Floor**: The minimum sell-order ISK a product must carry at the
   hub to be considered at all in **Market-Wide Build Opportunities** — the

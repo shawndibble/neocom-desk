@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { flattenMarketWideTree, MARKET_WIDE_MAX_DEPTH } from './lib/flattenMarketWideTree.mjs';
 import { buildShipTree } from './lib/shipTree.mjs';
 import { npcCorpFactions, stationOwnerFields } from './lib/stationOwners.mjs';
+import { npcCorporations, probeLpStores } from './lib/lpCorporations.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -609,6 +610,81 @@ async function probePackagedVolumes(typeIds) {
     `  packaged volume: ${result.size} of ${typeIds.length} resolved${failed > 0 ? ` (${failed} probe failures)` : ''}`
   );
   return result;
+}
+
+const LP_STORE_CACHE_FILE = join(CACHE_DIR, 'lp-store-probe.json');
+
+// Checked after the probe; see the sanity checks in `main`.
+const LP_STORE_CONTROL_CORPORATIONS = [
+  [1000120, 'Federation Navy'],
+  [1000130, 'Sisters of EVE'],
+  [1000128, "Mordu's Legion"],
+  [1000125, 'CONCORD'],
+  [1000127, 'Guristas'],
+  [1000135, 'Serpentis Corporation'],
+];
+
+/** True if corporationId's LP Store lists at least one offer, retrying like `fetchTypeInfo`. */
+async function fetchLpStoreHasOffers(corporationId) {
+  const url = `${ESI_BASE}/loyalty/stores/${corporationId}/offers/`;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          Accept: 'application/json',
+          'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
+          'X-User-Agent': ESI_USER_AGENT,
+        },
+      });
+      if (res.status === 429 || res.status === 420) {
+        if (attempt === 3) throw new Error(`HTTP ${res.status} for ${url} (rate limited)`);
+        await new Promise((r) => setTimeout(r, probeRetryWaitMs(res)));
+        continue;
+      }
+      // An id ESI doesn't know as a store is simply a corp without one.
+      if (res.status === 404) return false;
+      if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+      // Back off before either budget runs dry: the legacy error limit and
+      // the newer token-bucket X-Ratelimit-Remaining.
+      const errorsLeft = Number(res.headers.get('x-esi-error-limit-remain'));
+      const tokensLeft = Number(res.headers.get('x-ratelimit-remaining'));
+      if (
+        (Number.isFinite(errorsLeft) && errorsLeft > 0 && errorsLeft < 20) ||
+        (Number.isFinite(tokensLeft) && res.headers.has('x-ratelimit-remaining') && tokensLeft < 20)
+      ) {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      const body = await res.json();
+      return Array.isArray(body) && body.length > 0;
+    } catch (err) {
+      if (attempt === 3) throw err;
+      await new Promise((r) => setTimeout(r, 500 * attempt));
+    }
+  }
+  return false;
+}
+
+/**
+ * The NPC corps with an LP Store, cached to disk per corporation id like
+ * `probeMarketRegions`, so a rebuild doesn't re-probe ~280 corps against ESI.
+ */
+async function probeLpStoreCorporations(corps) {
+  let diskCache = {};
+  try {
+    diskCache = JSON.parse(await readFile(LP_STORE_CACHE_FILE, 'utf8'));
+  } catch {
+    /* no cache yet */
+  }
+  const { lpCorporations, cache, probed, failed } = await probeLpStores(corps, {
+    cache: diskCache,
+    hasOffers: fetchLpStoreHasOffers,
+  });
+  await mkdir(CACHE_DIR, { recursive: true });
+  await writeFile(LP_STORE_CACHE_FILE, JSON.stringify(cache));
+  console.log(
+    `  LP stores: ${lpCorporations.length} of ${corps.length} corps (${probed} probed, ${corps.length - probed - failed.length} cached${failed.length > 0 ? `, ${failed.length} failed` : ''})`
+  );
+  return lpCorporations;
 }
 
 async function main() {
@@ -1811,6 +1887,14 @@ async function main() {
     npcStations.sort((a, b) => a.id - b.id);
   }
 
+  // --- market/lpCorporations.json: NPC corps with an LP Store (issue #2320) ---
+  //
+  // The SDE has no "has an LP store" flag, so each NPC corp is probed against
+  // ESI's public offers endpoint and kept only if its store lists an offer.
+  const npcCorps = npcCorporations(raw['crpNPCCorporations.csv']);
+  console.log(`Probing ${npcCorps.length} NPC corporations against ESI for LP stores...`);
+  const lpCorporations = await probeLpStoreCorporations(npcCorps);
+
   // --- market/regions.json: mapRegions, probed live against ESI for orders ---
   const regionCandidates = [];
   {
@@ -1992,6 +2076,7 @@ async function main() {
     ['globalMarkets.json', globalMarkets],
     ['attributes.json', attributeDictionary],
     ['variations.json', variations],
+    ['lpCorporations.json', lpCorporations],
   ];
   for (const [name, data] of marketOutputs) {
     const json = JSON.stringify(data);
@@ -2035,6 +2120,20 @@ async function main() {
     if (typeof resolved !== 'number' || Math.abs(resolved - PACKAGED_VOLUME_CONTROL_EXPECTED) > 1) {
       console.error(
         `  FAIL: packaged volume control type ${PACKAGED_VOLUME_CONTROL_TYPE_ID} (Merlin) resolved to ${resolved ?? 'missing'}, expected ~${PACKAGED_VOLUME_CONTROL_EXPECTED} — the ESI type endpoint's packaged_volume field may have changed`
+      );
+      process.exitCode = 1;
+    }
+  }
+  console.log(`  LP store corporations: ${lpCorporations.length}`);
+  {
+    // Well-known stores across empire navies, independents, CONCORD and the
+    // pirate factions. A missing one means the probe (or the offers
+    // endpoint's shape) broke, not that the store went away.
+    const ids = new Set(lpCorporations.map((c) => c.id));
+    const missing = LP_STORE_CONTROL_CORPORATIONS.filter(([id]) => !ids.has(id));
+    if (missing.length > 0) {
+      console.error(
+        `  FAIL: LP store probe is missing well-known stores: ${missing.map(([, name]) => name).join(', ')}`
       );
       process.exitCode = 1;
     }
