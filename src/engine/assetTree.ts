@@ -20,6 +20,8 @@ export interface EngineAsset {
   location_id: number;
   location_type: 'station' | 'solar_system' | 'item' | 'other';
   location_flag: string;
+  /** ESI asset flag: a blueprint copy shares its original's typeID, so it is valued per item, not per type. */
+  is_blueprint_copy?: boolean;
 }
 
 export type AssetTreeBayKind = 'cargoHold' | 'droneBay' | 'fitting';
@@ -117,6 +119,7 @@ const BAY_ORDER: AssetTreeBayKind[] = ['cargoHold', 'droneBay', 'fitting'];
 interface BuildContext {
   childrenByLocationId: Map<number, EngineAsset[]>;
   priceByTypeId: ReadonlyMap<number, number>;
+  copyValueByItemId: ReadonlyMap<number, number>;
   visited: Set<number>;
 }
 
@@ -131,6 +134,23 @@ function childrenByLocationId(assets: readonly EngineAsset[]): Map<number, Engin
   return map;
 }
 
+const NO_COPY_VALUES: ReadonlyMap<number, number> = new Map();
+
+/**
+ * One asset stack's estimated value: quantity at the type's average price,
+ * except a blueprint copy, which is worth only what `copyValueByItemId`
+ * says (`blueprintCopyValue.ts`) and 0 when it says nothing — never its
+ * original's price, which the typeID alone would give it.
+ */
+export function assetStackValue(
+  asset: Pick<EngineAsset, 'item_id' | 'type_id' | 'quantity' | 'is_blueprint_copy'>,
+  priceByTypeId: ReadonlyMap<number, number>,
+  copyValueByItemId: ReadonlyMap<number, number> = NO_COPY_VALUES
+): number {
+  if (asset.is_blueprint_copy) return copyValueByItemId.get(asset.item_id) ?? 0;
+  return asset.quantity * (priceByTypeId.get(asset.type_id) ?? 0);
+}
+
 /**
  * One node's contribution to its parent's totals: its own quantity/value
  * (0 for a bay, which owns nothing itself) plus whatever is already
@@ -141,11 +161,12 @@ function childrenByLocationId(assets: readonly EngineAsset[]): Map<number, Engin
  */
 export function nodeContribution(
   node: AssetTreeNode,
-  priceByTypeId: ReadonlyMap<number, number>
+  priceByTypeId: ReadonlyMap<number, number>,
+  copyValueByItemId: ReadonlyMap<number, number> = NO_COPY_VALUES
 ): { itemCount: number; estimatedValue: number } {
   if (node.kind === 'bay')
     return { itemCount: node.itemCount, estimatedValue: node.estimatedValue };
-  const ownValue = node.asset.quantity * (priceByTypeId.get(node.asset.type_id) ?? 0);
+  const ownValue = assetStackValue(node.asset, priceByTypeId, copyValueByItemId);
   if (node.kind === 'item') return { itemCount: node.asset.quantity, estimatedValue: ownValue };
   return {
     itemCount: node.asset.quantity + node.itemCount,
@@ -214,7 +235,7 @@ function sumNodes(
   let itemCount = 0;
   let estimatedValue = 0;
   for (const node of nodes) {
-    const contribution = nodeContribution(node, ctx.priceByTypeId);
+    const contribution = nodeContribution(node, ctx.priceByTypeId, ctx.copyValueByItemId);
     itemCount += contribution.itemCount;
     estimatedValue += contribution.estimatedValue;
   }
@@ -300,11 +321,13 @@ export function buildAssetGroups<Id>(
   order: readonly Id[],
   alwaysInclude: ReadonlySet<Id>,
   groupIdFor: (asset: EngineAsset) => Id,
-  priceByTypeId: ReadonlyMap<number, number> = new Map()
+  priceByTypeId: ReadonlyMap<number, number> = new Map(),
+  copyValueByItemId: ReadonlyMap<number, number> = NO_COPY_VALUES
 ): AssetTreeGroup<Id>[] {
   const ctx: BuildContext = {
     childrenByLocationId: childrenByLocationId(assets),
     priceByTypeId,
+    copyValueByItemId,
     visited: new Set(),
   };
 
@@ -361,11 +384,13 @@ export function collectGroupItemIds<Id>(group: AssetTreeGroup<Id>): number[] {
 
 export function buildAssetTree(
   assets: readonly EngineAsset[],
-  priceByTypeId: ReadonlyMap<number, number> = new Map()
+  priceByTypeId: ReadonlyMap<number, number> = new Map(),
+  copyValueByItemId: ReadonlyMap<number, number> = NO_COPY_VALUES
 ): AssetTreeStation[] {
   const ctx: BuildContext = {
     childrenByLocationId: childrenByLocationId(assets),
     priceByTypeId,
+    copyValueByItemId,
     visited: new Set(),
   };
   const buildStation = (locationId: number, group: RootGroup): AssetTreeStation => {

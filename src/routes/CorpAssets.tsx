@@ -72,6 +72,7 @@ import {
 } from '@/engine/corp/assetPath';
 import { assetNodeSegment } from '@/engine/assetPath';
 import {
+  assetStackValue,
   collectGroupItemIds,
   collectItemIds,
   type AssetTreeGroup,
@@ -101,6 +102,8 @@ import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExpo
 import type { TableExport } from '@/components/ui/useTableExport';
 import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/character/assetsCsv';
 import { getAdjustedPrices } from '@/market/prices';
+import { loadCorporationBlueprints } from '@/features/corp/blueprints';
+import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useFocusHeading } from '@/lib/useFocusHeading';
 
@@ -125,6 +128,8 @@ interface AssetsSnapshot {
   labels: CorpAssetLabels;
   /** Global average market price per type, best-effort — an outage degrades ISK badges to 0 rather than the whole page. */
   priceByTypeId: ReadonlyMap<number, number>;
+  /** Each blueprint copy's own value by item id (`engine/blueprintCopyValue.ts`) — a copy never takes its type's average price. */
+  copyValueByItemId: ReadonlyMap<number, number>;
   /** Physical volume (m3, unpackaged) per type, best-effort from the slim SDE snapshot. */
   volumeByTypeId: ReadonlyMap<number, number>;
   /** The page cap was hit or a page was missing — corp holdings are the likelier of the two lists to hit it. */
@@ -141,6 +146,7 @@ const EMPTY_SNAPSHOT: AssetsSnapshot = {
   divisionNames: new Map(),
   labels: EMPTY_CORP_ASSET_LABELS,
   priceByTypeId: new Map(),
+  copyValueByItemId: new Map(),
   volumeByTypeId: new Map(),
   truncated: false,
   assetsShown: 0,
@@ -162,7 +168,8 @@ async function loadAssetPrices(): Promise<Map<number, number>> {
 
 async function loadAssetsSnapshot(
   characterId: number,
-  signal: RouteSnapshotSignal
+  signal: RouteSnapshotSignal,
+  canReadBlueprints: boolean
 ): Promise<AssetsSnapshot> {
   const corporationId = await loadCorporationId(characterId);
   if (corporationId === null || signal.cancelled) return { ...EMPTY_SNAPSHOT, corporationId };
@@ -179,16 +186,24 @@ async function loadAssetsSnapshot(
 
   const assets = assetsResult.cached?.data ?? null;
   const inputs = assets === null ? null : toCorpAssetInputs(assets);
-  const groups = inputs === null ? null : buildCorpAssetTree(inputs, priceByTypeId);
+  const typeIds = inputs === null ? [] : [...new Set(inputs.map((i) => i.typeId))];
+  const [labels, volumeByTypeId, copyValueByItemId] = await Promise.all([
+    assets === null ? EMPTY_CORP_ASSET_LABELS : loadCorpAssetLabels(characterId, assets),
+    loadTypeVolumes(typeIds),
+    // Director-only endpoint: without the role a copy still prices, at ME0/TE0.
+    loadAssetCopyValues(characterId, assets ?? [], async () =>
+      canReadBlueprints
+        ? ((await loadCorporationBlueprints(characterId, corporationId)).cached?.data ?? null)
+        : null
+    ),
+  ]);
+  const groups =
+    inputs === null ? null : buildCorpAssetTree(inputs, priceByTypeId, copyValueByItemId);
   const divisionNames = new Map(
     hangarDivisions(divisionsResult.cached?.data ?? null).map((d) => [d.division, d.name])
   );
-  const labels =
-    assets === null ? EMPTY_CORP_ASSET_LABELS : await loadCorpAssetLabels(characterId, assets);
   const truncated = assetsResult.cached?.truncated ?? false;
   const assetsShown = assets?.length ?? 0;
-  const typeIds = inputs === null ? [] : [...new Set(inputs.map((i) => i.typeId))];
-  const volumeByTypeId = await loadTypeVolumes(typeIds);
 
   const fetchedAts = [assetsResult, divisionsResult]
     .map((result) => result.cached?.fetchedAt)
@@ -205,6 +220,7 @@ async function loadAssetsSnapshot(
     divisionNames,
     labels,
     priceByTypeId,
+    copyValueByItemId,
     volumeByTypeId,
     truncated,
     assetsShown,
@@ -251,14 +267,6 @@ function nodeLabel(
     return locationNames.get(locationId) ?? t('corp.assets.unknownLocation', { locationId });
   }
   return typeDisplayName(node.asset.type_id, typeNames);
-}
-
-/** An asset stack's value at the global average price — 0 (not "unknown") for a type with no resolved price. */
-function estimatedValueFor(
-  asset: { type_id: number; quantity: number },
-  priceByTypeId: ReadonlyMap<number, number>
-): number {
-  return asset.quantity * (priceByTypeId.get(asset.type_id) ?? 0);
 }
 
 interface CorpAssetMatch {
@@ -335,10 +343,18 @@ function estimateRowHeight(row: BrowseRow): number {
 }
 
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
-function CorpAssetsView() {
+function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const snapshot = useRouteSnapshot<AssetsSnapshot>(loadAssetsSnapshot, undefined, {
+  // `useRouteSnapshot` keys its reload on the Character and refresh only, so
+  // this loader must not close over changing state: the parent remounts this
+  // view (`key`) when `canReadBlueprints` flips instead.
+  const loadSnapshot = useCallback(
+    (characterId: number, signal: RouteSnapshotSignal) =>
+      loadAssetsSnapshot(characterId, signal, canReadBlueprints),
+    [canReadBlueprints]
+  );
+  const snapshot = useRouteSnapshot<AssetsSnapshot>(loadSnapshot, undefined, {
     // Keeps the asset list on screen during a manual refresh (issue #418).
     staleWhileRevalidate: true,
     cacheKey: 'corp-assets',
@@ -743,6 +759,7 @@ function CorpAssetsView() {
                               pathSegments={pathSegments}
                               query={query}
                               priceByTypeId={data?.priceByTypeId ?? EMPTY_PRICES}
+                              copyValueByItemId={data?.copyValueByItemId ?? EMPTY_PRICES}
                               volumeByTypeId={data?.volumeByTypeId ?? EMPTY_VOLUMES}
                             />
                           </div>
@@ -774,6 +791,7 @@ interface BrowseRowViewProps {
   /** Current query string (`?q=…` or empty), kept on drill-down links. */
   query: string;
   priceByTypeId: ReadonlyMap<number, number>;
+  copyValueByItemId: ReadonlyMap<number, number>;
   volumeByTypeId: ReadonlyMap<number, number>;
 }
 
@@ -811,7 +829,11 @@ function BrowseRowView(props: BrowseRowViewProps) {
     <SearchResultRow
       name={match.name}
       quantity={match.node.asset.quantity}
-      estimatedValue={estimatedValueFor(match.node.asset, props.priceByTypeId)}
+      estimatedValue={assetStackValue(
+        match.node.asset,
+        props.priceByTypeId,
+        props.copyValueByItemId
+      )}
       trail={match.trail}
       security={undefined}
       href={corpAssetHref(match.groupId, match.segments, props.query)}
@@ -833,6 +855,7 @@ function NodeRowView({
   pathSegments,
   query,
   priceByTypeId,
+  copyValueByItemId,
   volumeByTypeId,
 }: BrowseRowViewProps & { node: AssetTreeNode }) {
   const label = nodeLabel(node, typeNames, locationNames, t);
@@ -860,7 +883,7 @@ function NodeRowView({
       name={label}
       quantity={asset.quantity}
       unitVolume={volumeByTypeId.get(asset.type_id)}
-      estimatedValue={estimatedValueFor(asset, priceByTypeId)}
+      estimatedValue={assetStackValue(asset, priceByTypeId, copyValueByItemId)}
       characterBadge={null}
       selectMode={selectMode}
       selectionState={selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
@@ -894,5 +917,6 @@ export function CorpAssets() {
     );
   }
 
-  return <CorpAssetsView />;
+  const { canReadBlueprints } = gate.capabilities;
+  return <CorpAssetsView key={String(canReadBlueprints)} canReadBlueprints={canReadBlueprints} />;
 }

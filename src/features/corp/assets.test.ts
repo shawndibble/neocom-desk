@@ -167,6 +167,12 @@ describe('toCorpAssetInputs', () => {
       },
     ]);
   });
+  it('carries the blueprint-copy flag so a copy is valued per item', () => {
+    const [input] = toCorpAssetInputs([
+      { ...ASSETS[0], item_id: 2001, is_singleton: true, is_blueprint_copy: true },
+    ]);
+    expect(input).toMatchObject({ itemId: 2001, isBlueprintCopy: true });
+  });
 });
 
 describe('loadCorpAssetLabels', () => {

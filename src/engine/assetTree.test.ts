@@ -53,6 +53,18 @@ describe('buildAssetTree', () => {
     expect(unpriced[0].estimatedValue).toBe(0);
   });
 
+  it("values a blueprint copy per item, never at its original's type price", () => {
+    const prices = new Map([[999, 2_000_000_000]]);
+    const assets = [
+      asset({ item_id: 1, type_id: 999, is_blueprint_copy: true }),
+      asset({ item_id: 2, type_id: 999, is_blueprint_copy: true }),
+      asset({ item_id: 3, type_id: 999 }),
+    ];
+    const tree = buildAssetTree(assets, prices, new Map([[1, 5_000_000]]));
+    // Copy 1 at its contract value, copy 2 unpriced (0), the original at the type price.
+    expect(tree[0].estimatedValue).toBe(2_005_000_000);
+  });
+
   it('classifies a singleton with Cargo/DroneBay/fitting-slot children as a ship, bucketed into named bays', () => {
     const tree = buildAssetTree([
       asset({ item_id: 10, type_id: 650, location_id: 60003760, location_flag: 'Hangar' }),
