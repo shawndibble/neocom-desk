@@ -7,7 +7,6 @@ import {
   filterOwnedBlueprints,
   ownedBlueprintQuantity,
   resolveBlueprintPlacement,
-  summarizeOwnedBlueprints,
   type OwnedBlueprintRow,
 } from './ownedBlueprints';
 
@@ -147,28 +146,6 @@ describe('filterOwnedBlueprints', () => {
   it('searches the blueprint and product names, case-insensitively', () => {
     expect(ids(filterOwnedBlueprints(rows, { ...all, search: '  rifter ' }))).toEqual(['1:11']);
     expect(ids(filterOwnedBlueprints(rows, { ...all, search: 'FORMULA' }))).toEqual(['1:12']);
-  });
-});
-
-describe('summarizeOwnedBlueprints', () => {
-  it('counts BPOs and BPCs, with a BPO stack counting as its size', () => {
-    const rows = buildOwnedBlueprintRows({
-      ownedByCharacter: new Map([
-        [
-          1,
-          [
-            bp({ item_id: 11, quantity: 3 }),
-            bp({ item_id: 12 }),
-            bp({ item_id: 13, runs: 2, quantity: -2 }),
-          ],
-        ],
-      ]),
-      characterNames: new Map(),
-      corpBlueprints: [],
-      catalog,
-      iskPerHourById: new Map(),
-    });
-    expect(summarizeOwnedBlueprints(rows)).toEqual({ bpo: 4, bpc: 1 });
   });
 });
 

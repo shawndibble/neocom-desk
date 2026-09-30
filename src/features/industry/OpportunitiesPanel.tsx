@@ -18,7 +18,6 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
 import {
   Button,
-  DataAgeBadge,
   DataTable,
   EmptyState,
   InfoTooltip,
@@ -80,6 +79,12 @@ interface OpportunitiesPanelProps {
   onAddToCompare: (rows: readonly OpportunityRow[]) => void;
   /** Resolves true once it has opened the new plan (see `StartPlanButton`). */
   onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
+  /**
+   * The oldest blueprint fetch behind these rows, or null — reported up
+   * rather than drawn here, so the route can show it beside the page title
+   * (`PageHeader.meta`) instead of crowding this panel's header.
+   */
+  onDataAgeChange?: (date: Date | null) => void;
 }
 
 /** `'current'`, not the synced default: this panel has always opened on the active pilot. */
@@ -123,6 +128,7 @@ export function OpportunitiesPanel({
   assumedMe,
   onAddToCompare,
   onStartPlan,
+  onDataAgeChange,
 }: OpportunitiesPanelProps) {
   const { t } = useTranslation();
   const unknown = t('common.unknown');
@@ -177,7 +183,7 @@ export function OpportunitiesPanel({
   const [blueprintsState, setBlueprintsState] = useState<{
     ownedByCharacter: Map<number, CharacterBlueprint[]>;
     loading: boolean;
-    /** Oldest fetch across every fetched Character — the panel's `DataAgeBadge` reads this. */
+    /** Oldest fetch across every fetched Character — reported up through `onDataAgeChange`. */
     oldestFetchedAt: Date | null;
   }>({ ownedByCharacter: new Map(), loading: true, oldestFetchedAt: null });
 
@@ -209,6 +215,11 @@ export function OpportunitiesPanel({
     };
   }, [characterIds]);
   const { ownedByCharacter, loading: blueprintsLoading, oldestFetchedAt } = blueprintsState;
+  const oldestFetchedMs = oldestFetchedAt?.getTime() ?? null;
+  useEffect(() => {
+    onDataAgeChange?.(oldestFetchedMs === null ? null : new Date(oldestFetchedMs));
+  }, [oldestFetchedMs, onDataAgeChange]);
+  useEffect(() => () => onDataAgeChange?.(null), [onDataAgeChange]);
 
   const candidates = useMemo(
     () => buildOpportunityCandidates(ownedByCharacter, characterNames, catalog),
@@ -503,7 +514,6 @@ export function OpportunitiesPanel({
           onChange={setCharacterFilter}
         />
       )}
-      {oldestFetchedAt && <DataAgeBadge date={oldestFetchedAt} />}
     </span>
   );
 

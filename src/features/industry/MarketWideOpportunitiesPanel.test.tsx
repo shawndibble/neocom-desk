@@ -175,7 +175,8 @@ describe('MarketWideOpportunitiesPanel filters', () => {
     const user = userEvent.setup();
     renderPanel();
     await user.click(screen.getByRole('button', { name: /Filters/ }));
-    await user.click(screen.getByRole('button', { name: 'Faction' }));
+    await user.click(screen.getByRole('button', { name: 'Tier' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Faction' }));
 
     expect(hookState.run).toHaveBeenCalledTimes(1);
     const [filters] = hookState.run.mock.calls[0]!;
@@ -221,7 +222,8 @@ describe('MarketWideOpportunitiesPanel filters: skill gate, mid-scan, phone', ()
       const user = userEvent.setup();
       renderPanel();
       await user.click(screen.getByRole('button', { name: /Filters/ }));
-      await user.click(screen.getByRole('button', { name: 'Faction' }));
+      await user.click(screen.getByRole('button', { name: 'Tier' }));
+      await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Faction' }));
       expect(hookState.run).toHaveBeenCalledTimes(1);
     } finally {
       hookState.loading = false;

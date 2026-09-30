@@ -16,7 +16,7 @@ import {
   DataTable,
   EmptyState,
   FilterBar,
-  FilterChip,
+  CheckboxSelect,
   FilterField,
   IconButton,
   IskAmount,
@@ -461,65 +461,68 @@ function BpcFilterBar({
               onChange={(maxPrice) => setDraft({ ...draft, maxPrice })}
             />
           </FilterField>
-          <div
-            role="group"
-            aria-label={t('bpcContracts.excludeLabel')}
-            className="flex flex-wrap items-center gap-2"
-          >
-            <span className="text-text-dim">{t('bpcContracts.excludeLabel')}</span>
-            <FilterChip
-              label={t('bpcContracts.hideAuctions')}
-              selected={draft.hideAuctions}
-              onToggle={() => setDraft({ ...draft, hideAuctions: !draft.hideAuctions })}
+          <FilterField label={t('bpcContracts.excludeLabel')}>
+            <CheckboxSelect
+              label={t('bpcContracts.excludeLabel')}
+              className="w-44"
+              options={[
+                { value: 'auctions' as const, label: t('bpcContracts.hideAuctions') },
+                {
+                  value: 'plex' as const,
+                  label: t('bpcContracts.hidePlex'),
+                  description: t('bpcContracts.hidePlexTooltip'),
+                },
+              ]}
+              selected={
+                new Set([
+                  ...(draft.hideAuctions ? (['auctions'] as const) : []),
+                  ...(draft.hidePlex ? (['plex'] as const) : []),
+                ])
+              }
+              onToggle={(value) =>
+                setDraft(
+                  value === 'auctions'
+                    ? { ...draft, hideAuctions: !draft.hideAuctions }
+                    : { ...draft, hidePlex: !draft.hidePlex }
+                )
+              }
             />
-            <FilterChip
-              label={t('bpcContracts.hidePlex')}
-              tooltip={t('bpcContracts.hidePlexTooltip')}
-              selected={draft.hidePlex}
-              onToggle={() => setDraft({ ...draft, hidePlex: !draft.hidePlex })}
+          </FilterField>
+          <FilterField label={t('bpcContracts.sourceLabel')}>
+            <CheckboxSelect
+              label={t('bpcContracts.sourceLabel')}
+              className="w-44"
+              options={SOURCE_TOGGLES.map((source) => ({
+                value: source,
+                label: t(SOURCE_LABEL_KEYS[source]),
+                description: SOURCE_TOOLTIP_KEYS[source] && t(SOURCE_TOOLTIP_KEYS[source]),
+              }))}
+              selected={draft.sources}
+              onToggle={(source) => {
+                const next = new Set(draft.sources);
+                if (next.has(source)) next.delete(source);
+                else next.add(source);
+                setDraft({ ...draft, sources: next });
+              }}
             />
-          </div>
-          <div
-            role="group"
-            aria-label={t('bpcContracts.sourceLabel')}
-            className="flex flex-wrap items-center gap-2"
-          >
-            <span className="text-text-dim">{t('bpcContracts.sourceLabel')}</span>
-            {SOURCE_TOGGLES.map((source) => (
-              <FilterChip
-                key={source}
-                label={t(SOURCE_LABEL_KEYS[source])}
-                tooltip={SOURCE_TOOLTIP_KEYS[source] && t(SOURCE_TOOLTIP_KEYS[source])}
-                selected={draft.sources.has(source)}
-                onToggle={() => {
-                  const next = new Set(draft.sources);
-                  if (next.has(source)) next.delete(source);
-                  else next.add(source);
-                  setDraft({ ...draft, sources: next });
-                }}
-              />
-            ))}
-          </div>
-          <div
-            role="group"
-            aria-label={t('bpcContracts.spaceLabel')}
-            className="flex flex-wrap items-center gap-2"
-          >
-            <span className="text-text-dim">{t('bpcContracts.spaceLabel')}</span>
-            {SPACE_KINDS.map((kind) => (
-              <FilterChip
-                key={kind}
-                label={t(`common.spaceOption.${kind}`)}
-                selected={draft.spaceKinds.includes(kind)}
-                onToggle={() => {
-                  const next = draft.spaceKinds.includes(kind)
-                    ? draft.spaceKinds.filter((existing) => existing !== kind)
-                    : [...draft.spaceKinds, kind];
-                  setDraft({ ...draft, spaceKinds: next });
-                }}
-              />
-            ))}
-          </div>
+          </FilterField>
+          <FilterField label={t('bpcContracts.spaceLabel')}>
+            <CheckboxSelect
+              label={t('bpcContracts.spaceLabel')}
+              className="w-44"
+              options={SPACE_KINDS.map((kind) => ({
+                value: kind,
+                label: t(`common.spaceOption.${kind}`),
+              }))}
+              selected={new Set(draft.spaceKinds)}
+              onToggle={(kind) => {
+                const next = draft.spaceKinds.includes(kind)
+                  ? draft.spaceKinds.filter((existing) => existing !== kind)
+                  : [...draft.spaceKinds, kind];
+                setDraft({ ...draft, spaceKinds: next });
+              }}
+            />
+          </FilterField>
         </>
       )}
     </FilterBar>

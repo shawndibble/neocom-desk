@@ -70,6 +70,11 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || !dialog.open) return;
+      // A browser skips the close request when the keydown was already
+      // cancelled — as a Radix menu or select open inside the dialog does when
+      // Escape dismisses it — so the one Escape closes that layer, not the
+      // dialog under it too.
+      if (event.defaultPrevented) return;
       event.preventDefault();
       const cancelled = !dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
       if (!cancelled) dialog.close();

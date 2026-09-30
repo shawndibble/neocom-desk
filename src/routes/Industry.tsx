@@ -3,7 +3,7 @@ import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-route
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { Button, EmptyState, Modal, Spinner } from '@/components/ui';
+import { Button, DataAgeBadge, EmptyState, Modal, Spinner } from '@/components/ui';
 import { preloadRouteChunk } from '@/app/routeChunks';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { IndustryHeader } from '@/features/industry/IndustryHeader';
@@ -162,6 +162,8 @@ export function Industry() {
     if (!compareMode) setCompareSelectedIds(new Set());
   }
   const [comparing, setComparing] = useState(false);
+  // Build Opportunities' blueprint data age, shown beside the page title.
+  const [opportunitiesDataAge, setOpportunitiesDataAge] = useState<Date | null>(null);
 
   // One plan per "Start a plan": set from the click until this page leaves
   // for the new plan, so a second tap while the first is still saving (the
@@ -554,6 +556,11 @@ export function Industry() {
           activeTab={tab}
           onTabChange={setTab}
           blueprintsNeedsReauth={blueprintsNeedsReauth}
+          meta={
+            tab === 'opportunities' && opportunitiesDataAge ? (
+              <DataAgeBadge date={opportunitiesDataAge} />
+            ) : undefined
+          }
         />
 
         {!plans || !catalog || !buildGroupsHydrated || !expandedGroupsHydrated ? (
@@ -566,7 +573,7 @@ export function Industry() {
               <BpcSourcingPanel />
             ) : tab === 'opportunities' ? (
               <div className="flex flex-col gap-4">
-                {/* First: "what's profitable to build" is the question most
+                {/* First: "what's profitable" is the question most
                     visits here come to answer; the owned-blueprint ranking
                     below narrows it to what you already hold. */}
                 <MarketWideOpportunitiesPanel
@@ -597,6 +604,7 @@ export function Industry() {
                     assumedMe={assumedMe}
                     onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
                     onStartPlan={handleStartPlan}
+                    onDataAgeChange={setOpportunitiesDataAge}
                   />
                 )}
               </div>

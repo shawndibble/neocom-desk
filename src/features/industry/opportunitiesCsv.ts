@@ -34,7 +34,7 @@ export function opportunitiesCsvColumns(t: CsvTranslate): CsvColumn<OpportunityR
   ];
 }
 
-/** "What's profitable to build" (the market-wide scan). */
+/** "What's profitable" (the market-wide scan). */
 export function marketWideOpportunitiesCsvColumns(
   t: CsvTranslate
 ): CsvColumn<MarketWideResultRow>[] {

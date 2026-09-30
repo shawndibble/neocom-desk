@@ -149,6 +149,7 @@ describe('OwnedBlueprintsPanel', () => {
   it('filters by BPO/BPC and activity', async () => {
     const user = userEvent.setup();
     renderPanel();
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
     await user.click(screen.getByRole('button', { name: 'BPO' }));
     expect(screen.getByText('Rifter Blueprint')).toBeInTheDocument();
     expect(screen.queryByText('Merlin Blueprint')).not.toBeInTheDocument();
@@ -178,8 +179,9 @@ describe('OwnedBlueprintsPanel', () => {
     expect(onStartPlan).toHaveBeenCalledWith(RIFTER);
   });
 
-  it('hides the corp toggle without corp blueprint access', () => {
+  it('hides the corp toggle without corp blueprint access', async () => {
     renderPanel();
+    await userEvent.setup().click(screen.getByRole('button', { name: /^Filters/ }));
     expect(screen.queryByRole('button', { name: 'Corp blueprints' })).not.toBeInTheDocument();
   });
 
@@ -192,6 +194,7 @@ describe('OwnedBlueprintsPanel', () => {
     };
     renderPanel();
     expect(screen.queryByText('Corporation')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
     await user.click(screen.getByRole('button', { name: 'Corp blueprints' }));
     expect(screen.getByText('Corporation')).toBeInTheDocument();
   });
