@@ -5,7 +5,7 @@ import { blueprintCopyValues, type OwnedBlueprintCopyAsset } from './blueprintCo
 const TYPE = 1000;
 
 let nextContractId = 1;
-function listing(overrides: Partial<BpcContractRow> = {}): BpcContractRow {
+function offer(overrides: Partial<BpcContractRow> = {}): BpcContractRow {
   return {
     contractId: nextContractId++,
     regionId: 10000002,
@@ -28,21 +28,21 @@ function copy(overrides: Partial<OwnedBlueprintCopyAsset> = {}): OwnedBlueprintC
 }
 
 describe('blueprintCopyValues', () => {
-  it('values a copy at its matching ME/TE listings, ISK per run times its own runs', () => {
+  it('values a copy at its matching ME/TE Offers, ISK per run times its own runs', () => {
     const values = blueprintCopyValues(
       [copy({ runs: 5 })],
-      [listing({ price: 10_000_000, runs: 10 })]
+      [offer({ price: 10_000_000, runs: 10 })]
     );
     expect(values.get(1)).toBe(5_000_000);
   });
 
-  it('takes the median ISK/run across matching listings, not the cheapest', () => {
+  it('takes the median ISK/run across matching Offers, not the cheapest', () => {
     const values = blueprintCopyValues(
       [copy({ runs: 1 })],
       [
-        listing({ price: 1_000_000, runs: 1 }),
-        listing({ price: 3_000_000, runs: 1 }),
-        listing({ price: 50_000_000, runs: 1 }),
+        offer({ price: 1_000_000, runs: 1 }),
+        offer({ price: 3_000_000, runs: 1 }),
+        offer({ price: 50_000_000, runs: 1 }),
       ]
     );
     expect(values.get(1)).toBe(3_000_000);
@@ -51,34 +51,34 @@ describe('blueprintCopyValues', () => {
   it('averages the middle two for an even count', () => {
     const values = blueprintCopyValues(
       [copy({ runs: 1 })],
-      [listing({ price: 2_000_000, runs: 1 }), listing({ price: 4_000_000, runs: 1 })]
+      [offer({ price: 2_000_000, runs: 1 }), offer({ price: 4_000_000, runs: 1 })]
     );
     expect(values.get(1)).toBe(3_000_000);
   });
 
-  it('prefers exact ME/TE listings over ME0/TE0 ones', () => {
+  it('prefers exact ME/TE Offers over ME0/TE0 ones', () => {
     const values = blueprintCopyValues(
       [copy({ runs: 1 })],
-      [listing({ price: 9_000_000, runs: 1 }), listing({ me: 0, te: 0, price: 1_000_000, runs: 1 })]
+      [offer({ price: 9_000_000, runs: 1 }), offer({ me: 0, te: 0, price: 1_000_000, runs: 1 })]
     );
     expect(values.get(1)).toBe(9_000_000);
   });
 
-  it('falls back to ME0/TE0 listings when nothing matches its ME/TE', () => {
+  it('falls back to ME0/TE0 Offers when nothing matches its ME/TE', () => {
     const values = blueprintCopyValues(
       [copy({ me: 8, te: 16, runs: 2 })],
-      [listing({ me: 0, te: 0, price: 1_000_000, runs: 1 }), listing({ me: 10, te: 20 })]
+      [offer({ me: 0, te: 0, price: 1_000_000, runs: 1 }), offer({ me: 10, te: 20 })]
     );
     expect(values.get(1)).toBe(2_000_000);
   });
 
   it('is worth 0 when neither its ME/TE nor ME0/TE0 is listed', () => {
-    const values = blueprintCopyValues([copy()], [listing({ me: 5, te: 10 })]);
+    const values = blueprintCopyValues([copy()], [offer({ me: 5, te: 10 })]);
     expect(values.get(1)).toBe(0);
   });
 
-  it('is worth 0 with no listings of its type at all', () => {
-    const values = blueprintCopyValues([copy()], [listing({ typeId: TYPE + 1 })]);
+  it('is worth 0 with no Offers of its type at all', () => {
+    const values = blueprintCopyValues([copy()], [offer({ typeId: TYPE + 1 })]);
     expect(values.get(1)).toBe(0);
   });
 
@@ -86,8 +86,8 @@ describe('blueprintCopyValues', () => {
     const values = blueprintCopyValues(
       [{ itemId: 1, typeId: TYPE }],
       [
-        listing({ me: 0, te: 0, price: 4_000_000, runs: 10 }),
-        listing({ me: 10, te: 20, price: 99_000_000, runs: 10 }),
+        offer({ me: 0, te: 0, price: 4_000_000, runs: 10 }),
+        offer({ me: 10, te: 20, price: 99_000_000, runs: 10 }),
       ]
     );
     expect(values.get(1)).toBe(4_000_000);
@@ -96,7 +96,7 @@ describe('blueprintCopyValues', () => {
   it('never reads a contract original (runs -1) as a copy price', () => {
     const values = blueprintCopyValues(
       [copy({ runs: 1 })],
-      [listing({ runs: -1, price: 2_000_000_000 })]
+      [offer({ runs: -1, price: 2_000_000_000 })]
     );
     expect(values.get(1)).toBe(0);
   });
@@ -105,9 +105,9 @@ describe('blueprintCopyValues', () => {
     const values = blueprintCopyValues(
       [copy({ runs: 1 })],
       [
-        listing({ isAuction: true, buyout: 1_000_000, runs: 1 }),
-        listing({ requestedPlex: 100, price: 1_000_000, runs: 1 }),
-        listing({ price: 0, runs: 1 }),
+        offer({ isAuction: true, buyout: 1_000_000, runs: 1 }),
+        offer({ requestedPlex: 100, price: 1_000_000, runs: 1 }),
+        offer({ price: 0, runs: 1 }),
       ]
     );
     expect(values.get(1)).toBe(0);
@@ -116,7 +116,7 @@ describe('blueprintCopyValues', () => {
   it('skips a contract bundling other item types — its price is not this blueprint alone', () => {
     const values = blueprintCopyValues(
       [copy({ runs: 1 })],
-      [listing({ isMultiType: true, price: 500_000_000, runs: 1 })]
+      [offer({ isMultiType: true, price: 500_000_000, runs: 1 })]
     );
     expect(values.get(1)).toBe(0);
   });
@@ -127,9 +127,9 @@ describe('blueprintCopyValues', () => {
     const values = blueprintCopyValues(
       [copy({ runs: 10 })],
       [
-        listing({ contractId: 900, quantity: 3, runs: 10, price: 30_000_000 }),
-        listing({ contractId: 901, quantity: 1, runs: 10, price: 20_000_000 }),
-        listing({ contractId: 901, quantity: 1, runs: 10, price: 20_000_000 }),
+        offer({ contractId: 900, quantity: 3, runs: 10, price: 30_000_000 }),
+        offer({ contractId: 901, quantity: 1, runs: 10, price: 20_000_000 }),
+        offer({ contractId: 901, quantity: 1, runs: 10, price: 20_000_000 }),
       ]
     );
     // Contract 900: 1M/run; contract 901: 20M over 20 runs = 1M/run.
@@ -140,8 +140,8 @@ describe('blueprintCopyValues', () => {
     const values = blueprintCopyValues(
       [copy({ runs: 1 })],
       [
-        listing({ contractId: 902, me: 10, te: 20, runs: 1, price: 50_000_000 }),
-        listing({ contractId: 902, me: 0, te: 0, runs: 1, price: 50_000_000 }),
+        offer({ contractId: 902, me: 10, te: 20, runs: 1, price: 50_000_000 }),
+        offer({ contractId: 902, me: 0, te: 0, runs: 1, price: 50_000_000 }),
       ]
     );
     expect(values.get(1)).toBe(0);
@@ -151,8 +151,8 @@ describe('blueprintCopyValues', () => {
     const values = blueprintCopyValues(
       [copy({ runs: 1 })],
       [
-        listing({ contractId: 903, runs: 1, price: 2_000_000_000 }),
-        listing({ contractId: 903, runs: -1, price: 2_000_000_000 }),
+        offer({ contractId: 903, runs: 1, price: 2_000_000_000 }),
+        offer({ contractId: 903, runs: -1, price: 2_000_000_000 }),
       ]
     );
     expect(values.get(1)).toBe(0);
@@ -162,8 +162,8 @@ describe('blueprintCopyValues', () => {
     const values = blueprintCopyValues(
       [copy({ runs: 1 })],
       [
-        listing({ contractId: 904, runs: 10, price: 100_000_000 }),
-        listing({ contractId: 904, runs: 0, price: 100_000_000 }),
+        offer({ contractId: 904, runs: 10, price: 100_000_000 }),
+        offer({ contractId: 904, runs: 0, price: 100_000_000 }),
       ]
     );
     expect(values.get(1)).toBe(0);
@@ -172,7 +172,7 @@ describe('blueprintCopyValues', () => {
   it('values each owned copy on its own', () => {
     const values = blueprintCopyValues(
       [copy({ itemId: 1, runs: 1 }), copy({ itemId: 2, me: 0, te: 0, runs: 3 })],
-      [listing({ price: 5_000_000, runs: 1 }), listing({ me: 0, te: 0, price: 1_000_000, runs: 1 })]
+      [offer({ price: 5_000_000, runs: 1 }), offer({ me: 0, te: 0, price: 1_000_000, runs: 1 })]
     );
     expect(values.get(1)).toBe(5_000_000);
     expect(values.get(2)).toBe(3_000_000);

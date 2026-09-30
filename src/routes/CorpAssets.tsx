@@ -103,7 +103,7 @@ import type { TableExport } from '@/components/ui/useTableExport';
 import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/character/assetsCsv';
 import { getAdjustedPrices } from '@/market/prices';
 import { loadCorporationBlueprints } from '@/features/corp/blueprints';
-import { loadBlueprintCopyValues } from '@/features/character/blueprintCopyValues';
+import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useFocusHeading } from '@/lib/useFocusHeading';
 
@@ -191,7 +191,7 @@ async function loadAssetsSnapshot(
     assets === null ? EMPTY_CORP_ASSET_LABELS : loadCorpAssetLabels(characterId, assets),
     loadTypeVolumes(typeIds),
     // Director-only endpoint: without the role a copy still prices, at ME0/TE0.
-    loadBlueprintCopyValues(characterId, assets ?? [], async () =>
+    loadAssetCopyValues(characterId, assets ?? [], async () =>
       canReadBlueprints
         ? ((await loadCorporationBlueprints(characterId, corporationId)).cached?.data ?? null)
         : null

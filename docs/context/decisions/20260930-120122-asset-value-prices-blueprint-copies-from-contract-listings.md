@@ -3,7 +3,7 @@
 _Recorded 2026-09-30._
 
 - **A blueprint copy's estimated value on Assets and Corp Assets comes from
-  Public Contract Offers, never the market average price.** A copy shares its
+  the Public Contract Offers snapshot, never the market average price.** A copy shares its
   original's typeID, and ESI's average price for that typeID is the
   original's, so a pilot's 117M copy library read as 2.1T. Originals, and
   every non-blueprint item, keep the global average price.
@@ -14,7 +14,7 @@ _Recorded 2026-09-30._
   Director) prices at ME0/TE0. When nothing is listed at either tier, the copy
   counts as 0, never at the original's price.
 
-- **Median of the matching listings, as ISK/run × the copy's remaining runs.**
+- **Median of the matching Offers, as ISK/run × the copy's remaining runs.**
   The median stops one lowball or troll ask from swinging a total. A copy
   with no known runs is worth the median ask per copy.
 
@@ -24,8 +24,8 @@ _Recorded 2026-09-30._
   ask across every copy and run it sells. One mixing ME/TE is skipped, and
   so is one that also sells the original: it shares the copies' typeID but
   is not the same blueprint, and its price would ride along.
-  Auctions, PLEX asks and zero-price barters are skipped too, and so are
-  contract originals.
+  Auctions, PLEX asks and zero-price barters are skipped too, and so are BPOs
+  sold by contract.
 
 - **Global, not hub-region.** This matches the average price the rest of the
   asset total uses.

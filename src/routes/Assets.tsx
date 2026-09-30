@@ -65,7 +65,7 @@ import { useFocusHeading } from '@/lib/useFocusHeading';
 import type { CharacterAsset } from '@/esi/endpoints';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
-import { loadBlueprintCopyValues } from '@/features/character/blueprintCopyValues';
+import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
 import type { TableExport } from '@/components/ui/useTableExport';
@@ -146,6 +146,7 @@ function assetHref(stationId: number | null, segments: readonly string[], query:
 
 /** Stable identity, so the fallback doesn't invalidate the grouping memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
+const NO_COPY_VALUES: ReadonlyMap<number, number> = new Map();
 const NO_PRICES: ReadonlyMap<number, number> = new Map();
 const NO_VOLUMES: ReadonlyMap<number, number> = new Map();
 const EMPTY_ITEM_OWNERS: ReadonlyMap<number, number> = new Map();
@@ -272,7 +273,7 @@ function loadOwnCopyValues(
   characterId: number,
   assets: readonly CharacterAsset[]
 ): Promise<Map<number, number>> {
-  return loadBlueprintCopyValues(
+  return loadAssetCopyValues(
     characterId,
     assets,
     async () => (await loadCharacterBlueprints(characterId)).cached?.data ?? null
@@ -826,7 +827,7 @@ export function Assets() {
   const typeNames = data?.typeNames ?? NO_NAMES;
   const locationNames = data?.locationNames ?? NO_NAMES;
   const priceByTypeId = data?.priceByTypeId ?? NO_PRICES;
-  const ownCopyValues = data?.copyValueByItemId ?? NO_PRICES;
+  const ownCopyValues = data?.copyValueByItemId ?? NO_COPY_VALUES;
   const volumeByTypeId = data?.volumeByTypeId ?? NO_VOLUMES;
 
   // CSV export always stays scoped to the active Character's own assets,

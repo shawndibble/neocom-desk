@@ -35,7 +35,7 @@ function tierKey(typeId: number, me: number, te: number): string {
 }
 
 /**
- * Folds listing rows into one rate per contract. A contract carrying any
+ * Folds Offer rows into one rate per contract. A contract carrying any
  * other item type is skipped (its price is the bundle's, not this
  * blueprint's), and so is one mixing ME/TE, or one that also sells the
  * original (`runs: -1`, same typeID) — only a contract of the same copy
@@ -44,9 +44,9 @@ function tierKey(typeId: number, me: number, te: number): string {
  * rather than leaving its siblings to carry the full ask. Auctions, PLEX asks
  * and zero-price barters have no price a buyer can pay.
  */
-function contractRates(listings: readonly BpcContractRow[]): CopyRate[] {
+function contractRates(offers: readonly BpcContractRow[]): CopyRate[] {
   const byContract = new Map<number, BpcContractRow[]>();
-  for (const row of listings) {
+  for (const row of offers) {
     if (row.isAuction || row.requestedPlex || row.isMultiType || !(row.price > 0)) continue;
     const list = byContract.get(row.contractId) ?? [];
     list.push(row);
@@ -92,16 +92,16 @@ function median(values: readonly number[]): number {
 /**
  * Each owned copy's value, keyed by `itemId`. Matches the copy's own ME/TE
  * first, then ME0/TE0, then 0 — never the original's price. The median
- * listing sets the rate, so one lowball or troll ask cannot swing a total.
+ * Offer sets the rate, so one lowball or troll ask cannot swing a total.
  * A copy with known runs is worth the median ISK/run times its runs; one
  * without is worth the median per-copy ask.
  */
 export function blueprintCopyValues(
   copies: readonly OwnedBlueprintCopyAsset[],
-  listings: readonly BpcContractRow[]
+  offers: readonly BpcContractRow[]
 ): Map<number, number> {
   const ratesByTier = new Map<string, CopyRate[]>();
-  for (const rate of contractRates(listings)) {
+  for (const rate of contractRates(offers)) {
     const key = tierKey(rate.typeId, rate.me, rate.te);
     const list = ratesByTier.get(key) ?? [];
     list.push(rate);

@@ -30,10 +30,10 @@ export type LoadBlueprints = () => Promise<
 
 /**
  * Imported on demand: it pulls in Firestore, which a page without copies
- * never needs. Originals ride along so the engine can tell a contract
+ * never needs. BPOs ride along so the engine can tell a contract
  * selling a copy beside its original apart from one selling copies alone.
  */
-async function loadCopyListings(characterId: number): Promise<readonly BpcContractRow[]> {
+async function loadCopyOffers(characterId: number): Promise<readonly BpcContractRow[]> {
   try {
     const { loadPublicBpcContracts } = await import('@/features/bpcContracts/syncedContracts');
     const snapshot = (await loadPublicBpcContracts(characterId))?.data;
@@ -52,19 +52,16 @@ async function safely<T>(load: () => Promise<T | null>): Promise<T | null> {
 }
 
 /** Per-item value of every blueprint copy in `assets`; empty (and nothing loaded) when there are none. */
-export async function loadBlueprintCopyValues(
+export async function loadAssetCopyValues(
   characterId: number,
   assets: readonly CopyAssetRow[],
   loadBlueprints: LoadBlueprints,
-  loadListings: (characterId: number) => Promise<readonly BpcContractRow[]> = loadCopyListings
+  loadOffers: (characterId: number) => Promise<readonly BpcContractRow[]> = loadCopyOffers
 ): Promise<Map<number, number>> {
   const copies = assets.filter((a) => a.is_blueprint_copy);
   if (copies.length === 0) return new Map();
 
-  const [listings, blueprints] = await Promise.all([
-    loadListings(characterId),
-    safely(loadBlueprints),
-  ]);
+  const [offers, blueprints] = await Promise.all([loadOffers(characterId), safely(loadBlueprints)]);
   const blueprintByItemId = new Map((blueprints ?? []).map((bp) => [bp.item_id, bp]));
 
   return blueprintCopyValues(
@@ -80,6 +77,6 @@ export async function loadBlueprintCopyValues(
           }
         : { itemId: asset.item_id, typeId: asset.type_id };
     }),
-    listings
+    offers
   );
 }
