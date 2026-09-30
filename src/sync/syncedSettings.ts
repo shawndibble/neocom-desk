@@ -198,8 +198,24 @@
 // for the whole account — "I never fly through Uedama" is about the pilot, not
 // one machine or one alt. Never deleted via deleteSyncedSetting: removing the
 // last system writes an empty list, so the tombstone-expiry edge does not bite.
+//
+// The rest of Settings → Travel (features/route/routeRules.ts), one key each so
+// each merges on its own: sync.routePreference (the default trip — prefer
+// shorter, safer or less secure — seeded from the Assets page's old
+// device-local `assetsRoutePreference`), sync.routeSecurityPenalty (the
+// game's 0–100 slider for how hard that preference bends the route),
+// sync.avoidedSystemsEnabled (the list
+// on or off without clearing it), sync.avoidEdencom and sync.avoidTriglavian
+// (the game's invasion-system avoidance options), and sync.avoidPodKills with
+// sync.podKillThreshold (keep out of systems with that many pod kills in the
+// last hour). All "set to another value, never unset", so the tombstone-expiry
+// edge does not bite them either.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
+  'sync.avoidEdencom',
+  'sync.avoidPodKills',
+  'sync.avoidTriglavian',
   'sync.avoidedSystems',
+  'sync.avoidedSystemsEnabled',
   'sync.bpcHideAuctions',
   'sync.bpcHidePlex',
   'sync.corpDarkAfterDays',
@@ -226,6 +242,9 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.overviewHiddenCards',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
+  'sync.podKillThreshold',
+  'sync.routePreference',
+  'sync.routeSecurityPenalty',
   'sync.skillCloneStates',
   'sync.spExtractionMonitoringEnabled',
   'sync.spExtractionThresholdSp',

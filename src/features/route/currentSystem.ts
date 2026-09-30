@@ -17,7 +17,7 @@ import {
 } from '@/engine/route/jumpRange';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { localJumpDistances } from '@/features/route/localRoute';
-import { useAvoidedSystemIds } from '@/features/route/avoidedSystems';
+import { useRouteQuery } from '@/features/route/routeRules';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
@@ -147,30 +147,33 @@ export function useJumpRangeFilter(
   range: JumpRange
 ): JumpRangeFilter {
   const originSystemId = current.systemId;
-  const { avoided, hydrated } = useAvoidedSystemIds();
+  // The pilot's Travel default in full: "within 5 jumps" counts the trip they would fly.
+  const { rules, key: routeKey, hydrated } = useRouteQuery();
   const [distances, setDistances] = useState<{
     origin: number;
-    avoided: readonly number[];
+    routeKey: string;
     jumps: ReadonlyMap<number, number> | null;
   } | null>(null);
 
   useEffect(() => {
     if (originSystemId === null || !hydrated) return;
     let cancelled = false;
-    void localJumpDistances(originSystemId, 'shortest', avoided).then((result) => {
+    void localJumpDistances(originSystemId, rules).then((result) => {
       if (cancelled) return;
       setDistances({
         origin: originSystemId,
-        avoided,
+        routeKey,
         jumps: result.kind === 'known' ? result.jumps : null,
       });
     });
     return () => {
       cancelled = true;
     };
-  }, [originSystemId, avoided, hydrated]);
+    // `routeKey` stands for `rules`: it changes exactly when they do.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [originSystemId, routeKey, hydrated]);
 
-  const settled = distances?.origin === originSystemId && distances.avoided === avoided;
+  const settled = distances?.origin === originSystemId && distances.routeKey === routeKey;
   const jumps = settled ? distances.jumps : null;
 
   const jumpsStatus = useMemo((): JumpDistanceStatus => {

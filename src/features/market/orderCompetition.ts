@@ -37,7 +37,12 @@
 import { fetchAggregates, type HubAggregate } from '@/market/fuzzwork';
 import { getOrderBook } from './orderBook';
 import { getStructureMarketOrders, type StructureMarketOrder } from '@/esi/endpoints';
-import { avoidCacheSuffix, getRouteAvoiding } from '@/features/route/esiRoute';
+import {
+  getRouteUnderRules,
+  PLAIN_ROUTE_RULES,
+  rulesCacheKey,
+  type EsiRouteRules,
+} from '@/features/route/esiRoute';
 import { conditionalPagedFetch, loadPaginatedWithCache } from '@/esi/cache';
 import { AuthError } from '@/auth/sso';
 import { EsiError } from '@/esi/client';
@@ -185,9 +190,9 @@ export async function loadStructureCompetition(
 function jumpsCacheKey(
   originSystemId: number,
   destinationSystemId: number,
-  avoid: readonly number[]
+  rules: EsiRouteRules
 ): string {
-  return `${originSystemId}:${destinationSystemId}${avoidCacheSuffix(originSystemId, destinationSystemId, avoid)}`;
+  return `${originSystemId}:${destinationSystemId}:${rulesCacheKey(originSystemId, destinationSystemId, rules)}`;
 }
 
 // Module-level, session-lifetime memo: a route between two fixed systems
@@ -217,20 +222,20 @@ export function clearJumpsCache(): void {
 export function loadJumpsBetween(
   originSystemId: number,
   destinationSystemId: number,
-  /** The pilot's Avoided Systems — see `features/route/esiRoute.ts` for how ESI is asked. */
-  avoid: readonly number[] = []
+  /** The pilot's Travel settings — see `features/route/esiRoute.ts` for how ESI is asked. */
+  rules: EsiRouteRules = PLAIN_ROUTE_RULES
 ): Promise<JumpsAwayResult> {
   if (originSystemId === destinationSystemId) {
     return Promise.resolve(jumpsAwayFromRoute([originSystemId]));
   }
 
-  const key = jumpsCacheKey(originSystemId, destinationSystemId, avoid);
+  const key = jumpsCacheKey(originSystemId, destinationSystemId, rules);
   const cached = jumpsCache.get(key);
   if (cached) return cached;
 
   const promise = (async () => {
     try {
-      const { data } = await getRouteAvoiding(originSystemId, destinationSystemId, avoid);
+      const { data } = await getRouteUnderRules(originSystemId, destinationSystemId, rules);
       return jumpsAwayFromRoute(data);
     } catch {
       return jumpsAwayFromRoute(null);

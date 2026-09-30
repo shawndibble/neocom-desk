@@ -1824,43 +1824,52 @@ export function getCharacterLocation(
   });
 }
 
-// --- GET /route/{origin}/{destination} (public) ---
+// --- POST /route/{origin_system_id}/{destination_system_id} (public) ---
 
 export interface RouteOptions extends EndpointOptions {
   /**
-   * ESI's real route-preference enum — verified live against
-   * `GET /route/{origin}/{destination}/`: `shortest`/`secure`/`insecure` are
-   * accepted, `fastest`/`safest` both 400. `secure` prefers highsec systems
-   * (the "Safest" choice issue #87's UI surfaces); `insecure` has no UI use
-   * today but is included so this wrapper reflects the endpoint it wraps.
+   * ESI's route preference, in its own words — the app's names map onto
+   * these in one place (`features/route/routeRules.ts`'s `esiRoutePreference`).
    */
-  flag?: 'shortest' | 'secure' | 'insecure';
+  preference?: 'Shorter' | 'Safer' | 'LessSecure';
   /**
-   * Systems the route must not enter, sent comma-separated. Verified live: a
-   * hard filter — ESI answers 404 "No route found" when the only way runs
-   * through one, or when the destination is one; an avoided origin is fine.
-   * `features/route/esiRoute.ts` is what softens that for the app.
+   * 0–100, ESI's default 50: how strongly `preference` bends the route —
+   * the game's own security-penalty slider. Verified live: Safer at 0 routes
+   * Jita–Amarr in 11 jumps, at 50 in 45.
+   */
+  securityPenalty?: number;
+  /**
+   * Systems the route must not enter (ESI caps it at 1000). Verified live: a
+   * hard filter — 404 "No route found" when the only way runs through one;
+   * an avoided destination is fine. `features/route/esiRoute.ts` softens that.
    */
   avoid?: readonly number[];
 }
 
-/** Waypoint solar-system ids, including both origin and destination. */
-export function getRoute(
+/**
+ * Waypoint solar-system ids, including both origin and destination.
+ *
+ * The POST endpoint (compatibility date 2025-09-30) replaced
+ * `GET /route/{origin}/{destination}`: only it takes a security penalty,
+ * and the legacy one is gone from the current spec.
+ */
+export async function postRoute(
   origin: number,
   destination: number,
   options: RouteOptions = {}
 ): Promise<EsiResult<number[]>> {
-  const { flag, avoid, ...rest } = options;
-  // Verified live against esi.evetech.net: /route/ 404s on the unversioned
-  // path once X-Compatibility-Date is set (every request here sends it) —
-  // every other endpoint tolerates the unversioned path fine, so the
-  // /latest/ prefix is scoped to this one call rather than a client-wide
-  // change.
-  return esiFetch<number[]>(`/latest/route/${origin}/${destination}`, {
+  const { preference, securityPenalty, avoid, ...rest } = options;
+  const result = await esiFetch<{ route: number[] }>(`/route/${origin}/${destination}`, {
     ...rest,
-    endpointId: 'getRoute',
-    query: { flag, avoid: avoid?.length ? avoid.join(',') : undefined },
+    method: 'POST',
+    endpointId: 'postRoute',
+    body: {
+      preference,
+      security_penalty: securityPenalty,
+      avoid_systems: avoid?.length ? avoid : undefined,
+    },
   });
+  return { ...result, data: result.data?.route ?? null };
 }
 
 // ---------------------------------------------------------------------------

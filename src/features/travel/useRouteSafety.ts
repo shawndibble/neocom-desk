@@ -9,7 +9,6 @@
  * - `unknown`: the stargate snapshot could not be read — this app cannot say.
  */
 import { useEffect, useMemo, useState } from 'react';
-import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import {
   buildRouteSafetyRows,
   summarizeRouteSafety,
@@ -18,7 +17,7 @@ import {
   type RouteSafetySystemEntry,
 } from '@/engine/route/routeSafety';
 import { findLocalRoute, type LocalRouteResult } from '@/features/route/localRoute';
-import { useAvoidedSystemIds } from '@/features/route/avoidedSystems';
+import type { RouteQuery } from '@/features/route/routeRules';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { loadRouteRegionNames, loadSystemActivity, type SystemActivity } from './routeSafetyData';
 
@@ -51,12 +50,12 @@ const NO_SYSTEMS: ReadonlyMap<number, RouteSafetySystemEntry> = new Map();
 export function useRouteSafety(
   fromId: number | null,
   toId: number | null,
-  preference: RoutePreferenceKind
+  route: RouteQuery
 ): RouteSafetyState {
   const [activity, setActivity] = useState<SystemActivity | null>(null);
   const [resolved, setResolved] = useState<ResolvedRoute | null>(null);
-  const { avoided, hydrated } = useAvoidedSystemIds();
-  const requestKey = `${fromId}:${toId}:${preference}:${avoided.join(',')}`;
+  const { rules, key: routeKey, hydrated } = route;
+  const requestKey = `${fromId}:${toId}:${routeKey}`;
   const wantsRoute = fromId !== null && toId !== null && fromId !== toId;
 
   // Re-read per route, not once per mount: inside the cache window it is a
@@ -80,7 +79,7 @@ export function useRouteSafety(
     let cancelled = false;
     void (async () => {
       const [result, systems] = await Promise.all([
-        findLocalRoute(fromId, toId, preference, avoided),
+        findLocalRoute(fromId, toId, rules),
         loadSolarSystemsById().catch(() => null),
       ]);
       const byId = systems ?? NO_SYSTEMS;
@@ -97,7 +96,9 @@ export function useRouteSafety(
     return () => {
       cancelled = true;
     };
-  }, [wantsRoute, hydrated, fromId, toId, preference, avoided, requestKey]);
+    // `requestKey` stands for `rules`: it changes exactly when they do.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsRoute, hydrated, fromId, toId, requestKey]);
 
   return useMemo((): RouteSafetyState => {
     if (fromId === null || toId === null) return { kind: 'incomplete' };

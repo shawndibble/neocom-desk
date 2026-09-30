@@ -59,13 +59,9 @@ import {
 import { EndpointRiskMarkers, RiskMarker } from '@/features/contractSearch/courierRiskDisplay';
 import { MARKED_RISKS } from '@/features/contractSearch/courierRiskLabels';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
-import {
-  DEFAULT_ROUTE_PREFERENCE,
-  ROUTE_PREFERENCE_LABEL_KEYS,
-  ROUTE_PREFERENCES,
-} from '@/features/route/routePreferences';
+import { ROUTE_PREFERENCE_LABEL_KEYS, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
-import { useAvoidedSystemIds } from '@/features/route/avoidedSystems';
+import { useRouteQuery, type RouteQuery } from '@/features/route/routeRules';
 import {
   CourierContractDetailModal,
   type CourierJumps,
@@ -82,7 +78,14 @@ import { formatMagnitude } from '@/lib/magnitude';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useRememberedUrlParams, useUrlSort, type UrlParamValues } from '@/lib/useUrlState';
-import { boolParam, enumParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
+import {
+  boolParam,
+  enumParam,
+  enumSetParam,
+  optionalEnumParam,
+  optionalIdParam,
+  textParam,
+} from '@/lib/urlState';
 import {
   DEFAULT_COURIER_FILTER,
   useCourierFilterPref,
@@ -628,7 +631,8 @@ const COURIER_FILTER_PARAMS = {
   'courier.maxCollateral': textParam(),
   'courier.maxVolume': textParam(),
   'courier.minDays': textParam(),
-  'courier.pref': enumParam(ROUTE_PREFERENCES, DEFAULT_ROUTE_PREFERENCE),
+  // Absent means the pilot's Travel default (Settings → Travel), not a fixed one.
+  'courier.pref': optionalEnumParam(ROUTE_PREFERENCES),
 };
 const COURIER_SORT = { columnId: 'iskPerJump', direction: 'desc' } as const;
 
@@ -699,24 +703,20 @@ const PENDING: JumpsState = { kind: 'pending' };
 /** The modal's own pending value, stable for the same reason `PENDING` is. */
 const PENDING_JUMPS: CourierJumps = { kind: 'pending' };
 
-function useJumpCounts(
-  rows: readonly CourierRouteRow[],
-  preference: RoutePreferenceKind
-): JumpsState {
+function useJumpCounts(rows: readonly CourierRouteRow[], route: RouteQuery): JumpsState {
   // The answer carries the inputs it was computed for, so "pending" is
   // *derived* during render rather than written by the effect: an answer whose
   // inputs are no longer the current ones is stale by definition, and the
   // board reads as loading the instant they change, with no extra render.
   const [answer, setAnswer] = useState<{
     rows: readonly CourierRouteRow[];
-    preference: RoutePreferenceKind;
-    avoided: readonly number[];
+    routeKey: string;
     state: JumpsState;
   } | null>(null);
-  const { avoided, hydrated } = useAvoidedSystemIds();
+  const { rules, key: routeKey, hydrated } = route;
 
   useEffect(() => {
-    // Held until the real list is in, so the board does not rank once without it.
+    // Held until the Travel settings are in, so the board does not rank once without them.
     if (!hydrated) return;
     let cancelled = false;
     void localJumpCountsForRoutes(
@@ -724,22 +724,18 @@ function useJumpCounts(
         originSystemId: row.origin.systemId,
         destinationSystemId: row.destination.systemId,
       })),
-      preference,
-      avoided
+      rules
     ).then((state) => {
-      if (!cancelled) setAnswer({ rows, preference, avoided, state });
+      if (!cancelled) setAnswer({ rows, routeKey, state });
     });
     return () => {
       cancelled = true;
     };
-  }, [rows, preference, avoided, hydrated]);
+    // `routeKey` stands for `rules`: it changes exactly when they do.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, routeKey, hydrated]);
 
-  return answer &&
-    answer.rows === rows &&
-    answer.preference === preference &&
-    answer.avoided === avoided
-    ? answer.state
-    : PENDING;
+  return answer && answer.rows === rows && answer.routeKey === routeKey ? answer.state : PENDING;
 }
 
 /**
@@ -901,7 +897,8 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
     }),
     [params]
   );
-  const preference = params['courier.pref'];
+  const routeQuery = useRouteQuery(params['courier.pref']);
+  const preference = routeQuery.rules.preference;
   const [selectedRow, setSelectedRow] = useState<CourierRouteRow | null>(null);
 
   // Where the character is (issue #940), owned here rather than by the control
@@ -994,7 +991,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
    * market. Costs no more than the unfiltered case already did, and the counts
    * are then looked up by contract id instead of by position.
    */
-  const jumps = useJumpCounts(rows, preference);
+  const jumps = useJumpCounts(rows, routeQuery);
   const visibleColumns = useVisibleCourierColumns((state) => state.value);
   const setVisibleColumns = useVisibleCourierColumns((state) => state.setValue);
   const hydrateVisibleColumns = useVisibleCourierColumns((state) => state.hydrate);

@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
+import type { EsiRouteRules } from '@/features/route/esiRoute';
 import { loadJumpsAway } from './routeDistance';
 
 const server = setupServer();
@@ -14,123 +15,141 @@ beforeEach(async () => {
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
+const JITA = 30000142;
+const AMARR = 30002187;
+const UEDAMA = 30045328;
+const SIVALA = 30003068;
+const ROUTE_URL = `${ESI_BASE_URL}/route/${JITA}/${AMARR}`;
+
+const SHORTEST: EsiRouteRules = { preference: 'shortest', securityPenalty: 50, avoid: [] };
+
+interface RouteBody {
+  preference?: string;
+  security_penalty?: number;
+  avoid_systems?: number[];
+}
+
+/** Answers every route request with `route`, recording each body it was sent. */
+function answerWith(route: number[] | ((body: RouteBody) => Response)) {
+  const bodies: RouteBody[] = [];
+  server.use(
+    http.post(ROUTE_URL, async ({ request }) => {
+      const body = (await request.json()) as RouteBody;
+      bodies.push(body);
+      return typeof route === 'function' ? route(body) : HttpResponse.json({ route });
+    })
+  );
+  return bodies;
+}
+
 describe('loadJumpsAway', () => {
   it('is 0 jumps without a network call when origin and destination are the same system', async () => {
-    const result = await loadJumpsAway(30000142, 30000142, 'shortest');
+    const result = await loadJumpsAway(JITA, JITA, SHORTEST);
     expect(result).toEqual({ kind: 'known', jumps: 0 });
   });
 
   it('resolves jumps from the ESI route waypoint list', async () => {
-    server.use(
-      http.get(`${ESI_BASE_URL}/latest/route/30000142/30002187`, () =>
-        HttpResponse.json([30000142, 30002053, 30002187])
-      )
-    );
+    answerWith([JITA, 30002053, AMARR]);
 
-    const result = await loadJumpsAway(30000142, 30002187, 'shortest');
+    const result = await loadJumpsAway(JITA, AMARR, SHORTEST);
 
     expect(result).toEqual({ kind: 'known', jumps: 2 });
   });
 
-  it('sends the app\'s "safest" preference as ESI\'s real "secure" flag value', async () => {
-    // ESI's actual /route/ enum is shortest/secure/insecure — verified live
-    // against the endpoint; fastest/safest both 400. "Safest" is this app's
-    // own UI wording (per issue #87), translated at the ESI boundary.
-    let capturedFlag: string | null = null;
-    server.use(
-      http.get(`${ESI_BASE_URL}/latest/route/30000142/30002187`, ({ request }) => {
-        capturedFlag = new URL(request.url).searchParams.get('flag');
-        return HttpResponse.json([30000142, 30002187]);
-      })
-    );
+  it("sends each preference in ESI's own words, with the security penalty", async () => {
+    const bodies = answerWith([JITA, AMARR]);
 
-    await loadJumpsAway(30000142, 30002187, 'safest');
+    await loadJumpsAway(JITA, AMARR, {
+      ...SHORTEST,
+      preference: 'prefer-highsec',
+      securityPenalty: 70,
+    });
+    await loadJumpsAway(JITA, AMARR, {
+      ...SHORTEST,
+      preference: 'avoid-highsec',
+      securityPenalty: 20,
+    });
 
-    expect(capturedFlag).toBe('secure');
+    expect(bodies).toEqual([
+      { preference: 'Safer', security_penalty: 70 },
+      { preference: 'LessSecure', security_penalty: 20 },
+    ]);
   });
 
-  it('sends the app\'s "shortest" preference as ESI\'s "shortest" flag value unchanged', async () => {
-    let capturedFlag: string | null = null;
-    server.use(
-      http.get(`${ESI_BASE_URL}/latest/route/30000142/30002187`, ({ request }) => {
-        capturedFlag = new URL(request.url).searchParams.get('flag');
-        return HttpResponse.json([30000142, 30002187]);
-      })
-    );
+  it('leaves the penalty out of a Shorter route, which it cannot bend', async () => {
+    const bodies = answerWith([JITA, AMARR]);
 
-    await loadJumpsAway(30000142, 30002187, 'shortest');
+    await loadJumpsAway(JITA, AMARR, SHORTEST);
 
-    expect(capturedFlag).toBe('shortest');
+    expect(bodies).toEqual([{ preference: 'Shorter' }]);
   });
 
   it('returns unknown/noRoute when the route cannot be resolved', async () => {
-    server.use(
-      http.get(`${ESI_BASE_URL}/latest/route/30000142/30999999`, () => HttpResponse.error())
-    );
+    server.use(http.post(`${ESI_BASE_URL}/route/${JITA}/30999999`, () => HttpResponse.error()));
 
-    const result = await loadJumpsAway(30000142, 30999999, 'shortest');
+    const result = await loadJumpsAway(JITA, 30999999, SHORTEST);
 
     expect(result).toEqual({ kind: 'unknown', reason: 'noRoute' });
+  });
+
+  it('never reuses a distance cached under a different penalty', async () => {
+    answerWith((body) =>
+      HttpResponse.json({
+        route: body.security_penalty === 90 ? [JITA, 1, 2, 3, AMARR] : [JITA, UEDAMA, AMARR],
+      })
+    );
+    const safer: EsiRouteRules = { ...SHORTEST, preference: 'prefer-highsec' };
+
+    expect(await loadJumpsAway(JITA, AMARR, { ...safer, securityPenalty: 10 })).toEqual({
+      kind: 'known',
+      jumps: 2,
+    });
+    expect(await loadJumpsAway(JITA, AMARR, { ...safer, securityPenalty: 90 })).toEqual({
+      kind: 'known',
+      jumps: 4,
+    });
   });
 });
 
 describe('loadJumpsAway with Avoided Systems', () => {
-  const UEDAMA = 30045328;
-  const SIVALA = 30003068;
+  it('sends the list as avoid_systems, leaving out the two ends', async () => {
+    const bodies = answerWith([JITA, 30002053, AMARR]);
 
-  it('sends the list as ESI avoid, leaving out the two ends', async () => {
-    let avoid: string | null = null;
-    server.use(
-      http.get(`${ESI_BASE_URL}/latest/route/30000142/30002187`, ({ request }) => {
-        avoid = new URL(request.url).searchParams.get('avoid');
-        return HttpResponse.json([30000142, 30002053, 30002187]);
-      })
-    );
+    await loadJumpsAway(JITA, AMARR, { ...SHORTEST, avoid: [UEDAMA, JITA, SIVALA, AMARR] });
 
-    await loadJumpsAway(30000142, 30002187, 'shortest', [UEDAMA, 30000142, SIVALA, 30002187]);
-
-    // ESI answers "No route found" for an avoided destination; the app does not.
-    expect(avoid).toBe(`${SIVALA},${UEDAMA}`);
+    expect(bodies[0].avoid_systems).toEqual([SIVALA, UEDAMA]);
   });
 
   /*
-   * ESI's avoid is a hard filter (verified live: 404 "No route found" when the
-   * only way runs through an avoided system). The local graph treats avoidance
-   * as a cost, never a wall — so this falls back to the unfiltered route
-   * rather than calling a reachable station unreachable.
+   * ESI's avoid list is a hard filter (verified live: 404 "No route found"
+   * when the only way runs through an avoided system). The local graph treats
+   * avoidance as a cost, never a wall — so this falls back to the unfiltered
+   * route rather than calling a reachable station unreachable.
    */
   it('falls back to the plain route when avoiding leaves none', async () => {
-    const asked: (string | null)[] = [];
-    server.use(
-      http.get(`${ESI_BASE_URL}/latest/route/30000142/30002187`, ({ request }) => {
-        const avoid = new URL(request.url).searchParams.get('avoid');
-        asked.push(avoid);
-        return avoid
-          ? HttpResponse.json({ error: 'No route found' }, { status: 404 })
-          : HttpResponse.json([30000142, UEDAMA, 30002187]);
-      })
+    const bodies = answerWith((body) =>
+      body.avoid_systems
+        ? HttpResponse.json({ error: 'No route found' }, { status: 404 })
+        : HttpResponse.json({ route: [JITA, UEDAMA, AMARR] })
     );
 
-    const result = await loadJumpsAway(30000142, 30002187, 'shortest', [UEDAMA]);
+    const result = await loadJumpsAway(JITA, AMARR, { ...SHORTEST, avoid: [UEDAMA] });
 
     expect(result).toEqual({ kind: 'known', jumps: 2 });
-    expect(asked).toEqual([`${UEDAMA}`, null]);
+    expect(bodies.map((body) => body.avoid_systems)).toEqual([[UEDAMA], undefined]);
   });
 
   it('never reuses a distance cached under a different list', async () => {
-    server.use(
-      http.get(`${ESI_BASE_URL}/latest/route/30000142/30002187`, ({ request }) =>
-        new URL(request.url).searchParams.get('avoid')
-          ? HttpResponse.json([30000142, 30002053, 30002054, 30002055, 30002187])
-          : HttpResponse.json([30000142, UEDAMA, 30002187])
-      )
+    answerWith((body) =>
+      HttpResponse.json({
+        route: body.avoid_systems
+          ? [JITA, 30002053, 30002054, 30002055, AMARR]
+          : [JITA, UEDAMA, AMARR],
+      })
     );
 
-    expect(await loadJumpsAway(30000142, 30002187, 'shortest')).toEqual({
-      kind: 'known',
-      jumps: 2,
-    });
-    expect(await loadJumpsAway(30000142, 30002187, 'shortest', [UEDAMA])).toEqual({
+    expect(await loadJumpsAway(JITA, AMARR, SHORTEST)).toEqual({ kind: 'known', jumps: 2 });
+    expect(await loadJumpsAway(JITA, AMARR, { ...SHORTEST, avoid: [UEDAMA] })).toEqual({
       kind: 'known',
       jumps: 4,
     });

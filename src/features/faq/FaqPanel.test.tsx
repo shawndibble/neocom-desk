@@ -52,6 +52,13 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.overviewHiddenCards': /Overview cards you hid/i,
   'sync.overviewCardOrder': /order you put them in/i,
   'sync.avoidedSystems': /systems you avoid/i,
+  'sync.avoidedSystemsEnabled': /systems you avoid/i,
+  'sync.routePreference': /route preference/i,
+  'sync.routeSecurityPenalty': /security penalty/i,
+  'sync.avoidEdencom': /EDENCOM/,
+  'sync.avoidTriglavian': /Triglavian/,
+  'sync.avoidPodKills': /pod kills/i,
+  'sync.podKillThreshold': /pod kills/i,
 };
 
 function syncedItemIds(): Set<string> {

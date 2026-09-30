@@ -1,11 +1,10 @@
 /**
  * Jumps-away distance between two solar systems (issue #87), via ESI's
  * server-side `/route/` — no local pathfinding graph needed (CONTEXT.md round
- * 14). Cached under the global sentinel: a route between two systems for a
- * given preference is character-independent, same shape as `stations.ts`'s
+ * 14). Cached under the global sentinel: a route between two systems under
+ * given Travel rules is character-independent, same shape as `stations.ts`'s
  * station-name cache.
  */
-import { avoidCacheSuffix, getRouteAvoiding } from '@/features/route/esiRoute';
 import {
   conditionalFetch,
   loadWithCache,
@@ -13,46 +12,32 @@ import {
   STALE_AFTER,
 } from '@/esi/cache';
 import { jumpsAwayFromRoute, type JumpsAwayResult } from '@/engine/jumpsAway';
-import type { RoutePreference } from './routePreference';
+import { getRouteUnderRules, rulesCacheKey, type EsiRouteRules } from '@/features/route/esiRoute';
 
 function cacheKey(
   originSystemId: number,
   destinationSystemId: number,
-  preference: RoutePreference,
-  avoid: readonly number[]
+  rules: EsiRouteRules
 ): string {
-  return `route:${originSystemId}:${destinationSystemId}:${preference}${avoidCacheSuffix(
-    originSystemId,
-    destinationSystemId,
-    avoid
-  )}`;
-}
-
-/** The app's "Shortest"/"Safest" wording maps to ESI's real `shortest`/`secure` flag values — see `RouteOptions` in `esi/endpoints.ts`. */
-function routeFlagFor(preference: RoutePreference): 'shortest' | 'secure' {
-  return preference === 'safest' ? 'secure' : 'shortest';
+  return `route:${originSystemId}:${destinationSystemId}:${rulesCacheKey(originSystemId, destinationSystemId, rules)}`;
 }
 
 export async function loadJumpsAway(
   originSystemId: number,
   destinationSystemId: number,
-  preference: RoutePreference,
-  /** The pilot's Avoided Systems — see `features/route/esiRoute.ts` for how ESI is asked. */
-  avoid: readonly number[] = []
+  rules: EsiRouteRules
 ): Promise<JumpsAwayResult> {
   if (originSystemId === destinationSystemId) return jumpsAwayFromRoute([originSystemId]);
   const { fetchLive, conditional } = conditionalFetch((options) =>
-    getRouteAvoiding(originSystemId, destinationSystemId, avoid, {
-      ...options,
-      flag: routeFlagFor(preference),
-    })
+    getRouteUnderRules(originSystemId, destinationSystemId, rules, options)
   );
   const result = await loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
-    cacheKey(originSystemId, destinationSystemId, preference, avoid),
+    cacheKey(originSystemId, destinationSystemId, rules),
     fetchLive,
-    // The jump graph is map data; a route between two fixed systems under a
-    // fixed preference is stable across a session and well beyond it.
+    // The jump graph is map data; a route between two fixed systems under
+    // fixed rules is stable across a session and well beyond it. Pod-kill
+    // avoidance changes the rules hourly, and so the key, not this entry.
     { staleAfterMs: STALE_AFTER.static, conditional }
   );
   return jumpsAwayFromRoute(result?.data ?? null);

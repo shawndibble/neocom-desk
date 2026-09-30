@@ -236,3 +236,83 @@ describe('avoided systems', () => {
     expect(jumps.get(LOW)).toBe(1);
   });
 });
+
+/*
+ * CCP's own route costs (developers.eveonline.com "Route Calculation"), so a
+ * local route agrees with ESI's and the game's: the system jumped into costs
+ * exp(0.15 × penalty) when unwanted, twice that for nullsec, and 0.9 when
+ * wanted. Raw security, 0.45 the highsec line.
+ */
+describe('security penalty', () => {
+  //   S ─ H1 ─ H2 ─ H3 ─ E      four jumps, highsec
+  //   S ─ L ─ E                 two jumps through one 0.4 system
+  const S = 1;
+  const H1 = 2;
+  const H2 = 3;
+  const H3 = 4;
+  const L = 5;
+  const E = 6;
+  const graph: JumpGraph = new Map([
+    [S, [H1, L]],
+    [H1, [S, H2]],
+    [H2, [H1, H3]],
+    [H3, [H2, E]],
+    [L, [S, E]],
+    [E, [H3, L]],
+  ]);
+  const security = new Map([
+    [S, 1.0],
+    [H1, 0.9],
+    [H2, 0.9],
+    [H3, 0.9],
+    [L, 0.4],
+    [E, 1.0],
+  ]);
+  const securityOfSmall = (id: number) => security.get(id);
+  const safer = (securityPenalty: number) =>
+    findJumpRoute(graph, S, E, {
+      preference: 'prefer-highsec',
+      securityOf: securityOfSmall,
+      securityPenalty,
+    });
+
+  it('takes the lowsec shortcut at penalty 0, where it costs no more than a highsec jump', () => {
+    // Two jumps at 1 + 0.9 = 1.9 beat four at 0.9 each = 3.6.
+    expect(safer(0)).toEqual({ kind: 'route', systems: [S, L, E] });
+  });
+
+  it('goes the long way once the penalty makes the lowsec jump dearer than the detour', () => {
+    // exp(0.15 × 10) ≈ 4.48 + 0.9 = 5.38 against 3.6.
+    expect(safer(10)).toEqual({ kind: 'route', systems: [S, H1, H2, H3, E] });
+  });
+
+  it('defaults to the game default of 50', () => {
+    const route = findJumpRoute(graph, S, E, {
+      preference: 'prefer-highsec',
+      securityOf: securityOfSmall,
+    });
+    expect(route).toEqual(safer(50));
+    expect(route).toEqual({ kind: 'route', systems: [S, H1, H2, H3, E] });
+  });
+
+  it('reads 0.45 as highsec, on the raw status rather than the rounded one', () => {
+    // 0.449 shows as 0.4 in game but 0.45 does not round down: both sides of the line.
+    const nearLine = new Map(security).set(L, 0.45);
+    const route = findJumpRoute(graph, S, E, {
+      preference: 'prefer-highsec',
+      securityOf: (id) => nearLine.get(id),
+    });
+    expect(route).toEqual({ kind: 'route', systems: [S, L, E] });
+  });
+
+  it('keeps Avoided Systems above even the harshest penalty', () => {
+    const lowsecDetour = new Map(security).set(H2, 0.1);
+    const route = findJumpRoute(graph, S, E, {
+      preference: 'prefer-highsec',
+      securityOf: (id) => lowsecDetour.get(id),
+      securityPenalty: 100,
+      avoid: new Set([L]),
+    });
+    expect(route).toEqual({ kind: 'route', systems: [S, H1, H2, H3, E] });
+  });
+});

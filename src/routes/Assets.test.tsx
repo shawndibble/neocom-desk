@@ -129,8 +129,8 @@ const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/location`, () =>
     HttpResponse.json({ solar_system_id: 30000142 })
   ),
-  http.get('https://esi.evetech.net/latest/route/:origin/:destination', ({ params }) =>
-    HttpResponse.json([Number(params.origin), Number(params.destination)])
+  http.post('https://esi.evetech.net/route/:origin/:destination', ({ params }) =>
+    HttpResponse.json({ route: [Number(params.origin), Number(params.destination)] })
   )
 );
 
@@ -1269,9 +1269,9 @@ describe('jumps-away distance (issue #87)', () => {
     const user = userEvent.setup();
     let routeCalled = false;
     server.use(
-      http.get('https://esi.evetech.net/latest/route/:origin/:destination', () => {
+      http.post('https://esi.evetech.net/route/:origin/:destination', () => {
         routeCalled = true;
-        return HttpResponse.json([30000142]);
+        return HttpResponse.json({ route: [30000142] });
       })
     );
     render(<App />);
@@ -1293,8 +1293,8 @@ describe('jumps-away distance (issue #87)', () => {
           solar_system_id: 30002187,
         })
       ),
-      http.get('https://esi.evetech.net/latest/route/30000142/30002187', () =>
-        HttpResponse.json([30000142, 30002053, 30002187])
+      http.post('https://esi.evetech.net/route/30000142/30002187', () =>
+        HttpResponse.json({ route: [30000142, 30002053, 30002187] })
       )
     );
     await db.stationPins.put({
@@ -1331,8 +1331,8 @@ describe('jumps-away distance (issue #87)', () => {
       http.get('https://esi.evetech.net/universe/systems/30002187', () =>
         HttpResponse.json({ system_id: 30002187, name: 'Amamake', security_status: 0.3 })
       ),
-      http.get('https://esi.evetech.net/latest/route/30000142/30002187', () =>
-        HttpResponse.json([30000142, 30002053, 30002187])
+      http.post('https://esi.evetech.net/route/30000142/30002187', () =>
+        HttpResponse.json({ route: [30000142, 30002053, 30002187] })
       )
     );
     await db.stationPins.put({
@@ -1383,9 +1383,9 @@ describe('jumps-away distance (issue #87)', () => {
     expect(screen.queryByText('Log in again to see your assets')).not.toBeInTheDocument();
   });
 
-  it('lets the user switch route preference, re-requesting the route with the new flag', async () => {
+  it('opens on the Travel default and lets the user switch preference for this view', async () => {
     const user = userEvent.setup();
-    const seenFlags: (string | null)[] = [];
+    const seenFlags: (string | undefined)[] = [];
     server.use(
       http.get('https://esi.evetech.net/universe/structures/1000000000001', () =>
         HttpResponse.json({
@@ -1394,9 +1394,9 @@ describe('jumps-away distance (issue #87)', () => {
           solar_system_id: 30002187,
         })
       ),
-      http.get('https://esi.evetech.net/latest/route/30000142/30002187', ({ request }) => {
-        seenFlags.push(new URL(request.url).searchParams.get('flag'));
-        return HttpResponse.json([30000142, 30002187]);
+      http.post('https://esi.evetech.net/route/30000142/30002187', async ({ request }) => {
+        seenFlags.push(((await request.json()) as { preference?: string }).preference);
+        return HttpResponse.json({ route: [30000142, 30002187] });
       })
     );
     await db.stationPins.put({
@@ -1409,14 +1409,13 @@ describe('jumps-away distance (issue #87)', () => {
 
     render(<App />);
     await screen.findByText('1 jump');
-    expect(seenFlags).toEqual(['shortest']);
+    // The Travel default is Prefer safer, sent in ESI's own word.
+    expect(seenFlags).toEqual(['Safer']);
 
     await user.click(screen.getByRole('combobox', { name: 'Route' }));
-    await user.click(await screen.findByRole('option', { name: 'Safest' }));
+    await user.click(await screen.findByRole('option', { name: 'Prefer shorter' }));
 
-    // ESI's real flag enum is shortest/secure/insecure — "Safest" is this
-    // app's own UI wording, translated to ESI's "secure" at the boundary.
-    await waitFor(() => expect(seenFlags).toEqual(['shortest', 'secure']));
+    await waitFor(() => expect(seenFlags).toEqual(['Safer', 'Shorter']));
   });
 });
 

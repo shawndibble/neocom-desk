@@ -37,7 +37,7 @@ import {
   getCharacterIndustryJobs,
   getMarketsPrices,
   getIndustrySystemCostIndices,
-  getRoute,
+  postRoute,
 } from './endpoints';
 import type { CharacterSkills, SkillQueueEntry, CharacterAttributes } from './endpoints';
 
@@ -408,24 +408,25 @@ describe('public info endpoints', () => {
     expect(result.data?.security_status).toBeCloseTo(0.9459);
   });
 
-  // ESI's /route/ endpoint 404s on the unversioned path once
-  // X-Compatibility-Date is set (every request here sends it) — confirmed
-  // live against esi.evetech.net: the same call against
-  // /latest/route/{origin}/{destination} succeeds. Every other endpoint
-  // tolerates the unversioned path fine, so this is scoped to getRoute
-  // rather than a global client change.
-  it('getRoute requests the versioned /latest/route/ path', async () => {
+  it('postRoute sends the preference, penalty and avoid list as JSON and unwraps the route', async () => {
+    let body: unknown = null;
     server.use(
-      http.get(`${ESI_BASE_URL}/latest/route/30003893/30000142`, ({ request }) => {
+      http.post(`${ESI_BASE_URL}/route/30003893/30000142`, async ({ request }) => {
         const bad = rejectBadEsiHeaders(request);
         if (bad) return bad;
-        return HttpResponse.json([30003893, 30000142]);
+        body = await request.json();
+        return HttpResponse.json({ route: [30003893, 30000142] });
       })
     );
 
-    const result = await getRoute(30003893, 30000142, { flag: 'shortest' });
+    const result = await postRoute(30003893, 30000142, {
+      preference: 'Safer',
+      securityPenalty: 60,
+      avoid: [30045328],
+    });
 
     expect(result.data).toEqual([30003893, 30000142]);
+    expect(body).toEqual({ preference: 'Safer', security_penalty: 60, avoid_systems: [30045328] });
   });
 });
 

@@ -59,8 +59,9 @@ import { loadSystemSecurity, loadSystemName } from '@/features/character/systemS
 import { loadTypeNames, loadTypeVolumes } from '@/features/character/typeNames';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadJumpsAway } from '@/features/character/routeDistance';
-import { useAvoidedSystemIds } from '@/features/route/avoidedSystems';
-import { useRoutePreference, type RoutePreference } from '@/features/character/routePreference';
+import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
+import { ROUTE_PREFERENCE_LABEL_KEYS, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
+import { useRouteQuery } from '@/features/route/routeRules';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useFocusHeading } from '@/lib/useFocusHeading';
 import type { CharacterAsset } from '@/esi/endpoints';
@@ -912,19 +913,14 @@ export function Assets() {
     [mergedAssets]
   );
 
-  const routePreference = useRoutePreference((state) => state.value);
-  const { avoided, hydrated: avoidedHydrated } = useAvoidedSystemIds();
-  // What a jumps-away answer was worked out under: the preference and the
-  // Avoided Systems both change the route, so both are in its key.
-  const jumpsFor = useMemo(
-    () => `${routePreference}|${[...avoided].sort((a, b) => a - b).join(',')}`,
-    [routePreference, avoided]
-  );
-  const hydrateRoutePreference = useRoutePreference((state) => state.hydrate);
-  const setRoutePreference = useRoutePreference((state) => state.setValue);
-  useEffect(() => {
-    void hydrateRoutePreference();
-  }, [hydrateRoutePreference]);
+  // Opens on the pilot's Travel default; the picker here changes this view only.
+  const [routeOverride, setRouteOverride] = useState<RoutePreferenceKind | null>(null);
+  const assetsRoute = useRouteQuery(routeOverride);
+  const routePreference = assetsRoute.rules.preference;
+  // What a jumps-away answer was worked out under: every Travel rule changes
+  // the route, so the whole query is in its key.
+  const jumpsFor = assetsRoute.key;
+  const avoidedHydrated = assetsRoute.hydrated;
 
   const stationSortField = useStationSort((state) => state.value);
   const hydrateStationSort = useStationSort((state) => state.hydrate);
@@ -1395,7 +1391,7 @@ export function Assets() {
         result =
           systemId === null
             ? { kind: 'unknown', reason: 'noRoute' }
-            : await loadJumpsAway(characterSystemId, systemId, routePreference, avoided);
+            : await loadJumpsAway(characterSystemId, systemId, assetsRoute.rules);
       }
       if (activeCharacterIdRef.current === requestedForCharacterId) {
         setJumpsAwayByKey((prev) => new Map(prev).set(key, result));
@@ -1408,8 +1404,7 @@ export function Assets() {
     stableScopedStations,
     jumpsAwayByKey,
     stationSystemIds,
-    routePreference,
-    avoided,
+    assetsRoute.rules,
     avoidedHydrated,
     jumpsFor,
   ]);
@@ -1872,23 +1867,20 @@ export function Assets() {
                         </Select>
                         <Select
                           value={routePreference}
-                          onValueChange={(value) =>
-                            void setRoutePreference(value as RoutePreference)
-                          }
+                          onValueChange={(value) => setRouteOverride(value as RoutePreferenceKind)}
                         >
                           <SelectTrigger
                             aria-label={t('assets.jumpsAway.routePreference.label')}
-                            className="w-28"
+                            className="w-40"
                           >
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="shortest">
-                              {t('assets.jumpsAway.routePreference.shortest')}
-                            </SelectItem>
-                            <SelectItem value="safest">
-                              {t('assets.jumpsAway.routePreference.safest')}
-                            </SelectItem>
+                            {ROUTE_PREFERENCES.map((preference) => (
+                              <SelectItem key={preference} value={preference}>
+                                {t(ROUTE_PREFERENCE_LABEL_KEYS[preference])}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>

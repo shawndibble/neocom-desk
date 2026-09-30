@@ -461,9 +461,9 @@ describe('ContractSearchPanel', () => {
       const rows = await bodyRows();
       const jumpsCell = (index: number) => rows[index].querySelector('[data-label="Jumps"]');
       expect(within(jumpsCell(0) as HTMLElement).getByText('0')).toBeInTheDocument();
-      // 2 via the lowsec shortcut (`JUMPS`'s shortest path), not the 4-jump
-      // highsec-only route the Courier board's own routing preference takes.
-      expect(within(jumpsCell(1) as HTMLElement).getByText('2')).toBeInTheDocument();
+      // 4, the highsec-only way: distance is counted under the pilot's Travel
+      // default (Prefer safer), not by `JUMPS`'s 2-jump lowsec shortcut.
+      expect(within(jumpsCell(1) as HTMLElement).getByText('4')).toBeInTheDocument();
     });
   });
 
@@ -759,7 +759,7 @@ describe('ContractSearchPanel — Courier mode', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /filters/i }));
     await userEvent.click(screen.getByRole('combobox', { name: 'Route' }));
-    await userEvent.click(screen.getByRole('option', { name: 'Shortest' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Prefer shorter' }));
 
     await waitFor(async () => {
       const refreshed = await bodyRows();
