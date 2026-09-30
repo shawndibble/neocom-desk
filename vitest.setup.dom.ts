@@ -15,6 +15,7 @@
  */
 import '@testing-library/jest-dom/vitest';
 import { configure } from '@testing-library/react';
+import { afterAll } from 'vitest';
 
 /**
  * Default is 1000ms. Under the CPU contention of several `/next-ticket`
@@ -26,6 +27,20 @@ import { configure } from '@testing-library/react';
  * only buys back time lost to scheduling, not to a broken assertion.
  */
 configure({ asyncUtilTimeout: 5000 });
+
+/**
+ * Radix's FocusScope unmounts by scheduling a `setTimeout(0)` that dispatches
+ * a focus event on its container. After a file's last test, Testing Library's
+ * cleanup unmounts an open menu, and if vitest tears jsdom down before that
+ * timer fires, it dispatches into a dead environment: "Failed to execute
+ * 'dispatchEvent' on 'EventTarget': parameter 1 is not of type 'Event'". The
+ * tests all pass, but the unhandled error fails the run (TableExport.test.tsx
+ * did on CI). One macrotask after the file's final cleanup lets it land while
+ * jsdom is still alive.
+ */
+afterAll(async () => {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+});
 
 /**
  * jsdom 30 ships the `HTMLDialogElement` interface but none of its behaviour, so
