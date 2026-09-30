@@ -797,7 +797,7 @@ describe('item name and blueprint badge', () => {
 
   it('badges a blueprint original as BPO once the blueprint set loads', async () => {
     const { loadBlueprints } = await import('@/sde/loadSde');
-    vi.mocked(loadBlueprints).mockResolvedValueOnce({
+    vi.mocked(loadBlueprints).mockResolvedValue({
       '691': {
         name: 'Rifter Blueprint',
         time: 6000,
@@ -819,8 +819,10 @@ describe('item name and blueprint badge', () => {
     render(<App />);
     await openLocation(user, JITA);
 
-    expect(await screen.findByTitle('Blueprint original')).toHaveTextContent('BPO');
-    expect(screen.getAllByTitle(/^Blueprint (original|copy)$/)).toHaveLength(1);
+    const badge = (await screen.findByText('Blueprint original')).parentElement;
+    expect(badge).toHaveTextContent('BPO');
+    expect(screen.getAllByText(/^Blueprint (original|copy)$/)).toHaveLength(1);
+    vi.mocked(loadBlueprints).mockResolvedValue({});
   });
 });
 

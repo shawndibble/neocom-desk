@@ -123,6 +123,13 @@
   --color-mastery-elite: #e8b84a;
   --color-omega: #d9a72c;
 
+  /*
+   * Blueprint copy — the Assets pages' BPC badge and nothing else (DESIGN.md
+   * §1 "Blueprints"). Its BPO sibling is plain `accent`. >= 34 deltaE from
+   * every other colour token, 7.3:1 on panel-2.
+   */
+  --color-blueprint-copy: #ea86ea;
+
   /* Type — system stack approximating EVE's condensed sans */
   --font-sans: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;

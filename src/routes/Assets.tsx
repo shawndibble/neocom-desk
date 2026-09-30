@@ -67,7 +67,7 @@ import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
-import { assetBlueprintKind, mayBeBlueprintName } from '@/engine/blueprintKind';
+import { assetBlueprintKind } from '@/engine/blueprintKind';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
 import type { TableExport } from '@/components/ui/useTableExport';
@@ -891,13 +891,7 @@ export function Assets() {
     }
     return merged;
   }, [typeNames, activeCrossCharacterData]);
-  // The BPO badge's blueprint set, fetched only once a listed name could be a
-  // blueprint's — most asset lists hold none, and the catalog is 1.6 MB.
-  const mayHoldBlueprints = useMemo(
-    () => [...mergedTypeNames.values()].some(mayBeBlueprintName),
-    [mergedTypeNames]
-  );
-  const blueprintTypeIds = useBlueprintTypeIds(mayHoldBlueprints);
+  const blueprintTypeIds = useBlueprintTypeIds(mergedTypeNames);
   const mergedLocationNames = useMemo(() => {
     if (!activeCrossCharacterData) return locationNames;
     const merged = new Map(locationNames);

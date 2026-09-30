@@ -12,11 +12,12 @@
  * (`w-14`/`w-16`/`w-20`) wrap with everything else.
  */
 
-import type { ReactElement, ReactNode } from 'react';
+import { useRef, type ReactElement, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { IconButton, IskAmount, RowActionsMenu, RowMoreActions } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { formatUnitVolume } from '@/lib/volume';
 import { securityStatusColor } from '@/engine/securityStatus';
 import { formatBadge } from './assetBrowserFormat';
@@ -97,31 +98,37 @@ interface BlueprintBadgeProps {
   t: Translate;
 }
 
+/** Per kind: the visible abbreviation, the full name a screen reader hears, and its hue (DESIGN.md §1 "Blueprints"). */
+const BLUEPRINT_BADGE: Record<BlueprintKind, { label: string; name: string; className: string }> = {
+  original: {
+    label: 'assets.blueprintBadge.original.label',
+    name: 'assets.blueprintBadge.original.name',
+    className: 'border-accent-dim text-accent',
+  },
+  copy: {
+    label: 'assets.blueprintBadge.copy.label',
+    name: 'assets.blueprintBadge.copy.name',
+    className: 'border-blueprint-copy/50 text-blueprint-copy',
+  },
+};
+
 /**
  * Marks a blueprint stack as a **BPO** or a **BPC** (CONTEXT.md) — the one
  * distinction the item name can't carry, since a copy shares its original's
- * typeID and name. Same accent-for-original convention as Industry's owned
- * blueprints; the written label, not the colour, is the signal (DESIGN.md §7),
- * and the full word is there for a screen reader.
+ * typeID and name. The written label, not the colour, is the signal
+ * (DESIGN.md §7); a screen reader hears the full name instead of the letters.
  */
 export function BlueprintBadge({ kind, t }: BlueprintBadgeProps) {
-  const original = kind === 'original';
+  const badge = BLUEPRINT_BADGE[kind];
   return (
     <span
       className={cx(
         'ml-1.5 shrink-0 rounded-xs border px-1 py-0.5 text-[0.6875rem] font-semibold',
-        original ? 'border-accent-dim text-accent' : 'border-line bg-panel-2 text-text-dim'
-      )}
-      title={t(
-        original ? 'assets.blueprintBadge.originalTitle' : 'assets.blueprintBadge.copyTitle'
+        badge.className
       )}
     >
-      <span aria-hidden="true">
-        {t(original ? 'assets.blueprintBadge.original' : 'assets.blueprintBadge.copy')}
-      </span>
-      <span className="sr-only">
-        {t(original ? 'assets.blueprintBadge.originalTitle' : 'assets.blueprintBadge.copyTitle')}
-      </span>
+      <span aria-hidden="true">{t(badge.label)}</span>
+      <span className="sr-only">{t(badge.name)}</span>
     </span>
   );
 }
@@ -342,6 +349,52 @@ export function ItemColumnLabels({ t }: ItemColumnLabelsProps) {
   );
 }
 
+/**
+ * How long a touch has to be held before it reads as the row menu's
+ * long-press rather than a tap — Radix opens the context menu at 700ms, so
+ * anything past `Tooltip`'s own 500ms hold is already that gesture.
+ */
+const LONG_PRESS_MS = 500;
+
+/**
+ * An item's name as the way into its Show info. It sits inside the row menu's
+ * trigger, so a touch-and-hold on it opens that menu — and some browsers
+ * still send a click when the finger lifts. That click is swallowed: a press
+ * that became a context menu (or was held that long) never opens Show info
+ * on top of the menu it just opened.
+ */
+function ItemNameButton({ name, onShowInfo }: { name: string; onShowInfo: () => void }) {
+  const press = useRef<{ start: number; touch: boolean; menu: boolean } | null>(null);
+  return (
+    <button
+      type="button"
+      className={cx(
+        'min-w-0 cursor-pointer truncate text-left text-sm underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+        tappableRowClassName
+      )}
+      title={name}
+      onPointerDown={(event) => {
+        press.current = {
+          start: event.timeStamp,
+          touch: event.pointerType !== 'mouse',
+          menu: false,
+        };
+      }}
+      onContextMenu={() => {
+        if (press.current) press.current.menu = true;
+      }}
+      onClick={(event) => {
+        const p = press.current;
+        press.current = null;
+        if (p && (p.menu || (p.touch && event.timeStamp - p.start >= LONG_PRESS_MS))) return;
+        onShowInfo();
+      }}
+    >
+      {name}
+    </button>
+  );
+}
+
 interface ItemRowProps {
   name: string;
   quantity: number;
@@ -407,14 +460,7 @@ export function ItemRow({
           <span className="flex min-w-0 flex-1 flex-col gap-0.5 md:contents">
             <span className="flex min-w-0 items-center md:flex-1">
               {onShowInfo ? (
-                <button
-                  type="button"
-                  className="min-w-0 cursor-pointer truncate text-left text-sm underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  title={name}
-                  onClick={onShowInfo}
-                >
-                  {name}
-                </button>
+                <ItemNameButton name={name} onShowInfo={onShowInfo} />
               ) : (
                 <span className="truncate text-sm" title={name}>
                   {name}

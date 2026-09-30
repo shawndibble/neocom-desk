@@ -186,6 +186,19 @@ the app's own. Always pair them with a written label — "Mastery V", "Needs an
 Omega clone" (§7). Scope decision:
 `docs/context/decisions/20260926-135538-fittings-ship-tree-tab-and-ship-info-window.md`.
 
+### Blueprints
+
+| Token            | Value     | Use                                                      |
+| ---------------- | --------- | -------------------------------------------------------- |
+| `blueprint-copy` | `#ea86ea` | The **BPC** badge on Assets item rows, and nothing else. |
+
+Its **BPO** sibling is plain `accent`, the convention Industry's owned
+blueprints already use. A copy needed a hue of its own: grey read as "no
+kind", and every existing token already means something — a clock kind or a
+status tone would give one hue two meanings. It sits ≥ 34 ΔE from every other
+colour token and at 7.3:1 on `panel-2`. Always paired with the written "BPO"
+/ "BPC" label (§7).
+
 ## 2. Typography
 
 No bundled fonts, no new deps — system stack approximating EVE's condensed sans

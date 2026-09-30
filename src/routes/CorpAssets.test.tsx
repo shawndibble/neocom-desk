@@ -461,16 +461,16 @@ describe('item name and blueprint badge', () => {
     renderAssets();
     await user.click(await screen.findByRole('link', { name: /Division 1/ }));
 
-    expect(await screen.findByTitle('Blueprint original')).toHaveTextContent('BPO');
-    expect(screen.getByTitle('Blueprint copy')).toHaveTextContent('BPC');
-    expect(screen.getAllByTitle(/^Blueprint (original|copy)$/)).toHaveLength(2);
+    expect((await screen.findByText('Blueprint original')).parentElement).toHaveTextContent('BPO');
+    expect(screen.getByText('Blueprint copy').parentElement).toHaveTextContent('BPC');
+    expect(screen.getAllByText(/^Blueprint (original|copy)$/)).toHaveLength(2);
   });
 
   it('badges a blueprint search hit, whose row stays a link', async () => {
     renderAssets('/corp/assets?q=Rifter');
 
-    expect(await screen.findByTitle('Blueprint original')).toHaveTextContent('BPO');
-    expect(screen.getByTitle('Blueprint copy')).toHaveTextContent('BPC');
+    expect((await screen.findByText('Blueprint original')).parentElement).toHaveTextContent('BPO');
+    expect(screen.getByText('Blueprint copy').parentElement).toHaveTextContent('BPC');
     expect(screen.queryByRole('button', { name: 'Rifter Blueprint' })).not.toBeInTheDocument();
   });
 });

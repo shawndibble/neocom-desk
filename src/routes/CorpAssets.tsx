@@ -98,7 +98,7 @@ import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useItemActions } from '@/features/market/itemActions';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
-import { assetBlueprintKind, mayBeBlueprintName } from '@/engine/blueprintKind';
+import { assetBlueprintKind } from '@/engine/blueprintKind';
 import { useCompareSet } from '@/features/market/compareSet';
 import { writeToClipboard } from '@/lib/clipboard';
 import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
@@ -382,13 +382,7 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
   const typeNames = data?.labels.types ?? EMPTY_CORP_ASSET_LABELS.types;
   const locationNames = data?.labels.locations ?? EMPTY_CORP_ASSET_LABELS.locations;
   const divisionNames = data?.divisionNames ?? EMPTY_DIVISION_NAMES;
-  // The BPO badge's blueprint set, fetched only once a listed name could be a
-  // blueprint's — most hangars hold none, and the catalog is 1.6 MB.
-  const mayHoldBlueprints = useMemo(
-    () => [...typeNames.values()].some(mayBeBlueprintName),
-    [typeNames]
-  );
-  const blueprintTypeIds = useBlueprintTypeIds(mayHoldBlueprints);
+  const blueprintTypeIds = useBlueprintTypeIds(typeNames);
 
   const resolved = useMemo(
     () => resolveCorpAssetPath(groups ?? [], pathGroupId, pathSegments),
