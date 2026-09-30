@@ -19,8 +19,8 @@ import type { PlanEntry } from '@/engine/types';
 import { RequiredSkillsSection } from '@/features/market/RequiredSkillsSection';
 import { isEntryCovered, plannedLevelFor } from '@/features/skills/planner/reorder';
 import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
+import { SkillNameButton } from '@/features/skills/SkillNameButton';
 import { SkillRow } from '@/features/skills/SkillRow';
-import { openSkillDetailModal } from '@/stores/skillDetailModal';
 import { skillTrainingStatus } from '@/features/skills/skillStatus';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { targetPlanEntries, type TargetPlan } from '@/features/skills/useTargetPlan';
@@ -235,6 +235,7 @@ export function SkillsMasteryTab({
                         <SkillRow
                           name={`${skillName(p.skillTypeID)} ${romanLevel(p.level)}`}
                           skillTypeID={p.skillTypeID}
+                          planEntries={planEntries}
                           status={status}
                           currentLevel={have}
                           timeLabel={
@@ -247,13 +248,9 @@ export function SkillsMasteryTab({
                         />
                       ) : (
                         <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => openSkillDetailModal(p.skillTypeID)}
-                            className="flex-1 text-left text-text hover:underline"
-                          >
+                          <SkillNameButton skillTypeID={p.skillTypeID} className="flex-1 text-text">
                             {skillName(p.skillTypeID)}
-                          </button>
+                          </SkillNameButton>
                           <span className="text-text-dim">
                             {t('plans.level', { level: p.level })}
                           </span>

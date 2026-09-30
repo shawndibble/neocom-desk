@@ -1,8 +1,9 @@
 /** One skill's status/level/[time]/[Add] row — shared by the Ships panel (Fit Check + Mastery) and Market's Required Skills, which otherwise each hand-rolled the same icon+name+bar layout. */
 import type { ReactNode } from 'react';
+import type { PlanEntry } from '@/engine/types';
 import { Button, SkillBar } from '@/components/ui';
-import { openSkillDetailModal } from '@/stores/skillDetailModal';
 import type { SkillTrainingStatus } from './skillStatus';
+import { SkillNameButton } from './SkillNameButton';
 import { SkillStatusIcon } from './SkillStatusIcon';
 
 export interface SkillRowProps {
@@ -22,6 +23,8 @@ export interface SkillRowProps {
   plannedLevel?: number | null;
   /** When set, the name opens the shared Skill Detail popover (#400/#405) instead of rendering as inert text. */
   skillTypeID?: number;
+  /** The target Skill Plan's entries, carried into the Skill Detail popover so its prerequisites read "Planned". */
+  planEntries?: readonly PlanEntry[];
 }
 
 /** No outer padding/border/margin — the caller's own wrapper controls spacing, since the Ships panel and Market's Required Skills each frame this row differently (dividers vs. plain stack). */
@@ -36,6 +39,7 @@ export function SkillRow({
   inPlanLabel,
   plannedLevel,
   skillTypeID,
+  planEntries,
 }: SkillRowProps) {
   const inPlan = status !== 'trained' && inPlanLabel !== undefined;
   const trailing =
@@ -51,13 +55,13 @@ export function SkillRow({
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
       <SkillStatusIcon status={status} />
       {skillTypeID !== undefined ? (
-        <button
-          type="button"
-          onClick={() => openSkillDetailModal(skillTypeID)}
-          className="flex-auto text-left text-text hover:underline"
+        <SkillNameButton
+          skillTypeID={skillTypeID}
+          planEntries={planEntries}
+          className="flex-auto text-text"
         >
           {name}
-        </button>
+        </SkillNameButton>
       ) : (
         <span className="flex-auto text-text">{name}</span>
       )}
