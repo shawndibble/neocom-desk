@@ -59,6 +59,12 @@ function gain(skillTypeId: number, fromLevel: number, overall: number): SkillGai
       hold: 0,
       remoteRepair: 0,
       jumpRange: 0,
+      burstStrength: 0,
+      burstRange: 0,
+      burstDuration: 0,
+      burstReload: 0,
+      compressionRange: 0,
+      coreFuel: 0,
     },
   };
 }

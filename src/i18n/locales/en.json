@@ -632,6 +632,7 @@
         "fitting": "Fitting",
         "price": "Price",
         "support": "Support out",
+        "fleetBoosts": "Fleet boosts",
         "mining": "Mining",
         "projected": "Projected effects",
         "fighters": "Fighters"
@@ -833,6 +834,15 @@
         "note": "Yield includes expected critical successes; a crystal's bonus counts only on its own ore. Residue is extra ore the asteroid loses on top of what you mine: it doesn't reduce your yield.",
         "fillTime": "{{time}} ({{capacity}} m³)"
       },
+      "fleetBoosts": {
+        "strength": "Strength",
+        "range": "Range",
+        "length": "Length",
+        "reload": "Reload",
+        "noCharge": "No charge loaded: hands out nothing",
+        "compressorRange": "{{range}} · every {{cycle}}",
+        "fuel": "{{value}} {{fuel}} every {{cycle}}"
+      },
       "fightersNoOverheat": "Fighters don't overheat"
     },
     "whatToTrain": {
@@ -860,13 +870,25 @@
         "miningYield": "Mining yield",
         "hold": "Hold space",
         "remoteRepair": "Remote repair",
-        "jumpRange": "Jump range"
+        "jumpRange": "Jump range",
+        "burstStrength": "Burst strength",
+        "burstRange": "Burst range",
+        "burstDuration": "Burst length",
+        "burstReload": "Burst reload",
+        "compressionRange": "Compression range",
+        "coreFuel": "Core fuel"
       },
       "role": {
         "miningYield": "Mining yield {{before}} → {{after}} m³/h",
         "hold": "Hold space {{before}} → {{after}} m³",
         "remoteRepair": "Remote repair {{before}} → {{after}} HP/s",
-        "jumpRange": "Jump range {{before}} → {{after}} ly"
+        "jumpRange": "Jump range {{before}} → {{after}} ly",
+        "burstStrength": "Burst strength {{before}} → {{after}}%",
+        "burstRange": "Burst range {{before}} → {{after}} km",
+        "burstDuration": "Burst length {{before}} → {{after}} s",
+        "burstReload": "Burst reload {{before}} → {{after}} s",
+        "compressionRange": "Compression range {{before}} → {{after}} km",
+        "coreFuel": "Core fuel {{before}} → {{after}} per activation"
       }
     },
     "variations": {
