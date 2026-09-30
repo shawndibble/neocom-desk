@@ -175,8 +175,10 @@ describe('Travel copy', () => {
     };
     const catalog = en as unknown as Record<string, Record<string, unknown>>;
     // Everything the page shows: its own section, its nav entry, and the
-    // Route Preference labels it borrows from Contract Search.
-    walk(catalog.travel);
+    // Route Preference labels it borrows from Contract Search. Pilot Lookup
+    // (`travel.pilot`) is checked by its own test: it names zKillboard's
+    // "danger ratio" statistic, which is a figure, not a verdict.
+    walk(Object.entries(catalog.travel).filter(([key]) => key !== 'pilot'));
     walk([catalog.nav.travel, (catalog.nav.groups as Record<string, string>).intel]);
     walk(catalog.contractSearch.routePreference);
     for (const text of strings) {

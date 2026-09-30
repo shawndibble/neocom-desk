@@ -4,11 +4,12 @@ import { Spinner, Tabs } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePageTab } from '@/lib/usePageTab';
 import { TRAVEL_TABS } from '@/app/pageTabs';
+import { PilotLookupTab } from '@/features/travel/PilotLookupTab';
 import { RouteSafetyTab } from '@/features/travel/RouteSafetyTab';
 
 /**
  * Travel (issue #2328): intel for getting somewhere — Route Safety first, with
- * Thera/Turnur connections and Pilot Lookup to follow as tabs (#2330, #2331).
+ * Pilot Lookup beside it (#2331) and Thera/Turnur connections to follow (#2330).
  * Signed-in like every other route; logged-out access is a possible follow-up.
  */
 export function Travel() {
@@ -37,7 +38,7 @@ export function Travel() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <RouteSafetyTab tabBar={tabBar} />
+      {tab === 'pilot' ? <PilotLookupTab tabBar={tabBar} /> : <RouteSafetyTab tabBar={tabBar} />}
     </div>
   );
 }

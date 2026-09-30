@@ -96,6 +96,119 @@ export async function fetchHullLosses(shipTypeId: number): Promise<HullLossesRes
   }
 }
 
+/** How many of a pilot's most-used hulls Pilot Lookup lists. */
+export const PILOT_TOP_SHIPS = 5;
+
+/** How long a pilot's zKillboard stats are reused before asking again. */
+export const PILOT_STATS_CACHE_MS = 10 * 60_000;
+
+/** One hull from zKillboard's all-time "ships used on kills" list. */
+export interface PilotTopShip {
+  shipTypeId: number;
+  kills: number;
+}
+
+/**
+ * A pilot's zKillboard totals, as stated. `iskEfficiency` is
+ * destroyed / (destroyed + lost), null when no ISK moved either way; the two
+ * ratios are zKillboard's own 0-100 figures, null when it sends none.
+ */
+export interface PilotStats {
+  kills: number;
+  losses: number;
+  iskDestroyed: number;
+  iskLost: number;
+  iskEfficiency: number | null;
+  soloKills: number;
+  dangerRatio: number | null;
+  gangRatio: number | null;
+  topShips: PilotTopShip[];
+}
+
+/** What zKillboard knows of a pilot: their stats, or that it has no kill or loss for them. */
+export type PilotStatsParse = { kind: 'stats'; stats: PilotStats } | { kind: 'no-history' };
+
+/** `failed` when the request failed or the body was unreadable — never cached. */
+export type PilotStatsResult = PilotStatsParse | { kind: 'failed' };
+
+function countOrZero(value: unknown): number {
+  return finiteOrNull(value) ?? 0;
+}
+
+function parseTopShips(topAllTime: unknown): PilotTopShip[] {
+  if (!Array.isArray(topAllTime)) return [];
+  const bucket: unknown = topAllTime.find((entry) => isRecord(entry) && entry.type === 'ship');
+  if (!isRecord(bucket) || !Array.isArray(bucket.data)) return [];
+  const ships: PilotTopShip[] = [];
+  for (const entry of bucket.data) {
+    if (!isRecord(entry) || typeof entry.shipTypeID !== 'number') continue;
+    const kills = finiteOrNull(entry.kills);
+    if (kills === null) continue;
+    ships.push({ shipTypeId: entry.shipTypeID, kills });
+  }
+  return ships.slice(0, PILOT_TOP_SHIPS);
+}
+
+/**
+ * Reads a `/api/stats/characterID/{id}/` body defensively. zKillboard answers
+ * an id it has never seen with a 200 `{"error": "Invalid type or id"}`, and a
+ * pilot with no kill or loss with a body that carries no counts — both are
+ * "no history", distinct from a failure. `null` for a body that is not an
+ * object at all.
+ */
+export function parsePilotStats(body: unknown): PilotStatsParse | null {
+  if (!isRecord(body) || Array.isArray(body)) return null;
+  if (typeof body.error === 'string') return { kind: 'no-history' };
+  const kills = countOrZero(body.shipsDestroyed);
+  const losses = countOrZero(body.shipsLost);
+  if (kills === 0 && losses === 0) return { kind: 'no-history' };
+  const iskDestroyed = countOrZero(body.iskDestroyed);
+  const iskLost = countOrZero(body.iskLost);
+  const iskMoved = iskDestroyed + iskLost;
+  return {
+    kind: 'stats',
+    stats: {
+      kills,
+      losses,
+      iskDestroyed,
+      iskLost,
+      iskEfficiency: iskMoved > 0 ? iskDestroyed / iskMoved : null,
+      soloKills: countOrZero(body.soloKills),
+      dangerRatio: finiteOrNull(body.dangerRatio),
+      gangRatio: finiteOrNull(body.gangRatio),
+      topShips: parseTopShips(body.topAllTime),
+    },
+  };
+}
+
+const pilotStatsCache = new Map<number, { at: number; value: PilotStatsParse }>();
+
+/** Test seam: forget every cached pilot. */
+export function resetPilotStatsCache(): void {
+  pilotStatsCache.clear();
+}
+
+/**
+ * A pilot's zKillboard stats, for Pilot Lookup. A browser fetch with no custom
+ * headers, as `fetchKillmailHash` (scope decision `20260924-195833`). The URL
+ * 302s to `.../kills/`; both legs are CORS-open, so the fetch follows it.
+ * Answers are reused for `PILOT_STATS_CACHE_MS`; a failure never is.
+ */
+export async function fetchPilotStats(characterId: number): Promise<PilotStatsResult> {
+  const cached = pilotStatsCache.get(characterId);
+  if (cached && Date.now() - cached.at < PILOT_STATS_CACHE_MS) return cached.value;
+  try {
+    const response = await fetch(`https://zkillboard.com/api/stats/characterID/${characterId}/`);
+    if (!response.ok) return { kind: 'failed' };
+    const parsed = parsePilotStats(await response.json());
+    if (parsed === null) return { kind: 'failed' };
+    pilotStatsCache.set(characterId, { at: Date.now(), value: parsed });
+    return parsed;
+  } catch {
+    return { kind: 'failed' };
+  }
+}
+
 export function characterZkillUrl(characterId: number): string {
   return `https://zkillboard.com/character/${characterId}/`;
 }
