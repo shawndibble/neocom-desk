@@ -6024,11 +6024,13 @@
     "resultsCount_one": "{{count}} result",
     "resultsCount_other": "{{count}} results",
     "activeCharacter": "Active",
+    "contactStanding": "{{standing}} {{character}}",
     "lpBalance": "{{lp}} LP",
     "groups": {
       "pages": "Pages",
       "commands": "Commands",
       "characters": "Characters",
+      "contacts": "Contacts",
       "lpStores": "LP Stores",
       "marketItems": "Market items"
     },
