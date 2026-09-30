@@ -2377,12 +2377,12 @@
     "opportunitiesLossBreakdown": "Build cost {{cost}} vs. sell price {{revenue}}",
     "opportunitiesViewHistory": "View {{name}} price history",
     "opportunitiesPriceHistoryTitle": "{{name}} — Price History",
-    "marketOpportunitiesTitle": "What's profitable to build",
+    "marketOpportunitiesTitle": "What's profitable",
     "marketOpportunitiesLiquidityTooltip": "Only products you can actually build are scanned: the blueprint is one your characters own, or one you can buy from the NPC market, a public contract, or an LP store you hold points with. Of those, only products with enough sell-order value at the hub to matter count, and only the top few per Market Group category. A sell price far above what the item actually trades for is treated as a troll order and replaced by that average.",
     "marketOpportunitiesRunScan": "Scan",
     "marketOpportunitiesScanning": "Scanning…",
     "marketOpportunitiesEmptyTitle": "Nothing scanned yet",
-    "marketOpportunitiesEmptyHint": "Run a market scan to rank what's profitable to build right now, from blueprints you own or can buy.",
+    "marketOpportunitiesEmptyHint": "Run a market scan to rank what's profitable right now, from blueprints you own or can buy.",
     "marketOpportunitiesNoResultsTitle": "Nothing to build here",
     "marketOpportunitiesNoResultsHint": "No product whose blueprint you own or can buy cleared the liquidity floor at this hub with these filters — try a busier Trade Hub or loosen the filters.",
     "marketOpportunitiesBlueprintSource": "Blueprint",
@@ -3028,7 +3028,13 @@
     },
     "iskExact": "{{amount}} ISK",
     "searchRegions": "Search regions…",
-    "noRegionMatches": "No matching regions"
+    "noRegionMatches": "No matching regions",
+    "checkboxSelect": {
+      "all": "All",
+      "none": "None",
+      "count": "{{count}} selected",
+      "labelled": "{{label}}: {{value}}"
+    }
   },
   "wallet": {
     "title": "Wallet",

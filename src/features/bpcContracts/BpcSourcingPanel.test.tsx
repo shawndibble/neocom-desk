@@ -305,6 +305,48 @@ async function openFilters(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /^Filters/ }));
 }
 
+/** Which filter dropdown each option lives in. */
+const FILTER_FIELD: Record<string, string> = {
+  Contracts: 'Source',
+  Owned: 'Source',
+  'Market BPOs': 'Source',
+  'Contract BPOs': 'Source',
+  Auctions: 'Exclude',
+  'PLEX contracts': 'Exclude',
+  Highsec: 'Space',
+  Wormhole: 'Space',
+};
+
+/** Opens the option's filter dropdown and returns its checkbox; close with Escape. */
+async function openFilterOption(
+  user: ReturnType<typeof userEvent.setup>,
+  option: string,
+  scope: Pick<typeof screen, 'getAllByRole'> = screen
+) {
+  // The trigger, not the table's same-named column header.
+  const trigger = scope
+    .getAllByRole('button', { name: new RegExp(`^${FILTER_FIELD[option]}:`) })
+    .find((button) => button.getAttribute('aria-haspopup') === 'menu');
+  await user.click(trigger!);
+  // `^`: an option with a description line carries it in its accessible name.
+  return screen.findByRole('menuitemcheckbox', { name: new RegExp(`^${option}`) });
+}
+
+async function toggleFilterOption(
+  user: ReturnType<typeof userEvent.setup>,
+  option: string,
+  scope: Pick<typeof screen, 'getAllByRole'> = screen
+) {
+  await user.click(await openFilterOption(user, option, scope));
+  await user.keyboard('{Escape}');
+}
+
+async function filterOptionChecked(user: ReturnType<typeof userEvent.setup>, option: string) {
+  const checked = (await openFilterOption(user, option)).getAttribute('aria-checked');
+  await user.keyboard('{Escape}');
+  return checked;
+}
+
 describe('BpcSourcingPanel', () => {
   it('renders synced BPC rows with item name, ME/TE and price', async () => {
     loadPublicBpcContracts.mockResolvedValue(
@@ -795,12 +837,10 @@ describe('BpcSourcingPanel source multiselect', () => {
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
-    await openFilters(userEvent.setup());
-    expect(screen.getByRole('button', { name: 'Contracts' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
-    expect(screen.getByRole('button', { name: 'Owned' })).toHaveAttribute('aria-pressed', 'true');
+    const user = userEvent.setup();
+    await openFilters(user);
+    expect(await filterOptionChecked(user, 'Contracts')).toBe('true');
+    expect(await filterOptionChecked(user, 'Owned')).toBe('true');
   });
 
   it('with only Contracts selected, shows exactly the contract rows and no owned ones', async () => {
@@ -814,7 +854,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
     await openFilters(user);
-    await user.click(screen.getByRole('button', { name: 'Owned' }));
+    await toggleFilterOption(user, 'Owned');
 
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
     expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
@@ -831,7 +871,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
 
     await openFilters(user);
-    await user.click(screen.getByRole('button', { name: 'Contracts' }));
+    await toggleFilterOption(user, 'Contracts');
 
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
     expect(within(table).queryByText('Rifter Blueprint')).not.toBeInTheDocument();
@@ -911,7 +951,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     expect(screen.getByText('Log in again to see owned blueprints')).toBeInTheDocument();
 
     await openFilters(user);
-    await user.click(screen.getByRole('button', { name: 'Contracts' }));
+    await toggleFilterOption(user, 'Contracts');
 
     expect(screen.getByText('No BPC listings match your filters.')).toBeInTheDocument();
     expect(
@@ -924,11 +964,8 @@ describe('BpcSourcingPanel source multiselect', () => {
 
     const resetTable = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(resetTable).getByText('Rifter Blueprint')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Contracts' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
-    expect(screen.getByRole('button', { name: 'Owned' })).toHaveAttribute('aria-pressed', 'true');
+    expect(await filterOptionChecked(user, 'Contracts')).toBe('true');
+    expect(await filterOptionChecked(user, 'Owned')).toBe('true');
   });
 
   it('shows a dedicated empty state when every source is deselected', async () => {
@@ -938,8 +975,8 @@ describe('BpcSourcingPanel source multiselect', () => {
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await openFilters(user);
-    await user.click(screen.getByRole('button', { name: 'Contracts' }));
-    await user.click(screen.getByRole('button', { name: 'Owned' }));
+    await toggleFilterOption(user, 'Contracts');
+    await toggleFilterOption(user, 'Owned');
 
     expect(screen.getByText('Select at least one source to search.')).toBeInTheDocument();
   });
@@ -995,7 +1032,7 @@ describe('BpcSourcingPanel source multiselect', () => {
 });
 
 describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
-  it('hides an auction row once the Auctions exclude chip is on', async () => {
+  it('hides an auction row once Auctions is excluded', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([
         row({ contractId: 1, typeId: 638 }),
@@ -1008,13 +1045,13 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
     await openFilters(user);
-    await user.click(screen.getByRole('button', { name: 'Auctions' }));
+    await toggleFilterOption(user, 'Auctions');
 
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
     expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
   });
 
-  it('hides a contract asking for PLEX once the PLEX exclude chip is on', async () => {
+  it('hides a contract asking for PLEX once PLEX contracts are excluded', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([
         row({ contractId: 1, typeId: 638 }),
@@ -1027,7 +1064,7 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
     await openFilters(user);
-    await user.click(screen.getByRole('button', { name: 'PLEX contracts' }));
+    await toggleFilterOption(user, 'PLEX contracts');
 
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
     expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
@@ -1053,7 +1090,7 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
     expect(within(table).getByText('100.00 + 100 PLEX')).toBeInTheDocument();
   });
 
-  it('Reset filters clears both exclude chips', async () => {
+  it('Reset filters clears both excludes', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([
         row({ contractId: 1, typeId: 638, isAuction: true }),
@@ -1065,18 +1102,12 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await openFilters(user);
-    await user.click(screen.getByRole('button', { name: 'Auctions' }));
-    await user.click(screen.getByRole('button', { name: 'PLEX contracts' }));
+    await toggleFilterOption(user, 'Auctions');
+    await toggleFilterOption(user, 'PLEX contracts');
     await user.click(screen.getByRole('button', { name: 'Reset filters' }));
 
-    expect(screen.getByRole('button', { name: 'Auctions' })).toHaveAttribute(
-      'aria-pressed',
-      'false'
-    );
-    expect(screen.getByRole('button', { name: 'PLEX contracts' })).toHaveAttribute(
-      'aria-pressed',
-      'false'
-    );
+    expect(await filterOptionChecked(user, 'Auctions')).toBe('false');
+    expect(await filterOptionChecked(user, 'PLEX contracts')).toBe('false');
   });
 });
 
@@ -1126,7 +1157,7 @@ describe('BpcSourcingPanel Location/Space', () => {
     expect(within(table).getByText('Highsec')).toBeInTheDocument();
 
     await openFilters(user);
-    await user.click(screen.getByRole('button', { name: 'Wormhole' }));
+    await toggleFilterOption(user, 'Wormhole');
 
     expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
@@ -1193,7 +1224,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
     };
   }
 
-  it('collapses Source/Space chips behind the shared filter funnel on a narrow viewport, leaving ColumnPickerMenu in the row', async () => {
+  it('collapses the Source/Exclude/Space dropdowns behind the shared filter funnel on a narrow viewport, leaving ColumnPickerMenu in the row', async () => {
     const restore = useNarrowViewport();
     try {
       loadPublicBpcContracts.mockResolvedValue(
@@ -1203,8 +1234,8 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       render(<App />);
       await screen.findByRole('table', { name: 'BPC Sourcing' });
 
-      expect(screen.queryByRole('button', { name: 'Contracts' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Owned' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Source:/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Space:/ })).not.toBeInTheDocument();
       // The column picker is a display preference, not a filter — it stays in
       // the row rather than collapsing with Source/Space.
       expect(screen.getByRole('button', { name: 'Columns' })).toBeInTheDocument();
@@ -1212,9 +1243,9 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       await user.click(screen.getByRole('button', { name: /^Filters/ }));
 
       const dialog = screen.getByRole('dialog', { name: 'Filters' });
-      expect(within(dialog).getByRole('button', { name: 'Contracts' })).toBeInTheDocument();
-      expect(within(dialog).getByRole('button', { name: 'Owned' })).toBeInTheDocument();
-      expect(within(dialog).getByRole('button', { name: 'Highsec' })).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: /^Source:/ })).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: /^Exclude:/ })).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: /^Space:/ })).toBeInTheDocument();
     } finally {
       restore();
     }
@@ -1236,7 +1267,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
 
       await user.click(screen.getByRole('button', { name: /^Filters/ }));
       const dialog = screen.getByRole('dialog', { name: 'Filters' });
-      await user.click(within(dialog).getByRole('button', { name: 'Owned' }));
+      await toggleFilterOption(user, 'Owned', within(dialog));
 
       // Still applied against the row behind the modal — the sheet's edit is a draft.
       expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
@@ -1267,7 +1298,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       const dialog = screen.getByRole('dialog', { name: 'Filters' });
       await user.click(within(dialog).getByRole('combobox', { name: 'Distance' }));
       await user.click(await screen.findByRole('option', { name: 'Within 3 jumps' }));
-      await user.click(within(dialog).getByRole('button', { name: 'Owned' }));
+      await toggleFilterOption(user, 'Owned', within(dialog));
       expect(window.location.search).not.toContain('sourcing.jumps');
 
       await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
@@ -1294,14 +1325,14 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
 
       await user.click(screen.getByRole('button', { name: /^Filters/ }));
       let dialog = screen.getByRole('dialog', { name: 'Filters' });
-      await user.click(within(dialog).getByRole('button', { name: 'Owned' }));
+      await toggleFilterOption(user, 'Owned', within(dialog));
       await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
 
       expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
 
       await user.click(screen.getByRole('button', { name: /^Filters/ }));
       dialog = screen.getByRole('dialog', { name: 'Filters' });
-      await user.click(within(dialog).getByRole('button', { name: 'Wormhole' }));
+      await toggleFilterOption(user, 'Wormhole', within(dialog));
       await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
 
       expect(screen.getByRole('button', { name: 'Filters (2 active)' })).toBeInTheDocument();
@@ -1478,7 +1509,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         within(table).queryByText('2,000,000.00 ISK', { selector: '.sr-only' })
       ).not.toBeInTheDocument();
       await openFilters(user);
-      await user.click(screen.getByRole('button', { name: 'Market BPOs' }));
+      await toggleFilterOption(user, 'Market BPOs');
       // The market row itself: its order price, and its station.
       expect(
         await within(table).findByText('2,000,000.00 ISK', { selector: '.sr-only' })
@@ -1533,7 +1564,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
 
       await openFilters(user);
-      await user.click(screen.getByRole('button', { name: 'Contract BPOs' }));
+      await toggleFilterOption(user, 'Contract BPOs');
 
       expect(await within(table).findByText('Caracal Blueprint')).toBeInTheDocument();
     });

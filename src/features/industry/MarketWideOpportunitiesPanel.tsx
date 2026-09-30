@@ -13,6 +13,7 @@ import {
   Button,
   DataTable,
   EmptyState,
+  CheckboxSelect,
   FilterBar,
   FilterChip,
   FilterField,
@@ -417,14 +418,14 @@ export function MarketWideOpportunitiesPanel({
               </SelectContent>
             </Select>
           </FilterField>
-          <ChipGroup
+          <FilterMultiSelect
             label={t('industry.marketOpportunitiesFilters.tier')}
             members={PRODUCT_TIERS}
             selected={draft.tiers}
             labelFor={(tier) => t(`industry.marketOpportunitiesFilters.tiers.${tier}`)}
             onToggle={(tier) => setDraft({ ...draft, tiers: toggled(draft.tiers, tier) })}
           />
-          <ChipGroup
+          <FilterMultiSelect
             label={t('industry.marketOpportunitiesFilters.category')}
             members={PRODUCT_CATEGORIES}
             selected={draft.categories}
@@ -433,7 +434,7 @@ export function MarketWideOpportunitiesPanel({
               setDraft({ ...draft, categories: toggled(draft.categories, category) })
             }
           />
-          <ChipGroup
+          <FilterMultiSelect
             label={t('industry.marketOpportunitiesBlueprintSource')}
             members={BLUEPRINT_SOURCES}
             selected={draft.sources}
@@ -565,8 +566,8 @@ export function MarketWideOpportunitiesPanel({
   );
 }
 
-/** One labelled row of on/off chips over a closed set — BPC Sourcing's filter groups, reused. */
-function ChipGroup<V extends string>({
+/** One labelled multi-select dropdown over a closed set — BPC Sourcing's filter groups, reused. */
+function FilterMultiSelect<V extends string>({
   label,
   members,
   selected,
@@ -580,16 +581,14 @@ function ChipGroup<V extends string>({
   onToggle: (member: V) => void;
 }) {
   return (
-    <div role="group" aria-label={label} className="flex flex-wrap items-center gap-2">
-      <span className="text-text-dim">{label}</span>
-      {members.map((member) => (
-        <FilterChip
-          key={member}
-          label={labelFor(member)}
-          selected={selected.has(member)}
-          onToggle={() => onToggle(member)}
-        />
-      ))}
-    </div>
+    <FilterField label={label}>
+      <CheckboxSelect
+        label={label}
+        className="w-44"
+        options={members.map((member) => ({ value: member, label: labelFor(member) }))}
+        selected={selected}
+        onToggle={onToggle}
+      />
+    </FilterField>
   );
 }

@@ -704,6 +704,6 @@ describe('Industry: Build Opportunities waits for the pricing-settings hydration
     // Build Opportunities reads no pricing input, so it's unaffected and
     // renders alongside the now-mounted panel.
     expect(await screen.findByRole('heading', { name: 'Build Opportunities' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: "What's profitable to build" })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: "What's profitable" })).toBeInTheDocument();
   });
 });

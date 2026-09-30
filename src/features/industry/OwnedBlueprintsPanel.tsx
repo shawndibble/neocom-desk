@@ -12,13 +12,14 @@ import {
   ColumnPickerMenu,
   DataTable,
   EmptyState,
+  FilterBar,
   FilterChip,
+  FilterField,
   IskAmount,
   Panel,
   SearchInput,
   SegmentedControl,
   Spinner,
-  StatChip,
   type DataTableColumn,
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -38,7 +39,6 @@ import {
   filterOwnedBlueprints,
   ownedBlueprintQuantity,
   resolveBlueprintPlacement,
-  summarizeOwnedBlueprints,
   type BlueprintPlacement,
   type OwnedBlueprintRow,
 } from './ownedBlueprints';
@@ -154,7 +154,6 @@ export function OwnedBlueprintsPanel({
     () => filterOwnedBlueprints(rows, { kind, activity, search }),
     [rows, kind, activity, search]
   );
-  const summary = useMemo(() => summarizeOwnedBlueprints(rows), [rows]);
 
   // Where each blueprint sits: containers walked up through the owner's
   // cached assets. Corp blueprints have no cached corp assets here, so a
@@ -353,55 +352,85 @@ export function OwnedBlueprintsPanel({
     columns.map((column) => column.id)
   );
 
+  const filterValue = { kind, activity, includeCorp };
+  const activeFilterCount = [kind !== 'all', activity !== 'all', includeCorp].filter(
+    Boolean
+  ).length;
+  function applyFilter(next: typeof filterValue) {
+    if (next.kind !== kind) setKind(next.kind);
+    if (next.activity !== activity) setActivity(next.activity);
+    if (next.includeCorp !== includeCorp) setIncludeCorp(next.includeCorp);
+  }
+
   const filters = (
-    <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-      <SearchInput
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        placeholder={t('industry.ownedBlueprintsSearch')}
-        aria-label={t('industry.ownedBlueprintsSearch')}
-        className="min-w-48 flex-1"
-      />
-      <SegmentedControl
-        label={t('industry.ownedBlueprintsKindFilter')}
-        size="sm"
-        value={kind}
-        onChange={setKind}
-        options={[
-          { value: 'all', label: t('industry.ownedBlueprintsAll') },
-          { value: 'bpo', label: t('industry.bpo') },
-          { value: 'bpc', label: t('industry.bpc') },
-        ]}
-      />
-      <SegmentedControl
-        label={t('industry.ownedBlueprintsActivityLabel')}
-        size="sm"
-        value={activity}
-        onChange={setActivity}
-        options={[
-          { value: 'all', label: t('industry.ownedBlueprintsAll') },
-          { value: 'manufacturing', label: t('industry.ownedBlueprintsActivity.manufacturing') },
-          { value: 'reaction', label: t('industry.ownedBlueprintsActivity.reaction') },
-        ]}
-      />
-      {corp.available && (
-        <FilterChip
-          label={t('industry.ownedBlueprintsIncludeCorp')}
-          selected={includeCorp}
-          onToggle={() => setIncludeCorp(!includeCorp)}
+    <FilterBar
+      value={filterValue}
+      onChange={applyFilter}
+      activeCount={activeFilterCount}
+      className="border-b border-line px-3 py-2"
+      search={
+        <SearchInput
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder={t('industry.ownedBlueprintsSearch')}
+          aria-label={t('industry.ownedBlueprintsSearch')}
+          className="min-w-48 flex-1"
         />
+      }
+      actions={
+        <ColumnPickerMenu
+          available={OWNED_BLUEPRINTS_COLUMN_IDS}
+          visible={visible}
+          columnsById={columnsById}
+          onToggle={toggle}
+          onReset={reset}
+          buttonLabel={t('common.columnsButton')}
+          menuTitle={t('common.columnsMenuTitle')}
+          resetLabel={t('common.resetColumns')}
+        />
+      }
+    >
+      {(draft, setDraft) => (
+        <>
+          <FilterField label={t('industry.ownedBlueprintsKindFilter')} stretch={false}>
+            <SegmentedControl
+              label={t('industry.ownedBlueprintsKindFilter')}
+              size="sm"
+              value={draft.kind}
+              onChange={(next) => setDraft({ ...draft, kind: next })}
+              options={[
+                { value: 'all', label: t('industry.ownedBlueprintsAll') },
+                { value: 'bpo', label: t('industry.bpo') },
+                { value: 'bpc', label: t('industry.bpc') },
+              ]}
+            />
+          </FilterField>
+          <FilterField label={t('industry.ownedBlueprintsActivityLabel')} stretch={false}>
+            <SegmentedControl
+              label={t('industry.ownedBlueprintsActivityLabel')}
+              size="sm"
+              value={draft.activity}
+              onChange={(next) => setDraft({ ...draft, activity: next })}
+              options={[
+                { value: 'all', label: t('industry.ownedBlueprintsAll') },
+                {
+                  value: 'manufacturing',
+                  label: t('industry.ownedBlueprintsActivity.manufacturing'),
+                },
+                { value: 'reaction', label: t('industry.ownedBlueprintsActivity.reaction') },
+              ]}
+            />
+          </FilterField>
+          {corp.available && (
+            <FilterChip
+              label={t('industry.ownedBlueprintsIncludeCorp')}
+              selected={draft.includeCorp}
+              onToggle={() => setDraft({ ...draft, includeCorp: !draft.includeCorp })}
+            />
+          )}
+        </>
       )}
-      <ColumnPickerMenu
-        available={OWNED_BLUEPRINTS_COLUMN_IDS}
-        visible={visible}
-        columnsById={columnsById}
-        onToggle={toggle}
-        onReset={reset}
-        buttonLabel={t('common.columnsButton')}
-        menuTitle={t('common.columnsMenuTitle')}
-        resetLabel={t('common.resetColumns')}
-      />
-    </div>
+    </FilterBar>
   );
 
   return (
@@ -411,8 +440,6 @@ export function OwnedBlueprintsPanel({
       actions={
         <span className="flex items-center gap-2">
           {pricingActions}
-          <StatChip label={t('industry.bpo')} value={summary.bpo} tone="accent" />
-          <StatChip label={t('industry.bpc')} value={summary.bpc} />
           {filteredRows.length > 0 && (
             <TableActionsMenu name={t('industry.ownedBlueprintsTitle')} tableExport={tableExport} />
           )}

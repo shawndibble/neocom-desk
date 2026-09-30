@@ -113,20 +113,6 @@ export function filterOwnedBlueprints(
   );
 }
 
-/** Blueprint counts, not rows: a stacked BPO counts once per original in it. */
-export function summarizeOwnedBlueprints(rows: readonly OwnedBlueprintRow[]): {
-  bpo: number;
-  bpc: number;
-} {
-  let bpo = 0;
-  let bpc = 0;
-  for (const row of rows) {
-    if (row.kind === 'bpo') bpo += ownedBlueprintQuantity(row.blueprint);
-    else bpc += ownedBlueprintQuantity(row.blueprint);
-  }
-  return { bpo, bpc };
-}
-
 /**
  * Flags ESI gives an item sitting directly in a station or structure, where
  * `location_id` is that place. Any other flag (a container, a ship bay, a

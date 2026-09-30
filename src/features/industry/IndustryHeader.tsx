@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader, Panel, Tabs } from '@/components/ui';
 import { GrantBanner } from '@/app/GrantNote';
@@ -16,6 +17,8 @@ export interface IndustryHeaderProps {
    * in-page tab switch, which arrow keys already handle correctly.
    */
   tabsActivation?: 'automatic' | 'manual';
+  /** Beside the page title — the current tab's `DataAgeBadge`, when it has one. */
+  meta?: ReactNode;
 }
 
 /**
@@ -33,11 +36,12 @@ export function IndustryHeader({
   onTabChange,
   blueprintsNeedsReauth,
   tabsActivation = 'automatic',
+  meta,
 }: IndustryHeaderProps) {
   const { t } = useTranslation();
   return (
     <>
-      <PageHeader title={t('nav.industry')} />
+      <PageHeader title={t('nav.industry')} meta={meta} />
       <ActiveJobsPanel characterId={activeCharacterId} />
 
       {blueprintsNeedsReauth && (

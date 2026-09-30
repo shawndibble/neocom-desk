@@ -89,6 +89,8 @@ export {
 export { RowActionsContext, RowMenuExtrasContext } from './rowActionsContext';
 export type { RowActions } from './rowActionsContext';
 export { ColumnPickerMenu } from './ColumnPickerMenu';
+export { CheckboxSelect } from './CheckboxSelect';
+export type { CheckboxSelectOption, CheckboxSelectProps } from './CheckboxSelect';
 export { MultiSelect } from './MultiSelect';
 export type { MultiSelectGroup, MultiSelectOption, MultiSelectProps } from './MultiSelect';
 export { RegionSelect } from './RegionSelect';
