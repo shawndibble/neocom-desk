@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -58,6 +59,28 @@ afterEach(async () => {
 });
 
 describe('ItemDetailModal', () => {
+  it('offers Open in Market only when asked, closing itself on the way', async () => {
+    server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => new Promise(() => {})));
+    mockedLoadDictionary.mockReturnValue(new Promise(() => {}));
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <MemoryRouter initialEntries={['/overview']}>
+        <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={onClose} showOpenInMarket />
+      </MemoryRouter>
+    );
+    const link = screen.getByRole('link', { name: 'Open in Market' });
+    expect(link).toHaveAttribute('href', `/market/browser?type=${TYPE_ID}`);
+    await userEvent.setup().click(link);
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <MemoryRouter initialEntries={['/overview']}>
+        <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={onClose} />
+      </MemoryRouter>
+    );
+    expect(screen.queryByRole('link', { name: 'Open in Market' })).not.toBeInTheDocument();
+  });
+
   it('shows a loading state while ESI and the attribute dictionary are in flight', () => {
     server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => new Promise(() => {})));
     mockedLoadDictionary.mockReturnValue(new Promise(() => {}));

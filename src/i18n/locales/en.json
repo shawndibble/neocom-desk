@@ -5287,6 +5287,7 @@
       "compare": "Compare"
     },
     "itemDetail": {
+      "openInMarket": "Open in Market",
       "volume": "Volume: {{volume}} m3",
       "bestSell": "Best sell:",
       "bestBuy": "Best buy:",
@@ -6015,19 +6016,23 @@
   "commandPalette": {
     "title": "Command palette",
     "trigger": "Search",
-    "triggerLong": "Search pages, commands and characters",
-    "placeholder": "Go to a page, run a command, switch character…",
-    "inputLabel": "Search pages, commands and characters",
+    "triggerLong": "Search pages, commands, characters and items",
+    "placeholder": "Go to a page, run a command, switch character, find an item…",
+    "inputLabel": "Search pages, commands, characters and items",
     "resultsLabel": "Results",
     "noResults": "Nothing matches.",
     "loadingGroup": "Searching…",
+    "groupError": "Couldn't load these results.",
     "resultsCount_one": "{{count}} result",
     "resultsCount_other": "{{count}} results",
     "activeCharacter": "Active",
+    "lpBalance": "{{lp}} LP",
     "groups": {
       "pages": "Pages",
       "commands": "Commands",
-      "characters": "Characters"
+      "characters": "Characters",
+      "lpStores": "LP Stores",
+      "marketItems": "Market items"
     },
     "commands": {
       "openSettings": "Open settings",
