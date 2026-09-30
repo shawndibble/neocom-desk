@@ -8,39 +8,36 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
 import {
   IconButton,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { db, type FittingRecord } from '@/db';
-import { decodeFittingShare } from '@/engine/fitting/fittingShare';
 import { applyImplantBasis, defaultImplantBasis } from '@/engine/fittings/implantBasis';
 import { buildAllVProfile } from '@/engine/fittings/pilotProfile';
 import { projectsNothing } from '@/engine/fittings/projection';
-import { shareToFitting } from '@/engine/fittings/shareMapper';
+import type { Fitting } from '@/engine/fittings/types';
 import { loadSkills } from '@/sde/loadSde';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { computeOutgoing } from './dogmaFittingEngine';
 import { useProjectedSources, type ProjectedSource } from './statsConditions';
+import { useFittingChoices } from './useFittingChoices';
 
 const MAX_SHIPS = 20;
 
-/** What one ship of a saved Fitting projects, at all skills V. */
-async function projectionOf(record: FittingRecord): Promise<ProjectedSource | null> {
-  const decoded = await decodeFittingShare(record.code);
-  if (!decoded.ok) return null;
-  const fitting = shareToFitting(decoded.value, record.name);
+/** What one ship of a Fitting projects, at all skills V. */
+async function projectionOf(id: string, name: string, fitting: Fitting): Promise<ProjectedSource> {
   const allV = buildAllVProfile((await loadSkills()).map((skill) => skill.typeID));
   const pilot = applyImplantBasis(allV, fitting.implantSet, defaultImplantBasis(fitting));
   return {
-    id: record.id,
-    name: record.name,
+    id,
+    name,
     count: 1,
     projection: await computeOutgoing(fitting, pilot),
   };
@@ -52,16 +49,20 @@ export function ProjectedEffectsPanel() {
   const sources = useProjectedSources((state) => state.sources);
   const setSources = useProjectedSources((state) => state.setSources);
   const [failed, setFailed] = useState<string | null>(null);
-  const records = useLiveQuery(
-    () =>
-      characterId === null
-        ? Promise.resolve([] as FittingRecord[])
-        : db.fittings.where('characterId').equals(characterId).toArray(),
-    [characterId]
-  );
-  const options = (records ?? [])
-    .filter((record) => !sources.some((source) => source.id === record.id))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const choices = useFittingChoices(characterId);
+  const isFree = (choice: { id: string }) => !sources.some((source) => source.id === choice.id);
+  const groups = [
+    {
+      key: 'saved',
+      heading: t('fittings.myFittings.title'),
+      options: choices.saved.filter(isFree),
+    },
+    {
+      key: 'inGame',
+      heading: t('fittings.start.tabInGame'),
+      options: choices.inGame.filter(isFree),
+    },
+  ].filter((group) => group.options.length > 0);
   const label = t('fittings.projected.add');
 
   // Always from the store's current list: an add lands after an await.
@@ -69,17 +70,18 @@ export function ProjectedEffectsPanel() {
     setSources(change(useProjectedSources.getState().sources));
 
   async function add(id: string) {
-    const record = records?.find((r) => r.id === id);
-    if (!record) return;
+    const choice = choices.all.find((c) => c.id === id);
+    if (!choice) return;
     setFailed(null);
     try {
-      const source = await projectionOf(record);
-      if (source === null) throw new Error('unreadable');
+      const picked = await choices.resolve(id);
+      if (picked === null) throw new Error('unreadable');
+      const source = await projectionOf(id, picked.name, picked.fitting);
       update((current) =>
         current.some((s) => s.id === source.id) ? current : [...current, source]
       );
     } catch {
-      setFailed(t('fittings.projected.failed', { name: record.name }));
+      setFailed(t('fittings.projected.failed', { name: choice.name }));
     }
   }
 
@@ -139,20 +141,25 @@ export function ProjectedEffectsPanel() {
           ))}
         </ul>
       )}
-      {characterId === null || (records !== undefined && records.length === 0) ? (
+      {characterId === null || (choices.ready && choices.all.length === 0) ? (
         <p className="text-text-dim">{t('fittings.projected.needsCharacter')}</p>
       ) : (
-        options.length > 0 && (
+        groups.length > 0 && (
           // Keyed on the list, so the trigger reads the placeholder again after each pick.
           <Select key={sources.length} onValueChange={(id) => void add(id)}>
             <SelectTrigger aria-label={label} className="w-full sm:w-64">
               <SelectValue placeholder={t('fittings.projected.addPlaceholder')} />
             </SelectTrigger>
             <SelectContent>
-              {options.map((record) => (
-                <SelectItem key={record.id} value={record.id}>
-                  {record.name}
-                </SelectItem>
+              {groups.map((group) => (
+                <SelectGroup key={group.key}>
+                  <SelectLabel>{group.heading}</SelectLabel>
+                  {group.options.map((choice) => (
+                    <SelectItem key={choice.id} value={choice.id}>
+                      {choice.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               ))}
             </SelectContent>
           </Select>

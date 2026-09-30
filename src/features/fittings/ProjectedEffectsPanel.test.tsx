@@ -11,6 +11,15 @@ const outgoing = vi.hoisted(() => ({
     effects: [{ typeId: 26913, effectId: -86, attributes: { [-45]: 42.5 } }],
   })),
 }));
+const inGame = vi.hoisted(() => ({ data: [] as unknown[] }));
+vi.mock('./useLibraryFittings', () => ({
+  useInGameFittings: () => ({ result: { data: inGame.data } }),
+}));
+vi.mock('@/engine/fittings/esiFittingMapper', () => ({
+  esiFittingToFitting: () => ({
+    fitting: { hullTypeId: 621, modules: [], drones: [], fighters: [], cargo: [], implantSet: [] },
+  }),
+}));
 vi.mock('./dogmaFittingEngine', () => ({ computeOutgoing: outgoing.computeOutgoing }));
 vi.mock('@/sde/loadSde', () => ({ loadSkills: async () => [{ typeID: 3300 }] }));
 vi.mock('@/engine/fitting/fittingShare', () => ({
@@ -42,6 +51,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  inGame.data = [];
   useProjectedSources.setState({ sources: [] });
   useActiveCharacter.setState({ activeCharacterId: null });
 });
@@ -62,7 +72,7 @@ describe('ProjectedEffectsPanel', () => {
     );
     expect(screen.getByRole('status')).toHaveTextContent('none');
 
-    await user.click(await screen.findByRole('combobox', { name: 'Project a saved fitting' }));
+    await user.click(await screen.findByRole('combobox', { name: 'Project a fitting' }));
     await user.click(await screen.findByRole('option', { name: 'Logi Caracal' }));
     expect(await screen.findByText('Logi Caracal')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('1');
@@ -76,11 +86,23 @@ describe('ProjectedEffectsPanel', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('none'));
   });
 
+  it('projects an In-game fitting too', async () => {
+    const user = userEvent.setup();
+    inGame.data = [{ fitting_id: 9, name: 'Game Logi', ship_type_id: 621, items: [] }];
+    render(<ProjectedEffectsPanel />);
+
+    await user.click(await screen.findByRole('combobox', { name: 'Project a fitting' }));
+    await user.click(await screen.findByRole('option', { name: 'Game Logi' }));
+    expect(await screen.findByText('Game Logi')).toBeInTheDocument();
+  });
+
   it('says a Character is needed when there are no saved fittings to project', () => {
     useActiveCharacter.setState({ activeCharacterId: null });
     render(<ProjectedEffectsPanel />);
     expect(
-      screen.getByText('Save fittings to My Fittings to project them onto this one.')
+      screen.getByText(
+        'Save fittings to My Fittings, or grant In-game Fittings access, to project them onto this one.'
+      )
     ).toBeInTheDocument();
   });
 });
