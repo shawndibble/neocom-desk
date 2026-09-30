@@ -532,6 +532,12 @@ export const ESI_REGISTRY = {
     route: '/universe/system_jumps',
     scope: PUBLIC,
   },
+  // Route Safety's zKillboard column (issue #2329): names the stargate a kill
+  // happened at, and where it leads. Read once per gate per session.
+  getUniverseStargate: {
+    route: '/universe/stargates/{stargate_id}',
+    scope: PUBLIC,
+  },
 
   // Base grant, deliberately: the Build Plan's build-location search is a plain
   // feature of a route every Character can open, and it pairs with

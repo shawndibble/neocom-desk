@@ -8,6 +8,7 @@ import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
+import { clearRouteKillCaches } from '@/features/travel/routeKillsData';
 import { App } from '@/app/App';
 import { clearEveScoutCache, EVE_SCOUT_SIGNATURES_URL } from '@/lib/eveScout';
 
@@ -21,7 +22,8 @@ vi.mock('virtual:pwa-register/react', () => ({
 
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
-  loadTypes: vi.fn(async () => ({})),
+  // A smartbomb, for the zKillboard column's tag.
+  loadTypes: vi.fn(async () => ({ '3995': { name: 'Large EMP Smartbomb II', groupID: 72 } })),
   loadBlueprints: vi.fn(async () => ({})),
   loadMarketWideTrees: vi.fn(async () => ({})),
 }));
@@ -108,8 +110,31 @@ const SIGNATURES = [
   }),
 ];
 
+const UEDAMA_GATE_TO_PERIMETER = 50001001;
+const KILL_TIME = new Date(Date.now() - 12 * 60_000).toISOString();
+
 const server = setupServer(
   http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json(SIGNATURES)),
+  http.get('https://zkillboard.com/api/kills/systemID/:id/pastSeconds/3600/', ({ params }) => {
+    if (Number(params.id) === PERIMETER) return new HttpResponse(null, { status: 429 });
+    if (Number(params.id) !== UEDAMA) return HttpResponse.json([]);
+    const kill = (id: number, npc: boolean) => ({
+      killmail_id: id,
+      killmail_time: KILL_TIME,
+      attackers: [{ ship_type_id: 4310, weapon_type_id: 3995 }],
+      victim: { ship_type_id: 670 },
+      zkb: { locationID: UEDAMA_GATE_TO_PERIMETER, npc },
+    });
+    return HttpResponse.json([kill(1, false), kill(2, false), kill(3, true)]);
+  }),
+  http.get(`${ESI}/universe/stargates/${UEDAMA_GATE_TO_PERIMETER}`, () =>
+    HttpResponse.json({
+      stargate_id: UEDAMA_GATE_TO_PERIMETER,
+      name: 'Stargate (Perimeter)',
+      system_id: UEDAMA,
+      destination: { stargate_id: 50001000, system_id: PERIMETER },
+    })
+  ),
   http.get(`${ESI}/universe/system_kills`, () =>
     HttpResponse.json([{ system_id: UEDAMA, ship_kills: 12, pod_kills: 4, npc_kills: 2 }])
   ),
@@ -134,6 +159,7 @@ beforeEach(async () => {
   clearJumpGraphIndex();
   clearSolarSystemIndex();
   clearEveScoutCache();
+  clearRouteKillCaches();
   loadSolarSystemJumps.mockReset();
   loadSolarSystemJumps.mockResolvedValue(JUMPS);
   await db.characters.clear();
@@ -181,6 +207,28 @@ describe('Travel › Route Safety', () => {
     expect(screen.getByText('2 jumps from start to destination')).toBeInTheDocument();
     expect(
       screen.getByText('Last hour along the route: 12 ship kills, 4 pod kills')
+    ).toBeInTheDocument();
+  });
+
+  it("fills in each system's zKillboard kills by location, one row at a time", async () => {
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    const table = await screen.findByRole('table', { name: 'Systems on the route' });
+    const body = (await within(table).findAllByRole('row')).slice(1);
+
+    const uedama = within(body[2]);
+    const count = await uedama.findByRole('link', { name: '2 player kills' });
+    expect(count).toHaveAttribute('href', `https://zkillboard.com/system/${UEDAMA}/`);
+    expect(
+      await uedama.findByText('2 kills at Stargate (Perimeter), last one 12 min ago')
+    ).toBeInTheDocument();
+    expect(uedama.getByText('On your route')).toBeInTheDocument();
+    expect(uedama.getByText('Smartbombs involved')).toBeInTheDocument();
+
+    // A rate-limited system says so on its own row; the rest still fill in.
+    expect(await within(body[1]).findByText('zKillboard unavailable')).toBeInTheDocument();
+    expect(
+      await within(body[0]).findByRole('link', { name: '0 player kills' })
     ).toBeInTheDocument();
   });
 

@@ -6573,7 +6573,21 @@
       "jumps": "Jumps (1h)",
       "shipKills": "Ship kills (1h)",
       "podKills": "Pod kills (1h)",
-      "npcKills": "NPC kills (1h)"
+      "npcKills": "NPC kills (1h)",
+      "recentKills": "zKillboard (1h)"
+    },
+    "kills": {
+      "loading": "Loading zKillboard kills…",
+      "unavailable": "zKillboard unavailable",
+      "count_one": "{{count}} player kill",
+      "count_other": "{{count}} player kills",
+      "at_one": "{{count}} kill at {{location}}, {{minutes}} min ago",
+      "at_other": "{{count}} kills at {{location}}, last one {{minutes}} min ago",
+      "elsewhere_one": "{{count}} kill elsewhere in the system, {{minutes}} min ago",
+      "elsewhere_other": "{{count}} kills elsewhere in the system, last one {{minutes}} min ago",
+      "onPath": "On your route",
+      "bubbles": "Interdictor or HIC on the mail",
+      "smartbombs": "Smartbombs involved"
     },
     "chokepoint": "Gank Chokepoint",
     "chokepointHint": "One of the systems haulers are most often killed in, as named by the community. A property of traffic, not of security status.",

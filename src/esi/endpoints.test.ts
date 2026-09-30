@@ -20,6 +20,7 @@ import {
   getCharacterWalletTransactions,
   getCharacterAssets,
   getUniverseRegion,
+  getUniverseStargate,
   getUniverseStation,
   getUniverseSystem,
   getCharacterMailHeaders,
@@ -367,6 +368,26 @@ describe('public info endpoints', () => {
     const result = await getUniverseStation(60003760);
 
     expect(result.data?.name).toBe('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
+  });
+
+  it('getUniverseStargate is unauthenticated and returns where the gate leads', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/stargates/50014002`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        return HttpResponse.json({
+          stargate_id: 50014002,
+          name: 'Stargate (Nourvukaiken)',
+          system_id: 30002813,
+          destination: { stargate_id: 50014001, system_id: 30001376 },
+        });
+      })
+    );
+
+    const result = await getUniverseStargate(50014002);
+
+    expect(result.data?.name).toBe('Stargate (Nourvukaiken)');
+    expect(result.data?.destination.system_id).toBe(30001376);
   });
 
   it('getUniverseSystem is unauthenticated and returns the security status', async () => {
