@@ -17,6 +17,7 @@ import {
 } from '@/engine/route/jumpRange';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { localJumpDistances } from '@/features/route/localRoute';
+import { useAvoidedSystemIds } from '@/features/route/avoidedSystems';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
@@ -146,36 +147,40 @@ export function useJumpRangeFilter(
   range: JumpRange
 ): JumpRangeFilter {
   const originSystemId = current.systemId;
+  const { avoided, hydrated } = useAvoidedSystemIds();
   const [distances, setDistances] = useState<{
     origin: number;
+    avoided: readonly number[];
     jumps: ReadonlyMap<number, number> | null;
   } | null>(null);
 
   useEffect(() => {
-    if (originSystemId === null) return;
+    if (originSystemId === null || !hydrated) return;
     let cancelled = false;
-    void localJumpDistances(originSystemId).then((result) => {
+    void localJumpDistances(originSystemId, 'shortest', avoided).then((result) => {
       if (cancelled) return;
       setDistances({
         origin: originSystemId,
+        avoided,
         jumps: result.kind === 'known' ? result.jumps : null,
       });
     });
     return () => {
       cancelled = true;
     };
-  }, [originSystemId]);
+  }, [originSystemId, avoided, hydrated]);
 
-  const jumps = distances?.origin === originSystemId ? distances.jumps : null;
+  const settled = distances?.origin === originSystemId && distances.avoided === avoided;
+  const jumps = settled ? distances.jumps : null;
 
   const jumpsStatus = useMemo((): JumpDistanceStatus => {
     // Still reading ESI: "no system" now would flash the set-your-system note.
     if (!current.loaded) return 'loading';
     if (originSystemId === null) return 'no-origin';
-    if (distances?.origin !== originSystemId) return 'loading';
+    if (!settled) return 'loading';
     if (distances.jumps === null) return 'unknown';
     return 'ready';
-  }, [current.loaded, originSystemId, distances]);
+  }, [current.loaded, originSystemId, settled, distances]);
 
   return useMemo((): JumpRangeFilter => {
     if (range === 'any') return { status: 'off', allowed: null, jumps, jumpsStatus };

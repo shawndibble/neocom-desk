@@ -41,12 +41,13 @@ export type RouteExposure =
 export async function routeExposure(
   originSystemId: number | null,
   destinationSystemId: number | null,
-  preference: RoutePreferenceKind
+  preference: RoutePreferenceKind,
+  avoid: readonly number[] = []
 ): Promise<RouteExposure> {
   if (originSystemId === null || destinationSystemId === null) return { kind: 'unknown' };
 
   const [route, systems] = await Promise.all([
-    findLocalRoute(originSystemId, destinationSystemId, preference),
+    findLocalRoute(originSystemId, destinationSystemId, preference, avoid),
     loadSolarSystemsById(),
   ]);
   if (route.kind === 'no-route') return { kind: 'no-route' };

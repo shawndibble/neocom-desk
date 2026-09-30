@@ -65,6 +65,7 @@ import {
   ROUTE_PREFERENCES,
 } from '@/features/route/routePreferences';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
+import { useAvoidedSystemIds } from '@/features/route/avoidedSystems';
 import {
   CourierContractDetailModal,
   type CourierJumps,
@@ -709,26 +710,34 @@ function useJumpCounts(
   const [answer, setAnswer] = useState<{
     rows: readonly CourierRouteRow[];
     preference: RoutePreferenceKind;
+    avoided: readonly number[];
     state: JumpsState;
   } | null>(null);
+  const { avoided, hydrated } = useAvoidedSystemIds();
 
   useEffect(() => {
+    // Held until the real list is in, so the board does not rank once without it.
+    if (!hydrated) return;
     let cancelled = false;
     void localJumpCountsForRoutes(
       rows.map((row) => ({
         originSystemId: row.origin.systemId,
         destinationSystemId: row.destination.systemId,
       })),
-      preference
+      preference,
+      avoided
     ).then((state) => {
-      if (!cancelled) setAnswer({ rows, preference, state });
+      if (!cancelled) setAnswer({ rows, preference, avoided, state });
     });
     return () => {
       cancelled = true;
     };
-  }, [rows, preference]);
+  }, [rows, preference, avoided, hydrated]);
 
-  return answer && answer.rows === rows && answer.preference === preference
+  return answer &&
+    answer.rows === rows &&
+    answer.preference === preference &&
+    answer.avoided === avoided
     ? answer.state
     : PENDING;
 }

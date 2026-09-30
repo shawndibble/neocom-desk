@@ -26,6 +26,12 @@ import { jumpCountsForRoutes, type RouteEnds } from '@/engine/route/jumpCounts';
 import { loadJumpGraph } from '@/sde/jumpGraph';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 
+/**
+ * Every entry point takes the pilot's Avoided Systems explicitly rather than
+ * reading the setting here: callers compute inside effects keyed on their
+ * inputs, and a list read behind their back would never re-run them when it
+ * changes.
+ */
 export type LocalRouteResult = JumpRouteResult | { kind: 'unknown' };
 
 /**
@@ -57,11 +63,16 @@ async function securityLookupFor(
 export async function findLocalRoute(
   originSystemId: number,
   destinationSystemId: number,
-  preference: RoutePreferenceKind = 'shortest'
+  preference: RoutePreferenceKind = 'shortest',
+  avoid: readonly number[] = []
 ): Promise<LocalRouteResult> {
   const [graph, securityOf] = await Promise.all([loadJumpGraph(), securityLookupFor(preference)]);
   if (!graph) return { kind: 'unknown' };
-  return findJumpRoute(graph, originSystemId, destinationSystemId, { preference, securityOf });
+  return findJumpRoute(graph, originSystemId, destinationSystemId, {
+    preference,
+    securityOf,
+    avoid: new Set(avoid),
+  });
 }
 
 /** A jump count, or which of the two reasons there isn't one. */
@@ -76,9 +87,10 @@ export type LocalJumpsResult =
 export async function findLocalJumps(
   originSystemId: number,
   destinationSystemId: number,
-  preference: RoutePreferenceKind = 'shortest'
+  preference: RoutePreferenceKind = 'shortest',
+  avoid: readonly number[] = []
 ): Promise<LocalJumpsResult> {
-  const route = await findLocalRoute(originSystemId, destinationSystemId, preference);
+  const route = await findLocalRoute(originSystemId, destinationSystemId, preference, avoid);
   return route.kind === 'route' ? { kind: 'known', jumps: route.systems.length - 1 } : route;
 }
 
@@ -96,13 +108,18 @@ export type LocalJumpDistances =
  */
 export async function localJumpDistances(
   originSystemId: number,
-  preference: RoutePreferenceKind = 'shortest'
+  preference: RoutePreferenceKind = 'shortest',
+  avoid: readonly number[] = []
 ): Promise<LocalJumpDistances> {
   const [graph, securityOf] = await Promise.all([loadJumpGraph(), securityLookupFor(preference)]);
   if (!graph) return { kind: 'unknown' };
   return {
     kind: 'known',
-    jumps: jumpDistancesFrom(graph, originSystemId, { preference, securityOf }),
+    jumps: jumpDistancesFrom(graph, originSystemId, {
+      preference,
+      securityOf,
+      avoid: new Set(avoid),
+    }),
   };
 }
 
@@ -122,9 +139,13 @@ export type LocalJumpCounts =
  */
 export async function localJumpCountsForRoutes(
   routes: readonly RouteEnds[],
-  preference: RoutePreferenceKind = 'shortest'
+  preference: RoutePreferenceKind = 'shortest',
+  avoid: readonly number[] = []
 ): Promise<LocalJumpCounts> {
   const [graph, securityOf] = await Promise.all([loadJumpGraph(), securityLookupFor(preference)]);
   if (!graph) return { kind: 'unknown' };
-  return { kind: 'known', counts: jumpCountsForRoutes(graph, routes, { preference, securityOf }) };
+  return {
+    kind: 'known',
+    counts: jumpCountsForRoutes(graph, routes, { preference, securityOf, avoid: new Set(avoid) }),
+  };
 }

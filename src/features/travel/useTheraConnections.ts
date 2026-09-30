@@ -11,6 +11,7 @@ import {
   type TheraConnectionRow,
 } from '@/engine/route/theraConnections';
 import { localJumpDistances } from '@/features/route/localRoute';
+import { useAvoidedSystemIds } from '@/features/route/avoidedSystems';
 import {
   EVE_SCOUT_CACHE_MS,
   loadTheraConnections,
@@ -50,7 +51,8 @@ export function useTheraConnections(
     key: string;
     value: ConnectionDistances;
   } | null>(null);
-  const distanceKey = `${originId}:${preference}`;
+  const { avoided, hydrated } = useAvoidedSystemIds();
+  const distanceKey = `${originId}:${preference}:${avoided.join(',')}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -75,15 +77,15 @@ export function useTheraConnections(
   }, []);
 
   useEffect(() => {
-    if (originId === null) return;
+    if (originId === null || !hydrated) return;
     let cancelled = false;
-    void localJumpDistances(originId, preference).then((next) => {
+    void localJumpDistances(originId, preference, avoided).then((next) => {
       if (!cancelled) setDistances({ key: distanceKey, value: next });
     });
     return () => {
       cancelled = true;
     };
-  }, [originId, preference, distanceKey]);
+  }, [originId, preference, avoided, hydrated, distanceKey]);
 
   return useMemo((): TheraConnectionsState => {
     if (result === null || systems === null) return { kind: 'loading' };

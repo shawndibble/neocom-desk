@@ -18,6 +18,7 @@ import {
   type RouteSafetySystemEntry,
 } from '@/engine/route/routeSafety';
 import { findLocalRoute, type LocalRouteResult } from '@/features/route/localRoute';
+import { useAvoidedSystemIds } from '@/features/route/avoidedSystems';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { loadRouteRegionNames, loadSystemActivity, type SystemActivity } from './routeSafetyData';
 
@@ -54,7 +55,8 @@ export function useRouteSafety(
 ): RouteSafetyState {
   const [activity, setActivity] = useState<SystemActivity | null>(null);
   const [resolved, setResolved] = useState<ResolvedRoute | null>(null);
-  const requestKey = `${fromId}:${toId}:${preference}`;
+  const { avoided, hydrated } = useAvoidedSystemIds();
+  const requestKey = `${fromId}:${toId}:${preference}:${avoided.join(',')}`;
   const wantsRoute = fromId !== null && toId !== null && fromId !== toId;
 
   // Re-read per route, not once per mount: inside the cache window it is a
@@ -73,11 +75,12 @@ export function useRouteSafety(
   }, [wantsRoute, requestKey]);
 
   useEffect(() => {
-    if (!wantsRoute) return;
+    // Held until the Avoided Systems are in, so the route is not drawn once without them.
+    if (!wantsRoute || !hydrated) return;
     let cancelled = false;
     void (async () => {
       const [result, systems] = await Promise.all([
-        findLocalRoute(fromId, toId, preference),
+        findLocalRoute(fromId, toId, preference, avoided),
         loadSolarSystemsById().catch(() => null),
       ]);
       const byId = systems ?? NO_SYSTEMS;
@@ -94,7 +97,7 @@ export function useRouteSafety(
     return () => {
       cancelled = true;
     };
-  }, [wantsRoute, fromId, toId, preference, requestKey]);
+  }, [wantsRoute, hydrated, fromId, toId, preference, avoided, requestKey]);
 
   return useMemo((): RouteSafetyState => {
     if (fromId === null || toId === null) return { kind: 'incomplete' };

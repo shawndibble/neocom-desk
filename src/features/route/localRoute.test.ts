@@ -8,7 +8,12 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadSolarSystems: () => loadSolarSystems(),
 }));
 
-import { findLocalJumps, findLocalRoute, localJumpDistances } from './localRoute';
+import {
+  findLocalJumps,
+  findLocalRoute,
+  localJumpCountsForRoutes,
+  localJumpDistances,
+} from './localRoute';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 
@@ -182,5 +187,25 @@ describe('localJumpDistances', () => {
     const result = await localJumpDistances(HUB, 'prefer-highsec');
     // The long all-highsec way round, so FAR is four jumps rather than two.
     expect(result.kind === 'known' && result.jumps.get(FAR)).toBe(4);
+  });
+});
+
+describe('Avoided Systems', () => {
+  it('routes around them in every entry point', async () => {
+    const avoid = [LOW];
+    expect(await findLocalRoute(HUB, FAR, 'shortest', avoid)).toEqual({
+      kind: 'route',
+      systems: [HUB, A, B, C, FAR],
+    });
+    expect(await findLocalJumps(HUB, FAR, 'shortest', avoid)).toEqual({ kind: 'known', jumps: 4 });
+    const distances = await localJumpDistances(HUB, 'shortest', avoid);
+    expect(distances.kind === 'known' && distances.jumps.get(FAR)).toBe(4);
+    expect(
+      await localJumpCountsForRoutes(
+        [{ originSystemId: HUB, destinationSystemId: FAR }],
+        'shortest',
+        avoid
+      )
+    ).toEqual({ kind: 'known', counts: [4] });
   });
 });

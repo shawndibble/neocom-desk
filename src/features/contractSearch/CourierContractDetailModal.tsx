@@ -47,6 +47,7 @@ import {
   paysFarAboveGoingRate,
 } from '@/engine/contracts/courierGoingRate';
 import { routeExposure, type RouteExposure } from '@/features/contractSearch/routeExposure';
+import { useAvoidedSystemIds } from '@/features/route/avoidedSystems';
 import { formatMagnitude } from '@/lib/magnitude';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { endpointName, endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
@@ -112,10 +113,12 @@ function useRouteExposure(
   const [exposure, setExposure] = useState<RouteExposure | null>(null);
   const originSystemId = row.origin.systemId;
   const destinationSystemId = row.destination.systemId;
+  const { avoided, hydrated } = useAvoidedSystemIds();
 
   useEffect(() => {
+    if (!hydrated) return;
     let cancelled = false;
-    void routeExposure(originSystemId, destinationSystemId, preference)
+    void routeExposure(originSystemId, destinationSystemId, preference, avoided)
       .catch((): RouteExposure => ({ kind: 'unknown' }))
       .then((result) => {
         if (!cancelled) setExposure(result);
@@ -123,7 +126,7 @@ function useRouteExposure(
     return () => {
       cancelled = true;
     };
-  }, [originSystemId, destinationSystemId, preference]);
+  }, [originSystemId, destinationSystemId, preference, avoided, hydrated]);
 
   return exposure;
 }
