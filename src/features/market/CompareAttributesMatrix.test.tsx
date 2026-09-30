@@ -131,7 +131,9 @@ describe('CompareAttributesMatrix', () => {
     render(<CompareAttributesMatrix rows={rows} data={data} onRemove={onRemove} />);
 
     const header = screen.getByRole('table', { name: 'Compared items' });
-    await userEvent.click(within(header).getByRole('button', { name: 'Remove Republic Fleet Rifter' }));
+    await userEvent.click(
+      within(header).getByRole('button', { name: 'Remove Republic Fleet Rifter' })
+    );
     expect(onRemove).toHaveBeenCalledWith(588);
   });
 });
