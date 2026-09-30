@@ -66,6 +66,7 @@ import {
   type FittingItemActions,
 } from './fittingItemActions';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
+import { MODULE_STATE_STYLE } from './moduleStateStyle';
 
 /**
  * The ring never grows past this: bigger only spreads the same tiles further
@@ -522,7 +523,9 @@ function SlotTile({
         : slotAccepts(drag, slot, handlers, actions)
           ? 'border-dashed border-accent'
           : module
-            ? 'border-line-bright'
+            ? shownState
+              ? MODULE_STATE_STYLE[shownState].border
+              : 'border-line-bright'
             : 'border-dashed border-line-bright';
   const draggable = !compact && module !== undefined && onMoveModule !== undefined;
   const interactive = !compact && onSelect !== undefined;
@@ -561,6 +564,7 @@ function SlotTile({
       aria-label={label}
       aria-pressed={pressed}
       data-ring-slot={`${slot.rack}-${slot.index}`}
+      data-module-state={module ? shownState : undefined}
       tabIndex={tabbable ? 0 : -1}
       className={`absolute border bg-bg ${border} ${lights === 'dim' ? 'opacity-35' : ''} ${interactive ? 'cursor-pointer hover:border-accent' : ''} ${draggable ? 'active:cursor-grabbing' : ''}`}
       style={{ ...position, transform: `rotate(${angle.toFixed(1)}deg)` }}
