@@ -17,9 +17,9 @@ const GROUPS: MarketGroupNode[] = [
 ];
 
 const TYPES: MarketTypeEntry[] = [
-  { typeId: 587, name: 'Rifter', marketGroupId: 2 },
-  { typeId: 597, name: 'Punisher', marketGroupId: 2 },
-  { typeId: 620, name: 'Rupture', marketGroupId: 3 },
+  { typeId: 587, name: 'Rifter', marketGroupId: 2, volume: 1 },
+  { typeId: 597, name: 'Punisher', marketGroupId: 2, volume: 1 },
+  { typeId: 620, name: 'Rupture', marketGroupId: 3, volume: 1 },
 ];
 
 describe('addAncestors', () => {
@@ -84,7 +84,7 @@ describe('filterMarketTree', () => {
   it('caps total displayed matches and reports when it has capped them', () => {
     const manyTypes: MarketTypeEntry[] = Array.from(
       { length: MARKET_TREE_MATCH_LIMIT + 10 },
-      (_, i) => ({ typeId: i, name: `Widget ${i}`, marketGroupId: 2 })
+      (_, i) => ({ typeId: i, name: `Widget ${i}`, marketGroupId: 2, volume: 1 })
     );
     const result = filterMarketTree(GROUPS, manyTypes, 'widget');
     expect(result?.totalMatches).toBe(MARKET_TREE_MATCH_LIMIT + 10);
@@ -94,7 +94,7 @@ describe('filterMarketTree', () => {
 
   it('pins an item whose name equals the query (case-insensitive) as bestMatch', () => {
     const types: MarketTypeEntry[] = [
-      { typeId: 1, name: 'Rifter Blueprint', marketGroupId: 4 },
+      { typeId: 1, name: 'Rifter Blueprint', marketGroupId: 4, volume: 1 },
       ...TYPES,
     ];
     expect(filterMarketTree(GROUPS, types, 'RIFTER')?.bestMatch?.typeId).toBe(587);

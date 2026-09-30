@@ -28,9 +28,9 @@ vi.mock('./marketItems', async (importOriginal) => {
   };
 });
 const CATALOGUE: MarketTypeEntry[] = [
-  { typeId: 34, name: 'Tritanium', marketGroupId: 1 },
-  { typeId: 35, name: 'Pyerite', marketGroupId: 1 },
-  { typeId: 587, name: 'Rifter', marketGroupId: 2 },
+  { typeId: 34, name: 'Tritanium', marketGroupId: 1, volume: 1 },
+  { typeId: 35, name: 'Pyerite', marketGroupId: 1, volume: 1 },
+  { typeId: 587, name: 'Rifter', marketGroupId: 2, volume: 1 },
 ];
 function installCatalogue(load: () => Promise<MarketTypeEntry[]>) {
   catalogueHolder.current = createMarketItemCatalogue(load);

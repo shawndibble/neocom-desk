@@ -10,6 +10,7 @@ import { flattenMarketWideTree, MARKET_WIDE_MAX_DEPTH } from './lib/flattenMarke
 import { buildShipTree } from './lib/shipTree.mjs';
 import { npcCorpFactions, stationOwnerFields } from './lib/stationOwners.mjs';
 import { npcCorporations, probeLpStores } from './lib/lpCorporations.mjs';
+import { marketTypeEntry } from './lib/marketTypeVolumes.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -307,6 +308,11 @@ const P0_PLANET_TYPES = {
   'Suspended Plasma': ['lava', 'plasma', 'storm'],
 };
 
+/** A type that belongs in market/types.json: published and market-grouped. */
+function isMarketType(t) {
+  return t.published && t.marketGroupID != null;
+}
+
 async function download(name) {
   const cached = join(CACHE_DIR, name);
   try {
@@ -533,6 +539,14 @@ const PACKAGED_VOLUME_CACHE_FILE = join(CACHE_DIR, 'packaged-volume-probe.json')
 // figure — rather than baking wrong numbers with no build error (issue #1085).
 const PACKAGED_VOLUME_CONTROL_TYPE_ID = 603; // Merlin
 const PACKAGED_VOLUME_CONTROL_EXPECTED = 2500;
+// Tritanium: the mineral control for market/types.json's plain `volume`.
+const MARKET_VOLUME_CONTROL_TYPE_ID = 34;
+const MARKET_VOLUME_CONTROL_EXPECTED = 0.01;
+// The probe covers every market type (~19.5k), so it runs a few requests at
+// once and saves its disk cache as it goes: an interrupted first build
+// resumes from the last checkpoint instead of starting over.
+const PACKAGED_VOLUME_PROBE_CONCURRENCY = 8;
+const PACKAGED_VOLUME_CHECKPOINT_EVERY = 500;
 
 /** Fetches one type's ESI record. */
 async function fetchTypeInfo(typeID) {
@@ -543,7 +557,7 @@ async function fetchTypeInfo(typeID) {
 }
 
 /**
- * Packaged volume (m3) for every manufacturing material typeID, from ESI's
+ * Packaged volume (m3) for every manufacturing material and market typeID, from ESI's
  * type endpoint — the SDE's own packaged-volume table ships empty (issue
  * #1085), so this is the only source. `invTypes.csv`'s `volume` column is
  * always the assembled figure; ESI's `packaged_volume` matches it for an
@@ -551,7 +565,7 @@ async function fetchTypeInfo(typeID) {
  * (a hull, a capital module).
  *
  * Cached to disk like `probeMarketRegions`, keyed by typeID, so repeated
- * local builds don't re-probe ~1,400 types against ESI every time. A type
+ * local builds don't re-probe ~20,000 types against ESI every time. A type
  * the probe can't resolve after retries is left out of the result rather
  * than guessed, matching `volumeForType`'s existing "no data, don't fake it"
  * contract — the caller falls back to the assembled `volume` for it, same as
@@ -564,12 +578,18 @@ async function probePackagedVolumes(typeIds) {
   } catch {
     /* no cache yet */
   }
+  const saveCache = async () => {
+    await mkdir(CACHE_DIR, { recursive: true });
+    await writeFile(PACKAGED_VOLUME_CACHE_FILE, JSON.stringify(diskCache));
+  };
 
-  const result = new Map();
+  const toProbe = typeIds.filter((typeID) => !diskCache[typeID]);
   let failed = 0;
-  for (const typeID of typeIds) {
-    let cached = diskCache[typeID];
-    if (!cached) {
+  let probed = 0;
+  let next = 0;
+  const worker = async () => {
+    while (next < toProbe.length) {
+      const typeID = toProbe[next++];
       try {
         const info = await fetchTypeInfo(typeID);
         const packagedVolume = info?.packaged_volume;
@@ -577,29 +597,42 @@ async function probePackagedVolumes(typeIds) {
         // `probeMarketRegions` caching a `false` result — otherwise every
         // ordinary mineral/component (the common case, where there's simply
         // no distinct figure to bake) gets re-probed against ESI on every
-        // future build instead of just once.
-        cached = { packagedVolume: typeof packagedVolume === 'number' ? packagedVolume : null };
-        diskCache[typeID] = cached;
+        // future build instead of just once. A failure is not cached, so a
+        // rerun retries it.
+        diskCache[typeID] = {
+          packagedVolume: typeof packagedVolume === 'number' ? packagedVolume : null,
+        };
       } catch (err) {
         console.warn(`  packaged volume: typeID ${typeID} failed: ${err.message}`);
         failed++;
         continue;
       }
+      probed++;
+      if (probed % PACKAGED_VOLUME_CHECKPOINT_EVERY === 0) {
+        await saveCache();
+        console.log(`  packaged volume: probed ${probed} of ${toProbe.length}...`);
+      }
     }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(PACKAGED_VOLUME_PROBE_CONCURRENCY, toProbe.length) }, worker)
+  );
+  await saveCache();
+
+  const volumes = new Map();
+  for (const typeID of typeIds) {
+    const cached = diskCache[typeID];
     // >0, not >=0: a real item never has zero volume, so a 0 here is ESI
     // returning something unusable, not a genuine figure to bake.
-    if (typeof cached.packagedVolume === 'number' && cached.packagedVolume > 0) {
-      result.set(typeID, cached.packagedVolume);
+    if (typeof cached?.packagedVolume === 'number' && cached.packagedVolume > 0) {
+      volumes.set(typeID, cached.packagedVolume);
     }
   }
 
-  await mkdir(CACHE_DIR, { recursive: true });
-  await writeFile(PACKAGED_VOLUME_CACHE_FILE, JSON.stringify(diskCache));
-
   console.log(
-    `  packaged volume: ${result.size} of ${typeIds.length} resolved${failed > 0 ? ` (${failed} probe failures)` : ''}`
+    `  packaged volume: ${volumes.size} of ${typeIds.length} resolved (${typeIds.length - toProbe.length} from cache, ${probed} probed${failed > 0 ? `, ${failed} probe failures` : ''})`
   );
-  return result;
+  return { volumes, failed };
 }
 
 const LP_STORE_CACHE_FILE = join(CACHE_DIR, 'lp-store-probe.json');
@@ -1164,10 +1197,18 @@ async function main() {
     if (bp.activity !== 'manufacturing') continue;
     for (const m of bp.materials) manufacturingMaterialTypeIds.add(m.typeID);
   }
+  // Every market type too, for market/types.json's packagedVolume (issue
+  // #2336): one probe over the union, so a type in both lists costs one call.
+  const marketTypeIds = [];
+  for (const [typeID, t] of types) {
+    if (isMarketType(t)) marketTypeIds.push(typeID);
+  }
+  const packagedVolumeTypeIds = [...new Set([...manufacturingMaterialTypeIds, ...marketTypeIds])];
   console.log(
-    `Probing packaged volume for ${manufacturingMaterialTypeIds.size} manufacturing material types...`
+    `Probing packaged volume for ${manufacturingMaterialTypeIds.size} manufacturing material and ${marketTypeIds.length} market types...`
   );
-  const packagedVolumeByType = await probePackagedVolumes([...manufacturingMaterialTypeIds]);
+  const { volumes: packagedVolumeByType, failed: packagedVolumeProbeFailures } =
+    await probePackagedVolumes(packagedVolumeTypeIds);
   let packagedVolumeApplied = 0;
   for (const [typeID, packagedVolume] of packagedVolumeByType) {
     const entry = typeMap[typeID];
@@ -1574,10 +1615,12 @@ async function main() {
   }
 
   // --- market/types.json: published invTypes with a market group -> MarketTypeEntry[] ---
+  // Volumes ride along (issue #2336) so the UI can show m3 without an ESI
+  // call per item; packagedVolume only where it differs, e.g. a hull.
   const marketTypes = [];
   for (const [typeID, t] of types) {
-    if (!t.published || t.marketGroupID == null) continue;
-    marketTypes.push({ typeId: typeID, name: t.name, marketGroupId: t.marketGroupID });
+    if (!isMarketType(t)) continue;
+    marketTypes.push(marketTypeEntry({ ...t, typeID }, packagedVolumeByType.get(typeID)));
   }
   marketTypes.sort((a, b) => a.typeId - b.typeId);
 
@@ -2343,6 +2386,45 @@ async function main() {
 
   console.log(`  market groups: ${marketGroups.length}`);
   console.log(`  market types: ${marketTypes.length}`);
+  {
+    const packaged = marketTypes.filter((t) => t.packagedVolume !== undefined).length;
+    const volumeless = marketTypes.filter((t) => !(t.volume > 0));
+    console.log(`  market types with a distinct packaged volume: ${packaged}`);
+    // A failed probe isn't cached, so a rerun heals it; shipping without it
+    // would quietly show a hull at its assembled size.
+    if (packagedVolumeProbeFailures > 0) {
+      console.error(
+        `  FAIL: ${packagedVolumeProbeFailures} packaged volume probes failed; rerun to retry them`
+      );
+      process.exitCode = 1;
+    }
+    if (volumeless.length > 0) {
+      console.warn(
+        `  WARN: ${volumeless.length} market types have no volume (e.g. ${volumeless
+          .slice(0, 5)
+          .map((t) => t.typeId)
+          .join(', ')})`
+      );
+    }
+    const byId = new Map(marketTypes.map((t) => [t.typeId, t]));
+    const hull = byId.get(PACKAGED_VOLUME_CONTROL_TYPE_ID)?.packagedVolume;
+    if (typeof hull !== 'number' || Math.abs(hull - PACKAGED_VOLUME_CONTROL_EXPECTED) > 1) {
+      console.error(
+        `  FAIL: market type ${PACKAGED_VOLUME_CONTROL_TYPE_ID} (Merlin) packagedVolume is ${hull ?? 'missing'}, expected ~${PACKAGED_VOLUME_CONTROL_EXPECTED}`
+      );
+      process.exitCode = 1;
+    }
+    const mineral = byId.get(MARKET_VOLUME_CONTROL_TYPE_ID);
+    if (
+      mineral?.volume !== MARKET_VOLUME_CONTROL_EXPECTED ||
+      mineral.packagedVolume !== undefined
+    ) {
+      console.error(
+        `  FAIL: market type ${MARKET_VOLUME_CONTROL_TYPE_ID} (Tritanium) volume is ${mineral?.volume ?? 'missing'}, expected ${MARKET_VOLUME_CONTROL_EXPECTED} with no packagedVolume`
+      );
+      process.exitCode = 1;
+    }
+  }
   console.log(`  solar systems: ${solarSystems.length}`);
   console.log(`  npc stations: ${npcStations.length}`);
   console.log(
