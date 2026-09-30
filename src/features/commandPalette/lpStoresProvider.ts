@@ -56,8 +56,8 @@ export function createLpStoresProvider({
   return {
     id: 'lp-stores',
     labelKey: 'commandPalette.groups.lpStores',
-    // After Pages, Commands, Characters and Market Items (#2319).
-    order: 4,
+    // After Pages, Commands, Characters, Assets and Market Items (#2319).
+    order: 5,
     minQueryLength: 2,
     search: (query) => {
       if (loaded) return match(query);

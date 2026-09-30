@@ -109,7 +109,7 @@ export function createContactsProvider({
   return {
     id: 'contacts',
     labelKey: 'commandPalette.groups.contacts',
-    order: 5,
+    order: 6,
     minQueryLength: 1,
     search: (query): PaletteResult[] =>
       rankedSearch(contacts, query, { primary: (c) => c.name, limit: GROUP_LIMIT }).map((c) => ({

@@ -127,7 +127,7 @@ describe('CommandPalette', () => {
 
     await user.keyboard('{Control>}k{/Control}');
     const input = await screen.findByRole('combobox', {
-      name: 'Search pages, commands, characters and items',
+      name: 'Search pages, commands, characters, assets and items',
     });
     expect(input).toHaveFocus();
 
