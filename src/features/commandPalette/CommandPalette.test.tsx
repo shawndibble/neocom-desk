@@ -9,6 +9,9 @@ import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
 import { CommandPaletteHost, CommandPaletteTrigger } from './CommandPaletteHost';
 import { useCommandPalette } from './store';
+import { GLOBAL_CACHE_CHARACTER_ID, writeCached } from '@/esi/cache';
+import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
+import { loadPaletteContacts } from './contactsProvider';
 
 vi.mock('@/app/useGrantedScopes', () => ({
   useGrantedScopes: () => undefined,
@@ -169,5 +172,66 @@ describe('CommandPalette', () => {
     await user.type(await screen.findByRole('combobox'), 'add char');
     await user.keyboard('{Enter}');
     expect(beginAddCharacterLogin).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Contacts group', () => {
+    const fetchSpy = vi.fn();
+
+    beforeEach(async () => {
+      vi.stubGlobal('fetch', fetchSpy);
+      fetchSpy.mockReset();
+      usePublicInfoModalStore.getState().close();
+      await Promise.all([db.tokens.clear(), db.esiCache.clear()]);
+      await writeCached(
+        1,
+        'contacts',
+        [{ contact_id: 90, contact_type: 'corporation', standing: -10 }],
+        Date.now()
+      );
+      await writeCached(GLOBAL_CACHE_CHARACTER_ID, 'name:90', 'Pirate Holdings', Date.now());
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    async function grantContacts(scopes: string[]) {
+      await db.tokens.put({
+        characterId: 1,
+        accessToken: 'x',
+        refreshToken: 'y',
+        expiresAt: Date.now() + 60_000,
+        scopes,
+      });
+    }
+
+    it('lists a matching contact with its standing, opens Public Info, and never fetches', async () => {
+      await grantContacts(['esi-characters.read_contacts.v1']);
+      const user = userEvent.setup();
+      renderShell();
+      await user.keyboard('{Control>}k{/Control}');
+      await user.type(await screen.findByRole('combobox'), 'pirate');
+
+      const option = await screen.findByRole('option', { name: /Pirate Holdings/ });
+      expect(screen.getByRole('group', { name: 'Contacts' })).toContainElement(option);
+      expect(option).toHaveTextContent('Corp · -10 Alpha Pilot');
+      await user.keyboard('{Enter}');
+      expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'corporation', id: 90 });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('never shows the group without the contacts scope', async () => {
+      await grantContacts([]);
+      const user = userEvent.setup();
+      renderShell();
+      await user.keyboard('{Control>}k{/Control}');
+      await user.type(await screen.findByRole('combobox'), 'pirate');
+      // Let the cache read land; it answers nothing, so no group ever renders.
+      await act(async () => {
+        await loadPaletteContacts();
+      });
+      expect(screen.queryByRole('group', { name: 'Contacts' })).not.toBeInTheDocument();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
   });
 });

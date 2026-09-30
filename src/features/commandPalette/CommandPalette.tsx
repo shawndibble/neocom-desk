@@ -12,13 +12,31 @@ import { listNavDestinations, NAV_LOCK_PATHS } from '@/app/navDestinations';
 import { useLockedRoutes } from '@/app/useGrantedScopes';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
+import { openPublicInfoModal } from '@/stores/publicInfoModal';
 import { createCharactersProvider, createCommandsProvider, createPagesProvider } from './providers';
+import {
+  createContactsProvider,
+  loadPaletteContacts,
+  type PaletteContact,
+} from './contactsProvider';
 import type { PaletteProvider, PaletteResult } from './types';
 import { usePaletteSearch } from './usePaletteSearch';
 
 const NO_CHARACTERS: readonly { characterId: number; name: string }[] = [];
+const NO_CONTACTS: readonly PaletteContact[] = [];
 
-/** The live reads behind the three shipped groups, turned into providers. */
+/** Literal keys, so the locale split's source scan finds them. */
+const CONTACT_TYPE_KEYS: Record<PaletteContact['kind'], string> = {
+  character: 'contacts.typeCharacter',
+  corporation: 'contacts.typeCorporation',
+  alliance: 'contacts.typeAlliance',
+};
+
+function signedStanding(standing: number): string {
+  return standing > 0 ? `+${standing}` : String(standing);
+}
+
+/** The live reads behind the shipped groups, turned into providers. */
 function useShippedProviders(): PaletteProvider[] {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -28,6 +46,8 @@ function useShippedProviders(): PaletteProvider[] {
   const characters = useLiveQuery(() => db.characters.toArray(), [], NO_CHARACTERS);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
+  // Cache-only, read as the palette opens: typing never waits on it or fetches.
+  const contacts = useLiveQuery(loadPaletteContacts, [], NO_CONTACTS);
 
   const destinations = useMemo(
     () => listNavDestinations({ locked, corpVisible, corpCapabilities: capabilities, t }),
@@ -48,8 +68,22 @@ function useShippedProviders(): PaletteProvider[] {
         activeHint: t('commandPalette.activeCharacter'),
         onSelect: (characterId) => void setActiveCharacter(characterId),
       }),
+      createContactsProvider({
+        contacts,
+        onOpen: openPublicInfoModal,
+        describe: (contact) =>
+          [
+            t(CONTACT_TYPE_KEYS[contact.kind]),
+            ...contact.holders.map((holder) =>
+              t('commandPalette.contactStanding', {
+                standing: signedStanding(holder.standing),
+                character: holder.characterName,
+              })
+            ),
+          ].join(' · '),
+      }),
     ],
-    [destinations, navigate, t, characters, activeCharacterId, setActiveCharacter]
+    [destinations, navigate, t, characters, activeCharacterId, setActiveCharacter, contacts]
   );
 }
 

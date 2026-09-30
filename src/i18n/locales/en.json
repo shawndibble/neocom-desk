@@ -6010,10 +6010,12 @@
     "resultsCount_one": "{{count}} result",
     "resultsCount_other": "{{count}} results",
     "activeCharacter": "Active",
+    "contactStanding": "{{standing}} {{character}}",
     "groups": {
       "pages": "Pages",
       "commands": "Commands",
-      "characters": "Characters"
+      "characters": "Characters",
+      "contacts": "Contacts"
     },
     "commands": {
       "openSettings": "Open settings",
