@@ -88,3 +88,41 @@ export function scheduleCachePrune(): () => void {
     cancelWait();
   };
 }
+
+/** Past boot, the ESI warm-up, the first route and the cache prune. */
+export const LAZY_SDE_WARM_DELAY_MS = 90_000;
+
+/**
+ * Schedules `warmLazySde` (the lazy SDE files + dogma engine, for offline
+ * first use) after `LAZY_SDE_WARM_DELAY_MS`, then an idle slot, from its own
+ * chunk. Gated on connection inside the warm; returns its cancel.
+ */
+export function scheduleLazySdeWarm(): () => void {
+  const signal = { cancelled: false };
+  let cancelWait = () => {};
+
+  const start = () => {
+    if (signal.cancelled) return;
+    import('@/sde/warmLazySde')
+      .then(({ warmLazySde }) => {
+        if (!signal.cancelled) return warmLazySde(signal);
+      })
+      .catch(() => {});
+  };
+
+  const delay = setTimeout(() => {
+    if (typeof globalThis.requestIdleCallback === 'function') {
+      const handle = requestIdleCallback(start, { timeout: BOOT_PREFETCH_IDLE_TIMEOUT_MS * 5 });
+      cancelWait = () => cancelIdleCallback(handle);
+    } else {
+      const handle = setTimeout(start, BOOT_PREFETCH_IDLE_TIMEOUT_MS);
+      cancelWait = () => clearTimeout(handle);
+    }
+  }, LAZY_SDE_WARM_DELAY_MS);
+
+  return () => {
+    signal.cancelled = true;
+    clearTimeout(delay);
+    cancelWait();
+  };
+}
