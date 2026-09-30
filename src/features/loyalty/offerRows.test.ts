@@ -53,6 +53,24 @@ const probes: LoyaltyStoreOffer = {
 };
 
 describe('computeLoyaltyOfferRows', () => {
+  it('prices every offer for a corp the Character holds no LP with, none of them affordable (issue #2321)', () => {
+    const rows = computeLoyaltyOfferRows({
+      offers: [probes],
+      catalog: makeCatalog(),
+      hubPrices: { [PROBE_ID]: 1_800 },
+      adjustedPrices: {},
+      systemCostIndex: 0,
+      skills: {},
+      liquidationBasis: 'order',
+      materialSourcing: undefined,
+      playerLp: 0,
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].profit.affordableLp).toBe(false);
+    expect(rows[0].profit.iskPerLp).not.toBeNull();
+  });
+
   it('treats a catalog-known type_id as a blueprint offer and runs the manufacturing engine', () => {
     const [row] = computeLoyaltyOfferRows({
       offers: [astero],
