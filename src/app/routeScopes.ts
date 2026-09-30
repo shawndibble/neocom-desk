@@ -248,8 +248,8 @@ export const ROUTE_REQUIREMENTS = {
     ],
     strings: 'pi',
   },
-  // Reached from Wallet's Loyalty Points panel (a store row, or "Browse LP
-  // stores" for any store — issue #2321), from item LP links, and directly.
+  // Reached from Wallet's Loyalty Points panel (a store row, or the LP
+  // Store picker for any store — issue #2321), from item LP links, and directly.
   // getLoyaltyStoreOffers is PUBLIC, so this one scope is what the route
   // actually needs a grant for: the character's own LP balance decides
   // affordability and pins the picker's held corps. Browsing a store you

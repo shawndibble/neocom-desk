@@ -304,11 +304,12 @@ export function Wallet() {
 
   // One age for the page: the stalest of the two feeds it shows.
   const oldestFetchedAt = useMemo(() => {
-    const dates = [balanceResult?.fetchedAt, loyaltyResult?.fetchedAt].filter(
-      (d): d is Date => d != null
-    );
+    const dates = [
+      balanceResult?.fetchedAt,
+      loyaltyNeedsReauth ? undefined : loyaltyResult?.fetchedAt,
+    ].filter((d): d is Date => d != null);
     return dates.length === 0 ? null : new Date(Math.min(...dates.map((d) => d.getTime())));
-  }, [balanceResult, loyaltyResult]);
+  }, [balanceResult, loyaltyResult, loyaltyNeedsReauth]);
 
   const loyaltyColumns = useMemo<DataTableColumn<CharacterLoyaltyPoints>[]>(
     () => [
@@ -663,6 +664,9 @@ export function Wallet() {
           )}
 
           <Panel
+            // Lifts this panel's stacking context over the next one, so the
+            // picker's popover isn't painted under it.
+            className="relative z-10"
             padded={false}
             title={t('loyalty.title')}
             actions={

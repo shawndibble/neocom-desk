@@ -7,7 +7,8 @@
  * balance (`lpStorePickerOptions`). Picking one navigates to
  * `/wallet/loyalty/:corporationId`, so the chosen store lives in the URL.
  *
- * Hand-built ARIA (decision 20260905-114550): the button opens a popover,
+ * Hand-built ARIA (decision 20260905-114550, reshaped by
+ * 20260930-select-box-lp-store-picker): the button opens a dialog popover,
  * focus moves to its search input, Arrow/Home/End move a highlight via
  * `aria-activedescendant`, Enter or a click opens the store, Escape closes the
  * popover and returns focus to the button.
@@ -180,9 +181,12 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
         ref={triggerRef}
         id={TRIGGER_ID}
         type="button"
-        aria-haspopup="listbox"
+        aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? POPOVER_ID : undefined}
+        // While open, keep focus in the search field: a blur here would close the
+        // popover and the click would reopen it (Safari/iOS don't focus buttons).
+        onMouseDown={(e) => open && e.preventDefault()}
         onClick={() => (open ? close() : setOpen(true))}
         className={cx(
           fieldBaseClassName,
@@ -207,6 +211,8 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
       {open && (
         <div
           id={POPOVER_ID}
+          role="dialog"
+          aria-label={t('loyaltyStore.pickerLabel')}
           className="absolute top-full right-0 z-20 mt-1 flex w-72 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-xs border border-line bg-panel p-1 shadow-lg shadow-black/50"
         >
           <label htmlFor={INPUT_ID} className="sr-only">
@@ -250,6 +256,8 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
               role="listbox"
               aria-label={t('loyaltyStore.pickerLabel')}
               className="max-h-72 overflow-y-auto"
+              // The scrollbar/gutter must not steal focus, or the popover closes.
+              onMouseDown={(e) => e.preventDefault()}
             >
               {options.map((option) => (
                 <li
