@@ -1,8 +1,8 @@
 /**
  * Runs the Hauling Opportunities scan for a route and category, and reports
  * where it is: the panel shows a progress line while the two cheap passes and
- * the order-book pass run, then the rows. A route or category change abandons
- * the scan in flight rather than letting a stale one land.
+ * the order-book pass run, then the rows. A route, category or mode change
+ * abandons the scan in flight rather than letting a stale one land.
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { AppraisalNetFees } from '@/engine/market/appraisal';
@@ -16,6 +16,7 @@ import { typeIdsInCategory } from './haulingCategories';
 import {
   clearHaulingScanCache,
   runHaulingScan,
+  type HaulMode,
   type HaulingProgress,
   type HaulingScan,
 } from './haulingData';
@@ -30,6 +31,7 @@ export function useHaulingScan(
   from: TradeHub,
   to: TradeHub,
   categoryId: number,
+  mode: HaulMode,
   enabled = true
 ): { state: HaulingScanState; refresh: () => void } {
   const [state, setState] = useState<HaulingScanState>({ status: 'loading', progress: null });
@@ -53,6 +55,7 @@ export function useHaulingScan(
           to,
           typeIds,
           scope: categoryId,
+          mode,
           types,
           signal: controller.signal,
           onProgress: (progress) => {
@@ -67,7 +70,7 @@ export function useHaulingScan(
       }
     })();
     return () => controller.abort();
-  }, [from, to, categoryId, enabled, attempt]);
+  }, [from, to, categoryId, mode, enabled, attempt]);
 
   const refresh = useCallback(() => {
     clearHaulingScanCache();

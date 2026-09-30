@@ -143,6 +143,68 @@ describe('planTrip', () => {
   });
 });
 
+describe('planTrip, selling into buy orders', () => {
+  // Accounting V: 3.375% tax, no broker fee.
+  const instant = (over: Partial<TripCandidate> & { typeId: number }) =>
+    candidate({
+      buyLadder: [
+        { price: 100, units: 10, orders: 1 },
+        { price: 105, units: 20, orders: 1 },
+      ],
+      destBuyLadder: [
+        { price: 115, units: 5, orders: 1 },
+        { price: 110, units: 12, orders: 1 },
+        { price: 108, units: 100, orders: 1 },
+      ],
+      demandCapUnits: null,
+      ...over,
+    });
+
+  it('sizes to the profitable depth of both books, not to a week of sales', () => {
+    const plan = planTrip({
+      candidates: [instant({ typeId: 1 })],
+      cargoM3: null,
+      budgetIsk: null,
+      fees: FEES,
+      overrides: NO_OVERRIDES,
+    });
+    expect(plan.lines[0]).toMatchObject({ quantity: 17, cost: 1735, limitedBy: 'supply' });
+    expect(plan.lines[0]!.profit).toBeCloseTo(1895 - 1895 * 0.03375 - 1735);
+    expect(plan.binding).toBeNull();
+  });
+
+  it('still stops at the hold', () => {
+    const plan = planTrip({
+      candidates: [instant({ typeId: 1, unitVolumeM3: 2 })],
+      cargoM3: 20,
+      budgetIsk: null,
+      fees: FEES,
+      overrides: NO_OVERRIDES,
+    });
+    expect(plan.lines[0]).toMatchObject({ quantity: 10, limitedBy: 'space' });
+    expect(plan.binding).toBe('space');
+  });
+
+  it('caps a typed quantity at what the destination buy orders take', () => {
+    const plan = planTrip({
+      candidates: [
+        instant({
+          typeId: 1,
+          destBuyLadder: [
+            { price: 115, units: 5, orders: 1 },
+            { price: 110, units: 3, orders: 1 },
+          ],
+        }),
+      ],
+      cargoM3: null,
+      budgetIsk: null,
+      fees: FEES,
+      overrides: new Map([[1, { quantity: 500 }]]),
+    });
+    expect(plan.lines[0]).toMatchObject({ quantity: 8, cost: 800, limitedBy: 'edited' });
+  });
+});
+
 describe('multibuyText', () => {
   it('writes one "Name Qty" line per shipped item, in the order given', () => {
     const text = multibuyText([

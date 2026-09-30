@@ -163,6 +163,40 @@ export function buildSellLadder(orders: readonly LadderOrder[]): LadderLevel[] {
   return [...byPrice.values()].sort((a, b) => a.price - b.price);
 }
 
+/**
+ * The buy side of an order book as descending price levels — dearest first,
+ * the order an instant sale fills in.
+ */
+export function buildBuyLadder(orders: readonly LadderOrder[]): LadderLevel[] {
+  const byPrice = new Map<number, LadderLevel>();
+  for (const order of orders) {
+    if (!order.is_buy_order || order.volume_remain <= 0) continue;
+    const level = byPrice.get(order.price) ?? { price: order.price, units: 0, orders: 0 };
+    level.units += order.volume_remain;
+    level.orders += 1;
+    byPrice.set(order.price, level);
+  }
+  return [...byPrice.values()].sort((a, b) => b.price - a.price);
+}
+
+export interface HubOrder extends LadderOrder {
+  location_id: number;
+}
+
+/**
+ * Both ladders of a region's book at one hub station. Only orders placed at
+ * the station count: a buy order's range is not read, so one placed
+ * elsewhere in the region is never assumed to reach the hub (the same rule
+ * `orderExits.ts` keeps).
+ */
+export function hubLadders(
+  orders: readonly HubOrder[],
+  stationId: number
+): { sell: LadderLevel[]; buy: LadderLevel[] } {
+  const atStation = orders.filter((o) => o.location_id === stationId);
+  return { sell: buildSellLadder(atStation), buy: buildBuyLadder(atStation) };
+}
+
 export interface SaleEstimate {
   /**
    * What to expect per unit, priced to sell: the lower of one tick under the
@@ -236,8 +270,10 @@ export type HaulingFlag = 'crowded' | 'thin' | 'low-margin' | 'outlier';
 
 /** The short heads-up tags for a row. Order is stable so the UI never reshuffles them. */
 export function haulingFlags(input: {
+  /** The destination's sell ladder; pass none when the lot is not listed (nothing to be crowded out of). */
   ladder: readonly LadderLevel[];
-  demand: DemandKind;
+  /** Null when no demand was read — an instant sale into buy orders. */
+  demand: DemandKind | null;
   marginPct: number;
   thresholds?: HaulingThresholds;
 }): HaulingFlag[] {
@@ -273,6 +309,59 @@ export function walkLadder(
   return { filled, cost };
 }
 
+export interface InstantWalk {
+  units: number;
+  /** ISK to buy them off the origin's sell orders. */
+  cost: number;
+  /** ISK the destination's buy orders pay for them, before tax. */
+  revenue: number;
+  salesTax: number;
+  profit: number;
+}
+
+/**
+ * Buy off the origin's sell orders (cheapest first) and sell straight into
+ * the destination's buy orders (dearest first), one unit at a time, while
+ * each unit still makes money after sales tax. Nothing is listed, so no
+ * broker fee. Stops at the first unit that would only break even or lose —
+ * every later pairing is dearer to buy and cheaper to sell — when either book
+ * runs out, or at `maxUnits`.
+ */
+export function walkInstant(input: {
+  /** The origin's sell ladder, ascending. */
+  originLadder: readonly LadderLevel[];
+  /** The destination's buy ladder, descending. */
+  destBuyLadder: readonly LadderLevel[];
+  accountingLevel: number;
+  maxUnits?: number;
+}): InstantWalk {
+  const { originLadder, destBuyLadder, accountingLevel } = input;
+  let remaining = input.maxUnits === undefined ? Infinity : Math.max(0, Math.floor(input.maxUnits));
+  let units = 0;
+  let cost = 0;
+  let revenue = 0;
+  let i = 0;
+  let j = 0;
+  let leftAtOrigin = originLadder[0]?.units ?? 0;
+  let leftAtDest = destBuyLadder[0]?.units ?? 0;
+  while (remaining > 0 && i < originLadder.length && j < destBuyLadder.length) {
+    const buyAt = originLadder[i]!.price;
+    const sellAt = destBuyLadder[j]!.price;
+    if (sellAt - salesTax(sellAt, accountingLevel) <= buyAt) break;
+    const take = Math.min(leftAtOrigin, leftAtDest, remaining);
+    units += take;
+    cost += take * buyAt;
+    revenue += take * sellAt;
+    remaining -= take;
+    leftAtOrigin -= take;
+    leftAtDest -= take;
+    if (leftAtOrigin <= 0) leftAtOrigin = originLadder[++i]?.units ?? 0;
+    if (leftAtDest <= 0) leftAtDest = destBuyLadder[++j]?.units ?? 0;
+  }
+  const tax = units > 0 ? salesTax(revenue, accountingLevel) : 0;
+  return { units, cost, revenue, salesTax: tax, profit: revenue - tax - cost };
+}
+
 export interface LotEconomics {
   /** Units that could actually be bought at the origin (≤ the quantity asked). */
   filled: number;
@@ -280,7 +369,7 @@ export interface LotEconomics {
   cost: number;
   /** What the lot is expected to bring in, before fees. */
   revenue: number;
-  /** Sales tax plus broker fee on the destination listing. */
+  /** Sales tax plus broker fee on the destination listing (sales tax only when selling into buy orders). */
   fees: number;
   salesTax: number;
   /** 100 ISK minimum, once for the lot. */
@@ -299,19 +388,34 @@ export interface LotEconomics {
  * Buying is an instant purchase from sell orders, so — unlike
  * `compareMargin`, which prices a buy order of your own — only the sale side
  * pays a broker fee.
+ *
+ * With `destBuyLadder` the lot is sold straight into the destination's buy
+ * orders instead: `expectedPrice` is ignored, the lot stops at the depth of
+ * that book (only what can be sold is bought), revenue is what those orders
+ * pay dearest first, and only sales tax is charged. Units past break-even are
+ * still priced honestly — this sizes nothing on its own.
  */
 export function lotEconomics(input: {
   buyLadder: readonly LadderLevel[];
   expectedPrice: number;
   quantity: number;
   fees: AppraisalNetFees;
+  destBuyLadder?: readonly LadderLevel[];
 }): LotEconomics {
-  const { filled, cost } = walkLadder(input.buyLadder, input.quantity);
-  const revenue = filled * input.expectedPrice;
   const { accountingLevel, brokerRelationsLevel, standing } = input.fees;
+  const { destBuyLadder } = input;
+  const instant = destBuyLadder !== undefined;
+  const quantity = instant
+    ? Math.min(
+        input.quantity,
+        destBuyLadder.reduce((sum, l) => sum + l.units, 0)
+      )
+    : input.quantity;
+  const { filled, cost } = walkLadder(input.buyLadder, quantity);
+  const revenue = instant ? walkLadder(destBuyLadder, filled).cost : filled * input.expectedPrice;
   const tax = filled > 0 ? salesTax(revenue, accountingLevel) : 0;
   const broker =
-    filled > 0
+    filled > 0 && !instant
       ? brokerFee(revenue, brokerRelationsLevel, standing.factionStanding, standing.corpStanding)
       : 0;
   const profit = revenue - tax - broker - cost;
@@ -323,11 +427,9 @@ export function lotEconomics(input: {
     salesTax: tax,
     brokerFee: broker,
     salesTaxPct: salesTaxPct(accountingLevel),
-    brokerFeePct: brokerFeePct(
-      brokerRelationsLevel,
-      standing.factionStanding,
-      standing.corpStanding
-    ),
+    brokerFeePct: instant
+      ? 0
+      : brokerFeePct(brokerRelationsLevel, standing.factionStanding, standing.corpStanding),
     profit,
     marginPct: cost > 0 ? (profit / cost) * 100 : 0,
   };
