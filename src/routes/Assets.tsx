@@ -66,6 +66,8 @@ import type { CharacterAsset } from '@/esi/endpoints';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
+import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
+import { assetBlueprintKind } from '@/engine/blueprintKind';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
 import type { TableExport } from '@/components/ui/useTableExport';
@@ -561,6 +563,8 @@ interface AssetItemActions {
   /** Material typeID -> the character's own Build Plan consuming it; null until the blueprint catalog has loaded. */
   materialPlanMap: ReadonlyMap<number, BuildPlanRecord> | null;
   onViewInIndustryAsMaterial: (typeId: number) => void;
+  /** Blueprint typeIDs for the BPO badge; null until loaded, or when nothing listed can be a blueprint. */
+  blueprintTypeIds: ReadonlySet<number> | null;
 }
 
 const AssetItemActionsContext = createContext<AssetItemActions | null>(null);
@@ -887,6 +891,7 @@ export function Assets() {
     }
     return merged;
   }, [typeNames, activeCrossCharacterData]);
+  const blueprintTypeIds = useBlueprintTypeIds(mergedTypeNames);
   const mergedLocationNames = useMemo(() => {
     if (!activeCrossCharacterData) return locationNames;
     const merged = new Map(locationNames);
@@ -1507,6 +1512,7 @@ export function Assets() {
       volumeByTypeId,
       materialPlanMap,
       onViewInIndustryAsMaterial: handleViewInIndustryAsMaterial,
+      blueprintTypeIds,
     }),
     [
       priceByTypeId,
@@ -1514,6 +1520,7 @@ export function Assets() {
       volumeByTypeId,
       materialPlanMap,
       handleViewInIndustryAsMaterial,
+      blueprintTypeIds,
     ]
   );
 
@@ -2053,6 +2060,7 @@ function SearchMatchRow({
       security={rootStationId === null ? undefined : securityForStation(rootStationId)}
       href={assetHref(rootStationId, [], query)}
       characterBadge={characterBadgeFor(asset.item_id, characterBadges)}
+      blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
       t={t}
     />
   );
@@ -2131,6 +2139,8 @@ function NodeRowView({
       unitVolume={actions.volumeByTypeId.get(asset.type_id)}
       estimatedValue={estimatedValue}
       characterBadge={badge}
+      blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
+      onShowInfo={() => pageActions.showInfo(asset.type_id, label)}
       selectMode={selectMode}
       selectionState={selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
       onToggleSelection={() => onToggleSelection([asset.item_id])}

@@ -12,11 +12,12 @@
  * (`w-14`/`w-16`/`w-20`) wrap with everything else.
  */
 
-import type { ReactElement, ReactNode } from 'react';
+import { useRef, type ReactElement, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { IconButton, IskAmount, RowActionsMenu, RowMoreActions } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { formatUnitVolume } from '@/lib/volume';
 import { securityStatusColor } from '@/engine/securityStatus';
 import { formatBadge } from './assetBrowserFormat';
@@ -24,6 +25,7 @@ import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import type { PinState } from '@/features/character/stationPins';
 import type { SelectionState } from '@/features/character/assetSelection';
 import { SelectionCheckbox } from './SelectionCheckbox';
+import type { BlueprintKind } from '@/engine/blueprintKind';
 
 export type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -87,6 +89,46 @@ export function CharacterBadge({ characterName, t }: CharacterBadgeProps) {
       title={t('assets.crossCharacterBadge', { character: characterName })}
     >
       {characterName}
+    </span>
+  );
+}
+
+interface BlueprintBadgeProps {
+  kind: BlueprintKind;
+  t: Translate;
+}
+
+/** Per kind: the visible abbreviation, the full name a screen reader hears, and its hue (DESIGN.md §1 "Blueprints"). */
+const BLUEPRINT_BADGE: Record<BlueprintKind, { label: string; name: string; className: string }> = {
+  original: {
+    label: 'assets.blueprintBadge.original.label',
+    name: 'assets.blueprintBadge.original.name',
+    className: 'border-accent-dim text-accent',
+  },
+  copy: {
+    label: 'assets.blueprintBadge.copy.label',
+    name: 'assets.blueprintBadge.copy.name',
+    className: 'border-blueprint-copy/50 text-blueprint-copy',
+  },
+};
+
+/**
+ * Marks a blueprint stack as a **BPO** or a **BPC** (CONTEXT.md) — the one
+ * distinction the item name can't carry, since a copy shares its original's
+ * typeID and name. The written label, not the colour, is the signal
+ * (DESIGN.md §7); a screen reader hears the full name instead of the letters.
+ */
+export function BlueprintBadge({ kind, t }: BlueprintBadgeProps) {
+  const badge = BLUEPRINT_BADGE[kind];
+  return (
+    <span
+      className={cx(
+        'ml-1.5 shrink-0 rounded-xs border px-1 py-0.5 text-[0.6875rem] font-semibold',
+        badge.className
+      )}
+    >
+      <span aria-hidden="true">{t(badge.label)}</span>
+      <span className="sr-only">{t(badge.name)}</span>
     </span>
   );
 }
@@ -307,12 +349,62 @@ export function ItemColumnLabels({ t }: ItemColumnLabelsProps) {
   );
 }
 
+/**
+ * How long a touch has to be held before it reads as the row menu's
+ * long-press rather than a tap — Radix opens the context menu at 700ms, so
+ * anything past `Tooltip`'s own 500ms hold is already that gesture.
+ */
+const LONG_PRESS_MS = 500;
+
+/**
+ * An item's name as the way into its Show info. It sits inside the row menu's
+ * trigger, so a touch-and-hold on it opens that menu — and some browsers
+ * still send a click when the finger lifts. That click is swallowed: a press
+ * that became a context menu (or was held that long) never opens Show info
+ * on top of the menu it just opened.
+ */
+function ItemNameButton({ name, onShowInfo }: { name: string; onShowInfo: () => void }) {
+  const press = useRef<{ start: number; touch: boolean; menu: boolean } | null>(null);
+  return (
+    <button
+      type="button"
+      className={cx(
+        'min-w-0 cursor-pointer truncate text-left text-sm underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+        tappableRowClassName
+      )}
+      title={name}
+      onPointerDown={(event) => {
+        press.current = {
+          start: event.timeStamp,
+          touch: event.pointerType !== 'mouse',
+          menu: false,
+        };
+      }}
+      onContextMenu={() => {
+        if (press.current) press.current.menu = true;
+      }}
+      onClick={(event) => {
+        const p = press.current;
+        press.current = null;
+        if (p && (p.menu || (p.touch && event.timeStamp - p.start >= LONG_PRESS_MS))) return;
+        onShowInfo();
+      }}
+    >
+      {name}
+    </button>
+  );
+}
+
 interface ItemRowProps {
   name: string;
   quantity: number;
   unitVolume: number | undefined;
   estimatedValue: number;
   characterBadge: string | null;
+  /** Set on a blueprint stack: a BPO or BPC badge beside the name. */
+  blueprintKind?: BlueprintKind | null;
+  /** Makes the name a button opening Show info — the row menu's first action, one click closer. */
+  onShowInfo?: () => void;
   /** Wraps the row in the shared item context menu — supplied by the route. */
   wrap: (children: ReactElement) => ReactNode;
   selectMode: boolean;
@@ -329,7 +421,10 @@ interface ItemRowProps {
  *
  * Full item detail (icon, volume, location, jumps-away) lives behind the
  * row's menu's "Show info" action — right-click, or the More actions button
- * the menu publishes into the row — not on the row itself.
+ * the menu publishes into the row — not on the row itself. With `onShowInfo`
+ * the name opens it directly too: a real button inside the menu's trigger,
+ * never wrapping another control, so right-click and long-press still reach
+ * the menu from it.
  */
 export function ItemRow({
   name,
@@ -337,6 +432,8 @@ export function ItemRow({
   unitVolume,
   estimatedValue,
   characterBadge,
+  blueprintKind = null,
+  onShowInfo,
   wrap,
   selectMode,
   selectionState,
@@ -362,9 +459,14 @@ export function ItemRow({
               above). */}
           <span className="flex min-w-0 flex-1 flex-col gap-0.5 md:contents">
             <span className="flex min-w-0 items-center md:flex-1">
-              <span className="truncate text-sm" title={name}>
-                {name}
-              </span>
+              {onShowInfo ? (
+                <ItemNameButton name={name} onShowInfo={onShowInfo} />
+              ) : (
+                <span className="truncate text-sm" title={name}>
+                  {name}
+                </span>
+              )}
+              {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
               {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
             </span>
             <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-dim tabular-nums md:contents md:text-xs">
@@ -401,6 +503,8 @@ interface SearchResultRowProps {
   security: number | null | undefined;
   href: string;
   characterBadge: string | null;
+  /** Set on a blueprint stack: a BPO or BPC badge beside the name. */
+  blueprintKind?: BlueprintKind | null;
   t: Translate;
 }
 
@@ -408,7 +512,9 @@ interface SearchResultRowProps {
  * A search hit. Search deliberately leaves the drill-down and reports across
  * every location at once — filtering only the level you happen to be standing
  * in would make "Search all characters" meaningless — so each hit has to say
- * where it lives, and links straight to that place.
+ * where it lives, and links straight to that place. The whole row is that
+ * link, so its name stays plain text — a Show info button there would nest
+ * one control inside another; the hit's own place has it one tap away.
  */
 export function SearchResultRow({
   name,
@@ -418,6 +524,7 @@ export function SearchResultRow({
   security,
   href,
   characterBadge,
+  blueprintKind = null,
   t,
 }: SearchResultRowProps) {
   return (
@@ -429,6 +536,7 @@ export function SearchResultRow({
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="flex min-w-0 flex-1 items-center">
             <span className="truncate text-sm font-medium">{name}</span>
+            {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
             {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
           </span>
           <span className="shrink-0 text-sm tabular-nums">×{quantity.toLocaleString()}</span>
