@@ -533,18 +533,21 @@ Rules:
   take an `Icon.*` glyph (`Icon.Decrease` / `Icon.Increase` for a stepper). Lint
   rejects JSX text that is only "−", "+" or "Aa".
 
-**Exception — the Fitting Add panel's three filter icons.** The module
-browser's Hull/Resources/Skills toggles (`FittingAddPanel.tsx`) use CCP's own
-in-game Fitting-window icons as raster PNGs (`public/images/fitting/{hull,
-resource,skill}.png`), not Phosphor SVGs, composed through `IconButton` as
-`<img>` children — the same "read as the game draws it" reasoning as the Ship
-Tree (§1): these three are copied from screenshots of a specific in-game
+**Exception — the Fitting Add panel's filter and slot icons.** The module
+browser's Hull/Resources/Skills toggles and its "Fits this slot" toggle
+(`FittingAddPanel.tsx`) use CCP's own in-game Fitting-window icons as raster
+PNGs (`public/images/fitting/{hull,resource,skill}.png` and
+`slot-{high,medium,low,rig}.png`), not Phosphor SVGs, composed through
+`IconButton` as `<img>` children — the same "read as the game draws it"
+reasoning as the Ship Tree (§1): these are copied from a specific in-game
 control, not drawn to this system's own illustration style, so a Phosphor
 glyph would say something else at a glance than what the pilot already knows
-from the client. The exception is scoped to exactly those three `<img>`
-elements and nothing else in the panel — its search icon, close button and
-every other glyph stay Phosphor as normal. Scope decision:
-`docs/context/decisions/20260927-104252-fitting-add-panel-hull-resource-skill-filter-icons.md`.
+from the client. The exception is scoped to exactly those `<img>` elements and
+nothing else in the panel — its search icon, close button and every other
+glyph stay Phosphor as normal (a subsystem slot, which has no in-game rack
+icon, keeps a text chip). Scope decisions:
+`docs/context/decisions/20260927-104252-fitting-add-panel-hull-resource-skill-filter-icons.md`,
+`docs/context/decisions/20260930-173310-fitting-add-panel-slot-icon-replaces-fits-this.md`.
 
 ## 6. Usage rules
 
