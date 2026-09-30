@@ -12,6 +12,7 @@
  * running) and per single drone on a drone stack.
  */
 import type { AppliedDpsInputs, AppliedWeapon, DamageSplit } from './appliedDps';
+import type { WeaponRange } from './types';
 
 export const APPLIED_DPS_ATTRIBUTE = {
   dps: -12,
@@ -123,18 +124,45 @@ function damageSplit(
   };
 }
 
+/** Metres a missile flies: its charge's speed × flight time. */
+function missileFlightRange(charge: AttributeMap): number {
+  return (
+    read(charge, APPLIED_DPS_ATTRIBUTE.maxVelocity) *
+    (read(charge, APPLIED_DPS_ATTRIBUTE.explosionDelay) / 1000)
+  );
+}
+
+function isMissile(charge: AttributeMap | undefined): charge is AttributeMap {
+  return charge !== undefined && read(charge, APPLIED_DPS_ATTRIBUTE.explosionRadius) > 0;
+}
+
+/**
+ * How far a weapon reaches: a launcher's missile flight range (no falloff),
+ * or a turret's or drone's optimal and falloff — what the engine worked out
+ * with the loaded ammo's modifiers. Null for anything else.
+ */
+export function weaponRange(attributes: AttributeMap, charge?: AttributeMap): WeaponRange | null {
+  if (isMissile(charge)) return { optimal: missileFlightRange(charge), falloff: 0 };
+  if (read(attributes, APPLIED_DPS_ATTRIBUTE.tracking) <= 0) return null;
+  const { optimal, falloff } = trackingOf(attributes);
+  return { optimal, falloff };
+}
+
+/** A drone's speed, m/s: 0 for a sentry. */
+export function droneSpeed(attributes: AttributeMap): number {
+  return read(attributes, APPLIED_DPS_ATTRIBUTE.maxVelocity);
+}
+
 function moduleWeapon(result: ItemResultLike): AppliedWeapon | null {
   if (result.state !== 'active' && result.state !== 'overload') return null;
   const dps = read(result.attributes, APPLIED_DPS_ATTRIBUTE.dps);
   if (dps <= 0) return null;
   const charge = result.charge?.attributes;
-  if (charge && read(charge, APPLIED_DPS_ATTRIBUTE.explosionRadius) > 0) {
+  if (isMissile(charge)) {
     return {
       kind: 'missile',
       dps,
-      range:
-        read(charge, APPLIED_DPS_ATTRIBUTE.maxVelocity) *
-        (read(charge, APPLIED_DPS_ATTRIBUTE.explosionDelay) / 1000),
+      range: missileFlightRange(charge),
       explosionRadius: read(charge, APPLIED_DPS_ATTRIBUTE.explosionRadius),
       explosionVelocity: read(charge, APPLIED_DPS_ATTRIBUTE.explosionVelocity),
       damageReductionFactor: read(charge, APPLIED_DPS_ATTRIBUTE.damageReductionFactor),
@@ -171,7 +199,7 @@ export function extractAppliedDpsInputs(
       weapons.push({
         kind: 'drone',
         dps: perDrone * (item.quantity ?? 1),
-        speed: read(result.attributes, APPLIED_DPS_ATTRIBUTE.maxVelocity),
+        speed: droneSpeed(result.attributes),
         ...trackingOf(result.attributes),
         ...damageSplit(result.attributes),
       });

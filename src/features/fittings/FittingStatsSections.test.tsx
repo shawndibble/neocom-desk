@@ -328,6 +328,33 @@ describe('FittingStatsSections offense', () => {
     expect(offense.getByText('120.0 DPS').closest('[title]')).toBeNull();
   });
 
+  it("shows a turret's optimal and falloff, and a launcher's single range, under its DPS", () => {
+    const base = heatedStats();
+    const [blasters, warriors] = base.offense.weapons;
+    renderSections({
+      ...base,
+      offense: {
+        ...base.offense,
+        weapons: [
+          { ...blasters, range: { optimal: 2410, falloff: 6250 } },
+          {
+            ...blasters,
+            chargeTypeId: undefined,
+            typeId: 2410,
+            range: { optimal: 62500, falloff: 0 },
+          },
+          warriors,
+        ],
+      },
+    });
+    const offense = within(sectionBody('Offense'));
+
+    expect(offense.getByText('Optimal 2.4 km · Falloff 6.3 km')).toBeInTheDocument();
+    expect(offense.getByText('Range 62.5 km')).toBeInTheDocument();
+    // A drone flying to its target carries no range.
+    expect(offense.getAllByText(/Optimal|Range/)).toHaveLength(2);
+  });
+
   it('shows no sustained figure when reloading costs nothing', () => {
     const base = heatedStats();
     renderSections({

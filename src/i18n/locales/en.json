@@ -642,6 +642,8 @@
       "weaponRow": "{{count}}× {{name}}",
       "weaponDps": "{{value}} DPS",
       "weaponVolley": "{{value}} volley",
+      "weaponRange": "Range {{range}} km",
+      "weaponOptimalFalloff": "Optimal {{optimal}} km · Falloff {{falloff}} km",
       "sustainedDps": "Sustained with reload: {{value}} DPS",
       "offenseTotal": "Total",
       "offenseNone": "Nothing is firing.",
