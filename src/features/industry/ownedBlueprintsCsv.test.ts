@@ -36,7 +36,7 @@ describe('ownedBlueprintsCsvColumns', () => {
       'industry.ownedBlueprintsBlueprint',
       'industry.product',
       'industry.ownedBlueprintsActivityLabel',
-      'industry.opportunitiesBlueprint',
+      'industry.ownedBlueprintsKind',
       'industry.ownedBlueprintsMe',
       'industry.ownedBlueprintsTe',
       'industry.runs',

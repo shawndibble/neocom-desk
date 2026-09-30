@@ -2329,6 +2329,8 @@
     },
     "ownedBlueprintsKindFilter": "Blueprint kind",
     "ownedBlueprintsAll": "All",
+    "ownedBlueprintsKind": "BPO/BPC",
+    "ownedBlueprintsUnlimitedRuns": "∞",
     "ownedBlueprintsMe": "ME",
     "ownedBlueprintsTe": "TE",
     "ownedBlueprintsLocation": "Location",

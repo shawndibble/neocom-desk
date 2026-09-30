@@ -107,6 +107,7 @@ function renderPanel(onStartPlan = vi.fn(() => Promise.resolve(false))) {
       ownedStockSnapshot={SNAPSHOT}
       loading={false}
       meta={null}
+      pricingActions={null}
       onStartPlan={onStartPlan}
     />,
     { wrapper: MemoryRouter }

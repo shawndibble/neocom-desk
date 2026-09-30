@@ -508,6 +508,20 @@ export function OpportunitiesPanel({
   );
 
   const showProgress = loading && progress.total > 0;
+  const pricingActions = (
+    <>
+      {showProgress && (
+        <span className="text-xs text-text-dim tabular-nums">
+          {t('industry.opportunitiesProgress', { done: progress.done, total: progress.total })}
+        </span>
+      )}
+      {manualRefreshOnly && (
+        <Button size="sm" onClick={refresh} disabled={loading}>
+          {t('industry.opportunitiesRefresh')}
+        </Button>
+      )}
+    </>
+  );
 
   if (view === 'owned') {
     return (
@@ -520,6 +534,7 @@ export function OpportunitiesPanel({
         ownedStockSnapshot={ownedStockSnapshot}
         loading={blueprintsLoading}
         meta={meta}
+        pricingActions={pricingActions}
         onStartPlan={onStartPlan}
       />
     );
@@ -531,16 +546,7 @@ export function OpportunitiesPanel({
       meta={meta}
       actions={
         <span className="flex items-center gap-2">
-          {showProgress && (
-            <span className="text-xs text-text-dim tabular-nums">
-              {t('industry.opportunitiesProgress', { done: progress.done, total: progress.total })}
-            </span>
-          )}
-          {manualRefreshOnly && (
-            <Button size="sm" onClick={refresh} disabled={loading}>
-              {t('industry.opportunitiesRefresh')}
-            </Button>
-          )}
+          {pricingActions}
           {selectedRows.length > 1 && (
             <Button size="sm" variant="primary" onClick={() => onAddToCompare(selectedRows)}>
               {t('industry.opportunitiesAddToCompare', { count: selectedRows.length })}

@@ -56,10 +56,6 @@ describe('blueprintKind', () => {
     expect(blueprintKind(bp({ runs: 5, quantity: -2 }))).toBe('bpc');
     expect(blueprintKind(bp({ runs: -2, quantity: -2 }))).toBe('bpc');
   });
-
-  it('treats a quantity of -2 as a copy even if runs looks original', () => {
-    expect(blueprintKind(bp({ runs: -1, quantity: -2 }))).toBe('bpc');
-  });
 });
 
 describe('ownedBlueprintQuantity', () => {
@@ -218,6 +214,15 @@ describe('resolveBlueprintPlacement', () => {
     ).toEqual({ kind: 'container' });
     expect(
       resolveBlueprintPlacement(bp({ location_id: 6000, location_flag: 'AutoFit' }), assets)
+    ).toEqual({ kind: 'container' });
+  });
+
+  it('treats a corp office division or ship bay it cannot follow as a container', () => {
+    expect(
+      resolveBlueprintPlacement(bp({ location_id: 8888, location_flag: 'CorpSAG1' }), assets)
+    ).toEqual({ kind: 'container' });
+    expect(
+      resolveBlueprintPlacement(bp({ location_id: 8888, location_flag: 'FleetHangar' }), assets)
     ).toEqual({ kind: 'container' });
   });
 });

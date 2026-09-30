@@ -30,12 +30,9 @@ export interface OwnedBlueprintRow {
   iskPerHour: number | null;
 }
 
-/**
- * ESI: `runs` is -1 for an original; `quantity` is -2 for a copy. A copy is
- * a copy whichever field says so.
- */
+/** ESI: `runs` is -1 for an original — the same rule the ranked view and CSV use. */
 export function blueprintKind(blueprint: CharacterBlueprint): BlueprintKind {
-  return blueprint.runs === -1 && blueprint.quantity !== -2 ? 'bpo' : 'bpc';
+  return blueprint.runs === -1 ? 'bpo' : 'bpc';
 }
 
 /** ESI's -1/-2 mark a singleton; a positive `quantity` is a stack of originals. */
@@ -130,8 +127,12 @@ export function summarizeOwnedBlueprints(rows: readonly OwnedBlueprintRow[]): {
   return { bpo, bpc };
 }
 
-/** Flags ESI gives an item sitting inside another item (a container, a ship's hold). */
-const CONTAINER_FLAGS = new Set(['AutoFit', 'Locked', 'Unlocked', 'Cargo']);
+/**
+ * Flags ESI gives an item sitting directly in a station or structure, where
+ * `location_id` is that place. Any other flag (a container, a ship bay, a
+ * corp office's `CorpSAG*` division) means `location_id` is another item's id.
+ */
+const PLACE_FLAGS = new Set(['Hangar', 'Deliveries', 'AssetSafety', 'CorpDeliveries']);
 
 export type BlueprintPlacement = { kind: 'place'; locationId: number } | { kind: 'container' };
 
@@ -148,9 +149,9 @@ export function resolveBlueprintPlacement(
 ): BlueprintPlacement {
   let current = assetsByItemId.get(blueprint.location_id);
   if (!current) {
-    return CONTAINER_FLAGS.has(blueprint.location_flag)
-      ? { kind: 'container' }
-      : { kind: 'place', locationId: blueprint.location_id };
+    return PLACE_FLAGS.has(blueprint.location_flag)
+      ? { kind: 'place', locationId: blueprint.location_id }
+      : { kind: 'container' };
   }
   const seen = new Set<number>([blueprint.location_id]);
   while (current.location_type === 'item') {

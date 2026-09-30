@@ -6,7 +6,7 @@
  * the blueprint load, the Character filter and the ranked rows this view
  * borrows ISK/hour from.
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ColumnPickerMenu,
@@ -88,6 +88,10 @@ const ownedRowKey = (row: OwnedBlueprintRow) => row.id;
 
 const NO_ASSETS: ReadonlyMap<number, CharacterAsset> = new Map();
 const NO_BLUEPRINTS: readonly CharacterBlueprint[] = [];
+const NO_ISK: ReadonlyMap<string, number | null> = new Map();
+
+/** Location names are resolved per (Character asking, location id). */
+const locationKey = (characterId: number, locationId: number) => `${characterId}:${locationId}`;
 
 interface OwnedBlueprintsPanelProps {
   catalog: BlueprintCatalog;
@@ -100,6 +104,8 @@ interface OwnedBlueprintsPanelProps {
   loading: boolean;
   /** The view toggle, Character filter and data age, shared with the ranked view. */
   meta: ReactNode;
+  /** Ranked pricing's progress / manual Refresh — the ISK/hour column fills from it. */
+  pricingActions: ReactNode;
   onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
 }
 
@@ -112,6 +118,7 @@ export function OwnedBlueprintsPanel({
   ownedStockSnapshot,
   loading,
   meta,
+  pricingActions,
   onStartPlan,
 }: OwnedBlueprintsPanelProps) {
   const { t } = useTranslation();
@@ -124,21 +131,25 @@ export function OwnedBlueprintsPanel({
   const corp = useCorpOwnedBlueprints();
   const corpBlueprints = corp.available && includeCorp ? corp.blueprints : NO_BLUEPRINTS;
 
-  const iskPerHourById = useMemo(
-    () => new Map(rankedRows.map((row) => [row.candidate.id, row.result.iskPerHour])),
-    [rankedRows]
-  );
-  const rows = useMemo(
+  // Built without ISK/hour first, so ranked pricing landing batch by batch
+  // only re-stamps that one field and never re-derives placements below.
+  const baseRows = useMemo(
     () =>
       buildOwnedBlueprintRows({
         ownedByCharacter,
         characterNames,
         corpBlueprints,
         catalog,
-        iskPerHourById,
+        iskPerHourById: NO_ISK,
       }),
-    [ownedByCharacter, characterNames, corpBlueprints, catalog, iskPerHourById]
+    [ownedByCharacter, characterNames, corpBlueprints, catalog]
   );
+  const rows = useMemo(() => {
+    const iskPerHourById = new Map(
+      rankedRows.map((row) => [row.candidate.id, row.result.iskPerHour])
+    );
+    return baseRows.map((row) => ({ ...row, iskPerHour: iskPerHourById.get(row.id) ?? null }));
+  }, [baseRows, rankedRows]);
   const filteredRows = useMemo(
     () => filterOwnedBlueprints(rows, { kind, activity, search }),
     [rows, kind, activity, search]
@@ -158,7 +169,7 @@ export function OwnedBlueprintsPanel({
   }, [ownedStockSnapshot]);
   const placements = useMemo(() => {
     const map = new Map<string, { placement: BlueprintPlacement; viaCharacterId: number }>();
-    for (const row of rows) {
+    for (const row of baseRows) {
       const viaCharacterId =
         row.owner.kind === 'character' ? row.owner.characterId : activeCharacterId;
       const assets =
@@ -171,34 +182,34 @@ export function OwnedBlueprintsPanel({
       });
     }
     return map;
-  }, [rows, assetsByCharacter, activeCharacterId]);
+  }, [baseRows, assetsByCharacter, activeCharacterId]);
 
   const [locationNames, setLocationNames] = useState<ReadonlyMap<string, string | null>>(new Map());
+  // Each location is asked for once and committed as it lands, so one slow
+  // structure lookup never holds back the rest.
+  const requestedLocations = useRef(new Set<string>());
   useEffect(() => {
-    const wanted = new Map<string, { characterId: number; locationId: number }>();
+    let active = true;
+    const requested = requestedLocations.current;
     for (const { placement, viaCharacterId } of placements.values()) {
       if (placement.kind !== 'place') continue;
-      const key = `${viaCharacterId}:${placement.locationId}`;
-      if (!locationNames.has(key))
-        wanted.set(key, { characterId: viaCharacterId, locationId: placement.locationId });
-    }
-    if (wanted.size === 0) return;
-    let cancelled = false;
-    void Promise.all(
-      [...wanted].map(([key, { characterId, locationId }]) =>
-        loadBlueprintLocation(characterId, locationId).then(
-          (resolved) => [key, resolved.name] as const,
-          () => [key, null] as const
+      const key = locationKey(viaCharacterId, placement.locationId);
+      if (requested.has(key)) continue;
+      requested.add(key);
+      void loadBlueprintLocation(viaCharacterId, placement.locationId)
+        .then(
+          (resolved) => resolved.name,
+          () => null
         )
-      )
-    ).then((resolved) => {
-      if (cancelled) return;
-      setLocationNames((prev) => new Map([...prev, ...resolved]));
-    });
+        .then((name) => {
+          if (active) setLocationNames((prev) => new Map(prev).set(key, name));
+          else requested.delete(key);
+        });
+    }
     return () => {
-      cancelled = true;
+      active = false;
     };
-  }, [placements, locationNames]);
+  }, [placements]);
 
   /** Null while a name is still resolving. */
   const locationLabel = useCallback(
@@ -206,7 +217,7 @@ export function OwnedBlueprintsPanel({
       const entry = placements.get(row.id);
       if (!entry) return null;
       if (entry.placement.kind === 'container') return t('industry.ownedBlueprintsInContainer');
-      const key = `${entry.viaCharacterId}:${entry.placement.locationId}`;
+      const key = locationKey(entry.viaCharacterId, entry.placement.locationId);
       if (!locationNames.has(key)) return null;
       return locationNames.get(key) ?? t('industry.ownedBlueprintsUnknownLocation');
     },
@@ -243,7 +254,7 @@ export function OwnedBlueprintsPanel({
     },
     {
       id: 'kind',
-      header: t('industry.opportunitiesBlueprint'),
+      header: t('industry.ownedBlueprintsKind'),
       sortValue: SORT_VALUE.kind,
       render: (row) => (
         <span className={row.kind === 'bpo' ? 'font-medium text-accent' : undefined}>
@@ -274,7 +285,7 @@ export function OwnedBlueprintsPanel({
       className: 'tabular-nums',
       sortValue: SORT_VALUE.runs,
       render: (row) =>
-        row.kind === 'bpo' ? t('industry.opportunitiesUnlimitedRuns') : row.blueprint.runs,
+        row.kind === 'bpo' ? t('industry.ownedBlueprintsUnlimitedRuns') : row.blueprint.runs,
     },
     {
       id: 'quantity',
@@ -329,7 +340,8 @@ export function OwnedBlueprintsPanel({
     OwnedBlueprintsColumnId,
     DataTableColumn<OwnedBlueprintRow>
   >;
-  // Filtered after the sort ids are taken, so a sort on a hidden column survives until it's back.
+  // The sort ids come from every column, so a URL sort on a hidden column is
+  // kept (the table just shows unsorted) and applies again once it's shown.
   const shownColumns = columns.filter(
     (column) =>
       !(OWNED_BLUEPRINTS_COLUMN_IDS as readonly string[]).includes(column.id) ||
@@ -398,6 +410,7 @@ export function OwnedBlueprintsPanel({
       meta={meta}
       actions={
         <span className="flex items-center gap-2">
+          {pricingActions}
           <StatChip label={t('industry.bpo')} value={summary.bpo} tone="accent" />
           <StatChip label={t('industry.bpc')} value={summary.bpc} />
           {filteredRows.length > 0 && (

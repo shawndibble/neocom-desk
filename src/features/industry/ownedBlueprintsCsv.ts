@@ -19,7 +19,7 @@ export function ownedBlueprintsCsvColumns(
         row.activity === null ? null : t(`industry.ownedBlueprintsActivity.${row.activity}`),
     },
     {
-      header: t('industry.opportunitiesBlueprint'),
+      header: t('industry.ownedBlueprintsKind'),
       value: (row) => (row.kind === 'bpo' ? t('industry.bpo') : t('industry.bpc')),
     },
     { header: t('industry.ownedBlueprintsMe'), value: (row) => row.blueprint.material_efficiency },
