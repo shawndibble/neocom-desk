@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { StatChip } from '@/components/ui';
 import type { AppraisalTotals } from '@/engine/market/appraisal';
-import { formatCubicMetres } from './appraisalVolume';
+import { formatCubicMetres } from '@/lib/volume';
 
 /**
  * The Appraisal's Total volume tile (issue #2337): packaged m³ over every row

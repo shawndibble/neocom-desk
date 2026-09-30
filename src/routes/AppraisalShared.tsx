@@ -242,8 +242,8 @@ export function AppraisalShared() {
               rowKey={(row) => row.typeId}
               label={t('appraisalShare.title')}
               // Six short numeric columns hang off the item name here, so the
-              // default one-per-line stack turned every item into a six-line
-              // card — on the one page most likely to be opened from a phone
+              // default one-per-line stack turned every item into a card one
+              // line per column — on the one page most likely to be opened from a phone
               // chat client (#1113, the follow-up #1097 scoped out).
               stackColumns={2}
             />

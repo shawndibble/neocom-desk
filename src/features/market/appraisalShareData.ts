@@ -75,12 +75,9 @@ export async function resolveAppraisalShare(payload: string): Promise<ResolveApp
   const typesById = await loadMarketTypesById();
 
   const unresolvedTypeIds: number[] = [];
-  const resolved: {
-    typeId: number;
-    name: string;
-    quantity: number;
+  const resolved: (Pick<AppraisalItem, 'typeId' | 'name' | 'quantity'> & {
     unitVolume: number | null;
-  }[] = [];
+  })[] = [];
   for (const item of decoded.value.items) {
     const type = typesById.get(item.typeId);
     if (type === undefined) {

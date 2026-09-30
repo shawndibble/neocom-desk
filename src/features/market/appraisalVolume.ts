@@ -10,13 +10,7 @@
 import type { TFunction } from 'i18next';
 import type { DataTableColumn } from '@/components/ui';
 import type { AppraisalRow } from '@/engine/market/appraisal';
-
-const CUBIC_METRES_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
-
-/** m³, thousands-separated, to at most two decimals — a stack of ammo is often under 1 m³. */
-export function formatCubicMetres(value: number): string {
-  return CUBIC_METRES_FORMAT.format(value);
-}
+import { formatCubicMetres } from '@/lib/volume';
 
 export function appraisalVolumeColumn(t: TFunction): DataTableColumn<AppraisalRow> {
   return {
