@@ -102,6 +102,7 @@ function capacitorGain(before: FittingStats['capacitor'], after: FittingStats['c
 }
 
 const activeTank = (s: FittingStats) => s.repair.shield + s.repair.armor + s.repair.hull;
+const alignTime = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navigation.agility);
 const isArmed = (s: FittingStats) => s.offense.dps > 0 || s.droneDps > 0;
 
 /** One role stat's before/after, at the digits it is shown with. */
@@ -115,8 +116,8 @@ interface RoleField {
   key: RoleMetric;
   digits: number;
   value: (s: FittingStats) => number;
-  /** Whether this fit's `before` has the role at all. */
-  applies: (before: FittingStats) => boolean;
+  /** Whether this fit's `before` has the role at all; absent: always. */
+  applies?: (before: FittingStats) => boolean;
 }
 
 /**
@@ -129,7 +130,6 @@ const ROLE_FIELDS: readonly RoleField[] = [
     key: 'miningYield',
     digits: 0,
     value: (s) => s.mining.perHour,
-    applies: () => true,
   },
   {
     key: 'hold',
@@ -142,13 +142,11 @@ const ROLE_FIELDS: readonly RoleField[] = [
     digits: 1,
     value: (s) =>
       s.support.remoteRepair.shield + s.support.remoteRepair.armor + s.support.remoteRepair.hull,
-    applies: () => true,
   },
   {
     key: 'jumpRange',
     digits: 2,
     value: (s) => s.jumpDrive?.rangeLightYears ?? 0,
-    applies: () => true,
   },
 ];
 
@@ -156,14 +154,13 @@ const ROLE_FIELDS: readonly RoleField[] = [
 export function roleChanges(before: FittingStats, after: FittingStats): RoleChange[] {
   const changes: RoleChange[] = [];
   for (const field of ROLE_FIELDS) {
-    if (!field.applies(before)) continue;
+    if (field.applies && !field.applies(before)) continue;
     const b = round(field.value(before), field.digits);
     const a = round(field.value(after), field.digits);
     if (b !== a) changes.push({ key: field.key, before: b, after: a });
   }
   return changes;
 }
-const alignTime = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navigation.agility);
 
 /**
  * How much better `after` is than `before` in each tracked stat, as a
@@ -172,9 +169,9 @@ const alignTime = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.nav
  * or relative depletion time, with turning stable a whole gain.
  */
 export function gainMetrics(before: FittingStats, after: FittingStats): GainMetrics {
-  const role = new Map(roleChanges(before, after).map((change) => [change.key, change]));
+  const changed = new Map(roleChanges(before, after).map((change) => [change.key, change]));
   const roleGain = (key: RoleMetric) => {
-    const change = role.get(key);
+    const change = changed.get(key);
     return change ? relative(change.before, change.after) : 0;
   };
   const metrics: Record<GainMetric, number> = {
