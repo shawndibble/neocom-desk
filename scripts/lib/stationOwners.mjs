@@ -6,7 +6,7 @@
 // Takes the array-of-arrays `parseCsv` returns (header row first, every cell a
 // string), so this is testable with small hand-made fixtures.
 
-function wholeNumber(s) {
+export function wholeNumber(s) {
   if (s === undefined || s === '') return null;
   const value = Number(s);
   return Number.isInteger(value) ? value : null;

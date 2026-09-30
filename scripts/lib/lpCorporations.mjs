@@ -9,11 +9,7 @@
 // Takes the array-of-arrays `parseCsv` returns (header row first, every cell a
 // string), same as `stationOwners.mjs`.
 
-function wholeNumber(s) {
-  if (s === undefined || s === '') return null;
-  const value = Number(s);
-  return Number.isInteger(value) ? value : null;
-}
+import { wholeNumber } from './stationOwners.mjs';
 
 /**
  * `crpNPCCorporations` rows -> `[{ id, name, factionId? }]`. A blank faction
