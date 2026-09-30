@@ -831,6 +831,10 @@
       "changes": "Whole-fitting change",
       "time": "Training time",
       "withPrerequisites": "incl. prerequisites",
+      "plan": "Skill Plan",
+      "addToPlan": "Add to plan",
+      "addToPlanLabel": "Add to plan: {{skill}}",
+      "inPlan": "In plan {{plan}}",
       "sort": {
         "overall": "Overall",
         "dps": "DPS",

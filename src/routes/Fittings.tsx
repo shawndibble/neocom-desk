@@ -528,7 +528,11 @@ function FittingsPage() {
       fitting={fitting}
       moduleResults={moduleResults}
       whatToTrain={
-        <FittingWhatToTrainPanel evaluator={workspace.skillGains} characterId={activeCharacterId} />
+        <FittingWhatToTrainPanel
+          evaluator={workspace.skillGains}
+          characterId={activeCharacterId}
+          fittingName={fitting.name}
+        />
       }
       implants={
         <>
