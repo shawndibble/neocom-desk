@@ -66,8 +66,11 @@ function useColumns(): DataTableColumn<RouteSafetyRow>[] {
         <span className="inline-flex items-center gap-2">
           <span className="font-semibold">{row.name ?? DASH}</span>
           {row.chokepoint && (
-            <Tooltip content={t('travel.chokepointHint')}>
-              <span className="rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] text-warning">
+            <Tooltip content={t('travel.chokepointHint')} openOnTap>
+              <span
+                tabIndex={0}
+                className="rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] text-warning"
+              >
                 {t('travel.chokepoint')}
               </span>
             </Tooltip>
@@ -134,8 +137,8 @@ function RouteSummary({ summary }: { summary: RouteSafetySummary }) {
   if (summary.shipKills !== null && summary.podKills !== null) {
     lines.push(
       t('travel.summary.kills', {
-        count: summary.shipKills,
-        pods: summary.podKills,
+        ships: summary.shipKills.toLocaleString(),
+        pods: summary.podKills.toLocaleString(),
       })
     );
   }

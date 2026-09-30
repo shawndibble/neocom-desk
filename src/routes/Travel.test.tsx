@@ -123,7 +123,10 @@ describe('Travel › Route Safety', () => {
     expect(within(body[0]).getByText('The Forge')).toBeInTheDocument();
 
     expect(screen.getByText('Passes through Gank Chokepoints: Uedama')).toBeInTheDocument();
-    expect(screen.getByText('2 jumps')).toBeInTheDocument();
+    expect(screen.getByText('2 jumps from start to destination')).toBeInTheDocument();
+    expect(
+      screen.getByText('Last hour along the route: 12 ship kills, 4 pod kills')
+    ).toBeInTheDocument();
   });
 
   it('starts from the Current System when the link names no start', async () => {
@@ -170,7 +173,12 @@ describe('Travel copy', () => {
       if (typeof node === 'string') strings.push(node);
       else if (node && typeof node === 'object') Object.values(node).forEach(walk);
     };
-    walk((en as Record<string, unknown>).travel);
+    const catalog = en as unknown as Record<string, Record<string, unknown>>;
+    // Everything the page shows: its own section, its nav entry, and the
+    // Route Preference labels it borrows from Contract Search.
+    walk(catalog.travel);
+    walk([catalog.nav.travel, (catalog.nav.groups as Record<string, string>).intel]);
+    walk(catalog.contractSearch.routePreference);
     for (const text of strings) {
       expect(text, text).not.toMatch(/\b(safe|safest|unsafe|dangerous|danger|camp\w*)\b/i);
     }

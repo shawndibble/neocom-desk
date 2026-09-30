@@ -6533,12 +6533,11 @@
     "chokepointHint": "One of the systems haulers are most often killed in, as named by the community. A property of traffic, not of security status.",
     "summary": {
       "label": "Route summary",
-      "jumps_one": "{{count}} jump",
-      "jumps_other": "{{count}} jumps",
+      "jumps_one": "{{count}} jump from start to destination",
+      "jumps_other": "{{count}} jumps from start to destination",
       "bands": "{{highsec}} highsec, {{lowsec}} lowsec, {{nullsec}} nullsec systems",
       "lowest": "Lowest security {{security}}",
-      "kills_one": "{{count}} ship kill and {{pods}} pod kills in the last hour along the route",
-      "kills_other": "{{count}} ship kills and {{pods}} pod kills in the last hour along the route",
+      "kills": "Last hour along the route: {{ships}} ship kills, {{pods}} pod kills",
       "chokepoints": "Passes through Gank Chokepoints: {{names}}",
       "noChokepoints": "Passes through no Gank Chokepoints"
     },

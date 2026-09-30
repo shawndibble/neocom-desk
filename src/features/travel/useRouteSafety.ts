@@ -57,8 +57,12 @@ export function useRouteSafety(
   const requestKey = `${fromId}:${toId}:${preference}`;
   const wantsRoute = fromId !== null && toId !== null && fromId !== toId;
 
+  // Re-read per route, not once per mount: inside the cache window it is a
+  // local read, and past it (ESI refreshes hourly) or after a failed feed it
+  // is the retry a page left open needs. The last answer stays on screen
+  // until the new one lands.
   useEffect(() => {
-    if (!wantsRoute || activity !== null) return;
+    if (!wantsRoute) return;
     let cancelled = false;
     void loadSystemActivity().then((next) => {
       if (!cancelled) setActivity(next);
@@ -66,7 +70,7 @@ export function useRouteSafety(
     return () => {
       cancelled = true;
     };
-  }, [wantsRoute, activity]);
+  }, [wantsRoute, requestKey]);
 
   useEffect(() => {
     if (!wantsRoute) return;
@@ -74,7 +78,7 @@ export function useRouteSafety(
     void (async () => {
       const [result, systems] = await Promise.all([
         findLocalRoute(fromId, toId, preference),
-        loadSolarSystemsById(),
+        loadSolarSystemsById().catch(() => null),
       ]);
       const byId = systems ?? NO_SYSTEMS;
       const regionIds =

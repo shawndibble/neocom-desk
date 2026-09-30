@@ -40,6 +40,7 @@ function publicJson(path: string, body: JsonBodyType) {
 describe('loadSystemActivity', () => {
   it('reads both universe-wide feeds, one request each', async () => {
     let calls = 0;
+    let jumpCalls = 0;
     server.use(
       http.get(`${ESI_BASE_URL}/universe/system_kills`, ({ request }) => {
         calls += 1;
@@ -48,12 +49,19 @@ describe('loadSystemActivity', () => {
           HttpResponse.json([{ system_id: 30000142, ship_kills: 3, pod_kills: 1, npc_kills: 5 }])
         );
       }),
-      publicJson('/universe/system_jumps', [{ system_id: 30000142, ship_jumps: 4200 }])
+      http.get(`${ESI_BASE_URL}/universe/system_jumps`, ({ request }) => {
+        jumpCalls += 1;
+        return (
+          rejectBadEsiHeaders(request) ??
+          HttpResponse.json([{ system_id: 30000142, ship_jumps: 4200 }])
+        );
+      })
     );
 
     const activity = await loadSystemActivity();
 
     expect(calls).toBe(1);
+    expect(jumpCalls).toBe(1);
     expect(activity.kills?.get(30000142)).toEqual({ shipKills: 3, podKills: 1, npcKills: 5 });
     expect(activity.jumps?.get(30000142)).toBe(4200);
     expect(activity.fetchedAt).toBeInstanceOf(Date);
