@@ -75,6 +75,10 @@ export function FittingLibrary({
           onStartHull(hull);
           onOpened?.();
         }}
+        onOpenPopular={async (loaded) => {
+          await workspace.openLoaded(loaded);
+          onOpened?.();
+        }}
       />
     ),
     import: (

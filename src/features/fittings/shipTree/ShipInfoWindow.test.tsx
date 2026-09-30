@@ -20,6 +20,8 @@ vi.mock('@/engine/fitting/fittingShare', async (importOriginal) => {
   const real = await importOriginal<typeof import('@/engine/fitting/fittingShare')>();
   return { ...real, encodeFittingShare: vi.fn(real.encodeFittingShare) };
 });
+const { usePopularFitsMock } = vi.hoisted(() => ({ usePopularFitsMock: vi.fn() }));
+vi.mock('../popularFits', () => ({ usePopularFits: usePopularFitsMock }));
 vi.mock('@/sde/loadSde', async (importOriginal) => {
   const f = await import('./__fixtures__/shipTreeFixture');
   return {
@@ -156,6 +158,7 @@ async function openShip(name: RegExp) {
 
 beforeEach(async () => {
   clearShipTreeCatalogCache();
+  usePopularFitsMock.mockReturnValue({ ok: true, fits: [] });
   useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
   await useShipTreeViewPreference.getState().setValue('map');
   await useShipInfoShowMissing.getState().setValue(false);
@@ -212,6 +215,44 @@ describe('Ship Info window', () => {
     );
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/ships\/tree$/);
     expect(within(dialog).getByRole('button', { name: 'Simulate' })).toBeEnabled();
+  });
+
+  it('Fitting: a Popular fit opens in the editor', async () => {
+    const HULL_ID = 603;
+    usePopularFitsMock.mockReturnValue({
+      ok: true,
+      fits: [
+        {
+          key: '100,200,300',
+          count: 4,
+          lastSeen: null,
+          value: null,
+          killmailIds: [9],
+          parts: {
+            hullTypeId: HULL_ID,
+            modules: [
+              { slot: 'high' as const, slotIndex: 0, typeId: 100, state: 'active' as const },
+            ],
+            drones: [],
+            cargo: [],
+            unresolved: [],
+          },
+        },
+      ],
+    });
+    const { user, dialog } = await openShip(/^Merlin/);
+    await user.click(within(dialog).getByRole('tab', { name: 'Fitting' }));
+    expect(usePopularFitsMock).toHaveBeenLastCalledWith(HULL_ID);
+    expect(within(dialog).getByText('4 losses')).toBeVisible();
+    await user.click(within(dialog).getByRole('button', { name: 'Open' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('location').textContent).toMatch(/\?f=/);
+    });
+    expect(vi.mocked(encodeFittingShare)).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        modules: expect.objectContaining({ high: [expect.objectContaining({ typeId: 100 })] }),
+      })
+    );
   });
 
   it('Fitting: a Tech III hull says its slots come from subsystems', async () => {
