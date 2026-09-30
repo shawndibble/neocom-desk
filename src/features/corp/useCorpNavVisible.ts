@@ -3,8 +3,8 @@ import { useActiveCorporationId } from './owner';
 
 /**
  * Whether the Corp section's nav entry shows: Corp Access `ready` *and* the
- * corporation known. One gate for the rail, the More sheet and the Command
- * Palette, so none of them can offer `/corp` while another hides it.
+ * corporation known. One gate for the rail, the More sheet and the command
+ * palette (#2318), so none of them can offer `/corp` while another hides it.
  *
  * Hidden, never locked, in every other case — including `unknown`, which
  * reads as hidden on purpose: a nav item that flickers into existence

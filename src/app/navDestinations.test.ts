@@ -12,6 +12,8 @@ import type { AppRoutePath } from './routeScopes';
 /** Echoes the key, so a label reads as the keys it was built from. */
 const t = (key: string) => key;
 const NO_LOCKS: ReadonlySet<AppRoutePath> = new Set();
+const ALL_CORP_VIEWS = { canReadMembers: true, canReadWallet: true, canReadAssets: true };
+const NO_CORP_VIEWS = { canReadMembers: false, canReadWallet: false, canReadAssets: false };
 
 describe('NAV_PAGES', () => {
   it('holds each path once', () => {
@@ -69,12 +71,15 @@ describe('NAV_LOCK_PATHS', () => {
         '/calendar',
         '/contracts',
         '/contacts',
+        // Overview's sub-views: the rail never draws them, `OverviewSubNav` does.
+        '/clones',
+        '/employment-history',
       ].toSorted()
     );
   });
 
   it('leaves /corp out: corp UI hides rather than locks', () => {
-    expect(NAV_LOCK_PATHS).not.toContain('/corp');
+    expect(NAV_LOCK_PATHS.filter((path) => path.startsWith('/corp'))).toEqual([]);
   });
 });
 
@@ -86,7 +91,12 @@ describe('navPageLabelKey', () => {
 });
 
 describe('listNavDestinations', () => {
-  const all = listNavDestinations({ locked: NO_LOCKS, corpVisible: true, t });
+  const all = listNavDestinations({
+    locked: NO_LOCKS,
+    corpVisible: true,
+    corpCapabilities: ALL_CORP_VIEWS,
+    t,
+  });
   const byPath = (path: string) => all.find((entry) => entry.path === path);
 
   it('lists every page, in nav order, before or among its tabs', () => {
@@ -104,6 +114,7 @@ describe('listNavDestinations', () => {
       label: 'industry.opportunitiesTab',
       breadcrumb: 'nav.industry › industry.opportunitiesTab',
       locked: false,
+      gating: 'scope',
     });
     const industryIndex = all.findIndex((entry) => entry.path === '/industry');
     expect(all[industryIndex + 1]?.path).toBe('/industry/plans');
@@ -139,6 +150,7 @@ describe('listNavDestinations', () => {
     const locked = listNavDestinations({
       locked: new Set<AppRoutePath>(['/industry']),
       corpVisible: true,
+      corpCapabilities: ALL_CORP_VIEWS,
       t,
     });
     const industry = locked.filter((entry) => entry.pagePath === '/industry');
@@ -148,9 +160,55 @@ describe('listNavDestinations', () => {
   });
 
   it('hides /corp, rather than locking it, when corp is not visible', () => {
-    const hidden = listNavDestinations({ locked: NO_LOCKS, corpVisible: false, t });
+    const hidden = listNavDestinations({
+      locked: NO_LOCKS,
+      corpVisible: false,
+      corpCapabilities: NO_CORP_VIEWS,
+      t,
+    });
     expect(hidden.some((entry) => entry.pagePath === '/corp')).toBe(false);
     expect(byPath('/corp')).toMatchObject({ locked: false });
+  });
+
+  it("lists Overview's sub-views with their own route's lock", () => {
+    const entries = listNavDestinations({
+      locked: new Set<AppRoutePath>(['/clones']),
+      corpVisible: false,
+      corpCapabilities: NO_CORP_VIEWS,
+      t,
+    });
+    expect(entries.find((entry) => entry.path === '/clones')).toMatchObject({
+      kind: 'tab',
+      pagePath: '/overview',
+      breadcrumb: 'nav.overview › nav.clones',
+      locked: true,
+    });
+    expect(entries.find((entry) => entry.path === '/overview')?.locked).toBe(false);
+    expect(entries.find((entry) => entry.path === '/employment-history')?.locked).toBe(false);
+  });
+
+  it('lists each Corp view only for its Corp Capability, marked corp-gated', () => {
+    const accountant = listNavDestinations({
+      locked: NO_LOCKS,
+      corpVisible: true,
+      corpCapabilities: { ...NO_CORP_VIEWS, canReadWallet: true },
+      t,
+    });
+    const corp = accountant.filter((entry) => entry.pagePath === '/corp');
+    expect(corp.map((entry) => entry.path)).toEqual(['/corp', '/corp/wallet']);
+    expect(corp.every((entry) => entry.gating === 'corp' && !entry.locked)).toBe(true);
+  });
+
+  it("hides Settings' Corporation section with the Corp entry", () => {
+    expect(byPath('/settings/corporation')).toBeDefined();
+    const hidden = listNavDestinations({
+      locked: NO_LOCKS,
+      corpVisible: false,
+      corpCapabilities: NO_CORP_VIEWS,
+      t,
+    });
+    expect(hidden.some((entry) => entry.path === '/settings/corporation')).toBe(false);
+    expect(hidden.some((entry) => entry.path === '/settings/display')).toBe(true);
   });
 
   it('lists each path once', () => {

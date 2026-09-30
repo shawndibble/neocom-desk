@@ -1,6 +1,6 @@
 /**
  * Every navigable destination, described once: the desktop rail, the phone's
- * tab bar and More sheet (`lib/mobileTabs.ts`), and the Command Palette all
+ * tab bar and More sheet (`lib/mobileTabs.ts`), and (from #2318) the command palette all
  * read this list, so adding a page to the nav is one edit here.
  *
  * Pure data plus a pure listing function — no React, no Dexie. The two live
@@ -13,6 +13,7 @@
  */
 import { tabBarTabs, tabPath } from '@/lib/pageTabs';
 import { PAGE_TABS } from './pageTabs';
+import type { CorpCapabilities } from '@/engine/corpRoles';
 import type { AppRoutePath } from './routeScopes';
 
 /**
@@ -65,6 +66,24 @@ export interface NavPage {
   readonly mobileTab: boolean;
   /** Tab ids listed nowhere as destinations: a redirect alias, not a view of this page. */
   readonly aliasTabs?: readonly string[];
+  /** Tab ids shown only while the Corp entry is (`visibleSettingsGroups`' Corporation section). */
+  readonly corpTabs?: readonly string[];
+  /**
+   * Views that are routes of their own but live in this page's sub-nav rather
+   * than its `PAGE_TABS` (`OverviewSubNav`, `CorpSubNav`). Listed as the
+   * page's tabs; each carries its own route's lock.
+   */
+  readonly subViews?: readonly NavSubView[];
+}
+
+/** The Corp Capabilities a Corp sub-view is gated on — hidden, not locked, without one. */
+export type CorpViewCapability = 'canReadMembers' | 'canReadWallet' | 'canReadAssets';
+
+export interface NavSubView {
+  readonly path: AppRoutePath;
+  readonly labelKey: string;
+  /** For a Corp view: the capability `CorpSubNav` shows it for. */
+  readonly corpCapability?: CorpViewCapability;
 }
 
 /**
@@ -78,6 +97,10 @@ export const NAV_PAGES = [
     group: 'primary',
     gating: 'scope',
     mobileTab: true,
+    subViews: [
+      { path: '/clones', labelKey: 'nav.clones' },
+      { path: '/employment-history', labelKey: 'nav.employmentHistory' },
+    ],
   },
   /*
    * Under Overview, not in Social: an alert is what the board is summarising,
@@ -90,7 +113,18 @@ export const NAV_PAGES = [
    * destination — "this pilot" and "this corporation" — and the Corp section
    * has sub-navigation of its own for the views under it (`CorpSubNav`).
    */
-  { path: '/corp', labelKey: 'nav.corp', group: 'primary', gating: 'corp', mobileTab: false },
+  {
+    path: '/corp',
+    labelKey: 'nav.corp',
+    group: 'primary',
+    gating: 'corp',
+    mobileTab: false,
+    subViews: [
+      { path: '/corp/members', labelKey: 'corp.membersTab', corpCapability: 'canReadMembers' },
+      { path: '/corp/wallet', labelKey: 'corp.walletTab', corpCapability: 'canReadWallet' },
+      { path: '/corp/assets', labelKey: 'corp.assetsTab', corpCapability: 'canReadAssets' },
+    ],
+  },
   {
     path: '/skills',
     labelKey: 'nav.skills',
@@ -163,6 +197,7 @@ export const NAV_PAGES = [
     group: 'footer',
     gating: 'ungated',
     mobileTab: false,
+    corpTabs: ['corporation'],
   },
   /*
    * Last: on the rail it is reached only via `CharacterFooterLink`'s portrait,
@@ -180,20 +215,22 @@ export const NAV_PAGES = [
 export type NavPagePath = (typeof NAV_PAGES)[number]['path'];
 
 /**
- * The pages the shell asks `useLockedRoutes` about — the ones that can draw
- * an amber lock dot. Module-level, so the hook's memo sees one array.
+ * Every scope-gated destination the shell asks `useLockedRoutes` about: the
+ * scope-gated pages (the rail's amber lock dots) and their sub-views. Corp
+ * paths are absent — corp hides rather than locks. Module-level, so the
+ * hook's memo sees one array.
  */
-export const NAV_LOCK_PATHS: readonly AppRoutePath[] = NAV_PAGES.filter(
-  (page) => page.gating === 'scope'
-).map((page) => page.path);
+export const NAV_LOCK_PATHS: readonly AppRoutePath[] = (NAV_PAGES as readonly NavPage[])
+  .filter((page) => page.gating === 'scope')
+  .flatMap((page) => [page.path, ...(page.subViews ?? []).map((view) => view.path)]);
 
-const LABEL_KEY_BY_PATH = new Map<string, string>(
+const LABEL_KEY_BY_PATH = Object.fromEntries(
   NAV_PAGES.map((page) => [page.path, page.labelKey])
-);
+) as Record<NavPagePath, string>;
 
 /** The `nav.*` key for a page in the descriptor. */
 export function navPageLabelKey(path: NavPagePath): string {
-  return LABEL_KEY_BY_PATH.get(path) ?? path;
+  return LABEL_KEY_BY_PATH[path];
 }
 
 export interface RailGroup {
@@ -221,14 +258,18 @@ export interface NavDestination {
   readonly label: string;
   /** "Industry › Opportunities" for a tab; the page's own label for a page. */
   readonly breadcrumb: string;
-  /** A tab carries its page's lock: the gate is on the route, not the tab. */
+  /** A `PAGE_TABS` tab carries its page's lock (the gate is on the route); a sub-view, its own route's. */
   readonly locked: boolean;
+  /** The page's gating: a `corp` entry is only ever listed while visible, never locked. */
+  readonly gating: NavGating;
 }
 
 export interface ListNavDestinationsOptions {
   readonly locked: ReadonlySet<AppRoutePath>;
   /** `useCorpNavVisible()` — `/corp` is left out entirely, never locked, when false. */
   readonly corpVisible: boolean;
+  /** `useCorpAccess().capabilities` — each Corp view shows only for its capability, as in `CorpSubNav`. */
+  readonly corpCapabilities: Pick<CorpCapabilities, CorpViewCapability>;
   readonly t: (key: string) => string;
 }
 
@@ -236,12 +277,14 @@ export const BREADCRUMB_SEPARATOR = ' › ';
 
 /**
  * Every page and page tab a pilot can navigate to, in nav order, each page
- * followed by its tabs. Standalone tabs (a page of their own below a tab, like
- * the Fitting editor) and redirect-only aliases are left out.
+ * followed by its tabs and then its sub-views. Standalone tabs (a page of
+ * their own below a tab, like the Fitting editor) and redirect-only aliases
+ * are left out; corp-only entries are left out, never locked, when hidden.
  */
 export function listNavDestinations({
   locked,
   corpVisible,
+  corpCapabilities,
   t,
 }: ListNavDestinationsOptions): NavDestination[] {
   const out: NavDestination[] = [];
@@ -257,21 +300,32 @@ export function listNavDestinations({
       label: pageLabel,
       breadcrumb: pageLabel,
       locked: pageLocked,
+      gating: page.gating,
     });
-    const tabs = PAGE_TABS[page.path];
-    if (!tabs) continue;
-    for (const tab of tabBarTabs(tabs)) {
-      if (page.aliasTabs?.includes(tab.id)) continue;
-      const label = t(tab.labelKey);
-      out.push({
+    const tabEntry = (path: string, labelKey: string, tabLocked: boolean): NavDestination => {
+      const label = t(labelKey);
+      return {
         kind: 'tab',
-        path: tabPath(tabs, tab.id),
+        path,
         pagePath: page.path,
-        labelKey: tab.labelKey,
+        labelKey,
         label,
         breadcrumb: `${pageLabel}${BREADCRUMB_SEPARATOR}${label}`,
-        locked: pageLocked,
-      });
+        locked: tabLocked,
+        gating: page.gating,
+      };
+    };
+    const tabs = PAGE_TABS[page.path];
+    if (tabs) {
+      for (const tab of tabBarTabs(tabs)) {
+        if (page.aliasTabs?.includes(tab.id)) continue;
+        if (page.corpTabs?.includes(tab.id) && !corpVisible) continue;
+        out.push(tabEntry(tabPath(tabs, tab.id), tab.labelKey, pageLocked));
+      }
+    }
+    for (const view of page.subViews ?? []) {
+      if (view.corpCapability && !corpCapabilities[view.corpCapability]) continue;
+      out.push(tabEntry(view.path, view.labelKey, locked.has(view.path)));
     }
   }
   return out;
