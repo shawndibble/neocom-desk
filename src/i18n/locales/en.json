@@ -6613,7 +6613,7 @@
       },
       "col": {
         "hub": "Hub",
-        "signatures": "Signatures",
+        "signatures": "Signatures (hub → exit)",
         "exit": "Exit system",
         "security": "Security",
         "region": "Region",
@@ -6622,9 +6622,9 @@
         "life": "Remaining life",
         "jumps": "Jumps"
       },
-      "signaturesHint": "The signature in the hub, then the signature in the exit system.",
       "noGateRoute": "No gate route",
       "noOrigin": "Pick a system to count jumps from, or set your current system.",
+      "originUngated": "{{system}} has no stargates, so no exit can be reached by gate from it.",
       "jumpsLoading": "Counting jumps from the stargate map…",
       "jumpsUnknown": "The local stargate map couldn't be read, so jumps show as —.",
       "tableLabel": "Thera and Turnur connections",

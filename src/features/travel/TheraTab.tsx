@@ -19,19 +19,16 @@ import {
   FilterField,
   PageHeader,
   Panel,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
 import {
   filterTheraConnections,
   jumpsSortValue,
+  shipSizeRank,
   THERA_HUBS,
   WORMHOLE_SHIP_SIZES,
+  type TheraConnectionFilter,
   type TheraConnectionRow,
 } from '@/engine/route/theraConnections';
 import { SPACE_KINDS } from '@/engine/space';
@@ -43,8 +40,8 @@ import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
 import { enumParam, optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
-import { PreferenceField } from './PreferenceField';
-import { useTheraConnections } from './useTheraConnections';
+import { OptionField, PreferenceField } from './PreferenceField';
+import { useTheraConnections, type TheraConnectionsState } from './useTheraConnections';
 
 const HUB_OPTIONS = ['all', ...THERA_HUBS] as const;
 const SPACE_OPTIONS = ['all', ...SPACE_KINDS] as const;
@@ -54,7 +51,7 @@ const THERA_PARAMS = {
   origin: optionalIdParam(),
   pref: enumParam(ROUTE_PREFERENCES, DEFAULT_ROUTE_PREFERENCE),
   hub: enumParam(HUB_OPTIONS, 'all'),
-  exit: enumParam(SPACE_OPTIONS, 'all'),
+  space: enumParam(SPACE_OPTIONS, 'all'),
   size: enumParam(SIZE_OPTIONS, 'any'),
 };
 
@@ -74,11 +71,7 @@ function useColumns(): DataTableColumn<TheraConnectionRow>[] {
       id: 'signatures',
       header: t('travel.thera.col.signatures'),
       className: 'font-mono tabular-nums',
-      render: (row) => (
-        <span title={t('travel.thera.signaturesHint')}>
-          {row.hubSignature ?? DASH} → {row.exitSignature ?? DASH}
-        </span>
-      ),
+      render: (row) => `${row.hubSignature ?? DASH} → ${row.exitSignature ?? DASH}`,
     },
     {
       id: 'exit',
@@ -116,8 +109,7 @@ function useColumns(): DataTableColumn<TheraConnectionRow>[] {
     {
       id: 'size',
       header: t('travel.thera.col.size'),
-      sortValue: (row) =>
-        row.maxShipSize === null ? undefined : WORMHOLE_SHIP_SIZES.indexOf(row.maxShipSize),
+      sortValue: (row) => (row.maxShipSize === null ? undefined : shipSizeRank(row.maxShipSize)),
       render: (row) =>
         row.maxShipSize === null ? DASH : t(`travel.thera.size.${row.maxShipSize}`),
     },
@@ -152,37 +144,6 @@ function useColumns(): DataTableColumn<TheraConnectionRow>[] {
       },
     },
   ];
-}
-
-function OptionField<V extends string>({
-  label,
-  value,
-  options,
-  optionLabel,
-  onChange,
-}: {
-  label: string;
-  value: V;
-  options: readonly V[];
-  optionLabel: (option: V) => string;
-  onChange: (next: V) => void;
-}) {
-  return (
-    <FilterField label={label} stretch={false}>
-      <Select value={value} onValueChange={(next) => onChange(next as V)}>
-        <SelectTrigger aria-label={label} className="w-40">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option} value={option}>
-              {optionLabel(option)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </FilterField>
-  );
 }
 
 export function TheraTab({ tabBar }: { tabBar: ReactNode }) {
@@ -233,12 +194,12 @@ export function TheraTab({ tabBar }: { tabBar: ReactNode }) {
           />
           <OptionField
             label={t('travel.thera.exitLabel')}
-            value={params.exit}
+            value={params.space}
             options={SPACE_OPTIONS}
             optionLabel={(space) =>
               space === 'all' ? t('travel.thera.anyExit') : t(`common.spaceOption.${space}`)
             }
-            onChange={(exit) => setParams({ exit })}
+            onChange={(space) => setParams({ space })}
           />
           <OptionField
             label={t('travel.thera.sizeLabel')}
@@ -252,8 +213,9 @@ export function TheraTab({ tabBar }: { tabBar: ReactNode }) {
       <TheraBody
         state={state}
         columns={columns}
-        filter={{ hub: params.hub, space: params.exit, shipSize: params.size }}
+        filter={{ hub: params.hub, space: params.space, shipSize: params.size }}
         hasOrigin={originId !== null}
+        originName={originName}
       />
     </div>
   );
@@ -264,11 +226,13 @@ function TheraBody({
   columns,
   filter,
   hasOrigin,
+  originName,
 }: {
-  state: ReturnType<typeof useTheraConnections>;
+  state: TheraConnectionsState;
   columns: DataTableColumn<TheraConnectionRow>[];
-  filter: Parameters<typeof filterTheraConnections>[1];
+  filter: TheraConnectionFilter;
   hasOrigin: boolean;
+  originName: string | null;
 }) {
   const { t } = useTranslation();
   if (state.kind === 'loading') {
@@ -287,26 +251,22 @@ function TheraBody({
     );
   }
   const rows = filterTheraConnections(state.rows, filter);
-  const jumpsUnknown =
-    !state.distancesLoading && state.rows.some((row) => row.jumps.kind === 'unknown');
+  // One live region, always mounted, so a change of message is announced.
+  const jumpsNote = !hasOrigin
+    ? t('travel.thera.noOrigin')
+    : state.distancesLoading
+      ? t('travel.thera.jumpsLoading')
+      : state.originUngated
+        ? t('travel.thera.originUngated', { system: originName ?? '…' })
+        : state.rows.some((row) => row.jumps.kind === 'unknown')
+          ? t('travel.thera.jumpsUnknown')
+          : '';
   return (
     <Panel>
       <div className="space-y-3">
-        {!hasOrigin && (
-          <p role="status" className="text-text-dim">
-            {t('travel.thera.noOrigin')}
-          </p>
-        )}
-        {state.distancesLoading && (
-          <p role="status" className="text-text-dim">
-            {t('travel.thera.jumpsLoading')}
-          </p>
-        )}
-        {jumpsUnknown && (
-          <p role="status" className="text-text-dim">
-            {t('travel.thera.jumpsUnknown')}
-          </p>
-        )}
+        <p role="status" className={cx('text-text-dim', jumpsNote === '' && 'sr-only')}>
+          {jumpsNote}
+        </p>
         {rows.length === 0 ? (
           <EmptyState
             title={

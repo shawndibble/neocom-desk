@@ -254,8 +254,15 @@ describe('Travel › Thera / Turnur', () => {
   });
 
   it('filters by hub, exit security and ship size from the URL', async () => {
-    visitThera('?hub=thera&exit=wormhole');
+    visitThera('?hub=thera&space=wormhole');
     expect(await exitNames()).toEqual(['J120704']);
+  });
+
+  it('says an origin with no stargates reaches no exit by gate', async () => {
+    visitThera(`?origin=${THERA}`);
+    expect(
+      await screen.findByText('Thera has no stargates, so no exit can be reached by gate from it.')
+    ).toBeInTheDocument();
   });
 
   it('keeps only connections that pass at least the chosen ship size', async () => {

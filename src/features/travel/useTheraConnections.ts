@@ -28,6 +28,8 @@ export type TheraConnectionsState =
       fetchedAt: Date;
       /** The jump sweep from the origin has not landed yet. */
       distancesLoading: boolean;
+      /** The origin has no stargates (Thera, J-space), so no exit is reachable by gate. */
+      originUngated: boolean;
     };
 
 /** Remaining life counts down in minutes, so the clock ticks once a minute. */
@@ -94,6 +96,8 @@ export function useTheraConnections(
       rows: buildTheraConnectionRows(result.connections, { now, systems, distances: value }),
       fetchedAt: result.fetchedAt,
       distancesLoading: originId !== null && settled === null,
+      // A sweep reaching nothing but its own origin started somewhere with no gates.
+      originUngated: settled?.kind === 'known' && settled.jumps.size <= 1,
     };
   }, [result, systems, distances, distanceKey, originId, now]);
 }

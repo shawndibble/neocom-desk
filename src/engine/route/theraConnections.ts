@@ -30,6 +30,11 @@ export const WORMHOLE_SHIP_SIZES: readonly WormholeShipSize[] = [
   'capital',
 ];
 
+/** A size's place in `WORMHOLE_SHIP_SIZES` (larger passes more): the one ordering filter and sort share. */
+export function shipSizeRank(size: WormholeShipSize): number {
+  return WORMHOLE_SHIP_SIZES.indexOf(size);
+}
+
 export interface TheraConnection {
   id: string;
   hub: TheraHub;
@@ -151,13 +156,13 @@ export function filterTheraConnections(
   rows: readonly TheraConnectionRow[],
   filter: TheraConnectionFilter
 ): TheraConnectionRow[] {
-  const minSize = filter.shipSize === 'any' ? -1 : WORMHOLE_SHIP_SIZES.indexOf(filter.shipSize);
+  const minSize = filter.shipSize === 'any' ? -1 : shipSizeRank(filter.shipSize);
   return rows.filter((row) => {
     if (filter.hub !== 'all' && row.hub !== filter.hub) return false;
     if (filter.space !== 'all' && row.exitSpace !== filter.space) return false;
     if (minSize >= 0) {
       if (row.maxShipSize === null) return false;
-      if (WORMHOLE_SHIP_SIZES.indexOf(row.maxShipSize) < minSize) return false;
+      if (shipSizeRank(row.maxShipSize) < minSize) return false;
     }
     return true;
   });
