@@ -135,6 +135,8 @@ export interface OrderBookOrchestration {
   currentSystem: CurrentSystemState;
   jumpRangeFilter: JumpRangeFilter;
   regionMode: boolean;
+  /** A set, measurable Jump Range: the book spans every region in reach, not the header's hub or region. */
+  rangeAcross: boolean;
 
   stationFilter: number | null;
   setStationFilter: (next: number | null) => void;
@@ -214,11 +216,13 @@ export function useOrderBookOrchestration({
   // round 10); undone via the banner rendered above the tables. URL-backed
   // (ADR 0015), scoped to the Browser tab.
   const [stationFilter, setStationFilter] = useUrlParam('browser.station', STATION_FILTER_PARAM);
-  // The order book's filter bar. Jump Range, Security and NPC stations only
-  // are Region mode only — Hub mode is already one NPC station — so they're
-  // neither shown nor applied there, whatever the URL says; Min quantity
-  // applies in both. All narrow the book next to the station filter, see
-  // `orderBookView.ts`'s `allowedSystems`/`minQuantity`/`npcStationIds`.
+  // The order book's filter bar. The Jump Range applies in every mode: set,
+  // it replaces the header's hub or region with every region in reach.
+  // Security and NPC stations only apply only once the book spans stations —
+  // Region mode, or a set range — since Hub mode alone is one NPC station;
+  // otherwise they're neither shown nor applied, whatever the URL says. Min
+  // quantity applies in both. All narrow the book next to the station filter,
+  // see `orderBookView.ts`'s `allowedSystems`/`minQuantity`/`npcStationIds`.
   const browserFilterSettingValue = useBrowserFilterSetting((state) => state.value);
   const browserFilterSettingHydrated = useBrowserFilterSetting((state) => state.hydrated);
   const hydrateBrowserFilterSetting = useBrowserFilterSetting((state) => state.hydrate);
@@ -254,16 +258,24 @@ export function useOrderBookOrchestration({
   const jumpRange = browserFilters['browser.jumps'];
   const spaceKinds = browserFilters['browser.sec'];
   const minQuantity = browserFilters['browser.minQty'];
-  const npcOnly = regionMode && browserFilters['browser.npcOnly'];
+  const rangeSet = jumpRange !== DEFAULT_JUMP_RANGE;
+  const spansStations = regionMode || rangeSet;
+  const npcOnly = spansStations && browserFilters['browser.npcOnly'];
   const currentSystem = useCurrentSystem();
-  const jumpRangeFilter = useJumpRangeFilter(
-    currentSystem,
-    regionMode ? jumpRange : DEFAULT_JUMP_RANGE
-  );
+  const jumpRangeFilter = useJumpRangeFilter(currentSystem, jumpRange);
+  // A set range fans out like All regions, over every region in reach — once
+  // it can be measured. Unmeasurable (no origin, no graph), the book falls
+  // back to the header's hub or region and the note says why.
+  const rangeWaiting = rangeSet && jumpRangeFilter.status === 'loading';
+  const rangeAcross = rangeSet && jumpRangeFilter.status === 'ready';
+  const rangeReaches = rangeAcross || rangeWaiting;
+  const fetchesAcross = allRegions || rangeReaches;
 
   // `allRegions` apart from `chosenRegionId`: The Forge → All regions with
   // Jita as hub is the same region id, yet a different book.
-  const resetKey = `${selectedTypeId ?? 'none'}:${chosenRegionId}:${allRegions ? 'all' : 'one'}`;
+  // A range that reaches out ignores the header's hub and region entirely, so
+  // changing them (or the range resolving) is no new book.
+  const resetKey = `${selectedTypeId ?? 'none'}:${rangeReaches ? 'range' : `${chosenRegionId}:${allRegions ? 'all' : 'one'}`}`;
   const [resetForKey, setResetForKey] = useState<string | null>(null);
   if (resetKey !== resetForKey) {
     setResetForKey(resetKey);
@@ -326,22 +338,32 @@ export function useOrderBookOrchestration({
     [selectedTypeId, chosenRegionId, globalMarketsMap]
   );
 
+  // The Browser's own book: a range fanned out over regions reads every
+  // station in them, so it drops the hub's one-station filter. Variations,
+  // Compare and Item Detail keep `orderBookLocation`, as with All regions.
+  const bookLocation = useMemo<OrderBookLocation>(
+    () => (rangeAcross ? { ...orderBookLocation, mode: 'region' } : orderBookLocation),
+    [rangeAcross, orderBookLocation]
+  );
+
   const hubRegionName =
     marketRegions?.find((r) => r.id === effectiveHub.regionId)?.name ?? effectiveHub.systemName;
 
-  // All regions' fan-out: every Market Region the picker lists, or — once a
-  // Jump Range is measurable — only those holding an in-range system, so
-  // "within 5 jumps" costs a few regions, not every one. Waits (null) while
-  // the range is still resolving rather than firing every region and then a
-  // few. Keyed by a joined string so an unchanged set never refetches.
+  // All regions' (or a set range's) fan-out: every Market Region the picker
+  // lists, or — once a Jump Range is measurable — only those holding an
+  // in-range system, so "within 5 jumps" costs a few regions, not every one.
+  // Waits (null) while the range is still resolving rather than firing every
+  // region and then a few. Keyed by a joined string so an unchanged set never
+  // refetches.
   const allRegionsFetchKey = useMemo((): string | null => {
-    if (!allRegions || marketRegions === null || jumpRangeFilter.status === 'loading') return null;
+    if (!fetchesAcross || marketRegions === null || jumpRangeFilter.status === 'loading')
+      return null;
     if (jumpRangeFilter.status === 'ready' && jumpRangeFilter.allowed !== null) {
       const inReach = regionsForSystems(jumpRangeFilter.allowed, systemRegions);
       return allMarketRegionIds.filter((id) => inReach.has(id)).join(',');
     }
     return allMarketRegionIds.join(',');
-  }, [allRegions, marketRegions, jumpRangeFilter, systemRegions, allMarketRegionIds]);
+  }, [fetchesAcross, marketRegions, jumpRangeFilter, systemRegions, allMarketRegionIds]);
   const allRegionsFetchIds = useMemo(
     () =>
       allRegionsFetchKey === null
@@ -374,7 +396,7 @@ export function useOrderBookOrchestration({
     )
       return;
     // Waits for the region list and the range (see `allRegionsFetchKey`).
-    if (allRegions && allRegionsFetchIds === null) return;
+    if (fetchesAcross && allRegionsFetchIds === null) return;
     let cancelled = false;
     void (async () => {
       setOrderBookLoading(true);
@@ -383,10 +405,10 @@ export function useOrderBookOrchestration({
           ? await fetchOrderBookAcross(
               selectedTypeId,
               allRegionsFetchIds,
-              orderBookLocation,
+              bookLocation,
               () => cancelled
             )
-          : await fetchOrderBook(selectedTypeId, orderBookLocation);
+          : await fetchOrderBook(selectedTypeId, bookLocation);
       if (cancelled) return;
       setOrderBookFetch(fetched);
       setOrderBookLoading(false);
@@ -396,8 +418,8 @@ export function useOrderBookOrchestration({
     };
   }, [
     selectedTypeId,
-    orderBookLocation,
-    allRegions,
+    bookLocation,
+    fetchesAcross,
     allRegionsFetchIds,
     hubHydrated,
     locationModeHydrated,
@@ -409,24 +431,24 @@ export function useOrderBookOrchestration({
   // Location Mode, Trade Hub station, the order-row "filter to this station"
   // action (CONTEXT.md round 10), the filter bar, split and sort all happen
   // in the view.
-  // All regions with no region catalogue has no "every region" to read: a
-  // failed book (with its retry), not a spinner waiting on a list that
-  // isn't coming.
-  const regionsUnavailable = allRegions && catalogueError;
+  // A fan-out (All regions, or a range) with no region catalogue has no
+  // "every region" to read: a failed book (with its retry), not a spinner
+  // waiting on a list that isn't coming.
+  const regionsUnavailable = fetchesAcross && catalogueError;
   const settledFetch = regionsUnavailable ? REGIONS_UNAVAILABLE_FETCH : orderBookFetch;
   const spaceSystems = useMemo(
-    () => (regionMode && solarSystems ? systemsInSpace(solarSystems, spaceKinds) : null),
-    [regionMode, solarSystems, spaceKinds]
+    () => (spansStations && solarSystems ? systemsInSpace(solarSystems, spaceKinds) : null),
+    [spansStations, solarSystems, spaceKinds]
   );
   const allowedSystems = useMemo(
     () =>
-      regionMode
+      spansStations
         ? intersectSystemSets(
             jumpRangeFilter.status === 'ready' ? jumpRangeFilter.allowed : null,
             spaceSystems
           )
         : null,
-    [regionMode, jumpRangeFilter, spaceSystems]
+    [spansStations, jumpRangeFilter, spaceSystems]
   );
   // Not applied until the station list has loaded — before then every order
   // would read as a player structure and the book would flash empty.
@@ -440,13 +462,13 @@ export function useOrderBookOrchestration({
         ? null
         : buildOrderBookView(
             selectedTypeId,
-            { ...orderBookLocation, stationFilter, allowedSystems, minQuantity, npcStationIds },
+            { ...bookLocation, stationFilter, allowedSystems, minQuantity, npcStationIds },
             settledFetch
           ),
     [
       settledFetch,
       selectedTypeId,
-      orderBookLocation,
+      bookLocation,
       stationFilter,
       allowedSystems,
       minQuantity,
@@ -491,11 +513,12 @@ export function useOrderBookOrchestration({
     }),
     [jumpRange, spaceKinds, minQuantity, browserFilters]
   );
-  // Only what this mode shows counts: a Region-only filter left in the URL
-  // does nothing in Hub mode, so badging it would claim a filter that isn't on.
+  // Only what this mode shows counts: a Security filter left in the URL does
+  // nothing on a one-station Hub book, so badging it would claim a filter that
+  // isn't on.
   const activeFilterCount = [
-    regionMode && jumpRange !== DEFAULT_JUMP_RANGE,
-    regionMode && spaceKinds.size !== SPACE_KINDS.length,
+    rangeSet,
+    spansStations && spaceKinds.size !== SPACE_KINDS.length,
     minQuantity > 0,
     npcOnly,
   ].filter(Boolean).length;
@@ -512,7 +535,7 @@ export function useOrderBookOrchestration({
   const failedRegionCount = loadedView?.failedRegionIds.length ?? 0;
   // Only "can't measure" earns a line: a range that applies needs no caption.
   const jumpNoteShown =
-    regionMode && (jumpRangeFilter.status === 'no-origin' || jumpRangeFilter.status === 'unknown');
+    rangeSet && (jumpRangeFilter.status === 'no-origin' || jumpRangeFilter.status === 'unknown');
 
   // Variations (CONTEXT.md round 6): the selected item's Tech/Meta/Faction
   // variation group, falling back to Market Group siblings, re-anchored
@@ -617,11 +640,11 @@ export function useOrderBookOrchestration({
   // because something else on the page was refreshed. Also the failed order
   // book's "Try again".
   function refresh() {
-    // All regions clears the type in every region, not just the ones last
+    // A fan-out clears the type in every region, not just the ones last
     // fetched: a range change since would otherwise leave some stale.
     if (selectedTypeId !== null) {
-      if (allRegions) {
-        clearOrderBookViewCacheAcross(selectedTypeId, allMarketRegionIds, orderBookLocation);
+      if (fetchesAcross) {
+        clearOrderBookViewCacheAcross(selectedTypeId, allMarketRegionIds, bookLocation);
       } else {
         clearOrderBookViewCache(selectedTypeId, orderBookLocation);
       }
@@ -642,6 +665,7 @@ export function useOrderBookOrchestration({
     currentSystem,
     jumpRangeFilter,
     regionMode,
+    rangeAcross,
     stationFilter,
     setStationFilter,
     stationFilterLabel,

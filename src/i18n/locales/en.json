@@ -4829,6 +4829,7 @@
     "region": "Region",
     "allRegions": "All regions",
     "allRegionsSecondaryNote": "Variations, Compare, item info and price history use {{regionName}} — only the order book reads every region.",
+    "rangeSecondaryNote": "Variations, Compare, item info and price history use {{scope}} — only the order book reaches every region in range.",
     "regionsFailed_one": "{{count}} region didn't load, so its orders are missing. Refresh to retry.",
     "regionsFailed_other": "{{count}} regions didn't load, so their orders are missing. Refresh to retry.",
     "filterMinQuantity": "Min quantity",
