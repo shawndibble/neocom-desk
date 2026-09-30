@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 import type { MarketHistoryPoint } from './priceHistory';
 import {
   HAULING_THRESHOLDS,
+  buildBuyLadder,
   buildSellLadder,
   estimateSale,
+  hubLadders,
   haulingFlags,
   lotEconomics,
   summarizeDemand,
+  walkInstant,
   walkLadder,
   type LadderLevel,
 } from './haulingMarket';
@@ -250,6 +253,125 @@ describe('lotEconomics', () => {
       fees: FEES,
     });
     expect(r.filled).toBe(3);
+  });
+});
+
+describe('buildBuyLadder', () => {
+  it('keeps buy orders only, one level per price, dearest first', () => {
+    expect(
+      buildBuyLadder([
+        { price: 90, volume_remain: 5, is_buy_order: true },
+        { price: 95, volume_remain: 2, is_buy_order: true },
+        { price: 90, volume_remain: 3, is_buy_order: true },
+        { price: 120, volume_remain: 7, is_buy_order: false },
+        { price: 99, volume_remain: 0, is_buy_order: true },
+      ])
+    ).toEqual([
+      { price: 95, units: 2, orders: 1 },
+      { price: 90, units: 8, orders: 2 },
+    ]);
+  });
+});
+
+describe('hubLadders', () => {
+  it('reads both sides of the book at the hub station only', () => {
+    const ladders = hubLadders(
+      [
+        { price: 100, volume_remain: 4, is_buy_order: false, location_id: 1 },
+        { price: 99, volume_remain: 9, is_buy_order: false, location_id: 2 },
+        { price: 90, volume_remain: 6, is_buy_order: true, location_id: 1 },
+        // A dearer buy order elsewhere in the region: its range is not read, so it never counts.
+        { price: 98, volume_remain: 50, is_buy_order: true, location_id: 2 },
+      ],
+      1
+    );
+    expect(ladders.sell).toEqual([{ price: 100, units: 4, orders: 1 }]);
+    expect(ladders.buy).toEqual([{ price: 90, units: 6, orders: 1 }]);
+  });
+});
+
+describe('walkInstant', () => {
+  // Accounting V: 3.375% sales tax, no broker fee (nothing is listed).
+  const origin: LadderLevel[] = [
+    { price: 100, units: 10, orders: 1 },
+    { price: 105, units: 20, orders: 2 },
+  ];
+  const destBuys: LadderLevel[] = [
+    { price: 115, units: 5, orders: 1 },
+    { price: 110, units: 12, orders: 2 },
+    { price: 108, units: 100, orders: 3 },
+  ];
+
+  it('pairs the cheapest sells with the dearest buys and stops at the first unit that loses money', () => {
+    // 5 @100→115, 5 @100→110, 7 @105→110; then 105→108 nets 104.355 < 105 and the walk stops
+    // partway through the origin's 105 level.
+    const r = walkInstant({ originLadder: origin, destBuyLadder: destBuys, accountingLevel: 5 });
+    expect(r.units).toBe(17);
+    expect(r.cost).toBe(1735);
+    expect(r.revenue).toBe(1895);
+    expect(r.salesTax).toBeCloseTo(1895 * 0.03375);
+    expect(r.profit).toBeCloseTo(1895 - 1895 * 0.03375 - 1735);
+  });
+
+  it('stops when either book runs out', () => {
+    const r = walkInstant({
+      originLadder: origin,
+      destBuyLadder: [{ price: 115, units: 5, orders: 1 }],
+      accountingLevel: 5,
+    });
+    expect(r.units).toBe(5);
+    expect(r.cost).toBe(500);
+  });
+
+  it('never takes a unit that only breaks even', () => {
+    // Accounting 0: 7.5% of 200 is 15, so a 185 buy nets exactly zero.
+    const r = walkInstant({
+      originLadder: [{ price: 185, units: 10, orders: 1 }],
+      destBuyLadder: [{ price: 200, units: 10, orders: 1 }],
+      accountingLevel: 0,
+    });
+    expect(r).toMatchObject({ units: 0, cost: 0, revenue: 0, profit: 0 });
+  });
+
+  it('stops at maxUnits', () => {
+    const r = walkInstant({
+      originLadder: origin,
+      destBuyLadder: destBuys,
+      accountingLevel: 5,
+      maxUnits: 3,
+    });
+    expect(r).toMatchObject({ units: 3, cost: 300, revenue: 345 });
+  });
+});
+
+describe('lotEconomics, selling into buy orders', () => {
+  const buyLadder: LadderLevel[] = [{ price: 100, units: 50, orders: 1 }];
+  const destBuyLadder: LadderLevel[] = [
+    { price: 120, units: 4, orders: 1 },
+    { price: 110, units: 4, orders: 1 },
+  ];
+
+  it('realises the buy orders dearest first and pays sales tax only', () => {
+    const r = lotEconomics({ buyLadder, expectedPrice: 0, quantity: 6, fees: FEES, destBuyLadder });
+    expect(r.filled).toBe(6);
+    expect(r.cost).toBe(600);
+    expect(r.revenue).toBe(4 * 120 + 2 * 110);
+    expect(r.brokerFee).toBe(0);
+    expect(r.brokerFeePct).toBe(0);
+    expect(r.salesTax).toBeCloseTo(700 * 0.03375);
+    expect(r.profit).toBeCloseTo(700 - 700 * 0.03375 - 600);
+  });
+
+  it('caps the lot at the destination book, buying only what can be sold', () => {
+    const r = lotEconomics({
+      buyLadder,
+      expectedPrice: 0,
+      quantity: 20,
+      fees: FEES,
+      destBuyLadder,
+    });
+    expect(r.filled).toBe(8);
+    expect(r.cost).toBe(800);
   });
 });
 

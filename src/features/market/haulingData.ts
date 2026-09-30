@@ -22,6 +22,12 @@
  * per-station history) while the ladders are the hub *station's*; the popover
  * says so. Pure decisions live in the engine — this module only fetches and
  * adapts.
+ *
+ * In `instant` mode (sell straight into the destination's buy orders) pass 1
+ * compares the origin's lowest sell with the destination's highest *buy*,
+ * pass 2 is skipped — a buy order already standing is the demand, and Days to
+ * Sell does not apply — and pass 3 reads the destination's buy ladder at the
+ * hub station.
  */
 import { getUniverseType } from '@/esi/endpoints';
 import { getOrderBook } from '@/features/market/orderBook';
@@ -30,8 +36,8 @@ import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { getHubPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
 import {
-  buildSellLadder,
   estimateSale,
+  hubLadders,
   summarizeDemand,
   type DemandSummary,
   type LadderLevel,
@@ -41,6 +47,12 @@ import type { TypeMap } from '@/sde/types';
 
 /** Destination lowest sell must beat origin lowest sell by this factor to be looked at. */
 export const MIN_LISTED_GAP = 1.1;
+/**
+ * Destination highest buy must beat origin lowest sell by this factor. Lower
+ * than the listed gap: the buy order is the price realised, not a ceiling a
+ * listing will be undercut from, and only sales tax comes off it.
+ */
+export const MIN_INSTANT_GAP = 1.02;
 export const MAX_PRICED_CANDIDATES = 80;
 export const MAX_BOOK_CANDIDATES = 40;
 /** Fees are not known here, so the history pass keeps anything that could clear a rough cut. */
@@ -58,7 +70,13 @@ export interface HaulingProgress {
   total: number;
 }
 
-export interface HaulingScanRow {
+/**
+ * How the cargo is sold at the destination: `list` it for sale at the
+ * Expected Sell Price, or sell it `instant`ly into the hub's buy orders.
+ */
+export type HaulMode = 'list' | 'instant';
+
+interface HaulingScanRowBase {
   typeId: number;
   name: string;
   /** m³ of one unit as hauled. */
@@ -67,9 +85,22 @@ export interface HaulingScanRow {
   buyLadder: LadderLevel[];
   /** The destination hub's sell ladder — the competition. */
   destLadder: LadderLevel[];
+  /** The destination hub station's buy ladder, dearest first — what an instant sale realises. */
+  destBuyLadder: LadderLevel[];
+}
+
+export interface ListHaulingScanRow extends HaulingScanRowBase {
+  mode: 'list';
   demand: DemandSummary;
   sale: SaleEstimate;
 }
+
+/** Sold into standing buy orders: no demand read and no Expected Sell Price — the orders are the price. */
+export interface InstantHaulingScanRow extends HaulingScanRowBase {
+  mode: 'instant';
+}
+
+export type HaulingScanRow = ListHaulingScanRow | InstantHaulingScanRow;
 
 export interface HaulingScan {
   rows: HaulingScanRow[];
@@ -84,6 +115,8 @@ export interface HaulingScanRequest {
   typeIds: readonly number[];
   /** Which category the ids came from, so two categories can never share a cache entry. */
   scope: number;
+  /** How the cargo is sold; defaults to `list`. */
+  mode?: HaulMode;
   types: TypeMap;
   /** ISO date the demand window ends on. */
   today?: string;
@@ -97,8 +130,11 @@ export function clearHaulingScanCache(): void {
   scanCache.clear();
 }
 
-function cacheKey(request: HaulingScanRequest): string {
-  return `${request.from.id}>${request.to.id}:${request.scope}`;
+/** A scan is cached per route, category and mode: the two modes keep different rows for the same route. */
+export function haulingScanCacheKey(
+  request: Pick<HaulingScanRequest, 'from' | 'to' | 'scope' | 'mode'>
+): string {
+  return `${request.from.id}>${request.to.id}:${request.scope}:${request.mode ?? 'list'}`;
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
@@ -119,16 +155,21 @@ async function resolveVolume(typeId: number, types: TypeMap): Promise<number | n
   }
 }
 
-async function stationLadder(hub: TradeHub, typeId: number): Promise<LadderLevel[]> {
+async function stationLadders(
+  hub: TradeHub,
+  typeId: number
+): Promise<{ sell: LadderLevel[]; buy: LadderLevel[] }> {
   const { orders } = await getOrderBook(hub.regionId, typeId);
-  return buildSellLadder(orders.filter((o) => o.location_id === hub.stationId));
+  return hubLadders(orders, hub.stationId);
 }
 
 export async function runHaulingScan(request: HaulingScanRequest): Promise<HaulingScan> {
   const { from, to, typeIds, types, onProgress, signal } = request;
   const today = request.today ?? new Date().toISOString().slice(0, 10);
+  const mode = request.mode ?? 'list';
+  const key = haulingScanCacheKey(request);
 
-  const cached = scanCache.get(cacheKey(request));
+  const cached = scanCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.scan;
 
   // 1. Prices.
@@ -148,18 +189,31 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   const priced = ids
     .map((typeId) => {
       const buy = fromPrices.get(typeId)?.sellMin ?? null;
-      const sell = toPrices.get(typeId)?.sellMin ?? null;
-      return { typeId, buy, gap: buy !== null && sell !== null ? sell / buy : 0 };
+      const dest = toPrices.get(typeId);
+      const sell = (mode === 'instant' ? dest?.buyMax : dest?.sellMin) ?? null;
+      return { typeId, buy, gap: buy !== null && sell !== null && buy > 0 ? sell / buy : 0 };
     })
-    .filter((c) => c.buy !== null && c.gap >= MIN_LISTED_GAP)
+    .filter(
+      (c) => c.buy !== null && c.gap >= (mode === 'instant' ? MIN_INSTANT_GAP : MIN_LISTED_GAP)
+    )
     .sort((a, b) => b.gap - a.gap)
     .slice(0, MAX_PRICED_CANDIDATES);
 
   // 2. History: drop what never sells or only sold below the origin price.
-  const withHistory: { typeId: number; buy: number; demand: DemandSummary; proxy: number }[] = [];
+  // An instant sale skips it: the standing buy order is the demand.
+  const withHistory: {
+    typeId: number;
+    buy: number;
+    demand: DemandSummary | null;
+    proxy: number;
+  }[] =
+    mode === 'instant'
+      ? priced.map((c) => ({ typeId: c.typeId, buy: c.buy!, demand: null, proxy: c.gap }))
+      : [];
   let historyDone = 0;
-  onProgress?.({ stage: 'history', done: 0, total: priced.length });
-  await mapWithConcurrencyLimit(priced, SCAN_CONCURRENCY, async (candidate) => {
+  const historyPass = mode === 'instant' ? [] : priced;
+  if (mode === 'list') onProgress?.({ stage: 'history', done: 0, total: priced.length });
+  await mapWithConcurrencyLimit(historyPass, SCAN_CONCURRENCY, async (candidate) => {
     throwIfAborted(signal);
     try {
       const { points } = await loadPriceHistory(to.regionId, candidate.typeId);
@@ -186,27 +240,37 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   await mapWithConcurrencyLimit(shortlist, SCAN_CONCURRENCY, async (candidate) => {
     throwIfAborted(signal);
     try {
-      const [buyLadder, destLadder] = await Promise.all([
-        stationLadder(from, candidate.typeId),
-        stationLadder(to, candidate.typeId),
+      const [origin, dest] = await Promise.all([
+        stationLadders(from, candidate.typeId),
+        stationLadders(to, candidate.typeId),
       ]);
-      const sale = estimateSale({
-        ladder: destLadder,
-        dailyVolume: candidate.demand.dailyVolume,
-        recentSalePrice: candidate.demand.recentSalePrice,
-      });
-      const unitVolumeM3 =
-        sale !== null && buyLadder.length > 0 ? await resolveVolume(candidate.typeId, types) : null;
-      if (sale !== null && buyLadder.length > 0 && unitVolumeM3 !== null) {
-        rows.push({
-          typeId: candidate.typeId,
-          name: types[String(candidate.typeId)]?.name ?? `#${candidate.typeId}`,
-          unitVolumeM3,
-          buyLadder,
-          destLadder,
-          demand: candidate.demand,
-          sale,
+      const buyLadder = origin.sell;
+      const base = {
+        typeId: candidate.typeId,
+        name: types[String(candidate.typeId)]?.name ?? `#${candidate.typeId}`,
+        buyLadder,
+        destLadder: dest.sell,
+        destBuyLadder: dest.buy,
+      };
+      if (candidate.demand === null) {
+        const unitVolumeM3 =
+          buyLadder.length > 0 && dest.buy.length > 0
+            ? await resolveVolume(candidate.typeId, types)
+            : null;
+        if (unitVolumeM3 !== null) rows.push({ ...base, mode: 'instant', unitVolumeM3 });
+      } else {
+        const sale = estimateSale({
+          ladder: dest.sell,
+          dailyVolume: candidate.demand.dailyVolume,
+          recentSalePrice: candidate.demand.recentSalePrice,
         });
+        const unitVolumeM3 =
+          sale !== null && buyLadder.length > 0
+            ? await resolveVolume(candidate.typeId, types)
+            : null;
+        if (sale !== null && unitVolumeM3 !== null) {
+          rows.push({ ...base, mode: 'list', unitVolumeM3, demand: candidate.demand, sale });
+        }
       }
     } catch {
       // One failed book drops that item, not the scan.
@@ -216,6 +280,6 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   });
 
   const scan: HaulingScan = { rows, scanned: ids.length, fetchedAt: Date.now() };
-  scanCache.set(cacheKey(request), { scan, expiresAt: Date.now() + SCAN_CACHE_TTL_MS });
+  scanCache.set(key, { scan, expiresAt: Date.now() + SCAN_CACHE_TTL_MS });
   return scan;
 }

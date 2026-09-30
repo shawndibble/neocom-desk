@@ -11,6 +11,10 @@
  * Beside them, the hub's cheapest sell orders as a table with the expected
  * price marked in place, so "units listed ahead of yours" is something you can
  * count rather than a bar to interpret.
+ *
+ * A row sold straight into the destination's buy orders has no Expected Sell
+ * Price and no Days to Sell: it opens on the load and margin (sales tax only)
+ * beside the hub station's buy orders, the ones the load sells into shaded.
  */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +22,7 @@ import type { AppraisalNetFees } from '@/engine/market/appraisal';
 import { HAULING_THRESHOLDS, lotEconomics } from '@/engine/market/haulingMarket';
 import { formatIsk } from '@/lib/isk';
 import type { TradeHub } from '@/market/hubs';
+import type { InstantHaulingScanRow, ListHaulingScanRow } from './haulingData';
 import { formatDaysToSell, type HaulingViewRow } from './haulingView';
 
 const ORDER_LEVELS = 8;
@@ -27,6 +32,10 @@ interface HaulingRowDetailProps {
   from: TradeHub;
   to: TradeHub;
   fees: AppraisalNetFees;
+}
+
+interface DetailProps<Row> extends Omit<HaulingRowDetailProps, 'row'> {
+  row: Row;
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -75,7 +84,134 @@ function Line({
   );
 }
 
-export function HaulingRowDetail({ row, from, to, fees }: HaulingRowDetailProps) {
+export function HaulingRowDetail({ row, ...rest }: HaulingRowDetailProps) {
+  return row.mode === 'instant' ? (
+    <InstantDetail row={row} {...rest} />
+  ) : (
+    <ListingDetail row={row} {...rest} />
+  );
+}
+
+function InstantDetail({
+  row,
+  from,
+  to,
+  fees,
+}: DetailProps<HaulingViewRow & InstantHaulingScanRow>) {
+  const { t } = useTranslation();
+  const lot = lotEconomics({
+    buyLadder: row.buyLadder,
+    expectedPrice: 0,
+    quantity: row.suggestedUnits,
+    fees,
+    destBuyLadder: row.destBuyLadder,
+  });
+  const avgBuy = lot.filled > 0 ? lot.cost / lot.filled : 0;
+  const isk0 = (value: number) => formatIsk(value, 0);
+  const each = (value: number) => `${value >= 0 ? '+' : '−'}${isk0(Math.abs(value))}`;
+
+  const levels = row.destBuyLadder.slice(0, ORDER_LEVELS);
+  const orderRows = levels.map((level, index) => {
+    const before = levels.slice(0, index).reduce((sum, l) => sum + l.units, 0);
+    return { ...level, running: before + level.units, soldInto: before < lot.filled };
+  });
+
+  return (
+    <div className="flex flex-col gap-4 bg-panel-2/40 p-4">
+      <div>
+        <h3 className="text-base font-semibold">
+          {t('market.hauling.detail.instantTitle', { item: row.name, hub: to.systemName })}
+        </h3>
+        <p className="text-xs text-text-dim">
+          {t('market.hauling.detail.instantNote', { hub: to.systemName })}
+        </p>
+      </div>
+
+      <div className="grid gap-x-8 gap-y-5 lg:grid-cols-2">
+        <Section title={t('market.hauling.detail.workingTitle', { count: lot.filled })}>
+          {lot.filled === 0 ? (
+            <p className="text-xs text-text-dim">{t('market.hauling.detail.noneProfitable')}</p>
+          ) : (
+            <>
+              <Line
+                label={t('market.hauling.detail.buyIn', { hub: from.systemName })}
+                detail={t('market.hauling.detail.unitsAt', {
+                  units: lot.filled.toLocaleString(),
+                  price: formatIsk(avgBuy, 2),
+                })}
+                amount={`−${isk0(lot.cost)}`}
+              />
+              <Line
+                label={t('market.hauling.detail.sellInto', { hub: to.systemName })}
+                detail={t('market.hauling.detail.unitsAt', {
+                  units: lot.filled.toLocaleString(),
+                  price: formatIsk(row.price, 2),
+                })}
+                amount={`+${isk0(lot.revenue)}`}
+              />
+              <Line
+                indent
+                label={t('market.hauling.detail.tax')}
+                detail={`${lot.salesTaxPct.toFixed(2)}%`}
+                amount={`−${isk0(lot.salesTax)}`}
+              />
+              <div className="border-t border-line pt-2">
+                <Line
+                  strong
+                  tone={lot.profit >= 0 ? 'success' : 'danger'}
+                  label={t('market.hauling.detail.profit')}
+                  detail={t('market.hauling.detail.eachShort', { isk: each(row.profitPerUnit) })}
+                  amount={each(lot.profit)}
+                />
+                <Line
+                  strong
+                  label={t('market.hauling.detail.margin')}
+                  detail={t('market.hauling.detail.marginHow')}
+                  amount={`${lot.marginPct.toFixed(1)}%`}
+                />
+              </div>
+            </>
+          )}
+        </Section>
+
+        <Section title={t('market.hauling.detail.buyOrdersTitle', { hub: to.systemName })}>
+          <div className="overflow-x-auto">
+            <table className="dt-embedded-table w-full min-w-[20rem] text-sm tabular-nums">
+              <thead>
+                <tr className="text-left text-[0.6875rem] tracking-wider text-text-dim uppercase">
+                  <th className="py-1 font-semibold">{t('market.hauling.detail.colPrice')}</th>
+                  <th className="py-1 text-right font-semibold">
+                    {t('market.hauling.detail.colUnits')}
+                  </th>
+                  <th className="py-1 text-right font-semibold">
+                    {t('market.hauling.detail.colTotal')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {orderRows.map((level) => (
+                  <tr
+                    key={level.price}
+                    className={`border-t border-line/60 ${level.soldInto ? 'bg-accent/10' : ''}`}
+                  >
+                    <td className="py-1">{formatIsk(level.price, 2)}</td>
+                    <td className="py-1 text-right">{level.units.toLocaleString()}</td>
+                    <td className="py-1 text-right text-text-dim">
+                      {level.running.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-text-dim">{t('market.hauling.detail.buyOrdersNote')}</p>
+        </Section>
+      </div>
+    </div>
+  );
+}
+
+function ListingDetail({ row, from, to, fees }: DetailProps<HaulingViewRow & ListHaulingScanRow>) {
   const { t } = useTranslation();
   const { sale } = row;
 

@@ -40,7 +40,7 @@ import {
   type TripLine,
   type TripOverride,
 } from '@/engine/market/haulingPlan';
-import type { HaulingFlag } from '@/engine/market/haulingMarket';
+import type { DemandKind, HaulingFlag } from '@/engine/market/haulingMarket';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
 import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
@@ -84,13 +84,18 @@ import {
 import { useMarketHub } from './hub';
 import { haulingHubDefaults, pickHaulingHub } from './haulingHubs';
 import { useHaulingFees, useHaulingScan } from './useHaulingScan';
+import type { HaulMode } from './haulingData';
 
 const HUB_IDS = TRADE_HUBS.map((h) => h.id);
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 const MARGIN_CHOICES = [0, 3, 5, 10] as const;
 
+const HAUL_MODES = ['list', 'instant'] as const satisfies readonly HaulMode[];
+
 const HAULING_URL_FILTERS = {
   cat: intParam(DEFAULT_HAULING_CATEGORY_ID),
+  /** How the cargo is sold at the destination. Lives in the URL only — never remembered with the filters. */
+  mode: enumParam(HAUL_MODES, 'list'),
   days: intParam(DEFAULT_HAULING_FILTER.days, { min: 0, max: 365 }),
   margin: intParam(DEFAULT_HAULING_FILTER.margin, { min: 0, max: 100 }),
   demand: enumParam(['steady', 'any'] as const, DEFAULT_HAULING_FILTER.demand),
@@ -134,12 +139,17 @@ const HAULING_COLUMN_IDS = [
   'buy',
   'expected',
   'margin',
+  'iskPerM3',
   'days',
   'demand',
   'flags',
   'bring',
 ] as const;
 type HaulingColumnId = (typeof HAULING_COLUMN_IDS)[number];
+
+/** Days to Sell and demand are read for a listing only: an instant sale into buy orders has neither. */
+const LISTING_ONLY_COLUMN_IDS: readonly HaulingColumnId[] = ['days', 'demand'];
+const INSTANT_COLUMN_IDS = HAULING_COLUMN_IDS.filter((id) => !LISTING_ONLY_COLUMN_IDS.includes(id));
 
 function isHaulingColumnId(id: string): id is HaulingColumnId {
   return (HAULING_COLUMN_IDS as readonly string[]).includes(id);
@@ -150,7 +160,7 @@ const useHaulingColumns = createColumnVisibilitySetting<HaulingColumnId>({
   ids: HAULING_COLUMN_IDS,
 });
 
-const DEMAND_DOT: Record<HaulingViewRow['demand']['demand'], string> = {
+const DEMAND_DOT: Record<DemandKind, string> = {
   'most-days': 'bg-success',
   bursts: 'bg-warning',
   rarely: 'bg-danger',
@@ -219,6 +229,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const from = hubFor(params.from);
   const to = hubFor(params.to);
   const categoryId = isHaulingCategoryId(params.cat) ? params.cat : DEFAULT_HAULING_CATEGORY_ID;
+  const mode: HaulMode = params.mode;
+  const instant = mode === 'instant';
 
   const columnVisibility = useColumnVisibility(useHaulingColumns, HAULING_COLUMN_IDS);
 
@@ -259,6 +271,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     from,
     to,
     categoryId,
+    mode,
     // Not before the default hub has loaded: until then the lane is the
     // fallback one, and scanning it would spend ESI budget on the wrong route.
     defaultHubHydrated && from.id !== to.id
@@ -285,9 +298,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     [viewRows, params.days, params.margin, params.demand]
   );
 
-  // The user's edits belong to one scan: a new route or category starts a fresh plan.
+  // The user's edits belong to one scan: a new route, category or mode starts a fresh plan.
   const [overrides, setOverrides] = useState<ReadonlyMap<number, TripOverride>>(new Map());
-  const scanKey = `${from.id}>${to.id}:${categoryId}`;
+  const scanKey = `${from.id}>${to.id}:${categoryId}:${mode}`;
   const [overridesFor, setOverridesFor] = useState(scanKey);
   if (overridesFor !== scanKey) {
     setOverridesFor(scanKey);
@@ -365,6 +378,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const csvColumns = useMemo(
     () =>
       haulingCsvColumns(t, {
+        mode,
         flagText: (flag) => flagLabel[flag].text,
         bringFor: (row) => {
           const line = lineOf.get(row.typeId);
@@ -372,7 +386,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           return line.quantity;
         },
       }),
-    [t, flagLabel, lineOf, overrides]
+    [t, mode, flagLabel, lineOf, overrides]
   );
   const tableExport = useTableExport({ surface: 'hauling', rows: shown, columns: csvColumns });
 
@@ -437,18 +451,22 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     {
       id: 'expected',
       headerClassName: 'whitespace-nowrap',
-      header: t('market.hauling.columns.expected'),
-      headerTooltip: t('market.hauling.columns.expectedTip'),
+      header: t(instant ? 'market.hauling.columns.buyOrder' : 'market.hauling.columns.expected'),
+      headerTooltip: t(
+        instant ? 'market.hauling.columns.buyOrderTip' : 'market.hauling.columns.expectedTip'
+      ),
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
-      sortValue: (row) => row.sale.price,
-      render: (row) => formatIsk(row.sale.price, 2),
+      sortValue: (row) => row.price,
+      render: (row) => formatIsk(row.price, 2),
     },
     {
       id: 'margin',
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.margin'),
-      headerTooltip: t('market.hauling.columns.marginTip'),
+      headerTooltip: t(
+        instant ? 'market.hauling.columns.marginInstantTip' : 'market.hauling.columns.marginTip'
+      ),
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
       cellClassName: (row) =>
@@ -466,32 +484,43 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       ),
     },
     {
+      id: 'iskPerM3',
+      headerClassName: 'whitespace-nowrap',
+      header: t('market.hauling.columns.iskPerM3'),
+      headerTooltip: t('market.hauling.columns.iskPerM3Tip'),
+      align: 'right',
+      className: 'tabular-nums whitespace-nowrap',
+      sortValue: (row) => row.iskPerM3,
+      render: (row) => formatIsk(row.iskPerM3, 0),
+    },
+    {
       id: 'days',
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.days'),
       headerTooltip: t('market.hauling.columns.daysTip'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: (row) => row.sale.daysToSell,
-      render: (row) => formatDaysToSell(row.sale.daysToSell),
+      sortValue: (row) => (row.mode === 'list' ? row.sale.daysToSell : undefined),
+      render: (row) => (row.mode === 'list' ? formatDaysToSell(row.sale.daysToSell) : null),
     },
     {
       id: 'demand',
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.demand'),
-      sortValue: (row) => row.demand.daysWithTrades,
-      render: (row) => (
-        <span
-          className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs"
-          title={t('market.hauling.demandDays', { count: row.demand.daysWithTrades })}
-        >
+      sortValue: (row) => (row.mode === 'list' ? row.demand.daysWithTrades : undefined),
+      render: (row) =>
+        row.mode === 'list' && (
           <span
-            aria-hidden="true"
-            className={`size-2 rounded-full ${DEMAND_DOT[row.demand.demand]}`}
-          />
-          {t(`market.hauling.demand.${row.demand.demand}`)}
-        </span>
-      ),
+            className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs"
+            title={t('market.hauling.demandDays', { count: row.demand.daysWithTrades })}
+          >
+            <span
+              aria-hidden="true"
+              className={`size-2 rounded-full ${DEMAND_DOT[row.demand.demand]}`}
+            />
+            {t(`market.hauling.demand.${row.demand.demand}`)}
+          </span>
+        ),
     },
     {
       id: 'flags',
@@ -550,8 +579,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       )
       .map((column) => [column.id, column])
   ) as Record<HaulingColumnId, DataTableColumn<HaulingViewRow>>;
+  const availableColumnIds = instant ? INSTANT_COLUMN_IDS : HAULING_COLUMN_IDS;
   const visibleColumns = columns.filter(
-    (column) => !isHaulingColumnId(column.id) || columnVisibility.isVisible(column.id)
+    (column) =>
+      !isHaulingColumnId(column.id) ||
+      (availableColumnIds.includes(column.id) && columnVisibility.isVisible(column.id))
   );
 
   const heldPct =
@@ -566,10 +598,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           ? t('market.hauling.plan.limitedSales')
           : null;
 
+  // Selling into buy orders reads neither days nor demand, so only the margin filter counts there.
   const activeFilterCount =
-    (params.days !== DEFAULT_HAULING_FILTER.days ? 1 : 0) +
+    (!instant && params.days !== DEFAULT_HAULING_FILTER.days ? 1 : 0) +
     (params.margin !== DEFAULT_HAULING_FILTER.margin ? 1 : 0) +
-    (params.demand !== DEFAULT_HAULING_FILTER.demand ? 1 : 0);
+    (!instant && params.demand !== DEFAULT_HAULING_FILTER.demand ? 1 : 0);
+  const hiddenCount = (instant ? 0 : hidden.thin + hidden.slow) + hidden.lowMargin;
   const filterValue = pickHaulingFilter(params);
 
   return (
@@ -663,11 +697,29 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                 </SelectContent>
               </Select>
             </label>
+            <label className="flex flex-col gap-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('market.hauling.mode')}
+              <Select
+                value={mode}
+                onValueChange={(value) => setParams({ mode: value as HaulMode })}
+              >
+                <SelectTrigger size="sm" aria-label={t('market.hauling.mode')} className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {HAUL_MODES.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {t(`market.hauling.modes.${m}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
           </>
         }
         actions={
           <ColumnPickerMenu
-            available={HAULING_COLUMN_IDS}
+            available={availableColumnIds}
             visible={columnVisibility.visible}
             columnsById={hideableColumnsById}
             onToggle={columnVisibility.toggle}
@@ -681,29 +733,31 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       >
         {(draft, setDraft) => (
           <>
-            <FilterField label={t('market.hauling.filters.sellsWithin')}>
-              <Select
-                value={String(draft.days)}
-                onValueChange={(v) => setDraft({ ...draft, days: Number(v) })}
-              >
-                <SelectTrigger
-                  size="sm"
-                  aria-label={t('market.hauling.filters.sellsWithin')}
-                  className="w-28"
+            {!instant && (
+              <FilterField label={t('market.hauling.filters.sellsWithin')}>
+                <Select
+                  value={String(draft.days)}
+                  onValueChange={(v) => setDraft({ ...draft, days: Number(v) })}
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DAY_CHOICES.map((d) => (
-                    <SelectItem key={d} value={String(d)}>
-                      {d === 0
-                        ? t('market.hauling.filters.anyTime')
-                        : t('market.hauling.filters.days', { count: d })}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterField>
+                  <SelectTrigger
+                    size="sm"
+                    aria-label={t('market.hauling.filters.sellsWithin')}
+                    className="w-28"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DAY_CHOICES.map((d) => (
+                      <SelectItem key={d} value={String(d)}>
+                        {d === 0
+                          ? t('market.hauling.filters.anyTime')
+                          : t('market.hauling.filters.days', { count: d })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            )}
             <FilterField label={t('market.hauling.filters.marginOver')}>
               <Select
                 value={String(draft.margin)}
@@ -725,35 +779,40 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                 </SelectContent>
               </Select>
             </FilterField>
-            <FilterField label={t('market.hauling.filters.demand')}>
-              <Select
-                value={draft.demand}
-                onValueChange={(v) => setDraft({ ...draft, demand: v as HaulingDemandFilter })}
-              >
-                <SelectTrigger
-                  size="sm"
-                  aria-label={t('market.hauling.filters.demand')}
-                  className="w-32"
+            {!instant && (
+              <FilterField label={t('market.hauling.filters.demand')}>
+                <Select
+                  value={draft.demand}
+                  onValueChange={(v) => setDraft({ ...draft, demand: v as HaulingDemandFilter })}
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="steady">{t('market.hauling.filters.steady')}</SelectItem>
-                  <SelectItem value="any">{t('market.hauling.filters.anyDemand')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
+                  <SelectTrigger
+                    size="sm"
+                    aria-label={t('market.hauling.filters.demand')}
+                    className="w-32"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="steady">{t('market.hauling.filters.steady')}</SelectItem>
+                    <SelectItem value="any">{t('market.hauling.filters.anyDemand')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            )}
             <p className="text-[0.6875rem] text-text-dim">
-              {t('market.hauling.feesLine', {
-                accounting: fees.accountingLevel,
-                broker: fees.brokerRelationsLevel,
-              })}
+              {instant
+                ? t('market.hauling.feesLineInstant', { accounting: fees.accountingLevel })
+                : t('market.hauling.feesLine', {
+                    accounting: fees.accountingLevel,
+                    broker: fees.brokerRelationsLevel,
+                  })}
             </p>
           </>
         )}
       </FilterBar>
 
-      {!introDismissed && (
+      {/* The intro explains the Expected Sell Price: an instant sale has none. */}
+      {!introDismissed && !instant && (
         <div className="flex items-start justify-between gap-3 border-b border-accent-dim bg-accent/10 px-3 py-2 text-sm">
           <p>
             <b>{t('market.hauling.introLead')}</b> {t('market.hauling.introBody')}
@@ -793,14 +852,19 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             <EmptyState
               title={t('market.hauling.emptyTitle')}
               hint={
-                hidden.thin + hidden.slow + hidden.lowMargin > 0
-                  ? t('market.hauling.emptyHiddenHint', {
-                      scanned: state.scan.scanned,
-                      thin: hidden.thin,
-                      slow: hidden.slow,
-                      low: hidden.lowMargin,
-                    })
-                  : t('market.hauling.emptyHint', { scanned: state.scan.scanned })
+                hiddenCount === 0
+                  ? t('market.hauling.emptyHint', { scanned: state.scan.scanned })
+                  : instant
+                    ? t('market.hauling.emptyHiddenHintInstant', {
+                        scanned: state.scan.scanned,
+                        low: hidden.lowMargin,
+                      })
+                    : t('market.hauling.emptyHiddenHint', {
+                        scanned: state.scan.scanned,
+                        thin: hidden.thin,
+                        slow: hidden.slow,
+                        low: hidden.lowMargin,
+                      })
               }
               action={
                 <Button size="sm" onClick={() => setParams(DEFAULT_HAULING_FILTER)}>
@@ -929,13 +993,15 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
               </div>
 
               <p className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-                {hidden.thin + hidden.slow + hidden.lowMargin > 0
-                  ? t('market.hauling.hiddenLine', {
-                      thin: hidden.thin,
-                      slow: hidden.slow,
-                      low: hidden.lowMargin,
-                    })
-                  : t('market.hauling.scannedLine', { count: state.scan.scanned })}
+                {hiddenCount === 0
+                  ? t('market.hauling.scannedLine', { count: state.scan.scanned })
+                  : instant
+                    ? t('market.hauling.hiddenLineInstant', { low: hidden.lowMargin })
+                    : t('market.hauling.hiddenLine', {
+                        thin: hidden.thin,
+                        slow: hidden.slow,
+                        low: hidden.lowMargin,
+                      })}
               </p>
             </>
           )}

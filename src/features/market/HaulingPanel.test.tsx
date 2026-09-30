@@ -14,7 +14,9 @@ const FEES = {
 };
 
 const SCAN_ROW: HaulingScanRow = {
+  mode: 'list',
   typeId: 2048,
+  destBuyLadder: [],
   name: 'Damage Control II',
   unitVolumeM3: 5,
   buyLadder: [{ price: 100, units: 10_000, orders: 3 }],
@@ -37,18 +39,41 @@ const READY: HaulingScanState = {
   scan: { rows: [SCAN_ROW], scanned: 1, fetchedAt: 0 },
 };
 
+const INSTANT_READY: HaulingScanState = {
+  status: 'ready',
+  scan: {
+    rows: [
+      {
+        mode: 'instant',
+        typeId: 2048,
+        name: 'Damage Control II',
+        unitVolumeM3: 5,
+        buyLadder: [{ price: 100, units: 10, orders: 1 }],
+        destLadder: [],
+        destBuyLadder: [{ price: 130, units: 10, orders: 1 }],
+      },
+    ],
+    scanned: 1,
+    fetchedAt: 0,
+  },
+};
+
+const scanModes: string[] = [];
 vi.mock('./useHaulingScan', () => ({
-  useHaulingScan: () => ({ state: READY, refresh: vi.fn() }),
+  useHaulingScan: (_from: unknown, _to: unknown, _cat: unknown, mode: string) => {
+    scanModes.push(mode);
+    return { state: mode === 'instant' ? INSTANT_READY : READY, refresh: vi.fn() };
+  },
   useHaulingFees: () => FEES,
 }));
 vi.mock('@/sde/loadMarketSde', () => ({ loadMarketGroups: vi.fn(async () => []) }));
 
 const { HaulingPanel } = await import('./HaulingPanel');
 
-function renderPanel() {
+function renderPanel(query = 'from=jita&to=amarr') {
   const actions = fakeItemActions();
   render(
-    <MemoryRouter initialEntries={['/market/hauling?from=jita&to=amarr']}>
+    <MemoryRouter initialEntries={[`/market/hauling?${query}`]}>
       <FakeItemActions actions={actions}>
         <HaulingPanel />
       </FakeItemActions>
@@ -86,5 +111,30 @@ describe('HaulingPanel item rows', () => {
   it('offers a visible More actions button on each row', () => {
     renderPanel();
     expect(screen.getByRole('button', { name: /more actions/i })).toBeInTheDocument();
+  });
+});
+
+describe('HaulingPanel modes', () => {
+  beforeEach(() => {
+    useActiveCharacter.setState({ activeCharacterId: null });
+    scanModes.length = 0;
+  });
+
+  it('lists for sale by default, with Days, Demand and ISK/m³ columns', () => {
+    renderPanel();
+    expect(scanModes.at(-1)).toBe('list');
+    expect(screen.getByRole('columnheader', { name: /Days/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Demand/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /ISK\/m³/ })).toBeInTheDocument();
+  });
+
+  it('selling into buy orders scans that mode and hides Days and Demand', () => {
+    renderPanel('from=jita&to=amarr&mode=instant');
+    expect(scanModes.at(-1)).toBe('instant');
+    expect(screen.queryByRole('columnheader', { name: /Days/ })).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: /Demand/ })).toBeNull();
+    expect(screen.getByRole('columnheader', { name: /ISK\/m³/ })).toBeInTheDocument();
+    // The realised buy-order price: 10 units sold at 130.
+    expect(screen.getByRole('row', { name: /Damage Control II/ })).toHaveTextContent('130.00');
   });
 });

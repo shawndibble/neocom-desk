@@ -4985,6 +4985,11 @@
       "to": "To",
       "category": "Category",
       "categoryFallback": "Category {{id}}",
+      "mode": "Sell by",
+      "modes": {
+        "list": "Listing for sale",
+        "instant": "Selling into buy orders"
+      },
       "introLead": "Prices here are what we expect you to actually get, not today's cheapest listing.",
       "introBody": "Other haulers are undercutting the same items, so we account for that.",
       "introDismiss": "Dismiss",
@@ -5010,6 +5015,9 @@
       "multibuyList": "Multibuy list",
       "multibuyEmpty": "Nothing selected.",
       "feesLine": "Fees: Accounting {{accounting}}, Broker Relations {{broker}}",
+      "feesLineInstant": "Fees: Accounting {{accounting}}. Selling into buy orders pays sales tax only.",
+      "hiddenLineInstant": "Hidden by your filters: {{low}} have a margin under your minimum.",
+      "emptyHiddenHintInstant": "We looked at {{scanned}} items. Hidden by your filters: {{low}} have a margin under your minimum.",
       "scannedLine": "{{count}} items looked at. Prices and history come from public market data.",
       "hiddenLine": "Hidden by your filters: {{thin}} rarely sell, {{slow}} take too long to sell, {{low}} have a margin under your minimum.",
       "columns": {
@@ -5023,7 +5031,12 @@
         "daysTip": "How long the units listed within 1% of your price, plus about a day's worth of yours, take to sell at the recent sales rate.",
         "demand": "Demand",
         "flags": "Heads up",
-        "bring": "Bring"
+        "bring": "Bring",
+        "buyOrder": "Sell",
+        "buyOrderTip": "What the destination hub's buy orders pay per unit for the suggested load, on average. You sell instantly: nothing is listed, so there is no broker fee. Only buy orders at the hub station count.",
+        "marginInstantTip": "Profit as a percentage of what the load costs, after the sales tax on the sale. Nothing is listed, so there is no broker fee. Open a row for the full working.",
+        "iskPerM3": "ISK/m³",
+        "iskPerM3Tip": "Profit per unit divided by its hauled volume: what each cubic metre of hold earns carrying this item."
       },
       "demand": {
         "most-days": "Sells most days",
@@ -5130,7 +5143,13 @@
         "colUnits": "Units",
         "colTotal": "Running total",
         "yourPrice": "Your expected price: {{price}}",
-        "ordersNote": "Cheapest first. Shaded rows are within 1% of your price: those sellers will relist below you, so they count as ahead of you."
+        "ordersNote": "Cheapest first. Shaded rows are within 1% of your price: those sellers will relist below you, so they count as ahead of you.",
+        "instantTitle": "{{item}} into {{hub}} buy orders",
+        "instantNote": "Only buy orders at the {{hub}} hub station count. You sell into them on arrival, so there is no broker fee and no wait.",
+        "sellInto": "Sell into buy orders in {{hub}}",
+        "buyOrdersTitle": "Buy orders in {{hub}}",
+        "buyOrdersNote": "Dearest first. Shaded rows are the ones the suggested load sells into.",
+        "noneProfitable": "No buy order here pays enough to cover the purchase and sales tax."
       }
     },
     "appraisal": {
