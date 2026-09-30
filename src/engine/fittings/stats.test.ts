@@ -494,10 +494,25 @@ describe('extractOffense', () => {
     expect(offense.weapons[1].range).toBeUndefined();
   });
 
+  it('gives no range to a charge the engine reads no flight for', () => {
+    const offense = extractOffense(
+      [BLASTER],
+      [rangedResult({}, { [APPLIED_DPS_ATTRIBUTE.explosionRadius]: 100 })],
+      null
+    );
+
+    expect(offense.weapons[0].range).toBeUndefined();
+  });
+
   it('gives a fighter row no range', () => {
     const offense = extractOffense(
       [{ typeId: 23055, quantity: 9, isDrone: true, isFighter: true }],
-      [rangedResult({ [APPLIED_DPS_ATTRIBUTE.optimal]: 10000 })],
+      [
+        rangedResult({
+          [APPLIED_DPS_ATTRIBUTE.optimal]: 10000,
+          [APPLIED_DPS_ATTRIBUTE.tracking]: 0.1,
+        }),
+      ],
       null
     );
 

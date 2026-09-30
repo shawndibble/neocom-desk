@@ -352,7 +352,7 @@ describe('FittingStatsSections offense', () => {
     expect(offense.getByText('Optimal 2.4 km · Falloff 6.3 km')).toBeInTheDocument();
     expect(offense.getByText('Range 62.5 km')).toBeInTheDocument();
     // A drone flying to its target carries no range.
-    expect(offense.getAllByText(/Optimal|Range/)).toHaveLength(2);
+    expect(offense.getAllByText(/^(Optimal|Range) [\d.]+ km/)).toHaveLength(2);
   });
 
   it('shows no sustained figure when reloading costs nothing', () => {
