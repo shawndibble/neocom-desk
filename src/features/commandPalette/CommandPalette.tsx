@@ -17,7 +17,10 @@ import {
   marketItemCatalogue,
   type ShownMarketItem,
 } from './marketItems';
+import { loadLpCorporations } from '@/sde/loadMarketSde';
+import { readCachedLoyaltyBalances } from '@/features/character/loyalty';
 import { createCharactersProvider, createCommandsProvider, createPagesProvider } from './providers';
+import { createLpStoresProvider, NO_BALANCES } from './lpStoresProvider';
 import type { PaletteProvider, PaletteResult } from './types';
 import { usePaletteSearch } from './usePaletteSearch';
 
@@ -39,6 +42,23 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
     [locked, corpVisible, capabilities, t]
   );
 
+  // Its own memo, keyed only on what it reads: the provider holds the loaded
+  // corporation list, so a Character-list or nav-lock change must not throw
+  // it away and flash the group back to loading.
+  const lpStores = useMemo(
+    () =>
+      createLpStoresProvider({
+        loadCorporations: loadLpCorporations,
+        loadBalances: () =>
+          activeCharacterId === null
+            ? Promise.resolve(NO_BALANCES)
+            : readCachedLoyaltyBalances(activeCharacterId),
+        navigate: (path) => void navigate(path),
+        balanceHint: (lp) => t('commandPalette.lpBalance', { lp: lp.toLocaleString() }),
+      }),
+    [activeCharacterId, navigate, t]
+  );
+
   return useMemo(
     () => [
       createPagesProvider({ destinations, navigate: (path) => void navigate(path) }),
@@ -53,9 +73,19 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
         activeHint: t('commandPalette.activeCharacter'),
         onSelect: (characterId) => void setActiveCharacter(characterId),
       }),
+      lpStores,
       createMarketItemsProvider({ catalogue: marketItemCatalogue, onSelect: onShowItem }),
     ],
-    [destinations, navigate, t, characters, activeCharacterId, setActiveCharacter, onShowItem]
+    [
+      destinations,
+      navigate,
+      t,
+      characters,
+      activeCharacterId,
+      setActiveCharacter,
+      lpStores,
+      onShowItem,
+    ]
   );
 }
 
@@ -67,8 +97,8 @@ interface CommandPaletteProps {
 
 /**
  * The Command Palette (#2318): one search box over grouped results — Pages,
- * Commands, Characters, Market Items (#2319) — each group a provider
- * (`types.ts`).
+ * Commands, Characters, LP Stores, Market Items (#2319) — each group a
+ * provider (`types.ts`).
  *
  * A hand-built ARIA combobox (decision 20260905-114550), after
  * `BuildLocationPicker`: DOM focus stays in the input, and the highlighted
