@@ -161,7 +161,7 @@ describe('PilotLookupTab', () => {
     expect(mocks.loadPilotProfile).not.toHaveBeenCalled();
   });
 
-  it('deep-links a pilot from ?pilot= and links to Public Info and zKillboard', async () => {
+  it('deep-links a pilot from ?pilot= and links to zKillboard', async () => {
     renderTab('/travel/pilot?pilot=42');
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
     expect(mocks.loadPilotProfile).toHaveBeenCalledWith(42);
@@ -169,8 +169,8 @@ describe('PilotLookupTab', () => {
     expect(screen.getByRole('link', { name: 'zKillboard' }).getAttribute('href')).toBe(
       'https://zkillboard.com/character/42/'
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Public Info' }));
-    expect(mocks.openPublicInfoModal).toHaveBeenCalledWith('character', 42);
+    // The profile is already on the page; the modal would only repeat it.
+    expect(screen.queryByRole('button', { name: 'Public Info' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Some Corp' }));
     expect(mocks.openPublicInfoModal).toHaveBeenCalledWith('corporation', 200);
   });

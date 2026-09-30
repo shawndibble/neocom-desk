@@ -5,8 +5,9 @@
  * so both places show a character the same way.
  *
  * Takes an already-loaded `PilotProfile`; each caller owns its own loading
- * and failure states. Where a corporation, alliance or public-info link goes
- * is the caller's too: Pilot Lookup opens the modal, the modal switches tabs.
+ * and failure states. Where a corporation or alliance link goes is the
+ * caller's too: Pilot Lookup opens the modal, the modal switches tabs.
+ * Neither links to the modal's Character tab, which would only repeat this view.
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,8 +23,6 @@ export interface PilotProfileViewProps {
   profile: PilotProfile;
   onOpenCorporation: (corporationId: number) => void;
   onOpenAlliance: (allianceId: number) => void;
-  /** Omitted where the view already is the public info, so it never links to itself. */
-  onOpenPublicInfo?: () => void;
   /** Hides the name heading where the surrounding dialog already titles it. */
   hideName?: boolean;
 }
@@ -58,7 +57,6 @@ function PilotIdentity({
   profile,
   onOpenCorporation,
   onOpenAlliance,
-  onOpenPublicInfo,
   hideName = false,
 }: PilotProfileViewProps) {
   const { t } = useTranslation();
@@ -113,11 +111,6 @@ function PilotIdentity({
           </dd>
         </dl>
         <div className="flex flex-wrap gap-3 pt-1 text-sm">
-          {onOpenPublicInfo && (
-            <button type="button" className={inlineLinkClassName} onClick={onOpenPublicInfo}>
-              {t('travel.pilot.publicInfo')}
-            </button>
-          )}
           <a
             href={characterZkillUrl(profile.characterId)}
             target="_blank"

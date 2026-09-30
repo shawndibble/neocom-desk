@@ -6595,7 +6595,6 @@
       "years_other": "{{count}} years",
       "days_one": "{{count}} day",
       "days_other": "{{count}} days",
-      "publicInfo": "Public Info",
       "zkillboard": "zKillboard",
       "statsLabel": "zKillboard stats",
       "statsLoading": "Loading zKillboard stats…",

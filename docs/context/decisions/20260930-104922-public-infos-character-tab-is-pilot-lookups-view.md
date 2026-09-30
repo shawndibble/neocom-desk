@@ -11,8 +11,10 @@ _Recorded 2026-09-30._
   Corporation, Alliance and Employment tabs are unchanged, and corporations
   and alliances still link out to zKillboard rather than showing stats inline.
 - **The caller owns the links.** Pilot Lookup's corporation/alliance links
-  open the modal; inside the modal they switch tabs, and the view's
-  "Public Info" link is left out so it never links to itself.
+  open the modal; inside the modal they switch tabs. The view has no
+  "Public Info" link at all: in the modal it would link to itself, and on
+  Pilot Lookup it would only open the same view over the page (removed at
+  Shawn's call after #2361).
 - **A character's chain follows the live affiliation.** The modal loads the
   character through `loadPilotProfile`, and the Corporation and Alliance tabs
   use its corporation and alliance ids, not the cached public record's
