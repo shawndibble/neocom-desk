@@ -3,7 +3,13 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadCharacterLoyaltyPoints, PARAGON_CORPORATION_ID, splitEverMarks } from './loyalty';
+import { writeCached } from '@/esi/cache';
+import {
+  loadCharacterLoyaltyPoints,
+  PARAGON_CORPORATION_ID,
+  readCachedLoyaltyBalances,
+  splitEverMarks,
+} from './loyalty';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -86,5 +92,28 @@ describe('splitEverMarks', () => {
 
   it('handles an empty list', () => {
     expect(splitEverMarks([])).toEqual({ everMarks: 0, otherLoyalty: [] });
+  });
+});
+
+describe('readCachedLoyaltyBalances', () => {
+  it('maps the cached balances by corporation without calling ESI', async () => {
+    await writeCached(
+      CHAR_ID,
+      'loyalty',
+      [
+        { corporation_id: 1000130, loyalty_points: 700 },
+        { corporation_id: 1000035, loyalty_points: 0 },
+      ],
+      Date.now()
+    );
+    const balances = await readCachedLoyaltyBalances(CHAR_ID);
+    expect([...balances]).toEqual([
+      [1000130, 700],
+      [1000035, 0],
+    ]);
+  });
+
+  it('is empty when nothing is cached yet', async () => {
+    expect((await readCachedLoyaltyBalances(CHAR_ID)).size).toBe(0);
   });
 });

@@ -12,13 +12,18 @@ import { listNavDestinations, NAV_LOCK_PATHS } from '@/app/navDestinations';
 import { useLockedRoutes } from '@/app/useGrantedScopes';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
+import { loadLpCorporations } from '@/sde/loadMarketSde';
+import { readCachedLoyaltyBalances } from '@/features/character/loyalty';
 import { createCharactersProvider, createCommandsProvider, createPagesProvider } from './providers';
+import { createLpStoresProvider } from './lpStoresProvider';
 import type { PaletteProvider, PaletteResult } from './types';
 import { usePaletteSearch } from './usePaletteSearch';
 
 const NO_CHARACTERS: readonly { characterId: number; name: string }[] = [];
 
-/** The live reads behind the three shipped groups, turned into providers. */
+const NO_BALANCES: ReadonlyMap<number, number> = new Map();
+
+/** The live reads behind the shipped groups, turned into providers. */
 function useShippedProviders(): PaletteProvider[] {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -32,6 +37,23 @@ function useShippedProviders(): PaletteProvider[] {
   const destinations = useMemo(
     () => listNavDestinations({ locked, corpVisible, corpCapabilities: capabilities, t }),
     [locked, corpVisible, capabilities, t]
+  );
+
+  // Its own memo, keyed only on what it reads: the provider holds the loaded
+  // corporation list, so a Character-list or nav-lock change must not throw
+  // it away and flash the group back to loading.
+  const lpStores = useMemo(
+    () =>
+      createLpStoresProvider({
+        loadCorporations: loadLpCorporations,
+        loadBalances: () =>
+          activeCharacterId === null
+            ? Promise.resolve(NO_BALANCES)
+            : readCachedLoyaltyBalances(activeCharacterId),
+        navigate: (path) => void navigate(path),
+        balanceHint: (lp) => t('commandPalette.lpBalance', { lp: lp.toLocaleString() }),
+      }),
+    [activeCharacterId, navigate, t]
   );
 
   return useMemo(
@@ -48,8 +70,9 @@ function useShippedProviders(): PaletteProvider[] {
         activeHint: t('commandPalette.activeCharacter'),
         onSelect: (characterId) => void setActiveCharacter(characterId),
       }),
+      lpStores,
     ],
-    [destinations, navigate, t, characters, activeCharacterId, setActiveCharacter]
+    [destinations, navigate, t, characters, activeCharacterId, setActiveCharacter, lpStores]
   );
 }
 
@@ -59,7 +82,7 @@ interface CommandPaletteProps {
 
 /**
  * The Command Palette (#2318): one search box over grouped results — Pages,
- * Commands, Characters — each group a provider (`types.ts`).
+ * Commands, Characters, LP Stores — each group a provider (`types.ts`).
  *
  * A hand-built ARIA combobox (decision 20260905-114550), after
  * `BuildLocationPicker`: DOM focus stays in the input, and the highlighted

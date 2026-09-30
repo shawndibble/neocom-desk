@@ -5997,10 +5997,12 @@
     "resultsCount_one": "{{count}} result",
     "resultsCount_other": "{{count}} results",
     "activeCharacter": "Active",
+    "lpBalance": "{{lp}} LP",
     "groups": {
       "pages": "Pages",
       "commands": "Commands",
-      "characters": "Characters"
+      "characters": "Characters",
+      "lpStores": "LP Stores"
     },
     "commands": {
       "openSettings": "Open settings",

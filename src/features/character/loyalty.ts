@@ -1,6 +1,6 @@
 /** Fetch + cache layer for the Loyalty Points view. */
 import { getCharacterLoyaltyPoints, type CharacterLoyaltyPoints } from '@/esi/endpoints';
-import { conditionalFetch, loadWithCacheStatus, type StatusResult } from '@/esi/cache';
+import { conditionalFetch, loadWithCacheStatus, readCached, type StatusResult } from '@/esi/cache';
 
 const KEY = 'loyalty';
 
@@ -16,6 +16,16 @@ export function loadCharacterLoyaltyPoints(
     getCharacterLoyaltyPoints(characterId, options)
   );
   return loadWithCacheStatus(characterId, KEY, fetchLive, { conditional });
+}
+
+/**
+ * The Character's LP per corporation from whatever is already cached — no ESI
+ * call, so a hint (the Command Palette's LP Stores group) can read it freely.
+ * Empty until the Wallet's Loyalty Points view has loaded once.
+ */
+export async function readCachedLoyaltyBalances(characterId: number): Promise<Map<number, number>> {
+  const cached = await readCached<CharacterLoyaltyPoints[]>(characterId, KEY);
+  return new Map((cached ?? []).map((entry) => [entry.corporation_id, entry.loyalty_points]));
 }
 
 /**
