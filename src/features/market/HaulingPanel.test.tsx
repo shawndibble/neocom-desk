@@ -123,16 +123,16 @@ describe('HaulingPanel modes', () => {
   it('lists for sale by default, with Days, Demand and ISK/m³ columns', () => {
     renderPanel();
     expect(scanModes.at(-1)).toBe('list');
-    expect(screen.getByRole('columnheader', { name: /Days/ })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: /Demand/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /^Days/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /^Demand/ })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /ISK\/m³/ })).toBeInTheDocument();
   });
 
   it('selling into buy orders scans that mode and hides Days and Demand', () => {
     renderPanel('from=jita&to=amarr&mode=instant');
     expect(scanModes.at(-1)).toBe('instant');
-    expect(screen.queryByRole('columnheader', { name: /Days/ })).toBeNull();
-    expect(screen.queryByRole('columnheader', { name: /Demand/ })).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: /^Days/ })).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: /^Demand/ })).toBeNull();
     expect(screen.getByRole('columnheader', { name: /ISK\/m³/ })).toBeInTheDocument();
     // The realised buy-order price: 10 units sold at 130.
     expect(screen.getByRole('row', { name: /Damage Control II/ })).toHaveTextContent('130.00');

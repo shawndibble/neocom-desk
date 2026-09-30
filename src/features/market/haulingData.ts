@@ -50,9 +50,11 @@ export const MIN_LISTED_GAP = 1.1;
 /**
  * Destination highest buy must beat origin lowest sell by this factor. Lower
  * than the listed gap: the buy order is the price realised, not a ceiling a
- * listing will be undercut from, and only sales tax comes off it.
+ * listing will be undercut from, and only sales tax comes off it. Just above
+ * 1 / (1 − 3.375%), Accounting V's tax: a smaller gap loses money at any
+ * skill, so it would only spend order-book requests on rows that never show.
  */
-export const MIN_INSTANT_GAP = 1.02;
+export const MIN_INSTANT_GAP = 1.035;
 export const MAX_PRICED_CANDIDATES = 80;
 export const MAX_BOOK_CANDIDATES = 40;
 /** Fees are not known here, so the history pass keeps anything that could clear a rough cut. */
@@ -74,7 +76,8 @@ export interface HaulingProgress {
  * How the cargo is sold at the destination: `list` it for sale at the
  * Expected Sell Price, or sell it `instant`ly into the hub's buy orders.
  */
-export type HaulMode = 'list' | 'instant';
+export const HAUL_MODES = ['list', 'instant'] as const;
+export type HaulMode = (typeof HAUL_MODES)[number];
 
 interface HaulingScanRowBase {
   typeId: number;

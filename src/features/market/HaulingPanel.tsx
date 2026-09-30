@@ -84,13 +84,11 @@ import {
 import { useMarketHub } from './hub';
 import { haulingHubDefaults, pickHaulingHub } from './haulingHubs';
 import { useHaulingFees, useHaulingScan } from './useHaulingScan';
-import type { HaulMode } from './haulingData';
+import { HAUL_MODES, type HaulMode } from './haulingData';
 
 const HUB_IDS = TRADE_HUBS.map((h) => h.id);
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 const MARGIN_CHOICES = [0, 3, 5, 10] as const;
-
-const HAUL_MODES = ['list', 'instant'] as const satisfies readonly HaulMode[];
 
 const HAULING_URL_FILTERS = {
   cat: intParam(DEFAULT_HAULING_CATEGORY_ID),

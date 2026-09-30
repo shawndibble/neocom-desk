@@ -403,17 +403,16 @@ export function lotEconomics(input: {
   destBuyLadder?: readonly LadderLevel[];
 }): LotEconomics {
   const { accountingLevel, brokerRelationsLevel, standing } = input.fees;
-  const instant = input.destBuyLadder !== undefined;
-  let quantity = input.quantity;
-  if (input.destBuyLadder !== undefined) {
-    const depth = input.destBuyLadder.reduce((sum, l) => sum + l.units, 0);
-    quantity = Math.min(quantity, depth);
-  }
+  const { destBuyLadder } = input;
+  const instant = destBuyLadder !== undefined;
+  const quantity = instant
+    ? Math.min(
+        input.quantity,
+        destBuyLadder.reduce((sum, l) => sum + l.units, 0)
+      )
+    : input.quantity;
   const { filled, cost } = walkLadder(input.buyLadder, quantity);
-  const revenue =
-    input.destBuyLadder !== undefined
-      ? walkLadder(input.destBuyLadder, filled).cost
-      : filled * input.expectedPrice;
+  const revenue = instant ? walkLadder(destBuyLadder, filled).cost : filled * input.expectedPrice;
   const tax = filled > 0 ? salesTax(revenue, accountingLevel) : 0;
   const broker =
     filled > 0 && !instant
