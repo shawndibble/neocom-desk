@@ -3026,6 +3026,10 @@
     "journalItemBought": "Bought {{quantity}} × {{unitPrice}} = {{total}}",
     "journalItemSold": "Sold {{quantity}} × {{unitPrice}} = {{total}}",
     "journalContractLink": "Contract →",
+    "journalBountyFaction": "{{faction}} ×{{count}}",
+    "journalBountyOther": "Other",
+    "journalBountyKills_one": "{{count}} NPC killed",
+    "journalBountyKills_other": "{{count}} NPCs killed",
     "journalFilteredSummary_one": "{{count}} entry · net <net>{{net}}</net>",
     "journalFilteredSummary_other": "{{count}} entries · net <net>{{net}}</net>"
   },
