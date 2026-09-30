@@ -36,7 +36,8 @@
  */
 import { fetchAggregates, type HubAggregate } from '@/market/fuzzwork';
 import { getOrderBook } from './orderBook';
-import { getRoute, getStructureMarketOrders, type StructureMarketOrder } from '@/esi/endpoints';
+import { getStructureMarketOrders, type StructureMarketOrder } from '@/esi/endpoints';
+import { avoidCacheSuffix, getRouteAvoiding } from '@/features/route/esiRoute';
 import { conditionalPagedFetch, loadPaginatedWithCache } from '@/esi/cache';
 import { AuthError } from '@/auth/sso';
 import { EsiError } from '@/esi/client';
@@ -181,8 +182,12 @@ export async function loadStructureCompetition(
   return { competitors, truncated: result.truncated };
 }
 
-function jumpsCacheKey(originSystemId: number, destinationSystemId: number): string {
-  return `${originSystemId}:${destinationSystemId}`;
+function jumpsCacheKey(
+  originSystemId: number,
+  destinationSystemId: number,
+  avoid: readonly number[]
+): string {
+  return `${originSystemId}:${destinationSystemId}${avoidCacheSuffix(originSystemId, destinationSystemId, avoid)}`;
 }
 
 // Module-level, session-lifetime memo: a route between two fixed systems
@@ -211,19 +216,21 @@ export function clearJumpsCache(): void {
  */
 export function loadJumpsBetween(
   originSystemId: number,
-  destinationSystemId: number
+  destinationSystemId: number,
+  /** The pilot's Avoided Systems — see `features/route/esiRoute.ts` for how ESI is asked. */
+  avoid: readonly number[] = []
 ): Promise<JumpsAwayResult> {
   if (originSystemId === destinationSystemId) {
     return Promise.resolve(jumpsAwayFromRoute([originSystemId]));
   }
 
-  const key = jumpsCacheKey(originSystemId, destinationSystemId);
+  const key = jumpsCacheKey(originSystemId, destinationSystemId, avoid);
   const cached = jumpsCache.get(key);
   if (cached) return cached;
 
   const promise = (async () => {
     try {
-      const { data } = await getRoute(originSystemId, destinationSystemId);
+      const { data } = await getRouteAvoiding(originSystemId, destinationSystemId, avoid);
       return jumpsAwayFromRoute(data);
     } catch {
       return jumpsAwayFromRoute(null);

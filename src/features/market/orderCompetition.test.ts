@@ -369,3 +369,35 @@ describe('loadStructureCompetition (issue #538)', () => {
     expect(result?.truncated).toBe(true);
   });
 });
+
+describe('loadJumpsBetween with Avoided Systems', () => {
+  const AVOIDED = 30045328;
+
+  it('memoizes per list, so adding an avoided system asks again', async () => {
+    const asked: (string | null)[] = [];
+    server.use(
+      http.get(`${ESI_BASE_URL}/latest/route/${SYS_A}/${SYS_B}`, ({ request }) => {
+        const avoid = new URL(request.url).searchParams.get('avoid');
+        asked.push(avoid);
+        return HttpResponse.json(avoid ? [SYS_A, 30000001, 30000002, SYS_B] : [SYS_A, SYS_B]);
+      })
+    );
+
+    expect(await loadJumpsBetween(SYS_A, SYS_B)).toEqual({ kind: 'known', jumps: 1 });
+    expect(await loadJumpsBetween(SYS_A, SYS_B, [AVOIDED])).toEqual({ kind: 'known', jumps: 3 });
+    expect(await loadJumpsBetween(SYS_A, SYS_B, [AVOIDED])).toEqual({ kind: 'known', jumps: 3 });
+    expect(asked).toEqual([null, `${AVOIDED}`]);
+  });
+
+  it('falls back to the plain route when avoiding leaves none', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/latest/route/${SYS_A}/${SYS_B}`, ({ request }) =>
+        new URL(request.url).searchParams.get('avoid')
+          ? HttpResponse.json({ error: 'No route found' }, { status: 404 })
+          : HttpResponse.json([SYS_A, AVOIDED, SYS_B])
+      )
+    );
+
+    expect(await loadJumpsBetween(SYS_A, SYS_B, [AVOIDED])).toEqual({ kind: 'known', jumps: 2 });
+  });
+});

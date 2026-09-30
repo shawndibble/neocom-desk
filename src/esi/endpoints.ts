@@ -1835,6 +1835,13 @@ export interface RouteOptions extends EndpointOptions {
    * today but is included so this wrapper reflects the endpoint it wraps.
    */
   flag?: 'shortest' | 'secure' | 'insecure';
+  /**
+   * Systems the route must not enter, sent comma-separated. Verified live: a
+   * hard filter — ESI answers 404 "No route found" when the only way runs
+   * through one, or when the destination is one; an avoided origin is fine.
+   * `features/route/esiRoute.ts` is what softens that for the app.
+   */
+  avoid?: readonly number[];
 }
 
 /** Waypoint solar-system ids, including both origin and destination. */
@@ -1843,7 +1850,7 @@ export function getRoute(
   destination: number,
   options: RouteOptions = {}
 ): Promise<EsiResult<number[]>> {
-  const { flag, ...rest } = options;
+  const { flag, avoid, ...rest } = options;
   // Verified live against esi.evetech.net: /route/ 404s on the unversioned
   // path once X-Compatibility-Date is set (every request here sends it) —
   // every other endpoint tolerates the unversioned path fine, so the
@@ -1852,7 +1859,7 @@ export function getRoute(
   return esiFetch<number[]>(`/latest/route/${origin}/${destination}`, {
     ...rest,
     endpointId: 'getRoute',
-    query: { flag },
+    query: { flag, avoid: avoid?.length ? avoid.join(',') : undefined },
   });
 }
 

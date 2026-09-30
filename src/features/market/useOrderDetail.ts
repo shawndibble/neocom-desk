@@ -12,6 +12,7 @@
  * its view.
  */
 import { useContext, useEffect, useLayoutEffect, useMemo } from 'react';
+import { useAvoidedSystemIds } from '@/features/route/avoidedSystems';
 import { useLazyRowCache } from '@/lib/useLazyRowCache';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { TRADE_HUBS } from '@/market/hubs';
@@ -134,6 +135,18 @@ export function useOrderDetail(): OrderDetail {
   const hubBids = useLazyRowCache<number, HubBids>();
   /** Jump distance, keyed by `"system:system"` — shared by the region-rival route and the trade-hub sweep. */
   const jumps = useLazyRowCache<string, JumpsAwayResult>();
+  // Loaded under the Avoided Systems in force, and read back only for those:
+  // a distance worked out before the pilot added a system is not this one.
+  const { avoided } = useAvoidedSystemIds();
+  const avoidTag = useMemo(() => [...avoided].sort((a, b) => a - b).join(','), [avoided]);
+  const jumpsForList = useMemo(() => {
+    const suffix = `|${avoidTag}`;
+    const view = new Map<string, JumpsAwayResult>();
+    for (const [key, value] of jumps.byKey) {
+      if (key.endsWith(suffix)) view.set(key.slice(0, -suffix.length), value);
+    }
+    return view;
+  }, [jumps.byKey, avoidTag]);
 
   const caches = useMemo<OrderDetailCacheContents>(
     () => ({
@@ -144,7 +157,7 @@ export function useOrderDetail(): OrderDetail {
       refine: refine.byKey,
       hubBids: hubBids.byKey,
       hubBidsFailed: hubBids.failedKeys,
-      jumps: jumps.byKey,
+      jumps: jumpsForList,
     }),
     [
       regionBooks.byKey,
@@ -154,7 +167,7 @@ export function useOrderDetail(): OrderDetail {
       refine.byKey,
       hubBids.byKey,
       hubBids.failedKeys,
-      jumps.byKey,
+      jumpsForList,
     ]
   );
 
@@ -206,8 +219,8 @@ export function useOrderDetail(): OrderDetail {
       // `load`'s own synchronous dedup is what keeps a sweep of several
       // routes from re-asking for one already requested (its doc comment).
       loadRoute: (fromSystemId, toSystemId) => {
-        void loadJumps(jumpsKey(fromSystemId, toSystemId), () =>
-          loaders.jumpsBetween(fromSystemId, toSystemId)
+        void loadJumps(`${jumpsKey(fromSystemId, toSystemId)}|${avoidTag}`, () =>
+          loaders.jumpsBetween(fromSystemId, toSystemId, avoided)
         );
       },
       loadStructure,
@@ -240,6 +253,8 @@ export function useOrderDetail(): OrderDetail {
     loadRefine,
     loadHubBidsFor,
     loadJumps,
+    avoidTag,
+    avoided,
   ]);
 
   return useMemo(() => ({ ...actions, caches }), [actions, caches]);

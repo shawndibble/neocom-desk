@@ -73,3 +73,66 @@ describe('loadJumpsAway', () => {
     expect(result).toEqual({ kind: 'unknown', reason: 'noRoute' });
   });
 });
+
+describe('loadJumpsAway with Avoided Systems', () => {
+  const UEDAMA = 30045328;
+  const SIVALA = 30003068;
+
+  it('sends the list as ESI avoid, leaving out the two ends', async () => {
+    let avoid: string | null = null;
+    server.use(
+      http.get(`${ESI_BASE_URL}/latest/route/30000142/30002187`, ({ request }) => {
+        avoid = new URL(request.url).searchParams.get('avoid');
+        return HttpResponse.json([30000142, 30002053, 30002187]);
+      })
+    );
+
+    await loadJumpsAway(30000142, 30002187, 'shortest', [UEDAMA, 30000142, SIVALA, 30002187]);
+
+    // ESI answers "No route found" for an avoided destination; the app does not.
+    expect(avoid).toBe(`${SIVALA},${UEDAMA}`);
+  });
+
+  /*
+   * ESI's avoid is a hard filter (verified live: 404 "No route found" when the
+   * only way runs through an avoided system). The local graph treats avoidance
+   * as a cost, never a wall — so this falls back to the unfiltered route
+   * rather than calling a reachable station unreachable.
+   */
+  it('falls back to the plain route when avoiding leaves none', async () => {
+    const asked: (string | null)[] = [];
+    server.use(
+      http.get(`${ESI_BASE_URL}/latest/route/30000142/30002187`, ({ request }) => {
+        const avoid = new URL(request.url).searchParams.get('avoid');
+        asked.push(avoid);
+        return avoid
+          ? HttpResponse.json({ error: 'No route found' }, { status: 404 })
+          : HttpResponse.json([30000142, UEDAMA, 30002187]);
+      })
+    );
+
+    const result = await loadJumpsAway(30000142, 30002187, 'shortest', [UEDAMA]);
+
+    expect(result).toEqual({ kind: 'known', jumps: 2 });
+    expect(asked).toEqual([`${UEDAMA}`, null]);
+  });
+
+  it('never reuses a distance cached under a different list', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/latest/route/30000142/30002187`, ({ request }) =>
+        new URL(request.url).searchParams.get('avoid')
+          ? HttpResponse.json([30000142, 30002053, 30002054, 30002055, 30002187])
+          : HttpResponse.json([30000142, UEDAMA, 30002187])
+      )
+    );
+
+    expect(await loadJumpsAway(30000142, 30002187, 'shortest')).toEqual({
+      kind: 'known',
+      jumps: 2,
+    });
+    expect(await loadJumpsAway(30000142, 30002187, 'shortest', [UEDAMA])).toEqual({
+      kind: 'known',
+      jumps: 4,
+    });
+  });
+});

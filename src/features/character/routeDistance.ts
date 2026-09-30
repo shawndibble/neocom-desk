@@ -5,7 +5,7 @@
  * given preference is character-independent, same shape as `stations.ts`'s
  * station-name cache.
  */
-import { getRoute } from '@/esi/endpoints';
+import { avoidCacheSuffix, getRouteAvoiding } from '@/features/route/esiRoute';
 import {
   conditionalFetch,
   loadWithCache,
@@ -18,9 +18,14 @@ import type { RoutePreference } from './routePreference';
 function cacheKey(
   originSystemId: number,
   destinationSystemId: number,
-  preference: RoutePreference
+  preference: RoutePreference,
+  avoid: readonly number[]
 ): string {
-  return `route:${originSystemId}:${destinationSystemId}:${preference}`;
+  return `route:${originSystemId}:${destinationSystemId}:${preference}${avoidCacheSuffix(
+    originSystemId,
+    destinationSystemId,
+    avoid
+  )}`;
 }
 
 /** The app's "Shortest"/"Safest" wording maps to ESI's real `shortest`/`secure` flag values — see `RouteOptions` in `esi/endpoints.ts`. */
@@ -31,15 +36,20 @@ function routeFlagFor(preference: RoutePreference): 'shortest' | 'secure' {
 export async function loadJumpsAway(
   originSystemId: number,
   destinationSystemId: number,
-  preference: RoutePreference
+  preference: RoutePreference,
+  /** The pilot's Avoided Systems — see `features/route/esiRoute.ts` for how ESI is asked. */
+  avoid: readonly number[] = []
 ): Promise<JumpsAwayResult> {
   if (originSystemId === destinationSystemId) return jumpsAwayFromRoute([originSystemId]);
   const { fetchLive, conditional } = conditionalFetch((options) =>
-    getRoute(originSystemId, destinationSystemId, { ...options, flag: routeFlagFor(preference) })
+    getRouteAvoiding(originSystemId, destinationSystemId, avoid, {
+      ...options,
+      flag: routeFlagFor(preference),
+    })
   );
   const result = await loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
-    cacheKey(originSystemId, destinationSystemId, preference),
+    cacheKey(originSystemId, destinationSystemId, preference, avoid),
     fetchLive,
     // The jump graph is map data; a route between two fixed systems under a
     // fixed preference is stable across a session and well beyond it.

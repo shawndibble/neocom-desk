@@ -59,6 +59,7 @@ import { loadSystemSecurity, loadSystemName } from '@/features/character/systemS
 import { loadTypeNames, loadTypeVolumes } from '@/features/character/typeNames';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadJumpsAway } from '@/features/character/routeDistance';
+import { useAvoidedSystemIds } from '@/features/route/avoidedSystems';
 import { useRoutePreference, type RoutePreference } from '@/features/character/routePreference';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useFocusHeading } from '@/lib/useFocusHeading';
@@ -912,6 +913,13 @@ export function Assets() {
   );
 
   const routePreference = useRoutePreference((state) => state.value);
+  const { avoided, hydrated: avoidedHydrated } = useAvoidedSystemIds();
+  // What a jumps-away answer was worked out under: the preference and the
+  // Avoided Systems both change the route, so both are in its key.
+  const jumpsFor = useMemo(
+    () => `${routePreference}|${[...avoided].sort((a, b) => a - b).join(',')}`,
+    [routePreference, avoided]
+  );
   const hydrateRoutePreference = useRoutePreference((state) => state.hydrate);
   const setRoutePreference = useRoutePreference((state) => state.setValue);
   useEffect(() => {
@@ -968,7 +976,7 @@ export function Assets() {
         mergedTypeNames,
         (station) => pinStateFor(station.locationId),
         stationSortField,
-        (station) => jumpsAwayByKey.get(`${station.locationId}:${routePreference}`)
+        (station) => jumpsAwayByKey.get(`${station.locationId}:${jumpsFor}`)
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pinStateFor closes over pins/activeCharacterId, listed explicitly instead
     [
@@ -979,7 +987,7 @@ export function Assets() {
       activeCharacterId,
       stationSortField,
       jumpsAwayByKey,
-      routePreference,
+      jumpsFor,
     ]
   );
 
@@ -1365,20 +1373,20 @@ export function Assets() {
   }, [activeCharacterId, stableScopedStations, stationSystemIds, mergedLocationNames]);
 
   useEffect(() => {
-    if (activeCharacterId === null || !characterLocationResolved) return;
+    if (activeCharacterId === null || !characterLocationResolved || !avoidedHydrated) return;
     const pending = stableScopedStations.filter((station) => {
-      const key = `${station.locationId}:${routePreference}`;
+      const key = `${station.locationId}:${jumpsFor}`;
       if (jumpsAwayByKey.has(key) || jumpsAwayRequested.current.has(key)) return false;
       return characterSystemId === null || stationSystemIds.has(station.locationId);
     });
     if (pending.length === 0) return;
     for (const station of pending) {
-      jumpsAwayRequested.current.add(`${station.locationId}:${routePreference}`);
+      jumpsAwayRequested.current.add(`${station.locationId}:${jumpsFor}`);
     }
 
     const requestedForCharacterId = activeCharacterId;
     void mapWithConcurrencyLimit(pending, ESI_FANOUT_CONCURRENCY, async (station) => {
-      const key = `${station.locationId}:${routePreference}`;
+      const key = `${station.locationId}:${jumpsFor}`;
       let result: JumpsAwayResult;
       if (characterSystemId === null) {
         result = { kind: 'unknown', reason: 'noLocation' };
@@ -1387,7 +1395,7 @@ export function Assets() {
         result =
           systemId === null
             ? { kind: 'unknown', reason: 'noRoute' }
-            : await loadJumpsAway(characterSystemId, systemId, routePreference);
+            : await loadJumpsAway(characterSystemId, systemId, routePreference, avoided);
       }
       if (activeCharacterIdRef.current === requestedForCharacterId) {
         setJumpsAwayByKey((prev) => new Map(prev).set(key, result));
@@ -1401,6 +1409,9 @@ export function Assets() {
     jumpsAwayByKey,
     stationSystemIds,
     routePreference,
+    avoided,
+    avoidedHydrated,
+    jumpsFor,
   ]);
 
   useEffect(() => {
@@ -1790,7 +1801,7 @@ export function Assets() {
                           />
                           <JumpsAwayText
                             result={jumpsAwayByKey.get(
-                              `${resolved.station.locationId}:${routePreference}`
+                              `${resolved.station.locationId}:${jumpsFor}`
                             )}
                             t={t}
                           />
@@ -1952,7 +1963,7 @@ export function Assets() {
                                 locationNames={mergedLocationNames}
                                 securityForStation={securityForStation}
                                 jumpsAwayFor={(locationId) =>
-                                  jumpsAwayByKey.get(`${locationId}:${routePreference}`)
+                                  jumpsAwayByKey.get(`${locationId}:${jumpsFor}`)
                                 }
                                 pinStateFor={pinStateFor}
                                 onTogglePin={(locationId) => void handleTogglePin(locationId)}
