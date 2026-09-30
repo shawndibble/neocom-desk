@@ -1,11 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import '@/i18n';
 import type { PopularFit } from '@/engine/fittings/popularFits';
 import type { PopularFitsResult } from './popularFits';
 
 const { usePopularFitsMock } = vi.hoisted(() => ({ usePopularFitsMock: vi.fn() }));
 vi.mock('./popularFits', () => ({ usePopularFits: usePopularFitsMock }));
+vi.mock('@/sde/loadSde', () => ({
+  typeName: (typeId: number) =>
+    Promise.resolve(
+      { 100: 'Heavy Neutron Blaster II', 200: 'Warp Scrambler II', 300: 'Damage Control II' }[
+        typeId
+      ] ?? `Type ${typeId}`
+    ),
+}));
 
 import { PopularFitsPanel } from './PopularFitsPanel';
 
@@ -55,6 +63,43 @@ describe('PopularFitsPanel', () => {
       shipTypeId: 626,
       modules: [{ slot: 'high', typeId: 100, chargeTypeId: 900 }],
     });
+  });
+
+  it('groups icons by rack and names each module', async () => {
+    renderPanel({
+      ok: true,
+      fits: [
+        fit('a', 2, {
+          parts: {
+            hullTypeId: 626,
+            modules: [
+              { slot: 'high', slotIndex: 0, typeId: 100, state: 'active' },
+              { slot: 'high', slotIndex: 1, typeId: 100, state: 'active' },
+              { slot: 'medium', slotIndex: 0, typeId: 200, state: 'active' },
+              { slot: 'low', slotIndex: 0, typeId: 300, state: 'active' },
+            ],
+            drones: [],
+            cargo: [],
+            unresolved: [],
+          },
+        }),
+      ],
+    });
+    const highs = screen.getByRole('group', { name: 'High slots' });
+    expect(
+      await within(highs).findAllByRole('img', { name: 'Heavy Neutron Blaster II' })
+    ).toHaveLength(2);
+    expect(
+      within(screen.getByRole('group', { name: 'Mid slots' })).getByRole('img', {
+        name: 'Warp Scrambler II',
+      })
+    ).toBeTruthy();
+    expect(
+      within(screen.getByRole('group', { name: 'Low slots' })).getByRole('img', {
+        name: 'Damage Control II',
+      })
+    ).toBeTruthy();
+    expect(screen.queryByRole('group', { name: 'Rigs' })).toBeNull();
   });
 
   it('says so, without blocking anything, when zKillboard fails', () => {
