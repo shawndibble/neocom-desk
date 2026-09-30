@@ -1,7 +1,7 @@
 /**
  * Ship Info › Fitting: the hull's slots, hardpoints and fitting resources
  * as CCP ships them (before the pilot's skills), and Simulate — a new,
- * empty Fitting of the hull in the editor.
+ * empty Fitting of the hull in the editor — or one of its Popular fits.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,9 +10,11 @@ import { Button } from '@/components/ui';
 import { encodeFittingShare } from '@/engine/fitting/fittingShare';
 import { newFitting } from '@/engine/fittings/fittingEdit';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
+import type { Fitting } from '@/engine/fittings/types';
 import { formatAttributeValue } from '@/features/market/format';
 import type { ShipTreeShip } from '@/sde/types';
 import { fittingEditLocation } from '../fittingRoutes';
+import { PopularFitsPanel } from '../PopularFitsPanel';
 
 /** T3 cruisers ship no slots of their own: the fitted subsystems add them. */
 function slotsFromSubsystems(ship: ShipTreeShip): boolean {
@@ -70,13 +72,11 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
     ]
   );
 
-  async function simulate() {
+  async function openInEditor(fitting: Fitting) {
     setBusy(true);
     setFailed(false);
     try {
-      const encoded = await encodeFittingShare(
-        fittingToShareInput(newFitting(ship.typeID, ship.name))
-      );
+      const encoded = await encodeFittingShare(fittingToShareInput(fitting));
       if (encoded.ok) navigate(fittingEditLocation(encoded.payload));
       else setFailed(true);
     } catch {
@@ -100,7 +100,11 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
         ))}
       </dl>
       <p className="text-text-dim">{t('ships.info.fitting.unskilledNote')}</p>
-      <Button variant="primary" onClick={() => void simulate()} disabled={busy}>
+      <Button
+        variant="primary"
+        onClick={() => void openInEditor(newFitting(ship.typeID, ship.name))}
+        disabled={busy}
+      >
         {t('ships.info.fitting.simulate')}
       </Button>
       {failed && (
@@ -108,6 +112,11 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
           {t('ships.info.fitting.simulateFailed')}
         </p>
       )}
+      <PopularFitsPanel
+        shipTypeId={ship.typeID}
+        hullName={ship.name}
+        onOpen={(loaded) => void openInEditor(loaded.fitting)}
+      />
     </div>
   );
 }

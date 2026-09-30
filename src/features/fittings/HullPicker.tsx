@@ -2,12 +2,16 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, SearchInput, TypeIcon } from '@/components/ui';
 import { buildHullCatalogue, searchHulls, type HullEntry } from '@/engine/fittings/hullCatalogue';
+import type { LoadedFitting } from '@/engine/fittings/load';
+import { PopularFitsPanel } from './PopularFitsPanel';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
 interface HullPickerProps {
   catalogue: FittingCatalogue | null;
   /** Opens a new Fitting on the chosen hull. */
   onStart: (hull: HullEntry) => void;
+  /** Opens one of the chosen hull's Popular fits; omitted, the panel isn't shown. */
+  onOpenPopular?: (loaded: LoadedFitting) => void;
 }
 
 /**
@@ -17,7 +21,7 @@ interface HullPickerProps {
  * the bare hull. Needs only the static market data, so it works before the
  * ship data (dogma engine) has downloaded.
  */
-export function HullPicker({ catalogue, onStart }: HullPickerProps) {
+export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<HullEntry | null>(null);
@@ -103,6 +107,13 @@ export function HullPicker({ catalogue, onStart }: HullPickerProps) {
           {t('fittings.start.startFitting')}
         </Button>
       </div>
+      {selected && onOpenPopular && (
+        <PopularFitsPanel
+          shipTypeId={selected.typeId}
+          hullName={selected.name}
+          onOpen={onOpenPopular}
+        />
+      )}
     </div>
   );
 }

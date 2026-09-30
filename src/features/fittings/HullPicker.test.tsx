@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import '@/i18n';
 import { HullPicker } from './HullPicker';
+
+const { usePopularFitsMock } = vi.hoisted(() => ({ usePopularFitsMock: vi.fn() }));
+vi.mock('./popularFits', () => ({ usePopularFits: usePopularFitsMock }));
 import type { FittingCatalogue } from './useFittingCatalogue';
 
 const groups = [
@@ -62,5 +65,43 @@ describe('HullPicker', () => {
     search('rift');
     fireEvent.doubleClick(screen.getByRole('button', { name: 'Rifter' }));
     expect(onStart).toHaveBeenCalledWith(expect.objectContaining({ typeId: 587 }));
+  });
+
+  it("shows the picked hull's Popular fits, and opens one", () => {
+    const HULL_ID = 587;
+    usePopularFitsMock.mockReturnValue({
+      ok: true,
+      fits: [
+        {
+          key: '100,200,300',
+          count: 4,
+          lastSeen: null,
+          value: null,
+          killmailIds: [9],
+          parts: {
+            hullTypeId: HULL_ID,
+            modules: [
+              { slot: 'high' as const, slotIndex: 0, typeId: 100, state: 'active' as const },
+            ],
+            drones: [],
+            cargo: [],
+            unresolved: [],
+          },
+        },
+      ],
+    });
+    const onOpenPopular = vi.fn();
+    render(<HullPicker catalogue={catalogue} onStart={() => {}} onOpenPopular={onOpenPopular} />);
+    expect(screen.queryByRole('region', { name: 'Popular fits' })).toBeNull();
+    search('rift');
+    fireEvent.click(screen.getByRole('button', { name: 'Rifter' }));
+    expect(usePopularFitsMock).toHaveBeenLastCalledWith(587);
+    expect(screen.getByText('4 losses')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    expect(onOpenPopular).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fitting: expect.objectContaining({ name: 'Rifter popular fit 1', shipTypeId: 587 }),
+      })
+    );
   });
 });

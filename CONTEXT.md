@@ -449,7 +449,7 @@ here — they go one per file in `docs/context/decisions/`.
   Structure timers, Moon chunks, Industry jobs — showing that kind's most urgent
   few and counting the rest. Fed by the one engine ranking, never a second one,
   and gated on the Corp Capability that opens its own read.
-- **Load**: Bringing a **Fitting** into the Ships section's Fittings tab from any outside source — EFT text, a DNA or in-game chat link, an exported fittings file, an **In-game Fitting**, a share link, another site's fit link, or a killmail. Loading stores nothing; only an explicit save does. Distinct from **Fit Import**, which turns fit text into Build Plans.
+- **Load**: Bringing a **Fitting** into the Ships section's Fittings tab from any outside source — EFT text, a DNA or in-game chat link, an exported fittings file, an **In-game Fitting**, a share link, another site's fit link, a killmail, or a **Popular fit**. Loading stores nothing; only an explicit save does. Distinct from **Fit Import**, which turns fit text into Build Plans.
 - **Local Draw**: What a PI colony's own factories take an hour off the
   products that colony makes, by input typeID. Counted for every factory line
   whatever its status — a line one of whose inputs is imported still eats the
@@ -664,6 +664,10 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   prereq is an ordinary entry from then on — same drag handle, priority
   control and remove button — and its own upstream prerequisites stay derived,
   moving with it.
+- **Popular fit**: One distinct fit of a hull among its most recent zKillboard
+  losses (about 40), grouped by the set of fitted modules — charges, drones and
+  cargo don't split a group. Shows how many losses flew it, when it was last
+  seen and roughly what it cost, and **Load**s the group's most recent loss.
 - **Price History**: The Market Browser item tab charting one item's daily
   history in a Region: **Daily Range**, average price and its moving average
   above, **Traded Volume** and **Order Count** below, on one shared date axis.
