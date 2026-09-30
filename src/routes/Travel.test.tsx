@@ -9,6 +9,7 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 import { App } from '@/app/App';
+import { clearEveScoutCache, EVE_SCOUT_SIGNATURES_URL } from '@/lib/eveScout';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -55,7 +56,60 @@ const JUMPS = {
   [THERA]: [],
 };
 
+const HOUR = 3_600_000;
+const TURNUR = 30002086;
+
+function signature(overrides: Record<string, unknown>) {
+  return {
+    id: '1',
+    signature_type: 'wormhole',
+    out_system_id: THERA,
+    out_system_name: 'Thera',
+    out_signature: 'AAA-111',
+    in_signature: 'BBB-222',
+    in_system_class: 'hs',
+    in_region_name: 'The Forge',
+    wh_type: 'Q063',
+    max_ship_size: 'medium',
+    expires_at: new Date(Date.now() + 10 * HOUR).toISOString(),
+    ...overrides,
+  };
+}
+
+const SIGNATURES = [
+  signature({
+    id: 'uedama',
+    in_system_id: UEDAMA,
+    in_system_name: 'Uedama',
+    in_signature: 'UED-001',
+  }),
+  signature({
+    id: 'perimeter',
+    out_system_id: TURNUR,
+    out_system_name: 'Turnur',
+    in_system_id: PERIMETER,
+    in_system_name: 'Perimeter',
+    in_signature: 'PER-002',
+    max_ship_size: 'capital',
+    expires_at: new Date(Date.now() + HOUR).toISOString(),
+  }),
+  signature({
+    id: 'jspace',
+    in_system_id: 31000629,
+    in_system_name: 'J120704',
+    in_system_class: 'c2',
+    in_region_name: 'C-R00010',
+  }),
+  signature({
+    id: 'expired',
+    in_system_id: JITA,
+    in_system_name: 'Jita',
+    expires_at: new Date(Date.now() - HOUR).toISOString(),
+  }),
+];
+
 const server = setupServer(
+  http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json(SIGNATURES)),
   http.get(`${ESI}/universe/system_kills`, () =>
     HttpResponse.json([{ system_id: UEDAMA, ship_kills: 12, pod_kills: 4, npc_kills: 2 }])
   ),
@@ -79,6 +133,7 @@ afterEach(() => server.resetHandlers());
 beforeEach(async () => {
   clearJumpGraphIndex();
   clearSolarSystemIndex();
+  clearEveScoutCache();
   loadSolarSystemJumps.mockReset();
   loadSolarSystemJumps.mockResolvedValue(JUMPS);
   await db.characters.clear();
@@ -163,6 +218,49 @@ describe('Travel › Route Safety', () => {
 
     expect(await screen.findByText('Pick where the route starts and ends')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/travel/route');
+  });
+});
+
+describe('Travel › Thera / Turnur', () => {
+  function visitThera(search: string) {
+    window.history.pushState({}, '', '/travel/thera' + search);
+    render(<App />);
+  }
+
+  async function exitNames() {
+    const table = await screen.findByRole('table', { name: 'Thera and Turnur connections' });
+    return within(table)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => within(row).getAllByRole('cell')[2].textContent);
+  }
+
+  it('lists live connections sorted by jumps from the current system, hiding expired ones', async () => {
+    visitThera('');
+
+    expect(await screen.findByText('Jita (current system)')).toBeInTheDocument();
+    await screen.findByText('No gate route');
+    expect(await exitNames()).toEqual(['Perimeter', 'Uedama', 'J120704']);
+    expect(screen.queryByText('Jita', { selector: 'td *' })).not.toBeInTheDocument();
+  });
+
+  it('shows a connection with two hours or less left in the warning color', async () => {
+    visitThera('');
+
+    const table = await screen.findByRole('table', { name: 'Thera and Turnur connections' });
+    const perimeter = within(table).getByText('Perimeter').closest('tr')!;
+    const life = within(perimeter).getByText(/m$/);
+    expect(life).toHaveClass('text-warning');
+  });
+
+  it('filters by hub, exit security and ship size from the URL', async () => {
+    visitThera('?hub=thera&exit=wormhole');
+    expect(await exitNames()).toEqual(['J120704']);
+  });
+
+  it('keeps only connections that pass at least the chosen ship size', async () => {
+    visitThera('?size=capital');
+    expect(await exitNames()).toEqual(['Perimeter']);
   });
 });
 

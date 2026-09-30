@@ -20,27 +20,18 @@ import {
   FilterField,
   PageHeader,
   Panel,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Spinner,
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
-import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import type { RouteSafetyRow, RouteSafetySummary } from '@/engine/route/routeSafety';
 import { useCurrentSystem } from '@/features/route/currentSystem';
-import {
-  DEFAULT_ROUTE_PREFERENCE,
-  ROUTE_PREFERENCE_LABEL_KEYS,
-  ROUTE_PREFERENCES,
-} from '@/features/route/routePreferences';
+import { DEFAULT_ROUTE_PREFERENCE, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { useSystemName } from '@/features/route/useSolarSystems';
 import { enumParam, optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
+import { PreferenceField } from './PreferenceField';
 import { useRouteSafety } from './useRouteSafety';
 
 const ROUTE_PARAMS = {
@@ -153,33 +144,6 @@ function RouteSummary({ summary }: { summary: RouteSafetySummary }) {
         <li key={line}>{line}</li>
       ))}
     </ul>
-  );
-}
-
-function PreferenceField({
-  value,
-  onChange,
-}: {
-  value: RoutePreferenceKind;
-  onChange: (next: RoutePreferenceKind) => void;
-}) {
-  const { t } = useTranslation();
-  const label = t('travel.preferenceLabel');
-  return (
-    <FilterField label={label} stretch={false}>
-      <Select value={value} onValueChange={(next) => onChange(next as RoutePreferenceKind)}>
-        <SelectTrigger aria-label={label} className="w-44">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {ROUTE_PREFERENCES.map((preference) => (
-            <SelectItem key={preference} value={preference}>
-              {t(ROUTE_PREFERENCE_LABEL_KEYS[preference])}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </FilterField>
   );
 }
 

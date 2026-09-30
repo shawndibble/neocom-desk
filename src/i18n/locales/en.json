@@ -6562,6 +6562,52 @@
     },
     "activityLoading": "Loading the last hour of jumps and kills…",
     "activityUnavailable": "Some of ESI's last-hour figures couldn't be read, so they show as —, not as zero.",
-    "dataAgeNote": "Jumps and kills cover the last hour; ESI refreshes them about hourly."
+    "dataAgeNote": "Jumps and kills cover the last hour; ESI refreshes them about hourly.",
+    "thera": {
+      "tab": "Thera / Turnur",
+      "originLabel": "Jumps from",
+      "changeOrigin": "Change the system jumps are counted from — {{current}}",
+      "hubLabel": "Hub",
+      "exitLabel": "Exit security",
+      "sizeLabel": "Ship size",
+      "anyExit": "Any exit",
+      "hub": {
+        "all": "Both hubs",
+        "thera": "Thera",
+        "turnur": "Turnur"
+      },
+      "size": {
+        "any": "Any size",
+        "small": "Small",
+        "medium": "Medium",
+        "large": "Large",
+        "xlarge": "Very large",
+        "capital": "Capital"
+      },
+      "col": {
+        "hub": "Hub",
+        "signatures": "Signatures",
+        "exit": "Exit system",
+        "security": "Security",
+        "region": "Region",
+        "type": "Wormhole",
+        "size": "Max ship size",
+        "life": "Remaining life",
+        "jumps": "Jumps"
+      },
+      "signaturesHint": "The signature in the hub, then the signature in the exit system.",
+      "noGateRoute": "No gate route",
+      "noOrigin": "Pick a system to count jumps from, or set your current system.",
+      "jumpsLoading": "Counting jumps from the stargate map…",
+      "jumpsUnknown": "The local stargate map couldn't be read, so jumps show as —.",
+      "tableLabel": "Thera and Turnur connections",
+      "emptyTitle": "EVE-Scout lists no open connections right now",
+      "emptyHint": "Scouts add connections as they find them. Check back later.",
+      "noMatchTitle": "No connections match these filters",
+      "noMatchHint": "Widen the hub, exit security or ship size filter.",
+      "unavailableTitle": "Connections can't be loaded right now",
+      "unavailableHint": "EVE-Scout couldn't be reached. Check your connection and try again.",
+      "dataAgeNote": "Connections come from EVE-Scout's volunteer scouts and are refreshed every 5 minutes."
+    }
   }
 }
