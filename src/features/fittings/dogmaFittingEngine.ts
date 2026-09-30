@@ -138,6 +138,27 @@ async function fetchWithProgress(
   return merged.buffer;
 }
 
+/**
+ * Background warm: puts the WASM + SDE snapshot into this module's own Cache
+ * Storage bucket without initialising the engine (no WASM compile, nothing
+ * held in memory), so the first Fittings open offline finds them. Same
+ * bucket and URLs `loadDogmaEngine` reads. Resolves quietly on any failure.
+ */
+export async function warmDogmaEngineAssets(): Promise<void> {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    for (const url of [WASM_URL, SDE_URL]) {
+      const hit = await cache.match(url);
+      if (hit && isEngineAsset(hit)) continue;
+      const response = await fetch(url);
+      if (!isEngineAsset(response)) return;
+      await cache.put(url, response);
+    }
+  } catch {
+    // Offline, quota, Cache Storage unavailable — the real load retries on use.
+  }
+}
+
 let enginePromise: Promise<void> | null = null;
 let engineReady = false;
 

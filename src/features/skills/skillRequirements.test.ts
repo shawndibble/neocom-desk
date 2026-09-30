@@ -84,6 +84,34 @@ describe('buildSkillRequirements', () => {
     expect(result?.prereqs[0].planned).toBe(false);
   });
 
+  it('marks a prereq planned when the plan trains it only on the way to another entry', () => {
+    // Frigate I needs Spaceship Command III, which the plan schedules ahead of it.
+    const result = buildSkillRequirements(catalog, new Map(), 2, [
+      { skillTypeID: 2, targetLevel: 1 },
+    ]);
+    expect(result?.prereqs[0].planned).toBe(true);
+  });
+
+  it('falls back to the plan entries alone when the plan cannot be scheduled', () => {
+    const circular = catalogOf(
+      [
+        engineSkill({ typeID: 1, prereqs: [{ typeID: 3, level: 1 }] }),
+        engineSkill({ typeID: 2, prereqs: [{ typeID: 1, level: 3 }] }),
+        engineSkill({ typeID: 3, prereqs: [{ typeID: 1, level: 1 }] }),
+      ],
+      [
+        sdeSkill({ typeID: 1, name: 'Spaceship Command' }),
+        sdeSkill({ typeID: 2, name: 'Frigate' }),
+        sdeSkill({ typeID: 3, name: 'Loop' }),
+      ]
+    );
+    const result = buildSkillRequirements(circular, new Map(), 2, [
+      { skillTypeID: 1, targetLevel: 3 },
+      { skillTypeID: 3, targetLevel: 1 },
+    ]);
+    expect(result?.prereqs[0].planned).toBe(true);
+  });
+
   it('treats a skill with no trained-skills entry as untrained (level 0)', () => {
     const result = buildSkillRequirements(catalog, new Map(), 2);
     expect(result?.prereqs[0].trained).toBe(false);

@@ -4,11 +4,15 @@ import {
   CACHE_PRUNE_DELAY_MS,
   scheduleBootPrefetch,
   scheduleCachePrune,
+  scheduleLazySdeWarm,
+  LAZY_SDE_WARM_DELAY_MS,
 } from './bootPrefetch';
 import { prefetchCharacterData, type PrefetchSignal } from './prefetch';
+import { warmLazySde } from '@/sde/warmLazySde';
 import { runDailyEsiCachePrune } from '@/esi/cachePrune';
 
 vi.mock('./prefetch', () => ({ prefetchCharacterData: vi.fn(async () => {}) }));
+vi.mock('@/sde/warmLazySde', () => ({ warmLazySde: vi.fn(async () => {}) }));
 vi.mock('@/esi/cachePrune', () => ({ runDailyEsiCachePrune: vi.fn(async () => null) }));
 
 /** Let the dynamic `import('./prefetch')` settle. */
@@ -115,5 +119,25 @@ describe('scheduleCachePrune', () => {
     await vi.advanceTimersByTimeAsync(BOOT_PREFETCH_IDLE_TIMEOUT_MS * 10);
     await flush();
     expect(runDailyEsiCachePrune).not.toHaveBeenCalled();
+  });
+});
+
+describe('scheduleLazySdeWarm', () => {
+  it('waits out the delay, then an idle slot, before warming', async () => {
+    scheduleLazySdeWarm();
+    await vi.advanceTimersByTimeAsync(LAZY_SDE_WARM_DELAY_MS - 1);
+    await flush();
+    expect(warmLazySde).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1 + BOOT_PREFETCH_IDLE_TIMEOUT_MS);
+    await flush();
+    expect(warmLazySde).toHaveBeenCalledOnce();
+  });
+
+  it('never starts once cancelled', async () => {
+    const cancel = scheduleLazySdeWarm();
+    cancel();
+    await vi.advanceTimersByTimeAsync(LAZY_SDE_WARM_DELAY_MS * 2);
+    await flush();
+    expect(warmLazySde).not.toHaveBeenCalled();
   });
 });

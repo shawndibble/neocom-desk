@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
+import type { PlanEntry } from '@/engine/types';
 import { formatCountdown } from '@/lib/duration';
 import type { FitCheckRow } from '@/features/skills/ships/fitCheckRows';
 import { SkillRow } from '@/features/skills/SkillRow';
@@ -11,6 +12,8 @@ export interface WhatToTrainPrerequisitesProps {
   rows: readonly FitCheckRow[];
   /** The highest level the target Skill Plan trains each skill to, so a row it already trains says so. */
   plannedLevels: ReadonlyMap<number, number>;
+  /** The target Skill Plan's entries, for the Skill Detail popover a skill name opens. */
+  planEntries?: readonly PlanEntry[];
   totalSeconds: number;
 }
 
@@ -23,6 +26,7 @@ export function WhatToTrainPrerequisites({
   skill,
   rows,
   plannedLevels,
+  planEntries,
   totalSeconds,
 }: WhatToTrainPrerequisitesProps) {
   const { t } = useTranslation();
@@ -48,6 +52,7 @@ export function WhatToTrainPrerequisites({
                 <SkillRow
                   name={row.name}
                   skillTypeID={row.skillTypeID}
+                  planEntries={planEntries}
                   status={row.status}
                   currentLevel={row.currentLevel}
                   timeLabel={formatCountdown(row.seconds)}

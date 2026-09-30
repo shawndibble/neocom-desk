@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PlanEntry } from '@/engine/types';
-import { openSkillDetailModal } from '@/stores/skillDetailModal';
+import { SkillNameButton } from './SkillNameButton';
 import type { PrereqRow, UnlockRow } from './skillRequirements';
 
 interface SkillRequirementsListProps {
@@ -9,7 +9,7 @@ interface SkillRequirementsListProps {
   unlocks: readonly UnlockRow[];
   className?: string;
   /**
-   * Carried into a nested `openSkillDetailModal` call so drilling into a
+   * Carried into a nested `SkillNameButton` so drilling into a
    * prereq/unlock's own detail keeps reading the same open plan's entries —
    * otherwise a skill two levels deep would lose "Planned" and fall back to
    * "Level needed" the instant its own detail opened.
@@ -40,13 +40,13 @@ function RequirementRow({
 }: RequirementRowProps) {
   return (
     <li className="flex items-center justify-between gap-2 py-1 text-xs">
-      <button
-        type="button"
-        onClick={() => openSkillDetailModal(typeID, { planEntries })}
-        className={`truncate text-left hover:underline ${muted ? 'text-text-dim' : 'text-text'}`}
+      <SkillNameButton
+        skillTypeID={typeID}
+        planEntries={planEntries}
+        className={`truncate ${muted ? 'text-text-dim' : 'text-text'}`}
       >
         {name}
-      </button>
+      </SkillNameButton>
       {trailing}
     </li>
   );

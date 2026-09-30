@@ -1,6 +1,6 @@
 # Neocom Desk
 
-Installable, offline-capable PWA companion for EVE Online: multi-character
+Installable PWA companion for EVE Online: multi-character
 overview, skill planning with remap optimization, industry build planning,
 a market browser, planetary industry, corp tools, and notifications.
 
@@ -43,7 +43,7 @@ Live: https://neocomdesk.com
   expiry warnings, a chain planner (sourcing floor, planet/pin layout,
   customs rate, margin and CPU/powergrid footprint), and an advisor.
 - **Character data views** — wallet and loyalty store, assets, mail,
-  calendar, contracts, and contacts, cached locally and viewable offline.
+  calendar, contracts, and contacts, cached locally and viewable offline once loaded.
   Read-only except replying to/forwarding mail, marking mail read, and
   calendar RSVPs.
 - **Corp tools** — role-gated ops board (structures, moon extractions),
@@ -52,8 +52,10 @@ Live: https://neocomdesk.com
 - **Notifications** — in-app feed plus scheduled/foreground-polled alerts
   for skill training, industry jobs, planetary extraction, mail, market
   orders, contracts, wallet changes, and calendar events.
-- **PWA** — installable to home screen/desktop, offline-capable, with an
-  update prompt and a one-time install call-to-action.
+- **PWA** — installable to home screen/desktop, with an update prompt and a
+  one-time install call-to-action. Character data and skill plans work
+  offline; market, killboard, and first-time large data
+  files need a connection.
 
 ## Architecture
 

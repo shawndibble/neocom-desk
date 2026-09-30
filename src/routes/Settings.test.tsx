@@ -101,6 +101,7 @@ vi.mock('@/features/notifications/foregroundPoller', async (importOriginal) => {
 vi.mock('@/app/bootPrefetch', () => ({
   scheduleBootPrefetch: () => () => {},
   scheduleCachePrune: () => () => {},
+  scheduleLazySdeWarm: () => () => {},
 }));
 
 const CHAR_ID = 91;
