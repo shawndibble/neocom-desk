@@ -23,6 +23,8 @@ import {
   fillRack,
   firstFreeSlotIndex,
   launchDrones,
+  launchLimitsFrom,
+  launchNewDrone,
   moveModule,
   recallDrones,
   removeAllOfType,
@@ -127,18 +129,7 @@ export function useEditorItemActions({
         : { capacity: droneCapacity, volumeOf: (typeId) => catalogueVolume(catalogue, typeId) },
     [droneCapacity, catalogue]
   );
-  const launchLimits = useMemo<DroneLaunchLimits | null>(
-    () =>
-      stats === null
-        ? null
-        : {
-            bandwidthTotal: stats.droneBandwidthTotal,
-            maxActive: stats.maxActiveDrones,
-            // A drone the engine gave no bandwidth for stays in the bay rather than launching unlimited.
-            bandwidthOf: (typeId) => stats.droneBandwidthByType[typeId] ?? Number.POSITIVE_INFINITY,
-          },
-    [stats]
-  );
+  const launchLimits = useMemo<DroneLaunchLimits | null>(() => launchLimitsFrom(stats), [stats]);
 
   /**
    * The charges a not-yet-fitted `typeId` could default to at `rack` — its
@@ -217,9 +208,9 @@ export function useEditorItemActions({
       if (payload.kind === 'drone' || payload.rack === 'drone') {
         const { typeId } = payload;
         edit((f) => {
-          // From the Add panel, one more goes in the bay first.
-          const stocked = payload.kind === 'type' ? addDronesWithinBay(f, typeId, 1, droneBay) : f;
-          return launchLimits === null ? stocked : launchDrones(stocked, launchLimits, typeId);
+          // From the Add panel, one more goes straight into space — a full bay doesn't stop it.
+          if (payload.kind === 'type') return launchNewDrone(f, typeId, droneBay, launchLimits);
+          return launchLimits === null ? f : launchDrones(f, launchLimits, typeId);
         });
         return;
       }
@@ -297,10 +288,13 @@ export function useEditorItemActions({
             launchDrones: (typeId) => {
               if (launchLimits !== null) edit((f) => launchDrones(f, launchLimits, typeId));
             },
-            recallDrones: (typeId) => edit((f) => recallDrones(f, typeId)),
+            recallDrones: (typeId) => edit((f) => recallDrones(f, typeId, droneBay)),
             recallAllDrones: () =>
               edit((f) =>
-                droneGroups(f).reduce((next, group) => recallDrones(next, group.typeId), f)
+                droneGroups(f).reduce(
+                  (next, group) => recallDrones(next, group.typeId, droneBay),
+                  f
+                )
               ),
             removeDrones: (typeId) =>
               edit((f) => setDroneCounts(f, typeId, { inSpace: 0, inBay: 0 })),

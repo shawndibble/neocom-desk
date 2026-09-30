@@ -42,7 +42,14 @@ const fitting: Fitting = {
 };
 
 function statsWith(cpuUsed: number): FittingStats {
-  return { cpuUsed, cpuTotal: 100, powergridUsed: 10, powergridTotal: 100 } as FittingStats;
+  return {
+    cpuUsed,
+    cpuTotal: 100,
+    powergridUsed: 10,
+    powergridTotal: 100,
+    maxActiveDrones: 5,
+    droneBandwidthByType: {},
+  } as FittingStats;
 }
 
 describe('FittingRackList', () => {
@@ -210,6 +217,37 @@ describe('DroneSection', () => {
     expect(screen.getByLabelText('In space')).toHaveValue(2);
     expect(screen.getByLabelText('In bay')).toHaveValue(3);
     expect(screen.queryByText('Drones')).toBeNull();
+  });
+
+  it('caps the in-space count by bandwidth and the pilot, not by the bay', () => {
+    // 10 Mbit/s each: two out of 25 Mbit/s leave room for none more.
+    const limited = {
+      ...stats,
+      maxActiveDrones: 5,
+      droneBandwidthByType: { 2486: 10 },
+    } as FittingStats;
+    const { rerender } = render(
+      <DroneSection
+        fitting={withDrones}
+        catalogue={null}
+        stats={limited}
+        edit={() => {}}
+        target={null}
+        onSelectTarget={() => {}}
+      />
+    );
+    expect(screen.getByLabelText('In space')).toHaveAttribute('max', '2');
+    rerender(
+      <DroneSection
+        fitting={withDrones}
+        catalogue={null}
+        stats={{ ...limited, droneBandwidthTotal: 50 }}
+        edit={() => {}}
+        target={null}
+        onSelectTarget={() => {}}
+      />
+    );
+    expect(screen.getByLabelText('In space')).toHaveAttribute('max', '5');
   });
 
   it('is nothing on a hull without a drone bay', () => {

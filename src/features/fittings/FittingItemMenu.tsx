@@ -377,11 +377,12 @@ export function EmptySlotMenuItems({ rack, index }: { rack: FittingSlotKind; ind
 /** A drone type's actions. */
 export function DroneMenuItems({
   typeId,
-  inSpace,
+  recallable,
   inBay,
 }: {
   typeId: number;
-  inSpace: number;
+  /** How many in space the bay has room to take back. */
+  recallable: number;
   inBay: number;
 }) {
   const { t } = useTranslation();
@@ -393,7 +394,7 @@ export function DroneMenuItems({
       <MenuItem disabled={inBay === 0} onSelect={() => actions.launchDrones(typeId)}>
         {t('fittings.item.launchAll')}
       </MenuItem>
-      <MenuItem disabled={inSpace === 0} onSelect={() => actions.recallDrones(typeId)}>
+      <MenuItem disabled={recallable === 0} onSelect={() => actions.recallDrones(typeId)}>
         {t('fittings.item.moveToBay')}
       </MenuItem>
       <MenuItem onSelect={() => actions.recallAllDrones()}>{t('fittings.item.recallAll')}</MenuItem>
