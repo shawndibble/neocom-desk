@@ -6345,7 +6345,6 @@
     "employmentEmptyHint": "This character has no public corporation history to show.",
     "characterUnknownTitle": "This character couldn't be found",
     "characterUnknownHint": "EVE has no character with this id.",
-    "corporation": "Corporation",
     "alliance": "Alliance",
     "ticker": "Ticker",
     "memberCount": "Members",
