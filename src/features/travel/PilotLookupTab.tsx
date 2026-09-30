@@ -301,7 +301,6 @@ function PilotResult({ characterId }: { characterId: number }) {
         profile={profile.profile}
         onOpenCorporation={(id) => openPublicInfoModal('corporation', id)}
         onOpenAlliance={(id) => openPublicInfoModal('alliance', id)}
-        onOpenPublicInfo={() => openPublicInfoModal('character', characterId)}
       />
     </Panel>
   );
