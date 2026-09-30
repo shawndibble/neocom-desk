@@ -10,11 +10,11 @@ import { useTranslation } from 'react-i18next';
 import type { TrainedSkill } from '@/engine/types';
 import type { RequiredSkill } from '@/features/skills/dogma';
 import { isEntryCovered, plannedLevelFor } from '@/features/skills/planner/reorder';
+import { SkillNameButton } from '@/features/skills/SkillNameButton';
 import { SkillRow } from '@/features/skills/SkillRow';
 import { skillTrainingStatus } from '@/features/skills/skillStatus';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { targetPlanEntries, type TargetPlan } from '@/features/skills/useTargetPlan';
-import { openSkillDetailModal } from '@/stores/skillDetailModal';
 import { skillNameOrFallback } from './skillNameOrFallback';
 
 export function RequiredSkillsSection({
@@ -80,6 +80,7 @@ export function RequiredSkillsSection({
               key={req.skillTypeID}
               name={name}
               skillTypeID={req.skillTypeID}
+              planEntries={planEntries}
               status={skillTrainingStatus(currentLevel, req.level)}
               currentLevel={currentLevel}
               plannedLevel={plannedLevelFor(planEntries, req.skillTypeID)}
@@ -110,13 +111,9 @@ function NameOnlySkillRow({
   const { t } = useTranslation();
   return (
     <div className="flex items-center gap-3 text-xs">
-      <button
-        type="button"
-        onClick={() => openSkillDetailModal(skillTypeID)}
-        className="flex-1 text-left text-text hover:underline"
-      >
+      <SkillNameButton skillTypeID={skillTypeID} className="flex-1 text-text">
         {name}
-      </button>
+      </SkillNameButton>
       <span className="text-text-dim">{t('plans.level', { level })}</span>
     </div>
   );

@@ -6,7 +6,8 @@
  * Character's real skills: under All 0 / All V or single-skill overrides a
  * "+1" would build on levels the pilot doesn't have.
  *
- * Each skill name opens the shared skill detail modal.
+ * Each skill name opens the shared skill detail modal, read against the
+ * target Skill Plan.
  *
  * Skills are ranked at their next level, but each row has a level picker:
  * the changes and time follow the level picked, worked out on demand. Levels
@@ -50,9 +51,9 @@ import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { buildFitCheckRows } from '@/features/skills/ships/fitCheckRows';
 import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
+import { SkillNameButton } from '@/features/skills/SkillNameButton';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { useTargetPlan } from '@/features/skills/useTargetPlan';
-import { openSkillDetailModal } from '@/stores/skillDetailModal';
 import { changeLabel } from './fittingVariationsCsv';
 import { WhatToTrainPrerequisites } from './FittingWhatToTrainPrerequisites';
 import { useSkillOverrides } from './statsConditions';
@@ -334,13 +335,13 @@ function WhatToTrainItem({
     <li className="flex flex-col border-t border-line-bright pt-2.5 first:border-t-0 first:pt-0">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-2">
         <span className="text-xs tabular-nums text-text-dim">{rank}</span>
-        <button
-          type="button"
-          onClick={() => openSkillDetailModal(row.skillTypeId)}
-          className="min-w-0 flex-1 text-left font-medium hover:underline"
+        <SkillNameButton
+          skillTypeID={row.skillTypeId}
+          planEntries={plan?.entries}
+          className="min-w-0 flex-1 font-medium"
         >
           {row.name}
-        </button>
+        </SkillNameButton>
         <span className="text-xs text-text-dim">
           {row.fromLevel > 0
             ? t('fittings.whatToTrain.trained', { level: romanLevel(row.fromLevel) })
@@ -386,6 +387,7 @@ function WhatToTrainItem({
               skill={skill}
               rows={prerequisiteRows}
               plannedLevels={plannedLevels}
+              planEntries={plan?.entries}
               totalSeconds={time.seconds}
             />
           )}

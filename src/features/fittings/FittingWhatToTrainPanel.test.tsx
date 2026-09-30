@@ -334,4 +334,23 @@ describe('FittingWhatToTrainPanel — skill detail', () => {
 
     expect(useSkillDetailModalStore.getState().request).toEqual({ typeID: 3315 });
   });
+
+  it('carries the target Skill Plan into the modal, so its prerequisites read Planned', async () => {
+    useSkillDetailModalStore.setState({ request: null });
+    const plan = {
+      ...newPlan(CHARACTER_ID, 'Gunnery plan'),
+      entries: [{ skillTypeID: 3300, targetLevel: 3 }],
+    };
+    await db.skillPlans.put(plan);
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByRole('link', { name: 'Gunnery plan' });
+
+    await user.click(await screen.findByRole('button', { name: 'Surgical Strike' }));
+
+    expect(useSkillDetailModalStore.getState().request).toEqual({
+      typeID: 3315,
+      planEntries: plan.entries,
+    });
+  });
 });
