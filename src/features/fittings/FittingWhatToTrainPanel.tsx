@@ -23,7 +23,6 @@ import {
   SelectValue,
   Toast,
 } from '@/components/ui';
-import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import {
   GAIN_METRICS,
   rankSkillGains,
@@ -47,8 +46,8 @@ import { useSkillOverrides } from './statsConditions';
 import type { SkillGainEvaluator } from './useFittingEvaluation';
 import { useSkillGains } from './useSkillGains';
 
-const SORTS: readonly GainSort[] = ['overall', ...GAIN_METRICS];
 const TOAST_MS = 8000;
+const EYEBROW = 'text-[0.6875rem] uppercase tracking-wider text-text-dim';
 
 interface WhatToTrainRow extends SkillGain {
   name: string;
@@ -140,7 +139,19 @@ function WhatToTrainRanking({
           : null,
     }));
   }, [gains, catalog, trainedSkills, trainedSkillsKnown, attributes, implants, cloneState]);
-  const ranked = useMemo(() => (rows === null ? null : rankSkillGains(rows, sort)), [rows, sort]);
+  // Only the stats some suggestion moves: a mining sort on a warship would rank nothing.
+  const sorts = useMemo(
+    (): GainSort[] => [
+      'overall',
+      ...GAIN_METRICS.filter((metric) => rows?.some((row) => row.metrics[metric] !== 0)),
+    ],
+    [rows]
+  );
+  const activeSort = sorts.includes(sort) ? sort : 'overall';
+  const ranked = useMemo(
+    () => (rows === null ? null : rankSkillGains(rows, activeSort)),
+    [rows, activeSort]
+  );
 
   const targetPlan = target.plans?.find((plan) => plan.id === target.targetPlanId);
   // Highest level the target plan trains each skill to — its derived
@@ -180,75 +191,27 @@ function WhatToTrainRanking({
     setAdded({ planId: result.planId, planName: result.planName, entries: result.added });
   }
 
-  const columns: DataTableColumn<WhatToTrainRow>[] = [
-    {
-      id: 'skill',
-      header: t('fittings.whatToTrain.skill'),
-      primary: true,
-      render: (row) => (
-        <span className="font-medium">
-          {row.name} {romanLevel(row.toLevel)}
+  function planAction(row: WhatToTrainRow) {
+    // Nothing until the plans load, or an already-planned level would flash an Add.
+    if (target.plans === undefined) return null;
+    if (targetPlan && (plannedLevels.get(row.skillTypeId) ?? 0) >= row.toLevel) {
+      return (
+        <span className="text-xs text-text-dim">
+          {t('fittings.whatToTrain.inPlan', { plan: targetPlan.name })}
         </span>
-      ),
-    },
-    {
-      id: 'changes',
-      header: t('fittings.whatToTrain.changes'),
-      className: 'text-xs',
-      render: (row) => (
-        <div className="flex flex-wrap gap-x-2 gap-y-0.5">
-          {row.delta.changes.map((change) => (
-            <span key={change.key}>{changeLabel(change, t)}</span>
-          ))}
-        </div>
-      ),
-    },
-    {
-      id: 'time',
-      header: t('fittings.whatToTrain.time'),
-      align: 'right',
-      className: 'tabular-nums',
-      render: (row) =>
-        row.time === null ? (
-          <span className="text-text-dim">{t('common.loading')}</span>
-        ) : (
-          <span>
-            {formatCountdown(row.time.seconds)}
-            {row.time.includesPrerequisites && (
-              <span className="block text-[0.6875rem] text-text-dim">
-                {t('fittings.whatToTrain.withPrerequisites')}
-              </span>
-            )}
-          </span>
-        ),
-    },
-    {
-      id: 'plan',
-      header: t('fittings.whatToTrain.plan'),
-      align: 'right',
-      render: (row) => {
-        // Nothing until the plans load, or an already-planned level would flash an Add.
-        if (target.plans === undefined) return null;
-        if (targetPlan && (plannedLevels.get(row.skillTypeId) ?? 0) >= row.toLevel) {
-          return (
-            <span className="text-xs text-text-dim">
-              {t('fittings.whatToTrain.inPlan', { plan: targetPlan.name })}
-            </span>
-          );
-        }
-        const skill = `${row.name} ${romanLevel(row.toLevel)}`;
-        return (
-          <Button
-            size="sm"
-            aria-label={t('fittings.whatToTrain.addToPlanLabel', { skill })}
-            onClick={() => void add(row)}
-          >
-            {t('fittings.whatToTrain.addToPlan')}
-          </Button>
-        );
-      },
-    },
-  ];
+      );
+    }
+    const skill = `${row.name} ${romanLevel(row.toLevel)}`;
+    return (
+      <Button
+        size="sm"
+        aria-label={t('fittings.whatToTrain.addToPlanLabel', { skill })}
+        onClick={() => void add(row)}
+      >
+        {t('fittings.whatToTrain.addToPlan')}
+      </Button>
+    );
+  }
 
   const rankByLabel = t('fittings.whatToTrain.rankBy');
   return (
@@ -256,9 +219,9 @@ function WhatToTrainRanking({
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
         <span className="text-text-dim">{rankByLabel}</span>
         <Select
-          value={sort}
+          value={activeSort}
           onValueChange={(value) => {
-            const picked = SORTS.find((option) => option === value);
+            const picked = sorts.find((option) => option === value);
             if (picked) setSort(picked);
           }}
         >
@@ -266,7 +229,7 @@ function WhatToTrainRanking({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {SORTS.map((option) => (
+            {sorts.map((option) => (
               <SelectItem key={option} value={option}>
                 {t(`fittings.whatToTrain.sort.${option}`)}
               </SelectItem>
@@ -277,13 +240,53 @@ function WhatToTrainRanking({
           <TargetPlanPicker target={target} />
         </span>
       </div>
-      <DataTable
-        columns={columns}
-        rows={ranked}
-        rowKey={(row) => row.skillTypeId}
-        label={t('fittings.stats.section.whatToTrain')}
-        density="compact"
-      />
+      <ul aria-label={t('fittings.stats.section.whatToTrain')} className="m-0 list-none p-0">
+        {ranked.map((row, index) => (
+          <li
+            key={row.skillTypeId}
+            className="flex flex-col border-t border-line-bright pt-2.5 first:border-t-0 first:pt-0"
+          >
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-2">
+              <span className="text-xs tabular-nums text-text-dim">{index + 1}</span>
+              <span className="min-w-0 flex-1 font-medium">
+                {row.name} {romanLevel(row.toLevel)}
+              </span>
+              {row.time?.includesPrerequisites && (
+                <span className="text-[0.6875rem] text-warning">
+                  {t('fittings.whatToTrain.withPrerequisites')}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-dashed border-line py-2">
+              <span className={EYEBROW}>{t('fittings.whatToTrain.changes')}</span>
+              <div className="flex min-w-0 flex-1 flex-wrap gap-x-3 gap-y-0.5 text-xs">
+                {row.delta.changes.map((change) => (
+                  <span key={change.key}>{changeLabel(change, t)}</span>
+                ))}
+                {row.roleChanges.map((change) => (
+                  <span key={change.key}>
+                    {t(`fittings.whatToTrain.role.${change.key}`, {
+                      before: change.before.toLocaleString(),
+                      after: change.after.toLocaleString(),
+                    })}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-dashed border-line py-2">
+              <span className={EYEBROW}>{t('fittings.whatToTrain.time')}</span>
+              <span className="min-w-0 flex-1 font-medium tabular-nums">
+                {row.time === null ? (
+                  <span className="text-text-dim">{t('common.loading')}</span>
+                ) : (
+                  formatCountdown(row.time.seconds)
+                )}
+              </span>
+              {planAction(row)}
+            </div>
+          </li>
+        ))}
+      </ul>
       {added && (
         <Toast
           message={t('skills.fitCheck.addedToast', {

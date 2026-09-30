@@ -45,6 +45,7 @@ function gain(skillTypeId: number, fromLevel: number, overall: number): SkillGai
     fromLevel,
     toLevel: fromLevel + 1,
     delta: { changes: [], count: 0 },
+    roleChanges: [],
     metrics: {
       overall,
       dps: overall,
@@ -54,6 +55,10 @@ function gain(skillTypeId: number, fromLevel: number, overall: number): SkillGai
       align: 0,
       capacitor: 0,
       lockRange: 0,
+      miningYield: 0,
+      hold: 0,
+      remoteRepair: 0,
+      jumpRange: 0,
     },
   };
 }

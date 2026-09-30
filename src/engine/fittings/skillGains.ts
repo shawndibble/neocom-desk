@@ -10,6 +10,7 @@
 import type { AttributeWithSources } from './affectedBy';
 import { alignTimeSeconds } from './stats';
 import type { FittingStats } from './types';
+import { round } from './fittingStatFields';
 import { diffFittingStats, type FittingStatsDelta } from './variationDelta';
 
 /** One calculated object's attributes, and its loaded charge's — the shape of the engine's `ItemResult`. */
@@ -58,8 +59,8 @@ export function skillGainCandidates(
   return candidates.sort((a, b) => a.skillTypeId - b.skillTypeId);
 }
 
-/** The stats a pilot ranks by; `overall` is all of them together. */
-export const GAIN_METRICS = [
+/** What a combat pilot ranks by. */
+const COMBAT_METRICS = [
   'dps',
   'ehp',
   'activeTank',
@@ -68,6 +69,17 @@ export const GAIN_METRICS = [
   'capacitor',
   'lockRange',
 ] as const;
+
+/**
+ * What a miner, hauler, logistics or jump pilot ranks by. Each is zero on a
+ * fit with no such role — no miners, a fit that shoots, no remote repairers,
+ * no jump drive — so a combat fit's list never grows a cargo or mining row.
+ */
+export const ROLE_METRICS = ['miningYield', 'hold', 'remoteRepair', 'jumpRange'] as const;
+export type RoleMetric = (typeof ROLE_METRICS)[number];
+
+/** The stats a pilot ranks by; `overall` is all of them together. */
+export const GAIN_METRICS = [...COMBAT_METRICS, ...ROLE_METRICS] as const;
 export type GainMetric = (typeof GAIN_METRICS)[number];
 export type GainSort = 'overall' | GainMetric;
 
@@ -90,6 +102,67 @@ function capacitorGain(before: FittingStats['capacitor'], after: FittingStats['c
 }
 
 const activeTank = (s: FittingStats) => s.repair.shield + s.repair.armor + s.repair.hull;
+const isArmed = (s: FittingStats) => s.offense.dps > 0 || s.droneDps > 0;
+
+/** One role stat's before/after, at the digits it is shown with. */
+export interface RoleChange {
+  key: RoleMetric;
+  before: number;
+  after: number;
+}
+
+interface RoleField {
+  key: RoleMetric;
+  digits: number;
+  value: (s: FittingStats) => number;
+  /** Whether this fit's `before` has the role at all. */
+  applies: (before: FittingStats) => boolean;
+}
+
+/**
+ * Hold space counts only on a fit that fires nothing: on a warship a bigger
+ * hold is noise, on a hauler or an Orca it is the point. Mining yield and
+ * the rest need no such gate — a fit without them never changes them.
+ */
+const ROLE_FIELDS: readonly RoleField[] = [
+  {
+    key: 'miningYield',
+    digits: 0,
+    value: (s) => s.mining.perHour,
+    applies: () => true,
+  },
+  {
+    key: 'hold',
+    digits: 0,
+    value: (s) => s.holds.cargo + s.holds.fleetHangar + s.holds.miningHold,
+    applies: (before) => !isArmed(before),
+  },
+  {
+    key: 'remoteRepair',
+    digits: 1,
+    value: (s) =>
+      s.support.remoteRepair.shield + s.support.remoteRepair.armor + s.support.remoteRepair.hull,
+    applies: () => true,
+  },
+  {
+    key: 'jumpRange',
+    digits: 2,
+    value: (s) => s.jumpDrive?.rangeLightYears ?? 0,
+    applies: () => true,
+  },
+];
+
+/** Role stats the +1 level changes, after the rounding they display at. */
+export function roleChanges(before: FittingStats, after: FittingStats): RoleChange[] {
+  const changes: RoleChange[] = [];
+  for (const field of ROLE_FIELDS) {
+    if (!field.applies(before)) continue;
+    const b = round(field.value(before), field.digits);
+    const a = round(field.value(after), field.digits);
+    if (b !== a) changes.push({ key: field.key, before: b, after: a });
+  }
+  return changes;
+}
 const alignTime = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navigation.agility);
 
 /**
@@ -99,6 +172,11 @@ const alignTime = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.nav
  * or relative depletion time, with turning stable a whole gain.
  */
 export function gainMetrics(before: FittingStats, after: FittingStats): GainMetrics {
+  const role = new Map(roleChanges(before, after).map((change) => [change.key, change]));
+  const roleGain = (key: RoleMetric) => {
+    const change = role.get(key);
+    return change ? relative(change.before, change.after) : 0;
+  };
   const metrics: Record<GainMetric, number> = {
     dps: relative(before.offense.dps, after.offense.dps),
     ehp: relative(before.ehp, after.ehp),
@@ -107,6 +185,10 @@ export function gainMetrics(before: FittingStats, after: FittingStats): GainMetr
     align: -relative(alignTime(before), alignTime(after)),
     capacitor: capacitorGain(before.capacitor, after.capacitor),
     lockRange: relative(before.targeting.maxTargetRange, after.targeting.maxTargetRange),
+    miningYield: roleGain('miningYield'),
+    hold: roleGain('hold'),
+    remoteRepair: roleGain('remoteRepair'),
+    jumpRange: roleGain('jumpRange'),
   };
   const overall = GAIN_METRICS.reduce((sum, metric) => sum + metrics[metric], 0);
   return { overall, ...metrics };
@@ -115,6 +197,8 @@ export function gainMetrics(before: FittingStats, after: FittingStats): GainMetr
 export interface SkillGain extends SkillGainCandidate {
   /** Every displayed stat the +1 level changes, as the Variations table words them. */
   delta: FittingStatsDelta;
+  /** Mining, hold, remote-repair and jump-range changes, which `delta` leaves out. */
+  roleChanges: RoleChange[];
   metrics: GainMetrics;
 }
 
@@ -148,7 +232,12 @@ export async function evaluateSkillGains(
       // just moves CPU use or the cargo hold isn't "what to train" for a fit.
       const metrics = gainMetrics(before, after);
       if (GAIN_METRICS.every((metric) => metrics[metric] === 0)) continue;
-      gains.push({ ...candidate, delta: diffFittingStats(before, after), metrics });
+      gains.push({
+        ...candidate,
+        delta: diffFittingStats(before, after),
+        roleChanges: roleChanges(before, after),
+        metrics,
+      });
     } catch {
       // Left out — see above.
     }
