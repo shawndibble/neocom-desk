@@ -15,6 +15,8 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { AppraisalRow } from '@/engine/market/appraisal';
 import { appraisalCsvColumns } from '@/features/market/appraisalCsv';
+import { appraisalVolumeColumn } from '@/features/market/appraisalVolume';
+import { AppraisalVolumeChip } from '@/features/market/AppraisalVolumeChip';
 import { formatVolume } from '@/features/market/format';
 import {
   resolveAppraisalShare,
@@ -141,6 +143,7 @@ export function AppraisalShared() {
       render: (row) => totalCell(row.sellTotal),
       sortValue: (row) => row.sellTotal ?? undefined,
     },
+    appraisalVolumeColumn(t),
   ];
 
   return (
@@ -203,6 +206,7 @@ export function AppraisalShared() {
                 <IskAmount value={state.view.appraisal.totals.buy} revealOn="tap" decimals={0} />
               }
             />
+            <AppraisalVolumeChip totals={state.view.appraisal.totals} />
             <StatChip
               label={t('appraisalShare.generatedLabel')}
               value={new Date(state.view.generatedAt * 1000).toLocaleString()}
@@ -237,7 +241,7 @@ export function AppraisalShared() {
               rows={state.view.appraisal.rows}
               rowKey={(row) => row.typeId}
               label={t('appraisalShare.title')}
-              // Five short numeric columns hang off the item name here, so the
+              // Six short numeric columns hang off the item name here, so the
               // default one-per-line stack turned every item into a six-line
               // card — on the one page most likely to be opened from a phone
               // chat client (#1113, the follow-up #1097 scoped out).

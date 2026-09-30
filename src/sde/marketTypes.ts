@@ -31,6 +31,19 @@ export function packagedVolumeOf(type: Pick<MarketTypeEntry, 'volume' | 'package
   return type.packagedVolume ?? type.volume;
 }
 
+/**
+ * `packagedVolumeOf`, or null where the entry is missing or carries no usable
+ * volume — a catalogue snapshot cached from before issue #2336 has no
+ * `volume` field at all, which must read as unknown, never as 0 m3.
+ */
+export function knownPackagedVolumeOf(
+  type: Pick<MarketTypeEntry, 'volume' | 'packagedVolume'> | undefined
+): number | null {
+  if (type === undefined) return null;
+  const volume = packagedVolumeOf(type) as number | undefined;
+  return typeof volume === 'number' && Number.isFinite(volume) ? volume : null;
+}
+
 /** One entry in public/data/market/systems.json. */
 export interface SolarSystemEntry {
   id: number;

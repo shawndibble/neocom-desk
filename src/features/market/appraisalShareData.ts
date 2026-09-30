@@ -18,6 +18,7 @@ import {
 } from '@/engine/market/appraisalShare';
 import { getTradeHub, type TradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
+import { knownPackagedVolumeOf } from '@/sde/marketTypes';
 import { loadMarketTypesById } from '@/sde/marketTypesById';
 import type { AppraisalOutcome } from './appraisalData';
 
@@ -74,14 +75,24 @@ export async function resolveAppraisalShare(payload: string): Promise<ResolveApp
   const typesById = await loadMarketTypesById();
 
   const unresolvedTypeIds: number[] = [];
-  const resolved: { typeId: number; name: string; quantity: number }[] = [];
+  const resolved: {
+    typeId: number;
+    name: string;
+    quantity: number;
+    unitVolume: number | null;
+  }[] = [];
   for (const item of decoded.value.items) {
-    const name = typesById.get(item.typeId)?.name;
-    if (name === undefined) {
+    const type = typesById.get(item.typeId);
+    if (type === undefined) {
       unresolvedTypeIds.push(item.typeId);
       continue;
     }
-    resolved.push({ typeId: item.typeId, name, quantity: item.quantity });
+    resolved.push({
+      typeId: item.typeId,
+      name: type.name,
+      quantity: item.quantity,
+      unitVolume: knownPackagedVolumeOf(type),
+    });
   }
 
   const prices = await getHubPrices(
@@ -96,6 +107,7 @@ export async function resolveAppraisalShare(payload: string): Promise<ResolveApp
       quantity: entry.quantity,
       buy: aggregate?.buyMax ?? null,
       sell: aggregate?.sellMin ?? null,
+      unitVolume: entry.unitVolume,
     };
   });
 

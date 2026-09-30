@@ -142,12 +142,67 @@ describe('buildAppraisal', () => {
       refineUnpricedRows: 0,
       cheapestBuy: 0,
       cheapestBuyViaLp: 0,
+      volume: 0,
+      volumeUnknownRows: 0,
     });
   });
 
   it('preserves the order it was given', () => {
     const { rows } = buildAppraisal([tritanium, damageControl], 90);
     expect(rows.map((row) => row.name)).toEqual(['Tritanium', 'Damage Control II']);
+  });
+
+  describe('volume', () => {
+    it('gives each row its quantity times the unit packaged volume', () => {
+      const { rows } = buildAppraisal(
+        [
+          { ...tritanium, unitVolume: 0.01 },
+          { ...damageControl, unitVolume: 5 },
+        ],
+        90
+      );
+      expect(rows[0].volume).toBeCloseTo(1_245, 6);
+      expect(rows[1].volume).toBe(15);
+    });
+
+    it('is not scaled by Price Percent', () => {
+      const { rows, totals } = buildAppraisal([{ ...damageControl, unitVolume: 5 }], 50);
+      expect(rows[0].volume).toBe(15);
+      expect(totals.volume).toBe(15);
+    });
+
+    it('totals every known row volume', () => {
+      const { totals } = buildAppraisal(
+        [
+          { ...tritanium, unitVolume: 0.01 },
+          { ...damageControl, unitVolume: 5 },
+        ],
+        100
+      );
+      expect(totals.volume).toBeCloseTo(1_260, 6);
+      expect(totals.volumeUnknownRows).toBe(0);
+    });
+
+    it('reports an unknown volume as null, left out of the total and counted as partial', () => {
+      const { rows, totals } = buildAppraisal(
+        [
+          { ...tritanium, unitVolume: null },
+          { ...damageControl, unitVolume: 5 },
+          { ...damageControl, typeId: 1, name: 'No volume given' },
+        ],
+        100
+      );
+      expect(rows[0].volume).toBeNull();
+      expect(rows[2].volume).toBeNull();
+      expect(totals.volume).toBe(15);
+      expect(totals.volumeUnknownRows).toBe(2);
+    });
+
+    it('treats a genuine zero unit volume as known, not missing', () => {
+      const { rows, totals } = buildAppraisal([{ ...damageControl, unitVolume: 0 }], 100);
+      expect(rows[0].volume).toBe(0);
+      expect(totals.volumeUnknownRows).toBe(0);
+    });
   });
 
   describe('refine-then-sell', () => {
@@ -280,6 +335,7 @@ describe('lpBeatsMarket', () => {
       sellEach: 95_000_000,
       buyTotal: 60_000_000,
       sellTotal: 95_000_000,
+      volume: null,
       lpCorpName: 'Sisters of EVE',
       lpCost: 400_000,
       lpIskCost: 850_000,
@@ -413,6 +469,7 @@ describe('refineBeatsSellAsIs (issue #1048)', () => {
       sellEach: 17_000,
       buyTotal: 1_600_000,
       sellTotal: 1_700_000,
+      volume: null,
       refineTotal: 1_700_000,
       refinePricedAll: true,
       refineUnitsLeftOver: 0,

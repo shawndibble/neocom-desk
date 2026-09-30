@@ -10,7 +10,7 @@ import { buildAppraisalShareLink, resolveAppraisalShare } from './appraisalShare
 
 vi.mock('@/sde/loadMarketSde', () => ({
   loadMarketTypes: vi.fn(async () => [
-    { typeId: 34, name: 'Tritanium', marketGroupId: 18 },
+    { typeId: 34, name: 'Tritanium', marketGroupId: 18, volume: 0.01 },
     { typeId: 2048, name: 'Damage Control II', marketGroupId: 300 },
   ]),
 }));
@@ -46,6 +46,7 @@ function outcome(): AppraisalOutcome {
           sellEach: 6,
           buyTotal: 500,
           sellTotal: 600,
+          volume: null,
         },
       ],
       totals: {
@@ -57,6 +58,8 @@ function outcome(): AppraisalOutcome {
         refineUnpricedRows: 0,
         cheapestBuy: 0,
         cheapestBuyViaLp: 0,
+        volume: 0,
+        volumeUnknownRows: 0,
       },
       items: [],
     },
@@ -97,6 +100,7 @@ describe('buildAppraisalShareLink', () => {
       sellEach: null,
       buyTotal: null,
       sellTotal: null,
+      volume: null,
     }));
     expect(buildAppraisalShareLink(oversized, DEFAULT_TRADE_HUB, 90)).toEqual({
       ok: false,
@@ -130,6 +134,7 @@ describe('resolveAppraisalShare', () => {
         sellEach: 5.058,
         buyTotal: 486.9000000000001,
         sellTotal: 505.79999999999995,
+        volume: 1,
       },
     ]);
     expect(result.value.unresolvedTypeIds).toEqual([]);

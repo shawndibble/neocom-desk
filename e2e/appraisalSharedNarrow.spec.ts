@@ -16,11 +16,13 @@
  * is — rather than on the class token, which
  * `src/routes/AppraisalShared.test.tsx` already guards.
  *
- * Only the five-column case exists here. `appraisalShareData.ts` resolves a
+ * Only one column count exists here. `appraisalShareData.ts` resolves a
  * link with no `characterId` at all, so the refine-then-sell comparison that
- * gives `AppraisalPanel` an optional sixth column never applies — this
- * page's `columns` array is fixed, and the odd trailing cell the ticket asks
- * to see land cleanly is the only shape to test.
+ * gives `AppraisalPanel` an optional extra column never applies — this
+ * page's `columns` array is fixed. Since the Volume column joined (issue
+ * #2337) that is six values, 2+2+2, so the odd trailing cell #1113 asked
+ * about no longer arises here; `marketAppraisalNarrow.spec.ts` still covers
+ * that shape on the live tab.
  *
  * No login: this is the app's one unauthenticated content route, which is
  * the whole point of a share link opened by a stranger.
@@ -187,30 +189,28 @@ test.describe('Shared appraisal — stacked result card', () => {
     await mockHubPrices(page);
   });
 
-  test('pairs its five value columns and lands the odd trailing cell cleanly at 390px', async ({
-    page,
-  }) => {
+  test('pairs its six value columns two-per-row at 390px', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await openShare(page);
 
     const { display, contentWidth, cells } = await readRow(page, TRITANIUM);
     expect(display).toBe('grid');
 
-    // Five values under a full-width title: 2+2+1. Asserted as the whole card
+    // Six values under a full-width title: 2+2+2. Asserted as the whole card
     // at once — a per-pair check would pass just as happily on a card that
     // had quietly dropped a column.
     expect(labelLines(cells)).toEqual([
       ['Item'],
       ['Qty', 'Buy each'],
       ['Sell each', 'Buy total'],
-      ['Sell total'],
+      ['Sell total', 'Volume (m³)'],
     ]);
 
     const [[item], ...valueLines] = lines(cells);
     // The name still titles the card across both tracks (`grid-column: 1 / -1`).
     expect(item.width).toBeCloseTo(contentWidth, 0);
 
-    for (const [first, second] of valueLines.slice(0, -1)) {
+    for (const [first, second] of valueLines) {
       // Side by side, each roughly half the card: same width, same line, and
       // the second starting past the end of the first (the 0.75rem gap).
       expect(second.left).toBeGreaterThan(first.left + first.width);
@@ -220,17 +220,14 @@ test.describe('Shared appraisal — stacked result card', () => {
     }
 
     const [firstOfPair] = valueLines[0];
-    const [trailing] = valueLines.at(-1)!;
-    // The dangling half-row the ticket asks about: it stays in the first
-    // track at a paired cell's width, rather than stretching across the card
-    // (which would print a label-above-value block at title width) or
-    // shifting into the second one.
-    expect(trailing.left).toBeCloseTo(firstOfPair.left, 0);
-    expect(trailing.width).toBeCloseTo(firstOfPair.width, 0);
-    // The other half of "renders cleanly": its label sits above the value in
-    // flow, not pinned into the default card's 6.5rem gutter — which inside a
-    // ~160px cell would leave the figure nowhere to render.
-    expect(trailing.labelPosition).toBe('static');
+    const [lastLineStart] = valueLines.at(-1)!;
+    // The last pair stays in step with the first: same track, same width.
+    expect(lastLineStart.left).toBeCloseTo(firstOfPair.left, 0);
+    expect(lastLineStart.width).toBeCloseTo(firstOfPair.width, 0);
+    // Its label sits above the value in flow, not pinned into the default
+    // card's 6.5rem gutter — which inside a ~160px cell would leave the
+    // figure nowhere to render.
+    expect(lastLineStart.labelPosition).toBe('static');
 
     // And the halved card still costs the page no sideways scroll, which is
     // the risk a two-track grid runs on a 390px screen.
@@ -247,10 +244,10 @@ test.describe('Shared appraisal — stacked result card', () => {
 
     const { display, contentWidth, rowHeight, cells } = await readRow(page, PYERITE);
     // `stackColumns` may only ever affect the card below `sm` — above it the
-    // row is still a table row, all five values plus the name on one line.
+    // row is still a table row, all six values plus the name on one line.
     expect(display).toBe('table-row');
     expect(labelLines(cells)).toEqual([
-      ['Qty', 'Item', 'Buy each', 'Sell each', 'Buy total', 'Sell total'],
+      ['Qty', 'Item', 'Buy each', 'Sell each', 'Buy total', 'Sell total', 'Volume (m³)'],
     ]);
     // Not just "one line group": a single dense row of text, so a cell that
     // started wrapping onto a second line would fail here rather than pass by

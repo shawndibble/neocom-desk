@@ -15,6 +15,7 @@ export const APPRAISAL_COLUMN_IDS = [
   'sellTotal',
   'refineTotal',
   'lpTotal',
+  'volume',
 ] as const;
 
 export type AppraisalColumnId = (typeof APPRAISAL_COLUMN_IDS)[number];

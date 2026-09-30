@@ -1,7 +1,7 @@
 /**
  * Appraisal result card's stacked layout at 390px (issue #1097): the result
- * table hangs five short numeric columns off the item name — six once a row
- * carries reprocessing data and `refineTotal` joins them — at `DataTable`'s
+ * table hung five short numeric columns off the item name — six once a row
+ * carried reprocessing data and `refineTotal` joined them — at `DataTable`'s
  * default `stackColumns={1}`, so every priced line became a six-line card and
  * a fifteen-item haul a page of them. Fixed by passing `stackColumns={2}`,
  * the two-value-per-row mode `.dt-stack-2col` already ships for exactly this
@@ -18,10 +18,11 @@
  * Both column counts are reachable here, so both are asserted end to end:
  * Veldspar has a `public/data/reprocessing.json` entry and Tritanium/Pyerite
  * do not, and the fixture pilot is an active Character — which is the whole
- * condition `appraisalData.ts` puts on computing `refine` at all. A paste of
- * Veldspar renders six value columns (2+2+2, no trailing cell); a paste of
- * only minerals renders five (2+2+1, the odd trailing cell the ticket asks
- * to see land cleanly).
+ * condition `appraisalData.ts` puts on computing `refine` at all. Since the
+ * Volume column joined them (issue #2337), a paste of Veldspar renders seven
+ * value columns (2+2+2+1, the odd trailing cell the ticket asks to see land
+ * cleanly) and a paste of only minerals renders six (2+2+2, none left over).
+ * The constants below keep their pre-#2337 names.
  *
  * The Fuzzwork aggregates route is overridden locally rather than in
  * `support/mockEsi.ts`: the shared `FUZZWORK_AGGREGATES` fixture omits
@@ -45,7 +46,7 @@ const DESKTOP = { width: 1280, height: 800 };
 const VELDSPAR = 1230;
 /** Tritanium: on the market, no reprocessing entry of its own — and Veldspar's only output material, so one price fixture serves both cases. */
 const TRITANIUM = 34;
-/** Pyerite: a second mineral, so the five-column paste still has more than one row. */
+/** Pyerite: a second mineral, so the no-refine paste still has more than one row. */
 const PYERITE = 35;
 
 /** Quantities large enough that every total renders as a real multi-character ISK figure rather than a two-digit one that would fit anywhere. */
@@ -215,28 +216,29 @@ test.describe('Market Appraisal — stacked result card', () => {
     await signInAndGoto(page);
   });
 
-  test('pairs its six value columns two-per-row at 390px', async ({ page }) => {
+  test('pairs its seven value columns two-per-row at 390px', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await appraise(page, SIX_COLUMN_PASTE);
 
     const { display, contentWidth, cells } = await readRow(page, VELDSPAR);
     expect(display).toBe('grid');
 
-    // Six values under a full-width title: 2+2+2, nothing left over. Asserted
-    // as the whole card at once — a per-pair check would pass just as happily
-    // on a card that had quietly dropped a column.
+    // Seven values under a full-width title: 2+2+2+1. Asserted as the whole
+    // card at once — a per-pair check would pass just as happily on a card
+    // that had quietly dropped a column.
     expect(labelLines(cells)).toEqual([
       ['Item'],
       ['Qty', 'Buy each'],
       ['Sell each', 'Buy total'],
       ['Sell total', 'Refine total'],
+      ['Volume (m³)'],
     ]);
 
     const [[item], ...valueLines] = lines(cells);
     // The name still titles the card across both tracks (`grid-column: 1 / -1`).
     expect(item.width).toBeCloseTo(contentWidth, 0);
 
-    for (const [first, second] of valueLines) {
+    for (const [first, second] of valueLines.slice(0, -1)) {
       // Side by side, each roughly half the card: same width, same line, and
       // the second starting past the end of the first (the 0.75rem gap).
       expect(second.left).toBeGreaterThan(first.left + first.width);
@@ -244,6 +246,20 @@ test.describe('Market Appraisal — stacked result card', () => {
       expect(first.width).toBeLessThan(contentWidth * 0.55);
       expect(first.width).toBeGreaterThan(contentWidth * 0.4);
     }
+
+    const [firstOfPair] = valueLines[0];
+    const [trailing] = valueLines.at(-1)!;
+    // The dangling half-row #1097 asks about: it stays in the first track at
+    // a paired cell's width, rather than stretching across the card (which
+    // would print a label-above-value block at title width) or shifting into
+    // the second one.
+    expect(trailing.left).toBeCloseTo(firstOfPair.left, 0);
+    expect(trailing.width).toBeCloseTo(firstOfPair.width, 0);
+    expect(trailing.width).toBeLessThan(contentWidth * 0.55);
+    // The other half of "renders cleanly": its label sits above the value in
+    // flow, not pinned into the default card's 6.5rem gutter — which inside a
+    // ~160px cell would leave the figure nowhere to render.
+    expect(trailing.labelPosition).toBe('static');
 
     // And the halved card still costs the page no sideways scroll, which is
     // the risk a two-track grid runs on a 390px screen.
@@ -260,39 +276,31 @@ test.describe('Market Appraisal — stacked result card', () => {
     expect(button.bottom).toBeLessThanOrEqual(row.bottom);
   });
 
-  test('pairs its five value columns and lands the odd trailing cell cleanly at 390px', async ({
-    page,
-  }) => {
+  test('pairs its six value columns and keeps the last pair in step at 390px', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await appraise(page, FIVE_COLUMN_PASTE);
 
     const { contentWidth, cells } = await readRow(page, TRITANIUM);
     // No row here has reprocessing data, so `AppraisalPanel` never adds the
-    // sixth column — five values, an odd count, and a trailing single cell.
+    // Refine column — six values, Volume closing the last pair.
     expect(labelLines(cells)).toEqual([
       ['Item'],
       ['Qty', 'Buy each'],
       ['Sell each', 'Buy total'],
-      ['Sell total'],
+      ['Sell total', 'Volume (m³)'],
     ]);
 
     const valueLines = lines(cells).slice(1);
     const [firstOfPair] = valueLines[0];
-    const [trailing] = valueLines.at(-1)!;
-    // The dangling half-row the ticket asks about: it stays in the first
-    // track at a paired cell's width, rather than stretching across the card
-    // (which would print a label-above-value block at title width) or
-    // shifting into the second one.
-    expect(trailing.left).toBeCloseTo(firstOfPair.left, 0);
-    expect(trailing.width).toBeCloseTo(firstOfPair.width, 0);
-    expect(trailing.width).toBeLessThan(contentWidth * 0.55);
-    // The other half of "renders cleanly": its label sits above the value in
-    // flow, not pinned into the default card's 6.5rem gutter — which inside a
-    // ~160px cell would leave the figure nowhere to render.
-    expect(trailing.labelPosition).toBe('static');
+    const [lastLineStart] = valueLines.at(-1)!;
+    // The last pair stays in step with the first: same track, same width,
+    // label in flow above the value.
+    expect(lastLineStart.left).toBeCloseTo(firstOfPair.left, 0);
+    expect(lastLineStart.width).toBeCloseTo(firstOfPair.width, 0);
+    expect(lastLineStart.width).toBeLessThan(contentWidth * 0.55);
+    expect(lastLineStart.labelPosition).toBe('static');
 
-    // The odd trailing cell is the shape most likely to crowd the pinned
-    // kebab out to the side — still no sideways scroll (#1708).
+    // Still no sideways scroll with the pinned kebab (#1708).
     await expectNoPageOverflow(page);
   });
 
@@ -302,10 +310,19 @@ test.describe('Market Appraisal — stacked result card', () => {
 
     const { display, contentWidth, rowHeight, cells } = await readRow(page, VELDSPAR);
     // `stackColumns` may only ever affect the card below `sm` — above it the
-    // row is still a table row, all six values plus the name on one line.
+    // row is still a table row, all seven values plus the name on one line.
     expect(display).toBe('table-row');
     expect(labelLines(cells)).toEqual([
-      ['Qty', 'Item', 'Buy each', 'Sell each', 'Buy total', 'Sell total', 'Refine total'],
+      [
+        'Qty',
+        'Item',
+        'Buy each',
+        'Sell each',
+        'Buy total',
+        'Sell total',
+        'Refine total',
+        'Volume (m³)',
+      ],
     ]);
     // Not just "one line group": a single dense row of text, so a cell that
     // started wrapping onto a second line would fail here rather than pass by
@@ -342,6 +359,7 @@ test.describe('Market Appraisal — stacked result card', () => {
       ['Qty', 'Buy each'],
       ['Sell each', 'Buy total'],
       ['Sell total', 'Refine total'],
+      ['Volume (m³)'],
     ]);
   });
 

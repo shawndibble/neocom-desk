@@ -21,6 +21,8 @@ function outcome(sell: number): AppraisalOutcome {
         refineUnpricedRows: 0,
         cheapestBuy: sell,
         cheapestBuyViaLp: 0,
+        volume: 0,
+        volumeUnknownRows: 0,
       },
       items: [],
     },

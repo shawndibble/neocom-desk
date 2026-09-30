@@ -9,13 +9,17 @@ import { loadReprocessing } from '@/sde/loadSde';
 import { loadCorrectedSkills, type CorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadCharacterImplants } from '@/features/skills/data';
 import { findLpOfferMatches, toLpOfferInputs } from '@/features/market/appraisalLpAcquisition';
+import { clearMarketTypeIndex } from '@/sde/marketTypesById';
 import { appraisePaste, clearAppraisalCatalogue, compareHubs } from './appraisalData';
 
 vi.mock('@/sde/loadMarketSde', () => ({
   loadMarketTypes: vi.fn(async () => [
-    { typeId: 34, name: 'Tritanium', marketGroupId: 18 },
-    { typeId: 2048, name: 'Damage Control II', marketGroupId: 300 },
-    { typeId: 999, name: 'Civilian Gatling Railgun', marketGroupId: 300 },
+    { typeId: 34, name: 'Tritanium', marketGroupId: 18, volume: 0.01 },
+    { typeId: 2048, name: 'Damage Control II', marketGroupId: 300, volume: 5 },
+    { typeId: 999, name: 'Civilian Gatling Railgun', marketGroupId: 300, volume: 5 },
+    // Assembled 27,289 m³, packaged 2,500 — a hauler carries the packaged hull.
+    { typeId: 587, name: 'Rifter', marketGroupId: 64, volume: 27_289, packagedVolume: 2_500 },
+    // No volume at all: a catalogue built before issue #2336 carried none.
     { typeId: 1230, name: 'Veldspar', marketGroupId: 402 },
   ]),
 }));
@@ -56,6 +60,7 @@ afterEach(() => {
   server.resetHandlers();
   clearMarketPriceCache();
   clearAppraisalCatalogue();
+  clearMarketTypeIndex();
   mockedLoadReprocessing.mockReset();
   mockedLoadCorrectedSkills.mockReset();
   mockedLoadCharacterImplants.mockReset();
@@ -99,9 +104,21 @@ describe('appraisePaste', () => {
         sellEach: 460_800,
         buyTotal: 1_345_950,
         sellTotal: 1_382_400,
+        volume: 15,
       },
     ]);
     expect(outcome.unmatched).toEqual([]);
+  });
+
+  it('gives each row its packaged volume, and an unknown one as null (issue #2337)', async () => {
+    server.use(aggregates(PRICED));
+
+    const text = ['Tritanium\t100', 'Rifter\t2', 'Veldspar\t1000'].join('\n');
+    const { appraisal } = await appraisePaste(text, DEFAULT_TRADE_HUB, 100);
+
+    expect(appraisal.rows.map((row) => row.volume)).toEqual([1, 5_000, null]);
+    expect(appraisal.totals.volume).toBe(5_001);
+    expect(appraisal.totals.volumeUnknownRows).toBe(1);
   });
 
   it('reports a name the catalogue does not hold, with its line number', async () => {

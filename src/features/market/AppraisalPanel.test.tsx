@@ -44,6 +44,7 @@ const APPRAISAL: Appraisal = {
       sellEach: 460_800,
       buyTotal: 1_345_950,
       sellTotal: 1_382_400,
+      volume: 15,
     },
     {
       typeId: 999,
@@ -53,6 +54,7 @@ const APPRAISAL: Appraisal = {
       sellEach: 1_000,
       buyTotal: null,
       sellTotal: 4_000,
+      volume: 1_240.5,
     },
   ],
   totals: {
@@ -64,6 +66,8 @@ const APPRAISAL: Appraisal = {
     refineUnpricedRows: 0,
     cheapestBuy: 0,
     cheapestBuyViaLp: 0,
+    volume: 1_255.5,
+    volumeUnknownRows: 0,
   },
   items: [],
 };
@@ -130,6 +134,29 @@ describe('AppraisalPanel', () => {
     expect(within(row).queryByText('0')).not.toBeInTheDocument();
   });
 
+  describe('volume (issue #2337)', () => {
+    it('shows each row’s m³ and a Total volume tile', () => {
+      renderPanel({ controller: controller({ result: outcome() }) });
+      expect(screen.getByRole('columnheader', { name: /Volume \(m³\)/ })).toBeInTheDocument();
+      const row = screen.getByRole('row', { name: /Civilian Gatling Railgun/ });
+      expect(within(row).getByText('1,240.5')).toBeInTheDocument();
+      expect(screen.getByText('Total volume')).toBeInTheDocument();
+      expect(screen.getByText('1,255.5 m³')).toBeInTheDocument();
+    });
+
+    it('shows an unknown volume as a dash and marks the total partial', () => {
+      const partial: Appraisal = {
+        ...APPRAISAL,
+        rows: APPRAISAL.rows.map((row) => (row.typeId === 999 ? { ...row, volume: null } : row)),
+        totals: { ...APPRAISAL.totals, volume: 15, volumeUnknownRows: 1 },
+      };
+      renderPanel({ controller: controller({ result: outcome({ appraisal: partial }) }) });
+      const row = screen.getByRole('row', { name: /Civilian Gatling Railgun/ });
+      expect(within(row).getAllByText('—')).toHaveLength(3);
+      expect(screen.getByText('≈ 15 m³')).toBeInTheDocument();
+    });
+  });
+
   it('says how many rows were left out of a total', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     expect(screen.getByText(/1 item has no orders on one side at this hub/)).toBeInTheDocument();
@@ -146,6 +173,7 @@ describe('AppraisalPanel', () => {
           sellEach: 1_050,
           buyTotal: 10_000,
           sellTotal: 10_500,
+          volume: 1,
         },
         {
           // Unpriced on the buy side only, so it must count toward the list
@@ -157,6 +185,7 @@ describe('AppraisalPanel', () => {
           sellEach: 1_000,
           buyTotal: null,
           sellTotal: 4_000,
+          volume: 1,
         },
       ],
       totals: {
@@ -168,6 +197,8 @@ describe('AppraisalPanel', () => {
         refineUnpricedRows: 0,
         cheapestBuy: 0,
         cheapestBuyViaLp: 0,
+        volume: 0,
+        volumeUnknownRows: 0,
       },
       items: [
         { typeId: 2048, name: 'Damage Control II', quantity: 10, buy: 1_000, sell: 1_050 },
@@ -394,6 +425,7 @@ describe('AppraisalPanel', () => {
               sellEach: 6,
               buyTotal: 5_000,
               sellTotal: 6_000,
+              volume: 1,
               refineTotal: 8_000,
               refinePricedAll: true,
               refineUnitsLeftOver: 0,
@@ -406,6 +438,7 @@ describe('AppraisalPanel', () => {
               sellEach: 460_800,
               buyTotal: 1_345_950,
               sellTotal: 1_382_400,
+              volume: 1,
             },
           ],
           totals: {
@@ -417,6 +450,8 @@ describe('AppraisalPanel', () => {
             refineUnpricedRows: 0,
             cheapestBuy: 0,
             cheapestBuyViaLp: 0,
+            volume: 0,
+            volumeUnknownRows: 0,
           },
           items: [],
         },
@@ -473,6 +508,7 @@ describe('AppraisalPanel', () => {
         buyTotal: 15_984_000,
         sellEach: 17_000,
         sellTotal: 16_983_000,
+        volume: 1,
         refineTotal: 15_436_890,
         refineUnitsLeftOver: 99,
       };
@@ -562,6 +598,7 @@ describe('AppraisalPanel', () => {
               sellEach: 95_000_000,
               buyTotal: 60_000_000,
               sellTotal: 95_000_000,
+              volume: 1,
               lpCorporationId: 1000125,
               lpCorpName: 'Sisters of EVE',
               lpCost: 400_000,
@@ -576,6 +613,7 @@ describe('AppraisalPanel', () => {
               sellEach: 460_800,
               buyTotal: 1_345_950,
               sellTotal: 1_382_400,
+              volume: 1,
             },
           ],
           totals: {
@@ -587,6 +625,8 @@ describe('AppraisalPanel', () => {
             refineUnpricedRows: 0,
             cheapestBuy: 2_232_400,
             cheapestBuyViaLp: 1,
+            volume: 0,
+            volumeUnknownRows: 0,
           },
           items: [],
         },
@@ -702,6 +742,8 @@ describe('AppraisalPanel', () => {
               refineUnpricedRows: 0,
               cheapestBuy: 0,
               cheapestBuyViaLp: 0,
+              volume: 0,
+              volumeUnknownRows: 0,
             },
             items: [],
           },
