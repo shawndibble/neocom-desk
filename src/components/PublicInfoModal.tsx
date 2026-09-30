@@ -172,6 +172,7 @@ export function PublicInfoModal() {
         {activeTab === 'corporation' && (
           <CorporationTab
             state={corporation}
+            allianceId={character.status === 'ready' ? character.data.allianceId : undefined}
             allianceName={alliance.status === 'ready' ? alliance.data.name : undefined}
             onOpenAlliance={alliance.status !== 'idle' ? () => setActiveTab('alliance') : undefined}
           />
@@ -265,10 +266,16 @@ function CharacterTab({
 
 function CorporationTab({
   state,
+  allianceId: liveAllianceId,
   allianceName,
   onOpenAlliance,
 }: {
   state: TabState<PublicCorporationInfo>;
+  /**
+   * A character's live alliance (null: none), which wins over the cached corp
+   * record's so this row and the Alliance tab agree. Undefined for a corp request.
+   */
+  allianceId?: number | null;
   /** Filled in once the alliance fetch resolves; a bare id shows until then. */
   allianceName?: string;
   onOpenAlliance?: () => void;
@@ -277,6 +284,7 @@ function CorporationTab({
   if (state.status !== 'ready')
     return <TabStatus status={state.status === 'idle' ? 'loading' : state.status} />;
   const { data } = state;
+  const allianceId = liveAllianceId === undefined ? data.alliance_id : liveAllianceId;
   return (
     <div className="flex items-start gap-3 text-xs">
       <img
@@ -297,16 +305,16 @@ function CorporationTab({
         <dt className="text-text-dim uppercase">{t('publicInfo.ceo')}</dt>
         <dd>{data.ceoName ?? t('common.unknown')}</dd>
 
-        {data.alliance_id !== undefined && (
+        {allianceId != null && (
           <>
             <dt className="text-text-dim uppercase">{t('publicInfo.alliance')}</dt>
             <dd>
               {onOpenAlliance ? (
                 <button type="button" onClick={onOpenAlliance} className={inlineLinkClassName}>
-                  {allianceName ?? `#${data.alliance_id}`}
+                  {allianceName ?? `#${allianceId}`}
                 </button>
               ) : (
-                (allianceName ?? `#${data.alliance_id}`)
+                (allianceName ?? `#${allianceId}`)
               )}
             </dd>
           </>

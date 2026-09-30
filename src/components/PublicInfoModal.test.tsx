@@ -399,6 +399,8 @@ describe('PublicInfoModal', () => {
       creator_id: 104,
       member_count: 2,
       tax_rate: 0,
+      // Cached corp record still names an alliance the live affiliation has left.
+      alliance_id: 13,
     });
     mockNames([
       { id: 11, name: 'New Home' },
@@ -412,6 +414,8 @@ describe('PublicInfoModal', () => {
     expect(await within(dialog).findByRole('button', { name: 'New Home' })).toBeInTheDocument();
     (await within(dialog).findByRole('tab', { name: 'Corporation' })).click();
     expect(await within(dialog).findByText('NEW')).toBeInTheDocument();
+    expect(within(dialog).queryByText('#13')).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('tab', { name: 'Alliance' })).not.toBeInTheDocument();
   });
 
   it('says a character EVE has no record of was not found, apart from a load failure', async () => {
