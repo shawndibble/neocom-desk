@@ -853,15 +853,19 @@ describe('SkillPlans editor: import / export', () => {
     // Anchored so it matches the name cell itself rather than any other
     // occurrence of the skill's name in the row.
     expect(await within(entriesPanel).findByText(/^Gunnery\b/)).toBeInTheDocument();
-    const stored = await db.skillPlans.get('plan-1');
     // ESI sends one row per level trained, and that is now exactly the shape
     // a plan keeps — the import no longer collapses them into one row.
-    expect(stored?.entries).toEqual([
-      { skillTypeID: 1, targetLevel: 1 },
-      { skillTypeID: 1, targetLevel: 2 },
-      { skillTypeID: 1, targetLevel: 3 },
-      { skillTypeID: 3, targetLevel: 1 },
-    ]);
+    // Polled: the seeded plan already shows Gunnery, so the findByText above can
+    // resolve before the import has written the stored plan.
+    await waitFor(async () => {
+      const stored = await db.skillPlans.get('plan-1');
+      expect(stored?.entries).toEqual([
+        { skillTypeID: 1, targetLevel: 1 },
+        { skillTypeID: 1, targetLevel: 2 },
+        { skillTypeID: 1, targetLevel: 3 },
+        { skillTypeID: 3, targetLevel: 1 },
+      ]);
+    });
 
     await user.click(screen.getByRole('button', { name: 'Export' }));
     await user.click(screen.getByRole('menuitem', { name: 'Export to clipboard' }));
