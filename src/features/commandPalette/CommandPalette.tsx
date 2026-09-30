@@ -12,14 +12,19 @@ import { listNavDestinations, NAV_LOCK_PATHS } from '@/app/navDestinations';
 import { useLockedRoutes } from '@/app/useGrantedScopes';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
+import {
+  createMarketItemsProvider,
+  marketItemCatalogue,
+  type ShownMarketItem,
+} from './marketItems';
 import { createCharactersProvider, createCommandsProvider, createPagesProvider } from './providers';
 import type { PaletteProvider, PaletteResult } from './types';
 import { usePaletteSearch } from './usePaletteSearch';
 
 const NO_CHARACTERS: readonly { characterId: number; name: string }[] = [];
 
-/** The live reads behind the three shipped groups, turned into providers. */
-function useShippedProviders(): PaletteProvider[] {
+/** The live reads behind the shipped groups, turned into providers. */
+function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): PaletteProvider[] {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const locked = useLockedRoutes(NAV_LOCK_PATHS);
@@ -48,18 +53,22 @@ function useShippedProviders(): PaletteProvider[] {
         activeHint: t('commandPalette.activeCharacter'),
         onSelect: (characterId) => void setActiveCharacter(characterId),
       }),
+      createMarketItemsProvider({ catalogue: marketItemCatalogue, onSelect: onShowItem }),
     ],
-    [destinations, navigate, t, characters, activeCharacterId, setActiveCharacter]
+    [destinations, navigate, t, characters, activeCharacterId, setActiveCharacter, onShowItem]
   );
 }
 
 interface CommandPaletteProps {
   onClose: () => void;
+  /** A Market Items pick: Item Detail over the current page, owned by the host so it outlives the palette. */
+  onShowItem: (item: ShownMarketItem) => void;
 }
 
 /**
  * The Command Palette (#2318): one search box over grouped results — Pages,
- * Commands, Characters — each group a provider (`types.ts`).
+ * Commands, Characters, Market Items (#2319) — each group a provider
+ * (`types.ts`).
  *
  * A hand-built ARIA combobox (decision 20260905-114550), after
  * `BuildLocationPicker`: DOM focus stays in the input, and the highlighted
@@ -71,12 +80,12 @@ interface CommandPaletteProps {
  * Rendered only while open (`CommandPaletteHost`), so each opening starts
  * with an empty query and the first result highlighted.
  */
-export function CommandPalette({ onClose }: CommandPaletteProps) {
+export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
   const { t } = useTranslation();
   const baseId = useId();
   const listboxId = `${baseId}-listbox`;
   const inputRef = useRef<HTMLInputElement>(null);
-  const providers = useShippedProviders();
+  const providers = useShippedProviders(onShowItem);
   const [query, setQuery] = useState('');
   const groups = usePaletteSearch(providers, query);
 
@@ -101,6 +110,13 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
   // (a child's effects run first), so the input takes focus from there.
   useEffect(() => {
     inputRef.current?.focus();
+  }, []);
+
+  // The item catalogue starts loading as the palette opens, not at the third
+  // keystroke — and off the render path, so typing never waits on it. A
+  // failure here is left to the Market Items group to report.
+  useEffect(() => {
+    marketItemCatalogue.load().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -180,7 +196,11 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
                   >
                     {t(group.provider.labelKey)}
                   </div>
-                  {group.status === 'loading' ? (
+                  {group.status === 'error' ? (
+                    <div className="px-2 py-1.5 text-sm text-danger">
+                      {t('commandPalette.groupError')}
+                    </div>
+                  ) : group.status === 'loading' ? (
                     <div
                       aria-hidden="true"
                       className="flex items-center gap-2 px-2 py-1.5 text-text-dim"
