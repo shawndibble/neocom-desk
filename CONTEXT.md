@@ -455,8 +455,9 @@ here — they go one per file in `docs/context/decisions/`.
 - **Avoided Systems**: The solar systems a pilot keeps off their routes,
   entered by hand in Settings → Travel — ESI cannot read the game client's own
   autopilot avoidance list. Synced across devices as ids; shown with each
-  system's security. Not a **Route Preference**, and not yet applied to any
-  route.
+  system's security. Not a **Route Preference**. Every jump count routes
+  around them as a cost, never a wall: a trip only possible through one
+  still has a route.
 - **Route Preference**: Which trip a distance describes — prefer highsec,
   shortest, or avoid highsec, the three the local jump graph supports
   (`engine/route/jumpRoute.ts`, issue #942). A reader's choice rather than a
