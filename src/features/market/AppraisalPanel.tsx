@@ -57,6 +57,8 @@ import {
 } from './appraisalColumns';
 import { appraisalCsvColumns } from './appraisalCsv';
 import { appraisalSellListText, hasAppraisalSellList } from './appraisalSellListText';
+import { appraisalVolumeColumn } from './appraisalVolume';
+import { AppraisalVolumeChip } from './AppraisalVolumeChip';
 import { buildAppraisalShareLink, MAX_SHARE_ITEMS } from './appraisalShareData';
 import { formatVolume } from './format';
 import { HubCompareCards } from './HubCompareCards';
@@ -337,6 +339,7 @@ export function AppraisalPanel({
       },
       sortValue: (row) => row.lpIskCost ?? undefined,
     },
+    volume: appraisalVolumeColumn(t),
   };
   const availableColumns = APPRAISAL_COLUMN_IDS.filter(
     (id) => (id !== 'refineTotal' || hasRefine) && (id !== 'lpTotal' || hasLpOption)
@@ -590,6 +593,7 @@ export function AppraisalPanel({
                     tooltip={t('market.appraisal.cheapestBuyHelp')}
                   />
                 )}
+                <AppraisalVolumeChip totals={totals} />
                 <StatChip label={t('market.appraisal.items')} value={rows.length} />
                 {loading && <Spinner label={t('common.loading')} size="sm" />}
               </div>

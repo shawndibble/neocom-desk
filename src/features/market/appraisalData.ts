@@ -32,6 +32,10 @@
  * gated on `characterId` being non-null, and its `requiredItemTypeIds`
  * widen the one `getHubPrices` batch every other price in this function
  * already shares — a turn-in's cost is never a second network round trip.
+ *
+ * Each row's packaged unit volume (issue #2337) is read from the same market
+ * type catalogue the names come from (`loadMarketTypesById`, memoized per
+ * session), so volume costs no per-row ESI call.
  */
 import {
   buildAppraisal,
@@ -57,6 +61,8 @@ import { findLpOfferMatches, toLpOfferInputs } from '@/features/market/appraisal
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { getHubPrices, invalidateHubPrices } from '@/market/prices';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
+import { knownPackagedVolumeOf } from '@/sde/marketTypes';
+import { loadMarketTypesById } from '@/sde/marketTypesById';
 import { loadReprocessing } from '@/sde/loadSde';
 import type { ReprocessingType } from '@/sde/types';
 
@@ -140,7 +146,10 @@ export async function appraisePaste(
   { force = false }: AppraiseOptions = {}
 ): Promise<AppraisalOutcome> {
   const entries = parseAppraisalPaste(text);
-  const catalogue = await loadAppraisalCatalogue();
+  const [catalogue, typesById] = await Promise.all([
+    loadAppraisalCatalogue(),
+    loadMarketTypesById(),
+  ]);
   const { matched, unmatched } = matchAppraisalEntries(entries, catalogue);
   const typeIds = matched.map((match) => match.typeId);
 
@@ -219,6 +228,7 @@ export async function appraisePaste(
       quantity: match.quantity,
       buy: aggregate?.buyMax ?? null,
       sell: aggregate?.sellMin ?? null,
+      unitVolume: knownPackagedVolumeOf(typesById.get(match.typeId)),
       ...(refine ? { refine } : {}),
       ...(lpOption ? { lpOption } : {}),
     };

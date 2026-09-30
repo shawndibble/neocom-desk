@@ -10,7 +10,9 @@ import { encodeAppraisalShare } from '@/engine/market/appraisalShare';
 import { AppraisalShared } from './AppraisalShared';
 
 vi.mock('@/sde/loadMarketSde', () => ({
-  loadMarketTypes: vi.fn(async () => [{ typeId: 34, name: 'Tritanium', marketGroupId: 18 }]),
+  loadMarketTypes: vi.fn(async () => [
+    { typeId: 34, name: 'Tritanium', marketGroupId: 18, volume: 0.01 },
+  ]),
 }));
 
 const server = setupServer();
@@ -67,7 +69,11 @@ describe('AppraisalShared', () => {
     expect(
       screen.getByText('Unverified, user-generated link — not an official quote.')
     ).toBeInTheDocument();
-    // The five numeric columns pair two-per-row on a phone (#1113). jsdom
+    // Packaged m³ per row and in total (issue #2337).
+    expect(screen.getByRole('columnheader', { name: 'Volume (m³)' })).toBeInTheDocument();
+    expect(screen.getByText('0.1')).toBeInTheDocument();
+    expect(screen.getByText('0.1 m³')).toBeInTheDocument();
+    // The six numeric columns pair two-per-row on a phone (#1113). jsdom
     // cannot evaluate the `@media (width < 40rem)` block the pairing lives
     // in, so this only guards that the prop is still passed —
     // `e2e/appraisalSharedNarrow.spec.ts` measures the reflow itself.

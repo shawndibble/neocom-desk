@@ -18,5 +18,7 @@ export function appraisalCsvColumns(t: CsvTranslate): CsvColumn<AppraisalRow>[] 
     { header: t('market.appraisal.columnSellEach'), value: (row) => row.sellEach },
     { header: t('market.appraisal.columnBuyTotal'), value: (row) => row.buyTotal },
     { header: t('market.appraisal.columnSellTotal'), value: (row) => row.sellTotal },
+    // Packaged m³ (issue #2337); unknown exports empty, the same as an unpriced side.
+    { header: t('market.appraisal.columnVolume'), value: (row) => row.volume },
   ];
 }

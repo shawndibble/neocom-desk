@@ -45,6 +45,14 @@
  * fraction of — and only ever competes with `sellTotal`, never `buyTotal`:
  * redeeming an offer is how a pilot *acquires* the item, not how they
  * dispose of one they already have.
+ *
+ * Volume (issue #2337) is the m³ a row takes up in a hauler's hold: its
+ * quantity times the type's **packaged** volume, supplied per item by the
+ * caller from the market type catalogue. It is never scaled by Price Percent
+ * — it is not a price. An unknown unit volume follows the same rule as an
+ * unlisted price side: the row's volume is null, it is left out of the
+ * total, and `volumeUnknownRows` counts it, so a partial total is labelled
+ * rather than silently read as the whole pile.
  */
 import {
   reprocessingValue,
@@ -80,6 +88,8 @@ export interface AppraisalItem {
   refine?: AppraisalRefine;
   /** Undefined when nothing the character holds LP with sells this item. */
   lpOption?: AppraisalLpOption;
+  /** Packaged m³ per unit; null or absent when the catalogue does not know it. */
+  unitVolume?: number | null;
 }
 
 export interface AppraisalRow {
@@ -100,6 +110,8 @@ export interface AppraisalRow {
   lpCost?: number;
   lpIskCost?: number;
   lpAffordable?: boolean;
+  /** `quantity` x packaged unit volume, m³; null when the unit volume is unknown. */
+  volume: number | null;
 }
 
 export interface AppraisalTotals {
@@ -124,6 +136,10 @@ export interface AppraisalTotals {
   cheapestBuy: number;
   /** Rows whose cheapest-known acquisition path is redeeming an LP offer. */
   cheapestBuyViaLp: number;
+  /** m³, summed over rows with a known volume. */
+  volume: number;
+  /** Rows with no known volume, so `volume` is a partial total when above 0. */
+  volumeUnknownRows: number;
 }
 
 export interface Appraisal {
@@ -203,6 +219,8 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
   let refineUnpricedRows = 0;
   let cheapestBuy = 0;
   let cheapestBuyViaLp = 0;
+  let volume = 0;
+  let volumeUnknownRows = 0;
 
   for (const item of items) {
     const buyEach = scale(item.buy, pricePercent);
@@ -225,6 +243,13 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
       if (!refinePricedAll) refineUnpricedRows += 1;
     }
 
+    const rowVolume =
+      item.unitVolume === undefined || item.unitVolume === null
+        ? null
+        : item.unitVolume * item.quantity;
+    if (rowVolume === null) volumeUnknownRows += 1;
+    else volume += rowVolume;
+
     const row: AppraisalRow = {
       typeId: item.typeId,
       name: item.name,
@@ -241,6 +266,7 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
       lpCost: item.lpOption?.lpCost,
       lpIskCost: item.lpOption?.iskCost,
       lpAffordable: item.lpOption?.affordableLp,
+      volume: rowVolume,
     };
 
     const useLp = lpBeatsMarket(row);
@@ -262,6 +288,8 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
       refineUnpricedRows,
       cheapestBuy,
       cheapestBuyViaLp,
+      volume,
+      volumeUnknownRows,
     },
     items,
   };

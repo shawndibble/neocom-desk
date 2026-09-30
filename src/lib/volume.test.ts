@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatUnitVolume } from './volume';
+import { formatCubicMetres, formatUnitVolume } from './volume';
 
 describe('formatUnitVolume', () => {
   it('keeps small volumes legible', () => {
@@ -10,5 +10,13 @@ describe('formatUnitVolume', () => {
   it('thousands-separates large volumes without trailing zeros', () => {
     expect(formatUnitVolume(470000)).toBe('470,000 m³');
     expect(formatUnitVolume(2.5)).toBe('2.5 m³');
+  });
+});
+
+describe('formatCubicMetres', () => {
+  it('formats the number alone, never rounding a small positive volume to 0', () => {
+    expect(formatCubicMetres(1_240.5)).toBe('1,240.5');
+    expect(formatCubicMetres(0.0025)).toBe('0.0025');
+    expect(formatCubicMetres(0)).toBe('0');
   });
 });

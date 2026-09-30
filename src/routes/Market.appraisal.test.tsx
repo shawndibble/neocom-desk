@@ -146,6 +146,7 @@ describe('Market Appraisal tab navigation', () => {
             sellEach: 6,
             buyTotal: 20,
             sellTotal: 30,
+            volume: null,
           },
         ],
         totals: {
@@ -157,6 +158,8 @@ describe('Market Appraisal tab navigation', () => {
           refineUnpricedRows: 0,
           cheapestBuy: 0,
           cheapestBuyViaLp: 0,
+          volume: 0,
+          volumeUnknownRows: 0,
         },
         items: [],
       },
