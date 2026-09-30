@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
@@ -128,6 +128,33 @@ describe('LpStorePicker', () => {
     expect(box).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('opens the best match on Enter with nothing highlighted', async () => {
+    const user = userEvent.setup();
+    renderPicker();
+    await user.type(screen.getByRole('combobox'), 'navy');
+    await screen.findByRole('option', { name: 'Federation Navy' });
+    await user.keyboard('{Enter}');
+    expect(screen.getByTestId('path')).toHaveTextContent('/wallet/loyalty/1000120');
+  });
+
+  it('announces when nothing matches', async () => {
+    const user = userEvent.setup();
+    renderPicker();
+    await user.type(screen.getByRole('combobox'), 'zzz');
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('No LP Store matches that name.')
+    );
+  });
+
+  it("drops the previous Character's pinned corps when the Character is cleared", async () => {
+    const user = userEvent.setup();
+    renderPicker();
+    await user.click(screen.getByRole('combobox'));
+    expect(await screen.findByText('12,500 LP')).toBeInTheDocument();
+    act(() => useActiveCharacter.setState({ activeCharacterId: null }));
+    await waitFor(() => expect(screen.queryByText('12,500 LP')).not.toBeInTheDocument());
+  });
+
   it('opens a store on click', async () => {
     const user = userEvent.setup();
     renderPicker();
@@ -145,7 +172,9 @@ describe('LpStorePicker', () => {
     const user = userEvent.setup();
     renderPicker();
     await user.type(screen.getByRole('combobox'), 'zzz');
-    expect(await screen.findByText('No LP store matches that name.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('No LP Store matches that name.', { selector: '[aria-hidden]' })
+    ).toBeVisible();
   });
 
   it('still lists every store when the Character has no loyalty data', async () => {

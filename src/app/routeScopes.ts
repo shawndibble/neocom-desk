@@ -35,6 +35,12 @@ export interface GatedRoute {
 
 export type RouteRequirement = Ungated | GatedRoute;
 
+/** One LP Store page, with or without a corp picked yet — one gate, so the two can't drift. */
+const LP_STORE_REQUIREMENT: GatedRoute = {
+  endpoints: ['getCharacterLoyaltyPoints'],
+  strings: 'loyalty',
+};
+
 /**
  * Every route rendered inside `Layout`. `App.tsx`'s element map is declared
  * `satisfies Record<AppRoutePath, ...>`, so adding a route there without an
@@ -247,14 +253,8 @@ export const ROUTE_REQUIREMENTS = {
   // grant (docs/context/decisions/, "LP Store browsing keeps the loyalty
   // scope gate"). Same reauth copy as `/wallet`'s loyalty panel — it is the
   // same grant. `/wallet/loyalty` is the same page with no store picked yet.
-  '/wallet/loyalty': {
-    endpoints: ['getCharacterLoyaltyPoints'],
-    strings: 'loyalty',
-  },
-  '/wallet/loyalty/:corporationId': {
-    endpoints: ['getCharacterLoyaltyPoints'],
-    strings: 'loyalty',
-  },
+  '/wallet/loyalty': LP_STORE_REQUIREMENT,
+  '/wallet/loyalty/:corporationId': LP_STORE_REQUIREMENT,
   '/contacts': {
     endpoints: ['getCharacterContacts', 'getCharacterContactLabels', 'postUniverseNames'],
     strings: 'contacts',

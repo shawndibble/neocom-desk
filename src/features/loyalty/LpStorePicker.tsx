@@ -62,12 +62,23 @@ export function LpStorePicker({ corporationName, className }: LpStorePickerProps
     };
   }, []);
 
+  // Keyed on the Character, so a switch (or clearing it) never pins the
+  // previous Character's held corps — adjust-during-render, not an effect.
+  const [balancesFor, setBalancesFor] = useState(characterId);
+  if (balancesFor !== characterId) {
+    setBalancesFor(characterId);
+    setBalances([]);
+  }
+
   useEffect(() => {
     if (characterId === null) return;
     let cancelled = false;
-    void loadCharacterLoyaltyPoints(characterId).then((result) => {
-      if (!cancelled) setBalances(result.cached?.data ?? []);
-    });
+    // A failed read just leaves nothing pinned; every store stays listed.
+    void loadCharacterLoyaltyPoints(characterId)
+      .then((result) => {
+        if (!cancelled) setBalances(result.cached?.data ?? []);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -78,6 +89,8 @@ export function LpStorePicker({ corporationName, className }: LpStorePickerProps
     [corporations, balances, query]
   );
   const listOpen = open && options.length > 0;
+  const trimmed = query?.trim() ?? '';
+  const noMatches = open && trimmed !== '' && corporations.length > 0 && options.length === 0;
   const highlighted =
     listOpen && highlightedIndex !== null ? (options[highlightedIndex] ?? null) : null;
 
@@ -105,12 +118,16 @@ export function LpStorePicker({ corporationName, className }: LpStorePickerProps
           moveHighlight(e.key as ComboboxNavKey, current, options.length)
         );
         break;
-      case 'Enter':
-        if (highlighted) {
+      case 'Enter': {
+        // With nothing highlighted, a typed name opens its best match — the
+        // top option — so "fed" + Enter goes straight to a store.
+        const target = highlighted ?? (listOpen && trimmed !== '' ? options[0] : null);
+        if (target) {
           e.preventDefault();
-          pick(highlighted);
+          pick(target);
         }
         break;
+      }
       case 'Escape':
         if (listOpen) {
           e.preventDefault();
@@ -125,8 +142,6 @@ export function LpStorePicker({ corporationName, className }: LpStorePickerProps
       ? null
       : t('loyaltyStore.pickerBalance', { lp: option.lp.toLocaleString() });
   }
-
-  const trimmed = query?.trim() ?? '';
 
   return (
     <div className={cx('relative flex flex-col gap-1 text-xs', className)}>
@@ -164,16 +179,19 @@ export function LpStorePicker({ corporationName, className }: LpStorePickerProps
           (highlighted
             ? t('loyaltyStore.pickerHighlighted', { count: options.length, name: highlighted.name })
             : t('loyaltyStore.pickerResultsCount', { count: options.length }))}
+        {noMatches && t('loyaltyStore.pickerNoResults')}
       </span>
-      {open && trimmed !== '' && corporations.length > 0 && options.length === 0 && (
-        <span className="text-text-dim">{t('loyaltyStore.pickerNoResults')}</span>
+      {noMatches && (
+        <span aria-hidden="true" className="text-text-dim">
+          {t('loyaltyStore.pickerNoResults')}
+        </span>
       )}
       {listOpen && (
         <ul
           id={LISTBOX_ID}
           role="listbox"
           aria-label={t('loyaltyStore.pickerLabel')}
-          className="absolute top-full right-0 left-0 z-20 mt-1 max-h-72 overflow-y-auto rounded-xs border border-line bg-panel shadow-lg"
+          className="absolute top-full right-0 left-0 z-20 mt-1 max-h-72 overflow-y-auto rounded-xs border border-line bg-panel shadow-lg shadow-black/50"
         >
           {options.map((option, index) => (
             <li

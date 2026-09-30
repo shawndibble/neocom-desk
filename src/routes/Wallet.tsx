@@ -13,6 +13,7 @@ import {
   Panel,
   Spinner,
   Tabs,
+  textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -677,10 +678,7 @@ export function Wallet() {
               <span className="flex items-center gap-2">
                 {/* Always shown, LP or not (issue #2321): the way into any
                     corp's store for a pilot who holds LP nowhere yet. */}
-                <Link
-                  to="/wallet/loyalty"
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs text-accent hover:underline md:min-h-0 md:min-w-0"
-                >
+                <Link to="/wallet/loyalty" className={textActionClassName()}>
                   {t('loyalty.browseStores')}
                 </Link>
                 {loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length > 0 && (

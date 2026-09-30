@@ -134,7 +134,7 @@ describe('Wallet', () => {
     );
   });
 
-  it('offers Browse LP stores even when the Character holds no LP anywhere (issue #2321)', async () => {
+  it('offers Browse LP Stores even when the Character holds no LP anywhere (issue #2321)', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/loyalty/points`, () =>
         HttpResponse.json([])
@@ -142,7 +142,7 @@ describe('Wallet', () => {
     );
     render(<App />);
     expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'Browse LP stores' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Browse LP Stores' })).toHaveAttribute(
       'href',
       '/wallet/loyalty'
     );
