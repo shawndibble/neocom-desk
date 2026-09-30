@@ -9,7 +9,6 @@
  */
 import type { AttributeWithSources } from './affectedBy';
 import { alignTimeSeconds } from './stats';
-import type { FleetSupportStats } from './fleetSupport';
 import type { FittingStats } from './types';
 import { round } from './fittingStatFields';
 import { diffFittingStats, type FittingStatsDelta } from './variationDelta';
@@ -127,16 +126,17 @@ export interface RoleChange {
 interface RoleField {
   key: RoleMetric;
   digits: number;
-  value: (s: FittingStats) => number;
+  /**
+   * One figure per burst, compressor or the like, in fit order, which a +1
+   * level never reorders. Compared item by item: a skill that raises only
+   * the weaker of two bursts still moves this stat.
+   */
+  values: (s: FittingStats) => number[];
   /** Whether this fit's `before` has the role at all; absent: always. */
   applies?: (before: FittingStats) => boolean;
   /** Less is better: a reload, a fuel bill. The gain is scored the other way up. */
   lowerIsBetter?: boolean;
 }
-
-/** The figure a fleet-boost metric reads across every burst: the best-placed one. */
-const burstMax = (s: FittingStats, read: (burst: FleetSupportStats['bursts'][number]) => number) =>
-  Math.max(0, ...s.fleetSupport.bursts.map(read));
 
 /**
  * Hold space counts only on a fit that fires nothing: on a warship a bigger
@@ -147,61 +147,92 @@ const ROLE_FIELDS: readonly RoleField[] = [
   {
     key: 'miningYield',
     digits: 0,
-    value: (s) => s.mining.perHour,
+    values: (s) => [s.mining.perHour],
   },
   {
     key: 'hold',
     digits: 0,
-    value: (s) => s.holds.cargo + s.holds.fleetHangar + s.holds.miningHold,
+    values: (s) => [s.holds.cargo + s.holds.fleetHangar + s.holds.miningHold],
     applies: (before) => !isArmed(before),
   },
   {
     key: 'remoteRepair',
     digits: 1,
-    value: (s) =>
+    values: (s) => [
       s.support.remoteRepair.shield + s.support.remoteRepair.armor + s.support.remoteRepair.hull,
+    ],
   },
   {
     key: 'jumpRange',
     digits: 2,
-    value: (s) => s.jumpDrive?.rangeLightYears ?? 0,
+    values: (s) => [s.jumpDrive?.rangeLightYears ?? 0],
   },
   {
     key: 'burstStrength',
     digits: 1,
-    value: (s) => burstMax(s, (burst) => Math.max(0, ...burst.strengths)),
+    values: (s) => s.fleetSupport.bursts.map((burst) => Math.max(0, ...burst.strengths)),
   },
-  { key: 'burstRange', digits: 1, value: (s) => burstMax(s, (burst) => burst.rangeMeters) / 1000 },
-  { key: 'burstDuration', digits: 1, value: (s) => burstMax(s, (burst) => burst.durationSeconds) },
+  {
+    key: 'burstRange',
+    digits: 1,
+    values: (s) => s.fleetSupport.bursts.map((burst) => burst.rangeMeters / 1000),
+  },
+  {
+    key: 'burstDuration',
+    digits: 1,
+    values: (s) => s.fleetSupport.bursts.map((burst) => burst.durationSeconds),
+  },
   {
     key: 'burstReload',
     digits: 1,
-    value: (s) => burstMax(s, (burst) => burst.reloadSeconds),
+    values: (s) => s.fleetSupport.bursts.map((burst) => burst.reloadSeconds),
     lowerIsBetter: true,
   },
   {
     key: 'compressionRange',
     digits: 1,
-    value: (s) => Math.max(0, ...s.fleetSupport.compressors.map((c) => c.rangeMeters)) / 1000,
+    values: (s) => s.fleetSupport.compressors.map((c) => c.rangeMeters / 1000),
   },
   {
     key: 'coreFuel',
     digits: 0,
-    value: (s) => s.fleetSupport.core?.fuelPerCycle ?? 0,
+    values: (s) => [s.fleetSupport.core?.fuelPerCycle ?? 0],
     lowerIsBetter: true,
   },
 ];
 
-/** Role stats the +1 level changes, after the rounding they display at. */
-export function roleChanges(before: FittingStats, after: FittingStats): RoleChange[] {
-  const changes: RoleChange[] = [];
+/**
+ * Each role stat the +1 level changes, with its gain. Compared item by item
+ * at the digits shown; where several move, the one that gains most is the one
+ * reported. A lower-is-better figure that was nothing before has no gain to
+ * speak of — a burst with no reload to shorten.
+ */
+function roleResults(
+  before: FittingStats,
+  after: FittingStats
+): { change: RoleChange; gain: number }[] {
+  const results: { change: RoleChange; gain: number }[] = [];
   for (const field of ROLE_FIELDS) {
     if (field.applies && !field.applies(before)) continue;
-    const b = round(field.value(before), field.digits);
-    const a = round(field.value(after), field.digits);
-    if (b !== a) changes.push({ key: field.key, before: b, after: a });
+    const was = field.values(before);
+    const now = field.values(after);
+    let best: { change: RoleChange; gain: number } | null = null;
+    for (let i = 0; i < Math.max(was.length, now.length); i++) {
+      const b = round(was[i] ?? 0, field.digits);
+      const a = round(now[i] ?? 0, field.digits);
+      if (b === a || (field.lowerIsBetter && b === 0)) continue;
+      const gain = field.lowerIsBetter ? -relative(b, a) : relative(b, a);
+      if (best === null || gain > best.gain)
+        best = { change: { key: field.key, before: b, after: a }, gain };
+    }
+    if (best) results.push(best);
   }
-  return changes;
+  return results;
+}
+
+/** Role stats the +1 level changes, after the rounding they display at. */
+export function roleChanges(before: FittingStats, after: FittingStats): RoleChange[] {
+  return roleResults(before, after).map(({ change }) => change);
 }
 
 /**
@@ -211,15 +242,10 @@ export function roleChanges(before: FittingStats, after: FittingStats): RoleChan
  * or relative depletion time, with turning stable a whole gain.
  */
 export function gainMetrics(before: FittingStats, after: FittingStats): GainMetrics {
-  const changed = new Map(roleChanges(before, after).map((change) => [change.key, change]));
-  const roleGains = Object.fromEntries(
-    ROLE_FIELDS.map(({ key, lowerIsBetter }): [RoleMetric, number] => {
-      const change = changed.get(key);
-      if (!change) return [key, 0];
-      const gain = relative(change.before, change.after);
-      return [key, lowerIsBetter ? -gain : gain];
-    })
-  ) as Record<RoleMetric, number>;
+  const roleGains = Object.fromEntries([
+    ...ROLE_METRICS.map((key): [RoleMetric, number] => [key, 0]),
+    ...roleResults(before, after).map(({ change, gain }) => [change.key, gain]),
+  ]) as Record<RoleMetric, number>;
   const metrics: Record<GainMetric, number> = {
     dps: relative(before.offense.dps, after.offense.dps),
     ehp: relative(before.ehp, after.ehp),

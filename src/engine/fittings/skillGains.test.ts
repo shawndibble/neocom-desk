@@ -3,6 +3,7 @@ import type { AttributeWithSources, SourceLike } from './affectedBy';
 import {
   evaluateSkillGains,
   gainMetrics,
+  roleChanges,
   rankSkillGains,
   skillGainCandidates,
   skillSourceTypeIds,
@@ -256,6 +257,31 @@ describe('gainMetrics — fleet boosts', () => {
       },
     });
     expect(gainMetrics(orca, farther).compressionRange).toBeCloseTo(0.5);
+  });
+
+  it('sees a skill that raises only the weaker of two bursts', () => {
+    const shield = { ...burst, typeId: 1, strengths: [30], rangeMeters: 60_000 };
+    const skirmish = { ...burst, typeId: 2, strengths: [25], rangeMeters: 40_000 };
+    const fit = (second: typeof skirmish) =>
+      withStats({
+        ...orca,
+        fleetSupport: { ...orca.fleetSupport, bursts: [shield, second] },
+      });
+    const before = fit(skirmish);
+    const after = fit({ ...skirmish, strengths: [27.5], rangeMeters: 44_000 });
+    const metrics = gainMetrics(before, after);
+    expect(metrics.burstStrength).toBeCloseTo(0.1);
+    expect(metrics.burstRange).toBeCloseTo(0.1);
+    expect(roleChanges(before, after)).toContainEqual({
+      key: 'burstStrength',
+      before: 25,
+      after: 27.5,
+    });
+  });
+
+  it('counts no gain for a reload that was nothing before', () => {
+    const before = withBurst({ reloadSeconds: 0 });
+    expect(gainMetrics(before, withBurst({ reloadSeconds: 30 })).burstReload).toBe(0);
   });
 
   it('is zero on a fit with no bursts or core', () => {
