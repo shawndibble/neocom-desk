@@ -2617,8 +2617,8 @@
         "desc": "It lives in this device's own storage and nowhere else — never on a server, never in a log. Logging in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it."
       },
       "offline": {
-        "name": "Works when the connection doesn't",
-        "desc": "Install it like an app. It keeps serving what it last fetched when ESI is down or you have no signal, and syncs your own plans across your devices."
+        "name": "Your data stays when the signal goes",
+        "desc": "Install it like an app. Your characters and skill plans open from this device without a connection, marked as cached, and your plans sync across your devices. Live market and killboard data need a connection."
       },
       "openSource": {
         "name": "Free, and open to read",
@@ -2627,7 +2627,7 @@
     },
     "bottomCtaHeading": "Undock into your dashboard.",
     "bottomCtaBody": "One EVE SSO login to start. Add as many characters as you fly — they all sit side by side.",
-    "footerOffline": "Offline-capable PWA",
+    "footerOffline": "Installable PWA",
     "footerOpenSource": "Free & open source",
     "footerPrivacy": "Privacy policy",
     "footerDataCredit": "Data credit",
