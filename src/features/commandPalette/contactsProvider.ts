@@ -3,14 +3,18 @@
  * searchable by name, each opening Public Info.
  *
  * Cache-only end to end — the contact lists and their names are read from
- * what the Contacts page (and every other name lookup) already cached, when
- * the palette opens, so typing never costs a request. A contact whose name
+ * what the Contacts page (and every other name lookup) already cached, while
+ * the palette is open, so typing never costs a request. A contact whose name
  * has never been resolved on this device is left out rather than fetched.
  */
 import { db } from '@/db';
-import { readCachedRows } from '@/esi/cache';
 import type { CharacterContact } from '@/esi/endpoints';
 import { requiredScopesForEndpoints } from '@/esi/registry';
+import {
+  loadContactsAcrossCharacters,
+  mergeContactsAcrossCharacters,
+  type AcrossCharactersRow,
+} from '@/features/character/contactsAcrossCharacters';
 import { readCachedNames } from '@/features/character/names';
 import type { PublicInfoKind } from '@/stores/publicInfoModal';
 import { rankedSearch } from '@/lib/rankedSearch';
@@ -29,40 +33,36 @@ export interface PaletteContact {
   readonly holders: readonly PaletteContactHolder[];
 }
 
-interface ContactList {
-  readonly name: string;
-  readonly contacts: readonly CharacterContact[];
-}
-
 function isPublicInfoKind(type: CharacterContact['contact_type']): type is PublicInfoKind {
   return type === 'character' || type === 'corporation' || type === 'alliance';
 }
 
 /**
- * Pure. One row per contact across every list, keyed on type and id (ids are
- * only unique within a type). Factions have no Public Info window, and a
+ * Pure. The Contacts page's across-Characters rows, reduced to what the
+ * palette can search and open: factions have no Public Info window, and a
  * contact with no known name cannot be searched for, so both are dropped.
+ * `names` is keyed by bare id — EVE entity ids are unique across types.
  */
 export function buildPaletteContacts(
-  lists: readonly ContactList[],
+  rows: readonly AcrossCharactersRow[],
   names: ReadonlyMap<number, string>
 ): PaletteContact[] {
-  const byKey = new Map<string, PaletteContact & { holders: PaletteContactHolder[] }>();
-  for (const list of lists) {
-    for (const contact of list.contacts) {
-      const kind = contact.contact_type;
-      const name = names.get(contact.contact_id);
-      if (!isPublicInfoKind(kind) || name === undefined) continue;
-      const key = `${kind}:${contact.contact_id}`;
-      let row = byKey.get(key);
-      if (!row) {
-        row = { kind, id: contact.contact_id, name, holders: [] };
-        byKey.set(key, row);
-      }
-      row.holders.push({ characterName: list.name, standing: contact.standing });
-    }
+  const contacts: PaletteContact[] = [];
+  for (const row of rows) {
+    const kind = row.contactType;
+    const name = names.get(row.contactId);
+    if (!isPublicInfoKind(kind) || name === undefined) continue;
+    contacts.push({
+      kind,
+      id: row.contactId,
+      name,
+      holders: row.held.map((holder) => ({
+        characterName: holder.name,
+        standing: holder.contact.standing,
+      })),
+    });
   }
-  return [...byKey.values()];
+  return contacts;
 }
 
 const CONTACTS_SCOPES = requiredScopesForEndpoints(['getCharacterContacts']);
@@ -73,33 +73,24 @@ const CONTACTS_SCOPES = requiredScopesForEndpoints(['getCharacterContacts']);
  * scope contributes nothing, so with no grant anywhere the group never shows.
  */
 export async function loadPaletteContacts(): Promise<PaletteContact[]> {
-  const [characters, tokens] = await Promise.all([db.characters.toArray(), db.tokens.toArray()]);
+  const tokens = await db.tokens.toArray();
   const granted = new Set(
     tokens
       .filter((token) => CONTACTS_SCOPES.every((scope) => token.scopes.includes(scope)))
       .map((token) => token.characterId)
   );
-  const eligible = characters
-    .filter((character) => granted.has(character.characterId))
-    .sort((a, b) => a.addedAt - b.addedAt);
-  if (eligible.length === 0) return [];
-
-  const rows = await readCachedRows<CharacterContact[]>(
-    eligible.map((character) => character.characterId),
-    'contacts'
+  if (granted.size === 0) return [];
+  const lists = (await loadContactsAcrossCharacters()).filter((list) =>
+    granted.has(list.characterId)
   );
-  const lists = eligible.map((character) => ({
-    name: character.name,
-    contacts: rows.get(character.characterId)?.data ?? [],
-  }));
   const names = await readCachedNames(
     lists.flatMap((list) => list.contacts.map((contact) => contact.contact_id))
   );
-  return buildPaletteContacts(lists, names);
+  return buildPaletteContacts(mergeContactsAcrossCharacters(lists), names);
 }
 
 export interface ContactsProviderOptions {
-  /** `loadPaletteContacts()`'s answer, read once per opening; empty until it lands. */
+  /** `loadPaletteContacts()`'s answer, kept live while the palette is open; empty until it lands. */
   readonly contacts: readonly PaletteContact[];
   readonly onOpen: (kind: PublicInfoKind, id: number) => void;
   /** The row's sublabel: its type and each holder's standing. */

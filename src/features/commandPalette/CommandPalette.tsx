@@ -13,6 +13,7 @@ import { useLockedRoutes } from '@/app/useGrantedScopes';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
 import { openPublicInfoModal } from '@/stores/publicInfoModal';
+import { CONTACT_TYPE_KEY } from '@/features/character/contactsFilter';
 import { createCharactersProvider, createCommandsProvider, createPagesProvider } from './providers';
 import {
   createContactsProvider,
@@ -24,13 +25,6 @@ import { usePaletteSearch } from './usePaletteSearch';
 
 const NO_CHARACTERS: readonly { characterId: number; name: string }[] = [];
 const NO_CONTACTS: readonly PaletteContact[] = [];
-
-/** Literal keys, so the locale split's source scan finds them. */
-const CONTACT_TYPE_KEYS: Record<PaletteContact['kind'], string> = {
-  character: 'contacts.typeCharacter',
-  corporation: 'contacts.typeCorporation',
-  alliance: 'contacts.typeAlliance',
-};
 
 function signedStanding(standing: number): string {
   return standing > 0 ? `+${standing}` : String(standing);
@@ -46,7 +40,8 @@ function useShippedProviders(): PaletteProvider[] {
   const characters = useLiveQuery(() => db.characters.toArray(), [], NO_CHARACTERS);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
-  // Cache-only, read as the palette opens: typing never waits on it or fetches.
+  // Cache-only and live (Dexie re-reads it on a cache or grant change), never
+  // per keystroke: typing neither waits on it nor fetches.
   const contacts = useLiveQuery(loadPaletteContacts, [], NO_CONTACTS);
 
   const destinations = useMemo(
@@ -73,7 +68,7 @@ function useShippedProviders(): PaletteProvider[] {
         onOpen: openPublicInfoModal,
         describe: (contact) =>
           [
-            t(CONTACT_TYPE_KEYS[contact.kind]),
+            t(CONTACT_TYPE_KEY[contact.kind]),
             ...contact.holders.map((holder) =>
               t('commandPalette.contactStanding', {
                 standing: signedStanding(holder.standing),

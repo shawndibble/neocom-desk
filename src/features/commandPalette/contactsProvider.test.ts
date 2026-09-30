@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { db } from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID, writeCached } from '@/esi/cache';
 import type { CharacterContact } from '@/esi/endpoints';
+import { mergeContactsAcrossCharacters } from '@/features/character/contactsAcrossCharacters';
 import {
   buildPaletteContacts,
   createContactsProvider,
@@ -27,15 +28,24 @@ function answer(provider: PaletteProvider, query: string): readonly PaletteResul
   return result as readonly PaletteResult[];
 }
 
+function list(characterId: number, name: string, contacts: CharacterContact[]) {
+  return { characterId, name, contacts, truncated: false };
+}
+
+/** The Contacts page's own merge, then the palette's reduction of it. */
+function merged(
+  lists: Parameters<typeof mergeContactsAcrossCharacters>[0],
+  names: ReadonlyMap<number, string>
+) {
+  return buildPaletteContacts(mergeContactsAcrossCharacters(lists), names);
+}
+
 describe('buildPaletteContacts', () => {
   it('merges every Character’s list into one row per contact, with each holder’s standing', () => {
-    const rows = buildPaletteContacts(
+    const rows = merged(
       [
-        { name: 'Main', contacts: [contact(10, 'character', 10)] },
-        {
-          name: 'Alt',
-          contacts: [contact(10, 'character', -5), contact(20, 'corporation', 5)],
-        },
+        list(1, 'Main', [contact(10, 'character', 10)]),
+        list(2, 'Alt', [contact(10, 'character', -5), contact(20, 'corporation', 5)]),
       ],
       new Map([
         [10, 'Scam Artist'],
@@ -62,13 +72,8 @@ describe('buildPaletteContacts', () => {
   });
 
   it('drops factions (no Public Info for them) and contacts whose name is not cached', () => {
-    const rows = buildPaletteContacts(
-      [
-        {
-          name: 'Main',
-          contacts: [contact(500001, 'faction', 5), contact(30, 'alliance', 0)],
-        },
-      ],
+    const rows = merged(
+      [list(1, 'Main', [contact(500001, 'faction', 5), contact(30, 'alliance', 0)])],
       new Map([[500001, 'Caldari State']])
     );
     expect(rows).toEqual([]);
