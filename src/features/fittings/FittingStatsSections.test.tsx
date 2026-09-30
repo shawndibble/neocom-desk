@@ -808,6 +808,11 @@ describe('FittingStatsSections — Overheat all and Copy stats', () => {
     // Offense: the blasters' DPS moved, their volley and the drones didn't.
     const offense = within(sectionBody('Offense'));
     expect(inWarningTone(offense.getByText('61.7 DPS'))).toBe(true);
+    // Heat's own hover keeps the row's sustained figure beside the unheated one.
+    expect(offense.getByText('61.7 DPS')).toHaveAttribute(
+      'title',
+      'Unheated: 53.7 DPS · Sustained with reload: 50.1 DPS'
+    );
     expect(inWarningTone(offense.getByText('304 volley'))).toBe(false);
     expect(inWarningTone(offense.getByText('120.0 DPS'))).toBe(false);
     // The total, in the body and as the section's headline.

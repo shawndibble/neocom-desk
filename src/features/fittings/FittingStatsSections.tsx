@@ -204,20 +204,19 @@ function DamageFigures({
   sustained?: 'tooltip' | 'line';
 }) {
   const { t } = useTranslation();
-  const sustainedLabel = (s: FittingStats) => {
-    const { dps, sustainedDps } = figures(s);
-    return sustainedDps.toFixed(1) === dps.toFixed(1)
-      ? ''
-      : t('fittings.stats.sustainedDps', { value: sustainedDps.toFixed(1) });
-  };
-  const label = sustainedLabel(stats);
-  const tooltip = sustained === 'tooltip' && label !== '' ? label : undefined;
+  const sustainedLabel = (s: FittingStats) =>
+    t('fittings.stats.sustainedDps', { value: figures(s).sustainedDps.toFixed(1) });
+  // Only where reloading costs something as shown: never lasers or drones.
+  const { dps, sustainedDps } = figures(stats);
+  const reloads = sustainedDps.toFixed(1) !== dps.toFixed(1);
+  const tooltip = sustained === 'tooltip' && reloads ? sustainedLabel(stats) : undefined;
   const numbers = (
     <span className="ml-auto shrink-0 text-right tabular-nums" title={tooltip}>
       <span>
         <HeatFigure
           stats={stats}
           format={(s) => t('fittings.stats.weaponDps', { value: figures(s).dps.toFixed(1) })}
+          note={tooltip}
         />
       </span>
       <span className="text-text-dim"> · </span>
@@ -230,7 +229,7 @@ function DamageFigures({
       {tooltip && <span className="sr-only"> ({tooltip})</span>}
     </span>
   );
-  if (sustained === 'tooltip' || label === '') return numbers;
+  if (sustained === 'tooltip' || !reloads) return numbers;
   return (
     <>
       {numbers}

@@ -93,7 +93,7 @@ describe('OffensePanel', () => {
     expect(screen.getByText('Turrets & launchers').nextElementSibling).toHaveTextContent('386');
     expect(screen.getByText('Drones').nextElementSibling).toHaveTextContent('96');
     expect(screen.getByText('Overheated').nextElementSibling).toHaveTextContent('551');
-    expect(screen.getByText('Sustained, with reload').nextElementSibling).toHaveTextContent('450');
+    expect(screen.getByText('Sustained DPS').nextElementSibling).toHaveTextContent('450');
     const row = screen.getByText('Heavy Missile Launcher II ×6').closest('tr') as HTMLElement;
     expect(within(row).getByText('Scourge Fury')).toBeInTheDocument();
     const drone = screen.getByText('Hammerhead II ×5').closest('tr') as HTMLElement;

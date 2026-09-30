@@ -423,21 +423,22 @@ function needsChargeToFire(attributes: AttributeMap): boolean {
  * and drones and fighters never reload, so all of those fire the whole time.
  * A weapon's cycle is its rate of fire: a launcher carries no `cycleTime`.
  */
-function weaponReloadDuty(attributes: AttributeMap, launched: boolean): number {
+function weaponReloadDuty(attributes: AttributeMap, neverReloads: boolean): number {
   const read = (id: number) => readAttribute(attributes, id);
-  if (launched || read(ITEM_DOGMA_ATTRIBUTE.chargeRate) <= 0) return 1;
+  if (neverReloads || read(ITEM_DOGMA_ATTRIBUTE.chargeRate) <= 0) return 1;
   return reloadDuty(magazineOf(read, ITEM_DOGMA_ATTRIBUTE.rateOfFire));
 }
 
 function damageFigures(
   attributes: AttributeMap,
   quantity: number,
-  launched: boolean
+  /** A drone or fighter, which never reloads. */
+  neverReloads: boolean
 ): DamageFigures {
   const dps = readAttribute(attributes, ITEM_DOGMA_ATTRIBUTE.damagePerSecond) * quantity;
   return {
     dps,
-    sustainedDps: dps * weaponReloadDuty(attributes, launched),
+    sustainedDps: dps * weaponReloadDuty(attributes, neverReloads),
     volley: readAttribute(attributes, ITEM_DOGMA_ATTRIBUTE.damageVolley) * quantity,
   };
 }
