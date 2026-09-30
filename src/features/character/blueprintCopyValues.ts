@@ -28,11 +28,16 @@ export type LoadBlueprints = () => Promise<
   | null
 >;
 
-/** Imported on demand: it pulls in Firestore, which a page without copies never needs. */
+/**
+ * Imported on demand: it pulls in Firestore, which a page without copies
+ * never needs. Originals ride along so the engine can tell a contract
+ * selling a copy beside its original apart from one selling copies alone.
+ */
 async function loadCopyListings(characterId: number): Promise<readonly BpcContractRow[]> {
   try {
     const { loadPublicBpcContracts } = await import('@/features/bpcContracts/syncedContracts');
-    return (await loadPublicBpcContracts(characterId))?.data.rows ?? [];
+    const snapshot = (await loadPublicBpcContracts(characterId))?.data;
+    return snapshot ? [...snapshot.rows, ...(snapshot.originals ?? [])] : [];
   } catch {
     return [];
   }

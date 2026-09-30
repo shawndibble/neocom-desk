@@ -37,15 +37,17 @@ function tierKey(typeId: number, me: number, te: number): string {
 /**
  * Folds listing rows into one rate per contract. A contract carrying any
  * other item type is skipped (its price is the bundle's, not this
- * blueprint's), and so is one mixing ME/TE — only a contract of the same
- * blueprint throughout divides its price evenly across the copies it sells.
- * Auctions, PLEX asks and zero-price barters have no price a buyer can pay.
+ * blueprint's), and so is one mixing ME/TE, or one that also sells the
+ * original (`runs: -1`, same typeID) — only a contract of the same copy
+ * throughout divides its price evenly across the copies it sells. Every line
+ * is grouped before any is judged, so one bad line voids its whole contract
+ * rather than leaving its siblings to carry the full ask. Auctions, PLEX asks
+ * and zero-price barters have no price a buyer can pay.
  */
 function contractRates(listings: readonly BpcContractRow[]): CopyRate[] {
   const byContract = new Map<number, BpcContractRow[]>();
   for (const row of listings) {
-    if (row.runs <= 0 || row.isAuction || row.requestedPlex || row.isMultiType) continue;
-    if (!(row.price > 0) || !(row.quantity > 0)) continue;
+    if (row.isAuction || row.requestedPlex || row.isMultiType || !(row.price > 0)) continue;
     const list = byContract.get(row.contractId) ?? [];
     list.push(row);
     byContract.set(row.contractId, list);
@@ -55,8 +57,15 @@ function contractRates(listings: readonly BpcContractRow[]): CopyRate[] {
   for (const rows of byContract.values()) {
     const [first] = rows;
     if (!first) continue;
-    if (rows.some((r) => r.typeId !== first.typeId || r.me !== first.me || r.te !== first.te))
-      continue;
+    const sameCopyThroughout = rows.every(
+      (r) =>
+        r.runs > 0 &&
+        r.quantity > 0 &&
+        r.typeId === first.typeId &&
+        r.me === first.me &&
+        r.te === first.te
+    );
+    if (!sameCopyThroughout) continue;
     let copies = 0;
     let runs = 0;
     for (const r of rows) {

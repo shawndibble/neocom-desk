@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import { loadBlueprintCopyValues } from './blueprintCopyValues';
 
+const snapshot = vi.hoisted(() => ({ rows: [] as unknown[], originals: [] as unknown[] }));
+vi.mock('@/features/bpcContracts/syncedContracts', () => ({
+  loadPublicBpcContracts: vi.fn(async () => ({ data: snapshot })),
+}));
+
 function listing(overrides: Partial<BpcContractRow>): BpcContractRow {
   return {
     contractId: Math.random(),
@@ -61,5 +66,24 @@ describe('loadBlueprintCopyValues', () => {
       ]
     );
     expect(values.get(7)).toBe(2_000_000);
+  });
+
+  it("reads the snapshot's originals too, so a copy sold beside its original is voided", async () => {
+    snapshot.rows = [listing({ contractId: 1, runs: 1, price: 2_000_000_000 })];
+    snapshot.originals = [listing({ contractId: 1, runs: -1, price: 2_000_000_000 })];
+    const values = await loadBlueprintCopyValues(
+      1,
+      [{ item_id: 7, type_id: 100, is_blueprint_copy: true }],
+      async () => null
+    );
+    expect(values.get(7)).toBe(0);
+
+    snapshot.originals = [];
+    const unvoided = await loadBlueprintCopyValues(
+      1,
+      [{ item_id: 7, type_id: 100, is_blueprint_copy: true }],
+      async () => null
+    );
+    expect(unvoided.get(7)).toBe(2_000_000_000);
   });
 });

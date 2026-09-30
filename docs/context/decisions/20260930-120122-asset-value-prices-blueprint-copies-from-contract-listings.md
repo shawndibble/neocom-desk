@@ -21,7 +21,9 @@ _Recorded 2026-09-30._
 - **Only a contract selling one blueprint prices it.** A contract carrying
   any other item type is skipped, because its ask covers the whole bundle.
   A contract whose lines are all the same blueprint at one ME/TE divides its
-  ask across every copy and run it sells. One mixing ME/TE is skipped.
+  ask across every copy and run it sells. One mixing ME/TE is skipped, and
+  so is one that also sells the original: it shares the copies' typeID but
+  is not the same blueprint, and its price would ride along.
   Auctions, PLEX asks and zero-price barters are skipped too, and so are
   contract originals.
 

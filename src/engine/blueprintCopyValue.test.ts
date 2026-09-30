@@ -147,6 +147,28 @@ describe('blueprintCopyValues', () => {
     expect(values.get(1)).toBe(0);
   });
 
+  it('skips a contract that also sells the original alongside copies', () => {
+    const values = blueprintCopyValues(
+      [copy({ runs: 1 })],
+      [
+        listing({ contractId: 903, runs: 1, price: 2_000_000_000 }),
+        listing({ contractId: 903, runs: -1, price: 2_000_000_000 }),
+      ]
+    );
+    expect(values.get(1)).toBe(0);
+  });
+
+  it('skips a whole contract when one of its copy lines states no runs', () => {
+    const values = blueprintCopyValues(
+      [copy({ runs: 1 })],
+      [
+        listing({ contractId: 904, runs: 10, price: 100_000_000 }),
+        listing({ contractId: 904, runs: 0, price: 100_000_000 }),
+      ]
+    );
+    expect(values.get(1)).toBe(0);
+  });
+
   it('values each owned copy on its own', () => {
     const values = blueprintCopyValues(
       [copy({ itemId: 1, runs: 1 }), copy({ itemId: 2, me: 0, te: 0, runs: 3 })],

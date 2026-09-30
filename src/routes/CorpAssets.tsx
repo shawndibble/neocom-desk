@@ -186,23 +186,24 @@ async function loadAssetsSnapshot(
 
   const assets = assetsResult.cached?.data ?? null;
   const inputs = assets === null ? null : toCorpAssetInputs(assets);
-  // Director-only endpoint: without the role a copy still prices, at ME0/TE0.
-  const copyValueByItemId = await loadBlueprintCopyValues(characterId, assets ?? [], async () =>
-    canReadBlueprints
-      ? ((await loadCorporationBlueprints(characterId, corporationId)).cached?.data ?? null)
-      : null
-  );
+  const typeIds = inputs === null ? [] : [...new Set(inputs.map((i) => i.typeId))];
+  const [labels, volumeByTypeId, copyValueByItemId] = await Promise.all([
+    assets === null ? EMPTY_CORP_ASSET_LABELS : loadCorpAssetLabels(characterId, assets),
+    loadTypeVolumes(typeIds),
+    // Director-only endpoint: without the role a copy still prices, at ME0/TE0.
+    loadBlueprintCopyValues(characterId, assets ?? [], async () =>
+      canReadBlueprints
+        ? ((await loadCorporationBlueprints(characterId, corporationId)).cached?.data ?? null)
+        : null
+    ),
+  ]);
   const groups =
     inputs === null ? null : buildCorpAssetTree(inputs, priceByTypeId, copyValueByItemId);
   const divisionNames = new Map(
     hangarDivisions(divisionsResult.cached?.data ?? null).map((d) => [d.division, d.name])
   );
-  const labels =
-    assets === null ? EMPTY_CORP_ASSET_LABELS : await loadCorpAssetLabels(characterId, assets);
   const truncated = assetsResult.cached?.truncated ?? false;
   const assetsShown = assets?.length ?? 0;
-  const typeIds = inputs === null ? [] : [...new Set(inputs.map((i) => i.typeId))];
-  const volumeByTypeId = await loadTypeVolumes(typeIds);
 
   const fetchedAts = [assetsResult, divisionsResult]
     .map((result) => result.cached?.fetchedAt)
