@@ -8,7 +8,9 @@ import { useTranslation } from 'react-i18next';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectSeparator,
   SelectTrigger,
   SelectValue,
@@ -58,11 +60,24 @@ function OverlayPicker({ overlay }: { overlay: OverlayFitting }) {
         <SelectContent>
           <SelectItem value={NO_OVERLAY}>{t('fittings.appliedDps.overlayNone')}</SelectItem>
           <SelectSeparator />
-          {overlay.options.map((option) => (
-            <SelectItem key={option.id} value={option.id}>
-              {option.name}
-            </SelectItem>
-          ))}
+          {(
+            [
+              ['saved', t('fittings.myFittings.title')],
+              ['inGame', t('fittings.start.tabInGame')],
+            ] as const
+          ).map(
+            ([source, heading]) =>
+              overlay.options[source].length > 0 && (
+                <SelectGroup key={source}>
+                  <SelectLabel>{heading}</SelectLabel>
+                  {overlay.options[source].map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )
+          )}
         </SelectContent>
       </Select>
     </div>
@@ -139,7 +154,9 @@ export function AppliedDpsPanel({
   return (
     <div className="space-y-2">
       <TargetProfilePicker targetProfiles={targetProfiles} />
-      {overlay && overlay.options.length > 0 && <OverlayPicker overlay={overlay} />}
+      {overlay && overlay.options.saved.length + overlay.options.inGame.length > 0 && (
+        <OverlayPicker overlay={overlay} />
+      )}
       {hasWeapons ? (
         <>
           <p className="text-xs">

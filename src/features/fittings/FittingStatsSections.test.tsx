@@ -595,7 +595,10 @@ describe('FittingStatsSections — Applied DPS', () => {
     const user = userEvent.setup();
     const select = vi.fn();
     const overlay: OverlayFitting = {
-      options: [{ id: 'f1', name: 'Kiting Vexor' }],
+      options: {
+        saved: [{ id: 'f1', name: 'Kiting Vexor' }],
+        inGame: [{ id: 'game-9', name: 'Game Rifter' }],
+      },
       selectedId: 'f1',
       select,
       result: {
@@ -611,6 +614,9 @@ describe('FittingStatsSections — Applied DPS', () => {
     ).toBeInTheDocument();
     expect(container.querySelector('svg line[stroke-dasharray="4 3"]')).not.toBeNull();
 
+    await user.click(screen.getByRole('combobox', { name: 'Compare with' }));
+    await user.click(await screen.findByRole('option', { name: 'Game Rifter' }));
+    expect(select).toHaveBeenCalledWith('game-9');
     await user.click(screen.getByRole('combobox', { name: 'Compare with' }));
     await user.click(await screen.findByRole('option', { name: 'No overlay' }));
     expect(select).toHaveBeenCalledWith(null);

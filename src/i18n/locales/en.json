@@ -1297,10 +1297,10 @@
       }
     },
     "projected": {
-      "hint": "Another saved Fitting's command bursts, remote repair, webs, neutralizers and the like, landing on this one. Each is worked out at all skills V.",
-      "add": "Project a saved fitting",
+      "hint": "Another Fitting's command bursts, remote repair, webs, neutralizers and the like, landing on this one. Each is worked out at all skills V.",
+      "add": "Project a fitting",
       "addPlaceholder": "Pick a fitting…",
-      "needsCharacter": "Save fittings to My Fittings to project them onto this one.",
+      "needsCharacter": "Save fittings to My Fittings, or grant In-game Fittings access, to project them onto this one.",
       "none": "Nothing projected.",
       "nothing": "Projects nothing (no running burst or remote module)",
       "count_one": "{{count}} ship",
