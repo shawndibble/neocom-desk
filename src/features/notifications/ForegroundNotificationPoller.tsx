@@ -7,6 +7,7 @@ import {
 } from './foregroundPoller';
 import { refreshAppBadge } from './appBadge';
 import { joinTabElection, runUnlessRunningElsewhere } from '@/lib/tabLeader';
+import { ignoreIdbTeardown } from '@/db/teardown';
 
 /**
  * Mounts the Foreground Poller (CONTEXT.md round 20): renders nothing, just
@@ -42,8 +43,12 @@ export function ForegroundNotificationPoller() {
     function poll() {
       if (cancelled || document.hidden || !seat.isLeader()) return;
       // A new leader's catch-up must not overlap the old leader's poll still
-      // in flight: both would fire, and feed, the same occurrences.
-      void runUnlessRunningElsewhere('neocom:poll', () => runForegroundPoll(liveDependencies()));
+      // in flight: both would fire, and feed, the same occurrences. A poll cut
+      // short by iOS aborting its IndexedDB transactions (the tab went to the
+      // background mid-save) is just a missed tick — the next one redoes it.
+      void ignoreIdbTeardown(
+        runUnlessRunningElsewhere('neocom:poll', () => runForegroundPoll(liveDependencies()))
+      );
     }
 
     const firstPoll = setTimeout(() => {
