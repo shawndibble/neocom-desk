@@ -375,6 +375,8 @@ export function getAlliancePublicInfo(
 
 export interface Killmail {
   killmail_id: number;
+  /** When it died (ISO). */
+  killmail_time?: string;
   victim: KillmailVictim;
 }
 

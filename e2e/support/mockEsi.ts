@@ -240,6 +240,17 @@ export async function installEsiMock(page: Page): Promise<void> {
     await route.fallback();
   });
 
+  // Popular fits (issue #2327) ask zKillboard for a picked hull's recent
+  // losses; none here, so the panel settles on its empty note.
+  await page.route('https://zkillboard.com/api/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: '[]',
+    });
+  });
+
   await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
     await route.fulfill({
       status: 200,

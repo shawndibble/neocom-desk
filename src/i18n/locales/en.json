@@ -155,7 +155,8 @@
         "unskilledNote": "Base values, before your skills.",
         "subsystems": "A Tech III hull's slots and hardpoints come from the subsystems fitted to it.",
         "simulate": "Simulate",
-        "simulateFailed": "Couldn't open this hull in the editor."
+        "simulateFailed": "Couldn't open this hull in the editor.",
+        "popularFailed": "Couldn't open that fit in the editor."
       },
       "skills": {
         "masteryTitle": "Mastery",
@@ -446,6 +447,18 @@
       "cargoAddMenu_other": "Add {{count}} to cargo",
       "cargoAddCount_one": "+{{count}}",
       "cargoAddCount_other": "+{{count}}"
+    },
+    "popular": {
+      "title": "Popular fits",
+      "loading": "Loading popular fits from zKillboard…",
+      "failed": "Couldn't load popular fits from zKillboard right now. Everything else still works.",
+      "empty": "No recent losses of this hull with a full fit.",
+      "losses_one": "{{count}} loss",
+      "losses_other": "{{count}} losses",
+      "lastSeen": "last seen {{age}}",
+      "value": "~{{value}} ISK",
+      "open": "Open",
+      "fitName": "{{hullName}} popular fit {{rank}}"
     },
     "start": {
       "newTitle": "New fitting from a hull",
@@ -4498,6 +4511,7 @@
     "emptyFetchedTitle": "No loyalty points",
     "corporation": "Corporation",
     "points": "Loyalty Points",
+    "browseStores": "Browse LP Stores",
     "reauthTitle": "Log in again to see your loyalty points",
     "reauthHint": "Log in again to fetch this character's loyalty point balances.",
     "reauthAction": "Log in again with EVE Online"
@@ -4529,6 +4543,16 @@
     "noMatchHint": "Try clearing the search or the Affordable/Blueprints filters.",
     "selectPrompt": "Select an offer to see its profit breakdown.",
     "selectedAnnouncement": "Showing {{name}}",
+    "pickerLabel": "LP Store corporation",
+    "pickerPlaceholder": "Search LP Stores…",
+    "pickerBalance": "{{lp}} LP",
+    "pickerResultsCount_one": "{{count}} store",
+    "pickerResultsCount_other": "{{count}} stores",
+    "pickerHighlighted_one": "{{count}} store. {{name}} highlighted.",
+    "pickerHighlighted_other": "{{count}} stores. {{name}} highlighted.",
+    "pickerNoResults": "No LP Store matches that name.",
+    "landingTitle": "Pick a corporation",
+    "landingHint": "Search any NPC corporation's LP Store to browse its offers — you don't need LP with it first.",
     "needMoreLp": "Needs {{amount}} more LP",
     "sellPriceAt": "Sell price ({{hub}})",
     "buyPriceAt": "Buy price ({{hub}})",
@@ -5225,6 +5249,7 @@
       "viewPrices": "Prices",
       "viewAttributes": "Attributes",
       "attributeColumn": "Attribute",
+      "itemsHeader": "Compared items",
       "worth": "Worth",
       "estimatedPrice": "Estimated Price",
       "errorTitle": "Couldn't load comparison",

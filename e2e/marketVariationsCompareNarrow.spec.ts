@@ -145,7 +145,8 @@ test('Variations compare keeps real item columns above sm (1280px)', async ({ pa
   await page.setViewportSize(DESKTOP);
   const drawer = await openCompareDrawer(page);
 
-  // Items are columns again, with a visible header row per category table.
+  // Items are columns again, named once in the sticky header row above every
+  // category (each category table keeps its own header, visually hidden).
   // The compared set includes the searched item itself (owner decision #2)
   // alongside its variants — `ITEM` would only match one column as a
   // substring, so this asserts on a variant's exact name instead.

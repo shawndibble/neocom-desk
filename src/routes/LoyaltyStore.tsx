@@ -7,6 +7,10 @@
  * bottom sheet instead of a second column. See
  * src/features/loyalty/useLoyaltyStoreOffers.ts for how the numbers are
  * assembled.
+ *
+ * The header's `LpStorePicker` opens any NPC corporation's store, LP or not
+ * (issue #2321); `/wallet/loyalty` with no corporation is the picker's
+ * landing state.
  */
 import {
   useCallback,
@@ -65,6 +69,7 @@ import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS } from '@/market/hubs';
 import { nameForType } from '@/features/industry/blueprintCatalog';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useLoyaltyStoreOffers } from '@/features/loyalty/useLoyaltyStoreOffers';
+import { LpStorePicker } from '@/features/loyalty/LpStorePicker';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import type { ResolvedMaterial } from '@/engine/industry/materialResolution';
@@ -367,11 +372,57 @@ const FILTER_PARAMS = {
 
 const OFFERS_SORT = { columnId: 'iskPerLp', direction: 'desc' } as const;
 
+/** The picker in the page header, sized so it wraps onto its own line on a phone. */
+const PICKER_CLASS = 'w-72 max-w-full';
+
+function BackToWallet() {
+  const { t } = useTranslation();
+  // `self-start`, unlike `SkillPlanEditor`'s otherwise identical link: this
+  // one's parent is a `flex flex-col`, whose default `align-items: stretch`
+  // would blow the control's intrinsic width out to the full page — a
+  // full-width bordered bar above the header.
+  return (
+    <Link to="/wallet" className={buttonClassName({ size: 'sm', className: 'self-start' })}>
+      {t('loyaltyStore.back')}
+    </Link>
+  );
+}
+
+/** `/wallet/loyalty` with no corporation chosen yet: just the picker. */
+function LoyaltyStoreLanding() {
+  const { t } = useTranslation();
+  return (
+    <div className="mx-auto flex max-w-6xl flex-col gap-3">
+      <BackToWallet />
+      <PageHeader
+        title={t('loyaltyStore.title')}
+        actions={<LpStorePicker corporationName={null} className={PICKER_CLASS} />}
+      />
+      <Panel>
+        <EmptyState title={t('loyaltyStore.landingTitle')} hint={t('loyaltyStore.landingHint')} />
+      </Panel>
+    </div>
+  );
+}
+
+/**
+ * The route: `/wallet/loyalty` (landing) or `/wallet/loyalty/:corporationId`.
+ * Keyed on the corporation so switching stores from the picker remounts the
+ * page — no previous store's offers, selection or loaded state carried over
+ * under the new store's URL.
+ */
 export function LoyaltyStore() {
+  const { corporationId: corporationIdParam } = useParams<{ corporationId?: string }>();
+  const corporationId = Number(corporationIdParam);
+  if (corporationIdParam === undefined || !Number.isInteger(corporationId) || corporationId <= 0) {
+    return <LoyaltyStoreLanding />;
+  }
+  return <LoyaltyStoreView key={corporationId} corporationId={corporationId} />;
+}
+
+function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { corporationId: corporationIdParam } = useParams<{ corporationId: string }>();
-  const corporationId = Number(corporationIdParam);
   const isDesktop = useIsDesktop();
 
   const hydrateHub = useMarketHub((s) => s.hydrate);
@@ -656,13 +707,7 @@ export function LoyaltyStore() {
   return (
     <ItemActionsProvider page={itemActions}>
       <div className="mx-auto flex max-w-6xl flex-col gap-3">
-        {/* `self-start`, unlike `SkillPlanEditor`'s otherwise identical link:
-          this one's parent is a `flex flex-col`, whose default
-          `align-items: stretch` would blow the control's intrinsic width out
-          to the full page — a full-width bordered bar above the header. */}
-        <Link to="/wallet" className={buttonClassName({ size: 'sm', className: 'self-start' })}>
-          {t('loyaltyStore.back')}
-        </Link>
+        <BackToWallet />
 
         <PageHeader
           title={corpName ?? t('loyaltyStore.title')}
@@ -680,6 +725,7 @@ export function LoyaltyStore() {
               />
             </div>
           }
+          actions={<LpStorePicker corporationName={corpName} className={PICKER_CLASS} />}
         />
 
         <FilterBar

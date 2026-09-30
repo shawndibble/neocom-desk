@@ -169,6 +169,7 @@ const ROUTE_ELEMENTS = {
   '/fittings/*': <LegacyShipsRedirect />,
   '/market': <Market />,
   '/wallet': <Wallet />,
+  '/wallet/loyalty': <LoyaltyStore />,
   '/wallet/loyalty/:corporationId': <LoyaltyStore />,
   '/mining': <MoonMiningTax />,
   '/clones': <Clones />,
