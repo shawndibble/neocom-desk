@@ -608,6 +608,31 @@ export function getUniverseStation(
   });
 }
 
+// --- GET /universe/stargates/{stargate_id} (public) ---
+
+/**
+ * A stargate and where it leads (issue #2329). `/universe/names` cannot name
+ * a stargate — ESI rejects the whole batch — so Route Safety reads each gate
+ * zKillboard places a kill at from here, once per session.
+ */
+export interface UniverseStargate {
+  stargate_id: number;
+  /** "Stargate (Nourvukaiken)". */
+  name: string;
+  system_id: number;
+  destination: { stargate_id: number; system_id: number };
+}
+
+export function getUniverseStargate(
+  stargateId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<UniverseStargate>> {
+  return esiFetch<UniverseStargate>(`/universe/stargates/${stargateId}`, {
+    ...options,
+    endpointId: 'getUniverseStargate',
+  });
+}
+
 // --- GET /universe/systems/{system_id} (public) ---
 
 export interface UniverseSystem {

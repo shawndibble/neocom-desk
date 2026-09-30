@@ -8,6 +8,7 @@
  * path segments live in one place instead of as template strings in JSX.
  */
 import type { KillmailVictim } from '@/engine/fittings/linkLoader';
+import type { RecentKill, RecentKillAttacker } from '@/engine/route/recentKills';
 
 /**
  * A zKillboard link carries only the killmail id, but ESI's killmail endpoint
@@ -213,6 +214,64 @@ export async function fetchPilotStats(characterId: number): Promise<PilotStatsRe
   } catch {
     return { kind: 'failed' };
   }
+}
+
+/** `ok: false` when zKillboard failed or rate-limited, so "no kills" and "couldn't load" differ. */
+export type SystemRecentKillsResult = { ok: true; kills: RecentKill[] } | { ok: false };
+
+function parseAttacker(value: unknown): RecentKillAttacker | null {
+  if (!isRecord(value)) return null;
+  const attacker: RecentKillAttacker = {};
+  if (typeof value.ship_type_id === 'number') attacker.shipTypeId = value.ship_type_id;
+  if (typeof value.weapon_type_id === 'number') attacker.weaponTypeId = value.weapon_type_id;
+  return attacker;
+}
+
+/**
+ * Reads a `kills/systemID` body defensively (issue #2329). zKillboard sends
+ * the killmail inline; an entry without an id or a readable time is dropped,
+ * and so is every NPC kill (`zkb.npc`) — Route Safety counts player kills.
+ */
+export function parseSystemKills(body: unknown): RecentKill[] {
+  if (!Array.isArray(body)) return [];
+  const kills: RecentKill[] = [];
+  for (const entry of body) {
+    if (!isRecord(entry) || typeof entry.killmail_id !== 'number') continue;
+    const time = typeof entry.killmail_time === 'string' ? Date.parse(entry.killmail_time) : NaN;
+    if (!Number.isFinite(time)) continue;
+    const zkb = isRecord(entry.zkb) ? entry.zkb : {};
+    if (zkb.npc === true) continue;
+    kills.push({
+      killmailId: entry.killmail_id,
+      time,
+      locationId: finiteOrNull(zkb.locationID),
+      attackers: Array.isArray(entry.attackers)
+        ? entry.attackers.flatMap((attacker) => parseAttacker(attacker) ?? [])
+        : [],
+    });
+  }
+  return kills;
+}
+
+/**
+ * A solar system's player kills from the last hour, for Route Safety. A
+ * browser fetch with no custom headers, as `fetchKillmailHash` (scope
+ * decision `20260924-195833`).
+ */
+export async function fetchSystemRecentKills(systemId: number): Promise<SystemRecentKillsResult> {
+  try {
+    const response = await fetch(
+      `https://zkillboard.com/api/kills/systemID/${systemId}/pastSeconds/3600/`
+    );
+    if (!response.ok) return { ok: false };
+    return { ok: true, kills: parseSystemKills(await response.json()) };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export function systemZkillUrl(systemId: number): string {
+  return `https://zkillboard.com/system/${systemId}/`;
 }
 
 export function characterZkillUrl(characterId: number): string {

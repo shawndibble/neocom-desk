@@ -437,9 +437,12 @@ here — they go one per file in `docs/context/decisions/`.
   would read as "nobody is hauling back" where the truth is "we cannot tell".
 - **Route Safety**: Travel's view of a stargate route — every system on it, in
   order, with its security, region, the last hour of jumps and ship, pod and
-  NPC kills ESI reports, and a mark on any **Gank Chokepoint**. States
-  conditions, never a verdict: no system or route is ever called safe or not.
-  A figure ESI could not supply is unknown, never zero.
+  NPC kills ESI reports, and a mark on any **Gank Chokepoint**. Each system
+  also lists zKillboard's last hour of player kills, grouped by the stargate
+  or station they happened at (gates leading along the route highlighted),
+  tagged when an Interdictor/HIC (nullsec) or a smartbomb was on the mail.
+  States conditions, never a verdict: no system or route is ever called safe
+  or not. A figure ESI or zKillboard could not supply is unknown, never zero.
 - **Pilot Lookup**: Travel's view of one pilot, found by name — portrait,
   corporation, alliance and character age from public ESI, and the all-time
   kills, losses, ISK, solo kills, danger and gang ratios and most-used hulls
