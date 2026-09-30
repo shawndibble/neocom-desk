@@ -4611,10 +4611,6 @@
         "title": "New mail",
         "body": "{{character}} has new mail."
       },
-      "cloneJumpReady": {
-        "title": "Clone jump ready",
-        "body": "{{character}} can jump clones again."
-      },
       "spExtractionReady": {
         "title": "SP extraction ready",
         "body": "{{character}} has enough spare skill points to use a Skill Extractor."

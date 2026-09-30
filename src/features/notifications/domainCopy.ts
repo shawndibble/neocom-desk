@@ -156,10 +156,7 @@ export const cloneJumpCopy: DomainCopy<CloneJumpReadyFire, NoNames> & {
   poll: (_fire, character) => simple('cloneJumpReady', { character }),
   push: (_fire, character) => {
     assertProjectionWording('cloneJumpReady', 'assert');
-    return {
-      title: 'Clone jump ready',
-      body: `${character} can jump clones again.`,
-    };
+    return renderSharedWording('cloneJumpReady', { character });
   },
 };
 

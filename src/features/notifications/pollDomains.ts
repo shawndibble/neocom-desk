@@ -32,7 +32,7 @@ import {
 import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
 import { loadCharacterClones } from '@/features/character/clones';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import { cloneJumpCooldown, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/cloneJump';
+import { cloneJumpCooldownHours, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/cloneJump';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { extractorProgramsFromPins } from '@/features/pi/adapters';
 import { loadMailHeaders } from '@/features/character/mail';
@@ -550,10 +550,8 @@ export const cloneJumpDomain = defineDomain<
     const lastJumpMs = last ? Date.parse(last) : NaN;
     // Never jumped: no cooldown to end, so no entry — and no skills fetch.
     if (!Number.isFinite(lastJumpMs)) return [];
-    const now = new Date();
-    const level = await infomorphSynchronizingLevel(characterId, now.getTime());
-    const { readyAt } = cloneJumpCooldown(last, level, now);
-    return readyAt ? [{ lastJumpMs, readyAtMs: readyAt.getTime() }] : [];
+    const level = await infomorphSynchronizingLevel(characterId, Date.now());
+    return [{ lastJumpMs, readyAtMs: lastJumpMs + cloneJumpCooldownHours(level) * HOUR_MS }];
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
   projection: async (characterId, characterName, snapshot, nowMs) =>
