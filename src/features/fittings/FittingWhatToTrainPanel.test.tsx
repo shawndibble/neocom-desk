@@ -8,6 +8,7 @@ import { normalizePlan } from '@/engine/plan';
 import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
 import type { SkillGain } from '@/engine/fittings/skillGains';
 import { newPlan } from '@/features/skills/planner/newPlan';
+import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import { FittingWhatToTrainPanel } from './FittingWhatToTrainPanel';
 import type { SkillGainEvaluator } from './useFittingEvaluation';
 
@@ -120,7 +121,7 @@ function renderPanel() {
 }
 
 function rowFor(name: string) {
-  const cell = screen.getByText(name, { selector: 'span' });
+  const cell = screen.getByRole('button', { name });
   const row = cell.closest('li');
   if (!row) throw new Error(`no row for ${name}`);
   return row as HTMLElement;
@@ -320,5 +321,17 @@ describe('FittingWhatToTrainPanel — Skill Plan button and prerequisites', () =
     const list = card.closest('div') as HTMLElement;
     expect(within(list).getByText('Gunnery')).toBeInTheDocument();
     expect(within(list).getByText('Surgical Strike')).toBeInTheDocument();
+  });
+});
+
+describe('FittingWhatToTrainPanel — skill detail', () => {
+  it('opens the skill detail modal from the skill name', async () => {
+    useSkillDetailModalStore.setState({ request: null });
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(await screen.findByRole('button', { name: 'Surgical Strike' }));
+
+    expect(useSkillDetailModalStore.getState().request).toEqual({ typeID: 3315 });
   });
 });
