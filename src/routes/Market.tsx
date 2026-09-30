@@ -868,7 +868,6 @@ export function Market() {
       value={itemTab}
       onChange={(id) => setItemTab(id as 'orders' | 'history')}
       label={t('market.itemTabsLabel')}
-      className="min-w-0 flex-1"
     />
   );
 
@@ -1183,7 +1182,7 @@ export function Market() {
                         </p>
                       )}
                       <div className="divide-y divide-line">
-                        {/* Outside the funnel, so a collapsed bar can't hide why a range isn't applying. */}
+                        {/* In the book, not the finder's funnel, so a collapsed bar can't hide why a range isn't applying. */}
                         {(jumpNoteShown || failedRegionCount > 0) && (
                           <div className="flex flex-col items-end gap-1 px-3 py-2 text-xs text-text-dim">
                             {jumpNoteShown && <JumpRangeNote status={jumpRangeFilter.status} />}
