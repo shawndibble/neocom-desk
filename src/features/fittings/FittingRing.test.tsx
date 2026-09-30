@@ -191,6 +191,24 @@ describe('FittingRing', () => {
     expect(screen.getByLabelText('Low slots 1, online')).toBeTruthy();
   });
 
+  it('colours each fitted tile border by the state it reached', () => {
+    const { container } = render(
+      <FittingRing
+        fitting={fitting}
+        stats={statsWith(10)}
+        moduleResults={[
+          { state: 'overload', maxState: 'overload', chargeGroupIds: [] },
+          { state: 'online', maxState: 'online', chargeGroupIds: [] },
+        ]}
+      />
+    );
+    const tiles = [...container.querySelectorAll('[data-module-state]')];
+    const borderOf = (state: string) =>
+      tiles.find((el) => el.getAttribute('data-module-state') === state)?.className;
+    expect(borderOf('overload')).toContain('border-warning');
+    expect(borderOf('online')).toContain('border-accent');
+  });
+
   it('marks the slot the Add panel is filling', () => {
     render(
       <FittingRing

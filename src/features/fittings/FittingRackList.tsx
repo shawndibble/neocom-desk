@@ -52,6 +52,7 @@ import { useFittingDropTarget, useFittingItemActions } from './fittingItemAction
 import type { AddTarget } from './addTarget';
 import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
+import { MODULE_STATE_STYLE } from './moduleStateStyle';
 
 const RACK_LABEL_CLASS =
   'mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
@@ -238,7 +239,7 @@ export function ModuleRow({
     >
       <NativeSelect
         size="sm"
-        className={`w-28 shrink-0 ${TOUCH_SELECT_CLASS}`}
+        className={`w-28 shrink-0 ${TOUCH_SELECT_CLASS} ${MODULE_STATE_STYLE[shownState].text} [&>select]:text-inherit`}
         aria-label={t('fittings.edit.stateLabel', { name })}
         value={shownState}
         onChange={(event) =>
