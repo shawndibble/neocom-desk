@@ -38,6 +38,10 @@ describe('parsePilotStats', () => {
     expect(parsePilotStats({ error: 'Invalid type or id' })).toEqual({ kind: 'no-history' });
   });
 
+  it('reads any other zKillboard error body as a failure', () => {
+    expect(parsePilotStats({ error: 'Rate limited' })).toBeNull();
+  });
+
   it('reads a body with no kill or loss counts as no history', () => {
     expect(parsePilotStats({ activepvp: {}, info: { id: 1 }, topLists: [] })).toEqual({
       kind: 'no-history',

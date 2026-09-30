@@ -154,6 +154,13 @@ describe('PilotLookupTab', () => {
     expect(await screen.findByText("This pilot couldn't be found")).toBeTruthy();
   });
 
+  it('shows an ESI outage apart from an unknown pilot', async () => {
+    mocks.loadPilotProfile.mockRejectedValue(new Error('offline'));
+    renderTab('/travel/pilot?pilot=42');
+    expect(await screen.findByText("EVE couldn't be reached")).toBeTruthy();
+    expect(screen.queryByText("This pilot couldn't be found")).toBeNull();
+  });
+
   it('shows no history apart from a failure', async () => {
     mocks.fetchPilotStats.mockResolvedValue({ kind: 'no-history' });
     renderTab('/travel/pilot?pilot=42');

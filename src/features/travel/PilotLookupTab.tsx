@@ -96,6 +96,8 @@ function PilotSearch({ onSelect }: { onSelect: (pilot: PilotSummary) => void }) 
   const [resolve, setResolve] = useState<ResolveState>({ kind: 'idle' });
   // Only the newest search may write results: ESI can answer out of order.
   const latestSearch = useRef(0);
+  // Likewise for an exact-name lookup: typing again supersedes one in flight.
+  const latestLookup = useRef(0);
 
   const trimmed = query.trim();
   const shown = canSuggest && trimmed.length >= MIN_RECIPIENT_SEARCH_LENGTH ? suggestions : [];
@@ -133,14 +135,16 @@ function PilotSearch({ onSelect }: { onSelect: (pilot: PilotSummary) => void }) 
 
   async function lookUpExactName() {
     if (trimmed === '') return;
+    const ticket = ++latestLookup.current;
     setOpen(false);
     setResolve({ kind: 'resolving' });
     try {
       const pilot = await resolvePilotByName(trimmed);
+      if (ticket !== latestLookup.current) return;
       if (pilot === null) setResolve({ kind: 'not-found', name: trimmed });
       else choose(pilot);
     } catch {
-      setResolve({ kind: 'failed' });
+      if (ticket === latestLookup.current) setResolve({ kind: 'failed' });
     }
   }
 
@@ -154,6 +158,7 @@ function PilotSearch({ onSelect }: { onSelect: (pilot: PilotSummary) => void }) 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Escape') {
       setOpen(false);
+      setHighlight(null);
       return;
     }
     const key = e.key;
@@ -177,7 +182,7 @@ function PilotSearch({ onSelect }: { onSelect: (pilot: PilotSummary) => void }) 
               role="combobox"
               aria-autocomplete="list"
               aria-expanded={listOpen}
-              aria-controls={listboxId}
+              aria-controls={listOpen ? listboxId : undefined}
               aria-activedescendant={
                 listOpen && highlight !== null ? `${listboxId}-option-${highlight}` : undefined
               }
@@ -186,7 +191,10 @@ function PilotSearch({ onSelect }: { onSelect: (pilot: PilotSummary) => void }) 
               autoComplete="off"
               value={query}
               onChange={(e) => {
+                // Typing supersedes a lookup in flight, and another query's hits must not linger.
+                latestLookup.current++;
                 setQuery(e.target.value);
+                setSuggestions([]);
                 setOpen(true);
                 setHighlight(null);
                 setResolve({ kind: 'idle' });
@@ -248,7 +256,10 @@ function PilotSearch({ onSelect }: { onSelect: (pilot: PilotSummary) => void }) 
 }
 
 type ProfileState =
-  { kind: 'loading' } | { kind: 'unknown' } | { kind: 'ready'; profile: PilotProfile };
+  | { kind: 'loading' }
+  | { kind: 'unknown' }
+  | { kind: 'failed' }
+  | { kind: 'ready'; profile: PilotProfile };
 
 /** Mounted per pilot (keyed by id), so each lookup starts from `loading` with nothing stale. */
 function PilotResult({ characterId }: { characterId: number }) {
@@ -264,7 +275,7 @@ function PilotResult({ characterId }: { characterId: number }) {
           setProfile(loaded === null ? { kind: 'unknown' } : { kind: 'ready', profile: loaded });
       })
       .catch(() => {
-        if (!cancelled) setProfile({ kind: 'unknown' });
+        if (!cancelled) setProfile({ kind: 'failed' });
       });
     void fetchPilotStats(characterId).then((result) => {
       if (!cancelled) setStats(result);
@@ -279,6 +290,14 @@ function PilotResult({ characterId }: { characterId: number }) {
       <div className="flex justify-center py-10">
         <Spinner label={t('common.loading')} />
       </div>
+    );
+  }
+  if (profile.kind === 'failed') {
+    return (
+      <EmptyState
+        title={t('travel.pilot.profileFailedTitle')}
+        hint={t('travel.pilot.profileFailedHint')}
+      />
     );
   }
   if (profile.kind === 'unknown') {
@@ -301,6 +320,7 @@ function PilotIdentity({ profile }: { profile: PilotProfile }) {
   // Rendered once per lookup; "now" for an age in years and days needs no ticking.
   const [now] = useState(() => new Date());
   const age = pilotAge(profile.birthday, now);
+  const { allianceId } = profile;
   return (
     <div className="flex flex-wrap items-start gap-4">
       <CharacterAvatar characterId={profile.characterId} size="lg" alt={profile.name} />
@@ -319,15 +339,15 @@ function PilotIdentity({ profile }: { profile: PilotProfile }) {
           </dd>
           <dt className="text-text-dim">{t('travel.pilot.alliance')}</dt>
           <dd>
-            {profile.allianceId === null ? (
+            {allianceId === null ? (
               t('travel.pilot.noAlliance')
             ) : (
               <button
                 type="button"
                 className={inlineLinkClassName}
-                onClick={() => openPublicInfoModal('alliance', profile.allianceId as number)}
+                onClick={() => openPublicInfoModal('alliance', allianceId)}
               >
-                {profile.allianceName ?? t('travel.pilot.unnamed', { id: profile.allianceId })}
+                {profile.allianceName ?? t('travel.pilot.unnamed', { id: allianceId })}
               </button>
             )}
           </dd>
@@ -363,8 +383,9 @@ function PilotIdentity({ profile }: { profile: PilotProfile }) {
   );
 }
 
-function percent(value: number | null, digits = 0): string {
-  return value === null ? '—' : `${(value * 100).toFixed(digits)}%`;
+/** A 0-1 share as a percentage; zKillboard's ratios are already 0-100, so they pass `scale` 1. */
+function percent(value: number | null, digits = 0, scale = 100): string {
+  return value === null ? '—' : `${(value * scale).toFixed(digits)}%`;
 }
 
 function PilotStatsSection({ stats }: { stats: PilotStatsResult | null }) {
@@ -397,8 +418,8 @@ function PilotStatsSection({ stats }: { stats: PilotStatsResult | null }) {
     [t('travel.pilot.iskLost'), formatIskCompact(s.iskLost)],
     [t('travel.pilot.iskEfficiency'), percent(s.iskEfficiency, 1)],
     [t('travel.pilot.soloKills'), s.soloKills.toLocaleString()],
-    [t('travel.pilot.dangerRatio'), s.dangerRatio === null ? '—' : `${s.dangerRatio}%`],
-    [t('travel.pilot.gangRatio'), s.gangRatio === null ? '—' : `${s.gangRatio}%`],
+    [t('travel.pilot.dangerRatio'), percent(s.dangerRatio, 0, 1)],
+    [t('travel.pilot.gangRatio'), percent(s.gangRatio, 0, 1)],
   ];
   return (
     <section aria-label={t('travel.pilot.statsLabel')} className="space-y-3">

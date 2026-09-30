@@ -164,6 +164,37 @@ describe('Travel › Route Safety', () => {
     expect(await screen.findByText('Pick where the route starts and ends')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/travel/route');
   });
+
+  it('opens Pilot Lookup from a bare /travel?pilot= link', async () => {
+    server.use(
+      http.get(`${ESI}/characters/42`, () =>
+        HttpResponse.json({
+          name: 'Some Pilot',
+          birthday: '2010-01-01T00:00:00Z',
+          corporation_id: 200,
+          bloodline_id: 1,
+          gender: 'male',
+          race_id: 1,
+        })
+      ),
+      http.post(`${ESI}/characters/affiliation`, () =>
+        HttpResponse.json([{ character_id: 42, corporation_id: 200 }])
+      ),
+      http.post(`${ESI}/universe/names`, () =>
+        HttpResponse.json([{ id: 200, name: 'Some Corp', category: 'corporation' }])
+      ),
+      http.get('https://zkillboard.com/api/stats/characterID/42/', () =>
+        HttpResponse.json({ error: 'Invalid type or id' })
+      )
+    );
+    window.history.pushState({}, '', '/travel?pilot=42');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/travel/pilot');
+    expect(window.location.search).toBe('?pilot=42');
+    expect(await screen.findByText('No kills or losses on zKillboard')).toBeInTheDocument();
+  });
 });
 
 describe('Travel copy', () => {

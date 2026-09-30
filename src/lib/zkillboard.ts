@@ -149,16 +149,22 @@ function parseTopShips(topAllTime: unknown): PilotTopShip[] {
   return ships.slice(0, PILOT_TOP_SHIPS);
 }
 
+/** zKillboard's answer for an id it has never recorded a kill or loss for. */
+const UNKNOWN_ID_ERROR = 'Invalid type or id';
+
 /**
  * Reads a `/api/stats/characterID/{id}/` body defensively. zKillboard answers
  * an id it has never seen with a 200 `{"error": "Invalid type or id"}`, and a
  * pilot with no kill or loss with a body that carries no counts — both are
- * "no history", distinct from a failure. `null` for a body that is not an
- * object at all.
+ * "no history", distinct from a failure. zKillboard leaves a zero count out
+ * of the body, so a missing count reads as 0. `null` (a failure) for any
+ * other error body, and for a body that is not an object at all.
  */
 export function parsePilotStats(body: unknown): PilotStatsParse | null {
   if (!isRecord(body) || Array.isArray(body)) return null;
-  if (typeof body.error === 'string') return { kind: 'no-history' };
+  if (body.error !== undefined) {
+    return body.error === UNKNOWN_ID_ERROR ? { kind: 'no-history' } : null;
+  }
   const kills = countOrZero(body.shipsDestroyed);
   const losses = countOrZero(body.shipsLost);
   if (kills === 0 && losses === 0) return { kind: 'no-history' };

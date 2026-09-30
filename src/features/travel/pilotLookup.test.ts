@@ -2,12 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   postUniverseIds: vi.fn(),
+  getCharacterPublicInfo: vi.fn(),
   loadPublicCharacterInfo: vi.fn(),
   resolveAffiliations: vi.fn(),
   resolveNames: vi.fn(),
 }));
 
-vi.mock('@/esi/endpoints', () => ({ postUniverseIds: mocks.postUniverseIds }));
+vi.mock('@/esi/endpoints', () => ({
+  postUniverseIds: mocks.postUniverseIds,
+  getCharacterPublicInfo: mocks.getCharacterPublicInfo,
+}));
 vi.mock('@/features/character/publicInfoData', () => ({
   loadPublicCharacterInfo: mocks.loadPublicCharacterInfo,
 }));
@@ -16,6 +20,7 @@ vi.mock('@/features/character/affiliations', () => ({
 }));
 vi.mock('@/features/character/names', () => ({ resolveNames: mocks.resolveNames }));
 
+import { EsiError } from '@/esi/errors';
 import { loadPilotProfile, pilotAge, resolvePilotByName } from './pilotLookup';
 
 describe('pilotAge', () => {
@@ -124,6 +129,14 @@ describe('loadPilotProfile', () => {
   it('is null when ESI knows no such character', async () => {
     mocks.loadPublicCharacterInfo.mockResolvedValue(null);
     mocks.resolveAffiliations.mockResolvedValue(new Map());
+    mocks.getCharacterPublicInfo.mockRejectedValue(new EsiError(404, 'Character not found'));
     expect(await loadPilotProfile(42)).toBeNull();
+  });
+
+  it('rejects, rather than calling the pilot unknown, when ESI could not be reached', async () => {
+    mocks.loadPublicCharacterInfo.mockResolvedValue(null);
+    mocks.resolveAffiliations.mockResolvedValue(new Map());
+    mocks.getCharacterPublicInfo.mockRejectedValue(new EsiError(0, 'timeout'));
+    await expect(loadPilotProfile(42)).rejects.toThrow('timeout');
   });
 });

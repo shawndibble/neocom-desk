@@ -3,7 +3,8 @@
  * alliance and character age — from public ESI alone. Their kills and losses
  * come from zKillboard (`lib/zkillboard.ts`), not from here.
  */
-import { postUniverseIds } from '@/esi/endpoints';
+import { getCharacterPublicInfo, postUniverseIds, type CharacterPublicInfo } from '@/esi/endpoints';
+import { EsiError } from '@/esi/errors';
 import { resolveAffiliations } from '@/features/character/affiliations';
 import { resolveNames } from '@/features/character/names';
 import { loadPublicCharacterInfo } from '@/features/character/publicInfoData';
@@ -53,16 +54,32 @@ export async function resolvePilotByName(
 }
 
 /**
+ * The public record when the cached loader came back empty. That loader folds
+ * "ESI has no such character" and "ESI could not be reached" into the same
+ * null, and Pilot Lookup shows those differently, so one direct request
+ * tells them apart: a 404 is null, any other failure throws.
+ */
+async function publicInfoOrNull(characterId: number): Promise<CharacterPublicInfo | null> {
+  try {
+    return (await getCharacterPublicInfo(characterId)).data;
+  } catch (err) {
+    if (err instanceof EsiError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+/**
  * The pilot's public record joined with their current affiliation. The public
  * record is cached as static, so its `corporation_id` can be stale — the
  * affiliation lookup is what moves, and wins when it answered. Null when ESI
- * has no such character.
+ * has no such character; rejects when ESI could not be reached.
  */
 export async function loadPilotProfile(characterId: number): Promise<PilotProfile | null> {
-  const [info, affiliations] = await Promise.all([
+  const [cached, affiliations] = await Promise.all([
     loadPublicCharacterInfo(characterId),
     resolveAffiliations([characterId]),
   ]);
+  const info = cached ?? (await publicInfoOrNull(characterId));
   if (info === null) return null;
   const affiliation = affiliations.get(characterId);
   const corporationId = affiliation?.corporation_id ?? info.corporation_id;
