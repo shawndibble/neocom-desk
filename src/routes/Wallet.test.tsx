@@ -134,6 +134,20 @@ describe('Wallet', () => {
     );
   });
 
+  it('offers Browse LP stores even when the Character holds no LP anywhere (issue #2321)', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/loyalty/points`, () =>
+        HttpResponse.json([])
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Browse LP stores' })).toHaveAttribute(
+      'href',
+      '/wallet/loyalty'
+    );
+  });
+
   it('opens a Copy Name / Show Info menu on a loyalty row right-click', async () => {
     render(<App />);
     expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
