@@ -65,6 +65,22 @@ export async function resolveNames(ids: readonly number[]): Promise<Map<number, 
   return map;
 }
 
+/**
+ * The cached names for `ids`, lapsed or not, with no request of any kind —
+ * for a caller that must never touch the network (the Command Palette
+ * searches on every keystroke). Ids never resolved on this device are absent.
+ */
+export async function readCachedNames(ids: readonly number[]): Promise<Map<number, string>> {
+  const unique = [...new Set(ids)];
+  const cached = await readCachedEntries<string>(GLOBAL_CACHE_CHARACTER_ID, unique.map(cacheKey));
+  const map = new Map<number, string>();
+  for (const id of unique) {
+    const row = cached.get(cacheKey(id));
+    if (row !== undefined) map.set(id, row.value);
+  }
+  return map;
+}
+
 /** Resolves and caches. Never rejects, so the background call needs no handler of its own. */
 async function fetchNames(ids: readonly number[]): Promise<Map<number, string>> {
   const resolved = new Map<number, string>();

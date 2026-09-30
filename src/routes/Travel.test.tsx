@@ -1,0 +1,186 @@
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+import '@/i18n';
+import en from '@/i18n/locales/en.json';
+import { db } from '@/db';
+import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
+import { clearJumpGraphIndex } from '@/sde/jumpGraph';
+import { clearSolarSystemIndex } from '@/sde/solarSystems';
+import { App } from '@/app/App';
+
+vi.mock('virtual:pwa-register/react', () => ({
+  useRegisterSW: () => ({
+    needRefresh: [false, vi.fn()],
+    offlineReady: [false, vi.fn()],
+    updateServiceWorker: vi.fn(),
+  }),
+}));
+
+vi.mock('@/sde/loadSde', () => ({
+  loadSkills: vi.fn(async () => []),
+  loadTypes: vi.fn(async () => ({})),
+  loadBlueprints: vi.fn(async () => ({})),
+  loadMarketWideTrees: vi.fn(async () => ({})),
+}));
+
+const loadSolarSystemJumps = vi.fn();
+vi.mock('@/sde/loadMarketSde', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/sde/loadMarketSde')>()),
+  loadSolarSystemJumps: () => loadSolarSystemJumps(),
+  loadSolarSystems: async () => SYSTEMS,
+  loadMarketRegions: async () => [{ id: 10000002, name: 'The Forge' }],
+}));
+
+const CHAR_ID = 91;
+const ESI = 'https://esi.evetech.net';
+
+const JITA = 30000142;
+const PERIMETER = 30000144;
+const UEDAMA = 30002768;
+const THERA = 31000005;
+
+const SYSTEMS = [
+  { id: JITA, name: 'Jita', security: 0.9459, regionId: 10000002 },
+  { id: PERIMETER, name: 'Perimeter', security: 0.95, regionId: 10000002 },
+  { id: UEDAMA, name: 'Uedama', security: 0.505, regionId: 10000033 },
+  { id: THERA, name: 'Thera', security: -0.99, regionId: 11000031 },
+];
+
+const JUMPS = {
+  [JITA]: [PERIMETER],
+  [PERIMETER]: [JITA, UEDAMA],
+  [UEDAMA]: [PERIMETER],
+  [THERA]: [],
+};
+
+const server = setupServer(
+  http.get(`${ESI}/universe/system_kills`, () =>
+    HttpResponse.json([{ system_id: UEDAMA, ship_kills: 12, pod_kills: 4, npc_kills: 2 }])
+  ),
+  http.get(`${ESI}/universe/system_jumps`, () =>
+    HttpResponse.json([
+      { system_id: JITA, ship_jumps: 4200 },
+      { system_id: UEDAMA, ship_jumps: 900 },
+    ])
+  ),
+  http.post(`${ESI}/universe/names`, () =>
+    HttpResponse.json([{ id: 10000033, name: 'The Citadel', category: 'region' }])
+  ),
+  http.get(`${ESI}/characters/${CHAR_ID}/location`, () =>
+    HttpResponse.json({ solar_system_id: JITA })
+  )
+);
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+afterAll(() => server.close());
+afterEach(() => server.resetHandlers());
+beforeEach(async () => {
+  clearJumpGraphIndex();
+  clearSolarSystemIndex();
+  loadSolarSystemJumps.mockReset();
+  loadSolarSystemJumps.mockResolvedValue(JUMPS);
+  await db.characters.clear();
+  await db.tokens.clear();
+  await db.settings.clear();
+  await db.esiCache.clear();
+  useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
+  await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
+  await db.tokens.put({
+    characterId: CHAR_ID,
+    accessToken: 'access-token',
+    refreshToken: 'refresh',
+    expiresAt: Date.now() + 3_600_000,
+    scopes: ['esi-location.read_location.v1'],
+  });
+  await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
+});
+
+function visit(search: string) {
+  window.history.pushState({}, '', `/travel/route${search}`);
+  render(<App />);
+}
+
+describe('Travel › Route Safety', () => {
+  it('lists every system on the route in order with its last hour of activity', async () => {
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    const table = await screen.findByRole('table', { name: 'Systems on the route' });
+    const rows = await within(table).findAllByRole('row');
+    const body = rows.slice(1);
+    expect(body.map((row) => within(row).getAllByRole('cell')[0].textContent)).toEqual([
+      'Jita',
+      'Perimeter',
+      expect.stringContaining('Uedama'),
+    ]);
+
+    const uedama = within(body[2]);
+    expect(await uedama.findByText('12')).toBeInTheDocument();
+    expect(uedama.getByText('900')).toBeInTheDocument();
+    expect(uedama.getByText('Gank Chokepoint')).toBeInTheDocument();
+    expect(await uedama.findByText('The Citadel')).toBeInTheDocument();
+    expect(within(body[0]).getByText('The Forge')).toBeInTheDocument();
+
+    expect(screen.getByText('Passes through Gank Chokepoints: Uedama')).toBeInTheDocument();
+    expect(screen.getByText('2 jumps from start to destination')).toBeInTheDocument();
+    expect(
+      screen.getByText('Last hour along the route: 12 ship kills, 4 pod kills')
+    ).toBeInTheDocument();
+  });
+
+  it('starts from the Current System when the link names no start', async () => {
+    visit(`?to=${UEDAMA}`);
+
+    expect(await screen.findByRole('table', { name: 'Systems on the route' })).toBeInTheDocument();
+    expect(await screen.findByText('Jita (current system)')).toBeInTheDocument();
+  });
+
+  it('says so when start and destination are the same system', async () => {
+    visit(`?from=${JITA}&to=${JITA}`);
+
+    expect(
+      await screen.findByText('Start and destination are the same system')
+    ).toBeInTheDocument();
+  });
+
+  it('says no stargate route exists, distinct from not knowing', async () => {
+    visit(`?from=${JITA}&to=${THERA}`);
+
+    expect(await screen.findByText('No stargate route connects these systems')).toBeInTheDocument();
+  });
+
+  it('says the route cannot be worked out when the stargate map is unreadable', async () => {
+    loadSolarSystemJumps.mockRejectedValue(new Error('offline'));
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    expect(await screen.findByText("This route can't be worked out right now")).toBeInTheDocument();
+  });
+
+  it('opens Route Safety from the bare /travel path', async () => {
+    window.history.pushState({}, '', '/travel');
+    render(<App />);
+
+    expect(await screen.findByText('Pick where the route starts and ends')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/travel/route');
+  });
+});
+
+describe('Travel copy', () => {
+  it('states conditions, never verdicts', () => {
+    const strings: string[] = [];
+    const walk = (node: unknown) => {
+      if (typeof node === 'string') strings.push(node);
+      else if (node && typeof node === 'object') Object.values(node).forEach(walk);
+    };
+    const catalog = en as unknown as Record<string, Record<string, unknown>>;
+    // Everything the page shows: its own section, its nav entry, and the
+    // Route Preference labels it borrows from Contract Search.
+    walk(catalog.travel);
+    walk([catalog.nav.travel, (catalog.nav.groups as Record<string, string>).intel]);
+    walk(catalog.contractSearch.routePreference);
+    for (const text of strings) {
+      expect(text, text).not.toMatch(/\b(safe|safest|unsafe|dangerous|danger|camp\w*)\b/i);
+    }
+  });
+});

@@ -46,6 +46,7 @@ export const LAZY_SECTIONS: readonly string[] = [
   'skills',
   'characters',
   'contacts',
+  'travel',
   'contracts',
   'mail',
   'loyaltyStore',

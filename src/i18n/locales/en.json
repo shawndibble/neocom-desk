@@ -19,7 +19,8 @@
     "groups": {
       "progression": "Progression",
       "economy": "Economy",
-      "social": "Social"
+      "social": "Social",
+      "intel": "Intel"
     },
     "wallet": "Wallet",
     "miningTax": "Mining",
@@ -31,6 +32,7 @@
     "calendar": "Calendar",
     "contracts": "Contracts",
     "contacts": "Contacts",
+    "travel": "Travel",
     "settings": "Settings",
     "soon": "Soon",
     "switchCharacter": "Switch character",
@@ -6049,11 +6051,13 @@
     "resultsCount_one": "{{count}} result",
     "resultsCount_other": "{{count}} results",
     "activeCharacter": "Active",
+    "contactStanding": "{{standing}} {{character}}",
     "lpBalance": "{{lp}} LP",
     "groups": {
       "pages": "Pages",
       "commands": "Commands",
       "characters": "Characters",
+      "contacts": "Contacts",
       "lpStores": "LP Stores",
       "marketItems": "Market items"
     },
@@ -6523,5 +6527,49 @@
     "noOrigin": "Set your current system to filter by distance.",
     "graphUnavailable": "Distances are unavailable offline. Showing every distance.",
     "distanceUnavailable": "Distance unavailable — the local stargate snapshot couldn't be read."
+  },
+  "travel": {
+    "title": "Travel",
+    "routeTab": "Route Safety",
+    "fromLabel": "From",
+    "toLabel": "To",
+    "preferenceLabel": "Route",
+    "pickSystem": "Pick a system",
+    "currentSystem": "{{system}} (current system)",
+    "changeFrom": "Change starting system — {{current}}",
+    "changeTo": "Change destination — {{current}}",
+    "pickTitle": "Pick where the route starts and ends",
+    "pickHint": "Every system on the route is listed with its security, region, and the last hour of jumps and kills ESI reports.",
+    "sameSystemTitle": "Start and destination are the same system",
+    "sameSystemHint": "There are no jumps to list. Pick a different destination.",
+    "noRouteTitle": "No stargate route connects these systems",
+    "noRouteHint": "One end has no stargates, or the two are not joined by any. Wormhole space is reached through wormholes, not gates.",
+    "unknownTitle": "This route can't be worked out right now",
+    "unknownHint": "The local stargate map couldn't be read. Check your connection and try again.",
+    "tableLabel": "Systems on the route",
+    "col": {
+      "system": "System",
+      "security": "Security",
+      "region": "Region",
+      "jumps": "Jumps (1h)",
+      "shipKills": "Ship kills (1h)",
+      "podKills": "Pod kills (1h)",
+      "npcKills": "NPC kills (1h)"
+    },
+    "chokepoint": "Gank Chokepoint",
+    "chokepointHint": "One of the systems haulers are most often killed in, as named by the community. A property of traffic, not of security status.",
+    "summary": {
+      "label": "Route summary",
+      "jumps_one": "{{count}} jump from start to destination",
+      "jumps_other": "{{count}} jumps from start to destination",
+      "bands": "{{highsec}} highsec, {{lowsec}} lowsec, {{nullsec}} nullsec systems",
+      "lowest": "Lowest security {{security}}",
+      "kills": "Last hour along the route: {{ships}} ship kills, {{pods}} pod kills",
+      "chokepoints": "Passes through Gank Chokepoints: {{names}}",
+      "noChokepoints": "Passes through no Gank Chokepoints"
+    },
+    "activityLoading": "Loading the last hour of jumps and kills…",
+    "activityUnavailable": "Some of ESI's last-hour figures couldn't be read, so they show as —, not as zero.",
+    "dataAgeNote": "Jumps and kills cover the last hour; ESI refreshes them about hourly."
   }
 }

@@ -84,6 +84,7 @@ const Mail = lazy(routeChunks.loadMail);
 const Calendar = lazy(routeChunks.loadCalendar);
 const Contracts = lazy(routeChunks.loadContracts);
 const Contacts = lazy(routeChunks.loadContacts);
+const Travel = lazy(routeChunks.loadTravel);
 const EmploymentHistory = lazy(routeChunks.loadEmploymentHistory);
 const Settings = lazy(routeChunks.loadSettings);
 const Styleguide = lazy(routeChunks.loadStyleguide);
@@ -189,6 +190,7 @@ const ROUTE_ELEMENTS = {
   // redirect so bookmarks and any link already in the wild still land on it.
   '/bpc-contracts': <Navigate to={industryTabHref('sourcing')} replace />,
   '/contacts': <Contacts />,
+  '/travel': <Travel />,
   '/settings': <Settings />,
 } satisfies Record<AppRoutePath, ReactElement>;
 

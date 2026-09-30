@@ -12,6 +12,13 @@ import { listNavDestinations, NAV_LOCK_PATHS } from '@/app/navDestinations';
 import { useLockedRoutes } from '@/app/useGrantedScopes';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
+import { openPublicInfoModal } from '@/stores/publicInfoModal';
+import { CONTACT_TYPE_KEY } from '@/features/character/contactsFilter';
+import {
+  createContactsProvider,
+  loadPaletteContacts,
+  type PaletteContact,
+} from './contactsProvider';
 import {
   createMarketItemsProvider,
   marketItemCatalogue,
@@ -25,6 +32,11 @@ import type { PaletteProvider, PaletteResult } from './types';
 import { usePaletteSearch } from './usePaletteSearch';
 
 const NO_CHARACTERS: readonly { characterId: number; name: string }[] = [];
+const NO_CONTACTS: readonly PaletteContact[] = [];
+
+function signedStanding(standing: number): string {
+  return standing > 0 ? `+${standing}` : String(standing);
+}
 
 /** The live reads behind the shipped groups, turned into providers. */
 function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): PaletteProvider[] {
@@ -36,6 +48,9 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
   const characters = useLiveQuery(() => db.characters.toArray(), [], NO_CHARACTERS);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
+  // Cache-only and live (Dexie re-reads it on a cache or grant change), never
+  // per keystroke: typing neither waits on it nor fetches.
+  const contacts = useLiveQuery(loadPaletteContacts, [], NO_CONTACTS);
 
   const destinations = useMemo(
     () => listNavDestinations({ locked, corpVisible, corpCapabilities: capabilities, t }),
@@ -73,6 +88,20 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
         activeHint: t('commandPalette.activeCharacter'),
         onSelect: (characterId) => void setActiveCharacter(characterId),
       }),
+      createContactsProvider({
+        contacts,
+        onOpen: openPublicInfoModal,
+        describe: (contact) =>
+          [
+            t(CONTACT_TYPE_KEY[contact.kind]),
+            ...contact.holders.map((holder) =>
+              t('commandPalette.contactStanding', {
+                standing: signedStanding(holder.standing),
+                character: holder.characterName,
+              })
+            ),
+          ].join(' · '),
+      }),
       lpStores,
       createMarketItemsProvider({ catalogue: marketItemCatalogue, onSelect: onShowItem }),
     ],
@@ -83,6 +112,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
       characters,
       activeCharacterId,
       setActiveCharacter,
+      contacts,
       lpStores,
       onShowItem,
     ]

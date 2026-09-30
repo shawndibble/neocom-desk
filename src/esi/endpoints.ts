@@ -11,6 +11,7 @@
  */
 import { uniqueTransactions } from './uniqueTransactions';
 import type { KillmailVictim } from '@/engine/fittings/linkLoader';
+import type { SystemJumpsEntry, SystemKillsEntry } from '@/engine/route/routeSafety';
 import { esiFetch, recordEsiActivity, outcomeForError, attachEndpointId } from './client';
 import type { EsiResult } from './client';
 import { fetchAllPagesStatus } from './paginated';
@@ -956,6 +957,36 @@ export function getIndustrySystemCostIndices(
   return esiFetch<SystemCostIndices[]>('/industry/systems', {
     ...options,
     endpointId: 'getIndustrySystemCostIndices',
+  });
+}
+
+// --- GET /universe/system_kills (public) ---
+
+/**
+ * Ship, pod and NPC kills per solar system in the last hour. ESI lists only
+ * systems that had kills, and none in wormhole space.
+ */
+export function getUniverseSystemKills(
+  options: EndpointOptions = {}
+): Promise<EsiResult<SystemKillsEntry[]>> {
+  return esiFetch<SystemKillsEntry[]>('/universe/system_kills', {
+    ...options,
+    endpointId: 'getUniverseSystemKills',
+  });
+}
+
+// --- GET /universe/system_jumps (public) ---
+
+/**
+ * Ship jumps per solar system in the last hour. ESI lists only systems that
+ * had jumps, and none in wormhole space.
+ */
+export function getUniverseSystemJumps(
+  options: EndpointOptions = {}
+): Promise<EsiResult<SystemJumpsEntry[]>> {
+  return esiFetch<SystemJumpsEntry[]>('/universe/system_jumps', {
+    ...options,
+    endpointId: 'getUniverseSystemJumps',
   });
 }
 

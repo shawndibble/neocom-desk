@@ -56,6 +56,7 @@ const ROUTE_TITLE_KEYS = {
   // A redirect into Industry's BPC tab; titled only because every route must be.
   '/bpc-contracts': ['nav.industry'],
   '/contacts': ['contacts.title'],
+  '/travel': ['travel.title'],
   '/settings': ['settings.title'],
 } satisfies Record<AppRoutePath, readonly string[]>;
 

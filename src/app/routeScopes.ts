@@ -203,6 +203,10 @@ export const ROUTE_REQUIREMENTS = {
   // A page gate on the calendar scope alone would blank five panels that still
   // work; the filter menu names the sources that need a new login instead.
   '/calendar': UNGATED,
+  // Route Safety (issue #2328) reads only public ESI (universe-wide kills and
+  // jumps, region names) and the local stargate graph, so no grant can lock
+  // it. It still sits behind a signed-in Character like every route here.
+  '/travel': UNGATED,
   /*
    * UNGATED, and not because it needs no scope — History needs
    * `read_character_contracts`. The page gates that scope per *tab* instead,
