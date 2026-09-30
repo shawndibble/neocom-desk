@@ -3,8 +3,12 @@ import type { AttributeWithSources, SourceLike } from './affectedBy';
 import {
   evaluateSkillGains,
   gainMetrics,
+  levelGain,
+  levelOptions,
+  pickedLevel,
   roleChanges,
   rankSkillGains,
+  scheduledSkillTargets,
   skillGainCandidates,
   skillSourceTypeIds,
   trainingTimeFor,
@@ -301,6 +305,53 @@ describe('gainMetrics — fleet boosts', () => {
   });
 });
 
+describe('levelGain', () => {
+  it('words one level: the displayed changes, the role changes and the scores, even when none moved', () => {
+    const after = withStats({ offense: { ...baseStats.offense, dps: 110 } });
+    const gain = levelGain(baseStats, after);
+    expect(gain.delta.changes.map((change) => change.key)).toContain('totalDps');
+    expect(gain.roleChanges).toEqual([]);
+    expect(gain.metrics.dps).toBeCloseTo(0.1);
+    const same = levelGain(baseStats, baseStats);
+    expect(same.delta.count).toBe(0);
+    expect(same.metrics.overall).toBe(0);
+  });
+});
+
+describe('levelOptions', () => {
+  it('lists the levels above what the pilot has, flagging those a plan already trains', () => {
+    expect(levelOptions(2, 3)).toEqual([
+      { level: 3, planned: true },
+      { level: 4, planned: false },
+      { level: 5, planned: false },
+    ]);
+    expect(levelOptions(0, 0).map((option) => option.level)).toEqual([1, 2, 3, 4, 5]);
+    expect(levelOptions(4, 0)).toEqual([{ level: 5, planned: false }]);
+  });
+
+  it('counts a plan that trains below what the pilot has as planning nothing', () => {
+    expect(levelOptions(3, 2).every((option) => !option.planned)).toBe(true);
+  });
+});
+
+describe('pickedLevel', () => {
+  const options = levelOptions(2, 3);
+
+  it('is the first level not in a plan until the pilot picks one', () => {
+    expect(pickedLevel(options, null)).toBe(4);
+  });
+
+  it('keeps a pick that is still open, and drops one a plan has since taken', () => {
+    expect(pickedLevel(options, 5)).toBe(5);
+    expect(pickedLevel(options, 3)).toBe(4);
+  });
+
+  it('is null once every level is in a plan', () => {
+    expect(pickedLevel(levelOptions(2, 5), 4)).toBeNull();
+    expect(pickedLevel([], null)).toBeNull();
+  });
+});
+
 describe('evaluateSkillGains', () => {
   const candidates = [
     { skillTypeId: 1, fromLevel: 3, toLevel: 4 },
@@ -441,5 +492,22 @@ describe('trainingTimeFor', () => {
       seconds: 80,
       includesPrerequisites: false,
     });
+  });
+});
+
+describe('scheduledSkillTargets', () => {
+  it('gives each scheduled skill once, at its highest level, in the order it first trains', () => {
+    expect(
+      scheduledSkillTargets([
+        { skillTypeID: 5, level: 1 },
+        { skillTypeID: 5, level: 2 },
+        { skillTypeID: 9, level: 3 },
+        { skillTypeID: 5, level: 3 },
+      ])
+    ).toEqual([
+      { skillTypeID: 5, targetLevel: 3 },
+      { skillTypeID: 9, targetLevel: 3 },
+    ]);
+    expect(scheduledSkillTargets([])).toEqual([]);
   });
 });
