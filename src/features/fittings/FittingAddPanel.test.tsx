@@ -326,4 +326,22 @@ describe('FittingAddPanel', () => {
     expect(screen.queryByRole('menuitem', { name: 'Change quantity…' })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: /^Remove/ })).toBeNull();
   });
+
+  it('shows the picked slot as its in-game icon, toggling the fits-this-slot filter', async () => {
+    const user = userEvent.setup();
+    renderPanel({ target: { kind: 'slot', slot: 'low', slotIndex: 0 } });
+
+    const toggle = screen.getByRole('button', { name: 'Fits this slot' });
+    expect(toggle.querySelector('img')).toHaveAttribute('src', '/images/fitting/slot-low.png');
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByText('Fits this slot')).not.toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('has no fits-this-slot toggle when no slot is picked', () => {
+    renderPanel({ target: null });
+    expect(screen.queryByRole('button', { name: 'Fits this slot' })).not.toBeInTheDocument();
+  });
 });

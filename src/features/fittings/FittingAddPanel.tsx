@@ -103,6 +103,14 @@ const FIT_FILTERS: readonly {
   },
 ];
 
+/** The in-game fitting window's rack icons, from the EVE University wiki. Subsystems have none, so theirs stays a text chip. */
+const SLOT_ICONS: Partial<Record<FittingSlotKind, string>> = {
+  high: '/images/fitting/slot-high.png',
+  medium: '/images/fitting/slot-medium.png',
+  low: '/images/fitting/slot-low.png',
+  rig: '/images/fitting/slot-rig.png',
+};
+
 interface BrowseFilterOptions {
   tab: BrowserTab;
   /** Only this rack — the chosen slot's, with "fits this slot" on. */
@@ -430,14 +438,24 @@ export function FittingAddPanel({
             onChange={(event) => setQuery(event.target.value)}
           />
           <div className="flex flex-wrap items-center gap-1.5">
-            {target?.kind === 'slot' && (
-              <FilterChip
-                label={t('fittings.add.fitsSlot')}
-                selected={fitsSlot}
-                tooltip={t('fittings.add.fitsSlotTooltip')}
-                onToggle={() => setFitsSlot((on) => !on)}
-              />
-            )}
+            {target?.kind === 'slot' &&
+              (SLOT_ICONS[target.slot] ? (
+                <IconButton
+                  icon={<img src={SLOT_ICONS[target.slot]} alt="" width={16} height={16} />}
+                  label={t('fittings.add.fitsSlot')}
+                  tooltip={t('fittings.add.fitsSlotTooltip')}
+                  size="sm"
+                  pressed={fitsSlot}
+                  onClick={() => setFitsSlot((on) => !on)}
+                />
+              ) : (
+                <FilterChip
+                  label={t('fittings.add.fitsSlot')}
+                  selected={fitsSlot}
+                  tooltip={t('fittings.add.fitsSlotTooltip')}
+                  onToggle={() => setFitsSlot((on) => !on)}
+                />
+              ))}
             <div className="flex items-center gap-1">
               {FIT_FILTERS.map(({ kind, icon, labelKey, tooltipKey }) => (
                 <IconButton
