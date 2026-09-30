@@ -61,19 +61,21 @@ export interface KillTagContext {
 
 /**
  * Bubbles can only be launched in nullsec, so a dictor on a highsec or lowsec
- * mail says nothing about a bubble and is not tagged.
+ * mail says nothing about a bubble and is not tagged. A killmail cannot show
+ * that a bubble was actually up — only that a bubble hull was there — so the
+ * tag's copy says exactly that.
  */
 export function classifyKillTags(kill: RecentKill, { groupOf, band }: KillTagContext): KillTags {
-  const groupOfOptional = (typeId: number | undefined) =>
+  const groupOfAttackerType = (typeId: number | undefined) =>
     typeId === undefined ? undefined : groupOf(typeId);
   const bubble =
     band === 'nullsec' &&
     kill.attackers.some((attacker) => {
-      const group = groupOfOptional(attacker.shipTypeId);
+      const group = groupOfAttackerType(attacker.shipTypeId);
       return group !== undefined && BUBBLE_HULL_GROUPS.has(group);
     });
   const smartbomb = kill.attackers.some(
-    (attacker) => groupOfOptional(attacker.weaponTypeId) === SMART_BOMB_GROUP_ID
+    (attacker) => groupOfAttackerType(attacker.weaponTypeId) === SMART_BOMB_GROUP_ID
   );
   return { bubble, smartbomb };
 }

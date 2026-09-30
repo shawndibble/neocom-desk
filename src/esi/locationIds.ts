@@ -21,3 +21,18 @@
  * `loadStructureCompetition`, never `loadStationBestPrices`).
  */
 export const UPWELL_STRUCTURE_ID_FLOOR = 1_000_000_000_000;
+
+/*
+ * CCP's id blocks for the static universe (issue #2329): stargates sit in
+ * 50,000,000–59,999,999 and NPC stations in 60,000,000–69,999,999. Planets,
+ * moons and belts are 40,000,000–49,999,999, and like stargates they have no
+ * `/universe/names` answer — so a caller naming a zKillboard location splits
+ * on these first rather than letting one id fail a whole batch.
+ */
+export function isStargateId(id: number): boolean {
+  return id >= 50_000_000 && id < 60_000_000;
+}
+
+export function isNpcStationId(id: number): boolean {
+  return id >= 60_000_000 && id < 70_000_000;
+}

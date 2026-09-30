@@ -16,6 +16,7 @@
  * structures stay unnamed.
  */
 import { getUniverseStargate } from '@/esi/endpoints';
+import { isNpcStationId, isStargateId } from '@/esi/locationIds';
 import type { ResolvedLocation } from '@/engine/route/recentKills';
 import { fetchSystemRecentKills, type SystemRecentKillsResult } from '@/lib/zkillboard';
 import { loadTypes } from '@/sde/loadSde';
@@ -23,12 +24,8 @@ import { lookupNpcStation } from '@/sde/npcStations';
 
 export const RECENT_KILLS_TTL_MS = 5 * 60_000;
 
-const STARGATE_MIN = 50_000_000;
-const STARGATE_MAX = 59_999_999;
-const STATION_MIN = 60_000_000;
-const STATION_MAX = 69_999_999;
-
-const killsCache = new Map<number, { at: number; result: SystemRecentKillsResult }>();
+/** Promises, so two callers asking at once share one request. */
+const killsCache = new Map<number, { at: number; result: Promise<SystemRecentKillsResult> }>();
 /** Stargates never change, so each one is read once per session. */
 const stargateCache = new Map<number, Promise<ResolvedLocation | null>>();
 
@@ -39,8 +36,11 @@ export async function loadSystemRecentKills(
 ): Promise<SystemRecentKillsResult> {
   const cached = killsCache.get(systemId);
   if (cached && now - cached.at < RECENT_KILLS_TTL_MS) return cached.result;
-  const result = await fetchSystemRecentKills(systemId);
-  if (result.ok) killsCache.set(systemId, { at: now, result });
+  const entry = { at: now, result: fetchSystemRecentKills(systemId) };
+  killsCache.set(systemId, entry);
+  const result = await entry.result;
+  // A failure is forgotten, so the next look asks again.
+  if (!result.ok && killsCache.get(systemId) === entry) killsCache.delete(systemId);
   return result;
 }
 
@@ -79,12 +79,11 @@ export async function resolveKillLocations(
   const resolved = new Map<number, ResolvedLocation>();
   await Promise.all(
     [...new Set(locationIds)].map(async (id) => {
-      const location =
-        id >= STARGATE_MIN && id <= STARGATE_MAX
-          ? await resolveStargate(id)
-          : id >= STATION_MIN && id <= STATION_MAX
-            ? await resolveStation(id)
-            : null;
+      const location = isStargateId(id)
+        ? await resolveStargate(id)
+        : isNpcStationId(id)
+          ? await resolveStation(id)
+          : null;
       if (location) resolved.set(id, location);
     })
   );

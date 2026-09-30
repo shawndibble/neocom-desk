@@ -44,6 +44,12 @@ describe('loadSystemRecentKills', () => {
     expect(fetchSystemRecentKills).toHaveBeenCalledTimes(2);
   });
 
+  it('shares one request between two callers asking at once', async () => {
+    fetchSystemRecentKills.mockResolvedValue({ ok: true, kills: [] });
+    await Promise.all([loadSystemRecentKills(1, 0), loadSystemRecentKills(1, 0)]);
+    expect(fetchSystemRecentKills).toHaveBeenCalledTimes(1);
+  });
+
   it('does not cache a failure, so the next look retries', async () => {
     fetchSystemRecentKills.mockResolvedValueOnce({ ok: false });
     expect(await loadSystemRecentKills(1, 0)).toEqual({ ok: false });

@@ -14,6 +14,8 @@ import type { KillTags, RecentKillLocation } from '@/engine/route/recentKills';
 import { systemZkillUrl } from '@/lib/zkillboard';
 import type { RouteKillsCell } from './useRouteKills';
 
+const BADGE = 'rounded-xs border px-1.5 text-[0.6875rem]';
+
 function Tags({ tags }: { tags: KillTags }) {
   const { t } = useTranslation();
   const labels = [
@@ -24,10 +26,7 @@ function Tags({ tags }: { tags: KillTags }) {
   return (
     <>
       {labels.map((label) => (
-        <span
-          key={label}
-          className="rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] text-warning"
-        >
+        <span key={label} className={`${BADGE} border-warning/60 text-warning`}>
           {label}
         </span>
       ))}
@@ -54,9 +53,7 @@ function LocationLine({ location }: { location: RecentKillLocation }) {
         {text}
       </span>
       {location.onPath && (
-        <span className="rounded-xs border border-accent/60 px-1.5 text-[0.6875rem] text-accent">
-          {t('travel.kills.onPath')}
-        </span>
+        <span className={`${BADGE} border-accent/60 text-accent`}>{t('travel.kills.onPath')}</span>
       )}
       <Tags tags={location} />
     </li>

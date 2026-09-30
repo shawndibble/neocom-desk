@@ -6559,7 +6559,7 @@
       "elsewhere_one": "{{count}} kill elsewhere in the system, {{minutes}} min ago",
       "elsewhere_other": "{{count}} kills elsewhere in the system, last one {{minutes}} min ago",
       "onPath": "On your route",
-      "bubbles": "Bubbles involved",
+      "bubbles": "Interdictor or HIC on the mail",
       "smartbombs": "Smartbombs involved"
     },
     "chokepoint": "Gank Chokepoint",

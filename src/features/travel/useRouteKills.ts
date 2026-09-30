@@ -10,7 +10,12 @@ import { useEffect, useState } from 'react';
 import { summarizeRecentKills, type RecentKillsSummary } from '@/engine/route/recentKills';
 import type { SecurityBand } from '@/engine/securityStatus';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
-import { loadSystemRecentKills, loadTypeGroups, resolveKillLocations } from './routeKillsData';
+import {
+  RECENT_KILLS_TTL_MS,
+  loadSystemRecentKills,
+  loadTypeGroups,
+  resolveKillLocations,
+} from './routeKillsData';
 
 /** Low on purpose: zKillboard is a third party that rate-limits hard. */
 export const ZKILL_CONCURRENCY = 3;
@@ -35,6 +40,16 @@ export function useRouteKills(
     key: '',
     bySystem: new Map(),
   });
+  // Re-walk once the cache has gone stale, so a page left open keeps its
+  // counts and "min ago" current instead of freezing at the first look.
+  const [refresh, setRefresh] = useState(0);
+  const hasRoute = route !== null;
+  useEffect(() => {
+    if (!hasRoute) return;
+    const timer = setInterval(() => setRefresh((n) => n + 1), RECENT_KILLS_TTL_MS);
+    return () => clearInterval(timer);
+  }, [hasRoute]);
+
   // The route itself is the key, so a re-render that rebuilds an equal route
   // (the activity feeds landing) does not restart the walk.
   const key = route ? JSON.stringify(route.map((system) => [system.systemId, system.band])) : '';
@@ -55,8 +70,9 @@ export function useRouteKills(
       });
     };
 
+    // Read alongside the first zKillboard requests, never ahead of them.
+    const groups = loadTypeGroups();
     void (async () => {
-      const groupOf = await loadTypeGroups();
       await mapWithConcurrencyLimit(
         systems.map((system, index) => ({ system, index })),
         ZKILL_CONCURRENCY,
@@ -67,6 +83,7 @@ export function useRouteKills(
             set(system.systemId, { status: 'unavailable' });
             return;
           }
+          const groupOf = await groups;
           const locations = await resolveKillLocations(
             result.kills.flatMap((kill) => (kill.locationId === null ? [] : [kill.locationId]))
           );
@@ -91,7 +108,7 @@ export function useRouteKills(
     return () => {
       cancelled = true;
     };
-  }, [key]);
+  }, [key, refresh]);
 
   return (systemId) => (cells.key === key ? cells.bySystem.get(systemId) : undefined) ?? LOADING;
 }

@@ -10,7 +10,7 @@
  * The preference is never persisted (`features/route/routePreferences.ts`).
  * From falls back to the Current System when the link does not name one.
  */
-import { useMemo, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import {
@@ -201,12 +201,12 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
   const fromName = useSystemName(fromId);
   const toName = useSystemName(params.to);
   const state = useRouteSafety(fromId, params.to, params.pref);
-  const routeRows = state.kind === 'route' ? state.rows : null;
-  const killsRoute = useMemo(
-    () => routeRows?.map((row) => ({ systemId: row.systemId, band: row.band })) ?? null,
-    [routeRows]
+  const killsOf = useRouteKills(
+    state.kind === 'route'
+      ? state.rows.map((row) => ({ systemId: row.systemId, band: row.band }))
+      : null
   );
-  const columns = useColumns(useRouteKills(killsRoute));
+  const columns = useColumns(killsOf);
 
   const fromTrigger =
     fromId === null
