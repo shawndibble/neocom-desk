@@ -91,6 +91,8 @@ export interface NavSubView {
   readonly labelKey: string;
   /** For a Corp view: the capability `CorpSubNav` shows it for. */
   readonly corpCapability?: CorpViewCapability;
+  /** i18n keys of other names it goes by: the palette also matches these (Wallet › LP Store ← "loyalty points"). */
+  readonly searchKeys?: readonly string[];
 }
 
 /**
@@ -174,6 +176,9 @@ export const NAV_PAGES = [
     mobileTab: true,
     // Sends an old link on to Market › Transactions (`WALLET_TABS`).
     aliasTabs: ['transactions'],
+    subViews: [
+      { path: '/wallet/loyalty', labelKey: 'loyaltyStore.title', searchKeys: ['loyalty.title'] },
+    ],
   },
   { path: '/assets', labelKey: 'nav.assets', group: 'economy', gating: 'scope', mobileTab: true },
   {
@@ -280,6 +285,8 @@ export interface NavDestination {
   readonly locked: boolean;
   /** The page's gating: a `corp` entry is only ever listed while visible, never locked. */
   readonly gating: NavGating;
+  /** Translated alternate names the palette matches after the label and breadcrumb. */
+  readonly keywords?: readonly string[];
 }
 
 export interface ListNavDestinationsOptions {
@@ -320,7 +327,12 @@ export function listNavDestinations({
       locked: pageLocked,
       gating: page.gating,
     });
-    const tabEntry = (path: string, labelKey: string, tabLocked: boolean): NavDestination => {
+    const tabEntry = (
+      path: string,
+      labelKey: string,
+      tabLocked: boolean,
+      searchKeys?: readonly string[]
+    ): NavDestination => {
       const label = t(labelKey);
       return {
         kind: 'tab',
@@ -331,6 +343,7 @@ export function listNavDestinations({
         breadcrumb: `${pageLabel}${BREADCRUMB_SEPARATOR}${label}`,
         locked: tabLocked,
         gating: page.gating,
+        ...(searchKeys && { keywords: searchKeys.map(t) }),
       };
     };
     const tabs = PAGE_TABS[page.path];
@@ -343,7 +356,7 @@ export function listNavDestinations({
     }
     for (const view of page.subViews ?? []) {
       if (view.corpCapability && !corpCapabilities[view.corpCapability]) continue;
-      out.push(tabEntry(view.path, view.labelKey, locked.has(view.path)));
+      out.push(tabEntry(view.path, view.labelKey, locked.has(view.path), view.searchKeys));
     }
   }
   return out;

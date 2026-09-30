@@ -28,6 +28,11 @@ function CurrentPath() {
   return <p data-testid="path">{useLocation().pathname}</p>;
 }
 
+async function openPicker(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /LP Store corporation/ }));
+  return screen.findByRole('combobox');
+}
+
 function renderPicker(corporationName: string | null = null) {
   return render(
     <MemoryRouter initialEntries={['/wallet/loyalty']}>
@@ -59,21 +64,22 @@ beforeEach(() => {
 });
 
 describe('LpStorePicker', () => {
-  it('is a labelled combobox controlling a listbox', async () => {
+  it('is a select button opening a search field above a listbox', async () => {
     const user = userEvent.setup();
     renderPicker();
-    const box = screen.getByRole('combobox', { name: 'LP Store corporation' });
-    expect(box).toHaveAttribute('aria-expanded', 'false');
-    await user.click(box);
+    const trigger = screen.getByRole('button', { name: /LP Store corporation/ });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    const box = await openPicker(user);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(box).toHaveFocus();
     const listbox = await screen.findByRole('listbox');
-    expect(box).toHaveAttribute('aria-expanded', 'true');
     expect(box).toHaveAttribute('aria-controls', listbox.id);
   });
 
   it('pins the corp the Character holds LP with first, showing its balance', async () => {
     const user = userEvent.setup();
     renderPicker();
-    await user.click(screen.getByRole('combobox'));
+    await openPicker(user);
     const options = await screen.findAllByRole('option');
     expect(options[0]).toHaveTextContent('Sisters of EVE');
     expect(options[0]).toHaveTextContent('12,500 LP');
@@ -87,7 +93,7 @@ describe('LpStorePicker', () => {
   it('filters by name as you type', async () => {
     const user = userEvent.setup();
     renderPicker();
-    await user.type(screen.getByRole('combobox'), 'fed');
+    await user.type(await openPicker(user), 'fed');
     await waitFor(() =>
       expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
         'Federal Intelligence Office',
@@ -99,7 +105,7 @@ describe('LpStorePicker', () => {
   it('opens the highlighted store on Enter, moving the highlight with the arrow keys', async () => {
     const user = userEvent.setup();
     renderPicker();
-    const box = screen.getByRole('combobox');
+    const box = await openPicker(user);
     await user.type(box, 'fed');
     await screen.findAllByRole('option');
     await user.keyboard('{ArrowDown}{ArrowDown}');
@@ -113,8 +119,7 @@ describe('LpStorePicker', () => {
   it('wraps Home/End and closes on Escape', async () => {
     const user = userEvent.setup();
     renderPicker();
-    const box = screen.getByRole('combobox');
-    await user.click(box);
+    await openPicker(user);
     await screen.findAllByRole('option');
     await user.keyboard('{End}');
     expect(screen.getByRole('option', { name: 'Federation Navy' })).toHaveAttribute(
@@ -125,13 +130,13 @@ describe('LpStorePicker', () => {
     expect(screen.getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
-    expect(box).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: /LP Store corporation/ })).toHaveFocus();
   });
 
   it('opens the best match on Enter with nothing highlighted', async () => {
     const user = userEvent.setup();
     renderPicker();
-    await user.type(screen.getByRole('combobox'), 'navy');
+    await user.type(await openPicker(user), 'navy');
     await screen.findByRole('option', { name: 'Federation Navy' });
     await user.keyboard('{Enter}');
     expect(screen.getByTestId('path')).toHaveTextContent('/wallet/loyalty/1000120');
@@ -140,7 +145,7 @@ describe('LpStorePicker', () => {
   it('announces when nothing matches', async () => {
     const user = userEvent.setup();
     renderPicker();
-    await user.type(screen.getByRole('combobox'), 'zzz');
+    await user.type(await openPicker(user), 'zzz');
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent('No LP Store matches that name.')
     );
@@ -149,7 +154,7 @@ describe('LpStorePicker', () => {
   it("drops the previous Character's pinned corps when the Character is cleared", async () => {
     const user = userEvent.setup();
     renderPicker();
-    await user.click(screen.getByRole('combobox'));
+    await openPicker(user);
     expect(await screen.findByText('12,500 LP')).toBeInTheDocument();
     act(() => useActiveCharacter.setState({ activeCharacterId: null }));
     await waitFor(() => expect(screen.queryByText('12,500 LP')).not.toBeInTheDocument());
@@ -164,7 +169,7 @@ describe('LpStorePicker', () => {
     );
     const user = userEvent.setup();
     renderPicker();
-    await user.click(screen.getByRole('combobox'));
+    await openPicker(user);
     await screen.findAllByRole('option');
     await user.keyboard('{ArrowDown}');
     expect(screen.getByRole('option', { name: 'CONCORD' })).toHaveAttribute(
@@ -191,20 +196,27 @@ describe('LpStorePicker', () => {
   it('opens a store on click', async () => {
     const user = userEvent.setup();
     renderPicker();
-    await user.click(screen.getByRole('combobox'));
+    await openPicker(user);
     await user.click(await screen.findByRole('option', { name: 'CONCORD' }));
     expect(screen.getByTestId('path')).toHaveTextContent('/wallet/loyalty/1000125');
   });
 
-  it('shows the open store by name when not searching', () => {
+  it('shows the open store by name on the closed select, or a prompt', () => {
     renderPicker('Sisters of EVE');
-    expect(screen.getByRole('combobox')).toHaveValue('Sisters of EVE');
+    expect(screen.getByRole('button', { name: /LP Store corporation/ })).toHaveTextContent(
+      'Sisters of EVE'
+    );
+  });
+
+  it('shows a prompt when no store is open', () => {
+    renderPicker();
+    expect(screen.getByRole('button')).toHaveTextContent('Select an LP Store');
   });
 
   it('says so when nothing matches', async () => {
     const user = userEvent.setup();
     renderPicker();
-    await user.type(screen.getByRole('combobox'), 'zzz');
+    await user.type(await openPicker(user), 'zzz');
     expect(
       await screen.findByText('No LP Store matches that name.', { selector: '[aria-hidden]' })
     ).toBeVisible();
@@ -214,7 +226,7 @@ describe('LpStorePicker', () => {
     loadCharacterLoyaltyPoints.mockResolvedValue({ cached: null, needsReauth: false });
     const user = userEvent.setup();
     renderPicker();
-    await user.click(screen.getByRole('combobox'));
+    await openPicker(user);
     expect(await screen.findAllByRole('option')).toHaveLength(CORPS.length);
   });
 });

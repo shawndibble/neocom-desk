@@ -4541,6 +4541,7 @@
     "corporation": "Corporation",
     "points": "Loyalty Points",
     "browseStores": "Browse LP Stores",
+    "openStore": "Open LP Store",
     "reauthTitle": "Log in again to see your loyalty points",
     "reauthHint": "Log in again to fetch this character's loyalty point balances.",
     "reauthAction": "Log in again with EVE Online"
@@ -4548,7 +4549,6 @@
   "loyaltyStore": {
     "csvIskCost": "ISK cost",
     "csvLpCost": "LP cost",
-    "back": "Loyalty Points",
     "title": "LP Store",
     "searchPlaceholder": "Search offers…",
     "hubLabel": "Market hub",
@@ -4574,6 +4574,8 @@
     "selectedAnnouncement": "Showing {{name}}",
     "pickerLabel": "LP Store corporation",
     "pickerPlaceholder": "Search LP Stores…",
+    "pickerPrompt": "Select an LP Store",
+    "pickerSearchLabel": "Search LP Stores",
     "pickerBalance": "{{lp}} LP",
     "pickerResultsCount_one": "{{count}} store",
     "pickerResultsCount_other": "{{count}} stores",

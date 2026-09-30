@@ -49,39 +49,6 @@ async function mockLoyaltyOffers(page: Page) {
   );
 }
 
-test('the back-to-Wallet link is a full sm-tier control (36px) at 390px', async ({ page }) => {
-  await signInAndGoto(page, `./wallet/loyalty/${CORPORATION_ID}`);
-  await page.setViewportSize(PHONE);
-
-  const back = page.getByRole('link', { name: /Loyalty Points/ });
-  await expect(back).toBeVisible();
-
-  const box = await back.evaluate((el) => {
-    const rect = el.getBoundingClientRect();
-    return { height: rect.height, width: rect.width };
-  });
-  expect(box.height).toBeGreaterThanOrEqual(36);
-  // Intrinsic width, not the stretched-to-the-viewport bar the flex column
-  // would otherwise produce.
-  expect(box.width).toBeLessThan(PHONE.width / 2);
-});
-
-test('the back-to-Wallet link drops to the compact tier at and above md (1280px)', async ({
-  page,
-}) => {
-  await signInAndGoto(page, `./wallet/loyalty/${CORPORATION_ID}`);
-  await page.setViewportSize(DESKTOP);
-
-  const back = page.getByRole('link', { name: /Loyalty Points/ });
-  await expect(back).toBeVisible();
-
-  // `h-7` (28px), pinned to a narrow band rather than a loose "< 36": a wide
-  // upper bound would not notice the touch-tier height leaking onto desktop.
-  const height = await back.evaluate((el) => el.getBoundingClientRect().height);
-  expect(height).toBeGreaterThanOrEqual(24);
-  expect(height).toBeLessThanOrEqual(32);
-});
-
 test('a phone sort control changes the Offers table order at 390px (issue #2174)', async ({
   page,
 }) => {

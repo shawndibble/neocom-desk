@@ -9,11 +9,11 @@ import {
   EmptyState,
   IconButton,
   InfoTooltip,
+  MenuItem,
   PageHeader,
   Panel,
   Spinner,
   Tabs,
-  textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -28,6 +28,7 @@ import {
   type CharacterWalletBalance,
   type WalletBalancesSnapshot,
 } from '@/features/character/wallet';
+import { LpStorePicker } from '@/features/loyalty/LpStorePicker';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { CorpHistoryContextMenu } from '@/features/character/CorpHistoryContextMenu';
 import {
@@ -301,6 +302,14 @@ export function Wallet() {
     [loyaltyResult]
   );
 
+  // One age for the page: the stalest of the two feeds it shows.
+  const oldestFetchedAt = useMemo(() => {
+    const dates = [balanceResult?.fetchedAt, loyaltyResult?.fetchedAt].filter(
+      (d): d is Date => d != null
+    );
+    return dates.length === 0 ? null : new Date(Math.min(...dates.map((d) => d.getTime())));
+  }, [balanceResult, loyaltyResult]);
+
   const loyaltyColumns = useMemo<DataTableColumn<CharacterLoyaltyPoints>[]>(
     () => [
       {
@@ -325,21 +334,6 @@ export function Wallet() {
         className: 'tabular-nums font-semibold',
         render: (entry) => entry.loyalty_points.toLocaleString(),
         sortValue: (entry) => entry.loyalty_points,
-      },
-      {
-        id: 'lpStoreAffordance',
-        header: '',
-        // Sized to the glyph (same as the Tax tab's edit affordance): without
-        // a width this column takes a share of the table's leftover space and
-        // the caret drifts in from the right edge.
-        className: 'w-6 px-2',
-        render: () => (
-          <Icon.Descend
-            size={Icon.ICON_SIZE.sm}
-            className="shrink-0 text-text-faint"
-            aria-hidden="true"
-          />
-        ),
       },
     ],
     [t, corporationNames]
@@ -490,6 +484,7 @@ export function Wallet() {
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader
         title={t('wallet.title')}
+        meta={oldestFetchedAt ? <DataAgeBadge date={oldestFetchedAt} /> : undefined}
         actions={
           <IconButton
             icon={<Icon.Refresh />}
@@ -590,11 +585,7 @@ export function Wallet() {
               )}
             </Panel>
           ) : (
-            <Panel
-              title={t('wallet.balanceTab')}
-              meta={walletCharacterFilterMeta}
-              actions={balanceResult ? <DataAgeBadge date={balanceResult.fetchedAt} /> : undefined}
-            >
+            <Panel title={t('wallet.balanceTab')} meta={walletCharacterFilterMeta}>
               <div className="flex flex-wrap gap-x-8 gap-y-4">
                 <div>
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -678,13 +669,10 @@ export function Wallet() {
               <span className="flex items-center gap-2">
                 {/* Always shown, LP or not (issue #2321): the way into any
                     corp's store for a pilot who holds LP nowhere yet. */}
-                <Link to="/wallet/loyalty" className={textActionClassName()}>
-                  {t('loyalty.browseStores')}
-                </Link>
+                <LpStorePicker corporationName={null} size="sm" className="w-44" />
                 {loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length > 0 && (
                   <TableActionsMenu name={t('loyalty.title')} tableExport={loyaltyExport} />
                 )}
-                {loyaltyResult && <DataAgeBadge date={loyaltyResult.fetchedAt} />}
               </span>
             }
           >
@@ -722,6 +710,13 @@ export function Wallet() {
                   <CorpHistoryContextMenu
                     corporationId={entry.corporation_id}
                     name={corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
+                    leadingItems={
+                      <MenuItem
+                        onSelect={() => navigate(`/wallet/loyalty/${entry.corporation_id}`)}
+                      >
+                        {t('loyalty.openStore')}
+                      </MenuItem>
+                    }
                   >
                     {tr}
                   </CorpHistoryContextMenu>

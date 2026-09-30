@@ -40,9 +40,23 @@ const DESTINATIONS: NavDestination[] = [
     breadcrumb: 'Industry › Opportunities',
   }),
   destination({ path: '/assets', label: 'Assets', breadcrumb: 'Assets', locked: true }),
+  destination({
+    path: '/wallet/loyalty',
+    kind: 'tab',
+    label: 'LP Store',
+    breadcrumb: 'Wallet › LP Store',
+    keywords: ['Loyalty Points'],
+  }),
 ];
 
 describe('createPagesProvider', () => {
+  it('finds Wallet › LP Store by its alternate name, even part of it', () => {
+    const provider = createPagesProvider({ destinations: DESTINATIONS, navigate: vi.fn() });
+    for (const query of ['loyalty points', 'loyal', 'lp sto']) {
+      expect(searchSync(provider, query).map((r) => r.label)).toContain('Wallet › LP Store');
+    }
+  });
+
   it('lists every page (not tab) for an empty query, so the palette doubles as a navigator', () => {
     const provider = createPagesProvider({ destinations: DESTINATIONS, navigate: vi.fn() });
     expect(searchSync(provider, '').map((r) => r.label)).toEqual([
