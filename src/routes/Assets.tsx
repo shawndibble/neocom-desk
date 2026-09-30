@@ -65,12 +65,15 @@ import { useFocusHeading } from '@/lib/useFocusHeading';
 import type { CharacterAsset } from '@/esi/endpoints';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { loadBlueprintCopyValues } from '@/features/character/blueprintCopyValues';
+import { loadCharacterBlueprints } from '@/features/industry/data';
 import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
 import type { TableExport } from '@/components/ui/useTableExport';
 import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/character/assetsCsv';
 import { getAdjustedPrices } from '@/market/prices';
 import { formatIsk, parseIskAmount } from '@/lib/isk';
 import {
+  assetStackValue,
   buildAssetTree,
   compareStations,
   collectItemIds,
@@ -160,6 +163,8 @@ interface Snapshot {
   locationNames: Map<number, string>;
   /** Global average market price per type, used for the tree's estimated-value badges. */
   priceByTypeId: Map<number, number>;
+  /** Each blueprint copy's own value by item id (`engine/blueprintCopyValue.ts`) — a copy never takes its type's average price. */
+  copyValueByItemId: Map<number, number>;
   /** m3 per unit, from the slim SDE snapshot only — best-effort, missing for market/asset-only types it doesn't cover. */
   volumeByTypeId: Map<number, number>;
 }
@@ -208,14 +213,6 @@ function locationLabel(
 interface AssetMatch {
   asset: CharacterAsset;
   name: string;
-}
-
-/** An asset stack's value at the global average price — 0 (not "unknown") for a type with no resolved price. */
-function estimatedValueFor(
-  asset: { type_id: number; quantity: number },
-  priceByTypeId: ReadonlyMap<number, number>
-): number {
-  return asset.quantity * (priceByTypeId.get(asset.type_id) ?? 0);
 }
 
 /** Name-substring search over a flat asset list, shared by the CSV export path and the on-screen results path. */
@@ -270,6 +267,18 @@ async function loadAssetPrices(): Promise<Map<number, number>> {
   }
 }
 
+/** A Character's own blueprint copies valued from contract listings, ME/TE/runs from its blueprints read when that scope is granted. */
+function loadOwnCopyValues(
+  characterId: number,
+  assets: readonly CharacterAsset[]
+): Promise<Map<number, number>> {
+  return loadBlueprintCopyValues(
+    characterId,
+    assets,
+    async () => (await loadCharacterBlueprints(characterId)).cached?.data ?? null
+  );
+}
+
 async function loadAssetsSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
@@ -281,9 +290,10 @@ async function loadAssetsSnapshot(
 
   // Already superseded: skip the ESI name resolves, their results would be discarded.
   const typeIds = signal.cancelled ? [] : [...new Set(assets.map((a) => a.type_id))];
-  const [typeNames, volumeByTypeId] = await Promise.all([
+  const [typeNames, volumeByTypeId, copyValueByItemId] = await Promise.all([
     loadTypeNames(typeIds),
     loadTypeVolumes(typeIds),
+    signal.cancelled ? new Map<number, number>() : loadOwnCopyValues(characterId, assets),
   ]);
 
   const stationIds = signal.cancelled
@@ -354,6 +364,7 @@ async function loadAssetsSnapshot(
     typeNames,
     locationNames,
     priceByTypeId,
+    copyValueByItemId,
     volumeByTypeId,
   };
 }
@@ -366,6 +377,8 @@ interface CrossCharacterData {
   /** Owning Character per asset item_id — item ids are globally unique, so this is safe to merge flat across Characters. */
   characterIdByItemId: Map<number, number>;
   characterNameById: Map<number, string>;
+  /** Every other Character's blueprint copies, valued the same way as the active one's. */
+  copyValueByItemId: Map<number, number>;
 }
 
 /**
@@ -441,7 +454,14 @@ async function loadCrossCharacterData(
   otherCharacterIds: readonly number[]
 ): Promise<CrossCharacterData> {
   const entries = await loadOtherCharactersAssets(otherCharacterIds);
-  const { typeNames, locationNames } = await loadCrossCharacterNames(entries);
+  const copyValueByItemId = new Map<number, number>();
+  const [{ typeNames, locationNames }] = await Promise.all([
+    loadCrossCharacterNames(entries),
+    mapWithConcurrencyLimit(entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
+      for (const [itemId, value] of await loadOwnCopyValues(entry.characterId, entry.assets))
+        copyValueByItemId.set(itemId, value);
+    }),
+  ]);
 
   const characterIdByItemId = new Map<number, number>();
   const characterNameById = new Map<number, string>();
@@ -450,7 +470,14 @@ async function loadCrossCharacterData(
     for (const asset of entry.assets) characterIdByItemId.set(asset.item_id, entry.characterId);
   }
 
-  return { entries, typeNames, locationNames, characterIdByItemId, characterNameById };
+  return {
+    entries,
+    typeNames,
+    locationNames,
+    characterIdByItemId,
+    characterNameById,
+    copyValueByItemId,
+  };
 }
 
 function nameForNode(node: AssetTreeNode, typeNames: ReadonlyMap<number, string>): string {
@@ -528,6 +555,7 @@ function characterBadgeFor(itemId: number, ctx: CharacterBadgeContext): string |
  */
 interface AssetItemActions {
   priceByTypeId: ReadonlyMap<number, number>;
+  copyValueByItemId: ReadonlyMap<number, number>;
   volumeByTypeId: ReadonlyMap<number, number>;
   /** Material typeID -> the character's own Build Plan consuming it; null until the blueprint catalog has loaded. */
   materialPlanMap: ReadonlyMap<number, BuildPlanRecord> | null;
@@ -798,6 +826,7 @@ export function Assets() {
   const typeNames = data?.typeNames ?? NO_NAMES;
   const locationNames = data?.locationNames ?? NO_NAMES;
   const priceByTypeId = data?.priceByTypeId ?? NO_PRICES;
+  const ownCopyValues = data?.copyValueByItemId ?? NO_PRICES;
   const volumeByTypeId = data?.volumeByTypeId ?? NO_VOLUMES;
 
   // CSV export always stays scoped to the active Character's own assets,
@@ -845,6 +874,10 @@ export function Assets() {
     if (!activeCrossCharacterData) return own;
     return [...own, ...activeCrossCharacterData.entries.flatMap((entry) => entry.assets)];
   }, [assetsResult, activeCrossCharacterData]);
+  const copyValueByItemId = useMemo(() => {
+    if (!activeCrossCharacterData) return ownCopyValues;
+    return new Map([...ownCopyValues, ...activeCrossCharacterData.copyValueByItemId]);
+  }, [ownCopyValues, activeCrossCharacterData]);
   const mergedTypeNames = useMemo(() => {
     if (!activeCrossCharacterData) return typeNames;
     const merged = new Map(typeNames);
@@ -905,8 +938,8 @@ export function Assets() {
   // (results are a separate flat list), so browsing always sees the whole
   // structure and clearing a search never has to rebuild it.
   const tree = useMemo(
-    () => buildAssetTree(mergedAssets, priceByTypeId),
-    [mergedAssets, priceByTypeId]
+    () => buildAssetTree(mergedAssets, priceByTypeId, copyValueByItemId),
+    [mergedAssets, priceByTypeId, copyValueByItemId]
   );
   const stationLabelFor = useMemo(
     () => (station: AssetTreeStation) =>
@@ -1038,12 +1071,19 @@ export function Assets() {
     if (!flatModeActive) return [];
     const valued: ValuedAssetMatch[] = searchMatches.map((match) => ({
       match,
-      value: estimatedValueFor(match.asset, priceByTypeId),
+      value: assetStackValue(match.asset, priceByTypeId, copyValueByItemId),
     }));
     const filtered =
       minValueThreshold > 0 ? valued.filter((v) => v.value >= minValueThreshold) : valued;
     return filtered.sort((a, b) => compareValuedAssetMatches(a, b, sortField)).map((v) => v.match);
-  }, [flatModeActive, searchMatches, minValueThreshold, priceByTypeId, sortField]);
+  }, [
+    flatModeActive,
+    searchMatches,
+    minValueThreshold,
+    priceByTypeId,
+    copyValueByItemId,
+    sortField,
+  ]);
 
   // The three list shapes, reduced to one row array for one virtualizer.
   const rows = useMemo<BrowseRow[]>(() => {
@@ -1462,11 +1502,18 @@ export function Assets() {
   const assetItemActions = useMemo<AssetItemActions>(
     () => ({
       priceByTypeId,
+      copyValueByItemId,
       volumeByTypeId,
       materialPlanMap,
       onViewInIndustryAsMaterial: handleViewInIndustryAsMaterial,
     }),
-    [priceByTypeId, volumeByTypeId, materialPlanMap, handleViewInIndustryAsMaterial]
+    [
+      priceByTypeId,
+      copyValueByItemId,
+      volumeByTypeId,
+      materialPlanMap,
+      handleViewInIndustryAsMaterial,
+    ]
   );
 
   if (!hydrated) {
@@ -2000,7 +2047,7 @@ function SearchMatchRow({
     <SearchResultRow
       name={name}
       quantity={asset.quantity}
-      estimatedValue={estimatedValueFor(asset, actions.priceByTypeId)}
+      estimatedValue={assetStackValue(asset, actions.priceByTypeId, actions.copyValueByItemId)}
       trail={trailFor(asset)}
       security={rootStationId === null ? undefined : securityForStation(rootStationId)}
       href={assetHref(rootStationId, [], query)}
@@ -2065,7 +2112,7 @@ function NodeRowView({
   }
 
   const { asset } = node;
-  const estimatedValue = estimatedValueFor(asset, actions.priceByTypeId);
+  const estimatedValue = assetStackValue(asset, actions.priceByTypeId, actions.copyValueByItemId);
   const planTarget =
     pageActions.blueprints === null
       ? undefined

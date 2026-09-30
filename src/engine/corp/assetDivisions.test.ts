@@ -155,4 +155,13 @@ describe('buildCorpAssetTree', () => {
     );
     expect(groups.find((g) => g.id === 1)?.estimatedValue).toBe(50);
   });
+
+  it('values a blueprint copy from its per-item value, not the type price', () => {
+    const groups = buildCorpAssetTree(
+      [asset({ itemId: 1, typeId: 100, isBlueprintCopy: true })],
+      new Map([[100, 2_000_000_000]]),
+      new Map([[1, 7_000_000]])
+    );
+    expect(groups.find((g) => g.id === 1)?.estimatedValue).toBe(7_000_000);
+  });
 });

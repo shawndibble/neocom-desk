@@ -94,6 +94,8 @@ export interface CorpAssetInput {
   locationId: number;
   locationType: EngineAsset['location_type'];
   locationFlag: string;
+  /** Carried so a copy is valued per item, not at its original's type price (`assetStackValue`). */
+  isBlueprintCopy?: boolean;
 }
 
 function toEngineAsset(asset: CorpAssetInput): EngineAsset {
@@ -104,6 +106,7 @@ function toEngineAsset(asset: CorpAssetInput): EngineAsset {
     location_id: asset.locationId,
     location_type: asset.locationType,
     location_flag: asset.locationFlag,
+    ...(asset.isBlueprintCopy ? { is_blueprint_copy: true } : {}),
   };
 }
 
@@ -124,12 +127,13 @@ export function corpAssetLocationId(node: AssetTreeNode): number | null {
 function locationNode(
   stationId: number,
   children: AssetTreeNode[],
-  priceByTypeId: ReadonlyMap<number, number>
+  priceByTypeId: ReadonlyMap<number, number>,
+  copyValueByItemId: ReadonlyMap<number, number>
 ): AssetTreeContainerNode {
   let itemCount = 0;
   let estimatedValue = 0;
   for (const child of children) {
-    const contribution = nodeContribution(child, priceByTypeId);
+    const contribution = nodeContribution(child, priceByTypeId, copyValueByItemId);
     itemCount += contribution.itemCount;
     estimatedValue += contribution.estimatedValue;
   }
@@ -161,7 +165,8 @@ function locationNode(
 function withLocationLevels(
   group: AssetTreeGroup<CorpAssetGroupId>,
   stationIdByItemId: ReadonlyMap<number, number>,
-  priceByTypeId: ReadonlyMap<number, number>
+  priceByTypeId: ReadonlyMap<number, number>,
+  copyValueByItemId: ReadonlyMap<number, number>
 ): AssetTreeGroup<CorpAssetGroupId> {
   const byStation = new Map<number, AssetTreeNode[]>();
   const direct: AssetTreeNode[] = [];
@@ -181,7 +186,9 @@ function withLocationLevels(
 
   const locationNodes = [...byStation.entries()]
     .sort(([a], [b]) => a - b)
-    .map(([stationId, stationChildren]) => locationNode(stationId, stationChildren, priceByTypeId));
+    .map(([stationId, stationChildren]) =>
+      locationNode(stationId, stationChildren, priceByTypeId, copyValueByItemId)
+    );
 
   return { ...group, children: [...locationNodes, ...direct] };
 }
@@ -208,7 +215,8 @@ function withLocationLevels(
  */
 export function buildCorpAssetTree(
   inputs: readonly CorpAssetInput[],
-  priceByTypeId: ReadonlyMap<number, number> = new Map()
+  priceByTypeId: ReadonlyMap<number, number> = new Map(),
+  copyValueByItemId: ReadonlyMap<number, number> = new Map()
 ): AssetTreeGroup<CorpAssetGroupId>[] {
   const officeStationByItemId = new Map<number, number>();
   for (const input of inputs) {
@@ -231,8 +239,11 @@ export function buildCorpAssetTree(
     ALL_CORP_ASSET_GROUP_IDS,
     new Set(HANGAR_DIVISIONS),
     (asset) => corpAssetGroupId(asset.location_flag),
-    priceByTypeId
+    priceByTypeId,
+    copyValueByItemId
   );
 
-  return groups.map((group) => withLocationLevels(group, stationIdByItemId, priceByTypeId));
+  return groups.map((group) =>
+    withLocationLevels(group, stationIdByItemId, priceByTypeId, copyValueByItemId)
+  );
 }
