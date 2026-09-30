@@ -707,18 +707,17 @@ function FittingsPage() {
                 // page aside, so the editor keeps the width rather than the stats.
                 // The Ring goes beside them from the desktop breakpoint — it is
                 // capped and square, so it fits beside 22rem of stats there (scope
-                // decision `20260925-095734`); the stats hold at 22rem until 78.125rem
-                // (1250px), since a track with a max grows to it before a 1fr one
-                // gets anything. The List's rows want the width, so it waits for
-                // 78.125rem too.
+                // decision `20260925-095734`); the stats hold at 22rem until xl,
+                // since a track with a max grows to it before a 1fr one gets
+                // anything. The List's rows want the width, so it waits for xl.
                 className={`grid items-start gap-3 ${
                   addMode === 'docked'
                     ? 'grid-cols-[20rem_minmax(0,1fr)_minmax(22rem,26rem)]'
                     : addOpen
                       ? 'grid-cols-1'
                       : view === 'ring'
-                        ? 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] min-[78.125rem]:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]'
-                        : 'grid-cols-1 min-[78.125rem]:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]'
+                        ? 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]'
+                        : 'grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]'
                 }`}
               >
                 {addMode === 'docked' && (

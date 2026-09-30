@@ -50,9 +50,9 @@ async function seed(page: Page): Promise<void> {
   );
 }
 
-// 1024 and 1279 are the stacked range the fix covers; 1280 and 1440 guard the
+// 1024 and 1249 are the stacked range the fix covers; 1250 and 1440 guard the
 // side-by-side split it now starts at.
-for (const width of [1024, 1279, 1280, 1440]) {
+for (const width of [1024, 1249, 1250, 1440]) {
   test(`Build Plan Materials table fits its frame at ${width}px`, async ({ page }) => {
     await signInAndGoto(page);
     await seed(page);

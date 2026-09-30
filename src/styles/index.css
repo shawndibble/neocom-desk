@@ -37,6 +37,10 @@
 
 /* Design tokens — see docs/DESIGN.md. Photon-UI-inspired dark theme. */
 @theme {
+  /* `xl` at 1250px rather than Tailwind's 1280px default, so the wide
+     two-column layouts (Fittings, Build Plans, Overview and others) split a little sooner. */
+  --breakpoint-xl: 78.125rem;
+
   /* Background layers (darkest -> lightest) */
   --color-bg: #0a0e14;
   --color-panel: #11161d;
