@@ -1,5 +1,42 @@
 import { describe, it, expect, vi } from 'vitest';
-import { SHORTCUTS } from './shortcuts';
+import {
+  SHORTCUTS,
+  commandPaletteDisplayKey,
+  isCommandPaletteShortcut,
+  type ChordEvent,
+} from './shortcuts';
+
+describe('isCommandPaletteShortcut', () => {
+  const press = (init: Partial<ChordEvent> & { key: string }): ChordEvent => ({
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    shiftKey: false,
+    ...init,
+  });
+
+  it('matches Ctrl+K and Cmd+K, whatever the case', () => {
+    expect(isCommandPaletteShortcut(press({ key: 'k', ctrlKey: true }))).toBe(true);
+    expect(isCommandPaletteShortcut(press({ key: 'k', metaKey: true }))).toBe(true);
+    expect(isCommandPaletteShortcut(press({ key: 'K', ctrlKey: true }))).toBe(true);
+  });
+
+  it('ignores a bare K and any other chord', () => {
+    expect(isCommandPaletteShortcut(press({ key: 'k' }))).toBe(false);
+    expect(isCommandPaletteShortcut(press({ key: 'k', ctrlKey: true, altKey: true }))).toBe(false);
+    expect(isCommandPaletteShortcut(press({ key: 'k', ctrlKey: true, shiftKey: true }))).toBe(
+      false
+    );
+    expect(isCommandPaletteShortcut(press({ key: 'j', ctrlKey: true }))).toBe(false);
+  });
+});
+
+describe('commandPaletteDisplayKey', () => {
+  it('shows the Command key on Apple platforms and Ctrl elsewhere', () => {
+    expect(commandPaletteDisplayKey(true)).toBe('⌘K');
+    expect(commandPaletteDisplayKey(false)).toBe('Ctrl K');
+  });
+});
 
 describe('SHORTCUTS', () => {
   it('has unique ids and keys, so the dispatch table never double-matches', () => {
