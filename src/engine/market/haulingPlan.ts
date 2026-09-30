@@ -42,6 +42,12 @@ export interface TripCandidate {
   demandCapUnits: number | null;
   /** The destination's buy ladder, dearest first: set when the lot is sold into it instead of listed. */
   destBuyLadder?: readonly LadderLevel[];
+  /**
+   * The fee rates this lot's sale pays, when they are not the plan's own: a
+   * scan that picks each item's lane can sell at different hubs, and the
+   * broker fee follows the standing toward each hub's owner.
+   */
+  fees?: AppraisalNetFees;
 }
 
 /** A user's change to one suggested line. `quantity` wins over the suggestion; `selected: false` removes the line. */
@@ -82,8 +88,8 @@ export interface PlanTripInput {
 }
 
 /** Units of `ladder` that cost less than a unit is worth after fees — past this every further unit loses money. */
-export function profitableDepth(candidate: TripCandidate, fees: AppraisalNetFees): number {
-  const { accountingLevel, brokerRelationsLevel, standing } = fees;
+export function profitableDepth(candidate: TripCandidate, planFees: AppraisalNetFees): number {
+  const { accountingLevel, brokerRelationsLevel, standing } = candidate.fees ?? planFees;
   if (candidate.destBuyLadder !== undefined) {
     return walkInstant({
       originLadder: candidate.buyLadder,
@@ -116,13 +122,13 @@ function lineFor(
   quantity: number,
   selected: boolean,
   limitedBy: QuantityLimit,
-  fees: AppraisalNetFees
+  planFees: AppraisalNetFees
 ): TripLine {
   const economics = lotEconomics({
     buyLadder: candidate.buyLadder,
     expectedPrice: candidate.expectedPrice,
     quantity,
-    fees,
+    fees: candidate.fees ?? planFees,
     destBuyLadder: candidate.destBuyLadder,
   });
   return {
@@ -178,7 +184,7 @@ export function planTrip(input: PlanTripInput): TripPlan {
       buyLadder: candidate.buyLadder,
       expectedPrice: candidate.expectedPrice,
       quantity: cap,
-      fees,
+      fees: candidate.fees ?? fees,
       destBuyLadder: candidate.destBuyLadder,
     });
     let scarcity = 0;

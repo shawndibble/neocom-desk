@@ -5012,6 +5012,7 @@
       "title": "Hauling",
       "from": "From",
       "to": "To",
+      "anyHub": "Any hub",
       "category": "Category",
       "categoryFallback": "Category {{id}}",
       "mode": "Sell by",
@@ -5024,6 +5025,8 @@
       "introDismiss": "Dismiss",
       "sameHubTitle": "Pick two different hubs",
       "sameHubHint": "Choose where to buy and where to sell.",
+      "bothAnyTitle": "Any hub works at one end only",
+      "bothAnyHint": "Pick a hub for From or To. Any hub then finds the best hub for the other end.",
       "errorTitle": "Couldn't scan the market",
       "errorHint": "Hub prices did not load. Check your connection and try again.",
       "retry": "Try again",
@@ -5051,6 +5054,9 @@
       "hiddenLine": "Hidden by your filters: {{thin}} rarely sell, {{slow}} take too long to sell, {{low}} have a margin under your minimum.",
       "columns": {
         "item": "Item",
+        "hub": "Hub",
+        "hubFromTip": "The trade hub each item is bought at: the other hub with the best price gap to your destination.",
+        "hubToTip": "The trade hub each item is sold at: the other hub with the best price gap from your origin.",
         "buy": "Buy",
         "expected": "Sell",
         "expectedTip": "Expected sell price: what you should get per unit if you list to sell. The lower of one tick under the cheapest listing and what it recently sold for. Click a row to see how.",
@@ -6668,6 +6674,52 @@
     },
     "activityLoading": "Loading the last hour of jumps and kills…",
     "activityUnavailable": "Some of ESI's last-hour figures couldn't be read, so they show as —, not as zero.",
-    "dataAgeNote": "Jumps and kills cover the last hour; ESI refreshes them about hourly."
+    "dataAgeNote": "Jumps and kills cover the last hour; ESI refreshes them about hourly.",
+    "thera": {
+      "tab": "Thera / Turnur",
+      "originLabel": "Jumps from",
+      "changeOrigin": "Change the system jumps are counted from — {{current}}",
+      "hubLabel": "Hub",
+      "exitLabel": "Exit security",
+      "sizeLabel": "Ship size",
+      "anyExit": "Any exit",
+      "hub": {
+        "all": "Both hubs",
+        "thera": "Thera",
+        "turnur": "Turnur"
+      },
+      "size": {
+        "any": "Any size",
+        "small": "Small",
+        "medium": "Medium",
+        "large": "Large",
+        "xlarge": "Very large",
+        "capital": "Capital"
+      },
+      "col": {
+        "hub": "Hub",
+        "signatures": "Signatures (hub → exit)",
+        "exit": "Exit system",
+        "security": "Security",
+        "region": "Region",
+        "type": "Wormhole",
+        "size": "Max ship size",
+        "life": "Remaining life",
+        "jumps": "Jumps"
+      },
+      "noGateRoute": "No gate route",
+      "noOrigin": "Pick a system to count jumps from, or set your current system.",
+      "originUngated": "{{system}} has no stargates, so no exit can be reached by gate from it.",
+      "jumpsLoading": "Counting jumps from the stargate map…",
+      "jumpsUnknown": "The local stargate map couldn't be read, so jumps show as —.",
+      "tableLabel": "Thera and Turnur connections",
+      "emptyTitle": "EVE-Scout lists no open connections right now",
+      "emptyHint": "Scouts add connections as they find them. Check back later.",
+      "noMatchTitle": "No connections match these filters",
+      "noMatchHint": "Widen the hub, exit security or ship size filter.",
+      "unavailableTitle": "Connections can't be loaded right now",
+      "unavailableHint": "EVE-Scout couldn't be reached. Check your connection and try again.",
+      "dataAgeNote": "Connections come from EVE-Scout's volunteer scouts and are refreshed every 5 minutes."
+    }
   }
 }

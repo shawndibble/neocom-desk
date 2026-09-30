@@ -49,8 +49,8 @@ export const NAV_GROUPS = [
   { id: 'economy', labelKey: 'nav.groups.economy' },
   { id: 'social', labelKey: 'nav.groups.social' },
   /*
-   * Where you are going and who is there: Travel's Route Safety today, with
-   * Thera/Turnur connections and Pilot Lookup to come (#2330, #2331) — the
+   * Where you are going and who is there: Travel's Route Safety,
+   * Thera/Turnur connections (#2330) and Pilot Lookup (#2331) — the
    * intel tools the remit took in with #2328. Not "Travel" as a heading: it
    * would sit over a single item of the same name.
    */

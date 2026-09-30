@@ -143,6 +143,30 @@ describe('planTrip', () => {
   });
 });
 
+describe('planTrip, a lane chosen per item', () => {
+  it("prices a candidate at its own destination's fees when it carries them", () => {
+    // Break-even at 150 x (1 - fees): with poor standing the broker fee eats the
+    // 141-ISK level, with good standing it stays profitable.
+    const ladder = [
+      { price: 100, units: 10, orders: 1 },
+      { price: 141, units: 10, orders: 1 },
+    ];
+    const good = { ...FEES, standing: { factionStanding: 10, corpStanding: 10 } };
+    const plan = planTrip({
+      candidates: [
+        candidate({ typeId: 1, expectedPrice: 150, buyLadder: ladder }),
+        candidate({ typeId: 2, expectedPrice: 150, buyLadder: ladder, fees: good }),
+      ],
+      cargoM3: null,
+      budgetIsk: null,
+      fees: { ...FEES, brokerRelationsLevel: 0 },
+      overrides: NO_OVERRIDES,
+    });
+    expect(plan.lines[0]!.quantity).toBe(10);
+    expect(plan.lines[1]!.quantity).toBe(20);
+  });
+});
+
 describe('planTrip, selling into buy orders', () => {
   // Accounting V: 3.375% tax, no broker fee.
   const instant = (over: Partial<TripCandidate> & { typeId: number }) =>

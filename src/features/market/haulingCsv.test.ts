@@ -76,4 +76,18 @@ describe('haulingCsvColumns', () => {
     );
     expect(csv.split('\r\n')[1]).toBe('"Tritanium",4.5,5.1,12.345,40,,400');
   });
+
+  it('with Any hub at one end, names the hub each row uses there, after the item', () => {
+    const columns = haulingCsvColumns(t, { ...options, anyEnd: 'from' });
+    expect(columns.map((c) => c.header).slice(0, 3)).toEqual([
+      'market.hauling.columns.item',
+      'market.hauling.columns.hub',
+      'market.hauling.columns.buy',
+    ]);
+    const csv = toCsv(
+      [row({ fromHub: { systemName: 'Dodixie' } } as unknown as Partial<HaulingViewRow>)],
+      columns
+    );
+    expect(csv.split('\r\n')[1]!.startsWith('"Tritanium","Dodixie",4.5')).toBe(true);
+  });
 });

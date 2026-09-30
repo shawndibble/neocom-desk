@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { filterHaulingRows, formatDaysToSell, toViewRows } from './haulingView';
 import type { HaulingScanRow, InstantHaulingScanRow, ListHaulingScanRow } from './haulingData';
+import { TRADE_HUBS } from '@/market/hubs';
 
 const FEES = {
   accountingLevel: 5,
   brokerRelationsLevel: 4,
   standing: { factionStanding: 0, corpStanding: 0 },
 };
+const FEES_AT = () => FEES;
+const JITA = TRADE_HUBS[0]!;
+const AMARR = TRADE_HUBS[1]!;
 
 function scanRow(
   over: Partial<ListHaulingScanRow> & { typeId: number },
@@ -14,6 +18,8 @@ function scanRow(
 ): ListHaulingScanRow {
   return {
     mode: 'list',
+    fromHub: JITA,
+    toHub: AMARR,
     destBuyLadder: [],
     name: `Item ${over.typeId}`,
     unitVolumeM3: 1,
@@ -38,6 +44,8 @@ function scanRow(
 function instantRow(over: Partial<InstantHaulingScanRow> & { typeId: number }): HaulingScanRow {
   return {
     mode: 'instant',
+    fromHub: JITA,
+    toHub: AMARR,
     name: `Item ${over.typeId}`,
     unitVolumeM3: 2,
     buyLadder: [
@@ -56,7 +64,7 @@ function instantRow(over: Partial<InstantHaulingScanRow> & { typeId: number }): 
 
 describe('toViewRows', () => {
   it('reports the margin after fees on the suggested load, and its flags', () => {
-    const [row] = toViewRows([scanRow({ typeId: 1 })], FEES);
+    const [row] = toViewRows([scanRow({ typeId: 1 })], FEES_AT);
     // 70 units: cost 7,000, revenue 10,500, tax 3.375% + broker 1.8% of revenue.
     const revenue = 70 * 150;
     const profit = revenue - revenue * 0.03375 - revenue * 0.018 - 7000;
@@ -65,8 +73,21 @@ describe('toViewRows', () => {
     expect(row!.flags).toEqual([]);
   });
 
+  it("prices each row at its own destination hub's fees", () => {
+    const good = { ...FEES, standing: { factionStanding: 10, corpStanding: 10 } };
+    const feesAt = (hub: { id: string }) => (hub.id === 'rens' ? good : FEES);
+    const [home, away] = toViewRows(
+      [scanRow({ typeId: 1 }), scanRow({ typeId: 2, toHub: TRADE_HUBS[3]! })],
+      feesAt
+    );
+    expect(home!.fees).toBe(FEES);
+    expect(away!.fees).toBe(good);
+    expect(away!.candidate.fees).toBe(good);
+    expect(away!.marginPct).toBeGreaterThan(home!.marginPct);
+  });
+
   it('carries a low-margin flag when the margin is under the floor', () => {
-    const [row] = toViewRows([scanRow({ typeId: 1 }, { price: 103 })], FEES);
+    const [row] = toViewRows([scanRow({ typeId: 1 }, { price: 103 })], FEES_AT);
     expect(row!.flags).toContain('low-margin');
   });
 });
@@ -78,7 +99,7 @@ describe('filterHaulingRows', () => {
       scanRow({ typeId: 2 }, { daysToSell: 30 }),
       scanRow({ typeId: 3 }, { price: 102, daysToSell: 2 }),
     ],
-    FEES
+    FEES_AT
   );
 
   it('hides the slow and the thin-margin, and counts each', () => {
@@ -114,7 +135,7 @@ describe('filterHaulingRows', () => {
   it('hides rarely-selling rows when asked for steady demand only', () => {
     const thin = scanRow({ typeId: 9 });
     thin.demand = { ...thin.demand, demand: 'rarely' };
-    const all = toViewRows([scanRow({ typeId: 1 }), thin], FEES);
+    const all = toViewRows([scanRow({ typeId: 1 }), thin], FEES_AT);
     const { shown, hidden } = filterHaulingRows(all, {
       maxDays: null,
       minMarginPct: -100,
@@ -137,7 +158,7 @@ describe('suggested units', () => {
           ],
         }),
       ],
-      FEES
+      FEES_AT
     );
     expect(row!.suggestedUnits).toBe(10);
     expect(row!.candidate.demandCapUnits).toBe(70);
@@ -146,16 +167,16 @@ describe('suggested units', () => {
 
 describe('ISK/m³', () => {
   it('is the profit per unit over the unit volume, in both modes', () => {
-    const [listed] = toViewRows([scanRow({ typeId: 1, unitVolumeM3: 4 })], FEES);
+    const [listed] = toViewRows([scanRow({ typeId: 1, unitVolumeM3: 4 })], FEES_AT);
     expect(listed!.iskPerM3).toBeCloseTo(listed!.profitPerUnit / 4);
-    const [instant] = toViewRows([instantRow({ typeId: 2 })], FEES);
+    const [instant] = toViewRows([instantRow({ typeId: 2 })], FEES_AT);
     expect(instant!.iskPerM3).toBeCloseTo(instant!.profitPerUnit / 2);
   });
 });
 
 describe('selling into buy orders', () => {
   it('works the load to the profitable depth of both books, after sales tax only', () => {
-    const [row] = toViewRows([instantRow({ typeId: 1 })], FEES);
+    const [row] = toViewRows([instantRow({ typeId: 1 })], FEES_AT);
     // The walkInstant worked example: 17 units, 1,735 ISK in, 1,895 ISK out.
     const profit = 1895 - 1895 * 0.03375 - 1735;
     expect(row!.suggestedUnits).toBe(17);
@@ -165,16 +186,16 @@ describe('selling into buy orders', () => {
   });
 
   it('shows the realised buy-order price, not an Expected Sell Price', () => {
-    const [row] = toViewRows([instantRow({ typeId: 1 })], FEES);
+    const [row] = toViewRows([instantRow({ typeId: 1 })], FEES_AT);
     expect(row!.price).toBeCloseTo(1895 / 17);
-    const [listed] = toViewRows([scanRow({ typeId: 2 })], FEES);
+    const [listed] = toViewRows([scanRow({ typeId: 2 })], FEES_AT);
     expect(listed!.price).toBe(150);
   });
 
   it('never hides an instant row as thin or slow, only on margin', () => {
     const rows = toViewRows(
       [instantRow({ typeId: 1 }), instantRow({ typeId: 2, destBuyLadder: [] })],
-      FEES
+      FEES_AT
     );
     const { shown, hidden } = filterHaulingRows(rows, {
       maxDays: 1,

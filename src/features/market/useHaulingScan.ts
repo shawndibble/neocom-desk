@@ -4,7 +4,7 @@
  * the order-book pass run, then the rows. A route, category or mode change
  * abandons the scan in flight rather than letting a stale one land.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppraisalNetFees } from '@/engine/market/appraisal';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { ZERO_STANDINGS } from '@/engine/market/standings';
@@ -20,6 +20,8 @@ import {
   type HaulingProgress,
   type HaulingScan,
 } from './haulingData';
+import type { HaulingEnd } from './haulingHubs';
+import type { HaulingFeesAt } from './haulingView';
 import { tradeHubStanding, useTradeHubStandings } from './useTradeHubStandings';
 
 export type HaulingScanState =
@@ -28,8 +30,8 @@ export type HaulingScanState =
   | { status: 'error' };
 
 export function useHaulingScan(
-  from: TradeHub,
-  to: TradeHub,
+  from: HaulingEnd,
+  to: HaulingEnd,
   categoryId: number,
   mode: HaulMode,
   enabled = true
@@ -80,13 +82,20 @@ export function useHaulingScan(
   return { state, refresh };
 }
 
+export interface HaulingFees {
+  accountingLevel: number;
+  brokerRelationsLevel: number;
+  /** The full fee rates for a sale at one hub — standings differ per hub owner. */
+  at: HaulingFeesAt;
+}
+
 /**
- * The fee rates a sale at `hub` is charged: this Character's Accounting and
- * Broker Relations levels and their standing toward the hub's owner. Level 0
- * and zero standings until they load or with no Character, which is the
- * conservative side — the page says so.
+ * The fee rates a sale is charged: this Character's Accounting and Broker
+ * Relations levels, and — per hub — their standing toward that hub's owner.
+ * Level 0 and zero standings until they load or with no Character, which is
+ * the conservative side — the page says so.
  */
-export function useHaulingFees(characterId: number | null, hub: TradeHub): AppraisalNetFees {
+export function useHaulingFees(characterId: number | null): HaulingFees {
   const standings = useTradeHubStandings(characterId);
   const [levels, setLevels] = useState<{ accounting: number; brokerRelations: number } | null>(
     null
@@ -111,9 +120,23 @@ export function useHaulingFees(characterId: number | null, hub: TradeHub): Appra
     };
   }, [characterId]);
 
-  return {
-    accountingLevel: characterId === null ? 0 : (levels?.accounting ?? 0),
-    brokerRelationsLevel: characterId === null ? 0 : (levels?.brokerRelations ?? 0),
-    standing: characterId === null ? ZERO_STANDINGS : tradeHubStanding(standings, hub.id),
-  };
+  const accountingLevel = characterId === null ? 0 : (levels?.accounting ?? 0);
+  const brokerRelationsLevel = characterId === null ? 0 : (levels?.brokerRelations ?? 0);
+  // Memoized per hub so each hub's fees keep one identity: rows and the trip plan recompute only when a level or standing changes.
+  return useMemo(() => {
+    const byHub = new Map<TradeHub['id'], AppraisalNetFees>();
+    const at = (hub: TradeHub): AppraisalNetFees => {
+      let fees = byHub.get(hub.id);
+      if (!fees) {
+        fees = {
+          accountingLevel,
+          brokerRelationsLevel,
+          standing: characterId === null ? ZERO_STANDINGS : tradeHubStanding(standings, hub.id),
+        };
+        byHub.set(hub.id, fees);
+      }
+      return fees;
+    };
+    return { accountingLevel, brokerRelationsLevel, at };
+  }, [accountingLevel, brokerRelationsLevel, characterId, standings]);
 }
