@@ -28,6 +28,12 @@
  * pass 2 is skipped — a buy order already standing is the demand, and Days to
  * Sell does not apply — and pass 3 reads the destination's buy ladder at the
  * hub station.
+ *
+ * One end may be _Any hub_ (`ANY_HUB`): pass 1 then prices every hub's
+ * aggregates (one cheap call per hub) and keeps each item on its single best
+ * lane by that pass's gap; passes 2 and 3 read that lane's hubs. The caps stay
+ * overall, not per lane — at most `MAX_BOOK_CANDIDATES` items reach the
+ * order-book pass whichever hubs they use — and each row says its lane.
  */
 import { getUniverseType } from '@/esi/endpoints';
 import { getOrderBook } from '@/features/market/orderBook';
@@ -35,6 +41,7 @@ import { loadPriceHistory } from '@/features/market/priceHistory';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { getHubPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
+import { ANY_HUB, expandHaulingLane, type HaulingHubChoice, type HubLane } from './haulingHubs';
 import {
   estimateSale,
   hubLadders,
@@ -82,6 +89,10 @@ export type HaulMode = (typeof HAUL_MODES)[number];
 interface HaulingScanRowBase {
   typeId: number;
   name: string;
+  /** The hub the item is bought at — the chosen one when From is Any. */
+  fromHub: TradeHub;
+  /** The hub the item is sold at — the chosen one when To is Any. */
+  toHub: TradeHub;
   /** m³ of one unit as hauled. */
   unitVolumeM3: number;
   /** The origin hub's sell ladder — what buying costs. */
@@ -112,9 +123,16 @@ export interface HaulingScan {
   fetchedAt: number;
 }
 
+/** One end of a scanned lane: a hub, or Any hub (at most one end). */
+export type HaulingEnd = TradeHub | typeof ANY_HUB;
+
+export function haulingEndId(end: HaulingEnd): HaulingHubChoice {
+  return end === ANY_HUB ? ANY_HUB : end.id;
+}
+
 export interface HaulingScanRequest {
-  from: TradeHub;
-  to: TradeHub;
+  from: HaulingEnd;
+  to: HaulingEnd;
   typeIds: readonly number[];
   /** Which category the ids came from, so two categories can never share a cache entry. */
   scope: number;
@@ -133,11 +151,11 @@ export function clearHaulingScanCache(): void {
   scanCache.clear();
 }
 
-/** A scan is cached per route, category and mode: the two modes keep different rows for the same route. */
+/** A scan is cached per route (Any included), category and mode: the two modes keep different rows for the same route. */
 export function haulingScanCacheKey(
   request: Pick<HaulingScanRequest, 'from' | 'to' | 'scope' | 'mode'>
 ): string {
-  return `${request.from.id}>${request.to.id}:${request.scope}:${request.mode ?? 'list'}`;
+  return `${haulingEndId(request.from)}>${haulingEndId(request.to)}:${request.scope}:${request.mode ?? 'list'}`;
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
@@ -175,30 +193,48 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   const cached = scanCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.scan;
 
-  // 1. Prices.
-  onProgress?.({ stage: 'prices', done: 0, total: 2 });
+  const lanes = expandHaulingLane(haulingEndId(from), haulingEndId(to));
+  if (lanes.length === 0) throw new Error('A hauling scan needs two different hubs.');
+
+  // 1. Prices: once per hub the lanes touch, however many lanes share it.
+  const hubs = [...new Set(lanes.flatMap((lane) => [lane.from, lane.to]))];
   const ids = [...typeIds];
-  const fromPrices = await getHubPrices(from, ids);
-  onProgress?.({ stage: 'prices', done: 1, total: 2 });
-  const toPrices = await getHubPrices(to, ids);
-  onProgress?.({ stage: 'prices', done: 2, total: 2 });
+  let pricesDone = 0;
+  onProgress?.({ stage: 'prices', done: 0, total: hubs.length });
+  const priceEntries = await Promise.all(
+    hubs.map(async (hub) => {
+      const prices = await getHubPrices(hub, ids);
+      pricesDone += 1;
+      onProgress?.({ stage: 'prices', done: pricesDone, total: hubs.length });
+      return [hub.id, prices] as const;
+    })
+  );
+  const pricesAt = new Map(priceEntries);
   throwIfAborted(signal);
 
-  const anyOriginPrice = ids.some((id) => fromPrices.get(id)?.sellMin != null);
+  const origins = [...new Set(lanes.map((lane) => lane.from))];
+  const anyOriginPrice = ids.some((id) =>
+    origins.some((hub) => pricesAt.get(hub.id)?.get(id)?.sellMin != null)
+  );
   if (ids.length > 0 && !anyOriginPrice) {
     throw new Error('Hub prices are unavailable right now.');
   }
 
+  const minGap = mode === 'instant' ? MIN_INSTANT_GAP : MIN_LISTED_GAP;
+  // Each item keeps only its best lane: the plan and the table are keyed by item.
   const priced = ids
-    .map((typeId) => {
-      const buy = fromPrices.get(typeId)?.sellMin ?? null;
-      const dest = toPrices.get(typeId);
-      const sell = (mode === 'instant' ? dest?.buyMax : dest?.sellMin) ?? null;
-      return { typeId, buy, gap: buy !== null && sell !== null && buy > 0 ? sell / buy : 0 };
+    .flatMap((typeId) => {
+      let best: { typeId: number; lane: HubLane; buy: number; gap: number } | null = null;
+      for (const lane of lanes) {
+        const buy = pricesAt.get(lane.from.id)?.get(typeId)?.sellMin ?? null;
+        const dest = pricesAt.get(lane.to.id)?.get(typeId);
+        const sell = (mode === 'instant' ? dest?.buyMax : dest?.sellMin) ?? null;
+        if (buy === null || sell === null || buy <= 0) continue;
+        const gap = sell / buy;
+        if (gap >= minGap && (best === null || gap > best.gap)) best = { typeId, lane, buy, gap };
+      }
+      return best === null ? [] : [best];
     })
-    .filter(
-      (c) => c.buy !== null && c.gap >= (mode === 'instant' ? MIN_INSTANT_GAP : MIN_LISTED_GAP)
-    )
     .sort((a, b) => b.gap - a.gap)
     .slice(0, MAX_PRICED_CANDIDATES);
 
@@ -206,12 +242,19 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   // An instant sale skips it: the standing buy order is the demand.
   const withHistory: {
     typeId: number;
+    lane: HubLane;
     buy: number;
     demand: DemandSummary | null;
     proxy: number;
   }[] =
     mode === 'instant'
-      ? priced.map((c) => ({ typeId: c.typeId, buy: c.buy!, demand: null, proxy: c.gap }))
+      ? priced.map((c) => ({
+          typeId: c.typeId,
+          lane: c.lane,
+          buy: c.buy,
+          demand: null,
+          proxy: c.gap,
+        }))
       : [];
   let historyDone = 0;
   const historyPass = mode === 'instant' ? [] : priced;
@@ -219,12 +262,18 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   await mapWithConcurrencyLimit(historyPass, SCAN_CONCURRENCY, async (candidate) => {
     throwIfAborted(signal);
     try {
-      const { points } = await loadPriceHistory(to.regionId, candidate.typeId);
+      const { points } = await loadPriceHistory(candidate.lane.to.regionId, candidate.typeId);
       const demand = summarizeDemand(points, today);
       if (demand.recentSalePrice !== null && demand.dailyVolume > 0) {
-        const proxy = (demand.recentSalePrice * ROUGH_FEE_FACTOR) / candidate.buy!;
+        const proxy = (demand.recentSalePrice * ROUGH_FEE_FACTOR) / candidate.buy;
         if (proxy >= MIN_RECENT_GAP) {
-          withHistory.push({ typeId: candidate.typeId, buy: candidate.buy!, demand, proxy });
+          withHistory.push({
+            typeId: candidate.typeId,
+            lane: candidate.lane,
+            buy: candidate.buy,
+            demand,
+            proxy,
+          });
         }
       }
     } catch {
@@ -244,13 +293,15 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     throwIfAborted(signal);
     try {
       const [origin, dest] = await Promise.all([
-        stationLadders(from, candidate.typeId),
-        stationLadders(to, candidate.typeId),
+        stationLadders(candidate.lane.from, candidate.typeId),
+        stationLadders(candidate.lane.to, candidate.typeId),
       ]);
       const buyLadder = origin.sell;
       const base = {
         typeId: candidate.typeId,
         name: types[String(candidate.typeId)]?.name ?? `#${candidate.typeId}`,
+        fromHub: candidate.lane.from,
+        toHub: candidate.lane.to,
         buyLadder,
         destLadder: dest.sell,
         destBuyLadder: dest.buy,

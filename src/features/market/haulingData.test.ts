@@ -14,7 +14,7 @@ vi.mock('@/features/market/orderBook', () => ({
 }));
 vi.mock('@/esi/endpoints', () => ({ getUniverseType: vi.fn() }));
 
-const { clearHaulingScanCache, haulingScanCacheKey, runHaulingScan } =
+const { clearHaulingScanCache, haulingScanCacheKey, MAX_BOOK_CANDIDATES, runHaulingScan } =
   await import('./haulingData');
 
 const FROM = TRADE_HUBS.find((h) => h.id === 'jita')!;
@@ -94,5 +94,92 @@ describe('runHaulingScan, selling into buy orders', () => {
       mode: 'instant',
     });
     expect(instant.rows).toHaveLength(1);
+  });
+});
+
+describe('runHaulingScan, Any hub at one end', () => {
+  const hubById = (id: string) => TRADE_HUBS.find((h) => h.id === id)!;
+  const JITA = hubById('jita');
+  const DODIXIE = hubById('dodixie');
+  const RENS = hubById('rens');
+  /** Lowest sell per hub for every item: Dodixie is the cheapest origin, Rens the dearest destination. */
+  const SELL: Record<string, number> = { jita: 200, amarr: 150, dodixie: 100, rens: 400, hek: 180 };
+  const BUY: Record<string, number> = { jita: 180, amarr: 120, dodixie: 90, rens: 300, hek: 150 };
+
+  beforeEach(() => {
+    getHubPrices.mockImplementation(
+      async (hub: { id: string }, ids: number[]) =>
+        new Map(ids.map((id) => [id, aggregate(SELL[hub.id]!, BUY[hub.id]!)]))
+    );
+    getOrderBook.mockImplementation(async (regionId: number) => {
+      const hub = TRADE_HUBS.find((h) => h.regionId === regionId)!;
+      return {
+        orders: [
+          {
+            price: SELL[hub.id],
+            volume_remain: 10,
+            is_buy_order: false,
+            location_id: hub.stationId,
+          },
+          { price: BUY[hub.id], volume_remain: 10, is_buy_order: true, location_id: hub.stationId },
+        ],
+      };
+    });
+  });
+
+  it('buys each item at its cheapest hub and says which one', async () => {
+    const scan = await runHaulingScan({
+      from: 'any',
+      to: JITA,
+      typeIds: [34],
+      scope: 4,
+      types: TYPES,
+      mode: 'instant',
+    });
+    expect(scan.rows).toHaveLength(1);
+    expect(scan.rows[0]).toMatchObject({
+      fromHub: DODIXIE,
+      toHub: JITA,
+      buyLadder: [{ price: 100, units: 10, orders: 1 }],
+      destBuyLadder: [{ price: 180, units: 10, orders: 1 }],
+    });
+  });
+
+  it('sells each item at its dearest hub, reading that hub region for demand', async () => {
+    loadPriceHistory.mockRejectedValue(new Error('no history'));
+    await runHaulingScan({ from: JITA, to: 'any', typeIds: [34], scope: 4, types: TYPES });
+    expect(loadPriceHistory).toHaveBeenCalledWith(RENS.regionId, 34);
+  });
+
+  it('fetches each hub price list once and keeps the order-book pass under the overall cap', async () => {
+    const typeIds = Array.from({ length: 200 }, (_, i) => 1000 + i);
+    const types = Object.fromEntries(
+      typeIds.map((id) => [String(id), { name: `T${id}`, volume: 1 }])
+    );
+    const scan = await runHaulingScan({
+      from: 'any',
+      to: JITA,
+      typeIds,
+      scope: 4,
+      types: types as never,
+      mode: 'instant',
+    });
+    expect(getHubPrices).toHaveBeenCalledTimes(TRADE_HUBS.length);
+    expect(scan.rows).toHaveLength(MAX_BOOK_CANDIDATES);
+    // Two books (origin and destination) per shortlisted item — no more.
+    expect(getOrderBook).toHaveBeenCalledTimes(2 * MAX_BOOK_CANDIDATES);
+  });
+
+  it('keeps Any in the cache key', () => {
+    expect(haulingScanCacheKey({ from: 'any', to: JITA, scope: 4 })).not.toBe(
+      haulingScanCacheKey({ from: DODIXIE, to: JITA, scope: 4 })
+    );
+  });
+
+  it('refuses Any at both ends', async () => {
+    await expect(
+      runHaulingScan({ from: 'any', to: 'any', typeIds: [34], scope: 4, types: TYPES })
+    ).rejects.toThrow();
+    expect(getHubPrices).not.toHaveBeenCalled();
   });
 });

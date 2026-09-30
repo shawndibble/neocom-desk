@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { TRADE_HUBS } from '@/market/hubs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { HaulingScanRow } from './haulingData';
 import type { HaulingScanState } from './useHaulingScan';
@@ -13,8 +14,14 @@ const FEES = {
   standing: { factionStanding: 0, corpStanding: 0 },
 };
 
+const JITA = TRADE_HUBS.find((h) => h.id === 'jita')!;
+const AMARR = TRADE_HUBS.find((h) => h.id === 'amarr')!;
+const DODIXIE = TRADE_HUBS.find((h) => h.id === 'dodixie')!;
+
 const SCAN_ROW: HaulingScanRow = {
   mode: 'list',
+  fromHub: JITA,
+  toHub: AMARR,
   typeId: 2048,
   destBuyLadder: [],
   name: 'Damage Control II',
@@ -45,6 +52,8 @@ const INSTANT_READY: HaulingScanState = {
     rows: [
       {
         mode: 'instant',
+        fromHub: JITA,
+        toHub: AMARR,
         typeId: 2048,
         name: 'Damage Control II',
         unitVolumeM3: 5,
@@ -58,13 +67,27 @@ const INSTANT_READY: HaulingScanState = {
   },
 };
 
+const ANY_FROM_READY: HaulingScanState = {
+  status: 'ready',
+  scan: { rows: [{ ...SCAN_ROW, fromHub: DODIXIE, toHub: JITA }], scanned: 1, fetchedAt: 0 },
+};
+
 const scanModes: string[] = [];
+const scanCalls: { from: unknown; to: unknown; enabled: boolean }[] = [];
 vi.mock('./useHaulingScan', () => ({
-  useHaulingScan: (_from: unknown, _to: unknown, _cat: unknown, mode: string) => {
+  useHaulingScan: (
+    from: unknown,
+    to: unknown,
+    _cat: unknown,
+    mode: string,
+    enabled: boolean = true
+  ) => {
     scanModes.push(mode);
-    return { state: mode === 'instant' ? INSTANT_READY : READY, refresh: vi.fn() };
+    scanCalls.push({ from, to, enabled });
+    const state = from === 'any' ? ANY_FROM_READY : mode === 'instant' ? INSTANT_READY : READY;
+    return { state, refresh: vi.fn() };
   },
-  useHaulingFees: () => FEES,
+  useHaulingFees: () => ({ accountingLevel: 5, brokerRelationsLevel: 4, at: () => FEES }),
 }));
 vi.mock('@/sde/loadMarketSde', () => ({ loadMarketGroups: vi.fn(async () => []) }));
 
@@ -136,5 +159,31 @@ describe('HaulingPanel modes', () => {
     expect(screen.getByRole('columnheader', { name: /ISK\/m³/ })).toBeInTheDocument();
     // The realised buy-order price: 10 units sold at 130.
     expect(screen.getByRole('row', { name: /Damage Control II/ })).toHaveTextContent('130.00');
+  });
+});
+
+describe('HaulingPanel, Any hub', () => {
+  beforeEach(() => {
+    useActiveCharacter.setState({ activeCharacterId: null });
+    scanCalls.length = 0;
+  });
+
+  it('reads Any from the link, scans with it, and names each row hub', () => {
+    renderPanel('from=any&to=jita');
+    expect(scanCalls.at(-1)).toMatchObject({ from: 'any', to: JITA });
+    expect(screen.getByRole('combobox', { name: 'From' })).toHaveTextContent('Any hub');
+    expect(screen.getByRole('columnheader', { name: /^Hub/ })).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /Damage Control II/ })).toHaveTextContent('Dodixie');
+  });
+
+  it('shows no Hub column on a plain lane', () => {
+    renderPanel();
+    expect(screen.queryByRole('columnheader', { name: /^Hub/ })).toBeNull();
+  });
+
+  it('refuses Any at both ends with a message, and runs no scan', () => {
+    renderPanel('from=any&to=any');
+    expect(screen.getByText('Any hub works at one end only')).toBeInTheDocument();
+    expect(scanCalls.every((call) => !call.enabled)).toBe(true);
   });
 });

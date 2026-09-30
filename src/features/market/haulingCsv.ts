@@ -10,6 +10,8 @@ export interface HaulingCsvOptions {
   bringFor: (row: HaulingViewRow) => number | null;
   /** Selling into buy orders drops Days to Sell and demand, as the table does. Defaults to `list`. */
   mode?: HaulMode;
+  /** The end set to Any hub: adds a Hub column naming the hub each row uses there. */
+  anyEnd?: 'from' | 'to' | null;
 }
 
 /**
@@ -20,7 +22,7 @@ export interface HaulingCsvOptions {
  */
 export function haulingCsvColumns(
   t: CsvTranslate,
-  { flagText, bringFor, mode = 'list' }: HaulingCsvOptions
+  { flagText, bringFor, mode = 'list', anyEnd = null }: HaulingCsvOptions
 ): CsvColumn<HaulingViewRow>[] {
   const listing: CsvColumn<HaulingViewRow>[] =
     mode === 'list'
@@ -36,8 +38,18 @@ export function haulingCsvColumns(
           },
         ]
       : [];
+  const hub: CsvColumn<HaulingViewRow>[] =
+    anyEnd === null
+      ? []
+      : [
+          {
+            header: t('market.hauling.columns.hub'),
+            value: (row) => (anyEnd === 'from' ? row.fromHub : row.toHub).systemName,
+          },
+        ];
   return [
     { header: t('market.hauling.columns.item'), value: (row) => row.name },
+    ...hub,
     { header: t('market.hauling.columns.buy'), value: (row) => row.buyLadder[0]?.price },
     {
       header: t(
