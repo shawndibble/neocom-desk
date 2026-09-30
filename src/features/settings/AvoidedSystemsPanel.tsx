@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconButton, Panel } from '@/components/ui';
+import { Checkbox, IconButton, Panel } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
@@ -10,6 +10,7 @@ import {
   removeAvoidedSystem,
   useAvoidedSystems,
 } from '@/features/route/avoidedSystems';
+import { useAvoidedSystemsEnabled } from '@/features/route/routeRules';
 
 /**
  * Settings → Travel: the pilot's Avoided Systems, added through the local
@@ -22,9 +23,14 @@ export function AvoidedSystemsPanel() {
   const setAvoided = useAvoidedSystems((state) => state.setValue);
   const hydrated = useAvoidedSystems((state) => state.hydrated);
   const hydrate = useAvoidedSystems((state) => state.hydrate);
+  const enabled = useAvoidedSystemsEnabled((state) => state.value);
+  const setEnabled = useAvoidedSystemsEnabled((state) => state.setValue);
+  const enabledHydrated = useAvoidedSystemsEnabled((state) => state.hydrated);
+  const hydrateEnabled = useAvoidedSystemsEnabled((state) => state.hydrate);
   useEffect(() => {
     void hydrate();
-  }, [hydrate]);
+    void hydrateEnabled();
+  }, [hydrate, hydrateEnabled]);
 
   const systems = useSolarSystems(true);
   const byId = useMemo(() => new Map(systems?.map((s) => [s.id, s]) ?? []), [systems]);
@@ -41,9 +47,14 @@ export function AvoidedSystemsPanel() {
 
   return (
     <Panel title={t('settings.avoidedSystems.title')}>
-      {hydrated ? (
+      {hydrated && enabledHydrated ? (
         <div className="max-w-md space-y-4">
           <p className="text-xs text-text-dim">{t('settings.avoidedSystems.hint')}</p>
+          {/* Off routes straight through the list without the pilot losing it. */}
+          <label className="flex items-center gap-2 text-xs font-semibold">
+            <Checkbox checked={enabled} onChange={() => void setEnabled(!enabled)} />
+            {t('settings.avoidedSystems.enabled')}
+          </label>
           <SolarSystemPicker
             value={null}
             onChange={(systemId) => void setAvoided(addAvoidedSystem(avoided, systemId))}

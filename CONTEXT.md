@@ -458,14 +458,20 @@ here — they go one per file in `docs/context/decisions/`.
   system's security. Not a **Route Preference**. Every jump count routes
   around them as a cost, never a wall: a trip only possible through one
   still has a route.
-- **Route Preference**: Which trip a distance describes — prefer highsec,
-  shortest, or avoid highsec, the three the local jump graph supports
-  (`engine/route/jumpRoute.ts`, issue #942). A reader's choice rather than a
-  fixed rule, because haulers genuinely differ on whether a 0.4 system is
-  worth a shorter run. Distinct from the Assets page's own two-value
-  `RoutePreference` setting and from ESI's `shortest`/`secure`/`insecure`
-  flags; unifying the three vocabularies is recorded as work owed before a
-  second _persisted_ preference control ships.
+- **Route Preference**: Which trip a distance describes — the game's Prefer
+  shorter, Prefer safer or Prefer less secure, one vocabulary app-wide: the
+  engine's `shortest`/`prefer-highsec`/`avoid-highsec`, and ESI's
+  `Shorter`/`Safer`/`LessSecure` (mapped in `features/route/esiRoute.ts`). The
+  pilot's default lives in **Travel Settings**; a page with its own picker
+  (Courier, Route Safety, Thera, Assets) opens on it and overrides it for that
+  view only.
+- **Travel Settings**: The in-game autopilot's route options, for planning —
+  the default **Route Preference**, the security penalty (0–100, the game's
+  slider, default 50), and what to avoid: the **Avoided Systems** (switchable
+  without clearing), EDENCOM and Triglavian minor-victory systems, and systems
+  at or over a pod-kill count in ESI's last-hour kill report. Every jump count
+  in the app follows them (`features/route/routeRules.ts`); the local graph
+  weighs jumps with CCP's own published route costs, so it agrees with ESI.
 - **Job Fee**: The ISK ESI charges to install a manufacturing job, separate
   from material cost. Sized from EIV, the system's **Cost Index**, a fixed
   SCC surcharge, and the facility's tax.

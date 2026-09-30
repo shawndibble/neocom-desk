@@ -1,12 +1,8 @@
 /**
- * The Route Preferences a reader can choose between, shared by Contract
- * Search's Courier board and Route Safety (issue #2328).
- *
- * Deliberately never persisted: a second *persisted* route preference is what
- * would force unifying this vocabulary with the Assets page's own
- * `RoutePreference` and ESI's flag names, and that unification is recorded
- * (CONTEXT.md, **Route Preference**) as work to do before such a control
- * ships, not as part of either of these. Both keep it in the URL only.
+ * The Route Preferences a reader can choose between — the game's Prefer
+ * shorter / safer / less secure — shared by every route picker and Settings →
+ * Travel. The pilot's default is persisted there (`routeRules.ts`); a page's
+ * own picker keeps its override in the URL, or in view state on Assets.
  */
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 

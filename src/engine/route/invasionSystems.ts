@@ -1,11 +1,196 @@
 /**
  * The systems the Triglavian Invasion left in a lasting state, for the
  * in-game autopilot's "Avoid EDENCOM systems" and "Avoid Triglavian minor
- * victory systems". Neither ESI nor the SDE marks them, so they are vendored.
+ * victory systems" (patch 18.10 split the two, 2020-10-20).
+ *
+ * Neither ESI nor the SDE marks them — the SDE's `visualEffect` flags only
+ * Pochven, which has no stargates to the rest of the cluster anyway — so they
+ * are vendored from kybernaut.space/invasions, the list EVE University's
+ * "EDENCOM systems" and "Triglavian minor victory" pages link to. The sets
+ * have not changed since the invasion ended (2020-10-13): re-invading a
+ * minor-victory system was patched out. Every id was checked against
+ * `systems.json` by name when vendored.
+ *
+ * "EDENCOM systems" is fortress plus minor-victory systems, as EVE University
+ * uses the term — both keep EDENCOM forces hostile to negative standings.
  */
 
-/** EDENCOM fortress and minor-victory systems. */
-export const EDENCOM_SYSTEMS: readonly number[] = [];
+/** 53 EDENCOM fortress systems. */
+const EDENCOM_FORTRESS: readonly number[] = [
+  30000004, // Jark
+  30000005, // Sasta
+  30000105, // Abha
+  30000113, // Astabih
+  30000118, // Uanzin
+  30000188, // Hentogaira
+  30002242, // Mamenkhanar
+  30002243, // Seiradih
+  30002251, // Sadye
+  30002253, // Arshat
+  30002266, // Ahmak
+  30002385, // Teonusude
+  30002386, // Gelfiven
+  30002530, // Avesber
+  30002651, // Fasse
+  30002662, // Pulin
+  30002665, // Misneden
+  30002700, // Bawilan
+  30002704, // Adrallezoen
+  30002986, // Mendori
+  30003050, // Odixie
+  30003392, // Eygfe
+  30003397, // Bongveber
+  30003398, // Anbald
+  30003490, // Khopa
+  30003514, // Yeeramoun
+  30003515, // Anila
+  30003539, // Miakie
+  30003541, // Faswiba
+  30003548, // Barira
+  30003553, // Warouh
+  30003556, // Arton
+  30003573, // Pertnineere
+  30003574, // Boystin
+  30003883, // Keberz
+  30003885, // Arzanni
+  30004084, // Ghesis
+  30004090, // Aband
+  30004100, // Halibai
+  30004103, // Kothe
+  30004141, // Hiremir
+  30004150, // Shaggoth
+  30004248, // Haimeh
+  30004250, // Chibi
+  30004305, // Esaeel
+  30004973, // Caslemon
+  30004992, // Palmon
+  30005052, // Soumi
+  30005058, // Neesher
+  30005251, // Asanot
+  30005252, // Anzalaisio
+  30005260, // Keri
+  30045322, // Samanuni
+];
 
-/** Triglavian minor-victory systems (not Pochven, which has no stargates to the cluster). */
-export const TRIGLAVIAN_MINOR_VICTORY_SYSTEMS: readonly number[] = [];
+/** 84 EDENCOM minor-victory systems. */
+const EDENCOM_MINOR_VICTORY: readonly number[] = [
+  30000012, // Asabona
+  30000048, // Ihal
+  30000060, // Janus
+  30000062, // Iosantin
+  30000102, // Dysa
+  30000109, // Berta
+  30000160, // Reisen
+  30001376, // Nourvukaiken
+  30001660, // Dabrid
+  30001696, // Iro
+  30001718, // Paye
+  30002048, // Bei
+  30002051, // Anher
+  30002239, // Rammi
+  30002241, // Rimbah
+  30002397, // Horaka
+  30002506, // Osoggur
+  30002513, // Dammalin
+  30002644, // Ambeke
+  30002724, // Assiettes
+  30002755, // Usi
+  30002772, // Rairomon
+  30002999, // Shastal
+  30003058, // Olide
+  30003061, // Mormelot
+  30003074, // Sasiekko
+  30003078, // Erkinen
+  30003088, // Oyonata
+  30003090, // Saidusairos
+  30003460, // Offikatlin
+  30003463, // Erlendur
+  30003478, // Basan
+  30003480, // Amod
+  30003481, // Unefsih
+  30003482, // Mista
+  30003558, // Madimal
+  30003570, // Elore
+  30003587, // Harner
+  30003788, // Intaki
+  30003794, // Stacmon
+  30003809, // Brellystier
+  30003823, // Kenninck
+  30003824, // Archavoinet
+  30003829, // Renarelle
+  30003854, // Alamel
+  30003894, // Sabusi
+  30003900, // Ham
+  30003904, // Col
+  30003908, // Bashyam
+  30003918, // Hakana
+  30003919, // Ashkoo
+  30003927, // Zahefeus
+  30003931, // Sassecho
+  30003932, // Timudan
+  30004108, // Chaneya
+  30004231, // Shakasi
+  30004254, // Fihrneh
+  30004256, // Edilkam
+  30004257, // Hakatiz
+  30004263, // Feshur
+  30004268, // Shenda
+  30004284, // Defsunun
+  30004287, // Esubara
+  30004289, // Vaini
+  30004295, // Keba
+  30004301, // Anath
+  30004302, // Omigiav
+  30004978, // Pemene
+  30004999, // Ladistier
+  30005034, // Bridi
+  30005066, // Kerying
+  30005074, // Daran
+  30005086, // Arza
+  30005209, // Sibe
+  30005213, // Hesarid
+  30005219, // Sigga
+  30005222, // Serren
+  30005236, // Noranim
+  30005255, // Saphthar
+  30005263, // Mozzidit
+  30005267, // Bherdasopt
+  30005284, // Promised Land
+  30005308, // Jufvitte
+  30005334, // Tierijev
+];
+
+/** EDENCOM fortress and minor-victory systems: 137. */
+export const EDENCOM_SYSTEMS: readonly number[] = [...EDENCOM_FORTRESS, ...EDENCOM_MINOR_VICTORY];
+
+/** 28 Triglavian minor-victory systems. */
+export const TRIGLAVIAN_MINOR_VICTORY_SYSTEMS: readonly number[] = [
+  30000163, // Akora
+  30000182, // Inaya
+  30000205, // Obe
+  30001358, // Ossa
+  30001383, // Vaajaita
+  30001390, // Pakkonen
+  30001391, // Piekura
+  30001400, // Litiura
+  30001401, // Nonni
+  30001447, // Taisy
+  30001685, // Ordat
+  30002557, // Atgur
+  30002575, // Sotrenzur
+  30002645, // Carrou
+  30002760, // Manjonakko
+  30002771, // Kulelen
+  30002795, // Oshaima
+  30003073, // Netsalakka
+  30003076, // Gammel
+  30003464, // Aldik
+  30003856, // Athounon
+  30004244, // Onanam
+  30004981, // Actee
+  30005330, // Arraron
+  30045331, // Vaaralen
+  30045338, // Hikkoken
+  30045345, // Hirri
+  30045354, // Reitsato
+];

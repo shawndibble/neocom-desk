@@ -126,8 +126,13 @@ export interface RouteRules {
   securityPenalty: number;
   /** Every system to keep out of, sorted — see `engine/route/avoidRules.ts`. */
   avoid: readonly number[];
-  /** False until every setting has been read, so nothing routes once on defaults. */
+  /**
+   * False until every setting has been read — and, with pod-kill avoidance
+   * on, the kill feed too — so nothing routes once on defaults.
+   */
   hydrated: boolean;
+  /** Every setting has been read; the kill feed may still be loading. For a settings form. */
+  settingsHydrated: boolean;
   /** Pod-kill avoidance is on but the kill feed could not be read. */
   podKillsUnavailable: boolean;
 }
@@ -212,9 +217,10 @@ export function useRouteRules(): RouteRules {
       securityPenalty,
       avoid,
       hydrated,
+      settingsHydrated: hydratedAll,
       podKillsUnavailable: avoidPodKills && podKills === null,
     }),
-    [preference, securityPenalty, avoid, hydrated, avoidPodKills, podKills]
+    [preference, securityPenalty, avoid, hydrated, hydratedAll, avoidPodKills, podKills]
   );
 }
 

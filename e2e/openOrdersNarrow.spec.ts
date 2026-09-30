@@ -169,8 +169,12 @@ async function mockOrderDetailDependencies(page: Page): Promise<void> {
     route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   );
   // `/route/` always includes at least the origin system (`engine/jumpsAway.ts`).
-  await page.route('https://esi.evetech.net/latest/route/*/*', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: '[30000142]' })
+  await page.route('https://esi.evetech.net/route/*/*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ route: [30000142] }),
+    })
   );
 }
 

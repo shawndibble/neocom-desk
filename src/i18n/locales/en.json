@@ -5811,8 +5811,8 @@
       "charactersSome_other": "{{count}} characters",
       "corporation_one": "Dark after {{count}} day",
       "corporation_other": "Dark after {{count}} days",
-      "travel_one": "{{count}} avoided system",
-      "travel_other": "{{count}} avoided systems"
+      "travel_one": "{{preference}}, {{count}} avoided system",
+      "travel_other": "{{preference}}, {{count}} avoided systems"
     },
     "industryDefaultsTitle": "Industry defaults",
     "marketDefaultsTitle": "Market defaults",
@@ -5821,7 +5821,28 @@
       "hint": "Systems you keep off your routes. Every jump count and route in the app goes around them where it can. The game doesn't share its own autopilot avoidance list, so enter yours here. Kept across your devices.",
       "add": "Add system",
       "remove": "Remove {{name}}",
-      "empty": "No systems avoided yet."
+      "empty": "No systems avoided yet.",
+      "enabled": "Keep routes out of these systems"
+    },
+    "travel": {
+      "routeTitle": "Route planning",
+      "hint": "The in-game autopilot's route settings, for planning. Every jump count and route in the app follows them; a page with its own route picker starts from the preference here. Kept across your devices.",
+      "preferenceLabel": "Default route preference",
+      "preferenceHint": "Which trip to plan, as the game's autopilot offers it.",
+      "penaltyLabel": "Security penalty",
+      "penaltyHint": "How hard the preference bends the route, 0 to 100 — the game's slider. At the default 50 one unwanted jump outweighs a long detour; lower it to accept a few for a much shorter trip.",
+      "penaltyShorterHint": "Prefer shorter counts jumps only, so the security penalty does not apply.",
+      "avoidTitle": "Also avoid",
+      "avoidEdencom_one": "EDENCOM systems ({{count}} system)",
+      "avoidEdencom_other": "EDENCOM systems ({{count}} systems)",
+      "avoidTriglavian_one": "Triglavian minor victory systems ({{count}} system)",
+      "avoidTriglavian_other": "Triglavian minor victory systems ({{count}} systems)",
+      "avoidPodKills": "Systems with at least",
+      "podKillThresholdLabel": "Pod kills in the last hour",
+      "podKillsSuffix_one": "pod kill in the last hour",
+      "podKillsSuffix_other": "pod kills in the last hour",
+      "avoidHint": "Avoided systems cost more than any security penalty, but a trip only possible through one still gets a route. Pod kills come from ESI's last-hour kill report and refresh with it.",
+      "podKillsUnavailable": "ESI's kill report can't be read right now, so routes aren't avoiding pod-kill systems."
     },
     "miningTaxDefaultsTitle": "Moon Mining Tax defaults",
     "miningTaxOreValueModeLabel": "Edit ore values individually",

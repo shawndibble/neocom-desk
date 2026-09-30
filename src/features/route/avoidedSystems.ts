@@ -9,7 +9,6 @@
  * Synced, and one list for the whole account: "I never fly through Uedama" is
  * a fact about the pilot, not about one machine or one alt.
  */
-import { useEffect } from 'react';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 
 export const AVOIDED_SYSTEMS_KEY = 'sync.avoidedSystems';
@@ -41,21 +40,3 @@ export const useAvoidedSystems = createSyncedSetting<number[]>({
   defaultValue: [],
   parse: parseAvoidedSystems,
 });
-
-/**
- * The Avoided Systems, hydrated — for a page that routes with them. Pages like
- * Market or Travel never mount Settings, so reading the store bare would route
- * with the empty default until something else happened to hydrate it.
- *
- * `hydrated` lets a caller hold its answer until the real list is in, rather
- * than routing once with `[]` and then again.
- */
-export function useAvoidedSystemIds(): { avoided: readonly number[]; hydrated: boolean } {
-  const avoided = useAvoidedSystems((state) => state.value);
-  const hydrated = useAvoidedSystems((state) => state.hydrated);
-  const hydrate = useAvoidedSystems((state) => state.hydrate);
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
-  return { avoided, hydrated };
-}
