@@ -13,6 +13,7 @@ import {
   Panel,
   Spinner,
   Tabs,
+  textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -674,14 +675,17 @@ export function Wallet() {
             padded={false}
             title={t('loyalty.title')}
             actions={
-              loyaltyResult ? (
-                <span className="flex items-center gap-2">
-                  {!loyaltyNeedsReauth && otherLoyalty.length > 0 && (
-                    <TableActionsMenu name={t('loyalty.title')} tableExport={loyaltyExport} />
-                  )}
-                  <DataAgeBadge date={loyaltyResult.fetchedAt} />
-                </span>
-              ) : undefined
+              <span className="flex items-center gap-2">
+                {/* Always shown, LP or not (issue #2321): the way into any
+                    corp's store for a pilot who holds LP nowhere yet. */}
+                <Link to="/wallet/loyalty" className={textActionClassName()}>
+                  {t('loyalty.browseStores')}
+                </Link>
+                {loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length > 0 && (
+                  <TableActionsMenu name={t('loyalty.title')} tableExport={loyaltyExport} />
+                )}
+                {loyaltyResult && <DataAgeBadge date={loyaltyResult.fetchedAt} />}
+              </span>
             }
           >
             {loyaltyNeedsReauth ? (

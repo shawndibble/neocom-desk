@@ -122,3 +122,25 @@ test('the phone sort control stays hidden at and above md (768px) (issue #2174)'
   await expect(itemCells).toHaveCount(2);
   await expect(page.getByRole('combobox', { name: 'Sort by' })).toBeHidden();
 });
+
+test('the header corporation picker fits a 390px phone without horizontal scroll (issue #2321)', async ({
+  page,
+}) => {
+  async function expectPickerFits() {
+    const picker = page.getByRole('combobox', { name: 'LP Store corporation' });
+    await expect(picker).toBeVisible();
+    const right = await picker.evaluate((el) => el.getBoundingClientRect().right);
+    expect(right).toBeLessThanOrEqual(PHONE.width);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  }
+
+  await signInAndGoto(page, './wallet/loyalty');
+  await page.setViewportSize(PHONE);
+  await expectPickerFits();
+
+  await page.goto(`./wallet/loyalty/${CORPORATION_ID}`);
+  await expectPickerFits();
+});

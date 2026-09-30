@@ -37,6 +37,7 @@ const ROUTE_TITLE_KEYS = {
   '/industry/groups/:groupId': ['nav.industry', 'industry.buildPlansTab'],
   '/market': ['nav.market'],
   '/wallet': ['nav.wallet'],
+  '/wallet/loyalty': ['nav.wallet', 'loyalty.browseStores'],
   '/wallet/loyalty/:corporationId': ['nav.wallet', 'loyaltyStore.title'],
   '/mining': ['nav.miningTax'],
   '/clones': ['clones.title'],
