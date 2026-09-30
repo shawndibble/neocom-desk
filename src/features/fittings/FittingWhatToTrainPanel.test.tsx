@@ -60,7 +60,7 @@ function gain(skillTypeId: number, fromLevel: number, overall: number): SkillGai
 
 vi.mock('./useSkillGains', () => ({
   useSkillGains: () => ({
-    gains: [gain(3315, 0, 0.2), gain(3436, 2, 0.1)],
+    gains: [gain(3315, 0, 0.2), gain(3436, 2, 0.1), gain(3300, 1, 0.05)],
     loading: false,
     failed: false,
   }),
@@ -110,7 +110,7 @@ describe('FittingWhatToTrainPanel — Add to plan', () => {
 
     await screen.findByText(/Surgical Strike I$/);
     await user.click(
-      within(rowFor(/Surgical Strike I$/)).getByRole('button', { name: /add to plan/i })
+      await within(rowFor(/Surgical Strike I$/)).findByRole('button', { name: /add to plan/i })
     );
 
     await waitFor(async () => {
@@ -139,7 +139,9 @@ describe('FittingWhatToTrainPanel — Add to plan', () => {
     renderPanel();
 
     await screen.findByText(/Drones III$/);
-    await user.click(within(rowFor(/Drones III$/)).getByRole('button', { name: /add to plan/i }));
+    await user.click(
+      await within(rowFor(/Drones III$/)).findByRole('button', { name: /add to plan/i })
+    );
     await waitFor(async () => {
       expect(await planEntries()).toEqual([
         { skillTypeID: 3300, targetLevel: 2 },
@@ -171,5 +173,20 @@ describe('FittingWhatToTrainPanel — Add to plan', () => {
     expect(
       within(rowFor(/Surgical Strike I$/)).getByRole('button', { name: /add to plan/i })
     ).toBeInTheDocument();
+  });
+
+  it('marks a level the plan already trains as a derived prerequisite of another entry', async () => {
+    await db.skillPlans.put({
+      ...newPlan(CHARACTER_ID, 'Gunnery'),
+      entries: [{ skillTypeID: 3315, targetLevel: 1 }],
+    });
+    renderPanel();
+
+    const row = await waitFor(() => {
+      const found = rowFor(/Gunnery II$/);
+      expect(within(found).getByText('In plan Gunnery')).toBeInTheDocument();
+      return found;
+    });
+    expect(within(row).queryByRole('button', { name: /add to plan/i })).toBeNull();
   });
 });

@@ -33,15 +33,15 @@ import {
   type SkillGainTrainingTime,
 } from '@/engine/fittings/skillGains';
 import { hasSkillOverrides } from '@/engine/fittings/skillOverrides';
+import { normalizePlan } from '@/engine/plan';
 import { romanLevel } from '@/engine/projection';
 import type { PlanEntry } from '@/engine/types';
 import { formatCountdown } from '@/lib/duration';
 import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
-import { isEntryCovered } from '@/features/skills/planner/reorder';
 import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
-import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
+import { useTargetPlan } from '@/features/skills/useTargetPlan';
 import { changeLabel } from './fittingVariationsCsv';
 import { useSkillOverrides } from './statsConditions';
 import type { SkillGainEvaluator } from './useFittingEvaluation';
@@ -76,7 +76,13 @@ export function FittingWhatToTrainPanel({
   if (overridden)
     return <p className="text-xs text-text-dim">{t('fittings.whatToTrain.overridesOn')}</p>;
   return (
-    <WhatToTrainRanking evaluator={evaluator} characterId={characterId} fittingName={fittingName} />
+    // Keyed so an Undo toast can't outlive a Character switch and sync the wrong pilot.
+    <WhatToTrainRanking
+      key={characterId}
+      evaluator={evaluator}
+      characterId={characterId}
+      fittingName={fittingName}
+    />
   );
 }
 
@@ -136,15 +142,34 @@ function WhatToTrainRanking({
   }, [gains, catalog, trainedSkills, trainedSkillsKnown, attributes, implants, cloneState]);
   const ranked = useMemo(() => (rows === null ? null : rankSkillGains(rows, sort)), [rows, sort]);
 
+  const targetPlan = target.plans?.find((plan) => plan.id === target.targetPlanId);
+  // Highest level the target plan trains each skill to — its derived
+  // prerequisite rows included, so a level it already trains on the way to
+  // another entry isn't offered again as a redundant entry.
+  const plannedLevels = useMemo(() => {
+    const levels = new Map<number, number>();
+    if (!targetPlan) return levels;
+    const raise = (skillTypeID: number, level: number) =>
+      levels.set(skillTypeID, Math.max(levels.get(skillTypeID) ?? 0, level));
+    for (const entry of targetPlan.entries) raise(entry.skillTypeID, entry.targetLevel);
+    if (!catalog) return levels;
+    try {
+      const known = targetPlan.entries.filter((e) => catalog.engineSkills.has(e.skillTypeID));
+      for (const step of normalizePlan(known, catalog.engineSkills, trainedSkills)) {
+        raise(step.skillTypeID, step.level);
+      }
+    } catch {
+      // A circular plan is the Skill Plan editor's to report; its entries still count.
+    }
+    return levels;
+  }, [targetPlan, catalog, trainedSkills]);
+
   if (evaluator === null || loading)
     return <p className="text-xs text-text-dim">{t('fittings.whatToTrain.loading')}</p>;
   if (failed || ranked === null)
     return <p className="text-xs text-text-dim">{t('fittings.whatToTrain.failed')}</p>;
   if (ranked.length === 0)
     return <p className="text-xs text-text-dim">{t('fittings.whatToTrain.none')}</p>;
-
-  const planEntries = targetPlanEntries(target);
-  const targetPlanName = target.plans?.find((plan) => plan.id === target.targetPlanId)?.name;
 
   async function add(row: WhatToTrainRow) {
     const result = await target.addEntries(
@@ -201,17 +226,27 @@ function WhatToTrainRanking({
       id: 'plan',
       header: t('fittings.whatToTrain.plan'),
       align: 'right',
-      render: (row) =>
-        targetPlanName !== undefined &&
-        isEntryCovered(planEntries, row.skillTypeId, row.toLevel) ? (
-          <span className="text-xs text-text-dim">
-            {t('fittings.whatToTrain.inPlan', { plan: targetPlanName })}
-          </span>
-        ) : (
-          <Button size="sm" onClick={() => void add(row)}>
+      render: (row) => {
+        // Nothing until the plans load, or an already-planned level would flash an Add.
+        if (target.plans === undefined) return null;
+        if (targetPlan && (plannedLevels.get(row.skillTypeId) ?? 0) >= row.toLevel) {
+          return (
+            <span className="text-xs text-text-dim">
+              {t('fittings.whatToTrain.inPlan', { plan: targetPlan.name })}
+            </span>
+          );
+        }
+        const skill = `${row.name} ${romanLevel(row.toLevel)}`;
+        return (
+          <Button
+            size="sm"
+            aria-label={t('fittings.whatToTrain.addToPlanLabel', { skill })}
+            onClick={() => void add(row)}
+          >
             {t('fittings.whatToTrain.addToPlan')}
           </Button>
-        ),
+        );
+      },
     },
   ];
 
