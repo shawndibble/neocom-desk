@@ -398,7 +398,7 @@ function WhatToTrainItem({
               <SelectTrigger
                 size="sm"
                 aria-label={t('fittings.whatToTrain.levelLabel', { skill: row.name })}
-                className="w-28"
+                className="w-16"
               >
                 <SelectValue />
               </SelectTrigger>
