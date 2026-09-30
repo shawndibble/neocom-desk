@@ -45,7 +45,7 @@ export function ForegroundNotificationPoller() {
       // A new leader's catch-up must not overlap the old leader's poll still
       // in flight: both would fire, and feed, the same occurrences. A poll cut
       // short by iOS aborting its IndexedDB transactions (the tab went to the
-      // background mid-save) is just a missed tick — the next one redoes it.
+      // background mid-save) is just a missed tick â€” the next one redoes it.
       void ignoreIdbTeardown(
         runUnlessRunningElsewhere('neocom:poll', () => runForegroundPoll(liveDependencies()))
       );

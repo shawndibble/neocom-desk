@@ -17,9 +17,9 @@ const leaderMock = vi.hoisted(() => {
       listeners.add(listener);
       return { isLeader: () => leader, leave: () => listeners.delete(listener) };
     },
-    // A promise of its own, as `navigator.locks.request` returns: the task's is
-    // a spy's, which vitest observes to record its outcome — marking a
-    // rejection handled that nothing in the component handled.
+    // A new promise, as `navigator.locks.request` returns. Passing the task's
+    // own through would hide an unhandled rejection: it comes from a vitest
+    // spy, and the spy attaches a handler of its own to record the outcome.
     runUnlessRunningElsewhere: (_lock: string, task: () => Promise<void>) =>
       task().then(() => undefined),
     /** Seats still standing â€” for the unmount assertion. */

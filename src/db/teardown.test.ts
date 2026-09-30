@@ -16,6 +16,10 @@ describe('isIdbTeardown', () => {
     expect(isIdbTeardown(new TypeError('boom'))).toBe(false);
     expect(isIdbTeardown(undefined)).toBe(false);
   });
+
+  it('does not recognise an abort from outside IndexedDB, such as a cancelled fetch', () => {
+    expect(isIdbTeardown(new DOMException('Aborted', 'AbortError'))).toBe(false);
+  });
 });
 
 describe('ignoreIdbTeardown', () => {

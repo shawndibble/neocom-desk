@@ -30,9 +30,11 @@ import {
  * there.
  */
 export async function refreshAppBadge(): Promise<void> {
-  // Fired and forgotten from mount and from several panels, so a transaction
-  // iOS aborted under it would otherwise surface as an unhandled rejection.
-  // The badge just keeps its last count until the next refresh.
+  // Fired and forgotten from mount and from several panels, where a transaction
+  // iOS aborted under it would surface as an unhandled rejection — and for the
+  // callers that await it after their own write, a badge that could not be
+  // read is no reason to fail that write. The badge keeps its last count until
+  // the next refresh.
   await ignoreIdbTeardown(deriveAppBadge());
 }
 
