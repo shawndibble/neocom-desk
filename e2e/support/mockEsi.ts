@@ -251,6 +251,17 @@ export async function installEsiMock(page: Page): Promise<void> {
     });
   });
 
+  // Travel's Thera / Turnur tab (issue #2330) reads EVE-Scout's public
+  // signatures; none here, so the tab settles on its empty state.
+  await page.route('https://api.eve-scout.com/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: '[]',
+    });
+  });
+
   await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
     await route.fulfill({
       status: 200,
