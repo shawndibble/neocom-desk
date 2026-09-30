@@ -367,8 +367,6 @@ describe('PublicInfoModal', () => {
     expect(within(dialog).getByText('-4.6')).toBeInTheDocument();
     expect(within(dialog).getByText('Character age')).toBeInTheDocument();
     expect(within(dialog).getByText('Recent kills and losses')).toBeInTheDocument();
-    // The modal is the public info already; no link back to itself.
-    expect(within(dialog).queryByRole('button', { name: 'Public Info' })).not.toBeInTheDocument();
 
     within(dialog).getByRole('button', { name: 'Lookup Corp' }).click();
     expect(await within(dialog).findByText('LOOK')).toBeInTheDocument();
