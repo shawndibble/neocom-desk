@@ -1,0 +1,109 @@
+{
+  "type": "characterID",
+  "id": 443630591,
+  "shipsDestroyed": 1043,
+  "shipsLost": 181,
+  "iskDestroyed": 1888837094625,
+  "iskLost": 14433463248,
+  "soloKills": 18,
+  "soloLosses": 70,
+  "dangerRatio": 68,
+  "gangRatio": 99,
+  "avgGangSize": 37.6,
+  "soloRatio": 0.7,
+  "topShips": [
+    {
+      "shipTypeID": 11132,
+      "groupID": 31,
+      "appearances": 2,
+      "kills": 0,
+      "losses": 2,
+      "isk": 102569.17
+    },
+    {
+      "shipTypeID": 621,
+      "groupID": 26,
+      "appearances": 1,
+      "kills": 0,
+      "losses": 1,
+      "isk": 31150409.47
+    },
+    {
+      "shipTypeID": 672,
+      "groupID": 31,
+      "appearances": 1,
+      "kills": 0,
+      "losses": 1,
+      "isk": 18992
+    },
+    {
+      "shipTypeID": 11129,
+      "groupID": 31,
+      "appearances": 1,
+      "kills": 0,
+      "losses": 1,
+      "isk": 18594.67
+    }
+  ],
+  "sequence": 99415535,
+  "topAllTime": [
+    {
+      "type": "ship",
+      "data": [
+        {
+          "kills": 317,
+          "shipTypeID": 19724
+        },
+        {
+          "kills": 130,
+          "shipTypeID": 24694
+        },
+        {
+          "kills": 119,
+          "shipTypeID": 23911
+        },
+        {
+          "kills": 89,
+          "shipTypeID": 24688
+        },
+        {
+          "kills": 43,
+          "shipTypeID": 29984
+        },
+        {
+          "kills": 34,
+          "shipTypeID": 11184
+        }
+      ]
+    },
+    {
+      "type": "system",
+      "data": [
+        {
+          "kills": 85,
+          "solarSystemID": 30004608
+        },
+        {
+          "kills": 50,
+          "solarSystemID": 30000875
+        },
+        {
+          "kills": 36,
+          "solarSystemID": 30004626
+        },
+        {
+          "kills": 34,
+          "solarSystemID": 30004610
+        },
+        {
+          "kills": 33,
+          "solarSystemID": 30004381
+        },
+        {
+          "kills": 32,
+          "solarSystemID": 30004023
+        }
+      ]
+    }
+  ]
+}

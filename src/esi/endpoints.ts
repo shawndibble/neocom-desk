@@ -1124,12 +1124,14 @@ export function getCharacterSearch(
 // --- POST /universe/ids (public) ---
 
 /**
- * Name -> id resolution. Only the `systems` bucket is modelled: the one caller
- * is the Build Plan's build-system field, and ESI returns a bucket per
- * category, so an unmodelled bucket is simply ignored rather than an error.
+ * Name -> id resolution. Only the buckets a caller reads are modelled — the
+ * Build Plan's build-system field (`systems`) and Pilot Lookup's exact-name
+ * fallback (`characters`). ESI returns a bucket per category, so an
+ * unmodelled bucket is simply ignored rather than an error.
  */
 export interface UniverseIds {
   systems?: { id: number; name: string }[];
+  characters?: { id: number; name: string }[];
 }
 
 /** Exact-name (case-insensitive) lookup. Empty input never calls ESI. */

@@ -443,6 +443,12 @@ here — they go one per file in `docs/context/decisions/`.
   tagged when an Interdictor/HIC (nullsec) or a smartbomb was on the mail.
   States conditions, never a verdict: no system or route is ever called safe
   or not. A figure ESI or zKillboard could not supply is unknown, never zero.
+- **Pilot Lookup**: Travel's view of one pilot, found by name — portrait,
+  corporation, alliance and character age from public ESI, and the all-time
+  kills, losses, ISK, solo kills, danger and gang ratios and most-used hulls
+  zKillboard states. Numbers, never a verdict: no pilot is called hostile or
+  safe. "No zKillboard history" and "zKillboard couldn't be reached" are
+  different answers.
 - **Route Preference**: Which trip a distance describes — prefer highsec,
   shortest, or avoid highsec, the three the local jump graph supports
   (`engine/route/jumpRoute.ts`, issue #942). A reader's choice rather than a

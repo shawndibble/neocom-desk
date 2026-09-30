@@ -28,6 +28,7 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
 /** Travel (issue #2328). Thera/Turnur and Pilot Lookup join as tabs (#2330, #2331). */
 export const TRAVEL_TABS = definePageTabs('/travel', [
   { id: 'route', labelKey: 'travel.routeTab' },
+  { id: 'pilot', labelKey: 'travel.pilotTab' },
 ]);
 
 /**
