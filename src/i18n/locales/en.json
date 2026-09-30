@@ -5188,6 +5188,7 @@
       "viewPrices": "Prices",
       "viewAttributes": "Attributes",
       "attributeColumn": "Attribute",
+      "itemsHeader": "Compared items",
       "worth": "Worth",
       "estimatedPrice": "Estimated Price",
       "errorTitle": "Couldn't load comparison",
