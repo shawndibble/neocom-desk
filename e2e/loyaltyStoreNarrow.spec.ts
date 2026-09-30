@@ -1,20 +1,10 @@
 /**
- * Loyalty Store's back-to-Wallet link (issue #1095): it was a bare
- * `inline-block text-xs text-accent hover:underline` anchor — text with no box
- * of its own, so on a phone it was a ~16px-tall tap target sitting above a
- * full page of controls that all size themselves from the shared control
- * scale.
+ * Loyalty Store at phone width: the phone sort control (issue #2174) and the
+ * corporation picker's fit (issue #2321).
  *
- * Asserted on the rendered bounding box, not on the class string: the class
- * name only proves what was typed, while the box proves what the cascade
- * actually produced at that viewport. Width is asserted too — the link's
- * parent is a `flex flex-col`, whose default `align-items: stretch` pulls an
- * `inline-flex` control out to the full page unless it opts out.
- *
- * The back-link tests below render only the route's chrome (header, back
- * link, empty state) with no offers at all, so the empty LP fixtures in
- * `support/mockEsi.ts` are enough for them; the phone-sort-control test
- * further down seeds its own offers via `mockLoyaltyOffers`.
+ * The picker-fit test renders only the route's chrome with no offers, so the
+ * empty LP fixtures in `support/mockEsi.ts` are enough; the phone-sort-control
+ * test seeds its own offers via `mockLoyaltyOffers`.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
@@ -94,14 +84,25 @@ test('the header corporation picker fits a 390px phone without horizontal scroll
   page,
 }) => {
   async function expectPickerFits() {
-    const picker = page.getByRole('combobox', { name: 'LP Store corporation' });
+    const picker = page.getByRole('button', { name: /LP Store corporation/ });
     await expect(picker).toBeVisible();
-    const right = await picker.evaluate((el) => el.getBoundingClientRect().right);
-    expect(right).toBeLessThanOrEqual(PHONE.width);
+    await picker.click();
+    // The popover opens too: both it and the closed select stay on screen.
+    const popover = page.getByRole('dialog', { name: 'LP Store corporation' });
+    await expect(popover).toBeVisible();
+    for (const el of [picker, popover]) {
+      const box = await el.evaluate((node) => {
+        const r = node.getBoundingClientRect();
+        return { left: r.left, right: r.right };
+      });
+      expect(box.left).toBeGreaterThanOrEqual(0);
+      expect(box.right).toBeLessThanOrEqual(PHONE.width);
+    }
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth
     );
     expect(overflow).toBeLessThanOrEqual(0);
+    await page.keyboard.press('Escape');
   }
 
   await signInAndGoto(page, './wallet/loyalty');
