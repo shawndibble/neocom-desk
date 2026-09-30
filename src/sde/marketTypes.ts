@@ -17,6 +17,18 @@ export interface MarketTypeEntry {
   typeId: number;
   name: string;
   marketGroupId: number;
+  /** Assembled volume in m3, from invTypes (issue #2336). */
+  volume: number;
+  /**
+   * Packaged volume in m3, from ESI's type record, present only where it
+   * differs from `volume` — a hull, and a few other assembled items.
+   */
+  packagedVolume?: number;
+}
+
+/** The m3 a type takes up packaged: what a hauler or a hangar counts. */
+export function packagedVolumeOf(type: Pick<MarketTypeEntry, 'volume' | 'packagedVolume'>): number {
+  return type.packagedVolume ?? type.volume;
 }
 
 /** One entry in public/data/market/systems.json. */

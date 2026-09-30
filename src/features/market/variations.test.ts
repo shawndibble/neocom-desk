@@ -6,7 +6,7 @@ import type { MarketTypeEntry } from '@/sde/marketTypes';
 const META_GROUP_NAMES = { 1: 'Tech I', 2: 'Tech II', 4: 'Faction' };
 
 function type(typeId: number, name: string, marketGroupId: number): MarketTypeEntry {
-  return { typeId, name, marketGroupId };
+  return { typeId, name, marketGroupId, volume: 1 };
 }
 
 describe('tierLabel', () => {

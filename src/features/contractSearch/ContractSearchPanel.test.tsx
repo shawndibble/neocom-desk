@@ -91,9 +91,9 @@ vi.mock('@/sde/loadSde', async (importOriginal) => {
 });
 
 const CATALOG: MarketTypeEntry[] = [
-  { typeId: 34, name: 'Tritanium', marketGroupId: 18 },
-  { typeId: 35, name: 'Pyerite', marketGroupId: 18 },
-  { typeId: 587, name: 'Rifter', marketGroupId: 61 },
+  { typeId: 34, name: 'Tritanium', marketGroupId: 18, volume: 1 },
+  { typeId: 35, name: 'Pyerite', marketGroupId: 18, volume: 1 },
+  { typeId: 587, name: 'Rifter', marketGroupId: 61, volume: 1 },
 ];
 const JITA = 60003760;
 const AMARR = 60008494;

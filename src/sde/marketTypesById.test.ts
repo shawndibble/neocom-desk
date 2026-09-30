@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { MarketTypeEntry } from './marketTypes';
 
 const TYPES: MarketTypeEntry[] = [
-  { typeId: 34, name: 'Tritanium', marketGroupId: 18 },
-  { typeId: 2048, name: 'Damage Control II', marketGroupId: 300 },
+  { typeId: 34, name: 'Tritanium', marketGroupId: 18, volume: 1 },
+  { typeId: 2048, name: 'Damage Control II', marketGroupId: 300, volume: 1 },
 ];
 
 const loadMarketTypes = vi.fn(async (): Promise<MarketTypeEntry[]> => TYPES);
