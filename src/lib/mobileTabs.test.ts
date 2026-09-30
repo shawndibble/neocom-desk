@@ -94,6 +94,26 @@ describe('the default bar', () => {
 });
 
 describe('the choice list', () => {
+  it('is the rail order without /corp and /settings, /characters last (derived from the nav descriptor)', () => {
+    expect(MOBILE_TAB_CHOICES).toEqual([
+      '/overview',
+      '/alerts',
+      '/skills',
+      '/industry',
+      '/ships',
+      '/mining',
+      '/planetary-industry',
+      '/market',
+      '/wallet',
+      '/assets',
+      '/contracts',
+      '/mail',
+      '/calendar',
+      '/contacts',
+      '/characters',
+    ]);
+  });
+
   it('includes /characters, off by default, last in canonical order (#1764 — it keeps the More-sheet position it has today)', () => {
     expect(MOBILE_TAB_CHOICES).toContain('/characters');
     expect(MOBILE_TAB_CHOICES.at(-1)).toBe('/characters');

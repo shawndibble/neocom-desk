@@ -1,4 +1,4 @@
-import { memo, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, memo, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { pageKeyFor } from './pageTabs';
 import { useRouteFocus } from './routeFocus';
@@ -37,8 +37,8 @@ import {
   type MobileTabPath,
 } from '@/lib/mobileTabs';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
-import { useCorpAccess } from '@/features/corp/useCorpAccess';
-import { useActiveCorporationId } from '@/features/corp/owner';
+import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
+import { NAV_LOCK_PATHS, navPageLabelKey, railGroups } from './navDestinations';
 import type { AppRoutePath } from './routeScopes';
 
 /**
@@ -125,33 +125,10 @@ function mobileNavClass({ isActive }: { isActive: boolean }): string {
 }
 
 /**
- * Routes the shell itself renders a lock marker for, so `useLockedRoutes`
- * answers for all of them at once. `/clones` and `/employment-history` left
- * with the rail — they are Overview tabs now and `OverviewSubNav` asks for
- * their state itself. `/characters` and `/settings` are UNGATED
- * (routeScopes.ts), so the footer's Settings item and `CharacterFooterLink`
- * have no marker to render.
- *
- * `/corp` is deliberately absent: this list is what draws the amber lock dot,
- * and corp UI hides rather than locks (CONTEXT.md round 35). Its entry is
- * rendered conditionally on `useCorpAccess()` instead — see `CorpNavItem`.
+ * The desktop rail's scrolling groups (`navDestinations.ts`), computed once.
+ * The footer — Settings, then the Character link — is placed by hand below.
  */
-const NAV_PATHS = [
-  '/overview',
-  '/alerts',
-  '/skills',
-  '/industry',
-  '/ships',
-  '/mining',
-  '/planetary-industry',
-  '/market',
-  '/wallet',
-  '/assets',
-  '/mail',
-  '/calendar',
-  '/contracts',
-  '/contacts',
-] as const satisfies readonly AppRoutePath[];
+const RAIL_GROUPS = railGroups();
 
 interface NavItemProps {
   to: AppRoutePath;
@@ -251,21 +228,7 @@ function NavItem({ to, label, locked, badge, presentation = 'rail', onClick }: N
 }
 
 /**
- * The Corp section's entry, present only for a Character whose Corp Access is
- * `ready` *and* whose corporation is known.
- *
- * Hidden, never locked, in every other case — including `unknown`, which
- * renders as `none` here on purpose: a nav item that flickers into existence
- * mid-load is worse than one that appears a beat late (CONTEXT.md round 35).
- * The route itself takes the opposite view of `unknown` and waits, so a
- * deep-linked Director is not bounced (`routes/Corp.tsx`).
- *
- * The corporation id is part of the gate rather than an extra
- * (`useActiveCorporationId`, `features/corp/owner.ts`): it is written by the
- * public-info read, so on a cold device it is simply absent, and
- * an entry into a section with no corporation behind it is one that must not be
- * on screen yet. It is self-healing — the first visit to `/corp` learns and
- * records the id, and this is a `useLiveQuery`.
+ * The Corp section's entry, present only while `useCorpNavVisible()` says so.
  *
  * `locked` is hard-wired false rather than read from `useLockedRoutes`: there
  * is no state in which this renders and is unusable, and the amber dot would
@@ -273,10 +236,11 @@ function NavItem({ to, label, locked, badge, presentation = 'rail', onClick }: N
  */
 function CorpNavItem({ onClick }: { onClick?: () => void }) {
   const { t } = useTranslation();
-  const { state } = useCorpAccess();
-  const corporationId = useActiveCorporationId();
-  if (state !== 'ready' || corporationId === null) return null;
-  return <NavItem to="/corp" label={t('nav.corp')} locked={false} onClick={onClick} />;
+  const visible = useCorpNavVisible();
+  if (!visible) return null;
+  return (
+    <NavItem to="/corp" label={t(navPageLabelKey('/corp'))} locked={false} onClick={onClick} />
+  );
 }
 
 /** Small heading introducing a group of NavItems in the desktop rail. */
@@ -451,7 +415,12 @@ function MobileMoreSheet({
           />
         ))}
         <FooterDivider />
-        <NavItem to="/settings" label={t('nav.settings')} locked={false} onClick={onClose} />
+        <NavItem
+          to="/settings"
+          label={t(navPageLabelKey('/settings'))}
+          locked={false}
+          onClick={onClose}
+        />
         <CharacterFooterLink
           activeCharacter={activeCharacter}
           size="sm"
@@ -571,7 +540,7 @@ export const Layout = memo(function Layout() {
     [activeCharacterId]
   );
 
-  const locked = useLockedRoutes(NAV_PATHS);
+  const locked = useLockedRoutes(NAV_LOCK_PATHS);
 
   const [moreOpen, setMoreOpen] = useState(false);
   // Read once, not per rendering: the rail, the tab bar and the sheet are all
@@ -626,90 +595,24 @@ export const Layout = memo(function Layout() {
             text scale) would push the footer off the bottom instead of
             scrolling. */}
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
-          <NavItem
-            to="/overview"
-            label={t(NAV_LABEL_KEYS['/overview'])}
-            locked={locked.has('/overview')}
-          />
-          {/*
-            Under Overview, not in Social: an alert is what the board is
-            summarising, and the two are read in that order. Mail and calendar
-            are correspondence — things other people sent you on purpose —
-            which is a different errand.
-          */}
-          <NavItem
-            to="/alerts"
-            label={t(NAV_LABEL_KEYS['/alerts'])}
-            locked={locked.has('/alerts')}
-            badge={unreadAlerts}
-          />
-          {/*
-            Beside Overview rather than inside a group: the two are the same
-            kind of destination — "this pilot" and "this corporation" — and the
-            Corp section has sub-navigation of its own for the views that land
-            under it (`CorpSubNav`). No group label, because a heading over a
-            conditionally-rendered item would strand itself for the ~95% of
-            users who never see the item.
-          */}
-          <CorpNavItem />
-          <NavGroupLabel>{t('nav.groups.progression')}</NavGroupLabel>
-          <NavItem
-            to="/skills"
-            label={t(NAV_LABEL_KEYS['/skills'])}
-            locked={locked.has('/skills')}
-          />
-          <NavItem
-            to="/industry"
-            label={t(NAV_LABEL_KEYS['/industry'])}
-            locked={locked.has('/industry')}
-          />
-          <NavItem to="/ships" label={t(NAV_LABEL_KEYS['/ships'])} locked={locked.has('/ships')} />
-          <NavItem
-            to="/mining"
-            label={t(NAV_LABEL_KEYS['/mining'])}
-            locked={locked.has('/mining')}
-          />
-          <NavItem
-            to="/planetary-industry"
-            label={t(NAV_LABEL_KEYS['/planetary-industry'])}
-            locked={locked.has('/planetary-industry')}
-          />
-          <NavGroupLabel>{t('nav.groups.economy')}</NavGroupLabel>
-          {/* Leads the group: it is the one economy view that answers a
-              question before you own anything, and the only one here that
-              isn't Character-scoped. */}
-          <NavItem
-            to="/market"
-            label={t(NAV_LABEL_KEYS['/market'])}
-            locked={locked.has('/market')}
-          />
-          <NavItem
-            to="/wallet"
-            label={t(NAV_LABEL_KEYS['/wallet'])}
-            locked={locked.has('/wallet')}
-          />
-          <NavItem
-            to="/assets"
-            label={t(NAV_LABEL_KEYS['/assets'])}
-            locked={locked.has('/assets')}
-          />
-          <NavItem
-            to="/contracts"
-            label={t(NAV_LABEL_KEYS['/contracts'])}
-            locked={locked.has('/contracts')}
-          />
-          <NavGroupLabel>{t('nav.groups.social')}</NavGroupLabel>
-          <NavItem to="/mail" label={t(NAV_LABEL_KEYS['/mail'])} locked={locked.has('/mail')} />
-          <NavItem
-            to="/calendar"
-            label={t(NAV_LABEL_KEYS['/calendar'])}
-            locked={locked.has('/calendar')}
-          />
-          <NavItem
-            to="/contacts"
-            label={t(NAV_LABEL_KEYS['/contacts'])}
-            locked={locked.has('/contacts')}
-          />
+          {RAIL_GROUPS.map((group) => (
+            <Fragment key={group.id}>
+              {group.labelKey !== null && <NavGroupLabel>{t(group.labelKey)}</NavGroupLabel>}
+              {group.pages.map((page) =>
+                page.gating === 'corp' ? (
+                  <CorpNavItem key={page.path} />
+                ) : (
+                  <NavItem
+                    key={page.path}
+                    to={page.path}
+                    label={t(page.labelKey)}
+                    locked={locked.has(page.path)}
+                    badge={page.path === '/alerts' ? unreadAlerts : undefined}
+                  />
+                )
+              )}
+            </Fragment>
+          ))}
         </nav>
         {/*
           Footer: Settings then the active Character, in that reading order —
@@ -719,7 +622,7 @@ export const Layout = memo(function Layout() {
           scrollable nav above.
         */}
         <div className="shrink-0 border-b border-line p-2">
-          <NavItem to="/settings" label={t('nav.settings')} locked={false} />
+          <NavItem to="/settings" label={t(navPageLabelKey('/settings'))} locked={false} />
         </div>
         <CharacterFooterLink activeCharacter={activeCharacter} />
       </aside>
