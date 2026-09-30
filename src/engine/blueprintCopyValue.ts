@@ -21,11 +21,13 @@ export interface OwnedBlueprintCopyAsset {
   runs?: number;
 }
 
-/** One contract's asking rate for copies of one type at one ME/TE. */
+/** One contract's asking rate for copies of one type — at one ME/TE, or `mixed` across several. */
 interface CopyRate {
   typeId: number;
   me: number;
   te: number;
+  /** Copies of one blueprint at differing ME/TE: a last-resort rate for the type, matched to no tier. */
+  mixed: boolean;
   iskPerRun: number;
   iskPerCopy: number;
 }
@@ -37,9 +39,11 @@ function tierKey(typeId: number, me: number, te: number): string {
 /**
  * Folds Offer rows into one rate per contract. A contract carrying any
  * other item type is skipped (its price is the bundle's, not this
- * blueprint's), and so is one mixing ME/TE, or one that also sells the
- * original (`runs: -1`, same typeID) — only a contract of the same copy
- * throughout divides its price evenly across the copies it sells. Every line
+ * blueprint's), and so is one that also sells the original (`runs: -1`,
+ * same typeID). A contract of copies of one blueprint divides its price
+ * evenly across every copy and run it sells; when those copies differ in
+ * ME/TE the rate is marked `mixed`, a fallback for when no single-tier
+ * contract matches. Every line
  * is grouped before any is judged, so one bad line voids its whole contract
  * rather than leaving its siblings to carry the full ask. Auctions, PLEX asks
  * and zero-price barters have no price a buyer can pay.
@@ -57,15 +61,10 @@ function contractRates(offers: readonly BpcContractRow[]): CopyRate[] {
   for (const rows of byContract.values()) {
     const [first] = rows;
     if (!first) continue;
-    const sameCopyThroughout = rows.every(
-      (r) =>
-        r.runs > 0 &&
-        r.quantity > 0 &&
-        r.typeId === first.typeId &&
-        r.me === first.me &&
-        r.te === first.te
+    const copiesOfOneBlueprint = rows.every(
+      (r) => r.runs > 0 && r.quantity > 0 && r.typeId === first.typeId
     );
-    if (!sameCopyThroughout) continue;
+    if (!copiesOfOneBlueprint) continue;
     let copies = 0;
     let runs = 0;
     for (const r of rows) {
@@ -76,6 +75,7 @@ function contractRates(offers: readonly BpcContractRow[]): CopyRate[] {
       typeId: first.typeId,
       me: first.me,
       te: first.te,
+      mixed: rows.some((r) => r.me !== first.me || r.te !== first.te),
       iskPerRun: first.price / runs,
       iskPerCopy: first.price / copies,
     });
@@ -91,7 +91,8 @@ function median(values: readonly number[]): number {
 
 /**
  * Each owned copy's value, keyed by `itemId`. Matches the copy's own ME/TE
- * first, then ME0/TE0, then 0 — never the original's price. The median
+ * first, then ME0/TE0, then any contract of this blueprint's copies at
+ * mixed ME/TE, then 0 — never the original's price. The median
  * Offer sets the rate, so one lowball or troll ask cannot swing a total.
  * A copy with known runs is worth the median ISK/run times its runs; one
  * without is worth the median per-copy ask.
@@ -101,11 +102,15 @@ export function blueprintCopyValues(
   offers: readonly BpcContractRow[]
 ): Map<number, number> {
   const ratesByTier = new Map<string, CopyRate[]>();
-  for (const rate of contractRates(offers)) {
-    const key = tierKey(rate.typeId, rate.me, rate.te);
-    const list = ratesByTier.get(key) ?? [];
+  const mixedRatesByType = new Map<number, CopyRate[]>();
+  const push = <K>(map: Map<K, CopyRate[]>, key: K, rate: CopyRate) => {
+    const list = map.get(key) ?? [];
     list.push(rate);
-    ratesByTier.set(key, list);
+    map.set(key, list);
+  };
+  for (const rate of contractRates(offers)) {
+    if (rate.mixed) push(mixedRatesByType, rate.typeId, rate);
+    else push(ratesByTier, tierKey(rate.typeId, rate.me, rate.te), rate);
   }
 
   const values = new Map<number, number>();
@@ -113,7 +118,8 @@ export function blueprintCopyValues(
     const known = owned.me !== undefined && owned.te !== undefined;
     const rates =
       (known ? ratesByTier.get(tierKey(owned.typeId, owned.me!, owned.te!)) : undefined) ??
-      ratesByTier.get(tierKey(owned.typeId, 0, 0));
+      ratesByTier.get(tierKey(owned.typeId, 0, 0)) ??
+      mixedRatesByType.get(owned.typeId);
     if (!rates) {
       values.set(owned.itemId, 0);
       continue;

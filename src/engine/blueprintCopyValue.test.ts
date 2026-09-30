@@ -136,12 +136,36 @@ describe('blueprintCopyValues', () => {
     expect(values.get(1)).toBe(10_000_000);
   });
 
-  it('skips a same-type contract whose copies differ in ME/TE', () => {
+  it('falls back to a same-blueprint contract of mixed ME/TE when nothing else matches', () => {
     const values = blueprintCopyValues(
-      [copy({ runs: 1 })],
+      [copy({ runs: 2 })],
       [
         offer({ contractId: 902, me: 10, te: 20, runs: 1, price: 50_000_000 }),
         offer({ contractId: 902, me: 0, te: 0, runs: 1, price: 50_000_000 }),
+      ]
+    );
+    // 50M over the 2 runs it sells, times the copy's own 2 runs.
+    expect(values.get(1)).toBe(50_000_000);
+  });
+
+  it('ignores a mixed ME/TE contract once its ME0/TE0 fallback has an Offer', () => {
+    const values = blueprintCopyValues(
+      [copy({ me: 8, te: 16, runs: 1 })],
+      [
+        offer({ contractId: 905, me: 8, te: 16, runs: 1, price: 90_000_000 }),
+        offer({ contractId: 905, me: 0, te: 0, runs: 1, price: 90_000_000 }),
+        offer({ me: 0, te: 0, runs: 1, price: 1_000_000 }),
+      ]
+    );
+    expect(values.get(1)).toBe(1_000_000);
+  });
+
+  it('still skips a mixed ME/TE contract that also carries the original', () => {
+    const values = blueprintCopyValues(
+      [copy({ runs: 1 })],
+      [
+        offer({ contractId: 906, me: 10, te: 20, runs: 1, price: 2_000_000_000 }),
+        offer({ contractId: 906, me: 0, te: 0, runs: -1, price: 2_000_000_000 }),
       ]
     );
     expect(values.get(1)).toBe(0);

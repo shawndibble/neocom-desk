@@ -8,11 +8,14 @@ _Recorded 2026-09-30._
   original's, so a pilot's 117M copy library read as 2.1T. Originals, and
   every non-blueprint item, keep the global average price.
 
-- **Match the copy's own ME/TE, else ME0/TE0, else 0.** No "nearest tier"
+- **Match the copy's own ME/TE, else ME0/TE0, else a mixed-ME/TE contract
+  of the same blueprint, else 0.** No "nearest tier"
   guess between them. A copy whose blueprint record can't be read (the
   Character hasn't granted the blueprints scope, or the corp read needs
-  Director) prices at ME0/TE0. When nothing is listed at either tier, the copy
-  counts as 0, never at the original's price.
+  Director) prices at ME0/TE0. A contract of this blueprint's copies at
+  differing ME/TE is the last resort, used only when neither tier has an
+  Offer. When nothing matches at all, the copy counts as 0, never at the
+  original's price.
 
 - **Median of the matching Offers, as ISK/run × the copy's remaining runs.**
   The median stops one lowball or troll ask from swinging a total. A copy
@@ -20,9 +23,10 @@ _Recorded 2026-09-30._
 
 - **Only a contract selling one blueprint prices it.** A contract carrying
   any other item type is skipped, because its ask covers the whole bundle.
-  A contract whose lines are all the same blueprint at one ME/TE divides its
-  ask across every copy and run it sells. One mixing ME/TE is skipped, and
-  so is one that also sells the original: it shares the copies' typeID but
+  A contract whose lines are all copies of the same blueprint divides its
+  ask across every copy and run it sells. At one ME/TE it prices that tier;
+  mixing ME/TE, it is the last-resort rate above. One that also sells the
+  original is skipped: it shares the copies' typeID but
   is not the same blueprint, and its price would ride along.
   Auctions, PLEX asks and zero-price barters are skipped too, and so are BPOs
   sold by contract.
