@@ -8,7 +8,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
-import { CommandPaletteHost, CommandPaletteTrigger } from './CommandPaletteHost';
+import { CommandPaletteHost } from './CommandPaletteHost';
 import { createMarketItemCatalogue, type MarketItemCatalogue } from './marketItems';
 import { useCommandPalette } from './store';
 import { GLOBAL_CACHE_CHARACTER_ID, writeCached } from '@/esi/cache';
@@ -92,7 +92,6 @@ function renderShell() {
         Page search
         <input />
       </label>
-      <CommandPaletteTrigger presentation="rail" />
       <CommandPaletteHost />
       <Where />
     </MemoryRouter>
@@ -135,13 +134,6 @@ describe('CommandPalette', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(pageSearch).toHaveFocus();
-  });
-
-  it('opens from the visible trigger', async () => {
-    const user = userEvent.setup();
-    renderShell();
-    await user.click(screen.getByRole('button', { name: /Search/ }));
-    expect(await screen.findByRole('combobox')).toBeInTheDocument();
   });
 
   it('does not stack over another open dialog', async () => {
