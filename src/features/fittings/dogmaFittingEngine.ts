@@ -27,6 +27,7 @@ import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes, type AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { skillSourceTypeIds } from '@/engine/fittings/skillGains';
 import { extractMining, miningYield } from '@/engine/fittings/mining';
+import { extractFleetSupport } from '@/engine/fittings/fleetSupport';
 import { projectsNothing } from '@/engine/fittings/projection';
 import {
   DOGMA_ATTRIBUTE,
@@ -453,6 +454,7 @@ function statsFrom(
     tank: extractTank(dogmaFit.items, shown.items, shown.ship.attributes, baseStats),
     support: extractSupport(dogmaFit.items, shown.items),
     mining: miningYield(extractMining(dogmaFit.items, shown.items)),
+    fleetSupport: extractFleetSupport(dogmaFit.items, shown.items),
     fighters: extractFighterStats(shown.ship.attributes),
     lockedTargets,
   };

@@ -37,6 +37,8 @@ import {
 import { CapacitorFacts, TankFacts } from './FittingTankStats';
 import { SupportFacts } from './FittingSupportStats';
 import { MiningFacts } from './FittingMiningStats';
+import { FleetBoostFacts } from './FittingFleetBoostStats';
+import { hasFleetSupport } from '@/engine/fittings/fleetSupport';
 import { ProjectedEffectsPanel } from './ProjectedEffectsPanel';
 import { useProjectedSources } from './statsConditions';
 import type { TargetProfiles } from './targetProfiles';
@@ -250,6 +252,7 @@ type Section =
   | 'capacitor'
   | 'support'
   | 'mining'
+  | 'fleetBoosts'
   | 'projected'
   | 'targeting'
   | 'navigation'
@@ -267,6 +270,7 @@ const OPEN_BY_DEFAULT: ReadonlySet<Section> = new Set([
   // Only there at all when the fit has something to show in it.
   'support',
   'mining',
+  'fleetBoosts',
   'navigation',
   'drones',
   'fighters',
@@ -656,6 +660,13 @@ export function FittingStatsSections({
     });
   }
 
+  /** Fleet boosts' headline: how far the first burst reaches, else the compressor. */
+  function fleetBoostsMeta(s: FittingStats): string {
+    const { bursts, compressors } = s.fleetSupport;
+    const meters = bursts[0]?.rangeMeters ?? compressors[0]?.rangeMeters ?? 0;
+    return t('fittings.stats.unit.km', { value: (meters / 1000).toFixed(1) });
+  }
+
   /** Holds, jump drive and sensors: what the hull carries, beside what the fit asks of it. */
   function resourceFacts(s: FittingStats): Fact[] {
     const facts: Fact[] = [
@@ -844,6 +855,14 @@ export function FittingStatsSections({
             })
           ),
           <MiningFacts stats={stats} typeName={typeName} />
+        )}
+
+      {stats &&
+        hasFleetSupport(stats.fleetSupport) &&
+        section(
+          'fleetBoosts',
+          figure(fleetBoostsMeta),
+          <FleetBoostFacts stats={stats} typeName={typeName} />
         )}
 
       {section(

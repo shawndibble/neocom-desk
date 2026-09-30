@@ -27,6 +27,7 @@ import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes } from '@/engine/fittings/affectedBy';
 import { skillSourceTypeIds } from '@/engine/fittings/skillGains';
 import { extractMining, miningYield } from '@/engine/fittings/mining';
+import { extractFleetSupport } from '@/engine/fittings/fleetSupport';
 import { capacitorStatusAtDrain } from '@/engine/fittings/tank';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
 import type { Fitting } from '@/engine/fittings/types';
@@ -913,6 +914,107 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(
       mine(hulk([strip(0)], [{ typeId: MINING_DRONE_II, quantity: 5, state: 'online' }])).perSecond
     ).toBeCloseTo(bare.perSecond, 9);
+  });
+
+  it('reads fleet boosts off an Orca and a Vulture, each skill moving the figure it should', () => {
+    // Looked up by exact name in `public/data/types.json`, 2026-09-30.
+    const ORCA = 28606;
+    const VULTURE = 22446;
+    const MINING_FOREMAN_BURST_II = 43551;
+    const SHIELD_COMMAND_BURST_II = 43555;
+    const MINING_LASER_FIELD_ENHANCEMENT_CHARGE = 42829;
+    const SHIELD_HARMONIZING_CHARGE = 42695;
+    const LARGE_INDUSTRIAL_CORE_II = 58950;
+    const LARGE_ASTEROID_ORE_COMPRESSOR_I = 62625;
+    const [MINING_FOREMAN, MINING_DIRECTOR, COMMAND_BURST_SPECIALIST] = [22536, 22552, 3354];
+    const [FLEET_COMPRESSION_LOGISTICS, INDUSTRIAL_RECONFIGURATION] = [62453, 58956];
+    const [LEADERSHIP, SHIELD_COMMAND, SHIELD_COMMAND_SPECIALIST] = [3348, 3350, 3351];
+
+    const orca: Fitting = {
+      name: 'Orca',
+      shipTypeId: ORCA,
+      modules: [
+        {
+          slot: 'high',
+          slotIndex: 0,
+          typeId: MINING_FOREMAN_BURST_II,
+          state: 'active',
+          chargeTypeId: MINING_LASER_FIELD_ENHANCEMENT_CHARGE,
+        },
+        { slot: 'high', slotIndex: 1, typeId: LARGE_INDUSTRIAL_CORE_II, state: 'active' },
+        { slot: 'high', slotIndex: 2, typeId: LARGE_ASTEROID_ORE_COMPRESSOR_I, state: 'active' },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const vulture: Fitting = {
+      name: 'Vulture',
+      shipTypeId: VULTURE,
+      modules: [
+        {
+          slot: 'high',
+          slotIndex: 0,
+          typeId: SHIELD_COMMAND_BURST_II,
+          state: 'active',
+          chargeTypeId: SHIELD_HARMONIZING_CHARGE,
+        },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const fleetAt = (fitting: Fitting, skills: number[]) => {
+      const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(skills));
+      const calculation = calculate(dogmaFit);
+      return {
+        stats: extractFleetSupport(dogmaFit.items, calculation.items),
+        outgoing: calculation.outgoing?.buffs ?? [],
+      };
+    };
+
+    const none = fleetAt(orca, []);
+    const burst = none.stats.bursts[0]!;
+    expect(burst.chargeTypeId).toBe(MINING_LASER_FIELD_ENHANCEMENT_CHARGE);
+    expect(none.stats.compressors).toHaveLength(1);
+    expect(none.stats.core?.fuelPerCycle).toBeGreaterThan(0);
+    // The strengths are what the engine itself hands a fleet.
+    expect(burst.strengths).toEqual(none.outgoing.map((buff) => Math.abs(buff.value)));
+
+    const moved = (skill: number) => fleetAt(orca, [skill]).stats;
+    expect(moved(MINING_DIRECTOR).bursts[0]!.strengths[0]).toBeGreaterThan(burst.strengths[0]!);
+    expect(moved(MINING_FOREMAN).bursts[0]!.durationSeconds).toBeGreaterThan(burst.durationSeconds);
+    expect(moved(COMMAND_BURST_SPECIALIST).bursts[0]!.reloadSeconds).toBeLessThan(
+      burst.reloadSeconds
+    );
+    expect(moved(LEADERSHIP).bursts[0]!.rangeMeters).toBeGreaterThan(burst.rangeMeters);
+    expect(moved(FLEET_COMPRESSION_LOGISTICS).compressors[0]!.rangeMeters).toBeGreaterThan(
+      none.stats.compressors[0]!.rangeMeters
+    );
+    expect(moved(INDUSTRIAL_RECONFIGURATION).core!.fuelPerCycle).toBeLessThan(
+      none.stats.core!.fuelPerCycle
+    );
+
+    // A combat burst reads the same way; its buff is negative, so the size is reported.
+    const shield = fleetAt(vulture, []);
+    expect(shield.outgoing[0]!.value).toBeLessThan(0);
+    const shieldBurst = shield.stats.bursts[0]!;
+    expect(shieldBurst.strengths).toEqual([Math.abs(shield.outgoing[0]!.value)]);
+    const shieldMoved = (skill: number) => fleetAt(vulture, [skill]).stats.bursts[0]!;
+    expect(shieldMoved(SHIELD_COMMAND_SPECIALIST).strengths[0]).toBeGreaterThan(
+      shieldBurst.strengths[0]!
+    );
+    expect(shieldMoved(SHIELD_COMMAND).durationSeconds).toBeGreaterThan(
+      shieldBurst.durationSeconds
+    );
+
+    // No charge: a burst with nothing to hand out.
+    const bare = fleetAt(
+      {
+        ...orca,
+        modules: [{ slot: 'high', slotIndex: 0, typeId: MINING_FOREMAN_BURST_II, state: 'active' }],
+      },
+      []
+    );
+    expect(bare.stats.bursts[0]).toMatchObject({ strengths: [], count: 1 });
   });
 
   it('runs an ancillary armor repairer at three times its dry rate on paste, and an ancillary shield booster on charges draws no capacitor', () => {

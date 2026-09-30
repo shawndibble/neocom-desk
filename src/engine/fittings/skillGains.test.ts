@@ -204,6 +204,77 @@ describe('gainMetrics — non-combat roles', () => {
   });
 });
 
+describe('gainMetrics — fleet boosts', () => {
+  const burst = {
+    typeId: 43551,
+    chargeTypeId: 42829,
+    count: 1,
+    strengths: [50, 2.5],
+    rangeMeters: 50_000,
+    durationSeconds: 60,
+    reloadSeconds: 60,
+  };
+  const orca = withStats({
+    offense: { ...baseStats.offense, dps: 0 },
+    fleetSupport: {
+      bursts: [burst],
+      compressors: [{ typeId: 62625, count: 1, rangeMeters: 80_000, cycleSeconds: 60 }],
+      core: { typeId: 58950, fuelTypeId: 16_272, fuelPerCycle: 400, cycleSeconds: 150 },
+    },
+  });
+  const withBurst = (patch: Partial<typeof burst>) =>
+    withStats({
+      ...orca,
+      fleetSupport: { ...orca.fleetSupport, bursts: [{ ...burst, ...patch }] },
+    });
+
+  it('scores a stronger, longer or farther-reaching burst as a gain', () => {
+    expect(gainMetrics(orca, withBurst({ strengths: [55, 2.75] })).burstStrength).toBeCloseTo(0.1);
+    expect(gainMetrics(orca, withBurst({ durationSeconds: 66 })).burstDuration).toBeCloseTo(0.1);
+    expect(gainMetrics(orca, withBurst({ rangeMeters: 55_000 })).burstRange).toBeCloseTo(0.1);
+  });
+
+  it('scores a shorter burst reload, and less fuel a cycle, as a gain', () => {
+    expect(gainMetrics(orca, withBurst({ reloadSeconds: 30 })).burstReload).toBeCloseTo(0.5);
+    const leaner = withStats({
+      ...orca,
+      fleetSupport: {
+        ...orca.fleetSupport,
+        core: { ...orca.fleetSupport.core!, fuelPerCycle: 300 },
+      },
+    });
+    expect(gainMetrics(orca, leaner).coreFuel).toBeCloseTo(0.25);
+    expect(gainMetrics(leaner, orca).coreFuel).toBeCloseTo(-1 / 3);
+  });
+
+  it('scores compressor range', () => {
+    const farther = withStats({
+      ...orca,
+      fleetSupport: {
+        ...orca.fleetSupport,
+        compressors: [{ typeId: 62625, count: 1, rangeMeters: 120_000, cycleSeconds: 60 }],
+      },
+    });
+    expect(gainMetrics(orca, farther).compressionRange).toBeCloseTo(0.5);
+  });
+
+  it('is zero on a fit with no bursts or core', () => {
+    const metrics = gainMetrics(baseStats, baseStats);
+    expect(metrics.burstStrength).toBe(0);
+    expect(metrics.coreFuel).toBe(0);
+  });
+
+  it('keeps a skill whose only effect is a fleet boost, listing it as a role change', async () => {
+    const compare = async () => ({ before: orca, after: withBurst({ reloadSeconds: 30 }) });
+    const gains = await evaluateSkillGains(
+      [{ skillTypeId: 3354, fromLevel: 4, toLevel: 5 }],
+      compare
+    );
+    expect(gains?.[0]?.roleChanges).toEqual([{ key: 'burstReload', before: 60, after: 30 }]);
+    expect(gains?.[0]?.metrics.overall).toBeCloseTo(0.5);
+  });
+});
+
 describe('evaluateSkillGains', () => {
   const candidates = [
     { skillTypeId: 1, fromLevel: 3, toLevel: 4 },
@@ -305,6 +376,12 @@ describe('rankSkillGains', () => {
         hold: 0,
         remoteRepair: 0,
         jumpRange: 0,
+        burstStrength: 0,
+        burstRange: 0,
+        burstDuration: 0,
+        burstReload: 0,
+        compressionRange: 0,
+        coreFuel: 0,
         ...metrics,
       },
     };

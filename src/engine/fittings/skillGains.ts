@@ -9,6 +9,7 @@
  */
 import type { AttributeWithSources } from './affectedBy';
 import { alignTimeSeconds } from './stats';
+import type { FleetSupportStats } from './fleetSupport';
 import type { FittingStats } from './types';
 import { round } from './fittingStatFields';
 import { diffFittingStats, type FittingStatsDelta } from './variationDelta';
@@ -75,7 +76,18 @@ const COMBAT_METRICS = [
  * fit with no such role — no miners, a fit that shoots, no remote repairers,
  * no jump drive — so a combat fit's list never grows a cargo or mining row.
  */
-export const ROLE_METRICS = ['miningYield', 'hold', 'remoteRepair', 'jumpRange'] as const;
+export const ROLE_METRICS = [
+  'miningYield',
+  'hold',
+  'remoteRepair',
+  'jumpRange',
+  'burstStrength',
+  'burstRange',
+  'burstDuration',
+  'burstReload',
+  'compressionRange',
+  'coreFuel',
+] as const;
 export type RoleMetric = (typeof ROLE_METRICS)[number];
 
 /** The stats a pilot ranks by; `overall` is all of them together. */
@@ -118,7 +130,13 @@ interface RoleField {
   value: (s: FittingStats) => number;
   /** Whether this fit's `before` has the role at all; absent: always. */
   applies?: (before: FittingStats) => boolean;
+  /** Less is better: a reload, a fuel bill. The gain is scored the other way up. */
+  lowerIsBetter?: boolean;
 }
+
+/** The figure a fleet-boost metric reads across every burst: the best-placed one. */
+const burstMax = (s: FittingStats, read: (burst: FleetSupportStats['bursts'][number]) => number) =>
+  Math.max(0, ...s.fleetSupport.bursts.map(read));
 
 /**
  * Hold space counts only on a fit that fires nothing: on a warship a bigger
@@ -148,6 +166,30 @@ const ROLE_FIELDS: readonly RoleField[] = [
     digits: 2,
     value: (s) => s.jumpDrive?.rangeLightYears ?? 0,
   },
+  {
+    key: 'burstStrength',
+    digits: 1,
+    value: (s) => burstMax(s, (burst) => Math.max(0, ...burst.strengths)),
+  },
+  { key: 'burstRange', digits: 1, value: (s) => burstMax(s, (burst) => burst.rangeMeters) / 1000 },
+  { key: 'burstDuration', digits: 1, value: (s) => burstMax(s, (burst) => burst.durationSeconds) },
+  {
+    key: 'burstReload',
+    digits: 1,
+    value: (s) => burstMax(s, (burst) => burst.reloadSeconds),
+    lowerIsBetter: true,
+  },
+  {
+    key: 'compressionRange',
+    digits: 1,
+    value: (s) => Math.max(0, ...s.fleetSupport.compressors.map((c) => c.rangeMeters)) / 1000,
+  },
+  {
+    key: 'coreFuel',
+    digits: 0,
+    value: (s) => s.fleetSupport.core?.fuelPerCycle ?? 0,
+    lowerIsBetter: true,
+  },
 ];
 
 /** Role stats the +1 level changes, after the rounding they display at. */
@@ -170,10 +212,14 @@ export function roleChanges(before: FittingStats, after: FittingStats): RoleChan
  */
 export function gainMetrics(before: FittingStats, after: FittingStats): GainMetrics {
   const changed = new Map(roleChanges(before, after).map((change) => [change.key, change]));
-  const roleGain = (key: RoleMetric) => {
-    const change = changed.get(key);
-    return change ? relative(change.before, change.after) : 0;
-  };
+  const roleGains = Object.fromEntries(
+    ROLE_FIELDS.map(({ key, lowerIsBetter }): [RoleMetric, number] => {
+      const change = changed.get(key);
+      if (!change) return [key, 0];
+      const gain = relative(change.before, change.after);
+      return [key, lowerIsBetter ? -gain : gain];
+    })
+  ) as Record<RoleMetric, number>;
   const metrics: Record<GainMetric, number> = {
     dps: relative(before.offense.dps, after.offense.dps),
     ehp: relative(before.ehp, after.ehp),
@@ -182,10 +228,7 @@ export function gainMetrics(before: FittingStats, after: FittingStats): GainMetr
     align: -relative(alignTime(before), alignTime(after)),
     capacitor: capacitorGain(before.capacitor, after.capacitor),
     lockRange: relative(before.targeting.maxTargetRange, after.targeting.maxTargetRange),
-    miningYield: roleGain('miningYield'),
-    hold: roleGain('hold'),
-    remoteRepair: roleGain('remoteRepair'),
-    jumpRange: roleGain('jumpRange'),
+    ...roleGains,
   };
   const overall = GAIN_METRICS.reduce((sum, metric) => sum + metrics[metric], 0);
   return { overall, ...metrics };

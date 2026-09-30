@@ -286,6 +286,7 @@ export function extractFittingStats(
   | 'tank'
   | 'support'
   | 'mining'
+  | 'fleetSupport'
   | 'fighters'
   | 'lockedTargets'
   | 'allOverheated'

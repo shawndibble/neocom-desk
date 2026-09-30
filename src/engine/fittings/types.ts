@@ -9,6 +9,7 @@ import type { AppliedDpsInputs } from './appliedDps';
 import type { CapacitorBudget } from './tank';
 import type { SupportStats } from './support';
 import type { MiningStats } from './mining';
+import type { FleetSupportStats } from './fleetSupport';
 
 export type FittingSlotKind = 'high' | 'medium' | 'low' | 'rig' | 'subsystem';
 
@@ -292,6 +293,8 @@ export interface FittingStats {
   support: SupportStats;
   /** Yield of the running miners and launched mining drones (`mining.ts`). */
   mining: MiningStats;
+  /** What the running bursts and industrial core give the fleet (`fleetSupport.ts`). */
+  fleetSupport: FleetSupportStats;
   fighters: FighterStats;
   sensor: SensorStats;
   holds: HoldStats;
