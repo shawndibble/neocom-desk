@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { CompareAttributesMatrix } from './CompareAttributesMatrix';
 import type { CompareAttributesData } from './useCompareAttributes';
@@ -34,8 +35,6 @@ describe('CompareAttributesMatrix', () => {
     render(<CompareAttributesMatrix rows={rows} data={data} />);
 
     expect(screen.getByText('Structure Hitpoints')).toBeInTheDocument();
-    // One table per attribute category (#1128), so each item's column header
-    // repeats once per category rather than appearing once for the matrix.
     expect(screen.getAllByText('Rifter').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Republic Fleet Rifter').length).toBeGreaterThan(0);
     expect(screen.getByText('Maximum Velocity')).toBeInTheDocument();
@@ -93,7 +92,8 @@ describe('CompareAttributesMatrix', () => {
 
     render(<CompareAttributesMatrix rows={rows} data={data} />);
 
-    const tables = screen.getAllByRole('table');
+    const [header, ...tables] = screen.getAllByRole('table');
+    expect(header).toHaveAttribute('aria-label', 'Compared items');
     expect(tables.map((table) => table.getAttribute('aria-label'))).toEqual([
       'Worth',
       'Speed and Travel',
@@ -104,5 +104,36 @@ describe('CompareAttributesMatrix', () => {
     const hpCell = screen.getByText('1,200 HP');
     expect(hpCell).toHaveAttribute('data-label', 'Rifter');
     expect(screen.getByText('Structure Hitpoints')).toHaveClass('dt-primary');
+  });
+
+  it('names each item once, in the one sticky header row above every category', () => {
+    const rows = [row(587, 'Rifter'), row(588, 'Republic Fleet Rifter')];
+    const data: CompareAttributesData = {
+      dogmaByTypeId: new Map([[587, [{ attribute_id: 9, value: 1200 }]]]),
+      dictionary: { 9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' } },
+      names: {},
+    };
+
+    render(<CompareAttributesMatrix rows={rows} data={data} />);
+
+    const header = screen.getByRole('table', { name: 'Compared items' });
+    expect(header).toHaveClass('sticky', 'top-0');
+    expect(within(header).getByText('Rifter')).toHaveClass('max-w-28');
+    // The category tables keep their own header for assistive tech, hidden from sight.
+    expect(screen.getByRole('table', { name: 'Structure' })).toHaveClass('sm:[&_thead]:sr-only');
+  });
+
+  it("removes an item from its header's x", async () => {
+    const onRemove = vi.fn();
+    const rows = [row(587, 'Rifter'), row(588, 'Republic Fleet Rifter')];
+    const data: CompareAttributesData = { dogmaByTypeId: new Map(), dictionary: {}, names: {} };
+
+    render(<CompareAttributesMatrix rows={rows} data={data} onRemove={onRemove} />);
+
+    const header = screen.getByRole('table', { name: 'Compared items' });
+    await userEvent.click(
+      within(header).getByRole('button', { name: 'Remove Republic Fleet Rifter' })
+    );
+    expect(onRemove).toHaveBeenCalledWith(588);
   });
 });

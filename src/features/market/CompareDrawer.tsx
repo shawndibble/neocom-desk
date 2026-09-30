@@ -330,9 +330,13 @@ export function CompareDrawer({
         header: '',
         align: 'right',
         render: (row) => (
-          <Button size="sm" onClick={() => removeItem(row.typeId)}>
-            {t('market.compare.remove', { name: row.itemName })}
-          </Button>
+          <IconButton
+            size="row"
+            variant="plain"
+            icon={<Icon.Close />}
+            label={t('market.compare.remove', { name: row.itemName })}
+            onClick={() => removeItem(row.typeId)}
+          />
         ),
       },
     ],
@@ -439,7 +443,11 @@ export function CompareDrawer({
               />
             </div>
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          {/* Both axes on the Attributes view: the matrix's sticky item header
+              and pinned attribute column need one scroller to stick to. */}
+          <div
+            className={`min-h-0 flex-1 ${view === 'attributes' ? 'overflow-auto' : 'overflow-y-auto'}`}
+          >
             {view === 'attributes' ? (
               attributes.loading || rows.length === 0 ? (
                 <div className="flex justify-center py-8">
@@ -457,6 +465,7 @@ export function CompareDrawer({
                     rows={rows}
                     data={attributes.data}
                     tableExport={attributesExport}
+                    onRemove={removeItem}
                   />
                 </div>
               )
