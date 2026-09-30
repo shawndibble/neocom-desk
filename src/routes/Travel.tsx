@@ -7,10 +7,11 @@ import { TRAVEL_TABS } from '@/app/pageTabs';
 import { isTabRouteDefaulted, tabPath } from '@/lib/pageTabs';
 import { PilotLookupTab } from '@/features/travel/PilotLookupTab';
 import { RouteSafetyTab } from '@/features/travel/RouteSafetyTab';
+import { TheraTab } from '@/features/travel/TheraTab';
 
 /**
- * Travel (issue #2328): intel for getting somewhere — Route Safety first, with
- * Pilot Lookup beside it (#2331) and Thera/Turnur connections to follow (#2330).
+ * Travel (issue #2328): intel for getting somewhere — Route Safety, Thera/Turnur
+ * connections (#2330) and Pilot Lookup (#2331).
  * Signed-in like every other route; logged-out access is a possible follow-up.
  */
 export function Travel() {
@@ -54,7 +55,13 @@ export function Travel() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      {tab === 'pilot' ? <PilotLookupTab tabBar={tabBar} /> : <RouteSafetyTab tabBar={tabBar} />}
+      {tab === 'thera' ? (
+        <TheraTab tabBar={tabBar} />
+      ) : tab === 'pilot' ? (
+        <PilotLookupTab tabBar={tabBar} />
+      ) : (
+        <RouteSafetyTab tabBar={tabBar} />
+      )}
     </div>
   );
 }
