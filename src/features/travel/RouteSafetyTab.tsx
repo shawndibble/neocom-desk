@@ -10,7 +10,7 @@
  * The preference is never persisted (`features/route/routePreferences.ts`).
  * From falls back to the Current System when the link does not name one.
  */
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import {
@@ -41,6 +41,8 @@ import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { useSystemName } from '@/features/route/useSolarSystems';
 import { enumParam, optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
+import { RecentKillsCell } from './RecentKillsCell';
+import { useRouteKills, type RouteKillsCell } from './useRouteKills';
 import { useRouteSafety } from './useRouteSafety';
 
 const ROUTE_PARAMS = {
@@ -55,7 +57,9 @@ function count(value: number | null): string {
   return value === null ? DASH : value.toLocaleString();
 }
 
-function useColumns(): DataTableColumn<RouteSafetyRow>[] {
+function useColumns(
+  killsOf: (systemId: number) => RouteKillsCell
+): DataTableColumn<RouteSafetyRow>[] {
   const { t } = useTranslation();
   return [
     {
@@ -117,6 +121,11 @@ function useColumns(): DataTableColumn<RouteSafetyRow>[] {
       align: 'right',
       className: 'tabular-nums',
       render: (row) => count(row.npcKills),
+    },
+    {
+      id: 'recentKills',
+      header: t('travel.col.recentKills'),
+      render: (row) => <RecentKillsCell systemId={row.systemId} cell={killsOf(row.systemId)} />,
     },
   ];
 }
@@ -192,7 +201,12 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
   const fromName = useSystemName(fromId);
   const toName = useSystemName(params.to);
   const state = useRouteSafety(fromId, params.to, params.pref);
-  const columns = useColumns();
+  const routeRows = state.kind === 'route' ? state.rows : null;
+  const killsRoute = useMemo(
+    () => routeRows?.map((row) => ({ systemId: row.systemId, band: row.band })) ?? null,
+    [routeRows]
+  );
+  const columns = useColumns(useRouteKills(killsRoute));
 
   const fromTrigger =
     fromId === null
