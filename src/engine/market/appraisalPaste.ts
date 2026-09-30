@@ -9,7 +9,7 @@
  * - **Inventory copy** — `Name<tab>Qty`, and the wider `Name<tab>Qty<tab>Group
  *   <tab>Volume` EVE gives when the inventory is in details mode. Everything
  *   past the second field is dropped.
- * - **Multibuy** — `Name Qty`, space-separated.
+ * - **Multibuy** — `Name Qty`, space-separated, or `Name xQty` / `Name x Qty`.
  * - **A bare name**, which counts as one.
  * - **An EFT ship fit**, recognised by the `[Ship Name, Fit Name]` header its
  *   first non-blank line always carries. A fit is not a list of loose items:
@@ -47,8 +47,12 @@ export interface AppraisalPasteEntry {
   lines: number[];
 }
 
-/** A trailing `xN` count, the same suffix `engine/import/eftFit.ts` reads. */
-const X_SUFFIX = /^(.*\S)\s+x([\d,]+)$/i;
+/**
+ * A trailing `xN` count, the same suffix `engine/import/eftFit.ts` reads —
+ * also hand-typed as `x N`. Without the optional space the plain
+ * trailing-number rule reads `Tritanium x 1000` as 1000 of "Tritanium x".
+ */
+const X_SUFFIX = /^(.*\S)\s+x\s*([\d,]+)$/i;
 
 /** A trailing standalone number: digits and thousands separators, nothing else. */
 const TRAILING_QUANTITY = /^(.*\S)\s+([\d,]+)$/;
