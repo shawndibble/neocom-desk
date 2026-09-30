@@ -12,7 +12,9 @@ test('Ctrl+K opens the palette, searches and navigates', async ({ page }) => {
   await expect(page.getByRole('button', { name: /^Search/ })).toBeVisible();
 
   await page.keyboard.press('Control+k');
-  const input = page.getByRole('combobox', { name: 'Search pages, commands and characters' });
+  const input = page.getByRole('combobox', {
+    name: 'Search pages, commands, characters and items',
+  });
   await expect(input).toBeFocused();
 
   await input.fill('opp');
@@ -44,6 +46,6 @@ test('the phone trigger opens the palette', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signInAndGoto(page, './overview');
 
-  await page.getByRole('button', { name: 'Search pages, commands and characters' }).click();
+  await page.getByRole('button', { name: 'Search pages, commands, characters and items' }).click();
   await expect(page.getByRole('combobox')).toBeFocused();
 });

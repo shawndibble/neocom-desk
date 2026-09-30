@@ -28,8 +28,9 @@ export interface PaletteProvider {
    * Given the trimmed query. A synchronous answer renders at once; a Promise
    * shows the group as loading until it settles, never holding up typing or
    * the other groups. `signal` aborts once the query moves on, and a late
-   * answer for an old query is discarded either way. A rejection hides the
-   * group. Providers cap their own answer (`GROUP_LIMIT`).
+   * answer for an old query is discarded either way. A rejection shows an
+   * error row in this group alone; the other groups carry on. Providers cap
+   * their own answer (`GROUP_LIMIT`).
    */
   search(
     query: string,
