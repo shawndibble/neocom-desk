@@ -94,8 +94,13 @@ export function createMarketItemCatalogue(
   };
 }
 
-/** The session's one catalogue: loaded on first palette open, kept until reload. */
-export const marketItemCatalogue = createMarketItemCatalogue(loadMarketTypes);
+/**
+ * The session's one catalogue: loaded on first palette open, kept until
+ * reload. The loader is read at call time, not at import: the shell imports
+ * this module on every page, and a test that mocks `loadMarketSde` without
+ * `loadMarketTypes` would otherwise fail on import alone.
+ */
+export const marketItemCatalogue = createMarketItemCatalogue(() => loadMarketTypes());
 
 export interface ShownMarketItem {
   readonly typeId: number;
