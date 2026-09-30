@@ -34,6 +34,11 @@ export function fittingStatsText(stats: FittingStats, t: Translate): string {
     stats.offense.overheated.dps.toFixed(1) !== stats.offense.dps.toFixed(1)
       ? k('dpsOverheated', { value: stats.offense.overheated.dps.toFixed(1) })
       : '';
+  // Reload only costs ammo-fed weapons anything; lasers and drones read the same.
+  const sustainedDps =
+    stats.offense.sustainedDps.toFixed(1) !== stats.offense.dps.toFixed(1)
+      ? k('dpsSustained', { value: stats.offense.sustainedDps.toFixed(1) })
+      : '';
   const capacitor = stats.capacitor.stable
     ? t('fittings.stats.capacitorStable', { pct: stats.capacitor.stablePercentage.toFixed(0) })
     : t('fittings.stats.capacitorDepletes', {
@@ -45,6 +50,7 @@ export function fittingStatsText(stats: FittingStats, t: Translate): string {
     k('dps', {
       dps: stats.offense.dps.toFixed(1),
       overheated: heatedDps,
+      sustained: sustainedDps,
       volley: stats.offense.volley.toFixed(0),
     }),
     k('ehp', {

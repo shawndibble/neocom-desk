@@ -27,6 +27,7 @@ import {
   boosterReloadShortfall,
   capacitorBudget,
   capacitorStatusAtDrain,
+  reloadDuty,
   sustainedRepair,
   type CapacitorBudget,
   type CapacitorUser,
@@ -414,9 +415,30 @@ function needsChargeToFire(attributes: AttributeMap): boolean {
   );
 }
 
-function damageFigures(attributes: AttributeMap, quantity: number): DamageFigures {
+/**
+ * The share of a long fight a weapon spends firing rather than reloading.
+ * Only a module that uses charges per shot (`chargeRate`: projectiles,
+ * hybrids, missiles) runs its magazine dry; a laser carries no `chargeRate`
+ * — its crystal is never used up per shot (the pinned engine, 2026-09-29) —
+ * and drones and fighters never reload, so all of those fire the whole time.
+ * A weapon's cycle is its rate of fire: a launcher carries no `cycleTime`.
+ */
+function weaponReloadDuty(attributes: AttributeMap, neverReloads: boolean): number {
+  const read = (id: number) => readAttribute(attributes, id);
+  if (neverReloads || read(ITEM_DOGMA_ATTRIBUTE.chargeRate) <= 0) return 1;
+  return reloadDuty(magazineOf(read, ITEM_DOGMA_ATTRIBUTE.rateOfFire));
+}
+
+function damageFigures(
+  attributes: AttributeMap,
+  quantity: number,
+  /** A drone or fighter, which never reloads. */
+  neverReloads: boolean
+): DamageFigures {
+  const dps = readAttribute(attributes, ITEM_DOGMA_ATTRIBUTE.damagePerSecond) * quantity;
   return {
-    dps: readAttribute(attributes, ITEM_DOGMA_ATTRIBUTE.damagePerSecond) * quantity,
+    dps,
+    sustainedDps: dps * weaponReloadDuty(attributes, neverReloads),
     volley: readAttribute(attributes, ITEM_DOGMA_ATTRIBUTE.damageVolley) * quantity,
   };
 }
@@ -458,7 +480,7 @@ export function extractOffense(
   items.forEach((item, index) => {
     const result = results[index];
     if (!result || !isFiring(result.state)) return;
-    const figures = damageFigures(result.attributes, item.quantity);
+    const figures = damageFigures(result.attributes, item.quantity, item.isDrone);
     if (figures.dps === 0 && figures.volley === 0) {
       if (
         !item.isDrone &&
@@ -482,17 +504,20 @@ export function extractOffense(
         ...(item.isFighter ? { isFighter: true } : {}),
         count: 0,
         dps: 0,
+        sustainedDps: 0,
         volley: 0,
-        overheated: heated ? { dps: 0, volley: 0 } : null,
+        overheated: heated ? { dps: 0, sustainedDps: 0, volley: 0 } : null,
       };
       rows.set(key, row);
     }
     row.count += item.quantity;
     row.dps += figures.dps;
+    row.sustainedDps += figures.sustainedDps;
     row.volley += figures.volley;
     if (heated && row.overheated) {
-      const heatedFigures = damageFigures(heated.attributes, item.quantity);
+      const heatedFigures = damageFigures(heated.attributes, item.quantity, item.isDrone);
       row.overheated.dps += heatedFigures.dps;
+      row.overheated.sustainedDps += heatedFigures.sustainedDps;
       row.overheated.volley += heatedFigures.volley;
     }
   });
@@ -504,10 +529,12 @@ export function extractOffense(
   return {
     weapons,
     dps: sum((row) => row.dps),
+    sustainedDps: sum((row) => row.sustainedDps),
     volley: sum((row) => row.volley),
     overheated: canOverheat
       ? {
           dps: sum((row) => row.overheated?.dps ?? row.dps),
+          sustainedDps: sum((row) => row.overheated?.sustainedDps ?? row.sustainedDps),
           volley: sum((row) => row.overheated?.volley ?? row.volley),
         }
       : null,
@@ -542,14 +569,19 @@ function runningModules<I extends CalculatedItem, R extends RunningResult>(
 
 /**
  * A loaded module's magazine: the charges the engine says it holds, over
- * what one cycle uses, and its reload. The same for an ancillary repairer
- * and a cap booster.
+ * what one cycle uses, and its reload. The same for an ancillary repairer,
+ * a cap booster and a weapon — whose cycle is its rate of fire.
  */
-function magazineOf(read: (id: number) => number): Magazine {
+function magazineOf(
+  read: (id: number) => number,
+  cycleAttribute: number = ITEM_DOGMA_ATTRIBUTE.cycleTime
+): Magazine {
   const chargeRate = read(ITEM_DOGMA_ATTRIBUTE.chargeRate) || 1;
   return {
-    cycles: Math.floor(read(ITEM_DOGMA_ATTRIBUTE.chargeAmount) / chargeRate + 1e-9),
-    cycleSeconds: read(ITEM_DOGMA_ATTRIBUTE.cycleTime) / 1000,
+    // The engine's figures are single-precision: a blaster's 160 rounds come
+    // back as 159.9999976, which a bare floor would cut to 159.
+    cycles: Math.floor(read(ITEM_DOGMA_ATTRIBUTE.chargeAmount) / chargeRate + 1e-4),
+    cycleSeconds: read(cycleAttribute) / 1000,
     reloadSeconds: read(ITEM_DOGMA_ATTRIBUTE.reloadTime) / 1000,
   };
 }

@@ -38,7 +38,13 @@ const stats = {
     signatureRadius: 120,
   },
   navigation: { maxVelocity: 350, agility: 0.5, mass: 10_000_000, warpSpeed: 3 },
-  offense: { weapons: [], dps: 173.7, volley: 784, overheated: { dps: 181.7, volley: 830 } },
+  offense: {
+    weapons: [],
+    dps: 173.7,
+    sustainedDps: 160.2,
+    volley: 784,
+    overheated: { dps: 181.7, sustainedDps: 181.7, volley: 830 },
+  },
   tank: { ...neutralExtendedStats().tank, burstEffective: 90, sustainedEffective: 50 },
   capacitorBudget: { ...neutralExtendedStats().capacitorBudget, delta: -4.2 },
 } as unknown as FittingStats;
@@ -48,7 +54,7 @@ describe('fittingStatsText', () => {
     const text = fittingStatsText(stats, i18n.t.bind(i18n));
 
     expect(text.split('\n')).toEqual([
-      'DPS 173.7 (181.7 overheated) · volley 784',
+      'DPS 173.7 (181.7 overheated) · 160.2 sustained with reload · volley 784',
       'EHP 24187 · shield 5000 HP · armor 4000 HP · hull 3000 HP',
       'Resists EM/Th/Kin/Exp: shield 50/50/50/50 · armor 60/60/60/60 · hull 33/33/33/33',
       'Tank 90.0 EHP/s burst · 50.0 EHP/s sustained',
