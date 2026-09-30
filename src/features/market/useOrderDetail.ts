@@ -135,9 +135,9 @@ export function useOrderDetail(): OrderDetail {
   const hubBids = useLazyRowCache<number, HubBids>();
   /** Jump distance, keyed by `"system:system"` — shared by the region-rival route and the trade-hub sweep. */
   const jumps = useLazyRowCache<string, JumpsAwayResult>();
-  // Loaded under the Travel settings in force, and read back only for those:
+  // Loaded under the Travel Settings in force, and read back only for those:
   // a distance worked out under other rules is not this one.
-  const { rules: routeRules, key: routeKey } = useRouteQuery();
+  const { rules: routeRules, key: routeKey, hydrated: routeHydrated } = useRouteQuery();
   const jumpsForList = useMemo(() => {
     const suffix = `|${routeKey}`;
     const view = new Map<string, JumpsAwayResult>();
@@ -218,6 +218,10 @@ export function useOrderDetail(): OrderDetail {
       // `load`'s own synchronous dedup is what keeps a sweep of several
       // routes from re-asking for one already requested (its doc comment).
       loadRoute: (fromSystemId, toSystemId) => {
+        // Not until the Travel Settings are in: a jump count asked on defaults is
+        // one the pilot's rules would not give. Hydrating re-creates this action,
+        // so the effects that call it ask again.
+        if (!routeHydrated) return;
         void loadJumps(`${jumpsKey(fromSystemId, toSystemId)}|${routeKey}`, () =>
           loaders.jumpsBetween(fromSystemId, toSystemId, routeRules)
         );
@@ -254,6 +258,7 @@ export function useOrderDetail(): OrderDetail {
     loadJumps,
     routeKey,
     routeRules,
+    routeHydrated,
   ]);
 
   return useMemo(() => ({ ...actions, caches }), [actions, caches]);

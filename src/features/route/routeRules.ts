@@ -1,5 +1,5 @@
 /**
- * The pilot's **Travel settings** — the in-game autopilot's route options,
+ * The pilot's **Travel Settings** — the in-game autopilot's route options,
  * for planning: which trip to prefer, and which systems to keep out of. Every
  * jump count in the app reads them through `useRouteRules`, so no page
  * carries its own copy of the rules.
@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { useTicker } from '@/lib/ticker';
-import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
+import { DEFAULT_SECURITY_PENALTY, type RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { effectiveAvoid } from '@/engine/route/avoidRules';
 import { EDENCOM_SYSTEMS, TRIGLAVIAN_MINOR_VICTORY_SYSTEMS } from '@/engine/route/invasionSystems';
 import { loadPodKills } from '@/features/travel/routeSafetyData';
@@ -35,8 +35,6 @@ export const POD_KILL_THRESHOLD_KEY = 'sync.podKillThreshold';
 
 /** Prefer safer: the trip most pilots actually fly, and what Courier and Travel already opened on. */
 export const DEFAULT_ROUTE_PREFERENCE: RoutePreferenceKind = 'prefer-highsec';
-/** The game's own default. */
-export const DEFAULT_SECURITY_PENALTY = 50;
 export const MIN_SECURITY_PENALTY = 0;
 export const MAX_SECURITY_PENALTY = 100;
 export const DEFAULT_POD_KILL_THRESHOLD = 3;
@@ -160,7 +158,7 @@ function useHydratedAll(): boolean {
 /** Pod kills by system while the rule is on; `undefined` while loading. */
 function usePodKills(enabled: boolean): ReadonlyMap<number, number> | null | undefined {
   const now = useTicker(POD_KILL_REFRESH_MS);
-  const window = Math.floor(now / POD_KILL_REFRESH_MS);
+  const refreshSlot = Math.floor(now / POD_KILL_REFRESH_MS);
   const [kills, setKills] = useState<ReadonlyMap<number, number> | null | undefined>(undefined);
   useEffect(() => {
     if (!enabled) return;
@@ -173,12 +171,12 @@ function usePodKills(enabled: boolean): ReadonlyMap<number, number> | null | und
     return () => {
       cancelled = true;
     };
-  }, [enabled, window]);
+  }, [enabled, refreshSlot]);
   return enabled ? kills : null;
 }
 
 /**
- * The Travel settings as one value, stable while none of them change — so a
+ * The Travel Settings as one value, stable while none of them change — so a
  * caller can key an effect or a cache on `avoid` directly.
  */
 export function useRouteRules(): RouteRules {
@@ -238,7 +236,7 @@ export interface RouteQuery {
 }
 
 /**
- * The Travel settings as a route query — the shape every jump count takes.
+ * The Travel Settings as a route query — the shape every jump count takes.
  * `preferenceOverride` is a page's own picker (a URL value, say); `null` or
  * `undefined` falls through to the pilot's default.
  */

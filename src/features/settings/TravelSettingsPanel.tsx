@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Checkbox,
@@ -19,7 +18,6 @@ import {
   MAX_SECURITY_PENALTY,
   MIN_POD_KILL_THRESHOLD,
   MIN_SECURITY_PENALTY,
-  ROUTE_RULE_STORES,
   useAvoidEdencom,
   useAvoidPodKills,
   useAvoidTriglavian,
@@ -58,9 +56,6 @@ export function TravelSettingsPanel() {
   const setPodKillThreshold = usePodKillThreshold((state) => state.setValue);
   // The form waits for the settings only: a kill feed still loading must not blank it.
   const { settingsHydrated: hydrated, podKillsUnavailable } = useRouteRules();
-  useEffect(() => {
-    for (const store of ROUTE_RULE_STORES) void store.getState().hydrate();
-  }, []);
 
   return (
     <div className="space-y-4">

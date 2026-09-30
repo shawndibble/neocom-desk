@@ -126,9 +126,7 @@ function useRouteExposure(
     return () => {
       cancelled = true;
     };
-    // `routeKey` stands for `rules`: it changes exactly when they do.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [originSystemId, destinationSystemId, routeKey, hydrated]);
+  }, [originSystemId, destinationSystemId, rules, routeKey, hydrated]);
 
   return exposure;
 }

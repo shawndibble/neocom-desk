@@ -96,9 +96,7 @@ export function useRouteSafety(
     return () => {
       cancelled = true;
     };
-    // `requestKey` stands for `rules`: it changes exactly when they do.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wantsRoute, hydrated, fromId, toId, requestKey]);
+  }, [wantsRoute, hydrated, fromId, toId, rules, requestKey]);
 
   return useMemo((): RouteSafetyState => {
     if (fromId === null || toId === null) return { kind: 'incomplete' };

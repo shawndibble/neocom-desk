@@ -27,12 +27,11 @@ import { loadJumpGraph } from '@/sde/jumpGraph';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 
 /**
- * Every entry point takes the pilot's Avoided Systems explicitly rather than
- * reading the setting here: callers compute inside effects keyed on their
- * inputs, and a list read behind their back would never re-run them when it
- * changes.
+ * What a route is asked under: the Travel Settings, or a page's own preference
+ * over them. Every entry point takes these explicitly rather than reading the
+ * settings here: callers compute inside effects keyed on their inputs, and
+ * rules read behind their back would never re-run them when they change.
  */
-/** What a route is asked under: the Travel settings, or a page's own preference over them. */
 export interface LocalRouteRules {
   preference?: RoutePreferenceKind;
   securityPenalty?: number;

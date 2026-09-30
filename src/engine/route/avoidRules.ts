@@ -1,5 +1,5 @@
 /**
- * Which systems a route should keep out of, from the pilot's Travel settings —
+ * Which systems a route should keep out of, from the pilot's Travel Settings —
  * the in-game autopilot's avoidance options, gathered into one list every
  * jump count is given (`engine/route/jumpRoute.ts`, and ESI's `avoid`).
  *

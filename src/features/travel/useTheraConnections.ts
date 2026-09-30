@@ -84,9 +84,7 @@ export function useTheraConnections(
     return () => {
       cancelled = true;
     };
-    // `distanceKey` stands for `rules`: it changes exactly when they do.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [originId, hydrated, distanceKey]);
+  }, [originId, hydrated, rules, distanceKey]);
 
   return useMemo((): TheraConnectionsState => {
     if (result === null || systems === null) return { kind: 'loading' };

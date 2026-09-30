@@ -368,7 +368,7 @@ describe('loadStructureCompetition (issue #538)', () => {
   });
 });
 
-describe('loadJumpsBetween with Travel settings', () => {
+describe('loadJumpsBetween with Travel Settings', () => {
   const AVOIDED = 30045328;
   const WITH_AVOID = { preference: 'shortest' as const, securityPenalty: 50, avoid: [AVOIDED] };
 

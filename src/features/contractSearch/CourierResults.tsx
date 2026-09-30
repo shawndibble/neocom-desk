@@ -717,7 +717,7 @@ function useJumpCounts(rows: readonly CourierRouteRow[], route: RouteQuery): Jum
   const { rules, key: routeKey, hydrated } = route;
 
   useEffect(() => {
-    // Held until the Travel settings are in, so the board does not rank once without them.
+    // Held until the Travel Settings are in, so the board does not rank once without them.
     if (!hydrated) return;
     let cancelled = false;
     void localJumpCountsForRoutes(
@@ -732,9 +732,7 @@ function useJumpCounts(rows: readonly CourierRouteRow[], route: RouteQuery): Jum
     return () => {
       cancelled = true;
     };
-    // `routeKey` stands for `rules`: it changes exactly when they do.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, routeKey, hydrated]);
+  }, [rows, rules, routeKey, hydrated]);
 
   return answer && answer.rows === rows && answer.routeKey === routeKey ? answer.state : PENDING;
 }

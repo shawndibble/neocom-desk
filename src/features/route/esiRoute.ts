@@ -1,5 +1,5 @@
 /**
- * ESI's `/route/` under the pilot's Travel settings, with Avoided Systems
+ * ESI's `/route/` under the pilot's Travel Settings, with Avoided Systems
  * given the meaning the local graph gives them (`engine/route/jumpRoute.ts`):
  * a cost, never a wall.
  *
@@ -14,19 +14,19 @@
 import { postRoute } from '@/esi/endpoints';
 import type { EsiResult } from '@/esi/client';
 import { EsiError } from '@/esi/errors';
-import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
+import { DEFAULT_SECURITY_PENALTY, type RoutePreferenceKind } from '@/engine/route/jumpRoute';
 
-/** What a route is asked under — the Travel settings, or a page's own preference over them. */
+/** What a route is asked under — the Travel Settings, or a page's own preference over them. */
 export interface EsiRouteRules {
   preference: RoutePreferenceKind;
   securityPenalty: number;
   avoid: readonly number[];
 }
 
-/** Shortest, nothing avoided — for a caller with no Travel settings to hand. */
+/** Shortest, nothing avoided — for a caller with no Travel Settings to hand. */
 export const PLAIN_ROUTE_RULES: EsiRouteRules = {
   preference: 'shortest',
-  securityPenalty: 50,
+  securityPenalty: DEFAULT_SECURITY_PENALTY,
   avoid: [],
 };
 

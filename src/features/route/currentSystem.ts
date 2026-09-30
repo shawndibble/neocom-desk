@@ -169,9 +169,7 @@ export function useJumpRangeFilter(
     return () => {
       cancelled = true;
     };
-    // `routeKey` stands for `rules`: it changes exactly when they do.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [originSystemId, routeKey, hydrated]);
+  }, [originSystemId, rules, routeKey, hydrated]);
 
   const settled = distances?.origin === originSystemId && distances.routeKey === routeKey;
   const jumps = settled ? distances.jumps : null;

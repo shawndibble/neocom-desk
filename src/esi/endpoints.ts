@@ -1829,7 +1829,7 @@ export function getCharacterLocation(
 export interface RouteOptions extends EndpointOptions {
   /**
    * ESI's route preference, in its own words — the app's names map onto
-   * these in one place (`features/route/routeRules.ts`'s `esiRoutePreference`).
+   * these in one place (`features/route/esiRoute.ts`'s `esiRoutePreference`).
    */
   preference?: 'Shorter' | 'Safer' | 'LessSecure';
   /**

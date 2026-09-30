@@ -455,9 +455,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Avoided Systems**: The solar systems a pilot keeps off their routes,
   entered by hand in Settings → Travel — ESI cannot read the game client's own
   autopilot avoidance list. Synced across devices as ids; shown with each
-  system's security. Not a **Route Preference**. Every jump count routes
-  around them as a cost, never a wall: a trip only possible through one
-  still has a route.
+  system's security. Part of **Travel Settings**; not a **Route Preference**.
 - **Route Preference**: Which trip a distance describes — the game's Prefer
   shorter, Prefer safer or Prefer less secure, one vocabulary app-wide: the
   engine's `shortest`/`prefer-highsec`/`avoid-highsec`, and ESI's
@@ -469,9 +467,8 @@ here — they go one per file in `docs/context/decisions/`.
   the default **Route Preference**, the security penalty (0–100, the game's
   slider, default 50), and what to avoid: the **Avoided Systems** (switchable
   without clearing), EDENCOM and Triglavian minor-victory systems, and systems
-  at or over a pod-kill count in ESI's last-hour kill report. Every jump count
-  in the app follows them (`features/route/routeRules.ts`); the local graph
-  weighs jumps with CCP's own published route costs, so it agrees with ESI.
+  at or over a pod-kill count in ESI's last-hour kill report
+  (`features/route/routeRules.ts`).
 - **Job Fee**: The ISK ESI charges to install a manufacturing job, separate
   from material cost. Sized from EIV, the system's **Cost Index**, a fixed
   SCC surcharge, and the facility's tax.

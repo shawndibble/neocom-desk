@@ -222,7 +222,7 @@ export function clearJumpsCache(): void {
 export function loadJumpsBetween(
   originSystemId: number,
   destinationSystemId: number,
-  /** The pilot's Travel settings — see `features/route/esiRoute.ts` for how ESI is asked. */
+  /** The pilot's Travel Settings — see `features/route/esiRoute.ts` for how ESI is asked. */
   rules: EsiRouteRules = PLAIN_ROUTE_RULES
 ): Promise<JumpsAwayResult> {
   if (originSystemId === destinationSystemId) {
