@@ -1,9 +1,20 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { JournalDescriptionCell } from './JournalDescriptionCell';
 import type { WalletJournalEntry } from '@/esi/endpoints';
+
+vi.mock('./npcFactions', () => ({
+  loadNpcFactions: vi.fn(
+    async () =>
+      new Map<number, string | null>([
+        [16938, 'Blood Raiders'],
+        [17039, 'Serpentis'],
+        [17594, null],
+      ])
+  ),
+}));
 
 function entry(overrides: Partial<WalletJournalEntry> = {}): WalletJournalEntry {
   return {
@@ -37,6 +48,25 @@ describe('JournalDescriptionCell', () => {
       </MemoryRouter>
     );
     expect(screen.getByText('moon tax Aug')).toBeInTheDocument();
+  });
+
+  it("sums a bounty line's kills per pirate faction instead of printing ESI's raw type ids", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <JournalDescriptionCell
+          entry={entry({
+            ref_type: 'bounty_prizes',
+            reason: '16938: 3,17039: 2,17594: 1,16952: 1',
+          })}
+          transaction={undefined}
+          itemName=""
+        />
+      </MemoryRouter>
+    );
+    expect(
+      await screen.findByText('Blood Raiders ×3 · Serpentis ×2 · Other ×2')
+    ).toBeInTheDocument();
+    expect(container).not.toHaveTextContent('16938');
   });
 
   it('links a contract-reward row to the contract history, highlighted', () => {

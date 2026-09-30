@@ -1,7 +1,8 @@
 /**
  * The wallet journal's Description cell: ESI's own description, plus three
  * optional extras — a dim `reason` line (issue #1721, e.g. a corp member's
- * "moon tax Aug" memo), a link to the contract behind a contract-reward row,
+ * "moon tax Aug" memo; on a bounty line, its kills summed per pirate
+ * faction instead of ESI's raw `typeID: count` list), a link to the contract behind a contract-reward row,
  * and — when the line is a market fill we have loaded — the item it bought
  * or sold, with its icon, linked to that item's Market listing.
  *
@@ -10,6 +11,7 @@
  * a tap on the link navigates, so touch-and-hold stays the way to read it
  * (see `Tooltip`).
  */
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TypeIcon } from '@/components/ui';
@@ -17,6 +19,8 @@ import type { WalletJournalEntry, WalletTransactionCommon } from '@/esi/endpoint
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { formatIsk } from '@/lib/isk';
+import { BountyFactionSummary } from './BountyFactionSummary';
+import { bountyKillsOf } from './bountyKills';
 import { transactionTotal } from './walletTransactionsCsv';
 
 interface JournalDescriptionCellProps {
@@ -32,6 +36,8 @@ export function JournalDescriptionCell({
 }: JournalDescriptionCellProps) {
   const { t } = useTranslation();
   const contractId = entry.context_id_type === 'contract_id' ? entry.context_id : undefined;
+  // A bounty line's reason is its kill list as raw `typeID: count` pairs.
+  const kills = useMemo(() => bountyKillsOf(entry), [entry]);
   if (!transaction && !entry.reason && contractId === undefined) return <>{entry.description}</>;
   const fill = transaction
     ? t(transaction.is_buy ? 'wallet.journalItemBought' : 'wallet.journalItemSold', {
@@ -43,7 +49,11 @@ export function JournalDescriptionCell({
   return (
     <div className="flex flex-col gap-1">
       <span>{entry.description}</span>
-      {entry.reason && <span className="text-text-dim">{entry.reason}</span>}
+      {kills ? (
+        <BountyFactionSummary kills={kills} />
+      ) : (
+        entry.reason && <span className="text-text-dim">{entry.reason}</span>
+      )}
       {contractId !== undefined && (
         <Link
           to={`/contracts/history?${HIGHLIGHT_PARAM}=${contractId}`}
