@@ -254,6 +254,11 @@ describe('CommandPalette', () => {
     expect(await within(items).findByText("Couldn't load these results.")).toBeInTheDocument();
     expect(within(items).queryByRole('option')).not.toBeInTheDocument();
     const pages = screen.getByRole('group', { name: 'Pages' });
+    // Announced too: the error row is not an option, so the count alone would miss it.
+    expect(screen.getByText(/results?\. Couldn't load these results\.$/)).toHaveAttribute(
+      'aria-live',
+      'polite'
+    );
     // The error row is never highlighted; the best page still is.
     expect(within(pages).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
     await user.keyboard('{Enter}');

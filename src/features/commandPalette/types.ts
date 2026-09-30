@@ -29,7 +29,8 @@ export interface PaletteProvider {
    * shows the group as loading until it settles, never holding up typing or
    * the other groups. `signal` aborts once the query moves on, and a late
    * answer for an old query is discarded either way. A rejection shows an
-   * error row in this group alone; the other groups carry on. Providers cap their own answer (`GROUP_LIMIT`).
+   * error row in this group alone; the other groups carry on. Providers cap
+   * their own answer (`GROUP_LIMIT`).
    */
   search(
     query: string,

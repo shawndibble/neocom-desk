@@ -56,7 +56,7 @@ describe('createMarketItemCatalogue', () => {
     expect(load).toHaveBeenCalledTimes(1);
   });
 
-  it('forgets a failed load so the next one retries', async () => {
+  it('keeps a failed load failed until a retry is asked for', async () => {
     const load = vi
       .fn<() => Promise<MarketTypeEntry[]>>()
       .mockRejectedValueOnce(new Error('offline'))
@@ -64,8 +64,20 @@ describe('createMarketItemCatalogue', () => {
     const catalogue = createMarketItemCatalogue(load);
     await expect(catalogue.load()).rejects.toThrow('offline');
     expect(catalogue.peek()).toBeNull();
-    await expect(catalogue.load()).resolves.toBeDefined();
+    // Another keystroke: no refetch.
+    await expect(catalogue.load()).rejects.toThrow('offline');
+    expect(load).toHaveBeenCalledTimes(1);
+    // The next opening retries.
+    await expect(catalogue.load({ retry: true })).resolves.toBeDefined();
     expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it('a retry on a healthy catalogue does not refetch', async () => {
+    const load = vi.fn(async () => CATALOGUE);
+    const catalogue = createMarketItemCatalogue(load);
+    await catalogue.load();
+    await catalogue.load({ retry: true });
+    expect(load).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -113,10 +113,11 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
   }, []);
 
   // The item catalogue starts loading as the palette opens, not at the third
-  // keystroke — and off the render path, so typing never waits on it. A
-  // failure here is left to the Market Items group to report.
+  // keystroke — and off the render path, so typing never waits on it. Each
+  // opening retries a failed load once; a failure is the Market Items
+  // group's to report.
   useEffect(() => {
-    marketItemCatalogue.load().catch(() => {});
+    marketItemCatalogue.load({ retry: true }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -159,6 +160,8 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
 
   let optionIndex = 0;
   const trimmed = query.trim();
+  // The error row is not an option, so the live count alone would hide it.
+  const groupFailed = groups.some((group) => group.status === 'error');
 
   return (
     <Modal open onClose={onClose} title={t('commandPalette.title')}>
@@ -261,7 +264,9 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
           )
         )}
         <span role="status" aria-live="polite" className="sr-only">
-          {trimmed === '' ? '' : t('commandPalette.resultsCount', { count: options.length })}
+          {trimmed === ''
+            ? ''
+            : `${t('commandPalette.resultsCount', { count: options.length })}${groupFailed ? `. ${t('commandPalette.groupError')}` : ''}`}
         </span>
       </div>
     </Modal>

@@ -6,14 +6,18 @@
  * (the palette's loading row) while it is cold.
  *
  * Matching is a linear scan over a name index built once — lowercased and
- * pre-sorted, so each keystroke is ~1 ms over the ~19.5k entries with no sort
- * of its own. Well under the ticket's 8 ms budget, so no worker and no
- * debounce.
+ * pre-sorted, so a keystroke does no sort and no lowercasing of its own. Its
+ * own scan rather than `rankedSearch` (same ranking) for that reason:
+ * measured in node over the real ~19.5k entries, 0.1–0.8 ms a keystroke
+ * against `rankedSearch`'s ~1.5 ms. Either is well under the ticket's 8 ms
+ * budget, so no worker and no debounce.
  */
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
-import { MARKET_TREE_MIN_QUERY_LENGTH } from '@/features/market/marketTree';
 import { GROUP_LIMIT, type PaletteProvider, type PaletteResult } from './types';
+
+/** Same threshold as the Market Browser's tree search: shorter matches half the catalogue. */
+export const MARKET_ITEMS_MIN_QUERY_LENGTH = 3;
 
 interface IndexedItem {
   readonly typeId: number;
@@ -55,8 +59,12 @@ export function searchMarketItems(
 }
 
 export interface MarketItemCatalogue {
-  /** The index, loading the catalogue on first call; a failed load is forgotten so the next call retries. */
-  load(): Promise<MarketItemIndex>;
+  /**
+   * The index, loading the catalogue on first call. A failed load stays
+   * failed until a call asks to `retry` (the palette's next opening), so an
+   * offline pilot's keystrokes do not each refetch the whole catalogue.
+   */
+  load(options?: { retry?: boolean }): Promise<MarketItemIndex>;
   /** The index if it has already loaded — lets a warm search answer synchronously. */
   peek(): MarketItemIndex | null;
 }
@@ -66,12 +74,17 @@ export function createMarketItemCatalogue(
 ): MarketItemCatalogue {
   let pending: Promise<MarketItemIndex> | null = null;
   let ready: MarketItemIndex | null = null;
+  let failed = false;
   return {
-    load() {
+    load({ retry = false } = {}) {
+      if (retry && failed) {
+        pending = null;
+        failed = false;
+      }
       pending ??= loadCatalogue().then(
         (catalogue) => (ready = buildMarketItemIndex(catalogue)),
         (error: unknown) => {
-          pending = null;
+          failed = true;
           throw error;
         }
       );
@@ -109,7 +122,7 @@ export function createMarketItemsProvider({
     id: 'marketItems',
     labelKey: 'commandPalette.groups.marketItems',
     order: 3,
-    minQueryLength: MARKET_TREE_MIN_QUERY_LENGTH,
+    minQueryLength: MARKET_ITEMS_MIN_QUERY_LENGTH,
     search: (query) => {
       const index = catalogue.peek();
       return index ? answer(index, query) : catalogue.load().then((index) => answer(index, query));
