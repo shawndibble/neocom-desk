@@ -191,21 +191,32 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
 /**
  * A row's DPS and volley — under "Overheat all", in the warning tone where
  * heat changed them. `figures` picks the same row out of either calculation.
+ * Sustained DPS (with reload), where reloading costs anything, is a dim
+ * `line` under the figures (the total) or their `tooltip` (a weapon row).
  */
 function DamageFigures({
   stats,
   figures,
+  sustained = 'tooltip',
 }: {
   stats: FittingStats;
   figures: (stats: FittingStats) => DamageFiguresValue;
+  sustained?: 'tooltip' | 'line';
 }) {
   const { t } = useTranslation();
-  return (
-    <span className="ml-auto shrink-0 text-right tabular-nums">
+  const sustainedLabel = (s: FittingStats) =>
+    t('fittings.stats.sustainedDps', { value: figures(s).sustainedDps.toFixed(1) });
+  // Only where reloading costs something as shown: never lasers or drones.
+  const { dps, sustainedDps } = figures(stats);
+  const reloads = sustainedDps.toFixed(1) !== dps.toFixed(1);
+  const tooltip = sustained === 'tooltip' && reloads ? sustainedLabel(stats) : undefined;
+  const numbers = (
+    <span className="ml-auto shrink-0 text-right tabular-nums" title={tooltip}>
       <span>
         <HeatFigure
           stats={stats}
           format={(s) => t('fittings.stats.weaponDps', { value: figures(s).dps.toFixed(1) })}
+          note={tooltip}
         />
       </span>
       <span className="text-text-dim"> · </span>
@@ -215,13 +226,24 @@ function DamageFigures({
           format={(s) => t('fittings.stats.weaponVolley', { value: figures(s).volley.toFixed(0) })}
         />
       </span>
+      {tooltip && <span className="sr-only"> ({tooltip})</span>}
     </span>
+  );
+  if (sustained === 'tooltip' || !reloads) return numbers;
+  return (
+    <>
+      {numbers}
+      <span className="basis-full text-right text-[0.6875rem] font-normal text-text-dim tabular-nums">
+        <HeatFigure stats={stats} format={sustainedLabel} />
+      </span>
+    </>
   );
 }
 
 /** Stable ids — the remembered layout (`statsSectionsPreference.ts`) is keyed on them. */
 type Section =
   | 'assumptions'
+  | 'whatToTrain'
   | 'offense'
   | 'appliedDps'
   | 'defense'
@@ -336,6 +358,8 @@ interface FittingStatsSectionsProps {
   conditions?: ReactNode;
   /** The implant controls, grouped with the skills override under "Implants & skills" — absent where a Fitting has no implants to choose. */
   implants?: ReactNode;
+  /** "What to train" (`FittingWhatToTrainPanel`) — absent where there's no Character to train. Collapsed by default: it only works anything out once opened. */
+  whatToTrain?: ReactNode;
   /** The hull takes drones (`showsDrones`) — else there is no Drones section. */
   showDrones?: boolean;
   /**
@@ -459,9 +483,9 @@ function OffenseRows({
           </li>
         );
       })}
-      <li className="flex justify-between gap-x-2 border-t border-line pt-1 font-semibold">
+      <li className="flex flex-wrap justify-between gap-x-2 border-t border-line pt-1 font-semibold">
         <span>{t('fittings.stats.offenseTotal')}</span>
-        <DamageFigures stats={stats} figures={(s) => s.offense} />
+        <DamageFigures stats={stats} figures={(s) => s.offense} sustained="line" />
       </li>
     </ul>
   );
@@ -488,6 +512,7 @@ export function FittingStatsSections({
   heading,
   conditions,
   implants,
+  whatToTrain,
   showDrones = true,
   fitting = null,
   moduleResults = null,
@@ -726,6 +751,8 @@ export function FittingStatsSections({
             <SkillOverridesControl />
           </div>
         )}
+
+      {stats && whatToTrain && section('whatToTrain', undefined, whatToTrain)}
 
       {section(
         'offense',

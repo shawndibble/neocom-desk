@@ -78,6 +78,7 @@ import {
 import { AlphaCloneChip } from '@/features/fittings/AlphaCloneChip';
 import { MasteryChip } from '@/features/fittings/MasteryChip';
 import { MissingSkillsChip } from '@/features/fittings/MissingSkillsChip';
+import { FittingWhatToTrainPanel } from '@/features/fittings/FittingWhatToTrainPanel';
 import { useFittingAlpha } from '@/features/fittings/useFittingAlpha';
 import { useFittingHardpoints } from '@/features/fittings/useFittingHardpoints';
 import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
@@ -526,6 +527,9 @@ function FittingsPage() {
       showDrones={dronesShown}
       fitting={fitting}
       moduleResults={moduleResults}
+      whatToTrain={
+        <FittingWhatToTrainPanel evaluator={workspace.skillGains} characterId={activeCharacterId} />
+      }
       implants={
         <>
           <ImplantBasisControl

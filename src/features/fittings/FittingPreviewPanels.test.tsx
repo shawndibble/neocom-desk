@@ -40,7 +40,14 @@ function statsWith(overrides: Partial<FittingStats>): FittingStats {
     hull: layer(2000),
     navigation: { maxVelocity: 1118, agility: 0.5, mass: 1, warpSpeed: 3 },
     targeting: { maxTargetRange: 1, maxLockedTargets: 1, scanResolution: 1, signatureRadius: 212 },
-    offense: { weapons: [], dps: 0, volley: 0, overheated: null, chargelessWeaponCount: 0 },
+    offense: {
+      weapons: [],
+      dps: 0,
+      sustainedDps: 0,
+      volley: 0,
+      overheated: null,
+      chargelessWeaponCount: 0,
+    },
     ...overrides,
   } as unknown as FittingStats;
 }
@@ -59,14 +66,24 @@ describe('OffensePanel', () => {
                 isDrone: false,
                 count: 6,
                 dps: 386,
+                sustainedDps: 386,
                 volley: 2000,
                 overheated: null,
               },
-              { typeId: 3, isDrone: true, count: 5, dps: 96, volley: 300, overheated: null },
+              {
+                typeId: 3,
+                isDrone: true,
+                count: 5,
+                dps: 96,
+                sustainedDps: 96,
+                volley: 300,
+                overheated: null,
+              },
             ],
             dps: 482,
+            sustainedDps: 450,
             volley: 2300,
-            overheated: { dps: 551, volley: 2600 },
+            overheated: { dps: 551, sustainedDps: 551, volley: 2600 },
             chargelessWeaponCount: 0,
           },
         })}
@@ -76,6 +93,7 @@ describe('OffensePanel', () => {
     expect(screen.getByText('Turrets & launchers').nextElementSibling).toHaveTextContent('386');
     expect(screen.getByText('Drones').nextElementSibling).toHaveTextContent('96');
     expect(screen.getByText('Overheated').nextElementSibling).toHaveTextContent('551');
+    expect(screen.getByText('Sustained DPS').nextElementSibling).toHaveTextContent('450');
     const row = screen.getByText('Heavy Missile Launcher II ×6').closest('tr') as HTMLElement;
     expect(within(row).getByText('Scourge Fury')).toBeInTheDocument();
     const drone = screen.getByText('Hammerhead II ×5').closest('tr') as HTMLElement;
