@@ -500,6 +500,131 @@ describe('extractOffense', () => {
     expect(offense.chargelessWeaponCount).toBe(0);
   });
 
+  /**
+   * A loaded weapon's firing and magazine, as the pinned engine reports it: a
+   * launcher carries only a rate of fire (no `cycleTime`), and a laser has no
+   * `chargeRate` at all — both read off a live run, 2026-09-29.
+   */
+  function magazineWeapon(
+    dps: number,
+    magazine: { rateOfFire: number; chargeAmount?: number; chargeRate?: number; reload: number },
+    state: 'active' | 'overload' = 'active'
+  ) {
+    const attributes = new Map<number, { value: number }>([
+      [ITEM_DOGMA_ATTRIBUTE.damagePerSecond, { value: dps }],
+      [ITEM_DOGMA_ATTRIBUTE.damageVolley, { value: (dps * magazine.rateOfFire) / 1000 }],
+      [ITEM_DOGMA_ATTRIBUTE.rateOfFire, { value: magazine.rateOfFire }],
+      [ITEM_DOGMA_ATTRIBUTE.reloadTime, { value: magazine.reload }],
+    ]);
+    if (magazine.chargeAmount !== undefined) {
+      attributes.set(ITEM_DOGMA_ATTRIBUTE.chargeAmount, { value: magazine.chargeAmount });
+    }
+    if (magazine.chargeRate !== undefined) {
+      attributes.set(ITEM_DOGMA_ATTRIBUTE.chargeRate, { value: magazine.chargeRate });
+    }
+    return { attributes, state, max_state: 'overload' as const };
+  }
+
+  const LAUNCHER: OffenseItem = { typeId: 2410, chargeTypeId: 209, quantity: 1, isDrone: false };
+  const LASER: OffenseItem = { typeId: 3520, chargeTypeId: 254, quantity: 1, isDrone: false };
+
+  it('averages a launcher over its reload: 40 missiles at 11.4 s, then 10 s to reload', () => {
+    const offense = extractOffense(
+      [LAUNCHER],
+      [magazineWeapon(13, { rateOfFire: 11400, chargeAmount: 40, chargeRate: 1, reload: 10000 })],
+      null
+    );
+
+    const duty = (40 * 11.4) / (40 * 11.4 + 10);
+    expect(offense.weapons[0].sustainedDps).toBeCloseTo(13 * duty, 9);
+    expect(offense.sustainedDps).toBeCloseTo(13 * duty, 9);
+    expect(offense.weapons[0].dps).toBeCloseTo(13, 9);
+  });
+
+  it('counts a magazine the engine reports a hair under whole, as it does 160 blaster rounds', () => {
+    const offense = extractOffense(
+      [BLASTER],
+      [
+        magazineWeapon(20, {
+          rateOfFire: 5000,
+          chargeAmount: 159.99999761581424,
+          chargeRate: 1,
+          reload: 5000,
+        }),
+      ],
+      null
+    );
+
+    expect(offense.weapons[0].sustainedDps).toBeCloseTo(20 * (800 / 805), 9);
+  });
+
+  it('keeps sustained at raw DPS for a laser, which has no charges per cycle to run out of', () => {
+    const offense = extractOffense(
+      [LASER],
+      [magazineWeapon(17, { rateOfFire: 4987.5, chargeAmount: 1, reload: 0.01 })],
+      null
+    );
+
+    expect(offense.weapons[0].sustainedDps).toBe(17);
+    expect(offense.sustainedDps).toBe(17);
+  });
+
+  it('keeps sustained at raw DPS for drones, fighters, no reload and a magazine under one cycle', () => {
+    const offense = extractOffense(
+      [
+        WARRIOR,
+        { typeId: 23055, quantity: 3, isDrone: true, isFighter: true },
+        { ...LAUNCHER, typeId: 1 },
+        { ...LAUNCHER, typeId: 2 },
+      ],
+      [
+        magazineWeapon(24, { rateOfFire: 4000, chargeAmount: 1, chargeRate: 1, reload: 10000 }),
+        magazineWeapon(300, { rateOfFire: 4000, chargeAmount: 1, chargeRate: 1, reload: 10000 }),
+        magazineWeapon(10, { rateOfFire: 5000, chargeAmount: 40, chargeRate: 1, reload: 0 }),
+        magazineWeapon(10, { rateOfFire: 5000, chargeAmount: 0.5, chargeRate: 1, reload: 10000 }),
+      ],
+      null
+    );
+
+    expect(offense.weapons.map((row) => row.sustainedDps)).toEqual(
+      offense.weapons.map((row) => row.dps)
+    );
+  });
+
+  it('sums a row per module, each over its own reload, never the summed row times one duty', () => {
+    const offense = extractOffense(
+      [LAUNCHER, LAUNCHER],
+      [
+        magazineWeapon(10, { rateOfFire: 10000, chargeAmount: 10, chargeRate: 1, reload: 100000 }),
+        magazineWeapon(30, { rateOfFire: 10000, chargeAmount: 40, chargeRate: 1, reload: 0 }),
+      ],
+      null
+    );
+
+    // 10 × 0.5 (100 s running, 100 s reloading) + 30 × 1 (never reloads).
+    expect(offense.weapons[0].count).toBe(2);
+    expect(offense.weapons[0].sustainedDps).toBeCloseTo(35, 9);
+    expect(offense.sustainedDps).toBeCloseTo(35, 9);
+  });
+
+  it('works out the overheated sustained figure from the faster overheated rate of fire', () => {
+    const cold = { rateOfFire: 10000, chargeAmount: 10, chargeRate: 1, reload: 50000 };
+    const offense = extractOffense(
+      [LAUNCHER, WARRIOR],
+      [magazineWeapon(10, cold), magazineWeapon(24, { rateOfFire: 4000, reload: 0 })],
+      [
+        magazineWeapon(12.5, { ...cold, rateOfFire: 8000 }, 'overload'),
+        magazineWeapon(24, { rateOfFire: 4000, reload: 0 }),
+      ]
+    );
+
+    expect(offense.weapons[0].sustainedDps).toBeCloseTo(10 * (100 / 150), 9);
+    expect(offense.weapons[0].overheated?.sustainedDps).toBeCloseTo(12.5 * (80 / 130), 9);
+    expect(offense.weapons[1].overheated).toBeNull();
+    // The five drones count at their own sustained figure in the overheated total.
+    expect(offense.overheated?.sustainedDps).toBeCloseTo(12.5 * (80 / 130) + 24 * 5, 9);
+  });
+
   it('never counts drones as chargeless, even if the row would otherwise qualify', () => {
     const offense = extractOffense(
       [{ ...WARRIOR, quantity: 0 }],
