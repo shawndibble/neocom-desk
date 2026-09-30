@@ -42,7 +42,10 @@ export function createPagesProvider({
       }
       return rankedSearch(destinations, query, {
         primary: (destination) => destination.label,
-        secondary: [(destination) => destination.breadcrumb],
+        secondary: [
+          (destination) => destination.breadcrumb,
+          (destination) => destination.keywords?.join(' ') ?? '',
+        ],
         limit: GROUP_LIMIT,
       }).map(toResult);
     },

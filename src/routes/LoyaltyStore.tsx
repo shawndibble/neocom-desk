@@ -20,7 +20,7 @@ import {
   useState,
   type ReactElement,
 } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
 import {
@@ -375,25 +375,11 @@ const OFFERS_SORT = { columnId: 'iskPerLp', direction: 'desc' } as const;
 /** The picker in the page header, sized so it wraps onto its own line on a phone. */
 const PICKER_CLASS = 'w-72 max-w-full';
 
-function BackToWallet() {
-  const { t } = useTranslation();
-  // `self-start`, unlike `SkillPlanEditor`'s otherwise identical link: this
-  // one's parent is a `flex flex-col`, whose default `align-items: stretch`
-  // would blow the control's intrinsic width out to the full page — a
-  // full-width bordered bar above the header.
-  return (
-    <Link to="/wallet" className={buttonClassName({ size: 'sm', className: 'self-start' })}>
-      {t('loyaltyStore.back')}
-    </Link>
-  );
-}
-
 /** `/wallet/loyalty` with no corporation chosen yet: just the picker. */
 function LoyaltyStoreLanding() {
   const { t } = useTranslation();
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3">
-      <BackToWallet />
       <PageHeader
         title={t('loyaltyStore.title')}
         actions={<LpStorePicker corporationName={null} className={PICKER_CLASS} />}
@@ -707,8 +693,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   return (
     <ItemActionsProvider page={itemActions}>
       <div className="mx-auto flex max-w-6xl flex-col gap-3">
-        <BackToWallet />
-
         <PageHeader
           title={corpName ?? t('loyaltyStore.title')}
           meta={

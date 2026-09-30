@@ -75,6 +75,8 @@ describe('NAV_LOCK_PATHS', () => {
         // Overview's sub-views: the rail never draws them, `OverviewSubNav` does.
         '/clones',
         '/employment-history',
+        // Wallet's LP Store.
+        '/wallet/loyalty',
       ].toSorted()
     );
   });
