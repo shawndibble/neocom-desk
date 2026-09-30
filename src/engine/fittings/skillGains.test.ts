@@ -159,6 +159,51 @@ describe('gainMetrics', () => {
   });
 });
 
+describe('gainMetrics — non-combat roles', () => {
+  const miner = withStats({
+    offense: { ...baseStats.offense, dps: 0 },
+    droneDps: 0,
+    mining: { rows: [], perSecond: 2, perHour: 7200, wastePerSecond: 0, wastePct: 0 },
+    holds: { cargo: 500, fleetHangar: 0, miningHold: 10000 },
+  });
+
+  it('scores mining yield as a relative gain in m³ an hour', () => {
+    const after = withStats({
+      ...miner,
+      mining: { ...miner.mining, perSecond: 2.2, perHour: 7920 },
+    });
+    const metrics = gainMetrics(miner, after);
+    expect(metrics.miningYield).toBeCloseTo(0.1);
+    expect(metrics.overall).toBeCloseTo(0.1);
+  });
+
+  it('scores total hold space on an unarmed hull, and ignores it on an armed one', () => {
+    const roomier = withStats({
+      ...miner,
+      holds: { cargo: 600, fleetHangar: 0, miningHold: 10000 },
+    });
+    expect(gainMetrics(miner, roomier).hold).toBeCloseTo(100 / 10500);
+    const armedBefore = withStats({ holds: { cargo: 500, fleetHangar: 0, miningHold: 0 } });
+    const armedAfter = withStats({ holds: { cargo: 600, fleetHangar: 0, miningHold: 0 } });
+    expect(gainMetrics(armedBefore, armedAfter).hold).toBe(0);
+  });
+
+  it('scores remote repair handed out, and jump range', () => {
+    const logi = withStats({
+      support: { ...baseStats.support, remoteRepair: { shield: 0, armor: 100, hull: 0 } },
+    });
+    const better = withStats({
+      support: { ...baseStats.support, remoteRepair: { shield: 0, armor: 110, hull: 0 } },
+    });
+    expect(gainMetrics(logi, better).remoteRepair).toBeCloseTo(0.1);
+    const drive = { rangeLightYears: 5, fuelTypeId: 1, fuelPerLightYear: 100 };
+    const jumper = withStats({ jumpDrive: drive });
+    const farther = withStats({ jumpDrive: { ...drive, rangeLightYears: 6 } });
+    expect(gainMetrics(jumper, farther).jumpRange).toBeCloseTo(0.2);
+    expect(gainMetrics(baseStats, baseStats).jumpRange).toBe(0);
+  });
+});
+
 describe('evaluateSkillGains', () => {
   const candidates = [
     { skillTypeId: 1, fromLevel: 3, toLevel: 4 },
@@ -183,6 +228,34 @@ describe('evaluateSkillGains', () => {
     expect(gains?.map((gain) => gain.skillTypeId)).toEqual([1, 3]);
     expect(gains?.[0]?.delta.changes.map((change) => change.key)).toContain('totalDps');
     expect(gains?.[1]?.metrics.ehp).toBeCloseTo(0.1);
+  });
+
+  it('keeps a mining skill for a mining fit and lists its role change', async () => {
+    const miner = withStats({
+      offense: { ...baseStats.offense, dps: 0 },
+      mining: { rows: [], perSecond: 2, perHour: 7200, wastePerSecond: 0, wastePct: 0 },
+    });
+    const compare = async () => ({
+      before: miner,
+      after: withStats({
+        ...miner,
+        mining: { ...miner.mining, perSecond: 2.2, perHour: 7920 },
+      }),
+    });
+    const gains = await evaluateSkillGains([candidates[0]!], compare);
+    expect(gains).toHaveLength(1);
+    expect(gains?.[0]?.roleChanges).toEqual([{ key: 'miningYield', before: 7200, after: 7920 }]);
+  });
+
+  it('drops a role change that rounds away', async () => {
+    const miner = withStats({
+      mining: { rows: [], perSecond: 2, perHour: 7200, wastePerSecond: 0, wastePct: 0 },
+    });
+    const compare = async () => ({
+      before: miner,
+      after: withStats({ ...miner, mining: { ...miner.mining, perHour: 7200.2 } }),
+    });
+    expect(await evaluateSkillGains([candidates[0]!], compare)).toEqual([]);
   });
 
   it('yields between runs and stops, returning null, once cancelled', async () => {
@@ -218,6 +291,7 @@ describe('rankSkillGains', () => {
       fromLevel: 1,
       toLevel: 2,
       delta: { changes: [], count: 1 },
+      roleChanges: [],
       metrics: {
         overall: 0,
         dps: 0,
@@ -227,6 +301,10 @@ describe('rankSkillGains', () => {
         align: 0,
         capacitor: 0,
         lockRange: 0,
+        miningYield: 0,
+        hold: 0,
+        remoteRepair: 0,
+        jumpRange: 0,
         ...metrics,
       },
     };

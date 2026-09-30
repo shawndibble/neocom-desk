@@ -842,11 +842,9 @@
       "failed": "Couldn't work out which skills affect this fit.",
       "none": "No single skill level would change this fit — every skill that affects it is trained to V.",
       "rankBy": "Rank by",
-      "skill": "Skill",
-      "changes": "Whole-fitting change",
-      "time": "Training time",
+      "changes": "Changes",
+      "time": "Train",
       "withPrerequisites": "incl. prerequisites",
-      "plan": "Skill Plan",
       "addToPlan": "Add to plan",
       "addToPlanLabel": "Add to plan: {{skill}}",
       "inPlan": "In plan {{plan}}",
@@ -858,7 +856,17 @@
         "speed": "Speed",
         "align": "Align time",
         "capacitor": "Capacitor",
-        "lockRange": "Lock range"
+        "lockRange": "Lock range",
+        "miningYield": "Mining yield",
+        "hold": "Hold space",
+        "remoteRepair": "Remote repair",
+        "jumpRange": "Jump range"
+      },
+      "role": {
+        "miningYield": "Mining yield {{before}} → {{after}} m³/h",
+        "hold": "Hold space {{before}} → {{after}} m³",
+        "remoteRepair": "Remote repair {{before}} → {{after}} HP/s",
+        "jumpRange": "Jump range {{before}} → {{after}} ly"
       }
     },
     "variations": {
