@@ -15,19 +15,26 @@ describe('isCommandPaletteShortcut', () => {
     ...init,
   });
 
-  it('matches Ctrl+K and Cmd+K, whatever the case', () => {
-    expect(isCommandPaletteShortcut(press({ key: 'k', ctrlKey: true }))).toBe(true);
-    expect(isCommandPaletteShortcut(press({ key: 'k', metaKey: true }))).toBe(true);
-    expect(isCommandPaletteShortcut(press({ key: 'K', ctrlKey: true }))).toBe(true);
+  it('matches Ctrl+K off Apple platforms and Cmd+K on them, whatever the case', () => {
+    expect(isCommandPaletteShortcut(press({ key: 'k', ctrlKey: true }), false)).toBe(true);
+    expect(isCommandPaletteShortcut(press({ key: 'K', ctrlKey: true }), false)).toBe(true);
+    expect(isCommandPaletteShortcut(press({ key: 'k', metaKey: true }), true)).toBe(true);
+  });
+
+  it('leaves the other platform’s chord alone (Ctrl+K is kill-line on a Mac)', () => {
+    expect(isCommandPaletteShortcut(press({ key: 'k', ctrlKey: true }), true)).toBe(false);
+    expect(isCommandPaletteShortcut(press({ key: 'k', metaKey: true }), false)).toBe(false);
   });
 
   it('ignores a bare K and any other chord', () => {
-    expect(isCommandPaletteShortcut(press({ key: 'k' }))).toBe(false);
-    expect(isCommandPaletteShortcut(press({ key: 'k', ctrlKey: true, altKey: true }))).toBe(false);
-    expect(isCommandPaletteShortcut(press({ key: 'k', ctrlKey: true, shiftKey: true }))).toBe(
+    expect(isCommandPaletteShortcut(press({ key: 'k' }), false)).toBe(false);
+    expect(isCommandPaletteShortcut(press({ key: 'k', ctrlKey: true, altKey: true }), false)).toBe(
       false
     );
-    expect(isCommandPaletteShortcut(press({ key: 'j', ctrlKey: true }))).toBe(false);
+    expect(
+      isCommandPaletteShortcut(press({ key: 'k', ctrlKey: true, shiftKey: true }), false)
+    ).toBe(false);
+    expect(isCommandPaletteShortcut(press({ key: 'j', ctrlKey: true }), false)).toBe(false);
   });
 });
 

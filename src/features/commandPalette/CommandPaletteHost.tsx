@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
+import { controlHeightClassName } from '@/components/ui/controlStyles';
 import {
   commandPaletteDisplayKey,
   isApplePlatform,
@@ -9,6 +10,9 @@ import {
 } from '@/lib/shortcuts';
 import { CommandPalette } from './CommandPalette';
 import { useCommandPalette } from './store';
+
+const APPLE = isApplePlatform();
+const SHORTCUT_LABEL = commandPaletteDisplayKey(APPLE);
 
 /**
  * The Ctrl+K / Cmd+K listener and the palette itself, mounted once from
@@ -30,9 +34,13 @@ export function CommandPaletteHost() {
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (!isCommandPaletteShortcut(event)) return;
+      if (!isCommandPaletteShortcut(event, APPLE)) return;
       event.preventDefault();
-      useCommandPalette.getState().toggle();
+      const { open, toggle } = useCommandPalette.getState();
+      // Not over another dialog: two stacked modals would leave Escape
+      // closing the palette back onto a dialog the pilot had forgotten.
+      if (!open && document.querySelector('dialog[open]')) return;
+      toggle();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
@@ -43,8 +51,6 @@ export function CommandPaletteHost() {
 
   return open ? <CommandPalette onClose={hide} /> : null;
 }
-
-const SHORTCUT_LABEL = commandPaletteDisplayKey(isApplePlatform());
 
 interface CommandPaletteTriggerProps {
   /** `rail`: the desktop rail's search row. `bar`: the phone's full-width row atop the page. */
@@ -65,10 +71,11 @@ export function CommandPaletteTrigger({ presentation, className }: CommandPalett
       type="button"
       onClick={show}
       aria-haspopup="dialog"
-      aria-keyshortcuts="Control+K Meta+K"
+      aria-keyshortcuts={APPLE ? 'Meta+K' : 'Control+K'}
       className={cx(
         'flex w-full items-center gap-2 rounded-xs border border-line bg-bg/60 text-left text-text-dim transition-colors hover:border-accent/60 hover:text-text',
-        rail ? 'h-8 px-2 text-xs' : 'min-h-11 px-3 text-sm',
+        controlHeightClassName[rail ? 'sm' : 'md'],
+        rail ? 'px-2 text-xs' : 'px-3 text-sm',
         className
       )}
     >
@@ -79,7 +86,7 @@ export function CommandPaletteTrigger({ presentation, className }: CommandPalett
       {rail && (
         <kbd
           aria-hidden="true"
-          className="shrink-0 rounded-xs border border-line bg-panel-2 px-1 font-mono text-[0.625rem] text-text-faint"
+          className="shrink-0 rounded-xs border border-line bg-panel-2 px-1 font-mono text-[0.6875rem] text-text-faint"
         >
           {SHORTCUT_LABEL}
         </kbd>

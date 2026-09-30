@@ -203,7 +203,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
                           onMouseDown={(event) => event.preventDefault()}
                           onClick={() => activate(result)}
                           className={cx(
-                            'flex min-h-9 cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-sm',
+                            'flex min-h-11 cursor-pointer md:min-h-9 items-center gap-2 rounded-xs px-2 py-1.5 text-sm',
                             highlighted ? 'bg-panel-2 text-text' : 'text-text-dim hover:bg-panel-2'
                           )}
                         >

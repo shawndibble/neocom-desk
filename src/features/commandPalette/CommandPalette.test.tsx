@@ -71,15 +71,26 @@ describe('CommandPalette', () => {
     expect(pageSearch).toHaveFocus();
   });
 
-  it('opens on Cmd+K and from the visible trigger', async () => {
+  it('opens from the visible trigger', async () => {
     const user = userEvent.setup();
     renderShell();
-    await user.keyboard('{Meta>}k{/Meta}');
-    expect(await screen.findByRole('combobox')).toBeInTheDocument();
-    await user.keyboard('{Escape}');
-
     await user.click(screen.getByRole('button', { name: /Search/ }));
     expect(await screen.findByRole('combobox')).toBeInTheDocument();
+  });
+
+  it('does not stack over another open dialog', async () => {
+    const user = userEvent.setup();
+    renderShell();
+    const other = document.createElement('dialog');
+    document.body.append(other);
+    other.showModal();
+    try {
+      await user.keyboard('{Control>}k{/Control}');
+      expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    } finally {
+      other.close();
+      other.remove();
+    }
   });
 
   it('lists pages on an empty query as a quick navigator', async () => {

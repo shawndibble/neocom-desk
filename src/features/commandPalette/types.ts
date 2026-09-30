@@ -34,7 +34,7 @@ export interface PaletteProvider {
   search(
     query: string,
     signal: AbortSignal
-  ): readonly PaletteResult[] | Promise<readonly PaletteResult[]>;
+  ): readonly PaletteResult[] | PromiseLike<readonly PaletteResult[]>;
 }
 
 /** Rows per group once the pilot is searching. */

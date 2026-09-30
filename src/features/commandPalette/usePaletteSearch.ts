@@ -12,7 +12,7 @@ interface SearchRun {
   readonly controller: AbortController;
   readonly entries: readonly {
     readonly provider: PaletteProvider;
-    readonly answer: readonly PaletteResult[] | Promise<readonly PaletteResult[]>;
+    readonly answer: readonly PaletteResult[] | PromiseLike<readonly PaletteResult[]>;
   }[];
 }
 
@@ -22,6 +22,13 @@ interface Settled {
 }
 
 const NOTHING_SETTLED: Settled = { run: null, results: new Map() };
+
+type Answer = SearchRun['entries'][number]['answer'];
+
+/** Any thenable, not just a native Promise — a provider may hand back its client's own. */
+function isPending(answer: Answer): answer is PromiseLike<readonly PaletteResult[]> {
+  return typeof (answer as PromiseLike<unknown>).then === 'function';
+}
 
 /**
  * Runs every provider for `query` and returns the groups to render, in their
@@ -36,6 +43,11 @@ const NOTHING_SETTLED: Settled = { run: null, results: new Map() };
  * the input is the caller's own state and re-renders on every keystroke.
  *
  * `providers` must be memoised by the caller — a new array is a new search.
+ *
+ * Known dev-only cost: StrictMode runs the memo twice, so an async provider
+ * sees a second, discarded call whose signal never aborts. Its answer can
+ * never land (only the kept run's settlements are read), so the cost is one
+ * extra request in development, not wrong results.
  */
 export function usePaletteSearch(
   providers: readonly PaletteProvider[],
@@ -71,7 +83,7 @@ export function usePaletteSearch(
       }));
     };
     for (const { provider, answer } of run.entries) {
-      if (!(answer instanceof Promise)) continue;
+      if (!isPending(answer)) continue;
       answer.then(
         (results) => land(provider.id, results),
         // A failed search hides its group rather than taking the palette down.
@@ -87,7 +99,7 @@ export function usePaletteSearch(
 
   const groups: PaletteGroup[] = [];
   for (const { provider, answer } of run.entries) {
-    if (!(answer instanceof Promise)) {
+    if (!isPending(answer)) {
       if (answer.length > 0) groups.push({ provider, status: 'ready', results: answer });
       continue;
     }

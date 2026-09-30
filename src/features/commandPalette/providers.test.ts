@@ -13,8 +13,8 @@ const signal = new AbortController().signal;
 /** Every provider here is synchronous; the async contract is `usePaletteSearch`'s test. */
 function searchSync(provider: PaletteProvider, query: string): readonly PaletteResult[] {
   const answer = provider.search(query, signal);
-  if (answer instanceof Promise) throw new Error(`${provider.id} answered asynchronously`);
-  return answer;
+  if (!Array.isArray(answer)) throw new Error(`${provider.id} answered asynchronously`);
+  return answer as readonly PaletteResult[];
 }
 
 function destination(overrides: Partial<NavDestination> & { path: string }): NavDestination {

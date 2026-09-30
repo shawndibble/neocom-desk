@@ -63,8 +63,11 @@ export const OVERLAY_SELECTOR = `dialog[open], [role="menu"], [role="listbox"], 
  */
 export type ChordEvent = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>;
 
-export function isCommandPaletteShortcut(event: ChordEvent): boolean {
-  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return false;
+export function isCommandPaletteShortcut(event: ChordEvent, apple: boolean): boolean {
+  // One modifier per platform: Ctrl+K on a Mac is the text fields' kill-line
+  // (Emacs keys), and Win+K elsewhere is the OS's own Cast panel.
+  const modifier = apple ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+  if (!modifier || event.altKey || event.shiftKey) return false;
   return event.key.toLowerCase() === 'k';
 }
 
@@ -72,9 +75,6 @@ export function isCommandPaletteShortcut(event: ChordEvent): boolean {
 export function commandPaletteDisplayKey(apple: boolean): string {
   return apple ? '⌘K' : 'Ctrl K';
 }
-
-/** The Settings › Shortcuts row's description. */
-export const COMMAND_PALETTE_DESCRIPTION_KEY = 'shortcuts.openCommandPalette';
 
 /** macOS, iOS and iPadOS, where the chord is Cmd rather than Ctrl. */
 export function isApplePlatform(): boolean {
