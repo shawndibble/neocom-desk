@@ -18,6 +18,7 @@ export type FittingStatKey =
   | 'calibrationTotal'
   | 'totalDps'
   | 'totalVolley'
+  | 'sustainedDps'
   | 'overheatedDps'
   | 'droneDps'
   | 'droneBandwidthUsed'
@@ -85,6 +86,7 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
   { key: 'calibrationTotal', digits: 0, value: (s) => s.calibrationTotal },
   { key: 'totalDps', digits: 1, value: (s) => s.offense.dps },
   { key: 'totalVolley', digits: 0, value: (s) => s.offense.volley },
+  { key: 'sustainedDps', digits: 1, value: (s) => s.offense.sustainedDps },
   // Nothing to overheat reads as its plain DPS, so every column has a figure.
   {
     key: 'overheatedDps',

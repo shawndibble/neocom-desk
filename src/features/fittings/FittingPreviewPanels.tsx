@@ -124,6 +124,14 @@ export function OffensePanel({
   const items = [
     { label: t('fittings.start.preview.totalDps'), value: formatCompactNumber(offense.dps) },
     { label: t('fittings.start.preview.volley'), value: formatCompactNumber(offense.volley) },
+    ...(offense.sustainedDps.toFixed(1) !== offense.dps.toFixed(1)
+      ? [
+          {
+            label: t('fittings.start.preview.sustainedDps'),
+            value: formatCompactNumber(offense.sustainedDps),
+          },
+        ]
+      : []),
     { label: t('fittings.start.preview.weaponsDps'), value: formatCompactNumber(guns) },
     { label: t('fittings.start.preview.dronesDps'), value: formatCompactNumber(drones) },
     ...(offense.overheated

@@ -6,21 +6,25 @@ import { unheatedIfChanged } from '@/engine/fittings/stats';
  * One figure as `format` shows it. Under "Overheat all" it reads in the
  * warning tone — the game's own mark for heat — only when heat changed it as
  * shown, with the unheated figure on hover; a figure heat leaves as it is
- * (a hold, the mass, a fitting budget) stays in the normal tone.
+ * (a hold, the mass, a fitting budget) stays in the normal tone. `note`
+ * joins the unheated figure on hover, since this title hides any the caller
+ * set around it.
  */
 export function HeatFigure<S extends { unheated: S | null }>({
   stats,
   format,
+  note,
 }: {
   stats: S;
   format: (stats: S) => string;
+  note?: string;
 }) {
   const { t } = useTranslation();
   const unheated = unheatedIfChanged(stats, format);
   if (unheated === null) return <>{format(stats)}</>;
   const was = t('fittings.stats.unheated', { value: unheated });
   return (
-    <span className="text-warning" title={was}>
+    <span className="text-warning" title={note ? `${was} · ${note}` : was}>
       {format(stats)}
       <span className="sr-only"> ({was})</span>
     </span>
