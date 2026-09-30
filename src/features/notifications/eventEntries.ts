@@ -33,6 +33,7 @@
 import {
   SKILL_QUEUE_NOTIFICATION_DIFFS,
   diffSpExtractionReady,
+  diffCloneJumpReady,
   diffIndustryJobComplete,
   diffPlanetaryExtractionDone,
   diffPlanetaryExtractorExpiring,
@@ -55,6 +56,7 @@ import {
   diffPriceAlertTriggered,
   type NotificationFire,
   type SpExtractionFire,
+  type CloneJumpReadyFire,
   type IndustryJobNotificationFire,
   type PlanetaryNotificationFire,
   type ExtractorExpiringFire,
@@ -74,6 +76,7 @@ import {
   type PriceAlertTriggeredFire,
   type SkillQueueSnapshot,
   type SpExtractionSnapshot,
+  type CloneJumpSnapshot,
   type IndustryJobSnapshot,
   type PlanetarySnapshot,
   type MailSnapshot,
@@ -95,6 +98,7 @@ import {
   skillQueueCopy,
   spExtractionCopy,
   industryJobCopy,
+  cloneJumpCopy,
   colonyCopy,
   mailCopy,
   calendarCopy,
@@ -124,6 +128,7 @@ import { THRESHOLD_FIELDS, type ThresholdField } from './eventThresholds';
 export type AnyNotificationFire =
   | NotificationFire
   | SpExtractionFire
+  | CloneJumpReadyFire
   | IndustryJobNotificationFire
   | PlanetaryNotificationFire
   | MailNotificationFire
@@ -165,6 +170,7 @@ function source<TSnapshot, TNames = NoNames>(id: string): SnapshotSource<TSnapsh
 export const SNAPSHOT_SOURCES = {
   skillQueue: source<SkillQueueSnapshot, SkillNames>('skillQueue'),
   spExtraction: source<SpExtractionSnapshot>('spExtraction'),
+  cloneJump: source<CloneJumpSnapshot>('cloneJump'),
   industryJobs: source<IndustryJobSnapshot, ItemNames>('industryJobs'),
   colonies: source<PlanetarySnapshot, PlanetNames>('colonies'),
   mail: source<MailSnapshot>('mail'),
@@ -313,6 +319,19 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     diff: diffIndustryJobComplete,
     copy: industryJobCopy,
     projection: { push: industryJobCopy.push, everyOccurrence: true },
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  // The ready time uses the effective Infomorph Synchronizing level; when
+  // skills can't be loaded it falls back to level 0 (a 24h cooldown), so the
+  // alert can arrive late but never early. The Occurrence Key is the jump
+  // itself, not the ready time, so two devices that read different levels
+  // still agree on one occurrence.
+  cloneJumpReady: defineEvent({
+    source: SNAPSHOT_SOURCES.cloneJump,
+    diff: diffCloneJumpReady,
+    copy: cloneJumpCopy,
+    projection: { push: cloneJumpCopy.push, everyOccurrence: true },
     thresholds: null,
     rowHintKey: null,
   }),

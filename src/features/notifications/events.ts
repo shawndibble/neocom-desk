@@ -110,6 +110,12 @@ const CATALOG = [
     scope: requiredScope('getCharacterIndustryJobs'),
   },
   {
+    id: 'cloneJumpReady',
+    labelKey: 'settings.notifications.event.cloneJumpReady',
+    defaultChannels: 'both',
+    scope: requiredScope('getCharacterClones'),
+  },
+  {
     id: 'newMail',
     labelKey: 'settings.notifications.event.newMail',
     defaultChannels: 'both',

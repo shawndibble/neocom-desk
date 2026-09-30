@@ -1014,6 +1014,7 @@ describe('Settings — Notifications (issue #170)', () => {
       rowFor('Planetary Extractor Expiring').getByRole('img', { name: badgeName })
     ).toBeInTheDocument();
     expect(rowFor('Structure Fuel Low').getByRole('img', { name: badgeName })).toBeInTheDocument();
+    expect(rowFor('Clone Jump Ready').getByRole('img', { name: badgeName })).toBeInTheDocument();
 
     // Poll-only: nothing knows when these happen until they have happened.
     expect(rowFor('New Mail').queryByRole('img', { name: badgeName })).toBeNull();

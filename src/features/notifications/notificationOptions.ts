@@ -44,6 +44,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // column and its threshold live.
   spExtractionReady: '/characters',
   industryJobComplete: '/industry',
+  cloneJumpReady: '/clones',
   planetaryExtractionDone: '/planetary-industry',
   planetaryExtractorExpiring: '/planetary-industry',
   newMail: '/mail',
