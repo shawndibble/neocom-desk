@@ -155,6 +155,39 @@ describe('LpStorePicker', () => {
     await waitFor(() => expect(screen.queryByText('12,500 LP')).not.toBeInTheDocument());
   });
 
+  it('keeps the same corp highlighted when the balances land and re-pin the list', async () => {
+    let resolveBalances: (value: unknown) => void = () => {};
+    loadCharacterLoyaltyPoints.mockReturnValue(
+      new Promise((resolve) => {
+        resolveBalances = resolve;
+      })
+    );
+    const user = userEvent.setup();
+    renderPicker();
+    await user.click(screen.getByRole('combobox'));
+    await screen.findAllByRole('option');
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('option', { name: 'CONCORD' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    await act(async () => {
+      resolveBalances({
+        cached: {
+          data: [{ corporation_id: 1000130, loyalty_points: 12_500 }],
+          fetchedAt: new Date(),
+          fromCache: false,
+        },
+        needsReauth: false,
+      });
+    });
+    expect(screen.getAllByRole('option')[0]).toHaveTextContent('Sisters of EVE');
+    expect(screen.getByRole('option', { name: 'CONCORD' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+  });
+
   it('opens a store on click', async () => {
     const user = userEvent.setup();
     renderPicker();

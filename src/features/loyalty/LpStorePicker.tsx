@@ -46,7 +46,9 @@ export function LpStorePicker({ corporationName, className }: LpStorePickerProps
   // a typed fragment (BuildLocationPicker's idiom).
   const [query, setQuery] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
+  // Held by corporation, not list position: the balances landing re-pins
+  // the list, and an index would silently jump to a different corp.
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,12 +93,23 @@ export function LpStorePicker({ corporationName, className }: LpStorePickerProps
   const listOpen = open && options.length > 0;
   const trimmed = query?.trim() ?? '';
   const noMatches = open && trimmed !== '' && corporations.length > 0 && options.length === 0;
-  const highlighted =
-    listOpen && highlightedIndex !== null ? (options[highlightedIndex] ?? null) : null;
+  const highlightedIndex = listOpen
+    ? options.findIndex((option) => option.corporationId === highlightedId)
+    : -1;
+  const highlighted = highlightedIndex >= 0 ? options[highlightedIndex] : null;
+
+  // Keyboard moves through ~180 stores in a scrolling list: keep the
+  // highlighted one in view (`aria-activedescendant` alone doesn't scroll).
+  useEffect(() => {
+    if (highlighted === null) return;
+    document.getElementById(optionId(highlighted.corporationId))?.scrollIntoView?.({
+      block: 'nearest',
+    });
+  }, [highlighted]);
 
   function close() {
     setOpen(false);
-    setHighlightedIndex(null);
+    setHighlightedId(null);
   }
 
   function pick(option: LpStorePickerOption) {
@@ -114,9 +127,14 @@ export function LpStorePicker({ corporationName, className }: LpStorePickerProps
         if (!listOpen && (e.key === 'Home' || e.key === 'End')) return;
         e.preventDefault();
         setOpen(true);
-        setHighlightedIndex((current) =>
-          moveHighlight(e.key as ComboboxNavKey, current, options.length)
-        );
+        {
+          const next = moveHighlight(
+            e.key as ComboboxNavKey,
+            highlightedIndex >= 0 ? highlightedIndex : null,
+            options.length
+          );
+          setHighlightedId(next === null ? null : options[next].corporationId);
+        }
         break;
       case 'Enter': {
         // With nothing highlighted, a typed name opens its best match — the
@@ -155,7 +173,7 @@ export function LpStorePicker({ corporationName, className }: LpStorePickerProps
         onChange={(e) => {
           setQuery(e.target.value);
           setOpen(true);
-          setHighlightedIndex(null);
+          setHighlightedId(null);
         }}
         onFocus={(e) => {
           e.currentTarget.select();
@@ -193,15 +211,17 @@ export function LpStorePicker({ corporationName, className }: LpStorePickerProps
           aria-label={t('loyaltyStore.pickerLabel')}
           className="absolute top-full right-0 left-0 z-20 mt-1 max-h-72 overflow-y-auto rounded-xs border border-line bg-panel shadow-lg shadow-black/50"
         >
-          {options.map((option, index) => (
+          {options.map((option) => (
             <li
               key={option.corporationId}
               id={optionId(option.corporationId)}
               role="option"
-              aria-selected={index === highlightedIndex}
+              aria-selected={option.corporationId === highlighted?.corporationId}
               className={cx(
                 'flex cursor-pointer items-center justify-between gap-3 border-b border-line px-2 py-1.5 last:border-b-0',
-                index === highlightedIndex ? 'bg-panel-2' : 'hover:bg-panel-2'
+                option.corporationId === highlighted?.corporationId
+                  ? 'bg-panel-2'
+                  : 'hover:bg-panel-2'
               )}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => pick(option)}
