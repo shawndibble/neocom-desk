@@ -13,6 +13,10 @@ import {
 import { SettingsBackLink, SettingsIndex, SettingsNav } from '@/features/settings/SettingsNav';
 import { DevicePanel } from '@/features/settings/DevicePanel';
 import { UpdatePanel } from '@/features/settings/UpdatePanel';
+import { TravelSettingsPanel } from '@/features/settings/TravelSettingsPanel';
+import { useDefaultRoutePreference } from '@/features/route/routeRules';
+import { ROUTE_PREFERENCE_LABEL_KEYS } from '@/features/route/routePreferences';
+import { useAvoidedSystems } from '@/features/route/avoidedSystems';
 import {
   Button,
   DataTable,
@@ -1236,6 +1240,11 @@ function usePhoneSummaries(): Partial<Record<SettingsSectionId, string>> {
   const hub = useMarketHub((state) => state.value);
   const characterFilter = useDefaultCharacterFilter((state) => state.value);
   const darkAfterDays = useDarkThreshold((state) => state.value);
+  const avoidedCount = useAvoidedSystems((state) => state.value.length);
+  // Only the Travel panel hydrates this otherwise, and the phone list does not mount it.
+  useHydratedStore(useAvoidedSystems);
+  const routePreference = useDefaultRoutePreference((state) => state.value);
+  useHydratedStore(useDefaultRoutePreference);
 
   return {
     display: t('settings.summary.display', {
@@ -1256,6 +1265,10 @@ function usePhoneSummaries(): Partial<Record<SettingsSectionId, string>> {
           ? t('settings.summary.charactersAll')
           : t('settings.summary.charactersSome', { count: characterFilter.length }),
     corporation: t('settings.summary.corporation', { count: darkAfterDays }),
+    travel: t('settings.summary.travel', {
+      preference: t(ROUTE_PREFERENCE_LABEL_KEYS[routePreference]),
+      count: avoidedCount,
+    }),
   };
 }
 
@@ -1429,6 +1442,7 @@ export function Settings() {
           {section === 'miningTax' && <MiningTaxDefaultsPanel />}
           {section === 'characters' && <CharacterDefaultsPanel />}
           {section === 'corporation' && <CorpDefaultsPanel />}
+          {section === 'travel' && <TravelSettingsPanel />}
           {/* The Overview feed's "Settings" link targets `/settings/notifications` directly. */}
           {section === 'notifications' && <NotificationsPanel />}
           {section === 'dataAge' && (

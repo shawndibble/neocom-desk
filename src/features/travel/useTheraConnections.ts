@@ -4,13 +4,13 @@
  * origin — never a route request per row.
  */
 import { useEffect, useMemo, useState } from 'react';
-import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import {
   buildTheraConnectionRows,
   type ConnectionDistances,
   type TheraConnectionRow,
 } from '@/engine/route/theraConnections';
 import { localJumpDistances } from '@/features/route/localRoute';
+import type { RouteQuery } from '@/features/route/routeRules';
 import {
   EVE_SCOUT_CACHE_MS,
   loadTheraConnections,
@@ -39,7 +39,7 @@ const NO_SYSTEMS: ReadonlyMap<number, { security: number }> = new Map();
 
 export function useTheraConnections(
   originId: number | null,
-  preference: RoutePreferenceKind
+  route: RouteQuery
 ): TheraConnectionsState {
   const now = useTicker(TICK_MS);
   // Asks again once per cache window; inside it the answer is a memory read.
@@ -50,7 +50,8 @@ export function useTheraConnections(
     key: string;
     value: ConnectionDistances;
   } | null>(null);
-  const distanceKey = `${originId}:${preference}`;
+  const { rules, key: routeKey, hydrated } = route;
+  const distanceKey = `${originId}:${routeKey}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -75,15 +76,15 @@ export function useTheraConnections(
   }, []);
 
   useEffect(() => {
-    if (originId === null) return;
+    if (originId === null || !hydrated) return;
     let cancelled = false;
-    void localJumpDistances(originId, preference).then((next) => {
+    void localJumpDistances(originId, rules).then((next) => {
       if (!cancelled) setDistances({ key: distanceKey, value: next });
     });
     return () => {
       cancelled = true;
     };
-  }, [originId, preference, distanceKey]);
+  }, [originId, hydrated, rules, distanceKey]);
 
   return useMemo((): TheraConnectionsState => {
     if (result === null || systems === null) return { kind: 'loading' };

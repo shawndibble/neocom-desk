@@ -33,6 +33,12 @@ const DAY_MS = 24 * 60 * 60_000;
 
 /** Rows `STALE_AFTER.static` (24 h) would already refetch: 30x that. */
 export const STATIC_RETENTION_MS = 30 * DAY_MS;
+/**
+ * A route asked around an avoid list (`features/route/esiRoute.ts`). Keyed by
+ * that list, and pod-kill avoidance changes it hourly, so most rows are never
+ * read twice: two days, not thirty.
+ */
+export const AVOID_ROUTE_RETENTION_MS = 2 * DAY_MS;
 /** Market rows, stale after 5-15 minutes: a week is still generous. */
 export const MARKET_RETENTION_MS = 7 * DAY_MS;
 /** A run at most this often. */
@@ -101,7 +107,14 @@ export const PRUNE_RULES: readonly PruneRule[] = [
   // never rewrites it, so a pruned name could not come back.
   // `contract-location:`/`bpc-blueprint-location:v2:` re-resolve through it.
   { pattern: /^structure:\d+:(?:forbidden|roster-forbidden)$/, maxAgeMs: STATIC_RETENTION_MS },
-  { pattern: /^route:\d+:\d+:[a-z]+$/, maxAgeMs: STATIC_RETENTION_MS },
+  // Keyed by the Travel rules (`features/route/esiRoute.ts`'s `rulesCacheKey`):
+  // preference, then the penalty, then the avoid list's size and hash. The
+  // older `route:<o>:<d>:shortest|safest` rows still match the second.
+  {
+    pattern: /^route:\d+:\d+:[a-z-]+(?::p\d+)?:a\d+:[0-9a-z]+$/,
+    maxAgeMs: AVOID_ROUTE_RETENTION_MS,
+  },
+  { pattern: /^route:\d+:\d+:[a-z-]+(?::p\d+)?$/, maxAgeMs: STATIC_RETENTION_MS },
   {
     pattern: /^mail:(\d+)$/,
     maxAgeMs: STATIC_RETENTION_MS,

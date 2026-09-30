@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
+import { AVOIDED_SYSTEMS_KEY, useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_KEY, DEFAULT_FONT_SCALE } from '@/lib/fontScale';
 import { useActivityLog } from '@/stores/activityLog';
@@ -139,6 +140,7 @@ beforeEach(async () => {
   // Module-scope singletons: a value left over from a previous test would
   // make the assertions below pass or fail for the wrong reason.
   useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: false });
+  useAvoidedSystems.setState({ value: [], hydrated: false });
   useCalendarWeekStart.setState({ value: DEFAULT_CALENDAR_WEEK_START, hydrated: false });
   useMarketHub.setState({ value: 'jita', hydrated: false });
   useAssumedMe.setState({ value: 0, hydrated: false });
@@ -1825,6 +1827,7 @@ describe('Settings — sections rail', () => {
       'Moon Mining Tax',
       'Characters',
       // Corporation is absent: this character has no corp access.
+      'Travel',
       'Notifications',
       'Data & storage',
       'Activity Log',
@@ -1899,7 +1902,7 @@ describe('Settings — phone list', () => {
     }
     // Corporation is absent: this character has no corp access.
     expect(within(nav).queryByRole('link', { name: /corporation/i })).not.toBeInTheDocument();
-    expect(within(nav).getAllByRole('link')).toHaveLength(12);
+    expect(within(nav).getAllByRole('link')).toHaveLength(13);
     expect(within(nav).getByRole('link', { name: /^display/i })).toHaveTextContent(
       /default text, my local time/i
     );
@@ -1909,9 +1912,26 @@ describe('Settings — phone list', () => {
     expect(within(nav).getByRole('link', { name: /^characters/i })).toHaveTextContent(
       /current character/i
     );
+    expect(within(nav).getByRole('link', { name: /^travel/i })).toHaveTextContent(
+      /0 avoided systems/i
+    );
     expect(within(nav).getByRole('link', { name: /^faq$/i })).toBeInTheDocument();
     // Log out lives in Data & storage, not as a row of its own.
     expect(screen.queryByText(/log out/i)).not.toBeInTheDocument();
+  });
+
+  it('counts the stored Avoided Systems on the Travel row', async () => {
+    await db.settings.put({ key: AVOIDED_SYSTEMS_KEY, value: [30045328, 30002813] });
+    window.history.pushState({}, '', '/settings');
+    stubViewport(false);
+    render(<App />);
+
+    const nav = await screen.findByRole('navigation', { name: /settings sections/i });
+    await waitFor(() =>
+      expect(within(nav).getByRole('link', { name: /^travel/i })).toHaveTextContent(
+        /2 avoided systems/i
+      )
+    );
   });
 
   it('opens a section from its row, and the back link returns to the list', async () => {

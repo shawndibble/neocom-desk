@@ -221,23 +221,26 @@ describe('loadRegionCompetition', () => {
 const SYS_A = 30000142;
 const SYS_B = 30002187;
 
+/** Shortest, nothing avoided. */
+const SHORTEST = { preference: 'shortest' as const, securityPenalty: 50, avoid: [] };
+
 describe('loadJumpsBetween', () => {
   it('is 0 jumps with no ESI call for the same origin and destination', async () => {
-    const result = await loadJumpsBetween(SYS_A, SYS_A);
+    const result = await loadJumpsBetween(SYS_A, SYS_A, SHORTEST);
     expect(result).toEqual({ kind: 'known', jumps: 0 });
   });
 
   it('memoizes per ordered pair: only one ESI call for a repeated pair', async () => {
     let hits = 0;
     server.use(
-      http.get(`${ESI_BASE_URL}/latest/route/${SYS_A}/${SYS_B}`, () => {
+      http.post(`${ESI_BASE_URL}/route/${SYS_A}/${SYS_B}`, () => {
         hits += 1;
-        return HttpResponse.json([SYS_A, SYS_B]);
+        return HttpResponse.json({ route: [SYS_A, SYS_B] });
       })
     );
 
-    const first = await loadJumpsBetween(SYS_A, SYS_B);
-    const second = await loadJumpsBetween(SYS_A, SYS_B);
+    const first = await loadJumpsBetween(SYS_A, SYS_B, SHORTEST);
+    const second = await loadJumpsBetween(SYS_A, SYS_B, SHORTEST);
 
     expect(first).toEqual({ kind: 'known', jumps: 1 });
     expect(second).toEqual({ kind: 'known', jumps: 1 });
@@ -245,11 +248,9 @@ describe('loadJumpsBetween', () => {
   });
 
   it('degrades to unknown/noRoute on a failed route lookup, never throwing', async () => {
-    server.use(
-      http.get(`${ESI_BASE_URL}/latest/route/${SYS_A}/${SYS_B}`, () => HttpResponse.error())
-    );
+    server.use(http.post(`${ESI_BASE_URL}/route/${SYS_A}/${SYS_B}`, () => HttpResponse.error()));
 
-    const result = await loadJumpsBetween(SYS_A, SYS_B);
+    const result = await loadJumpsBetween(SYS_A, SYS_B, SHORTEST);
 
     expect(result).toEqual({ kind: 'unknown', reason: 'noRoute' });
   });
@@ -257,14 +258,14 @@ describe('loadJumpsBetween', () => {
   it('does not stick on a transient failure: a later call for the same pair retries', async () => {
     let hits = 0;
     server.use(
-      http.get(`${ESI_BASE_URL}/latest/route/${SYS_A}/${SYS_B}`, () => {
+      http.post(`${ESI_BASE_URL}/route/${SYS_A}/${SYS_B}`, () => {
         hits += 1;
-        return hits === 1 ? HttpResponse.error() : HttpResponse.json([SYS_A, SYS_B]);
+        return hits === 1 ? HttpResponse.error() : HttpResponse.json({ route: [SYS_A, SYS_B] });
       })
     );
 
-    const first = await loadJumpsBetween(SYS_A, SYS_B);
-    const second = await loadJumpsBetween(SYS_A, SYS_B);
+    const first = await loadJumpsBetween(SYS_A, SYS_B, SHORTEST);
+    const second = await loadJumpsBetween(SYS_A, SYS_B, SHORTEST);
 
     expect(first).toEqual({ kind: 'unknown', reason: 'noRoute' });
     expect(second).toEqual({ kind: 'known', jumps: 1 });
@@ -367,5 +368,40 @@ describe('loadStructureCompetition (issue #538)', () => {
     const result = await loadStructureCompetition(CHARACTER_ID, STRUCTURE_ID);
 
     expect(result?.truncated).toBe(true);
+  });
+});
+
+describe('loadJumpsBetween with Travel Settings', () => {
+  const AVOIDED = 30045328;
+  const WITH_AVOID = { preference: 'shortest' as const, securityPenalty: 50, avoid: [AVOIDED] };
+
+  it('memoizes per set of rules, so adding an avoided system asks again', async () => {
+    const asked: (number[] | undefined)[] = [];
+    server.use(
+      http.post(`${ESI_BASE_URL}/route/${SYS_A}/${SYS_B}`, async ({ request }) => {
+        const avoid = ((await request.json()) as { avoid_systems?: number[] }).avoid_systems;
+        asked.push(avoid);
+        return HttpResponse.json({
+          route: avoid ? [SYS_A, 30000001, 30000002, SYS_B] : [SYS_A, SYS_B],
+        });
+      })
+    );
+
+    expect(await loadJumpsBetween(SYS_A, SYS_B, SHORTEST)).toEqual({ kind: 'known', jumps: 1 });
+    expect(await loadJumpsBetween(SYS_A, SYS_B, WITH_AVOID)).toEqual({ kind: 'known', jumps: 3 });
+    expect(await loadJumpsBetween(SYS_A, SYS_B, WITH_AVOID)).toEqual({ kind: 'known', jumps: 3 });
+    expect(asked).toEqual([undefined, [AVOIDED]]);
+  });
+
+  it('falls back to the plain route when avoiding leaves none', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/route/${SYS_A}/${SYS_B}`, async ({ request }) =>
+        ((await request.json()) as { avoid_systems?: number[] }).avoid_systems
+          ? HttpResponse.json({ error: 'No route found' }, { status: 404 })
+          : HttpResponse.json({ route: [SYS_A, AVOIDED, SYS_B] })
+      )
+    );
+
+    expect(await loadJumpsBetween(SYS_A, SYS_B, WITH_AVOID)).toEqual({ kind: 'known', jumps: 2 });
   });
 });

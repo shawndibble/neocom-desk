@@ -26,10 +26,11 @@ import {
 } from '@/components/ui';
 import type { RouteSafetyRow, RouteSafetySummary } from '@/engine/route/routeSafety';
 import { useCurrentSystem } from '@/features/route/currentSystem';
-import { DEFAULT_ROUTE_PREFERENCE, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
+import { ROUTE_PREFERENCES } from '@/features/route/routePreferences';
+import { useRouteQuery } from '@/features/route/routeRules';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { useSystemName } from '@/features/route/useSolarSystems';
-import { enumParam, optionalIdParam } from '@/lib/urlState';
+import { optionalEnumParam, optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { PreferenceField } from './PreferenceField';
 import { RecentKillsCell } from './RecentKillsCell';
@@ -39,7 +40,8 @@ import { useRouteSafety } from './useRouteSafety';
 const ROUTE_PARAMS = {
   from: optionalIdParam(),
   to: optionalIdParam(),
-  pref: enumParam(ROUTE_PREFERENCES, DEFAULT_ROUTE_PREFERENCE),
+  // Absent means the pilot's Travel default (Settings → Travel).
+  pref: optionalEnumParam(ROUTE_PREFERENCES),
 };
 
 const DASH = '—';
@@ -164,7 +166,8 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
   const fromIsCurrent = params.from === null && current.systemId !== null;
   const fromName = useSystemName(fromId);
   const toName = useSystemName(params.to);
-  const state = useRouteSafety(fromId, params.to, params.pref);
+  const routeQuery = useRouteQuery(params.pref);
+  const state = useRouteSafety(fromId, params.to, routeQuery);
   const killsOf = useRouteKills(
     state.kind === 'route'
       ? state.rows.map((row) => ({ systemId: row.systemId, band: row.band }))
@@ -210,7 +213,10 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
               placeholder={t('travel.pickSystem')}
             />
           </FilterField>
-          <PreferenceField value={params.pref} onChange={(pref) => setParams({ pref })} />
+          <PreferenceField
+            value={routeQuery.rules.preference}
+            onChange={(pref) => setParams({ pref })}
+          />
         </div>
       </Panel>
       <RouteBody state={state} columns={columns} />

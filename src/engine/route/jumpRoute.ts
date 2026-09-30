@@ -14,7 +14,6 @@
  * the graph and the security lookup; `sde/jumpGraph.ts` is what reads them off
  * the snapshots.
  */
-import { securityBand } from '@/engine/securityStatus';
 
 /**
  * Adjacency by solar system id. Every system the snapshot knows has an entry;
@@ -25,9 +24,10 @@ import { securityBand } from '@/engine/securityStatus';
 export type JumpGraph = ReadonlyMap<number, readonly number[]>;
 
 /**
- * Which trip the caller is asking about. Mirrors the three flags ESI's own
- * `/route/` accepts (`shortest`/`secure`/`insecure`), named for what they do
- * rather than for ESI's wording, since nothing here talks to ESI.
+ * Which trip the caller is asking about — the game's Prefer Shorter, Prefer
+ * Safer and Prefer Less Secure, and ESI's `Shorter`/`Safer`/`LessSecure`
+ * (`features/route/esiRoute.ts` maps them), named for what they do since
+ * nothing here talks to ESI.
  *
  * Both biased preferences are *preferences*, not filters: they make the
  * unwanted space expensive, never impassable, so a destination only reachable
@@ -48,35 +48,79 @@ export interface FindJumpRouteOptions {
    * of counting jumps.
    */
   securityOf?: (systemId: number) => number | undefined;
+  /**
+   * 0–100, the game's default 50: how strongly a biased preference bends the
+   * route, as the in-game slider does. Ignored by `shortest`.
+   */
+  securityPenalty?: number;
+  /**
+   * The pilot's Avoided Systems. Like the security bias, a cost rather than
+   * a wall: a destination only reachable through one still gets a route, and
+   * the route crosses as few of them as it can. Reaching one is not crossing
+   * it — an avoided origin or destination changes nothing, since every route
+   * between the same two ends pays for it alike.
+   */
+  avoid?: ReadonlySet<number>;
 }
 
-/**
- * What entering an unwanted system costs, in units of one jump. Any route
- * that avoids a single unwanted system beats any route that takes one,
- * because no route in New Eden is thousands of jumps long — so this orders
- * by "unwanted systems crossed" first and "jumps" only as the tie-break,
- * with one scalar instead of a pair.
- */
-const UNWANTED_PENALTY = 10_000;
+/** The game's default security penalty. */
+export const DEFAULT_SECURITY_PENALTY = 50;
+
+/** The line CCP's route costs draw highsec at, on the raw status. */
+const HIGHSEC_FROM = 0.45;
+
+/** What entering a wanted system costs: CCP's 0.9, just under Shorter's 1. */
+const WANTED_COST = 0.9;
 
 /**
- * An unknown security is treated as *not* highsec. The conservative reading
- * is the only honest one: a `prefer-highsec` route must never claim safety
- * for a system the snapshot cannot vouch for.
+ * What entering an Avoided System costs: above any route's total security
+ * cost — at the harshest penalty, exp(15) × 2 per nullsec jump is ~6.5e6, and
+ * no route is thousands of jumps long — so crossing one fewer avoided system
+ * always wins. The pilot named those systems; the security bias is a default.
  */
-function isHighsec(systemId: number, securityOf: (id: number) => number | undefined): boolean {
-  const security = securityOf(systemId);
-  return security !== undefined && securityBand(security) === 'highsec';
-}
+const AVOIDED_PENALTY = 1e12;
 
-function stepCostFor(
+/**
+ * CCP's own per-jump costs (developers.eveonline.com, "Route Calculation"),
+ * charged for the system jumped into, so a local route agrees with ESI's
+ * `/route/` and the game's autopilot:
+ *
+ * - penalty cost = exp(0.15 × penalty), the slider running 0–100;
+ * - nullsec (≤ 0.0) costs twice that under both biased preferences;
+ * - the other unwanted band costs it once, the wanted band 0.9.
+ *
+ * So penalty 0 is not quite Shorter — it still leans 0.9 against 1 and
+ * counts nullsec double — and that is the game's behaviour, not a rounding.
+ *
+ * An unknown security is charged as unwanted. The conservative reading is the
+ * only honest one: a Safer route must never claim safety for a system the
+ * snapshot cannot vouch for.
+ */
+function securityStepCost(
   preference: RoutePreferenceKind,
-  securityOf: FindJumpRouteOptions['securityOf']
+  securityOf: FindJumpRouteOptions['securityOf'],
+  securityPenalty: number
 ): (systemId: number) => number {
   if (preference === 'shortest' || !securityOf) return () => 1;
-  const avoidHighsec = preference === 'avoid-highsec';
-  return (systemId) =>
-    isHighsec(systemId, securityOf) === avoidHighsec ? 1 + UNWANTED_PENALTY : 1;
+  const penaltyCost = Math.exp(0.15 * securityPenalty);
+  const wantHighsec = preference === 'prefer-highsec';
+  return (systemId) => {
+    const security = securityOf(systemId);
+    if (security === undefined) return penaltyCost;
+    if (security <= 0) return 2 * penaltyCost;
+    return security >= HIGHSEC_FROM === wantHighsec ? WANTED_COST : penaltyCost;
+  };
+}
+
+function stepCostFor(options: FindJumpRouteOptions): (systemId: number) => number {
+  const base = securityStepCost(
+    options.preference ?? 'shortest',
+    options.securityOf,
+    options.securityPenalty ?? DEFAULT_SECURITY_PENALTY
+  );
+  const avoid = options.avoid;
+  if (!avoid?.size) return base;
+  return (systemId) => base(systemId) + (avoid.has(systemId) ? AVOIDED_PENALTY : 0);
 }
 
 /**
@@ -205,7 +249,7 @@ export function findJumpRoute(
     return { kind: 'route', systems: [originSystemId] };
   }
 
-  const stepCost = stepCostFor(options.preference ?? 'shortest', options.securityOf);
+  const stepCost = stepCostFor(options);
   const { cameFrom, reachedStopAt } = search(graph, originSystemId, stepCost, destinationSystemId);
   if (!reachedStopAt) return { kind: 'no-route' };
   return { kind: 'route', systems: reconstruct(cameFrom, destinationSystemId) };
@@ -232,6 +276,6 @@ export function jumpDistancesFrom(
   options: FindJumpRouteOptions = {}
 ): ReadonlyMap<number, number> {
   if (!graph.has(originSystemId)) return new Map();
-  const stepCost = stepCostFor(options.preference ?? 'shortest', options.securityOf);
+  const stepCost = stepCostFor(options);
   return search(graph, originSystemId, stepCost).jumps;
 }

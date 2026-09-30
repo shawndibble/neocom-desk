@@ -143,7 +143,11 @@ describe('useOrderDetail', () => {
         HUB_STATIONS.map((stationId) => ({ stationId, typeIds: [34] }))
       );
       for (const hubSystem of [30000142, 30002187, 30002659, 30002510, 30002053]) {
-        expect(loaders.jumpsBetween).toHaveBeenCalledWith(JITA_SYSTEM, hubSystem);
+        expect(loaders.jumpsBetween).toHaveBeenCalledWith(
+          JITA_SYSTEM,
+          hubSystem,
+          expect.anything()
+        );
       }
       await waitFor(() =>
         expect(result.current.view.hubs?.find((hub) => hub.hubId === 'amarr')).toEqual({
@@ -210,7 +214,7 @@ describe('useOrderDetail', () => {
         snapshot: SNAPSHOT,
       });
 
-      expect(loaders.jumpsBetween).toHaveBeenCalledWith(JITA_SYSTEM, PERIMETER);
+      expect(loaders.jumpsBetween).toHaveBeenCalledWith(JITA_SYSTEM, PERIMETER, expect.anything());
       await waitFor(() =>
         expect(result.current.view.regionJumps).toEqual({ kind: 'known', jumps: 1 })
       );

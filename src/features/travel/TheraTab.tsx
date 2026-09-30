@@ -33,12 +33,13 @@ import {
 } from '@/engine/route/theraConnections';
 import { SPACE_KINDS } from '@/engine/space';
 import { useCurrentSystem } from '@/features/route/currentSystem';
-import { DEFAULT_ROUTE_PREFERENCE, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
+import { ROUTE_PREFERENCES } from '@/features/route/routePreferences';
+import { useRouteQuery } from '@/features/route/routeRules';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { useSystemName } from '@/features/route/useSolarSystems';
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
-import { enumParam, optionalIdParam } from '@/lib/urlState';
+import { enumParam, optionalEnumParam, optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { OptionField, PreferenceField } from './PreferenceField';
 import { useTheraConnections, type TheraConnectionsState } from './useTheraConnections';
@@ -49,7 +50,8 @@ const SIZE_OPTIONS = ['any', ...WORMHOLE_SHIP_SIZES] as const;
 
 const THERA_PARAMS = {
   origin: optionalIdParam(),
-  pref: enumParam(ROUTE_PREFERENCES, DEFAULT_ROUTE_PREFERENCE),
+  // Absent means the pilot's Travel default (Settings → Travel).
+  pref: optionalEnumParam(ROUTE_PREFERENCES),
   hub: enumParam(HUB_OPTIONS, 'all'),
   space: enumParam(SPACE_OPTIONS, 'all'),
   size: enumParam(SIZE_OPTIONS, 'any'),
@@ -153,7 +155,8 @@ export function TheraTab({ tabBar }: { tabBar: ReactNode }) {
   const originId = params.origin ?? current.systemId;
   const originIsCurrent = params.origin === null && current.systemId !== null;
   const originName = useSystemName(originId);
-  const state = useTheraConnections(originId, params.pref);
+  const routeQuery = useRouteQuery(params.pref);
+  const state = useTheraConnections(originId, routeQuery);
   const columns = useColumns();
 
   const originTrigger =
@@ -184,7 +187,10 @@ export function TheraTab({ tabBar }: { tabBar: ReactNode }) {
               triggerLabel={originTrigger}
             />
           </FilterField>
-          <PreferenceField value={params.pref} onChange={(pref) => setParams({ pref })} />
+          <PreferenceField
+            value={routeQuery.rules.preference}
+            onChange={(pref) => setParams({ pref })}
+          />
           <OptionField
             label={t('travel.thera.hubLabel')}
             value={params.hub}

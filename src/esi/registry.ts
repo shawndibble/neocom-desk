@@ -452,8 +452,8 @@ export const ESI_REGISTRY = {
     scope: 'esi-location.read_location.v1',
     group: 'characterDetails',
   },
-  getRoute: {
-    route: '/route/{origin}/{destination}',
+  postRoute: {
+    route: '/route/{origin_system_id}/{destination_system_id}',
     scope: PUBLIC,
   },
   getAlliancePublicInfo: {

@@ -59,7 +59,9 @@ import { loadSystemSecurity, loadSystemName } from '@/features/character/systemS
 import { loadTypeNames, loadTypeVolumes } from '@/features/character/typeNames';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadJumpsAway } from '@/features/character/routeDistance';
-import { useRoutePreference, type RoutePreference } from '@/features/character/routePreference';
+import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
+import { ROUTE_PREFERENCE_LABEL_KEYS, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
+import { useRouteQuery } from '@/features/route/routeRules';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useFocusHeading } from '@/lib/useFocusHeading';
 import type { CharacterAsset } from '@/esi/endpoints';
@@ -911,12 +913,14 @@ export function Assets() {
     [mergedAssets]
   );
 
-  const routePreference = useRoutePreference((state) => state.value);
-  const hydrateRoutePreference = useRoutePreference((state) => state.hydrate);
-  const setRoutePreference = useRoutePreference((state) => state.setValue);
-  useEffect(() => {
-    void hydrateRoutePreference();
-  }, [hydrateRoutePreference]);
+  // Opens on the pilot's Travel default; the picker here changes this view only.
+  const [routeOverride, setRouteOverride] = useState<RoutePreferenceKind | null>(null);
+  const assetsRoute = useRouteQuery(routeOverride);
+  const routePreference = assetsRoute.rules.preference;
+  // What a jumps-away answer was worked out under: every Travel rule changes
+  // the route, so the whole query is in its key.
+  const jumpsFor = assetsRoute.key;
+  const avoidedHydrated = assetsRoute.hydrated;
 
   const stationSortField = useStationSort((state) => state.value);
   const hydrateStationSort = useStationSort((state) => state.hydrate);
@@ -968,7 +972,7 @@ export function Assets() {
         mergedTypeNames,
         (station) => pinStateFor(station.locationId),
         stationSortField,
-        (station) => jumpsAwayByKey.get(`${station.locationId}:${routePreference}`)
+        (station) => jumpsAwayByKey.get(`${station.locationId}:${jumpsFor}`)
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pinStateFor closes over pins/activeCharacterId, listed explicitly instead
     [
@@ -979,7 +983,7 @@ export function Assets() {
       activeCharacterId,
       stationSortField,
       jumpsAwayByKey,
-      routePreference,
+      jumpsFor,
     ]
   );
 
@@ -1365,20 +1369,20 @@ export function Assets() {
   }, [activeCharacterId, stableScopedStations, stationSystemIds, mergedLocationNames]);
 
   useEffect(() => {
-    if (activeCharacterId === null || !characterLocationResolved) return;
+    if (activeCharacterId === null || !characterLocationResolved || !avoidedHydrated) return;
     const pending = stableScopedStations.filter((station) => {
-      const key = `${station.locationId}:${routePreference}`;
+      const key = `${station.locationId}:${jumpsFor}`;
       if (jumpsAwayByKey.has(key) || jumpsAwayRequested.current.has(key)) return false;
       return characterSystemId === null || stationSystemIds.has(station.locationId);
     });
     if (pending.length === 0) return;
     for (const station of pending) {
-      jumpsAwayRequested.current.add(`${station.locationId}:${routePreference}`);
+      jumpsAwayRequested.current.add(`${station.locationId}:${jumpsFor}`);
     }
 
     const requestedForCharacterId = activeCharacterId;
     void mapWithConcurrencyLimit(pending, ESI_FANOUT_CONCURRENCY, async (station) => {
-      const key = `${station.locationId}:${routePreference}`;
+      const key = `${station.locationId}:${jumpsFor}`;
       let result: JumpsAwayResult;
       if (characterSystemId === null) {
         result = { kind: 'unknown', reason: 'noLocation' };
@@ -1387,7 +1391,7 @@ export function Assets() {
         result =
           systemId === null
             ? { kind: 'unknown', reason: 'noRoute' }
-            : await loadJumpsAway(characterSystemId, systemId, routePreference);
+            : await loadJumpsAway(characterSystemId, systemId, assetsRoute.rules);
       }
       if (activeCharacterIdRef.current === requestedForCharacterId) {
         setJumpsAwayByKey((prev) => new Map(prev).set(key, result));
@@ -1400,7 +1404,9 @@ export function Assets() {
     stableScopedStations,
     jumpsAwayByKey,
     stationSystemIds,
-    routePreference,
+    assetsRoute.rules,
+    avoidedHydrated,
+    jumpsFor,
   ]);
 
   useEffect(() => {
@@ -1790,7 +1796,7 @@ export function Assets() {
                           />
                           <JumpsAwayText
                             result={jumpsAwayByKey.get(
-                              `${resolved.station.locationId}:${routePreference}`
+                              `${resolved.station.locationId}:${jumpsFor}`
                             )}
                             t={t}
                           />
@@ -1861,23 +1867,20 @@ export function Assets() {
                         </Select>
                         <Select
                           value={routePreference}
-                          onValueChange={(value) =>
-                            void setRoutePreference(value as RoutePreference)
-                          }
+                          onValueChange={(value) => setRouteOverride(value as RoutePreferenceKind)}
                         >
                           <SelectTrigger
                             aria-label={t('assets.jumpsAway.routePreference.label')}
-                            className="w-28"
+                            className="w-40"
                           >
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="shortest">
-                              {t('assets.jumpsAway.routePreference.shortest')}
-                            </SelectItem>
-                            <SelectItem value="safest">
-                              {t('assets.jumpsAway.routePreference.safest')}
-                            </SelectItem>
+                            {ROUTE_PREFERENCES.map((preference) => (
+                              <SelectItem key={preference} value={preference}>
+                                {t(ROUTE_PREFERENCE_LABEL_KEYS[preference])}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -1952,7 +1955,7 @@ export function Assets() {
                                 locationNames={mergedLocationNames}
                                 securityForStation={securityForStation}
                                 jumpsAwayFor={(locationId) =>
-                                  jumpsAwayByKey.get(`${locationId}:${routePreference}`)
+                                  jumpsAwayByKey.get(`${locationId}:${jumpsFor}`)
                                 }
                                 pinStateFor={pinStateFor}
                                 onTogglePin={(locationId) => void handleTogglePin(locationId)}

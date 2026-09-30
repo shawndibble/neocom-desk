@@ -60,6 +60,19 @@ export async function loadSystemActivity(): Promise<SystemActivity> {
 }
 
 /**
+ * Pod kills by system over the kill feed's last hour — the same cached call
+ * `loadSystemActivity` makes, without the jumps feed, for the pod-kill
+ * avoidance rule (`features/route/routeRules.ts`). `null` when the feed
+ * could not be read: an unread feed is not a quiet universe.
+ */
+export async function loadPodKills(): Promise<ReadonlyMap<number, number> | null> {
+  const kills = await loadFeed<SystemKillsEntry[]>(KILLS_CACHE_KEY, (options) =>
+    getUniverseSystemKills(options)
+  );
+  return kills ? new Map(kills.data.map((entry) => [entry.system_id, entry.pod_kills])) : null;
+}
+
+/**
  * Region names for a route. `regions.json` carries only regions that hold a
  * market, so ESI names the rest in one batched call; a region neither can
  * name is simply absent, and the row shows a dash.

@@ -8,7 +8,12 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadSolarSystems: () => loadSolarSystems(),
 }));
 
-import { findLocalJumps, findLocalRoute, localJumpDistances } from './localRoute';
+import {
+  findLocalJumps,
+  findLocalRoute,
+  localJumpCountsForRoutes,
+  localJumpDistances,
+} from './localRoute';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 
@@ -59,21 +64,23 @@ beforeEach(() => {
 
 describe('findLocalRoute', () => {
   it('resolves a route with no ESI request at all', async () => {
-    await expect(findLocalRoute(HUB, FAR, 'shortest')).resolves.toEqual({
+    await expect(findLocalRoute(HUB, FAR, { preference: 'shortest' })).resolves.toEqual({
       kind: 'route',
       systems: [HUB, LOW, FAR],
     });
   });
 
   it('reads the security snapshot, so prefer-highsec takes the long way round', async () => {
-    await expect(findLocalRoute(HUB, FAR, 'prefer-highsec')).resolves.toEqual({
+    await expect(findLocalRoute(HUB, FAR, { preference: 'prefer-highsec' })).resolves.toEqual({
       kind: 'route',
       systems: [HUB, A, B, C, FAR],
     });
   });
 
   it('says no-route for a wormhole destination — a fact, not a gap', async () => {
-    await expect(findLocalRoute(HUB, WORMHOLE, 'shortest')).resolves.toEqual({ kind: 'no-route' });
+    await expect(findLocalRoute(HUB, WORMHOLE, { preference: 'shortest' })).resolves.toEqual({
+      kind: 'no-route',
+    });
   });
 
   it('reports zero jumps inside one wormhole, which is keyed like any system', async () => {
@@ -96,29 +103,31 @@ describe('findLocalRoute', () => {
 
   it('says unknown, not no-route, when the graph snapshot cannot be read', async () => {
     loadSolarSystemJumps.mockRejectedValue(new Error('offline'));
-    await expect(findLocalRoute(HUB, FAR, 'shortest')).resolves.toEqual({ kind: 'unknown' });
+    await expect(findLocalRoute(HUB, FAR, { preference: 'shortest' })).resolves.toEqual({
+      kind: 'unknown',
+    });
   });
 
   it('still routes when only the systems snapshot is unreadable, degrading to shortest', async () => {
     loadSolarSystems.mockRejectedValue(new Error('offline'));
     // No security to bias on, so prefer-highsec must not pretend to — it
     // takes the short lowsec hop rather than answering unknown.
-    await expect(findLocalRoute(HUB, FAR, 'prefer-highsec')).resolves.toEqual({
+    await expect(findLocalRoute(HUB, FAR, { preference: 'prefer-highsec' })).resolves.toEqual({
       kind: 'route',
       systems: [HUB, LOW, FAR],
     });
   });
 
   it('indexes the graph once across repeated lookups', async () => {
-    await findLocalRoute(HUB, FAR, 'prefer-highsec');
-    await findLocalRoute(FAR, HUB, 'prefer-highsec');
-    await findLocalRoute(HUB, C, 'prefer-highsec');
+    await findLocalRoute(HUB, FAR, { preference: 'prefer-highsec' });
+    await findLocalRoute(FAR, HUB, { preference: 'prefer-highsec' });
+    await findLocalRoute(HUB, C, { preference: 'prefer-highsec' });
     expect(loadSolarSystemJumps).toHaveBeenCalledTimes(1);
     expect(loadSolarSystems).toHaveBeenCalledTimes(1);
   });
 
   it('never fetches the systems snapshot for a shortest route, which cannot use it', async () => {
-    await findLocalRoute(HUB, FAR, 'shortest');
+    await findLocalRoute(HUB, FAR, { preference: 'shortest' });
     expect(loadSolarSystems).not.toHaveBeenCalled();
   });
 
@@ -132,7 +141,7 @@ describe('findLocalRoute', () => {
 
 describe('findLocalJumps', () => {
   it('counts the jumps between the two ends', async () => {
-    await expect(findLocalJumps(HUB, FAR, 'shortest')).resolves.toEqual({
+    await expect(findLocalJumps(HUB, FAR, { preference: 'shortest' })).resolves.toEqual({
       kind: 'known',
       jumps: 2,
     });
@@ -179,8 +188,24 @@ describe('localJumpDistances', () => {
   });
 
   it('reads the security snapshot when the preference needs it', async () => {
-    const result = await localJumpDistances(HUB, 'prefer-highsec');
+    const result = await localJumpDistances(HUB, { preference: 'prefer-highsec' });
     // The long all-highsec way round, so FAR is four jumps rather than two.
     expect(result.kind === 'known' && result.jumps.get(FAR)).toBe(4);
+  });
+});
+
+describe('Avoided Systems', () => {
+  it('routes around them in every entry point', async () => {
+    const avoid = [LOW];
+    expect(await findLocalRoute(HUB, FAR, { avoid })).toEqual({
+      kind: 'route',
+      systems: [HUB, A, B, C, FAR],
+    });
+    expect(await findLocalJumps(HUB, FAR, { avoid })).toEqual({ kind: 'known', jumps: 4 });
+    const distances = await localJumpDistances(HUB, { avoid });
+    expect(distances.kind === 'known' && distances.jumps.get(FAR)).toBe(4);
+    expect(
+      await localJumpCountsForRoutes([{ originSystemId: HUB, destinationSystemId: FAR }], { avoid })
+    ).toEqual({ kind: 'known', counts: [4] });
   });
 });

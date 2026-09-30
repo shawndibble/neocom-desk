@@ -51,6 +51,7 @@ export const SETTINGS_TABS = definePageTabs(
     { id: 'miningTax', labelKey: 'settings.tabs.miningTax' },
     { id: 'characters', labelKey: 'settings.tabs.characters' },
     { id: 'corporation', labelKey: 'settings.tabs.corporation' },
+    { id: 'travel', labelKey: 'settings.tabs.travel' },
     { id: 'notifications', labelKey: 'settings.tabs.notifications' },
     { id: 'dataAge', labelKey: 'settings.tabs.data' },
     { id: 'activity', labelKey: 'settings.tabs.activity' },

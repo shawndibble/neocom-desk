@@ -12,6 +12,7 @@
  * its view.
  */
 import { useContext, useEffect, useLayoutEffect, useMemo } from 'react';
+import { useRouteQuery } from '@/features/route/routeRules';
 import { useLazyRowCache } from '@/lib/useLazyRowCache';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { TRADE_HUBS } from '@/market/hubs';
@@ -134,6 +135,17 @@ export function useOrderDetail(): OrderDetail {
   const hubBids = useLazyRowCache<number, HubBids>();
   /** Jump distance, keyed by `"system:system"` — shared by the region-rival route and the trade-hub sweep. */
   const jumps = useLazyRowCache<string, JumpsAwayResult>();
+  // Loaded under the Travel Settings in force, and read back only for those:
+  // a distance worked out under other rules is not this one.
+  const { rules: routeRules, key: routeKey, hydrated: routeHydrated } = useRouteQuery();
+  const jumpsForList = useMemo(() => {
+    const suffix = `|${routeKey}`;
+    const view = new Map<string, JumpsAwayResult>();
+    for (const [key, value] of jumps.byKey) {
+      if (key.endsWith(suffix)) view.set(key.slice(0, -suffix.length), value);
+    }
+    return view;
+  }, [jumps.byKey, routeKey]);
 
   const caches = useMemo<OrderDetailCacheContents>(
     () => ({
@@ -144,7 +156,7 @@ export function useOrderDetail(): OrderDetail {
       refine: refine.byKey,
       hubBids: hubBids.byKey,
       hubBidsFailed: hubBids.failedKeys,
-      jumps: jumps.byKey,
+      jumps: jumpsForList,
     }),
     [
       regionBooks.byKey,
@@ -154,7 +166,7 @@ export function useOrderDetail(): OrderDetail {
       refine.byKey,
       hubBids.byKey,
       hubBids.failedKeys,
-      jumps.byKey,
+      jumpsForList,
     ]
   );
 
@@ -206,8 +218,12 @@ export function useOrderDetail(): OrderDetail {
       // `load`'s own synchronous dedup is what keeps a sweep of several
       // routes from re-asking for one already requested (its doc comment).
       loadRoute: (fromSystemId, toSystemId) => {
-        void loadJumps(jumpsKey(fromSystemId, toSystemId), () =>
-          loaders.jumpsBetween(fromSystemId, toSystemId)
+        // Not until the Travel Settings are in: a jump count asked on defaults is
+        // one the pilot's rules would not give. Hydrating re-creates this action,
+        // so the effects that call it ask again.
+        if (!routeHydrated) return;
+        void loadJumps(`${jumpsKey(fromSystemId, toSystemId)}|${routeKey}`, () =>
+          loaders.jumpsBetween(fromSystemId, toSystemId, routeRules)
         );
       },
       loadStructure,
@@ -240,6 +256,9 @@ export function useOrderDetail(): OrderDetail {
     loadRefine,
     loadHubBidsFor,
     loadJumps,
+    routeKey,
+    routeRules,
+    routeHydrated,
   ]);
 
   return useMemo(() => ({ ...actions, caches }), [actions, caches]);
