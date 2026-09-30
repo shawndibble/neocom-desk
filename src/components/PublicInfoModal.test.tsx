@@ -427,6 +427,7 @@ describe('PublicInfoModal', () => {
     const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByText("This character couldn't be found")).toBeInTheDocument();
     expect(within(dialog).queryByRole('tab', { name: 'Corporation' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('tab', { name: 'Employment' })).not.toBeInTheDocument();
   });
 
   it('closes when a link inside it changes page, but not for a query-only change', async () => {

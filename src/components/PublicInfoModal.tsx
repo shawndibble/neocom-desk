@@ -63,6 +63,8 @@ export function PublicInfoModal() {
   const [corporation, setCorporation] = useState<TabState<PublicCorporationInfo>>(IDLE);
   const [alliance, setAlliance] = useState<TabState<PublicAllianceInfo>>(IDLE);
 
+  // Runs after render, so a caller must not navigate and open in one handler — the
+  // open would be closed straight away. None does: every opener stays on its page.
   useEffect(() => {
     if (shownPathname.current === pathname) return;
     shownPathname.current = pathname;
@@ -135,8 +137,8 @@ export function PublicInfoModal() {
   if (corporation.status !== 'idle')
     tabs.push({ id: 'corporation', label: t('publicInfo.corporationTab') });
   if (alliance.status !== 'idle') tabs.push({ id: 'alliance', label: t('publicInfo.allianceTab') });
-  // Only a character has a corporation history to show.
-  if (request.kind === 'character' && character.status !== 'idle')
+  // Only a character has a corporation history to show — and not one EVE has no record of.
+  if (request.kind === 'character' && character.status !== 'idle' && character.status !== 'unknown')
     tabs.push({ id: 'employment', label: t('publicInfo.employmentTab') });
 
   const activeData =
