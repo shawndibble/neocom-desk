@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
+import Dexie from 'dexie';
 import { ForegroundNotificationPoller } from './ForegroundNotificationPoller';
 import { runForegroundPoll, FIRST_POLL_DELAY_MS, POLL_INTERVAL_MS } from './foregroundPoller';
 
@@ -16,7 +17,11 @@ const leaderMock = vi.hoisted(() => {
       listeners.add(listener);
       return { isLeader: () => leader, leave: () => listeners.delete(listener) };
     },
-    runUnlessRunningElsewhere: (_lock: string, task: () => Promise<void>) => task(),
+    // A new promise, as `navigator.locks.request` returns. Passing the task's
+    // own through would hide an unhandled rejection: it comes from a vitest
+    // spy, and the spy attaches a handler of its own to record the outcome.
+    runUnlessRunningElsewhere: (_lock: string, task: () => Promise<void>) =>
+      task().then(() => undefined),
     /** Seats still standing — for the unmount assertion. */
     seats: () => listeners.size,
     /** Simulate the election: another tab leads (`false`) or this one does. */
@@ -150,6 +155,48 @@ describe('ForegroundNotificationPoller', () => {
       expect(runForegroundPoll).not.toHaveBeenCalled();
       vi.advanceTimersByTime(FIRST_POLL_DELAY_MS);
       expect(runForegroundPoll).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('a poll that fails', () => {
+    /** Rejections nothing handled, as `onunhandledrejection` would have reported them. */
+    async function unhandledDuring(run: () => void): Promise<unknown[]> {
+      const seen: unknown[] = [];
+      const listener = (reason: unknown) => seen.push(reason);
+      process.on('unhandledRejection', listener);
+      try {
+        run();
+        // Node reports an unhandled rejection a turn after it goes unhandled.
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      } finally {
+        process.off('unhandledRejection', listener);
+      }
+      return seen;
+    }
+
+    it('drops a transaction the browser aborted instead of reporting it unhandled', async () => {
+      vi.mocked(runForegroundPoll).mockRejectedValueOnce(new Dexie.AbortError());
+      vi.useFakeTimers();
+      render(<ForegroundNotificationPoller />);
+      const seen = await unhandledDuring(() => {
+        vi.advanceTimersByTime(FIRST_POLL_DELAY_MS);
+        vi.useRealTimers();
+      });
+      expect(runForegroundPoll).toHaveBeenCalledTimes(1);
+      expect(seen).toEqual([]);
+    });
+
+    it('still surfaces any other failure', async () => {
+      const error = new TypeError('boom');
+      vi.mocked(runForegroundPoll).mockRejectedValueOnce(error);
+      vi.useFakeTimers();
+      render(<ForegroundNotificationPoller />);
+      const seen = await unhandledDuring(() => {
+        vi.advanceTimersByTime(FIRST_POLL_DELAY_MS);
+        vi.useRealTimers();
+      });
+      expect(runForegroundPoll).toHaveBeenCalledTimes(1);
+      expect(seen).toEqual([error]);
     });
   });
 });

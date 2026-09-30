@@ -9,6 +9,7 @@
  * dumb (it takes a number and nothing else); this is the piece that knows
  * what the number means.
  */
+import { ignoreIdbTeardown } from '@/db/teardown';
 import { setAppBadgeCount } from './badge';
 import { readFeed } from './feed';
 import { visibleFeedEntries } from './feedSelection';
@@ -29,6 +30,15 @@ import {
  * there.
  */
 export async function refreshAppBadge(): Promise<void> {
+  // Fired and forgotten from mount and from several panels, where a transaction
+  // iOS aborted under it would surface as an unhandled rejection — and for the
+  // callers that await it after their own write, a badge that could not be
+  // read is no reason to fail that write. The badge keeps its last count until
+  // the next refresh.
+  await ignoreIdbTeardown(deriveAppBadge());
+}
+
+async function deriveAppBadge(): Promise<void> {
   await hydrateNotificationPreferences();
   const prefs = useNotificationPreferences.getState().value;
   if (!prefs.masterEnabled || !isFeedChannelEnabled(prefs)) {

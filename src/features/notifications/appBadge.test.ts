@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import Dexie from 'dexie';
 import { db } from '@/db';
 import { refreshAppBadge } from './appBadge';
 import { recordFeedEntry } from './feed';
@@ -102,5 +103,29 @@ describe('refreshAppBadge', () => {
     await refreshAppBadge();
 
     expect(setAppBadge).toHaveBeenCalledWith(1);
+  });
+
+  describe('when IndexedDB goes away mid-read', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('leaves the badge as it was instead of rejecting', async () => {
+      await seed(1, 'newMail');
+      setAppBadge.mockClear();
+      vi.spyOn(db.notificationFeed, 'orderBy').mockImplementation(() => {
+        throw new Dexie.AbortError();
+      });
+
+      await expect(refreshAppBadge()).resolves.toBeUndefined();
+      expect(setAppBadge).not.toHaveBeenCalled();
+    });
+
+    it('still rejects with any other failure', async () => {
+      const error = new TypeError('boom');
+      vi.spyOn(db.notificationFeed, 'orderBy').mockImplementation(() => {
+        throw error;
+      });
+
+      await expect(refreshAppBadge()).rejects.toBe(error);
+    });
   });
 });
