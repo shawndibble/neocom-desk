@@ -11,7 +11,7 @@
 import { db } from '@/db';
 import { readCachedRows } from '@/esi/cache';
 import type { CharacterAsset } from '@/esi/endpoints';
-import { ESI_REGISTRY } from '@/esi/registry';
+import { requiredScopesForEndpoints } from '@/esi/registry';
 import { KEY as ASSETS_KEY } from '@/features/character/assets';
 import { readCachedTypeNames } from '@/features/character/typeNames';
 import { rankedSearch } from '@/lib/rankedSearch';
@@ -85,7 +85,7 @@ export function assetsHref(
   return `/assets?${params.toString()}`;
 }
 
-const ASSETS_SCOPE = ESI_REGISTRY.getCharacterAssets.scope;
+const ASSETS_SCOPES = requiredScopesForEndpoints(['getCharacterAssets']);
 
 /**
  * The cached assets of every Character whose grant covers them. No request,
@@ -95,7 +95,9 @@ const ASSETS_SCOPE = ESI_REGISTRY.getCharacterAssets.scope;
 export async function loadPaletteAssets(): Promise<PaletteAsset[]> {
   const [characters, tokens] = await Promise.all([db.characters.toArray(), db.tokens.toArray()]);
   const granted = new Set(
-    tokens.filter((token) => token.scopes.includes(ASSETS_SCOPE)).map((t) => t.characterId)
+    tokens
+      .filter((token) => ASSETS_SCOPES.every((scope) => token.scopes.includes(scope)))
+      .map((token) => token.characterId)
   );
   const holders = characters.filter((character) => granted.has(character.characterId));
   if (holders.length === 0) return [];
