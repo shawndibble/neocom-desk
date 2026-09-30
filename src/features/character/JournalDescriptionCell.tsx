@@ -20,7 +20,7 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { formatIsk } from '@/lib/isk';
 import { BountyFactionSummary } from './BountyFactionSummary';
-import { parseBountyKills } from './bountyKills';
+import { bountyKillsOf } from './bountyKills';
 import { transactionTotal } from './walletTransactionsCsv';
 
 interface JournalDescriptionCellProps {
@@ -37,10 +37,7 @@ export function JournalDescriptionCell({
   const { t } = useTranslation();
   const contractId = entry.context_id_type === 'contract_id' ? entry.context_id : undefined;
   // A bounty line's reason is its kill list as raw `typeID: count` pairs.
-  const kills = useMemo(
-    () => (entry.ref_type.startsWith('bounty_prize') ? parseBountyKills(entry.reason) : null),
-    [entry.ref_type, entry.reason]
-  );
+  const kills = useMemo(() => bountyKillsOf(entry), [entry]);
   if (!transaction && !entry.reason && contractId === undefined) return <>{entry.description}</>;
   const fill = transaction
     ? t(transaction.is_buy ? 'wallet.journalItemBought' : 'wallet.journalItemSold', {

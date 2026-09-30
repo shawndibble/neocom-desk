@@ -72,6 +72,14 @@ describe('filterWalletJournal', () => {
     expect(filterWalletJournal(rows, filter).map((r) => r.id)).toEqual([1]);
   });
 
+  it("does not match a bounty line's raw kill list, which the journal never shows", () => {
+    const rows = [
+      entry({ id: 1, ref_type: 'bounty_prizes', description: 'Bounty prizes', reason: '17039: 2' }),
+    ];
+    const filter: WalletJournalFilter = { ...EMPTY_WALLET_JOURNAL_FILTER, text: '17039' };
+    expect(filterWalletJournal(rows, filter)).toEqual([]);
+  });
+
   it('combines every active criterion with AND', () => {
     const rows = [
       entry({ id: 1, ref_type: 'bounty_prize', date: '2026-08-01T00:00:00Z', description: 'x' }),

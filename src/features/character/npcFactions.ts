@@ -78,10 +78,10 @@ export async function loadNpcFactions(
   typeIds: readonly number[]
 ): Promise<Map<number, string | null>> {
   const unique = [...new Set(typeIds)];
-  const fresh = unique.filter((id) => !inFlight.has(id));
-  if (fresh.length > 0) {
-    const batch = resolveFactions(fresh).catch(() => new Map<number, string | null>());
-    for (const id of fresh) {
+  const notInFlight = unique.filter((id) => !inFlight.has(id));
+  if (notInFlight.length > 0) {
+    const batch = resolveFactions(notInFlight).catch(() => new Map<number, string | null>());
+    for (const id of notInFlight) {
       const one = batch.then((factions) => factions.get(id) ?? null);
       inFlight.set(id, one);
       void one.finally(() => inFlight.delete(id));

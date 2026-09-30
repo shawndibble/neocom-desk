@@ -11,6 +11,11 @@ export interface BountyKill {
 
 const PAIR = /^(\d+):\s*(\d+)$/;
 
+/** A journal line's bounty kills, or null when it isn't a bounty line with a kill list. */
+export function bountyKillsOf(entry: { ref_type: string; reason?: string }): BountyKill[] | null {
+  return entry.ref_type.startsWith('bounty_prize') ? parseBountyKills(entry.reason) : null;
+}
+
 /** The kills in a bounty `reason`, most killed first — or null when it isn't a kill list. */
 export function parseBountyKills(reason: string | undefined): BountyKill[] | null {
   if (!reason) return null;

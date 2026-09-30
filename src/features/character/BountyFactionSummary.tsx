@@ -11,12 +11,18 @@ import { loadNpcFactions } from './npcFactions';
 
 export function BountyFactionSummary({ kills }: { kills: readonly BountyKill[] }) {
   const { t } = useTranslation();
-  const [factions, setFactions] = useState<ReadonlyMap<number, string | null> | null>(null);
+  // Keyed by the kills it was resolved for, so a row handed new kills never
+  // sums them against the previous row's map.
+  const [resolved, setResolved] = useState<{
+    kills: readonly BountyKill[];
+    factions: ReadonlyMap<number, string | null>;
+  } | null>(null);
+  const factions = resolved?.kills === kills ? resolved.factions : null;
 
   useEffect(() => {
     let cancelled = false;
-    void loadNpcFactions(kills.map((kill) => kill.typeId)).then((resolved) => {
-      if (!cancelled) setFactions(resolved);
+    void loadNpcFactions(kills.map((kill) => kill.typeId)).then((factions) => {
+      if (!cancelled) setResolved({ kills, factions });
     });
     return () => {
       cancelled = true;
