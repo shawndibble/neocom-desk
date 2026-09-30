@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { normalizePlan } from '@/engine/plan';
@@ -76,6 +77,17 @@ vi.mock('./useSkillGains', () => ({
     failed: false,
   }),
 }));
+// A level the ranking did not score: worked out on demand, told apart here by the level asked for.
+vi.mock('./useSkillLevelGain', () => ({
+  useSkillLevelGain: (_evaluator: unknown, gain: SkillGain, level: number) =>
+    level === gain.toLevel
+      ? gain
+      : {
+          delta: { changes: [], count: 0 },
+          roleChanges: [{ key: 'miningYield', before: 100, after: 100 + level }],
+          metrics: gain.metrics,
+        },
+}));
 vi.mock('@/features/skills/planner/usePlanEditorData', () => ({
   usePlanEditorData: () => ({
     catalog: { engineSkills: SKILLS },
@@ -94,18 +106,20 @@ afterEach(async () => {
 
 function renderPanel() {
   render(
-    <FittingWhatToTrainPanel
-      evaluator={evaluator}
-      characterId={CHARACTER_ID}
-      fittingName="Rifter"
-    />
+    <MemoryRouter>
+      <FittingWhatToTrainPanel
+        evaluator={evaluator}
+        characterId={CHARACTER_ID}
+        fittingName="Rifter"
+      />
+    </MemoryRouter>
   );
 }
 
-function rowFor(name: RegExp) {
-  const cell = screen.getByText(name);
-  const row = cell.closest('tr, [role="row"], li');
-  if (!row) throw new Error(`no row for ${String(name)}`);
+function rowFor(name: string) {
+  const cell = screen.getByText(name, { selector: 'span' });
+  const row = cell.closest('li');
+  if (!row) throw new Error(`no row for ${name}`);
   return row as HTMLElement;
 }
 
@@ -119,9 +133,9 @@ describe('FittingWhatToTrainPanel — Add to plan', () => {
     const user = userEvent.setup();
     renderPanel();
 
-    await screen.findByText(/Surgical Strike I$/);
+    await screen.findByText('Surgical Strike');
     await user.click(
-      await within(rowFor(/Surgical Strike I$/)).findByRole('button', { name: /add to plan/i })
+      await within(rowFor('Surgical Strike')).findByRole('button', { name: /add to plan/i })
     );
 
     await waitFor(async () => {
@@ -136,23 +150,20 @@ describe('FittingWhatToTrainPanel — Add to plan', () => {
       { skillTypeID: 3315, level: 1 },
     ]);
     expect(
-      await within(rowFor(/Surgical Strike I$/)).findByText('In plan Rifter')
+      await within(rowFor('Surgical Strike')).findByRole('link', { name: 'Rifter' })
     ).toBeInTheDocument();
   });
 
   it('Undo removes exactly what was added, leaving the plan as it was', async () => {
-    const existing = {
+    await db.skillPlans.put({
       ...newPlan(CHARACTER_ID, 'Frigates'),
       entries: [{ skillTypeID: 3300, targetLevel: 2 }],
-    };
-    await db.skillPlans.put(existing);
+    });
     const user = userEvent.setup();
     renderPanel();
 
-    await screen.findByText(/Drones III$/);
-    await user.click(
-      await within(rowFor(/Drones III$/)).findByRole('button', { name: /add to plan/i })
-    );
+    await screen.findByText('Drones');
+    await user.click(await within(rowFor('Drones')).findByRole('button', { name: /add to plan/i }));
     await waitFor(async () => {
       expect(await planEntries()).toEqual([
         { skillTypeID: 3300, targetLevel: 2 },
@@ -166,8 +177,74 @@ describe('FittingWhatToTrainPanel — Add to plan', () => {
       expect(await planEntries()).toEqual([{ skillTypeID: 3300, targetLevel: 2 }]);
     });
   });
+});
 
-  it('marks a level the plan already trains, at or above, instead of offering to add it', async () => {
+describe('FittingWhatToTrainPanel — level picker', () => {
+  it('offers only the levels the pilot does not have, and adds the one picked', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByText('Drones');
+    const row = rowFor('Drones');
+
+    // Drones is trained to II: I and II are not offered.
+    await user.click(await within(row).findByRole('combobox', { name: /level to train/i }));
+    const options = (await screen.findAllByRole('option')).map((option) =>
+      option.textContent?.replace('✓', '')
+    );
+    expect(options).toEqual(['III', 'IV', 'V']);
+    await user.click(screen.getByRole('option', { name: 'V' }));
+
+    // The changes follow the level picked.
+    expect(within(row).getByText('Mining yield 100 → 105 m³/h')).toBeInTheDocument();
+    await user.click(within(row).getByRole('button', { name: /add to plan/i }));
+    await waitFor(async () => {
+      expect(await planEntries()).toEqual([{ skillTypeID: 3436, targetLevel: 5 }]);
+    });
+  });
+
+  it('shows levels a plan already trains grayed out, links its name, and starts at the first open level', async () => {
+    const plan = {
+      ...newPlan(CHARACTER_ID, 'Drone boat'),
+      entries: [{ skillTypeID: 3436, targetLevel: 4 }],
+    };
+    await db.skillPlans.put(plan);
+    const user = userEvent.setup();
+    renderPanel();
+
+    const row = await waitFor(() => {
+      const found = rowFor('Drones');
+      expect(within(found).getByRole('link', { name: 'Drone boat' })).toBeInTheDocument();
+      return found;
+    });
+    expect(within(row).getByRole('link', { name: 'Drone boat' })).toHaveAttribute(
+      'href',
+      `/skills/plans/${plan.id}`
+    );
+    expect(row).toHaveTextContent('III–IV in plan Drone boat');
+    // III and IV are in the plan, so the picker already sits on V.
+    const picker = within(row).getByRole('combobox', { name: /level to train/i });
+    expect(picker).toHaveTextContent('V');
+    await user.click(picker);
+    expect(await screen.findByRole('option', { name: 'III · in plan' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    expect(screen.getByRole('option', { name: 'IV · in plan' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    await user.keyboard('{Escape}');
+
+    await user.click(within(row).getByRole('button', { name: /add to plan/i }));
+    await waitFor(async () => {
+      expect(await planEntries()).toEqual([
+        { skillTypeID: 3436, targetLevel: 4 },
+        { skillTypeID: 3436, targetLevel: 5 },
+      ]);
+    });
+  });
+
+  it('offers no picker once every level is in a plan', async () => {
     await db.skillPlans.put({
       ...newPlan(CHARACTER_ID, 'Drone boat'),
       entries: [{ skillTypeID: 3436, targetLevel: 5 }],
@@ -175,18 +252,19 @@ describe('FittingWhatToTrainPanel — Add to plan', () => {
     renderPanel();
 
     const row = await waitFor(() => {
-      const found = rowFor(/Drones III$/);
-      expect(within(found).getByText('In plan Drone boat')).toBeInTheDocument();
+      const found = rowFor('Drones');
+      expect(within(found).getByRole('link', { name: 'Drone boat' })).toBeInTheDocument();
       return found;
     });
     expect(within(row).queryByRole('button', { name: /add to plan/i })).toBeNull();
+    expect(within(row).queryByRole('combobox')).toBeNull();
     // The other row is still offered.
     expect(
-      within(rowFor(/Surgical Strike I$/)).getByRole('button', { name: /add to plan/i })
+      within(rowFor('Surgical Strike')).getByRole('button', { name: /add to plan/i })
     ).toBeInTheDocument();
   });
 
-  it('marks a level the plan already trains as a derived prerequisite of another entry', async () => {
+  it('marks a level the plan trains only as a derived prerequisite of another entry', async () => {
     await db.skillPlans.put({
       ...newPlan(CHARACTER_ID, 'Gunnery'),
       entries: [{ skillTypeID: 3315, targetLevel: 1 }],
@@ -194,10 +272,50 @@ describe('FittingWhatToTrainPanel — Add to plan', () => {
     renderPanel();
 
     const row = await waitFor(() => {
-      const found = rowFor(/Gunnery II$/);
-      expect(within(found).getByText('In plan Gunnery')).toBeInTheDocument();
+      const found = rowFor('Gunnery');
+      expect(found).toHaveTextContent('II–III in plan Gunnery');
       return found;
     });
-    expect(within(row).queryByRole('button', { name: /add to plan/i })).toBeNull();
+    expect(within(row).getByRole('link', { name: 'Gunnery' })).toBeInTheDocument();
+  });
+});
+
+describe('FittingWhatToTrainPanel — Skill Plan button and prerequisites', () => {
+  it('opens the Skill Plans page, or the target plan once there is one', async () => {
+    renderPanel();
+    expect(await screen.findByRole('link', { name: 'Skill Plan' })).toHaveAttribute(
+      'href',
+      '/skills/plans'
+    );
+  });
+
+  it('opens the target plan from the Skill Plan button', async () => {
+    const plan = newPlan(CHARACTER_ID, 'Drone boat');
+    await db.skillPlans.put(plan);
+    renderPanel();
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Skill Plan' })).toHaveAttribute(
+        'href',
+        `/skills/plans/${plan.id}`
+      )
+    );
+  });
+
+  it('lists the prerequisite skills behind "incl. prerequisites"', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByText('Surgical Strike');
+
+    // Only Surgical Strike misses a prerequisite (Gunnery III).
+    expect(screen.getAllByRole('button', { name: /skills needed for/i })).toHaveLength(1);
+    await user.click(
+      await within(rowFor('Surgical Strike')).findByRole('button', {
+        name: /skills needed for surgical strike i/i,
+      })
+    );
+    const card = await screen.findByText(/^Skills needed for Surgical Strike I$/);
+    const list = card.closest('div') as HTMLElement;
+    expect(within(list).getByText('Gunnery')).toBeInTheDocument();
+    expect(within(list).getByText('Surgical Strike')).toBeInTheDocument();
   });
 });

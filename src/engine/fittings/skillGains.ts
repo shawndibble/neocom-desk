@@ -9,6 +9,7 @@
  */
 import type { AttributeWithSources } from './affectedBy';
 import { alignTimeSeconds } from './stats';
+import type { PlanEntry } from '../types';
 import type { FittingStats } from './types';
 import { round } from './fittingStatFields';
 import { diffFittingStats, type FittingStatsDelta } from './variationDelta';
@@ -268,6 +269,47 @@ export interface SkillGain extends SkillGainCandidate {
   metrics: GainMetrics;
 }
 
+/** What one skill level does to a fit: `SkillGain` without the skill it is for. */
+export type LevelGain = Pick<SkillGain, 'delta' | 'roleChanges' | 'metrics'>;
+
+/**
+ * One level worked out from the fit before and after it — also for a level
+ * that changes nothing, which the ranking leaves out but a pilot picking that
+ * level still wants to see as "no change".
+ */
+export function levelGain(before: FittingStats, after: FittingStats): LevelGain {
+  return {
+    delta: diffFittingStats(before, after),
+    roleChanges: roleChanges(before, after),
+    metrics: gainMetrics(before, after),
+  };
+}
+
+export interface LevelOption {
+  level: number;
+  /** A Skill Plan already trains it: shown, but not pickable. */
+  planned: boolean;
+}
+
+/**
+ * The levels a pilot can pick for a skill: every one above what they have
+ * (`fromLevel`), those a plan trains `plannedThrough` — a plan trains a skill
+ * level by level, so it covers everything up to its highest — flagged.
+ */
+export function levelOptions(fromLevel: number, plannedThrough: number): LevelOption[] {
+  const options: LevelOption[] = [];
+  for (let level = fromLevel + 1; level <= 5; level++) {
+    options.push({ level, planned: level <= plannedThrough });
+  }
+  return options;
+}
+
+/** The pilot's `picked` level if it is still open, else the first open one; null when none is. */
+export function pickedLevel(options: readonly LevelOption[], picked: number | null): number | null {
+  const open = options.filter((option) => !option.planned);
+  return open.find((option) => option.level === picked)?.level ?? open[0]?.level ?? null;
+}
+
 export interface EvaluateSkillGainsOptions {
   /** Awaited before each calculation — hands the main thread back between them. */
   between?: () => Promise<void>;
@@ -296,14 +338,9 @@ export async function evaluateSkillGains(
       const { before, after } = await compare(candidate.skillTypeId, candidate.toLevel);
       // Only a change to a stat the pilot ranks by counts: a skill that
       // just moves CPU use or the cargo hold isn't "what to train" for a fit.
-      const metrics = gainMetrics(before, after);
-      if (GAIN_METRICS.every((metric) => metrics[metric] === 0)) continue;
-      gains.push({
-        ...candidate,
-        delta: diffFittingStats(before, after),
-        roleChanges: roleChanges(before, after),
-        metrics,
-      });
+      const described = levelGain(before, after);
+      if (GAIN_METRICS.every((metric) => described.metrics[metric] === 0)) continue;
+      gains.push({ ...candidate, ...described });
     } catch {
       // Left out — see above.
     }
@@ -339,4 +376,18 @@ export function trainingTimeFor(
     seconds: scheduled.reduce((sum, step) => sum + step.seconds, 0),
     includesPrerequisites: scheduled.some((step) => step.skillTypeID !== skillTypeId),
   };
+}
+
+/**
+ * The skills a schedule trains, each once at the highest level it reaches, in
+ * the order they first train — the rows of a card listing what a level needs.
+ */
+export function scheduledSkillTargets(
+  scheduled: readonly { skillTypeID: number; level: number }[]
+): PlanEntry[] {
+  const targets = new Map<number, number>();
+  for (const { skillTypeID, level } of scheduled) {
+    targets.set(skillTypeID, Math.max(targets.get(skillTypeID) ?? 0, level));
+  }
+  return Array.from(targets, ([skillTypeID, targetLevel]) => ({ skillTypeID, targetLevel }));
 }
