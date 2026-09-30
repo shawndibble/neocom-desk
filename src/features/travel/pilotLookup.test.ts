@@ -87,6 +87,7 @@ describe('loadPilotProfile', () => {
       name: 'Some Pilot',
       birthday: '2010-01-01T00:00:00Z',
       corporation_id: 100,
+      security_status: -2.345,
     });
     mocks.resolveAffiliations.mockResolvedValue(
       new Map([[42, { character_id: 42, corporation_id: 200, alliance_id: 300 }]])
@@ -105,8 +106,21 @@ describe('loadPilotProfile', () => {
       corporationName: 'New Corp',
       allianceId: 300,
       allianceName: 'Some Alliance',
+      securityStatus: -2.345,
     });
     expect(mocks.resolveNames).toHaveBeenCalledWith([200, 300]);
+  });
+
+  it('leaves security status null when ESI omits it', async () => {
+    mocks.loadPublicCharacterInfo.mockResolvedValue({
+      character_id: 42,
+      name: 'Some Pilot',
+      birthday: '2010-01-01T00:00:00Z',
+      corporation_id: 100,
+    });
+    mocks.resolveAffiliations.mockResolvedValue(new Map());
+    mocks.resolveNames.mockResolvedValue(new Map());
+    expect(await loadPilotProfile(42)).toMatchObject({ securityStatus: null });
   });
 
   it('falls back to the public record when no affiliation came back', async () => {

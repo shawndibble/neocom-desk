@@ -13,27 +13,41 @@
  * its kind has actually entered the chain — an alliance-less character (or
  * corp) never puts the Alliance tab into `loading`, so it never appears,
  * which is what keeps that case tab-hidden rather than tab-with-an-error.
+ *
+ * The Character tab is Pilot Lookup's result (`PilotProfileView`): identity,
+ * zKillboard stats and recent kills and losses, so a character reads the same
+ * wherever it's opened. Its corporation and alliance come from the live
+ * affiliation `loadPilotProfile` resolves, and the Corporation and Alliance
+ * tabs follow those ids, not the cached public record's, so the two agree.
+ * The dialog is `wide` for a character, since that view needs the room.
+ *
+ * A link inside the modal that changes page (Open in Fittings) closes it.
  */
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import { EmptyState, Modal, Spinner, Tabs, type TabItem } from '@/components/ui';
 import {
   loadPublicAllianceInfo,
-  loadPublicCharacterInfo,
   loadPublicCorporationInfo,
   type PublicAllianceInfo,
-  type PublicCharacterInfo,
   type PublicCorporationInfo,
 } from '@/features/character/publicInfoData';
-import { allianceLogoUrl, characterPortraitUrl, corporationLogoUrl } from '@/lib/eveImages';
-import { allianceZkillUrl, characterZkillUrl, corporationZkillUrl } from '@/lib/zkillboard';
+import { loadPilotProfile, type PilotProfile } from '@/features/travel/pilotLookup';
+import { allianceLogoUrl, corporationLogoUrl } from '@/lib/eveImages';
+import { allianceZkillUrl, corporationZkillUrl } from '@/lib/zkillboard';
 import { usePublicInfoModalStore, type PublicInfoKind } from '@/stores/publicInfoModal';
 
 const LazyEmploymentTab = lazy(() => import('@/features/character/PublicInfoEmploymentTab'));
+// Lazy: its killmail fits pull in Fittings, and this modal is mounted app-wide.
+const LazyPilotProfileView = lazy(() => import('@/features/travel/PilotProfileView'));
 
 type TabState<T> =
   { status: 'idle' } | { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: T };
+
+/** `unknown` is ESI having no such character, apart from `error`, ESI not answering. */
+type CharacterState = TabState<PilotProfile> | { status: 'unknown' };
 
 const IDLE: TabState<never> = { status: 'idle' };
 
@@ -41,11 +55,21 @@ export function PublicInfoModal() {
   const { t } = useTranslation();
   const request = usePublicInfoModalStore((state) => state.request);
   const close = usePublicInfoModalStore((state) => state.close);
+  const { pathname } = useLocation();
+  const shownPathname = useRef(pathname);
 
   const [activeTab, setActiveTab] = useState<PublicInfoKind | 'employment'>('character');
-  const [character, setCharacter] = useState<TabState<PublicCharacterInfo>>(IDLE);
+  const [character, setCharacter] = useState<CharacterState>(IDLE);
   const [corporation, setCorporation] = useState<TabState<PublicCorporationInfo>>(IDLE);
   const [alliance, setAlliance] = useState<TabState<PublicAllianceInfo>>(IDLE);
+
+  // Runs after render, so a caller must not navigate and open in one handler — the
+  // open would be closed straight away. None does: every opener stays on its page.
+  useEffect(() => {
+    if (shownPathname.current === pathname) return;
+    shownPathname.current = pathname;
+    close();
+  }, [pathname, close]);
 
   useEffect(() => {
     if (!request) return;
@@ -60,11 +84,23 @@ export function PublicInfoModal() {
       let allianceId: number | undefined;
 
       if (request.kind === 'character') {
-        const info = await loadPublicCharacterInfo(request.id);
+        let profile: PilotProfile | null;
+        try {
+          profile = await loadPilotProfile(request.id);
+        } catch {
+          if (!cancelled) setCharacter({ status: 'error' });
+          return;
+        }
         if (cancelled) return;
-        setCharacter(info ? { status: 'ready', data: info } : { status: 'error' });
-        corporationId = info?.corporation_id;
-        allianceId = info?.alliance_id;
+        if (profile === null) {
+          setCharacter({ status: 'unknown' });
+          return;
+        }
+        setCharacter({ status: 'ready', data: profile });
+        corporationId = profile.corporationId;
+        allianceId = profile.allianceId ?? undefined;
+        // Known up front, so its tab shows now rather than after the corporation loads.
+        if (allianceId !== undefined) setAlliance({ status: 'loading' });
       } else if (request.kind === 'corporation') {
         corporationId = request.id;
       } else {
@@ -76,7 +112,8 @@ export function PublicInfoModal() {
         const info = await loadPublicCorporationInfo(corporationId);
         if (cancelled) return;
         setCorporation(info ? { status: 'ready', data: info } : { status: 'error' });
-        allianceId = allianceId ?? info?.alliance_id;
+        // A character's alliance is its live affiliation's; the cached corp record can lag.
+        if (request.kind === 'corporation') allianceId = info?.alliance_id;
       }
 
       if (allianceId !== undefined) {
@@ -100,8 +137,8 @@ export function PublicInfoModal() {
   if (corporation.status !== 'idle')
     tabs.push({ id: 'corporation', label: t('publicInfo.corporationTab') });
   if (alliance.status !== 'idle') tabs.push({ id: 'alliance', label: t('publicInfo.allianceTab') });
-  // Only a character has a corporation history to show.
-  if (request.kind === 'character' && character.status !== 'idle')
+  // Only a character has a corporation history to show — and not one EVE has no record of.
+  if (request.kind === 'character' && character.status !== 'idle' && character.status !== 'unknown')
     tabs.push({ id: 'employment', label: t('publicInfo.employmentTab') });
 
   const activeData =
@@ -109,7 +146,12 @@ export function PublicInfoModal() {
   const title = activeData.status === 'ready' ? activeData.data.name : t('publicInfo.title');
 
   return (
-    <Modal open onClose={close} title={title}>
+    <Modal
+      open
+      onClose={close}
+      title={title}
+      placement={request.kind === 'character' ? 'wide' : 'center'}
+    >
       <div className="space-y-3">
         {tabs.length > 0 && (
           <Tabs
@@ -123,17 +165,14 @@ export function PublicInfoModal() {
         {activeTab === 'character' && (
           <CharacterTab
             state={character}
-            corporationName={corporation.status === 'ready' ? corporation.data.name : undefined}
-            allianceName={alliance.status === 'ready' ? alliance.data.name : undefined}
-            onOpenCorporation={
-              corporation.status !== 'idle' ? () => setActiveTab('corporation') : undefined
-            }
-            onOpenAlliance={alliance.status !== 'idle' ? () => setActiveTab('alliance') : undefined}
+            onOpenCorporation={() => setActiveTab('corporation')}
+            onOpenAlliance={() => setActiveTab('alliance')}
           />
         )}
         {activeTab === 'corporation' && (
           <CorporationTab
             state={corporation}
+            allianceId={character.status === 'ready' ? character.data.allianceId : undefined}
             allianceName={alliance.status === 'ready' ? alliance.data.name : undefined}
             onOpenAlliance={alliance.status !== 'idle' ? () => setActiveTab('alliance') : undefined}
           />
@@ -156,8 +195,8 @@ export function PublicInfoModal() {
 }
 
 /**
- * Kills and losses are not in ESI's public-info endpoints, so each tab links
- * out to that entity's own zKillboard page rather than showing them inline.
+ * A corporation's or alliance's kills and losses aren't shown inline (only a
+ * character's are, in its tab), so those tabs link out to zKillboard instead.
  */
 function ZkillRow({ href }: { href: string }) {
   const { t } = useTranslation();
@@ -193,74 +232,50 @@ function TabStatus({ status }: { status: 'loading' | 'error' }) {
 
 function CharacterTab({
   state,
-  corporationName,
-  allianceName,
   onOpenCorporation,
   onOpenAlliance,
 }: {
-  state: TabState<PublicCharacterInfo>;
-  /** Filled in once the corp/alliance chain resolves; a bare id shows until then. */
-  corporationName?: string;
-  allianceName?: string;
-  onOpenCorporation?: () => void;
-  onOpenAlliance?: () => void;
+  state: CharacterState;
+  onOpenCorporation: () => void;
+  onOpenAlliance: () => void;
 }) {
   const { t } = useTranslation();
+  if (state.status === 'unknown') {
+    return (
+      <EmptyState
+        title={t('publicInfo.characterUnknownTitle')}
+        hint={t('publicInfo.characterUnknownHint')}
+        className="py-8"
+      />
+    );
+  }
   if (state.status !== 'ready')
     return <TabStatus status={state.status === 'idle' ? 'loading' : state.status} />;
-  const { data } = state;
   return (
-    <div className="flex items-start gap-3 text-xs">
-      <img
-        src={characterPortraitUrl(data.character_id, 128)}
-        crossOrigin="anonymous"
-        alt=""
-        width={64}
-        height={64}
-        className="shrink-0 rounded-xs border border-line"
+    <Suspense fallback={<TabStatus status="loading" />}>
+      <LazyPilotProfileView
+        key={state.data.characterId}
+        profile={state.data}
+        hideName
+        onOpenCorporation={onOpenCorporation}
+        onOpenAlliance={onOpenAlliance}
       />
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-        <dt className="text-text-dim uppercase">{t('publicInfo.securityStatus')}</dt>
-        <dd>{data.security_status?.toFixed(1) ?? t('common.unknown')}</dd>
-
-        <dt className="text-text-dim uppercase">{t('publicInfo.corporation')}</dt>
-        <dd>
-          {onOpenCorporation ? (
-            <button type="button" onClick={onOpenCorporation} className={inlineLinkClassName}>
-              {corporationName ?? `#${data.corporation_id}`}
-            </button>
-          ) : (
-            (corporationName ?? `#${data.corporation_id}`)
-          )}
-        </dd>
-
-        {data.alliance_id !== undefined && (
-          <>
-            <dt className="text-text-dim uppercase">{t('publicInfo.alliance')}</dt>
-            <dd>
-              {onOpenAlliance ? (
-                <button type="button" onClick={onOpenAlliance} className={inlineLinkClassName}>
-                  {allianceName ?? `#${data.alliance_id}`}
-                </button>
-              ) : (
-                (allianceName ?? `#${data.alliance_id}`)
-              )}
-            </dd>
-          </>
-        )}
-
-        <ZkillRow href={characterZkillUrl(data.character_id)} />
-      </dl>
-    </div>
+    </Suspense>
   );
 }
 
 function CorporationTab({
   state,
+  allianceId: liveAllianceId,
   allianceName,
   onOpenAlliance,
 }: {
   state: TabState<PublicCorporationInfo>;
+  /**
+   * A character's live alliance (null: none), which wins over the cached corp
+   * record's so this row and the Alliance tab agree. Undefined for a corp request.
+   */
+  allianceId?: number | null;
   /** Filled in once the alliance fetch resolves; a bare id shows until then. */
   allianceName?: string;
   onOpenAlliance?: () => void;
@@ -269,6 +284,7 @@ function CorporationTab({
   if (state.status !== 'ready')
     return <TabStatus status={state.status === 'idle' ? 'loading' : state.status} />;
   const { data } = state;
+  const allianceId = liveAllianceId === undefined ? data.alliance_id : liveAllianceId;
   return (
     <div className="flex items-start gap-3 text-xs">
       <img
@@ -289,16 +305,16 @@ function CorporationTab({
         <dt className="text-text-dim uppercase">{t('publicInfo.ceo')}</dt>
         <dd>{data.ceoName ?? t('common.unknown')}</dd>
 
-        {data.alliance_id !== undefined && (
+        {allianceId != null && (
           <>
             <dt className="text-text-dim uppercase">{t('publicInfo.alliance')}</dt>
             <dd>
               {onOpenAlliance ? (
                 <button type="button" onClick={onOpenAlliance} className={inlineLinkClassName}>
-                  {allianceName ?? `#${data.alliance_id}`}
+                  {allianceName ?? `#${allianceId}`}
                 </button>
               ) : (
-                (allianceName ?? `#${data.alliance_id}`)
+                (allianceName ?? `#${allianceId}`)
               )}
             </dd>
           </>
