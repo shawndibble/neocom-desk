@@ -110,6 +110,7 @@ describe('the choice list', () => {
       '/mail',
       '/calendar',
       '/contacts',
+      '/travel',
       '/characters',
     ]);
   });

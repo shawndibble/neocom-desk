@@ -406,7 +406,7 @@ describe('Layout desktop rail domain grouping', () => {
     expect(within(rail).queryByRole('link', { name: 'Home' })).not.toBeInTheDocument();
   });
 
-  it('orders the rail as Overview, then Progression/Economy/Social groups in full', () => {
+  it('orders the rail as Overview, then Progression/Economy/Social/Intel groups in full', () => {
     mockIsSyncConfigured.mockReturnValue(false);
     renderLayout();
 
@@ -438,6 +438,8 @@ describe('Layout desktop rail domain grouping', () => {
       'Mail',
       'Calendar',
       'Contacts',
+      '[Intel]',
+      'Travel',
     ]);
   });
 

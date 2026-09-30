@@ -25,6 +25,11 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'across', labelKey: 'contacts.tabAcrossCharacters' },
 ]);
 
+/** Travel (issue #2328). Thera/Turnur and Pilot Lookup join as tabs (#2330, #2331). */
+export const TRAVEL_TABS = definePageTabs('/travel', [
+  { id: 'route', labelKey: 'travel.routeTab' },
+]);
+
 /**
  * Settings has no tab bar: each entry is a section in the page's own left rail
  * (`features/settings/sections.ts` groups them and decides which the rail
@@ -126,6 +131,7 @@ export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/planetary-industry': PI_TABS,
   '/mining': MINING_TABS,
   '/wallet': WALLET_TABS,
+  '/travel': TRAVEL_TABS,
 };
 
 const TABBED_PAGES = Object.values(PAGE_TABS);

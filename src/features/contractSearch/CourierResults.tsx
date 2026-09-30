@@ -59,6 +59,11 @@ import {
 import { EndpointRiskMarkers, RiskMarker } from '@/features/contractSearch/courierRiskDisplay';
 import { MARKED_RISKS } from '@/features/contractSearch/courierRiskLabels';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
+import {
+  DEFAULT_ROUTE_PREFERENCE,
+  ROUTE_PREFERENCE_LABEL_KEYS,
+  ROUTE_PREFERENCES,
+} from '@/features/route/routePreferences';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
 import {
   CourierContractDetailModal,
@@ -423,7 +428,7 @@ function RoutePreferenceField({
         <SelectContent>
           {ROUTE_PREFERENCES.map((preference) => (
             <SelectItem key={preference} value={preference}>
-              {t(`contractSearch.routePreference.${preference}`)}
+              {t(ROUTE_PREFERENCE_LABEL_KEYS[preference])}
             </SelectItem>
           ))}
         </SelectContent>
@@ -609,26 +614,6 @@ function CourierFilterBar({
     </FilterBar>
   );
 }
-
-/**
- * The preferences offered, in the order a hauler weighs them. Deliberately
- * component state rather than a saved setting: a second *persisted* route
- * preference is what would force unifying this vocabulary with the Assets
- * page's own `RoutePreference` and ESI's flag names, and that unification is
- * recorded as work to do before such a control ships, not as part of this one.
- */
-const ROUTE_PREFERENCES: readonly RoutePreferenceKind[] = [
-  'prefer-highsec',
-  'shortest',
-  'avoid-highsec',
-];
-
-/**
- * Highsec-preferring by default: it is the trip most haulers will actually
- * fly, and a rate quoted against a route nobody would take is the wrong
- * number to rank on.
- */
-const DEFAULT_ROUTE_PREFERENCE: RoutePreferenceKind = 'prefer-highsec';
 
 /** The Courier board's own filter, route preference and show-all, in the URL (ADR 0015) as one group. */
 const COURIER_FILTER_PARAMS = {

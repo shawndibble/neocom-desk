@@ -30,7 +30,13 @@ Missioneers' Atlas (live: static-SDE LP store finder with LP/ISK cost and
 required items, plus agent finder, mission browser and zKill system intel — no
 market pricing, wallet or industry; the LP finder is covered by #718/#1050/#1068,
 the rest is mission-running remit), Gatewatch (Discord intel/DScan backend) and
-EVE PvP Corp Activity Search (both intel, non-ISK).
+EVE PvP Corp Activity Search (both intel).
+
+**Remit widened (#2328, decision `20260929-234357`): intel and travel tools are
+in scope** — route safety (kills/jumps along a route), Thera/Turnur connections
+and pilot lookup live in the Travel section. "Intel" or "non-ISK" alone no
+longer clears a tool; re-read any cleared on those grounds for these three
+shapes. Client-reading intel (Local scan, DScan) still dies on kill-test 2.
 
 **Three classes are closed, and with them the ecosystem has no untested class
 left**; a sweep's job is to notice a tool fitting none of them. (1) _Web
@@ -110,7 +116,8 @@ Survey method, all still current:
   Map Tool, Eve-mentor-mcp, WarBeacon, Project Eden, EVE 3D MAP,
   @strata-eve/esi SDK, Eve Missile Analyst, Eve Ship Stats, Grey Zone
   Automation, EVE Intelligence Nexus, Eveswitcher, Insurgency Tools,
-  Battlefield.Space. Cleared, non-ISK: Ministry of Pantoscopic Observance
+  Battlefield.Space. Cleared as non-ISK before the #2328 remit change (re-check
+  any that offer route safety, Thera/Turnur or pilot lookup): Ministry of Pantoscopic Observance
   (intel desk calculator), Rangefinder (cyno routing), EVE OQM integration
   (dev-recruitment thread, nothing shipped), Nexum (wormhole chain mapper),
   Helm (plugin-first corp platform, no industry plugin exists), fleet-manager
@@ -191,7 +198,9 @@ Numbering is stable — later runs cite these by number. Append, never renumber.
     boundary.
 13. **A pre-investment calc with no ESI ground truth is a maintenance trap.**
 14. **No bulk market-history endpoint** — kills market-wide movers/trending.
-15. **Every real route requires a Character** (`FEATURE_ROUTES`, `ScopeGate`).
+15. **Every real route requires a Character** (`FEATURE_ROUTES`, `ScopeGate`) —
+    a logged-out-only tool dies here, but a travel/intel tool behind sign-in is
+    on remit (#2328).
 16. **`invTypes.volume` is assembled, not packaged** — narrows product volume.
 17. **A PI pin's live state is untrustworthy or deliberately unread.**
 18. **A badge is noise when most rows pass** — mark exceptions only (#1015).

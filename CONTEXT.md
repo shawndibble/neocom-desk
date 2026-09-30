@@ -433,6 +433,11 @@ here — they go one per file in `docs/context/decisions/`.
   rather than as a matched return trip. A haul with an end nothing local places
   has **no lane to look up** — stated as such, never as a count of zero, which
   would read as "nobody is hauling back" where the truth is "we cannot tell".
+- **Route Safety**: Travel's view of a stargate route — every system on it, in
+  order, with its security, region, the last hour of jumps and ship, pod and
+  NPC kills ESI reports, and a mark on any **Gank Chokepoint**. States
+  conditions, never a verdict: no system or route is ever called safe or not.
+  A figure ESI could not supply is unknown, never zero.
 - **Route Preference**: Which trip a distance describes — prefer highsec,
   shortest, or avoid highsec, the three the local jump graph supports
   (`engine/route/jumpRoute.ts`, issue #942). A reader's choice rather than a

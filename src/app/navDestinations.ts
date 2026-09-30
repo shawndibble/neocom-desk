@@ -30,7 +30,7 @@ export type NavGating = 'scope' | 'corp' | 'ungated';
  * `primary` sits at the top of the rail with no heading; `footer` is pinned
  * below the scrolling rail (Settings, then the Character link).
  */
-export type NavGroupId = 'primary' | 'progression' | 'economy' | 'social' | 'footer';
+export type NavGroupId = 'primary' | 'progression' | 'economy' | 'social' | 'intel' | 'footer';
 
 export interface NavGroup {
   readonly id: NavGroupId;
@@ -48,6 +48,13 @@ export const NAV_GROUPS = [
   { id: 'progression', labelKey: 'nav.groups.progression' },
   { id: 'economy', labelKey: 'nav.groups.economy' },
   { id: 'social', labelKey: 'nav.groups.social' },
+  /*
+   * Where you are going and who is there: Travel's Route Safety today, with
+   * Thera/Turnur connections and Pilot Lookup to come (#2330, #2331) — the
+   * intel tools the remit took in with #2328. Not "Travel" as a heading: it
+   * would sit over a single item of the same name.
+   */
+  { id: 'intel', labelKey: 'nav.groups.intel' },
   { id: 'footer', labelKey: null },
 ] as const satisfies readonly NavGroup[];
 
@@ -189,6 +196,17 @@ export const NAV_PAGES = [
     labelKey: 'nav.contacts',
     group: 'social',
     gating: 'scope',
+    mobileTab: true,
+  },
+  /*
+   * `ungated` rather than `scope`: every read is public ESI or the local
+   * stargate graph, so there is no grant whose absence could lock it.
+   */
+  {
+    path: '/travel',
+    labelKey: 'nav.travel',
+    group: 'intel',
+    gating: 'ungated',
     mobileTab: true,
   },
   {
