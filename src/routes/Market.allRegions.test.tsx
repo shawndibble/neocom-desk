@@ -61,7 +61,7 @@ vi.mock('virtual:pwa-register/react', () => ({
 }));
 
 const GROUPS: MarketGroupNode[] = [{ id: 2, name: 'Frigates', parentId: null, hasTypes: true }];
-const TYPES: MarketTypeEntry[] = [{ typeId: RIFTER, name: 'Rifter', marketGroupId: 2 }];
+const TYPES: MarketTypeEntry[] = [{ typeId: RIFTER, name: 'Rifter', marketGroupId: 2, volume: 1 }];
 const STATIONS: NpcStationEntry[] = [
   { id: JITA_4_4, name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant', systemId: JITA },
   { id: AMARR_8, name: 'Amarr VIII (Oris) - Emperor Family Academy', systemId: AMARR },

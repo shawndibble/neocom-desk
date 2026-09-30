@@ -26,10 +26,10 @@ const catalogue: FittingCatalogue = {
   types: {},
   rackOf: { 1: 'low', 2: 'low', 3: 'medium', 4: 'medium' },
   marketTypes: [
-    { typeId: 1, name: 'Damage Control I', marketGroupId: 10 },
-    { typeId: 2, name: 'Damage Control II', marketGroupId: 10 },
-    { typeId: 3, name: '1MN Afterburner II', marketGroupId: 20 },
-    { typeId: 4, name: 'Anchoring Array', marketGroupId: 30 },
+    { typeId: 1, name: 'Damage Control I', marketGroupId: 10, volume: 1 },
+    { typeId: 2, name: 'Damage Control II', marketGroupId: 10, volume: 1 },
+    { typeId: 3, name: '1MN Afterburner II', marketGroupId: 20, volume: 1 },
+    { typeId: 4, name: 'Anchoring Array', marketGroupId: 30, volume: 1 },
   ],
   groupsById: new Map([
     [10, { id: 10, name: 'Damage Controls', parentId: null, hasTypes: true }],
