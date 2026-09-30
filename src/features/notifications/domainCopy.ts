@@ -27,6 +27,7 @@ import i18n from '@/i18n';
 import type {
   NotificationFire,
   SpExtractionFire,
+  CloneJumpReadyFire,
   IndustryJobNotificationFire,
   PlanetaryNotificationFire,
   ExtractorExpiringFire,
@@ -145,6 +146,18 @@ export const skillQueueCopy: DomainCopy<NotificationFire, SkillNames> & {
 
 export const spExtractionCopy: DomainCopy<SpExtractionFire, NoNames> = {
   poll: (_fire, character) => simple('spExtractionReady', { character }),
+};
+
+/* Clone jump -------------------------------------------------------------- */
+
+export const cloneJumpCopy: DomainCopy<CloneJumpReadyFire, NoNames> & {
+  readonly push: PushCopy<CloneJumpReadyFire, NoNames>;
+} = {
+  poll: (_fire, character) => simple('cloneJumpReady', { character }),
+  push: (_fire, character) => {
+    assertProjectionWording('cloneJumpReady', 'assert');
+    return renderSharedWording('cloneJumpReady', { character });
+  },
 };
 
 /* Industry jobs ----------------------------------------------------------- */

@@ -11,6 +11,7 @@ import type { NotificationCopy } from '@/engine/notificationWording';
 import {
   skillQueueCopy,
   spExtractionCopy,
+  cloneJumpCopy,
   industryJobCopy,
   colonyCopy,
   mailCopy,
@@ -28,6 +29,12 @@ import {
 } from './domainCopy';
 
 const C = 1;
+const cloneJump = {
+  eventId: 'cloneJumpReady',
+  characterId: C,
+  lastJumpMs: 0,
+  readyAtMs: 1,
+} as const;
 const PILOT = 'Kestrel';
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
@@ -117,6 +124,11 @@ describe('poll copy', () => {
         title: 'SP extraction ready',
         body: 'Kestrel has enough spare skill points to use a Skill Extractor.',
       },
+    },
+    {
+      name: 'cloneJumpReady',
+      render: () => cloneJumpCopy.poll(cloneJump, PILOT, {}),
+      expected: { title: 'Clone jump ready', body: 'Kestrel can jump clones again.' },
     },
     {
       name: 'industryJobComplete, product',
@@ -534,6 +546,11 @@ describe('push copy', () => {
       name: 'characterNotTraining',
       render: () => skillQueueCopy.push(notTraining, PILOT, {}),
       expected: { title: 'Not training', body: 'Kestrel has no skill in training.' },
+    },
+    {
+      name: 'cloneJumpReady',
+      render: () => cloneJumpCopy.push(cloneJump, PILOT, {}),
+      expected: { title: 'Clone jump ready', body: 'Kestrel can jump clones again.' },
     },
     {
       name: 'industryJobComplete, named',

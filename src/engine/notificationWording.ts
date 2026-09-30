@@ -61,6 +61,10 @@ export const SHARED_NOTIFICATION_WORDING = {
     title: 'Industry job complete',
     body: "{{character}}'s industry job for {{item}} is complete.",
   },
+  cloneJumpReady: {
+    title: 'Clone jump ready',
+    body: '{{character}} can jump clones again.',
+  },
   planetaryExtractionDone: {
     title: 'Extraction done',
     body: "{{character}}'s extraction on {{planet}} has stopped.",
