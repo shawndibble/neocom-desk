@@ -121,6 +121,7 @@ export const loadMail = named(() => import('@/routes/Mail'), 'Mail');
 export const loadCalendar = named(() => import('@/routes/Calendar'), 'Calendar');
 export const loadContracts = named(() => import('@/routes/Contracts'), 'Contracts');
 export const loadContacts = named(() => import('@/routes/Contacts'), 'Contacts');
+export const loadTravel = named(() => import('@/routes/Travel'), 'Travel');
 export const loadEmploymentHistory = named(
   () => import('@/routes/EmploymentHistory'),
   'EmploymentHistory'
@@ -176,6 +177,7 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/contracts': loadContracts,
   '/bpc-contracts': loadIndustry,
   '/contacts': loadContacts,
+  '/travel': loadTravel,
   '/settings': loadSettings,
 };
 

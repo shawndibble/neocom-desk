@@ -522,6 +522,16 @@ export const ESI_REGISTRY = {
     route: '/industry/systems',
     scope: PUBLIC,
   },
+  // Route Safety (issue #2328): one call each answers the whole universe, so a
+  // route of any length costs two requests, never one per system.
+  getUniverseSystemKills: {
+    route: '/universe/system_kills',
+    scope: PUBLIC,
+  },
+  getUniverseSystemJumps: {
+    route: '/universe/system_jumps',
+    scope: PUBLIC,
+  },
 
   // Base grant, deliberately: the Build Plan's build-location search is a plain
   // feature of a route every Character can open, and it pairs with
