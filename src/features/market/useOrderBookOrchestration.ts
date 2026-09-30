@@ -268,11 +268,14 @@ export function useOrderBookOrchestration({
   // back to the header's hub or region and the note says why.
   const rangeWaiting = rangeSet && jumpRangeFilter.status === 'loading';
   const rangeAcross = rangeSet && jumpRangeFilter.status === 'ready';
-  const fetchesAcross = allRegions || rangeAcross || rangeWaiting;
+  const rangeReaches = rangeAcross || rangeWaiting;
+  const fetchesAcross = allRegions || rangeReaches;
 
   // `allRegions` apart from `chosenRegionId`: The Forge → All regions with
   // Jita as hub is the same region id, yet a different book.
-  const resetKey = `${selectedTypeId ?? 'none'}:${chosenRegionId}:${allRegions || rangeAcross ? 'all' : 'one'}`;
+  // A range that reaches out ignores the header's hub and region entirely, so
+  // changing them (or the range resolving) is no new book.
+  const resetKey = `${selectedTypeId ?? 'none'}:${rangeReaches ? 'range' : `${chosenRegionId}:${allRegions ? 'all' : 'one'}`}`;
   const [resetForKey, setResetForKey] = useState<string | null>(null);
   if (resetKey !== resetForKey) {
     setResetForKey(resetKey);
@@ -428,10 +431,10 @@ export function useOrderBookOrchestration({
   // Location Mode, Trade Hub station, the order-row "filter to this station"
   // action (CONTEXT.md round 10), the filter bar, split and sort all happen
   // in the view.
-  // All regions with no region catalogue has no "every region" to read: a
-  // failed book (with its retry), not a spinner waiting on a list that
-  // isn't coming.
-  const regionsUnavailable = allRegions && catalogueError;
+  // A fan-out (All regions, or a range) with no region catalogue has no
+  // "every region" to read: a failed book (with its retry), not a spinner
+  // waiting on a list that isn't coming.
+  const regionsUnavailable = fetchesAcross && catalogueError;
   const settledFetch = regionsUnavailable ? REGIONS_UNAVAILABLE_FETCH : orderBookFetch;
   const spaceSystems = useMemo(
     () => (spansStations && solarSystems ? systemsInSpace(solarSystems, spaceKinds) : null),
@@ -640,7 +643,7 @@ export function useOrderBookOrchestration({
     // A fan-out clears the type in every region, not just the ones last
     // fetched: a range change since would otherwise leave some stale.
     if (selectedTypeId !== null) {
-      if (allRegions || rangeAcross) {
+      if (fetchesAcross) {
         clearOrderBookViewCacheAcross(selectedTypeId, allMarketRegionIds, bookLocation);
       } else {
         clearOrderBookViewCache(selectedTypeId, orderBookLocation);
