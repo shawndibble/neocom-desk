@@ -36,9 +36,12 @@ function useModuleNames(fits: readonly PopularFit[] | null): ReadonlyMap<number,
     const typeIds = [...new Set(fits.flatMap((fit) => fit.parts.modules.map((m) => m.typeId)))];
     void Promise.all(
       typeIds.map(async (typeId): Promise<[number, string]> => [typeId, await typeName(typeId)])
-    ).then((resolved) => {
-      if (!cancelled) setNames(new Map(resolved));
-    });
+    )
+      .then((resolved) => {
+        if (!cancelled) setNames(new Map(resolved));
+      })
+      // No SDE, no names: the icons keep their `#id` fallback.
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -106,17 +109,11 @@ export function PopularFitsPanel({
                       )}
                     >
                       {typeIds.map((typeId, slotIndex) => {
-                        const name = names.get(typeId);
-                        return name === undefined ? (
-                          <TypeIcon
-                            key={slotIndex}
-                            typeId={typeId}
-                            size={32}
-                            width={20}
-                            height={20}
-                          />
-                        ) : (
-                          <Tooltip key={slotIndex} content={name}>
+                        const name = names.get(typeId) ?? `#${typeId}`;
+                        // Not a tab stop: ~20 per fit would bury Open; the name reaches
+                        // screen readers as the icon's label, and touch reads it by tap.
+                        return (
+                          <Tooltip key={slotIndex} content={name} openOnTap>
                             <span role="img" aria-label={name} className="inline-flex">
                               <TypeIcon typeId={typeId} size={32} width={20} height={20} />
                             </span>
