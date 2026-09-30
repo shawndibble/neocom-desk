@@ -155,7 +155,8 @@
         "unskilledNote": "Base values, before your skills.",
         "subsystems": "A Tech III hull's slots and hardpoints come from the subsystems fitted to it.",
         "simulate": "Simulate",
-        "simulateFailed": "Couldn't open this hull in the editor."
+        "simulateFailed": "Couldn't open this hull in the editor.",
+        "popularFailed": "Couldn't open that fit in the editor."
       },
       "skills": {
         "masteryTitle": "Mastery",
@@ -446,6 +447,18 @@
       "cargoAddMenu_other": "Add {{count}} to cargo",
       "cargoAddCount_one": "+{{count}}",
       "cargoAddCount_other": "+{{count}}"
+    },
+    "popular": {
+      "title": "Popular fits",
+      "loading": "Loading popular fits from zKillboard…",
+      "failed": "Couldn't load popular fits from zKillboard right now. Everything else still works.",
+      "empty": "No recent losses of this hull with a full fit.",
+      "losses_one": "{{count}} loss",
+      "losses_other": "{{count}} losses",
+      "lastSeen": "last seen {{age}}",
+      "value": "~{{value}} ISK",
+      "open": "Open",
+      "fitName": "{{hullName}} popular fit {{rank}}"
     },
     "start": {
       "newTitle": "New fitting from a hull",

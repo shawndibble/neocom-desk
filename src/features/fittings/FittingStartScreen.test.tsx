@@ -16,6 +16,7 @@ const useEndpointsGrantedMock = vi.hoisted(() => vi.fn());
 vi.mock('@/app/useGrantedScopes', () => ({ useEndpointsGranted: useEndpointsGrantedMock }));
 const loadInGameFittingsMock = vi.hoisted(() => vi.fn());
 vi.mock('./inGameFittings', () => ({ loadInGameFittings: loadInGameFittingsMock }));
+vi.mock('./popularFits', () => ({ usePopularFits: () => ({ ok: true, fits: [] }) }));
 vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => ({ '587': { name: 'Rifter' }, '24698': { name: 'Drake' } })),
 }));

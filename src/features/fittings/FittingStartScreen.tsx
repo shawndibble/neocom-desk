@@ -294,6 +294,11 @@ export function FittingStartScreen({
             onStartHull(hull);
             onOpened?.();
           }}
+          onOpenPopular={async (loaded) => {
+            await workspace.openLoaded(loaded);
+            setHullOpen(false);
+            onOpened?.();
+          }}
         />
       </Modal>
       <Modal
