@@ -548,11 +548,13 @@ const MARKET_VOLUME_CONTROL_EXPECTED = 0.01;
 const PACKAGED_VOLUME_PROBE_CONCURRENCY = 8;
 const PACKAGED_VOLUME_CHECKPOINT_EVERY = 500;
 
-/** Fetches one type's ESI record. */
+/** Fetches one type's ESI record, or null for a type ESI doesn't know (404). */
 async function fetchTypeInfo(typeID) {
   const url = `${ESI_BASE}/universe/types/${typeID}/?datasource=tranquility`;
   const res = await fetchEsiProbe(url);
-  if (res.status === 404) throw new Error(`HTTP 404 for ${url}`);
+  // A 404 is a definite answer, not a transient failure: cached as "no
+  // figure" by the probe so one retired type can't fail every rebuild.
+  if (res.status === 404) return null;
   return res.json();
 }
 
@@ -1210,7 +1212,12 @@ async function main() {
   const { volumes: packagedVolumeByType, failed: packagedVolumeProbeFailures } =
     await probePackagedVolumes(packagedVolumeTypeIds);
   let packagedVolumeApplied = 0;
-  for (const [typeID, packagedVolume] of packagedVolumeByType) {
+  // Only the material types: the probe now also covers every market type,
+  // and types.json keeps #1085's scope rather than growing a packaged figure
+  // for every hull it names as a blueprint product.
+  for (const typeID of manufacturingMaterialTypeIds) {
+    const packagedVolume = packagedVolumeByType.get(typeID);
+    if (packagedVolume === undefined) continue;
     const entry = typeMap[typeID];
     if (entry && packagedVolume !== entry.volume) {
       entry.packagedVolume = packagedVolume;
@@ -1620,7 +1627,7 @@ async function main() {
   const marketTypes = [];
   for (const [typeID, t] of types) {
     if (!isMarketType(t)) continue;
-    marketTypes.push(marketTypeEntry({ ...t, typeID }, packagedVolumeByType.get(typeID)));
+    marketTypes.push(marketTypeEntry(typeID, t, packagedVolumeByType.get(typeID)));
   }
   marketTypes.sort((a, b) => a.typeId - b.typeId);
 

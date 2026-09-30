@@ -10,13 +10,13 @@ export function roundVolume(volume) {
 
 /**
  * One market/types.json entry from an invTypes row plus its ESI packaged
- * volume (undefined when the probe had none). `packagedVolume` is only
+ * volume (undefined when the probe had none), keyed by typeId. `packagedVolume` is only
  * written when it differs from `volume`, which keeps the file compact: it
  * differs for hulls and a few other assembled items, and nothing else.
  */
-export function marketTypeEntry(type, packagedVolume) {
+export function marketTypeEntry(typeId, type, packagedVolume) {
   const volume = roundVolume(type.volume);
-  const entry = { typeId: type.typeID, name: type.name, marketGroupId: type.marketGroupID, volume };
+  const entry = { typeId, name: type.name, marketGroupId: type.marketGroupID, volume };
   if (typeof packagedVolume === 'number' && packagedVolume > 0) {
     const packaged = roundVolume(packagedVolume);
     if (packaged !== volume) entry.packagedVolume = packaged;

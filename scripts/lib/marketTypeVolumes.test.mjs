@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { marketTypeEntry, roundVolume } from './marketTypeVolumes.mjs';
 
-const MERLIN = { typeID: 603, name: 'Merlin', marketGroupID: 61, volume: 16500 };
-const TRITANIUM = { typeID: 34, name: 'Tritanium', marketGroupID: 1857, volume: 0.01 };
+const MERLIN = { name: 'Merlin', marketGroupID: 61, volume: 16500 };
+const TRITANIUM = { name: 'Tritanium', marketGroupID: 1857, volume: 0.01 };
 
 describe('roundVolume', () => {
   it('keeps small volumes instead of rounding them to zero', () => {
@@ -19,7 +19,7 @@ describe('roundVolume', () => {
 
 describe('marketTypeEntry', () => {
   it('carries the packaged volume for a hull whose packaged figure differs', () => {
-    expect(marketTypeEntry(MERLIN, 2500)).toEqual({
+    expect(marketTypeEntry(603, MERLIN, 2500)).toEqual({
       typeId: 603,
       name: 'Merlin',
       marketGroupId: 61,
@@ -29,7 +29,7 @@ describe('marketTypeEntry', () => {
   });
 
   it('omits packagedVolume when it equals the volume', () => {
-    expect(marketTypeEntry(TRITANIUM, 0.01)).toEqual({
+    expect(marketTypeEntry(34, TRITANIUM, 0.01)).toEqual({
       typeId: 34,
       name: 'Tritanium',
       marketGroupId: 1857,
@@ -38,16 +38,16 @@ describe('marketTypeEntry', () => {
   });
 
   it('omits packagedVolume when it only differs by float noise', () => {
-    const entry = marketTypeEntry({ ...TRITANIUM, volume: 0.1 }, 0.10000000000000002);
+    const entry = marketTypeEntry(34, { ...TRITANIUM, volume: 0.1 }, 0.10000000000000002);
     expect(entry).not.toHaveProperty('packagedVolume');
   });
 
   it('omits packagedVolume when the probe had nothing for the type', () => {
-    expect(marketTypeEntry(MERLIN, undefined)).not.toHaveProperty('packagedVolume');
+    expect(marketTypeEntry(603, MERLIN, undefined)).not.toHaveProperty('packagedVolume');
   });
 
   it('ignores an unusable packaged volume', () => {
-    expect(marketTypeEntry(MERLIN, 0)).not.toHaveProperty('packagedVolume');
-    expect(marketTypeEntry(MERLIN, Number.NaN)).not.toHaveProperty('packagedVolume');
+    expect(marketTypeEntry(603, MERLIN, 0)).not.toHaveProperty('packagedVolume');
+    expect(marketTypeEntry(603, MERLIN, Number.NaN)).not.toHaveProperty('packagedVolume');
   });
 });
