@@ -26,13 +26,13 @@ import {
   useRouteRules,
   useSecurityPenalty,
 } from '@/features/route/routeRules';
+import { clampInt } from '@/features/industry/clampInt';
 import { AvoidedSystemsPanel } from './AvoidedSystemsPanel';
 
 /** A whole number typed into a field, clamped to its range; `null` for an unreadable entry. */
 function clampedInt(raw: string, min: number, max: number): number | null {
-  const parsed = Math.round(Number(raw));
-  if (raw.trim() === '' || !Number.isFinite(parsed)) return null;
-  return Math.min(max, Math.max(min, parsed));
+  // A cleared field leaves the setting alone rather than snapping it to `min`.
+  return raw.trim() === '' ? null : clampInt(Number(raw), min, max);
 }
 
 /**

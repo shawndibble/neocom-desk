@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
 import {
+  clearPodKillsLoad,
   ROUTE_RULE_STORES,
   useAvoidEdencom,
   useAvoidPodKills,
@@ -30,6 +31,7 @@ beforeEach(async () => {
   useAvoidEdencom.setState({ value: false });
   useAvoidPodKills.setState({ value: false });
   usePodKillThreshold.setState({ value: 3 });
+  clearPodKillsLoad();
   loadPodKills.mockReset().mockResolvedValue(new Map());
 });
 

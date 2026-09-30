@@ -24,6 +24,7 @@ import {
 } from '@/engine/route/jumpRoute';
 import { jumpCountsForRoutes, type RouteEnds } from '@/engine/route/jumpCounts';
 import { loadJumpGraph } from '@/sde/jumpGraph';
+import type { RouteRules } from './routeRules';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 
 /**
@@ -32,11 +33,7 @@ import { loadSolarSystemsById } from '@/sde/solarSystems';
  * settings here: callers compute inside effects keyed on their inputs, and
  * rules read behind their back would never re-run them when they change.
  */
-export interface LocalRouteRules {
-  preference?: RoutePreferenceKind;
-  securityPenalty?: number;
-  avoid?: readonly number[];
-}
+export type LocalRouteRules = Partial<RouteRules>;
 
 function engineOptions(
   rules: LocalRouteRules,

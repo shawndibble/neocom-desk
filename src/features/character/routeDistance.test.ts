@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import type { EsiRouteRules } from '@/features/route/esiRoute';
+import type { RouteRules } from '@/features/route/routeRules';
 import { loadJumpsAway } from './routeDistance';
 
 const server = setupServer();
@@ -21,7 +21,7 @@ const UEDAMA = 30045328;
 const SIVALA = 30003068;
 const ROUTE_URL = `${ESI_BASE_URL}/route/${JITA}/${AMARR}`;
 
-const SHORTEST: EsiRouteRules = { preference: 'shortest', securityPenalty: 50, avoid: [] };
+const SHORTEST: RouteRules = { preference: 'shortest', securityPenalty: 50, avoid: [] };
 
 interface RouteBody {
   preference?: string;
@@ -98,7 +98,7 @@ describe('loadJumpsAway', () => {
         route: body.security_penalty === 90 ? [JITA, 1, 2, 3, AMARR] : [JITA, UEDAMA, AMARR],
       })
     );
-    const safer: EsiRouteRules = { ...SHORTEST, preference: 'prefer-highsec' };
+    const safer: RouteRules = { ...SHORTEST, preference: 'prefer-highsec' };
 
     expect(await loadJumpsAway(JITA, AMARR, { ...safer, securityPenalty: 10 })).toEqual({
       kind: 'known',

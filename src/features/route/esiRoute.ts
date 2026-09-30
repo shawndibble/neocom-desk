@@ -14,21 +14,9 @@
 import { postRoute } from '@/esi/endpoints';
 import type { EsiResult } from '@/esi/client';
 import { EsiError } from '@/esi/errors';
-import { DEFAULT_SECURITY_PENALTY, type RoutePreferenceKind } from '@/engine/route/jumpRoute';
-
-/** What a route is asked under — the Travel Settings, or a page's own preference over them. */
-export interface EsiRouteRules {
-  preference: RoutePreferenceKind;
-  securityPenalty: number;
-  avoid: readonly number[];
-}
-
-/** Shortest, nothing avoided — for a caller with no Travel Settings to hand. */
-export const PLAIN_ROUTE_RULES: EsiRouteRules = {
-  preference: 'shortest',
-  securityPenalty: DEFAULT_SECURITY_PENALTY,
-  avoid: [],
-};
+import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
+import { avoidListKey } from '@/engine/route/avoidRules';
+import type { RouteRules } from './routeRules';
 
 /** The one place the app's preference names meet ESI's. */
 export function esiRoutePreference(
@@ -40,7 +28,7 @@ export function esiRoutePreference(
 }
 
 /** The list ESI is actually sent for this pair: without either end, deduped and sorted. */
-export function avoidFor(
+function avoidFor(
   originSystemId: number,
   destinationSystemId: number,
   avoid: readonly number[]
@@ -48,18 +36,6 @@ export function avoidFor(
   return [...new Set(avoid)]
     .filter((id) => id !== originSystemId && id !== destinationSystemId)
     .sort((a, b) => a - b);
-}
-
-/** FNV-1a over the ids, base 36 — a short, stable name for one avoid list. */
-function hashIds(ids: readonly number[]): string {
-  let hash = 0x811c9dc5;
-  for (const id of ids) {
-    for (const char of `${id},`) {
-      hash ^= char.charCodeAt(0);
-      hash = Math.imul(hash, 0x01000193) >>> 0;
-    }
-  }
-  return hash.toString(36);
 }
 
 /**
@@ -74,11 +50,12 @@ function hashIds(ids: readonly number[]): string {
 export function rulesCacheKey(
   originSystemId: number,
   destinationSystemId: number,
-  rules: EsiRouteRules
+  rules: RouteRules
 ): string {
   const penalty = rules.preference === 'shortest' ? '' : `:p${rules.securityPenalty}`;
   const avoid = avoidFor(originSystemId, destinationSystemId, rules.avoid);
-  return `${rules.preference}${penalty}${avoid.length ? `:a${avoid.length}:${hashIds(avoid)}` : ''}`;
+  const avoidKey = avoidListKey(avoid);
+  return `${rules.preference}${penalty}${avoidKey ? `:${avoidKey}` : ''}`;
 }
 
 /**
@@ -91,7 +68,7 @@ const AVOID_REFUSED = new Set([404, 422]);
 export async function getRouteUnderRules(
   originSystemId: number,
   destinationSystemId: number,
-  rules: EsiRouteRules,
+  rules: RouteRules,
   options: { etag?: string } = {}
 ): Promise<EsiResult<number[]>> {
   const base = {

@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { AVOID_ROUTE_RETENTION_MS, pruneRuleFor, STATIC_RETENTION_MS } from '@/esi/cachePrune';
 import { EDENCOM_SYSTEMS } from '@/engine/route/invasionSystems';
-import { rulesCacheKey, type EsiRouteRules } from './esiRoute';
+import { rulesCacheKey } from './esiRoute';
+import type { RouteRules } from './routeRules';
 
 const JITA = 30000142;
 const AMARR = 30002187;
-const SAFER: EsiRouteRules = { preference: 'prefer-highsec', securityPenalty: 50, avoid: [] };
+const SAFER: RouteRules = { preference: 'prefer-highsec', securityPenalty: 50, avoid: [] };
 
 /** The key `routeDistance.ts` stores a route under. */
-const routeKey = (rules: EsiRouteRules) =>
+const routeKey = (rules: RouteRules) =>
   `route:${JITA}:${AMARR}:${rulesCacheKey(JITA, AMARR, rules)}`;
 
 describe('rulesCacheKey', () => {

@@ -17,7 +17,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { useTicker } from '@/lib/ticker';
 import { DEFAULT_SECURITY_PENALTY, type RoutePreferenceKind } from '@/engine/route/jumpRoute';
-import { effectiveAvoid } from '@/engine/route/avoidRules';
+import { avoidListKey, effectiveAvoid } from '@/engine/route/avoidRules';
 import { EDENCOM_SYSTEMS, TRIGLAVIAN_MINOR_VICTORY_SYSTEMS } from '@/engine/route/invasionSystems';
 import { loadPodKills } from '@/features/travel/routeSafetyData';
 import { useAvoidedSystems } from './avoidedSystems';
@@ -48,23 +48,14 @@ export function parseRoutePreference(raw: unknown): RoutePreferenceKind | null {
     : null;
 }
 
-export function parsePodKillThreshold(raw: unknown): number | null {
-  return typeof raw === 'number' &&
-    Number.isInteger(raw) &&
-    raw >= MIN_POD_KILL_THRESHOLD &&
-    raw <= MAX_POD_KILL_THRESHOLD
-    ? raw
-    : null;
+/** A stored whole number in `[min, max]`, or `null` — the parse both numeric Travel Settings share. */
+function intInRange(min: number, max: number): (raw: unknown) => number | null {
+  return (raw) =>
+    typeof raw === 'number' && Number.isInteger(raw) && raw >= min && raw <= max ? raw : null;
 }
 
-export function parseSecurityPenalty(raw: unknown): number | null {
-  return typeof raw === 'number' &&
-    Number.isInteger(raw) &&
-    raw >= MIN_SECURITY_PENALTY &&
-    raw <= MAX_SECURITY_PENALTY
-    ? raw
-    : null;
-}
+export const parsePodKillThreshold = intInRange(MIN_POD_KILL_THRESHOLD, MAX_POD_KILL_THRESHOLD);
+export const parseSecurityPenalty = intInRange(MIN_SECURITY_PENALTY, MAX_SECURITY_PENALTY);
 
 export const useDefaultRoutePreference = createSyncedSetting<RoutePreferenceKind>({
   key: ROUTE_PREFERENCE_KEY,
@@ -117,6 +108,7 @@ export const ROUTE_RULE_STORES = [
   usePodKillThreshold,
 ] as const;
 
+/** What one route is asked under — the shape every jump count, local or ESI, takes. */
 export interface RouteRules {
   /** The pilot's default; a page with its own picker passes its choice instead. */
   preference: RoutePreferenceKind;
@@ -124,6 +116,10 @@ export interface RouteRules {
   securityPenalty: number;
   /** Every system to keep out of, sorted — see `engine/route/avoidRules.ts`. */
   avoid: readonly number[];
+}
+
+/** The Travel Settings as `useRouteRules` reads them. */
+export interface TravelSettingsState extends RouteRules {
   /**
    * False until every setting has been read — and, with pod-kill avoidance
    * on, the kill feed too — so nothing routes once on defaults.
@@ -155,6 +151,25 @@ function useHydratedAll(): boolean {
   return flags.every(Boolean);
 }
 
+/**
+ * One kill-feed read per refresh slot for the whole app: every mounted route
+ * consumer asks, and each would otherwise read and index the feed itself.
+ */
+let podKillsLoad: { slot: number; promise: Promise<ReadonlyMap<number, number> | null> } | null =
+  null;
+
+/** Forgets the shared kill-feed read — tests only. */
+export function clearPodKillsLoad(): void {
+  podKillsLoad = null;
+}
+
+function podKillsFor(slot: number): Promise<ReadonlyMap<number, number> | null> {
+  if (podKillsLoad?.slot !== slot) {
+    podKillsLoad = { slot, promise: loadPodKills().catch(() => null) };
+  }
+  return podKillsLoad.promise;
+}
+
 /** Pod kills by system while the rule is on; `undefined` while loading. */
 function usePodKills(enabled: boolean): ReadonlyMap<number, number> | null | undefined {
   const now = useTicker(POD_KILL_REFRESH_MS);
@@ -163,11 +178,9 @@ function usePodKills(enabled: boolean): ReadonlyMap<number, number> | null | und
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    void loadPodKills()
-      .catch(() => null)
-      .then((next) => {
-        if (!cancelled) setKills(next);
-      });
+    void podKillsFor(refreshSlot).then((next) => {
+      if (!cancelled) setKills(next);
+    });
     return () => {
       cancelled = true;
     };
@@ -179,7 +192,7 @@ function usePodKills(enabled: boolean): ReadonlyMap<number, number> | null | und
  * The Travel Settings as one value, stable while none of them change — so a
  * caller can key an effect or a cache on `avoid` directly.
  */
-export function useRouteRules(): RouteRules {
+export function useRouteRules(): TravelSettingsState {
   const hydratedAll = useHydratedAll();
   const preference = useDefaultRoutePreference((state) => state.value);
   const securityPenalty = useSecurityPenalty((state) => state.value);
@@ -191,18 +204,30 @@ export function useRouteRules(): RouteRules {
   const podKillThreshold = usePodKillThreshold((state) => state.value);
   const podKills = usePodKills(hydratedAll && avoidPodKills);
 
-  const avoidKey = effectiveAvoid({
-    avoidList,
-    avoidListEnabled,
-    avoidEdencom,
-    edencomSystems: EDENCOM_SYSTEMS,
-    avoidTriglavian,
-    triglavianSystems: TRIGLAVIAN_MINOR_VICTORY_SYSTEMS,
-    avoidPodKills,
-    podKillThreshold,
-    podKillsBySystem: podKills ?? null,
-  }).join(',');
-  // Rebuilt from its key, so an equal list keeps its identity across renders.
+  const avoidKey = useMemo(
+    () =>
+      effectiveAvoid({
+        avoidList,
+        avoidListEnabled,
+        avoidEdencom,
+        edencomSystems: EDENCOM_SYSTEMS,
+        avoidTriglavian,
+        triglavianSystems: TRIGLAVIAN_MINOR_VICTORY_SYSTEMS,
+        avoidPodKills,
+        podKillThreshold,
+        podKillsBySystem: podKills ?? null,
+      }).join(','),
+    [
+      avoidList,
+      avoidListEnabled,
+      avoidEdencom,
+      avoidTriglavian,
+      avoidPodKills,
+      podKillThreshold,
+      podKills,
+    ]
+  );
+  // Rebuilt from its key, so an equal list keeps its identity when the feed refreshes unchanged.
   const avoid = useMemo(() => (avoidKey === '' ? [] : avoidKey.split(',').map(Number)), [avoidKey]);
 
   // Pod-kill avoidance waits for its feed too, or every route would be drawn
@@ -224,12 +249,9 @@ export function useRouteRules(): RouteRules {
 
 /** The rules one route is asked under, and a string that changes exactly when they do. */
 export interface RouteQuery {
-  rules: {
-    preference: RoutePreferenceKind;
-    securityPenalty: number;
-    avoid: readonly number[];
-  };
-  /** For keying an effect's answer or a cache. */
+  /** Stable while the rules are: its identity changes only with `key`. */
+  rules: RouteRules;
+  /** For keying an effect's answer or a cache; the avoid list goes in hashed. */
   key: string;
   hydrated: boolean;
   podKillsUnavailable: boolean;
@@ -244,13 +266,19 @@ export function useRouteQuery(preferenceOverride?: RoutePreferenceKind | null): 
   const settings = useRouteRules();
   const preference = preferenceOverride ?? settings.preference;
   const { securityPenalty, avoid, hydrated, podKillsUnavailable } = settings;
+  // Memoized apart from the loading flags, so an effect keyed on `rules` does
+  // not re-run when only `hydrated` or the feed's availability changes.
+  const rules = useMemo(
+    () => ({ preference, securityPenalty, avoid }),
+    [preference, securityPenalty, avoid]
+  );
   return useMemo(
     () => ({
-      rules: { preference, securityPenalty, avoid },
-      key: `${preference}:${securityPenalty}:${avoid.join(',')}`,
+      rules,
+      key: `${preference}:${securityPenalty}:${avoidListKey(avoid)}`,
       hydrated,
       podKillsUnavailable,
     }),
-    [preference, securityPenalty, avoid, hydrated, podKillsUnavailable]
+    [rules, preference, securityPenalty, avoid, hydrated, podKillsUnavailable]
   );
 }

@@ -12,20 +12,17 @@ import {
   STALE_AFTER,
 } from '@/esi/cache';
 import { jumpsAwayFromRoute, type JumpsAwayResult } from '@/engine/jumpsAway';
-import { getRouteUnderRules, rulesCacheKey, type EsiRouteRules } from '@/features/route/esiRoute';
+import { getRouteUnderRules, rulesCacheKey } from '@/features/route/esiRoute';
+import type { RouteRules } from '@/features/route/routeRules';
 
-function cacheKey(
-  originSystemId: number,
-  destinationSystemId: number,
-  rules: EsiRouteRules
-): string {
+function cacheKey(originSystemId: number, destinationSystemId: number, rules: RouteRules): string {
   return `route:${originSystemId}:${destinationSystemId}:${rulesCacheKey(originSystemId, destinationSystemId, rules)}`;
 }
 
 export async function loadJumpsAway(
   originSystemId: number,
   destinationSystemId: number,
-  rules: EsiRouteRules
+  rules: RouteRules
 ): Promise<JumpsAwayResult> {
   if (originSystemId === destinationSystemId) return jumpsAwayFromRoute([originSystemId]);
   const { fetchLive, conditional } = conditionalFetch((options) =>

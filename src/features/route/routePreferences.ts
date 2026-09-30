@@ -13,12 +13,6 @@ export const ROUTE_PREFERENCES: readonly RoutePreferenceKind[] = [
   'avoid-highsec',
 ];
 
-/**
- * Highsec-preferring by default: it is the trip most pilots will actually
- * fly, and a number quoted against a route nobody would take is the wrong one.
- */
-export const DEFAULT_ROUTE_PREFERENCE: RoutePreferenceKind = 'prefer-highsec';
-
 /** Literal keys, so the locale split finds them from every page that names this module. */
 export const ROUTE_PREFERENCE_LABEL_KEYS: Readonly<Record<RoutePreferenceKind, string>> = {
   'prefer-highsec': 'contractSearch.routePreference.prefer-highsec',

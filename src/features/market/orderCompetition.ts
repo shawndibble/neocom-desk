@@ -37,12 +37,8 @@
 import { fetchAggregates, type HubAggregate } from '@/market/fuzzwork';
 import { getOrderBook } from './orderBook';
 import { getStructureMarketOrders, type StructureMarketOrder } from '@/esi/endpoints';
-import {
-  getRouteUnderRules,
-  PLAIN_ROUTE_RULES,
-  rulesCacheKey,
-  type EsiRouteRules,
-} from '@/features/route/esiRoute';
+import { getRouteUnderRules, rulesCacheKey } from '@/features/route/esiRoute';
+import type { RouteRules } from '@/features/route/routeRules';
 import { conditionalPagedFetch, loadPaginatedWithCache } from '@/esi/cache';
 import { AuthError } from '@/auth/sso';
 import { EsiError } from '@/esi/client';
@@ -190,7 +186,7 @@ export async function loadStructureCompetition(
 function jumpsCacheKey(
   originSystemId: number,
   destinationSystemId: number,
-  rules: EsiRouteRules
+  rules: RouteRules
 ): string {
   return `${originSystemId}:${destinationSystemId}:${rulesCacheKey(originSystemId, destinationSystemId, rules)}`;
 }
@@ -223,7 +219,7 @@ export function loadJumpsBetween(
   originSystemId: number,
   destinationSystemId: number,
   /** The pilot's Travel Settings — see `features/route/esiRoute.ts` for how ESI is asked. */
-  rules: EsiRouteRules = PLAIN_ROUTE_RULES
+  rules: RouteRules
 ): Promise<JumpsAwayResult> {
   if (originSystemId === destinationSystemId) {
     return Promise.resolve(jumpsAwayFromRoute([originSystemId]));

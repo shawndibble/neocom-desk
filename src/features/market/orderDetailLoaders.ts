@@ -36,7 +36,7 @@ export const esiOrderDetailLoaders: OrderDetailLoaders = {
   regionCompetition: (regionId, typeId) => loadRegionCompetition(regionId, typeId),
   structureCompetition: (characterId, structureId) =>
     loadStructureCompetition(characterId, structureId),
-  jumpsBetween: (origin, destination, avoid) => loadJumpsBetween(origin, destination, avoid),
+  jumpsBetween: (origin, destination, rules) => loadJumpsBetween(origin, destination, rules),
   priceHistory: (regionId, typeId) => loadPriceHistory(regionId, typeId),
   reprocessing: () => loadReprocessing(),
   stationBestPrices: (requests) => loadStationBestPrices(requests),

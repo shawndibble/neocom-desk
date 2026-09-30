@@ -34,3 +34,20 @@ export function effectiveAvoid(rules: AvoidRules): number[] {
   }
   return [...avoid].sort((a, b) => a - b);
 }
+
+/**
+ * A short, stable name for an avoid list — its size and an FNV-1a hash of the
+ * ids, base 36 — for keys that would otherwise carry 140+ ids each. Empty for
+ * an empty list.
+ */
+export function avoidListKey(ids: readonly number[]): string {
+  if (ids.length === 0) return '';
+  let hash = 0x811c9dc5;
+  for (const id of ids) {
+    for (const char of `${id},`) {
+      hash ^= char.charCodeAt(0);
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+  }
+  return `a${ids.length}:${hash.toString(36)}`;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveAvoid, type AvoidRules } from './avoidRules';
+import { avoidListKey, effectiveAvoid, type AvoidRules } from './avoidRules';
 
 const UEDAMA = 30045328;
 const TAMA = 30002813;
@@ -63,5 +63,18 @@ describe('effectiveAvoid', () => {
         avoidPodKills: true,
       })
     ).toEqual([EDENCOM_A, PODDED]);
+  });
+});
+
+describe('avoidListKey', () => {
+  it('is empty for nothing avoided', () => {
+    expect(avoidListKey([])).toBe('');
+  });
+
+  it('is short however long the list, and differs for different lists', () => {
+    const long = Array.from({ length: 165 }, (_, i) => 30000001 + i);
+    expect(avoidListKey(long).length).toBeLessThan(16);
+    expect(avoidListKey([1, 2])).not.toBe(avoidListKey([1, 3]));
+    expect(avoidListKey([1, 2])).toBe(avoidListKey([1, 2]));
   });
 });

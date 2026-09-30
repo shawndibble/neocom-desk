@@ -9,6 +9,7 @@ import {
   AVOIDED_SYSTEMS_ENABLED_KEY,
   POD_KILL_THRESHOLD_KEY,
   ROUTE_PREFERENCE_KEY,
+  clearPodKillsLoad,
   ROUTE_RULE_STORES,
   useRouteQuery,
 } from './routeRules';
@@ -33,6 +34,7 @@ beforeEach(async () => {
   await db.settings.clear();
   // Module singletons: drop what a previous test hydrated, so each reads its own rows.
   resetStores(true);
+  clearPodKillsLoad();
   loadPodKills.mockReset().mockResolvedValue(new Map([[PODDED, 4]]));
 });
 

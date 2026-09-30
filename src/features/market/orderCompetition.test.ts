@@ -221,9 +221,12 @@ describe('loadRegionCompetition', () => {
 const SYS_A = 30000142;
 const SYS_B = 30002187;
 
+/** Shortest, nothing avoided. */
+const SHORTEST = { preference: 'shortest' as const, securityPenalty: 50, avoid: [] };
+
 describe('loadJumpsBetween', () => {
   it('is 0 jumps with no ESI call for the same origin and destination', async () => {
-    const result = await loadJumpsBetween(SYS_A, SYS_A);
+    const result = await loadJumpsBetween(SYS_A, SYS_A, SHORTEST);
     expect(result).toEqual({ kind: 'known', jumps: 0 });
   });
 
@@ -236,8 +239,8 @@ describe('loadJumpsBetween', () => {
       })
     );
 
-    const first = await loadJumpsBetween(SYS_A, SYS_B);
-    const second = await loadJumpsBetween(SYS_A, SYS_B);
+    const first = await loadJumpsBetween(SYS_A, SYS_B, SHORTEST);
+    const second = await loadJumpsBetween(SYS_A, SYS_B, SHORTEST);
 
     expect(first).toEqual({ kind: 'known', jumps: 1 });
     expect(second).toEqual({ kind: 'known', jumps: 1 });
@@ -247,7 +250,7 @@ describe('loadJumpsBetween', () => {
   it('degrades to unknown/noRoute on a failed route lookup, never throwing', async () => {
     server.use(http.post(`${ESI_BASE_URL}/route/${SYS_A}/${SYS_B}`, () => HttpResponse.error()));
 
-    const result = await loadJumpsBetween(SYS_A, SYS_B);
+    const result = await loadJumpsBetween(SYS_A, SYS_B, SHORTEST);
 
     expect(result).toEqual({ kind: 'unknown', reason: 'noRoute' });
   });
@@ -261,8 +264,8 @@ describe('loadJumpsBetween', () => {
       })
     );
 
-    const first = await loadJumpsBetween(SYS_A, SYS_B);
-    const second = await loadJumpsBetween(SYS_A, SYS_B);
+    const first = await loadJumpsBetween(SYS_A, SYS_B, SHORTEST);
+    const second = await loadJumpsBetween(SYS_A, SYS_B, SHORTEST);
 
     expect(first).toEqual({ kind: 'unknown', reason: 'noRoute' });
     expect(second).toEqual({ kind: 'known', jumps: 1 });
@@ -384,7 +387,7 @@ describe('loadJumpsBetween with Travel Settings', () => {
       })
     );
 
-    expect(await loadJumpsBetween(SYS_A, SYS_B)).toEqual({ kind: 'known', jumps: 1 });
+    expect(await loadJumpsBetween(SYS_A, SYS_B, SHORTEST)).toEqual({ kind: 'known', jumps: 1 });
     expect(await loadJumpsBetween(SYS_A, SYS_B, WITH_AVOID)).toEqual({ kind: 'known', jumps: 3 });
     expect(await loadJumpsBetween(SYS_A, SYS_B, WITH_AVOID)).toEqual({ kind: 'known', jumps: 3 });
     expect(asked).toEqual([undefined, [AVOIDED]]);
