@@ -8,12 +8,18 @@ import { useEffect, useState } from 'react';
 import { levelGain, type LevelGain, type SkillGain } from '@/engine/fittings/skillGains';
 import type { SkillGainEvaluator } from './useFittingEvaluation';
 
-/** Null while a level other than the ranked one is being worked out. */
+export interface SkillLevelGainState {
+  /** Null while a level other than the ranked one is being worked out, or when that failed. */
+  gain: LevelGain | null;
+  /** The calculation itself failed, so there is nothing to show for this level. */
+  failed: boolean;
+}
+
 export function useSkillLevelGain(
   evaluator: SkillGainEvaluator | null,
   gain: SkillGain,
   level: number
-): LevelGain | null {
+): SkillLevelGainState {
   const [computed, setComputed] = useState<{
     evaluator: SkillGainEvaluator;
     skillTypeId: number;
@@ -38,12 +44,12 @@ export function useSkillLevelGain(
     };
   }, [evaluator, skillTypeId, level, ranked]);
 
-  if (ranked) return gain;
+  if (ranked) return { gain, failed: false };
   const fresh =
     computed?.evaluator === evaluator &&
     computed?.skillTypeId === skillTypeId &&
     computed?.level === level
       ? computed
       : null;
-  return fresh?.result ?? null;
+  return { gain: fresh?.result ?? null, failed: fresh !== null && fresh.result === null };
 }

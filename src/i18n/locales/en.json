@@ -863,8 +863,9 @@
       "trained": "Trained {{level}}",
       "notTrained": "Not trained",
       "noChange": "No change to this fit",
+      "levelFailed": "Couldn't work out this level.",
       "plannedLevels": "{{levels}} in plan <plan>{{plan}}</plan>",
-      "prerequisitesOpen": "Skills needed for {{skill}}",
+      "prerequisitesOpen": "incl. prerequisites: {{skill}}",
       "prerequisitesTitle": "Skills needed for {{skill}}",
       "prerequisitesTotal": "Total {{time}}",
       "sort": {

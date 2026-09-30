@@ -1,8 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
-import type { PlanEntry } from '@/engine/types';
 import { formatCountdown } from '@/lib/duration';
-import { isEntryCovered, plannedLevelFor } from '@/features/skills/planner/reorder';
 import type { FitCheckRow } from '@/features/skills/ships/fitCheckRows';
 import { SkillRow } from '@/features/skills/SkillRow';
 
@@ -11,8 +9,8 @@ export interface WhatToTrainPrerequisitesProps {
   skill: string;
   /** Every skill the level needs trained first, and the skill itself, in training order. */
   rows: readonly FitCheckRow[];
-  /** The target Skill Plan's entries, so a row it already trains says so. */
-  planEntries: readonly PlanEntry[];
+  /** The highest level the target Skill Plan trains each skill to, so a row it already trains says so. */
+  plannedLevels: ReadonlyMap<number, number>;
   totalSeconds: number;
 }
 
@@ -24,7 +22,7 @@ export interface WhatToTrainPrerequisitesProps {
 export function WhatToTrainPrerequisites({
   skill,
   rows,
-  planEntries,
+  plannedLevels,
   totalSeconds,
 }: WhatToTrainPrerequisitesProps) {
   const { t } = useTranslation();
@@ -54,11 +52,11 @@ export function WhatToTrainPrerequisites({
                   currentLevel={row.currentLevel}
                   timeLabel={formatCountdown(row.seconds)}
                   inPlanLabel={
-                    isEntryCovered(planEntries, row.skillTypeID, row.targetLevel)
+                    (plannedLevels.get(row.skillTypeID) ?? 0) >= row.targetLevel
                       ? t('skills.fitCheck.inPlan')
                       : undefined
                   }
-                  plannedLevel={plannedLevelFor(planEntries, row.skillTypeID)}
+                  plannedLevel={plannedLevels.get(row.skillTypeID) ?? null}
                 />
               </div>
             ))}

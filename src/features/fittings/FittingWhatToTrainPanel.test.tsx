@@ -79,14 +79,17 @@ vi.mock('./useSkillGains', () => ({
 }));
 // A level the ranking did not score: worked out on demand, told apart here by the level asked for.
 vi.mock('./useSkillLevelGain', () => ({
-  useSkillLevelGain: (_evaluator: unknown, gain: SkillGain, level: number) =>
-    level === gain.toLevel
-      ? gain
-      : {
-          delta: { changes: [], count: 0 },
-          roleChanges: [{ key: 'miningYield', before: 100, after: 100 + level }],
-          metrics: gain.metrics,
-        },
+  useSkillLevelGain: (_evaluator: unknown, gain: SkillGain, level: number) => ({
+    failed: false,
+    gain:
+      level === gain.toLevel
+        ? gain
+        : {
+            delta: { changes: [], count: 0 },
+            roleChanges: [{ key: 'miningYield', before: 100, after: 100 + level }],
+            metrics: gain.metrics,
+          },
+  }),
 }));
 vi.mock('@/features/skills/planner/usePlanEditorData', () => ({
   usePlanEditorData: () => ({
@@ -307,10 +310,10 @@ describe('FittingWhatToTrainPanel — Skill Plan button and prerequisites', () =
     await screen.findByText('Surgical Strike');
 
     // Only Surgical Strike misses a prerequisite (Gunnery III).
-    expect(screen.getAllByRole('button', { name: /skills needed for/i })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /incl\. prerequisites/i })).toHaveLength(1);
     await user.click(
       await within(rowFor('Surgical Strike')).findByRole('button', {
-        name: /skills needed for surgical strike i/i,
+        name: /incl\. prerequisites: surgical strike i/i,
       })
     );
     const card = await screen.findByText(/^Skills needed for Surgical Strike I$/);

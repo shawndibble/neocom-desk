@@ -174,7 +174,8 @@ function WhatToTrainRanking({
     const raise = (skillTypeID: number, level: number) =>
       levels.set(skillTypeID, Math.max(levels.get(skillTypeID) ?? 0, level));
     for (const entry of targetPlan.entries) raise(entry.skillTypeID, entry.targetLevel);
-    if (!catalog) return levels;
+    // Not before the Character's skills are in, or every prerequisite would count as untrained.
+    if (!catalog || !trainedSkillsKnown) return levels;
     try {
       const known = targetPlan.entries.filter((e) => catalog.engineSkills.has(e.skillTypeID));
       for (const step of normalizePlan(known, catalog.engineSkills, trainedSkills)) {
@@ -184,7 +185,7 @@ function WhatToTrainRanking({
       // A circular plan is the Skill Plan editor's to report; its entries still count.
     }
     return levels;
-  }, [targetPlan, catalog, trainedSkills]);
+  }, [targetPlan, catalog, trainedSkills, trainedSkillsKnown]);
 
   if (evaluator === null || loading)
     return <p className="text-xs text-text-dim">{t('fittings.whatToTrain.loading')}</p>;
@@ -243,7 +244,7 @@ function WhatToTrainRanking({
             rank={index + 1}
             evaluator={evaluator}
             plan={target.plans === undefined ? undefined : (targetPlan ?? null)}
-            plannedThrough={plannedLevels.get(row.skillTypeId) ?? 0}
+            plannedLevels={plannedLevels}
             scheduleFor={scheduleFor}
             skills={catalog?.engineSkills}
             trainedSkills={trainedSkills}
@@ -276,8 +277,8 @@ interface WhatToTrainItemProps {
   evaluator: SkillGainEvaluator;
   /** The target Skill Plan; null when the Character has none yet, undefined while plans load. */
   plan: SkillPlanRecord | null | undefined;
-  /** The highest level the plan trains this skill to, prerequisite rows included; 0 for none. */
-  plannedThrough: number;
+  /** The highest level the plan trains each skill to, prerequisite rows included. */
+  plannedLevels: ReadonlyMap<number, number>;
   scheduleFor: (skillTypeId: number, level: number) => readonly ScheduledStep[] | null;
   skills: ReadonlyMap<number, EngineSkill> | undefined;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
@@ -299,7 +300,7 @@ function WhatToTrainItem({
   rank,
   evaluator,
   plan,
-  plannedThrough,
+  plannedLevels,
   scheduleFor,
   skills,
   trainedSkills,
@@ -307,11 +308,12 @@ function WhatToTrainItem({
 }: WhatToTrainItemProps) {
   const { t } = useTranslation();
   const [picked, setPicked] = useState<number | null>(null);
+  const plannedThrough = plannedLevels.get(row.skillTypeId) ?? 0;
   const options = levelOptions(row.fromLevel, plannedThrough);
   const level = pickedLevel(options, picked);
   // Every level in a plan: what the whole skill would give, not a level to pick.
   const shownLevel = level ?? 5;
-  const gain = useSkillLevelGain(evaluator, row, shownLevel);
+  const { gain, failed } = useSkillLevelGain(evaluator, row, shownLevel);
   const scheduled = scheduleFor(row.skillTypeId, shownLevel);
   const time = scheduled ? trainingTimeFor(scheduled, row.skillTypeId) : null;
   const prerequisiteRows =
@@ -339,7 +341,9 @@ function WhatToTrainItem({
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-dashed border-line py-2">
         <span className={EYEBROW}>{t('fittings.whatToTrain.changes')}</span>
         <div className="flex min-w-0 flex-1 flex-wrap gap-x-3 gap-y-0.5 text-xs">
-          {gain === null ? (
+          {failed ? (
+            <span className="text-text-dim">{t('fittings.whatToTrain.levelFailed')}</span>
+          ) : gain === null ? (
             <span className="text-text-dim">{t('common.loading')}</span>
           ) : changeCount === 0 ? (
             <span className="text-text-dim">{t('fittings.whatToTrain.noChange')}</span>
@@ -372,7 +376,7 @@ function WhatToTrainItem({
             <WhatToTrainPrerequisites
               skill={skill}
               rows={prerequisiteRows}
-              planEntries={plan?.entries ?? []}
+              plannedLevels={plannedLevels}
               totalSeconds={time.seconds}
             />
           )}

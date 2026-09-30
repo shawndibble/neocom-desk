@@ -37,7 +37,7 @@ describe('useSkillLevelGain', () => {
     const compare = vi.fn();
     const ev = evaluator(compare);
     const { result } = renderHook(() => useSkillLevelGain(ev, gain, 2));
-    expect(result.current).toBe(gain);
+    expect(result.current).toEqual({ gain, failed: false });
     expect(compare).not.toHaveBeenCalled();
   });
 
@@ -48,10 +48,10 @@ describe('useSkillLevelGain', () => {
     }));
     const ev = evaluator(compare);
     const { result } = renderHook(() => useSkillLevelGain(ev, gain, 4));
-    expect(result.current).toBeNull();
-    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(result.current).toEqual({ gain: null, failed: false });
+    await waitFor(() => expect(result.current.gain).not.toBeNull());
     expect(compare).toHaveBeenCalledWith(7, 4);
-    expect(result.current?.metrics.overall).toBe(400);
+    expect(result.current.gain?.metrics.overall).toBe(400);
   });
 
   it("never shows one level's figures for another, nor a previous evaluator's", async () => {
@@ -63,21 +63,20 @@ describe('useSkillLevelGain', () => {
     const { result, rerender } = renderHook(({ ev, level }) => useSkillLevelGain(ev, gain, level), {
       initialProps: { ev: first, level: 3 },
     });
-    await waitFor(() => expect(result.current).not.toBeNull());
+    await waitFor(() => expect(result.current.gain).not.toBeNull());
     rerender({ ev: first, level: 5 });
-    expect(result.current).toBeNull();
-    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(result.current.gain).toBeNull();
+    await waitFor(() => expect(result.current.gain).not.toBeNull());
     rerender({ ev: evaluator(compare), level: 5 });
-    expect(result.current).toBeNull();
+    expect(result.current.gain).toBeNull();
   });
 
-  it('stays null when the calculation throws', async () => {
+  it('says so when the calculation throws, rather than staying on loading', async () => {
     const compare = vi.fn(async () => {
       throw new Error('engine');
     });
     const ev = evaluator(compare);
     const { result } = renderHook(() => useSkillLevelGain(ev, gain, 4));
-    await waitFor(() => expect(compare).toHaveBeenCalled());
-    expect(result.current).toBeNull();
+    await waitFor(() => expect(result.current).toEqual({ gain: null, failed: true }));
   });
 });
