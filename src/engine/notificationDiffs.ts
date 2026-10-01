@@ -1081,7 +1081,8 @@ function diffContractTerminalTransition(
   prev: ContractSnapshot | undefined,
   next: ContractSnapshot,
   eventId: 'contractCompleted' | 'contractFailed',
-  matchesStatus: (status: ContractStatus) => boolean
+  matchesStatus: (status: ContractStatus) => boolean,
+  occurredAt: (entry: ContractEntrySnapshot) => number | undefined = () => undefined
 ): ContractNotificationFire[] {
   if (!prev) return [];
   const prevStatusById = new Map(prev.entries.map((entry) => [entry.contractId, entry.status]));
@@ -1090,7 +1091,7 @@ function diffContractTerminalTransition(
     if (!matchesStatus(entry.status)) continue;
     if (!wasLiveContractStatus(prevStatusById.get(entry.contractId))) continue;
     if (!isPartyToContract(entry, characterId)) continue;
-    const occurredMs = eventId === 'contractCompleted' ? entry.dateCompletedMs : undefined;
+    const occurredMs = occurredAt(entry);
     fires.push({
       eventId,
       characterId,
@@ -1113,8 +1114,13 @@ export function diffContractCompleted(
   prev: ContractSnapshot | undefined,
   next: ContractSnapshot
 ): ContractNotificationFire[] {
-  return diffContractTerminalTransition(characterId, prev, next, 'contractCompleted', (status) =>
-    COMPLETED_CONTRACT_STATUSES.has(status)
+  return diffContractTerminalTransition(
+    characterId,
+    prev,
+    next,
+    'contractCompleted',
+    (status) => COMPLETED_CONTRACT_STATUSES.has(status),
+    (entry) => entry.dateCompletedMs
   );
 }
 

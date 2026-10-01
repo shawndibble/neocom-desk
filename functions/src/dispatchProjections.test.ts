@@ -101,6 +101,7 @@ describe('buildPushData', () => {
       occurrenceKey: '1:industryJobComplete:987',
       title: 'Industry job complete',
       body: "Aurelia's industry job for Tritanium is complete.",
+      fireAt: '1700000000000',
     });
   });
 
@@ -111,6 +112,7 @@ describe('buildPushData', () => {
       occurrenceKey: '1:industryJobComplete:987',
       title: 'Industry job complete',
       body: "Aurelia's industry job for Tritanium is complete.",
+      fireAt: '1700000000000',
       eveType: 'StructureLostShields',
     });
   });

@@ -74,6 +74,13 @@ export interface PushPayload {
    * Foreground Poller's own feed write already is.
    */
   readonly eveType?: string;
+  /**
+   * The projection row's `fireAt` — the moment the occurrence was scheduled
+   * to happen — so the feed row is dated by it rather than by when the push
+   * arrived. Absent from pushes sent by a Cloud Function deployed before it
+   * existed; the feed row then falls back to arrival time.
+   */
+  readonly fireAt?: number;
 }
 
 function isNotificationEventId(value: unknown): value is NotificationEventId {
@@ -98,7 +105,7 @@ export function parsePushPayload(rawText: string | null): PushPayload | null {
   const { data } = parsed as Record<string, unknown>;
   if (typeof data !== 'object' || data === null) return null;
 
-  const { characterId, eventId, occurrenceKey, title, body, eveType } = data as Record<
+  const { characterId, eventId, occurrenceKey, title, body, eveType, fireAt } = data as Record<
     string,
     unknown
   >;
@@ -109,6 +116,8 @@ export function parsePushPayload(rawText: string | null): PushPayload | null {
   if (typeof title !== 'string' || title.length === 0) return null;
   if (typeof body !== 'string') return null;
   if (eveType !== undefined && typeof eveType !== 'string') return null;
+  // Lenient, unlike the fields above: a bad fireAt only costs the feed row its date.
+  const fireAtNum = typeof fireAt === 'string' && fireAt.length > 0 ? Number(fireAt) : NaN;
 
   return {
     characterId: characterIdNum,
@@ -117,6 +126,7 @@ export function parsePushPayload(rawText: string | null): PushPayload | null {
     title,
     body,
     ...(eveType !== undefined ? { eveType } : {}),
+    ...(Number.isFinite(fireAtNum) ? { fireAt: fireAtNum } : {}),
   };
 }
 
@@ -152,7 +162,8 @@ export async function handlePush(env: PushEnv, rawText: string | null, now: numb
           eventId: payload.eventId,
           title: payload.title,
           body: payload.body,
-          firedAt: now,
+          // Never in the future, should the server's clock run ahead of this device's.
+          firedAt: payload.fireAt === undefined ? now : Math.min(payload.fireAt, now),
           // So this device's Foreground Poller does not toast it a second time.
           notifiedHereAt: now,
           ...(payload.eveType !== undefined ? { eveType: payload.eveType } : {}),

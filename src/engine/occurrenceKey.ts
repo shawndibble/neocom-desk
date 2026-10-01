@@ -205,8 +205,9 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
  * the future (a fuel expiry, an extractor's expiry warning, a calendar
  * event's start), not the moment the thing happened.
  *
- * ESI-reported moments are clamped to `nowMs` (`pastOrNow`) so a server
- * clock running ahead of this device never dates a row in the future.
+ * The job, colony, contract and mail moments are clamped to `nowMs`
+ * (`pastOrNow`) so a server clock running ahead of this device never dates a
+ * row in the future.
  */
 export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
   const pastOrNow = (ms: number | undefined): number =>

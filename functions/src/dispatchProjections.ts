@@ -102,6 +102,8 @@ export function buildPushData(row: StoredProjectionRow): Record<string, string> 
     occurrenceKey: row.occurrenceKey,
     title: row.title,
     body: row.body,
+    // Dates the receiving device's feed row by when the occurrence happened.
+    fireAt: String(row.fireAt),
     ...(row.eveType !== undefined ? { eveType: row.eveType } : {}),
   };
 }

@@ -110,6 +110,23 @@ describe('parsePushPayload', () => {
     ).toEqual({ ...VALID_PAYLOAD, eveType: 'StructureLostShields' });
   });
 
+  it('parses the projected fireAt from its wire string, to date the feed row', () => {
+    const characterId = String(VALID_PAYLOAD.characterId);
+    expect(
+      parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId, fireAt: '1699999000000' }))
+    ).toEqual({ ...VALID_PAYLOAD, fireAt: 1_699_999_000_000 });
+  });
+
+  it('omits fireAt when the wire payload has none or it is not a number', () => {
+    const characterId = String(VALID_PAYLOAD.characterId);
+    expect(parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId }))).toEqual(
+      VALID_PAYLOAD
+    );
+    expect(
+      parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId, fireAt: 'soon' }))
+    ).toEqual(VALID_PAYLOAD);
+  });
+
   it('omits eveType when the wire payload has none', () => {
     const characterId = String(VALID_PAYLOAD.characterId);
     const parsed = parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId }));
@@ -165,6 +182,35 @@ describe('handlePush', () => {
       firedAt: now,
       notifiedHereAt: now,
     });
+  });
+
+  it('dates the feed entry by the projected fireAt, not by when the push arrived', async () => {
+    const e = env();
+    const now = 1_700_000_000_000;
+    const fireAt = now - 15 * 3_600_000;
+    const raw = rawFcmPayload({
+      ...VALID_PAYLOAD,
+      characterId: String(VALID_PAYLOAD.characterId),
+      fireAt: String(fireAt),
+    });
+    await handlePush(e, raw, now);
+
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ firedAt: fireAt, notifiedHereAt: now })
+    );
+  });
+
+  it('never dates the feed entry in the future when the server clock runs ahead', async () => {
+    const e = env();
+    const now = 1_700_000_000_000;
+    const raw = rawFcmPayload({
+      ...VALID_PAYLOAD,
+      characterId: String(VALID_PAYLOAD.characterId),
+      fireAt: String(now + 60_000),
+    });
+    await handlePush(e, raw, now);
+
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(expect.objectContaining({ firedAt: now }));
   });
 
   it("records the feed entry's eveType when the pushed payload carries one", async () => {
