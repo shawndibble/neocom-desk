@@ -185,3 +185,58 @@ describe('contractOfferPriceSummary', () => {
     });
   });
 });
+
+describe('requested PLEX folded into the price', () => {
+  const PLEX_PRICE = 5_000_000;
+  const barter = offer({ price: 0, requestedPlex: 100 });
+  const iskAndPlex = offer({ price: 20_000_000, requestedPlex: 10 });
+
+  it('adds the PLEX ask at the given PLEX price to the ISK ask', () => {
+    expect(offerAskingPrice(barter, PLEX_PRICE)).toBe(500_000_000);
+    expect(offerAskingPrice(iskAndPlex, PLEX_PRICE)).toBe(70_000_000);
+    expect(isUnpricedOffer(barter, PLEX_PRICE)).toBe(false);
+  });
+
+  it('reads a PLEX-asking row as unpriced while the PLEX price is unknown — its ISK part alone would understate it', () => {
+    expect(isUnpricedOffer(barter)).toBe(true);
+    expect(isUnpricedOffer(iskAndPlex)).toBe(true);
+    expect(isUnpricedOffer(iskAndPlex, null)).toBe(true);
+  });
+
+  it('judges maxPrice on ISK plus PLEX value, and passes a PLEX row while the PLEX price is unknown', () => {
+    const rows = [iskAndPlex];
+    expect(filterContractOffers(rows, { maxPrice: 50_000_000, plexPrice: PLEX_PRICE })).toEqual([]);
+    expect(filterContractOffers(rows, { maxPrice: 80_000_000, plexPrice: PLEX_PRICE })).toEqual(
+      rows
+    );
+    expect(filterContractOffers(rows, { maxPrice: 1 })).toEqual(rows);
+  });
+
+  it('lets a PLEX barter win cheapest and count toward the median once PLEX is priced', () => {
+    const rows = [offer({ typeId: 34, price: 900_000_000 }), barter];
+    expect(contractOfferStats(rows, PLEX_PRICE).get(34)).toEqual({
+      offerCount: 2,
+      cheapest: 500_000_000,
+    });
+    expect(contractOfferStats(rows).get(34)).toEqual({ offerCount: 2, cheapest: 900_000_000 });
+    expect(contractOfferPriceSummary(rows, PLEX_PRICE)).toEqual({
+      offerCount: 2,
+      cheapest: 500_000_000,
+      median: 700_000_000,
+    });
+  });
+});
+
+describe('exclude filters', () => {
+  it('hides auctions and PLEX-asking contracts on request', () => {
+    const exchange = offer();
+    const auction = offer({ isAuction: true });
+    const plex = offer({ price: 0, requestedPlex: 5 });
+    const rows = [exchange, auction, plex];
+    expect(filterContractOffers(rows, { hideAuctions: true })).toEqual([exchange, plex]);
+    expect(filterContractOffers(rows, { hidePlexRequests: true })).toEqual([exchange, auction]);
+    expect(filterContractOffers(rows, { hideAuctions: true, hidePlexRequests: true })).toEqual([
+      exchange,
+    ]);
+  });
+});

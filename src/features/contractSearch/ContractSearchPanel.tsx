@@ -25,6 +25,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  CheckboxSelect,
   ColumnPickerMenu,
   DataTable,
   EmptyState,
@@ -68,6 +69,7 @@ import { loadPublicContractOffers } from '@/features/contractSearch/publicContra
 import { loadPublicCourierContracts } from '@/features/contractSearch/publicCourierContracts';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
 import { useOfferLocations } from '@/features/contractSearch/offerLocations';
+import { usePlexPrice } from '@/features/contractSearch/plexPrice';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import {
   useCourierEndpoints,
@@ -92,7 +94,13 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
-import { enumParam, optionalEnumParam, optionalIdParam, textParam } from '@/lib/urlState';
+import {
+  boolParam,
+  enumParam,
+  optionalEnumParam,
+  optionalIdParam,
+  textParam,
+} from '@/lib/urlState';
 import {
   DEFAULT_JUMP_RANGE,
   JUMP_RANGES,
@@ -154,6 +162,9 @@ interface UiFilter {
   maxPrice: string;
   minQuantity: string;
   saleKind: ContractSaleKind | null;
+  hideAuctions: boolean;
+  /** Hides a contract asking for PLEX in return (`requestedPlex`). */
+  hidePlex: boolean;
   /** Distance from the Current System (`engine/route/jumpRange.ts`); `'any'` is no restriction. */
   jumps: JumpRange;
 }
@@ -165,6 +176,8 @@ const ITEMS_FILTER_PARAMS = {
   'items.maxPrice': textParam(),
   'items.minQty': textParam(),
   'items.kind': optionalEnumParam(SALE_KINDS),
+  'items.hideAuctions': boolParam(),
+  'items.hidePlex': boolParam(),
   'items.jumps': enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE),
   'items.type': optionalIdParam(),
 };
@@ -188,8 +201,8 @@ function parseNumeric(value: string): number | null {
  * descending — the exact bug this fix removes, reintroduced from the
  * other direction.
  */
-function sortablePrice(row: PublicContractOfferRow): number {
-  return isUnpricedOffer(row) ? Infinity : offerAskingPrice(row);
+function sortablePrice(row: PublicContractOfferRow, plexPrice: number | null): number {
+  return isUnpricedOffer(row, plexPrice) ? Infinity : offerAskingPrice(row, plexPrice);
 }
 
 /**
@@ -199,8 +212,11 @@ function sortablePrice(row: PublicContractOfferRow): number {
  * "unknowable sorts last either way" rule `BpcSourcingPanel.tsx`'s ISK/run
  * column already follows for its own `undefined`.
  */
-function sortValueForPriceColumn(row: PublicContractOfferRow): number | undefined {
-  return isUnpricedOffer(row) ? undefined : offerAskingPrice(row);
+function sortValueForPriceColumn(
+  row: PublicContractOfferRow,
+  plexPrice: number | null
+): number | undefined {
+  return isUnpricedOffer(row, plexPrice) ? undefined : offerAskingPrice(row, plexPrice);
 }
 
 interface RegionOption {
@@ -235,6 +251,8 @@ function ContractSearchFilterBar({
     filter.maxPrice,
     filter.minQuantity,
     filter.saleKind !== null,
+    filter.hideAuctions,
+    filter.hidePlex,
     filter.jumps !== DEFAULT_JUMP_RANGE,
   ].filter(Boolean).length;
 
@@ -305,6 +323,33 @@ function ContractSearchFilterBar({
               />
             ))}
           </div>
+          <FilterField label={t('contractSearch.excludeLabel')}>
+            <CheckboxSelect
+              label={t('contractSearch.excludeLabel')}
+              className="w-44"
+              options={[
+                { value: 'auctions' as const, label: t('contractSearch.hideAuctions') },
+                {
+                  value: 'plex' as const,
+                  label: t('contractSearch.hidePlex'),
+                  description: t('contractSearch.hidePlexTooltip'),
+                },
+              ]}
+              selected={
+                new Set([
+                  ...(draft.hideAuctions ? (['auctions'] as const) : []),
+                  ...(draft.hidePlex ? (['plex'] as const) : []),
+                ])
+              }
+              onToggle={(value) =>
+                setDraft(
+                  value === 'auctions'
+                    ? { ...draft, hideAuctions: !draft.hideAuctions }
+                    : { ...draft, hidePlex: !draft.hidePlex }
+                )
+              }
+            />
+          </FilterField>
           <FilterField label={t('jumpRange.label')}>
             <JumpRangeSelect
               value={draft.jumps}
@@ -456,6 +501,9 @@ export function ContractSearchPanel({
   // location ids, so narrowing the filter never changes the key and never
   // flashes the newly shown rows back to "resolving".
   const offerLocations = useOfferLocations(rows);
+  // Converts a contract's PLEX ask into ISK so it prices, sorts and filters
+  // like any other — until it lands, a PLEX-asking row reads as unpriced.
+  const plexPrice = usePlexPrice();
 
   const [itemsParams, setItemsParams] = useUrlParams(ITEMS_FILTER_PARAMS);
   const uiFilter = useMemo<UiFilter>(
@@ -465,6 +513,8 @@ export function ContractSearchPanel({
       maxPrice: itemsParams['items.maxPrice'],
       minQuantity: itemsParams['items.minQty'],
       saleKind: itemsParams['items.kind'],
+      hideAuctions: itemsParams['items.hideAuctions'],
+      hidePlex: itemsParams['items.hidePlex'],
       jumps: itemsParams['items.jumps'],
     }),
     [itemsParams]
@@ -546,8 +596,19 @@ export function ContractSearchPanel({
       maxPrice: parseNumeric(uiFilter.maxPrice),
       minQuantity: parseNumeric(uiFilter.minQuantity),
       saleKind: uiFilter.saleKind,
+      hideAuctions: uiFilter.hideAuctions,
+      hidePlexRequests: uiFilter.hidePlex,
+      plexPrice,
     }),
-    [uiFilter.regionId, uiFilter.maxPrice, uiFilter.minQuantity, uiFilter.saleKind]
+    [
+      uiFilter.regionId,
+      uiFilter.maxPrice,
+      uiFilter.minQuantity,
+      uiFilter.saleKind,
+      uiFilter.hideAuctions,
+      uiFilter.hidePlex,
+      plexPrice,
+    ]
   );
   /**
    * Jump Range folded in here rather than into `nonTypeFilter`/the engine:
@@ -574,7 +635,10 @@ export function ContractSearchPanel({
       return location === undefined || withinJumpRange(location.systemId, allowed);
     });
   }, [rows, nonTypeFilter, offerLocations, jumpRangeFilter.allowed]);
-  const statsByType = useMemo(() => contractOfferStats(nonTypeRows), [nonTypeRows]);
+  const statsByType = useMemo(
+    () => contractOfferStats(nonTypeRows, plexPrice),
+    [nonTypeRows, plexPrice]
+  );
 
   /**
    * Deferred rather than the raw keystroke value: `typeIds` feeding
@@ -614,9 +678,9 @@ export function ContractSearchPanel({
   const displayRows = useMemo(
     () =>
       filterContractOffers(nonTypeRows, { typeIds }).sort(
-        (a, b) => sortablePrice(a) - sortablePrice(b)
+        (a, b) => sortablePrice(a, plexPrice) - sortablePrice(b, plexPrice)
       ),
-    [nonTypeRows, typeIds]
+    [nonTypeRows, typeIds, plexPrice]
   );
 
   const suggestions = useMemo<Suggestion[]>(() => {
@@ -636,8 +700,8 @@ export function ContractSearchPanel({
   }, [selectedTypeId, uiFilter.typeQuery, typeOptions, statsByType]);
 
   const summary = useMemo(
-    () => (selectedTypeId === null ? null : contractOfferPriceSummary(displayRows)),
-    [selectedTypeId, displayRows]
+    () => (selectedTypeId === null ? null : contractOfferPriceSummary(displayRows, plexPrice)),
+    [selectedTypeId, displayRows, plexPrice]
   );
 
   function changeFilter(next: UiFilter) {
@@ -653,6 +717,8 @@ export function ContractSearchPanel({
       'items.maxPrice': next.maxPrice,
       'items.minQty': next.minQuantity,
       'items.kind': next.saleKind,
+      'items.hideAuctions': next.hideAuctions,
+      'items.hidePlex': next.hidePlex,
       'items.jumps': next.jumps,
       'items.type': unpin ? null : selectedTypeId,
     });
@@ -688,6 +754,24 @@ export function ContractSearchPanel({
     [offerLocations, jumpRangeFilter]
   );
 
+  /**
+   * A PLEX ask as the contract states it — "100 PLEX", or "20M ISK + 10 PLEX"
+   * when it wants both — for wherever no PLEX price is in hand to fold it into
+   * one ISK figure.
+   */
+  const plexAskLabel = useCallback(
+    (row: PublicContractOfferRow): string => {
+      const plex = (row.requestedPlex ?? 0).toLocaleString();
+      return row.price > 0
+        ? t('contractSearch.iskPlusPlexPrice', {
+            isk: formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW),
+            plex,
+          })
+        : t('contractSearch.plexPrice', { plex });
+    },
+    [t]
+  );
+
   const itemsColumnsById = useMemo<
     Record<ContractSearchItemsColumnId, DataTableColumn<PublicContractOfferRow>>
   >(
@@ -710,11 +794,16 @@ export function ContractSearchPanel({
         // The headline figure of the dense phone card, on the title line.
         cardCorner: true,
         className: 'tabular-nums whitespace-nowrap',
-        sortValue: (row) => sortValueForPriceColumn(row),
+        sortValue: (row) => sortValueForPriceColumn(row, plexPrice),
         render: (row) => (
           <>
-            {/* Long press, not tap: the row's own tap opens the offer's detail modal. */}
-            <IskAmount value={offerAskingPrice(row)} revealOn="longPress" />
+            {row.requestedPlex && plexPrice === null ? (
+              // No PLEX price to convert at yet: state the ask as it stands.
+              plexAskLabel(row)
+            ) : (
+              // Long press, not tap: the row's own tap opens the offer's detail modal.
+              <IskAmount value={offerAskingPrice(row, plexPrice)} revealOn="longPress" />
+            )}
             {row.isAuction && (
               // An auction's number is a starting bid unless the seller set a
               // buyout, so the figure alone would read as a fixed ask.
@@ -724,14 +813,24 @@ export function ContractSearchPanel({
                   : t('contractSearch.startingBidShort')}
               </span>
             )}
-            {isUnpricedOffer(row) && (
-              // A barter's 0 ISK is real but not a price (issue #1080) — the
-              // row's own tap already opens the detail modal, which shows
-              // both sides of the exchange correctly.
-              <span className="block text-[0.625rem] text-text-dim">
-                {t('contractSearch.unpricedOfferMarker')}
-              </span>
-            )}
+            {row.requestedPlex
+              ? plexPrice !== null && (
+                  // The figure above already counts the PLEX at market; say so,
+                  // since the contract itself asks for PLEX, not that much ISK.
+                  <span className="block text-[0.625rem] text-text-dim">
+                    {t('contractSearch.includesPlex', {
+                      plex: row.requestedPlex.toLocaleString(),
+                    })}
+                  </span>
+                )
+              : isUnpricedOffer(row) && (
+                  // A barter's 0 ISK is real but not a price (issue #1080) — the
+                  // row's own tap already opens the detail modal, which shows
+                  // both sides of the exchange correctly.
+                  <span className="block text-[0.625rem] text-text-dim">
+                    {t('contractSearch.unpricedOfferMarker')}
+                  </span>
+                )}
           </>
         ),
       },
@@ -793,7 +892,7 @@ export function ContractSearchPanel({
         stackAffix: { before: t('contractSearch.mobile.expiresAffix') },
       },
     }),
-    [t, regionNames, offerLocations, timeZone, offerJumps]
+    [t, regionNames, offerLocations, timeZone, offerJumps, plexPrice, plexAskLabel]
   );
 
   const columns = useMemo<DataTableColumn<PublicContractOfferRow>[]>(() => {
@@ -831,8 +930,9 @@ export function ContractSearchPanel({
           const cell = offerJumps(row);
           return cell.kind === 'value' ? cell.count : null;
         },
+        plexPrice,
       }),
-    [t, typeNames, regionNames, offerLocations, offerJumps]
+    [t, typeNames, regionNames, offerLocations, offerJumps, plexPrice]
   );
   const itemsExport = useTableExport({
     surface: 'contract-search',
@@ -846,13 +946,22 @@ export function ContractSearchPanel({
    * the column's compact suffix.
    */
   const statChipsForRow = (row: PublicContractOfferRow): PublicContractDetailModalStatChip[] => {
-    const priceLabel = row.isAuction
-      ? row.buyout !== undefined
-        ? t('contractSearch.buyout', { price: formatIskAuto(row.buyout, CONTRACT_ISK_CENTS_BELOW) })
-        : t('contractSearch.startingBid', {
-            price: formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW),
+    const priceLabel = row.requestedPlex
+      ? plexPrice === null
+        ? plexAskLabel(row)
+        : t('contractSearch.priceInclPlex', {
+            price: formatIskAuto(offerAskingPrice(row, plexPrice), CONTRACT_ISK_CENTS_BELOW),
+            plex: row.requestedPlex.toLocaleString(),
           })
-      : formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW);
+      : row.isAuction
+        ? row.buyout !== undefined
+          ? t('contractSearch.buyout', {
+              price: formatIskAuto(row.buyout, CONTRACT_ISK_CENTS_BELOW),
+            })
+          : t('contractSearch.startingBid', {
+              price: formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW),
+            })
+        : formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW);
     const chips: PublicContractDetailModalStatChip[] = [
       { label: t('contractSearch.priceColumn'), value: priceLabel },
       { label: t('contractSearch.qtyColumn'), value: row.quantity.toLocaleString() },
@@ -1129,6 +1238,8 @@ export function ContractSearchPanel({
                               maxPrice: '',
                               minQuantity: '',
                               saleKind: null,
+                              hideAuctions: false,
+                              hidePlex: false,
                               jumps: DEFAULT_JUMP_RANGE,
                             })
                           }

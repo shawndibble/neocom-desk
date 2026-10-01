@@ -10,6 +10,7 @@ const lookups: ContractSearchCsvLookups = {
   regionName: (regionId) => (regionId === 10000002 ? 'The Forge' : `#${regionId}`),
   systemName: (row) => (row.locationId === 60003760 ? 'Jita' : null),
   jumps: (row) => (row.locationId === 60003760 ? 4 : null),
+  plexPrice: 5_000_000,
 };
 
 function offer(overrides: Partial<PublicContractOfferRow> = {}): PublicContractOfferRow {
@@ -32,6 +33,7 @@ describe('contractSearchCsvColumns', () => {
       'contractSearch.itemColumn',
       'contractSearch.qtyColumn',
       'contractSearch.priceColumn',
+      'contractSearch.plexColumn',
       'contractSearch.systemColumn',
       'contractSearch.itemsJumpsColumn',
       'contractSearch.regionColumn',
@@ -42,7 +44,7 @@ describe('contractSearchCsvColumns', () => {
   it('writes numbers raw, names as text and the expiry as a UTC date', () => {
     const csv = toCsv([offer()], contractSearchCsvColumns(t, lookups));
     expect(csv.split('\r\n')[1]).toBe(
-      '"Damage Control II",3,1500000,"Jita",4,"The Forge",2026-09-30 12:00:00'
+      '"Damage Control II",3,1500000,,"Jita",4,"The Forge",2026-09-30 12:00:00'
     );
   });
 
@@ -56,6 +58,15 @@ describe('contractSearchCsvColumns', () => {
       [offer({ price: 0, locationId: 1_000_000_000_000 })],
       contractSearchCsvColumns(t, lookups)
     );
-    expect(csv.split('\r\n')[1]).toBe('"Damage Control II",3,,,,"The Forge",2026-09-30 12:00:00');
+    expect(csv.split('\r\n')[1]).toBe('"Damage Control II",3,,,,,"The Forge",2026-09-30 12:00:00');
+  });
+
+  it('counts a PLEX ask into Price at the PLEX price, and lists the PLEX raw beside it', () => {
+    const [, , price, plex] = contractSearchCsvColumns(t, lookups);
+    const row = offer({ price: 1_000_000, requestedPlex: 10 });
+    expect(price.value(row)).toBe(51_000_000);
+    expect(plex.value(row)).toBe(10);
+    const [, , unknownPrice] = contractSearchCsvColumns(t, { ...lookups, plexPrice: null });
+    expect(unknownPrice.value(row)).toBeNull();
   });
 });

@@ -114,6 +114,18 @@ describe('PublicContractDetailModal — contents', () => {
     expect(screen.queryByText('Everything on this contract')).not.toBeInTheDocument();
   });
 
+  it('puts what the contract asks for ahead of what the buyer gets', async () => {
+    showItems([
+      item({ record_id: 1, quantity: 5 }),
+      item({ record_id: 2, type_id: 40519, quantity: 10, is_included: false }),
+    ]);
+    renderModal();
+
+    const get = await screen.findByText('What you get');
+    const handOver = screen.getByText('What you hand over');
+    expect(handOver.compareDocumentPosition(get) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('keeps the plain heading when the contract only hands things over', async () => {
     showItems([item({ record_id: 1 })]);
     renderModal();
