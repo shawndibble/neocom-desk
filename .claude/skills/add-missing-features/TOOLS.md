@@ -30,7 +30,9 @@ Missioneers' Atlas (live: static-SDE LP store finder with LP/ISK cost and
 required items, plus agent finder, mission browser and zKill system intel — no
 market pricing, wallet or industry; the LP finder is covered by #718/#1050/#1068,
 the rest is mission-running remit), Gatewatch (Discord intel/DScan backend) and
-EVE PvP Corp Activity Search (both intel).
+EVE PvP Corp Activity Search (both intel). Blizbor's skill trio (EvE Modular
+Skillplans, EVEMon Pilot Progression, EVEMon Certificates Enhanced — no license,
+so their data is unusable; surfaced #2390).
 
 **Remit widened (#2328, decision `20260929-234357`): intel and travel tools are
 in scope** — route safety (kills/jumps along a route), Thera/Turnur connections
@@ -171,6 +173,10 @@ for the module or route.
 - **Contracts**: item-exchange/auction value; Courier mode ships ISK/jump,
   ISK/m³, Reverse Lane, Endpoint Space, "From my region", Completion Risk, Going
   Rate bait detection.
+- **Skills**: plan import (clipboard Append/Replace dedupes — covers any
+  "plan mixer"), EVEMon/EFT/queue import, remap optimizer, ship masteries with
+  "Add tier to plan" (built from SDE certificates), Skill Detail unlocks (#400),
+  Skill Compare matrix, Alpha caps.
 
 **The "engine computes it, the UI never shows it" scan is SPENT** — every
 exported `src/engine` field was checked against the whole app and accounted for.
@@ -275,7 +281,9 @@ demand a turn-in `offerProfit` subtracts and the `<dl>` never shows). #1051
 (`marketWideTrees.json` bakes the TOP blueprint's `time`). Unblocked: #1085
 (assembled volume on hull material lines).
 
-**New.** #1091 NARROW — contract notifications announce completion and failure,
+**New.** #2390 NARROW — Skills › Certificates tab: CCP's SDE certificates,
+combat groups only, grade + next-grade gap + "Add to plan"; Alpha cap shown only
+on Alpha characters. #1091 NARROW — contract notifications announce completion and failure,
 not just acceptance; every status is stored but only the edge into `in_progress`
 is diffed. Two events, silent on rejected/cancelled/deleted/reversed, gated on a
 known-live prior status and on the character being issuer or acceptor (the
@@ -343,7 +351,10 @@ Grouped by the test that killed them; the reason is what stops a re-pitch.
   Abyssal pricing (`unpricedRows` flags them); Skill Extractor ISK/hr; Corp
   Wallet chart by division (Accountant-only).
 - **On merit:** Skill ROI in any framing incl. the owner's invited re-frame — no
-  realized ISK/hr per job exists. Cross-plan material reservation and LP
+  realized ISK/hr per job exists. Curated starter-plan/template library (13:
+  hand-authored role modules rot on every CCP rework; masteries are CCP's own
+  templates). Certificate grades in Skill Compare (3). A hand-typed "lagging
+  support skills"/Magic-14 audit rule (13 + 18). Cross-plan material reservation and LP
   required-item re-pricing — `20260909-212724-group-ownership-overlay` rejected
   an allocation solver outright. Hand-entered cost basis with no linked run — a
   per-unit average over fungible lots. Per-order undercut timeline — narrowed
