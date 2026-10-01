@@ -7,7 +7,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import type { BuildPlanRecord } from '@/db';
+import { db, type BuildPlanRecord } from '@/db';
 import type { BlueprintType, TypeMap } from '@/sde/types';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import type { CorpOwnedStockState } from './corpOwnedStock';
@@ -16,6 +16,12 @@ import { PRICING_INPUTS_FIXTURE } from './pricingInputsFixtures';
 import { EMPTY_OWNED_STOCK_SNAPSHOT } from './ownedStockDetection';
 import { BuildPlanDetail, type PlanPatch } from './BuildPlanDetail';
 import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
+import { DEFAULT_FACILITY_DEFAULTS, useFacilityDefaults } from './facilityDefaults';
+import {
+  DEFAULT_REACTION_FACILITY_DEFAULTS,
+  REACTION_FACILITY_DEFAULTS_SETTING_KEY,
+  useReactionFacilityDefaults,
+} from './reactionFacilityDefaults';
 
 // BuildPlanDetail fetches a market snapshot in an effect on mount; a real
 // fetch would hit ESI/Fuzzwork and never resolve under MSW's default
@@ -272,6 +278,17 @@ const valueOf = (input: HTMLElement) => (input as HTMLInputElement).value;
 async function openSetup(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Edit setup' }));
 }
+
+// A location edit on this page writes the remembered defaults, so every test
+// starts from none — a value left by the last one would seed the next.
+beforeEach(async () => {
+  await db.settings.clear();
+  useFacilityDefaults.setState({ value: DEFAULT_FACILITY_DEFAULTS, hydrated: false });
+  useReactionFacilityDefaults.setState({
+    value: DEFAULT_REACTION_FACILITY_DEFAULTS,
+    hydrated: false,
+  });
+});
 
 describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
   it('reflects exactly what is typed mid-edit, including an intermediate out-of-range value', async () => {
@@ -1130,7 +1147,7 @@ describe('BuildPlanDetail Include Reactions (issue #698)', () => {
     expect(screen.queryByLabelText('Reaction location')).toBeNull();
   });
 
-  it('turning it on pre-fills the Reaction Location from the Settings default and reveals its controls', async () => {
+  it('turning it on pre-fills the Reaction Location from the remembered default and reveals its controls', async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
@@ -1175,6 +1192,107 @@ describe('BuildPlanDetail Include Reactions (issue #698)', () => {
     await screen.findByText('Tritanium');
 
     expect(screen.getByText('Reactions')).toHaveAttribute('aria-disabled', 'true');
+  });
+});
+
+describe('BuildPlanDetail remembers the location it sets', () => {
+  async function openOverride(user: ReturnType<typeof userEvent.setup>) {
+    await openSetup(user);
+    await user.click(screen.getByRole('button', { name: /Override/ }));
+  }
+
+  it('remembers a facility picked here as where the next manufacturing plan starts', async () => {
+    const user = userEvent.setup();
+    render(
+      <Harness
+        plan={{
+          facility: 'raitaru',
+          security: 'highsec',
+          buildSystemId: 30003888,
+          buildSystemName: 'Badivefi',
+          buildLocationId: 1035,
+          buildLocationName: 'K2-18 R&D',
+        }}
+      />
+    );
+    await openOverride(user);
+
+    await user.click(screen.getByLabelText('Facility'));
+    await user.click(await screen.findByRole('option', { name: 'Azbel' }));
+
+    await waitFor(() => expect(useFacilityDefaults.getState().value.facility).toBe('azbel'));
+    // The plan's whole resulting location — its system stays, the picked
+    // place the facility change forgot is forgotten here too.
+    const remembered = useFacilityDefaults.getState().value;
+    expect(remembered).toMatchObject({
+      security: 'highsec',
+      buildSystemId: 30003888,
+      buildSystemName: 'Badivefi',
+    });
+    expect('buildLocationId' in remembered).toBe(false);
+  });
+
+  it('remembers a typed build system', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await openOverride(user);
+
+    await user.type(screen.getByLabelText('Build system'), 'badivefi');
+    await user.tab();
+
+    await waitFor(() =>
+      expect(useFacilityDefaults.getState().value.buildSystemName).toBe('Badivefi')
+    );
+  });
+
+  it('remembers nothing for an edit that does not move the job', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.clear(runsInput());
+    await user.type(runsInput(), '25');
+    await user.tab();
+
+    expect(onUpdate).toHaveBeenCalledWith({ runs: 25 });
+    expect(await db.settings.count()).toBe(0);
+    expect(useFacilityDefaults.getState().value).toEqual(DEFAULT_FACILITY_DEFAULTS);
+  });
+
+  it('pre-fills the whole Reaction Location from the remembered one, without re-remembering it', async () => {
+    useReactionFacilityDefaults.setState({
+      value: {
+        facility: 'tatara',
+        rigFit: ['meT2', 'none', 'none'],
+        facilityTaxPct: 1,
+        security: 'lowsec',
+        buildSystemId: 30002053,
+        buildSystemName: 'Hek',
+        buildLocationId: 1022734985679,
+        buildLocationName: 'Hek - Refinery',
+      },
+      hydrated: true,
+    });
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.click(screen.getByRole('checkbox', { name: 'Include Reactions' }));
+
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      includeReactions: true,
+      reactionFacility: 'tatara',
+      reactionRigFit: ['meT2', 'none', 'none'],
+      reactionFacilityTaxPct: 1,
+      reactionSecurity: 'lowsec',
+      reactionBuildSystemId: 30002053,
+      reactionBuildSystemName: 'Hek',
+      reactionBuildLocationId: 1022734985679,
+      reactionBuildLocationName: 'Hek - Refinery',
+    });
+    expect(await db.settings.get(REACTION_FACILITY_DEFAULTS_SETTING_KEY)).toBeUndefined();
   });
 });
 

@@ -1,27 +1,28 @@
 /**
- * What a brand-new Build Plan starts at when there is no earlier plan to copy
- * from.
+ * Where a brand-new Build Plan starts: the location the pilot last set from a
+ * Build Plan page, one record per activity.
  *
- * `newBuildPlan` already carries facility, rig, security, hub, tax and build
- * system forward from the character's most recently updated plan (issue #456),
- * so this is only consulted for a character's *first* plan — and for one whose
- * previous plan hosts a different activity, where carrying the facility
- * forward would name a structure the new blueprint cannot run at.
+ * Remembered, not configured. Any plan-page edit to a plan's location —
+ * a Build Location pick, the facility, rigs, tax or build system — saves that
+ * plan's resulting location here (`rememberLocationFromEdit.ts`), and
+ * `newBuildPlan` starts the next plan of that activity from it. Each plan
+ * keeps its own location once created; this only decides where the next one
+ * starts. It replaced both the Settings-level default facility and the older
+ * "copy the most recently updated plan" rule (issue #456), which pulled new
+ * plans back to wherever the last *edited* plan happened to be rather than the
+ * last place the pilot actually chose — see
+ * `docs/context/decisions/20261001-114015-new-plans-start-at-the-last-location-set.md`.
  *
- * That is a narrow window, but it is the one where the pilot has told the app
- * nothing and the app has to guess. An industrialist who owns a rigged Azbel
- * builds there; guessing NPC station quotes their first plan against a
- * facility they never use, and every plan after inherits it.
- *
- * One packed record rather than three keys: rig level and facility tax only
- * mean anything for a player structure, and splitting them lets the three
- * drift into a combination the pilot never chose.
+ * One packed record rather than one key per field: rig level and facility tax
+ * only mean anything for a player structure, and the build system and picked
+ * place only mean anything beside the facility they name, so splitting them
+ * lets the fields drift into a combination the pilot never chose.
  *
  * Synced across the pilot's devices — the Azbel they build at is theirs, not
- * their laptop's. The packing has one cost there, named in the decision that
- * introduced it: `mergeSettings` is last-write-wins per *key*, so two devices
- * that change different fields of this record before either syncs keep only
- * the later record whole, rather than merging the two fields.
+ * their laptop's. The packing has one cost there: `mergeSettings` is
+ * last-write-wins per *key*, so two devices that set different fields before
+ * either syncs keep only the later record whole. For a record that is always
+ * written whole from one plan, that is the right answer anyway.
  */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import {
@@ -33,6 +34,7 @@ import {
   type RigKind,
   type RigLevel,
 } from '@/engine/industry/types';
+import { parseRememberedLocation, type RememberedLocationFields } from './rememberedLocation';
 import {
   DEFAULT_REACTION_FACILITY_DEFAULTS,
   useReactionFacilityDefaults,
@@ -45,7 +47,7 @@ export const FACILITY_DEFAULTS_SETTING_KEY = 'sync.industryFacilityDefaults';
 /** What it was stored under before it synced; its value is adopted once. */
 export const LEGACY_FACILITY_DEFAULTS_SETTING_KEY = 'industryFacilityDefaults';
 
-export interface FacilityDefaults {
+export interface FacilityDefaults extends RememberedLocationFields {
   facility: FacilityKind;
   /** Only meaningful for a player structure; forced to all-none otherwise (issue #609). */
   rigFit: RigFit;
@@ -57,7 +59,7 @@ export interface FacilityDefaults {
   facilityTaxPct: number | null;
 }
 
-/** Today's hardcoded behaviour, so an existing pilot's first plan is unchanged. */
+/** What a pilot who has never set a location gets: an unrigged NPC station at their hub. */
 export const DEFAULT_FACILITY_DEFAULTS: FacilityDefaults = {
   facility: 'npcStation',
   rigFit: EMPTY_RIG_FIT,
@@ -71,34 +73,35 @@ const LEGACY_RIG_LEVELS: readonly RigLevel[] = ['none', 't1', 't2'];
  * Two incoherent records, reset differently.
  *
  * A non-manufacturing facility is reset **whole**: this record seeds only
- * manufacturing plans now, so a refinery in it would be read by nothing and
- * the picker does not offer one to show. `adoptRefineryDefault.ts` moves a
+ * manufacturing plans now, so a refinery in it would be read by nothing.
+ * `adoptRefineryDefault.ts` moves a
  * pilot's existing one to the Reaction Location default before any store
  * reads this, so the reset lands on a value already rescued.
  *
- * An NPC station with rigs or a tax keeps its **facility** and loses the two
- * fields that cannot exist: the facility is the part the pilot chose, and
- * dropping it over a stale rig fit would be the more surprising outcome. That
- * half is the same rule `BuildPlanDetail` applies when the pilot switches a
- * plan away from a structure — one place would be better, but that one is a
- * form handler over a plan record and this is a stored preference.
+ * An NPC station with rigs or a tax keeps its **facility** and its remembered
+ * place, and loses the two fields that cannot exist: the facility is the part
+ * the pilot chose, and dropping it over a stale rig fit would be the more
+ * surprising outcome. That half is the same rule `BuildPlanDetail` applies
+ * when the pilot switches a plan away from a structure — one place would be
+ * better, but that one is a form handler over a plan record and this is a
+ * stored preference.
  */
 export function normalizeFacilityDefaults(value: FacilityDefaults): FacilityDefaults {
   // A refinery here is incoherent now that reactions have their own default:
   // nothing would ever read it, since `newBuildPlan` takes this record only
-  // for a manufacturing plan. Reset whole rather than kept inert, so the
-  // picker has a value it can show. The mirror of
+  // for a manufacturing plan. Reset whole — the remembered place with it,
+  // since it is the refinery's — rather than kept inert. The mirror of
   // `normalizeReactionFacilityDefaults`, and for the same reason — the whole
   // record only means anything for its own activity.
   if (FACILITY_PRESETS[value.facility].activity !== 'manufacturing') {
     return DEFAULT_FACILITY_DEFAULTS;
   }
   if (FACILITY_PRESETS[value.facility].structure) return value;
-  return { facility: value.facility, rigFit: EMPTY_RIG_FIT, facilityTaxPct: null };
+  return { ...value, rigFit: EMPTY_RIG_FIT, facilityTaxPct: null };
 }
 
 /**
- * The pilot's Settings-level default for each activity a plan can have.
+ * The pilot's remembered location for each activity a plan can have.
  *
  * Two records rather than one, because a refinery and an engineering complex
  * are both standing facts about the same pilot and neither can host the
@@ -118,18 +121,9 @@ export const DEFAULT_ACTIVITY_FACILITY_DEFAULTS: ActivityFacilityDefaults = {
   reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,
 };
 
-/**
- * The only facilities this setting may hold — what the Default facility
- * picker offers, so a pick can never be a value `normalizeFacilityDefaults`
- * would reset. Mirrors `REACTION_FACILITY_PRESETS`.
- */
-export const MANUFACTURING_FACILITY_PRESETS = Object.values(FACILITY_PRESETS).filter(
-  (preset) => preset.activity === 'manufacturing'
-);
-
 function parseFacilityDefaults(raw: unknown): FacilityDefaults | null {
   if (typeof raw !== 'object' || raw === null) return null;
-  const record = raw as {
+  const record = raw as Record<string, unknown> & {
     facility?: unknown;
     rigFit?: unknown;
     rigLevel?: unknown;
@@ -159,6 +153,9 @@ function parseFacilityDefaults(raw: unknown): FacilityDefaults | null {
   )
     return null;
   return normalizeFacilityDefaults({
+    // Absent from every record written before locations were remembered, and
+    // dropped field by field when malformed — see `parseRememberedLocation`.
+    ...parseRememberedLocation(record),
     facility: record.facility as FacilityKind,
     rigFit: resolveRigFit({
       rigFit: record.rigFit as RigKind[] | undefined,

@@ -6,8 +6,8 @@
  * only to plans of that facility's own activity. So storing a Tatara there was
  * how a pilot said "my reaction plans start at my rigged Tatara" — the
  * manufacturing half simply went unused. Now that reactions read their own
- * key, that record would be read by nothing and the picker no longer offers
- * it, so the intent has to move rather than evaporate.
+ * key, that record would be read by nothing, so the intent has to move
+ * rather than evaporate.
  *
  * Runs before either store hydrates (`app/App.tsx` gates the first render on
  * it), because both would otherwise read the rows this rewrites.

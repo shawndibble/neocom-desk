@@ -106,8 +106,9 @@ export interface FitImportPlanContext {
   characterId: number;
   catalog: BlueprintCatalog;
   ownedBlueprints: readonly CharacterBlueprint[];
-  /** The plan every created plan takes its facility/hub/system from (issue #456). */
+  /** The plan every created plan takes its hub and price basis from (issue #456). */
   defaultsFrom: BuildPlanRecord | null;
+  /** Where every created plan builds: the pilot's remembered location per activity. */
   facilityDefaults: ActivityFacilityDefaults;
   /** ME to quote a blueprint the character owns no copy of — `sync.industryAssumedMe`. */
   assumedMe: number;
@@ -128,8 +129,8 @@ function entryFor(
  *
  * Stamped newest-first from `Date.now()`, so `mostRecentlyUpdatedPlan`'s
  * strict `>` resolves the batch to the ship rather than to whichever member
- * Dexie happens to return first — otherwise the settings the pilot's next
- * hand-made plan inherits come from a random rig (issue #456). Stepping
+ * Dexie happens to return first — otherwise the hub the pilot's next
+ * hand-made plan inherits comes from a random rig (issue #456). Stepping
  * *back* rather than nudging the hull forward: `Date.now()` is the newest any
  * of them may honestly claim, and it makes every member deterministic instead
  * of only the hull's boundary.

@@ -10,6 +10,8 @@ import { db, type BuildPlanRecord } from '@/db';
 import { loadBlueprintCatalog } from './blueprintCatalog';
 import { mostRecentlyUpdatedPlan, newBuildPlan } from './newBuildPlan';
 import { createBuildPlans } from './buildPlanStore';
+import { hydrateActivityFacilityDefaults, useFacilityDefaults } from './facilityDefaults';
+import { useReactionFacilityDefaults } from './reactionFacilityDefaults';
 import type { ActiveJob } from './jobs';
 
 /** The job-derived numbers Log Production should start from, once a target plan is known. */
@@ -33,10 +35,10 @@ export async function findMatchingBuildPlans(
 
 /**
  * Creates a sensibly-defaulted Build Plan for a job with no existing match
- * (same defaulting `newBuildPlan` gives every other creation path — facility/
- * hub/ME/TE from the character's most recent plan). Returns its id, or null
- * if the job's blueprint isn't in the SDE catalog (not expected for a real
- * ESI job).
+ * (same defaulting `newBuildPlan` gives every other creation path — location
+ * from the remembered default for the blueprint's activity, hub from the
+ * character's most recent plan). Returns its id, or null if the job's
+ * blueprint isn't in the SDE catalog (not expected for a real ESI job).
  */
 export async function createBuildPlanForJob(
   characterId: number,
@@ -46,7 +48,13 @@ export async function createBuildPlanForJob(
   const entry = catalog.byBlueprintTypeID.get(job.blueprint_type_id);
   if (!entry) return null;
   const existing = await db.buildPlans.where('characterId').equals(characterId).toArray();
-  const plan = newBuildPlan(characterId, entry, null, mostRecentlyUpdatedPlan(existing));
+  // Outside React, so read straight off the stores — hydrated first, since a
+  // row action can run before any Industry page has mounted to do it.
+  await hydrateActivityFacilityDefaults();
+  const plan = newBuildPlan(characterId, entry, null, mostRecentlyUpdatedPlan(existing), {
+    manufacturing: useFacilityDefaults.getState().value,
+    reaction: useReactionFacilityDefaults.getState().value,
+  });
   await createBuildPlans([plan]);
   return plan.id;
 }

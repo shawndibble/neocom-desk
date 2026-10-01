@@ -59,30 +59,11 @@ import { useTicker } from '@/lib/ticker';
 import { formatTimestamp } from '@/lib/timestamp';
 import { SHORTCUTS, commandPaletteDisplayKey, isApplePlatform } from '@/lib/shortcuts';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import {
-  FACILITY_PRESETS,
-  RIG_KIND_OPTIONS,
-  setRigSlot,
-  type FacilityKind,
-  type FacilityPreset,
-} from '@/engine/industry/types';
-import { rigKindLabelKey } from '@/features/industry/rigFitLabels';
 import { useMarketHub } from '@/features/market/hub';
 import { useMiningTaxOreValueMode } from '@/features/miningTax/oreValueMode';
 import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
 import { useAssumedTe, MIN_ASSUMED_TE, MAX_ASSUMED_TE } from '@/features/industry/assumedTe';
 import { useIncludeBlueprintCost } from '@/features/industry/includeBlueprintCost';
-import {
-  useFacilityDefaults,
-  normalizeFacilityDefaults,
-  hydrateActivityFacilityDefaults,
-  MANUFACTURING_FACILITY_PRESETS,
-  type FacilityDefaults,
-} from '@/features/industry/facilityDefaults';
-import {
-  useReactionFacilityDefaults,
-  REACTION_FACILITY_PRESETS,
-} from '@/features/industry/reactionFacilityDefaults';
 import { useExpiringWindowHours, EXPIRING_WINDOW_HOUR_OPTIONS } from '@/features/pi/expiringWindow';
 import {
   useSpExtractionMonitoringEnabled,
@@ -702,104 +683,6 @@ function MobileTabsPanel() {
 }
 
 /**
- * One facility-defaults record's controls: which facility, its rig fit, and
- * the owner-set tax. Rendered twice in {@link DefaultsPanel} — once for where
- * a Build Plan manufactures, once for its Reaction Location — because
- * `FacilityDefaults` and `ReactionFacilityDefaults` are the same three fields
- * over different preset sets, and the two only ever drifted apart by accident
- * when they were two copies of this markup.
- *
- * Normalising stays with the caller: what an incoherent pick means differs
- * per record (an NPC station drops rigs and tax; a non-reaction facility is
- * refused outright), and only the caller knows which store it is writing.
- */
-function FacilityDefaultsFields({
-  idPrefix,
-  value,
-  onChange,
-  presets,
-  showRigAndTax,
-  labels,
-}: {
-  idPrefix: string;
-  value: FacilityDefaults;
-  onChange: (next: FacilityDefaults) => void;
-  presets: readonly FacilityPreset[];
-  showRigAndTax: boolean;
-  labels: { facility: string; hint: string; rigGroup: string; tax: string };
-}) {
-  const { t } = useTranslation();
-  return (
-    <div className="space-y-1.5 border-t border-line pt-3">
-      <label htmlFor={`${idPrefix}-facility`} className="block text-xs font-semibold">
-        {labels.facility}
-      </label>
-      <p className="text-xs text-text-dim">{labels.hint}</p>
-      <Select
-        value={value.facility}
-        onValueChange={(picked) => onChange({ ...value, facility: picked as FacilityKind })}
-      >
-        <SelectTrigger id={`${idPrefix}-facility`} aria-label={labels.facility}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {presets.map((preset) => (
-            <SelectItem key={preset.kind} value={preset.kind}>
-              {preset.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {showRigAndTax && (
-        <div className="space-y-3 border-l border-line pt-2 pl-3">
-          <div role="group" aria-label={labels.rigGroup} className="space-y-3">
-            <p className="text-xs font-semibold">{labels.rigGroup}</p>
-            {value.rigFit.map((kind, slot) => (
-              <ChipRow
-                // A slot's position is its identity, not the kind fitted in it.
-                key={slot}
-                label={t('industry.rigSlotLabel', { slot: slot + 1 })}
-                options={RIG_KIND_OPTIONS}
-                selected={kind}
-                onSelect={(picked) =>
-                  onChange({ ...value, rigFit: setRigSlot(value.rigFit, slot, picked) })
-                }
-                labelFor={(kind) => t(rigKindLabelKey(kind))}
-              />
-            ))}
-          </div>
-          <div className="space-y-1.5">
-            <label htmlFor={`${idPrefix}-facility-tax`} className="block text-xs font-semibold">
-              {labels.tax}
-            </label>
-            <p className="text-xs text-text-dim">{t('settings.facilityTaxHint')}</p>
-            <TextInput
-              id={`${idPrefix}-facility-tax`}
-              type="number"
-              min={0}
-              step={0.01}
-              value={value.facilityTaxPct ?? ''}
-              placeholder={String(FACILITY_PRESETS[value.facility].defaultTaxPct)}
-              onChange={(event) => {
-                const raw = event.target.value.trim();
-                const parsed = Number(raw);
-                onChange({
-                  ...value,
-                  // Empty means "use the preset's own", which is what a plan
-                  // with no tax of its own already does.
-                  facilityTaxPct:
-                    raw === '' || !Number.isFinite(parsed) || parsed < 0 ? null : parsed,
-                });
-              }}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-/**
  * What a page assumes when the pilot has not said otherwise. Every control
  * in the Defaults panels below defaults to exactly what the app did before it
  * was settable, so an existing pilot's numbers do not move until they ask
@@ -822,31 +705,13 @@ function IndustryDefaultsPanel() {
   const setAssumedTe = useAssumedTe((state) => state.setValue);
   const includeBlueprintCost = useIncludeBlueprintCost((state) => state.value);
   const setIncludeBlueprintCost = useIncludeBlueprintCost((state) => state.setValue);
-  const facilityDefaults = useFacilityDefaults((state) => state.value);
-  const setFacilityDefaults = useFacilityDefaults((state) => state.setValue);
-  const reactionFacilityDefaults = useReactionFacilityDefaults((state) => state.value);
-  const setReactionFacilityDefaults = useReactionFacilityDefaults((state) => state.setValue);
 
   // Each on its own line, never `a() && b()`: `&&` short-circuits, which would
   // make every hook after the first false one a conditional call.
   const assumedMeHydrated = useHydratedStore(useAssumedMe);
   const assumedTeHydrated = useHydratedStore(useAssumedTe);
   const includeBlueprintCostHydrated = useHydratedStore(useIncludeBlueprintCost);
-  // Through the pair's own gate, not `useHydratedStore`: the one-time
-  // adoption rewrites both rows, so neither store may read before it runs.
-  const facilityHydrated = useFacilityDefaults((state) => state.hydrated);
-  const reactionFacilityHydrated = useReactionFacilityDefaults((state) => state.hydrated);
-  useEffect(() => {
-    void hydrateActivityFacilityDefaults();
-  }, []);
-  const ready =
-    assumedMeHydrated &&
-    assumedTeHydrated &&
-    includeBlueprintCostHydrated &&
-    facilityHydrated &&
-    reactionFacilityHydrated;
-
-  const facilityPreset = FACILITY_PRESETS[facilityDefaults.facility];
+  const ready = assumedMeHydrated && assumedTeHydrated && includeBlueprintCostHydrated;
 
   if (!ready) {
     return (
@@ -860,48 +725,6 @@ function IndustryDefaultsPanel() {
     <Panel title={t('settings.industryDefaultsTitle')}>
       <div className="max-w-md space-y-4">
         <p className="text-xs text-text-dim">{t('settings.defaultsSyncHint')}</p>
-
-        <FacilityDefaultsFields
-          idPrefix="settings"
-          value={facilityDefaults}
-          // Normalised on the way in: an NPC station fits no rigs and its tax
-          // is fixed, so switching to one has to drop both rather than leave a
-          // combination that cannot exist. Same rule `BuildPlanDetail` applies
-          // to a plan.
-          onChange={(next) => void setFacilityDefaults(normalizeFacilityDefaults(next))}
-          presets={MANUFACTURING_FACILITY_PRESETS}
-          // Rig and owner-set tax only exist for a player structure.
-          showRigAndTax={facilityPreset.structure}
-          labels={{
-            facility: t('settings.facilityLabel'),
-            hint: t('settings.facilityHint'),
-            rigGroup: t('settings.rigLevelLabel'),
-            tax: t('settings.facilityTaxLabel'),
-          }}
-        />
-
-        {/*
-          The Reaction Location a Build Plan starts at the first time Include
-          Reactions is turned on for it. Its own synced key
-          (`features/industry/reactionFacilityDefaults.ts`): a pilot's refinery
-          and their factory are two standing facts that share no facility.
-
-          `showRigAndTax` is unconditional — every reaction facility is a
-          player structure, unlike an NPC station above.
-        */}
-        <FacilityDefaultsFields
-          idPrefix="settings-reaction"
-          value={reactionFacilityDefaults}
-          onChange={(next) => void setReactionFacilityDefaults(next)}
-          presets={REACTION_FACILITY_PRESETS}
-          showRigAndTax
-          labels={{
-            facility: t('settings.reactionLocationLabel'),
-            hint: t('settings.reactionLocationHint'),
-            rigGroup: t('settings.reactionLocationRigLabel'),
-            tax: t('settings.reactionLocationTaxLabel'),
-          }}
-        />
 
         <div className="space-y-1.5 border-t border-line pt-3">
           <label htmlFor="settings-assumed-me" className="block text-xs font-semibold">
@@ -1236,7 +1059,6 @@ function usePhoneSummaries(): Partial<Record<SettingsSectionId, string>> {
   const singleKeyShortcuts = useSingleKeyShortcuts((state) => state.value);
   const assumedMe = useAssumedMe((state) => state.value);
   const assumedTe = useAssumedTe((state) => state.value);
-  const facility = useFacilityDefaults((state) => state.value.facility);
   const hub = useMarketHub((state) => state.value);
   const characterFilter = useDefaultCharacterFilter((state) => state.value);
   const darkAfterDays = useDarkThreshold((state) => state.value);
@@ -1253,7 +1075,6 @@ function usePhoneSummaries(): Partial<Record<SettingsSectionId, string>> {
     }),
     shortcuts: t(singleKeyShortcuts ? 'settings.summary.on' : 'settings.summary.off'),
     industry: t('settings.summary.industry', {
-      facility: FACILITY_PRESETS[facility].name,
       me: assumedMe,
       te: assumedTe,
     }),

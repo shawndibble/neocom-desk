@@ -185,7 +185,7 @@ export function useOpportunities({
       // Characters resolve to, not one shared hard-coded default.
       const hubGroups = groupCandidatesByHub(currentCandidates, hubForCharacter);
       const requests = hubGroups.map((group) =>
-        opportunitySnapshotRequest(group.candidates, group.hub, catalog, pi)
+        opportunitySnapshotRequest(group.candidates, group.hub, catalog, pi, facilityDefaults)
       );
       const snapshots = await Promise.all(loadMarketSnapshots(requests));
       if (cancelled) return;

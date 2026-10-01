@@ -13,6 +13,15 @@ import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import { useBuildGroups } from '@/features/industry/buildGroups';
 import { useAssumedMe } from '@/features/industry/assumedMe';
+import {
+  DEFAULT_FACILITY_DEFAULTS,
+  FACILITY_DEFAULTS_SETTING_KEY,
+  useFacilityDefaults,
+} from '@/features/industry/facilityDefaults';
+import {
+  DEFAULT_REACTION_FACILITY_DEFAULTS,
+  useReactionFacilityDefaults,
+} from '@/features/industry/reactionFacilityDefaults';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 
@@ -161,6 +170,12 @@ beforeEach(async () => {
   // Module-scope store, so it outlives a test unless it is put back — same
   // reason `useLastOpenedPlan` used to need this.
   useBuildGroups.setState({ value: {}, hydrated: false });
+  // Plan-page location edits write these, so they must not carry between tests.
+  useFacilityDefaults.setState({ value: DEFAULT_FACILITY_DEFAULTS, hydrated: false });
+  useReactionFacilityDefaults.setState({
+    value: DEFAULT_REACTION_FACILITY_DEFAULTS,
+    hydrated: false,
+  });
   usePublicInfo.setState({ byCharacterId: {} });
   useAuthFailure.setState({ failure: null });
 
@@ -270,43 +285,49 @@ describe('Industry: Build Plan CRUD', () => {
     expect(remaining[0].name).toBe('Rifter run (copy)');
   });
 
-  it('defaults facility/rig/security/hub/tax/build system/build location on a new plan from the most-recently-updated existing plan (#456)', async () => {
-    // Older plan first: its (wrong) settings must lose to the newer one below,
-    // proving the defaulting picks the most-recently-updated plan, not just
-    // "some" existing plan.
+  it('starts a new plan at the remembered location, with the hub from the most-recently-updated plan', async () => {
+    // The location the pilot last set from a plan page — the Raitaru in Tama
+    // — is what a new plan builds at, whatever plan was touched last.
+    await db.settings.put({
+      key: FACILITY_DEFAULTS_SETTING_KEY,
+      value: {
+        facility: 'raitaru',
+        rigFit: ['meT2', 'teT2', 'none'],
+        facilityTaxPct: 0.25,
+        security: 'lowsec',
+        buildSystemId: 30002813,
+        buildSystemName: 'Tama',
+        buildLocationId: 1035466617946,
+        buildLocationName: 'Tama - Sosala Raitaru',
+      },
+    });
+    // Older plan first: its hub must lose to the newer one below, proving the
+    // hub still comes from the most-recently-updated plan (#456).
     await db.buildPlans.add(
       seedPlan({
         id: 'bp-old',
         name: 'Old run',
         blueprintTypeID: 9841,
-        facility: 'azbel',
-        rigLevel: 't1',
-        security: 'nullsec',
         hubId: 'rens',
-        facilityTaxPct: 0.1,
-        buildSystemId: 30002510,
-        buildSystemName: 'Rens',
-        buildLocationId: 60004588,
-        buildLocationName: 'Rens VI - Moon 8 - Brutor Tribe Treasury',
         updatedAt: 3,
       })
     );
+    // The newest plan builds somewhere else entirely; none of its location
+    // carries — only its hub.
     await db.buildPlans.add(
       seedPlan({
         id: 'bp-parts',
         name: 'Parts run',
         blueprintTypeID: 9841,
-        facility: 'raitaru',
-        rigLevel: 't2',
-        // Lowsec because it builds in Tama, not because anyone typed it — the
-        // band follows the build system now, so the fixture has to name one.
-        security: 'lowsec',
-        buildSystemId: 30002813,
-        buildSystemName: 'Tama',
+        facility: 'azbel',
+        rigLevel: 't1',
+        security: 'nullsec',
         hubId: 'amarr',
-        facilityTaxPct: 0.25,
-        buildLocationId: 1035466617946,
-        buildLocationName: 'Tama - Sosala Raitaru',
+        facilityTaxPct: 0.1,
+        buildSystemId: 30002510,
+        buildSystemName: 'Rens',
+        buildLocationId: 60004588,
+        buildLocationName: 'Rens VI - Moon 8 - Brutor Tribe Treasury',
         updatedAt: 5,
       })
     );
