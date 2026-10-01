@@ -68,8 +68,16 @@ vi.mock('@/features/bpcContracts/publicContractItems', () => ({
   loadPublicContractItems: (...args: unknown[]) => loadPublicContractItems(...args),
 }));
 
+// 48098 stands in for a type on contract that the market catalogue never
+// lists (an unmarketable blueprint copy), so only this lookup can name it.
 vi.mock('@/features/character/typeNames', () => ({
-  loadTypeNames: vi.fn(async () => new Map([[34, 'Tritanium']])),
+  loadTypeNames: vi.fn(
+    async () =>
+      new Map([
+        [34, 'Tritanium'],
+        [48098, 'Baryon Exotic Plasma S Blueprint'],
+      ])
+  ),
 }));
 
 /** The Jump Range filter's origin (`features/route/currentSystem.ts`), mocked so a test can set it without ESI. */
@@ -530,6 +538,20 @@ describe('ContractSearchPanel', () => {
     expect(within(modes).getByRole('button', { name: 'Items' })).toHaveAttribute(
       'aria-pressed',
       'true'
+    );
+  });
+
+  it('names a listed type the market catalogue lacks, such as an unmarketable blueprint copy', async () => {
+    loadPublicContractOffers.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 7, typeId: 48098, price: 40_000 })])
+    );
+    renderWithRouter();
+
+    const rows = await bodyRows();
+    await waitFor(() =>
+      expect(within(rows[0]).getAllByRole('cell')[0]).toHaveTextContent(
+        'Baryon Exotic Plasma S Blueprint'
+      )
     );
   });
 
