@@ -13,6 +13,10 @@ import { unzipSync, strFromU8 } from 'fflate';
 const LATEST_URL =
   'https://developers.eveonline.com/static-data/eve-online-static-data-latest-jsonl.zip';
 const ZIP_NAME = /^eve-online-static-data-\d+-jsonl\.zip$/;
+// A stalled connection should fail the build, not hang it. The archive is
+// ~100 MB, so its budget is generous; resolving "latest" is one HEAD request.
+const RESOLVE_TIMEOUT_MS = 30_000;
+const DOWNLOAD_TIMEOUT_MS = 10 * 60_000;
 
 /**
  * The build-numbered URL "latest" currently redirects to. Anything but a
@@ -24,6 +28,7 @@ async function resolveLatestUrl(userAgent) {
     method: 'HEAD',
     redirect: 'manual',
     headers: { 'User-Agent': userAgent },
+    signal: AbortSignal.timeout(RESOLVE_TIMEOUT_MS),
   });
   const location = res.headers.get('location');
   if (res.status >= 300 && res.status < 400 && location) {
@@ -62,7 +67,10 @@ async function cachedZip(cacheDir, userAgent) {
   } catch {
     /* not cached */
   }
-  const res = await fetch(url, { headers: { 'User-Agent': userAgent } });
+  const res = await fetch(url, {
+    headers: { 'User-Agent': userAgent },
+    signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
   const bytes = Buffer.from(await res.arrayBuffer());
   await mkdir(cacheDir, { recursive: true });
