@@ -1,12 +1,16 @@
 /**
- * What a Build Plan's Reaction Location starts at the first time Include
- * Reactions is turned on for it (issue #698) — a real, explicit Settings-level
- * default, not "copy the most recently edited plan's facility" the way the
- * plan's own primary location seeds a fresh plan (`facilityDefaults.ts`'s own
- * module doc explains why that shortcut doesn't apply to a first plan; here
- * there is no earlier *Reaction Location* to copy from regardless of how many
- * plans exist, since it's a per-plan field only just introduced).
+ * Where the pilot's reactions run: the Reaction Location the pilot last set
+ * from a Build Plan page — a manufacturing plan's Reaction Location, or a
+ * reaction-activity plan's own location (`rememberLocationFromEdit.ts`).
  *
+ * Read in two places: a manufacturing plan's Reaction Location starts here
+ * the first time Include Reactions is turned on for it (issue #698), and a
+ * fresh reaction-activity plan's primary location starts here
+ * (`newBuildPlan`). Each plan keeps its own copy from then on; this record
+ * only decides where the *next* one starts.
+ *
+ * Once a Settings control (issue #698); now remembered rather than set — see
+ * `docs/context/decisions/20261001-114015-new-plans-start-at-the-last-location-set.md`.
  * Mirrors `facilityDefaults.ts` field-for-field, restricted to a refinery
  * (`athanor`/`tatara`) instead of any facility kind — the one the Reaction
  * Location picker itself is restricted to.
@@ -20,10 +24,11 @@ import {
   type RigFit,
   type RigKind,
 } from '@/engine/industry/types';
+import { parseRememberedLocation, type RememberedLocationFields } from './rememberedLocation';
 
 export const REACTION_FACILITY_DEFAULTS_SETTING_KEY = 'sync.industryReactionFacilityDefaults';
 
-export interface ReactionFacilityDefaults {
+export interface ReactionFacilityDefaults extends RememberedLocationFields {
   facility: FacilityKind;
   rigFit: RigFit;
   facilityTaxPct: number | null;
@@ -40,8 +45,8 @@ const RIG_KINDS: readonly RigKind[] = ['none', 'meT1', 'meT2', 'teT1', 'teT2'];
 
 /**
  * The only facilities this setting may hold — the same restriction the
- * Reaction Location picker applies, so a control offering these can never
- * produce a value `normalizeReactionFacilityDefaults` would reject.
+ * Reaction Location picker applies, so a pick from it can never produce a
+ * value `normalizeReactionFacilityDefaults` would reject.
  */
 export const REACTION_FACILITY_PRESETS = Object.values(FACILITY_PRESETS).filter(
   (preset) => preset.activity === 'reaction'
@@ -53,7 +58,7 @@ export const REACTION_FACILITY_PRESETS = Object.values(FACILITY_PRESETS).filter(
  * same "the facility is what the pilot chose" reasoning
  * `normalizeFacilityDefaults` uses for a non-structure. There is no partial
  * fix here the way there is for a non-structure's rig/tax, since the whole
- * record only means anything for a refinery.
+ * record — remembered place included — only means anything for a refinery.
  */
 export function normalizeReactionFacilityDefaults(
   value: ReactionFacilityDefaults
@@ -64,7 +69,11 @@ export function normalizeReactionFacilityDefaults(
 
 function parseReactionFacilityDefaults(raw: unknown): ReactionFacilityDefaults | null {
   if (typeof raw !== 'object' || raw === null) return null;
-  const record = raw as { facility?: unknown; rigFit?: unknown; facilityTaxPct?: unknown };
+  const record = raw as Record<string, unknown> & {
+    facility?: unknown;
+    rigFit?: unknown;
+    facilityTaxPct?: unknown;
+  };
   if (typeof record.facility !== 'string' || !(record.facility in FACILITY_PRESETS)) return null;
   const hasRigFit =
     record.rigFit === undefined ||
@@ -78,6 +87,7 @@ function parseReactionFacilityDefaults(raw: unknown): ReactionFacilityDefaults |
   )
     return null;
   return normalizeReactionFacilityDefaults({
+    ...parseRememberedLocation(record),
     facility: record.facility as FacilityKind,
     rigFit: resolveRigFit({ rigFit: record.rigFit as RigKind[] | undefined }),
     facilityTaxPct: (tax as number | null | undefined) ?? null,

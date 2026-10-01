@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import { EMPTY_RIG_FIT, resolveRigFit } from '@/engine/industry/types';
+import { EMPTY_RIG_FIT } from '@/engine/industry/types';
 import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS, DEFAULT_FACILITY_DEFAULTS } from './facilityDefaults';
 import { DEFAULT_REACTION_FACILITY_DEFAULTS } from './reactionFacilityDefaults';
 import type { BlueprintCatalogEntry } from './blueprintCatalog';
@@ -200,22 +200,118 @@ describe('newBuildPlan — overrides', () => {
 });
 
 describe('newBuildPlan — carried defaults', () => {
-  it('carries facility, hub and build system from the last plan of the same activity', () => {
+  const BADIVEFI_AZBEL = {
+    facility: 'azbel',
+    rigFit: ['meT1', 'none', 'none'],
+    facilityTaxPct: 4,
+    security: 'nullsec',
+    buildSystemId: 30003888,
+    buildSystemName: 'Badivefi',
+    buildLocationId: 1035466617946,
+    buildLocationName: 'Badivefi - K2-18 b R&D',
+    setOnPlanPage: true,
+  } as const;
+
+  it('carries hub and price basis from the last plan, but not its location, once a plan page set one', () => {
+    // The location is the remembered default's alone now: the last plan
+    // *updated* is not necessarily the last place the pilot *set*, and an
+    // edit to runs on an old plan used to pull every new plan back there.
     const previous = plan({
       id: 'p',
       facility: 'raitaru',
       rigLevel: 't1',
       hubId: 'amarr',
+      materialPriceBasis: 'buy',
+      buildSystemId: 30000142,
+      buildSystemName: 'Jita',
+      buildLocationId: 60003760,
+    });
+    const created = newBuildPlan(1, entry(), null, previous, {
+      manufacturing: { ...DEFAULT_FACILITY_DEFAULTS, setOnPlanPage: true },
+      reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,
+    });
+    expect(created.hubId).toBe('amarr');
+    expect(created.materialPriceBasis).toBe('buy');
+    expect(created.facility).toBe('npcStation');
+    expect(created.rigFit).toEqual(EMPTY_RIG_FIT);
+    expect(created.security).toBe('highsec');
+    expect('buildSystemId' in created).toBe(false);
+    expect('buildLocationId' in created).toBe(false);
+  });
+
+  it('starts at the remembered location, build system and picked place included', () => {
+    // The bug that prompted it: a pilot who picked their Azbel in Badivefi
+    // saw every new plan open at the hub's system with no build location.
+    const previous = plan({ id: 'p', facility: 'raitaru', hubId: 'amarr' });
+    const created = newBuildPlan(1, entry(), null, previous, {
+      manufacturing: BADIVEFI_AZBEL,
+      reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,
+    });
+    expect(created).toMatchObject({
+      facility: 'azbel',
+      rigFit: ['meT1', 'none', 'none'],
+      facilityTaxPct: 4,
+      security: 'nullsec',
       buildSystemId: 30003888,
       buildSystemName: 'Badivefi',
+      buildLocationId: 1035466617946,
+      buildLocationName: 'Badivefi - K2-18 b R&D',
+      hubId: 'amarr',
     });
-    const created = newBuildPlan(1, entry(), null, previous, DEFAULT_ACTIVITY_FACILITY_DEFAULTS);
-    expect(created.facility).toBe('raitaru');
-    // Through `resolveRigFit`, so a plan still in the pre-#609 `rigLevel`
-    // shape carries forward as the fit it migrates to.
-    expect(created.rigFit).toEqual(resolveRigFit(previous));
-    expect(created.hubId).toBe('amarr');
-    expect(created.buildSystemName).toBe('Badivefi');
+  });
+
+  it('carries the last plan’s whole location until a plan page has set one (upgrade path)', () => {
+    // A record no plan page wrote is a Settings-era one, or the untouched
+    // default. Preferring it would drop a pilot who has used one Azbel for
+    // months back to an NPC station on the first plan after the update.
+    const previous = plan({
+      id: 'p',
+      facility: 'raitaru',
+      rigLevel: 't1',
+      facilityTaxPct: 3,
+      security: 'lowsec',
+      hubId: 'amarr',
+      buildSystemId: 30002813,
+      buildSystemName: 'Tama',
+      buildLocationId: 1035466617946,
+      buildLocationName: 'Tama - Sosala Raitaru',
+    });
+    const created = newBuildPlan(1, entry(), null, previous, {
+      manufacturing: { facility: 'azbel', rigFit: EMPTY_RIG_FIT, facilityTaxPct: null },
+      reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,
+    });
+    expect(created).toMatchObject({
+      facility: 'raitaru',
+      rigFit: ['meT1', 'teT1', 'none'],
+      facilityTaxPct: 3,
+      security: 'lowsec',
+      buildSystemId: 30002813,
+      buildSystemName: 'Tama',
+      buildLocationId: 1035466617946,
+      buildLocationName: 'Tama - Sosala Raitaru',
+    });
+  });
+
+  it('takes an unmarked record when the last plan runs the other activity', () => {
+    const previous = plan({ id: 'p', facility: 'athanor', buildSystemId: 1, buildSystemName: 'X' });
+    const created = newBuildPlan(1, entry(), null, previous, {
+      manufacturing: { facility: 'azbel', rigFit: EMPTY_RIG_FIT, facilityTaxPct: 5 },
+      reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,
+    });
+    expect(created.facility).toBe('azbel');
+    expect(created.facilityTaxPct).toBe(5);
+    expect('buildSystemId' in created).toBe(false);
+  });
+
+  it('starts in highsec when the remembered record names no band', () => {
+    // A record written by Settings before locations were remembered.
+    const created = newBuildPlan(1, entry(), null, null, {
+      manufacturing: { facility: 'azbel', rigFit: EMPTY_RIG_FIT, facilityTaxPct: null },
+      reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,
+    });
+    expect(created.facility).toBe('azbel');
+    expect(created.security).toBe('highsec');
+    expect('buildSystemId' in created).toBe(false);
   });
 
   it('refuses a facility from a plan of the other activity', () => {
@@ -272,18 +368,17 @@ describe('newBuildPlan — a default per activity', () => {
     expect(created.facilityTaxPct).toBe(5);
   });
 
-  it('still lets the most recent matching plan win over the default', () => {
-    // `defaultsMatchActivity` is checked first (#456/#460). Without this the
-    // new default would look broken to anyone who already has plans.
+  it('takes a plan-page default over the most recent plan of the same activity', () => {
+    // Reversed from #456/#460, where the last plan won: the default *is* the
+    // last place the pilot set from a plan page, so it is already the more
+    // deliberate answer of the two.
     const previous = plan({ id: 'p', facility: 'athanor', rigLevel: 'none', facilityTaxPct: 9 });
     const created = newBuildPlan(1, entry('reaction'), null, previous, {
       manufacturing: DEFAULT_FACILITY_DEFAULTS,
-      reaction: RIGGED_TATARA,
+      reaction: { ...RIGGED_TATARA, setOnPlanPage: true },
     });
-    expect(created.facility).toBe('athanor');
-    // `fallbackFacility('reaction')` is also an Athanor, so the facility alone
-    // proves nothing — the tax is what shows the plan won, not the fallback.
-    expect(created.facilityTaxPct).toBe(9);
+    expect(created.facility).toBe('tatara');
+    expect(created.facilityTaxPct).toBe(2);
   });
 
   it('falls back when a default names a facility its own activity cannot host', () => {
@@ -296,6 +391,25 @@ describe('newBuildPlan — a default per activity', () => {
     });
     expect(created.facility).toBe('npcStation');
     expect(created.rigFit).toEqual(EMPTY_RIG_FIT);
+  });
+
+  it('carries none of a refused default’s location either', () => {
+    // The place belongs to the refused facility; naming it on the fallback
+    // would label a job whose numbers came from somewhere else.
+    const created = newBuildPlan(1, entry('manufacturing'), null, null, {
+      manufacturing: {
+        ...RIGGED_TATARA,
+        security: 'lowsec',
+        buildSystemId: 30002053,
+        buildSystemName: 'Hek',
+        buildLocationId: 1022734985679,
+      },
+      reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,
+    });
+    expect(created.facility).toBe('npcStation');
+    expect(created.security).toBe('highsec');
+    expect('buildSystemId' in created).toBe(false);
+    expect('buildLocationId' in created).toBe(false);
   });
 });
 

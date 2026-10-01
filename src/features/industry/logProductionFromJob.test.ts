@@ -6,6 +6,11 @@ import {
   createBuildPlanForJob,
   jobProductionSeed,
 } from './logProductionFromJob';
+import {
+  DEFAULT_FACILITY_DEFAULTS,
+  FACILITY_DEFAULTS_SETTING_KEY,
+  useFacilityDefaults,
+} from './facilityDefaults';
 
 const BLUEPRINTS: BlueprintMap = {
   '638': {
@@ -49,6 +54,8 @@ function plan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
 
 beforeEach(async () => {
   await db.buildPlans.clear();
+  await db.settings.clear();
+  useFacilityDefaults.setState({ value: DEFAULT_FACILITY_DEFAULTS, hydrated: false });
 });
 
 describe('jobProductionSeed', () => {
@@ -97,7 +104,26 @@ describe('createBuildPlanForJob', () => {
     expect(stored?.name).toBe('Rifter');
   });
 
-  it('inherits facility/hub from the character’s most recently updated plan', async () => {
+  it('starts at the remembered manufacturing location, not the last plan’s', async () => {
+    await db.settings.put({
+      key: FACILITY_DEFAULTS_SETTING_KEY,
+      value: {
+        facility: 'azbel',
+        rigFit: ['none', 'none', 'none'],
+        facilityTaxPct: null,
+        buildSystemId: 30003888,
+        buildSystemName: 'Badivefi',
+        setOnPlanPage: true,
+      },
+    });
+    await db.buildPlans.add(plan({ blueprintTypeID: 999, facility: 'raitaru', updatedAt: 100 }));
+    const id = await createBuildPlanForJob(CHAR_ID, { blueprint_type_id: 638 });
+    const stored = await db.buildPlans.get(id!);
+    expect(stored?.facility).toBe('azbel');
+    expect(stored?.buildSystemName).toBe('Badivefi');
+  });
+
+  it('inherits the hub from the character’s most recently updated plan', async () => {
     await db.buildPlans.add(
       plan({ blueprintTypeID: 999, facility: 'athanor', hubId: 'rens', updatedAt: 100 })
     );

@@ -82,3 +82,42 @@ describe('useReactionFacilityDefaults', () => {
     });
   });
 });
+
+describe('useReactionFacilityDefaults — the remembered location', () => {
+  const HEK = {
+    security: 'lowsec',
+    buildSystemId: 30002053,
+    buildSystemName: 'Hek',
+    buildLocationId: 1022734985679,
+  } as const;
+
+  it('round-trips the whole place a plan page last set', async () => {
+    const value: ReactionFacilityDefaults = {
+      facility: 'tatara',
+      rigFit: ['meT2', 'none', 'none'],
+      facilityTaxPct: 1,
+      ...HEK,
+    };
+    await db.settings.put({ key: REACTION_FACILITY_DEFAULTS_SETTING_KEY, value });
+    expect(await hydrated()).toEqual(value);
+  });
+
+  it('drops a malformed location field without throwing away the refinery', async () => {
+    await db.settings.put({
+      key: REACTION_FACILITY_DEFAULTS_SETTING_KEY,
+      value: { facility: 'tatara', rigFit: EMPTY_RIG_FIT, ...HEK, buildLocationId: 'nope' },
+    });
+    const value = await hydrated();
+    expect(value.facility).toBe('tatara');
+    expect('buildLocationId' in value).toBe(false);
+    expect(value.buildSystemName).toBe('Hek');
+  });
+
+  it('resets a manufacturing facility whole, location and all', async () => {
+    await db.settings.put({
+      key: REACTION_FACILITY_DEFAULTS_SETTING_KEY,
+      value: { facility: 'azbel', rigFit: EMPTY_RIG_FIT, ...HEK },
+    });
+    expect(await hydrated()).toEqual(DEFAULT_REACTION_FACILITY_DEFAULTS);
+  });
+});

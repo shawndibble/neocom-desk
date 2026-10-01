@@ -6,8 +6,8 @@
  * (CONTEXT.md).
  *
  * The four fields move as one bundle: there is no per-field apply, the same
- * rule `facilityDefaults.ts` documents for facility/rig/tax ("splitting them
- * lets the three drift into a combination the pilot never chose").
+ * rule `facilityDefaults.ts` documents for its packed record ("splitting them
+ * lets the fields drift into a combination the pilot never chose").
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';

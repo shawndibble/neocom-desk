@@ -7,7 +7,7 @@
  * classifies. What's new here is turning "every manufacturing blueprint a
  * set of characters owns" into the inputs those already-tested pieces need.
  */
-import { mostRecentlyUpdatedPlan, newBuildPlan } from './newBuildPlan';
+import { mostRecentlyUpdatedPlan, newBuildPlan, startingLocation } from './newBuildPlan';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { computeBuildPlan } from './computeBuildPlan';
 import type { BuildPlanRecord } from '@/db';
@@ -126,14 +126,27 @@ export function opportunitySnapshotRequest(
   candidates: readonly OpportunityCandidate[],
   hub: TradeHub,
   catalog: BlueprintCatalog,
-  pi: PiData | null
+  pi: PiData | null,
+  facilityDefaults: ActivityFacilityDefaults
 ): MarketSnapshotRequest {
   const typeIds = new Set<number>();
   for (const candidate of candidates) {
     const blueprint = toIndustryBlueprint(candidate.catalogEntry.blueprint);
     for (const id of buildPlanTypeIds(blueprint, { catalog, pi })) typeIds.add(id);
   }
-  return { hub, typeIds: [...typeIds], activity: 'manufacturing' };
+  // The job fee is charged at the system the seeded plan will build in — the
+  // remembered one, through the same resolution `newBuildPlan` uses — so a
+  // row and the plan "Add to Compare" makes from it quote the same fee. Half
+  // a pair builds at the hub, as it does on a plan.
+  const location = startingLocation('manufacturing', facilityDefaults);
+  return {
+    hub,
+    typeIds: [...typeIds],
+    activity: 'manufacturing',
+    ...(location.buildSystemId !== undefined && location.buildSystemName !== undefined
+      ? { costIndexSystemId: location.buildSystemId }
+      : {}),
+  };
 }
 
 /** Owned-materials claiming for one blueprint's material list, from whole-account detected stock — same free-first rule a real Build Plan applies. */
@@ -415,7 +428,9 @@ export function opportunitiesInputsKey(inputs: OpportunityPricingInputs): string
     assumedMe: inputs.assumedMe,
     modifiers,
     standings,
-    facilityDefaults: inputs.facilityDefaults,
+    // Only the manufacturing record: every candidate is a manufacturing
+    // blueprint, so a Reaction Location set on some plan page changes no row.
+    facilityDefaults: inputs.facilityDefaults.manufacturing,
     research,
   });
 }

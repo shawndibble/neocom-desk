@@ -119,7 +119,7 @@ here — they go one per file in `docs/context/decisions/`.
   Sourcing offer is listed. The only acquisition target for a
   reaction-activity node, since reaction formulas have no copies at all.
 - **Build Group**: A named collection of **Build Plan**s belonging to one Character, which also totals as one — open a member and it behaves exactly like any other Build Plan; open the group and every material across its members is added up and costed (see **Group Rollup**). Membership is exclusive and groups do not nest. Membership lives only on the plan, as `buildGroupId`; the group's name, order and mere existence live in the `sync.industryBuildGroups` setting, so an emptied group survives having no members and no merge can hand one plan to two groups. Deleting a group deletes its member plans with it (see the 20260923 scope decision); a `buildGroupId` naming a group that is gone, such as after a torn write, still renders as an ordinary ungrouped plan — the same rule the Mining Tax `groupId` follows. Written in full in code and docs, where a bare "group" would collide with **Market Group** or an item's **Group**; the Industry plan list's own copy says "group", since neither of those can be meant there. See **Auto Build** and **Group Owned Overlay** for two of a group's own operations, distinct from what it merely displays via **Group Rollup**.
-- **Build Location**: The search at the head of a Build Plan's Location & market group, over the stations and structures the Character can dock at. Picking one fills facility, **Build System** and security band in a single edit, and the plan remembers which place it was so the box can still name it after a reload. That name is a label only — every number reads the plan's own values, and any edit that moves the job elsewhere drops it. "Override" unfolds the fields behind the box. A manufacturing-activity plan can additionally carry a **Reaction Location** — a second, independent instance of this same control, gated by **Include Reactions**.
+- **Build Location**: The search at the head of a Build Plan's Location & market group, over the stations and structures the Character can dock at. Picking one fills facility, **Build System** and security band in a single edit, and the plan remembers which place it was so the box can still name it after a reload. Setting it (or any of the fields behind it) also updates the **Remembered Location** a new plan starts at. That name is a label only — every number reads the plan's own values, and any edit that moves the job elsewhere drops it. "Override" unfolds the fields behind the box. A manufacturing-activity plan can additionally carry a **Reaction Location** — a second, independent instance of this same control, gated by **Include Reactions**.
 - **Build Opportunities**: Industry's fourth tab (Build Plans / Records / BPC Sourcing / Opportunities, issue #642). Ranks every manufacturing blueprint original or copy the chosen Character(s) own by ISK/hour, owned-materials-adjusted, at the default Trade Hub — the same costing `computeBuildPlan`/`buildVsBuy` already do for a hand-made Build Plan, run over every owned blueprint instead of one. Reaction blueprints are excluded; invention/research/copying stay out of scope, same as **Build Plan**. Selecting rows seeds them into **Build Plan Compare** as ordinary Build Plans. See **Order Depth** for its own new vocabulary — the row-ranking auto-build depth setting this tab once had (issue #652) was removed as unused ahead of the **Auto Build** rename (issue #798). Sits beside **Market-Wide Build Opportunities** (issue #819), the tab's ownership-independent sibling panel.
 - **Build Plan**: An industry plan for one blueprint or reaction formula: materials needed, costs, fees/taxes, time, and two independent verdicts — an **Acquisition Verdict** and a **Sale Profitability** read (see round 15). Covers manufacturing and reactions (issue #460); invention and research/copying are still out of scope (`.out-of-scope/`). Which activity a plan runs is derived from the picked blueprint/formula's own `activity`, never a separate field on the record.
 - **Build Strategy**: Which rule an **Auto Build** pass applies to every
@@ -827,12 +827,9 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   restricted to Athanor/Tatara, reactor rig fit, tax, security band read off
   the pick), revealed only when **Include Reactions** is on. Not derived
   from the plan's own primary location; a fresh plan's first one is
-  pre-filled from its own Settings-level default rather than carried forward
-  from whichever plan was last edited (issue #456's precedent for the
-  primary Build Location), since a pilot's manufacturing location turns over
-  far more often than their one dedicated reactor. See
+  pre-filled from the **Remembered Location** for reactions. See
   `docs/context/decisions/20260910-082559-reaction-location-a-second-facility-context-lets-craft.md`.
-  Its **Settings-level default** answers one question wider than the field
+  That remembered location answers one question wider than the field
   itself: where the pilot's reactions run at all. So it also seeds the primary
   **Build Location** of a plan whose own **Industry Activity** is `reaction` —
   which has no Reaction Location field, because the engine reuses that plan's
@@ -841,6 +838,18 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Remap**: In-game reallocation of a character's attributes. The optimizer suggests where in a Skill Plan remaps should be placed.
 - **Remap Marker**: A user-placed row in a Skill Plan marking where the character will remap attributes. Draggable like a plan entry.
 - **Remaps Available**: How many attribute remaps the character can spend: bonus remaps (new characters get several) plus the yearly remap, counted even while it's on cooldown — usable from its cooldown date, not before (`docs/context/decisions/`). Read from the API (bonus_remaps, last_remap_date, cooldown) and always planned with in full — no user override; a plan without readable ESI attributes falls back to a stored per-plan count instead (`docs/context/decisions/`). Optimizer must support the common single-remap case: train a leading segment on current attributes, then remap at the optimizer-chosen point.
+- **Remembered Location**: Where a new Build Plan starts. There is one per
+  activity, manufacturing and reaction: the whole location the pilot last
+  set from a Build Plan page. That covers facility, rigs, tax, security
+  band, **Build System** and the picked **Build Location**. A manufacturing
+  plan's own location is remembered for manufacturing. A reaction-activity
+  plan's own location, or a manufacturing plan's **Reaction Location**, is
+  remembered for reactions. Only plan-page edits that move a location
+  update it. Plans written elsewhere (Opportunities, Fit Import, a group
+  Retarget, sync) never do. Each plan keeps its own location once created.
+  Not a Settings control, and not copied from the most recently updated plan
+  (which still supplies hub and price basis). See
+  `docs/context/decisions/20261001-114015-new-plans-start-at-the-last-location-set.md`.
 - **Requested Scopes**: What one authorize round trip asked SSO for, carried on
   its **Pending Login** and read back by `completeLogin`. The baseline the login
   path judges revocation against; the refresh path has none and uses the stored

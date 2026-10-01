@@ -15,6 +15,7 @@ import {
   decideOpportunitiesCache,
   opportunitiesBatchKey,
   opportunitiesInputsKey,
+  opportunitySnapshotRequest,
   planForOpportunityCandidate,
   rankOpportunityRows,
   type OpportunityCandidate,
@@ -401,6 +402,21 @@ describe('opportunitiesInputsKey', () => {
     );
   });
 
+  it('is the same when only the reaction location changes, which no row reads', () => {
+    // Every candidate is a manufacturing blueprint, so only the manufacturing
+    // record seeds or prices a row; a Reaction Location set on some plan page
+    // must not ask for a Refresh.
+    expect(opportunitiesInputsKey(INPUTS)).toBe(
+      opportunitiesInputsKey({
+        ...INPUTS,
+        facilityDefaults: {
+          ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+          reaction: { ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.reaction, facility: 'tatara' },
+        },
+      })
+    );
+  });
+
   it('changes when an owned blueprint is researched', () => {
     expect(opportunitiesInputsKey(INPUTS)).not.toBe(
       opportunitiesInputsKey({
@@ -502,5 +518,50 @@ describe('rankOpportunityRows', () => {
     const ranked = rankOpportunityRows([row('low', 1), row('high', 3)]);
     expect(ranked.map((r) => r.candidate.id)).toEqual(['high', 'low']);
     expect(ranked[0]!.orderDepth).toBe('deep');
+  });
+});
+
+describe('opportunitySnapshotRequest — where the job fee is charged', () => {
+  it('prices at the remembered build system, the one a seeded plan will name', () => {
+    // A row priced at the hub's cost index would seed a plan that quotes a
+    // different job fee the moment it is opened.
+    const request = opportunitySnapshotRequest([], DEFAULT_TRADE_HUB, catalog([]), null, {
+      ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      manufacturing: {
+        facility: 'azbel',
+        rigFit: ['none', 'none', 'none'],
+        facilityTaxPct: null,
+        buildSystemId: 30003888,
+        buildSystemName: 'Badivefi',
+      },
+    });
+    expect(request.costIndexSystemId).toBe(30003888);
+  });
+
+  it('prices at the hub when nothing names a build system', () => {
+    const request = opportunitySnapshotRequest(
+      [],
+      DEFAULT_TRADE_HUB,
+      catalog([]),
+      null,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS
+    );
+    expect('costIndexSystemId' in request).toBe(false);
+  });
+
+  it('prices at the hub when the remembered facility cannot manufacture', () => {
+    // `newBuildPlan` refuses such a record whole, so the seeded plan builds
+    // at its hub — and so must the row.
+    const request = opportunitySnapshotRequest([], DEFAULT_TRADE_HUB, catalog([]), null, {
+      ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      manufacturing: {
+        facility: 'tatara',
+        rigFit: ['none', 'none', 'none'],
+        facilityTaxPct: null,
+        buildSystemId: 30003888,
+        buildSystemName: 'Badivefi',
+      },
+    });
+    expect('costIndexSystemId' in request).toBe(false);
   });
 });

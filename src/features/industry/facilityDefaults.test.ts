@@ -4,7 +4,6 @@ import { EMPTY_RIG_FIT } from '@/engine/industry/types';
 import {
   DEFAULT_FACILITY_DEFAULTS,
   FACILITY_DEFAULTS_SETTING_KEY,
-  MANUFACTURING_FACILITY_PRESETS,
   normalizeFacilityDefaults,
   useFacilityDefaults,
   type FacilityDefaults,
@@ -23,8 +22,7 @@ async function hydrated(): Promise<FacilityDefaults> {
 describe('normalizeFacilityDefaults — one activity per record', () => {
   it('resets a refinery, which this record can no longer mean anything for', () => {
     // Reactions have their own default now, so a refinery here would be read
-    // by nothing. Reset whole rather than left inert, so the picker — which
-    // offers manufacturing facilities only — still has a value to show.
+    // by nothing. Reset whole rather than left inert.
     expect(
       normalizeFacilityDefaults({
         facility: 'tatara',
@@ -32,15 +30,6 @@ describe('normalizeFacilityDefaults — one activity per record', () => {
         facilityTaxPct: 2,
       })
     ).toEqual(DEFAULT_FACILITY_DEFAULTS);
-  });
-
-  it('offers only what it can hold', () => {
-    expect(MANUFACTURING_FACILITY_PRESETS.map((preset) => preset.kind)).toEqual([
-      'npcStation',
-      'raitaru',
-      'azbel',
-      'sotiyo',
-    ]);
   });
 });
 
@@ -128,5 +117,59 @@ describe('useFacilityDefaults', () => {
       rigFit: ['meT1', 'teT1', 'none'],
       facilityTaxPct: null,
     });
+  });
+});
+
+describe('useFacilityDefaults — the remembered location', () => {
+  const BADIVEFI = {
+    security: 'nullsec',
+    buildSystemId: 30003888,
+    buildSystemName: 'Badivefi',
+    buildLocationId: 1035466617946,
+    buildLocationName: 'Badivefi - K2-18 b R&D',
+  } as const;
+
+  it('round-trips the whole place a plan page last set', async () => {
+    const value: FacilityDefaults = {
+      facility: 'azbel',
+      rigFit: ['meT1', 'none', 'none'],
+      facilityTaxPct: 4,
+      ...BADIVEFI,
+      setOnPlanPage: true,
+    };
+    await db.settings.put({ key: FACILITY_DEFAULTS_SETTING_KEY, value });
+    expect(await hydrated()).toEqual(value);
+  });
+
+  it('drops a malformed location field without throwing away the facility', async () => {
+    await db.settings.put({
+      key: FACILITY_DEFAULTS_SETTING_KEY,
+      value: { facility: 'azbel', rigFit: EMPTY_RIG_FIT, ...BADIVEFI, security: 'wormhole' },
+    });
+    const value = await hydrated();
+    expect(value.facility).toBe('azbel');
+    expect('security' in value).toBe(false);
+    expect(value.buildSystemName).toBe('Badivefi');
+  });
+
+  it('keeps an NPC station’s location while stripping the rigs it cannot fit', async () => {
+    await db.settings.put({
+      key: FACILITY_DEFAULTS_SETTING_KEY,
+      value: { facility: 'npcStation', rigFit: ['meT2', 'none', 'none'], ...BADIVEFI },
+    });
+    expect(await hydrated()).toEqual({
+      facility: 'npcStation',
+      rigFit: EMPTY_RIG_FIT,
+      facilityTaxPct: null,
+      ...BADIVEFI,
+    });
+  });
+
+  it('resets a refinery whole, location and all — the place it names cannot manufacture', async () => {
+    await db.settings.put({
+      key: FACILITY_DEFAULTS_SETTING_KEY,
+      value: { facility: 'tatara', rigFit: EMPTY_RIG_FIT, ...BADIVEFI },
+    });
+    expect(await hydrated()).toEqual(DEFAULT_FACILITY_DEFAULTS);
   });
 });

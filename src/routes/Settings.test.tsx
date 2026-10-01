@@ -42,7 +42,6 @@ import {
 import {
   useReactionFacilityDefaults,
   DEFAULT_REACTION_FACILITY_DEFAULTS,
-  REACTION_FACILITY_DEFAULTS_SETTING_KEY,
 } from '@/features/industry/reactionFacilityDefaults';
 import { useExpiringWindowHours } from '@/features/pi/expiringWindow';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
@@ -1443,16 +1442,24 @@ describe('Settings defaults', () => {
     expect(await screen.findByLabelText(/assumed te/i)).toHaveValue(4);
   });
 
-  it('hides rig and tax for an NPC station, which fits neither', async () => {
+  it('offers no facility defaults — a new plan starts where the last plan page set one', async () => {
+    // Both records are remembered from Build Plan pages now; a stored one is
+    // left exactly as it was, since the Settings page no longer reads it.
+    const stored = { facility: 'azbel', rigLevel: 't2', facilityTaxPct: 5 };
+    await db.settings.put({ key: FACILITY_DEFAULTS_SETTING_KEY, value: stored });
     window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
+    expect(await screen.findByLabelText(/assumed me/i)).toBeInTheDocument();
     expect(
-      await screen.findByRole('combobox', { name: /default manufacturing facility/i })
-    ).toHaveTextContent(/npc/i);
-    expect(screen.queryByRole('group', { name: 'Rigs' })).not.toBeInTheDocument();
+      screen.queryByRole('combobox', { name: /default manufacturing facility/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: /default reaction location/i })
+    ).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/facility tax/i)).not.toBeInTheDocument();
+    expect(await db.settings.get(FACILITY_DEFAULTS_SETTING_KEY)).toMatchObject({ value: stored });
   });
 
   it('shows the stored values on a cold load, not the defaults', async () => {
@@ -1464,38 +1471,6 @@ describe('Settings defaults', () => {
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
     expect(await screen.findByLabelText(/assumed me/i)).toHaveValue(7);
-  });
-
-  it('never writes a default over a stored record it has not read yet', async () => {
-    // The packed facility record makes an unhydrated read destructive, not
-    // merely stale: changing one field spreads the rest, so an unhydrated
-    // `{npcStation, none, null}` would wipe a stored rig level and tax.
-    await db.settings.put({
-      key: FACILITY_DEFAULTS_SETTING_KEY,
-      value: { facility: 'azbel', rigLevel: 't2', facilityTaxPct: 5 },
-    });
-    window.history.pushState({}, '', '/settings/industry');
-    render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /settings/i });
-
-    expect(await screen.findByRole('group', { name: 'Rigs' })).toBeInTheDocument();
-    expect(screen.getByLabelText(/facility tax/i)).toHaveValue(5);
-    expect(await db.settings.get(FACILITY_DEFAULTS_SETTING_KEY)).toMatchObject({
-      value: { facility: 'azbel', rigLevel: 't2', facilityTaxPct: 5 },
-    });
-  });
-
-  it('reveals rig and tax once the default facility is a player structure', async () => {
-    useFacilityDefaults.setState({
-      value: { facility: 'azbel', rigFit: ['meT1', 'teT1', 'none'], facilityTaxPct: 2 },
-      hydrated: true,
-    });
-    window.history.pushState({}, '', '/settings/industry');
-    render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /settings/i });
-
-    expect(await screen.findByRole('group', { name: 'Rigs' })).toBeInTheDocument();
-    expect(screen.getByLabelText(/facility tax/i)).toHaveValue(2);
   });
 
   it('shows the shortcut list from the ? shortcut, even from another section', async () => {
@@ -1514,87 +1489,6 @@ describe('Settings defaults', () => {
     await user.keyboard('{Shift>}?{/Shift}');
 
     expect(await screen.findByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
-  });
-
-  it('offers a reaction location default, which nothing could set before', async () => {
-    window.history.pushState({}, '', '/settings/industry');
-    render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /settings/i });
-
-    // `sync.industryReactionFacilityDefaults` was allow-listed, promised in
-    // the FAQ and read by BuildPlanDetail, with no control anywhere — so
-    // every plan's first Reaction Location was an unfitted Athanor forever.
-    expect(
-      await screen.findByRole('combobox', { name: /default reaction location/i })
-    ).toHaveTextContent(/athanor/i);
-    expect(screen.getByRole('group', { name: 'Reaction location rigs' })).toBeInTheDocument();
-    expect(screen.getByLabelText(/reaction location tax/i)).toBeInTheDocument();
-  });
-
-  it('offers no refinery as the manufacturing default, since reactions have their own', async () => {
-    const user = userEvent.setup();
-    window.history.pushState({}, '', '/settings/industry');
-    render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /settings/i });
-
-    await user.click(
-      await screen.findByRole('combobox', { name: /default manufacturing facility/i })
-    );
-    const options = within(screen.getByRole('listbox')).getAllByRole('option');
-    // The whole list, not just "no Athanor" — a Tatara slipping in would pass
-    // that, and it is the same mistake in the same place.
-    expect(options.map((option) => option.textContent)).toEqual([
-      expect.stringContaining('NPC station'),
-      expect.stringContaining('Raitaru'),
-      expect.stringContaining('Azbel'),
-      expect.stringContaining('Sotiyo'),
-    ]);
-  });
-
-  it('only offers refineries as a reaction location', async () => {
-    const user = userEvent.setup();
-    window.history.pushState({}, '', '/settings/industry');
-    render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /settings/i });
-
-    await user.click(await screen.findByRole('combobox', { name: /default reaction location/i }));
-    const reactionOptions = within(screen.getByRole('listbox')).getAllByRole('option');
-    // `stringContaining`, not the bare name: the selected option also renders
-    // a check glyph inside its own label.
-    expect(reactionOptions.map((option) => option.textContent)).toEqual([
-      expect.stringContaining('Athanor'),
-      expect.stringContaining('Tatara'),
-    ]);
-  });
-
-  it('persists a reaction location tax', async () => {
-    const user = userEvent.setup();
-    window.history.pushState({}, '', '/settings/industry');
-    render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /settings/i });
-
-    await user.type(await screen.findByLabelText(/reaction location tax/i), '3');
-
-    await waitFor(async () => {
-      expect(await db.settings.get(REACTION_FACILITY_DEFAULTS_SETTING_KEY)).toMatchObject({
-        value: { facility: 'athanor', facilityTaxPct: 3 },
-      });
-    });
-  });
-
-  it('shows a stored reaction location on a cold load rather than the default', async () => {
-    await db.settings.put({
-      key: REACTION_FACILITY_DEFAULTS_SETTING_KEY,
-      value: { facility: 'tatara', rigFit: ['meT2', 'none', 'none'], facilityTaxPct: 4 },
-    });
-    window.history.pushState({}, '', '/settings/industry');
-    render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /settings/i });
-
-    expect(
-      await screen.findByRole('combobox', { name: /default reaction location/i })
-    ).toHaveTextContent(/tatara/i);
-    expect(screen.getByLabelText(/reaction location tax/i)).toHaveValue(4);
   });
 
   it('offers the PI expiring-soon window, defaulting to 24 hours', async () => {
@@ -1907,7 +1801,7 @@ describe('Settings — phone list', () => {
       /default text, my local time/i
     );
     expect(within(nav).getByRole('link', { name: /^shortcuts/i })).toHaveTextContent(/on/i);
-    expect(within(nav).getByRole('link', { name: /^industry/i })).toHaveTextContent(/, ME 0, TE 0/);
+    expect(within(nav).getByRole('link', { name: /^industry/i })).toHaveTextContent(/ME 0, TE 0/);
     expect(within(nav).getByRole('link', { name: /^market/i })).toHaveTextContent(/jita/i);
     expect(within(nav).getByRole('link', { name: /^characters/i })).toHaveTextContent(
       /current character/i

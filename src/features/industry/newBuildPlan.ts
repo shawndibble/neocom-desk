@@ -5,6 +5,14 @@
  * second creator: an import that built its plans from its own defaults would
  * quietly ignore the facility, hub and build system the pilot already set, and
  * the two would drift apart the next time either was touched.
+ *
+ * Two sources, for two different questions. *Where* the job runs — facility,
+ * rigs, tax, security band, build system and picked place — comes whole from
+ * the remembered location for the plan's activity (`facilityDefaults.ts`):
+ * the last place the pilot set from a plan page. *Where it trades* — hub and
+ * material price basis — still carries from the most recently updated plan
+ * (issue #456). Until a plan page has written a location for the activity,
+ * the old rule still holds for location too — see `startingLocation`.
  */
 
 import type { BuildPlanRecord } from '@/db';
@@ -21,13 +29,69 @@ import {
 import type { BlueprintCatalogEntry } from './blueprintCatalog';
 
 /**
- * The historical hardcoded default per activity — a character with no prior
- * plan of that activity, or whose most recent plan is the other activity
- * (issue #460: `defaultsFrom.facility` would otherwise be an NPC station
- * that cannot host a reaction, or a refinery that cannot manufacture).
+ * The hardcoded facility per activity, for when the remembered default names
+ * one the activity cannot host (issue #460: an NPC station cannot run a
+ * reaction, and a refinery cannot manufacture).
  */
 export function fallbackFacility(activity: IndustryActivity): FacilityKind {
   return activity === 'reaction' ? 'athanor' : 'npcStation';
+}
+
+/** A plan's primary location in the remembered record's shape — the pre-plan-page rule's source. */
+function planLocation(plan: BuildPlanRecord): FacilityDefaults {
+  return {
+    facility: plan.facility,
+    rigFit: resolveRigFit(plan),
+    facilityTaxPct: plan.facilityTaxPct ?? null,
+    security: plan.security,
+    ...(plan.buildSystemId !== undefined && plan.buildSystemName !== undefined
+      ? { buildSystemId: plan.buildSystemId, buildSystemName: plan.buildSystemName }
+      : {}),
+    ...(plan.buildLocationId !== undefined ? { buildLocationId: plan.buildLocationId } : {}),
+    ...(plan.buildLocationName !== undefined ? { buildLocationName: plan.buildLocationName } : {}),
+  };
+}
+
+/**
+ * Where a new plan of `activity` builds. In order:
+ *
+ * 1. The remembered location for the activity, once a plan page wrote it
+ *    (`setOnPlanPage`) — the last place the pilot chose.
+ * 2. Otherwise `defaultsFrom`'s own location, when its facility hosts this
+ *    activity — the rule before plan pages remembered anything (#456/#460).
+ *    Kept so the update does not drop a pilot who has built at one Azbel for
+ *    months back to an NPC station on their first new plan.
+ * 3. Otherwise the record anyway (a Settings-era one, or the default).
+ * 4. When that record names a facility the activity cannot host, the
+ *    hardcoded fallback.
+ *
+ * Exported so a caller pricing a plan it has not created yet (Opportunities)
+ * prices it where the plan will build.
+ *
+ * Guarded rather than trusted: each store normalises its own record, but a
+ * value pulled from a device on an older build has not been through that.
+ *
+ * Facility, rig fit, tax and place move together, from one source. Taking the
+ * facility from one place and the rest from another produces a combination
+ * neither source ever held — an NPC station with rigs fitted, or an Athanor
+ * labelled with a manufacturing structure's name. So a refused record is
+ * refused whole: the fallback brings no rigs, no tax and no place, and builds
+ * at the hub in highsec.
+ */
+export function startingLocation(
+  activity: IndustryActivity,
+  facilityDefaults: ActivityFacilityDefaults,
+  defaultsFrom?: BuildPlanRecord | null
+): FacilityDefaults {
+  const forActivity = facilityDefaults[activity];
+  const recordHosts = FACILITY_PRESETS[forActivity.facility].activity === activity;
+  if (recordHosts && forActivity.setOnPlanPage) return forActivity;
+  if (defaultsFrom != null && FACILITY_PRESETS[defaultsFrom.facility].activity === activity) {
+    return planLocation(defaultsFrom);
+  }
+  return recordHosts
+    ? forActivity
+    : { facility: fallbackFacility(activity), rigFit: EMPTY_RIG_FIT, facilityTaxPct: null };
 }
 
 /** The character's own plan with the highest `updatedAt`, or null if they have none yet. */
@@ -91,13 +155,12 @@ export interface NewBuildPlanOverrides {
   updatedAt?: number;
 }
 
-// Facility/rig/security/hub/tax, build system and build location all default
-// from the character's own most recently updated plan (issue #456), so a
-// second plan doesn't force re-picking settings the pilot already set once. `defaultsFrom` is that
-// plan, or null/undefined for a character with no plans yet, in which case
-// the historical hardcoded defaults apply. Only carried when it hosts the
-// same activity as the new plan (issue #460) — otherwise it names a
-// facility the new blueprint/formula cannot run at.
+// The location — facility, rig, tax, security, build system and build location
+// — comes from `startingLocation`: the place the pilot last set from a plan
+// page for this activity, or the last plan's until there is one. Hub and
+// material price basis carry from
+// `defaultsFrom`, the character's most recently updated plan (issue #456), or
+// fall back to the defaults when it is null/undefined (no plans yet).
 export function newBuildPlan(
   characterId: number,
   entry: BlueprintCatalogEntry,
@@ -110,36 +173,7 @@ export function newBuildPlan(
   // literals), the SDE's own `BlueprintType.activity` is always set — no
   // fallback needed here.
   const activity = entry.blueprint.activity;
-  const defaultsMatchActivity =
-    defaultsFrom != null && FACILITY_PRESETS[defaultsFrom.facility].activity === activity;
-  // The pilot's own default for *this* activity, still guarded rather than
-  // trusted: each store normalises its own record, but a value pulled from a
-  // device on an older build has not been through that. A refinery cannot
-  // manufacture and an NPC station cannot run a reaction — the same rule
-  // `fallbackFacility` exists for.
-  const forActivity = facilityDefaults[activity];
-  const preferred =
-    FACILITY_PRESETS[forActivity.facility].activity === activity ? forActivity : null;
-  /**
-   * Facility, rig fit and owner-set tax move together, from one source.
-   *
-   * Taking the facility from one place and the rig from another produces a
-   * combination neither source ever held — an NPC station with rigs fitted,
-   * which `normalizeFacilityDefaults` refuses to even store. It also made the
-   * pilot's configured rig and tax unreachable: any earlier plan, whatever its
-   * activity, supplied a rig fit and won.
-   */
-  const facilityConfig: FacilityDefaults = defaultsMatchActivity
-    ? {
-        facility: defaultsFrom.facility,
-        rigFit: resolveRigFit(defaultsFrom),
-        facilityTaxPct: defaultsFrom.facilityTaxPct ?? null,
-      }
-    : (preferred ?? {
-        facility: fallbackFacility(activity),
-        rigFit: EMPTY_RIG_FIT,
-        facilityTaxPct: null,
-      });
+  const location = startingLocation(activity, facilityDefaults, defaultsFrom);
   // One precedence order for research, everywhere, and the same one on both
   // lines below: an explicit per-copy seed (#637) beats an owned copy, and an
   // owned blueprint's real research beats the assumed value (#634) — the
@@ -157,36 +191,34 @@ export function newBuildPlan(
     runs: overrides.runs ?? (owned !== null && owned.runs > 0 ? owned.runs : 1),
     me: overrides.me ?? owned?.material_efficiency ?? assumedMe,
     te: overrides.te ?? owned?.time_efficiency ?? assumedTe,
-    facility: facilityConfig.facility,
-    rigFit: facilityConfig.rigFit,
-    security: defaultsFrom?.security ?? 'highsec',
+    facility: location.facility,
+    rigFit: location.rigFit,
+    // Highsec when the record names no band: a record from before locations
+    // were remembered, which is what every plan started at then.
+    security: location.security ?? 'highsec',
     hubId: defaultsFrom?.hubId ?? DEFAULT_TRADE_HUB.id,
-    // Carried like facility/rig/hub: a pilot who builds in one system builds
-    // their next thing there too, and re-typing it every plan is the annoyance
-    // issue #456 removed for the settings beside it.
-    ...(defaultsFrom?.buildSystemId !== undefined
-      ? { buildSystemId: defaultsFrom.buildSystemId, buildSystemName: defaultsFrom.buildSystemName }
+    // A pilot who builds in one system builds their next thing there too, and
+    // re-typing it every plan is the annoyance issue #456 removed. The pair is
+    // one fact — a plan holding half of it builds at its hub.
+    ...(location.buildSystemId !== undefined && location.buildSystemName !== undefined
+      ? { buildSystemId: location.buildSystemId, buildSystemName: location.buildSystemName }
       : {}),
-    ...(facilityConfig.facilityTaxPct != null
-      ? { facilityTaxPct: facilityConfig.facilityTaxPct }
-      : {}),
+    ...(location.facilityTaxPct != null ? { facilityTaxPct: location.facilityTaxPct } : {}),
     // Carried like the hub it names a side of: a pilot who sources on buy
     // orders sources their next plan that way too.
     ...(defaultsFrom?.materialPriceBasis !== undefined
       ? { materialPriceBasis: defaultsFrom.materialPriceBasis }
       : {}),
-    // The picked place itself (#527), carried under the same activity check as
-    // `facility` rather than merely when the source plan has one: where the
-    // activity differs the new plan's facility is the hardcoded fallback, not
-    // the picked place's, so its name would label a job whose numbers came
-    // from somewhere else. The id and the name are independently optional —
-    // ESI withholds some structure names, and the id alone still drives the
-    // picker's stand-in label.
-    ...(defaultsMatchActivity && defaultsFrom.buildLocationId !== undefined
-      ? { buildLocationId: defaultsFrom.buildLocationId }
+    // The picked place itself (#527), from the same record as the facility so
+    // its name never labels a job whose numbers came from somewhere else. The
+    // id and the name are independently optional — ESI withholds some
+    // structure names, and the id alone still drives the picker's stand-in
+    // label.
+    ...(location.buildLocationId !== undefined
+      ? { buildLocationId: location.buildLocationId }
       : {}),
-    ...(defaultsMatchActivity && defaultsFrom.buildLocationName !== undefined
-      ? { buildLocationName: defaultsFrom.buildLocationName }
+    ...(location.buildLocationName !== undefined
+      ? { buildLocationName: location.buildLocationName }
       : {}),
     ...(overrides.buildGroupId !== undefined ? { buildGroupId: overrides.buildGroupId } : {}),
     ...(overrides.buildHere !== undefined ? { buildHere: overrides.buildHere } : {}),

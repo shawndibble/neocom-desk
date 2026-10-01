@@ -52,9 +52,14 @@ import {
   reactionPlanFacilityContextFor,
   autoBuildDepthContext,
 } from './planFacilityContext';
-import { useReactionFacilityDefaults, REACTION_FACILITY_PRESETS } from './reactionFacilityDefaults';
+import { REACTION_FACILITY_PRESETS } from './reactionFacilityDefaults';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
-import { hydrateActivityFacilityDefaults } from './facilityDefaults';
+import {
+  hydrateActivityFacilityDefaults,
+  loadActivityFacilityDefaults,
+  rememberActivityLocations,
+} from './facilityDefaults';
+import { rememberedLocationsFromEdit } from './rememberLocationFromEdit';
 import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
@@ -336,15 +341,13 @@ export function BuildPlanDetail({
   const { offersFor: blueprintPurchaseOffersFor, ready: blueprintOffersReady } =
     useBlueprintPurchaseOffers(plan.characterId, hub, blueprintTypeIds);
 
-  // Pre-fills a fresh plan's Reaction Location the first time Include
-  // Reactions is turned on for it (issue #698) — read here, ahead of
-  // `toggleIncludeReactions`, so it's in hand the moment that needs it
-  // rather than one render behind.
-  const reactionFacilityDefaults = useReactionFacilityDefaults((state) => state.value);
-  const hydrateReactionFacilityDefaults = hydrateActivityFacilityDefaults;
+  // Started on mount so the remembered locations are usually in hand before
+  // `toggleIncludeReactions` reads them; it still awaits them itself. Both
+  // stores are also written from here: a location the pilot sets on this page
+  // becomes where their next plan starts (`rememberLocationFromEdit.ts`).
   useEffect(() => {
-    void hydrateReactionFacilityDefaults();
-  }, [hydrateReactionFacilityDefaults]);
+    void hydrateActivityFacilityDefaults();
+  }, []);
 
   const [refreshTick, setRefreshTick] = useState(0);
   /**
@@ -960,8 +963,23 @@ export function BuildPlanDetail({
   // Production Runs panel's "Log Production" default below.
   const productQuantity = blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null;
 
-  function update(patch: PlanPatch) {
+  /** A plan edit that is not the pilot choosing a place — see {@link update}. */
+  function editPlan(patch: PlanPatch) {
     onChange({ kind: 'edit', patch });
+  }
+
+  /**
+   * Every control's edit. One that moves the plan's location — or its
+   * Reaction Location — also remembers the result as where the pilot's next
+   * plan of that activity starts. Edits that touch no location fields
+   * remember nothing, so this is safe for every control on the page.
+   */
+  function update(patch: PlanPatch) {
+    editPlan(patch);
+    const remembered = rememberedLocationsFromEdit(plan, patch, activity);
+    if (remembered.manufacturing || remembered.reaction) {
+      void rememberActivityLocations(remembered);
+    }
   }
 
   function changeSourcing(edits: readonly SourcingPatchEntry[]) {
@@ -991,23 +1009,44 @@ export function BuildPlanDetail({
 
   /**
    * Include Reactions (issue #698). Turning it on for the first time — no
-   * Reaction Location configured yet — pre-fills it from the Settings-level
-   * default, a real explicit default rather than copying any other plan's
-   * facility (unlike the primary location, which does copy forward for a
-   * fresh plan — see `reactionFacilityDefaults.ts`'s module doc). Turning it
-   * off only clears the flag: the Reaction Location itself is left alone, so
-   * flipping it back on doesn't lose whatever the pilot configured.
+   * Reaction Location configured yet — pre-fills the whole Reaction Location
+   * from the remembered reaction default (`reactionFacilityDefaults.ts`), the
+   * place the pilot last set reactions to run. Turning it off only clears the
+   * flag: the Reaction Location itself is left alone, so flipping it back on
+   * doesn't lose whatever the pilot configured.
+   *
+   * Through `editPlan`, not `update`: the pre-fill *is* the remembered
+   * default, so writing it back would only re-stamp it as a fresh choice.
+   * Awaits hydration, so a click that lands before the stored record has
+   * loaded still pre-fills the remembered place, not the built-in default.
    */
   function toggleIncludeReactions(next: boolean) {
     if (next && plan.reactionFacility === undefined) {
-      update({
-        includeReactions: true,
-        reactionFacility: reactionFacilityDefaults.facility,
-        reactionRigFit: reactionFacilityDefaults.rigFit,
-        reactionFacilityTaxPct: reactionFacilityDefaults.facilityTaxPct ?? undefined,
-      });
+      void loadActivityFacilityDefaults().then(({ reaction: seed }) =>
+        editPlan({
+          includeReactions: true,
+          reactionFacility: seed.facility,
+          reactionRigFit: seed.rigFit,
+          reactionFacilityTaxPct: seed.facilityTaxPct ?? undefined,
+          // Only what the record holds: an absent band already reads as
+          // highsec, and an absent system as the hub's.
+          ...(seed.security !== undefined ? { reactionSecurity: seed.security } : {}),
+          ...(seed.buildSystemId !== undefined && seed.buildSystemName !== undefined
+            ? {
+                reactionBuildSystemId: seed.buildSystemId,
+                reactionBuildSystemName: seed.buildSystemName,
+              }
+            : {}),
+          ...(seed.buildLocationId !== undefined
+            ? { reactionBuildLocationId: seed.buildLocationId }
+            : {}),
+          ...(seed.buildLocationName !== undefined
+            ? { reactionBuildLocationName: seed.buildLocationName }
+            : {}),
+        })
+      );
     } else {
-      update({ includeReactions: next });
+      editPlan({ includeReactions: next });
     }
   }
 

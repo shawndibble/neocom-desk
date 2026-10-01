@@ -13,6 +13,14 @@ import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import { useBuildGroups } from '@/features/industry/buildGroups';
 import { useAssumedMe } from '@/features/industry/assumedMe';
+import {
+  DEFAULT_FACILITY_DEFAULTS,
+  useFacilityDefaults,
+} from '@/features/industry/facilityDefaults';
+import {
+  DEFAULT_REACTION_FACILITY_DEFAULTS,
+  useReactionFacilityDefaults,
+} from '@/features/industry/reactionFacilityDefaults';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -210,6 +218,12 @@ beforeEach(async () => {
   await db.quickbars.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   useBuildGroups.setState({ value: {}, hydrated: false });
+  // A location edit on the plan page writes these; none may leak to the next test.
+  useFacilityDefaults.setState({ value: DEFAULT_FACILITY_DEFAULTS, hydrated: false });
+  useReactionFacilityDefaults.setState({
+    value: DEFAULT_REACTION_FACILITY_DEFAULTS,
+    hydrated: false,
+  });
   usePublicInfo.setState({ byCharacterId: {} });
   useAuthFailure.setState({ failure: null });
 
