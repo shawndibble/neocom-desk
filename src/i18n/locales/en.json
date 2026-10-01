@@ -853,10 +853,10 @@
       },
       "fleetBoosts": {
         "lasts": "lasts {{value}}",
-        "reloads": "reload {{value}}",
+        "reloadTime": "reload {{value}}",
         "noCharge": "No charge loaded: hands out nothing",
         "compression": "Compression",
-        "every": "every {{cycle}}",
+        "every": "Every {{cycle}}",
         "fuel": "{{value}} {{fuel}}"
       },
       "fightersNoOverheat": "Fighters don't overheat"

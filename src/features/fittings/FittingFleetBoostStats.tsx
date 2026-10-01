@@ -35,14 +35,20 @@ export function FleetBoostFacts({
                 count: burst.count,
                 name: typeName(burst.typeId),
               })}
-              detail={joinDetail([
+              detail={
                 burst.chargeTypeId === undefined
                   ? t('fittings.stats.fleetBoosts.noCharge')
-                  : typeName(burst.chargeTypeId),
-                km(burst.rangeMeters),
-                t('fittings.stats.fleetBoosts.lasts', { value: seconds(burst.durationSeconds) }),
-                t('fittings.stats.fleetBoosts.reloads', { value: seconds(burst.reloadSeconds) }),
-              ])}
+                  : joinDetail([
+                      typeName(burst.chargeTypeId),
+                      km(burst.rangeMeters),
+                      t('fittings.stats.fleetBoosts.lasts', {
+                        value: seconds(burst.durationSeconds),
+                      }),
+                      t('fittings.stats.fleetBoosts.reloadTime', {
+                        value: seconds(burst.reloadSeconds),
+                      }),
+                    ])
+              }
               detailTone={burst.chargeTypeId === undefined ? 'warning' : undefined}
               figure={burst.strengths.map((value) => `${value.toFixed(1)}%`).join(' · ') || '—'}
             />

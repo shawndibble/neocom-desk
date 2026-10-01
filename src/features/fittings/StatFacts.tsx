@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { unheatedIfChanged } from '@/engine/fittings/stats';
-import { STAT_EYEBROW, statRowClassName } from './statKit';
+import { STAT_DETAIL, STAT_EYEBROW, statRowClassName } from './statKit';
 
 /**
  * One figure as `format` shows it. Under "Overheat all" it reads in the
@@ -38,7 +38,7 @@ const NOTE_TONE = {
   danger: 'text-danger',
 } as const;
 
-/** A footnote, a hint or an empty state: dim 11px, or a status tone. */
+/** A footnote, a hint or an empty state (a short list, too): dim 11px, or a status tone. */
 export function StatNote({
   tone = 'dim',
   children,
@@ -46,7 +46,7 @@ export function StatNote({
   tone?: keyof typeof NOTE_TONE;
   children: ReactNode;
 }) {
-  return <p className={`text-[0.6875rem] ${NOTE_TONE[tone]}`}>{children}</p>;
+  return <div className={`text-[0.6875rem] ${NOTE_TONE[tone]}`}>{children}</div>;
 }
 
 /** A labelled run of rows or facts inside a section ("Local tank", "Compression"). */
@@ -64,18 +64,28 @@ export interface StatRowProps {
   name: ReactNode;
   /** Dim beneath the name: its charge, range, cycle (`joinDetail`). */
   detail?: ReactNode;
+  /** The whole detail line is a warning ("Projects nothing"). */
   detailTone?: 'warning';
-  /** The row's figure: right of the detail line, or beside the name on a row with no detail (a total). */
+  /** The row's figure — or its controls — at the right of the detail line. */
   figure?: ReactNode;
   /** A control at the end of the name line (the row's ⋮). */
   action?: ReactNode;
+  /** One line: the figure beside the name, for a row with nothing to detail (a total). */
+  inline?: boolean;
 }
 
 const FIGURE = 'max-w-[60%] shrink-0 text-right tabular-nums';
 
 /** A row's two lines: the name across the top, then the detail with the figure at its right. */
-export function StatRowContent({ name, detail, detailTone, figure, action }: StatRowProps) {
-  if (detail === undefined)
+export function StatRowContent({
+  name,
+  detail,
+  detailTone,
+  figure,
+  action,
+  inline = false,
+}: StatRowProps) {
+  if (inline)
     return (
       <span className="flex items-start justify-between gap-3">
         <span className="min-w-0 flex-1 font-semibold">{name}</span>
@@ -89,16 +99,16 @@ export function StatRowContent({ name, detail, detailTone, figure, action }: Sta
         <span className="min-w-0 flex-1 font-semibold">{name}</span>
         {action}
       </span>
-      <span className="flex items-start justify-between gap-3">
-        <span
-          className={`min-w-0 flex-1 text-[0.6875rem] font-normal tabular-nums ${
-            detailTone === 'warning' ? 'text-warning' : 'text-text-dim'
-          }`}
-        >
-          {detail}
+      {(detail !== undefined || figure !== undefined) && (
+        <span className="flex items-start justify-between gap-3">
+          <span
+            className={`min-w-0 flex-1 ${STAT_DETAIL} ${detailTone === 'warning' ? 'text-warning' : ''}`}
+          >
+            {detail}
+          </span>
+          {figure !== undefined && <span className={FIGURE}>{figure}</span>}
         </span>
-        {figure !== undefined && <span className={FIGURE}>{figure}</span>}
-      </span>
+      )}
     </>
   );
 }
@@ -112,12 +122,8 @@ export function StatRow(props: StatRowProps) {
 }
 
 /** A list of things the fit carries — weapons, remote modules, miners, bursts — one row each. */
-export function StatRows({ label, children }: { label?: string; children: ReactNode }) {
-  return (
-    <ul aria-label={label} className="flex flex-col text-xs">
-      {children}
-    </ul>
-  );
+export function StatRows({ children }: { children: ReactNode }) {
+  return <ul className="flex flex-col text-xs">{children}</ul>;
 }
 
 /** The pickers and buttons at the top of a section, each a dim label beside a small control. */

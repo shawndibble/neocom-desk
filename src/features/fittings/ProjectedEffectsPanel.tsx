@@ -104,7 +104,9 @@ export function ProjectedEffectsPanel() {
             <li key={source.id} className={statRowClassName()}>
               <StatRowContent
                 name={source.name}
-                detail={projectsNothing(source.projection) ? t('fittings.projected.nothing') : ''}
+                detail={
+                  projectsNothing(source.projection) ? t('fittings.projected.nothing') : undefined
+                }
                 detailTone="warning"
                 action={
                   <IconButton

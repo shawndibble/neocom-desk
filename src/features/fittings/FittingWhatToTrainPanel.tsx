@@ -62,7 +62,7 @@ import { useSkillGains } from './useSkillGains';
 import { useSkillLevelGain } from './useSkillLevelGain';
 import type { SkillPlanRecord } from '@/db';
 import { StatControls, StatNote } from './StatFacts';
-import { joinDetail } from './statKit';
+import { STAT_DETAIL, joinDetail, statRowClassName } from './statKit';
 
 const TOAST_MS = 8000;
 
@@ -348,7 +348,7 @@ function WhatToTrainItem({
   const canAdd = plan !== undefined && level !== null;
 
   return (
-    <li className="flex flex-col gap-1.5 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+    <li className={statRowClassName()}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <span className="flex items-baseline gap-2">
@@ -361,7 +361,7 @@ function WhatToTrainItem({
               {row.name}
             </SkillNameButton>
           </span>
-          <p className="text-[0.6875rem] text-text-dim tabular-nums">
+          <p className={STAT_DETAIL}>
             {joinDetail([
               row.fromLevel > 0
                 ? t('fittings.whatToTrain.trained', { level: romanLevel(row.fromLevel) })
@@ -390,7 +390,7 @@ function WhatToTrainItem({
         </div>
       </div>
       {((plan && plannedSpan !== null) || canAdd) && (
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="mt-1 flex flex-wrap items-center justify-end gap-2">
           {plan && plannedSpan !== null && (
             <span className="mr-auto text-[0.6875rem] text-text-dim">
               <Trans

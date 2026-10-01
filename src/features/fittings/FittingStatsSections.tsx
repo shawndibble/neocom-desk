@@ -305,7 +305,7 @@ function StatSection({
   return (
     <section className="border-b border-line last:border-b-0">
       {/* Every section's row is shaded alike, open or shut: its small-caps title, the headline figure beside. */}
-      <div className="flex items-center gap-2 bg-panel-2 pr-3">
+      <div className="flex items-center gap-2 bg-panel-2 pr-3 transition-colors hover:bg-line">
         <h3 className="min-w-0 flex-1">
           <button
             type="button"
@@ -502,6 +502,7 @@ function OffenseRows({
       <li className={statRowClassName(true)}>
         <StatRowContent
           name={t('fittings.stats.offenseTotal')}
+          inline
           figure={<DamageFigures stats={stats} figures={(s) => s.offense} sustained="line" />}
         />
       </li>
@@ -1164,7 +1165,7 @@ export function FittingStatsSections({
               ]}
             />
             {price.totals.unpricedRows > 0 && (
-              <div className="text-[0.6875rem] text-warning">
+              <StatNote tone="warning">
                 <p>{t('fittings.stats.priceUnpriced', { count: price.totals.unpricedRows })}</p>
                 <ul className="mt-0.5 list-disc pl-4">
                   {namedPrice!.rows
@@ -1176,7 +1177,7 @@ export function FittingStatsSections({
                       </li>
                     ))}
                 </ul>
-              </div>
+              </StatNote>
             )}
           </>
         ) : (

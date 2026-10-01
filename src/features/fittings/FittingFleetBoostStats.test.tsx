@@ -58,8 +58,8 @@ describe('FleetBoostFacts', () => {
     });
     expect(screen.getByText('1× Large Asteroid Ore Compressor I')).toBeInTheDocument();
     expect(screen.getByText('124.5 km')).toBeInTheDocument();
-    expect(screen.getByText('every 60.0 s')).toBeInTheDocument();
+    expect(screen.getByText('Every 60.0 s')).toBeInTheDocument();
     expect(screen.getByText('375 Heavy Water')).toBeInTheDocument();
-    expect(screen.getByText('every 150.0 s')).toBeInTheDocument();
+    expect(screen.getByText('Every 150.0 s')).toBeInTheDocument();
   });
 });

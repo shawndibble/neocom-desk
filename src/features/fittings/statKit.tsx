@@ -13,6 +13,9 @@ export const STAT_EYEBROW_TYPE = 'text-[0.6875rem] font-semibold tracking-widest
 /** A small-caps label: a group inside a section, a table's column heads. */
 export const STAT_EYEBROW = `${STAT_EYEBROW_TYPE} text-text-dim`;
 
+/** The dim line under a row's name: its charge, range, cycle — or what it changes. */
+export const STAT_DETAIL = 'text-[0.6875rem] font-normal text-text-dim tabular-nums';
+
 /**
  * One row of a `StatRows` list, for a caller that renders its own `<li>`
  * (one wrapped in a row menu). A hairline sits between rows; a total's is
