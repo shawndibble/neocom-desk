@@ -253,3 +253,16 @@ export async function markFeedNotifiedHere(
 export async function deleteFeedForCharacter(characterId: number): Promise<void> {
   await db.notificationFeed.where('characterId').equals(characterId).delete();
 }
+
+/** A `marketOrderFilled` row still dated by the poll that noticed it — see `fillTimeSettle.ts`. */
+export type ProvisionalFillRow = NotificationFeedEntry & {
+  fillMatch: NonNullable<NotificationFeedEntry['fillMatch']>;
+};
+
+export function isProvisionalFill(row: NotificationFeedEntry): row is ProvisionalFillRow {
+  return (
+    row.eventId === 'marketOrderFilled' &&
+    row.fillMatch !== undefined &&
+    row.fillSettledAt === undefined
+  );
+}

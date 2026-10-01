@@ -3058,6 +3058,10 @@
     "unmuteHint": "Show this type again",
     "dismissType": "Dismiss every {{type}} alert",
     "dismissOne": "Dismiss {{title}}",
+    "fillTimeProvisional": {
+      "label": "Approximate time",
+      "content": "This is when the fill was noticed, not when it happened. The exact time comes from your wallet transactions, which EVE updates once an hour."
+    },
     "newest": "newest {{age}}",
     "mutedTypes": "Muted types",
     "filterTitle": "Filter alerts",

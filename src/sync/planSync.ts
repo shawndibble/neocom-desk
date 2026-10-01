@@ -990,6 +990,8 @@ interface RemoteNotificationFeedDoc extends RemoteFeedDoc {
   subjectId?: number;
   /** `subjectId`'s former name — read for rows written by the release that used it. */
   typeId?: number;
+  fillMatch?: NotificationFeedRecord['fillMatch'];
+  fillSettledAt?: number;
 }
 
 function toRemoteFeedDoc(
@@ -1007,6 +1009,8 @@ function toRemoteFeedDoc(
     ...(row.eveType !== undefined ? { eveType: row.eveType } : {}),
     ...(row.subjectId !== undefined ? { subjectId: row.subjectId } : {}),
     ...(row.dismissedAt !== undefined ? { dismissedAt: row.dismissedAt } : {}),
+    ...(row.fillMatch !== undefined ? { fillMatch: row.fillMatch } : {}),
+    ...(row.fillSettledAt !== undefined ? { fillSettledAt: row.fillSettledAt } : {}),
     ownerHash,
     // Transport only — what an incremental pull cursors on (issue #581).
     // `mergeFeed` still keys on firedAt/dismissedAt and never reads this.
@@ -1048,6 +1052,8 @@ function toLocalFeedRecord(
       ? { subjectId: remote.subjectId ?? remote.typeId }
       : {}),
     ...(remote.dismissedAt !== undefined ? { dismissedAt: remote.dismissedAt } : {}),
+    ...(remote.fillMatch !== undefined ? { fillMatch: remote.fillMatch } : {}),
+    ...(remote.fillSettledAt !== undefined ? { fillSettledAt: remote.fillSettledAt } : {}),
   });
 }
 
@@ -1072,8 +1078,15 @@ async function syncFeed(ctx: SyncContext): Promise<void> {
     FEED_SYNC_WINDOW_MS
   );
 
-  const pushed = [...plan.pushCreate, ...plan.pushDismiss];
   const writeNow = Date.now();
+  const remoteById = new Map(remote.map((row) => [row.id, row]));
+  // A re-date pushes the merge of both copies, not the local row alone: the
+  // remote doc is replaced wholesale, and anything only it holds would go.
+  const redated = plan.pushRedate.map((row) => {
+    const remoteRow = remoteById.get(row.id);
+    return remoteRow === undefined ? row : toLocalFeedRecord(remoteRow, writeNow, row);
+  });
+  const pushed = [...plan.pushCreate, ...plan.pushDismiss, ...redated];
   await Promise.all([
     ...pushed.map((row) => setDoc(doc(col, row.id), toRemoteFeedDoc(row, ctx.ownerHash, writeNow))),
     ...plan.purgeRemote.map((id) => deleteDoc(doc(col, id))),
@@ -1097,7 +1110,7 @@ async function syncFeed(ctx: SyncContext): Promise<void> {
     await db.notificationFeed.where('id').anyOf(knownRemote).modify({ syncedAt: writeNow });
   }
 
-  const pulled = [...plan.pullCreate, ...plan.pullDismiss].map((row) =>
+  const pulled = [...plan.pullCreate, ...plan.pullDismiss, ...plan.pullRedate].map((row) =>
     toLocalFeedRecord(row, writeNow, localById.get(row.id))
   );
   if (pulled.length > 0) {

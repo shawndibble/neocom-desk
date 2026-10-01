@@ -509,6 +509,26 @@ export interface NotificationFeedRecord {
    */
   dismissedAt?: number;
   /**
+   * `marketOrderFilled` rows only: how to find the order's sales in the
+   * wallet (`engine/market/fillTime.FillMatch`, restated here because
+   * `src/db` depends on nothing above it). Present means `firedAt` started as
+   * the poll that noticed the fill, not the fill itself.
+   */
+  fillMatch?: {
+    typeId: number;
+    locationId: number;
+    price: number;
+    issuedMs: number;
+    quantity: number;
+  };
+  /**
+   * Epoch ms the wallet cross-reference concluded — `firedAt` re-dated to the
+   * sale, or confirmed as the best there is. A row with `fillMatch` and no
+   * `fillSettledAt` is still provisionally dated, which the Alerts page marks.
+   * Never cleared once set, like every field here (`feed.mergeFeedRecord`).
+   */
+  fillSettledAt?: number;
+  /**
    * Epoch ms the remote side is known to hold this row, absent until it does.
    * Local bookkeeping: `sync/planSync`'s `toRemoteFeedDoc` never uploads it,
    * and `sync/merge.mergeFeed` is the only reader. See `sync/merge.LocalFeedRow`

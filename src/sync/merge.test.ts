@@ -465,8 +465,68 @@ describe('mergeFeed', () => {
       pushDismiss: [],
       pullCreate: [],
       pullDismiss: [],
+      pushRedate: [],
+      pullRedate: [],
       purgeRemote: [],
     });
+  });
+
+  it('pulls a remote copy dated earlier — another device settled when it really happened', () => {
+    const result = mergeFeedNow([feedRow({ firedAt: NOW - 1000 })], new Set(), [
+      remoteFeedRow({ firedAt: NOW - 50_000 }),
+    ]);
+    expect(result.pullRedate.map((r) => r.id)).toEqual(['occ-1']);
+    expect(result.pushRedate).toEqual([]);
+  });
+
+  it('pushes a local copy dated earlier, even outside the create-push window', () => {
+    const result = mergeFeedNow([feedRow({ firedAt: NOW - 50_000 })], new Set(), [
+      remoteFeedRow({ firedAt: NOW - 1000 }),
+    ]);
+    expect(result.pushRedate.map((r) => r.id)).toEqual(['occ-1']);
+    expect(result.pullRedate).toEqual([]);
+  });
+
+  it('pushes a settlement that kept the date, so the other device drops its provisional mark', () => {
+    const result = mergeFeedNow([feedRow({ fillSettledAt: NOW - 10 })], new Set(), [
+      remoteFeedRow(),
+    ]);
+    expect(result.pushRedate.map((r) => r.id)).toEqual(['occ-1']);
+  });
+
+  it('pulls a settlement that kept the date', () => {
+    const result = mergeFeedNow([feedRow()], new Set(), [
+      remoteFeedRow({ fillSettledAt: NOW - 10 }),
+    ]);
+    expect(result.pullRedate.map((r) => r.id)).toEqual(['occ-1']);
+  });
+
+  it('does nothing once both copies are settled on the same date', () => {
+    const result = mergeFeedNow([feedRow({ fillSettledAt: NOW - 10 })], new Set(), [
+      remoteFeedRow({ fillSettledAt: NOW - 20 }),
+    ]);
+    expect(result.pushRedate).toEqual([]);
+    expect(result.pullRedate).toEqual([]);
+  });
+
+  it('pulls a newer remote dismissal first, rather than overwrite it with an earlier local date', () => {
+    // The pull merges both (earlier date, later dismissal) locally; the next
+    // pass pushes the date back up with the dismissals already agreeing.
+    const result = mergeFeedNow([feedRow({ firedAt: NOW - 50_000 })], new Set(), [
+      remoteFeedRow({ firedAt: NOW - 1000, dismissedAt: NOW - 10 }),
+    ]);
+    expect(result.pullDismiss.map((r) => r.id)).toEqual(['occ-1']);
+    expect(result.pushRedate).toEqual([]);
+  });
+
+  it('lets a pushed dismissal carry an earlier local date along, with no second write', () => {
+    const result = mergeFeedNow(
+      [feedRow({ firedAt: NOW - 50_000, dismissedAt: NOW - 10 })],
+      new Set(),
+      [remoteFeedRow({ firedAt: NOW - 1000 })]
+    );
+    expect(result.pushDismiss.map((r) => r.id)).toEqual(['occ-1']);
+    expect(result.pushRedate).toEqual([]);
   });
 
   it('pushes a dismissal newer than the remote copy, within the push window', () => {

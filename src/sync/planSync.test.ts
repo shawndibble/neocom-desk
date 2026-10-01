@@ -1557,6 +1557,53 @@ describe('triggerSync: notification feed', () => {
     );
   });
 
+  it('carries a fill re-dated here up to the remote copy, with its match details', async () => {
+    const fillMatch = { typeId: 34, locationId: 60003760, price: 5, issuedMs: 0, quantity: 1 };
+    const noticed = FEED_ROW_FIRED_AT;
+    const sold = noticed - 3_600_000;
+    seedRemote(NOTIFICATION_FEED_PATH, [
+      remoteFeedDoc({
+        eventId: 'marketOrderFilled',
+        firedAt: noticed,
+        fillMatch,
+        updatedAt: Date.now(),
+      }),
+    ]);
+    // What `fillTimeSettle` leaves behind: re-dated, settled, `syncedAt` cleared.
+    await db.notificationFeed.put(
+      feedRow({ eventId: 'marketOrderFilled', firedAt: sold, fillMatch, fillSettledAt: noticed })
+    );
+    await triggerSync(1);
+    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.get('occ-1')).toMatchObject({
+      firedAt: sold,
+      fillMatch,
+      fillSettledAt: noticed,
+    });
+  });
+
+  it('takes a fill another device re-dated, settling it here too', async () => {
+    const fillMatch = { typeId: 34, locationId: 60003760, price: 5, issuedMs: 0, quantity: 1 };
+    const noticed = FEED_ROW_FIRED_AT;
+    const sold = noticed - 3_600_000;
+    await db.notificationFeed.put(
+      feedRow({ eventId: 'marketOrderFilled', firedAt: noticed, fillMatch, syncedAt: noticed })
+    );
+    seedRemote(NOTIFICATION_FEED_PATH, [
+      remoteFeedDoc({
+        eventId: 'marketOrderFilled',
+        firedAt: sold,
+        fillMatch,
+        fillSettledAt: noticed,
+        updatedAt: Date.now(),
+      }),
+    ]);
+    await triggerSync(1);
+    expect(await db.notificationFeed.get('occ-1')).toMatchObject({
+      firedAt: sold,
+      fillSettledAt: noticed,
+    });
+  });
+
   it('never syncs another Character’s feed rows onto this uid', async () => {
     await db.notificationFeed.put(feedRow({ id: 'other-char', characterId: 2 }));
     await triggerSync(1);

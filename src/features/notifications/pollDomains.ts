@@ -1024,7 +1024,13 @@ function isMarketOrderEntrySnapshot(raw: unknown): raw is MarketOrderEntrySnapsh
     typeof r.filled === 'boolean' &&
     typeof r.isBuyOrder === 'boolean' &&
     typeof r.typeId === 'number' &&
-    typeof r.quantity === 'number'
+    typeof r.quantity === 'number' &&
+    // Optional, unlike the rest: added for fill-time matching, and a baseline
+    // written before them must stay readable rather than reset every Character.
+    (r.locationId === undefined || typeof r.locationId === 'number') &&
+    (r.price === undefined || typeof r.price === 'number') &&
+    (r.issuedMs === undefined || typeof r.issuedMs === 'number') &&
+    (r.isCorporation === undefined || typeof r.isCorporation === 'boolean')
   );
 }
 
@@ -1043,12 +1049,19 @@ export function deriveMarketOrderEntries(
   // ESI omits `is_buy_order` entirely on a sell order rather than sending
   // false, so absent has to read as "sell" — the same shape the Market views
   // already assume of this field.
-  const common = (order: MarketOrder) => ({
-    orderId: order.order_id,
-    isBuyOrder: order.is_buy_order === true,
-    typeId: order.type_id,
-    quantity: order.volume_total,
-  });
+  const common = (order: MarketOrder) => {
+    const issuedMs = Date.parse(order.issued);
+    return {
+      orderId: order.order_id,
+      isBuyOrder: order.is_buy_order === true,
+      typeId: order.type_id,
+      quantity: order.volume_total,
+      locationId: order.location_id,
+      price: order.price,
+      ...(Number.isFinite(issuedMs) ? { issuedMs } : {}),
+      isCorporation: order.is_corporation === true,
+    };
+  };
   const entries: MarketOrderEntrySnapshot[] = openOrders.map((order) => ({
     ...common(order),
     filled: false,

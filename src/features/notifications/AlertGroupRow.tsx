@@ -9,13 +9,14 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Caret, IconButton, SEVERITY_LABEL, SeverityIcon } from '@/components/ui';
+import { Caret, IconButton, InfoTooltip, SEVERITY_LABEL, SeverityIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { formatAge } from '@/lib/age';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { NotificationFeedRecord } from '@/db';
 import type { DisplayAlertGroup } from './alertsFilter';
+import { isProvisionalFill } from './feed';
 import { dedupeCharacterName } from './notificationBody';
 import { notificationUrlForSubject } from './notificationOptions';
 
@@ -211,6 +212,14 @@ function AlertFireRow({
         {/* eslint-disable-next-line react-hooks/purity -- relative age reads the wall clock; it only affects this label */}
         {formatAge(Math.max(0, Date.now() - entry.firedAt), t)}
       </time>
+      {/* A fill dated by the poll that noticed it, until the wallet shows the sale (`fillTimeSettle.ts`). */}
+      {isProvisionalFill(entry) && (
+        <InfoTooltip
+          label={t('alerts.fillTimeProvisional.label')}
+          content={t('alerts.fillTimeProvisional.content')}
+          className="order-2 sm:order-3"
+        />
+      )}
       <Link
         to={notificationUrlForSubject(
           entry.eventId,

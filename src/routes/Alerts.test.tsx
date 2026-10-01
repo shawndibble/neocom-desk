@@ -187,6 +187,27 @@ describe('Alerts', () => {
     expect(screen.getAllByText('Sera Vantis')).not.toHaveLength(0);
   });
 
+  it('marks a sell order fill whose time is still the poll that noticed it, and only that one', async () => {
+    const fillMatch = { typeId: 34, locationId: 60003760, price: 5, issuedMs: 0, quantity: 1 };
+    await db.notificationFeed.bulkPut([
+      {
+        ...entry({ id: 'pending', eventId: 'marketOrderFilled', title: 'Pending fill' }),
+        fillMatch,
+      },
+      {
+        ...entry({ id: 'settled', eventId: 'marketOrderFilled', title: 'Settled fill' }),
+        fillMatch,
+        fillSettledAt: 1,
+      },
+    ]);
+    renderPage();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /sell order filled/i, expanded: false })
+    );
+    expect(await screen.findAllByRole('button', { name: 'Approximate time' })).toHaveLength(1);
+  });
+
   it('leaves dismissed fires out entirely', async () => {
     await db.notificationFeed.bulkPut([
       entry({ id: 'live' }),

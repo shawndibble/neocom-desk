@@ -318,6 +318,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     alreadyDelivered: vi.fn(async () => false),
     markDelivered: vi.fn(async () => {}),
     retractFromFeed: vi.fn(async () => {}),
+    settleFillTimes: vi.fn(async () => {}),
     uploadProjection: vi.fn(async () => {}),
     ...rest,
   };
@@ -329,6 +330,13 @@ describe('runForegroundPoll', () => {
     const deps = baseDeps({ masterEnabled: async () => false, characters });
     await runForegroundPoll(deps);
     expect(characters).not.toHaveBeenCalled();
+  });
+
+  it('runs the fill-time settle step for each Character, with its granted scopes', async () => {
+    const settleFillTimes = vi.fn(async () => {});
+    const deps = baseDeps({ settleFillTimes });
+    await runForegroundPoll(deps);
+    expect(settleFillTimes).toHaveBeenCalledWith(CHAR.characterId, new Set([SKILLQUEUE_SCOPE]));
   });
 
   it('does nothing when neither channel can show anything', async () => {

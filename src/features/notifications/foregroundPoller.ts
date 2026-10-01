@@ -39,6 +39,7 @@ import {
 } from './preferences';
 import { feedSuppressesToast, markFeedNotifiedHere } from './feed';
 import { dismissFeedKeysAndSync, recordFeedEntryAndSync } from './feedSync';
+import { settleFillTimes } from './fillTimeSettle';
 import {
   isEventEnabledFor,
   isEveTypeAllowed,
@@ -144,6 +145,11 @@ export interface PollDependencies {
     characterIds: readonly number[],
     occurrenceKeys: readonly string[]
   ) => Promise<void>;
+  /**
+   * Re-dates this Character's provisionally dated market order fills once
+   * the wallet shows the sale (`fillTimeSettle.ts`). Never throws.
+   */
+  settleFillTimes: (characterId: number, scopes: ReadonlySet<string>) => Promise<void>;
   /**
    * The Scheduled Push upload (issue #358, ADR 0010, CONTEXT.md round 45):
    * every Character mapped to its whole 72-hour Projection window, built by
@@ -345,6 +351,10 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
       }
     }
 
+    // Fills an earlier poll could only date by when it noticed them; the feed
+    // rows this poll writes below get their turn on the next one.
+    await deps.settleFillTimes(character.characterId, scopes);
+
     if (snapshots.size > 0) {
       updates.push({
         characterId: character.characterId,
@@ -533,6 +543,10 @@ async function recordFeedNotification(
       title,
       body,
       firedAt,
+      // Marks the row provisional until `fillTimeSettle` finds the sale.
+      ...(fire.eventId === 'marketOrderFilled' && fire.fillMatch !== undefined
+        ? { fillMatch: fire.fillMatch }
+        : {}),
     });
   } catch {
     // Same fire-and-forget contract as sendBrowserNotification: pollerState
@@ -584,6 +598,7 @@ export function liveDependencies(): PollDependencies {
     alreadyDelivered: (key) => feedSuppressesToast(key, Date.now()),
     markDelivered: (keys) => markFeedNotifiedHere(keys, Date.now()),
     retractFromFeed: dismissFeedKeysAndSync,
+    settleFillTimes: (characterId, scopes) => settleFillTimes(characterId, scopes, Date.now()),
     uploadProjection: uploadProjectionRows,
   };
 }
