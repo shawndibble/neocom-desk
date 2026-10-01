@@ -20,6 +20,7 @@ import {
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
 import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
+import { StatFields } from '@/features/fittings/StatFacts';
 import { useWeatherName } from '@/features/fittings/abyssalWeatherSelection';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { useIsDesktop } from '@/lib/useIsDesktop';
@@ -544,14 +545,19 @@ function FittingsPage() {
             onImplantSetChange={workspace.setImplantSet}
           />
           {workspace.implantBasis === 'clone' && workspace.canUseCloneBasis && (
-            <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
+            // Across both columns of the stats column's controls grid.
+            <div className="col-span-2">
+              <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
+            </div>
           )}
         </>
       }
       conditions={
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <TacticalModePicker fitting={fitting} onChange={edit} />
-          <AbyssalWeatherPicker />
+        <div className="space-y-2">
+          <StatFields>
+            <TacticalModePicker fitting={fitting} onChange={edit} />
+            <AbyssalWeatherPicker field />
+          </StatFields>
           {gaps && gaps.missing.length > 0 && activeCharacterId !== null && (
             <MissingSkillsChip
               entries={gaps.missing}

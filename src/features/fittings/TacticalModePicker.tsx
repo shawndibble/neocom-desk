@@ -11,6 +11,8 @@ import {
   tacticalModesFor,
 } from '@/engine/fittings/tacticalModes';
 import type { Fitting } from '@/engine/fittings/types';
+import { StatField } from './StatFacts';
+import { STAT_FIELD_WIDTH } from './statKit';
 
 /**
  * The Fitting in `mode`. The hull's default leaves no `mode` at all — it's
@@ -42,13 +44,12 @@ export function TacticalModePicker({
   const label = t('fittings.mode.label');
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-text-dim">{label}</span>
+    <StatField label={label}>
       <Select
         value={String(current)}
         onValueChange={(value) => onChange((f) => withMode(f, Number(value)))}
       >
-        <SelectTrigger aria-label={label} size="sm" className="w-48">
+        <SelectTrigger aria-label={label} size="sm" className={STAT_FIELD_WIDTH}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -59,6 +60,6 @@ export function TacticalModePicker({
           ))}
         </SelectContent>
       </Select>
-    </div>
+    </StatField>
   );
 }

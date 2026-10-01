@@ -31,6 +31,8 @@ import {
   useDamageProfileName,
   type DamageProfiles,
 } from './damageProfiles';
+import { StatField } from './StatFacts';
+import { STAT_FIELD_WIDTH } from './statKit';
 
 const DAMAGE_TYPES = ['em', 'thermal', 'kinetic', 'explosive'] as const;
 
@@ -211,17 +213,23 @@ function ManageProfilesModal({
   );
 }
 
-export function DamageProfilePicker({ damageProfiles }: { damageProfiles: DamageProfiles }) {
+export function DamageProfilePicker({
+  damageProfiles,
+  field = false,
+}: {
+  damageProfiles: DamageProfiles;
+  /** In the stats column's `StatFields` grid: the label in its column. */
+  field?: boolean;
+}) {
   const { t } = useTranslation();
   const nameOf = useDamageProfileName();
   const [managing, setManaging] = useState(false);
   const label = t('fittings.damageProfile.label');
 
-  return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-text-dim">{label}</span>
+  const controls = (
+    <>
       <Select value={damageProfiles.selected.id} onValueChange={damageProfiles.select}>
-        <SelectTrigger aria-label={label} size="sm" className="w-36">
+        <SelectTrigger aria-label={label} size="sm" className={STAT_FIELD_WIDTH}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -248,14 +256,25 @@ export function DamageProfilePicker({ damageProfiles }: { damageProfiles: Damage
           )}
         </SelectContent>
       </Select>
-      <Button size="sm" onClick={() => setManaging(true)}>
-        {t('fittings.damageProfile.manage')}
+      <Button
+        size="sm"
+        aria-label={field ? t('fittings.damageProfile.manage') : undefined}
+        onClick={() => setManaging(true)}
+      >
+        {field ? t('fittings.stats.manage') : t('fittings.damageProfile.manage')}
       </Button>
       <ManageProfilesModal
         open={managing}
         onClose={() => setManaging(false)}
         damageProfiles={damageProfiles}
       />
+    </>
+  );
+  if (field) return <StatField label={label}>{controls}</StatField>;
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <span className="text-text-dim">{label}</span>
+      {controls}
     </div>
   );
 }

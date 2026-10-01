@@ -24,6 +24,8 @@ import { withSkillLevel, type SkillBase } from '@/engine/fittings/skillOverrides
 import { loadSkills } from '@/sde/loadSde';
 import type { SkillType } from '@/sde/types';
 import { useSkillOverrides } from './statsConditions';
+import { StatField } from './StatFacts';
+import { STAT_FIELD_WIDTH } from './statKit';
 
 const BASES: readonly SkillBase[] = ['character', 'all0', 'allV'];
 const LEVELS = [0, 1, 2, 3, 4, 5];
@@ -167,15 +169,12 @@ export function SkillOverridesControl() {
   const overridden = skills.base !== 'character' || customCount > 0;
 
   return (
-    <div
-      className={`flex flex-wrap items-center gap-2 text-xs ${overridden ? 'text-warning' : ''}`}
-    >
-      <span className={overridden ? '' : 'text-text-dim'}>{label}</span>
+    <StatField label={label} tone={overridden ? 'warning' : undefined}>
       <Select
         value={skills.base}
         onValueChange={(base) => setSkills({ ...skills, base: base as SkillBase })}
       >
-        <SelectTrigger aria-label={label} size="sm" className="w-36">
+        <SelectTrigger aria-label={label} size="sm" className={STAT_FIELD_WIDTH}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -192,6 +191,6 @@ export function SkillOverridesControl() {
           : t('fittings.skillOverrides.custom')}
       </Button>
       <CustomLevelsModal open={editing} onClose={() => setEditing(false)} />
-    </div>
+    </StatField>
   );
 }

@@ -45,6 +45,8 @@ import {
   useTargetProfileName,
   type TargetProfiles,
 } from './targetProfiles';
+import { StatField } from './StatFacts';
+import { STAT_FIELD_WIDTH } from './statKit';
 
 interface Draft {
   id: string | null;
@@ -290,62 +292,92 @@ function ManageProfilesModal({
   );
 }
 
-export function TargetProfilePicker({ targetProfiles }: { targetProfiles: TargetProfiles }) {
+export function TargetProfilePicker({
+  targetProfiles,
+  field = false,
+}: {
+  targetProfiles: TargetProfiles;
+  /** In the stats column's `StatFields` grid: the label in its column, the profile's summary beneath. */
+  field?: boolean;
+}) {
   const { t } = useTranslation();
   const nameOf = useTargetProfileName();
   const [managing, setManaging] = useState(false);
   const label = t('fittings.targetProfile.label');
   const { selected } = targetProfiles;
 
-  return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-text-dim">{label}</span>
-      <Select value={selected.id} onValueChange={targetProfiles.select}>
-        <SelectTrigger aria-label={label} size="sm" className="w-36">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            <SelectLabel>{t('fittings.targetProfile.builtInGroup')}</SelectLabel>
-            {BUILT_IN_TARGET_PROFILES.map((profile) => (
-              <SelectItem key={profile.id} value={profile.id}>
-                {nameOf(profile)}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-          {targetProfiles.custom.length > 0 && (
-            <>
-              <SelectSeparator />
-              <SelectGroup>
-                <SelectLabel>{t('fittings.targetProfile.customGroup')}</SelectLabel>
-                {targetProfiles.custom.map((profile) => (
-                  <SelectItem key={profile.id} value={profile.id}>
-                    {profile.name}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </>
-          )}
-        </SelectContent>
-      </Select>
-      <span className="text-text-dim">
-        {t('fittings.targetProfile.summary', {
-          signature: selected.signatureRadius,
-          velocity: selected.velocity,
+  const summary = (
+    <>
+      {t('fittings.targetProfile.summary', {
+        signature: selected.signatureRadius,
+        velocity: selected.velocity,
+      })}
+      {selected.resists &&
+        t('fittings.targetProfile.resistSummary', {
+          resists: resistSummary(selected.resists),
         })}
-        {selected.resists &&
-          t('fittings.targetProfile.resistSummary', {
-            resists: resistSummary(selected.resists),
-          })}
-      </span>
-      <Button size="sm" onClick={() => setManaging(true)}>
-        {t('fittings.targetProfile.manage')}
+    </>
+  );
+  const select = (
+    <Select value={selected.id} onValueChange={targetProfiles.select}>
+      <SelectTrigger aria-label={label} size="sm" className={STAT_FIELD_WIDTH}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          <SelectLabel>{t('fittings.targetProfile.builtInGroup')}</SelectLabel>
+          {BUILT_IN_TARGET_PROFILES.map((profile) => (
+            <SelectItem key={profile.id} value={profile.id}>
+              {nameOf(profile)}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+        {targetProfiles.custom.length > 0 && (
+          <>
+            <SelectSeparator />
+            <SelectGroup>
+              <SelectLabel>{t('fittings.targetProfile.customGroup')}</SelectLabel>
+              {targetProfiles.custom.map((profile) => (
+                <SelectItem key={profile.id} value={profile.id}>
+                  {profile.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </>
+        )}
+      </SelectContent>
+    </Select>
+  );
+  const manage = (
+    <>
+      {/* Beside a label that already names it, "Manage" says enough; the full name stays its accessible one. */}
+      <Button
+        size="sm"
+        aria-label={field ? t('fittings.targetProfile.manage') : undefined}
+        onClick={() => setManaging(true)}
+      >
+        {field ? t('fittings.stats.manage') : t('fittings.targetProfile.manage')}
       </Button>
       <ManageProfilesModal
         open={managing}
         onClose={() => setManaging(false)}
         targetProfiles={targetProfiles}
       />
+    </>
+  );
+  if (field)
+    return (
+      <StatField label={label} note={summary}>
+        {select}
+        {manage}
+      </StatField>
+    );
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <span className="text-text-dim">{label}</span>
+      {select}
+      <span className="text-text-dim">{summary}</span>
+      {manage}
     </div>
   );
 }

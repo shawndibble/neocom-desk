@@ -61,8 +61,8 @@ import type { SkillGainEvaluator } from './useFittingEvaluation';
 import { useSkillGains } from './useSkillGains';
 import { useSkillLevelGain } from './useSkillLevelGain';
 import type { SkillPlanRecord } from '@/db';
-import { StatControls, StatNote } from './StatFacts';
-import { STAT_DETAIL, joinDetail, statRowClassName } from './statKit';
+import { StatField, StatFields, StatNote } from './StatFacts';
+import { STAT_DETAIL, STAT_FIELD_WIDTH, joinDetail, statRowClassName } from './statKit';
 
 const TOAST_MS = 8000;
 
@@ -207,9 +207,8 @@ function WhatToTrainRanking({
   const rankByLabel = t('fittings.whatToTrain.rankBy');
   return (
     <div className="space-y-3">
-      <StatControls>
-        <span className="flex items-center gap-2">
-          <span className="text-text-dim">{rankByLabel}</span>
+      <StatFields>
+        <StatField label={rankByLabel}>
           <Select
             value={activeSort}
             onValueChange={(value) => {
@@ -217,7 +216,7 @@ function WhatToTrainRanking({
               if (picked) setSort(picked);
             }}
           >
-            <SelectTrigger aria-label={rankByLabel} size="sm" className="w-40">
+            <SelectTrigger aria-label={rankByLabel} size="sm" className={STAT_FIELD_WIDTH}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -228,15 +227,20 @@ function WhatToTrainRanking({
               ))}
             </SelectContent>
           </Select>
-        </span>
-        <TargetPlanPicker target={target} />
-        <Link
-          to={targetPlan ? `/skills/plans/${targetPlan.id}` : '/skills/plans'}
-          className={buttonClassName({ size: 'sm' })}
-        >
-          {t('fittings.whatToTrain.openPlan')}
-        </Link>
-      </StatControls>
+          <Link
+            to={targetPlan ? `/skills/plans/${targetPlan.id}` : '/skills/plans'}
+            className={buttonClassName({ size: 'sm' })}
+          >
+            {t('fittings.whatToTrain.openPlan')}
+          </Link>
+        </StatField>
+        {/* Only with a plan to choose between (`TargetPlanPicker`). */}
+        {target.plans && target.plans.length > 1 && (
+          <StatField label={t('skills.targetPlan.label')}>
+            <TargetPlanPicker target={target} bare className={STAT_FIELD_WIDTH} />
+          </StatField>
+        )}
+      </StatFields>
       <ul
         aria-label={t('fittings.stats.section.whatToTrain')}
         className="m-0 list-none p-0 text-xs"

@@ -28,7 +28,8 @@ import {
 } from '@/engine/fittings/appliedDps';
 import type { AppliedDpsRow } from './AppliedDpsChart';
 import { kmValue } from './rangeText';
-import { Facts, HeatFigure, StatControls, StatNote } from './StatFacts';
+import { Facts, HeatFigure, StatField, StatFields, StatNote } from './StatFacts';
+import { STAT_FIELD_WIDTH } from './statKit';
 import { TargetProfilePicker } from './TargetProfilePicker';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
@@ -49,13 +50,12 @@ function OverlayPicker({ overlay }: { overlay: OverlayFitting }) {
   const { t } = useTranslation();
   const label = t('fittings.appliedDps.overlayLabel');
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-text-dim">{label}</span>
+    <StatField label={label}>
       <Select
         value={overlay.selectedId ?? NO_OVERLAY}
         onValueChange={(value) => overlay.select(value === NO_OVERLAY ? null : value)}
       >
-        <SelectTrigger aria-label={label} size="sm" className="w-48">
+        <SelectTrigger aria-label={label} size="sm" className={STAT_FIELD_WIDTH}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -81,7 +81,7 @@ function OverlayPicker({ overlay }: { overlay: OverlayFitting }) {
           )}
         </SelectContent>
       </Select>
-    </div>
+    </StatField>
   );
 }
 
@@ -161,12 +161,12 @@ export function AppliedDpsPanel({
 
   return (
     <div className="space-y-3">
-      <StatControls>
-        <TargetProfilePicker targetProfiles={targetProfiles} />
+      <StatFields>
+        <TargetProfilePicker targetProfiles={targetProfiles} field />
         {overlay && overlay.options.saved.length + overlay.options.inGame.length > 0 && (
           <OverlayPicker overlay={overlay} />
         )}
-      </StatControls>
+      </StatFields>
       {hasWeapons ? (
         <>
           <Facts

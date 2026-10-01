@@ -13,6 +13,12 @@ export const STAT_EYEBROW_TYPE = 'text-[0.6875rem] font-semibold tracking-widest
 /** A small-caps label: a group inside a section, a table's column heads. */
 export const STAT_EYEBROW = `${STAT_EYEBROW_TYPE} text-text-dim`;
 
+/**
+ * Every select (or select-like trigger) in a `StatFields` grid: one width,
+ * so stacked controls line up whatever their values read.
+ */
+export const STAT_FIELD_WIDTH = 'w-36';
+
 /** The dim line under a row's name: its charge, range, cycle — or what it changes. */
 export const STAT_DETAIL = 'text-[0.6875rem] font-normal text-text-dim tabular-nums';
 

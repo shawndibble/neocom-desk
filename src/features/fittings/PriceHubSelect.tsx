@@ -3,12 +3,20 @@ import { useTranslation } from 'react-i18next';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { useMarketHub } from '@/features/market/hub';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { STAT_FIELD_WIDTH } from './statKit';
 
 /**
  * The Trade Hub the Price section quotes — the same synced "Default Trade Hub"
  * as Settings, so picking one here changes it there too.
  */
-export function PriceHubSelect({ size = 'md' }: { size?: 'sm' | 'md' } = {}) {
+export function PriceHubSelect({
+  size = 'md',
+  bare = false,
+}: {
+  size?: 'sm' | 'md';
+  /** Just the select, for a caller that labels it itself (the stats column's `StatField`). */
+  bare?: boolean;
+} = {}) {
   const { t } = useTranslation();
   const hub = useMarketHub((state) => state.value);
   const setHub = useMarketHub((state) => state.setValue);
@@ -16,21 +24,29 @@ export function PriceHubSelect({ size = 'md' }: { size?: 'sm' | 'md' } = {}) {
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+  const select = (
+    <Select value={hub} onValueChange={(value) => void setHub(value as TradeHub['id'])}>
+      <SelectTrigger
+        aria-label={t('fittings.stats.priceHub')}
+        size={size}
+        className={bare ? STAT_FIELD_WIDTH : 'min-w-0'}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {TRADE_HUBS.map((tradeHub) => (
+          <SelectItem key={tradeHub.id} value={tradeHub.id}>
+            {tradeHub.systemName}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+  if (bare) return select;
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="text-text-dim">{t('fittings.stats.priceHub')}</span>
-      <Select value={hub} onValueChange={(value) => void setHub(value as TradeHub['id'])}>
-        <SelectTrigger aria-label={t('fittings.stats.priceHub')} size={size} className="min-w-0">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {TRADE_HUBS.map((tradeHub) => (
-            <SelectItem key={tradeHub.id} value={tradeHub.id}>
-              {tradeHub.systemName}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {select}
     </div>
   );
 }
