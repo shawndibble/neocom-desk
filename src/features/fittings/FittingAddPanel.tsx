@@ -103,6 +103,17 @@ const FIT_FILTERS: readonly {
   },
 ];
 
+/**
+ * The in-game fitting window's rack icons, from the EVE University wiki.
+ * Subsystems have none, so theirs stays a text chip.
+ */
+const SLOT_ICONS: Partial<Record<FittingSlotKind, string>> = {
+  high: '/images/fitting/slot-high.png',
+  medium: '/images/fitting/slot-medium.png',
+  low: '/images/fitting/slot-low.png',
+  rig: '/images/fitting/slot-rig.png',
+};
+
 interface BrowseFilterOptions {
   tab: BrowserTab;
   /** Only this rack — the chosen slot's, with "fits this slot" on. */
@@ -255,6 +266,8 @@ export function FittingAddPanel({
 
   const hullFit = useHullFit(catalogue, fitting.shipTypeId, profile, engineReady);
   const slotRack = target?.kind === 'slot' && fitsSlot ? target.slot : null;
+  const slotIcon = target?.kind === 'slot' ? SLOT_ICONS[target.slot] : undefined;
+  const toggleFitsSlot = () => setFitsSlot((on) => !on);
 
   const trimmed = query.trim().toLowerCase();
   const results = useMemo(() => {
@@ -430,13 +443,24 @@ export function FittingAddPanel({
             onChange={(event) => setQuery(event.target.value)}
           />
           <div className="flex flex-wrap items-center gap-1.5">
-            {target?.kind === 'slot' && (
-              <FilterChip
+            {slotIcon ? (
+              <IconButton
+                icon={<img src={slotIcon} alt="" width={16} height={16} />}
                 label={t('fittings.add.fitsSlot')}
-                selected={fitsSlot}
                 tooltip={t('fittings.add.fitsSlotTooltip')}
-                onToggle={() => setFitsSlot((on) => !on)}
+                size="sm"
+                pressed={fitsSlot}
+                onClick={toggleFitsSlot}
               />
+            ) : (
+              target?.kind === 'slot' && (
+                <FilterChip
+                  label={t('fittings.add.fitsSlot')}
+                  selected={fitsSlot}
+                  tooltip={t('fittings.add.fitsSlotTooltip')}
+                  onToggle={toggleFitsSlot}
+                />
+              )
             )}
             <div className="flex items-center gap-1">
               {FIT_FILTERS.map(({ kind, icon, labelKey, tooltipKey }) => (
