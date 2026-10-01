@@ -1,5 +1,6 @@
 // Kicks off EVE SSO: stash PKCE state, then leave the app for login.eveonline.com.
 import { startLogin, scopesForRetry, takeRetryBudget } from '@/auth/session';
+import { routerPathOf, setLoginReturnTo } from '@/auth/loginReturnTo';
 import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
 import type { ScopeGroup } from '@/esi/registry';
 import { db } from '@/db';
@@ -78,9 +79,16 @@ async function requestedScopes(
  * `beginGrant` always names it instead. With no active Character there is
  * nothing to union with and this is the base set — the same conservative answer
  * as an unreadable Dexie.
+ *
+ * Every caller is pressed while looking at a page, so the callback returns to
+ * it rather than to `/characters`. `/callback` itself is never remembered: its
+ * query is the spent code, and its error panel restarts through
+ * `retryLastLogin`, which keeps whatever landing the failed login stashed.
  */
 export async function beginEveLogin(options: EveLoginOptions = {}): Promise<void> {
   const characterId = options.characterId ?? useActiveCharacter.getState().activeCharacterId;
+  const here = routerPathOf(window.location, import.meta.env.BASE_URL);
+  if (!/^\/callback(?:[/?#]|$)/.test(here)) setLoginReturnTo(here);
   assignLocation(await startLogin(await requestedScopes(characterId, options.groups ?? [])));
 }
 

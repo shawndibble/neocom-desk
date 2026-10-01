@@ -1,22 +1,22 @@
 /**
- * Where a login started outside the ordinary in-app flow should land once it
- * completes — today, only the logged-out Fitting Share Link view (#1544),
- * whose "Open in Neocom Desk" CTA needs the *same* link to open in the
- * editor once SSO comes back, not the ordinary post-login `/characters`.
+ * Where a login should land once SSO comes back, instead of the ordinary
+ * post-login `/characters`. Two writers: the logged-out Fitting Share Link
+ * view (#1544), whose "Open in Neocom Desk" CTA needs the *same* link to open
+ * in the editor, and `app/loginFlow`'s `beginEveLogin`, so a re-auth or a
+ * Permission grant returns to the page it was pressed on.
  *
  * `sessionStorage`, not React Router `state`: SSO leaves the app for a full
  * page navigation to login.eveonline.com and back, which router state does
- * not survive. Always consumed on read and bounded by a short TTL, so a
- * leftover value from an abandoned share-view login can only misdirect a
- * *different* login in the same tab within a few minutes of it — never a
- * different visitor or a different tab, and the worst case is landing on the
- * wrong in-app page, not a security exposure. Kept short (rather than
- * `session.ts`'s 15-minute PKCE TTL, which has to outlast a visitor
- * hesitating on EVE's own login page) because nothing here needs to survive
- * that long.
+ * not survive. Always consumed on read and bounded by the same TTL as
+ * `session.ts`'s Pending Login, so it outlasts a visitor hesitating on EVE's
+ * own login page but no login that could still complete. A leftover value
+ * from an abandoned login can only misdirect a *different* login in the same
+ * tab within that window — never a different visitor or a different tab, and
+ * the worst case is landing on the wrong in-app page, not a security
+ * exposure.
  */
 const KEY = 'neocom.loginReturnTo';
-const TTL_MS = 5 * 60_000;
+const TTL_MS = 15 * 60_000;
 
 interface Stashed {
   path: string;
@@ -45,4 +45,19 @@ export function takeLoginReturnTo(): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * A browser location as a path the router can navigate to: query and hash
+ * kept, Vite's `BASE_URL` stripped, since the router is mounted under it
+ * (`app/App.tsx`'s `basename`).
+ */
+export function routerPathOf(
+  location: Pick<Location, 'pathname' | 'search' | 'hash'>,
+  baseUrl: string
+): string {
+  const base = baseUrl.replace(/\/$/, '');
+  const { pathname } = location;
+  const path = base && pathname.startsWith(base) ? pathname.slice(base.length) || '/' : pathname;
+  return `${path}${location.search}${location.hash}`;
 }

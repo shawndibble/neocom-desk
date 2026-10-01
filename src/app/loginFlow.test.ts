@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node';
 import { db, type TokenRecord } from '@/db';
 import { CORE_GRANT, SCOPES, revokedScopes, scopesForGroup } from '@/esi/scopes';
 import { completeLogin } from '@/auth/session';
+import { takeLoginReturnTo } from '@/auth/loginReturnTo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 const { assignLocation } = vi.hoisted(() => ({ assignLocation: vi.fn<(url: string) => void>() }));
@@ -240,6 +241,40 @@ describe('beginEveLogin: re-auth for a known character', () => {
 // same "nobody to union with" reasoning as `beginAddCharacterLogin`, but with
 // a hand-picked set of Permissions instead of every default-on one.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Where the round trip lands. A re-auth or grant is pressed while looking at
+// a page, so `/callback` brings the user back to it; Add Character keeps the
+// ordinary landing.
+// ---------------------------------------------------------------------------
+
+describe('post-login landing', () => {
+  afterEach(() => window.history.replaceState(null, '', '/'));
+
+  it('beginEveLogin remembers the page it was pressed on, query and hash included', async () => {
+    window.history.replaceState(null, '', '/industry/jobs?tab=history#top');
+
+    await beginEveLogin({ characterId: CHAR_ID, groups: ['corp'] });
+
+    expect(takeLoginReturnTo()).toBe('/industry/jobs?tab=history#top');
+  });
+
+  it('beginEveLogin does not remember /callback itself', async () => {
+    window.history.replaceState(null, '', '/callback?code=abc&state=def');
+
+    await beginEveLogin({ characterId: CHAR_ID });
+
+    expect(takeLoginReturnTo()).toBeNull();
+  });
+
+  it('beginAddCharacterLogin leaves the landing alone', async () => {
+    window.history.replaceState(null, '', '/settings');
+
+    await beginAddCharacterLogin();
+
+    expect(takeLoginReturnTo()).toBeNull();
+  });
+});
 
 describe('beginCustomizedAddCharacterLogin', () => {
   it('sends only the Core Grant when every Permission is unchecked (Select none)', async () => {
