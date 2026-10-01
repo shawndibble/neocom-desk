@@ -15,6 +15,7 @@
  * than flooding the notification the first time an already-stalled or
  * already-finished queue is observed.
  */
+import type { FillMatch } from './market/fillTime';
 import { colonyStatus } from './pi/colonyStatus';
 import { diffRoster } from './corp/members';
 import { isSpExtractionReady } from './spExtraction';
@@ -1236,6 +1237,16 @@ export interface MarketOrderEntrySnapshot {
    * reaches here. Anyone adding partial-fill detection has to revisit this.
    */
   quantity: number;
+  /**
+   * What `engine/market/fillTime` needs to date a fill from the wallet —
+   * the station, unit price and `issued` (epoch ms) the order's sales share.
+   * Optional so a baseline persisted before they existed still validates.
+   */
+  locationId?: number;
+  price?: number;
+  issuedMs?: number;
+  /** ESI's `is_corporation`: a corp order's sales pay the corp wallet, which this Character's transactions never show. */
+  isCorporation?: boolean;
 }
 
 export interface MarketOrderSnapshot {
@@ -1249,6 +1260,20 @@ export interface MarketOrderNotificationFire {
   orderId: number;
   typeId: number;
   quantity: number;
+  /**
+   * How to find this order's sales in the wallet, so the feed row can be
+   * re-dated to the real fill once they show up. Absent for a corp order or
+   * an entry whose baseline lacks the details — those keep the poll's time.
+   */
+  fillMatch?: FillMatch;
+}
+
+/** The order's wallet-matching details, when it has all of them and its sales land in this Character's wallet. */
+function fillMatchFor(entry: MarketOrderEntrySnapshot): FillMatch | undefined {
+  const { locationId, price, issuedMs } = entry;
+  if (entry.isCorporation === true) return undefined;
+  if (locationId === undefined || price === undefined || issuedMs === undefined) return undefined;
+  return { typeId: entry.typeId, locationId, price, issuedMs, quantity: entry.quantity };
 }
 
 /**
@@ -1280,12 +1305,14 @@ export function diffMarketOrderFilled(
   for (const entry of next.entries) {
     if (!entry.filled || entry.isBuyOrder) continue;
     if (prevFilledById.get(entry.orderId) === true) continue;
+    const fillMatch = fillMatchFor(entry);
     fires.push({
       eventId: 'marketOrderFilled',
       characterId,
       orderId: entry.orderId,
       typeId: entry.typeId,
       quantity: entry.quantity,
+      ...(fillMatch === undefined ? {} : { fillMatch }),
     });
   }
   return fires;

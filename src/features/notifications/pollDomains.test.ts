@@ -221,8 +221,15 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
 });
 
 describe('deriveMarketOrderEntries', () => {
-  /** The fixture's own type and size, so a row assertion states only what it is testing. */
-  const item = { typeId: 34, quantity: 10 };
+  /** The fixture's own type, size and fill-matching details, so a row assertion states only what it is testing. */
+  const item = {
+    typeId: 34,
+    quantity: 10,
+    locationId: 60003760,
+    price: 100,
+    issuedMs: Date.parse('2026-01-01T00:00:00Z'),
+    isCorporation: false,
+  };
 
   it('marks every still-open order as not filled', () => {
     const entries = deriveMarketOrderEntries([marketOrder({ order_id: 1 })], []);
@@ -881,7 +888,17 @@ describe('truncation guards', () => {
     vi.mocked(loadOrders).mockResolvedValue(statusResult([marketOrder({ order_id: 9 })], false));
     vi.mocked(loadOrderHistory).mockResolvedValue(statusResult([], false));
     expect(await marketOrderDomain.load(1)).toEqual([
-      { orderId: 9, filled: false, isBuyOrder: false, typeId: 34, quantity: 10 },
+      {
+        orderId: 9,
+        filled: false,
+        isBuyOrder: false,
+        typeId: 34,
+        quantity: 10,
+        locationId: 60003760,
+        price: 100,
+        issuedMs: Date.parse('2026-01-01T00:00:00Z'),
+        isCorporation: false,
+      },
     ]);
   });
 });

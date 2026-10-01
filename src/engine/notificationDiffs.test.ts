@@ -1729,6 +1729,46 @@ describe('diffMarketOrderFilled', () => {
     ]);
   });
 
+  it('carries what the wallet cross-reference needs to date the fill, for a personal order', () => {
+    const details = { locationId: 60003760, price: 5.5, issuedMs: T0 - 86_400_000 };
+    const prev = orderSnapshot([orderEntry(1, false, details)], T0);
+    const next = orderSnapshot([orderEntry(1, true, details)], T0 + 2000);
+    expect(diffMarketOrderFilled(7, prev, next)).toEqual([
+      {
+        eventId: 'marketOrderFilled',
+        characterId: 7,
+        orderId: 1,
+        typeId: 34,
+        quantity: 100,
+        fillMatch: {
+          typeId: 34,
+          locationId: 60003760,
+          price: 5.5,
+          issuedMs: T0 - 86_400_000,
+          quantity: 100,
+        },
+      },
+    ]);
+  });
+
+  it('carries no fillMatch for a corp order — its sales pay into the corp wallet, not this one', () => {
+    const details = {
+      locationId: 60003760,
+      price: 5.5,
+      issuedMs: T0 - 86_400_000,
+      isCorporation: true,
+    };
+    const prev = orderSnapshot([orderEntry(1, false, details)], T0);
+    const next = orderSnapshot([orderEntry(1, true, details)], T0 + 2000);
+    expect(diffMarketOrderFilled(7, prev, next)[0].fillMatch).toBeUndefined();
+  });
+
+  it('carries no fillMatch for an entry from a baseline that predates the order details', () => {
+    const prev = orderSnapshot([orderEntry(1, false)], T0);
+    const next = orderSnapshot([orderEntry(1, true)], T0 + 2000);
+    expect(diffMarketOrderFilled(7, prev, next)[0].fillMatch).toBeUndefined();
+  });
+
   it('stays silent for a filled buy order — nobody bought anything from you', () => {
     const prev = orderSnapshot([orderEntry(2, false, { isBuyOrder: true })], T0);
     const next = orderSnapshot([orderEntry(2, true, { isBuyOrder: true })], T0 + 2000);
