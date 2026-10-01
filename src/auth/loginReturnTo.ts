@@ -56,31 +56,3 @@ export function clearLoginReturnTo(): void {
     // Unreachable storage holds no stash to misdirect anything.
   }
 }
-
-/**
- * A browser location as a path the router can navigate to: query and hash
- * kept, Vite's `BASE_URL` stripped, since the router is mounted under it
- * (`app/App.tsx`'s `basename`).
- */
-export function routerPathOf(
-  location: Pick<Location, 'pathname' | 'search' | 'hash'>,
-  baseUrl: string
-): string {
-  const base = baseUrl.replace(/\/$/, '');
-  const { pathname } = location;
-  const underBase = base !== '' && (pathname === base || pathname.startsWith(`${base}/`));
-  const path = underBase ? pathname.slice(base.length) || '/' : pathname;
-  return `${path}${location.search}${location.hash}`;
-}
-
-/** The router path of the page this tab is showing. */
-export function currentRouterPath(): string {
-  return routerPathOf(window.location, import.meta.env.BASE_URL);
-}
-
-/** Whether `path` (a router path) is on `route`, e.g. `/callback?code=…` on `/callback`. */
-export function isOnRoute(path: string, route: string): boolean {
-  if (!path.startsWith(route)) return false;
-  const next = path.charAt(route.length);
-  return next === '' || '/?#'.includes(next);
-}

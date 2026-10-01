@@ -187,6 +187,7 @@ describe('startup import graph', () => {
     expect([...reached].sort()).toEqual([
       '/src/app/bootShellPreload.ts',
       '/src/app/routeChunks.ts',
+      '/src/app/routerPath.ts',
       '/src/app/signedInShellHint.ts',
     ]);
   });
