@@ -70,4 +70,38 @@ describe('Disclosure', () => {
     expect(button.className).toContain('min-h-11');
     expect(button.className).toContain('md:min-h-0');
   });
+
+  it('renders a label accessory outside the toggle so clicking it does not toggle', async () => {
+    const onToggle = vi.fn();
+    render(
+      <Disclosure
+        label="Job fee"
+        labelAccessory={<button type="button">About job fee</button>}
+        trailing="65"
+        expanded={false}
+        onToggle={onToggle}
+      >
+        <div>EIV detail</div>
+      </Disclosure>
+    );
+
+    const toggle = screen.getByRole('button', { name: /^job fee/i });
+    // The value stays in the toggle's name even though it renders outside it.
+    expect(toggle).toHaveAccessibleName('Job fee65');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).not.toContainElement(screen.getByRole('button', { name: /about job fee/i }));
+
+    await userEvent.click(screen.getByRole('button', { name: /about job fee/i }));
+    expect(onToggle).not.toHaveBeenCalled();
+
+    await userEvent.click(toggle);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(screen.getByText('65', { selector: '[aria-hidden="true"] > span' }));
+    expect(onToggle).toHaveBeenCalledTimes(2);
+
+    toggle.focus();
+    await userEvent.keyboard('{Enter}');
+    expect(onToggle).toHaveBeenCalledTimes(3);
+  });
 });

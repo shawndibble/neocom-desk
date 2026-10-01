@@ -52,6 +52,13 @@ export interface ItemContextMenuProps {
   onToggleBuildHere?: () => void;
   /** Picks the toggle's label. Meaningless without `onToggleBuildHere`. */
   buildingHere?: boolean;
+  /**
+   * Opens the Build Plan's blueprint tier picker, to swap the blueprint or
+   * change its ME/TE. Present only on a Build Plan's blueprint row, where it
+   * takes the Build Plan entry's place — a blueprint has no blueprint of its
+   * own, so that entry could only ever say "No blueprint options".
+   */
+  onModifyBlueprint?: () => void;
   /** Caller-specific entries appended after the shared ones (Open Orders' "Copy new price"). */
   extraItems?: ReactNode;
   children: ReactElement;
@@ -125,6 +132,7 @@ function useItemMenuItems(props: ItemMenuProps, onAlertRequest: () => void): Rea
     onViewInIndustryAsMaterial,
     onToggleBuildHere,
     buildingHere,
+    onModifyBlueprint,
     extraItems,
   } = props;
   const { t } = useTranslation();
@@ -170,15 +178,21 @@ function useItemMenuItems(props: ItemMenuProps, onAlertRequest: () => void): Rea
       <MenuItem onSelect={() => void writeToClipboard(itemName)}>
         {t('market.contextMenu.copyName')}
       </MenuItem>
-      <MenuItem
-        disabled={!blueprintTypeID}
-        onSelect={() => {
-          if (blueprintTypeID)
-            navigate(`${industryTabHref('plans')}?product=${planProductTypeID ?? typeId}`);
-        }}
-      >
-        {buildPlanLabel}
-      </MenuItem>
+      {onModifyBlueprint ? (
+        <MenuItem onSelect={onModifyBlueprint}>
+          {t('industry.contextMenu.modifyBlueprint')}
+        </MenuItem>
+      ) : (
+        <MenuItem
+          disabled={!blueprintTypeID}
+          onSelect={() => {
+            if (blueprintTypeID)
+              navigate(`${industryTabHref('plans')}?product=${planProductTypeID ?? typeId}`);
+          }}
+        >
+          {buildPlanLabel}
+        </MenuItem>
+      )}
       {onViewInIndustryAsMaterial && (
         <MenuItem onSelect={onViewInIndustryAsMaterial}>
           {t('market.contextMenu.viewInIndustryAsMaterial')}

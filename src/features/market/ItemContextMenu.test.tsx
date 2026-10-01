@@ -81,6 +81,34 @@ describe('ItemContextMenu — build-here toggle', () => {
   });
 });
 
+describe('ItemContextMenu — Modify blueprint', () => {
+  it('replaces the Build Plan entry and invokes the action on select', async () => {
+    const onModifyBlueprint = vi.fn();
+    render(
+      <MemoryRouter initialEntries={['/industry']}>
+        <FakeItemActions>
+          <ItemContextMenu
+            typeId={638}
+            itemName="Rifter Blueprint"
+            blueprintTypeID={null}
+            onModifyBlueprint={onModifyBlueprint}
+          >
+            <button type="button">Rifter Blueprint</button>
+          </ItemContextMenu>
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Rifter Blueprint' }));
+
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Modify blueprint' }));
+
+    expect(onModifyBlueprint).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByRole('menuitem', { name: /Build Plan|No blueprint options/ })
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('ItemContextMenu — View in Industry as material (issue #414)', () => {
   it('offers the action when the caller supplies it, and invokes it on select', async () => {
     const onViewInIndustryAsMaterial = vi.fn();

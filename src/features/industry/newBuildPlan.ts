@@ -152,7 +152,9 @@ export function newBuildPlan(
     characterId,
     name: overrides.name ?? entry.productName,
     blueprintTypeID: entry.blueprintTypeID,
-    runs: overrides.runs ?? 1,
+    // Same default the in-game Industry window uses: a BPC fills in its
+    // remaining runs, a BPO (`runs === -1`, unlimited) starts at 1.
+    runs: overrides.runs ?? (owned !== null && owned.runs > 0 ? owned.runs : 1),
     me: overrides.me ?? owned?.material_efficiency ?? assumedMe,
     te: overrides.te ?? owned?.time_efficiency ?? assumedTe,
     facility: facilityConfig.facility,

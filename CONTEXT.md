@@ -486,7 +486,8 @@ here — they go one per file in `docs/context/decisions/`.
   (`features/route/routeRules.ts`).
 - **Job Fee**: The ISK ESI charges to install a manufacturing job, separate
   from material cost. Sized from EIV, the system's **Cost Index**, a fixed
-  SCC surcharge, and the facility's tax.
+  SCC surcharge, and the facility's tax. Labelled "Total job cost" in the UI,
+  matching the in-game Industry window.
 - **Jump Range**: The distance filter on Market Browser, Contract Search's Items and **BPC Sourcing**: Any, the **Current System** only, or within 3, 5, 10, 15 or 20 stargate jumps of it. Counted on the local stargate graph, never ESI. A row the app cannot place (a player structure) drops out once a range is set. Contract Search and BPC Sourcing narrow what was already fetched. On Market Browser a set range replaces the header's Trade Hub or region: the book is fetched from every region holding an in-range system, at every station. Its "Any" option is labelled with the header's scope.
 - **Kind Card**: One `/corp` overview panel per kind of Corp Board Item — Fuel,
   Structure timers, Moon chunks, Industry jobs — showing that kind's most urgent

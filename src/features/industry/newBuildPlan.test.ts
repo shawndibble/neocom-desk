@@ -138,6 +138,35 @@ describe('newBuildPlan — assumed ME and TE', () => {
   });
 });
 
+describe('newBuildPlan — default runs, as the in-game Industry window picks them', () => {
+  it("starts an owned BPC at the copy's remaining runs", () => {
+    const created = newBuildPlan(1, entry(), owned({ runs: 150 }), null);
+    expect(created.runs).toBe(150);
+  });
+
+  it('starts an owned BPO at 1 run', () => {
+    const created = newBuildPlan(1, entry(), owned({ runs: -1 }), null);
+    expect(created.runs).toBe(1);
+  });
+
+  it('starts at 1 run when no blueprint is owned', () => {
+    const created = newBuildPlan(1, entry(), null, null);
+    expect(created.runs).toBe(1);
+  });
+
+  it("lets the caller's runs beat the copy's remaining runs", () => {
+    const created = newBuildPlan(
+      1,
+      entry(),
+      owned({ runs: 150 }),
+      null,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      { runs: 7 }
+    );
+    expect(created.runs).toBe(7);
+  });
+});
+
 describe('newBuildPlan — overrides', () => {
   it('takes runs, group and timestamp from the caller', () => {
     const created = newBuildPlan(1, entry(), null, null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {

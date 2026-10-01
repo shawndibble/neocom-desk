@@ -386,7 +386,7 @@ describe('IndustryPlanPage: Log production prefill from a job (#1787)', () => {
     await screen.findByRole('heading', { name: 'Rifter' });
     expect(await screen.findByRole('heading', { name: 'Log Production' })).toBeInTheDocument();
     expect(screen.getByLabelText('Qty')).toHaveValue('4');
-    expect(screen.getByLabelText('Job fee')).toHaveValue('999');
+    expect(screen.getByLabelText('Total job cost')).toHaveValue('999');
   });
 
   it('multiplies runs by the blueprint’s own per-run product quantity, not just the run count', async () => {
@@ -466,7 +466,7 @@ describe('IndustryPlanPage: Log production prefill from a job (#1787)', () => {
 
     expect(await screen.findByRole('heading', { name: 'Log Production' })).toBeInTheDocument();
     expect(screen.getByLabelText('Qty')).toHaveValue('3');
-    expect(screen.getByLabelText('Job fee')).toHaveValue('4,500');
+    expect(screen.getByLabelText('Total job cost')).toHaveValue('4,500');
   });
 });
 

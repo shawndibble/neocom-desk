@@ -10,7 +10,6 @@ import {
   IconButton,
   InfoTooltip,
   Panel,
-  StatChip,
   Select,
   SelectContent,
   SelectItem,
@@ -1053,7 +1052,8 @@ export function BuildPlanDetail({
   function itemContextMenu(
     typeId: number,
     trigger: ReactElement,
-    buildHere?: { onToggle: () => void; building: boolean }
+    buildHere?: { onToggle: () => void; building: boolean },
+    onModifyBlueprint?: () => void
   ) {
     return (
       <ItemContextMenu
@@ -1062,6 +1062,7 @@ export function BuildPlanDetail({
         blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}
         onToggleBuildHere={buildHere?.onToggle}
         buildingHere={buildHere?.building}
+        onModifyBlueprint={onModifyBlueprint}
       >
         {trigger}
       </ItemContextMenu>
@@ -1080,8 +1081,14 @@ export function BuildPlanDetail({
             onToggle: () => toggleBuildHere(material.typeID),
             building: material.subBuilds.length > 0,
           }
-        : undefined
+        : undefined,
+      modifyBlueprintFor(material)
     );
+  }
+
+  /** The blueprint row's own action: the same tier picker its blueprint glyph opens. */
+  function modifyBlueprintFor(material: MaterialTableRow): (() => void) | undefined {
+    return material.acquisitionTier ? () => setAcquisitionPickerTypeId(material.typeID) : undefined;
   }
 
   /**
@@ -1092,7 +1099,8 @@ export function BuildPlanDetail({
    */
   function itemActionsFor(
     typeId: number,
-    buildHere?: { onToggle: () => void; building: boolean }
+    buildHere?: { onToggle: () => void; building: boolean },
+    onModifyBlueprint?: () => void
   ): ReactElement {
     return (
       <ItemMoreActions
@@ -1101,6 +1109,7 @@ export function BuildPlanDetail({
         blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}
         onToggleBuildHere={buildHere?.onToggle}
         buildingHere={buildHere?.building}
+        onModifyBlueprint={onModifyBlueprint}
       />
     );
   }
@@ -1114,7 +1123,8 @@ export function BuildPlanDetail({
             onToggle: () => toggleBuildHere(material.typeID),
             building: material.subBuilds.length > 0,
           }
-        : undefined
+        : undefined,
+      modifyBlueprintFor(material)
     );
   }
 
@@ -1162,32 +1172,46 @@ export function BuildPlanDetail({
     standing,
   };
 
-  const chip = (label: string, value: string) => (
-    <StatChip key={label} label={label} value={value} />
+  // Read-only summary of the setup: plain label-over-value pairs, not chips —
+  // a bordered, filled box reads as a button, and nothing here is clickable.
+  const setupFact = (label: string, value: string) => (
+    <div key={label} className="min-w-0">
+      <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        {label}
+      </dt>
+      <dd className="text-xs text-text tabular-nums">{value}</dd>
+    </div>
   );
-  const setupChips = [
-    chip(t('industry.runs'), plan.runs.toLocaleString()),
-    ...(activity === 'manufacturing'
+  // ME/TE belong to the materials table's blueprint row, whose tier picker
+  // sets them. An owned BPO gets no such row (nothing to buy), so only then
+  // does the summary carry them — and not before the plan resolves, or they
+  // would flash in and out on every plan that does have the row.
+  const lacksBlueprintRow =
+    result !== null &&
+    !result.materials.some((m) => m.typeID === plan.blueprintTypeID && m.acquisitionTier);
+  const setupFacts = [
+    setupFact(t('industry.runs'), plan.runs.toLocaleString()),
+    ...(activity === 'manufacturing' && lacksBlueprintRow
       ? [
-          chip(t('industry.setupChipMe'), `${resolvedMe}%`),
-          chip(t('industry.setupChipTe'), `${resolvedTe}%`),
+          setupFact(t('industry.setupChipMe'), `${resolvedMe}%`),
+          setupFact(t('industry.setupChipTe'), `${resolvedTe}%`),
         ]
       : []),
     // The place the pilot picked, by the name they picked it under; the
     // facility · system · band triple only when no place was picked.
-    chip(
+    setupFact(
       t('industry.buildLocation'),
       buildLocationName ??
         `${facilityPreset.name} · ${buildSystem?.name ?? hub.systemName} · ${t(`industry.${plan.security}`)}`
     ),
     ...(facilityPreset.structure
       ? [
-          chip(t('industry.setupChipRig'), rigFitSummaryLabel(resolveRigFit(plan), t)),
-          chip(t('industry.setupChipTax'), `${plan.facilityTaxPct ?? 0}%`),
+          setupFact(t('industry.setupChipRig'), rigFitSummaryLabel(resolveRigFit(plan), t)),
+          setupFact(t('industry.setupChipTax'), `${plan.facilityTaxPct ?? 0}%`),
         ]
       : []),
-    chip(t('industry.tradeHub'), hub.systemName),
-    chip(
+    setupFact(t('industry.tradeHub'), hub.systemName),
+    setupFact(
       t('industry.materialPriceBasis'),
       materialPriceBasisOf(plan.materialPriceBasis) === 'buy'
         ? t('industry.materialPriceBasisBuy')
@@ -1283,7 +1307,7 @@ export function BuildPlanDetail({
                 ME/TE are no longer pilot-set fields (issue #838): the
                 Blueprint Acquisition tier picker resolves them — whichever
                 owned or purchasable tier is cheapest overall — and the
-                setup chips above show the result. A pilot who sources a
+                blueprint row in the materials table shows and changes it. A pilot who sources a
                 copy the app cannot see still overrides its price the way
                 any material's price is overridden (#839 will add a picker
                 for choosing among multiple owned instances).
@@ -1639,7 +1663,7 @@ export function BuildPlanDetail({
             </div>
           </div>
         ) : (
-          <div className="flex flex-wrap gap-1.5">{setupChips}</div>
+          <dl className="flex flex-wrap gap-x-6 gap-y-2">{setupFacts}</dl>
         )}
       </Panel>
 
