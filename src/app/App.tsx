@@ -26,6 +26,7 @@ import { DocumentTitleTracker } from './DocumentTitleTracker';
 import { ReloadPrompt } from './ReloadPrompt';
 import { InstallPrompt } from './InstallPrompt';
 import { BootScreen } from './BootScreen';
+import { ROUTER_BASENAME } from './routerPath';
 import { Spinner } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 import { RequireCharacter } from './RequireCharacter';
@@ -134,9 +135,6 @@ function SignedInShell() {
     </ErrorBoundary>
   );
 }
-
-// Vite's BASE_URL (set by `base` in vite.config.ts, currently '/').
-const BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 
 /**
  * Every feature route, keyed by path. `satisfies Record<AppRoutePath, ...>` is
@@ -312,7 +310,7 @@ export function App() {
 
   return (
     <ErrorBoundary>
-      <BrowserRouter basename={BASENAME}>
+      <BrowserRouter basename={ROUTER_BASENAME}>
         <AuthFailureRedirect />
         <AnalyticsPageViewTracker />
         <DocumentTitleTracker />

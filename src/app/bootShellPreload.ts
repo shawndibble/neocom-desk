@@ -1,5 +1,6 @@
 import { preloadSignedInShell } from './routeChunks';
 import { readSignedInShellHint, shouldPreloadSignedInShell } from './signedInShellHint';
+import { routerPathname } from './routerPath';
 
 /**
  * Side-effect module, imported by `main.tsx` straight after `./instrument`:
@@ -8,11 +9,10 @@ import { readSignedInShellHint, shouldPreloadSignedInShell } from './signedInShe
  * usually in hand by the time `RequireCharacter`'s Dexie read lets `Layout`
  * render. A first-time visitor on /login skips it and never downloads them.
  *
- * Deliberately light: `routeChunks` and the hint helper import nothing at
- * runtime, so this adds no weight ahead of the rest of the entry.
+ * Deliberately light: `routeChunks`, the hint helper and `routerPath` import
+ * nothing at runtime, so this adds no weight ahead of the rest of the entry.
  */
-// The router's path, without Vite's `base` (`/` today, so a no-op).
-const routerPath = window.location.pathname.slice(import.meta.env.BASE_URL.length - 1);
+const routerPath = routerPathname(window.location.pathname, import.meta.env.BASE_URL);
 if (shouldPreloadSignedInShell(routerPath, readSignedInShellHint())) {
   preloadSignedInShell();
 }

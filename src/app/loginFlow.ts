@@ -1,17 +1,12 @@
 // Kicks off EVE SSO: stash PKCE state, then leave the app for login.eveonline.com.
 import { startLogin, scopesForRetry, takeRetryBudget } from '@/auth/session';
-import {
-  clearLoginReturnTo,
-  currentRouterPath,
-  isOnRoute,
-  setLoginReturnTo,
-  takeLoginReturnTo,
-} from '@/auth/loginReturnTo';
+import { clearLoginReturnTo, setLoginReturnTo, takeLoginReturnTo } from '@/auth/loginReturnTo';
 import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
 import type { ScopeGroup } from '@/esi/registry';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { assignLocation } from './navigation';
+import { currentRouterPath, isOnRoute } from './routerPath';
 
 export interface EveLoginOptions {
   /**
