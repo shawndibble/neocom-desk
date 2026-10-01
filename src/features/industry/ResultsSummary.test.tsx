@@ -126,7 +126,7 @@ describe('ResultsSummary: jargon tooltips (UX-REVIEW #8)', () => {
     fireEvent.focus(jobFeeButton);
     const tooltipId = jobFeeButton.getAttribute('aria-describedby')!;
     // 3,737,181 x 0.00005 = 186.86 -> 187
-    expect(document.getElementById(tooltipId)?.textContent).toContain('±187');
+    expect(document.getElementById(tooltipId)?.textContent).toContain('±187 ISK');
   });
 
   it('gives the ISK/hour chip an accessible tooltip explaining its basis (UX-REVIEW #13)', () => {

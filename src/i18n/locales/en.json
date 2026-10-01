@@ -2056,7 +2056,7 @@
     "sccSurchargeTooltip": "Fixed 4% surcharge on the job's EIV, paid to the Secure Commerce Commission.",
     "facilityTaxAmount": "Facility tax",
     "jobFee": "Total job cost",
-    "jobFeeTooltip": "<b>Can be off by up to ±{{amount}}.</b> ESI rounds cost indices to 4 decimals.",
+    "jobFeeTooltip": "<b>Can be off by up to ±{{amount}} ISK.</b> ESI rounds cost indices to 4 decimals.",
     "materialCost": "Material cost",
     "totalCost": "Total cost",
     "time": "Time",
