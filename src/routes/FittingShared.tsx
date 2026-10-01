@@ -104,7 +104,7 @@ export function FittingShared() {
     profile: readyProfile,
     implantBasis: 'fitting',
   });
-  const hardpointsUsed = useFittingHardpoints(readyFitting);
+  const hardpoints = useFittingHardpoints(readyFitting);
 
   useEffect(() => {
     if (readyFitting === null) return;
@@ -199,7 +199,8 @@ export function FittingShared() {
             fitting={state.fitting}
             stats={stats}
             moduleResults={stats?.modules ?? null}
-            hardpointsUsed={hardpointsUsed}
+            hardpointsUsed={hardpoints.used}
+            hardpointKindOf={hardpoints.kindOf}
           />
           <FittingStatsSections
             conditions={

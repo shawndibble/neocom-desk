@@ -1,15 +1,26 @@
 /**
  * How many turret and launcher hardpoints the open Fitting's high slots take,
- * from each fitted type's dogma effects (`hardpointKinds.ts`). Null until
- * every high-slot type is known, so a pip is never shown free by mistake.
+ * from each fitted type's dogma effects (`hardpointKinds.ts`), and which one
+ * each type takes, for its tile's badge. The counts are null until every
+ * high-slot type is known, so a pip is never shown free by mistake.
  */
-import { useEffect, useMemo, useState } from 'react';
-import { countHardpoints, type HardpointKind } from '@/engine/fittings/hardpoints';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  countHardpoints,
+  type HardpointKind,
+  type HardpointKindOf,
+} from '@/engine/fittings/hardpoints';
 import type { Fitting, HardpointCounts } from '@/engine/fittings/types';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadHardpointKind } from './hardpointKinds';
 
-export function useFittingHardpoints(fitting: Fitting | null): HardpointCounts | null {
+export interface FittingHardpoints {
+  used: HardpointCounts | null;
+  /** A high-slot type's hardpoint (null: none); undefined until fetched, or for a type in another rack. */
+  kindOf: HardpointKindOf;
+}
+
+export function useFittingHardpoints(fitting: Fitting | null): FittingHardpoints {
   const [kinds, setKinds] = useState<ReadonlyMap<number, HardpointKind | null>>(new Map());
   const highTypeIds = useMemo(
     () => [
@@ -45,6 +56,6 @@ export function useFittingHardpoints(fitting: Fitting | null): HardpointCounts |
     };
   }, [highTypeIds, kinds]);
 
-  if (fitting === null) return null;
-  return countHardpoints(fitting, (typeId) => kinds.get(typeId));
+  const kindOf = useCallback((typeId: number) => kinds.get(typeId), [kinds]);
+  return { used: fitting === null ? null : countHardpoints(fitting, kindOf), kindOf };
 }

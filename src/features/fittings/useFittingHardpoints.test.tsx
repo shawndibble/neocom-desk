@@ -44,18 +44,28 @@ const WITH_UNKNOWN: Fitting = {
 describe('useFittingHardpoints', () => {
   it('counts the turrets and launchers the high slots take', async () => {
     const { result } = renderHook(() => useFittingHardpoints(RIFTER));
-    await waitFor(() => expect(result.current).toEqual({ turrets: 2, launchers: 1 }));
+    await waitFor(() => expect(result.current.used).toEqual({ turrets: 2, launchers: 1 }));
+  });
+
+  it('names the hardpoint each high-slot type takes, for its tile', async () => {
+    const { result } = renderHook(() => useFittingHardpoints(RIFTER));
+    await waitFor(() => expect(result.current.kindOf(2889)).toBe('turret'));
+    expect(result.current.kindOf(10631)).toBe('launcher');
+    // A mid-slot type is never looked up; a high-slot utility module would be null.
+    expect(result.current.kindOf(3244)).toBeUndefined();
   });
 
   it('stays unknown while a high-slot type can’t be fetched, rather than showing its pip free', async () => {
     const { result } = renderHook(() => useFittingHardpoints(WITH_UNKNOWN));
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(result.current).toBeNull();
+    expect(result.current.used).toBeNull();
+    // What is known still badges its tile.
+    expect(result.current.kindOf(2889)).toBe('turret');
   });
 
   it('is null with nothing open', () => {
     const { result } = renderHook(() => useFittingHardpoints(null));
-    expect(result.current).toBeNull();
+    expect(result.current.used).toBeNull();
   });
 
   it('caps how many high-slot types it looks up at once (N+1 fan-out)', async () => {
@@ -72,7 +82,7 @@ describe('useFittingHardpoints', () => {
       })),
     };
     const { result } = renderHook(() => useFittingHardpoints(many));
-    await waitFor(() => expect(result.current).not.toBeNull());
+    await waitFor(() => expect(result.current.used).not.toBeNull());
     expect(maxInFlight).toBeLessThanOrEqual(ESI_FANOUT_CONCURRENCY);
   });
 });
