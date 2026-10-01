@@ -14,6 +14,7 @@ import {
   type FittingModule,
   type FittingSlotKind,
 } from './types';
+import type { HardpointKind } from './hardpoints';
 
 export interface RingSlot {
   rack: FittingSlotKind;
@@ -79,13 +80,14 @@ export const RING_GAUGES = {
 
 export type RingGauge = keyof typeof RING_GAUGES;
 
-/**
- * Degrees between neighbouring hardpoint pips, from 12 o'clock to the first,
- * and to the kind's glyph, which sits between the two so a split hull's
- * turrets and launchers are told apart without a hover.
- */
+/** Degrees between neighbouring hardpoint pips. */
 const PIP_PITCH_DEG = 3;
+/** Degrees from 12 o'clock to a kind's first pip. */
 const PIP_START_DEG = 7.5;
+/**
+ * Degrees from 12 o'clock to a kind's glyph, between the top and its first
+ * pip, so a split hull's turrets and launchers are told apart without a hover.
+ */
 const GLYPH_DEG = 3.5;
 
 /**
@@ -94,7 +96,7 @@ const GLYPH_DEG = 3.5;
  * 12 o'clock, launchers out right, the first of each nearest the top, just
  * past its kind's glyph (`hardpointGlyphAngle`).
  */
-export function hardpointPipAngles(kind: 'turret' | 'launcher', count: number): number[] {
+export function hardpointPipAngles(kind: HardpointKind, count: number): number[] {
   const side = kind === 'turret' ? -1 : 1;
   return Array.from(
     { length: count },
@@ -102,8 +104,8 @@ export function hardpointPipAngles(kind: 'turret' | 'launcher', count: number): 
   );
 }
 
-/** Where a kind's glyph — the game's turret or launcher hardpoint icon — sits, beside 12 o'clock. */
-export function hardpointGlyphAngle(kind: 'turret' | 'launcher'): number {
+/** Where a kind's glyph â€” the game's turret or launcher hardpoint icon â€” sits, beside 12 o'clock. */
+export function hardpointGlyphAngle(kind: HardpointKind): number {
   return kind === 'turret' ? -GLYPH_DEG : GLYPH_DEG;
 }
 

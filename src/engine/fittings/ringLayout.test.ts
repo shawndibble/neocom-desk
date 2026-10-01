@@ -294,7 +294,7 @@ describe('hardpointPipAngles', () => {
 });
 
 describe('hardpointGlyphAngle', () => {
-  it('puts each kind�s glyph on its own side, between 12 o�clock and its first pip', () => {
+  it('puts each kind’s glyph on its own side, between 12 o’clock and its first pip', () => {
     const turret = hardpointGlyphAngle('turret');
     const launcher = hardpointGlyphAngle('launcher');
     expect(turret).toBeLessThan(0);
@@ -303,8 +303,8 @@ describe('hardpointGlyphAngle', () => {
     expect(launcher).toBeLessThan(hardpointPipAngles('launcher', 1)[0]);
   });
 
-  it('leaves a glyph�s width clear on both sides: of the other glyph and of the first pip', () => {
-    // A glyph is about 2.6� wide at the gauge radius, a pip about 1.8�.
+  it('leaves a glyph’s width clear on both sides: of the other glyph and of the first pip', () => {
+    // A glyph is about 3.3° wide at the gauge radius, a pip about 1.8°.
     const launcher = hardpointGlyphAngle('launcher');
     expect(launcher * 2).toBeGreaterThanOrEqual(3.3 + 2);
     expect(hardpointPipAngles('launcher', 1)[0] - launcher).toBeGreaterThanOrEqual(

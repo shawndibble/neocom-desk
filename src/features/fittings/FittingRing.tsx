@@ -279,7 +279,7 @@ const GLYPH_SIZE = 18;
 /**
  * CCP's own fitting-window hardpoint icons (the EVE University wiki's
  * `Icon_turret_hp.png` / `Icon_launcher_hp.png`), as the Add panel's slot
- * icons are (DESIGN.md ง5's exception): a split hull's two rows of pips read
+ * icons are (DESIGN.md ยง5's exception): a split hull's two rows of pips read
  * as the client draws them, not as two anonymous runs of dots.
  */
 const HARDPOINT_ICON: Readonly<Record<HardpointKind, string>> = {
@@ -524,7 +524,13 @@ function SlotTile({
   const shownState = module && shownModuleState(slot.rack, reachedState, module.state);
   const state = shownState ? t(`fittings.list.moduleState.${shownState}`) : '';
   const label = module
-    ? `${t('fittings.ring.slotFitted', { rack: rackLabel, index, state })}${cantUse ? `, ${t('fittings.list.cantUse')}` : ''}`
+    ? [
+        t('fittings.ring.slotFitted', { rack: rackLabel, index, state }),
+        hardpoint ? t(`fittings.ring.hardpoints.${hardpoint}Label`) : null,
+        cantUse ? t('fittings.list.cantUse') : null,
+      ]
+        .filter(Boolean)
+        .join(', ')
     : t('fittings.ring.slotEmpty', { rack: rackLabel, index });
   const emptyTooltipKey = compact
     ? 'fittings.ring.tooltipEmptyCompact'
