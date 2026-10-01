@@ -2398,9 +2398,13 @@ async function main() {
       process.exitCode = 1;
     }
     const wantedIds = new Set(certificates.map((c) => c.id));
+    // Only skills asked for at some grade: one that is level 0 at all five is
+    // dropped as "not needed", not as unknown, and mustn't count against this.
+    const askedFor = (s) =>
+      ['basic', 'standard', 'improved', 'advanced', 'elite'].some((g) => s[g] >= 1);
     const rawSkills = certificateRecords
       .filter((r) => wantedIds.has(r._key))
-      .reduce((n, r) => n + (r.skillTypes?.length ?? 0), 0);
+      .reduce((n, r) => n + (r.skillTypes ?? []).filter(askedFor).length, 0);
     const bakedSkills = certificates.reduce(
       (n, c) => n + new Set(c.levels.flat().map((p) => p.skillTypeID)).size,
       0
