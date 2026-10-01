@@ -48,7 +48,7 @@ export function TacticalModePicker({
         value={String(current)}
         onValueChange={(value) => onChange((f) => withMode(f, Number(value)))}
       >
-        <SelectTrigger aria-label={label} className="w-56">
+        <SelectTrigger aria-label={label} size="sm" className="w-48">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

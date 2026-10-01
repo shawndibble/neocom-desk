@@ -559,9 +559,11 @@ describe('FittingStatsSections — Applied DPS', () => {
 
   it('moves applied DPS with the target profile, never raw DPS', () => {
     const { rerender } = renderSections(armed(), damageProfiles(), targetProfiles());
-    const summary = () => screen.getByText(/^Raw DPS/).textContent ?? '';
-    const againstCruiser = summary();
-    expect(againstCruiser).toMatch(/^Raw DPS 100\.0 · applied/);
+    const fact = (label: string) => screen.getByText(label).nextElementSibling?.textContent;
+    const applied = () => fact('Applied, at best range');
+    const againstCruiser = applied();
+    expect(fact('Raw DPS')).toBe('100.0');
+    expect(againstCruiser).toMatch(/^[\d.]+ at [\d.]+ km$/);
     expect(screen.getByRole('combobox', { name: 'Target profile' })).toHaveTextContent(
       'NPC cruiser'
     );
@@ -577,8 +579,8 @@ describe('FittingStatsSections — Applied DPS', () => {
         typeName={typeName}
       />
     );
-    expect(summary()).toMatch(/^Raw DPS 100\.0 · applied/);
-    expect(summary()).not.toBe(againstCruiser);
+    expect(fact('Raw DPS')).toBe('100.0');
+    expect(applied()).not.toBe(againstCruiser);
     expect(screen.getByText(/Our own calculation/)).toBeInTheDocument();
   });
 
@@ -838,7 +840,7 @@ describe('FittingStatsSections — Overheat all and Copy stats', () => {
     expect(ehp).toHaveAttribute('title', 'Unheated: 4619 EHP');
     // Colour and hover alone reach neither touch nor screen readers: the value is also in the text.
     expect(ehp).toHaveTextContent('(Unheated: 4619 EHP)');
-    expect(inWarningTone(screen.getByText('Armor repair: 81.8 HP/s'))).toBe(true);
+    expect(inWarningTone(screen.getByText('81.8 HP/s'))).toBe(true);
 
     // Offense: the blasters' DPS moved, their volley and the drones didn't.
     const offense = within(sectionBody('Offense'));
@@ -861,7 +863,8 @@ describe('FittingStatsSections — Overheat all and Copy stats', () => {
     expect(armor.getAllByText('50%').some(inWarningTone)).toBe(false);
 
     // Applied DPS moves with the weapons' raw DPS.
-    expect(inWarningTone(screen.getByText(/^Raw DPS 115\.0/))).toBe(true);
+    const rawDps = screen.getByText('Raw DPS').nextElementSibling!.firstElementChild as HTMLElement;
+    expect(inWarningTone(rawDps)).toBe(true);
 
     // What heat never touches stays in the normal tone.
     expect(screen.getAllByText('350 m/s').some(inWarningTone)).toBe(false);

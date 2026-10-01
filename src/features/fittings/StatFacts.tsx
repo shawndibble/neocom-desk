@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { unheatedIfChanged } from '@/engine/fittings/stats';
+import { STAT_EYEBROW, statRowClassName } from './statKit';
 
 /**
  * One figure as `format` shows it. Under "Overheat all" it reads in the
@@ -31,7 +32,102 @@ export function HeatFigure<S extends { unheated: S | null }>({
   );
 }
 
+const NOTE_TONE = {
+  dim: 'text-text-dim',
+  warning: 'text-warning',
+  danger: 'text-danger',
+} as const;
+
+/** A footnote, a hint or an empty state: dim 11px, or a status tone. */
+export function StatNote({
+  tone = 'dim',
+  children,
+}: {
+  tone?: keyof typeof NOTE_TONE;
+  children: ReactNode;
+}) {
+  return <p className={`text-[0.6875rem] ${NOTE_TONE[tone]}`}>{children}</p>;
+}
+
+/** A labelled run of rows or facts inside a section ("Local tank", "Compression"). */
+export function StatGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <h4 className={STAT_EYEBROW}>{label}</h4>
+      {children}
+    </div>
+  );
+}
+
+export interface StatRowProps {
+  /** What the row is: "4× Heavy Assault Missile Launcher II". Takes the full width, wrapping if it must. */
+  name: ReactNode;
+  /** Dim beneath the name: its charge, range, cycle (`joinDetail`). */
+  detail?: ReactNode;
+  detailTone?: 'warning';
+  /** The row's figure: right of the detail line, or beside the name on a row with no detail (a total). */
+  figure?: ReactNode;
+  /** A control at the end of the name line (the row's ⋮). */
+  action?: ReactNode;
+}
+
+const FIGURE = 'max-w-[60%] shrink-0 text-right tabular-nums';
+
+/** A row's two lines: the name across the top, then the detail with the figure at its right. */
+export function StatRowContent({ name, detail, detailTone, figure, action }: StatRowProps) {
+  if (detail === undefined)
+    return (
+      <span className="flex items-start justify-between gap-3">
+        <span className="min-w-0 flex-1 font-semibold">{name}</span>
+        {figure !== undefined && <span className={FIGURE}>{figure}</span>}
+        {action}
+      </span>
+    );
+  return (
+    <>
+      <span className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 font-semibold">{name}</span>
+        {action}
+      </span>
+      <span className="flex items-start justify-between gap-3">
+        <span
+          className={`min-w-0 flex-1 text-[0.6875rem] font-normal tabular-nums ${
+            detailTone === 'warning' ? 'text-warning' : 'text-text-dim'
+          }`}
+        >
+          {detail}
+        </span>
+        {figure !== undefined && <span className={FIGURE}>{figure}</span>}
+      </span>
+    </>
+  );
+}
+
+export function StatRow(props: StatRowProps) {
+  return (
+    <li className={statRowClassName()}>
+      <StatRowContent {...props} />
+    </li>
+  );
+}
+
+/** A list of things the fit carries — weapons, remote modules, miners, bursts — one row each. */
+export function StatRows({ label, children }: { label?: string; children: ReactNode }) {
+  return (
+    <ul aria-label={label} className="flex flex-col text-xs">
+      {children}
+    </ul>
+  );
+}
+
+/** The pickers and buttons at the top of a section, each a dim label beside a small control. */
+export function StatControls({ children }: { children: ReactNode }) {
+  return <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">{children}</div>;
+}
+
 export interface Fact {
+  /** Tells two facts with the same label apart (two of one repairer); the label otherwise. */
+  id?: string;
   label: string;
   value: ReactNode;
 }
@@ -41,7 +137,7 @@ export function Facts({ items }: { items: Fact[] }) {
   return (
     <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs tabular-nums">
       {items.map((item) => (
-        <div key={item.label} className="min-w-0">
+        <div key={item.id ?? item.label} className="min-w-0">
           <dt className="text-[0.6875rem] text-text-dim">{item.label}</dt>
           <dd>{item.value}</dd>
         </div>

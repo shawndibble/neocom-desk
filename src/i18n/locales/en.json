@@ -668,9 +668,9 @@
       "dronesNoOverheat": "Drones don't overheat",
       "defenseEhp": "{{value}} EHP",
       "repair": {
-        "shield": "Shield boost: {{value}} HP/s",
-        "armor": "Armor repair: {{value}} HP/s",
-        "hull": "Hull repair: {{value}} HP/s"
+        "shield": "Shield boost",
+        "armor": "Armor repair",
+        "hull": "Hull repair"
       },
       "shield": "Shield",
       "armor": "Armor",
@@ -765,8 +765,9 @@
         "cubicMetresUsed": "{{used}} / {{total}} m³"
       },
       "tank": {
-        "passiveShield": "Passive shield regen: {{value}} HP/s",
-        "ancillary": "{{name}}: {{loaded}} HP/s with paste, {{empty}} dry",
+        "title": "Local tank",
+        "passiveShield": "Passive shield regen",
+        "ancillary": "{{loaded}} HP/s with paste, {{empty}} dry",
         "burst": "Burst tank",
         "sustained": "Sustained",
         "capLimited": "Cap-limited: repairers get {{pct}}% of the capacitor they need",
@@ -851,13 +852,12 @@
         "fillTime": "{{time}} ({{capacity}} m³)"
       },
       "fleetBoosts": {
-        "strength": "Strength",
-        "range": "Range",
-        "length": "Length",
-        "reload": "Reload",
+        "lasts": "lasts {{value}}",
+        "reloads": "reload {{value}}",
         "noCharge": "No charge loaded: hands out nothing",
-        "compressorRange": "{{range}} · every {{cycle}}",
-        "fuel": "{{value}} {{fuel}} every {{cycle}}"
+        "compression": "Compression",
+        "every": "every {{cycle}}",
+        "fuel": "{{value}} {{fuel}}"
       },
       "fightersNoOverheat": "Fighters don't overheat"
     },
@@ -868,8 +868,6 @@
       "failed": "Couldn't work out which skills affect this fit.",
       "none": "No single skill level would change this fit — every skill that affects it is trained to V.",
       "rankBy": "Rank by",
-      "changes": "Changes",
-      "time": "Train",
       "withPrerequisites": "incl. prerequisites",
       "addToPlan": "Add to plan",
       "addToPlanLabel": "Add to plan: {{skill}}",
@@ -1049,7 +1047,9 @@
       "resistSummary": " · resists {{resists}}%"
     },
     "appliedDps": {
-      "summary": "Raw DPS {{raw}} · applied {{applied}} at {{km}} km",
+      "raw": "Raw DPS",
+      "applied": "Applied, at best range",
+      "appliedValue": "{{value}} at {{km}} km",
       "assumptions": "Our own calculation, not the engine's: your ship stationary, the target moving fully transversal at the profile's speed. Drones only apply inside drone control range. Fighters fly to the target and are counted at full damage at any range — their hit chance isn't modelled.",
       "noWeapons": "No weapons are running — set a turret or launcher active, or launch drones or fighters.",
       "loading": "Loading graphs…",

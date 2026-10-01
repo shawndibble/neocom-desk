@@ -19,6 +19,9 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
   } as FittingStats;
 }
 
+/** A Facts pair's value, by its label. */
+const fact = (label: string) => screen.getByText(label).nextElementSibling?.textContent ?? '';
+
 describe('TankFacts', () => {
   it('sets burst beside sustained tank and passive regeneration', () => {
     render(
@@ -38,8 +41,8 @@ describe('TankFacts', () => {
       />
     );
 
-    expect(screen.getByText('Shield boost: 40.0 HP/s')).toBeInTheDocument();
-    expect(screen.getByText('Passive shield regen: 5.5 HP/s')).toBeInTheDocument();
+    expect(fact('Shield boost')).toBe('40.0 HP/s');
+    expect(fact('Passive shield regen')).toBe('5.5 HP/s');
     expect(screen.getByText('90.0 EHP/s')).toBeInTheDocument();
     expect(screen.getByText('50.0 EHP/s')).toBeInTheDocument();
     expect(
@@ -63,9 +66,7 @@ describe('TankFacts', () => {
       />
     );
 
-    expect(
-      screen.getByText('Medium Ancillary Armor Repairer: 78.0 HP/s with paste, 26.0 dry')
-    ).toBeInTheDocument();
+    expect(fact('Medium Ancillary Armor Repairer')).toBe('78.0 HP/s with paste, 26.0 dry');
   });
 
   it('says nothing about the capacitor limiting a tank it keeps up with', () => {

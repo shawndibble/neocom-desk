@@ -3,7 +3,8 @@ import { holdFillSeconds } from '@/engine/fittings/mining';
 import type { FittingStats } from '@/engine/fittings/types';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatDuration } from '@/lib/duration';
-import { Facts } from './StatFacts';
+import { Facts, StatNote, StatRow, StatRows } from './StatFacts';
+import { joinDetail } from './statKit';
 
 /**
  * Mining: each miner type (with its crystal) and mining drone stack, what
@@ -29,31 +30,25 @@ export function MiningFacts({
     t('fittings.stats.unit.cubicMetresPerSecond', { value: value.toFixed(1) });
 
   return (
-    <div className="space-y-2">
-      <ul className="space-y-1.5 text-xs">
+    <>
+      <StatRows>
         {mining.rows.map((row) => (
-          <li
+          <StatRow
             key={`${row.isDrone ? 'drone' : 'module'}:${row.typeId}:${row.chargeTypeId ?? ''}`}
-            className="flex flex-wrap justify-between gap-x-2"
-          >
-            <span className="min-w-0">
-              {t('fittings.stats.weaponRow', { count: row.count, name: typeName(row.typeId) })}
-              {row.chargeTypeId !== undefined && (
-                <span className="block text-text-dim">
-                  {t('fittings.stats.mining.crystal', { name: typeName(row.chargeTypeId) })}
-                </span>
-              )}
-              <span className="block text-text-dim tabular-nums">
-                {t('fittings.stats.mining.perCycle', {
-                  value: row.perCycle.toFixed(0),
-                  seconds: row.cycleSeconds.toFixed(1),
-                })}
-              </span>
-            </span>
-            <span className="shrink-0 text-right tabular-nums">{perSecond(row.perSecond)}</span>
-          </li>
+            name={t('fittings.stats.weaponRow', { count: row.count, name: typeName(row.typeId) })}
+            detail={joinDetail([
+              row.chargeTypeId === undefined
+                ? undefined
+                : t('fittings.stats.mining.crystal', { name: typeName(row.chargeTypeId) }),
+              t('fittings.stats.mining.perCycle', {
+                value: row.perCycle.toFixed(0),
+                seconds: row.cycleSeconds.toFixed(1),
+              }),
+            ])}
+            figure={perSecond(row.perSecond)}
+          />
         ))}
-      </ul>
+      </StatRows>
       <Facts
         items={[
           { label: t('fittings.stats.mining.total'), value: perSecond(mining.perSecond) },
@@ -83,7 +78,7 @@ export function MiningFacts({
             : []),
         ]}
       />
-      <p className="text-xs text-text-dim">{t('fittings.stats.mining.note')}</p>
-    </div>
+      <StatNote>{t('fittings.stats.mining.note')}</StatNote>
+    </>
   );
 }

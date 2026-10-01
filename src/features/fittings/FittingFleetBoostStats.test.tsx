@@ -37,8 +37,8 @@ describe('FleetBoostFacts', () => {
     expect(screen.getByText('Mining Laser Field Enhancement Charge')).toBeInTheDocument();
     expect(screen.getByText('77.3% · 3.9%')).toBeInTheDocument();
     expect(screen.getByText('51.8 km')).toBeInTheDocument();
-    expect(screen.getByText('92.7 s')).toBeInTheDocument();
-    expect(screen.getByText('30.0 s')).toBeInTheDocument();
+    expect(screen.getByText('lasts 92.7 s')).toBeInTheDocument();
+    expect(screen.getByText('reload 30.0 s')).toBeInTheDocument();
   });
 
   it('says a burst with no charge hands out nothing', () => {
@@ -57,7 +57,9 @@ describe('FleetBoostFacts', () => {
       core: { typeId: 58950, fuelTypeId: 16_272, fuelPerCycle: 375, cycleSeconds: 150 },
     });
     expect(screen.getByText('1× Large Asteroid Ore Compressor I')).toBeInTheDocument();
-    expect(screen.getByText('124.5 km · every 60.0 s')).toBeInTheDocument();
-    expect(screen.getByText('375 Heavy Water every 150.0 s')).toBeInTheDocument();
+    expect(screen.getByText('124.5 km')).toBeInTheDocument();
+    expect(screen.getByText('every 60.0 s')).toBeInTheDocument();
+    expect(screen.getByText('375 Heavy Water')).toBeInTheDocument();
+    expect(screen.getByText('every 150.0 s')).toBeInTheDocument();
   });
 });

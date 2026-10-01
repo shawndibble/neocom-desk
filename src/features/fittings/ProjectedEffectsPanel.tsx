@@ -26,6 +26,8 @@ import type { Fitting } from '@/engine/fittings/types';
 import { loadSkills } from '@/sde/loadSde';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { computeOutgoing } from './dogmaFittingEngine';
+import { StatNote, StatRowContent, StatRows } from './StatFacts';
+import { statRowClassName } from './statKit';
 import { useProjectedSources, type ProjectedSource } from './statsConditions';
 import { useFittingChoices } from './useFittingChoices';
 
@@ -93,61 +95,62 @@ export function ProjectedEffectsPanel() {
     );
 
   return (
-    <div className="space-y-2 text-xs">
-      <p className="text-text-dim">{t('fittings.projected.hint')}</p>
+    <div className="space-y-3">
       {sources.length === 0 ? (
-        <p className="text-text-dim">{t('fittings.projected.none')}</p>
+        <StatNote>{t('fittings.projected.none')}</StatNote>
       ) : (
-        <ul className="space-y-1">
+        <StatRows>
           {sources.map((source) => (
-            <li
-              key={source.id}
-              className="flex flex-wrap items-center gap-2 rounded-xs bg-panel-2 p-1.5"
-            >
-              <span className="min-w-0 flex-1 basis-40">
-                <span className="block truncate text-sm">{source.name}</span>
-                {projectsNothing(source.projection) && (
-                  <span className="block text-warning">{t('fittings.projected.nothing')}</span>
-                )}
-              </span>
-              <IconButton
-                size="row"
-                icon={<Icon.Decrease />}
-                label={t('fittings.projected.fewer', { name: source.name })}
-                tooltip={t('fittings.projected.fewerShort')}
-                disabled={source.count <= 1}
-                onClick={() => setCount(source.id, source.count - 1)}
-              />
-              <span className="w-14 shrink-0 text-center tabular-nums">
-                {t('fittings.projected.count', { count: source.count })}
-              </span>
-              <IconButton
-                size="row"
-                icon={<Icon.Increase />}
-                label={t('fittings.projected.more', { name: source.name })}
-                tooltip={t('fittings.projected.moreShort')}
-                disabled={source.count >= MAX_SHIPS}
-                onClick={() => setCount(source.id, source.count + 1)}
-              />
-              <IconButton
-                variant="plain"
-                size="sm"
-                tone="danger"
-                icon={<Icon.Close />}
-                label={t('fittings.projected.remove', { name: source.name })}
-                onClick={() => update((current) => current.filter((s) => s.id !== source.id))}
+            <li key={source.id} className={statRowClassName()}>
+              <StatRowContent
+                name={source.name}
+                detail={projectsNothing(source.projection) ? t('fittings.projected.nothing') : ''}
+                detailTone="warning"
+                action={
+                  <IconButton
+                    variant="plain"
+                    size="sm"
+                    tone="danger"
+                    icon={<Icon.Close />}
+                    label={t('fittings.projected.remove', { name: source.name })}
+                    onClick={() => update((current) => current.filter((s) => s.id !== source.id))}
+                  />
+                }
+                figure={
+                  <span className="flex items-center gap-1">
+                    <IconButton
+                      size="row"
+                      icon={<Icon.Decrease />}
+                      label={t('fittings.projected.fewer', { name: source.name })}
+                      tooltip={t('fittings.projected.fewerShort')}
+                      disabled={source.count <= 1}
+                      onClick={() => setCount(source.id, source.count - 1)}
+                    />
+                    <span className="w-14 shrink-0 text-center tabular-nums">
+                      {t('fittings.projected.count', { count: source.count })}
+                    </span>
+                    <IconButton
+                      size="row"
+                      icon={<Icon.Increase />}
+                      label={t('fittings.projected.more', { name: source.name })}
+                      tooltip={t('fittings.projected.moreShort')}
+                      disabled={source.count >= MAX_SHIPS}
+                      onClick={() => setCount(source.id, source.count + 1)}
+                    />
+                  </span>
+                }
               />
             </li>
           ))}
-        </ul>
+        </StatRows>
       )}
       {characterId === null || (choices.ready && choices.all.length === 0) ? (
-        <p className="text-text-dim">{t('fittings.projected.needsCharacter')}</p>
+        <StatNote>{t('fittings.projected.needsCharacter')}</StatNote>
       ) : (
         groups.length > 0 && (
           // Keyed on the list, so the trigger reads the placeholder again after each pick.
           <Select key={sources.length} onValueChange={(id) => void add(id)}>
-            <SelectTrigger aria-label={label} className="w-full sm:w-64">
+            <SelectTrigger aria-label={label} size="sm" className="w-full sm:w-64">
               <SelectValue placeholder={t('fittings.projected.addPlaceholder')} />
             </SelectTrigger>
             <SelectContent>
@@ -165,7 +168,8 @@ export function ProjectedEffectsPanel() {
           </Select>
         )
       )}
-      {failed && <p className="text-danger">{failed}</p>}
+      {failed && <StatNote tone="danger">{failed}</StatNote>}
+      <StatNote>{t('fittings.projected.hint')}</StatNote>
     </div>
   );
 }

@@ -17,7 +17,6 @@ import type {
   FittingStats,
   Resonances,
   StatsErrorReason,
-  WeaponRange,
   WeaponRow,
 } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
@@ -25,7 +24,16 @@ import type { DogmaAssetProgress } from './dogmaFittingEngine';
 import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
 import { DamageProfilePicker } from './DamageProfilePicker';
 import { AppliedDpsPanel } from './AppliedDpsPanel';
-import { Facts, HeatFigure, type Fact } from './StatFacts';
+import {
+  Facts,
+  HeatFigure,
+  StatControls,
+  StatNote,
+  StatRowContent,
+  StatRows,
+  type Fact,
+} from './StatFacts';
+import { STAT_EYEBROW, STAT_EYEBROW_TYPE, joinDetail, statRowClassName } from './statKit';
 import { SkillOverridesControl } from './SkillOverridesControl';
 import { PriceHubSelect } from './PriceHubSelect';
 import { FittingAppraisalModal } from './FittingAppraisalModal';
@@ -73,8 +81,6 @@ const RESONANCE_KEY = {
   kinetic: 'kineticResonance',
   explosive: 'explosiveResonance',
 } as const satisfies Record<DamageType, keyof Resonances>;
-
-const MICRO_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
 /** One resist, as the game draws it: the damage type's colour filling the share resisted. */
 function ResistCell({
@@ -140,12 +146,12 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
             <th
               key={type}
               scope="col"
-              className={`pb-1 text-center text-[0.6875rem] font-semibold uppercase ${DMG_TEXT_CLASS[type]}`}
+              className={`pb-1 text-center ${STAT_EYEBROW_TYPE} ${DMG_TEXT_CLASS[type]}`}
             >
               {t(`fittings.stats.damageTypeShort.${type}`)}
             </th>
           ))}
-          <th scope="col" className={`w-[18%] pb-1 text-right ${MICRO_LABEL}`}>
+          <th scope="col" className={`w-[18%] pb-1 text-right ${STAT_EYEBROW}`}>
             {t('fittings.stats.ehpColumn')}
           </th>
         </tr>
@@ -238,7 +244,7 @@ function DamageFigures({
   return (
     <>
       {numbers}
-      <span className="basis-full text-right text-[0.6875rem] font-normal text-text-dim tabular-nums">
+      <span className="block text-right text-[0.6875rem] font-normal text-text-dim tabular-nums">
         <HeatFigure stats={stats} format={sustainedLabel} />
       </span>
     </>
@@ -298,22 +304,24 @@ function StatSection({
 }) {
   return (
     <section className="border-b border-line last:border-b-0">
-      <div className="flex items-center gap-2 pr-3 hover:bg-panel-2">
+      {/* Every section's row is shaded alike, open or shut: its small-caps title, the headline figure beside. */}
+      <div className="flex items-center gap-2 bg-panel-2 pr-3">
         <h3 className="min-w-0 flex-1">
           <button
             type="button"
             aria-expanded={expanded}
             onClick={onToggle}
-            className="flex min-h-11 w-full items-center gap-2 pl-3 text-left text-sm font-semibold md:min-h-9"
+            className="flex min-h-11 w-full items-center gap-2 pl-3 text-left text-xs font-semibold tracking-widest uppercase md:min-h-9"
           >
             <Caret expanded={expanded} />
             {title}
           </button>
         </h3>
-        {warning && <span className="shrink-0 text-xs text-warning">{warning}</span>}
-        {meta && <span className="shrink-0 text-sm tabular-nums">{meta}</span>}
+        {/* Status text, never boxed: a box would read as a control (DESIGN.md §6). */}
+        {warning && <span className={`shrink-0 text-warning ${STAT_EYEBROW_TYPE}`}>{warning}</span>}
+        {meta && <span className="shrink-0 text-sm font-semibold tabular-nums">{meta}</span>}
       </div>
-      {expanded && <div className="space-y-2 px-3 pb-3">{children}</div>}
+      {expanded && <div className="space-y-3 p-3 text-xs">{children}</div>}
     </section>
   );
 }
@@ -417,16 +425,6 @@ function weaponGroup(
   };
 }
 
-/** A weapon row's reach, dim under its DPS, as the HUD tooltip reads it (`rangeText.ts`). */
-function WeaponRangeLines({ range }: { range: WeaponRange }) {
-  const { t } = useTranslation();
-  return rangeLines(t, range.optimal, range.falloff).map((line) => (
-    <span key={line} className="basis-full text-right text-[0.6875rem] text-text-dim tabular-nums">
-      {line}
-    </span>
-  ));
-}
-
 /** The Offense section's rows — a weapon group, drone stack or squadron each — and their total. */
 function OffenseRows({
   stats,
@@ -442,7 +440,7 @@ function OffenseRows({
   const { t } = useTranslation();
   const actions = useFittingItemActions();
   return (
-    <ul className="space-y-1.5 text-xs">
+    <StatRows>
       {stats.offense.weapons.map((row) => {
         const group =
           actions !== null && fitting !== null && !row.isDrone
@@ -453,34 +451,34 @@ function OffenseRows({
           name: typeName(row.typeId),
         });
         const hasMenu = group !== null && group.modules.length > 0;
+        // Its charge and reach on one dim line, the reach as the HUD tooltip reads it (`rangeText.ts`).
+        const detail = joinDetail([
+          row.chargeTypeId === undefined ? undefined : typeName(row.chargeTypeId),
+          row.isDrone
+            ? t(
+                row.isFighter
+                  ? 'fittings.stats.fightersNoOverheat'
+                  : 'fittings.stats.dronesNoOverheat'
+              )
+            : undefined,
+          ...(row.range ? rangeLines(t, row.range.optimal, row.range.falloff) : []),
+        ]);
         const content = (
-          <>
-            <span className="min-w-0 basis-full">
-              <span>{name}</span>
-              {row.chargeTypeId !== undefined && (
-                <span className="block text-text-dim">{typeName(row.chargeTypeId)}</span>
-              )}
-              {row.isDrone && (
-                <span className="block text-text-dim">
-                  {t(
-                    row.isFighter
-                      ? 'fittings.stats.fightersNoOverheat'
-                      : 'fittings.stats.dronesNoOverheat'
-                  )}
-                </span>
-              )}
-            </span>
-            <DamageFigures
-              stats={stats}
-              figures={(s) =>
-                s.offense.weapons.find((other) => weaponRowKey(other) === weaponRowKey(row)) ?? row
-              }
-            />
-            {hasMenu && <RowMoreActions />}
-            {row.range && <WeaponRangeLines range={row.range} />}
-          </>
+          <StatRowContent
+            name={name}
+            detail={detail}
+            figure={
+              <DamageFigures
+                stats={stats}
+                figures={(s) =>
+                  s.offense.weapons.find((other) => weaponRowKey(other) === weaponRowKey(row)) ??
+                  row
+                }
+              />
+            }
+            action={hasMenu ? <RowMoreActions /> : undefined}
+          />
         );
-        const rowClass = 'flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5';
         return hasMenu ? (
           <FittingItemMenu
             key={weaponRowKey(row)}
@@ -493,19 +491,21 @@ function OffenseRows({
               />
             }
           >
-            <li className={rowClass}>{content}</li>
+            <li className={statRowClassName()}>{content}</li>
           </FittingItemMenu>
         ) : (
-          <li key={weaponRowKey(row)} className={rowClass}>
+          <li key={weaponRowKey(row)} className={statRowClassName()}>
             {content}
           </li>
         );
       })}
-      <li className="flex flex-wrap justify-between gap-x-2 border-t border-line pt-1 font-semibold">
-        <span>{t('fittings.stats.offenseTotal')}</span>
-        <DamageFigures stats={stats} figures={(s) => s.offense} sustained="line" />
+      <li className={statRowClassName(true)}>
+        <StatRowContent
+          name={t('fittings.stats.offenseTotal')}
+          figure={<DamageFigures stats={stats} figures={(s) => s.offense} sustained="line" />}
+        />
       </li>
-    </ul>
+    </StatRows>
   );
 }
 
@@ -589,13 +589,13 @@ export function FittingStatsSections({
 
   // The error is said once, above the sections; each section just says it has nothing.
   const placeholder = statsError ? (
-    <p className="text-xs text-text-dim">{t('fittings.stats.unavailable')}</p>
+    <StatNote>{t('fittings.stats.unavailable')}</StatNote>
   ) : (
-    <p className="text-xs text-text-dim">
+    <StatNote>
       {downloadPct === null
         ? t('fittings.stats.loadingIndeterminate')
         : t('fittings.stats.loading', { pct: downloadPct })}
-    </p>
+    </StatNote>
   );
 
   const pctOf = (used: number, total: number) => (total > 0 ? (used / total) * 100 : 0);
@@ -778,10 +778,10 @@ export function FittingStatsSections({
         section(
           'assumptions',
           undefined,
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <StatControls>
             {implants}
             <SkillOverridesControl />
-          </div>
+          </StatControls>
         )}
 
       {stats && whatToTrain && section('whatToTrain', undefined, whatToTrain)}
@@ -800,11 +800,11 @@ export function FittingStatsSections({
               moduleResults={moduleResults}
             />
           ) : stats.offense.chargelessWeaponCount > 0 ? (
-            <p className="text-xs text-text-dim">
+            <StatNote>
               {t('fittings.stats.offenseNoCharge', { count: stats.offense.chargelessWeaponCount })}
-            </p>
+            </StatNote>
           ) : (
-            <p className="text-xs text-text-dim">{t('fittings.stats.offenseNone')}</p>
+            <StatNote>{t('fittings.stats.offenseNone')}</StatNote>
           )
         ) : (
           placeholder
@@ -836,9 +836,9 @@ export function FittingStatsSections({
             <>
               <ResistTable rows={resistRows(stats)} />
               {adaptedHardeners.length > 0 && (
-                <p className="text-xs text-text-dim">
+                <StatNote>
                   {t('fittings.stats.armorIncludesRah', { profile: profileName })}
-                </p>
+                </StatNote>
               )}
               <TankFacts stats={stats} typeName={typeName} />
             </>
@@ -1113,7 +1113,7 @@ export function FittingStatsSections({
               ]}
             />
             {stats.unknownItemTypeIds.length > 0 && (
-              <p className="text-xs text-warning">
+              <StatNote tone="warning">
                 {/* Which items, one per line — on hover, focus or a tap. */}
                 <Tooltip
                   openOnTap
@@ -1126,7 +1126,7 @@ export function FittingStatsSections({
                     {t('fittings.stats.unknownItems', { count: stats.unknownItemTypeIds.length })}
                   </button>
                 </Tooltip>
-              </p>
+              </StatNote>
             )}
           </>
         ) : (
@@ -1140,10 +1140,12 @@ export function FittingStatsSections({
         price ? (nothingPriced ? '—' : iskLabel(price.totals.sell)) : undefined,
         price ? (
           <>
-            <div className="flex flex-wrap items-center gap-2">
-              <PriceHubSelect />
-              <Button onClick={() => setAppraisalOpen(true)}>{t('fittings.appraisal.open')}</Button>
-            </div>
+            <StatControls>
+              <PriceHubSelect size="sm" />
+              <Button size="sm" onClick={() => setAppraisalOpen(true)}>
+                {t('fittings.appraisal.open')}
+              </Button>
+            </StatControls>
             <FittingAppraisalModal
               open={appraisalOpen}
               onClose={() => setAppraisalOpen(false)}
@@ -1162,7 +1164,7 @@ export function FittingStatsSections({
               ]}
             />
             {price.totals.unpricedRows > 0 && (
-              <div className="text-xs text-warning">
+              <div className="text-[0.6875rem] text-warning">
                 <p>{t('fittings.stats.priceUnpriced', { count: price.totals.unpricedRows })}</p>
                 <ul className="mt-0.5 list-disc pl-4">
                   {namedPrice!.rows
@@ -1178,7 +1180,7 @@ export function FittingStatsSections({
             )}
           </>
         ) : (
-          <p className="text-xs text-text-dim">{t('fittings.stats.priceLoading')}</p>
+          <StatNote>{t('fittings.stats.priceLoading')}</StatNote>
         ),
         price && price.totals.unpricedRows > 0 ? t('fittings.stats.incomplete') : undefined
       )}

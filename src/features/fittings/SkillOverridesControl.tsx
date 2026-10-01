@@ -167,13 +167,15 @@ export function SkillOverridesControl() {
   const overridden = skills.base !== 'character' || customCount > 0;
 
   return (
-    <div className={`flex flex-wrap items-center gap-2 ${overridden ? 'text-warning' : ''}`}>
+    <div
+      className={`flex flex-wrap items-center gap-2 text-xs ${overridden ? 'text-warning' : ''}`}
+    >
       <span className={overridden ? '' : 'text-text-dim'}>{label}</span>
       <Select
         value={skills.base}
         onValueChange={(base) => setSkills({ ...skills, base: base as SkillBase })}
       >
-        <SelectTrigger aria-label={label} className="w-36">
+        <SelectTrigger aria-label={label} size="sm" className="w-36">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
