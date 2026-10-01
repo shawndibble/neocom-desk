@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import {
+  CheckboxSelect,
   EmptyState,
-  FilterChip,
   PageHeader,
   Select,
   SelectContent,
@@ -11,17 +11,19 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
-  StatChip,
   Toast,
 } from '@/components/ui';
 import type { PlanEntry } from '@/engine/types';
 import { CertificateRow } from '@/features/skills/certificates/CertificateRow';
 import {
+  ALL_GRADES,
   certificateRows,
   certificateTimes,
   filterRows,
-  gradeSummary,
+  gradeCounts,
+  GRADES,
   sortRows,
+  type CertificateGrade,
   type CertificateSort,
 } from '@/features/skills/certificates/certificatesModel';
 import { useCertificatesData } from '@/features/skills/certificates/useCertificatesData';
@@ -58,7 +60,7 @@ export function SkillCertificates() {
   const planEntries = useMemo(() => targetPlanEntries(target), [target]);
 
   const [group, setGroup] = useState<string | null>(null);
-  const [hideElite, setHideElite] = useState(false);
+  const [grades, setGrades] = useState<ReadonlySet<CertificateGrade>>(ALL_GRADES);
   const [sort, setSort] = useState<CertificateSort>('grade');
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [added, setAdded] = useState<Added | null>(null);
@@ -113,10 +115,19 @@ export function SkillCertificates() {
     [certificates]
   );
   const visible = useMemo(
-    () => sortRows(filterRows(rows, { group, hideElite }), sort, times),
-    [rows, group, hideElite, sort, times]
+    () => sortRows(filterRows(rows, { group, grades }), sort, times),
+    [rows, group, grades, sort, times]
   );
-  const summary = useMemo(() => gradeSummary(rows), [rows]);
+  const counts = useMemo(() => gradeCounts(rows), [rows]);
+
+  function toggleGrade(grade: CertificateGrade) {
+    setGrades((current) => {
+      const next = new Set(current);
+      if (next.has(grade)) next.delete(grade);
+      else next.add(grade);
+      return next;
+    });
+  }
 
   async function add(entries: readonly PlanEntry[], certificateName: string) {
     const result = await target.addEntries(entries, certificateName);
@@ -162,15 +173,6 @@ export function SkillCertificates() {
   } else {
     body = (
       <>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatChip label={t('skills.certificates.summary.elite')} value={summary.elite} />
-          <StatChip label={t('skills.certificates.summary.advanced')} value={summary.advanced} />
-          <StatChip label={t('skills.certificates.summary.basicOnly')} value={summary.basicOnly} />
-          <StatChip
-            label={t('skills.certificates.summary.notStarted')}
-            value={summary.notStarted}
-          />
-        </div>
         <div
           role="toolbar"
           aria-label={t('skills.certificates.filtersLabel')}
@@ -185,7 +187,7 @@ export function SkillCertificates() {
             <SelectTrigger
               size="sm"
               aria-label={t('skills.certificates.groupLabel')}
-              className="w-48"
+              className="w-40"
             >
               <SelectValue />
             </SelectTrigger>
@@ -198,10 +200,19 @@ export function SkillCertificates() {
               ))}
             </SelectContent>
           </Select>
-          <FilterChip
-            label={t('skills.certificates.hideElite')}
-            selected={hideElite}
-            onToggle={() => setHideElite(!hideElite)}
+          {/* Each grade carries its count, so the filter doubles as the summary. */}
+          <CheckboxSelect
+            label={t('skills.certificates.gradeFilter')}
+            className="w-44"
+            options={GRADES.map((grade) => ({
+              value: grade,
+              label: t('skills.certificates.gradeOption', {
+                grade: t(`skills.certificates.grade.${grade}`),
+                count: counts[grade],
+              }),
+            }))}
+            selected={grades}
+            onToggle={toggleGrade}
           />
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <TargetPlanPicker target={target} />
@@ -209,7 +220,7 @@ export function SkillCertificates() {
               <SelectTrigger
                 size="sm"
                 aria-label={t('skills.certificates.sortLabel')}
-                className="w-56"
+                className="w-36"
               >
                 <SelectValue />
               </SelectTrigger>

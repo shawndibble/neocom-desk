@@ -4,8 +4,9 @@ import type { Certificate } from '@/sde/types';
 import {
   certificateRows,
   certificateTimes,
+  ALL_GRADES,
   filterRows,
-  gradeSummary,
+  gradeCounts,
   sortRows,
   type CertificateRow,
 } from './certificatesModel';
@@ -67,27 +68,25 @@ function rows(levels: Record<number, number>): CertificateRow[] {
   return certificateRows([NAV, ARMOR, DRONES], { trainedLevel: trained(levels), planEntries: [] });
 }
 
-describe('gradeSummary', () => {
-  it('counts Elite, Advanced, Basic-only and not-started certificates', () => {
-    expect(gradeSummary(rows({ 100: 5, 200: 4 }))).toEqual({
-      elite: 1,
-      advanced: 1,
-      basicOnly: 0,
-      notStarted: 1,
-    });
-    expect(gradeSummary(rows({ 100: 1 }))).toMatchObject({ basicOnly: 1, notStarted: 2 });
+describe('gradeCounts', () => {
+  it('counts certificates at each of the six grades', () => {
+    expect(gradeCounts(rows({ 100: 5, 200: 4 }))).toEqual([1, 0, 0, 0, 1, 1]);
+    expect(gradeCounts(rows({ 100: 1 }))).toEqual([2, 1, 0, 0, 0, 0]);
   });
 });
 
 describe('filterRows', () => {
-  it('limits to one group and hides Elite on request', () => {
-    const all = rows({ 100: 5, 200: 1 });
-    expect(
-      filterRows(all, { group: 'Armor', hideElite: false }).map((r) => r.certificate.id)
-    ).toEqual([2]);
-    expect(filterRows(all, { group: null, hideElite: true }).map((r) => r.certificate.id)).toEqual([
-      2, 3,
-    ]);
+  const all = rows({ 100: 5, 200: 1 });
+  const ids = (filtered: CertificateRow[]) => filtered.map((r) => r.certificate.id);
+
+  it('limits to one group', () => {
+    expect(ids(filterRows(all, { group: 'Armor', grades: ALL_GRADES }))).toEqual([2]);
+  });
+
+  it('keeps only the chosen grades', () => {
+    expect(ids(filterRows(all, { group: null, grades: new Set([0, 1] as const) }))).toEqual([2, 3]);
+    expect(ids(filterRows(all, { group: null, grades: new Set([5] as const) }))).toEqual([1]);
+    expect(filterRows(all, { group: null, grades: new Set() })).toEqual([]);
   });
 });
 

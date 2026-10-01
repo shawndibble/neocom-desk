@@ -20,7 +20,7 @@ const CERTS: Certificate[] = [
   {
     id: 1,
     name: 'Armor Tanking',
-    description: '',
+    description: 'Competence in armor buffers.',
     groupId: 1210,
     groupName: 'Armor',
     levels: ladder(10),
@@ -28,7 +28,7 @@ const CERTS: Certificate[] = [
   {
     id: 2,
     name: 'Navigation',
-    description: '',
+    description: 'Competence in moving about.',
     groupId: 275,
     groupName: 'Navigation',
     levels: ladder(20),
@@ -94,7 +94,7 @@ function renderPage() {
 }
 
 describe('SkillCertificates', () => {
-  it('grades each certificate, lowest grade first, and summarizes the grades', async () => {
+  it('grades each certificate, lowest grade first', async () => {
     renderPage();
     expect(await screen.findByText('Standard (2 of 5)')).toBeInTheDocument();
     expect(screen.getByText('Elite: nothing left to train')).toBeInTheDocument();
@@ -102,11 +102,13 @@ describe('SkillCertificates', () => {
     expect(screen.getByText(/Improved needs 1 skill level/)).toBeInTheDocument();
   });
 
-  it('hides Elite certificates on request', async () => {
+  it('filters by grade, each option carrying its count', async () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByText('Standard (2 of 5)');
-    await user.click(screen.getByRole('button', { name: 'Hide Elite' }));
+    await user.click(screen.getByRole('button', { name: /^Grade/ }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Elite (1)' }));
+    await user.keyboard('{Escape}');
     expect(screen.queryByText('Armor Tanking')).not.toBeInTheDocument();
     expect(screen.getByText('Navigation', { selector: 'span' })).toBeInTheDocument();
   });
@@ -119,8 +121,17 @@ describe('SkillCertificates', () => {
     });
     await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Competence in moving about.')).toBeInTheDocument();
     expect(screen.getByText('Missing for Improved')).toBeInTheDocument();
     expect(screen.getByText('Navigation III')).toBeInTheDocument();
+  });
+
+  it('opens an Elite certificate for its description alone', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'About Armor Tanking' }));
+    expect(screen.getByText('Competence in armor buffers.')).toBeInTheDocument();
+    expect(screen.queryByText(/^Missing for/)).not.toBeInTheDocument();
   });
 
   it('adds the next grade to a Skill Plan and offers Undo', async () => {
