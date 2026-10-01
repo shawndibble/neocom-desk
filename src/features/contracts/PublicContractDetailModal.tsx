@@ -48,7 +48,7 @@ import {
   type PublicContractItemsOutcome,
 } from '@/features/bpcContracts/publicContractItems';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
-import { loadPlexPrice } from '@/features/contractSearch/plexPrice';
+import { loadPlexPrice } from '@/features/market/plexPrice';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';

@@ -69,7 +69,7 @@ import { loadPublicContractOffers } from '@/features/contractSearch/publicContra
 import { loadPublicCourierContracts } from '@/features/contractSearch/publicCourierContracts';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
 import { useOfferLocations } from '@/features/contractSearch/offerLocations';
-import { usePlexPrice } from '@/features/contractSearch/plexPrice';
+import { usePlexPrice } from '@/features/market/plexPrice';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import {
   useCourierEndpoints,
@@ -503,7 +503,8 @@ export function ContractSearchPanel({
   const offerLocations = useOfferLocations(rows);
   // Converts a contract's PLEX ask into ISK so it prices, sorts and filters
   // like any other — until it lands, a PLEX-asking row reads as unpriced.
-  const plexPrice = usePlexPrice();
+  const hasPlexAsks = useMemo(() => rows.some((row) => row.requestedPlex), [rows]);
+  const plexPrice = usePlexPrice(hasPlexAsks);
 
   const [itemsParams, setItemsParams] = useUrlParams(ITEMS_FILTER_PARAMS);
   const uiFilter = useMemo<UiFilter>(

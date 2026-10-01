@@ -40,7 +40,7 @@ vi.mock('@/features/contractSearch/publicContractOffers', () => ({
 
 // PLEX trades on its own global market; the panel reads one price for it.
 const usePlexPrice = vi.fn<() => number | null>(() => null);
-vi.mock('@/features/contractSearch/plexPrice', () => ({
+vi.mock('@/features/market/plexPrice', () => ({
   usePlexPrice: () => usePlexPrice(),
 }));
 
