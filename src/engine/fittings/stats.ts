@@ -22,6 +22,7 @@ import {
   type SensorType,
   type TankStats,
   type FighterStats,
+  CHARACTER_BASE_DRONE_CONTROL_RANGE,
   CHARACTER_BASE_LOCKED_TARGETS,
 } from './types';
 import {
@@ -220,7 +221,8 @@ export function extractLockedTargets(
 }
 
 /**
- * What limits the drones in space: how many the pilot controls, and each
+ * What limits the drones in space: how many the pilot controls, how far
+ * from the ship, and each
  * drone type's bandwidth (read even for a stack still in the bay, which draws
  * none yet). `items`/`itemResults` are index-parallel, as `calculate()` takes and returns them.
  */
@@ -228,7 +230,7 @@ export function extractDroneLimits(
   items: readonly CalculatedItem[],
   itemResults: readonly { attributes: AttributeMap }[],
   characterAttributes: AttributeMap
-): Pick<FittingStats, 'maxActiveDrones' | 'droneBandwidthByType'> {
+): Pick<FittingStats, 'maxActiveDrones' | 'droneBandwidthByType' | 'droneControlRange'> {
   const droneBandwidthByType: Record<number, number> = {};
   items.forEach((item, index) => {
     const result = itemResults[index];
@@ -241,6 +243,10 @@ export function extractDroneLimits(
   return {
     maxActiveDrones: readAttribute(characterAttributes, CHARACTER_DOGMA_ATTRIBUTE.maxActiveDrones),
     droneBandwidthByType,
+    // The engine reads no control range for a pilot without Drone Avionics.
+    droneControlRange:
+      readAttribute(characterAttributes, CHARACTER_DOGMA_ATTRIBUTE.droneControlRange) ||
+      CHARACTER_BASE_DRONE_CONTROL_RANGE,
   };
 }
 
@@ -280,6 +286,7 @@ export function extractFittingStats(
   | 'droneBandwidthUsed'
   | 'maxActiveDrones'
   | 'droneBandwidthByType'
+  | 'droneControlRange'
   | 'modules'
   | 'offense'
   | 'overheated'

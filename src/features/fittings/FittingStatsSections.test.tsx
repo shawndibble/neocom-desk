@@ -52,6 +52,7 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     droneBandwidthUsed: 0,
     droneBandwidthTotal: 0,
     maxActiveDrones: 0,
+    droneControlRange: 20000,
     droneBandwidthByType: {},
     hardpoints: { turrets: 0, launchers: 0 },
     droneCapacity: 0,
@@ -1211,5 +1212,15 @@ describe('FittingStatsSections price', () => {
     expect(body.getByText('Rare Thing ×3')).toBeInTheDocument();
     expect(body.queryByText('Priced Thing')).toBeNull();
     expect(body.getByRole('combobox', { name: 'Priced at' })).toBeInTheDocument();
+  });
+});
+
+describe('FittingStatsSections drones', () => {
+  it("shows the pilot's drone control range", () => {
+    renderSections(stats({ droneControlRange: 57_500 }));
+
+    const drones = within(sectionBody('Drones'));
+    expect(drones.getByText('Drone control range')).toBeInTheDocument();
+    expect(drones.getByText('57.5 km')).toBeInTheDocument();
   });
 });

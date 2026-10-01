@@ -719,6 +719,7 @@
         "sell": "Sell",
         "buy": "Buy",
         "maxActiveDrones": "Max active drones",
+        "droneControlRange": "Drone control range",
         "cargo": "Cargo hold",
         "fleetHangar": "Fleet hangar",
         "miningHold": "Mining hold",

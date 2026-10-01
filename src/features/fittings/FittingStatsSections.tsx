@@ -1016,6 +1016,12 @@ export function FittingStatsSections({
                   label: t('fittings.stats.fact.maxActiveDrones'),
                   value: figure((s) => String(s.maxActiveDrones)),
                 },
+                {
+                  label: t('fittings.stats.fact.droneControlRange'),
+                  value: figure((s) =>
+                    t('fittings.stats.unit.km', { value: kmValue(s.droneControlRange) })
+                  ),
+                },
               ]}
             />
           ) : (

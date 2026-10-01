@@ -866,11 +866,25 @@ describe('extractDroneLimits', () => {
       ],
       new Map([[352, { value: 5 }]])
     );
-    expect(limits).toEqual({ maxActiveDrones: 5, droneBandwidthByType: { 2454: 5, 2185: 10 } });
+    expect(limits).toEqual({
+      maxActiveDrones: 5,
+      droneBandwidthByType: { 2454: 5, 2185: 10 },
+      droneControlRange: 20_000,
+    });
   });
 
   it('allows no drones in space when the character has no Drones skill', () => {
     expect(extractDroneLimits([], [], new Map()).maxActiveDrones).toBe(0);
+  });
+
+  it("reads the pilot's drone control range off the character", () => {
+    expect(extractDroneLimits([], [], new Map([[458, { value: 60_000 }]])).droneControlRange).toBe(
+      60_000
+    );
+  });
+
+  it('falls back to the base 20 km control range the engine leaves out for an untrained pilot', () => {
+    expect(extractDroneLimits([], [], new Map()).droneControlRange).toBe(20_000);
   });
 });
 
