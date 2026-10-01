@@ -2061,7 +2061,7 @@
     "totalCost": "Total cost",
     "time": "Time",
     "costIndexWithSystem": "Cost index ({{system}})",
-    "costIndexTooltip": "<b>Can be slightly off: ESI rounds it to 4 decimals.</b> The build system's manufacturing activity level, which drives the job's cost-index fee. Read live from ESI for the build system named above — the trade hub sets material and product prices, never this.",
+    "costIndexTooltip": "<b>Can be slightly off:</b> ESI rounds it to 4 decimals. The build system's manufacturing activity level, which drives the job's cost-index fee. Read live from ESI for the build system named above — the trade hub sets material and product prices, never this.",
     "revenue": "Revenue",
     "salesTax": "Sales tax",
     "brokerFee": "Broker fee",
