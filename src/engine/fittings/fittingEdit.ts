@@ -622,6 +622,19 @@ export function reachableModuleStates(
   return states;
 }
 
+/**
+ * The state a module shows: the one the engine reached, or the one asked for
+ * until it has. A subsystem always shows online — it has no state to toggle,
+ * though the engine, finding no online effect on it, reports it offline.
+ */
+export function shownModuleState(
+  slot: FittingSlotKind,
+  reached: FittingItemState | undefined,
+  asked: FittingItemState
+): FittingItemState {
+  return slot === 'subsystem' ? 'online' : (reached ?? asked);
+}
+
 /** Puts `quantity` more of `typeId` in the bay. */
 export function addDrones(fitting: Fitting, typeId: number, quantity: number): Fitting {
   const current = droneGroups(fitting).find((group) => group.typeId === typeId);

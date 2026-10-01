@@ -30,7 +30,7 @@ import {
   type RingSlot,
   type SlotLayout,
 } from '@/engine/fittings/ringLayout';
-import { cargoGroups } from '@/engine/fittings/fittingEdit';
+import { cargoGroups, shownModuleState } from '@/engine/fittings/fittingEdit';
 import type { HardpointKind } from '@/engine/fittings/hardpoints';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
@@ -485,7 +485,7 @@ function SlotTile({
   const nameOf = (typeId: number) => typeName?.(typeId) ?? `#${typeId}`;
   const rackLabel = t(`fittings.list.rack.${slot.rack}`);
   const index = slot.index + 1;
-  const shownState = reachedState ?? module?.state;
+  const shownState = module && shownModuleState(slot.rack, reachedState, module.state);
   const state = shownState ? t(`fittings.list.moduleState.${shownState}`) : '';
   const label = module
     ? `${t('fittings.ring.slotFitted', { rack: rackLabel, index, state })}${cantUse ? `, ${t('fittings.list.cantUse')}` : ''}`
