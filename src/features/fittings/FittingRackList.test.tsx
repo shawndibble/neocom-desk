@@ -137,6 +137,7 @@ describe('FittingRackList', () => {
         moduleResults={[{ state: 'offline', maxState: 'offline', chargeGroupIds: [] }]}
       />
     );
+    expect(screen.getByText('#30')).toBeTruthy();
     expect(screen.queryByLabelText('State of #30')).toBeNull();
   });
 
