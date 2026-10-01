@@ -3234,6 +3234,8 @@
     "emptyTitle": "No mining ledger entries match this filter",
     "emptyHint": "Mine a moon and check back — ESI's personal mining ledger updates daily.",
     "managePayeesAction": "Payees",
+    "firstPayeeTitle": "Create a Payee first",
+    "firstPayeeHint": "Mining tax is owed to a Payee, such as the corporation that owns the moon. Use the Payees button above to add one, then your mining ledger entries show up here to assign.",
     "managePayeesTitle": "Manage Payees",
     "payeesEmpty": "No Payees yet.",
     "editPayee": "Edit {{name}}",

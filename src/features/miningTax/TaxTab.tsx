@@ -1106,6 +1106,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     characters[0]?.characterId ??
     null;
 
+  const needsFirstPayee =
+    data != null && allPayees.length === 0 && payeeManagerDefaultCharacterId !== null;
+
   const duplicateRows =
     data?.entries.filter((row) => (row.duplicateAssignmentIds?.length ?? 0) > 0) ?? [];
 
@@ -1125,7 +1128,10 @@ export function TaxTab({ tabBar }: TaxTabProps) {
         actions={
           <>
             {payeeManagerDefaultCharacterId !== null && (
-              <Button onClick={() => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)}>
+              <Button
+                variant={needsFirstPayee ? 'accent' : 'ghost'}
+                onClick={() => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)}
+              >
                 {t('miningTax.managePayeesAction')}
               </Button>
             )}
@@ -1288,259 +1294,279 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             </div>
           )}
 
-          {/* Balances strip (decision doc): who is owed what right now, and
-              the lump-sum "Settle up" on each card. Settled Payees hide
-              behind the toggle; unassigned ore gets its own card so a
-              balance is never silently short of it. */}
-          <div className="space-y-1.5">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('miningTax.balancesLabel')} ·{' '}
-              {owedBalances.length > 0
-                ? t('miningTax.balancesAcross', {
-                    amount: formatIsk(owedTotal),
-                    count: owedBalances.length,
-                  })
-                : t('miningTax.balancesNothing')}
-            </p>
-            {(visibleBalances.length > 0 ||
-              unassigned.entryCount > 0 ||
-              linkSuggestions.length > 0) && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {visibleBalances.map((balance) => (
-                  <Panel key={balance.payee.id}>
-                    <div className="flex items-center justify-between gap-2">
-                      {/* -my-3 cancels min-h-11's added height so the row (and card) doesn't grow — the 44px only exists as invisible hit area bleeding into Panel's own p-3 padding above and the tight gap below; md: reverts both so desktop is unchanged. */}
-                      <button
-                        type="button"
-                        onClick={() => filterToPayee(balance.payee.id)}
-                        aria-label={t('miningTax.filterToPayee', { payee: balance.payee.name })}
-                        aria-pressed={isSolePayeeFilter(balance.payee.id)}
-                        className="-my-3 flex min-h-11 min-w-0 items-center text-left text-sm font-semibold hover:text-accent focus-visible:outline-2 focus-visible:outline-accent aria-pressed:text-accent md:my-0 md:min-h-0"
-                      >
-                        <span className="min-w-0 truncate">{balance.payee.name}</span>
-                      </button>
-                      <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                        {t('miningTax.balanceEntries', { count: balance.members.length })}
-                      </span>
-                    </div>
-                    {characters.length > 1 && (
-                      <p className="truncate text-[0.6875rem] text-text-dim">
-                        {characters.find((c) => c.characterId === balance.payee.characterId)
-                          ?.characterName ?? ''}
-                      </p>
-                    )}
-                    <p className="mt-1 flex items-baseline gap-1.5">
-                      <span
-                        className={cx(
-                          'text-xl font-semibold tabular-nums',
-                          balance.owed > 0 ? 'text-isk-neg' : 'text-isk-pos'
-                        )}
-                      >
-                        {formatIsk(balance.owed, 0)}
-                      </span>
-                      <span className="text-[0.6875rem] text-text-dim">ISK</span>
-                    </p>
-                    <div className="mt-2">
-                      {balance.owed > 0 ? (
-                        <Button
-                          size="sm"
-                          className="w-full"
-                          onClick={() => settleUpBalance(balance.members)}
-                        >
-                          {t('miningTax.settleUpAction')}
-                        </Button>
-                      ) : (
-                        <Button size="sm" className="w-full" disabled>
-                          {t('miningTax.nothingToSettle')}
-                        </Button>
-                      )}
-                    </div>
-                  </Panel>
-                ))}
-                {unassigned.entryCount > 0 && (
-                  <Panel className="border-dashed">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold text-warning">
-                        {t('miningTax.unassignedCardTitle')}
-                      </span>
-                      <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                        {t('miningTax.balanceEntries', { count: unassigned.entryCount })}
-                      </span>
-                    </div>
-                    <p className="mt-1 flex items-baseline gap-1.5">
-                      <span className="text-xl font-semibold tabular-nums">
-                        {formatIsk(unassigned.estimatedValue, 0)}
-                      </span>
-                      <span className="text-[0.6875rem] text-text-dim">
-                        {t('miningTax.unassignedMined')}
-                      </span>
-                    </p>
-                    {allPayees.length === 0 && (
-                      <p className="mt-2 text-xs text-text-dim">
-                        {t('miningTax.unassignedNoPayeesPrompt')}
-                      </p>
-                    )}
-                    <div className="mt-2">
-                      <Button
-                        size="sm"
-                        className="w-full"
-                        onClick={
-                          allPayees.length === 0 && payeeManagerDefaultCharacterId !== null
-                            ? () => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)
-                            : assignNext
-                        }
-                      >
-                        {allPayees.length === 0 && payeeManagerDefaultCharacterId !== null
-                          ? t('miningTax.addPayee')
-                          : t('miningTax.assignNextAction')}
-                      </Button>
-                    </div>
-                  </Panel>
-                )}
-                {/* Paying backwards (issue #540): ISK that left the wallet and
-                    isn't accounted for. A card beside Unassigned, never an
-                    alert — it is an observation about balances, and only
-                    payments with a plausible target reach here at all. */}
-                {linkSuggestions.length > 0 && (
-                  <Panel className="border-dashed">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold">
-                        {t('miningTax.unlinkedPaymentsCardTitle')}
-                      </span>
-                      <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                        {t('miningTax.unlinkedPaymentsCount', { count: linkSuggestions.length })}
-                      </span>
-                    </div>
-                    <p className="mt-1 truncate text-[0.6875rem] text-text-dim">
-                      {t('miningTax.unlinkedPaymentsHint')}
-                    </p>
-                    <div className="mt-2">
-                      <Button size="sm" className="w-full" onClick={() => setLinkPaymentOpen(true)}>
-                        {t('miningTax.linkPaymentAction')}
-                      </Button>
-                    </div>
-                  </Panel>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <CharacterFilterControl
-              activeCharacterId={activeCharacterId}
-              value={characterFilter}
-              onChange={setCharacterFilter}
+          {/* Until a Payee exists there is nothing to assign an entry to, so
+              the balances, filters and table would all read as blank. Point
+              at the Payees button (outlined in accent while this shows)
+              instead. */}
+          {needsFirstPayee ? (
+            <EmptyState
+              title={t('miningTax.firstPayeeTitle')}
+              hint={t('miningTax.firstPayeeHint')}
+              className="py-16"
             />
-
-            {allPayees.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm">
-                    {resolvedPayeeFilter === 'all'
-                      ? t('miningTax.allPayees')
-                      : t('miningTax.payeesSelected', { count: resolvedPayeeFilter.size })}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  {allPayees.map((p) => (
-                    <DropdownMenuCheckboxItem
-                      key={p.id}
-                      checked={resolvedPayeeFilter === 'all' || resolvedPayeeFilter.has(p.id)}
-                      onSelect={(e) => e.preventDefault()}
-                      onCheckedChange={() => togglePayee(p.id)}
-                    >
-                      {characters.length > 1
-                        ? t('miningTax.payeeOptionWithCharacter', {
-                            payee: p.name,
-                            character:
-                              characters.find((c) => c.characterId === p.characterId)
-                                ?.characterName ?? '',
-                          })
-                        : p.name}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm">
-                  {t('miningTax.statusFilterLabel', { count: statusFilter.size })}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {ALL_STATUSES.map((status) => (
-                  <DropdownMenuCheckboxItem
-                    key={status}
-                    checked={statusFilter.has(status)}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={() => toggleStatus(status)}
-                  >
-                    {statusLabel(t, status)} ({statusCounts.get(status) ?? 0})
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/*
-              Settled Payees are hidden from the Balances strip by default —
-              a balance of zero is not a thing to act on. The control belongs
-              with the other three filters rather than on the strip's own
-              label, and is a `FilterChip` rather than a checkbox: a pressed
-              view toggle, drawn the way every other one in the app is. At
-              `sm` it shares the small `Button` dropdown triggers' height and
-              uppercase 11px type, so the row still reads as one control row —
-              and it stays off the accent fill, which here belongs to the
-              selection toolbar's Settle Up just below. Only offered when
-              hiding is actually doing something: with nothing settled the
-              toggle would change nothing on screen.
-            */}
-            <span className="ml-auto flex items-center gap-2">
-              {settledCount > 0 && (
-                <FilterChip
-                  size="sm"
-                  label={t('miningTax.settledPayeesFilter')}
-                  selected={showSettled}
-                  onToggle={() => setShowSettled(!showSettled)}
-                />
-              )}
-              {visibleRows.length > 0 && (
-                <TableActionsMenu name={t('miningTax.title')} tableExport={taxExport} />
-              )}
-            </span>
-          </div>
-
-          <SelectionToolbar
-            selectedCount={selectedRows.length}
-            canSelectAll={selectableVisible.some((dr) => !selection.has(dr.key))}
-            onSelectAll={() => setSelection(new Set(selectableVisible.map((dr) => dr.key)))}
-            onClear={() => setSelection(new Set())}
-            settleUpCount={selectedSettleUpRows.length}
-            onSettleUp={() => setSettleUpRows(selectedSettleUpRows)}
-            combine={combine}
-            onCombine={handleCombineSelected}
-            dismissCount={dismissTargets.length}
-            onDismiss={() => setBulkDismissOpen(true)}
-          />
-
-          {visibleRows.length === 0 ? (
-            <EmptyState title={t('miningTax.emptyTitle')} hint={t('miningTax.emptyHint')} />
           ) : (
-            <Panel padded={false}>
-              <div className="overflow-x-auto">
-                <DataTable
-                  {...taxExport.tableProps}
-                  columns={columns}
-                  rows={visibleRows}
-                  rowKey={(dr) => dr.key}
-                  label={t('miningTax.title')}
-                  {...taxSort}
-                  mobileSort
-                  onRowClick={(dr) => setDetailTarget(dr)}
-                />
+            <>
+              {/* Balances strip (decision doc): who is owed what right now, and
+                the lump-sum "Settle up" on each card. Settled Payees hide
+                behind the toggle; unassigned ore gets its own card so a
+                balance is never silently short of it. */}
+              <div className="space-y-1.5">
+                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('miningTax.balancesLabel')} ·{' '}
+                  {owedBalances.length > 0
+                    ? t('miningTax.balancesAcross', {
+                        amount: formatIsk(owedTotal),
+                        count: owedBalances.length,
+                      })
+                    : t('miningTax.balancesNothing')}
+                </p>
+                {(visibleBalances.length > 0 ||
+                  unassigned.entryCount > 0 ||
+                  linkSuggestions.length > 0) && (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {visibleBalances.map((balance) => (
+                      <Panel key={balance.payee.id}>
+                        <div className="flex items-center justify-between gap-2">
+                          {/* -my-3 cancels min-h-11's added height so the row (and card) doesn't grow — the 44px only exists as invisible hit area bleeding into Panel's own p-3 padding above and the tight gap below; md: reverts both so desktop is unchanged. */}
+                          <button
+                            type="button"
+                            onClick={() => filterToPayee(balance.payee.id)}
+                            aria-label={t('miningTax.filterToPayee', { payee: balance.payee.name })}
+                            aria-pressed={isSolePayeeFilter(balance.payee.id)}
+                            className="-my-3 flex min-h-11 min-w-0 items-center text-left text-sm font-semibold hover:text-accent focus-visible:outline-2 focus-visible:outline-accent aria-pressed:text-accent md:my-0 md:min-h-0"
+                          >
+                            <span className="min-w-0 truncate">{balance.payee.name}</span>
+                          </button>
+                          <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                            {t('miningTax.balanceEntries', { count: balance.members.length })}
+                          </span>
+                        </div>
+                        {characters.length > 1 && (
+                          <p className="truncate text-[0.6875rem] text-text-dim">
+                            {characters.find((c) => c.characterId === balance.payee.characterId)
+                              ?.characterName ?? ''}
+                          </p>
+                        )}
+                        <p className="mt-1 flex items-baseline gap-1.5">
+                          <span
+                            className={cx(
+                              'text-xl font-semibold tabular-nums',
+                              balance.owed > 0 ? 'text-isk-neg' : 'text-isk-pos'
+                            )}
+                          >
+                            {formatIsk(balance.owed, 0)}
+                          </span>
+                          <span className="text-[0.6875rem] text-text-dim">ISK</span>
+                        </p>
+                        <div className="mt-2">
+                          {balance.owed > 0 ? (
+                            <Button
+                              size="sm"
+                              className="w-full"
+                              onClick={() => settleUpBalance(balance.members)}
+                            >
+                              {t('miningTax.settleUpAction')}
+                            </Button>
+                          ) : (
+                            <Button size="sm" className="w-full" disabled>
+                              {t('miningTax.nothingToSettle')}
+                            </Button>
+                          )}
+                        </div>
+                      </Panel>
+                    ))}
+                    {unassigned.entryCount > 0 && (
+                      <Panel className="border-dashed">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold text-warning">
+                            {t('miningTax.unassignedCardTitle')}
+                          </span>
+                          <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                            {t('miningTax.balanceEntries', { count: unassigned.entryCount })}
+                          </span>
+                        </div>
+                        <p className="mt-1 flex items-baseline gap-1.5">
+                          <span className="text-xl font-semibold tabular-nums">
+                            {formatIsk(unassigned.estimatedValue, 0)}
+                          </span>
+                          <span className="text-[0.6875rem] text-text-dim">
+                            {t('miningTax.unassignedMined')}
+                          </span>
+                        </p>
+                        {allPayees.length === 0 && (
+                          <p className="mt-2 text-xs text-text-dim">
+                            {t('miningTax.unassignedNoPayeesPrompt')}
+                          </p>
+                        )}
+                        <div className="mt-2">
+                          <Button
+                            size="sm"
+                            className="w-full"
+                            onClick={
+                              allPayees.length === 0 && payeeManagerDefaultCharacterId !== null
+                                ? () => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)
+                                : assignNext
+                            }
+                          >
+                            {allPayees.length === 0 && payeeManagerDefaultCharacterId !== null
+                              ? t('miningTax.addPayee')
+                              : t('miningTax.assignNextAction')}
+                          </Button>
+                        </div>
+                      </Panel>
+                    )}
+                    {/* Paying backwards (issue #540): ISK that left the wallet and
+                      isn't accounted for. A card beside Unassigned, never an
+                      alert — it is an observation about balances, and only
+                      payments with a plausible target reach here at all. */}
+                    {linkSuggestions.length > 0 && (
+                      <Panel className="border-dashed">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold">
+                            {t('miningTax.unlinkedPaymentsCardTitle')}
+                          </span>
+                          <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                            {t('miningTax.unlinkedPaymentsCount', {
+                              count: linkSuggestions.length,
+                            })}
+                          </span>
+                        </div>
+                        <p className="mt-1 truncate text-[0.6875rem] text-text-dim">
+                          {t('miningTax.unlinkedPaymentsHint')}
+                        </p>
+                        <div className="mt-2">
+                          <Button
+                            size="sm"
+                            className="w-full"
+                            onClick={() => setLinkPaymentOpen(true)}
+                          >
+                            {t('miningTax.linkPaymentAction')}
+                          </Button>
+                        </div>
+                      </Panel>
+                    )}
+                  </div>
+                )}
               </div>
-            </Panel>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <CharacterFilterControl
+                  activeCharacterId={activeCharacterId}
+                  value={characterFilter}
+                  onChange={setCharacterFilter}
+                />
+
+                {allPayees.length > 0 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm">
+                        {resolvedPayeeFilter === 'all'
+                          ? t('miningTax.allPayees')
+                          : t('miningTax.payeesSelected', { count: resolvedPayeeFilter.size })}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      {allPayees.map((p) => (
+                        <DropdownMenuCheckboxItem
+                          key={p.id}
+                          checked={resolvedPayeeFilter === 'all' || resolvedPayeeFilter.has(p.id)}
+                          onSelect={(e) => e.preventDefault()}
+                          onCheckedChange={() => togglePayee(p.id)}
+                        >
+                          {characters.length > 1
+                            ? t('miningTax.payeeOptionWithCharacter', {
+                                payee: p.name,
+                                character:
+                                  characters.find((c) => c.characterId === p.characterId)
+                                    ?.characterName ?? '',
+                              })
+                            : p.name}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm">
+                      {t('miningTax.statusFilterLabel', { count: statusFilter.size })}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {ALL_STATUSES.map((status) => (
+                      <DropdownMenuCheckboxItem
+                        key={status}
+                        checked={statusFilter.has(status)}
+                        onSelect={(e) => e.preventDefault()}
+                        onCheckedChange={() => toggleStatus(status)}
+                      >
+                        {statusLabel(t, status)} ({statusCounts.get(status) ?? 0})
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/*
+                Settled Payees are hidden from the Balances strip by default —
+                a balance of zero is not a thing to act on. The control belongs
+                with the other three filters rather than on the strip's own
+                label, and is a `FilterChip` rather than a checkbox: a pressed
+                view toggle, drawn the way every other one in the app is. At
+                `sm` it shares the small `Button` dropdown triggers' height and
+                uppercase 11px type, so the row still reads as one control row —
+                and it stays off the accent fill, which here belongs to the
+                selection toolbar's Settle Up just below. Only offered when
+                hiding is actually doing something: with nothing settled the
+                toggle would change nothing on screen.
+              */}
+                <span className="ml-auto flex items-center gap-2">
+                  {settledCount > 0 && (
+                    <FilterChip
+                      size="sm"
+                      label={t('miningTax.settledPayeesFilter')}
+                      selected={showSettled}
+                      onToggle={() => setShowSettled(!showSettled)}
+                    />
+                  )}
+                  {visibleRows.length > 0 && (
+                    <TableActionsMenu name={t('miningTax.title')} tableExport={taxExport} />
+                  )}
+                </span>
+              </div>
+
+              <SelectionToolbar
+                selectedCount={selectedRows.length}
+                canSelectAll={selectableVisible.some((dr) => !selection.has(dr.key))}
+                onSelectAll={() => setSelection(new Set(selectableVisible.map((dr) => dr.key)))}
+                onClear={() => setSelection(new Set())}
+                settleUpCount={selectedSettleUpRows.length}
+                onSettleUp={() => setSettleUpRows(selectedSettleUpRows)}
+                combine={combine}
+                onCombine={handleCombineSelected}
+                dismissCount={dismissTargets.length}
+                onDismiss={() => setBulkDismissOpen(true)}
+              />
+
+              {visibleRows.length === 0 ? (
+                <EmptyState title={t('miningTax.emptyTitle')} hint={t('miningTax.emptyHint')} />
+              ) : (
+                <Panel padded={false}>
+                  <div className="overflow-x-auto">
+                    <DataTable
+                      {...taxExport.tableProps}
+                      columns={columns}
+                      rows={visibleRows}
+                      rowKey={(dr) => dr.key}
+                      label={t('miningTax.title')}
+                      {...taxSort}
+                      mobileSort
+                      onRowClick={(dr) => setDetailTarget(dr)}
+                    />
+                  </div>
+                </Panel>
+              )}
+            </>
           )}
         </>
       )}
