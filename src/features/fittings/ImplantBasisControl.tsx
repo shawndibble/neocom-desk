@@ -22,6 +22,9 @@ import { Expanded } from '@/components/ui/icons';
 import type { ImplantBasis } from '@/engine/fittings/implantBasis';
 import type { FittingImplantSet } from '@/engine/fittings/types';
 import { ImplantSetPicker } from './ImplantSetPicker';
+import { StatField } from './StatFacts';
+import { STAT_FIELD_WIDTH } from './statKit';
+import { fieldBaseClassName, fieldSizeClassName } from '@/components/ui/controlStyles';
 
 interface ImplantBasisControlProps {
   basis: ImplantBasis;
@@ -54,15 +57,20 @@ export function ImplantBasisControl({
     { id: 'fitting', label: t('fittings.implants.basis.fitting') },
   ];
 
+  const label = t('fittings.implants.label');
   return (
-    <>
+    <StatField label={label}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button size="sm" className="whitespace-nowrap">
-            <span className="text-text-dim">{t('fittings.implants.chipLabel')}</span>
-            {t(`fittings.implants.basis.${effective}`)}
-            <Expanded aria-hidden />
-          </Button>
+          {/* Drawn as the select beside it: it picks one of two, then opens the set. */}
+          <button
+            type="button"
+            aria-label={`${label}: ${t(`fittings.implants.basis.${effective}`)}`}
+            className={`flex items-center justify-between gap-1 ${fieldBaseClassName} ${fieldSizeClassName.sm} ${STAT_FIELD_WIDTH}`}
+          >
+            <span className="truncate">{t(`fittings.implants.basis.${effective}`)}</span>
+            <Expanded aria-hidden className="shrink-0 text-text-dim" />
+          </button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-3">
           <div className="space-y-3 text-sm">
@@ -100,6 +108,6 @@ export function ImplantBasisControl({
         implantSet={implantSet}
         onChange={onImplantSetChange}
       />
-    </>
+    </StatField>
   );
 }

@@ -126,9 +126,45 @@ export function StatRows({ children }: { children: ReactNode }) {
   return <ul className="flex flex-col text-xs">{children}</ul>;
 }
 
-/** The pickers and buttons at the top of a section, each a dim label beside a small control. */
-export function StatControls({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">{children}</div>;
+/**
+ * The pickers at the top of a section, as a two-column grid of `StatField`s:
+ * labels in one column, controls lined up in the other.
+ */
+export function StatFields({ children }: { children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[max-content_minmax(0,1fr)] items-center gap-x-3 gap-y-2 text-xs">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * One labelled control in a `StatFields` grid: the label in the left column,
+ * the control (`STAT_FIELD_WIDTH` wide) and its own action in the right, so
+ * stacked controls line up however long their labels or values. `note` reads
+ * dim beneath the control; a `warning` label marks a setting moved off its
+ * default.
+ */
+export function StatField({
+  label,
+  tone,
+  note,
+  children,
+}: {
+  label: ReactNode;
+  tone?: 'warning';
+  note?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      <span className={tone === 'warning' ? 'text-warning' : 'text-text-dim'}>{label}</span>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>
+      {note !== undefined && note !== null && note !== false && (
+        <p className="col-start-2 -mt-1 text-[0.6875rem] text-text-dim">{note}</p>
+      )}
+    </>
+  );
 }
 
 export interface Fact {

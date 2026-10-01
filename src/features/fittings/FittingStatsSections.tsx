@@ -27,7 +27,8 @@ import { AppliedDpsPanel } from './AppliedDpsPanel';
 import {
   Facts,
   HeatFigure,
-  StatControls,
+  StatField,
+  StatFields,
   StatNote,
   StatRowContent,
   StatRows,
@@ -779,10 +780,10 @@ export function FittingStatsSections({
         section(
           'assumptions',
           undefined,
-          <StatControls>
+          <StatFields>
             {implants}
             <SkillOverridesControl />
-          </StatControls>
+          </StatFields>
         )}
 
       {stats && whatToTrain && section('whatToTrain', undefined, whatToTrain)}
@@ -832,7 +833,9 @@ export function FittingStatsSections({
         'defense',
         figure((s) => t('fittings.stats.defenseEhp', { value: s.ehp.toFixed(0) })),
         <>
-          <DamageProfilePicker damageProfiles={damageProfiles} />
+          <StatFields>
+            <DamageProfilePicker damageProfiles={damageProfiles} field />
+          </StatFields>
           {stats ? (
             <>
               <ResistTable rows={resistRows(stats)} />
@@ -1141,12 +1144,14 @@ export function FittingStatsSections({
         price ? (nothingPriced ? '—' : iskLabel(price.totals.sell)) : undefined,
         price ? (
           <>
-            <StatControls>
-              <PriceHubSelect size="sm" />
-              <Button size="sm" onClick={() => setAppraisalOpen(true)}>
-                {t('fittings.appraisal.open')}
-              </Button>
-            </StatControls>
+            <StatFields>
+              <StatField label={t('fittings.stats.priceHub')}>
+                <PriceHubSelect size="sm" bare />
+                <Button size="sm" onClick={() => setAppraisalOpen(true)}>
+                  {t('fittings.appraisal.open')}
+                </Button>
+              </StatField>
+            </StatFields>
             <FittingAppraisalModal
               open={appraisalOpen}
               onClose={() => setAppraisalOpen(false)}

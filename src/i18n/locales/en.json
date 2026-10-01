@@ -685,6 +685,7 @@
       "priceBuy": "Jita buy: {{value}} ISK",
       "priceSell": "Jita sell: {{value}} ISK",
       "priceHub": "Priced at",
+      "manage": "Manage",
       "priceUnpriced_one": "{{count}} item has no price at this hub",
       "priceUnpriced_other": "{{count}} items have no price at this hub",
       "priceLoading": "Pricing…",
@@ -1070,7 +1071,7 @@
         "fitting": "Fitting's"
       },
       "editSet": "Edit Fitting's set",
-      "chipLabel": "Implants:",
+      "label": "Implants",
       "popoverTitle": "Implants in these stats",
       "cloneExplain": "The implants in {{name}}'s current clone.",
       "cloneExplainNoName": "The implants in your current clone.",

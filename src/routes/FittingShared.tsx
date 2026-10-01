@@ -15,6 +15,7 @@ import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
 import { useFittingHardpoints } from '@/features/fittings/useFittingHardpoints';
 import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
+import { StatFields } from '@/features/fittings/StatFacts';
 import { useFittingEvaluation } from '@/features/fittings/useFittingEvaluation';
 import { fittingToEft } from '@/engine/fittings/eftExport';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
@@ -201,7 +202,11 @@ export function FittingShared() {
             hardpointsUsed={hardpointsUsed}
           />
           <FittingStatsSections
-            conditions={<AbyssalWeatherPicker />}
+            conditions={
+              <StatFields>
+                <AbyssalWeatherPicker field />
+              </StatFields>
+            }
             stats={stats}
             statsProgress={statsProgress}
             statsError={statsError}
