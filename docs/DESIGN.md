@@ -572,6 +572,16 @@ icon, keeps a text chip). Scope decisions:
   not shadows. Shadows only for popovers/menus (`shadow-lg shadow-black/50`).
 - One `primary` button per view; everything else `ghost`.
 - Accent = interactive/selected. Don't use accent for static decoration.
+- **A box means "you can click this."** A small inline element drawn with a
+  border (the edge of a `Button`, `Select`, `TextInput`, `FilterChip`) is how
+  a reader recognises a control, so never draw one around static content: a
+  status word ("incomplete"), a count, a label, a headline figure. Emphasise
+  static content with type and colour instead: a status tone on the text,
+  `font-semibold`, or the uppercase micro-heading treatment (§2). This rule
+  covers inline elements sized like a control. A panel's, table's or
+  section's hairlines divide regions, and nobody reads them as buttons.
+  `StatChip` predates the rule: it is static but drawn with a chip box.
+  Don't copy it for new static content.
 - **In-sentence links underline at rest.** An accent link inside a sentence or
   a definition list uses `inlineLinkClassName` (`controlStyles.ts`:
   `text-accent font-medium underline`) — colour must not be the only cue
