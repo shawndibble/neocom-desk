@@ -1,5 +1,6 @@
 import type {
   BlueprintMap,
+  CertifiedPlan,
   FittingSlotMap,
   MarketWideTreeMap,
   MasteryMap,
@@ -32,6 +33,8 @@ function cached<T>(file: string): () => Promise<T> {
 export const loadSkills = cached<SkillType[]>('skills.json');
 /** See `MasteryMap`. */
 export const loadMasteries = cached<MasteryMap>('masteries.json');
+/** See `CertifiedPlan`. Small (~110 KB), so precached with the shell rather than lazy. */
+export const loadCertifiedPlans = cached<CertifiedPlan[]>('certifiedPlans.json');
 /** See `SkillAttributeModifierMap`. */
 export const loadSkillAttributeModifiers = cached<SkillAttributeModifierMap>(
   'skillAttributeModifiers.json'

@@ -1,9 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type SkillPlanRecord } from '@/db';
-import { Button, Panel, Spinner } from '@/components/ui';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  IconButton,
+  Panel,
+  Spinner,
+} from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { markPlanDeleted, scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
 import {
@@ -12,6 +22,9 @@ import {
 } from '@/lib/useViewportBoundedHeight';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { newPlan } from './newPlan';
+import { certifiedPlanRecord } from './certifiedPlan';
+import { CertifiedPlanDialog } from './CertifiedPlanDialog';
+import type { CertifiedPlan } from '@/sde/types';
 import { PlanList, type PlanRowStats } from './PlanList';
 import { schedulePlan, type PlanScheduleInputs } from './planSchedule';
 import { readsLoadedImplants } from './whatIfImplants';
@@ -130,6 +143,29 @@ export function PlanListPane({
     navigate(`/skills/plans/${plan.id}`, { state: { focusName: true } });
   }
 
+  const [certifiedOpen, setCertifiedOpen] = useState(false);
+  // Set by the menu item; the dialog opens once the menu has handed focus back
+  // to its trigger, so the native <dialog> restores focus there on close
+  // rather than to a menu item that has already unmounted.
+  const openCertifiedAfterMenu = useRef(false);
+
+  // Named after the certified plan already, so no rename-on-arrival flag.
+  async function handleCreateFromCertified(
+    certified: CertifiedPlan,
+    skillNameFor: (skillTypeID: number) => string
+  ) {
+    const plan = certifiedPlanRecord(
+      activeCharacterId,
+      certified,
+      skillNameFor,
+      remapInfo?.available ?? 0
+    );
+    await db.skillPlans.add(plan);
+    syncAfterEdit();
+    setCertifiedOpen(false);
+    navigate(`/skills/plans/${plan.id}`);
+  }
+
   const characters = useLiveQuery(async () => db.characters.toArray(), []);
   const otherCharacters = (characters ?? []).filter((c) => c.characterId !== activeCharacterId);
 
@@ -183,11 +219,48 @@ export function PlanListPane({
       className={className}
       title={t('plans.title')}
       actions={
-        <Button variant="primary" size="sm" onClick={() => void handleCreate()}>
-          {t('plans.create')}
-        </Button>
+        // A split button: "New plan" stays one click for a blank plan, and the
+        // caret holds the other starting points without costing the sidebar's
+        // narrow header the width a second labelled button would.
+        <div className="flex gap-1">
+          <Button variant="primary" size="sm" onClick={() => void handleCreate()}>
+            {t('plans.create')}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton
+                size="sm"
+                icon={<Icon.Expanded size={Icon.ICON_SIZE.sm} />}
+                label={t('plans.newPlanOptions')}
+              />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              onCloseAutoFocus={() => {
+                if (openCertifiedAfterMenu.current) {
+                  openCertifiedAfterMenu.current = false;
+                  setCertifiedOpen(true);
+                }
+              }}
+            >
+              <DropdownMenuItem
+                onSelect={() => {
+                  openCertifiedAfterMenu.current = true;
+                }}
+              >
+                {t('plans.fromCertifiedItem')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       }
     >
+      {certifiedOpen && (
+        <CertifiedPlanDialog
+          onPick={(plan, skillNameFor) => void handleCreateFromCertified(plan, skillNameFor)}
+          onClose={() => setCertifiedOpen(false)}
+        />
+      )}
       {showImplantsNote && (
         <div className="border-b border-line px-3 empty:hidden">
           <ImplantsAssumedNote

@@ -42,6 +42,30 @@ export interface SkillType {
 export type MasteryMap = Record<string, SkillPrereq[][]>;
 
 /**
+ * One row of public/data/certifiedPlans.json (issue #2392): a CCP Certified
+ * Skill Plan, one of the career plans the client lists under Skill Plans ›
+ * Certified Plans. Baked from CCP's own `skillPlans.jsonl` by
+ * `scripts/build-sde.mjs` (`scripts/lib/certifiedPlans.mjs`).
+ */
+export interface CertifiedPlan {
+  /** CCP's plan id. */
+  id: number;
+  /** English name, as the client shows it ("Manufacturer"). */
+  name: string;
+  /** Plain text: the client markup and its links are stripped at bake time. */
+  description: string;
+  /** 4 Explorer, 5 Industrialist, 6 Enforcer, 7 Soldier of Fortune. */
+  careerPathId: number;
+  /** Absent on a plan open to every faction (the Industrialist plans). */
+  factionId?: number;
+  factionName?: string;
+  /** One row per skill level, in CCP's training order — prerequisites first. */
+  entries: SkillPrereq[];
+  /** CCP's skill-level milestones; each one matches one of `entries`. */
+  milestones: SkillPrereq[];
+}
+
+/**
  * One row of public/data/skillAttributeModifiers.json: a skill that grants a
  * PostPercent (flat "+N% per level") bonus to some item attribute.
  * `gatingSkillTypeID` is the skill an item must itself require for the bonus

@@ -148,6 +148,13 @@ here — they go one per file in `docs/context/decisions/`.
   the moment it started (end of its day, or six hours, whichever is later) can
   leave a late-night op sitting in yesterday's cell until the small hours. Drawn at one of two densities — a month, or the
   fortnight around today.
+- **Certified Plan**: One of CCP's own career skill plans (Explorer, Industrialist,
+  Enforcer, Soldier of Fortune), the ones the game lists under Skill Plans ›
+  Certified Plans (issue #2392). Static data, baked from CCP's JSONL export
+  rather than Fuzzwork's CSVs, which lack it. Never edited in the app: picking
+  one creates an ordinary **Skill Plan** holding its levels in CCP's order and
+  its skill-level milestones as **Plan Milestones**. The new plan has no link
+  back, so a later CCP change to the Certified Plan never reaches it.
 - **Character**: One EVE Online character. The unit of login (EVE SSO) and of API data. App supports many Characters side by side from day one.
 - **Character Board Item**: One clock on the `/calendar` board, from any of eight
   sources — a calendar event, a skill-queue completion, an industry job

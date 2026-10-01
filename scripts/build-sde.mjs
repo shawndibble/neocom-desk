@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Build-time SDE pipeline: downloads Fuzzwork SDE CSVs, emits slim JSON for the app.
 // Usage: node scripts/build-sde.mjs
-// No deps; Node 24 built-ins only.
+// Node 24 built-ins, plus fflate (already an app dependency) to read the one
+// table only CCP's own JSONL export carries — see lib/ccpStaticData.mjs.
 
 import { mkdir, readFile, writeFile, stat } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
@@ -11,6 +12,8 @@ import { buildShipTree } from './lib/shipTree.mjs';
 import { npcCorpFactions, stationOwnerFields } from './lib/stationOwners.mjs';
 import { npcCorporations, probeLpStores } from './lib/lpCorporations.mjs';
 import { marketTypeEntry } from './lib/marketTypeVolumes.mjs';
+import { bakeCertifiedPlans, factionNames, parseJsonl } from './lib/certifiedPlans.mjs';
+import { readCcpStaticDataFiles } from './lib/ccpStaticData.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -151,6 +154,11 @@ const MASTERY_TIER_COUNT = 5;
 // (wrong column, wrong category filter) lands at 0, not slightly off.
 const MASTERY_SHIPS_MIN = 350;
 const MASTERY_SHIPS_MAX = 700;
+// CCP Certified Skill Plans with a career path, as counted against CCP's
+// export on 2026-09-30: 39. A broken bake (a renamed field, a dropped filter)
+// lands at 0, not slightly off (issue #2392).
+const CERTIFIED_PLANS_MIN = 25;
+const CERTIFIED_PLANS_MAX = 80;
 // Ship Tree hulls/factions/classes, as counted against the dump on
 // 2026-09-26: 360 hulls, 17 factions, 52 classes. Same idea as
 // MASTERY_SHIPS_MIN/MAX above — a broken join (wrong category filter, wrong
@@ -2045,6 +2053,21 @@ async function main() {
     dgmAttributeTypes: raw['dgmAttributeTypes.csv'],
   });
 
+  // --- certifiedPlans.json: CCP's Certified Skill Plans (issue #2392). Only
+  // CCP's own JSONL export carries skillPlans, so this is the one table read
+  // from there; faction names come from the same export so the two agree. ---
+  const ccpStaticData = await readCcpStaticDataFiles(
+    CACHE_DIR,
+    ['skillPlans.jsonl', 'factions.jsonl'],
+    ESI_USER_AGENT
+  );
+  const skillPlanRecords = parseJsonl(ccpStaticData['skillPlans.jsonl']);
+  const certifiedPlans = bakeCertifiedPlans(
+    skillPlanRecords,
+    new Set(skills.map((s) => s.typeID)),
+    factionNames(parseJsonl(ccpStaticData['factions.jsonl']))
+  );
+
   // --- write outputs (compact) ---
   await mkdir(OUT_DIR, { recursive: true });
   await mkdir(MARKET_OUT_DIR, { recursive: true });
@@ -2062,6 +2085,7 @@ async function main() {
   const outputs = [
     ['skills.json', skills],
     ['masteries.json', masteries],
+    ['certifiedPlans.json', certifiedPlans],
     ['skillAttributeModifiers.json', skillAttributeModifiers],
     ['blueprints.json', blueprints],
     ['marketWideTrees.json', marketWideTrees],
@@ -2310,6 +2334,35 @@ async function main() {
     }
     console.log(`  mastery skill refs pointing outside skills.json: ${masteryBadSkillId}`);
     if (masteryBadSkillId) process.exitCode = 1;
+  }
+  {
+    const planCount = certifiedPlans.length;
+    console.log(`  certified skill plans: ${planCount}`);
+    if (planCount < CERTIFIED_PLANS_MIN || planCount > CERTIFIED_PLANS_MAX) {
+      console.error(
+        `  FAIL: ${planCount} certified skill plans, outside the plausible ${CERTIFIED_PLANS_MIN}-${CERTIFIED_PLANS_MAX} range`
+      );
+      process.exitCode = 1;
+    }
+    // Entries naming a skill skills.json lacks are dropped silently by the
+    // bake; a broad CCP/Fuzzwork build mismatch would hollow plans out
+    // without emptying any, so count the drops too.
+    const rawEntries = skillPlanRecords
+      .filter((r) => Number.isInteger(r.careerPathID))
+      .reduce((n, r) => n + (r.skillRequirements?.length ?? 0), 0);
+    const bakedEntries = certifiedPlans.reduce((n, p) => n + p.entries.length, 0);
+    console.log(`  certified plan entries dropped: ${rawEntries - bakedEntries} of ${rawEntries}`);
+    if (rawEntries - bakedEntries > rawEntries * 0.02) {
+      console.error('  FAIL: more than 2% of certified plan entries name an unknown skill');
+      process.exitCode = 1;
+    }
+    const empty = certifiedPlans.filter((plan) => plan.entries.length === 0);
+    if (empty.length) {
+      console.error(
+        `  FAIL: certified plans with no entries: ${empty.map((p) => p.name).join(', ')}`
+      );
+      process.exitCode = 1;
+    }
   }
   {
     const hullCount = shipTree.ships.length;

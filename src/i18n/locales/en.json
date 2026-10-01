@@ -1456,6 +1456,8 @@
   "plans": {
     "title": "Skill Plans",
     "create": "New plan",
+    "newPlanOptions": "More ways to start a plan",
+    "fromCertifiedItem": "From a Certified Plan…",
     "newPlanName": "Untitled plan",
     "copySuffix": "{{name}} (copy)",
     "namePlaceholder": "Plan name",
@@ -1724,7 +1726,26 @@
       "save": "Save",
       "cancel": "Cancel"
     },
-    "jumpToAdded": "Jump to it"
+    "jumpToAdded": "Jump to it",
+    "certified": {
+      "title": "New plan from a Certified Plan",
+      "intro": "CCP’s own career plans, the ones the game lists under Skill Plans › Certified Plans. The new plan keeps CCP’s training order and milestones.",
+      "careerPaths": "Career path",
+      "career": {
+        "4": "Explorer",
+        "5": "Industrialist",
+        "6": "Enforcer",
+        "7": "Soldier of Fortune"
+      },
+      "careerFallback": "Career {{id}}",
+      "anyFaction": "Any faction",
+      "levels_one": "{{count}} skill level",
+      "levels_other": "{{count}} skill levels",
+      "milestones_one": "{{count}} milestone",
+      "milestones_other": "{{count}} milestones",
+      "create": "Create plan",
+      "loadFailed": "Couldn’t load the Certified Plans."
+    }
   },
   "skillCompare": {
     "pickCharacters": "Characters to compare",
