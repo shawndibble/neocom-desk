@@ -16,6 +16,7 @@ import {
   type OffenseItem,
 } from './stats';
 import { DOGMA_ATTRIBUTE, ITEM_DOGMA_ATTRIBUTE, type FittingItemState } from './types';
+import { APPLIED_DPS_ATTRIBUTE } from './appliedWeapons';
 
 function attrs(
   values: Partial<Record<keyof typeof DOGMA_ATTRIBUTE, number>>
@@ -425,6 +426,97 @@ describe('extractOffense', () => {
     );
 
     expect(offense.weapons.map(weaponRowKey)).toEqual(['module:3186:230', 'drone:2488:']);
+  });
+
+  /** `weaponResult` plus the given attributes on the item, and on its charge. */
+  function rangedResult(own: Record<number, number>, charge?: Record<number, number>) {
+    const toMap = (values: Record<number, number>) =>
+      new Map(Object.entries(values).map(([id, value]) => [Number(id), { value }] as const));
+    const result = weaponResult(10, 50, 'active', 'active');
+    const attributes = new Map([...result.attributes, ...toMap(own)]);
+    return { ...result, attributes, ...(charge ? { charge: { attributes: toMap(charge) } } : {}) };
+  }
+
+  it("gives a turret row the module's optimal and falloff", () => {
+    const offense = extractOffense(
+      [BLASTER],
+      [
+        rangedResult({
+          [APPLIED_DPS_ATTRIBUTE.optimal]: 2400,
+          [APPLIED_DPS_ATTRIBUTE.falloff]: 5000,
+          [APPLIED_DPS_ATTRIBUTE.tracking]: 0.3,
+        }),
+      ],
+      null
+    );
+
+    expect(offense.weapons[0].range).toEqual({ optimal: 2400, falloff: 5000 });
+  });
+
+  it("gives a launcher row its charge's flight range, with no falloff", () => {
+    const offense = extractOffense(
+      [{ typeId: 2410, chargeTypeId: 209, quantity: 1, isDrone: false }],
+      [
+        rangedResult(
+          {},
+          {
+            [APPLIED_DPS_ATTRIBUTE.maxVelocity]: 4000,
+            [APPLIED_DPS_ATTRIBUTE.explosionDelay]: 12500,
+            [APPLIED_DPS_ATTRIBUTE.explosionRadius]: 140,
+          }
+        ),
+      ],
+      null
+    );
+
+    expect(offense.weapons[0].range).toEqual({ optimal: 50000, falloff: 0 });
+  });
+
+  it('gives a sentry drone row its optimal and falloff, but not a drone that flies to its target', () => {
+    const sentry = rangedResult({
+      [APPLIED_DPS_ATTRIBUTE.optimal]: 30000,
+      [APPLIED_DPS_ATTRIBUTE.falloff]: 12000,
+      [APPLIED_DPS_ATTRIBUTE.tracking]: 0.02,
+    });
+    const mobile = rangedResult({
+      [APPLIED_DPS_ATTRIBUTE.optimal]: 5000,
+      [APPLIED_DPS_ATTRIBUTE.falloff]: 5000,
+      [APPLIED_DPS_ATTRIBUTE.tracking]: 0.5,
+      [APPLIED_DPS_ATTRIBUTE.maxVelocity]: 3000,
+    });
+    const offense = extractOffense(
+      [{ typeId: 23561, quantity: 2, isDrone: true }, WARRIOR],
+      [sentry, mobile],
+      null
+    );
+
+    expect(offense.weapons[0].range).toEqual({ optimal: 30000, falloff: 12000 });
+    expect(offense.weapons[1].range).toBeUndefined();
+  });
+
+  it('gives no range to a charge the engine reads no flight for', () => {
+    const offense = extractOffense(
+      [BLASTER],
+      [rangedResult({}, { [APPLIED_DPS_ATTRIBUTE.explosionRadius]: 100 })],
+      null
+    );
+
+    expect(offense.weapons[0].range).toBeUndefined();
+  });
+
+  it('gives a fighter row no range', () => {
+    const offense = extractOffense(
+      [{ typeId: 23055, quantity: 9, isDrone: true, isFighter: true }],
+      [
+        rangedResult({
+          [APPLIED_DPS_ATTRIBUTE.optimal]: 10000,
+          [APPLIED_DPS_ATTRIBUTE.tracking]: 0.1,
+        }),
+      ],
+      null
+    );
+
+    expect(offense.weapons[0].range).toBeUndefined();
   });
 
   function chargeSlotResult(state: 'online' | 'active' | 'overload' = 'active') {

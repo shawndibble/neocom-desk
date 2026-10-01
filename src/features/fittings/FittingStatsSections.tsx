@@ -17,6 +17,7 @@ import type {
   FittingStats,
   Resonances,
   StatsErrorReason,
+  WeaponRange,
   WeaponRow,
 } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
@@ -414,6 +415,25 @@ function weaponGroup(
   };
 }
 
+/**
+ * A weapon row's reach, dim under its DPS: optimal and falloff, or a single
+ * range where there's no falloff (a missile's flight range).
+ */
+function WeaponRangeLine({ range }: { range: WeaponRange }) {
+  const { t } = useTranslation();
+  const km = (metres: number) => (metres / 1000).toFixed(1);
+  return (
+    <span className="basis-full text-right text-[0.6875rem] text-text-dim tabular-nums">
+      {range.falloff > 0
+        ? t('fittings.stats.weaponOptimalFalloff', {
+            optimal: km(range.optimal),
+            falloff: km(range.falloff),
+          })
+        : t('fittings.stats.weaponRange', { range: km(range.optimal) })}
+    </span>
+  );
+}
+
 /** The Offense section's rows — a weapon group, drone stack or squadron each — and their total. */
 function OffenseRows({
   stats,
@@ -464,6 +484,7 @@ function OffenseRows({
               }
             />
             {hasMenu && <RowMoreActions />}
+            {row.range && <WeaponRangeLine range={row.range} />}
           </>
         );
         const rowClass = 'flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5';

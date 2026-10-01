@@ -340,6 +340,14 @@ export interface WeaponRow {
   volley: number;
   /** Null when the row can't overheat — drones never do. */
   overheated: DamageFigures | null;
+  /** Absent for a fighter, or a drone that flies to its target. */
+  range?: WeaponRange;
+}
+
+/** How far one weapon reaches, metres. A missile has no falloff: 0. */
+export interface WeaponRange {
+  optimal: number;
+  falloff: number;
 }
 
 export interface DamageFigures {

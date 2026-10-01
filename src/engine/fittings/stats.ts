@@ -12,6 +12,7 @@ import {
   type LocalRepair,
   type OffenseStats,
   type OverheatedStats,
+  type WeaponRange,
   type WeaponRow,
   type Resonances,
   type AncillaryRepairer,
@@ -35,6 +36,7 @@ import {
   type RepairLayer,
   type Repairer,
 } from './tank';
+import { droneSpeed, weaponRange } from './appliedWeapons';
 
 const REPAIR_LAYERS: readonly RepairLayer[] = ['shield', 'armor', 'hull'];
 
@@ -352,6 +354,8 @@ interface ModuleCalculationResult {
   attributes: AttributeMap;
   state: FittingItemState;
   max_state: FittingItemState;
+  /** The loaded charge's own calculation. */
+  charge?: { attributes: AttributeMap };
 }
 
 /**
@@ -444,6 +448,19 @@ function damageFigures(
   };
 }
 
+/**
+ * The row's reach: a module's or a sentry's. A drone that flies to its
+ * target, or a fighter, fights wherever it's sent — its own optimal says
+ * nothing about where the ship can fight from.
+ */
+function offenseRange(item: OffenseItem, result: ModuleCalculationResult): { range?: WeaponRange } {
+  if (item.isFighter) return {};
+  if (item.isDrone && droneSpeed(result.attributes) > 0) return {};
+  const range = weaponRange(result.attributes, result.charge?.attributes);
+  // A charge the engine reads no flight for (a Vorton pack) reaches nowhere shown.
+  return range && range.optimal > 0 ? { range } : {};
+}
+
 /** One Offense row per key: module, drone or fighter, type and charge. */
 export function weaponRowKey(
   row: Pick<WeaponRow, 'isDrone' | 'isFighter' | 'typeId' | 'chargeTypeId'>
@@ -508,6 +525,7 @@ export function extractOffense(
         sustainedDps: 0,
         volley: 0,
         overheated: heated ? { dps: 0, sustainedDps: 0, volley: 0 } : null,
+        ...offenseRange(item, result),
       };
       rows.set(key, row);
     }
