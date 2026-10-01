@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   DataTable,
@@ -32,7 +32,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 interface CostRowProps {
   label: string;
   value: ReactNode;
-  tooltip?: string;
+  tooltip?: ReactNode;
   emphasized?: boolean;
   indented?: boolean;
   /** `'negative'`/`'positive'` render the value in the `isk-neg`/`isk-pos` tone, e.g. for
@@ -137,6 +137,13 @@ interface ResultsSummaryProps {
 }
 
 /** Stable empty fallback, so the export's rows don't change identity every render. */
+/**
+ * Worst-case error in ESI's cost index, which it rounds to 4 decimals (half
+ * of 0.0001). Times EIV, that bounds how far the job fee can drift from the
+ * game's; a structure's job-cost bonus only shrinks it.
+ */
+const COST_INDEX_ROUNDING_STEP = 0.00005;
+
 const NO_SALE_LINES: readonly OwnedStockSaleLine[] = [];
 
 /**
@@ -314,6 +321,18 @@ export function ResultsSummary({
 
         <Disclosure
           label={t('industry.jobFee')}
+          labelAccessory={
+            <InfoTooltip
+              label={t('common.aboutLabel', { label: t('industry.jobFee') })}
+              content={
+                <Trans
+                  i18nKey="industry.jobFeeTooltip"
+                  values={{ amount: formatIsk(result.jobFee.eiv * COST_INDEX_ROUNDING_STEP) }}
+                  components={{ b: <strong /> }}
+                />
+              }
+            />
+          }
           trailing={formatIsk(result.jobFee.total)}
           expanded={jobFeeExpanded}
           onToggle={() => setJobFeeExpanded((expanded) => !expanded)}
@@ -357,7 +376,7 @@ export function ResultsSummary({
           <CostRow
             label={t('industry.costIndexWithSystem', { system: costIndexSystemName })}
             value={formatCostIndex(systemCostIndex)}
-            tooltip={t('industry.costIndexTooltip')}
+            tooltip={<Trans i18nKey="industry.costIndexTooltip" components={{ b: <strong /> }} />}
           />
         )}
       </div>

@@ -151,7 +151,7 @@ describe('ProductionRunsPanel', () => {
 
     await user.click(await screen.findByRole('cell', { name: /^320,000$/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Edit production run' });
-    const jobFeeInput = within(dialog).getByLabelText('Job fee');
+    const jobFeeInput = within(dialog).getByLabelText('Total job cost');
     await user.clear(jobFeeInput);
     await user.type(jobFeeInput, '40000');
     await user.tab();

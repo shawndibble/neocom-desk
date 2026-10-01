@@ -312,8 +312,8 @@ export function Tooltip({
 interface InfoTooltipProps {
   /** Accessible name for the trigger button, e.g. "About Material Efficiency". */
   label: string;
-  /** One-line plain-language tooltip content. */
-  content: string;
+  /** One-line plain-language tooltip content; a node only to bold a caveat (see `Tooltip`). */
+  content: ReactNode;
   /**
    * Makes the trigger do something as well as explain: the tooltip stays the
    * one-line answer on hover/focus, the click opens the longer one. Say so in

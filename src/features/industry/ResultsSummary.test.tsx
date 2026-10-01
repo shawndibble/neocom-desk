@@ -107,7 +107,7 @@ function renderSummary(overrides: Partial<Parameters<typeof ResultsSummary>[0]> 
 describe('ResultsSummary: jargon tooltips (UX-REVIEW #8)', () => {
   it('gives EIV and SCC surcharge rows an accessible tooltip once Job Fee is expanded', async () => {
     renderSummary();
-    await userEvent.click(screen.getByRole('button', { name: /job fee/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^total job cost$/i }));
 
     const eivButton = screen.getByRole('button', { name: /about eiv/i });
     fireEvent.focus(eivButton);
@@ -118,6 +118,15 @@ describe('ResultsSummary: jargon tooltips (UX-REVIEW #8)', () => {
     fireEvent.focus(sccButton);
     const sccTooltipId = sccButton.getAttribute('aria-describedby')!;
     expect(document.getElementById(sccTooltipId)?.textContent).not.toBe('');
+  });
+
+  it('bounds the Job Fee rounding drift by EIV x half the last cost-index digit ESI keeps', () => {
+    renderSummary({ result: { ...RESULT, jobFee: { ...RESULT.jobFee, eiv: 3_737_181 } } });
+    const jobFeeButton = screen.getByRole('button', { name: /about total job cost/i });
+    fireEvent.focus(jobFeeButton);
+    const tooltipId = jobFeeButton.getAttribute('aria-describedby')!;
+    // 3,737,181 x 0.00005 = 186.86 -> 187
+    expect(document.getElementById(tooltipId)?.textContent).toContain('±187');
   });
 
   it('gives the ISK/hour chip an accessible tooltip explaining its basis (UX-REVIEW #13)', () => {
@@ -142,7 +151,7 @@ describe('ResultsSummary: Costs stack (#116)', () => {
     renderSummary();
 
     expect(screen.getByText('Material cost')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /job fee/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^total job cost$/i })).toBeInTheDocument();
     expect(screen.getByText('Total cost')).toBeInTheDocument();
     expect(screen.getByText('Time')).toBeInTheDocument();
     expect(screen.getByText('Cost index (Jita)')).toBeInTheDocument();
@@ -156,7 +165,7 @@ describe('ResultsSummary: Costs stack (#116)', () => {
     const { container } = renderSummary();
     const text = container.textContent ?? '';
     const materialIdx = text.indexOf('Material cost');
-    const jobFeeIdx = text.indexOf('Job fee');
+    const jobFeeIdx = text.indexOf('Total job cost');
     const totalIdx = text.indexOf('Total cost');
     const timeIdx = text.indexOf('Time');
     const costIndexIdx = text.indexOf('Cost index');
@@ -170,7 +179,7 @@ describe('ResultsSummary: Costs stack (#116)', () => {
 
   it('keeps the Job Fee row collapsed by default, hiding its breakdown', () => {
     renderSummary();
-    const jobFeeButton = screen.getByRole('button', { name: /job fee/i });
+    const jobFeeButton = screen.getByRole('button', { name: /^total job cost$/i });
     expect(jobFeeButton).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('EIV')).not.toBeInTheDocument();
     expect(screen.queryByText('Cost index fee')).not.toBeInTheDocument();
@@ -180,7 +189,7 @@ describe('ResultsSummary: Costs stack (#116)', () => {
 
   it('expands the Job Fee row on click to reveal EIV, Cost Index Fee, SCC Surcharge, and Facility Tax', async () => {
     renderSummary();
-    const jobFeeButton = screen.getByRole('button', { name: /job fee/i });
+    const jobFeeButton = screen.getByRole('button', { name: /^total job cost$/i });
 
     await userEvent.click(jobFeeButton);
 
@@ -194,7 +203,7 @@ describe('ResultsSummary: Costs stack (#116)', () => {
 
   it('collapses the Job Fee row again when re-activated', async () => {
     renderSummary();
-    const jobFeeButton = screen.getByRole('button', { name: /job fee/i });
+    const jobFeeButton = screen.getByRole('button', { name: /^total job cost$/i });
 
     await userEvent.click(jobFeeButton);
     expect(jobFeeButton).toHaveAttribute('aria-expanded', 'true');
@@ -206,7 +215,7 @@ describe('ResultsSummary: Costs stack (#116)', () => {
 
   it('is keyboard-operable: Enter and Space toggle the Job Fee row', async () => {
     renderSummary();
-    const jobFeeButton = screen.getByRole('button', { name: /job fee/i });
+    const jobFeeButton = screen.getByRole('button', { name: /^total job cost$/i });
     jobFeeButton.focus();
 
     await userEvent.keyboard('{Enter}');
