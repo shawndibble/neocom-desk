@@ -398,7 +398,13 @@ function MobileMoreSheet({
   const rows = mobileSheetPaths(tabs).filter((path) => path !== '/characters');
 
   return (
-    <Modal open={open} id={MORE_SHEET_ID} onClose={onClose} title={t('nav.more')} placement="sheet">
+    <Modal
+      open={open}
+      id={MORE_SHEET_ID}
+      onClose={onClose}
+      title={t('nav.more')}
+      placement="sheet-full"
+    >
       {/* `space-y-2`, not the tighter `space-y-1` a desktop-rail-shared gap
           would use: these rows are now full 44px touch targets, and 4px
           between two of them left almost no dead zone for a thumb to miss
