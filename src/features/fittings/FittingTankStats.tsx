@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { FittingStats, LocalRepair } from '@/engine/fittings/types';
-import { Facts, HeatFigure } from './StatFacts';
+import { Facts, HeatFigure, StatGroup, StatNote, type Fact } from './StatFacts';
 
 const REPAIR_LAYERS: readonly (keyof LocalRepair)[] = ['shield', 'armor', 'hull'];
 
@@ -12,9 +12,10 @@ function signed(value: number, digits: number): string {
 }
 
 /**
- * Local tank under Defense: each repairer layer at burst, passive shield regeneration, and the whole tank burst
- * beside sustained in EHP/s — the sustained figure being our own estimate
- * (`engine/fittings/tank.ts`), so it says so.
+ * Local tank under Defense, one fact each: every repairer layer at burst,
+ * passive shield regeneration, each ancillary repairer with paste and dry,
+ * and the whole tank burst beside sustained in EHP/s — the sustained figure
+ * being our own estimate (`engine/fittings/tank.ts`), so it says so.
  */
 export function TankFacts({
   stats,
@@ -26,89 +27,68 @@ export function TankFacts({
   const { t } = useTranslation();
   const { tank } = stats;
   const hasTank = tank.burstEffective > 0 || tank.sustainedEffective > 0;
+  const figure = (format: (s: FittingStats) => string) => (
+    <HeatFigure stats={stats} format={format} />
+  );
+  const perSecond = (value: number) =>
+    t('fittings.stats.unit.hpPerSecond', { value: value.toFixed(1) });
+  const facts: Fact[] = [
+    ...REPAIR_LAYERS.filter((layer) => stats.repair[layer] > 0).map((layer) => ({
+      label: t(`fittings.stats.repair.${layer}`),
+      value: figure((s) => perSecond(s.repair[layer])),
+    })),
+    ...(tank.passiveShield > 0
+      ? [
+          {
+            label: t('fittings.stats.tank.passiveShield'),
+            value: figure((s) => perSecond(s.tank.passiveShield)),
+          },
+        ]
+      : []),
+    ...tank.ancillary.map((row, index) => ({
+      id: `ancillary-${index}`,
+      label: typeName(row.typeId),
+      value: figure((s) => {
+        // The same repairer unheated: the ancillary rows line up.
+        const same = s.tank.ancillary[index] ?? row;
+        return t('fittings.stats.tank.ancillary', {
+          loaded: same.loaded.toFixed(1),
+          empty: same.empty.toFixed(1),
+        });
+      }),
+    })),
+    ...(hasTank
+      ? [
+          {
+            label: t('fittings.stats.tank.burst'),
+            value: figure((s) =>
+              t('fittings.stats.unit.ehpPerSecond', { value: s.tank.burstEffective.toFixed(1) })
+            ),
+          },
+          {
+            label: t('fittings.stats.tank.sustained'),
+            value: figure((s) =>
+              t('fittings.stats.unit.ehpPerSecond', {
+                value: s.tank.sustainedEffective.toFixed(1),
+              })
+            ),
+          },
+        ]
+      : []),
+  ];
+  if (facts.length === 0) return null;
   return (
-    <div className="space-y-2">
-      <ul className="space-y-1 text-xs text-text-dim">
-        {REPAIR_LAYERS.filter((layer) => stats.repair[layer] > 0).map((layer) => (
-          <li key={layer}>
-            <HeatFigure
-              stats={stats}
-              format={(s) =>
-                t(`fittings.stats.repair.${layer}`, { value: s.repair[layer].toFixed(1) })
-              }
-            />
-          </li>
-        ))}
-        {tank.passiveShield > 0 && (
-          <li>
-            <HeatFigure
-              stats={stats}
-              format={(s) =>
-                t('fittings.stats.tank.passiveShield', { value: s.tank.passiveShield.toFixed(1) })
-              }
-            />
-          </li>
-        )}
-        {tank.ancillary.map((row, index) => (
-          <li key={`${row.typeId}-${index}`}>
-            <HeatFigure
-              stats={stats}
-              format={(s) => {
-                // The same repairer unheated: the ancillary rows line up.
-                const same = s.tank.ancillary[index] ?? row;
-                return t('fittings.stats.tank.ancillary', {
-                  name: typeName(same.typeId),
-                  loaded: same.loaded.toFixed(1),
-                  empty: same.empty.toFixed(1),
-                });
-              }}
-            />
-          </li>
-        ))}
-      </ul>
-      {hasTank && (
-        <>
-          <Facts
-            items={[
-              {
-                label: t('fittings.stats.tank.burst'),
-                value: (
-                  <HeatFigure
-                    stats={stats}
-                    format={(s) =>
-                      t('fittings.stats.unit.ehpPerSecond', {
-                        value: s.tank.burstEffective.toFixed(1),
-                      })
-                    }
-                  />
-                ),
-              },
-              {
-                label: t('fittings.stats.tank.sustained'),
-                value: (
-                  <HeatFigure
-                    stats={stats}
-                    format={(s) =>
-                      t('fittings.stats.unit.ehpPerSecond', {
-                        value: s.tank.sustainedEffective.toFixed(1),
-                      })
-                    }
-                  />
-                ),
-              },
-            ]}
-          />
-          {tank.capFraction < 1 && (
-            <p className="text-xs text-warning">
-              {t('fittings.stats.tank.capLimited', {
-                pct: (tank.capFraction * 100).toFixed(0),
-              })}
-            </p>
-          )}
-          <p className="text-xs text-text-dim">{t('fittings.stats.tank.estimateNote')}</p>
-        </>
+    <>
+      <StatGroup label={t('fittings.stats.tank.title')}>
+        <Facts items={facts} />
+      </StatGroup>
+      {hasTank && tank.capFraction < 1 && (
+        <StatNote tone="warning">
+          {t('fittings.stats.tank.capLimited', { pct: (tank.capFraction * 100).toFixed(0) })}
+        </StatNote>
       )}
-    </div>
+      {hasTank && <StatNote>{t('fittings.stats.tank.estimateNote')}</StatNote>}
+    </>
   );
 }
 

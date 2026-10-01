@@ -231,7 +231,7 @@ export function ModuleRow({
           <TypeIcon typeId={typeId} size={32} width={24} height={24} />
           <SlotName typeId={typeId} name={name} />
           {cantUse && (
-            <span className="shrink-0 rounded-xs border border-danger px-1 text-[0.6875rem] font-semibold text-danger">
+            <span className="shrink-0 text-[0.6875rem] font-semibold text-danger">
               {t('fittings.list.cantUse')}
             </span>
           )}

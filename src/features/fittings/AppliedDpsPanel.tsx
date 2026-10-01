@@ -28,7 +28,7 @@ import {
 } from '@/engine/fittings/appliedDps';
 import type { AppliedDpsRow } from './AppliedDpsChart';
 import { kmValue } from './rangeText';
-import { HeatFigure } from './StatFacts';
+import { Facts, HeatFigure, StatControls, StatNote } from './StatFacts';
 import { TargetProfilePicker } from './TargetProfilePicker';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
@@ -55,7 +55,7 @@ function OverlayPicker({ overlay }: { overlay: OverlayFitting }) {
         value={overlay.selectedId ?? NO_OVERLAY}
         onValueChange={(value) => overlay.select(value === NO_OVERLAY ? null : value)}
       >
-        <SelectTrigger aria-label={label} className="w-48">
+        <SelectTrigger aria-label={label} size="sm" className="w-48">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -140,33 +140,48 @@ export function AppliedDpsPanel({
   const summaries = useMemo(() => {
     const read = (inputs: AppliedDpsInputs) => {
       const atRange = bestRange(appliedDpsVsRange(inputs, target, maxRange));
-      return t('fittings.appliedDps.summary', {
+      return {
         raw: rawDps(inputs).toFixed(1),
-        applied: appliedDps(inputs, target, atRange).toFixed(1),
-        km: kmValue(atRange),
-      });
+        applied: t('fittings.appliedDps.appliedValue', {
+          value: appliedDps(inputs, target, atRange).toFixed(1),
+          km: kmValue(atRange),
+        }),
+      };
     };
-    const byInputs = new Map<AppliedDpsInputs, string>([[applied, read(applied)]]);
+    const byInputs = new Map<AppliedDpsInputs, { raw: string; applied: string }>([
+      [applied, read(applied)],
+    ]);
     if (unheatedApplied) byInputs.set(unheatedApplied, read(unheatedApplied));
     return byInputs;
   }, [applied, unheatedApplied, target, maxRange, t]);
-  const summary = ({ applied: inputs }: AppliedFigures) => summaries.get(inputs) ?? '';
+  const summary =
+    (part: 'raw' | 'applied') =>
+    ({ applied: inputs }: AppliedFigures) =>
+      summaries.get(inputs)?.[part] ?? '';
 
   return (
-    <div className="space-y-2">
-      <TargetProfilePicker targetProfiles={targetProfiles} />
-      {overlay && overlay.options.saved.length + overlay.options.inGame.length > 0 && (
-        <OverlayPicker overlay={overlay} />
-      )}
+    <div className="space-y-3">
+      <StatControls>
+        <TargetProfilePicker targetProfiles={targetProfiles} />
+        {overlay && overlay.options.saved.length + overlay.options.inGame.length > 0 && (
+          <OverlayPicker overlay={overlay} />
+        )}
+      </StatControls>
       {hasWeapons ? (
         <>
-          <p className="text-xs">
-            <HeatFigure stats={figures} format={summary} />
-          </p>
-          <p className="text-xs text-text-dim">{t('fittings.appliedDps.assumptions')}</p>
-          <Suspense
-            fallback={<p className="text-xs text-text-dim">{t('fittings.appliedDps.loading')}</p>}
-          >
+          <Facts
+            items={[
+              {
+                label: t('fittings.appliedDps.raw'),
+                value: <HeatFigure stats={figures} format={summary('raw')} />,
+              },
+              {
+                label: t('fittings.appliedDps.applied'),
+                value: <HeatFigure stats={figures} format={summary('applied')} />,
+              },
+            ]}
+          />
+          <Suspense fallback={<StatNote>{t('fittings.appliedDps.loading')}</StatNote>}>
             <AppliedDpsChart
               range={graphs.range}
               speed={graphs.speed}
@@ -174,13 +189,12 @@ export function AppliedDpsPanel({
               overlayName={overlayResult?.name}
             />
           </Suspense>
+          <StatNote>{t('fittings.appliedDps.assumptions')}</StatNote>
         </>
       ) : chargelessWeaponCount > 0 ? (
-        <p className="text-xs text-text-dim">
-          {t('fittings.stats.offenseNoCharge', { count: chargelessWeaponCount })}
-        </p>
+        <StatNote>{t('fittings.stats.offenseNoCharge', { count: chargelessWeaponCount })}</StatNote>
       ) : (
-        <p className="text-xs text-text-dim">{t('fittings.appliedDps.noWeapons')}</p>
+        <StatNote>{t('fittings.appliedDps.noWeapons')}</StatNote>
       )}
     </div>
   );

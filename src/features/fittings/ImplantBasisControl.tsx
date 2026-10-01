@@ -58,7 +58,7 @@ export function ImplantBasisControl({
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button className="whitespace-nowrap">
+          <Button size="sm" className="whitespace-nowrap">
             <span className="text-text-dim">{t('fittings.implants.chipLabel')}</span>
             {t(`fittings.implants.basis.${effective}`)}
             <Expanded aria-hidden />

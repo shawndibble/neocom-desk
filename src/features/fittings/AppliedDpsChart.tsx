@@ -21,6 +21,7 @@ import {
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
+import { STAT_EYEBROW } from './statKit';
 
 export interface AppliedDpsRow {
   /** Metres (range graph) or m/s (speed graph). */
@@ -121,7 +122,7 @@ function Graph({
   // table is a sibling, never a child.
   return (
     <div className="space-y-1">
-      <p className="text-xs font-semibold text-text-dim">{label}</p>
+      <h4 className={STAT_EYEBROW}>{label}</h4>
       <div role="img" aria-label={label} className="h-48 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -192,7 +193,7 @@ export default function AppliedDpsChart({
   return (
     <div className="space-y-3">
       {overlayName !== undefined && (
-        <div className="flex flex-wrap gap-3 text-xs text-text-dim">
+        <div className="flex flex-wrap gap-3 text-[0.6875rem] text-text-dim">
           <Swatch dashed={false} label={t('fittings.appliedDps.thisFitting')} />
           <Swatch dashed label={overlayName} />
         </div>

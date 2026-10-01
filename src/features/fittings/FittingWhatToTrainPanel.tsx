@@ -61,9 +61,10 @@ import type { SkillGainEvaluator } from './useFittingEvaluation';
 import { useSkillGains } from './useSkillGains';
 import { useSkillLevelGain } from './useSkillLevelGain';
 import type { SkillPlanRecord } from '@/db';
+import { StatControls, StatNote } from './StatFacts';
+import { STAT_DETAIL, joinDetail, statRowClassName } from './statKit';
 
 const TOAST_MS = 8000;
-const EYEBROW = 'text-[0.6875rem] uppercase tracking-wider text-text-dim';
 
 interface WhatToTrainRow extends SkillGain {
   name: string;
@@ -84,10 +85,8 @@ export function FittingWhatToTrainPanel({
 }: FittingWhatToTrainPanelProps) {
   const { t } = useTranslation();
   const overridden = useSkillOverrides((state) => hasSkillOverrides(state.skills));
-  if (characterId === null)
-    return <p className="text-xs text-text-dim">{t('fittings.whatToTrain.noCharacter')}</p>;
-  if (overridden)
-    return <p className="text-xs text-text-dim">{t('fittings.whatToTrain.overridesOn')}</p>;
+  if (characterId === null) return <StatNote>{t('fittings.whatToTrain.noCharacter')}</StatNote>;
+  if (overridden) return <StatNote>{t('fittings.whatToTrain.overridesOn')}</StatNote>;
   return (
     // Keyed so an Undo toast can't outlive a Character switch and sync the wrong pilot.
     <WhatToTrainRanking
@@ -192,11 +191,9 @@ function WhatToTrainRanking({
   }, [targetPlan, catalog, trainedSkills, trainedSkillsKnown]);
 
   if (evaluator === null || loading)
-    return <p className="text-xs text-text-dim">{t('fittings.whatToTrain.loading')}</p>;
-  if (failed || ranked === null)
-    return <p className="text-xs text-text-dim">{t('fittings.whatToTrain.failed')}</p>;
-  if (ranked.length === 0)
-    return <p className="text-xs text-text-dim">{t('fittings.whatToTrain.none')}</p>;
+    return <StatNote>{t('fittings.whatToTrain.loading')}</StatNote>;
+  if (failed || ranked === null) return <StatNote>{t('fittings.whatToTrain.failed')}</StatNote>;
+  if (ranked.length === 0) return <StatNote>{t('fittings.whatToTrain.none')}</StatNote>;
 
   async function add(row: WhatToTrainRow, level: number) {
     const result = await target.addEntries(
@@ -209,38 +206,41 @@ function WhatToTrainRanking({
 
   const rankByLabel = t('fittings.whatToTrain.rankBy');
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-        <span className="text-text-dim">{rankByLabel}</span>
-        <Select
-          value={activeSort}
-          onValueChange={(value) => {
-            const picked = sorts.find((option) => option === value);
-            if (picked) setSort(picked);
-          }}
-        >
-          <SelectTrigger aria-label={rankByLabel} size="sm" className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {sorts.map((option) => (
-              <SelectItem key={option} value={option}>
-                {t(`fittings.whatToTrain.sort.${option}`)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <span className="ml-auto flex flex-wrap items-center gap-2">
-          <TargetPlanPicker target={target} />
-          <Link
-            to={targetPlan ? `/skills/plans/${targetPlan.id}` : '/skills/plans'}
-            className={buttonClassName({ size: 'sm' })}
+    <div className="space-y-3">
+      <StatControls>
+        <span className="flex items-center gap-2">
+          <span className="text-text-dim">{rankByLabel}</span>
+          <Select
+            value={activeSort}
+            onValueChange={(value) => {
+              const picked = sorts.find((option) => option === value);
+              if (picked) setSort(picked);
+            }}
           >
-            {t('fittings.whatToTrain.openPlan')}
-          </Link>
+            <SelectTrigger aria-label={rankByLabel} size="sm" className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {sorts.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {t(`fittings.whatToTrain.sort.${option}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </span>
-      </div>
-      <ul aria-label={t('fittings.stats.section.whatToTrain')} className="m-0 list-none p-0">
+        <TargetPlanPicker target={target} />
+        <Link
+          to={targetPlan ? `/skills/plans/${targetPlan.id}` : '/skills/plans'}
+          className={buttonClassName({ size: 'sm' })}
+        >
+          {t('fittings.whatToTrain.openPlan')}
+        </Link>
+      </StatControls>
+      <ul
+        aria-label={t('fittings.stats.section.whatToTrain')}
+        className="m-0 list-none p-0 text-xs"
+      >
         {ranked.map((row, index) => (
           <WhatToTrainItem
             key={row.skillTypeId}
@@ -295,9 +295,9 @@ function levelSpan(from: number, to: number): string {
 }
 
 /**
- * One suggestion as three bands — the skill, what it changes, what it takes —
- * with a level picker beside Add to plan: the changes and the time follow the
- * level picked.
+ * One suggestion: the skill and what it changes on the left, the time it
+ * takes at the top right; beneath, the plan it is already in, then a level
+ * picker beside Add to plan. The changes and the time follow the level picked.
  */
 function WhatToTrainItem({
   row,
@@ -330,113 +330,115 @@ function WhatToTrainItem({
       ? levelSpan(row.fromLevel + 1, Math.min(plannedThrough, 5))
       : null;
   const changeCount = gain ? gain.delta.changes.length + gain.roleChanges.length : 0;
+  const changes = failed
+    ? [t('fittings.whatToTrain.levelFailed')]
+    : gain === null
+      ? [t('common.loading')]
+      : changeCount === 0
+        ? [t('fittings.whatToTrain.noChange')]
+        : [
+            ...gain.delta.changes.map((change) => changeLabel(change, t)),
+            ...gain.roleChanges.map((change) =>
+              t(`fittings.whatToTrain.role.${change.key}`, {
+                before: change.before.toLocaleString(),
+                after: change.after.toLocaleString(),
+              })
+            ),
+          ];
+  const canAdd = plan !== undefined && level !== null;
 
   return (
-    <li className="flex flex-col border-t border-line-bright pt-2.5 first:border-t-0 first:pt-0">
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-2">
-        <span className="text-xs tabular-nums text-text-dim">{rank}</span>
-        <SkillNameButton
-          skillTypeID={row.skillTypeId}
-          planEntries={plan?.entries}
-          className="min-w-0 flex-1 font-medium"
-        >
-          {row.name}
-        </SkillNameButton>
-        <span className="text-xs text-text-dim">
-          {row.fromLevel > 0
-            ? t('fittings.whatToTrain.trained', { level: romanLevel(row.fromLevel) })
-            : t('fittings.whatToTrain.notTrained')}
-        </span>
-      </div>
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-dashed border-line py-2">
-        <span className={EYEBROW}>{t('fittings.whatToTrain.changes')}</span>
-        <div className="flex min-w-0 flex-1 flex-wrap gap-x-3 gap-y-0.5 text-xs">
-          {failed ? (
-            <span className="text-text-dim">{t('fittings.whatToTrain.levelFailed')}</span>
-          ) : gain === null ? (
-            <span className="text-text-dim">{t('common.loading')}</span>
-          ) : changeCount === 0 ? (
-            <span className="text-text-dim">{t('fittings.whatToTrain.noChange')}</span>
-          ) : (
-            <>
-              {gain.delta.changes.map((change) => (
-                <span key={change.key}>{changeLabel(change, t)}</span>
-              ))}
-              {gain.roleChanges.map((change) => (
-                <span key={change.key}>
-                  {t(`fittings.whatToTrain.role.${change.key}`, {
-                    before: change.before.toLocaleString(),
-                    after: change.after.toLocaleString(),
-                  })}
-                </span>
-              ))}
-            </>
-          )}
+    <li className={statRowClassName()}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <span className="flex items-baseline gap-2">
+            <span className="text-text-dim tabular-nums">{rank}</span>
+            <SkillNameButton
+              skillTypeID={row.skillTypeId}
+              planEntries={plan?.entries}
+              className="min-w-0 font-semibold"
+            >
+              {row.name}
+            </SkillNameButton>
+          </span>
+          <p className={STAT_DETAIL}>
+            {joinDetail([
+              row.fromLevel > 0
+                ? t('fittings.whatToTrain.trained', { level: romanLevel(row.fromLevel) })
+                : t('fittings.whatToTrain.notTrained'),
+              ...changes,
+            ])}
+          </p>
         </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-dashed border-line py-2">
-        <span className={EYEBROW}>{t('fittings.whatToTrain.time')}</span>
-        <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 font-medium tabular-nums">
+        <div className="shrink-0 text-right tabular-nums">
           {time === null ? (
             <span className="text-text-dim">{t('common.loading')}</span>
           ) : (
             formatCountdown(time.seconds)
           )}
           {time?.includesPrerequisites && (
-            <WhatToTrainPrerequisites
-              skill={skill}
-              rows={prerequisiteRows}
-              plannedLevels={plannedLevels}
-              planEntries={plan?.entries}
-              totalSeconds={time.seconds}
-            />
+            <div>
+              <WhatToTrainPrerequisites
+                skill={skill}
+                rows={prerequisiteRows}
+                plannedLevels={plannedLevels}
+                planEntries={plan?.entries}
+                totalSeconds={time.seconds}
+              />
+            </div>
           )}
-        </span>
-        {plan && plannedSpan !== null && (
-          <span className="text-xs text-text-dim">
-            <Trans
-              i18nKey="fittings.whatToTrain.plannedLevels"
-              values={{ levels: plannedSpan, plan: plan.name }}
-              components={{
-                plan: <Link to={`/skills/plans/${plan.id}`} className={inlineLinkClassName} />,
-              }}
-            />
-          </span>
-        )}
-        {plan !== undefined && level !== null && (
-          <span className="flex items-center gap-2">
-            <Select value={String(level)} onValueChange={(value) => setPicked(Number(value))}>
-              <SelectTrigger
-                size="sm"
-                aria-label={t('fittings.whatToTrain.levelLabel', { skill: row.name })}
-                className="w-16"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {options.map((option) => (
-                  <SelectItem
-                    key={option.level}
-                    value={String(option.level)}
-                    disabled={option.planned}
-                  >
-                    {option.planned
-                      ? t('fittings.whatToTrain.levelInPlan', { level: romanLevel(option.level) })
-                      : romanLevel(option.level)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              size="sm"
-              aria-label={t('fittings.whatToTrain.addToPlanLabel', { skill })}
-              onClick={() => void onAdd(row, level)}
-            >
-              {t('fittings.whatToTrain.addToPlan')}
-            </Button>
-          </span>
-        )}
+        </div>
       </div>
+      {((plan && plannedSpan !== null) || canAdd) && (
+        <div className="mt-1 flex flex-wrap items-center justify-end gap-2">
+          {plan && plannedSpan !== null && (
+            <span className="mr-auto text-[0.6875rem] text-text-dim">
+              <Trans
+                i18nKey="fittings.whatToTrain.plannedLevels"
+                values={{ levels: plannedSpan, plan: plan.name }}
+                components={{
+                  plan: <Link to={`/skills/plans/${plan.id}`} className={inlineLinkClassName} />,
+                }}
+              />
+            </span>
+          )}
+          {canAdd && (
+            <>
+              <Select value={String(level)} onValueChange={(value) => setPicked(Number(value))}>
+                <SelectTrigger
+                  size="sm"
+                  aria-label={t('fittings.whatToTrain.levelLabel', { skill: row.name })}
+                  className="w-16"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.map((option) => (
+                    <SelectItem
+                      key={option.level}
+                      value={String(option.level)}
+                      disabled={option.planned}
+                    >
+                      {option.planned
+                        ? t('fittings.whatToTrain.levelInPlan', {
+                            level: romanLevel(option.level),
+                          })
+                        : romanLevel(option.level)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                aria-label={t('fittings.whatToTrain.addToPlanLabel', { skill })}
+                onClick={() => void onAdd(row, level)}
+              >
+                {t('fittings.whatToTrain.addToPlan')}
+              </Button>
+            </>
+          )}
+        </div>
+      )}
     </li>
   );
 }

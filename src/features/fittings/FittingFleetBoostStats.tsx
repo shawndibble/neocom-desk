@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import type { BurstRow } from '@/engine/fittings/fleetSupport';
 import type { FittingStats } from '@/engine/fittings/types';
 import { kmValue } from './rangeText';
-import { Facts } from './StatFacts';
+import { StatGroup, StatRow, StatRows } from './StatFacts';
+import { joinDetail } from './statKit';
 
 /**
  * Fleet boosts: each running burst with the charge it carries, how strong,
@@ -21,59 +21,67 @@ export function FleetBoostFacts({
   const { bursts, compressors, core } = stats.fleetSupport;
   const km = (meters: number) => t('fittings.stats.unit.km', { value: kmValue(meters) });
   const seconds = (value: number) => t('fittings.stats.unit.seconds', { value: value.toFixed(1) });
-  const burstFacts = (burst: BurstRow) => [
-    {
-      label: t('fittings.stats.fleetBoosts.strength'),
-      value: burst.strengths.map((value) => `${value.toFixed(1)}%`).join(' · ') || '—',
-    },
-    { label: t('fittings.stats.fleetBoosts.range'), value: km(burst.rangeMeters) },
-    { label: t('fittings.stats.fleetBoosts.length'), value: seconds(burst.durationSeconds) },
-    { label: t('fittings.stats.fleetBoosts.reload'), value: seconds(burst.reloadSeconds) },
-  ];
+  const every = (cycleSeconds: number) =>
+    t('fittings.stats.fleetBoosts.every', { cycle: seconds(cycleSeconds) });
 
   return (
-    <div className="space-y-3">
-      {bursts.map((burst) => (
-        <div key={`${burst.typeId}:${burst.chargeTypeId ?? ''}`} className="space-y-1.5">
-          <div className="text-xs">
-            {t('fittings.stats.weaponRow', { count: burst.count, name: typeName(burst.typeId) })}
-            <span className="block text-text-dim">
-              {burst.chargeTypeId === undefined
-                ? t('fittings.stats.fleetBoosts.noCharge')
-                : typeName(burst.chargeTypeId)}
-            </span>
-          </div>
-          <Facts items={burstFacts(burst)} />
-        </div>
-      ))}
-      {(compressors.length > 0 || core) && (
-        <Facts
-          items={[
-            ...compressors.map((compressor) => ({
-              label: t('fittings.stats.weaponRow', {
-                count: compressor.count,
-                name: typeName(compressor.typeId),
-              }),
-              value: t('fittings.stats.fleetBoosts.compressorRange', {
-                range: km(compressor.rangeMeters),
-                cycle: seconds(compressor.cycleSeconds),
-              }),
-            })),
-            ...(core
-              ? [
-                  {
-                    label: typeName(core.typeId),
-                    value: t('fittings.stats.fleetBoosts.fuel', {
-                      value: core.fuelPerCycle.toFixed(0),
-                      fuel: typeName(core.fuelTypeId),
-                      cycle: seconds(core.cycleSeconds),
-                    }),
-                  },
-                ]
-              : []),
-          ]}
-        />
+    <>
+      {bursts.length > 0 && (
+        <StatRows>
+          {bursts.map((burst) => (
+            <StatRow
+              key={`${burst.typeId}:${burst.chargeTypeId ?? ''}`}
+              name={t('fittings.stats.weaponRow', {
+                count: burst.count,
+                name: typeName(burst.typeId),
+              })}
+              detail={
+                burst.chargeTypeId === undefined
+                  ? t('fittings.stats.fleetBoosts.noCharge')
+                  : joinDetail([
+                      typeName(burst.chargeTypeId),
+                      km(burst.rangeMeters),
+                      t('fittings.stats.fleetBoosts.lasts', {
+                        value: seconds(burst.durationSeconds),
+                      }),
+                      t('fittings.stats.fleetBoosts.reloadTime', {
+                        value: seconds(burst.reloadSeconds),
+                      }),
+                    ])
+              }
+              detailTone={burst.chargeTypeId === undefined ? 'warning' : undefined}
+              figure={burst.strengths.map((value) => `${value.toFixed(1)}%`).join(' · ') || '—'}
+            />
+          ))}
+        </StatRows>
       )}
-    </div>
+      {(compressors.length > 0 || core) && (
+        <StatGroup label={t('fittings.stats.fleetBoosts.compression')}>
+          <StatRows>
+            {compressors.map((compressor) => (
+              <StatRow
+                key={compressor.typeId}
+                name={t('fittings.stats.weaponRow', {
+                  count: compressor.count,
+                  name: typeName(compressor.typeId),
+                })}
+                detail={every(compressor.cycleSeconds)}
+                figure={km(compressor.rangeMeters)}
+              />
+            ))}
+            {core && (
+              <StatRow
+                name={typeName(core.typeId)}
+                detail={every(core.cycleSeconds)}
+                figure={t('fittings.stats.fleetBoosts.fuel', {
+                  value: core.fuelPerCycle.toFixed(0),
+                  fuel: typeName(core.fuelTypeId),
+                })}
+              />
+            )}
+          </StatRows>
+        </StatGroup>
+      )}
+    </>
   );
 }

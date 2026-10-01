@@ -8,7 +8,7 @@ import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
  * The Trade Hub the Price section quotes — the same synced "Default Trade Hub"
  * as Settings, so picking one here changes it there too.
  */
-export function PriceHubSelect() {
+export function PriceHubSelect({ size = 'md' }: { size?: 'sm' | 'md' } = {}) {
   const { t } = useTranslation();
   const hub = useMarketHub((state) => state.value);
   const setHub = useMarketHub((state) => state.setValue);
@@ -20,7 +20,7 @@ export function PriceHubSelect() {
     <div className="flex items-center gap-2 text-xs">
       <span className="text-text-dim">{t('fittings.stats.priceHub')}</span>
       <Select value={hub} onValueChange={(value) => void setHub(value as TradeHub['id'])}>
-        <SelectTrigger aria-label={t('fittings.stats.priceHub')} className="min-w-0">
+        <SelectTrigger aria-label={t('fittings.stats.priceHub')} size={size} className="min-w-0">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
