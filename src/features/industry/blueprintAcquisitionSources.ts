@@ -369,6 +369,28 @@ export function overridePatchFor(row: AcquisitionSourceRow): MaterialSourcing {
 }
 
 /**
+ * The job runs picking `row` sets on the plan, after the in-game Industry
+ * window: a copy fills its runs, an original starts at 1. Where the row brings
+ * several copies — every owned copy at one tier, or a contract's bundle — the
+ * runs are summed, not one copy's: the game installs one copy per job, but a
+ * plan's runs are everything it builds with that tier, and the tier pool
+ * already prices the plan across all of them. `null` leaves the plan's runs
+ * alone — an LP offer never states its copies' runs.
+ */
+export function runsForPickedRow(row: AcquisitionSourceRow): number | null {
+  switch (row.kind) {
+    case 'owned':
+      return row.runs ?? 1;
+    case 'contract':
+      return row.runs === null ? 1 : row.runs * row.quantity;
+    case 'market':
+      return 1;
+    case 'lp':
+      return null;
+  }
+}
+
+/**
  * Whether `sourcing` is exactly what picking `row` wrote. Tier alone is not
  * enough — an owned ME0 original, a market BPO and an LP copy all share
  * ME0/TE0 — so a priced row also matches on price, and an owned row only

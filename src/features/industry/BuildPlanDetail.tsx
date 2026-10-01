@@ -1823,6 +1823,11 @@ export function BuildPlanDetail({
                   ownedCopies={acquisitionPickerOwnedCopies}
                   sourcing={plan.materialSourcing?.[acquisitionPickerTypeId]}
                   onSourcingChange={changeOneSourcing}
+                  onPickRuns={
+                    acquisitionPickerTypeId === plan.blueprintTypeID
+                      ? (runs) => update({ runs })
+                      : undefined
+                  }
                   onSearchBpcSourcing={onSearchBpcSourcing}
                   planHubId={plan.hubId}
                 />

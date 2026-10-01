@@ -13,6 +13,7 @@ import {
   marketSellRows,
   overridePatchFor,
   ownedTierRows,
+  runsForPickedRow,
   SECTION_ROW_LIMIT,
   sectionRows,
 } from './blueprintAcquisitionSources';
@@ -442,6 +443,56 @@ describe('overridePatchFor', () => {
       acquisitionTierOverride: { me: 0, te: 0 },
       overridePrice: 21_500_000,
     });
+  });
+});
+
+describe('runsForPickedRow — job runs the in-game Industry window would fill in', () => {
+  it("fills an owned copy tier's remaining runs", () => {
+    const [owned] = ownedTierRows([{ me: 10, te: 20, runs: 150 }]);
+    expect(runsForPickedRow(owned)).toBe(150);
+  });
+
+  it('sums every owned copy at the picked tier — a plan builds with all of them', () => {
+    const [owned] = ownedTierRows([
+      { me: 10, te: 20, runs: 10 },
+      { me: 10, te: 20, runs: 10 },
+    ]);
+    expect(runsForPickedRow(owned)).toBe(20);
+  });
+
+  it('starts an owned original at 1 run', () => {
+    const [owned] = ownedTierRows([{ me: 10, te: 20, runs: -1 }]);
+    expect(runsForPickedRow(owned)).toBe(1);
+  });
+
+  it("fills every run a contract's copies bring", () => {
+    const [row] = contractOfferRows({
+      copies: [contract({ me: 9, te: 18, runs: 10, quantity: 3 })],
+      originals: [],
+      blueprintTypeID: ASTERO_BP,
+      regionId: null,
+    });
+    expect(runsForPickedRow(row)).toBe(30);
+  });
+
+  it('starts a contract original at 1 run', () => {
+    const [row] = contractOfferRows({
+      copies: [],
+      originals: [contract({ runs: -1, quantity: 1 })],
+      blueprintTypeID: ASTERO_BP,
+      regionId: null,
+    });
+    expect(runsForPickedRow(row)).toBe(1);
+  });
+
+  it('starts a market BPO at 1 run', () => {
+    const [row] = marketSellRows([order({ price: 7_500_000 })], JITA_44);
+    expect(runsForPickedRow(row)).toBe(1);
+  });
+
+  it('leaves runs alone for an LP copy, whose run count the offer never states', () => {
+    const [row] = lpOfferRows([lpMatch()], 10);
+    expect(runsForPickedRow(row)).toBeNull();
   });
 });
 
