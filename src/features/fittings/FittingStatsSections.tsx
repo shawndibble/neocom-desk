@@ -541,6 +541,12 @@ export function FittingStatsSections({
   // A fit with nothing priceable totals 0 on both sides — that's "unknown",
   // not a free ship, so the price section shows a dash instead of "0 ISK".
   const nothingPriced = price !== null && price.totals.sell === 0 && price.totals.buy === 0;
+  // The price loader names each row by its bare typeId; the section and its
+  // breakdown read (and the multibuy pastes) the item's real name.
+  const namedPrice =
+    price === null
+      ? null
+      : { ...price, rows: price.rows.map((row) => ({ ...row, name: typeName(row.typeId) })) };
   const iskLabel = (value: number) =>
     t('fittings.stats.unit.isk', { value: formatIskCompact(value) });
   // A RAH's resists move with the profile (the engine adapts it), so the
@@ -1135,7 +1141,7 @@ export function FittingStatsSections({
             <FittingAppraisalModal
               open={appraisalOpen}
               onClose={() => setAppraisalOpen(false)}
-              price={price}
+              price={namedPrice!}
             />
             <Facts
               items={[
@@ -1153,7 +1159,7 @@ export function FittingStatsSections({
               <div className="text-xs text-warning">
                 <p>{t('fittings.stats.priceUnpriced', { count: price.totals.unpricedRows })}</p>
                 <ul className="mt-0.5 list-disc pl-4">
-                  {price.rows
+                  {namedPrice!.rows
                     .filter((row) => row.buyTotal === null || row.sellTotal === null)
                     .map((row) => (
                       <li key={row.typeId}>

@@ -586,7 +586,8 @@
     },
     "appraisal": {
       "open": "Appraise",
-      "title": "Appraisal",
+      "title": "Price breakdown",
+      "tableLabel": "Items and their prices",
       "basis": "Priced at the lowest {{hub}} sell order.",
       "item": "Item",
       "quantity": "Qty",

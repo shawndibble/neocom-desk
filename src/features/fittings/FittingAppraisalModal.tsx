@@ -82,7 +82,7 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
           columns={columns}
           rows={price.rows}
           rowKey={(row) => row.typeId}
-          label={t('fittings.appraisal.title')}
+          label={t('fittings.appraisal.tableLabel')}
           density="compact"
         />
         <div className="flex justify-between gap-2 border-t border-line pt-2 text-sm font-semibold">
@@ -95,11 +95,10 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
           </p>
         )}
         <div className="flex items-center justify-end gap-2">
-          {notice !== null && (
-            <span role="status" className="text-xs text-text-dim">
-              {notice}
-            </span>
-          )}
+          {/* Always mounted, so a screen reader announces the notice when it appears. */}
+          <span role="status" className="text-xs text-text-dim">
+            {notice}
+          </span>
           <Button variant="primary" onClick={() => void copyMultibuy()}>
             {t('fittings.appraisal.copyMultibuy')}
           </Button>
