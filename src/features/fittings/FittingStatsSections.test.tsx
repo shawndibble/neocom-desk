@@ -52,7 +52,6 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     droneBandwidthUsed: 0,
     droneBandwidthTotal: 0,
     maxActiveDrones: 0,
-    droneControlRange: 20000,
     droneBandwidthByType: {},
     hardpoints: { turrets: 0, launchers: 0 },
     droneCapacity: 0,
@@ -1217,7 +1216,7 @@ describe('FittingStatsSections price', () => {
 
 describe('FittingStatsSections drones', () => {
   it("shows the pilot's drone control range", () => {
-    renderSections(stats({ droneControlRange: 57_500 }));
+    renderSections(stats({ applied: { weapons: [], droneControlRange: 57_500 } }));
 
     const drones = within(sectionBody('Drones'));
     expect(drones.getByText('Drone control range')).toBeInTheDocument();

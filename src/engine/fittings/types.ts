@@ -265,8 +265,6 @@ export interface FittingStats {
   maxActiveDrones: number;
   /** Mbit/s one drone of each type in the Fitting draws, whether launched or not. */
   droneBandwidthByType: Record<number, number>;
-  /** How far from the ship the pilot can control drones, metres. */
-  droneControlRange: number;
   droneCapacity: number;
   /** The hull's turret and launcher hardpoints; what the high slots take is `countHardpoints`. */
   hardpoints: HardpointCounts;
@@ -606,18 +604,10 @@ export const CHARACTER_DOGMA_ATTRIBUTE = {
   // (`CHARACTER_BASE_LOCKED_TARGETS`): a live run reads 5 at Target
   // Management V alone and nothing untrained (2026-09-25).
   maxLockedTargets: 192,
-  // How far from the ship drones can be controlled, metres: Drone Avionics
-  // adds 5 km a level, Advanced Drone Avionics 3 km, on top of the base
-  // (`CHARACTER_BASE_DRONE_CONTROL_RANGE`). A live run reads 35 km at Drone
-  // Avionics III, 60 km with both at V, and nothing untrained (2026-10-01).
-  droneControlRange: 458,
 } as const;
 
 /** `maxLockedTargets` on the SDE's CharacterType (1373): what an untrained pilot can lock. */
 export const CHARACTER_BASE_LOCKED_TARGETS = 2;
-
-/** `droneControlDistance` on the SDE's CharacterType (1373), metres: an untrained pilot's drone control range. */
-export const CHARACTER_BASE_DRONE_CONTROL_RANGE = 20_000;
 
 /**
  * Item-level (not ship-level) dogma attributes this seam reads off a fitted

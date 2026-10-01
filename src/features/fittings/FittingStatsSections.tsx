@@ -1019,7 +1019,7 @@ export function FittingStatsSections({
                 {
                   label: t('fittings.stats.fact.droneControlRange'),
                   value: figure((s) =>
-                    t('fittings.stats.unit.km', { value: kmValue(s.droneControlRange) })
+                    t('fittings.stats.unit.km', { value: kmValue(s.applied.droneControlRange) })
                   ),
                 },
               ]}

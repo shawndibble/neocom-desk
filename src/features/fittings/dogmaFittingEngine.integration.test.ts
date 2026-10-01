@@ -123,9 +123,6 @@ const CENOBITE_I = 37599;
 const FIGHTER_SKILL_IDS = [23069, 40572, 40573, 24613];
 const COMMAND_SKILL_IDS = [3348, 3349, 3354, 11574, 24764, 23950];
 
-const DRONE_AVIONICS = 3437;
-const ADVANCED_DRONE_AVIONICS = 23566;
-
 const PARTIAL_SKILLS = new Map([
   [3332, 3], // Gallente Cruiser
   [3426, 3], // CPU Management
@@ -281,34 +278,9 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     };
 
     // A Warrior II is a light drone, 5 Mbit/s; Drones V controls five, Drones III three.
-    expect(read(allV)).toEqual({
-      maxActiveDrones: 5,
-      droneBandwidthByType: { [WARRIOR_II]: 5 },
-      droneControlRange: 20_000,
-    });
+    expect(read(allV)).toEqual({ maxActiveDrones: 5, droneBandwidthByType: { [WARRIOR_II]: 5 } });
     expect(read(partial).maxActiveDrones).toBe(3);
     expect(read(noDrones).maxActiveDrones).toBe(0);
-  });
-
-  it("reads the pilot's drone control range: 20 km base, +5 km a Drone Avionics level, +3 km an Advanced Drone Avionics level", () => {
-    const fitting = vexorNavyIssueFit();
-    const range = (skills: Map<number, number>) => {
-      const dogmaFit = fittingToDogmaFit(fitting, buildPilotProfile(skills, []));
-      const calculation = calculate(dogmaFit);
-      return extractDroneLimits(dogmaFit.items, calculation.items, calculation.character.attributes)
-        .droneControlRange;
-    };
-
-    expect(range(new Map())).toBe(20_000);
-    expect(range(new Map([[DRONE_AVIONICS, 3]]))).toBe(35_000);
-    expect(
-      range(
-        new Map([
-          [DRONE_AVIONICS, 5],
-          [ADVANCED_DRONE_AVIONICS, 5],
-        ])
-      )
-    ).toBe(60_000);
   });
 
   it('marks a type id the pinned data has nothing for as unknown, without failing the rest of the calculation', () => {
