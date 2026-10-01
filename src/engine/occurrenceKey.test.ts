@@ -118,6 +118,7 @@ describe('occurrenceKey', () => {
       blueprintTypeId: 1,
       productTypeId: 2,
       activityId: 1,
+      endMs: T0,
     };
     const corp: CorpIndustryJobNotificationFire = {
       eventId: 'corpIndustryJobReady',
@@ -126,6 +127,7 @@ describe('occurrenceKey', () => {
       blueprintTypeId: 1,
       productTypeId: 2,
       activityId: 1,
+      endMs: T0,
     };
     expect(occurrenceKey(personal, T0)).toEqual(occurrenceKey({ ...personal }, T0 + 1000));
     expect(occurrenceKey(personal, T0)).not.toEqual(occurrenceKey(corp, T0));
@@ -501,6 +503,73 @@ describe('occurrenceFiredAt', () => {
       orderId: 99,
       typeId: 34,
       quantity: 1,
+    };
+    expect(occurrenceFiredAt(fire, T0)).toBe(T0);
+  });
+
+  it("dates contractCompleted by ESI's date_completed, not by the poll that noticed it", () => {
+    const completedAt = T0 - 15 * 3_600_000;
+    const fire: ContractNotificationFire = {
+      eventId: 'contractCompleted',
+      characterId: 7,
+      contractId: 42,
+      occurredMs: completedAt,
+    };
+    expect(occurrenceFiredAt(fire, T0)).toBe(completedAt);
+    expect(occurrenceFiredAt({ ...fire, occurredMs: undefined }, T0)).toBe(T0);
+  });
+
+  it("dates contractAccepted by ESI's date_accepted", () => {
+    const acceptedAt = T0 - 3_600_000;
+    const fire: ContractNotificationFire = {
+      eventId: 'contractAccepted',
+      characterId: 7,
+      contractId: 42,
+      occurredMs: acceptedAt,
+    };
+    expect(occurrenceFiredAt(fire, T0)).toBe(acceptedAt);
+  });
+
+  it('dates industryJobComplete and corpIndustryJobReady by the job end_date', () => {
+    const endMs = T0 - 5 * 3_600_000;
+    const job: IndustryJobNotificationFire = {
+      eventId: 'industryJobComplete',
+      characterId: 7,
+      jobId: 1,
+      blueprintTypeId: 2,
+      productTypeId: 3,
+      activityId: 1,
+      endMs,
+    };
+    const corpJob: CorpIndustryJobNotificationFire = { ...job, eventId: 'corpIndustryJobReady' };
+    expect(occurrenceFiredAt(job, T0)).toBe(endMs);
+    expect(occurrenceFiredAt(corpJob, T0)).toBe(endMs);
+  });
+
+  it("dates newMail by the mail's own timestamp, and falls back when the header had none", () => {
+    const sentMs = T0 - 2 * 3_600_000;
+    const fire: MailNotificationFire = { eventId: 'newMail', characterId: 7, mailId: 5, sentMs };
+    expect(occurrenceFiredAt(fire, T0)).toBe(sentMs);
+    expect(occurrenceFiredAt({ eventId: 'newMail', characterId: 7, mailId: 5 }, T0)).toBe(T0);
+  });
+
+  it("dates planetaryExtractionDone by the colony's expiry, which has already passed", () => {
+    const expiryTimeMs = T0 - 8 * 3_600_000;
+    const fire: PlanetaryNotificationFire = {
+      eventId: 'planetaryExtractionDone',
+      characterId: 7,
+      planetId: 9,
+      expiryTimeMs,
+    };
+    expect(occurrenceFiredAt(fire, T0)).toBe(expiryTimeMs);
+  });
+
+  it("never dates a row in the future when ESI's clock runs ahead of this device", () => {
+    const fire: ContractNotificationFire = {
+      eventId: 'contractCompleted',
+      characterId: 7,
+      contractId: 42,
+      occurredMs: T0 + 30_000,
     };
     expect(occurrenceFiredAt(fire, T0)).toBe(T0);
   });

@@ -8,6 +8,7 @@ import {
   cloneJumpDomain,
   colonyDomain,
   contractDomain,
+  mailDomain,
   walletDomain,
   marketOrderDomain,
   marketOrderUndercutDomain,
@@ -61,6 +62,8 @@ import type {
   CorporationWalletDivision,
   WalletJournalEntry,
   CharacterCorporationRoles,
+  Contract,
+  MailHeader,
 } from '@/esi/endpoints';
 
 vi.mock('@/features/character/contracts', () => ({ loadContracts: vi.fn() }));
@@ -883,6 +886,48 @@ describe('truncation guards', () => {
   });
 });
 
+describe('contractDomain.load dates', () => {
+  beforeEach(() => {
+    vi.mocked(loadContracts).mockReset();
+  });
+
+  it("carries ESI's date_accepted / date_completed onto the snapshot, to date the feed row", async () => {
+    const contract = {
+      contract_id: 5,
+      status: 'finished',
+      type: 'item_exchange',
+      issuer_id: 1,
+      acceptor_id: 2,
+      date_accepted: '2026-01-01T00:00:00Z',
+      date_completed: '2026-01-01T03:00:00Z',
+    } as Contract;
+    vi.mocked(loadContracts).mockResolvedValue(statusResult([contract], false));
+    expect(await contractDomain.load(1)).toEqual([
+      {
+        contractId: 5,
+        status: 'finished',
+        issuerId: 1,
+        acceptorId: 2,
+        dateAcceptedMs: Date.parse('2026-01-01T00:00:00Z'),
+        dateCompletedMs: Date.parse('2026-01-01T03:00:00Z'),
+      },
+    ]);
+  });
+});
+
+describe('mailDomain.toSnapshot', () => {
+  it("carries each header's timestamp, and omits it when ESI sent none", () => {
+    const headers: MailHeader[] = [
+      { mail_id: 2, timestamp: '2026-01-01T00:00:00Z' },
+      { mail_id: 1 },
+    ];
+    expect(mailDomain.toSnapshot(headers, 1_000)).toEqual({
+      entries: [{ mailId: 2, sentMs: Date.parse('2026-01-01T00:00:00Z') }, { mailId: 1 }],
+      nowMs: 1_000,
+    });
+  });
+});
+
 /**
  * `walletDomain.load` bakes the Character's current wallet-balance-changed
  * threshold onto every entry it returns, the same async-preference-read
@@ -1317,6 +1362,7 @@ describe('copy wiring', () => {
         blueprintTypeId: 691,
         productTypeId: 587,
         activityId: 1,
+        endMs: 0,
       },
       'Kestrel'
     );

@@ -740,7 +740,19 @@ export const colonyDomain = defineDomain<
 function isMailHeaderSnapshot(raw: unknown): raw is MailHeaderSnapshot {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
-  return typeof r.mailId === 'number';
+  return typeof r.mailId === 'number' && (r.sentMs === undefined || typeof r.sentMs === 'number');
+}
+
+/** An ESI date string as epoch ms, or `undefined` when absent or unparseable. */
+function optionalDateMs(iso: string | undefined): number | undefined {
+  if (iso === undefined) return undefined;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms : undefined;
+}
+
+function toMailHeaderSnapshot(header: MailHeader): MailHeaderSnapshot {
+  const sentMs = optionalDateMs(header.timestamp);
+  return { mailId: header.mail_id, ...(sentMs === undefined ? {} : { sentMs }) };
 }
 
 export const mailDomain = defineDomain<MailHeader, MailSnapshot, MailNotificationFire>({
@@ -753,10 +765,7 @@ export const mailDomain = defineDomain<MailHeader, MailSnapshot, MailNotificatio
     if (result.needsReauth || result.cached === null) return null;
     return result.cached.data;
   },
-  toSnapshot: (headers, nowMs) => ({
-    entries: headers.map((header) => ({ mailId: header.mail_id })),
-    nowMs,
-  }),
+  toSnapshot: (headers, nowMs) => ({ entries: headers.map(toMailHeaderSnapshot), nowMs }),
 });
 
 /* -------------------------------------------------------------------------- */
@@ -870,18 +879,24 @@ function isContractEntrySnapshot(raw: unknown): raw is ContractEntrySnapshot {
     // Optional: a baseline written before `courierDeliveryDue` (issue #1713)
     // lacks both, and must stay readable rather than reset every character.
     (r.deliveryDeadlineMs === undefined || typeof r.deliveryDeadlineMs === 'number') &&
-    (r.dueLeadMs === undefined || typeof r.dueLeadMs === 'number')
+    (r.dueLeadMs === undefined || typeof r.dueLeadMs === 'number') &&
+    (r.dateAcceptedMs === undefined || typeof r.dateAcceptedMs === 'number') &&
+    (r.dateCompletedMs === undefined || typeof r.dateCompletedMs === 'number')
   );
 }
 
 function toContractEntrySnapshot(contract: Contract, dueLeadMs: number): ContractEntrySnapshot {
   const deliveryDeadlineMs = courierDeliveryDeadlineMs(contract);
+  const dateAcceptedMs = optionalDateMs(contract.date_accepted);
+  const dateCompletedMs = optionalDateMs(contract.date_completed);
   return {
     contractId: contract.contract_id,
     status: contract.status,
     issuerId: contract.issuer_id,
     acceptorId: contract.acceptor_id,
     ...(deliveryDeadlineMs === null ? {} : { deliveryDeadlineMs, dueLeadMs }),
+    ...(dateAcceptedMs === undefined ? {} : { dateAcceptedMs }),
+    ...(dateCompletedMs === undefined ? {} : { dateCompletedMs }),
   };
 }
 

@@ -551,6 +551,7 @@ describe('runForegroundPoll', () => {
       blueprintTypeId: 1000,
       productTypeId: 2000,
       activityId: 1,
+      endMs: Date.parse('2026-01-01T01:00:00Z'),
     });
     expect(character).toEqual(CHAR);
   });

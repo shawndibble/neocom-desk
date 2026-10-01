@@ -581,6 +581,7 @@ describe('diffIndustryJobComplete', () => {
         blueprintTypeId: 1000,
         productTypeId: 2000,
         activityId: 1,
+        endMs: T0 + 1000,
       },
     ]);
   });
@@ -614,6 +615,7 @@ describe('diffIndustryJobComplete', () => {
         blueprintTypeId: 1000,
         productTypeId: 2000,
         activityId: 1,
+        endMs: T0 + 100,
       },
       {
         eventId: 'industryJobComplete',
@@ -622,6 +624,7 @@ describe('diffIndustryJobComplete', () => {
         blueprintTypeId: 1000,
         productTypeId: 2000,
         activityId: 1,
+        endMs: T0 + 200,
       },
     ]);
   });
@@ -637,6 +640,7 @@ describe('diffIndustryJobComplete', () => {
         blueprintTypeId: 1000,
         productTypeId: 2000,
         activityId: 1,
+        endMs: T0 + 1000,
       },
     ]);
   });
@@ -1202,6 +1206,14 @@ describe('diffNewMail', () => {
     expect(diffNewMail(7, prev, next)).toEqual([{ eventId: 'newMail', characterId: 7, mailId: 6 }]);
   });
 
+  it("carries the mail's own sent time, to date the feed row", () => {
+    const prev = mailSnapshot([mailEntry(5)], T0);
+    const next = mailSnapshot([{ mailId: 6, sentMs: T0 - 60_000 }, mailEntry(5)], T0 + 2000);
+    expect(diffNewMail(7, prev, next)).toEqual([
+      { eventId: 'newMail', characterId: 7, mailId: 6, sentMs: T0 - 60_000 },
+    ]);
+  });
+
   it('does not fire for an id already seen', () => {
     const prev = mailSnapshot([mailEntry(5)], T0);
     const next = mailSnapshot([mailEntry(5)], T0 + 2000);
@@ -1404,6 +1416,17 @@ describe('diffContractAccepted', () => {
     ]);
   });
 
+  it("carries ESI's date_accepted, to date the feed row", () => {
+    const prev = contractSnapshot([contractEntry(1, 'outstanding')], T0);
+    const next = contractSnapshot(
+      [{ ...contractEntry(1, 'in_progress'), dateAcceptedMs: T0 - 60_000 }],
+      T0 + 2000
+    );
+    expect(diffContractAccepted(7, prev, next)).toEqual([
+      { eventId: 'contractAccepted', characterId: 7, contractId: 1, occurredMs: T0 - 60_000 },
+    ]);
+  });
+
   it('does not fire while the contract stays outstanding', () => {
     const prev = contractSnapshot([contractEntry(1, 'outstanding')], T0);
     const next = contractSnapshot([contractEntry(1, 'outstanding')], T0 + 2000);
@@ -1450,6 +1473,24 @@ describe('diffContractCompleted', () => {
       ]);
     }
   );
+
+  it("carries ESI's date_completed, to date the feed row", () => {
+    const completedAt = T0 - 15 * 3_600_000;
+    const prev = contractSnapshot([contractEntry(1, 'in_progress')], T0);
+    const next = contractSnapshot(
+      [
+        {
+          ...contractEntry(1, 'finished'),
+          dateAcceptedMs: T0 - 86_400_000,
+          dateCompletedMs: completedAt,
+        },
+      ],
+      T0 + 2000
+    );
+    expect(diffContractCompleted(7, prev, next)).toEqual([
+      { eventId: 'contractCompleted', characterId: 7, contractId: 1, occurredMs: completedAt },
+    ]);
+  });
 
   it('fires when a contract moves from outstanding straight to a completed status', () => {
     const prev = contractSnapshot([contractEntry(1, 'outstanding')], T0);
@@ -2205,6 +2246,7 @@ describe('diffCorpIndustryJobReady', () => {
         blueprintTypeId: 1000,
         productTypeId: 2000,
         activityId: 1,
+        endMs: T0 + 1000,
       },
     ]);
   });
