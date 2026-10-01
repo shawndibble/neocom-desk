@@ -14,23 +14,22 @@ import {
   StatChip,
   Toast,
 } from '@/components/ui';
-import { tiersReached } from '@/engine/tierLadder';
 import type { PlanEntry } from '@/engine/types';
 import { CertificateRow } from '@/features/skills/certificates/CertificateRow';
 import {
   certificateRows,
-  ELITE,
+  certificateTimes,
   filterRows,
   gradeSummary,
   sortRows,
   type CertificateSort,
 } from '@/features/skills/certificates/certificatesModel';
 import { useCertificatesData } from '@/features/skills/certificates/useCertificatesData';
-import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { GrantNote } from '@/app/GrantNote';
 
 const SORTS: readonly CertificateSort[] = ['grade', 'name', 'time'];
 const TOAST_MS = 8000;
@@ -95,40 +94,27 @@ export function SkillCertificates() {
     [certificates, skillsKnown, trainedLevel, planEntries, alphaMaxLevel]
   );
 
-  // Every row's time to its next grade, by the Skill Plan scheduler: the
-  // "least time" sort needs all of them, not just the expanded one.
-  const times = useMemo(() => {
-    const total = new Map<number, number>();
-    const perSkill = new Map<number, Map<number, number>>();
-    if (!catalog) return { total, perSkill };
-    const ctx = {
-      skills: catalog.engineSkills,
-      trainedSkills,
-      attributes,
-      implants,
-      cloneState,
-    };
-    for (const row of rows) {
-      if (row.next.length === 0) continue;
-      const bySkill = new Map<number, number>();
-      let sum = 0;
-      for (const step of scheduleEntries(row.next, ctx)) {
-        bySkill.set(step.skillTypeID, (bySkill.get(step.skillTypeID) ?? 0) + step.seconds);
-        sum += step.seconds;
-      }
-      total.set(row.certificate.id, sum);
-      perSkill.set(row.certificate.id, bySkill);
-    }
-    return { total, perSkill };
-  }, [rows, catalog, trainedSkills, attributes, implants, cloneState]);
+  const times = useMemo(
+    () =>
+      catalog
+        ? certificateTimes(rows, {
+            skills: catalog.engineSkills,
+            trainedSkills,
+            attributes,
+            implants,
+            cloneState,
+          })
+        : new Map(),
+    [rows, catalog, trainedSkills, attributes, implants, cloneState]
+  );
 
   const groupNames = useMemo(
     () => [...new Set((certificates ?? []).map((c) => c.groupName))],
     [certificates]
   );
   const visible = useMemo(
-    () => sortRows(filterRows(rows, { group, hideElite }), sort, times.total),
-    [rows, group, hideElite, sort, times.total]
+    () => sortRows(filterRows(rows, { group, hideElite }), sort, times),
+    [rows, group, hideElite, sort, times]
   );
   const summary = useMemo(() => gradeSummary(rows), [rows]);
 
@@ -161,7 +147,18 @@ export function SkillCertificates() {
       </div>
     );
   } else if (!skillsKnown) {
-    body = <EmptyState title={t('skills.emptyTitle')} hint={t('skills.emptyHint')} />;
+    body = (
+      <>
+        {/* Only when the stored grant really lacks the skills read. */}
+        <GrantNote
+          endpoints={['getCharacterSkills']}
+          title={t('skills.reauthTitle')}
+          hint={t('skills.reauthHint')}
+          actionLabel={t('skills.reauthAction')}
+        />
+        <EmptyState title={t('skills.emptyTitle')} hint={t('skills.emptyHint')} />
+      </>
+    );
   } else {
     body = (
       <>
@@ -249,17 +246,11 @@ export function SkillCertificates() {
                         row={row}
                         expanded={expandedId === row.certificate.id}
                         onToggle={() =>
-                          setExpandedId(
-                            expandedId === row.certificate.id ? null : row.certificate.id
+                          setExpandedId((open) =>
+                            open === row.certificate.id ? null : row.certificate.id
                           )
                         }
-                        secondsToNext={times.total.get(row.certificate.id)}
-                        skillSeconds={times.perSkill.get(row.certificate.id) ?? new Map()}
-                        alphaReach={
-                          alphaMaxLevel && row.alphaCapped.length > 0 && row.grade !== ELITE
-                            ? tiersReached(row.certificate.levels, alphaMaxLevel)
-                            : null
-                        }
+                        time={times.get(row.certificate.id)}
                         planEntries={planEntries}
                         trainedLevel={trainedLevel}
                         skillName={skillName}

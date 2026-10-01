@@ -7,7 +7,7 @@ import { SkillRow } from '@/features/skills/SkillRow';
 import { skillTrainingStatus } from '@/features/skills/skillStatus';
 import { formatCountdown } from '@/lib/duration';
 import { cx } from '@/lib/cx';
-import { ELITE, type CertificateRow as Row } from './certificatesModel';
+import { ELITE, type CertificateRow as Row, type CertificateTime } from './certificatesModel';
 
 const GRADES = [1, 2, 3, 4, 5] as const;
 
@@ -51,12 +51,8 @@ export interface CertificateRowProps {
   row: Row;
   expanded: boolean;
   onToggle: () => void;
-  /** Total time to the next grade, by the plan scheduler; absent at Elite. */
-  secondsToNext: number | undefined;
-  /** Per-skill time for the expanded list. */
-  skillSeconds: ReadonlyMap<number, number>;
-  /** Highest grade an Alpha clone reaches; null for an Omega Character. */
-  alphaReach: number | null;
+  /** Time to the next grade, by the plan scheduler; absent at Elite. */
+  time: CertificateTime | undefined;
   planEntries: readonly PlanEntry[];
   trainedLevel: (skillTypeID: number) => number;
   skillName: (skillTypeID: number) => string;
@@ -68,16 +64,14 @@ export function CertificateRow({
   row,
   expanded,
   onToggle,
-  secondsToNext,
-  skillSeconds,
-  alphaReach,
+  time,
   planEntries,
   trainedLevel,
   skillName,
   onAdd,
 }: CertificateRowProps) {
   const { t } = useTranslation();
-  const { certificate, grade, next, unplanned, alphaCapped } = row;
+  const { certificate, grade, next, unplanned, alphaCapped, alphaReach } = row;
   const elite = grade === ELITE;
   const nextGrade = elite ? '' : t(`skills.certificates.grade.${grade + 1}`);
   const capped = alphaCapped.length > 0;
@@ -85,11 +79,7 @@ export function CertificateRow({
 
   let action;
   if (elite) {
-    action = (
-      <Button size="sm" disabled>
-        {t('skills.certificates.complete')}
-      </Button>
-    );
+    action = <span className="text-text-dim">{t('skills.certificates.complete')}</span>;
   } else if (capped) {
     action = (
       <Button size="sm" disabled>
@@ -121,7 +111,7 @@ export function CertificateRow({
               name: certificate.name,
             })}
             onClick={onToggle}
-            className="flex min-h-9 min-w-0 items-center gap-1.5 text-left text-sm font-medium text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="flex min-h-11 min-w-0 items-center md:min-h-9 gap-1.5 text-left text-sm font-medium text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <Caret expanded={expanded} />
             <span className="truncate">{certificate.name}</span>
@@ -144,7 +134,7 @@ export function CertificateRow({
             t('skills.certificates.nextNeeds', {
               grade: nextGrade,
               count: next.length,
-              time: formatCountdown(secondsToNext ?? 0),
+              time: formatCountdown(time?.total ?? 0),
             })
           )}
         </p>
@@ -156,19 +146,21 @@ export function CertificateRow({
             {t('skills.certificates.missingFor', { grade: nextGrade })}
           </p>
           <ul className="space-y-1">
-            {next.map((entry) => {
+            {/* The schedule's own steps, not just `next`: a prerequisite the
+                scheduler injects shows here too, so the rows sum to the total. */}
+            {(time?.steps ?? []).map((entry) => {
               const have = trainedLevel(entry.skillTypeID);
               return (
                 <li key={entry.skillTypeID}>
                   <SkillRow
-                    name={`${skillName(entry.skillTypeID)} ${romanLevel(entry.targetLevel)}`}
+                    name={`${skillName(entry.skillTypeID)} ${romanLevel(entry.level)}`}
                     skillTypeID={entry.skillTypeID}
                     planEntries={planEntries}
-                    status={skillTrainingStatus(have, entry.targetLevel)}
+                    status={skillTrainingStatus(have, entry.level)}
                     currentLevel={have}
-                    timeLabel={formatCountdown(skillSeconds.get(entry.skillTypeID) ?? 0)}
+                    timeLabel={formatCountdown(entry.seconds)}
                     inPlanLabel={
-                      isEntryCovered(planEntries, entry.skillTypeID, entry.targetLevel)
+                      isEntryCovered(planEntries, entry.skillTypeID, entry.level)
                         ? t('skills.fitCheck.inPlan')
                         : undefined
                     }

@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import type { EngineSkill } from '@/engine/types';
 import type { Certificate } from '@/sde/types';
 import {
   certificateRows,
+  certificateTimes,
   filterRows,
   gradeSummary,
   sortRows,
@@ -103,9 +105,50 @@ describe('sortRows', () => {
   it('sorts by least time to the next grade, Elite last', () => {
     const elite = rows({ 100: 5, 200: 1 });
     const seconds = new Map([
-      [2, 600],
-      [3, 60],
+      [2, { total: 600, steps: [] }],
+      [3, { total: 60, steps: [] }],
     ]);
     expect(sortRows(elite, 'time', seconds).map((r) => r.certificate.id)).toEqual([3, 2, 1]);
+  });
+});
+
+describe('certificateTimes', () => {
+  const skill = (typeID: number, prereqs: { typeID: number; level: number }[] = []) =>
+    ({
+      typeID,
+      name: `S${typeID}`,
+      rank: 1,
+      primary: 'intelligence',
+      secondary: 'memory',
+      prereqs,
+    }) as EngineSkill;
+  const ctx = {
+    // 200 needs 100 at II — a prerequisite the certificate itself never names.
+    skills: new Map([
+      [100, skill(100)],
+      [200, skill(200, [{ typeID: 100, level: 2 }])],
+    ]),
+    trainedSkills: new Map(),
+    attributes: { intelligence: 20, memory: 20, perception: 20, willpower: 20, charisma: 19 },
+    implants: {},
+    cloneState: 'omega' as const,
+  };
+  const CERT = cert(9, 'Needs a prereq', 'Armor', 200);
+
+  it('lists every scheduled step, injected prerequisites included, so the steps sum to the total', () => {
+    const [row] = certificateRows([CERT], { trainedLevel: () => 0, planEntries: [] });
+    const times = certificateTimes([row], ctx).get(9);
+    expect(times).toBeDefined();
+    expect(times!.steps.map((s) => [s.skillTypeID, s.level])).toEqual([
+      [100, 2],
+      [200, 1],
+    ]);
+    expect(times!.steps.reduce((sum, s) => sum + s.seconds, 0)).toBe(times!.total);
+    expect(times!.total).toBeGreaterThan(0);
+  });
+
+  it('has no entry for an Elite certificate', () => {
+    const [row] = certificateRows([CERT], { trainedLevel: () => 5, planEntries: [] });
+    expect(certificateTimes([row], ctx).has(9)).toBe(false);
   });
 });

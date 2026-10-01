@@ -40,8 +40,8 @@ function skill(typeID: number, name: string, alphaMaxLevel?: number): EngineSkil
     typeID,
     name,
     rank: 1,
-    primaryAttr: 'intelligence',
-    secondaryAttr: 'memory',
+    primary: 'intelligence',
+    secondary: 'memory',
     prereqs: [],
     ...(alphaMaxLevel !== undefined ? { alphaMaxLevel } : {}),
   } as unknown as EngineSkill;
@@ -98,7 +98,7 @@ describe('SkillCertificates', () => {
     renderPage();
     expect(await screen.findByText('Standard (2 of 5)')).toBeInTheDocument();
     expect(screen.getByText('Elite: nothing left to train')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Complete' })).toBeDisabled();
+    expect(screen.getByText('Complete')).toBeInTheDocument();
     expect(screen.getByText(/Improved needs 1 skill level/)).toBeInTheDocument();
   });
 
