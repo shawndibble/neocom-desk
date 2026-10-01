@@ -166,7 +166,7 @@ function FittingsPage() {
   )?.name;
   const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
   const alpha = useFittingAlpha(workspace.fitting);
-  const hardpointsUsed = useFittingHardpoints(workspace.fitting);
+  const hardpoints = useFittingHardpoints(workspace.fitting);
   // The weather the numbers on screen are in — which lags a new pick until they land.
   const weatherName = useWeatherName(workspace.statsWeatherTypeId);
   const [saveToEveOpen, setSaveToEveOpen] = useState(false);
@@ -444,7 +444,8 @@ function FittingsPage() {
           }
           compact={isPhone}
           onRackOpen={setRackSheet}
-          hardpointsUsed={hardpointsUsed}
+          hardpointsUsed={hardpoints.used}
+          hardpointKindOf={hardpoints.kindOf}
           selectedSlot={
             target?.kind === 'slot' ? { rack: target.slot, index: target.slotIndex } : null
           }

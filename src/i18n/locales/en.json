@@ -373,6 +373,8 @@
         "launcher": "Launcher hardpoints: {{used}} of {{total}} used",
         "turretLoading": "Turret hardpoints: {{total}}",
         "launcherLoading": "Launcher hardpoints: {{total}}",
+        "turretTile": "Uses a turret hardpoint",
+        "launcherTile": "Uses a launcher hardpoint",
         "over_one": "{{label}} — {{count}} more than the hull has",
         "over_other": "{{label}} — {{count}} more than the hull has"
       },

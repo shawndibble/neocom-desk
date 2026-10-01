@@ -11,6 +11,7 @@ import {
   arcPath,
   buildRingSlots,
   gaugeArc,
+  hardpointGlyphAngle,
   hardpointPipAngles,
   ringGhostIndices,
   ringPoint,
@@ -289,5 +290,25 @@ describe('hardpointPipAngles', () => {
       expect(angle).toBeGreaterThan(RING_GAUGES.calibration.to);
       expect(angle).toBeLessThan(RING_GAUGES.droneBandwidth.from);
     }
+  });
+});
+
+describe('hardpointGlyphAngle', () => {
+  it('puts each kind�s glyph on its own side, between 12 o�clock and its first pip', () => {
+    const turret = hardpointGlyphAngle('turret');
+    const launcher = hardpointGlyphAngle('launcher');
+    expect(turret).toBeLessThan(0);
+    expect(launcher).toBeGreaterThan(0);
+    expect(turret).toBeGreaterThan(hardpointPipAngles('turret', 1)[0]);
+    expect(launcher).toBeLessThan(hardpointPipAngles('launcher', 1)[0]);
+  });
+
+  it('leaves a glyph�s width clear on both sides: of the other glyph and of the first pip', () => {
+    // A glyph is about 2.6� wide at the gauge radius, a pip about 1.8�.
+    const launcher = hardpointGlyphAngle('launcher');
+    expect(launcher * 2).toBeGreaterThanOrEqual(3.3 + 2);
+    expect(hardpointPipAngles('launcher', 1)[0] - launcher).toBeGreaterThanOrEqual(
+      (2.6 + 1.8) / 2 + 1
+    );
   });
 });

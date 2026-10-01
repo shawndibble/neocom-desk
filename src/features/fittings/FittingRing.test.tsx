@@ -282,6 +282,57 @@ describe('FittingRing', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Turret hardpoints: 2 of 3 used');
   });
 
+  it('heads each kind�s pips with the game�s hardpoint icon, so a split hull reads at a glance', () => {
+    const { container } = render(
+      <FittingRing
+        fitting={fitting}
+        stats={{ ...statsWith(10), hardpoints: { turrets: 3, launchers: 2 } }}
+        hardpointsUsed={{ turrets: 1, launchers: 0 }}
+      />
+    );
+    const glyph = (kind: string) =>
+      container.querySelector(`[data-hardpoints="${kind}"] image`)?.getAttribute('href');
+    expect(glyph('turret')).toBe('/images/fitting/hardpoint-turret.png');
+    expect(glyph('launcher')).toBe('/images/fitting/hardpoint-launcher.png');
+  });
+
+  it('badges a high-slot tile with the hardpoint its module takes, and names it on hover', async () => {
+    const kinds: Record<number, 'turret' | 'launcher' | null> = {
+      10: 'turret',
+      12: 'launcher',
+      13: null,
+    };
+    const split: Fitting = {
+      ...fitting,
+      modules: [
+        ...fitting.modules,
+        { slot: 'high', slotIndex: 1, typeId: 12, state: 'active' },
+        { slot: 'high', slotIndex: 2, typeId: 13, state: 'active' },
+      ],
+    };
+    const { container } = render(
+      <FittingRing
+        fitting={split}
+        stats={{ ...statsWith(10), hardpoints: { turrets: 1, launchers: 1 } }}
+        hardpointsUsed={{ turrets: 1, launchers: 1 }}
+        hardpointKindOf={(typeId) => kinds[typeId]}
+        typeName={(typeId) => `Type ${typeId}`}
+      />
+    );
+    const badge = (slot: string) =>
+      container.querySelector(`[data-ring-slot="${slot}"] [data-hardpoint-badge]`);
+    expect(badge('high-0')?.getAttribute('data-hardpoint-badge')).toBe('turret');
+    expect(badge('high-1')?.getAttribute('data-hardpoint-badge')).toBe('launcher');
+    // A utility high (a neut, a cloak) takes no hardpoint, and a low slot never does.
+    expect(badge('high-2')).toBeNull();
+    expect(badge('low-0')).toBeNull();
+
+    fireEvent.pointerMove(container.querySelector('[data-ring-slot="high-1"]')!, {
+      pointerType: 'mouse',
+    });
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Uses a launcher hardpoint');
+  });
+
   it('draws no hardpoints for a hull without them, and flags a rack fitted past them', () => {
     const { container } = render(
       <FittingRing

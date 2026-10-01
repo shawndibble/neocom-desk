@@ -79,14 +79,20 @@ export const RING_GAUGES = {
 
 export type RingGauge = keyof typeof RING_GAUGES;
 
-/** Degrees between neighbouring hardpoint pips, and from 12 o'clock to the first. */
-const PIP_PITCH_DEG = 3.5;
-const PIP_START_DEG = 4;
+/**
+ * Degrees between neighbouring hardpoint pips, from 12 o'clock to the first,
+ * and to the kind's glyph, which sits between the two so a split hull's
+ * turrets and launchers are told apart without a hover.
+ */
+const PIP_PITCH_DEG = 3;
+const PIP_START_DEG = 7.5;
+const GLYPH_DEG = 3.5;
 
 /**
  * Where a hull's hardpoint pips sit on the rim's top gap, between the
  * calibration and drone bandwidth bands: turrets running out left from
- * 12 o'clock, launchers out right, the first of each nearest the top.
+ * 12 o'clock, launchers out right, the first of each nearest the top, just
+ * past its kind's glyph (`hardpointGlyphAngle`).
  */
 export function hardpointPipAngles(kind: 'turret' | 'launcher', count: number): number[] {
   const side = kind === 'turret' ? -1 : 1;
@@ -94,6 +100,11 @@ export function hardpointPipAngles(kind: 'turret' | 'launcher', count: number): 
     { length: count },
     (_, index) => side * (PIP_START_DEG + index * PIP_PITCH_DEG)
   );
+}
+
+/** Where a kind's glyph — the game's turret or launcher hardpoint icon — sits, beside 12 o'clock. */
+export function hardpointGlyphAngle(kind: 'turret' | 'launcher'): number {
+  return kind === 'turret' ? -GLYPH_DEG : GLYPH_DEG;
 }
 
 /**

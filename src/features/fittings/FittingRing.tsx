@@ -20,6 +20,7 @@ import {
   arcPath,
   buildRingSlots,
   gaugeArc,
+  hardpointGlyphAngle,
   hardpointPipAngles,
   ringGhostIndices,
   ringPoint,
@@ -31,7 +32,7 @@ import {
   type SlotLayout,
 } from '@/engine/fittings/ringLayout';
 import { cargoGroups, shownModuleState } from '@/engine/fittings/fittingEdit';
-import type { HardpointKind } from '@/engine/fittings/hardpoints';
+import type { HardpointKind, HardpointKindOf } from '@/engine/fittings/hardpoints';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
 import {
@@ -132,6 +133,8 @@ interface FittingRingProps {
   selectedSlot?: { rack: FittingSlotKind; index: number } | null;
   /** The turrets and launchers the high slots take; null (no pips filled) until known. */
   hardpointsUsed?: HardpointCounts | null;
+  /** The hardpoint each high-slot type takes, for its tile's badge; no badges without it. */
+  hardpointKindOf?: HardpointKindOf;
   /** The panel header's controls â€” the page's "+ Add module". */
   actions?: ReactNode;
   /** No panel of its own, for a host that already frames it (the Start screen's preview). */
@@ -270,10 +273,23 @@ function hardpointLabel(
 /** A pip's radius, and the band a pointer hovers to read a kind's numbers. */
 const PIP_RADIUS = 5;
 const PIP_HIT_WIDTH = 22;
+/** The hardpoint icon's side, ring units: a little wider than a pip. */
+const GLYPH_SIZE = 18;
 
 /**
- * One kind of hardpoint on the rim's top gap: a pip each, filled where the
- * high slots take one, red past what the hull has.
+ * CCP's own fitting-window hardpoint icons (the EVE University wiki's
+ * `Icon_turret_hp.png` / `Icon_launcher_hp.png`), as the Add panel's slot
+ * icons are (DESIGN.md §5's exception): a split hull's two rows of pips read
+ * as the client draws them, not as two anonymous runs of dots.
+ */
+const HARDPOINT_ICON: Readonly<Record<HardpointKind, string>> = {
+  turret: '/images/fitting/hardpoint-turret.png',
+  launcher: '/images/fitting/hardpoint-launcher.png',
+};
+
+/**
+ * One kind of hardpoint on the rim's top gap: its icon by 12 o'clock, then a
+ * pip each, filled where the high slots take one, red past what the hull has.
  */
 function HardpointPips({
   kind,
@@ -292,6 +308,17 @@ function HardpointPips({
   const angles = hardpointPipAngles(kind, Math.max(total, taken));
   if (angles.length === 0) return null;
   const c = RING_VIEW / 2;
+  const glyphAngle = hardpointGlyphAngle(kind);
+  const g = ringPoint(glyphAngle, RING_GAUGE_RADIUS);
+  const glyph = (
+    <image
+      href={HARDPOINT_ICON[kind]}
+      x={c + g.x - GLYPH_SIZE / 2}
+      y={c + g.y - GLYPH_SIZE / 2}
+      width={GLYPH_SIZE}
+      height={GLYPH_SIZE}
+    />
+  );
   const pips = angles.map((angle, index) => {
     const p = ringPoint(angle, RING_GAUGE_RADIUS);
     const fill =
@@ -311,17 +338,23 @@ function HardpointPips({
       />
     );
   });
-  if (compact) return <g data-hardpoints={kind}>{pips}</g>;
-  const first = angles[0];
-  const last = angles[angles.length - 1];
+  if (compact)
+    return (
+      <g data-hardpoints={kind}>
+        {glyph}
+        {pips}
+      </g>
+    );
+  const ends = [glyphAngle, angles[0], angles[angles.length - 1]];
   return (
     <Tooltip content={hardpointLabel(t, kind, used, total)}>
       <g data-hardpoints={kind} className="pointer-events-auto">
         <path
-          d={arcPath(Math.min(first, last) - 2, Math.max(first, last) + 2, RING_GAUGE_RADIUS, c, c)}
+          d={arcPath(Math.min(...ends) - 2, Math.max(...ends) + 2, RING_GAUGE_RADIUS, c, c)}
           className="fill-none stroke-transparent"
           strokeWidth={PIP_HIT_WIDTH}
         />
+        {glyph}
         {pips}
       </g>
     </Tooltip>
@@ -438,6 +471,8 @@ function slotAccepts(
 interface SlotTileProps extends DropHandlers {
   slot: RingSlot;
   cantUse: boolean;
+  /** The hardpoint a high-slot module takes; null for none, or not yet known. */
+  hardpoint: HardpointKind | null;
   /** The state the engine reached, when it has calculated this module. */
   reachedState?: FittingModuleResult['state'];
   /** Whether this is the slot being filled; undefined when nothing can be. */
@@ -461,6 +496,7 @@ interface SlotTileProps extends DropHandlers {
 function SlotTile({
   slot,
   cantUse,
+  hardpoint,
   reachedState,
   selected,
   maxState,
@@ -506,6 +542,7 @@ function SlotTile({
         module.chargeTypeId !== undefined
           ? t('fittings.ring.tooltipCharge', { name: nameOf(module.chargeTypeId) })
           : null,
+        hardpoint ? t(`fittings.ring.hardpoints.${hardpoint}Tile`) : null,
         cantUse ? t('fittings.ring.tooltipCantUse') : null,
       ]
         .filter(Boolean)
@@ -608,6 +645,20 @@ function SlotTile({
         {module?.chargeTypeId !== undefined && (
           <span className="absolute right-0 bottom-0 h-[38%] w-[38%] border border-line bg-panel">
             <TypeIcon typeId={module.chargeTypeId} size={32} className="h-full w-full" />
+          </span>
+        )}
+        {/* The hardpoint it takes, matching the icon heading that kind's pips on the rim. */}
+        {module && hardpoint && (
+          <span
+            data-hardpoint-badge={hardpoint}
+            className="absolute top-0 left-0 h-[34%] w-[34%] border border-line bg-bg/85"
+          >
+            <img
+              src={HARDPOINT_ICON[hardpoint]}
+              alt=""
+              aria-hidden="true"
+              className="h-full w-full object-contain"
+            />
           </span>
         )}
         {/* A corner flag, small enough to leave the module readable under it. */}
@@ -756,6 +807,7 @@ export function FittingRing({
   droneButton,
   selectedSlot,
   hardpointsUsed,
+  hardpointKindOf,
   actions,
   bare = false,
 }: FittingRingProps) {
@@ -830,6 +882,8 @@ export function FittingRing({
     return groups === undefined ? undefined : groups.length > 0;
   };
   const reachedState = (slot: RingSlot) => resultOf(slot)?.state;
+  const hardpointOf = (slot: RingSlot) =>
+    slot.rack === 'high' && slot.module ? (hardpointKindOf?.(slot.module.typeId) ?? null) : null;
 
   function tilePosition(angle: number): CSSProperties {
     const p = ringPoint(angle, RING_SLOT_RADIUS);
@@ -986,6 +1040,7 @@ export function FittingRing({
                 {...tileProps}
                 slot={slot}
                 cantUse={cantUse(slot)}
+                hardpoint={hardpointOf(slot)}
                 reachedState={reachedState(slot)}
                 maxState={maxStateOf(slot)}
                 takesCharges={takesChargesOf(slot)}

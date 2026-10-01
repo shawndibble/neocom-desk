@@ -545,7 +545,10 @@ glyph would say something else at a glance than what the pilot already knows
 from the client. The exception is scoped to exactly those `<img>` elements and
 nothing else in the panel — its search icon, close button and every other
 glyph stay Phosphor as normal (a subsystem slot, which has no in-game rack
-icon, keeps a text chip). Scope decisions:
+icon, keeps a text chip). The Fitting Ring's turret and launcher hardpoint
+icons (`public/images/fitting/hardpoint-{turret,launcher}.png`) fall under the
+same exception: one heads each kind's hardpoint pips on the rim, and the same
+one badges each high-slot tile whose module takes that hardpoint. Scope decisions:
 `docs/context/decisions/20260927-104252-fitting-add-panel-hull-resource-skill-filter-icons.md`,
 `docs/context/decisions/20260930-173310-fitting-add-panel-slot-icon-replaces-fits-this.md`.
 
