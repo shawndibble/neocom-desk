@@ -6,31 +6,52 @@
 // "latest" would serve the first build ever downloaded forever. Only the
 // requested members are inflated (fflate's `filter`), not the whole archive.
 
-import { mkdir, readFile, writeFile, stat } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile, stat } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { unzipSync, strFromU8 } from 'fflate';
 
 const LATEST_URL =
   'https://developers.eveonline.com/static-data/eve-online-static-data-latest-jsonl.zip';
-const USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
+const ZIP_NAME = /^eve-online-static-data-\d+-jsonl\.zip$/;
 
-/** The build-numbered URL "latest" currently redirects to. */
-async function resolveLatestUrl() {
+/**
+ * The build-numbered URL "latest" currently redirects to. Anything but a
+ * redirect to a build-numbered file throws: caching under "latest" itself
+ * would freeze the cache on whichever build it first saw.
+ */
+async function resolveLatestUrl(userAgent) {
   const res = await fetch(LATEST_URL, {
     method: 'HEAD',
     redirect: 'manual',
-    headers: { 'User-Agent': USER_AGENT },
+    headers: { 'User-Agent': userAgent },
   });
   const location = res.headers.get('location');
   if (res.status >= 300 && res.status < 400 && location) {
-    return new URL(location, LATEST_URL).href;
+    const url = new URL(location, LATEST_URL).href;
+    if (ZIP_NAME.test(basename(new URL(url).pathname))) return url;
+    throw new Error(`${LATEST_URL} redirected to an unrecognised file: ${url}`);
   }
-  if (res.ok) return LATEST_URL;
-  throw new Error(`HTTP ${res.status} resolving ${LATEST_URL}`);
+  throw new Error(`HTTP ${res.status} resolving ${LATEST_URL}; expected a redirect`);
 }
 
-async function cachedZip(cacheDir) {
-  const url = await resolveLatestUrl();
+/** The highest-numbered build already in the cache, for an offline rebuild. */
+async function newestCachedZip(cacheDir) {
+  const names = (await readdir(cacheDir).catch(() => [])).filter((n) => ZIP_NAME.test(n));
+  const build = (n) => Number(n.match(/\d+/)[0]);
+  names.sort((a, b) => build(b) - build(a));
+  return names[0] ? join(cacheDir, names[0]) : null;
+}
+
+async function cachedZip(cacheDir, userAgent) {
+  let url;
+  try {
+    url = await resolveLatestUrl(userAgent);
+  } catch (err) {
+    const fallback = await newestCachedZip(cacheDir);
+    if (!fallback) throw err;
+    console.warn(`  ${err.message} — using cached ${basename(fallback)}`);
+    return readFile(fallback);
+  }
   const path = join(cacheDir, basename(new URL(url).pathname));
   try {
     const s = await stat(path);
@@ -41,7 +62,7 @@ async function cachedZip(cacheDir) {
   } catch {
     /* not cached */
   }
-  const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+  const res = await fetch(url, { headers: { 'User-Agent': userAgent } });
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
   const bytes = Buffer.from(await res.arrayBuffer());
   await mkdir(cacheDir, { recursive: true });
@@ -51,8 +72,8 @@ async function cachedZip(cacheDir) {
 }
 
 /** The named members of CCP's latest JSONL export, as text, keyed by name. */
-export async function readCcpStaticDataFiles(cacheDir, names) {
-  const zip = await cachedZip(cacheDir);
+export async function readCcpStaticDataFiles(cacheDir, names, userAgent) {
+  const zip = await cachedZip(cacheDir, userAgent);
   const wanted = new Set(names);
   const members = unzipSync(new Uint8Array(zip), { filter: (file) => wanted.has(file.name) });
   const out = {};

@@ -10,8 +10,7 @@ import type { CertifiedPlan } from '@/sde/types';
 import { newPlan } from './newPlan';
 import { appendImportedEntries } from './reorder';
 import { normalizeMilestones } from './milestones';
-
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
+import { romanLevel } from '@/engine/projection';
 
 /**
  * A new plan holding the certified plan's levels in CCP's order. Entries go
@@ -36,7 +35,7 @@ export function certifiedPlanRecord(
   const milestones = normalizeMilestones(
     plan.milestones.map((m): PlanMilestone => ({
       id: crypto.randomUUID(),
-      name: `${skillNameFor(m.skillTypeID)} ${ROMAN[m.level - 1]}`,
+      name: `${skillNameFor(m.skillTypeID)} ${romanLevel(m.level)}`,
       skillTypeID: m.skillTypeID,
       level: m.level,
     }))

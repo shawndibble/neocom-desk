@@ -53,19 +53,19 @@ describe('CertifiedPlanDialog', () => {
   it("opens on the first career path and lists only that path's plans", async () => {
     renderDialog();
     expect(
-      await screen.findByRole('button', { name: /Caldari Treasure Hunter/ })
+      await screen.findByRole('radio', { name: /Caldari Treasure Hunter/ })
     ).toBeInTheDocument();
     expect(screen.getByText('Caldari State')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Manufacturer/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Manufacturer/ })).not.toBeInTheDocument();
   });
 
   it('switches career path', async () => {
     const user = userEvent.setup();
     renderDialog();
     await user.click(await screen.findByRole('tab', { name: 'Industrialist' }));
-    expect(screen.getByRole('button', { name: /Manufacturer/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Manufacturer/ })).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /Caldari Treasure Hunter/ })
+      screen.queryByRole('radio', { name: /Caldari Treasure Hunter/ })
     ).not.toBeInTheDocument();
   });
 
@@ -76,9 +76,9 @@ describe('CertifiedPlanDialog', () => {
     expect(create).toBeDisabled();
 
     await user.click(screen.getByRole('tab', { name: 'Industrialist' }));
-    const row = screen.getByRole('button', { name: /Manufacturer/ });
+    const row = screen.getByRole('radio', { name: /Manufacturer/ });
     await user.click(row);
-    expect(row).toHaveAttribute('aria-pressed', 'true');
+    expect(row).toBeChecked();
     expect(screen.getByText('Builds things.')).toBeInTheDocument();
 
     await user.click(create);
@@ -94,7 +94,7 @@ describe('CertifiedPlanDialog', () => {
     renderDialog();
     await user.click(await screen.findByRole('button', { name: 'Try again' }));
     expect(
-      await screen.findByRole('button', { name: /Caldari Treasure Hunter/ })
+      await screen.findByRole('radio', { name: /Caldari Treasure Hunter/ })
     ).toBeInTheDocument();
   });
 });

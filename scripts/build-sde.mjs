@@ -2056,12 +2056,14 @@ async function main() {
   // --- certifiedPlans.json: CCP's Certified Skill Plans (issue #2392). Only
   // CCP's own JSONL export carries skillPlans, so this is the one table read
   // from there; faction names come from the same export so the two agree. ---
-  const ccpStaticData = await readCcpStaticDataFiles(CACHE_DIR, [
-    'skillPlans.jsonl',
-    'factions.jsonl',
-  ]);
+  const ccpStaticData = await readCcpStaticDataFiles(
+    CACHE_DIR,
+    ['skillPlans.jsonl', 'factions.jsonl'],
+    ESI_USER_AGENT
+  );
+  const skillPlanRecords = parseJsonl(ccpStaticData['skillPlans.jsonl']);
   const certifiedPlans = bakeCertifiedPlans(
-    parseJsonl(ccpStaticData['skillPlans.jsonl']),
+    skillPlanRecords,
     new Set(skills.map((s) => s.typeID)),
     factionNames(parseJsonl(ccpStaticData['factions.jsonl']))
   );
@@ -2340,6 +2342,18 @@ async function main() {
       console.error(
         `  FAIL: ${planCount} certified skill plans, outside the plausible ${CERTIFIED_PLANS_MIN}-${CERTIFIED_PLANS_MAX} range`
       );
+      process.exitCode = 1;
+    }
+    // Entries naming a skill skills.json lacks are dropped silently by the
+    // bake; a broad CCP/Fuzzwork build mismatch would hollow plans out
+    // without emptying any, so count the drops too.
+    const rawEntries = skillPlanRecords
+      .filter((r) => Number.isInteger(r.careerPathID))
+      .reduce((n, r) => n + (r.skillRequirements?.length ?? 0), 0);
+    const bakedEntries = certifiedPlans.reduce((n, p) => n + p.entries.length, 0);
+    console.log(`  certified plan entries dropped: ${rawEntries - bakedEntries} of ${rawEntries}`);
+    if (rawEntries - bakedEntries > rawEntries * 0.02) {
+      console.error('  FAIL: more than 2% of certified plan entries name an unknown skill');
       process.exitCode = 1;
     }
     const empty = certifiedPlans.filter((plan) => plan.entries.length === 0);

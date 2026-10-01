@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, Spinner, Tabs, type TabItem } from '@/components/ui';
+import { Button, Modal, Radio, Spinner, Tabs, type TabItem } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { loadCertifiedPlans, loadSkills } from '@/sde/loadSde';
 import type { CertifiedPlan } from '@/sde/types';
@@ -78,7 +78,7 @@ export function CertifiedPlanDialog({ onPick, onClose }: CertifiedPlanDialogProp
   function create() {
     if (!picked || state.status !== 'ready') return;
     const names = state.skillNames;
-    onPick(picked, (id) => names.get(id) ?? `Skill ${id}`);
+    onPick(picked, (id) => names.get(id) ?? t('common.unknownType', { id }));
   }
 
   return (
@@ -119,17 +119,19 @@ export function CertifiedPlanDialog({ onPick, onClose }: CertifiedPlanDialogProp
                 const isPicked = plan.id === pickedId;
                 return (
                   <li key={plan.id}>
-                    <button
-                      type="button"
-                      aria-pressed={isPicked}
-                      onClick={() => setPickedId(plan.id)}
+                    <label
                       className={cx(
-                        'flex w-full min-h-11 items-center justify-between gap-3 px-3 py-2 text-left',
-                        'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                        'flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2',
                         isPicked ? 'bg-accent/10 text-text' : 'text-text hover:bg-panel-2'
                       )}
                     >
-                      <span className="min-w-0">
+                      <Radio
+                        name="certified-plan"
+                        checked={isPicked}
+                        onChange={() => setPickedId(plan.id)}
+                        className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      />
+                      <span className="min-w-0 flex-1">
                         <span className="block font-medium">{plan.name}</span>
                         <span className="block text-text-dim">
                           {plan.factionName ?? t('plans.certified.anyFaction')}
@@ -138,7 +140,7 @@ export function CertifiedPlanDialog({ onPick, onClose }: CertifiedPlanDialogProp
                       <span className="shrink-0 text-text-dim tabular-nums">
                         {t('plans.certified.levels', { count: plan.entries.length })}
                       </span>
-                    </button>
+                    </label>
                   </li>
                 );
               })}

@@ -3572,14 +3572,8 @@
     "crossCharacterBadge": "From {{character}}",
     "crossCharacterCsvNote": "CSV export only includes this character's own items.",
     "blueprintBadge": {
-      "original": {
-        "label": "BPO",
-        "name": "Blueprint original"
-      },
-      "copy": {
-        "label": "BPC",
-        "name": "Blueprint copy"
-      }
+      "original": { "label": "BPO", "name": "Blueprint original" },
+      "copy": { "label": "BPC", "name": "Blueprint copy" }
     },
     "bay": {
       "cargoHold": "Cargo Hold",
