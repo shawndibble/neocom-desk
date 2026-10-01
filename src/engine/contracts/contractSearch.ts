@@ -29,6 +29,16 @@ export interface ContractOfferFilter {
   /** Lets a buyer skip the single-unit listings when they want a stack. */
   minQuantity?: number | null;
   saleKind?: ContractSaleKind | null;
+  /** Drops an auction row — the same exclusion BPC Sourcing's `hideAuctions` makes. */
+  hideAuctions?: boolean | null;
+  /** Drops a row whose contract asks for PLEX in return (`requestedPlex`). */
+  hidePlexRequests?: boolean | null;
+  /**
+   * ISK per PLEX, for judging `maxPrice` on a contract that asks for PLEX.
+   * `null`/absent while unknown — such a row then passes the ceiling, the
+   * same "unknown, so it passes" stance a no-buyout auction gets.
+   */
+  plexPrice?: number | null;
 }
 
 /**
@@ -51,10 +61,16 @@ function buyoutOf(row: PublicContractOfferRow): number | null {
  * agrees on — the table's price column sorts on this, so a "cheapest" figure
  * computed any other way would name a number the first row beneath it
  * contradicts. For an auction with no buyout the starting bid is the only
- * figure there is.
+ * figure there is. A contract asking for PLEX costs its ISK ask plus that
+ * PLEX at `plexPrice` — when no PLEX price is given, `isUnpricedOffer` says so
+ * and callers must not read this ISK-only figure as the whole price.
  */
-export function offerAskingPrice(row: PublicContractOfferRow): number {
-  return buyoutOf(row) ?? row.price;
+export function offerAskingPrice(
+  row: PublicContractOfferRow,
+  plexPrice: number | null = null
+): number {
+  const isk = buyoutOf(row) ?? row.price;
+  return row.requestedPlex && plexPrice != null ? isk + row.requestedPlex * plexPrice : isk;
 }
 
 /**
@@ -65,8 +81,14 @@ export function offerAskingPrice(row: PublicContractOfferRow): number {
  * from a barter on this data, so it is treated the same, safer way rather
  * than as the cheapest thing on the page.
  */
-export function isUnpricedOffer(row: PublicContractOfferRow): boolean {
-  return offerAskingPrice(row) <= 0;
+export function isUnpricedOffer(
+  row: PublicContractOfferRow,
+  plexPrice: number | null = null
+): boolean {
+  // A PLEX ask with no PLEX price to convert it at: the ISK part alone (often
+  // 0, sometimes a real amount) would understate what the contract costs.
+  if (row.requestedPlex && plexPrice == null) return true;
+  return offerAskingPrice(row, plexPrice) <= 0;
 }
 
 /**
@@ -77,9 +99,10 @@ export function isUnpricedOffer(row: PublicContractOfferRow): boolean {
  * buyout has an unknowable eventual price and passes rather than being
  * excluded on a number that does not describe it.
  */
-function priceForMaxFilter(row: PublicContractOfferRow): number | null {
-  if (!row.isAuction) return row.price;
-  return buyoutOf(row);
+function priceForMaxFilter(row: PublicContractOfferRow, plexPrice: number | null): number | null {
+  const isk = row.isAuction ? buyoutOf(row) : row.price;
+  if (isk === null || !row.requestedPlex) return isk;
+  return plexPrice == null ? null : isk + row.requestedPlex * plexPrice;
 }
 
 export function filterContractOffers(
@@ -93,8 +116,10 @@ export function filterContractOffers(
     if (filter.saleKind != null && (row.isAuction ? 'auction' : 'exchange') !== filter.saleKind) {
       return false;
     }
+    if (filter.hideAuctions && row.isAuction) return false;
+    if (filter.hidePlexRequests && row.requestedPlex) return false;
     if (filter.maxPrice != null) {
-      const price = priceForMaxFilter(row);
+      const price = priceForMaxFilter(row, filter.plexPrice ?? null);
       if (price != null && price > filter.maxPrice) return false;
     }
     return true;
@@ -150,12 +175,13 @@ export interface ContractOfferStats {
  * summary reading "2".
  */
 export function contractOfferStats(
-  rows: readonly PublicContractOfferRow[]
+  rows: readonly PublicContractOfferRow[],
+  plexPrice: number | null = null
 ): Map<number, ContractOfferStats> {
   const stats = new Map<number, ContractOfferStats>();
   for (const row of rows) {
-    const unpriced = isUnpricedOffer(row);
-    const price = offerAskingPrice(row);
+    const unpriced = isUnpricedOffer(row, plexPrice);
+    const price = offerAskingPrice(row, plexPrice);
     const existing = stats.get(row.typeId);
     if (!existing) {
       stats.set(row.typeId, { offerCount: 1, cheapest: unpriced ? null : price });
@@ -183,7 +209,8 @@ export interface ContractOfferPriceSummary {
  * exactly the number a buyer would misread as "the going rate".
  */
 export function contractOfferPriceSummary(
-  rows: readonly PublicContractOfferRow[]
+  rows: readonly PublicContractOfferRow[],
+  plexPrice: number | null = null
 ): ContractOfferPriceSummary {
   if (rows.length === 0) return { offerCount: 0, cheapest: null, median: null };
   // A zero/negative-price (barter) row still counts toward `offerCount` — it
@@ -191,8 +218,8 @@ export function contractOfferPriceSummary(
   // computed (issue #1080): its price is not a real one to average or win
   // "cheapest" with.
   const prices = rows
-    .filter((row) => !isUnpricedOffer(row))
-    .map(offerAskingPrice)
+    .filter((row) => !isUnpricedOffer(row, plexPrice))
+    .map((row) => offerAskingPrice(row, plexPrice))
     .sort((a, b) => a - b);
   if (prices.length === 0) return { offerCount: rows.length, cheapest: null, median: null };
   const middle = prices.length >> 1;

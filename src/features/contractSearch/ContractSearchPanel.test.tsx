@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -36,6 +36,12 @@ vi.mock('@/app/syncStatus', async (importOriginal) => {
 const loadPublicContractOffers = vi.fn();
 vi.mock('@/features/contractSearch/publicContractOffers', () => ({
   loadPublicContractOffers: (...args: unknown[]) => loadPublicContractOffers(...args),
+}));
+
+// PLEX trades on its own global market; the panel reads one price for it.
+const usePlexPrice = vi.fn<() => number | null>(() => null);
+vi.mock('@/features/market/plexPrice', () => ({
+  usePlexPrice: () => usePlexPrice(),
 }));
 
 const loadPublicCourierContracts = vi.fn();
@@ -372,6 +378,41 @@ function renderWithRouter(initialEntries?: string[]) {
 }
 
 describe('ContractSearchPanel', () => {
+  describe('PLEX-asking contracts', () => {
+    const PLEX_BARTER = row({ contractId: 50, typeId: 34, price: 0, requestedPlex: 100 });
+
+    afterEach(() => usePlexPrice.mockReturnValue(null));
+
+    it('prices a PLEX ask at the PLEX market price and sorts it with the ISK offers', async () => {
+      usePlexPrice.mockReturnValue(5_000);
+      loadPublicContractOffers.mockResolvedValue(cachedSnapshot([TRIT_FORGE, PLEX_BARTER]));
+      renderWithRouter();
+
+      const rows = await bodyRows();
+      // 100 PLEX at 5,000 ISK is 500k — cheaper than the 1M ISK offer.
+      expect(within(rows[0]).getByText('incl. 100 PLEX')).toBeInTheDocument();
+    });
+
+    it('states the PLEX ask as it is, sorted last, while no PLEX price is known', async () => {
+      loadPublicContractOffers.mockResolvedValue(cachedSnapshot([PLEX_BARTER, TRIT_FORGE]));
+      renderWithRouter();
+
+      const rows = await bodyRows();
+      expect(within(rows[1]).getByText('100 PLEX')).toBeInTheDocument();
+    });
+
+    it('drops PLEX-asking and auction contracts behind the Exclude filter', async () => {
+      loadPublicContractOffers.mockResolvedValue(
+        cachedSnapshot([TRIT_FORGE, PLEX_BARTER, PYERITE_AUCTION])
+      );
+      renderWithRouter(['/?items.hidePlex=1&items.hideAuctions=1']);
+
+      const rows = await bodyRows();
+      expect(rows).toHaveLength(1);
+      expect(within(rows[0]).queryByText(/PLEX/)).not.toBeInTheDocument();
+    });
+  });
+
   it('lists every synced offer, any item type, cheapest first', async () => {
     renderWithRouter();
 

@@ -12,6 +12,9 @@
  */
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 
+/** PLEX's type id — what `requestedPlex` counts, and the type a PLEX price is read for. */
+export const PLEX_TYPE_ID = 44992;
+
 /**
  * One row of the shared snapshot: a for-sale line of a public
  * item_exchange/auction contract, any item type. Mirrors

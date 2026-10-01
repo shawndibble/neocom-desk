@@ -24,8 +24,10 @@
  * price — so it carries what that needs and nothing else: an icon per line so
  * a pile is scannable rather than read word by word, ESI's per-stack records
  * merged into one line per item (`mergeContractItemLines`), the two sides of
- * an item_exchange split under their own headings instead of tagged inline,
- * and a sell-order total per side at the reader's Trade Hub. Every line
+ * an item_exchange split under their own headings instead of tagged inline —
+ * what the buyer hands over first, since that is the ask being judged — and a
+ * sell-order total per side at the reader's Trade Hub (PLEX, which no hub
+ * lists, at its global market price). Every line
  * right-clicks into the same item actions the rest of the app offers.
  */
 import { useEffect, useState } from 'react';
@@ -46,6 +48,8 @@ import {
   type PublicContractItemsOutcome,
 } from '@/features/bpcContracts/publicContractItems';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { loadPlexPrice } from '@/features/market/plexPrice';
+import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
@@ -169,12 +173,16 @@ export function PublicContractDetailModal({
         group.map((line) => ({ type_id: line.typeId, quantity: line.quantity }));
       const includedLines = merged.filter((line) => line.isIncluded);
       const requestedLines = merged.filter((line) => !line.isIncluded);
+      const plexPrice = merged.some((line) => line.typeId === PLEX_TYPE_ID)
+        ? await loadPlexPrice().catch(() => null)
+        : null;
+      const overrides = new Map(plexPrice === null ? [] : [[PLEX_TYPE_ID, plexPrice]]);
       const [includedValue, requestedValue] = await Promise.all([
         includedLines.length > 0
-          ? loadContractMarketValue(hub, priced(includedLines), items.typeNames)
+          ? loadContractMarketValue(hub, priced(includedLines), items.typeNames, overrides)
           : Promise.resolve(null),
         requestedLines.length > 0
-          ? loadContractMarketValue(hub, priced(requestedLines), items.typeNames)
+          ? loadContractMarketValue(hub, priced(requestedLines), items.typeNames, overrides)
           : Promise.resolve(null),
       ]);
       if (!cancelled) setMarketValue({ included: includedValue, requested: requestedValue });
@@ -245,17 +253,17 @@ export function PublicContractDetailModal({
         ) : twoSided ? (
           <>
             <ItemGroup
-              heading={t('contractDetail.youReceiveHeading')}
-              lines={included}
-              typeNames={items.typeNames}
-              marketValue={marketValue?.included}
-              hubName={hub.systemName}
-            />
-            <ItemGroup
               heading={t('contractDetail.youHandOverHeading')}
               lines={requested}
               typeNames={items.typeNames}
               marketValue={marketValue?.requested}
+              hubName={hub.systemName}
+            />
+            <ItemGroup
+              heading={t('contractDetail.youReceiveHeading')}
+              lines={included}
+              typeNames={items.typeNames}
+              marketValue={marketValue?.included}
               hubName={hub.systemName}
             />
           </>

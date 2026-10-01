@@ -27,11 +27,22 @@ export function BpcContractModal({
 }: BpcContractModalProps) {
   const { t } = useTranslation();
 
-  const priceLabel = row.isAuction
-    ? row.buyout !== undefined
-      ? t('bpcContracts.buyout', { price: formatIskAuto(row.buyout, CONTRACT_ISK_CENTS_BELOW) })
-      : t('bpcContracts.startingBid', { price: formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW) })
-    : formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW);
+  // A PLEX ask is stated as the contract states it — its ISK `price` is
+  // usually 0, which on its own would read as a free blueprint (issue #1105).
+  const priceLabel = row.requestedPlex
+    ? row.price > 0
+      ? t('bpcContracts.iskPlusPlexPrice', {
+          isk: formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW),
+          plex: row.requestedPlex.toLocaleString(),
+        })
+      : t('bpcContracts.plexPrice', { plex: row.requestedPlex.toLocaleString() })
+    : row.isAuction
+      ? row.buyout !== undefined
+        ? t('bpcContracts.buyout', { price: formatIskAuto(row.buyout, CONTRACT_ISK_CENTS_BELOW) })
+        : t('bpcContracts.startingBid', {
+            price: formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW),
+          })
+      : formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW);
 
   return (
     <PublicContractDetailModal

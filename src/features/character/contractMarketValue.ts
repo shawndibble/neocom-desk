@@ -34,10 +34,15 @@ export interface PricedContractLine {
   quantity: number;
 }
 
+/**
+ * `sellOverrides` prices a type the hub station never lists — PLEX, which
+ * trades only on its own global market — from wherever the caller found it.
+ */
 export async function loadContractMarketValue(
   hub: TradeHub,
   items: readonly PricedContractLine[],
-  typeNames: ReadonlyMap<number, string>
+  typeNames: ReadonlyMap<number, string>,
+  sellOverrides: ReadonlyMap<number, number> = new Map()
 ): Promise<ContractMarketValue> {
   const prices = await getHubPrices(
     hub,
@@ -48,7 +53,7 @@ export async function loadContractMarketValue(
     name: typeNames.get(item.type_id) ?? `#${item.type_id}`,
     quantity: item.quantity,
     buy: null,
-    sell: prices.get(item.type_id)?.sellMin ?? null,
+    sell: sellOverrides.get(item.type_id) ?? prices.get(item.type_id)?.sellMin ?? null,
   }));
   const { rows, totals } = buildAppraisal(appraisalItems, 100);
   return {
