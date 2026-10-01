@@ -4,8 +4,9 @@
  */
 import { computeSkillPlanSchedule } from '@/engine/skillPlanSchedule';
 import type { Attributes, CloneState, EngineSkill, Implants, TrainedSkill } from '@/engine/types';
-import type { MasteryMap, ShipTreeShip, SkillPrereq } from '@/sde/types';
+import type { MasteryMap, ShipTreeShip } from '@/sde/types';
 import type { ShipTreeHullStatus } from './types';
+import { tiersReached } from '../tierLadder';
 
 export interface HullStatusContext {
   skills: ReadonlyMap<number, EngineSkill>;
@@ -14,24 +15,6 @@ export interface HullStatusContext {
   implants: Implants;
   cloneState: CloneState;
   now: Date;
-}
-
-/**
- * Highest Mastery tier fully trained, walking tiers in order and stopping at
- * the first that is unmet — or empty: a hull with no tier V skills tops out
- * at IV rather than reading as Mastery V.
- */
-function masteryReached(
-  tiers: readonly (readonly SkillPrereq[])[] | undefined,
-  trainedLevel: (skillTypeID: number) => number
-): number {
-  let reached = 0;
-  for (const tier of tiers ?? []) {
-    if (tier.length === 0) break;
-    if (tier.some((p) => trainedLevel(p.skillTypeID) < p.level)) break;
-    reached++;
-  }
-  return reached;
 }
 
 export function hullStatuses(
@@ -63,7 +46,7 @@ export function hullStatuses(
     out.set(ship.typeID, {
       canFly,
       secondsToFly,
-      mastery: canFly ? masteryReached(masteries[String(ship.typeID)], trainedLevel) : 0,
+      mastery: canFly ? tiersReached(masteries[String(ship.typeID)], trainedLevel) : 0,
     });
   }
   return out;

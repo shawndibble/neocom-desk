@@ -42,6 +42,26 @@ export interface SkillType {
 export type MasteryMap = Record<string, SkillPrereq[][]>;
 
 /**
+ * One row of public/data/certificates.json (issue #2390): a CCP certificate
+ * from one of the combat groups. `levels` is its five-grade ladder (Basic,
+ * Standard, Improved, Advanced, Elite) — the same shape as a ship's Mastery
+ * tiers, graded by the same rule (`engine/tierLadder.ts`). Baked from CCP's
+ * `certificates.jsonl` by `scripts/build-sde.mjs` (`scripts/lib/certificates.mjs`).
+ */
+export interface Certificate {
+  /** CCP's certificate id. */
+  id: number;
+  name: string;
+  /** Plain text. */
+  description: string;
+  groupId: number;
+  /** English group name ("Armor", "Navigation"). */
+  groupName: string;
+  /** Exactly five grades; never an empty one (the build fails on that). */
+  levels: SkillPrereq[][];
+}
+
+/**
  * One row of public/data/certifiedPlans.json (issue #2392): a CCP Certified
  * Skill Plan, one of the career plans the client lists under Skill Plans ›
  * Certified Plans. Baked from CCP's own `skillPlans.jsonl` by

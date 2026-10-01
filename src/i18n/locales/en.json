@@ -1353,6 +1353,7 @@
     "trainedTab": "Trained",
     "plansTab": "Plans",
     "compareTab": "Compare",
+    "certificatesTab": "Certificates",
     "targetPlan": {
       "label": "Adding to"
     },
@@ -1451,6 +1452,47 @@
       "addToSkillPlan": "Add to Skill Plan",
       "noPlans": "No skill plans yet",
       "maxLevelTitle": "Already at level 5"
+    },
+    "certificates": {
+      "intro": "CCP's combat certificates, graded against this character's trained skills. Each grade lists what the next one still needs.",
+      "grade": {
+        "0": "Not started",
+        "1": "Basic",
+        "2": "Standard",
+        "3": "Improved",
+        "4": "Advanced",
+        "5": "Elite"
+      },
+      "gradeOf": "{{grade}} ({{level}} of 5)",
+      "summary": {
+        "elite": "Elite",
+        "advanced": "Advanced",
+        "basicOnly": "Basic only",
+        "notStarted": "Not started"
+      },
+      "filtersLabel": "Certificate filters",
+      "groupLabel": "Certificate group",
+      "allGroups": "All groups",
+      "hideElite": "Hide Elite",
+      "sortLabel": "Sort certificates",
+      "sort": {
+        "grade": "Lowest grade first",
+        "name": "Name",
+        "time": "Least time to next grade"
+      },
+      "groupCount": "{{shown}} of {{total}}",
+      "nextNeeds_one": "{{grade}} needs {{count}} skill level · {{time}}",
+      "nextNeeds_other": "{{grade}} needs {{count}} skill levels · {{time}}",
+      "eliteDone": "Elite: nothing left to train",
+      "add": "Add {{grade}} to plan",
+      "inPlan": "In plan",
+      "complete": "Complete",
+      "omegaOnly": "Omega only",
+      "alphaCapped": "An Alpha clone can’t reach {{grade}}: {{skills}} need Omega.",
+      "showNeeds": "What {{grade}} needs for {{name}}",
+      "missingFor": "Missing for {{grade}}",
+      "noMatches": "No certificates match these filters.",
+      "loadFailed": "Couldn’t load the certificates."
     }
   },
   "plans": {

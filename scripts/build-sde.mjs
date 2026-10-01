@@ -14,6 +14,7 @@ import { npcCorporations, probeLpStores } from './lib/lpCorporations.mjs';
 import { marketTypeEntry } from './lib/marketTypeVolumes.mjs';
 import { bakeCertifiedPlans, factionNames, parseJsonl } from './lib/certifiedPlans.mjs';
 import { readCcpStaticDataFiles } from './lib/ccpStaticData.mjs';
+import { bakeCertificates } from './lib/certificates.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -159,6 +160,10 @@ const MASTERY_SHIPS_MAX = 700;
 // lands at 0, not slightly off (issue #2392).
 const CERTIFIED_PLANS_MIN = 25;
 const CERTIFIED_PLANS_MAX = 80;
+// Combat-group certificates, as counted against CCP's export on 2026-09-30:
+// 68. Same idea — a broken group filter lands at 0 (issue #2390).
+const CERTIFICATES_MIN = 50;
+const CERTIFICATES_MAX = 90;
 // Ship Tree hulls/factions/classes, as counted against the dump on
 // 2026-09-26: 360 hulls, 17 factions, 52 classes. Same idea as
 // MASTERY_SHIPS_MIN/MAX above — a broken join (wrong category filter, wrong
@@ -2053,19 +2058,27 @@ async function main() {
     dgmAttributeTypes: raw['dgmAttributeTypes.csv'],
   });
 
-  // --- certifiedPlans.json: CCP's Certified Skill Plans (issue #2392). Only
-  // CCP's own JSONL export carries skillPlans, so this is the one table read
-  // from there; faction names come from the same export so the two agree. ---
+  // --- certifiedPlans.json and certificates.json: read from CCP's own JSONL
+  // export. Only it carries skillPlans (issue #2392); certificates come from
+  // it too (issue #2390) so their names and group names travel with them,
+  // and faction/group names come from the same build so everything agrees. ---
   const ccpStaticData = await readCcpStaticDataFiles(
     CACHE_DIR,
-    ['skillPlans.jsonl', 'factions.jsonl'],
+    ['skillPlans.jsonl', 'factions.jsonl', 'certificates.jsonl', 'groups.jsonl'],
     ESI_USER_AGENT
   );
+  const bakedSkillIds = new Set(skills.map((s) => s.typeID));
   const skillPlanRecords = parseJsonl(ccpStaticData['skillPlans.jsonl']);
   const certifiedPlans = bakeCertifiedPlans(
     skillPlanRecords,
-    new Set(skills.map((s) => s.typeID)),
+    bakedSkillIds,
     factionNames(parseJsonl(ccpStaticData['factions.jsonl']))
+  );
+  const certificateRecords = parseJsonl(ccpStaticData['certificates.jsonl']);
+  const certificates = bakeCertificates(
+    certificateRecords,
+    parseJsonl(ccpStaticData['groups.jsonl']),
+    bakedSkillIds
   );
 
   // --- write outputs (compact) ---
@@ -2086,6 +2099,7 @@ async function main() {
     ['skills.json', skills],
     ['masteries.json', masteries],
     ['certifiedPlans.json', certifiedPlans],
+    ['certificates.json', certificates],
     ['skillAttributeModifiers.json', skillAttributeModifiers],
     ['blueprints.json', blueprints],
     ['marketWideTrees.json', marketWideTrees],
@@ -2361,6 +2375,39 @@ async function main() {
       console.error(
         `  FAIL: certified plans with no entries: ${empty.map((p) => p.name).join(', ')}`
       );
+      process.exitCode = 1;
+    }
+  }
+  {
+    const certificateCount = certificates.length;
+    console.log(`  combat certificates: ${certificateCount}`);
+    if (certificateCount < CERTIFICATES_MIN || certificateCount > CERTIFICATES_MAX) {
+      console.error(
+        `  FAIL: ${certificateCount} combat certificates, outside the plausible ${CERTIFICATES_MIN}-${CERTIFICATES_MAX} range`
+      );
+      process.exitCode = 1;
+    }
+    // The grade rule (engine/tierLadder.ts) stops at the first empty level, as
+    // it must for an unpublished mastery tier — so a certificate level left
+    // empty would cap every pilot below it. None is today; fail if one appears.
+    const gapped = certificates.filter((c) => c.levels.some((level) => level.length === 0));
+    if (gapped.length) {
+      console.error(
+        `  FAIL: certificates with an empty grade: ${gapped.map((c) => c.name).join(', ')}`
+      );
+      process.exitCode = 1;
+    }
+    const wantedIds = new Set(certificates.map((c) => c.id));
+    const rawSkills = certificateRecords
+      .filter((r) => wantedIds.has(r._key))
+      .reduce((n, r) => n + (r.skillTypes?.length ?? 0), 0);
+    const bakedSkills = certificates.reduce(
+      (n, c) => n + new Set(c.levels.flat().map((p) => p.skillTypeID)).size,
+      0
+    );
+    console.log(`  certificate skills dropped: ${rawSkills - bakedSkills} of ${rawSkills}`);
+    if (rawSkills - bakedSkills > rawSkills * 0.02) {
+      console.error('  FAIL: more than 2% of certificate skills name an unknown skill');
       process.exitCode = 1;
     }
   }
