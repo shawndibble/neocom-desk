@@ -24,7 +24,7 @@ export interface RingSlot {
 
 export type SlotLayout = Record<FittingSlotKind, number>;
 
-/** The racks drawn on the ring; subsystems sit in a row beneath it. */
+/** The racks every hull draws on the ring; a T3 adds its subsystems (see `ringSlotAngles`). */
 export type RingRack = 'high' | 'medium' | 'low' | 'rig';
 
 export const RING_RACKS: readonly RingRack[] = ['high', 'medium', 'low', 'rig'];
@@ -121,6 +121,84 @@ export function buildRingSlots(fitting: Fitting, layout: SlotLayout | null): Rin
 export function ringSlotAngle(rack: RingRack, index: number): number {
   const first = RACK_CENTRE_DEG[rack] - ((RING_POSITIONS[rack] - 1) / 2) * PITCH_DEG;
   return first + index * PITCH_DEG;
+}
+
+/** Clockwise round a T3's band: subsystems sit upper-left, between the rigs and the highs. */
+const SUBSYSTEM_RING_ORDER: readonly FittingSlotKind[] = [
+  'rig',
+  'subsystem',
+  'high',
+  'medium',
+  'low',
+];
+/** A T3's racks sit one empty position apart, centre to centre... */
+const SUBSYSTEM_GAP_DEG = 2 * PITCH_DEG;
+/** ...closing to the tactical ring's spacing (highs' last to mids' first) when the slots need it... */
+const MIN_GAP_DEG =
+  RACK_CENTRE_DEG.medium -
+  ((RING_POSITIONS.medium - 1) / 2) * PITCH_DEG -
+  (RACK_CENTRE_DEG.high + ((RING_POSITIONS.high - 1) / 2) * PITCH_DEG);
+/** ...and the pitch to where neighbouring tiles' inner corners would touch. */
+const MIN_PITCH_DEG =
+  (2 * Math.asin(RING_TILE / 2 / (RING_SLOT_RADIUS - RING_TILE / 2)) * 180) / Math.PI;
+
+/**
+ * The angle of every slot, per rack, given how many each draws. A hull
+ * without subsystems keeps the fixed positions of `ringSlotAngle`. A T3 —
+ * whose slot counts come from its subsystems, and whose racks could never all
+ * draw their full eight round one band — draws only its own slots, the
+ * subsystems on the band between the rigs and the highs, every rack one
+ * empty position from the next and the highs still centred over the top; any
+ * room to spare is left across the bottom, between the lows and the rigs. If
+ * the slots don't fit, the gaps close first, then the pitch.
+ */
+export function ringSlotAngles(counts: SlotLayout): Record<FittingSlotKind, number[]> {
+  const angles = Object.fromEntries(
+    FITTING_SLOT_KINDS.map((rack) => [rack, [] as number[]])
+  ) as Record<FittingSlotKind, number[]>;
+  if (counts.subsystem <= 0) {
+    for (const rack of RING_RACKS) {
+      angles[rack] = Array.from({ length: counts[rack] }, (_, index) => ringSlotAngle(rack, index));
+    }
+    return angles;
+  }
+
+  const racks = SUBSYSTEM_RING_ORDER.filter((rack) => counts[rack] > 0);
+  const tiles = racks.reduce((sum, rack) => sum + counts[rack], 0);
+  // Steps round the circle: one per neighbouring pair inside a rack, one gap per rack.
+  const inRack = tiles - racks.length;
+  // Spare room collects in the gap after the last rack — the lows, across
+  // the bottom — rather than spreading the racks apart.
+  let pitch = PITCH_DEG;
+  let gap = Math.min(SUBSYSTEM_GAP_DEG, (360 - inRack * pitch) / racks.length);
+  if (gap < MIN_GAP_DEG) {
+    gap = MIN_GAP_DEG;
+    pitch = (360 - racks.length * gap) / inRack;
+    if (pitch < MIN_PITCH_DEG) {
+      pitch = MIN_PITCH_DEG;
+      gap = (360 - inRack * pitch) / racks.length;
+      if (gap < pitch) pitch = gap = 360 / tiles;
+    }
+  }
+
+  let at = 0;
+  for (const rack of racks) {
+    for (let index = 0; index < counts[rack]; index++) {
+      angles[rack].push(at);
+      at += index < counts[rack] - 1 ? pitch : gap;
+    }
+  }
+  // Turn the whole band so the highs are centred where every hull's are — or,
+  // on a bare hull no subsystem has given highs yet, the subsystems on the left.
+  const anchor = counts.high > 0 ? 'high' : 'subsystem';
+  const anchorList = angles[anchor];
+  const centre = (anchorList[0] + anchorList[anchorList.length - 1]) / 2;
+  const LEFT = -90;
+  const turn = (anchor === 'high' ? RACK_CENTRE_DEG.high : LEFT) - centre;
+  for (const rack of racks) {
+    angles[rack] = angles[rack].map((angle) => angle + turn);
+  }
+  return angles;
 }
 
 /** The positions a rack draws beyond a hull's `slotCount` slots — the faint outlines. */
