@@ -17,6 +17,8 @@ import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
 import type { CharacterAttributes, SkillQueueEntry } from '@/esi/endpoints';
 
 export interface PlanEditorData {
+  /** The first load for this character has finished, successfully or not. */
+  loaded: boolean;
   catalog: SkillCatalog | null;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   /**
@@ -65,6 +67,7 @@ export interface PlanEditorData {
  * they're siblings, not parent/child, once plan editing has its own route.
  */
 export function usePlanEditorData(characterId: number | null): PlanEditorData {
+  const [loadedFor, setLoadedFor] = useState<number | null>(null);
   const [catalog, setCatalog] = useState<SkillCatalog | null>(null);
   const [trainedSkills, setTrainedSkills] = useState<ReadonlyMap<number, TrainedSkill>>(new Map());
   const [trainedSkillsKnown, setTrainedSkillsKnown] = useState(false);
@@ -114,6 +117,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
       setAttributesResult(attrs);
       setRemapInfo(remapAvailability(attrs?.data ?? null, new Date()));
       setImplants(implantBonuses);
+      setLoadedFor(characterId);
     })();
     return () => {
       cancelled = true;
@@ -121,6 +125,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
   }, [characterId]);
 
   return {
+    loaded: characterId !== null && loadedFor === characterId,
     catalog,
     trainedSkills,
     trainedSkillsKnown,

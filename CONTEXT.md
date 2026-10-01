@@ -161,7 +161,9 @@ here — they go one per file in `docs/context/decisions/`.
   Certified Plans (issue #2392). Static data, baked from CCP's JSONL export
   rather than Fuzzwork's CSVs, which lack it. Never edited in the app: picking
   one creates an ordinary **Skill Plan** holding its levels in CCP's order and
-  its skill-level milestones as **Plan Milestones**. The new plan has no link
+  its skill-level milestones as **Plan Milestones**, minus the levels the
+  Character has already trained and the milestones already reached. A Certified
+  Plan fully trained is hidden from the picker. The new plan has no link
   back, so a later CCP change to the Certified Plan never reaches it.
 - **Character**: One EVE Online character. The unit of login (EVE SSO) and of API data. App supports many Characters side by side from day one.
 - **Character Board Item**: One clock on the `/calendar` board, from any of eight

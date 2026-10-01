@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { CertifiedPlan } from '@/sde/types';
-import { certifiedPlanRecord, groupByCareerPath } from './certifiedPlan';
+import {
+  certifiedPlanRecord,
+  groupByCareerPath,
+  isPlanCompleted,
+  untrainedEntries,
+} from './certifiedPlan';
 
 const NAMES: Record<number, string> = {
   3380: 'Industry',
@@ -88,5 +93,34 @@ describe('groupByCareerPath', () => {
       [4, [2]],
       [6, [1, 3]],
     ]);
+  });
+});
+
+describe('trained levels', () => {
+  const trained = (levels: Record<number, number>) =>
+    new Map(Object.entries(levels).map(([id, level]) => [Number(id), { level, sp: 0 }]));
+
+  it('keeps only the levels not trained yet', () => {
+    expect(untrainedEntries(plan(), trained({ 3380: 1, 3327: 1 }))).toEqual([
+      { skillTypeID: 3380, level: 2 },
+      { skillTypeID: 3387, level: 1 },
+    ]);
+  });
+
+  it('is completed only when every level is trained', () => {
+    expect(isPlanCompleted(plan(), trained({ 3380: 2, 3327: 1, 3387: 1 }))).toBe(true);
+    expect(isPlanCompleted(plan(), trained({ 3380: 2, 3327: 1 }))).toBe(false);
+    expect(isPlanCompleted(plan(), new Map())).toBe(false);
+  });
+
+  it('builds a record of the untrained levels and unreached milestones', () => {
+    const record = certifiedPlanRecord(1, plan(), nameFor, 0, trained({ 3380: 2, 3327: 1 }));
+    expect(record.entries).toEqual([{ skillTypeID: 3387, targetLevel: 1 }]);
+    expect(record.milestones?.map((m) => m.name)).toEqual(['Mass Production I']);
+  });
+
+  it('omits milestones when all are reached', () => {
+    const record = certifiedPlanRecord(1, plan(), nameFor, 0, trained({ 3380: 2, 3387: 1 }));
+    expect(record.milestones).toBeUndefined();
   });
 });

@@ -1766,8 +1766,8 @@
     },
     "jumpToAdded": "Jump to it",
     "certified": {
-      "title": "New plan from a Certified Plan",
-      "intro": "CCP’s own career plans, the ones the game lists under Skill Plans › Certified Plans. The new plan keeps CCP’s training order and milestones.",
+      "title": "New certified plan",
+      "intro": "CCP’s own career plans, the ones the game lists under Skill Plans › Certified Plans. The new plan keeps CCP’s training order and milestones, minus any levels you’ve already trained.",
       "careerPaths": "Career path",
       "career": {
         "4": "Explorer",
@@ -1781,6 +1781,7 @@
       "levels_other": "{{count}} skill levels",
       "milestones_one": "{{count}} milestone",
       "milestones_other": "{{count}} milestones",
+      "allComplete": "All Certified Plans Complete",
       "create": "Create plan",
       "loadFailed": "Couldn’t load the Certified Plans."
     }
