@@ -28,7 +28,7 @@ import { decodeFittingShare, encodeFittingShare } from '@/engine/fitting/fitting
 import { loadEveFitXmlEntry, type FittingXmlDocument } from '@/engine/import/eveFitXml';
 import { toLoadOutcome, type LoadedFitting, type LoadOutcome } from '@/engine/fittings/load';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
-import { launchDrones } from '@/engine/fittings/fittingEdit';
+import { launchDrones, launchLimitsFrom } from '@/engine/fittings/fittingEdit';
 import { loadFittingFromText } from './loadFittingFromText';
 import { defaultImplantBasis, type ImplantBasis } from '@/engine/fittings/implantBasis';
 import type {
@@ -529,13 +529,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     // Until the decode lands, the code is written but the old Fitting is still on screen.
     if (!('fitting' in pending) || pending.fitting !== fitting || statsFitting !== fitting) return;
     launchPendingRef.current = null;
-    const launched = launchDrones(fitting, {
-      bandwidthTotal: evaluatedStats.droneBandwidthTotal,
-      maxActive: evaluatedStats.maxActiveDrones,
-      // A drone the engine gave no bandwidth for stays in the bay rather than launching unlimited.
-      bandwidthOf: (typeId) =>
-        evaluatedStats.droneBandwidthByType[typeId] ?? Number.POSITIVE_INFINITY,
-    });
+    const launched = launchDrones(fitting, launchLimitsFrom(evaluatedStats));
     if (launched !== fitting) {
       applyEdit(() => launched, { history: pending.writeUrl ? 'replace' : 'none' });
     }

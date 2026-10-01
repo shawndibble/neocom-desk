@@ -16,7 +16,9 @@ import {
   droneBayUsed,
   droneCountMax,
   droneGroups,
-  setDroneCountWithinBay,
+  droneRecallRoom,
+  launchLimitsFrom,
+  setDroneCountWithinLimits,
   type DroneBay,
   reachableModuleStates,
   removeModule,
@@ -607,9 +609,10 @@ interface DroneSectionProps {
 
 /**
  * The Fitting's drones: each type with how many are launched (these count
- * toward DPS) and how many wait in the bay, capped at what the bay holds, and
- * a way to add more. The List's Drones section, the Ring's drone panel, and
- * the phone Ring's Drones sheet. Nothing on a hull that takes no drones.
+ * toward DPS and bandwidth, capped by it) and how many wait in the bay
+ * (capped at what the bay holds — drones in space take none of it), and a
+ * way to add more. The List's Drones section, the Ring's drone panel, and the
+ * phone Ring's Drones sheet. Nothing on a hull that takes no drones.
  */
 export function DroneSection({
   fitting,
@@ -628,6 +631,7 @@ export function DroneSection({
   // Before the ship data the bay's size is unknown, so nothing is capped yet.
   const bay: DroneBay | null =
     stats === null ? null : { capacity: stats.droneCapacity, volumeOf: droneVolume };
+  const launch = launchLimitsFrom(stats);
   if (!showsDrones(stats, drones.length)) return null;
   return (
     // A drone dragged here (from the bay below, or the Add panel) launches.
@@ -665,7 +669,7 @@ export function DroneSection({
                   items: (
                     <DroneMenuItems
                       typeId={group.typeId}
-                      inSpace={group.inSpace}
+                      recallable={droneRecallRoom(fitting, group.typeId, bay)}
                       inBay={group.inBay}
                     />
                   ),
@@ -693,10 +697,10 @@ export function DroneSection({
               <CountInput
                 label={t('fittings.edit.inSpace')}
                 value={group.inSpace}
-                max={droneCountMax(fitting, group.typeId, 'inSpace', bay)}
+                max={droneCountMax(fitting, group.typeId, 'inSpace', bay, launch)}
                 onCommit={(inSpace) =>
                   edit(
-                    (f) => setDroneCountWithinBay(f, group.typeId, { inSpace }, bay),
+                    (f) => setDroneCountWithinLimits(f, group.typeId, { inSpace }, bay, launch),
                     `drone-space-${group.typeId}`
                   )
                 }
@@ -704,10 +708,10 @@ export function DroneSection({
               <CountInput
                 label={t('fittings.edit.inBay')}
                 value={group.inBay}
-                max={droneCountMax(fitting, group.typeId, 'inBay', bay)}
+                max={droneCountMax(fitting, group.typeId, 'inBay', bay, launch)}
                 onCommit={(inBay) =>
                   edit(
-                    (f) => setDroneCountWithinBay(f, group.typeId, { inBay }, bay),
+                    (f) => setDroneCountWithinLimits(f, group.typeId, { inBay }, bay, launch),
                     `drone-bay-${group.typeId}`
                   )
                 }
