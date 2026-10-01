@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { loadMarketRegions } from '@/sde/loadMarketSde';
 import { loadMarketTypesById } from '@/sde/marketTypesById';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
+import { loadTypeNames } from '@/features/character/typeNames';
 import type { CourierEndpoint, PublicCourierContractRow } from '@/engine/contracts/courierSearch';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import { loadCourierEndpoints } from './courierEndpoints';
@@ -82,6 +83,14 @@ function useResolved<TInput, TValue>(
  * already names every published market type and is what the Market Browser's
  * own search runs against.
  *
+ * The catalogue only holds *market* types, though, and a contract can sell
+ * what the market never lists — faction and event blueprint copies above all
+ * (2,128 of 11,392 listed types on 2026-10-01). Those fall through to
+ * `loadTypeNames` afterwards: its slim snapshot covers most of them (it is
+ * blueprint-referenced types), so only a remainder (~720) reaches one batched,
+ * cached `/universe/names` call. Without it they render as `#48098` and the
+ * item search cannot find them by name.
+ *
  * Items-board only. Loading it here rather than in the shared loader is what
  * stops the Courier board waiting on 1.45 MB it never reads.
  */
@@ -98,9 +107,23 @@ async function resolveTypeNames(
   if (rows.length === 0) return EMPTY_NAMES;
   const catalog = await loadMarketTypesById();
   const names = new Map<number, string>();
+  const missing = new Set<number>();
   for (const { typeId } of rows) {
     const entry = catalog.get(typeId);
     if (entry) names.set(typeId, entry.name);
+    else missing.add(typeId);
+  }
+  if (missing.size > 0) {
+    // Guarded so a failed fallback never costs the catalogue names above, and
+    // its `Type #id` placeholder is skipped: an unnamed id keeps rendering as
+    // the board's own `#id`.
+    try {
+      for (const [typeId, name] of await loadTypeNames([...missing])) {
+        if (name !== `Type #${typeId}`) names.set(typeId, name);
+      }
+    } catch {
+      // Catalogue names only.
+    }
   }
   return names;
 }

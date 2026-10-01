@@ -15,6 +15,7 @@ import { isSyncConfigured } from '@/app/syncStatus';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { loadMarketTypes, loadSolarSystemJumps } from '@/sde/loadMarketSde';
 import { clearMarketTypeIndex } from '@/sde/marketTypesById';
+import { loadTypeNames } from '@/features/character/typeNames';
 import {
   ContractSearchPanel,
   type ContractMode,
@@ -530,6 +531,27 @@ describe('ContractSearchPanel', () => {
     expect(within(modes).getByRole('button', { name: 'Items' })).toHaveAttribute(
       'aria-pressed',
       'true'
+    );
+  });
+
+  it('names a listed type the market catalogue lacks, such as an unmarketable blueprint copy', async () => {
+    // 48098 (Baryon Exotic Plasma S Blueprint) is on contract but never on the
+    // market, so the market catalogue cannot name it; the general type-name
+    // lookup can.
+    vi.mocked(loadTypeNames).mockImplementationOnce(
+      async (ids: readonly number[]) =>
+        new Map(ids.includes(48098) ? [[48098, 'Baryon Exotic Plasma S Blueprint']] : [])
+    );
+    loadPublicContractOffers.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 7, typeId: 48098, price: 40_000 })])
+    );
+    renderWithRouter();
+
+    const rows = await bodyRows();
+    await waitFor(() =>
+      expect(within(rows[0]).getAllByRole('cell')[0]).toHaveTextContent(
+        'Baryon Exotic Plasma S Blueprint'
+      )
     );
   });
 
