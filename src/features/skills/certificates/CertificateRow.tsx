@@ -75,7 +75,7 @@ export function CertificateRow({
   const elite = grade === ELITE;
   const nextGrade = elite ? '' : t(`skills.certificates.grade.${grade + 1}`);
   const capped = alphaCapped.length > 0;
-  const panelId = `certificate-${certificate.id}-needs`;
+  const panelId = `certificate-${certificate.id}-details`;
 
   let action;
   if (elite) {
@@ -150,31 +150,33 @@ export function CertificateRow({
               {t('skills.certificates.missingFor', { grade: nextGrade })}
             </p>
           )}
-          <ul className="space-y-1">
-            {/* The schedule's own steps, not just `next`: a prerequisite the
+          {!elite && (
+            <ul className="space-y-1">
+              {/* The schedule's own steps, not just `next`: a prerequisite the
                 scheduler injects shows here too, so the rows sum to the total. */}
-            {(time?.steps ?? []).map((entry) => {
-              const have = trainedLevel(entry.skillTypeID);
-              return (
-                <li key={entry.skillTypeID}>
-                  <SkillRow
-                    name={`${skillName(entry.skillTypeID)} ${romanLevel(entry.level)}`}
-                    skillTypeID={entry.skillTypeID}
-                    planEntries={planEntries}
-                    status={skillTrainingStatus(have, entry.level)}
-                    currentLevel={have}
-                    timeLabel={formatCountdown(entry.seconds)}
-                    inPlanLabel={
-                      isEntryCovered(planEntries, entry.skillTypeID, entry.level)
-                        ? t('skills.fitCheck.inPlan')
-                        : undefined
-                    }
-                    plannedLevel={plannedLevelFor(planEntries, entry.skillTypeID)}
-                  />
-                </li>
-              );
-            })}
-          </ul>
+              {(time?.steps ?? []).map((entry) => {
+                const have = trainedLevel(entry.skillTypeID);
+                return (
+                  <li key={entry.skillTypeID}>
+                    <SkillRow
+                      name={`${skillName(entry.skillTypeID)} ${romanLevel(entry.level)}`}
+                      skillTypeID={entry.skillTypeID}
+                      planEntries={planEntries}
+                      status={skillTrainingStatus(have, entry.level)}
+                      currentLevel={have}
+                      timeLabel={formatCountdown(entry.seconds)}
+                      inPlanLabel={
+                        isEntryCovered(planEntries, entry.skillTypeID, entry.level)
+                          ? t('skills.fitCheck.inPlan')
+                          : undefined
+                      }
+                      plannedLevel={plannedLevelFor(planEntries, entry.skillTypeID)}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       )}
     </li>

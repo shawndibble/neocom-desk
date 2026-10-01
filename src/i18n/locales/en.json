@@ -1473,7 +1473,7 @@
       "sort": {
         "grade": "Lowest grade",
         "name": "Name",
-        "time": "Least time"
+        "time": "Nearest grade"
       },
       "groupCount": "{{shown}} of {{total}}",
       "nextNeeds_one": "{{grade}} needs {{count}} skill level · {{time}}",
