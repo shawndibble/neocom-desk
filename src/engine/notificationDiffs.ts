@@ -354,6 +354,8 @@ export interface IndustryJobNotificationFire {
   blueprintTypeId: number;
   productTypeId: number | null;
   activityId: number;
+  /** The job's `end_date` — already past when this fires, so it dates the feed row. */
+  endMs: number;
 }
 
 /**
@@ -378,6 +380,7 @@ interface JobReadyFire<TEventId extends string> {
   blueprintTypeId: number;
   productTypeId: number | null;
   activityId: number;
+  endMs: number;
 }
 
 /**
@@ -409,6 +412,7 @@ function diffJobReady<TEventId extends string, TEntry extends JobReadyEntry>(
       blueprintTypeId: entry.blueprintTypeId,
       productTypeId: entry.productTypeId,
       activityId: entry.activityId,
+      endMs: entry.endMs,
     });
   }
   return fires;
@@ -709,6 +713,11 @@ export function disprovenExtractorOccurrences(
 
 export interface MailHeaderSnapshot {
   mailId: number;
+  /**
+   * The header's `timestamp`, epoch ms — dates the feed row. Optional so a
+   * baseline persisted before it existed still validates.
+   */
+  sentMs?: number;
 }
 
 export interface MailSnapshot {
@@ -720,6 +729,8 @@ export interface MailNotificationFire {
   eventId: 'newMail';
   characterId: number;
   mailId: number;
+  /** When the mail was sent, when the header carried it. */
+  sentMs?: number;
 }
 
 /**
@@ -743,7 +754,12 @@ export function diffNewMail(
   const fires: MailNotificationFire[] = [];
   for (const entry of next.entries) {
     if (entry.mailId <= maxPrevId) continue;
-    fires.push({ eventId: 'newMail', characterId, mailId: entry.mailId });
+    fires.push({
+      eventId: 'newMail',
+      characterId,
+      mailId: entry.mailId,
+      ...(entry.sentMs === undefined ? {} : { sentMs: entry.sentMs }),
+    });
   }
   return fires;
 }
@@ -910,6 +926,14 @@ export interface ContractEntrySnapshot {
    * and cannot read a preference). Only set alongside `deliveryDeadlineMs`.
    */
   dueLeadMs?: number;
+  /**
+   * ESI's `date_accepted` / `date_completed`, epoch ms — what dates a
+   * `contractAccepted` / `contractCompleted` feed row, rather than the poll
+   * that happened to notice it. Optional: absent until ESI sets them, and a
+   * baseline persisted before they existed must still validate.
+   */
+  dateAcceptedMs?: number;
+  dateCompletedMs?: number;
 }
 
 export interface ContractSnapshot {
@@ -925,6 +949,11 @@ export interface ContractNotificationFire {
   deadlineMs?: number;
   /** `courierDeliveryDue` only: the lead time, in ms, that it crossed. */
   thresholdMs?: number;
+  /**
+   * `contractAccepted` / `contractCompleted` only: when ESI says that
+   * happened (`date_accepted` / `date_completed`), when it said.
+   */
+  occurredMs?: number;
 }
 
 /**
@@ -949,7 +978,12 @@ export function diffContractAccepted(
   for (const entry of next.entries) {
     if (entry.status !== 'in_progress') continue;
     if (prevStatusById.get(entry.contractId) === 'in_progress') continue;
-    fires.push({ eventId: 'contractAccepted', characterId, contractId: entry.contractId });
+    fires.push({
+      eventId: 'contractAccepted',
+      characterId,
+      contractId: entry.contractId,
+      ...(entry.dateAcceptedMs === undefined ? {} : { occurredMs: entry.dateAcceptedMs }),
+    });
   }
   return fires;
 }
@@ -1056,7 +1090,13 @@ function diffContractTerminalTransition(
     if (!matchesStatus(entry.status)) continue;
     if (!wasLiveContractStatus(prevStatusById.get(entry.contractId))) continue;
     if (!isPartyToContract(entry, characterId)) continue;
-    fires.push({ eventId, characterId, contractId: entry.contractId });
+    const occurredMs = eventId === 'contractCompleted' ? entry.dateCompletedMs : undefined;
+    fires.push({
+      eventId,
+      characterId,
+      contractId: entry.contractId,
+      ...(occurredMs === undefined ? {} : { occurredMs }),
+    });
   }
   return fires;
 }
@@ -1690,6 +1730,8 @@ export interface CorpIndustryJobNotificationFire {
   blueprintTypeId: number;
   productTypeId: number | null;
   activityId: number;
+  /** The job's `end_date` — already past when this fires, so it dates the feed row. */
+  endMs: number;
 }
 
 /**

@@ -68,6 +68,7 @@ const job = (blueprintTypeId: number, productTypeId: number | null) =>
     blueprintTypeId,
     productTypeId,
     activityId: 1,
+    endMs: 0,
   }) as const;
 const corpJob = (blueprintTypeId: number, productTypeId: number | null) =>
   ({ ...job(blueprintTypeId, productTypeId), eventId: 'corpIndustryJobReady' }) as const;

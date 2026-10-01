@@ -199,13 +199,18 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
  * Exhaustive over every `NotificationEventId` for `occurrenceKey`'s reason: a
  * new Notification Event has to state which clock dates it, rather than
  * defaulting to the poll's and being wrong quietly. `nowMs` is the honest
- * answer for most of them — a market order fill has none of its own (ESI's
- * order history records when an order was *issued*, never when it filled),
- * and the times the rest carry are deadlines in the future (a fuel expiry, an
- * extractor's expiry, a calendar event's start), not the moment the thing
- * happened.
+ * answer only where there is no past moment to use — a market order fill has
+ * none of its own (ESI's order history records when an order was *issued*,
+ * never when it filled), and the times some others carry are deadlines in
+ * the future (a fuel expiry, an extractor's expiry warning, a calendar
+ * event's start), not the moment the thing happened.
+ *
+ * ESI-reported moments are clamped to `nowMs` (`pastOrNow`) so a server
+ * clock running ahead of this device never dates a row in the future.
  */
 export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
+  const pastOrNow = (ms: number | undefined): number =>
+    ms === undefined || !Number.isFinite(ms) ? nowMs : Math.min(ms, nowMs);
   switch (fire.eventId) {
     case 'walletBalanceChanged':
       return fire.dateMs;
@@ -221,23 +226,31 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
       const sentAt = Date.parse(fire.timestamp);
       return Number.isFinite(sentAt) ? sentAt : nowMs;
     }
+    // The job's `end_date`, already in the past by the time the diff fires.
+    case 'industryJobComplete':
+    case 'corpIndustryJobReady':
+      return pastOrNow(fire.endMs);
+    // The colony's soonest extractor expiry — the moment it went idle.
+    case 'planetaryExtractionDone':
+      return pastOrNow(fire.expiryTimeMs);
+    // ESI's `date_accepted` / `date_completed`, when the contract carried it.
+    case 'contractAccepted':
+    case 'contractCompleted':
+      return pastOrNow(fire.occurredMs);
+    // The mail header's own `timestamp`.
+    case 'newMail':
+      return pastOrNow(fire.sentMs);
     case 'characterNotTraining':
     // falls through: skillQueueEnding's tail finish is a future deadline too, not the moment the queue actually runs dry (same reasoning as planetaryExtractorExpiring).
     case 'skillQueueEnding':
     case 'spExtractionReady':
-    case 'industryJobComplete':
-    case 'corpIndustryJobReady':
-    case 'planetaryExtractionDone':
     case 'planetaryExtractorExpiring':
     case 'newCalendarEvent':
     case 'calendarEventStarting':
-    case 'contractAccepted':
-    case 'contractCompleted':
     case 'contractFailed':
     // falls through: a future deadline, not the moment the contract failed.
     case 'courierDeliveryDue':
     case 'marketOrderFilled':
-    case 'newMail':
     case 'structureReinforcementExit':
     case 'structureFuelLow':
     case 'corpMemberJoined':

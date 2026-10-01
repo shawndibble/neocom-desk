@@ -347,6 +347,7 @@ export function projectIndustryJobs(
       blueprintTypeId: entry.blueprintTypeId,
       productTypeId: entry.productTypeId,
       activityId: entry.activityId,
+      endMs: entry.endMs,
     };
     rows.push(
       buildRow(
