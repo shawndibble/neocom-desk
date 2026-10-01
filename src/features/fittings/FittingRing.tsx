@@ -24,21 +24,24 @@ import {
   ringGhostIndices,
   ringPoint,
   ringSlotAngle,
+  ringSlotAngles,
   type RingGauge,
   type RingRack,
   type RingSlot,
+  type SlotLayout,
 } from '@/engine/fittings/ringLayout';
 import { cargoGroups } from '@/engine/fittings/fittingEdit';
 import type { HardpointKind } from '@/engine/fittings/hardpoints';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
-import type {
-  Fitting,
-  FittingItemState,
-  FittingModuleResult,
-  FittingSlotKind,
-  FittingStats,
-  HardpointCounts,
+import {
+  FITTING_SLOT_KINDS,
+  type Fitting,
+  type FittingItemState,
+  type FittingModuleResult,
+  type FittingSlotKind,
+  type FittingStats,
+  type HardpointCounts,
 } from '@/engine/fittings/types';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { SustainedTankReadout } from './FittingTankStats';
@@ -730,8 +733,10 @@ function CargoHoldReadout({ actions }: { actions: FittingItemActions }) {
  * the resource budgets as bands on the rim: CPU solid up the lower right,
  * powergrid dashed up the lower left, calibration and drone bandwidth thin
  * above them. Hovering a band gives its numbers; the same numbers sit in a
- * strip beneath the ring laid out as the rim is. Subsystems (T3s) and cargo
- * sit in rows below; the page puts the drones in a panel of their own.
+ * strip beneath the ring laid out as the rim is. A T3's subsystems join the
+ * band upper-left, between the rigs and the highs, its racks closing up and
+ * dropping the outlines to make room (`ringSlotAngles`). Cargo sits in a row
+ * below; the page puts the drones in a panel of their own.
  *
  * Tiles take drops: an Add panel item on a slot of its rack, or a fitted
  * module dragged along its rack. The phone overview (`compact`) is read-only;
@@ -841,12 +846,17 @@ export function FittingRing({
   );
   const subsystems = slots.filter((slot) => slot.rack === 'subsystem');
   const cargo = cargoGroups(fitting);
-  const ghosts = RING_RACKS.flatMap((rack) =>
-    ringGhostIndices(rack, ringSlots.filter((slot) => slot.rack === rack).length).map((index) => ({
-      rack,
-      index,
-    }))
-  );
+  const counts = Object.fromEntries(
+    FITTING_SLOT_KINDS.map((rack) => [rack, slots.filter((slot) => slot.rack === rack).length])
+  ) as SlotLayout;
+  const angles = ringSlotAngles(counts);
+  // A T3's band has no room for the positions it lacks.
+  const ghosts =
+    subsystems.length > 0
+      ? []
+      : RING_RACKS.flatMap((rack) =>
+          ringGhostIndices(rack, counts[rack]).map((index) => ({ rack, index }))
+        );
 
   // One tab stop for the whole ring, not one per tile: the arrow keys walk
   // the slots in ring order (highs, mids, lows, rigs, then subsystems),
@@ -967,8 +977,8 @@ export function FittingRing({
               />
             );
           })}
-          {ringSlots.map((slot) => {
-            const angle = ringSlotAngle(slot.rack, slot.index);
+          {[...ringSlots, ...subsystems].map((slot) => {
+            const angle = angles[slot.rack][slot.index];
             return (
               <SlotTile
                 key={`${slot.rack}-${slot.index}`}
@@ -1047,30 +1057,6 @@ export function FittingRing({
               {droneButton}
             </div>
           </>
-        )}
-
-        {subsystems.length > 0 && (
-          <div>
-            <p className={MICRO_LABEL}>{t('fittings.list.rack.subsystem')}</p>
-            <div className="flex flex-wrap gap-2">
-              {subsystems.map((slot) => (
-                <div key={slot.index} className="relative h-11 w-11">
-                  <SlotTile
-                    {...tileProps}
-                    slot={slot}
-                    cantUse={cantUse(slot)}
-                    reachedState={reachedState(slot)}
-                    maxState={maxStateOf(slot)}
-                    takesCharges={takesChargesOf(slot)}
-                    selected={isSelected(slot)}
-                    {...roving(slot)}
-                    position={{ inset: 0 }}
-                    angle={0}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
         )}
 
         {/* What the ring has no slot for; the drones get a panel of their own beneath it. */}

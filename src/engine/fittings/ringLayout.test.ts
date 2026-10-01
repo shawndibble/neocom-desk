@@ -15,6 +15,7 @@ import {
   ringGhostIndices,
   ringPoint,
   ringSlotAngle,
+  ringSlotAngles,
 } from './ringLayout';
 import type { Fitting } from './types';
 
@@ -109,6 +110,85 @@ describe('ringSlotAngle', () => {
   it('seats every tile inside the band', () => {
     expect(RING_SLOT_RADIUS - RING_TILE / 2).toBeGreaterThanOrEqual(RING_INNER_RADIUS);
     expect(RING_SLOT_RADIUS + RING_TILE / 2).toBeLessThanOrEqual(RING_OUTER_RADIUS);
+  });
+});
+
+describe('ringSlotAngles', () => {
+  const tactical = { high: 7, medium: 5, low: 4, rig: 3, subsystem: 0 };
+  // A T3 cruiser's slots once its four subsystems are fitted.
+  const t3 = { high: 6, medium: 5, low: 6, rig: 3, subsystem: 4 };
+  const RING_ORDER = ['rig', 'subsystem', 'high', 'medium', 'low'] as const;
+  /** Every tile's angle in clockwise order from the rigs, unwrapped so they only rise. */
+  const clockwise = (angles: Record<string, number[]>) => {
+    const list = RING_ORDER.flatMap((rack) => angles[rack]);
+    return list.map((a, i) => (i > 0 && a < list[0] ? a + 360 : a));
+  };
+  const steps = (list: number[]) => list.slice(1).map((a, i) => a - list[i]);
+  const innerChord = (degrees: number) =>
+    2 * (RING_SLOT_RADIUS - RING_TILE / 2) * Math.sin((degrees * Math.PI) / 360);
+
+  it('leaves a hull without subsystems exactly where the racks always sat', () => {
+    const angles = ringSlotAngles(tactical);
+    for (const rack of ['high', 'medium', 'low', 'rig'] as const) {
+      expect(angles[rack]).toEqual(
+        Array.from({ length: tactical[rack] }, (_, index) => ringSlotAngle(rack, index))
+      );
+    }
+    expect(angles.subsystem).toEqual([]);
+  });
+
+  it('puts a T3�s subsystems on the band between the rigs and the highs', () => {
+    const list = clockwise(ringSlotAngles(t3));
+    for (let i = 1; i < list.length; i++) expect(list[i]).toBeGreaterThan(list[i - 1]);
+    // And the lows still come round to the rigs.
+    expect(list[0] + 360).toBeGreaterThan(list[list.length - 1]);
+  });
+
+  it('keeps a T3�s highs centred over the top, as every hull�s are', () => {
+    const highs = ringSlotAngles(t3).high;
+    expect((highs[0] + highs[highs.length - 1]) / 2).toBeCloseTo(-15, 6);
+  });
+
+  it('closes a T3’s racks to one empty position apart, the spare room left between the lows and rigs', () => {
+    // A Tengu fit: fewer slots than the band has room for.
+    const angles = ringSlotAngles({ high: 5, medium: 5, low: 3, rig: 3, subsystem: 4 });
+    for (const rack of RING_ORDER) {
+      for (const step of steps(angles[rack])) expect(step).toBeCloseTo(12, 6);
+    }
+    const list = clockwise(angles);
+    const gaps = steps(list).filter((s) => s > 12.5);
+    expect(gaps).toHaveLength(4);
+    for (const gap of gaps) expect(gap).toBeCloseTo(24, 6);
+    // The lows-to-rigs gap, across the bottom, takes the rest.
+    expect(list[0] + 360 - list[list.length - 1]).toBeGreaterThan(24);
+  });
+
+  it('puts a bare T3 hull’s subsystems on the left, before any subsystem gives it highs', () => {
+    const subsystems = ringSlotAngles({
+      high: 0,
+      medium: 0,
+      low: 0,
+      rig: 3,
+      subsystem: 4,
+    }).subsystem;
+    expect((subsystems[0] + subsystems[subsystems.length - 1]) / 2).toBeCloseTo(-90, 6);
+  });
+
+  it('gives a rack with no slots no gap', () => {
+    const angles = ringSlotAngles({ ...t3, rig: 0 });
+    expect(angles.rig).toEqual([]);
+    const list = clockwise(angles);
+    expect(
+      [...steps(list), list[0] + 360 - list[list.length - 1]].filter((s) => s > 12.5)
+    ).toHaveLength(4);
+  });
+
+  it('squeezes the gaps, then the pitch, before letting any T3 tiles overlap', () => {
+    const crowded = { high: 7, medium: 6, low: 7, rig: 3, subsystem: 4 };
+    const list = clockwise(ringSlotAngles(crowded));
+    const all = [...steps(list), list[0] + 360 - list[list.length - 1]];
+    expect(all.reduce((sum, s) => sum + s, 0)).toBeCloseTo(360, 6);
+    for (const step of all) expect(innerChord(step)).toBeGreaterThanOrEqual(RING_TILE);
   });
 });
 

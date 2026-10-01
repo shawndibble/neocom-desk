@@ -50,6 +50,21 @@ describe('FittingRing', () => {
     expect(screen.getAllByLabelText(/empty$/)).toHaveLength(3 - 1 + 2 + 0 + 5);
   });
 
+  it('seats a T3’s subsystems on the band, which drops the outlines of positions it lacks', () => {
+    const { container, rerender } = render(<FittingRing fitting={fitting} stats={statsWith(10)} />);
+    const subsystem = screen.getByLabelText(/^Subsystems 1, /);
+    // On the band: turned with the ring like every other tile, not in a row beneath it.
+    expect(subsystem.closest('[style*="rotate"]')).not.toBeNull();
+    expect(screen.queryByText('Subsystems')).toBeNull();
+    const outlines = () => container.querySelectorAll('span[aria-hidden="true"][style*="rotate"]');
+    expect(outlines()).toHaveLength(0);
+
+    const tactical = statsWith(10);
+    tactical.slotCounts = { ...tactical.slotCounts, subsystem: 0 };
+    rerender(<FittingRing fitting={fitting} stats={tactical} />);
+    expect(outlines()).toHaveLength(8 - 3 + 8 - 2 + 8 - 1 + 3);
+  });
+
   it('reports the slot tapped', () => {
     const onSlotSelect = vi.fn();
     render(<FittingRing fitting={fitting} stats={statsWith(10)} onSlotSelect={onSlotSelect} />);
