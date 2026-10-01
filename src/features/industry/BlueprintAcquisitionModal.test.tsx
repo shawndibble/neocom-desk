@@ -189,9 +189,31 @@ describe('BlueprintAcquisitionModal — Owned', () => {
     });
     expect(props.onClose).toHaveBeenCalled();
   });
+
+  it("sets the job runs to the picked copy's remaining runs, as the game does", async () => {
+    const user = userEvent.setup();
+    const onPickRuns = vi.fn();
+    renderModal({ ownedCopies: [{ me: 8, te: 16, runs: 5 }], onPickRuns });
+    await user.click(screen.getByRole('button', { name: /Use this blueprint: ME 8% \/ TE 16%/ }));
+    expect(onPickRuns).toHaveBeenCalledWith(5);
+  });
 });
 
 describe('BlueprintAcquisitionModal — Manual', () => {
+  it('leaves the job runs alone — a typed tier says nothing about runs', async () => {
+    const user = userEvent.setup();
+    const onPickRuns = vi.fn();
+    renderModal({ onPickRuns });
+    const manual = section('Manual tier');
+    const [me, te] = within(manual).getAllByRole('textbox');
+    await user.clear(me);
+    await user.type(me, '7');
+    await user.clear(te);
+    await user.type(te, '14');
+    await user.click(within(manual).getByRole('button', { name: /Use this blueprint/ }));
+    expect(onPickRuns).not.toHaveBeenCalled();
+  });
+
   it('forces the typed tier and price', async () => {
     const user = userEvent.setup();
     const props = renderModal();

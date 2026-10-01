@@ -77,6 +77,7 @@ import {
   marketSellRows,
   overridePatchFor,
   ownedTierRows,
+  runsForPickedRow,
   sectionRows,
   type AcquisitionOwnedCopy,
   type AcquisitionSourceRow,
@@ -111,6 +112,13 @@ interface BlueprintAcquisitionModalProps {
   /** This row's own sourcing entry, for the current override/price (if any). */
   sourcing: MaterialSourcing | undefined;
   onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
+  /**
+   * Sets the plan's job runs to what a picked blueprint brings, the way the
+   * in-game Industry window fills them in (`runsForPickedRow`). Given only
+   * for the plan's own blueprint: a sub-build's runs follow from what the
+   * plan needs, not from the copy.
+   */
+  onPickRuns?: (runs: number) => void;
   /** Navigates to BPC Sourcing pre-filtered to this blueprint. */
   onSearchBpcSourcing: (blueprintTypeID: number) => void;
   /** The Build Plan's own Trade Hub — the modal's starting hub. */
@@ -196,6 +204,7 @@ export function BlueprintAcquisitionModal({
   ownedCopies,
   sourcing,
   onSourcingChange,
+  onPickRuns,
   onSearchBpcSourcing,
   planHubId,
   itemMenuFor,
@@ -308,6 +317,8 @@ export function BlueprintAcquisitionModal({
 
   function pick(row: AcquisitionSourceRow) {
     onSourcingChange(blueprintTypeID, overridePatchFor(row));
+    const runs = runsForPickedRow(row);
+    if (runs !== null) onPickRuns?.(runs);
     onClose();
   }
 

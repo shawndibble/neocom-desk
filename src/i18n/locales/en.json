@@ -1873,14 +1873,14 @@
     "materialPriceBasisTooltip": "Which side of the hub's order book your materials are costed at. Sell orders is what you pay to buy them right now; buy orders is what they cost if you place orders and wait to be filled. The product is always valued at the hub's lowest sell, since that is what buying it outright costs.",
     "buildSystem": "Build system",
     "buildSystemTooltipLabel": "About build system",
-    "buildSystemTooltip": "The solar system your job runs in. Its cost index sets the job fee, and its security band scales whatever rig is fitted (1x highsec, 1.9x lowsec, 2.1x nullsec) — so naming it settles both. It cannot tell you which rig is fitted; ESI does not publish structure fittings. Leave it empty to build at the hub. Type the system name exactly, then press Enter or click away.",
+    "buildSystemTooltip": "The solar system your job runs in. Its cost index drives the total job cost, and its security band scales whatever rig is fitted (1x highsec, 1.9x lowsec, 2.1x nullsec) — so naming it settles both. It cannot tell you which rig is fitted; ESI does not publish structure fittings. Leave it empty to build at the hub. Type the system name exactly, then press Enter or click away.",
     "buildSystemNotFound": "No solar system by that name.",
     "buildLocation": "Build location",
     "buildLocationPlaceholder": "Search a station or structure…",
     "buildLocationUnnamed": "{{facility}} in {{system}}",
     "facilityTax": "Facility tax %",
     "facilityTaxTooltipLabel": "About facility tax",
-    "facilityTaxTooltip": "Structure owner's cut of the job fee, set per-structure by its owner.",
+    "facilityTaxTooltip": "Structure owner's tax, part of the total job cost, set per-structure by its owner.",
     "includeReactions": "Include Reactions",
     "includeReactionsTooltipLabel": "About Include Reactions",
     "includeReactionsTooltip": "Lets this plan build its reaction materials instead of only buying them. Turning it on adds a Reaction Location below, because reactions need their own facility — an engineering complex cannot run them.",
@@ -2029,7 +2029,7 @@
       "spare": "{{spare}} spare units are left over.",
       "inputsTitle": "These jobs consume",
       "jobTime": "Job time",
-      "jobFees": "Installation fees",
+      "jobFees": "Total job cost",
       "unitCost": "Cost per unit built",
       "me": "ME %"
     },
@@ -2049,9 +2049,9 @@
     },
     "results": "Results",
     "eiv": "EIV",
-    "eivTooltip": "Estimated Item Value: the SCC's reference price for the materials consumed, used to calculate job fees.",
+    "eivTooltip": "Estimated Item Value: the SCC's reference price for the materials consumed, used to calculate the total job cost.",
     "costIndexFee": "Cost index fee",
-    "costIndexFeeTooltip": "Part of the job fee driven by system manufacturing activity: EIV × this system's cost index.",
+    "costIndexFeeTooltip": "Part of the total job cost driven by system manufacturing activity: EIV × this system's cost index.",
     "sccSurcharge": "SCC surcharge",
     "sccSurchargeTooltip": "Fixed 4% surcharge on the job's EIV, paid to the Secure Commerce Commission.",
     "facilityTaxAmount": "Facility tax",
@@ -2061,7 +2061,7 @@
     "totalCost": "Total cost",
     "time": "Time",
     "costIndexWithSystem": "Cost index ({{system}})",
-    "costIndexTooltip": "The build system's manufacturing activity level, which drives the job's cost-index fee. Read live from ESI for the build system named above — the trade hub sets material and product prices, never this. <b>Can be slightly off:</b> ESI rounds it to 4 decimals.",
+    "costIndexTooltip": "<b>Can be slightly off: ESI rounds it to 4 decimals.</b> The build system's manufacturing activity level, which drives the job's cost-index fee. Read live from ESI for the build system named above — the trade hub sets material and product prices, never this.",
     "revenue": "Revenue",
     "salesTax": "Sales tax",
     "brokerFee": "Broker fee",
@@ -2240,7 +2240,7 @@
     "groupEmptyTitle": "This group is empty",
     "groupEmptyHint": "Move plans in from the list, or import a fit to fill a new group.",
     "groupVerdictMaterial": "material {{amount}}",
-    "groupVerdictJobFees": "job fees {{amount}}",
+    "groupVerdictJobFees": "total job cost {{amount}}",
     "groupVerdictCheaperAt": "{{percent}} cheaper than buying at {{hub}}",
     "groupVerdictCheaper": "{{percent}} cheaper than buying",
     "groupVerdictMoreAt": "{{percent}} more than buying at {{hub}}",
@@ -2331,7 +2331,7 @@
       "pricesMaterialsBuy": "Materials: {{hub}} highest buy — what they cost if you place orders and wait.",
       "pricesOre": "Ore, ice and gas: priced as themselves. Refining is not modelled, so a plan that eats minerals prices minerals.",
       "pricesOwned": "Owned units: 0 ISK. Ore you mined is free here — the plan does not charge what you could have sold it for.",
-      "pricesBuilt": "Built materials: their own recipe instead of a price — inputs plus job fee, at every level you chose to build.",
+      "pricesBuilt": "Built materials: their own recipe instead of a price — inputs plus total job cost, at every level you chose to build.",
       "pricesProduct": "{{product}}: always {{hub}} lowest sell, whichever side the materials use.",
       "materialsTitle": "Material cost",
       "materials": "Quantity after ME {{me}} waste (rounded once per job, not per run) × unit price. Owned units come off first.",
@@ -2564,7 +2564,7 @@
       },
       "build": {
         "question": "Is this blueprint worth building today?",
-        "answer": "A Build Plan costs the materials, job fee and taxes at live hub prices and answers two different questions instead of blurring them: is it cheaper than buying outright, and does it still profit once sales tax and broker fees come off. Sub-builds recurse into the same plan, owned stock is checked against what it would fetch if you sold it instead, and every figure on screen opens the rule it came from with your own values substituted in."
+        "answer": "A Build Plan costs the materials, total job cost and taxes at live hub prices and answers two different questions instead of blurring them: is it cheaper than buying outright, and does it still profit once sales tax and broker fees come off. Sub-builds recurse into the same plan, owned stock is checked against what it would fetch if you sold it instead, and every figure on screen opens the rule it came from with your own values substituted in."
       },
       "training": {
         "question": "What is this training plan really going to cost me?",
@@ -2656,7 +2656,7 @@
       },
       "industry": {
         "name": "Industry",
-        "desc": "Build plans for manufacturing and reactions: materials, job fees, facility rigs and taxes at live hub prices. A production log tracks what each run really made, Opportunities ranks the blueprints you own and scans the market for what is profitable to build, and BPC Search covers every public blueprint-copy contract by ME/TE, runs, price and jumps.",
+        "desc": "Build plans for manufacturing and reactions: materials, total job costs, facility rigs and taxes at live hub prices. A production log tracks what each run really made, Opportunities ranks the blueprints you own and scans the market for what is profitable to build, and BPC Search covers every public blueprint-copy contract by ME/TE, runs, price and jumps.",
         "tag": "Manufacturing"
       },
       "ships": {
