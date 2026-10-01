@@ -104,7 +104,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
 import type { TableExport } from '@/components/ui/useTableExport';
 import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/character/assetsCsv';
-import { getAdjustedPrices } from '@/market/prices';
+import { getAveragePriceByType } from '@/market/prices';
 import { loadCorporationBlueprints } from '@/features/corp/blueprints';
 import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -156,19 +156,6 @@ const EMPTY_SNAPSHOT: AssetsSnapshot = {
   fetchedAt: null,
 };
 
-async function loadAssetPrices(): Promise<Map<number, number>> {
-  try {
-    const prices = await getAdjustedPrices();
-    const byType = new Map<number, number>();
-    for (const [typeId, price] of prices) {
-      if (price.average !== null) byType.set(typeId, price.average);
-    }
-    return byType;
-  } catch {
-    return new Map();
-  }
-}
-
 async function loadAssetsSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal,
@@ -180,7 +167,7 @@ async function loadAssetsSnapshot(
   const [assetsResult, divisionsResult, priceByTypeId] = await Promise.all([
     loadCorporationAssets(characterId, corporationId),
     loadCorporationDivisions(characterId, corporationId),
-    loadAssetPrices(),
+    getAveragePriceByType(),
   ]);
 
   // A character switch mid-load: skip the label fan-out for a snapshot about

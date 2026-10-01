@@ -20,8 +20,15 @@ import { readRouteSnapshot, writeRouteSnapshot } from './routeSnapshotCache';
  * loaders may also read it between their own awaits to skip follow-up fetches
  * whose results would only be thrown away.
  */
-export interface RouteSnapshotSignal {
+export interface RouteSnapshotSignal<T = unknown> {
   cancelled: boolean;
+  /**
+   * Show an early partial snapshot while the loader finishes the slow reads.
+   * No-op when anything is already on screen (finished, retained or carried
+   * over); `loading` stays true and a partial is never retained. Absent when a
+   * loader runs outside the hook (`app/routeWarm.ts`).
+   */
+  publish?(partial: T): void;
 }
 
 /**
@@ -42,6 +49,8 @@ interface StampedSnapshot<T> {
   epoch: number;
   data: T | null;
   error: unknown;
+  /** An early `publish`: renders, but the load is still in flight. */
+  partial?: boolean;
 }
 
 export interface RouteSnapshotOptions {
@@ -106,7 +115,7 @@ export interface RouteSnapshot<T> {
 const MAX_CONSECUTIVE_AUTO_RELOADS = 3;
 
 export function useRouteSnapshot<T>(
-  load: (characterId: number, signal: RouteSnapshotSignal) => Promise<T>,
+  load: (characterId: number, signal: RouteSnapshotSignal<T>) => Promise<T>,
   /**
    * Second case alongside the active-character store: a caller that already
    * resolved its own character (e.g. a panel embedded in a route that reads
@@ -177,8 +186,10 @@ export function useRouteSnapshot<T>(
   // Latest-ref so a caller passing an inline loader can't re-trigger the load
   // effect every render. Declared first, so it is current before that effect runs.
   const loadRef = useRef(load);
+  const lastGoodRef = useRef(lastGoodData);
   useEffect(() => {
     loadRef.current = load;
+    lastGoodRef.current = lastGoodData;
   });
 
   /**
@@ -208,7 +219,19 @@ export function useRouteSnapshot<T>(
   const { characterId, epoch } = lifecycle;
   useEffect(() => {
     if (characterId === null) return;
-    const signal: RouteSnapshotSignal = { cancelled: false };
+    const signal: RouteSnapshotSignal<T> = {
+      cancelled: false,
+      publish(partial) {
+        if (signal.cancelled) return;
+        if (lastGoodRef.current !== null) return;
+        if (cacheKey !== undefined && readRouteSnapshot(cacheKey, characterId) !== null) return;
+        setSnapshot((prev) =>
+          prev?.epoch === epoch && !prev.partial
+            ? prev
+            : { epoch, data: partial, error: null, partial: true }
+        );
+      },
+    };
     loadInFlight.current = true;
     void (async () => {
       try {
@@ -272,7 +295,7 @@ export function useRouteSnapshot<T>(
   return {
     data: current?.data ?? (staleWhileRevalidate ? lastGoodData : null) ?? retained,
     error: current?.error ?? null,
-    loading: current === null,
+    loading: current === null || current.partial === true,
     hydrated,
     activeCharacterId,
     refreshCount: lifecycle.refreshCount,

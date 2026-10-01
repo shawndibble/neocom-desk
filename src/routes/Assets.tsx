@@ -74,7 +74,7 @@ import { loadCharacterBlueprints } from '@/features/industry/data';
 import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
 import type { TableExport } from '@/components/ui/useTableExport';
 import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/character/assetsCsv';
-import { getAdjustedPrices } from '@/market/prices';
+import { getAveragePriceByType } from '@/market/prices';
 import { formatIsk, parseIskAmount } from '@/lib/isk';
 import {
   assetStackValue,
@@ -170,6 +170,8 @@ interface Snapshot {
   priceByTypeId: Map<number, number>;
   /** Each blueprint copy's own value by item id (`engine/blueprintCopyValue.ts`) — a copy never takes its type's average price. */
   copyValueByItemId: Map<number, number>;
+  /** False in an early partial: values read 0 until prices land, so value filters must not apply. */
+  pricesReady: boolean;
   /** m3 per unit, from the slim SDE snapshot only — best-effort, missing for market/asset-only types it doesn't cover. */
   volumeByTypeId: Map<number, number>;
 }
@@ -258,20 +260,6 @@ function compareValuedAssetMatches(
   }
 }
 
-/** Global average market prices, best-effort — a Fuzzwork/ESI outage degrades badges to 0 rather than the whole page. */
-async function loadAssetPrices(): Promise<Map<number, number>> {
-  try {
-    const prices = await getAdjustedPrices();
-    const byType = new Map<number, number>();
-    for (const [typeId, price] of prices) {
-      if (price.average !== null) byType.set(typeId, price.average);
-    }
-    return byType;
-  } catch {
-    return new Map();
-  }
-}
-
 /** A Character's own blueprint copies valued from contract listings, ME/TE/runs from its blueprints read when that scope is granted. */
 function loadOwnCopyValues(
   characterId: number,
@@ -286,20 +274,48 @@ function loadOwnCopyValues(
 
 async function loadAssetsSnapshot(
   characterId: number,
-  signal: RouteSnapshotSignal
+  signal: RouteSnapshotSignal<Snapshot>
 ): Promise<Snapshot> {
-  const [{ cached: assetsResult, needsReauth: assetsNeedsReauth }, priceByTypeId] =
-    await Promise.all([loadCharacterAssets(characterId), loadAssetPrices()]);
+  // Not awaited with the assets: a first-ever price read is the slowest call.
+  const pricesPromise = getAveragePriceByType();
+  const { cached: assetsResult, needsReauth: assetsNeedsReauth } =
+    await loadCharacterAssets(characterId);
   const assetsTruncated = assetsResult?.truncated ?? false;
   const assets = assetsResult?.data ?? [];
 
+  // Rows first, the slow reads (prices, Firestore copy values) fill in behind.
+  let shown: Snapshot = {
+    assetsResult,
+    assetsTruncated,
+    assetsNeedsReauth,
+    typeNames: new Map(),
+    locationNames: new Map(),
+    priceByTypeId: new Map(),
+    pricesReady: false,
+    copyValueByItemId: new Map(),
+    volumeByTypeId: new Map(),
+  };
+  const show = (patch: Partial<Snapshot>) => {
+    shown = { ...shown, ...patch };
+    signal.publish?.(shown);
+  };
+  show({});
+  void pricesPromise.then((priceByTypeId) => show({ priceByTypeId, pricesReady: true }));
+
   // Already superseded: skip the ESI name resolves, their results would be discarded.
   const typeIds = signal.cancelled ? [] : [...new Set(assets.map((a) => a.type_id))];
-  const [typeNames, volumeByTypeId, copyValueByItemId] = await Promise.all([
+  const copyValuesPromise = signal.cancelled
+    ? Promise.resolve(new Map<number, number>())
+    : loadOwnCopyValues(characterId, assets);
+  void copyValuesPromise.then(
+    (copyValueByItemId) => show({ copyValueByItemId }),
+    () => {}
+  );
+  const [typeNames, volumeByTypeId] = await Promise.all([
     loadTypeNames(typeIds),
     loadTypeVolumes(typeIds),
-    signal.cancelled ? new Map<number, number>() : loadOwnCopyValues(characterId, assets),
   ]);
+  show({ typeNames, volumeByTypeId });
 
   const stationIds = signal.cancelled
     ? []
@@ -362,6 +378,9 @@ async function loadAssetsSnapshot(
     if (name) locationNames.set(id, name);
   });
 
+  show({ locationNames });
+  const [copyValueByItemId, priceByTypeId] = await Promise.all([copyValuesPromise, pricesPromise]);
+
   return {
     assetsResult,
     assetsTruncated,
@@ -369,6 +388,7 @@ async function loadAssetsSnapshot(
     typeNames,
     locationNames,
     priceByTypeId,
+    pricesReady: true,
     copyValueByItemId,
     volumeByTypeId,
   };
@@ -680,7 +700,8 @@ export function Assets() {
   const allItemsView = view.all;
   const minValueInput = view.min;
   const flatModeActive = searchActive || allItemsView;
-  const minValueThreshold = parseIskAmount(minValueInput) ?? 0;
+  // Held off while prices are still loading: every asset values 0 until then.
+  const minValueThreshold = data?.pricesReady === false ? 0 : (parseIskAmount(minValueInput) ?? 0);
 
   // Multi-select and bulk actions (issue #90): select mode is off by default and
   // browsing (select mode off) renders exactly as it did before this ticket.

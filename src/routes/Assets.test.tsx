@@ -513,9 +513,13 @@ describe('Assets', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText(/only the first 25 assets were fetched/i);
+    // The notice shows with the rows, before names and values finish; the
+    // button is disabled until that load settles.
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    await waitFor(() => expect(retry).toBeEnabled());
     const requestsBeforeRetry = requestCount;
 
-    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await user.click(retry);
 
     await waitFor(() => expect(requestCount).toBeGreaterThan(requestsBeforeRetry));
   });
@@ -979,6 +983,28 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
 
     await user.type(screen.getByLabelText('Minimum value'), '10000');
 
+    await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+  });
+
+  it('keeps rows visible under a min-value filter while prices are still loading', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.get('https://esi.evetech.net/markets/prices', async () => {
+        await gate;
+        return HttpResponse.json([{ type_id: 35, average_price: 5000 }]);
+      })
+    );
+    window.history.replaceState({}, '', '/assets?all=1&min=10000');
+    render(<App />);
+
+    // Prices parked: every stack values 0, which the filter must not read as "below the minimum".
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+
+    release();
     await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
   });

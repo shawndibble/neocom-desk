@@ -188,6 +188,17 @@ snapshot is a whole rendered board and cannot be forgotten by `corp:` prefix.
 `{ name, characterId }`, folding its own key (character + corporation +
 division) into the retained name.
 
+**Partial snapshots.** A loader with a slow tail (Assets: prices, names,
+Firestore copy values) calls `signal.publish(partial)` after its fast read.
+The hook renders it only when nothing is on screen (no finished, retained or
+carried-over data), keeps `loading` true until the loader returns, and never
+retains it — so `data` can be non-null while `loading` is true, and views
+still spin on `loading && !data`. A partial's gaps must read as "not loaded
+yet", never as a value a filter can act on (Assets' `pricesReady`).
+`market/prices.ts`'s `getAdjustedPrices(now, { allowStale })` is the matching
+cache-side escape: it serves a lapsed persisted copy at once and, when the
+refresh lands, fires `emitCacheRevalidated` so mounted views re-read.
+
 Session-only is the load-bearing limit, not an implementation detail: the
 **first** visit to a route after an app load still composes its snapshot from
 scratch, and that is the one window a spinner is still on screen. `prefetch.ts`
