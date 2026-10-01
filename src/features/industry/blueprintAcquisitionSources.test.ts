@@ -452,6 +452,14 @@ describe('runsForPickedRow — job runs the in-game Industry window would fill i
     expect(runsForPickedRow(owned)).toBe(150);
   });
 
+  it('sums every owned copy at the picked tier — a plan builds with all of them', () => {
+    const [owned] = ownedTierRows([
+      { me: 10, te: 20, runs: 10 },
+      { me: 10, te: 20, runs: 10 },
+    ]);
+    expect(runsForPickedRow(owned)).toBe(20);
+  });
+
   it('starts an owned original at 1 run', () => {
     const [owned] = ownedTierRows([{ me: 10, te: 20, runs: -1 }]);
     expect(runsForPickedRow(owned)).toBe(1);
