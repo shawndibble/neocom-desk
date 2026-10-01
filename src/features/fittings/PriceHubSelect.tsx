@@ -20,7 +20,7 @@ export function PriceHubSelect() {
     <div className="flex items-center gap-2 text-xs">
       <span className="text-text-dim">{t('fittings.stats.priceHub')}</span>
       <Select value={hub} onValueChange={(value) => void setHub(value as TradeHub['id'])}>
-        <SelectTrigger aria-label={t('fittings.stats.priceHub')} className="min-w-0 flex-1">
+        <SelectTrigger aria-label={t('fittings.stats.priceHub')} className="min-w-0">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

@@ -1212,4 +1212,41 @@ describe('FittingStatsSections price', () => {
     expect(body.queryByText('Priced Thing')).toBeNull();
     expect(body.getByRole('combobox', { name: 'Priced at' })).toBeInTheDocument();
   });
+
+  it('breaks the price down per item and copies it as a multibuy list', async () => {
+    const written: string[] = [];
+    configureClipboard(async (text) => {
+      written.push(text);
+    });
+    const price = {
+      rows: [row(1, 'Priced Thing', 2, 1500), row(2, 'Rare Thing', 3, null)],
+      totals: { buy: 3000, sell: 3000, spread: 0, unpricedRows: 1 },
+    } as unknown as Appraisal;
+    const user = userEvent.setup();
+    render(
+      <FittingStatsSections
+        stats={stats()}
+        statsProgress={null}
+        statsError={false}
+        price={price}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={typeName}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: /^Price/ }));
+    await user.click(within(sectionBody('Price')).getByRole('button', { name: 'Appraise' }));
+
+    const dialog = within(screen.getByRole('dialog', { name: 'Appraisal' }));
+    const priced = within(dialog.getByText('Priced Thing').closest('tr')!);
+    expect(priced.getByText('1,500 ISK')).toBeInTheDocument();
+    expect(priced.getByText('3,000 ISK')).toBeInTheDocument();
+    const rare = within(dialog.getByText('Rare Thing').closest('tr')!);
+    expect(rare.getAllByText('—')).toHaveLength(2);
+
+    await user.click(dialog.getByRole('button', { name: 'Copy to multibuy' }));
+    expect(written).toEqual(['Priced Thing 2\nRare Thing 3']);
+    expect(await dialog.findByText('Multibuy list copied')).toBeInTheDocument();
+    configureClipboard(null);
+  });
 });
