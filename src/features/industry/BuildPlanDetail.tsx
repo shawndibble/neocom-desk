@@ -52,9 +52,13 @@ import {
   reactionPlanFacilityContextFor,
   autoBuildDepthContext,
 } from './planFacilityContext';
-import { useReactionFacilityDefaults, REACTION_FACILITY_PRESETS } from './reactionFacilityDefaults';
+import { REACTION_FACILITY_PRESETS } from './reactionFacilityDefaults';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
-import { hydrateActivityFacilityDefaults, rememberActivityLocations } from './facilityDefaults';
+import {
+  hydrateActivityFacilityDefaults,
+  loadActivityFacilityDefaults,
+  rememberActivityLocations,
+} from './facilityDefaults';
 import { rememberedLocationsFromEdit } from './rememberLocationFromEdit';
 import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
@@ -337,13 +341,10 @@ export function BuildPlanDetail({
   const { offersFor: blueprintPurchaseOffersFor, ready: blueprintOffersReady } =
     useBlueprintPurchaseOffers(plan.characterId, hub, blueprintTypeIds);
 
-  // Pre-fills a fresh plan's Reaction Location the first time Include
-  // Reactions is turned on for it (issue #698) — read here, ahead of
-  // `toggleIncludeReactions`, so it's in hand the moment that needs it
-  // rather than one render behind. Both stores are also written from here:
-  // a location the pilot sets on this page becomes where their next plan
-  // starts (`rememberLocationFromEdit.ts`).
-  const reactionFacilityDefaults = useReactionFacilityDefaults((state) => state.value);
+  // Started on mount so the remembered locations are usually in hand before
+  // `toggleIncludeReactions` reads them; it still awaits them itself. Both
+  // stores are also written from here: a location the pilot sets on this page
+  // becomes where their next plan starts (`rememberLocationFromEdit.ts`).
   useEffect(() => {
     void hydrateActivityFacilityDefaults();
   }, []);
@@ -1016,31 +1017,34 @@ export function BuildPlanDetail({
    *
    * Through `editPlan`, not `update`: the pre-fill *is* the remembered
    * default, so writing it back would only re-stamp it as a fresh choice.
+   * Awaits hydration, so a click that lands before the stored record has
+   * loaded still pre-fills the remembered place, not the built-in default.
    */
   function toggleIncludeReactions(next: boolean) {
     if (next && plan.reactionFacility === undefined) {
-      const seed = reactionFacilityDefaults;
-      editPlan({
-        includeReactions: true,
-        reactionFacility: seed.facility,
-        reactionRigFit: seed.rigFit,
-        reactionFacilityTaxPct: seed.facilityTaxPct ?? undefined,
-        // Only what the record holds: an absent band already reads as
-        // highsec, and an absent system as the hub's.
-        ...(seed.security !== undefined ? { reactionSecurity: seed.security } : {}),
-        ...(seed.buildSystemId !== undefined && seed.buildSystemName !== undefined
-          ? {
-              reactionBuildSystemId: seed.buildSystemId,
-              reactionBuildSystemName: seed.buildSystemName,
-            }
-          : {}),
-        ...(seed.buildLocationId !== undefined
-          ? { reactionBuildLocationId: seed.buildLocationId }
-          : {}),
-        ...(seed.buildLocationName !== undefined
-          ? { reactionBuildLocationName: seed.buildLocationName }
-          : {}),
-      });
+      void loadActivityFacilityDefaults().then(({ reaction: seed }) =>
+        editPlan({
+          includeReactions: true,
+          reactionFacility: seed.facility,
+          reactionRigFit: seed.rigFit,
+          reactionFacilityTaxPct: seed.facilityTaxPct ?? undefined,
+          // Only what the record holds: an absent band already reads as
+          // highsec, and an absent system as the hub's.
+          ...(seed.security !== undefined ? { reactionSecurity: seed.security } : {}),
+          ...(seed.buildSystemId !== undefined && seed.buildSystemName !== undefined
+            ? {
+                reactionBuildSystemId: seed.buildSystemId,
+                reactionBuildSystemName: seed.buildSystemName,
+              }
+            : {}),
+          ...(seed.buildLocationId !== undefined
+            ? { reactionBuildLocationId: seed.buildLocationId }
+            : {}),
+          ...(seed.buildLocationName !== undefined
+            ? { reactionBuildLocationName: seed.buildLocationName }
+            : {}),
+        })
+      );
     } else {
       editPlan({ includeReactions: next });
     }
