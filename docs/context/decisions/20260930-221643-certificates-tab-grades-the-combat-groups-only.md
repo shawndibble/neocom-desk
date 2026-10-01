@@ -43,7 +43,16 @@ _Recorded 2026-09-30 · issue #2390._
 - **The group filter is a select, not chips.** The ticket sketched chips.
   Ten group chips wrapped to five lines on a phone before a single
   certificate showed, so the group is a `Select` ("All groups" plus the
-  nine). "Hide Elite" stays a chip.
+  nine).
+- **Grades filter through one multi-select; there is no summary bar.**
+  Revised after the first release, at the owner's request. The four summary
+  chips (Elite / Advanced / Basic only / Not started) and the "Hide Elite"
+  chip became a single "Grade" checkbox select over all six grades. Each
+  option carries its count ("Elite (3)"), so the filter is also the summary,
+  and hiding Elite is just unticking it. All grades start ticked.
+- **Every certificate opens, Elite included.** The expanded panel leads with
+  CCP's description of the certificate, then (below Elite) what the next
+  grade needs.
 - **Precached.** `certificates.json` is about 100 KB, the same size class as
   `certifiedPlans.json`.
 - **Out of scope:** certificate grades in Skill Compare, curated starter

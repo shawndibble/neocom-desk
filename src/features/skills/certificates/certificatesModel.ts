@@ -20,9 +20,6 @@ import type { Certificate } from '@/sde/types';
 /** 0 = not started, 1 Basic … 5 Elite. */
 export type CertificateGrade = 0 | 1 | 2 | 3 | 4 | 5;
 export const ELITE: CertificateGrade = 5;
-const ADVANCED: CertificateGrade = 4;
-const BASIC: CertificateGrade = 1;
-const NOT_STARTED: CertificateGrade = 0;
 
 export interface CertificateRow {
   certificate: Certificate;
@@ -73,37 +70,30 @@ export function certificateRows(
   });
 }
 
-export interface GradeSummary {
-  elite: number;
-  advanced: number;
-  /** Basic, and not yet Standard. */
-  basicOnly: number;
-  notStarted: number;
-}
+/** Every grade, Not started through Elite — the grade filter's default. */
+export const GRADES: readonly CertificateGrade[] = [0, 1, 2, 3, 4, 5];
+export const ALL_GRADES: ReadonlySet<CertificateGrade> = new Set(GRADES);
 
-export function gradeSummary(rows: readonly CertificateRow[]): GradeSummary {
-  const count = (grade: CertificateGrade) => rows.filter((r) => r.grade === grade).length;
-  return {
-    elite: count(ELITE),
-    advanced: count(ADVANCED),
-    basicOnly: count(BASIC),
-    notStarted: count(NOT_STARTED),
-  };
+/** How many certificates sit at each grade, indexed by grade (0–5). */
+export function gradeCounts(rows: readonly CertificateRow[]): number[] {
+  const counts = GRADES.map(() => 0);
+  for (const r of rows) counts[r.grade]++;
+  return counts;
 }
 
 export interface CertificateFilter {
   /** A certificate group name, or null for every group. */
   group: string | null;
-  hideElite: boolean;
+  /** The grades to show; an empty set shows nothing. */
+  grades: ReadonlySet<CertificateGrade>;
 }
 
 export function filterRows(
   rows: readonly CertificateRow[],
-  { group, hideElite }: CertificateFilter
+  { group, grades }: CertificateFilter
 ): CertificateRow[] {
   return rows.filter(
-    (r) =>
-      (group === null || r.certificate.groupName === group) && !(hideElite && r.grade === ELITE)
+    (r) => (group === null || r.certificate.groupName === group) && grades.has(r.grade)
   );
 }
 

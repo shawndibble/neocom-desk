@@ -99,24 +99,22 @@ export function CertificateRow({
   return (
     <li className="border-t border-line text-xs">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-3 py-2 sm:grid-cols-[minmax(0,1.3fr)_auto_minmax(0,1.4fr)_auto]">
-        {elite ? (
-          <span className="min-w-0 truncate text-sm font-medium text-text">{certificate.name}</span>
-        ) : (
-          <button
-            type="button"
-            aria-expanded={expanded}
-            aria-controls={panelId}
-            aria-label={t('skills.certificates.showNeeds', {
-              grade: nextGrade,
-              name: certificate.name,
-            })}
-            onClick={onToggle}
-            className="flex min-h-11 min-w-0 items-center md:min-h-9 gap-1.5 text-left text-sm font-medium text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            <Caret expanded={expanded} />
-            <span className="truncate">{certificate.name}</span>
-          </button>
-        )}
+        {/* Every row opens, Elite included: the description is there for all. */}
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={panelId}
+          aria-label={
+            elite
+              ? t('skills.certificates.showDetails', { name: certificate.name })
+              : t('skills.certificates.showNeeds', { grade: nextGrade, name: certificate.name })
+          }
+          onClick={onToggle}
+          className="flex min-h-11 min-w-0 items-center gap-1.5 text-left text-sm font-medium text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-9"
+        >
+          <Caret expanded={expanded} />
+          <span className="truncate">{certificate.name}</span>
+        </button>
         <GradePips grade={grade} alphaReach={alphaReach} />
         <p className="col-span-2 min-w-0 text-text-dim sm:col-span-1">
           {elite ? (
@@ -140,11 +138,18 @@ export function CertificateRow({
         </p>
         <div className="col-span-2 flex justify-end sm:col-span-1">{action}</div>
       </div>
-      {expanded && !elite && (
+      {expanded && (
         <div id={panelId} className="mx-3 mb-3 border border-line bg-bg px-3 py-2">
-          <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('skills.certificates.missingFor', { grade: nextGrade })}
-          </p>
+          {certificate.description && (
+            <p className="mb-2 max-w-prose whitespace-pre-line text-text">
+              {certificate.description}
+            </p>
+          )}
+          {!elite && (
+            <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('skills.certificates.missingFor', { grade: nextGrade })}
+            </p>
+          )}
           <ul className="space-y-1">
             {/* The schedule's own steps, not just `next`: a prerequisite the
                 scheduler injects shows here too, so the rows sum to the total. */}

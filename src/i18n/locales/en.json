@@ -1464,21 +1464,16 @@
         "5": "Elite"
       },
       "gradeOf": "{{grade}} ({{level}} of 5)",
-      "summary": {
-        "elite": "Elite",
-        "advanced": "Advanced",
-        "basicOnly": "Basic only",
-        "notStarted": "Not started"
-      },
       "filtersLabel": "Certificate filters",
       "groupLabel": "Certificate group",
       "allGroups": "All groups",
-      "hideElite": "Hide Elite",
+      "gradeFilter": "Grade",
+      "gradeOption": "{{grade}} ({{count}})",
       "sortLabel": "Sort certificates",
       "sort": {
-        "grade": "Lowest grade first",
+        "grade": "Lowest grade",
         "name": "Name",
-        "time": "Least time to next grade"
+        "time": "Least time"
       },
       "groupCount": "{{shown}} of {{total}}",
       "nextNeeds_one": "{{grade}} needs {{count}} skill level · {{time}}",
@@ -1490,6 +1485,7 @@
       "omegaOnly": "Omega only",
       "alphaCapped": "An Alpha clone can’t reach {{grade}}: {{skills}} need Omega.",
       "showNeeds": "What {{grade}} needs for {{name}}",
+      "showDetails": "About {{name}}",
       "missingFor": "Missing for {{grade}}",
       "noMatches": "No certificates match these filters.",
       "loadFailed": "Couldn’t load the certificates."
