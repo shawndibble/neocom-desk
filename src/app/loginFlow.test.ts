@@ -4,7 +4,7 @@ import { setupServer } from 'msw/node';
 import { db, type TokenRecord } from '@/db';
 import { CORE_GRANT, SCOPES, revokedScopes, scopesForGroup } from '@/esi/scopes';
 import { completeLogin } from '@/auth/session';
-import { takeLoginReturnTo } from '@/auth/loginReturnTo';
+import { setLoginReturnTo, takeLoginReturnTo } from '@/auth/loginReturnTo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 const { assignLocation } = vi.hoisted(() => ({ assignLocation: vi.fn<(url: string) => void>() }));
@@ -14,6 +14,7 @@ import {
   beginAddCharacterLogin,
   beginCustomizedAddCharacterLogin,
   beginEveLogin,
+  retryLastLogin,
 } from './loginFlow';
 
 const CHAR_ID = 2112625428;
@@ -237,12 +238,6 @@ describe('beginEveLogin: re-auth for a known character', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Branch 1b — Add Character through the Customize permissions dialog (#1522):
-// same "nobody to union with" reasoning as `beginAddCharacterLogin`, but with
-// a hand-picked set of Permissions instead of every default-on one.
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // Where the round trip lands. A re-auth or grant is pressed while looking at
 // a page, so `/callback` brings the user back to it; Add Character keeps the
 // ordinary landing.
@@ -267,6 +262,14 @@ describe('post-login landing', () => {
     expect(takeLoginReturnTo()).toBeNull();
   });
 
+  it('beginEveLogin does not remember a protocol-relative path', async () => {
+    window.history.replaceState(null, '', `${window.location.origin}//evil.example/x`);
+
+    await beginEveLogin({ characterId: CHAR_ID });
+
+    expect(takeLoginReturnTo()).toBeNull();
+  });
+
   it('beginAddCharacterLogin leaves the landing alone', async () => {
     window.history.replaceState(null, '', '/settings');
 
@@ -274,7 +277,57 @@ describe('post-login landing', () => {
 
     expect(takeLoginReturnTo()).toBeNull();
   });
+
+  it('Add Character drops a landing an abandoned grant left behind', async () => {
+    window.history.replaceState(null, '', '/industry');
+    await beginEveLogin({ characterId: CHAR_ID });
+    window.history.replaceState(null, '', '/characters');
+
+    await beginAddCharacterLogin();
+
+    expect(takeLoginReturnTo()).toBeNull();
+  });
+
+  it('Customize Add Character drops it too', async () => {
+    setLoginReturnTo('/industry');
+    window.history.replaceState(null, '', '/characters');
+
+    await beginCustomizedAddCharacterLogin([]);
+
+    expect(takeLoginReturnTo()).toBeNull();
+  });
+
+  it('Add Character from /login keeps the landing a Fitting Share Link stashed (#1544)', async () => {
+    setLoginReturnTo('/ships/fittings?f=abc');
+    window.history.replaceState(null, '', '/login');
+
+    await beginAddCharacterLogin();
+
+    expect(takeLoginReturnTo()).toBe('/ships/fittings?f=abc');
+  });
+
+  it('a retry restarts the landing clock along with the new Pending Login', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      window.history.replaceState(null, '', '/settings');
+      await beginEveLogin({ characterId: CHAR_ID });
+      vi.setSystemTime(Date.now() + 10 * 60_000);
+
+      expect(await retryLastLogin()).toBe(true);
+      vi.setSystemTime(Date.now() + 10 * 60_000);
+
+      expect(takeLoginReturnTo()).toBe('/settings');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
+
+// ---------------------------------------------------------------------------
+// Branch 1b — Add Character through the Customize permissions dialog (#1522):
+// same "nobody to union with" reasoning as `beginAddCharacterLogin`, but with
+// a hand-picked set of Permissions instead of every default-on one.
+// ---------------------------------------------------------------------------
 
 describe('beginCustomizedAddCharacterLogin', () => {
   it('sends only the Core Grant when every Permission is unchecked (Select none)', async () => {

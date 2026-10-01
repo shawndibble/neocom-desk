@@ -15,8 +15,9 @@
  * the worst case is landing on the wrong in-app page, not a security
  * exposure.
  */
+import { PENDING_TTL_MS } from './session';
+
 const KEY = 'neocom.loginReturnTo';
-const TTL_MS = 15 * 60_000;
 
 interface Stashed {
   path: string;
@@ -40,10 +41,19 @@ export function takeLoginReturnTo(): string | null {
     if (raw === null) return null;
     const parsed = JSON.parse(raw) as Partial<Stashed>;
     if (typeof parsed.path !== 'string' || typeof parsed.createdAt !== 'number') return null;
-    if (Date.now() - parsed.createdAt > TTL_MS) return null;
+    if (Date.now() - parsed.createdAt > PENDING_TTL_MS) return null;
     return parsed.path;
   } catch {
     return null;
+  }
+}
+
+/** Drops the stash, so a login it was not meant for lands on the default. */
+export function clearLoginReturnTo(): void {
+  try {
+    sessionStorage.removeItem(KEY);
+  } catch {
+    // Unreachable storage holds no stash to misdirect anything.
   }
 }
 
@@ -58,6 +68,19 @@ export function routerPathOf(
 ): string {
   const base = baseUrl.replace(/\/$/, '');
   const { pathname } = location;
-  const path = base && pathname.startsWith(base) ? pathname.slice(base.length) || '/' : pathname;
+  const underBase = base !== '' && (pathname === base || pathname.startsWith(`${base}/`));
+  const path = underBase ? pathname.slice(base.length) || '/' : pathname;
   return `${path}${location.search}${location.hash}`;
+}
+
+/** The router path of the page this tab is showing. */
+export function currentRouterPath(): string {
+  return routerPathOf(window.location, import.meta.env.BASE_URL);
+}
+
+/** Whether `path` (a router path) is on `route`, e.g. `/callback?code=…` on `/callback`. */
+export function isOnRoute(path: string, route: string): boolean {
+  if (!path.startsWith(route)) return false;
+  const next = path.charAt(route.length);
+  return next === '' || '/?#'.includes(next);
 }

@@ -51,6 +51,11 @@ describe('routerPathOf', () => {
     expect(routerPathOf(location, '/neocom-desk/')).toBe('/settings');
   });
 
+  it('strips the base only at a path-segment boundary', () => {
+    const location = { pathname: '/neocom-desktop/x', search: '', hash: '' };
+    expect(routerPathOf(location, '/neocom-desk/')).toBe('/neocom-desktop/x');
+  });
+
   it('maps the bare base itself to the root route', () => {
     const location = { pathname: '/neocom-desk/', search: '', hash: '' };
     expect(routerPathOf(location, '/neocom-desk/')).toBe('/');
