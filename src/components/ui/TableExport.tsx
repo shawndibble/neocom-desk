@@ -150,6 +150,9 @@ export function TableActionsMenu<T>({
   const label = exportOnly
     ? t('common.tableExport.exportButtonLabel', { name })
     : t('common.tableExport.menuLabel', { name });
+  // An `md` button sits in a toolbar beside other md controls (a column
+  // picker), whose glyphs are md too.
+  const iconSize = size === 'md' ? Icon.ICON_SIZE.md : Icon.ICON_SIZE.sm;
   const onDone = (format: ExportFormat, count: number) => {
     if (format !== 'clipboard') return;
     setCopied(count);
@@ -162,11 +165,11 @@ export function TableActionsMenu<T>({
         <IconButton
           icon={
             copied !== null ? (
-              <Icon.Done size={Icon.ICON_SIZE.sm} />
+              <Icon.Done size={iconSize} />
             ) : exportOnly ? (
-              <Icon.Download size={Icon.ICON_SIZE.sm} />
+              <Icon.Download size={iconSize} />
             ) : (
-              <Icon.More size={Icon.ICON_SIZE.sm} />
+              <Icon.More size={iconSize} />
             )
           }
           label={copied === null ? label : t('common.tableExport.copied', { count: copied })}

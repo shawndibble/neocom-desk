@@ -1128,6 +1128,7 @@ export function ContractSearchPanel({
                       <TableActionsMenu
                         name={t('contractSearch.title')}
                         tableExport={itemsExport}
+                        size="md"
                       />
                     </>
                   }
