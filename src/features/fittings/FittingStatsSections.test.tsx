@@ -1213,3 +1213,13 @@ describe('FittingStatsSections price', () => {
     expect(body.getByRole('combobox', { name: 'Priced at' })).toBeInTheDocument();
   });
 });
+
+describe('FittingStatsSections drones', () => {
+  it("shows the pilot's drone control range", () => {
+    renderSections(stats({ applied: { weapons: [], droneControlRange: 57_500 } }));
+
+    const drones = within(sectionBody('Drones'));
+    expect(drones.getByText('Drone control range')).toBeInTheDocument();
+    expect(drones.getByText('57.5 km')).toBeInTheDocument();
+  });
+});
