@@ -584,6 +584,18 @@
       "stats": "Stats",
       "label": "Fitting sections"
     },
+    "appraisal": {
+      "open": "Appraise",
+      "title": "Price breakdown",
+      "tableLabel": "Items and their prices",
+      "basis": "Priced at the lowest {{hub}} sell order.",
+      "item": "Item",
+      "quantity": "Qty",
+      "unitPrice": "Unit price",
+      "lineTotal": "Total",
+      "total": "Total",
+      "copyMultibuy": "Copy to multibuy"
+    },
     "export": {
       "button": "Export",
       "shareLink": "Copy Share Link",

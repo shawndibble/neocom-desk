@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Caret, RowMoreActions, Tooltip } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
@@ -28,6 +28,7 @@ import { AppliedDpsPanel } from './AppliedDpsPanel';
 import { Facts, HeatFigure, type Fact } from './StatFacts';
 import { SkillOverridesControl } from './SkillOverridesControl';
 import { PriceHubSelect } from './PriceHubSelect';
+import { FittingAppraisalModal } from './FittingAppraisalModal';
 import { StatsToolbar } from './StatsToolbar';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
@@ -536,9 +537,16 @@ export function FittingStatsSections({
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
   const profileName = useDamageProfileName()(damageProfiles.selected);
+  const [appraisalOpen, setAppraisalOpen] = useState(false);
   // A fit with nothing priceable totals 0 on both sides — that's "unknown",
   // not a free ship, so the price section shows a dash instead of "0 ISK".
   const nothingPriced = price !== null && price.totals.sell === 0 && price.totals.buy === 0;
+  // The price loader names each row by its bare typeId; the section and its
+  // breakdown read (and the multibuy pastes) the item's real name.
+  const namedPrice =
+    price === null
+      ? null
+      : { ...price, rows: price.rows.map((row) => ({ ...row, name: typeName(row.typeId) })) };
   const iskLabel = (value: number) =>
     t('fittings.stats.unit.isk', { value: formatIskCompact(value) });
   // A RAH's resists move with the profile (the engine adapts it), so the
@@ -1132,7 +1140,15 @@ export function FittingStatsSections({
         price ? (nothingPriced ? '—' : iskLabel(price.totals.sell)) : undefined,
         price ? (
           <>
-            <PriceHubSelect />
+            <div className="flex flex-wrap items-center gap-2">
+              <PriceHubSelect />
+              <Button onClick={() => setAppraisalOpen(true)}>{t('fittings.appraisal.open')}</Button>
+            </div>
+            <FittingAppraisalModal
+              open={appraisalOpen}
+              onClose={() => setAppraisalOpen(false)}
+              price={namedPrice!}
+            />
             <Facts
               items={[
                 {
@@ -1149,7 +1165,7 @@ export function FittingStatsSections({
               <div className="text-xs text-warning">
                 <p>{t('fittings.stats.priceUnpriced', { count: price.totals.unpricedRows })}</p>
                 <ul className="mt-0.5 list-disc pl-4">
-                  {price.rows
+                  {namedPrice!.rows
                     .filter((row) => row.buyTotal === null || row.sellTotal === null)
                     .map((row) => (
                       <li key={row.typeId}>
