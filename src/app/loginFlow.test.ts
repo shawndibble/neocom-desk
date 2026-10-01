@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node';
 import { db, type TokenRecord } from '@/db';
 import { CORE_GRANT, SCOPES, revokedScopes, scopesForGroup } from '@/esi/scopes';
 import { completeLogin } from '@/auth/session';
+import { setLoginReturnTo, takeLoginReturnTo } from '@/auth/loginReturnTo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 const { assignLocation } = vi.hoisted(() => ({ assignLocation: vi.fn<(url: string) => void>() }));
@@ -13,6 +14,7 @@ import {
   beginAddCharacterLogin,
   beginCustomizedAddCharacterLogin,
   beginEveLogin,
+  retryLastLogin,
 } from './loginFlow';
 
 const CHAR_ID = 2112625428;
@@ -232,6 +234,92 @@ describe('beginEveLogin: re-auth for a known character', () => {
     await beginEveLogin({ characterId: OTHER_CHAR_ID });
 
     expect(requestedScopes()).toContain(EXTRA_SCOPE);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Where the round trip lands. A re-auth or grant is pressed while looking at
+// a page, so `/callback` brings the user back to it; Add Character keeps the
+// ordinary landing.
+// ---------------------------------------------------------------------------
+
+describe('post-login landing', () => {
+  afterEach(() => window.history.replaceState(null, '', '/'));
+
+  it('beginEveLogin remembers the page it was pressed on, query and hash included', async () => {
+    window.history.replaceState(null, '', '/industry/jobs?tab=history#top');
+
+    await beginEveLogin({ characterId: CHAR_ID, groups: ['corp'] });
+
+    expect(takeLoginReturnTo()).toBe('/industry/jobs?tab=history#top');
+  });
+
+  it('beginEveLogin does not remember /callback itself', async () => {
+    window.history.replaceState(null, '', '/callback?code=abc&state=def');
+
+    await beginEveLogin({ characterId: CHAR_ID });
+
+    expect(takeLoginReturnTo()).toBeNull();
+  });
+
+  it('beginEveLogin does not remember a protocol-relative path', async () => {
+    window.history.replaceState(null, '', `${window.location.origin}//evil.example/x`);
+
+    await beginEveLogin({ characterId: CHAR_ID });
+
+    expect(takeLoginReturnTo()).toBeNull();
+  });
+
+  it('beginAddCharacterLogin leaves the landing alone', async () => {
+    window.history.replaceState(null, '', '/settings');
+
+    await beginAddCharacterLogin();
+
+    expect(takeLoginReturnTo()).toBeNull();
+  });
+
+  it('Add Character drops a landing an abandoned grant left behind', async () => {
+    window.history.replaceState(null, '', '/industry');
+    await beginEveLogin({ characterId: CHAR_ID });
+    window.history.replaceState(null, '', '/characters');
+
+    await beginAddCharacterLogin();
+
+    expect(takeLoginReturnTo()).toBeNull();
+  });
+
+  it('Customize Add Character drops it too', async () => {
+    setLoginReturnTo('/industry');
+    window.history.replaceState(null, '', '/characters');
+
+    await beginCustomizedAddCharacterLogin([]);
+
+    expect(takeLoginReturnTo()).toBeNull();
+  });
+
+  it('Add Character from /login keeps the landing a Fitting Share Link stashed (#1544)', async () => {
+    setLoginReturnTo('/ships/fittings?f=abc');
+    window.history.replaceState(null, '', '/login');
+
+    await beginAddCharacterLogin();
+
+    expect(takeLoginReturnTo()).toBe('/ships/fittings?f=abc');
+  });
+
+  it('a retry restarts the landing clock along with the new Pending Login', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      window.history.replaceState(null, '', '/settings');
+      await beginEveLogin({ characterId: CHAR_ID });
+      vi.setSystemTime(Date.now() + 10 * 60_000);
+
+      expect(await retryLastLogin()).toBe(true);
+      vi.setSystemTime(Date.now() + 10 * 60_000);
+
+      expect(takeLoginReturnTo()).toBe('/settings');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

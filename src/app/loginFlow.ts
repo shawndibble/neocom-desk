@@ -1,5 +1,12 @@
 // Kicks off EVE SSO: stash PKCE state, then leave the app for login.eveonline.com.
 import { startLogin, scopesForRetry, takeRetryBudget } from '@/auth/session';
+import {
+  clearLoginReturnTo,
+  currentRouterPath,
+  isOnRoute,
+  setLoginReturnTo,
+  takeLoginReturnTo,
+} from '@/auth/loginReturnTo';
 import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
 import type { ScopeGroup } from '@/esi/registry';
 import { db } from '@/db';
@@ -78,10 +85,38 @@ async function requestedScopes(
  * `beginGrant` always names it instead. With no active Character there is
  * nothing to union with and this is the base set — the same conservative answer
  * as an unreadable Dexie.
+ *
+ * Every caller is pressed while looking at a page, so the callback returns to
+ * it rather than to `/characters`.
  */
 export async function beginEveLogin(options: EveLoginOptions = {}): Promise<void> {
   const characterId = options.characterId ?? useActiveCharacter.getState().activeCharacterId;
+  rememberThisPage();
   assignLocation(await startLogin(await requestedScopes(characterId, options.groups ?? [])));
+}
+
+/**
+ * Stash the current page as the post-login landing. `/callback` is never
+ * remembered: its query is the spent code, and its error panel restarts
+ * through `retryLastLogin`, which keeps the failed login's own landing. A
+ * protocol-relative `//host` path is refused rather than handed to the router.
+ */
+function rememberThisPage(): void {
+  const here = currentRouterPath();
+  if (here.startsWith('//') || isOnRoute(here, '/callback')) return;
+  setLoginReturnTo(here);
+}
+
+/**
+ * Add Character lands where it ordinarily does, so a landing a grant left
+ * behind (pressed, then abandoned on EVE's page) must not steer it. Two pages
+ * keep the stash: `/login`, where a Fitting Share Link's "Open in Neocom Desk"
+ * (#1544) sent the visitor with its landing already stashed, and `/callback`,
+ * whose Retry fallback restarts the very login that landing belongs to.
+ */
+function forgetStrayLanding(): void {
+  const here = currentRouterPath();
+  if (!isOnRoute(here, '/login') && !isOnRoute(here, '/callback')) clearLoginReturnTo();
 }
 
 /**
@@ -103,6 +138,7 @@ export async function beginEveLogin(options: EveLoginOptions = {}): Promise<void
  * precisely the over-ask, aimed at somebody else.
  */
 export async function beginAddCharacterLogin(): Promise<void> {
+  forgetStrayLanding();
   assignLocation(await startLogin(await requestedScopes(null, [])));
 }
 
@@ -118,6 +154,7 @@ export async function beginCustomizedAddCharacterLogin(
   groups: readonly ScopeGroup[]
 ): Promise<void> {
   const scopes = [...new Set([...CORE_GRANT, ...groups.flatMap((group) => scopesForGroup(group))])];
+  forgetStrayLanding();
   assignLocation(await startLogin(scopes));
 }
 
@@ -128,10 +165,15 @@ export async function beginCustomizedAddCharacterLogin(
  * callback route cannot tell an Add Character from a corp grant, and guessing
  * would retry a scope grant as a plain re-auth — succeeding while silently not
  * granting what was asked for.
+ *
+ * The retry is a fresh Pending Login, so the landing's clock restarts with it;
+ * otherwise a slow first attempt could expire the landing mid-retry.
  */
 export async function retryLastLogin(): Promise<boolean> {
   const scopes = scopesForRetry();
   if (!scopes) return false;
+  const landing = takeLoginReturnTo();
+  if (landing !== null) setLoginReturnTo(landing);
   assignLocation(await startLogin(scopes));
   return true;
 }

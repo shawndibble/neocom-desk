@@ -50,7 +50,7 @@ const INTENT_KEY = 'neocom.sso.intent';
  * forgotten rather than kept for the life of the tab. The TTL is enforced on
  * read as well as on prune, so it holds in a tab that starts no further login.
  */
-const PENDING_TTL_MS = 15 * 60_000;
+export const PENDING_TTL_MS = 15 * 60_000;
 const MAX_PENDING = 5;
 
 /**
