@@ -861,7 +861,8 @@ export function FittingRing({
   // One tab stop for the whole ring, not one per tile: the arrow keys walk
   // the slots in ring order (highs, mids, lows, rigs, then subsystems),
   // Home and End jump to either end.
-  const order = [...ringSlots, ...subsystems].map((slot) => `${slot.rack}-${slot.index}`);
+  const bandSlots = [...ringSlots, ...subsystems];
+  const order = bandSlots.map((slot) => `${slot.rack}-${slot.index}`);
   const tabStop = focusKey !== null && order.includes(focusKey) ? focusKey : order[0];
   function roving(slot: RingSlot) {
     const key = `${slot.rack}-${slot.index}`;
@@ -977,7 +978,7 @@ export function FittingRing({
               />
             );
           })}
-          {[...ringSlots, ...subsystems].map((slot) => {
+          {bandSlots.map((slot) => {
             const angle = angles[slot.rack][slot.index];
             return (
               <SlotTile

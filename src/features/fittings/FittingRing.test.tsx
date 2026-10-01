@@ -50,7 +50,7 @@ describe('FittingRing', () => {
     expect(screen.getAllByLabelText(/empty$/)).toHaveLength(3 - 1 + 2 + 0 + 5);
   });
 
-  it('seats a T3’s subsystems on the band, which drops the outlines of positions it lacks', () => {
+  it('seats a T3â€™s subsystems on the band, which drops the outlines of positions it lacks', () => {
     const { container, rerender } = render(<FittingRing fitting={fitting} stats={statsWith(10)} />);
     const subsystem = screen.getByLabelText(/^Subsystems 1, /);
     // On the band: turned with the ring like every other tile, not in a row beneath it.

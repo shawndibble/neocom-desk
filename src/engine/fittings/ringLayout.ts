@@ -133,17 +133,20 @@ const SUBSYSTEM_RING_ORDER: readonly FittingSlotKind[] = [
 ];
 /** A T3's racks sit one empty position apart, centre to centre... */
 const SUBSYSTEM_GAP_DEG = 2 * PITCH_DEG;
-/** ...closing to the tactical ring's spacing when the slots need it... */
-const MIN_GAP_DEG = 21;
+/** ...closing to the tactical ring's spacing (highs' last to mids' first) when the slots need it... */
+const MIN_GAP_DEG =
+  RACK_CENTRE_DEG.medium -
+  ((RING_POSITIONS.medium - 1) / 2) * PITCH_DEG -
+  (RACK_CENTRE_DEG.high + ((RING_POSITIONS.high - 1) / 2) * PITCH_DEG);
 /** ...and the pitch to where neighbouring tiles' inner corners would touch. */
 const MIN_PITCH_DEG =
   (2 * Math.asin(RING_TILE / 2 / (RING_SLOT_RADIUS - RING_TILE / 2)) * 180) / Math.PI;
 
 /**
  * The angle of every slot, per rack, given how many each draws. A hull
- * without subsystems keeps the fixed positions of `ringSlotAngle`. A T3 �
+ * without subsystems keeps the fixed positions of `ringSlotAngle`. A T3 —
  * whose slot counts come from its subsystems, and whose racks could never all
- * draw their full eight round one band � draws only its own slots, the
+ * draw their full eight round one band — draws only its own slots, the
  * subsystems on the band between the rigs and the highs, every rack one
  * empty position from the next and the highs still centred over the top; any
  * room to spare is left across the bottom, between the lows and the rigs. If
@@ -190,7 +193,8 @@ export function ringSlotAngles(counts: SlotLayout): Record<FittingSlotKind, numb
   const anchor = counts.high > 0 ? 'high' : 'subsystem';
   const anchorList = angles[anchor];
   const centre = (anchorList[0] + anchorList[anchorList.length - 1]) / 2;
-  const turn = (anchor === 'high' ? RACK_CENTRE_DEG.high : RACK_CENTRE_DEG.rig) - centre;
+  const LEFT = -90;
+  const turn = (anchor === 'high' ? RACK_CENTRE_DEG.high : LEFT) - centre;
   for (const rack of racks) {
     angles[rack] = angles[rack].map((angle) => angle + turn);
   }

@@ -137,14 +137,14 @@ describe('ringSlotAngles', () => {
     expect(angles.subsystem).toEqual([]);
   });
 
-  it('puts a T3�s subsystems on the band between the rigs and the highs', () => {
+  it('puts a T3’s subsystems on the band between the rigs and the highs', () => {
     const list = clockwise(ringSlotAngles(t3));
     for (let i = 1; i < list.length; i++) expect(list[i]).toBeGreaterThan(list[i - 1]);
     // And the lows still come round to the rigs.
     expect(list[0] + 360).toBeGreaterThan(list[list.length - 1]);
   });
 
-  it('keeps a T3�s highs centred over the top, as every hull�s are', () => {
+  it('keeps a T3’s highs centred over the top, as every hull’s are', () => {
     const highs = ringSlotAngles(t3).high;
     expect((highs[0] + highs[highs.length - 1]) / 2).toBeCloseTo(-15, 6);
   });
