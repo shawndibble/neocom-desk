@@ -4,7 +4,7 @@ import { IconButton } from './IconButton';
 import * as Icon from './icons';
 import { PortalContainerProvider } from './portalContainer';
 
-export type ModalPlacement = 'center' | 'sheet' | 'wide' | 'media';
+export type ModalPlacement = 'center' | 'sheet' | 'sheet-full' | 'wide' | 'media';
 
 interface ModalProps {
   /** Parent owns the state; the modal never closes itself. */
@@ -23,7 +23,7 @@ interface ModalProps {
    */
   titleActions?: ReactNode;
   children: ReactNode;
-  /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `wide` for multi-column content (e.g. a comparison matrix), `media` for an enlarged image — sized to its content up to 95% of the viewport. */
+  /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `sheet-full` for the same drawer at full viewport height (long lists), `wide` for multi-column content (e.g. a comparison matrix), `media` for an enlarged image — sized to its content up to 95% of the viewport. */
   placement?: ModalPlacement;
 }
 
@@ -32,13 +32,17 @@ interface ModalProps {
  * inner column share — one entry, so the two can never disagree.
  */
 const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightClass: string }> = {
-  center: { dialogClass: 'm-auto w-full max-w-lg', heightClass: 'max-h-[85vh]' },
+  center: { dialogClass: 'm-auto w-full max-w-lg', heightClass: 'h-fit max-h-[85vh]' },
   sheet: {
     dialogClass: 'mx-auto mt-auto mb-0 w-full max-w-md rounded-b-none',
-    heightClass: 'max-h-[85vh]',
+    heightClass: 'h-fit max-h-[85vh]',
   },
-  wide: { dialogClass: 'm-auto w-full max-w-5xl', heightClass: 'max-h-[85vh]' },
-  media: { dialogClass: 'm-auto w-fit max-w-[95vw]', heightClass: 'max-h-[95vh]' },
+  'sheet-full': {
+    dialogClass: 'mx-auto mt-auto mb-0 w-full max-w-md rounded-b-none',
+    heightClass: 'h-dvh max-h-dvh',
+  },
+  wide: { dialogClass: 'm-auto w-full max-w-5xl', heightClass: 'h-fit max-h-[85vh]' },
+  media: { dialogClass: 'm-auto w-fit max-w-[95vw]', heightClass: 'h-fit max-h-[95vh]' },
 };
 
 /**
@@ -117,7 +121,7 @@ export function Modal({
         // ones that landed on its ::backdrop.
         if (event.target === dialogRef.current) onClose();
       }}
-      className={`fixed inset-0 h-fit overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${heightClass} ${dialogClass}`}
+      className={`fixed inset-0 overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${heightClass} ${dialogClass}`}
     >
       {open && (
         // The provider spans the header too, not just the body: a title can
@@ -157,7 +161,7 @@ export function Modal({
             <div
               ref={bodyRef}
               tabIndex={-1}
-              className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none${placement === 'sheet' ? ' scroll-pb-20' : ''}`}
+              className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none${placement.startsWith('sheet') ? ' scroll-pb-20' : ''}`}
             >
               {children}
             </div>
