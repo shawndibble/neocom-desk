@@ -21,6 +21,7 @@ import {
   setDroneCountWithinLimits,
   type DroneBay,
   reachableModuleStates,
+  shownModuleState,
   removeModule,
   setCargoQuantity,
   setDroneCounts,
@@ -181,7 +182,7 @@ export function ModuleRow({
   // calculation says otherwise — and show the one it reached: a pasted fit
   // asks for "active" everywhere, which a passive module or rig runs online.
   const maxState = result?.maxState ?? 'overload';
-  const shownState = result?.state ?? module.state;
+  const shownState = shownModuleState(slot, result?.state, module.state);
   const states = reachableModuleStates(maxState, shownState);
 
   const chargeGroupIds = result?.chargeGroupIds;
@@ -239,21 +240,23 @@ export function ModuleRow({
       removeLabel={t('fittings.edit.remove', { name })}
       onRemove={() => edit((f) => removeModule(f, slot, slotIndex))}
     >
-      <NativeSelect
-        size="sm"
-        className={`w-28 shrink-0 ${TOUCH_SELECT_CLASS} ${MODULE_STATE_STYLE[shownState].text} [&>select]:text-inherit`}
-        aria-label={t('fittings.edit.stateLabel', { name })}
-        value={shownState}
-        onChange={(event) =>
-          edit((f) => setModuleState(f, slot, slotIndex, event.target.value as FittingItemState))
-        }
-      >
-        {states.map((state) => (
-          <option key={state} value={state}>
-            {t(`fittings.list.moduleState.${state}`)}
-          </option>
-        ))}
-      </NativeSelect>
+      {slot !== 'subsystem' && (
+        <NativeSelect
+          size="sm"
+          className={`w-28 shrink-0 ${TOUCH_SELECT_CLASS} ${MODULE_STATE_STYLE[shownState].text} [&>select]:text-inherit`}
+          aria-label={t('fittings.edit.stateLabel', { name })}
+          value={shownState}
+          onChange={(event) =>
+            edit((f) => setModuleState(f, slot, slotIndex, event.target.value as FittingItemState))
+          }
+        >
+          {states.map((state) => (
+            <option key={state} value={state}>
+              {t(`fittings.list.moduleState.${state}`)}
+            </option>
+          ))}
+        </NativeSelect>
+      )}
       {(charges.length > 0 || loadedCharge !== undefined) && (
         <NativeSelect
           size="sm"

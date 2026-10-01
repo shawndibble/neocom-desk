@@ -390,6 +390,25 @@ describe('FittingRing with the editor’s item actions', () => {
     expect(within(menu).getByRole('menuitem', { name: 'Remove #30' })).toBeTruthy();
   });
 
+  it('draws a subsystem online, not greyed out, though the engine reports it offline', () => {
+    const t3: Fitting = {
+      ...fitting,
+      modules: [
+        ...fitting.modules,
+        { slot: 'subsystem', slotIndex: 0, typeId: 30, state: 'online' },
+      ],
+    };
+    renderRing(fakeItemActions({ names }), {
+      fitting: t3,
+      moduleResults: [
+        ...results,
+        { state: 'offline' as const, maxState: 'offline' as const, chargeGroupIds: [] },
+      ],
+    });
+    const tile = screen.getByLabelText('Subsystems 1, online');
+    expect(tile.getAttribute('data-module-state')).toBe('online');
+  });
+
   it('removes a focused module with Delete', () => {
     const actions = fakeItemActions({ names });
     renderRing(actions);

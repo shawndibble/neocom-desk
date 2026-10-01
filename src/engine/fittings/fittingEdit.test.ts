@@ -24,6 +24,7 @@ import {
   loadChargeIntoCompatible,
   moveModule,
   reachableModuleStates,
+  shownModuleState,
   newFitting,
   recallDrones,
   removeAllOfType,
@@ -716,6 +717,18 @@ describe('reachableModuleStates', () => {
 
   it('keeps the state it is in, even past what it can reach, so a control can show it', () => {
     expect(reachableModuleStates('online', 'active')).toEqual(['offline', 'online', 'active']);
+  });
+});
+
+describe('shownModuleState', () => {
+  it('shows the state the engine reached, or the one asked for until it has', () => {
+    expect(shownModuleState('low', 'online', 'active')).toBe('online');
+    expect(shownModuleState('high', undefined, 'active')).toBe('active');
+  });
+
+  it('always shows a subsystem online, whatever the engine reports — it has no state to toggle', () => {
+    expect(shownModuleState('subsystem', 'offline', 'online')).toBe('online');
+    expect(shownModuleState('subsystem', undefined, 'offline')).toBe('online');
   });
 });
 

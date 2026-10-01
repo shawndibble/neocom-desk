@@ -125,6 +125,21 @@ describe('FittingRackList', () => {
     expect([...passive.options].map((option) => option.value)).toEqual(['offline', 'online']);
   });
 
+  it('gives a subsystem no state control — it is always online', () => {
+    const t3: Fitting = {
+      ...fitting,
+      modules: [{ slot: 'subsystem', slotIndex: 0, typeId: 30, state: 'online' }],
+    };
+    render(
+      <FittingRackList
+        fitting={t3}
+        stats={statsWith(10)}
+        moduleResults={[{ state: 'offline', maxState: 'offline', chargeGroupIds: [] }]}
+      />
+    );
+    expect(screen.queryByLabelText('State of #30')).toBeNull();
+  });
+
   it('lists the cargo, edits a quantity and removes a type', () => {
     const edits: Fitting[] = [];
     const carrying: Fitting = { ...fitting, cargo: [{ typeId: 209, quantity: 1535 }] };
