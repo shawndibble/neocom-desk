@@ -5,6 +5,19 @@ import '@/i18n';
 import type { CertifiedPlan } from '@/sde/types';
 import { loadCertifiedPlans, loadSkills } from '@/sde/loadSde';
 import { CertifiedPlanDialog } from './CertifiedPlanDialog';
+import { usePlanEditorData } from './usePlanEditorData';
+
+vi.mock('./usePlanEditorData', () => ({ usePlanEditorData: vi.fn() }));
+
+function mockTrained(levels: Record<number, number> | null) {
+  vi.mocked(usePlanEditorData).mockReturnValue({
+    trainedSkills: new Map(
+      Object.entries(levels ?? {}).map(([id, level]) => [Number(id), { level, sp: 0 }])
+    ),
+    trainedSkillsKnown: levels !== null,
+    loaded: true,
+  } as unknown as ReturnType<typeof usePlanEditorData>);
+}
 
 vi.mock('@/sde/loadSde', () => ({
   loadCertifiedPlans: vi.fn(),
@@ -36,6 +49,7 @@ const PLANS: CertifiedPlan[] = [
 ];
 
 beforeEach(() => {
+  mockTrained(null);
   vi.mocked(loadCertifiedPlans).mockResolvedValue(PLANS);
   vi.mocked(loadSkills).mockResolvedValue([
     { typeID: 3380, name: 'Industry' } as Awaited<ReturnType<typeof loadSkills>>[number],
@@ -45,7 +59,7 @@ beforeEach(() => {
 function renderDialog() {
   const onPick = vi.fn();
   const onClose = vi.fn();
-  render(<CertifiedPlanDialog onPick={onPick} onClose={onClose} />);
+  render(<CertifiedPlanDialog characterId={1} onPick={onPick} onClose={onClose} />);
   return { onPick, onClose };
 }
 
@@ -96,5 +110,59 @@ describe('CertifiedPlanDialog', () => {
     expect(
       await screen.findByRole('radio', { name: /Caldari Treasure Hunter/ })
     ).toBeInTheDocument();
+  });
+
+  it('hides plans the character has fully trained', async () => {
+    mockTrained({ 3402: 1, 3380: 1 });
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(await screen.findByRole('tab', { name: 'Industrialist' }));
+    expect(screen.getByRole('radio', { name: /Manufacturer/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Explorer' }));
+    expect(
+      screen.queryByRole('radio', { name: /Caldari Treasure Hunter/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('counts only the levels still untrained and passes the trained levels on', async () => {
+    mockTrained({ 3380: 1 });
+    const user = userEvent.setup();
+    const { onPick } = renderDialog();
+    await user.click(await screen.findByRole('tab', { name: 'Industrialist' }));
+    const row = screen.getByRole('radio', { name: /Manufacturer/ });
+    expect(row).toHaveAccessibleName(/1 skill level/);
+    await user.click(row);
+    await user.click(screen.getByRole('button', { name: 'Create plan' }));
+    const trained = onPick.mock.calls[0][2] as Map<number, { level: number }>;
+    expect(trained.get(3380)?.level).toBe(1);
+  });
+
+  it('says so in a tab whose plans are all trained, and keeps the tab', async () => {
+    mockTrained({ 3402: 1 });
+    const user = userEvent.setup();
+    renderDialog();
+    expect(await screen.findByText('All Certified Plans Complete')).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Industrialist' }));
+    expect(screen.queryByText('All Certified Plans Complete')).not.toBeInTheDocument();
+  });
+
+  it('shows every plan while the trained levels are unknown', async () => {
+    mockTrained(null);
+    renderDialog();
+    expect(
+      await screen.findByRole('radio', { name: /Caldari Treasure Hunter/ })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('All Certified Plans Complete')).not.toBeInTheDocument();
+  });
+
+  it('waits for the trained levels before offering plans', async () => {
+    vi.mocked(usePlanEditorData).mockReturnValue({
+      loaded: false,
+      trainedSkills: new Map(),
+      trainedSkillsKnown: false,
+    } as unknown as ReturnType<typeof usePlanEditorData>);
+    renderDialog();
+    expect(await screen.findByRole('button', { name: 'Create plan' })).toBeDisabled();
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
   });
 });

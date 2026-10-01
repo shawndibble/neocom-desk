@@ -22,7 +22,7 @@ import {
 } from '@/lib/useViewportBoundedHeight';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { newPlan } from './newPlan';
-import { certifiedPlanRecord } from './certifiedPlan';
+import { certifiedPlanRecord, type TrainedLevels } from './certifiedPlan';
 import { CertifiedPlanDialog } from './CertifiedPlanDialog';
 import type { CertifiedPlan } from '@/sde/types';
 import { PlanList, type PlanRowStats } from './PlanList';
@@ -152,13 +152,15 @@ export function PlanListPane({
   // Named after the certified plan already, so no rename-on-arrival flag.
   async function handleCreateFromCertified(
     certified: CertifiedPlan,
-    skillNameFor: (skillTypeID: number) => string
+    skillNameFor: (skillTypeID: number) => string,
+    trained: TrainedLevels | null
   ) {
     const plan = certifiedPlanRecord(
       activeCharacterId,
       certified,
       skillNameFor,
-      remapInfo?.available ?? 0
+      remapInfo?.available ?? 0,
+      trained
     );
     await db.skillPlans.add(plan);
     syncAfterEdit();
@@ -257,7 +259,10 @@ export function PlanListPane({
     >
       {certifiedOpen && (
         <CertifiedPlanDialog
-          onPick={(plan, skillNameFor) => void handleCreateFromCertified(plan, skillNameFor)}
+          characterId={activeCharacterId}
+          onPick={(plan, skillNameFor, trained) =>
+            void handleCreateFromCertified(plan, skillNameFor, trained)
+          }
           onClose={() => setCertifiedOpen(false)}
         />
       )}

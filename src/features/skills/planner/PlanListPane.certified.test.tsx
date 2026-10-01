@@ -7,6 +7,10 @@ import { db } from '@/db';
 import type { CertifiedPlan } from '@/sde/types';
 import { PlanListPane } from './PlanListPane';
 
+vi.mock('./usePlanEditorData', () => ({
+  usePlanEditorData: () => ({ loaded: true, trainedSkills: new Map(), trainedSkillsKnown: false }),
+}));
+
 const PLAN: CertifiedPlan = {
   id: 14,
   name: 'Manufacturer',

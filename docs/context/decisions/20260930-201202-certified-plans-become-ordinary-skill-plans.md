@@ -10,7 +10,8 @@ _Recorded 2026-09-30 · issue #2392._
   prerequisites first. They go through the same append rule as every other
   import, so a level an earlier row already covers is never added twice.
   Levels the Character already has stay in the plan, as they do for any
-  import, and show as trained.
+  import, and show as trained. _(Superseded 2026-10-01: trained levels are
+  now dropped — see `20261001-113650-certified-plans-hide-when-trained-and-drop-trained.md`.)_
 - **Only skill-level milestones carry over.** CCP's ship milestones ("fly an
   Iteron Mark V") have no skill level, and a Plan Milestone anchors to one, so
   they are dropped at bake time. The rest are named after their skill level
