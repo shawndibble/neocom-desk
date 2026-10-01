@@ -299,6 +299,7 @@ describe('Industry: Build Plan CRUD', () => {
         buildSystemName: 'Tama',
         buildLocationId: 1035466617946,
         buildLocationName: 'Tama - Sosala Raitaru',
+        setOnPlanPage: true,
       },
     });
     // Older plan first: its hub must lose to the newer one below, proving the

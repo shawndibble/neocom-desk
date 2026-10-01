@@ -6,8 +6,10 @@
  * Pure, and its own module, because it is the one place that decides which
  * edits count as the pilot *setting* a location. Only `BuildPlanDetail`'s own
  * edit path calls it: a plan written anywhere else (Opportunities seeding, Fit
- * Import, a group Retarget from the group view, a sync pull) is the app moving
- * a plan, not the pilot choosing a place, and must not move the default.
+ * Import, the group view's Retarget dialog, a sync pull) is the app moving
+ * plans, not the pilot choosing a place, and must not move the default. The
+ * plan page's own "apply group target" link does write it — that is the
+ * pilot setting this plan's place, from this plan's page.
  */
 import type { BuildPlanRecord } from '@/db';
 import {
@@ -80,6 +82,9 @@ function locationRecord(fields: {
     facility: fields.facility,
     rigFit: fields.rigFit,
     facilityTaxPct: fields.facilityTaxPct ?? null,
+    // What tells `newBuildPlan` this record is the new rule's, not a
+    // Settings-era one it should still let the last plan outrank.
+    setOnPlanPage: true,
     ...(fields.security !== undefined ? { security: fields.security } : {}),
     // One fact in two fields: a plan holding half of it builds at its hub, so
     // half is remembered as none.

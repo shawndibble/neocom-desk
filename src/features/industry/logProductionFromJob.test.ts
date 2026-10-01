@@ -113,6 +113,7 @@ describe('createBuildPlanForJob', () => {
         facilityTaxPct: null,
         buildSystemId: 30003888,
         buildSystemName: 'Badivefi',
+        setOnPlanPage: true,
       },
     });
     await db.buildPlans.add(plan({ blueprintTypeID: 999, facility: 'raitaru', updatedAt: 100 }));

@@ -209,9 +209,10 @@ describe('newBuildPlan — carried defaults', () => {
     buildSystemName: 'Badivefi',
     buildLocationId: 1035466617946,
     buildLocationName: 'Badivefi - K2-18 b R&D',
+    setOnPlanPage: true,
   } as const;
 
-  it('carries hub and price basis from the last plan, but not its location', () => {
+  it('carries hub and price basis from the last plan, but not its location, once a plan page set one', () => {
     // The location is the remembered default's alone now: the last plan
     // *updated* is not necessarily the last place the pilot *set*, and an
     // edit to runs on an old plan used to pull every new plan back there.
@@ -225,7 +226,10 @@ describe('newBuildPlan — carried defaults', () => {
       buildSystemName: 'Jita',
       buildLocationId: 60003760,
     });
-    const created = newBuildPlan(1, entry(), null, previous, DEFAULT_ACTIVITY_FACILITY_DEFAULTS);
+    const created = newBuildPlan(1, entry(), null, previous, {
+      manufacturing: { ...DEFAULT_FACILITY_DEFAULTS, setOnPlanPage: true },
+      reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,
+    });
     expect(created.hubId).toBe('amarr');
     expect(created.materialPriceBasis).toBe('buy');
     expect(created.facility).toBe('npcStation');
@@ -254,6 +258,49 @@ describe('newBuildPlan — carried defaults', () => {
       buildLocationName: 'Badivefi - K2-18 b R&D',
       hubId: 'amarr',
     });
+  });
+
+  it('carries the last plan’s whole location until a plan page has set one (upgrade path)', () => {
+    // A record no plan page wrote is a Settings-era one, or the untouched
+    // default. Preferring it would drop a pilot who has used one Azbel for
+    // months back to an NPC station on the first plan after the update.
+    const previous = plan({
+      id: 'p',
+      facility: 'raitaru',
+      rigLevel: 't1',
+      facilityTaxPct: 3,
+      security: 'lowsec',
+      hubId: 'amarr',
+      buildSystemId: 30002813,
+      buildSystemName: 'Tama',
+      buildLocationId: 1035466617946,
+      buildLocationName: 'Tama - Sosala Raitaru',
+    });
+    const created = newBuildPlan(1, entry(), null, previous, {
+      manufacturing: { facility: 'azbel', rigFit: EMPTY_RIG_FIT, facilityTaxPct: null },
+      reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,
+    });
+    expect(created).toMatchObject({
+      facility: 'raitaru',
+      rigFit: ['meT1', 'teT1', 'none'],
+      facilityTaxPct: 3,
+      security: 'lowsec',
+      buildSystemId: 30002813,
+      buildSystemName: 'Tama',
+      buildLocationId: 1035466617946,
+      buildLocationName: 'Tama - Sosala Raitaru',
+    });
+  });
+
+  it('takes an unmarked record when the last plan runs the other activity', () => {
+    const previous = plan({ id: 'p', facility: 'athanor', buildSystemId: 1, buildSystemName: 'X' });
+    const created = newBuildPlan(1, entry(), null, previous, {
+      manufacturing: { facility: 'azbel', rigFit: EMPTY_RIG_FIT, facilityTaxPct: 5 },
+      reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,
+    });
+    expect(created.facility).toBe('azbel');
+    expect(created.facilityTaxPct).toBe(5);
+    expect('buildSystemId' in created).toBe(false);
   });
 
   it('starts in highsec when the remembered record names no band', () => {
@@ -321,14 +368,14 @@ describe('newBuildPlan — a default per activity', () => {
     expect(created.facilityTaxPct).toBe(5);
   });
 
-  it('takes the default over the most recent plan of the same activity', () => {
+  it('takes a plan-page default over the most recent plan of the same activity', () => {
     // Reversed from #456/#460, where the last plan won: the default *is* the
     // last place the pilot set from a plan page, so it is already the more
     // deliberate answer of the two.
     const previous = plan({ id: 'p', facility: 'athanor', rigLevel: 'none', facilityTaxPct: 9 });
     const created = newBuildPlan(1, entry('reaction'), null, previous, {
       manufacturing: DEFAULT_FACILITY_DEFAULTS,
-      reaction: RIGGED_TATARA,
+      reaction: { ...RIGGED_TATARA, setOnPlanPage: true },
     });
     expect(created.facility).toBe('tatara');
     expect(created.facilityTaxPct).toBe(2);

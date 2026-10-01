@@ -11,12 +11,13 @@
  * the remembered location for the plan's activity (`facilityDefaults.ts`):
  * the last place the pilot set from a plan page. *Where it trades* — hub and
  * material price basis — still carries from the most recently updated plan
- * (issue #456).
+ * (issue #456). Until a plan page has written a location for the activity,
+ * the old rule still holds for location too — see `startingLocation`.
  */
 
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import { EMPTY_RIG_FIT, FACILITY_PRESETS } from '@/engine/industry/types';
+import { EMPTY_RIG_FIT, FACILITY_PRESETS, resolveRigFit } from '@/engine/industry/types';
 import type { FacilityKind, IndustryActivity } from '@/engine/industry/types';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import {
@@ -36,11 +37,36 @@ export function fallbackFacility(activity: IndustryActivity): FacilityKind {
   return activity === 'reaction' ? 'athanor' : 'npcStation';
 }
 
+/** A plan's primary location in the remembered record's shape — the pre-plan-page rule's source. */
+function planLocation(plan: BuildPlanRecord): FacilityDefaults {
+  return {
+    facility: plan.facility,
+    rigFit: resolveRigFit(plan),
+    facilityTaxPct: plan.facilityTaxPct ?? null,
+    security: plan.security,
+    ...(plan.buildSystemId !== undefined && plan.buildSystemName !== undefined
+      ? { buildSystemId: plan.buildSystemId, buildSystemName: plan.buildSystemName }
+      : {}),
+    ...(plan.buildLocationId !== undefined ? { buildLocationId: plan.buildLocationId } : {}),
+    ...(plan.buildLocationName !== undefined ? { buildLocationName: plan.buildLocationName } : {}),
+  };
+}
+
 /**
- * Where a new plan of `activity` builds: the pilot's remembered location for
- * it, or — when that record names a facility the activity cannot host — the
- * hardcoded fallback. Exported so a caller pricing a plan it has not created
- * yet (Opportunities) prices it where the plan will build.
+ * Where a new plan of `activity` builds. In order:
+ *
+ * 1. The remembered location for the activity, once a plan page wrote it
+ *    (`setOnPlanPage`) — the last place the pilot chose.
+ * 2. Otherwise `defaultsFrom`'s own location, when its facility hosts this
+ *    activity — the rule before plan pages remembered anything (#456/#460).
+ *    Kept so the update does not drop a pilot who has built at one Azbel for
+ *    months back to an NPC station on their first new plan.
+ * 3. Otherwise the record anyway (a Settings-era one, or the default).
+ * 4. When that record names a facility the activity cannot host, the
+ *    hardcoded fallback.
+ *
+ * Exported so a caller pricing a plan it has not created yet (Opportunities)
+ * prices it where the plan will build.
  *
  * Guarded rather than trusted: each store normalises its own record, but a
  * value pulled from a device on an older build has not been through that.
@@ -54,10 +80,16 @@ export function fallbackFacility(activity: IndustryActivity): FacilityKind {
  */
 export function startingLocation(
   activity: IndustryActivity,
-  facilityDefaults: ActivityFacilityDefaults
+  facilityDefaults: ActivityFacilityDefaults,
+  defaultsFrom?: BuildPlanRecord | null
 ): FacilityDefaults {
   const forActivity = facilityDefaults[activity];
-  return FACILITY_PRESETS[forActivity.facility].activity === activity
+  const recordHosts = FACILITY_PRESETS[forActivity.facility].activity === activity;
+  if (recordHosts && forActivity.setOnPlanPage) return forActivity;
+  if (defaultsFrom != null && FACILITY_PRESETS[defaultsFrom.facility].activity === activity) {
+    return planLocation(defaultsFrom);
+  }
+  return recordHosts
     ? forActivity
     : { facility: fallbackFacility(activity), rigFit: EMPTY_RIG_FIT, facilityTaxPct: null };
 }
@@ -124,8 +156,9 @@ export interface NewBuildPlanOverrides {
 }
 
 // The location — facility, rig, tax, security, build system and build location
-// — comes from `facilityDefaults[activity]`, the place the pilot last set from
-// a plan page for this activity. Hub and material price basis carry from
+// — comes from `startingLocation`: the place the pilot last set from a plan
+// page for this activity, or the last plan's until there is one. Hub and
+// material price basis carry from
 // `defaultsFrom`, the character's most recently updated plan (issue #456), or
 // fall back to the defaults when it is null/undefined (no plans yet).
 export function newBuildPlan(
@@ -140,7 +173,7 @@ export function newBuildPlan(
   // literals), the SDE's own `BlueprintType.activity` is always set — no
   // fallback needed here.
   const activity = entry.blueprint.activity;
-  const location = startingLocation(activity, facilityDefaults);
+  const location = startingLocation(activity, facilityDefaults, defaultsFrom);
   // One precedence order for research, everywhere, and the same one on both
   // lines below: an explicit per-copy seed (#637) beats an owned copy, and an
   // owned blueprint's real research beats the assumed value (#634) — the

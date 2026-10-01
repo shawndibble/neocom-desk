@@ -54,7 +54,7 @@ import {
 } from './planFacilityContext';
 import { useReactionFacilityDefaults, REACTION_FACILITY_PRESETS } from './reactionFacilityDefaults';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
-import { hydrateActivityFacilityDefaults, useFacilityDefaults } from './facilityDefaults';
+import { hydrateActivityFacilityDefaults, rememberActivityLocations } from './facilityDefaults';
 import { rememberedLocationsFromEdit } from './rememberLocationFromEdit';
 import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
@@ -344,8 +344,6 @@ export function BuildPlanDetail({
   // a location the pilot sets on this page becomes where their next plan
   // starts (`rememberLocationFromEdit.ts`).
   const reactionFacilityDefaults = useReactionFacilityDefaults((state) => state.value);
-  const rememberReactionLocation = useReactionFacilityDefaults((state) => state.setValue);
-  const rememberManufacturingLocation = useFacilityDefaults((state) => state.setValue);
   useEffect(() => {
     void hydrateActivityFacilityDefaults();
   }, []);
@@ -978,8 +976,9 @@ export function BuildPlanDetail({
   function update(patch: PlanPatch) {
     editPlan(patch);
     const remembered = rememberedLocationsFromEdit(plan, patch, activity);
-    if (remembered.manufacturing) void rememberManufacturingLocation(remembered.manufacturing);
-    if (remembered.reaction) void rememberReactionLocation(remembered.reaction);
+    if (remembered.manufacturing || remembered.reaction) {
+      void rememberActivityLocations(remembered);
+    }
   }
 
   function changeSourcing(edits: readonly SourcingPatchEntry[]) {

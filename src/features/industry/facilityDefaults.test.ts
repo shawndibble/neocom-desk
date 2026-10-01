@@ -135,6 +135,7 @@ describe('useFacilityDefaults — the remembered location', () => {
       rigFit: ['meT1', 'none', 'none'],
       facilityTaxPct: 4,
       ...BADIVEFI,
+      setOnPlanPage: true,
     };
     await db.settings.put({ key: FACILITY_DEFAULTS_SETTING_KEY, value });
     expect(await hydrated()).toEqual(value);

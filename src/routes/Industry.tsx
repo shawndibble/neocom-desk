@@ -6,6 +6,7 @@ import { db } from '@/db';
 import { Button, DataAgeBadge, EmptyState, Modal, Spinner } from '@/components/ui';
 import { preloadRouteChunk } from '@/app/routeChunks';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
+import { loadActivityFacilityDefaults } from '@/features/industry/facilityDefaults';
 import { IndustryHeader } from '@/features/industry/IndustryHeader';
 import {
   buildPlansByMaterialTypeID,
@@ -178,12 +179,15 @@ export function Industry() {
     ): Promise<string | null> => {
       if (activeCharacterId === null) return null;
       const owned = findOwnedBlueprint(ownedBlueprints, entry.blueprintTypeID);
+      // Read off disk, not the workspace's render value: a click before the
+      // stores hydrate would otherwise start the plan at the fallback.
+      const currentFacilityDefaults = await loadActivityFacilityDefaults();
       const plan = newBuildPlan(
         activeCharacterId,
         entry,
         owned,
         mostRecentlyUpdatedPlan(plans),
-        facilityDefaults,
+        currentFacilityDefaults,
         {
           assumedMe,
           assumedTe,
@@ -218,7 +222,7 @@ export function Industry() {
       await createBuildPlans([seeded]);
       return seeded.id;
     },
-    [activeCharacterId, ownedBlueprints, plans, facilityDefaults, assumedMe, assumedTe, t]
+    [activeCharacterId, ownedBlueprints, plans, assumedMe, assumedTe, t]
   );
 
   // The Market Browser / Assets / BPC Search "jump to a Build Plan" deep
@@ -482,7 +486,8 @@ export function Industry() {
       catalog,
       ownedBlueprints,
       defaultsFrom: mostRecentlyUpdatedPlan(plans),
-      facilityDefaults,
+      // Off disk for the same reason as `createPlan`.
+      facilityDefaults: await loadActivityFacilityDefaults(),
       assumedMe,
       assumedTe,
       buildGroups,
@@ -500,10 +505,12 @@ export function Industry() {
 
   async function handleAddOpportunitiesToCompare(rows: readonly OpportunityRow[]) {
     if (activeCharacterId === null || rows.length === 0) return;
+    // Off disk for the same reason as `createPlan`.
+    const currentFacilityDefaults = await loadActivityFacilityDefaults();
     const newPlans = rows.map((row) =>
       planForOpportunityCandidate(
         row.candidate,
-        facilityDefaults,
+        currentFacilityDefaults,
         row.materialSourcing,
         row.buildHere,
         activeCharacterId,

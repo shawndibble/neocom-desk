@@ -34,7 +34,11 @@ import {
   type RigKind,
   type RigLevel,
 } from '@/engine/industry/types';
-import { parseRememberedLocation, type RememberedLocationFields } from './rememberedLocation';
+import {
+  parseRememberedLocation,
+  sameRememberedRecord,
+  type RememberedLocationFields,
+} from './rememberedLocation';
 import {
   DEFAULT_REACTION_FACILITY_DEFAULTS,
   useReactionFacilityDefaults,
@@ -191,4 +195,45 @@ export async function hydrateActivityFacilityDefaults(): Promise<void> {
     useFacilityDefaults.getState().hydrate(),
     useReactionFacilityDefaults.getState().hydrate(),
   ]);
+}
+
+/**
+ * Both records as they stand on disk, for a caller about to create a plan.
+ *
+ * A React reader's value is the store's default until hydration lands, so a
+ * plan created in that window — a fast click on a cold page — would start at
+ * the fallback rather than the pilot's place. Awaiting here closes it.
+ */
+export async function loadActivityFacilityDefaults(): Promise<ActivityFacilityDefaults> {
+  await hydrateActivityFacilityDefaults();
+  return {
+    manufacturing: useFacilityDefaults.getState().value,
+    reaction: useReactionFacilityDefaults.getState().value,
+  };
+}
+
+/**
+ * Saves what a plan-page edit remembered (`rememberLocationFromEdit.ts`).
+ *
+ * Waits for hydration first, which waits for the one-time refinery adoption:
+ * a write that landed while that was running would be overwritten on disk by
+ * its reset of the manufacturing row. And skips a record equal to the one
+ * already held — every write pushes to Firestore, schedules a sync for each
+ * Character and re-prices Opportunities, for an edit that changed nothing.
+ */
+export async function rememberActivityLocations(next: {
+  manufacturing?: FacilityDefaults;
+  reaction?: ReactionFacilityDefaults;
+}): Promise<void> {
+  await hydrateActivityFacilityDefaults();
+  const writes: Promise<void>[] = [];
+  const manufacturing = useFacilityDefaults.getState();
+  if (next.manufacturing && !sameRememberedRecord(manufacturing.value, next.manufacturing)) {
+    writes.push(manufacturing.setValue(next.manufacturing));
+  }
+  const reaction = useReactionFacilityDefaults.getState();
+  if (next.reaction && !sameRememberedRecord(reaction.value, next.reaction)) {
+    writes.push(reaction.setValue(next.reaction));
+  }
+  await Promise.all(writes);
 }

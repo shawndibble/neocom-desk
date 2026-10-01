@@ -20,6 +20,14 @@ export interface RememberedLocationFields {
   buildLocationId?: number;
   /** Only with `buildLocationId`; the id alone is still a place (ESI withholds some names). */
   buildLocationName?: string;
+  /**
+   * Present (always `true`) only on a record a Build Plan page wrote. One
+   * without it is a Settings-era record or the untouched default, and
+   * `newBuildPlan` still prefers the most recent plan's location over it —
+   * so the update does not drop a pilot's long-used Azbel back to an NPC
+   * station before they have set anything under the new rule.
+   */
+  setOnPlanPage?: true;
 }
 
 const SECURITY_BANDS: readonly SecurityBand[] = ['highsec', 'lowsec', 'nullsec'];
@@ -51,5 +59,25 @@ export function parseRememberedLocation(raw: Record<string, unknown>): Remembere
     fields.buildLocationId = raw.buildLocationId;
     if (isName(raw.buildLocationName)) fields.buildLocationName = raw.buildLocationName;
   }
+  if (raw.setOnPlanPage === true) fields.setOnPlanPage = true;
   return fields;
+}
+
+/** Sorted-key JSON, so two records built in a different key order compare equal. */
+function stableJson(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b)))
+      : v
+  );
+}
+
+/**
+ * Whether two remembered records hold the same thing. A plan-page edit that
+ * lands on the location already remembered — a rig re-picked to what it was —
+ * skips the write: each one pushes to Firestore, schedules a sync for every
+ * Character and re-prices Opportunities.
+ */
+export function sameRememberedRecord(a: object, b: object): boolean {
+  return stableJson(a) === stableJson(b);
 }

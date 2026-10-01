@@ -428,7 +428,9 @@ export function opportunitiesInputsKey(inputs: OpportunityPricingInputs): string
     assumedMe: inputs.assumedMe,
     modifiers,
     standings,
-    facilityDefaults: inputs.facilityDefaults,
+    // Only the manufacturing record: every candidate is a manufacturing
+    // blueprint, so a Reaction Location set on some plan page changes no row.
+    facilityDefaults: inputs.facilityDefaults.manufacturing,
     research,
   });
 }

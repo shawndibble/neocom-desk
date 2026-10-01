@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRememberedLocation } from './rememberedLocation';
+import { parseRememberedLocation, sameRememberedRecord } from './rememberedLocation';
 
 describe('parseRememberedLocation', () => {
   it('keeps a whole, well-formed location', () => {
@@ -60,5 +60,34 @@ describe('parseRememberedLocation', () => {
     ['an empty system name', { buildSystemId: 30003888, buildSystemName: '' }],
   ])('drops %s', (_label, raw) => {
     expect(parseRememberedLocation(raw)).toEqual({});
+  });
+});
+
+describe('parseRememberedLocation — the plan-page marker', () => {
+  it('keeps the marker a plan page writes', () => {
+    expect(parseRememberedLocation({ setOnPlanPage: true })).toEqual({ setOnPlanPage: true });
+  });
+
+  it('drops anything but `true`, so an old record stays unmarked', () => {
+    expect(parseRememberedLocation({ setOnPlanPage: 'yes' })).toEqual({});
+    expect(parseRememberedLocation({ setOnPlanPage: false })).toEqual({});
+  });
+});
+
+describe('sameRememberedRecord', () => {
+  it('matches equal records whatever order their keys were written in', () => {
+    expect(
+      sameRememberedRecord(
+        { facility: 'azbel', rigFit: ['meT1', 'none', 'none'], buildSystemId: 1 },
+        { buildSystemId: 1, rigFit: ['meT1', 'none', 'none'], facility: 'azbel' }
+      )
+    ).toBe(true);
+  });
+
+  it('tells apart a changed field, an added one and a reordered rig fit', () => {
+    const base = { facility: 'azbel', rigFit: ['meT1', 'none', 'none'] };
+    expect(sameRememberedRecord(base, { ...base, facility: 'raitaru' })).toBe(false);
+    expect(sameRememberedRecord(base, { ...base, setOnPlanPage: true })).toBe(false);
+    expect(sameRememberedRecord(base, { ...base, rigFit: ['none', 'meT1', 'none'] })).toBe(false);
   });
 });

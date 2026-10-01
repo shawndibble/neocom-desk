@@ -41,11 +41,26 @@ _Recorded 2026-10-01._
   highsec, with no place. A record with no band means highsec. Hub and
   material price basis still carry from the most recently updated plan. They
   answer where the pilot _trades_, which is a separate question.
+- **Upgrade path: the old rule holds until a plan page writes.** A record
+  written from a plan page carries `setOnPlanPage: true`. A record without
+  that marker is a Settings-era record or the untouched default. While a
+  record is unmarked, a new plan still takes the most recently updated
+  plan's whole location, as long as that plan's facility hosts the activity.
+  Otherwise it takes the record. Without this, a pilot who has built at one
+  Azbel for months would get an NPC station on their first new plan after
+  the update.
+- **Writes wait for the refinery adoption and skip no-ops.** A plan-page
+  write first awaits `hydrateActivityFacilityDefaults()`. If it landed
+  mid-adoption, the adoption's reset would overwrite it. A record equal to
+  the one already held isn't written. Plan creators (new plan, Fit Import,
+  Opportunities' Add to Compare, Log production) read the records off disk
+  after hydration, not from a render value that may still be the default.
 - **Each plan keeps its own location.** The remembered record only decides
   where the next plan starts. Editing it never moves an existing plan.
 - **Opportunities prices where its seeded plan will build.** A row's job fee
   reads the remembered manufacturing build system's cost index, so "Add to
   Compare" doesn't quote a different fee once the plan opens. The cost:
-  Opportunities' cache key includes the defaults, so a location change on any
-  plan page re-prices the tab. Above the auto-recalculate threshold, that
-  shows the Refresh prompt.
+  Opportunities' cache key includes the manufacturing record, so a real
+  manufacturing location change on a plan page re-prices the tab. Above the
+  auto-recalculate threshold, that shows the Refresh prompt. The reaction
+  record isn't part of the key, because no row reads it.

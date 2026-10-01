@@ -10,8 +10,7 @@ import { db, type BuildPlanRecord } from '@/db';
 import { loadBlueprintCatalog } from './blueprintCatalog';
 import { mostRecentlyUpdatedPlan, newBuildPlan } from './newBuildPlan';
 import { createBuildPlans } from './buildPlanStore';
-import { hydrateActivityFacilityDefaults, useFacilityDefaults } from './facilityDefaults';
-import { useReactionFacilityDefaults } from './reactionFacilityDefaults';
+import { loadActivityFacilityDefaults } from './facilityDefaults';
 import type { ActiveJob } from './jobs';
 
 /** The job-derived numbers Log Production should start from, once a target plan is known. */
@@ -48,13 +47,15 @@ export async function createBuildPlanForJob(
   const entry = catalog.byBlueprintTypeID.get(job.blueprint_type_id);
   if (!entry) return null;
   const existing = await db.buildPlans.where('characterId').equals(characterId).toArray();
-  // Outside React, so read straight off the stores — hydrated first, since a
-  // row action can run before any Industry page has mounted to do it.
-  await hydrateActivityFacilityDefaults();
-  const plan = newBuildPlan(characterId, entry, null, mostRecentlyUpdatedPlan(existing), {
-    manufacturing: useFacilityDefaults.getState().value,
-    reaction: useReactionFacilityDefaults.getState().value,
-  });
+  // Off disk, hydrated first: a row action can run before any Industry page
+  // has mounted to hydrate the stores.
+  const plan = newBuildPlan(
+    characterId,
+    entry,
+    null,
+    mostRecentlyUpdatedPlan(existing),
+    await loadActivityFacilityDefaults()
+  );
   await createBuildPlans([plan]);
   return plan.id;
 }

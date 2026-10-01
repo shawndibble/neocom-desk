@@ -402,6 +402,21 @@ describe('opportunitiesInputsKey', () => {
     );
   });
 
+  it('is the same when only the reaction location changes, which no row reads', () => {
+    // Every candidate is a manufacturing blueprint, so only the manufacturing
+    // record seeds or prices a row; a Reaction Location set on some plan page
+    // must not ask for a Refresh.
+    expect(opportunitiesInputsKey(INPUTS)).toBe(
+      opportunitiesInputsKey({
+        ...INPUTS,
+        facilityDefaults: {
+          ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+          reaction: { ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.reaction, facility: 'tatara' },
+        },
+      })
+    );
+  });
+
   it('changes when an owned blueprint is researched', () => {
     expect(opportunitiesInputsKey(INPUTS)).not.toBe(
       opportunitiesInputsKey({

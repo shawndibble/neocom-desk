@@ -50,6 +50,7 @@ describe('rememberedLocationsFromEdit — the primary location', () => {
         buildSystemName: 'Badivefi',
         buildLocationId: 1035466617946,
         buildLocationName: 'Badivefi - K2-18 b R&D',
+        setOnPlanPage: true,
       },
     });
   });
@@ -121,6 +122,7 @@ describe('rememberedLocationsFromEdit — the primary location', () => {
         security: 'highsec',
         buildSystemId: 30003888,
         buildSystemName: 'Badivefi',
+        setOnPlanPage: true,
       },
     });
   });
@@ -181,6 +183,7 @@ describe('rememberedLocationsFromEdit — the Reaction Location', () => {
         buildSystemName: 'Hek',
         buildLocationId: 1022734985679,
         buildLocationName: 'Hek - Refinery',
+        setOnPlanPage: true,
       },
     });
   });
