@@ -1,12 +1,16 @@
 import { controlHeightClassName, type ControlSize } from './controlStyles';
 
-export type ButtonVariant = 'primary' | 'ghost' | 'danger' | 'success' | 'warning';
+export type ButtonVariant = 'primary' | 'ghost' | 'accent' | 'danger' | 'success' | 'warning';
 export type ButtonSize = ControlSize;
 export type ButtonAlign = 'center' | 'start';
 
 const VARIANT: Record<ButtonVariant, string> = {
   primary: 'border-accent bg-accent text-accent-contrast hover:bg-accent/85',
   ghost: 'border-line bg-transparent text-text hover:border-line-bright hover:bg-panel-2',
+  // An accent outline rather than a fill: draws the eye to the one control a
+  // view is waiting on (e.g. Payees on an empty Mining Tax tab) without
+  // spending the view's single `primary`.
+  accent: 'border-accent bg-transparent text-accent hover:bg-accent/10',
   danger: 'border-danger/60 bg-transparent text-danger hover:border-danger hover:bg-danger/10',
   // Same outline formula as `danger`, for a toggle that needs the other two
   // status tones (e.g. an RSVP's Accept/Tentative) rather than red.

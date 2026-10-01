@@ -36,10 +36,14 @@ describe('Button', () => {
       <>
         <Button variant="primary">Save</Button>
         <Button variant="danger">Delete</Button>
+        <Button variant="accent">Payees</Button>
       </>
     );
     expect(screen.getByRole('button', { name: 'Save' }).className).toContain('bg-accent');
     expect(screen.getByRole('button', { name: 'Delete' }).className).toContain('text-danger');
+    const accent = screen.getByRole('button', { name: 'Payees' }).className;
+    expect(accent).toContain('border-accent');
+    expect(accent.split(' ')).not.toContain('bg-accent');
   });
 
   it('does not fire onClick when disabled', async () => {
