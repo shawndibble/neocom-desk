@@ -504,9 +504,13 @@ describe('Assets', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText(/only the first 25 assets were fetched/i);
+    // The notice shows with the rows, before names and values finish; the
+    // button is disabled until that load settles.
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    await waitFor(() => expect(retry).toBeEnabled());
     const requestsBeforeRetry = requestCount;
 
-    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await user.click(retry);
 
     await waitFor(() => expect(requestCount).toBeGreaterThan(requestsBeforeRetry));
   });

@@ -257,7 +257,7 @@ function compareValuedAssetMatches(
 /** Global average market prices, best-effort — a Fuzzwork/ESI outage degrades badges to 0 rather than the whole page. */
 async function loadAssetPrices(): Promise<Map<number, number>> {
   try {
-    const prices = await getAdjustedPrices();
+    const prices = await getAdjustedPrices(Date.now, { allowStale: true });
     const byType = new Map<number, number>();
     for (const [typeId, price] of prices) {
       if (price.average !== null) byType.set(typeId, price.average);
@@ -282,20 +282,50 @@ function loadOwnCopyValues(
 
 async function loadAssetsSnapshot(
   characterId: number,
-  signal: RouteSnapshotSignal
+  signal: RouteSnapshotSignal<Snapshot>
 ): Promise<Snapshot> {
-  const [{ cached: assetsResult, needsReauth: assetsNeedsReauth }, priceByTypeId] =
-    await Promise.all([loadCharacterAssets(characterId), loadAssetPrices()]);
+  // Prices are a separate, slower read: once the hour-long adjusted-price
+  // window lapses it blocks on the live call (`market/prices.ts` never serves a
+  // lapsed row), so the rows must not wait on it.
+  const pricesPromise = loadAssetPrices();
+  const { cached: assetsResult, needsReauth: assetsNeedsReauth } =
+    await loadCharacterAssets(characterId);
   const assetsTruncated = assetsResult?.truncated ?? false;
   const assets = assetsResult?.data ?? [];
 
+  // Rows first, everything else fills in behind them: the assets are already
+  // local, the rest are the slow reads (prices, and blueprint copy values that
+  // pull a Firestore snapshot). `publish` is a no-op when a snapshot is already
+  // on screen, so a revisit never blinks back to this bare state.
+  let shown: Snapshot = {
+    assetsResult,
+    assetsTruncated,
+    assetsNeedsReauth,
+    typeNames: new Map(),
+    locationNames: new Map(),
+    priceByTypeId: new Map(),
+    copyValueByItemId: new Map(),
+    volumeByTypeId: new Map(),
+  };
+  const show = (patch: Partial<Snapshot>) => {
+    shown = { ...shown, ...patch };
+    signal.publish?.(shown);
+  };
+  show({});
+  void pricesPromise.then((priceByTypeId) => show({ priceByTypeId }));
+
   // Already superseded: skip the ESI name resolves, their results would be discarded.
   const typeIds = signal.cancelled ? [] : [...new Set(assets.map((a) => a.type_id))];
-  const [typeNames, volumeByTypeId, copyValueByItemId] = await Promise.all([
+  // Started now, awaited last: it must not hold up names and locations.
+  const copyValuesPromise = signal.cancelled
+    ? Promise.resolve(new Map<number, number>())
+    : loadOwnCopyValues(characterId, assets);
+  void copyValuesPromise.then((copyValueByItemId) => show({ copyValueByItemId }));
+  const [typeNames, volumeByTypeId] = await Promise.all([
     loadTypeNames(typeIds),
     loadTypeVolumes(typeIds),
-    signal.cancelled ? new Map<number, number>() : loadOwnCopyValues(characterId, assets),
   ]);
+  show({ typeNames, volumeByTypeId });
 
   const stationIds = signal.cancelled
     ? []
@@ -357,6 +387,9 @@ async function loadAssetsSnapshot(
     const name = resolvedOrphanParents[i];
     if (name) locationNames.set(id, name);
   });
+
+  show({ locationNames });
+  const [copyValueByItemId, priceByTypeId] = await Promise.all([copyValuesPromise, pricesPromise]);
 
   return {
     assetsResult,

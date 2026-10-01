@@ -408,6 +408,57 @@ describe('persistence across a reload', () => {
     expect(hits).toBe(2);
   });
 
+  it('allowStale hands back the lapsed persisted prices at once and refreshes behind them', async () => {
+    await db.esiCache.clear();
+    let hits = 0;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/prices`, async () => {
+        hits += 1;
+        if (hits > 1) await gate;
+        return HttpResponse.json([
+          { type_id: 34, adjusted_price: 5.5, average_price: hits > 1 ? 9 : 5.2 },
+        ]);
+      })
+    );
+    let now = 1_000_000;
+    const clock = () => now;
+
+    await (await freshPricesModule()).getAdjustedPrices(clock);
+    now += ADJUSTED_PRICE_TTL_MS + 1;
+    const reloaded = await reloadPricesModule();
+
+    // Live call is parked: only the stored row can answer.
+    const stale = await reloaded.getAdjustedPrices(clock, { allowStale: true });
+    expect(stale.get(34)).toEqual({ adjusted: 5.5, average: 5.2 });
+    // A second display-only caller is not queued behind the refresh.
+    const again = await reloaded.getAdjustedPrices(clock, { allowStale: true });
+    expect(again.get(34)).toEqual({ adjusted: 5.5, average: 5.2 });
+
+    release();
+    await vi.waitFor(async () =>
+      expect((await reloaded.getAdjustedPrices(clock)).get(34)?.average).toBe(9)
+    );
+  });
+
+  it('allowStale with nothing stored waits for the live prices', async () => {
+    await db.esiCache.clear();
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/prices`, () =>
+        HttpResponse.json([{ type_id: 34, adjusted_price: 5.5, average_price: 5.2 }])
+      )
+    );
+    const prices = await (
+      await freshPricesModule()
+    ).getAdjustedPrices(() => 1_000_000, {
+      allowStale: true,
+    });
+    expect(prices.get(34)).toEqual({ adjusted: 5.5, average: 5.2 });
+  });
+
   it('a failed Fuzzwork fetch persists nothing', async () => {
     await db.esiCache.clear();
     server.use(http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.error()));

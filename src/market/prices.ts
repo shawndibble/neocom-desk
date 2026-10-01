@@ -10,7 +10,12 @@
  * they did when this cache was memory-only. Concurrent asks for the same
  * prices share one in-flight request rather than each missing and fetching.
  */
-import { GLOBAL_CACHE_CHARACTER_ID, readCachedEntries, writeCachedMany } from '@/esi/cache';
+import {
+  emitCacheRevalidated,
+  GLOBAL_CACHE_CHARACTER_ID,
+  readCachedEntries,
+  writeCachedMany,
+} from '@/esi/cache';
 import { fetchAggregates, type HubAggregate } from './fuzzwork';
 import { fetchAdjustedPrices, type AdjustedPrice } from './esiPrices';
 import type { TradeHub } from './hubs';
@@ -47,6 +52,8 @@ let adjustedPriceCache: CacheEntry<Map<number, AdjustedPrice>> | null = null;
  */
 const hubPricesInFlight = new Map<string, Promise<HubAggregate | null>>();
 let adjustedPricesInFlight: Promise<Map<number, AdjustedPrice>> | null = null;
+/** The lapsed copy an `allowStale` caller was handed while the live refresh runs; null when none is out. */
+let adjustedStaleServed: Map<number, AdjustedPrice> | null = null;
 
 /**
  * Keys `invalidateHubPrices` dropped: their persisted rows are skipped until a
@@ -108,6 +115,7 @@ export function clearMarketPriceCache(): void {
   adjustedPriceCache = null;
   hubPricesInFlight.clear();
   adjustedPricesInFlight = null;
+  adjustedStaleServed = null;
   persistedBypass.clear();
   persistedGeneration += 1;
 }
@@ -301,14 +309,20 @@ export async function getRegionSellPrices(
 
 /** Global adjusted/average prices (job-cost EIV), cached for an hour. */
 export async function getAdjustedPrices(
-  now: Clock = Date.now
+  now: Clock = Date.now,
+  options: { allowStale?: boolean } = {}
 ): Promise<Map<number, AdjustedPrice>> {
   const nowMs = now();
   if (adjustedPriceCache && adjustedPriceCache.expiresAt > nowMs) {
     return adjustedPriceCache.value;
   }
-  if (adjustedPricesInFlight) return adjustedPricesInFlight;
-  const load = loadAdjustedPrices(nowMs);
+  if (adjustedPricesInFlight) {
+    // A display-only caller is not made to wait on a refresh when it was
+    // already handed a lapsed copy this session.
+    if (options.allowStale && adjustedStaleServed) return adjustedStaleServed;
+    return adjustedPricesInFlight;
+  }
+  const load = loadAdjustedPrices(nowMs, options.allowStale === true);
   adjustedPricesInFlight = load;
   try {
     return await load;
@@ -324,21 +338,50 @@ export async function getAdjustedPrices(
  */
 type AdjustedPriceRow = Array<[typeId: number, adjusted: number | null, average: number | null]>;
 
-async function loadAdjustedPrices(nowMs: number): Promise<Map<number, AdjustedPrice>> {
+async function loadAdjustedPrices(
+  nowMs: number,
+  allowStale: boolean
+): Promise<Map<number, AdjustedPrice>> {
   const generation = persistedGeneration;
   const stored = await readPersisted<AdjustedPriceRow>([ADJUSTED_KEY]);
   const row = stored.get(persistedKey(ADJUSTED_KEY));
-  if (generation === persistedGeneration && row && row.fetchedAt + ADJUSTED_PRICE_TTL_MS > nowMs) {
+  const toMap = (rows: AdjustedPriceRow) => {
     const value = new Map<number, AdjustedPrice>();
-    for (const [typeId, adjusted, average] of row.value) value.set(typeId, { adjusted, average });
+    for (const [typeId, adjusted, average] of rows) value.set(typeId, { adjusted, average });
+    return value;
+  };
+  if (generation === persistedGeneration && row && row.fetchedAt + ADJUSTED_PRICE_TTL_MS > nowMs) {
+    const value = toMap(row.value);
     adjustedPriceCache = { value, expiresAt: row.fetchedAt + ADJUSTED_PRICE_TTL_MS };
     return value;
   }
-  const value = await fetchAdjustedPrices();
-  if (generation !== persistedGeneration) return value;
-  adjustedPriceCache = { value, expiresAt: nowMs + ADJUSTED_PRICE_TTL_MS };
-  const tuples: AdjustedPriceRow = [];
-  for (const [typeId, price] of value) tuples.push([typeId, price.adjusted, price.average]);
-  persist([[ADJUSTED_KEY, tuples]], nowMs);
-  return value;
+  const fetchLive = async () => {
+    const value = await fetchAdjustedPrices();
+    if (generation !== persistedGeneration) return value;
+    adjustedPriceCache = { value, expiresAt: nowMs + ADJUSTED_PRICE_TTL_MS };
+    const tuples: AdjustedPriceRow = [];
+    for (const [typeId, price] of value) tuples.push([typeId, price.adjusted, price.average]);
+    persist([[ADJUSTED_KEY, tuples]], nowMs);
+    return value;
+  };
+  if (allowStale && generation === persistedGeneration && row) {
+    // Hourly averages used for badges: a lapsed copy is close enough to show
+    // now. The refresh lands behind the caller and signals the mounted views
+    // to re-read, so the badges update in place.
+    const stale = toMap(row.value);
+    adjustedStaleServed = stale;
+    const refresh = fetchLive();
+    adjustedPricesInFlight = refresh;
+    void refresh
+      .then(
+        () => emitCacheRevalidated(),
+        () => {}
+      )
+      .finally(() => {
+        if (adjustedPricesInFlight === refresh) adjustedPricesInFlight = null;
+        if (adjustedStaleServed === stale) adjustedStaleServed = null;
+      });
+    return stale;
+  }
+  return fetchLive();
 }

@@ -412,7 +412,7 @@ export function onCacheRevalidated(listener: RevalidatedListener): () => void {
   return () => revalidatedListeners.delete(listener);
 }
 
-function emitCacheRevalidated(): void {
+export function emitCacheRevalidated(): void {
   for (const listener of revalidatedListeners) listener();
 }
 

@@ -46,7 +46,7 @@ describe('useRouteSnapshot', () => {
     setCharacter(CHAR_A);
     await waitFor(() => expect(result.current.data).toBe('data-a'));
     expect(load).toHaveBeenCalledTimes(1);
-    expect(load).toHaveBeenCalledWith(CHAR_A, { cancelled: false });
+    expect(load).toHaveBeenCalledWith(CHAR_A, expect.objectContaining({ cancelled: false }));
     expect(result.current.loading).toBe(false);
     expect(result.current.refreshCount).toBe(0);
     expect(result.current.activeCharacterId).toBe(CHAR_A);
@@ -344,7 +344,7 @@ describe('useRouteSnapshot', () => {
       await waitFor(() => expect(result.current.data).toBe(`data-${CHAR_A}`));
       expect(result.current.hydrated).toBe(true);
       expect(result.current.activeCharacterId).toBe(CHAR_A);
-      expect(load).toHaveBeenCalledWith(CHAR_A, { cancelled: false });
+      expect(load).toHaveBeenCalledWith(CHAR_A, expect.objectContaining({ cancelled: false }));
     });
 
     it('ignores the store character while a prop character is supplied', async () => {
@@ -459,5 +459,72 @@ describe('useRouteSnapshot cacheKey', () => {
     // the error is reported and the views branch on it first, so the rows are
     // never presented as the fresh answer.
     expect(second.result.current.data).toBe('data-a');
+  });
+  describe('publish (early partial snapshot)', () => {
+    function partialLoader() {
+      const calls: {
+        signal: RouteSnapshotSignal<string>;
+        resolve: (value: string) => void;
+      }[] = [];
+      const load = (_id: number, signal: RouteSnapshotSignal<string>) =>
+        new Promise<string>((resolve) => {
+          calls.push({ signal, resolve });
+        });
+      return { calls, load };
+    }
+
+    it('renders a partial while loading stays true, then the final result', async () => {
+      const { calls, load } = partialLoader();
+      setCharacter(CHAR_A);
+      const { result } = renderHook(() => useRouteSnapshot(load));
+      await waitFor(() => expect(calls).toHaveLength(1));
+
+      act(() => calls[0].signal.publish?.('partial'));
+      expect(result.current.data).toBe('partial');
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => calls[0].resolve('final'));
+      expect(result.current.data).toBe('final');
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('does not retain a partial for the next visit', async () => {
+      const { calls, load } = partialLoader();
+      setCharacter(CHAR_A);
+      const first = renderHook(() => useRouteSnapshot(load, undefined, { cacheKey: 'demo' }));
+      await waitFor(() => expect(calls).toHaveLength(1));
+      act(() => calls[0].signal.publish?.('partial'));
+      first.unmount();
+
+      const { load: parked } = partialLoader();
+      const second = renderHook(() => useRouteSnapshot(parked, undefined, { cacheKey: 'demo' }));
+      expect(second.result.current.data).toBeNull();
+    });
+
+    it('ignores a partial when a retained snapshot is already showing', async () => {
+      const done = vi.fn(async () => 'retained');
+      setCharacter(CHAR_A);
+      const first = renderHook(() => useRouteSnapshot(done, undefined, { cacheKey: 'demo' }));
+      await waitFor(() => expect(first.result.current.data).toBe('retained'));
+      first.unmount();
+
+      const { calls, load } = partialLoader();
+      const second = renderHook(() => useRouteSnapshot(load, undefined, { cacheKey: 'demo' }));
+      await waitFor(() => expect(calls).toHaveLength(1));
+      act(() => calls[0].signal.publish?.('partial'));
+      expect(second.result.current.data).toBe('retained');
+    });
+
+    it('ignores a partial once the load is cancelled', async () => {
+      const { calls, load } = partialLoader();
+      setCharacter(CHAR_A);
+      const { result } = renderHook(() => useRouteSnapshot(load));
+      await waitFor(() => expect(calls).toHaveLength(1));
+
+      setCharacter(CHAR_B);
+      await waitFor(() => expect(calls).toHaveLength(2));
+      act(() => calls[0].signal.publish?.('stale partial'));
+      expect(result.current.data).toBeNull();
+    });
   });
 });

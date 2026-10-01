@@ -155,7 +155,7 @@ const EMPTY_SNAPSHOT: AssetsSnapshot = {
 
 async function loadAssetPrices(): Promise<Map<number, number>> {
   try {
-    const prices = await getAdjustedPrices();
+    const prices = await getAdjustedPrices(Date.now, { allowStale: true });
     const byType = new Map<number, number>();
     for (const [typeId, price] of prices) {
       if (price.average !== null) byType.set(typeId, price.average);
