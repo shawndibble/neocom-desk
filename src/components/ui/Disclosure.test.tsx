@@ -85,7 +85,9 @@ describe('Disclosure', () => {
       </Disclosure>
     );
 
-    const toggle = screen.getByRole('button', { name: /^job fee$/i });
+    const toggle = screen.getByRole('button', { name: /^job fee/i });
+    // The value stays in the toggle's name even though it renders outside it.
+    expect(toggle).toHaveAccessibleName('Job fee65');
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).not.toContainElement(screen.getByRole('button', { name: /about job fee/i }));
 
@@ -95,7 +97,7 @@ describe('Disclosure', () => {
     await userEvent.click(toggle);
     expect(onToggle).toHaveBeenCalledTimes(1);
 
-    await userEvent.click(screen.getByText('65'));
+    await userEvent.click(screen.getByText('65', { selector: '[aria-hidden="true"] > span' }));
     expect(onToggle).toHaveBeenCalledTimes(2);
 
     toggle.focus();

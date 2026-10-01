@@ -1184,14 +1184,14 @@ export function BuildPlanDetail({
   );
   // ME/TE belong to the materials table's blueprint row, whose tier picker
   // sets them. An owned BPO gets no such row (nothing to buy), so only then
-  // does the summary carry them.
-  const hasBlueprintRow =
-    result?.materials.some(
-      (m) => m.typeID === plan.blueprintTypeID && m.acquisitionTier !== undefined
-    ) ?? false;
+  // does the summary carry them — and not before the plan resolves, or they
+  // would flash in and out on every plan that does have the row.
+  const lacksBlueprintRow =
+    result !== null &&
+    !result.materials.some((m) => m.typeID === plan.blueprintTypeID && m.acquisitionTier);
   const setupFacts = [
     setupFact(t('industry.runs'), plan.runs.toLocaleString()),
-    ...(activity === 'manufacturing' && !hasBlueprintRow
+    ...(activity === 'manufacturing' && lacksBlueprintRow
       ? [
           setupFact(t('industry.setupChipMe'), `${resolvedMe}%`),
           setupFact(t('industry.setupChipTe'), `${resolvedTe}%`),

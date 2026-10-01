@@ -136,7 +136,6 @@ interface ResultsSummaryProps {
   itemActionsFor?: (typeId: number) => ReactElement;
 }
 
-/** Stable empty fallback, so the export's rows don't change identity every render. */
 /**
  * Worst-case error in ESI's cost index, which it rounds to 4 decimals (half
  * of 0.0001). Times EIV, that bounds how far the job fee can drift from the
@@ -144,6 +143,7 @@ interface ResultsSummaryProps {
  */
 const COST_INDEX_ROUNDING_STEP = 0.00005;
 
+/** Stable empty fallback, so the export's rows don't change identity every render. */
 const NO_SALE_LINES: readonly OwnedStockSaleLine[] = [];
 
 /**

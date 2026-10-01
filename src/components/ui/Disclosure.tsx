@@ -71,11 +71,16 @@ export function Disclosure({
             className="text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             {labelContent}
+            {/* The value sits outside the button for layout; keep it in the
+                button's name so the toggle still announces it. */}
+            {trailing !== undefined && <span className="sr-only">{trailing}</span>}
           </button>
           <span className="flex items-center" onClick={(e) => e.stopPropagation()}>
             {labelAccessory}
           </span>
-          <span className="ml-auto">{trailingContent}</span>
+          <span className="ml-auto" aria-hidden="true">
+            {trailingContent}
+          </span>
         </div>
         {body}
       </div>
