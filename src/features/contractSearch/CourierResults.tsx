@@ -1450,7 +1450,11 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
               buttonLabel={t('contractSearch.columnsButton')}
               menuTitle={t('contractSearch.columnsMenuTitle')}
             />
-            <TableActionsMenu name={t('contractSearch.courierTitle')} tableExport={courierExport} />
+            <TableActionsMenu
+              name={t('contractSearch.courierTitle')}
+              tableExport={courierExport}
+              size="md"
+            />
           </>
         }
       />
