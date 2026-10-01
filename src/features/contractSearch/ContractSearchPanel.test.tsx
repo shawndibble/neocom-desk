@@ -15,7 +15,6 @@ import { isSyncConfigured } from '@/app/syncStatus';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { loadMarketTypes, loadSolarSystemJumps } from '@/sde/loadMarketSde';
 import { clearMarketTypeIndex } from '@/sde/marketTypesById';
-import { loadTypeNames } from '@/features/character/typeNames';
 import {
   ContractSearchPanel,
   type ContractMode,
@@ -69,8 +68,16 @@ vi.mock('@/features/bpcContracts/publicContractItems', () => ({
   loadPublicContractItems: (...args: unknown[]) => loadPublicContractItems(...args),
 }));
 
+// 48098 stands in for a type on contract that the market catalogue never
+// lists (an unmarketable blueprint copy), so only this lookup can name it.
 vi.mock('@/features/character/typeNames', () => ({
-  loadTypeNames: vi.fn(async () => new Map([[34, 'Tritanium']])),
+  loadTypeNames: vi.fn(
+    async () =>
+      new Map([
+        [34, 'Tritanium'],
+        [48098, 'Baryon Exotic Plasma S Blueprint'],
+      ])
+  ),
 }));
 
 /** The Jump Range filter's origin (`features/route/currentSystem.ts`), mocked so a test can set it without ESI. */
@@ -535,13 +542,6 @@ describe('ContractSearchPanel', () => {
   });
 
   it('names a listed type the market catalogue lacks, such as an unmarketable blueprint copy', async () => {
-    // 48098 (Baryon Exotic Plasma S Blueprint) is on contract but never on the
-    // market, so the market catalogue cannot name it; the general type-name
-    // lookup can.
-    vi.mocked(loadTypeNames).mockImplementationOnce(
-      async (ids: readonly number[]) =>
-        new Map(ids.includes(48098) ? [[48098, 'Baryon Exotic Plasma S Blueprint']] : [])
-    );
     loadPublicContractOffers.mockResolvedValue(
       cachedSnapshot([row({ contractId: 7, typeId: 48098, price: 40_000 })])
     );

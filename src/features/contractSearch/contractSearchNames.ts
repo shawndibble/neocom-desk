@@ -25,6 +25,7 @@ import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import { loadCourierEndpoints } from './courierEndpoints';
 
 const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
+const EMPTY_IDS: readonly number[] = [];
 const EMPTY_ENDPOINTS: ReadonlyMap<number, CourierEndpoint> = new Map();
 
 /**
@@ -86,9 +87,10 @@ function useResolved<TInput, TValue>(
  * The catalogue only holds *market* types, though, and a contract can sell
  * what the market never lists — faction and event blueprint copies above all
  * (2,128 of 11,392 listed types on 2026-10-01). Those fall through to
- * `loadTypeNames` afterwards: its slim snapshot covers most of them (it is
- * blueprint-referenced types), so only a remainder (~720) reaches one batched,
- * cached `/universe/names` call. Without it they render as `#48098` and the
+ * `loadTypeNames` afterwards, as a second lookup that fills in behind the
+ * catalogue's: its slim snapshot covers most of them (blueprint-referenced
+ * types), so only a remainder reaches one batched, cached `/universe/names`
+ * call. Without it they render as `#48098` and the
  * item search cannot find them by name.
  *
  * Items-board only. Loading it here rather than in the shared loader is what
@@ -98,32 +100,51 @@ export function useListedTypeNames(rows: readonly PublicContractOfferRow[]): {
   value: ReadonlyMap<number, string>;
   resolving: boolean;
 } {
-  return useResolved(rows, resolveTypeNames, EMPTY_NAMES);
+  const catalog = useResolved(rows, resolveCatalogNames, EMPTY_NAMES);
+  // Only once the catalogue has answered, so an id it is about to name is
+  // never sent off to ESI first.
+  const missing = useMemo<readonly number[]>(() => {
+    if (catalog.resolving) return EMPTY_IDS;
+    const ids = new Set<number>();
+    for (const { typeId } of rows) if (!catalog.value.has(typeId)) ids.add(typeId);
+    return ids.size === 0 ? EMPTY_IDS : [...ids];
+  }, [rows, catalog.value, catalog.resolving]);
+  const fallback = useResolved(missing, resolveFallbackNames, EMPTY_NAMES);
+  const value = useMemo(
+    () =>
+      fallback.value.size === 0 ? catalog.value : new Map([...fallback.value, ...catalog.value]),
+    [catalog.value, fallback.value]
+  );
+  // The catalogue alone decides "resolving": the fallback fills in behind a
+  // board that is already readable, rather than holding every name back for a
+  // network round-trip.
+  return { value, resolving: catalog.resolving };
 }
 
-async function resolveTypeNames(
+async function resolveCatalogNames(
   rows: readonly PublicContractOfferRow[]
 ): Promise<ReadonlyMap<number, string>> {
   if (rows.length === 0) return EMPTY_NAMES;
   const catalog = await loadMarketTypesById();
   const names = new Map<number, string>();
-  const missing = new Set<number>();
   for (const { typeId } of rows) {
     const entry = catalog.get(typeId);
     if (entry) names.set(typeId, entry.name);
-    else missing.add(typeId);
   }
-  if (missing.size > 0) {
-    // Guarded so a failed fallback never costs the catalogue names above, and
-    // its `Type #id` placeholder is skipped: an unnamed id keeps rendering as
-    // the board's own `#id`.
-    try {
-      for (const [typeId, name] of await loadTypeNames([...missing])) {
-        if (name !== `Type #${typeId}`) names.set(typeId, name);
-      }
-    } catch {
-      // Catalogue names only.
-    }
+  return names;
+}
+
+/**
+ * `loadTypeNames`' `Type #id` placeholder is skipped, so an id nothing can
+ * name keeps rendering as the board's own `#id`.
+ */
+async function resolveFallbackNames(
+  typeIds: readonly number[]
+): Promise<ReadonlyMap<number, string>> {
+  if (typeIds.length === 0) return EMPTY_NAMES;
+  const names = new Map<number, string>();
+  for (const [typeId, name] of await loadTypeNames(typeIds)) {
+    if (name !== `Type #${typeId}`) names.set(typeId, name);
   }
   return names;
 }
