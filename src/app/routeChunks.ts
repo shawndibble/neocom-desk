@@ -92,6 +92,10 @@ export const loadSkillPlanEditor = named(
   'SkillPlanEditor'
 );
 export const loadSkillCompare = named(() => import('@/routes/SkillCompare'), 'SkillCompare');
+export const loadSkillCertificates = named(
+  () => import('@/routes/SkillCertificates'),
+  'SkillCertificates'
+);
 export const loadIndustry = named(() => import('@/routes/Industry'), 'Industry');
 export const loadIndustryPlanPage = named(
   () => import('@/routes/IndustryPlanPage'),
@@ -150,6 +154,7 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/skills/plans': loadSkillPlans,
   '/skills/plans/:planId': loadSkillPlanEditor,
   '/skills/compare': loadSkillCompare,
+  '/skills/certificates': loadSkillCertificates,
   '/industry': loadIndustry,
   '/industry/plans/:planId': loadIndustryPlanPage,
   '/industry/groups/:groupId': loadIndustryGroupPage,

@@ -65,6 +65,9 @@ export const ROUTE_REQUIREMENTS = {
   // Reads each compared character's already-cached skills endpoint (same one
   // the trained view itself uses); no scope of its own to gate on.
   '/skills/compare': UNGATED,
+  // Grades the active Character's already-cached skills against baked
+  // certificates; a Character without the skills read sees the empty state.
+  '/skills/certificates': UNGATED,
   // A redirect onto the Ship Tree, in the Ships section (App.tsx); no scope of its own.
   '/skills/ships': UNGATED,
   // Section index: renders nothing of its own, it redirects to the plan list

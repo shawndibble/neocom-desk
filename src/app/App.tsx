@@ -64,6 +64,7 @@ const Skills = lazy(routeChunks.loadSkills);
 const SkillPlans = lazy(routeChunks.loadSkillPlans);
 const SkillPlanEditor = lazy(routeChunks.loadSkillPlanEditor);
 const SkillCompare = lazy(routeChunks.loadSkillCompare);
+const SkillCertificates = lazy(routeChunks.loadSkillCertificates);
 const Industry = lazy(routeChunks.loadIndustry);
 const IndustryPlanPage = lazy(routeChunks.loadIndustryPlanPage);
 const IndustryGroupPage = lazy(routeChunks.loadIndustryGroupPage);
@@ -156,6 +157,7 @@ const ROUTE_ELEMENTS = {
   '/skills/plans': <SkillPlans />,
   '/skills/plans/:planId': <SkillPlanEditor />,
   '/skills/compare': <SkillCompare />,
+  '/skills/certificates': <SkillCertificates />,
   // The old Skills › Ships page is gone; old bookmarks land on the Ship Tree.
   '/skills/ships': <LegacyShipsRedirect />,
   '/industry': <Industry />,

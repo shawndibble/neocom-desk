@@ -148,6 +148,14 @@ here — they go one per file in `docs/context/decisions/`.
   the moment it started (end of its day, or six hours, whichever is later) can
   leave a late-night op sitting in yesterday's cell until the small hours. Drawn at one of two densities — a month, or the
   fortnight around today.
+- **Certificate**: One of CCP's combat certificates (Armor Tanking, Navigation,
+  Medium Missiles, …) — a five-grade ladder of skill levels, Basic, Standard,
+  Improved, Advanced, Elite, read from CCP's JSONL export (issue #2390). The
+  same ladders CCP assembles ship **Masteries** from, kept whole so the Skills ›
+  Certificates tab can grade a pilot by area rather than by hull. Graded by the
+  Mastery rule (`engine/tierLadder.ts`): the highest grade whose levels, and
+  every lower grade's, are all trained. Only the nine combat groups are baked;
+  industry, science and trade certificates are left out.
 - **Certified Plan**: One of CCP's own career skill plans (Explorer, Industrialist,
   Enforcer, Soldier of Fortune), the ones the game lists under Skill Plans ›
   Certified Plans (issue #2392). Static data, baked from CCP's JSONL export

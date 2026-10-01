@@ -27,6 +27,7 @@ const ROUTE_TITLE_KEYS = {
   '/skills/plans': ['nav.skills', 'skills.plansTab'],
   '/skills/plans/:planId': ['nav.skills', 'skills.plansTab'],
   '/skills/compare': ['nav.skills', 'skills.compareTab'],
+  '/skills/certificates': ['nav.skills', 'skills.certificatesTab'],
   '/industry': ['nav.industry'],
   '/ships': ['nav.ships'],
   // Redirects into Ships (the Tree, and the section's old paths); titled only because every route must be.
