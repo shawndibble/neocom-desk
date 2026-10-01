@@ -1302,7 +1302,6 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             <EmptyState
               title={t('miningTax.firstPayeeTitle')}
               hint={t('miningTax.firstPayeeHint')}
-              className="py-16"
             />
           ) : (
             <>
@@ -1393,24 +1392,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                             {t('miningTax.unassignedMined')}
                           </span>
                         </p>
-                        {allPayees.length === 0 && (
-                          <p className="mt-2 text-xs text-text-dim">
-                            {t('miningTax.unassignedNoPayeesPrompt')}
-                          </p>
-                        )}
                         <div className="mt-2">
-                          <Button
-                            size="sm"
-                            className="w-full"
-                            onClick={
-                              allPayees.length === 0 && payeeManagerDefaultCharacterId !== null
-                                ? () => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)
-                                : assignNext
-                            }
-                          >
-                            {allPayees.length === 0 && payeeManagerDefaultCharacterId !== null
-                              ? t('miningTax.addPayee')
-                              : t('miningTax.assignNextAction')}
+                          <Button size="sm" className="w-full" onClick={assignNext}>
+                            {t('miningTax.assignNextAction')}
                           </Button>
                         </div>
                       </Panel>

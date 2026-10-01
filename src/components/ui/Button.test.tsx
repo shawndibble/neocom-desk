@@ -43,7 +43,7 @@ describe('Button', () => {
     expect(screen.getByRole('button', { name: 'Delete' }).className).toContain('text-danger');
     const accent = screen.getByRole('button', { name: 'Payees' }).className;
     expect(accent).toContain('border-accent');
-    expect(accent).not.toContain('bg-accent ');
+    expect(accent.split(' ')).not.toContain('bg-accent');
   });
 
   it('does not fire onClick when disabled', async () => {
