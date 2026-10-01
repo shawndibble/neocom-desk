@@ -349,10 +349,12 @@ describe('FittingStatsSections offense', () => {
     });
     const offense = within(sectionBody('Offense'));
 
-    expect(offense.getByText('Optimal 2.4 km · Falloff 6.3 km')).toBeInTheDocument();
-    expect(offense.getByText('Range 62.5 km')).toBeInTheDocument();
+    // As the HUD tooltip reads it: the falloff line is optimal + falloff.
+    expect(offense.getByText('Optimal range within 2.4 km')).toBeInTheDocument();
+    expect(offense.getByText('Falloff range within 8.7 km')).toBeInTheDocument();
+    expect(offense.getByText('Range within 62.5 km')).toBeInTheDocument();
     // A drone flying to its target carries no range.
-    expect(offense.getAllByText(/^(Optimal|Range) [\d.]+ km/)).toHaveLength(2);
+    expect(offense.getAllByText(/range within [\d.]+ km$/i)).toHaveLength(3);
   });
 
   it('shows no sustained figure when reloading costs nothing', () => {
@@ -915,10 +917,13 @@ describe('FittingStatsSections — Overheat all and Copy stats', () => {
     const support = within(sectionBody('Support out'));
     // The neutralizer drains harder, at the same range.
     expect(inWarningTone(support.getByText('17.6 GJ/s neutralized'))).toBe(true);
-    expect(inWarningTone(support.getByText('10.0 km'))).toBe(false);
+    expect(inWarningTone(support.getByText('Range within 10.0 km'))).toBe(false);
     // The scrambler reaches further, with the same two points.
-    expect(inWarningTone(support.getByText('10.8 km'))).toBe(true);
-    expect(support.getByText('10.8 km')).toHaveAttribute('title', 'Unheated: 9.0 km');
+    expect(inWarningTone(support.getByText('Range within 10.8 km'))).toBe(true);
+    expect(support.getByText('Range within 10.8 km')).toHaveAttribute(
+      'title',
+      'Unheated: Range within 9.0 km'
+    );
 
     const capacitor = within(sectionBody('Capacitor'));
     expect(inWarningTone(capacitor.getByText('−23.5 GJ/s'))).toBe(true);
@@ -1016,7 +1021,8 @@ describe('FittingStatsSections — Support out', () => {
     const support = within(sectionBody('Support out'));
     expect(support.getAllByText('85.3 HP/s')).toHaveLength(1);
     expect(support.getByText('85.3 HP/s armor')).toBeInTheDocument();
-    expect(support.getByText('10.5 + 3.0 km')).toBeInTheDocument();
+    expect(support.getByText('Optimal range within 10.5 km')).toBeInTheDocument();
+    expect(support.getByText('Falloff range within 13.5 km')).toBeInTheDocument();
     expect(support.getByText('−60% speed')).toBeInTheDocument();
     expect(support.getByText('2 points')).toBeInTheDocument();
   });

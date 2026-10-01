@@ -5,6 +5,7 @@
  */
 import { alignTimeSeconds, resistPct } from '@/engine/fittings/stats';
 import type { FittingStats, Resonances } from '@/engine/fittings/types';
+import { kmValue } from './rangeText';
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
@@ -75,7 +76,7 @@ export function fittingStatsText(stats: FittingStats, t: Translate): string {
       warp: stats.navigation.warpSpeed.toFixed(1),
     }),
     k('targeting', {
-      range: (stats.targeting.maxTargetRange / 1000).toFixed(1),
+      range: kmValue(stats.targeting.maxTargetRange),
       targets: stats.targeting.maxLockedTargets,
       scanResolution: stats.targeting.scanResolution.toFixed(0),
       signature: stats.targeting.signatureRadius.toFixed(0),

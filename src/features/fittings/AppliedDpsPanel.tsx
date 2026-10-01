@@ -27,6 +27,7 @@ import {
   type AppliedDpsPoint,
 } from '@/engine/fittings/appliedDps';
 import type { AppliedDpsRow } from './AppliedDpsChart';
+import { kmValue } from './rangeText';
 import { HeatFigure } from './StatFacts';
 import { TargetProfilePicker } from './TargetProfilePicker';
 import type { TargetProfiles } from './targetProfiles';
@@ -142,7 +143,7 @@ export function AppliedDpsPanel({
       return t('fittings.appliedDps.summary', {
         raw: rawDps(inputs).toFixed(1),
         applied: appliedDps(inputs, target, atRange).toFixed(1),
-        km: (atRange / 1000).toFixed(1),
+        km: kmValue(atRange),
       });
     };
     const byInputs = new Map<AppliedDpsInputs, string>([[applied, read(applied)]]);

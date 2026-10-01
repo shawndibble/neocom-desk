@@ -45,6 +45,7 @@ import { useProjectedSources } from './statsConditions';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
 import { FittingItemMenu, WeaponMenuItems } from './FittingItemMenu';
+import { kmValue, rangeLines } from './rangeText';
 import { useFittingItemActions } from './fittingItemActions';
 
 const DMG_FILL_CLASS = {
@@ -415,23 +416,14 @@ function weaponGroup(
   };
 }
 
-/**
- * A weapon row's reach, dim under its DPS: optimal and falloff, or a single
- * range where there's no falloff (a missile's flight range).
- */
-function WeaponRangeLine({ range }: { range: WeaponRange }) {
+/** A weapon row's reach, dim under its DPS, as the HUD tooltip reads it (`rangeText.ts`). */
+function WeaponRangeLines({ range }: { range: WeaponRange }) {
   const { t } = useTranslation();
-  const km = (metres: number) => (metres / 1000).toFixed(1);
-  return (
-    <span className="basis-full text-right text-[0.6875rem] text-text-dim tabular-nums">
-      {range.falloff > 0
-        ? t('fittings.stats.weaponOptimalFalloff', {
-            optimal: km(range.optimal),
-            falloff: km(range.falloff),
-          })
-        : t('fittings.stats.weaponRange', { range: km(range.optimal) })}
+  return rangeLines(t, range.optimal, range.falloff).map((line) => (
+    <span key={line} className="basis-full text-right text-[0.6875rem] text-text-dim tabular-nums">
+      {line}
     </span>
-  );
+  ));
 }
 
 /** The Offense section's rows — a weapon group, drone stack or squadron each — and their total. */
@@ -484,7 +476,7 @@ function OffenseRows({
               }
             />
             {hasMenu && <RowMoreActions />}
-            {row.range && <WeaponRangeLine range={row.range} />}
+            {row.range && <WeaponRangeLines range={row.range} />}
           </>
         );
         const rowClass = 'flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5';
@@ -685,7 +677,7 @@ export function FittingStatsSections({
   function fleetBoostsMeta(s: FittingStats): string {
     const { bursts, compressors } = s.fleetSupport;
     const meters = bursts[0]?.rangeMeters ?? compressors[0]?.rangeMeters ?? 0;
-    return t('fittings.stats.unit.km', { value: (meters / 1000).toFixed(1) });
+    return t('fittings.stats.unit.km', { value: kmValue(meters) });
   }
 
   /** Holds, jump drive and sensors: what the hull carries, beside what the fit asks of it. */
@@ -896,7 +888,7 @@ export function FittingStatsSections({
         'targeting',
         figure((s) =>
           t('fittings.stats.unit.km', {
-            value: (s.targeting.maxTargetRange / 1000).toFixed(1),
+            value: kmValue(s.targeting.maxTargetRange),
           })
         ),
         stats ? (
@@ -906,7 +898,7 @@ export function FittingStatsSections({
                 label: t('fittings.stats.fact.targetRange'),
                 value: figure((s) =>
                   t('fittings.stats.unit.km', {
-                    value: (s.targeting.maxTargetRange / 1000).toFixed(1),
+                    value: kmValue(s.targeting.maxTargetRange),
                   })
                 ),
               },

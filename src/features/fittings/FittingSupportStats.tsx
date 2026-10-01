@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { SupportRow } from '@/engine/fittings/support';
 import type { FittingStats } from '@/engine/fittings/types';
+import { rangeLines } from './rangeText';
 import { HeatFigure } from './StatFacts';
 
 /** Rates and points to one decimal; percentages and jam strength as the game shows them. */
@@ -62,13 +63,7 @@ export function SupportFacts({
   typeName: (typeId: number) => string;
 }) {
   const { t } = useTranslation();
-  const range = (row: SupportRow) =>
-    row.falloff > 0
-      ? t('fittings.stats.support.rangeFalloff', {
-          optimal: (row.optimal / 1000).toFixed(1),
-          falloff: (row.falloff / 1000).toFixed(1),
-        })
-      : t('fittings.stats.support.range', { optimal: (row.optimal / 1000).toFixed(1) });
+  const range = (row: SupportRow) => rangeLines(t, row.optimal, row.falloff);
   const amount = (row: SupportRow) =>
     effectsText(row, t) ??
     t(`fittings.stats.support.kind.${row.kind}`, {
@@ -96,9 +91,11 @@ export function SupportFacts({
           >
             <span className="min-w-0">
               {t('fittings.stats.weaponRow', { count: row.count, name: typeName(row.typeId) })}
-              <span className="block text-text-dim tabular-nums">
-                <HeatFigure stats={stats} format={(s) => range(same(s))} />
-              </span>
+              {range(row).map((_, line) => (
+                <span key={line} className="block text-text-dim tabular-nums">
+                  <HeatFigure stats={stats} format={(s) => range(same(s))[line] ?? ''} />
+                </span>
+              ))}
             </span>
             <span className="shrink-0 text-right tabular-nums">
               <HeatFigure stats={stats} format={(s) => amount(same(s))} />

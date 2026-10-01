@@ -642,8 +642,11 @@
       "weaponRow": "{{count}}× {{name}}",
       "weaponDps": "{{value}} DPS",
       "weaponVolley": "{{value}} volley",
-      "weaponRange": "Range {{range}} km",
-      "weaponOptimalFalloff": "Optimal {{optimal}} km · Falloff {{falloff}} km",
+      "range": {
+        "optimal": "Optimal range within {{value}} km",
+        "falloff": "Falloff range within {{value}} km",
+        "single": "Range within {{value}} km"
+      },
       "sustainedDps": "Sustained with reload: {{value}} DPS",
       "offenseTotal": "Total",
       "offenseNone": "Nothing is firing.",
@@ -792,8 +795,6 @@
         "gravimetric": "Gravimetric"
       },
       "support": {
-        "range": "{{optimal}} km",
-        "rangeFalloff": "{{optimal}} + {{falloff}} km",
         "modules_one": "{{count}} module",
         "modules_other": "{{count}} modules",
         "kind": {

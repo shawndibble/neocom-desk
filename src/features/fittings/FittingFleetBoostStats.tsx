@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { BurstRow } from '@/engine/fittings/fleetSupport';
 import type { FittingStats } from '@/engine/fittings/types';
+import { kmValue } from './rangeText';
 import { Facts } from './StatFacts';
 
 /**
@@ -18,7 +19,7 @@ export function FleetBoostFacts({
 }) {
   const { t } = useTranslation();
   const { bursts, compressors, core } = stats.fleetSupport;
-  const km = (meters: number) => t('fittings.stats.unit.km', { value: (meters / 1000).toFixed(1) });
+  const km = (meters: number) => t('fittings.stats.unit.km', { value: kmValue(meters) });
   const seconds = (value: number) => t('fittings.stats.unit.seconds', { value: value.toFixed(1) });
   const burstFacts = (burst: BurstRow) => [
     {
