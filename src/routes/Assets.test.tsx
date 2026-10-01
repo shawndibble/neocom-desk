@@ -924,6 +924,28 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
   });
 
+  it('keeps rows visible under a min-value filter while prices are still loading', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.get('https://esi.evetech.net/markets/prices', async () => {
+        await gate;
+        return HttpResponse.json([{ type_id: 35, average_price: 5000 }]);
+      })
+    );
+    window.history.replaceState({}, '', '/assets?all=1&min=10000');
+    render(<App />);
+
+    // Prices parked: every stack values 0, which the filter must not read as "below the minimum".
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+
+    release();
+    await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+  });
+
   it('takes ISK shorthand in the minimum value, with no echo line in the strip (issue #2227)', async () => {
     const user = userEvent.setup();
     render(<App />);

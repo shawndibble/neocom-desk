@@ -6,9 +6,10 @@
  * generic `esiCache` table (under `GLOBAL_CACHE_CHARACTER_ID`) carries the
  * same entries across a reload, so reopening the app inside the TTL does not
  * refetch every price on screen. A persisted entry is served only while its
- * own TTL holds — never as a stale fallback — so the TTLs mean exactly what
- * they did when this cache was memory-only. Concurrent asks for the same
- * prices share one in-flight request rather than each missing and fetching.
+ * own TTL holds — never as a stale fallback, except adjusted prices read with
+ * `allowStale` — so the TTLs mean exactly what they did when this cache was
+ * memory-only. Concurrent asks for the same prices share one in-flight
+ * request rather than each missing and fetching.
  */
 import {
   emitCacheRevalidated,
@@ -52,7 +53,7 @@ let adjustedPriceCache: CacheEntry<Map<number, AdjustedPrice>> | null = null;
  */
 const hubPricesInFlight = new Map<string, Promise<HubAggregate | null>>();
 let adjustedPricesInFlight: Promise<Map<number, AdjustedPrice>> | null = null;
-/** The lapsed copy an `allowStale` caller was handed while the live refresh runs; null when none is out. */
+/** Lapsed copy handed to `allowStale` callers while the refresh runs. */
 let adjustedStaleServed: Map<number, AdjustedPrice> | null = null;
 
 /**
@@ -317,8 +318,6 @@ export async function getAdjustedPrices(
     return adjustedPriceCache.value;
   }
   if (adjustedPricesInFlight) {
-    // A display-only caller is not made to wait on a refresh when it was
-    // already handed a lapsed copy this session.
     if (options.allowStale && adjustedStaleServed) return adjustedStaleServed;
     return adjustedPricesInFlight;
   }
@@ -338,6 +337,18 @@ export async function getAdjustedPrices(
  */
 type AdjustedPriceRow = Array<[typeId: number, adjusted: number | null, average: number | null]>;
 
+function rowsToMap(rows: AdjustedPriceRow): Map<number, AdjustedPrice> {
+  const value = new Map<number, AdjustedPrice>();
+  for (const [typeId, adjusted, average] of rows) value.set(typeId, { adjusted, average });
+  return value;
+}
+
+function mapToRows(value: Map<number, AdjustedPrice>): AdjustedPriceRow {
+  const rows: AdjustedPriceRow = [];
+  for (const [typeId, price] of value) rows.push([typeId, price.adjusted, price.average]);
+  return rows;
+}
+
 async function loadAdjustedPrices(
   nowMs: number,
   allowStale: boolean
@@ -345,13 +356,8 @@ async function loadAdjustedPrices(
   const generation = persistedGeneration;
   const stored = await readPersisted<AdjustedPriceRow>([ADJUSTED_KEY]);
   const row = stored.get(persistedKey(ADJUSTED_KEY));
-  const toMap = (rows: AdjustedPriceRow) => {
-    const value = new Map<number, AdjustedPrice>();
-    for (const [typeId, adjusted, average] of rows) value.set(typeId, { adjusted, average });
-    return value;
-  };
   if (generation === persistedGeneration && row && row.fetchedAt + ADJUSTED_PRICE_TTL_MS > nowMs) {
-    const value = toMap(row.value);
+    const value = rowsToMap(row.value);
     adjustedPriceCache = { value, expiresAt: row.fetchedAt + ADJUSTED_PRICE_TTL_MS };
     return value;
   }
@@ -359,16 +365,13 @@ async function loadAdjustedPrices(
     const value = await fetchAdjustedPrices();
     if (generation !== persistedGeneration) return value;
     adjustedPriceCache = { value, expiresAt: nowMs + ADJUSTED_PRICE_TTL_MS };
-    const tuples: AdjustedPriceRow = [];
-    for (const [typeId, price] of value) tuples.push([typeId, price.adjusted, price.average]);
-    persist([[ADJUSTED_KEY, tuples]], nowMs);
+    persist([[ADJUSTED_KEY, mapToRows(value)]], nowMs);
     return value;
   };
   if (allowStale && generation === persistedGeneration && row) {
-    // Hourly averages used for badges: a lapsed copy is close enough to show
-    // now. The refresh lands behind the caller and signals the mounted views
-    // to re-read, so the badges update in place.
-    const stale = toMap(row.value);
+    // Hourly averages behind badges: show the lapsed copy now, swap in place
+    // when the refresh signals mounted views.
+    const stale = rowsToMap(row.value);
     adjustedStaleServed = stale;
     const refresh = fetchLive();
     adjustedPricesInFlight = refresh;
@@ -384,4 +387,21 @@ async function loadAdjustedPrices(
     return stale;
   }
   return fetchLive();
+}
+
+/**
+ * Average traded price per type for value badges. Best-effort: a lapsed copy
+ * shows at once, and an outage degrades the badges to 0 rather than the page.
+ */
+export async function getAveragePriceByType(): Promise<Map<number, number>> {
+  const byType = new Map<number, number>();
+  try {
+    const prices = await getAdjustedPrices(Date.now, { allowStale: true });
+    for (const [typeId, price] of prices) {
+      if (price.average !== null) byType.set(typeId, price.average);
+    }
+  } catch {
+    byType.clear();
+  }
+  return byType;
 }

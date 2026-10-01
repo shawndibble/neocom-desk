@@ -23,15 +23,10 @@ import { readRouteSnapshot, writeRouteSnapshot } from './routeSnapshotCache';
 export interface RouteSnapshotSignal<T = unknown> {
   cancelled: boolean;
   /**
-   * Show an early, incomplete snapshot while the loader keeps resolving the
-   * slow parts (names, prices, ...). Only takes effect when the view has
-   * nothing at all to show for this load — never over a finished snapshot, a
-   * retained one from the last visit, or a refresh's carried-over data, so a
-   * background revalidation cannot blink complete rows back to a partial
-   * state. `loading` stays true until the loader returns, and a partial is
-   * never written to the retained cache. Absent on callers that run a loader
-   * outside the hook (`app/routeWarm.ts`). Method syntax keeps loaders typed
-   * with the default `RouteSnapshotSignal` assignable.
+   * Show an early partial snapshot while the loader finishes the slow reads.
+   * No-op when anything is already on screen (finished, retained or carried
+   * over); `loading` stays true and a partial is never retained. Absent when a
+   * loader runs outside the hook (`app/routeWarm.ts`).
    */
   publish?(partial: T): void;
 }
