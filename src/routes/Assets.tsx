@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { measureElement, useVirtualizer } from '@tanstack/react-virtual';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
@@ -1205,6 +1205,12 @@ export function Assets() {
     count: rows.length,
     getScrollElement: () => scrollParentRef.current,
     estimateSize: (index) => estimateRowHeight(rows[index]),
+    // Rows wrap onto two lines at phone widths, so the estimate is only a first
+    // guess — measure the real height or rows overlap. Zero (jsdom, a row not
+    // laid out yet) falls back to the estimate.
+    measureElement: (element, entry, instance) =>
+      measureElement(element, entry, instance) ||
+      instance.options.estimateSize(instance.indexFromElement(element)),
     getItemKey: (index) => rows[index].key,
     overscan: 10,
   });
@@ -1955,6 +1961,7 @@ export function Assets() {
                             <div
                               key={virtualRow.key}
                               data-index={virtualRow.index}
+                              ref={rowVirtualizer.measureElement}
                               style={{
                                 position: 'absolute',
                                 top: 0,

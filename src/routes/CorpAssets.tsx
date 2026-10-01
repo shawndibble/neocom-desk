@@ -30,7 +30,7 @@
  * before this rework — corp assets still never loads the blueprint catalog.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { measureElement, useVirtualizer } from '@tanstack/react-virtual';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
@@ -427,6 +427,12 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
     count: rows.length,
     getScrollElement: () => scrollParentRef.current,
     estimateSize: (index) => estimateRowHeight(rows[index]),
+    // Rows wrap onto two lines at phone widths, so the estimate is only a first
+    // guess — measure the real height or rows overlap. Zero (jsdom, a row not
+    // laid out yet) falls back to the estimate.
+    measureElement: (element, entry, instance) =>
+      measureElement(element, entry, instance) ||
+      instance.options.estimateSize(instance.indexFromElement(element)),
     getItemKey: (index) => rows[index].key,
     overscan: 10,
   });
@@ -729,6 +735,7 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
                           <div
                             key={virtualRow.key}
                             data-index={virtualRow.index}
+                            ref={rowVirtualizer.measureElement}
                             style={{
                               position: 'absolute',
                               top: 0,
