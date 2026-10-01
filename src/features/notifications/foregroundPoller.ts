@@ -544,7 +544,9 @@ async function recordFeedNotification(
       body,
       firedAt,
       // Marks the row provisional until `fillTimeSettle` finds the sale.
-      fillMatch: fire.eventId === 'marketOrderFilled' ? fire.fillMatch : undefined,
+      ...(fire.eventId === 'marketOrderFilled' && fire.fillMatch !== undefined
+        ? { fillMatch: fire.fillMatch }
+        : {}),
     });
   } catch {
     // Same fire-and-forget contract as sendBrowserNotification: pollerState

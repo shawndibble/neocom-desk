@@ -50,14 +50,14 @@ export function planFillSettlements(
   if (wallet.kind === 'retry') return [];
   const settlements: FillSettlement[] = [];
   for (const row of rows) {
-    const keepDate = { id: row.id, firedAt: row.firedAt };
+    const settleAsNoticed = { id: row.id, firedAt: row.firedAt };
     if (wallet.kind === 'unavailable' || nowMs - row.firedAt > SETTLE_WINDOW_MS) {
-      settlements.push(keepDate);
+      settlements.push(settleAsNoticed);
       continue;
     }
     const result = resolveFillTime(row.fillMatch, wallet.rows, row.firedAt, wallet.fetchedAtMs);
     if (result.status === 'settled') settlements.push({ id: row.id, firedAt: result.fillMs });
-    else if (result.status === 'unmatched') settlements.push(keepDate);
+    else if (result.status === 'unmatched') settlements.push(settleAsNoticed);
   }
   return settlements;
 }

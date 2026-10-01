@@ -52,6 +52,13 @@ export type FillTimeResolution =
  */
 export const WALLET_TRANSACTIONS_LAG_MS = 65 * 60_000;
 
+/**
+ * How far ESI's clock may run ahead of this device's. A sale dated later than
+ * that past the poll that noticed the fill is not this order's — most often
+ * a relist of the same item at the same price, already selling.
+ */
+const CLOCK_SKEW_MS = 5 * 60_000;
+
 /** ISK prices go to the cent; compare in cents so float noise never splits a match. */
 function sameCents(a: number, b: number): boolean {
   return Math.round(a * 100) === Math.round(b * 100);
@@ -67,7 +74,9 @@ function sameCents(a: number, b: number): boolean {
  * Known limitation: a second order for the same item, at the same price and
  * station, that also sold since this one was issued is indistinguishable
  * without an order id; its sales count here too. The date that results is
- * still a real sale of this item at this price.
+ * still a real sale of this item at this price. A relist that sold between
+ * the fill and the poll noticing it is the same blind spot, bounded by that
+ * poll; one that sold after it is excluded.
  */
 export function resolveFillTime(
   match: FillMatch,
@@ -82,13 +91,14 @@ export function resolveFillTime(
     if (row.typeId !== match.typeId || row.locationId !== match.locationId) continue;
     if (!sameCents(row.unitPrice, match.price)) continue;
     if (row.dateMs < match.issuedMs) continue;
+    if (row.dateMs > observedAtMs + CLOCK_SKEW_MS) continue;
     sold += row.quantity;
     newestMs = Math.max(newestMs, row.dateMs);
   }
 
   const found = sold > 0;
-  // Clamped: the fill cannot have happened after the poll that saw it; a
-  // later date is ESI's clock running ahead of this device's.
+  // Clamped: a sale inside the skew allowance is ESI's clock running ahead,
+  // and the fill cannot have happened after the poll that saw it.
   const settled = (): FillTimeResolution => ({
     status: 'settled',
     fillMs: Math.min(newestMs, observedAtMs),

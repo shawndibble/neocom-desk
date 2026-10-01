@@ -487,6 +487,28 @@ describe('mergeFeed', () => {
     expect(result.pullRedate).toEqual([]);
   });
 
+  it('pushes a settlement that kept the date, so the other device drops its provisional mark', () => {
+    const result = mergeFeedNow([feedRow({ fillSettledAt: NOW - 10 })], new Set(), [
+      remoteFeedRow(),
+    ]);
+    expect(result.pushRedate.map((r) => r.id)).toEqual(['occ-1']);
+  });
+
+  it('pulls a settlement that kept the date', () => {
+    const result = mergeFeedNow([feedRow()], new Set(), [
+      remoteFeedRow({ fillSettledAt: NOW - 10 }),
+    ]);
+    expect(result.pullRedate.map((r) => r.id)).toEqual(['occ-1']);
+  });
+
+  it('does nothing once both copies are settled on the same date', () => {
+    const result = mergeFeedNow([feedRow({ fillSettledAt: NOW - 10 })], new Set(), [
+      remoteFeedRow({ fillSettledAt: NOW - 20 }),
+    ]);
+    expect(result.pushRedate).toEqual([]);
+    expect(result.pullRedate).toEqual([]);
+  });
+
   it('pulls a newer remote dismissal first, rather than overwrite it with an earlier local date', () => {
     // The pull merges both (earlier date, later dismissal) locally; the next
     // pass pushes the date back up with the dismissals already agreeing.

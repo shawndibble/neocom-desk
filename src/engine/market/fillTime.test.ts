@@ -87,9 +87,20 @@ describe('resolveFillTime', () => {
     ).toEqual({ status: 'settled', fillMs: OBSERVED - 2 * HOUR });
   });
 
-  it('never dates the fill after the moment it was noticed', () => {
+  it('ignores a sale after the fill was noticed — a relist at the same price, not this order', () => {
+    const rows = [
+      txn({ dateMs: OBSERVED - 2 * HOUR, quantity: 100 }),
+      txn({ dateMs: OBSERVED + 20 * 60_000, quantity: 10 }),
+    ];
+    expect(resolveFillTime(match, rows, OBSERVED, STALE_FETCH)).toEqual({
+      status: 'settled',
+      fillMs: OBSERVED - 2 * HOUR,
+    });
+  });
+
+  it('still takes a sale a few seconds after the poll — ESI clock skew — dated at the poll', () => {
     expect(
-      resolveFillTime(match, [txn({ dateMs: OBSERVED + 60_000 })], OBSERVED, STALE_FETCH)
+      resolveFillTime(match, [txn({ dateMs: OBSERVED + 30_000 })], OBSERVED, STALE_FETCH)
     ).toEqual({ status: 'settled', fillMs: OBSERVED });
   });
 

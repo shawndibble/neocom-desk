@@ -9,7 +9,10 @@ _Recorded 2026-10-01._
   `issued` is that order's sale, and the newest one is the fill
   (`engine/market/fillTime`). Two of the Character's own orders with the same
   item, price and station can't be told apart. That's accepted, because the
-  date that results is still a real sale of that item at that price.
+  date that results is still a real sale of that item at that price. A relist
+  at the same price is the common form of this. Its sales after the poll that
+  noticed the fill are excluded, with a 5-minute allowance for ESI clock
+  skew. Its sales between the fill and that poll can't be told apart.
 - **First dated by the poll, re-dated later.** ESI caches transactions for
   an hour and orders for twenty minutes, so the poll that notices a fill
   usually can't see its sale yet. The feed row is written at the poll's time

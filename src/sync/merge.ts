@@ -258,6 +258,13 @@ export interface FeedRow {
   firedAt: number;
   /** Epoch ms dismissed, absent while live. */
   dismissedAt?: number;
+  /**
+   * Epoch ms a market order fill's date was settled from the wallet
+   * (`fillTimeSettle.ts`). Compared by presence only: a settlement that kept
+   * the date changes nothing else the merge reads, and without this the other
+   * device would mark the row provisional forever.
+   */
+  fillSettledAt?: number;
 }
 
 /** Remote Firestore doc at /characters/{uid}/notificationFeed/{id}. */
@@ -293,13 +300,13 @@ export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
   /** Remote rows whose dismissal is newer than the local copy — pull the flag. */
   pullDismiss: R[];
   /**
-   * Local rows dated earlier than the remote copy, dismissals agreeing — push
-   * the earlier date. A row's date can move back after it is first written:
+   * Local rows dated earlier than the remote copy — or settled where the
+   * remote copy is not — dismissals agreeing: push the row. A row's date can move back after it is first written:
    * a market order fill is first dated by the poll that noticed it, then
    * re-dated once the wallet shows the sale (`engine/market/fillTime`).
    */
   pushRedate: L[];
-  /** Remote rows dated earlier than the local copy, dismissals agreeing — pull the earlier date. */
+  /** The mirror of `pushRedate`: remote rows dated earlier, or settled where the local copy is not. */
   pullRedate: R[];
   /**
    * Remote doc ids whose `firedAt` has aged past the synced window, to delete
@@ -393,8 +400,8 @@ export function mergeFeed<L extends LocalFeedRow, R extends RemoteFeedDoc>(
     const r = remoteById.get(id);
 
     // Keyed on the *remote* doc's own `firedAt` — this decides the fate of
-    // the remote copy, and the local twin (equal in practice: content never
-    // changes once a row is fired) is untouched either way.
+    // the remote copy, and the local twin (at most re-dated earlier, which
+    // only moves it further out of the window) is untouched either way.
     if (r && r.firedAt < purgeBefore) {
       result.purgeRemote.push(id);
       continue;
@@ -428,6 +435,10 @@ export function mergeFeed<L extends LocalFeedRow, R extends RemoteFeedDoc>(
       } else if (l.firedAt < r.firedAt) {
         result.pushRedate.push(l);
       } else if (r.firedAt < l.firedAt) {
+        result.pullRedate.push(r);
+      } else if (l.fillSettledAt !== undefined && r.fillSettledAt === undefined) {
+        result.pushRedate.push(l);
+      } else if (r.fillSettledAt !== undefined && l.fillSettledAt === undefined) {
         result.pullRedate.push(r);
       }
     }
