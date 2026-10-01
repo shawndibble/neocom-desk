@@ -1,6 +1,6 @@
 import { preloadSignedInShell } from './routeChunks';
 import { readSignedInShellHint, shouldPreloadSignedInShell } from './signedInShellHint';
-import { routerPathname } from './routerPath';
+import { currentRouterPathname } from './routerPath';
 
 /**
  * Side-effect module, imported by `main.tsx` straight after `./instrument`:
@@ -12,7 +12,6 @@ import { routerPathname } from './routerPath';
  * Deliberately light: `routeChunks`, the hint helper and `routerPath` import
  * nothing at runtime, so this adds no weight ahead of the rest of the entry.
  */
-const routerPath = routerPathname(window.location.pathname, import.meta.env.BASE_URL);
-if (shouldPreloadSignedInShell(routerPath, readSignedInShellHint())) {
+if (shouldPreloadSignedInShell(currentRouterPathname(), readSignedInShellHint())) {
   preloadSignedInShell();
 }

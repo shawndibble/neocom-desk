@@ -18,8 +18,8 @@ export const ROUTER_BASENAME = basenameOf(import.meta.env.BASE_URL);
 
 /** A browser pathname as a router pathname, the base stripped at a segment boundary. */
 export function routerPathname(pathname: string, baseUrl: string): string {
-  const base = baseUrl.replace(/\/$/, '');
-  const underBase = base !== '' && (pathname === base || pathname.startsWith(`${base}/`));
+  const base = basenameOf(baseUrl);
+  const underBase = base !== '/' && (pathname === base || pathname.startsWith(`${base}/`));
   return underBase ? pathname.slice(base.length) || '/' : pathname;
 }
 
@@ -29,6 +29,11 @@ export function routerPathOf(
   baseUrl: string
 ): string {
   return `${routerPathname(location.pathname, baseUrl)}${location.search}${location.hash}`;
+}
+
+/** The router pathname of the page this tab is showing, no query or hash. */
+export function currentRouterPathname(): string {
+  return routerPathname(window.location.pathname, import.meta.env.BASE_URL);
 }
 
 /** The router path of the page this tab is showing. */
