@@ -405,9 +405,10 @@ here — they go one per file in `docs/context/decisions/`.
 - **Install Prompt**: A one-time, in-app call-to-action to install Neocom
   Desk as a home-screen app, layered on top of the browser's own passive PWA
   affordance (already present via `vite-plugin-pwa`). Phones and tablets
-  only (iOS and Android) — desktop browsers never see it. On Android it uses
-  the native `beforeinstallprompt` event when the browser fires it, else
-  "open the menu → Install app / Add to Home screen" instructions; on iOS,
+  only (iOS and Android) — desktop browsers never see it. On Android
+  Chromium browsers it waits for the native `beforeinstallprompt` event;
+  Firefox for Android, which never fires it, gets "open the menu → Add app
+  to Home screen" instructions; on iOS,
   where the event never fires, it's a static instructional banner worded
   for Safari's Share button or for other iOS browsers' Share menu. Shown
   once ever per device — accepting or dismissing either one permanently

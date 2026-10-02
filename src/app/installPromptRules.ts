@@ -25,8 +25,15 @@ export interface BeforeInstallPromptEvent extends Event {
  * browsers (Chrome, Firefox, Edge… all WebKit underneath) because they put
  * "Add to Home Screen" behind different menus. iPadOS 13+ Safari sends a
  * Mac UA by default, so a "Macintosh" with touch points is an iPad.
+ *
+ * Android splits Firefox from the Chromium browsers (Chrome, Samsung
+ * Internet, Edge…). Chromium fires `beforeinstallprompt` — late, and never
+ * when the app is already installed — so it waits for that event rather
+ * than showing menu instructions that could be dismissed (forever) before
+ * the native button arrives, or that would tell an installed user to
+ * install. Firefox never fires it, so it gets written instructions.
  */
-export type InstallPlatform = 'ios-safari' | 'ios-other' | 'android';
+export type InstallPlatform = 'ios-safari' | 'ios-other' | 'android-firefox' | 'android';
 
 export function detectInstallPlatform(
   userAgent: string,
@@ -35,11 +42,11 @@ export function detectInstallPlatform(
   const isIOS =
     /iphone|ipad|ipod/i.test(userAgent) || (/macintosh/i.test(userAgent) && maxTouchPoints > 1);
   if (isIOS) return /crios|fxios|edgios|opios/i.test(userAgent) ? 'ios-other' : 'ios-safari';
-  if (/android/i.test(userAgent)) return 'android';
+  if (/android/i.test(userAgent)) return /firefox/i.test(userAgent) ? 'android-firefox' : 'android';
   return null;
 }
 
-export type InstallPromptVariant = 'none' | 'native' | InstallPlatform;
+export type InstallPromptVariant = 'none' | 'native' | Exclude<InstallPlatform, 'android'>;
 
 export function selectInstallPromptVariant(state: {
   seen: boolean;
@@ -49,5 +56,5 @@ export function selectInstallPromptVariant(state: {
 }): InstallPromptVariant {
   if (state.seen || state.isStandalone || state.platform === null) return 'none';
   if (state.deferredPromptAvailable) return 'native';
-  return state.platform;
+  return state.platform === 'android' ? 'none' : state.platform;
 }

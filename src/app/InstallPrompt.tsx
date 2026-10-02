@@ -13,15 +13,16 @@ import { useOnboardingBannerSlot } from './onboardingBannerSlot';
 const INSTRUCTION_KEYS = {
   'ios-safari': 'pwa.installIosSafariCta',
   'ios-other': 'pwa.installIosOtherCta',
-  android: 'pwa.installAndroidCta',
+  'android-firefox': 'pwa.installAndroidFirefoxCta',
 } as const satisfies Record<Exclude<InstallPromptVariant, 'none' | 'native'>, string>;
 
 /**
  * One-time, phones-and-tablets-only install CTA: uses the native
- * `beforeinstallprompt` event where Android fires it, otherwise shows
- * instructions for this browser's own menu (iOS never fires the event).
- * Shown once ever per device — accepting or dismissing either variant
- * permanently suppresses it (CONTEXT.md "Install Prompt", round 20).
+ * `beforeinstallprompt` event where Android Chromium fires it, otherwise
+ * shows instructions for this browser's own menu on iOS and Firefox for
+ * Android, which never fire the event. Shown once ever per device —
+ * accepting or dismissing either variant permanently suppresses it
+ * (CONTEXT.md "Install Prompt"; decision 20261002-165619).
  */
 export function InstallPrompt() {
   const { t } = useTranslation();

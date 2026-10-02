@@ -10,7 +10,10 @@ _Recorded 2026-10-02._
 - **Instructions are worded per browser family.** iOS Safari points at
   Share, which newer iOS tucks under the ••• Page Menu (Apple's iPhone User
   Guide); other iOS browsers (Chrome, Firefox, Edge — WebKit, no
-  `beforeinstallprompt`) at their own menu's Share; Android without a native
-  prompt (Firefox, Samsung Internet, …) at the browser's ⋮ menu → Install
-  app / Add to Home screen. Android with `beforeinstallprompt` keeps the
-  one-tap native Install button.
+  `beforeinstallprompt`) at Share in their toolbar or menu; Firefox for
+  Android at its ⋮ menu → Add app to Home screen. Android Chromium browsers
+  (Chrome, Samsung Internet, Edge) get no instructions — only the one-tap
+  native Install button once `beforeinstallprompt` fires. Instructions
+  shown before that late event could be dismissed forever before the
+  button arrived, and Chromium skips the event when the app is already
+  installed, so instructions there would tell installed users to install.

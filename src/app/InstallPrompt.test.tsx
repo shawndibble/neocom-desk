@@ -10,6 +10,7 @@ const desktopChromeUA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36';
 const androidChromeUA =
   'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36';
+const androidFirefoxUA = 'Mozilla/5.0 (Android 13; Mobile; rv:119.0) Gecko/119.0 Firefox/119.0';
 const iosSafariUA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 
@@ -58,12 +59,17 @@ describe('InstallPrompt', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('shows Android menu instructions when no native prompt fires', async () => {
+  it('shows nothing on Android Chrome until beforeinstallprompt fires', async () => {
     setUserAgent(androidChromeUA);
     render(<InstallPrompt />);
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      /install app or add to home screen/i
-    );
+    await waitFor(() => expect(useInstallPromptSeen.getState().hydrated).toBe(true));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows menu instructions on Firefox for Android', async () => {
+    setUserAgent(androidFirefoxUA);
+    render(<InstallPrompt />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/add app to home screen/i);
   });
 
   it('shows the native install CTA after beforeinstallprompt fires on Android', async () => {

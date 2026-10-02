@@ -43,9 +43,9 @@ describe('detectInstallPlatform', () => {
     expect(detectInstallPlatform(UA.iosFirefox, 5)).toBe('ios-other');
   });
 
-  it('detects Android browsers', () => {
+  it('separates Firefox for Android from the Chromium browsers', () => {
     expect(detectInstallPlatform(UA.androidChrome, 5)).toBe('android');
-    expect(detectInstallPlatform(UA.androidFirefox, 5)).toBe('android');
+    expect(detectInstallPlatform(UA.androidFirefox, 5)).toBe('android-firefox');
   });
 
   it('returns null on desktop browsers', () => {
@@ -84,8 +84,14 @@ describe('selectInstallPromptVariant', () => {
     expect(selectInstallPromptVariant({ ...base, deferredPromptAvailable: true })).toBe('native');
   });
 
-  it('falls back to Android menu instructions without a native prompt', () => {
-    expect(selectInstallPromptVariant(base)).toBe('android');
+  it('waits for the native prompt on Android Chromium rather than showing instructions', () => {
+    expect(selectInstallPromptVariant(base)).toBe('none');
+  });
+
+  it('shows menu instructions on Firefox for Android, which has no native prompt', () => {
+    expect(selectInstallPromptVariant({ ...base, platform: 'android-firefox' })).toBe(
+      'android-firefox'
+    );
   });
 
   it('gives Safari and other iOS browsers their own instructions', () => {
