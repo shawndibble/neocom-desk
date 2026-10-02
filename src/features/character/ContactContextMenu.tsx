@@ -9,11 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { MenuItem, RowActionsMenu } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
 import { usePublicInfoModal } from '@/stores/publicInfoModal';
-import { contactPublicInfoKind } from './contactsFilter';
-import type { CharacterContact } from '@/esi/endpoints';
-
-/** Only the identity is read, so a merged Across-Characters row can supply one too. */
-export type ContactIdentity = Pick<CharacterContact, 'contact_id' | 'contact_type'>;
+import { contactPublicInfoKind, type ContactIdentity } from './contactsFilter';
 
 export interface ContactContextMenuProps {
   contact: ContactIdentity;

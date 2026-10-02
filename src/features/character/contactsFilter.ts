@@ -63,7 +63,7 @@ export const CONTACT_KIND_KEY: Record<ContactKind, string> = {
 };
 
 /** Only the identity is read, so a merged Across-Characters row can be sorted too. */
-type ContactIdentity = Pick<CharacterContact, 'contact_id' | 'contact_type'>;
+export type ContactIdentity = Pick<CharacterContact, 'contact_id' | 'contact_type'>;
 
 export function contactKind(contact: ContactIdentity): ContactKind {
   if (contact.contact_type === 'character' && isNpcCharacterId(contact.contact_id)) return 'npc';

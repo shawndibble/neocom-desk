@@ -2,9 +2,9 @@
  * A pilot's or a corporation's zKillboard stats: the all-time figures, the
  * Snuggly↔Dangerous and Solo↔Gang meters, and the ships used most on kills.
  * Shared by Pilot Lookup / the Show Info Character tab (`PilotProfileView`)
- * and the Show Info Corporation tab, so the two read the same way — both
- * meters answer "should I worry about this one, and alone or as a gang?",
- * which is the question someone opening either tab came with.
+ * and the Show Info Corporation tab, so the two read the same way. The two
+ * meters quote zKillboard's own scales, ends and all (decision
+ * `20261002-145207`); the app adds no reading of its own.
  *
  * zKillboard sends the same body for either kind of id (`parsePilotStats`);
  * only the no-history wording names which one it is.
@@ -172,7 +172,8 @@ function RatioMeter({
         aria-valuetext={text}
         className="relative h-2 overflow-hidden rounded-full border border-line bg-bg"
       >
-        <div className="h-full rounded-full bg-accent" style={{ width: `${clamped}%` }} />
+        {/* `text-dim`, not accent: a reading, not a control (DESIGN.md §6). */}
+        <div className="h-full rounded-full bg-text-dim" style={{ width: `${clamped}%` }} />
         <span aria-hidden className="absolute inset-y-0 left-1/2 w-px bg-line-bright" />
       </div>
       <div aria-hidden className="flex justify-between text-xs text-text-dim">

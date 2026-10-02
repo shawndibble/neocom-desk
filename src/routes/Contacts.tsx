@@ -55,11 +55,12 @@ import {
   contactPublicInfoKind,
   contactTypeLabelKey,
   filterContacts,
+  type ContactIdentity,
   type ContactKind,
   type ContactsFilter,
   type StandingCategory,
 } from '@/features/character/contactsFilter';
-import { ContactContextMenu, type ContactIdentity } from '@/features/character/ContactContextMenu';
+import { ContactContextMenu } from '@/features/character/ContactContextMenu';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { allianceLogoUrl, characterPortraitUrl, corporationLogoUrl } from '@/lib/eveImages';
 import { usePublicInfoModal } from '@/stores/publicInfoModal';
@@ -228,28 +229,74 @@ function ContactPortrait({ contact }: { contact: ContactIdentity }) {
   );
 }
 
-/** The name, with an "NPC" tag for an agent or NPC corp — the written label, not a colour, carries it. */
-function ContactNameCell({ contact, name }: { contact: ContactIdentity; name: string }) {
+/**
+ * The name, with an "NPC" tag for an agent or NPC corp — the written word, in
+ * the micro-heading treatment rather than a box (DESIGN.md §6), carries it.
+ * `flags`, when given, ride beside the name on the phone card only: there the
+ * Flags column is hidden, and a blocked or watched mark belongs with the name
+ * it is about rather than at the end of the meta line.
+ */
+function ContactNameCell({
+  contact,
+  name,
+  flags,
+}: {
+  contact: ContactIdentity;
+  name: string;
+  flags?: ReactNode;
+}) {
   const { t } = useTranslation();
   return (
     <span className="inline-flex max-w-full min-w-0 items-center gap-1.5">
       <span className="truncate">{name}</span>
       {contactKind(contact) === 'npc' && (
-        <span className="shrink-0 rounded-xs border border-line-bright px-1 text-[0.625rem] leading-4 font-semibold tracking-wider text-text-dim">
+        <span className="shrink-0 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('contacts.npcBadge')}
         </span>
+      )}
+      {flags && <span className="inline-flex shrink-0 sm:hidden">{flags}</span>}
+    </span>
+  );
+}
+
+/** A contact's blocked/watched marks, or null for neither. */
+function ContactFlags({ contact }: { contact: CharacterContact }) {
+  const { t } = useTranslation();
+  const blocked = contact.is_blocked === true;
+  const watched = contact.is_watched === true;
+  if (!blocked && !watched) return null;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {blocked && (
+        <FlagBadge
+          icon={<Icon.Blocked size={ICON_SIZE.sm} />}
+          label={t('contacts.blocked')}
+          tone="text-danger"
+        />
+      )}
+      {watched && (
+        <FlagBadge
+          icon={<Icon.Watched size={ICON_SIZE.sm} />}
+          label={t('contacts.watched')}
+          tone="text-warning"
+        />
       )}
     </span>
   );
 }
 
 /**
- * An empty cell's dash. It reads as "none" in a table column, but on the
- * phone's dense card it would print as one more "· —" on the meta line, so
- * the card hides a cell holding nothing else (`data-dense-empty`, index.css).
+ * A value the phone's dense card can do without (`data-dense-omit`,
+ * index.css): an empty cell's dash, which reads as "none" in a table column
+ * but would print as one more "· —" on the meta line, or a word the card
+ * already says another way. The card hides a cell holding nothing else.
  */
+function DenseOmit({ children }: { children: ReactNode }) {
+  return <span data-dense-omit>{children}</span>;
+}
+
 function EmptyCell() {
-  return <span data-dense-empty>—</span>;
+  return <DenseOmit>—</DenseOmit>;
 }
 
 /** The portrait column both tables lead with: no header, never sorted, never hidden. */
@@ -810,7 +857,13 @@ export function Contacts() {
         id: 'type',
         header: t('contacts.type'),
         className: 'text-text-dim',
-        render: (contact) => t(contactTypeLabelKey(contact)),
+        // A player's "Player" and an NPC's "NPC agent" add nothing to the
+        // phone card — the NPC tag beside the name already tells them apart —
+        // so only a corp, alliance or faction says what it is there.
+        render: (contact) => {
+          const label = t(contactTypeLabelKey(contact));
+          return contact.contact_type === 'character' ? <DenseOmit>{label}</DenseOmit> : label;
+        },
         // Sorts on what is printed, not on ESI's word for it — otherwise
         // "Player" would sort under C and "Corp" under C too, by accident.
         sortValue: (contact) => t(contactTypeLabelKey(contact)),
@@ -891,29 +944,16 @@ export function Contacts() {
         id: 'flags',
         header: t('contacts.flags'),
         align: 'center',
-        render: (contact) => {
-          const blocked = contact.is_blocked === true;
-          const watched = contact.is_watched === true;
-          if (!blocked && !watched) return <EmptyCell />;
-          return (
-            <span className="inline-flex items-center gap-1.5">
-              {blocked && (
-                <FlagBadge
-                  icon={<Icon.Blocked size={ICON_SIZE.sm} />}
-                  label={t('contacts.blocked')}
-                  tone="text-danger"
-                />
-              )}
-              {watched && (
-                <FlagBadge
-                  icon={<Icon.Watched size={ICON_SIZE.sm} />}
-                  label={t('contacts.watched')}
-                  tone="text-warning"
-                />
-              )}
-            </span>
-          );
-        },
+        // On the phone card the marks ride beside the name instead
+        // (`ContactNameCell`). `!`: the dense card's own cell rule would
+        // otherwise outrank a plain utility.
+        className: 'max-sm:hidden!',
+        render: (contact) =>
+          contact.is_blocked === true || contact.is_watched === true ? (
+            <ContactFlags contact={contact} />
+          ) : (
+            <EmptyCell />
+          ),
         // Icon-only, but blocked/watched is a real two-level rank (issue
         // #1282) — blocked outranks watched, and a plain contact has neither
         // so it sinks (`undefined`) rather than sorting as "0".
@@ -932,6 +972,7 @@ export function Contacts() {
     () => CONTACTS_CHARACTER_COLUMN_IDS.filter((id) => id !== 'labels' || hasLabels),
     [hasLabels]
   );
+  const flagsVisible = characterColumnVisibility.isVisible('flags');
   const columns = useMemo<DataTableColumn<CharacterContact>[]>(
     () => [
       CHARACTER_PORTRAIT_COLUMN,
@@ -943,6 +984,7 @@ export function Contacts() {
           <ContactNameCell
             contact={contact}
             name={contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`}
+            flags={flagsVisible && <ContactFlags contact={contact} />}
           />
         ),
         sortValue: (contact) => contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`,
@@ -953,6 +995,7 @@ export function Contacts() {
     ],
     [
       t,
+      flagsVisible,
       contactNames,
       optionalCharacterColumns,
       availableCharacterColumnIds,

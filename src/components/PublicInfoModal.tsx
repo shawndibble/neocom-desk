@@ -29,7 +29,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { CharacterAvatar, EmptyState, Modal, Spinner, Tabs, type TabItem } from '@/components/ui';
 import { isNpcCharacterId } from '@/esi/entityIds';
-import { resolveNames } from '@/features/character/names';
+import { useEntityName } from '@/features/character/useEntityName';
 import {
   loadPublicAllianceInfo,
   loadPublicCorporationInfo,
@@ -188,8 +188,8 @@ export function PublicInfoModal() {
             allianceId={character.status === 'ready' ? character.data.allianceId : undefined}
             allianceName={alliance.status === 'ready' ? alliance.data.name : undefined}
             onOpenAlliance={alliance.status !== 'idle' ? () => setActiveTab('alliance') : undefined}
-            onOpenCharacter={(id) => open('character', id)}
-            onOpenAllianceId={(id) => open('alliance', id)}
+            onShowCharacter={(id) => open('character', id)}
+            onShowAlliance={(id) => open('alliance', id)}
           />
         )}
         {activeTab === 'alliance' && <AllianceTab state={alliance} />}
@@ -298,8 +298,8 @@ function CorporationTab({
   allianceId: liveAllianceId,
   allianceName,
   onOpenAlliance,
-  onOpenCharacter,
-  onOpenAllianceId,
+  onShowCharacter,
+  onShowAlliance,
 }: {
   state: TabState<PublicCorporationInfo>;
   /**
@@ -310,8 +310,8 @@ function CorporationTab({
   /** Filled in once the alliance fetch resolves; a bare id shows until then. */
   allianceName?: string;
   onOpenAlliance?: () => void;
-  onOpenCharacter: (characterId: number) => void;
-  onOpenAllianceId: (allianceId: number) => void;
+  onShowCharacter: (characterId: number) => void;
+  onShowAlliance: (allianceId: number) => void;
 }) {
   if (state.status !== 'ready')
     return <TabStatus status={state.status === 'idle' ? 'loading' : state.status} />;
@@ -325,8 +325,8 @@ function CorporationTab({
         allianceId={allianceId}
         allianceName={allianceName}
         onOpenAlliance={onOpenAlliance}
-        onOpenCharacter={onOpenCharacter}
-        onOpenAllianceId={onOpenAllianceId}
+        onShowCharacter={onShowCharacter}
+        onShowAlliance={onShowAlliance}
       />
     </Suspense>
   );
@@ -372,31 +372,19 @@ function NpcCharacterCard({
   onOpenCorporation: () => void;
 }) {
   const { t } = useTranslation();
-  const [factionName, setFactionName] = useState<string | null>(null);
-  useEffect(() => {
-    if (factionId === undefined) return;
-    let cancelled = false;
-    void resolveNames([factionId])
-      .then((names) => {
-        if (!cancelled) setFactionName(names.get(factionId) ?? null);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [factionId]);
+  const factionName = useEntityName(factionId);
   return (
     <div className="flex flex-wrap items-start gap-4 text-sm">
       <CharacterAvatar characterId={profile.characterId} size="lg" alt={profile.name} />
       <div className="min-w-0 flex-1 space-y-3">
-        <span className="inline-block rounded-xs border border-line-bright px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        <span className="block text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('publicInfo.npcAgent')}
         </span>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-          <dt className="text-text-dim">{t('travel.pilot.corporation')}</dt>
+          <dt className="text-text-dim">{t('publicInfo.corporation')}</dt>
           <dd>
             <button type="button" className={inlineLinkClassName} onClick={onOpenCorporation}>
-              {profile.corporationName ?? t('travel.pilot.unnamed', { id: profile.corporationId })}
+              {profile.corporationName ?? `#${profile.corporationId}`}
             </button>
           </dd>
           {factionId !== undefined && (

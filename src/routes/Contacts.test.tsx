@@ -68,7 +68,6 @@ const affiliationPayload = [
   { character_id: CHAR_ID, corporation_id: 2001, alliance_id: 3001 },
 ];
 
-/** Every filter now sits behind the funnel (FilterBar, issue #1282). */
 /** Switches the page to every character through the header's character filter. */
 async function showAllCharacters() {
   const user = userEvent.setup();
@@ -76,6 +75,7 @@ async function showAllCharacters() {
   await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
 }
 
+/** Every filter now sits behind the funnel (FilterBar, issue #1282). */
 function openFilters() {
   fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
 }
@@ -153,9 +153,11 @@ describe('Contacts', () => {
     expect(screen.getByText('Neutral Corp')).toBeInTheDocument();
     expect(screen.getByText('Bad Alliance')).toBeInTheDocument();
     // Flags are icons now; their meaning reaches a reader through the
-    // accessible name, not through a word in the cell.
-    expect(screen.getByRole('img', { name: 'Watched' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Blocked' })).toBeInTheDocument();
+    // accessible name, not through a word in the cell. Each is rendered twice
+    // — beside the name for the phone card, in the Flags column for the table
+    // — and CSS shows exactly one (jsdom applies no CSS, so both are here).
+    expect(screen.getAllByRole('img', { name: 'Watched' })).toHaveLength(2);
+    expect(screen.getAllByRole('img', { name: 'Blocked' })).toHaveLength(2);
   });
 
   it('names contact types the way a pilot does, not the way ESI does', async () => {

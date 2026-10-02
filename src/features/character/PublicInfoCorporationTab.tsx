@@ -28,13 +28,13 @@ import {
 } from '@/lib/zkillboard';
 import { ZkillStatsSection } from '@/features/travel/ZkillStatsSection';
 import { corporationAge } from './corporationInfo';
-import { resolveNames } from './names';
 import {
   loadPublicAllianceHistory,
   type PublicAllianceHistory,
   type PublicCorporationInfo,
 } from './publicInfoData';
 import { loadStationName } from './stations';
+import { useEntityName } from './useEntityName';
 
 export interface PublicInfoCorporationTabProps {
   data: PublicCorporationInfo;
@@ -42,10 +42,17 @@ export interface PublicInfoCorporationTabProps {
   allianceId: number | null;
   allianceName?: string;
   onOpenAlliance?: () => void;
-  onOpenCharacter: (characterId: number) => void;
-  onOpenAllianceId: (allianceId: number) => void;
+  /** Opens another pilot (the CEO, the founder) in the modal, replacing this request. */
+  onShowCharacter: (characterId: number) => void;
+  /** Opens a past alliance in the modal, replacing this request. */
+  onShowAlliance: (allianceId: number) => void;
 }
 
+/** zKillboard and Website: links, so they wear a control's edge (DESIGN.md §6). */
+const externalLinkClassName =
+  'inline-flex h-11 flex-1 items-center justify-center rounded-xs border border-line-bright px-3 text-xs text-text hover:bg-panel-2 sm:h-8 sm:flex-none';
+/** Status words: type and colour, never a box — a box would read as a button (DESIGN.md §6). */
+const statusWordClassName = 'text-[0.6875rem] font-semibold tracking-widest uppercase';
 const sectionHeading = 'text-xs font-semibold tracking-widest text-text-dim uppercase';
 const termClassName = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
@@ -74,8 +81,8 @@ export default function PublicInfoCorporationTab({
   allianceId,
   allianceName,
   onOpenAlliance,
-  onOpenCharacter,
-  onOpenAllianceId,
+  onShowCharacter,
+  onShowAlliance,
 }: PublicInfoCorporationTabProps) {
   const { t } = useTranslation();
   const corporationId = data.corporation_id;
@@ -84,7 +91,7 @@ export default function PublicInfoCorporationTab({
   const [stats, setStats] = useState<PilotStatsResult | null>(null);
   const [history, setHistory] = useState<PublicAllianceHistory | null>(null);
   const [stationName, setStationName] = useState<string | null>(null);
-  const [factionName, setFactionName] = useState<string | null>(null);
+  const factionName = useEntityName(data.faction_id);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,18 +112,10 @@ export default function PublicInfoCorporationTab({
         })
         .catch(() => {});
     }
-    if (data.faction_id !== undefined) {
-      const factionId = data.faction_id;
-      void resolveNames([factionId])
-        .then((names) => {
-          if (!cancelled) setFactionName(names.get(factionId) ?? null);
-        })
-        .catch(() => {});
-    }
     return () => {
       cancelled = true;
     };
-  }, [corporationId, npc, data.home_station_id, data.faction_id]);
+  }, [corporationId, npc, data.home_station_id]);
 
   const age = corporationAge(data.date_founded, now);
   const website = websiteUrl(data.url);
@@ -175,18 +174,12 @@ export default function PublicInfoCorporationTab({
               )}
             </p>
           )}
-          <p className="flex flex-wrap gap-1.5 text-[0.6875rem]">
-            {npc ? (
-              <span className="rounded-xs border border-line-bright px-1.5 py-0.5 text-text-dim">
-                {t('publicInfo.npcCorporation')}
-              </span>
-            ) : (
-              <span className="rounded-xs border border-line-bright px-1.5 py-0.5 text-text-dim">
-                {t('publicInfo.playerCorporation')}
-              </span>
-            )}
+          <p className="flex flex-wrap gap-x-3 gap-y-1">
+            <span className={`${statusWordClassName} text-text-dim`}>
+              {npc ? t('publicInfo.npcCorporation') : t('publicInfo.playerCorporation')}
+            </span>
             {data.war_eligible && (
-              <span className="rounded-xs border border-warning px-1.5 py-0.5 text-warning">
+              <span className={`${statusWordClassName} text-warning`}>
                 {t('publicInfo.warEligible')}
               </span>
             )}
@@ -198,7 +191,7 @@ export default function PublicInfoCorporationTab({
               href={corporationZkillUrl(corporationId)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-11 flex-1 items-center justify-center rounded-xs border border-line-bright px-3 text-xs text-text hover:bg-panel-2 sm:h-8 sm:flex-none"
+              className={externalLinkClassName}
             >
               {t('publicInfo.zkillboard')} <span aria-hidden>↗</span>
             </a>
@@ -208,7 +201,7 @@ export default function PublicInfoCorporationTab({
               href={website}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-11 flex-1 items-center justify-center rounded-xs border border-line-bright px-3 text-xs text-text hover:bg-panel-2 sm:h-8 sm:flex-none"
+              className={externalLinkClassName}
             >
               {t('publicInfo.website')} <span aria-hidden>↗</span>
             </a>
@@ -229,11 +222,11 @@ export default function PublicInfoCorporationTab({
         <dl className="grid grid-cols-[6.5rem_1fr] items-center gap-x-3 gap-y-2 self-start">
           <dt className={termClassName}>{t('publicInfo.ceo')}</dt>
           <dd>
-            <PersonLink id={data.ceo_id} name={data.ceoName} onOpen={onOpenCharacter} />
+            <PersonLink id={data.ceo_id} name={data.ceoName} onOpen={onShowCharacter} />
           </dd>
           <dt className={termClassName}>{t('publicInfo.founder')}</dt>
           <dd>
-            <PersonLink id={data.creator_id} name={data.creatorName} onOpen={onOpenCharacter} />
+            <PersonLink id={data.creator_id} name={data.creatorName} onOpen={onShowCharacter} />
           </dd>
           {data.date_founded && (
             <>
@@ -288,7 +281,7 @@ export default function PublicInfoCorporationTab({
                   >
                     <span
                       aria-hidden
-                      className={`absolute top-2.5 -left-[5px] size-2 rounded-full ${row.endDate === null ? 'bg-accent' : 'bg-line-bright'}`}
+                      className={`absolute top-2.5 -left-[5px] size-2 rounded-full ${row.endDate === null ? 'bg-text' : 'bg-line-bright'}`}
                     />
                     {row.allianceId === null ? (
                       <span className="text-text-dim">{t('publicInfo.noAlliance')}</span>
@@ -296,7 +289,7 @@ export default function PublicInfoCorporationTab({
                       <button
                         type="button"
                         className={`${inlineLinkClassName} text-left`}
-                        onClick={() => onOpenAllianceId(row.allianceId as number)}
+                        onClick={() => onShowAlliance(row.allianceId as number)}
                       >
                         {history.names.get(row.allianceId) ?? `#${row.allianceId}`}
                       </button>
