@@ -642,7 +642,7 @@ export function OpportunitiesPanel({
           selectedIds={selectedIds}
           onToggleSelected={toggleSelected}
           onClearSelected={() => setSelectedIds(new Set())}
-          onCompare={() => onAddToCompare(selectedRows)}
+          onCompare={onAddToCompare}
           onStartPlan={onStartPlan}
           onViewHistory={(typeId, itemName, regionId) =>
             setHistoryItem({ typeId, itemName, regionId })

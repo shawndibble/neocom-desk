@@ -32,9 +32,9 @@ import {
   InfoTooltip,
   IskAmount,
   StatChip,
-  nextDataTableSort,
   sortRows,
   Checkbox,
+  textActionClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { MenuKindContext } from '@/components/ui/rowActionsContext';
@@ -50,6 +50,7 @@ import { groupIdentical, identicalBlueprintKey } from './identicalBlueprints';
 import { ORDER_DEPTH_TONE, unitMargin } from './opportunityMetrics';
 import { formatPercent } from './format';
 import type { OpportunityRow } from './opportunities';
+import { MobileSortToolbar } from './MobileSortToolbar';
 import { SkillGateMarker } from './SkillGateMarker';
 import { useUrlSort } from '@/lib/useUrlState';
 import { OPPORTUNITIES_DEFAULT_SORT, OPPORTUNITIES_SORT_KEY } from './opportunitiesUrl';
@@ -60,8 +61,8 @@ interface MobileOpportunityListProps {
   selectedIds: ReadonlySet<string>;
   onToggleSelected: (id: string) => void;
   onClearSelected: () => void;
-  /** Seeds the ticked rows into Build Plan Compare. */
-  onCompare: () => void;
+  /** Seeds the ticked cards' rows into Build Plan Compare. */
+  onCompare: (rows: readonly OpportunityRow[]) => void;
   /** Resolves true once it has opened the new plan (see `StartPlanButton`). */
   onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
   onViewHistory: (typeId: number, itemName: string, regionId: number) => void;
@@ -150,14 +151,6 @@ function sortFields(t: ReturnType<typeof useTranslation>['t']): Record<
 
 const SORT_FIELD_ORDER: readonly SortFieldId[] = ['iskPerHour', 'unitMargin', 'margin', 'duration'];
 
-/**
- * A borderless text action at the touch tier — the sort trigger and the
- * compare bar's Clear. A ghost `Button` would draw a box around a control
- * that sits inline in a toolbar line.
- */
-const TEXT_BUTTON_CLASS =
-  'inline-flex min-h-11 items-center gap-1.5 rounded-xs px-2 text-xs font-semibold tracking-widest uppercase hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-9';
-
 const identicalRowKey = (row: OpportunityRow) =>
   identicalBlueprintKey(String(row.candidate.characterId), row.candidate.blueprint);
 
@@ -187,44 +180,23 @@ export function MobileOpportunityList({
 
   const sortedRows = sortRows(rows, { sortValue: fields[activeFieldId].sortValue }, sort.direction);
   const groups = groupIdentical(sortedRows, identicalRowKey);
-  // Ticked rows still listed — not `selectedIds.size`, which can hold an id a
-  // Character filter change has since dropped from `rows`.
-  const selectedCount = rows.filter((row) => selectedIds.has(row.candidate.id)).length;
-
-  const SortIcon = sort.direction === 'asc' ? Icon.Ascending : Icon.Descending;
+  // A folded card's checkbox stands for its first row only, so selection is
+  // read off the visible cards: neither a hidden copy ticked earlier (say on
+  // desktop, before a resize) nor an id a Character filter change dropped
+  // from `rows` can count toward Compare.
+  const selectedRows = groups
+    .map((group) => group.first)
+    .filter((row) => selectedIds.has(row.candidate.id));
 
   return (
     <div className="flex flex-col">
-      <div className="-mt-1 flex items-center justify-between gap-2 border-b border-line pb-1">
-        <span className="text-xs text-text-dim tabular-nums">
-          {t('industry.opportunitiesCount', { count: groups.length })}
-        </span>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className={TEXT_BUTTON_CLASS}
-              aria-label={t('industry.opportunitiesSortByField', {
-                field: fields[activeFieldId].label,
-              })}
-            >
-              <span className="font-normal text-text-dim">{t('industry.opportunitiesSortBy')}</span>{' '}
-              {fields[activeFieldId].label}
-              <SortIcon aria-hidden="true" size={Icon.ICON_SIZE.sm} className="text-accent" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <p className="px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('industry.opportunitiesSortBy')}
-            </p>
-            {SORT_FIELD_ORDER.map((id) => (
-              <DropdownMenuItem key={id} onSelect={() => setSort(nextDataTableSort(sort, id))}>
-                {fields[id].label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <MobileSortToolbar
+        count={groups.length}
+        fields={SORT_FIELD_ORDER.map((id) => ({ id, label: fields[id].label }))}
+        sort={sort}
+        onSortChange={setSort}
+        className="-mt-1 pb-1"
+      />
 
       <ul className="-mx-3 flex flex-col" aria-label={t('industry.opportunitiesTitle')}>
         {groups.map(({ first: row, members }) => {
@@ -355,19 +327,23 @@ export function MobileOpportunityList({
         })}
       </ul>
 
-      {selectedCount > 1 && (
+      {selectedRows.length > 1 && (
         <div
           role="region"
           aria-label={t('industry.opportunitiesCompareBar')}
-          className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-30 -mx-1 mt-2 flex items-center gap-2 rounded-xs border border-accent-dim bg-panel-2 py-1.5 pr-1.5 pl-3 shadow-lg md:bottom-3"
+          className="sticky bottom-[var(--bottom-nav-clearance)] z-30 -mx-1 mt-2 flex items-center gap-2 rounded-xs border border-accent-dim bg-panel-2 py-1.5 pr-1.5 pl-3 shadow-lg md:bottom-3"
         >
           <span className="flex-1 text-sm text-text-dim">
-            {t('industry.opportunitiesSelectedCount', { count: selectedCount })}
+            {t('industry.opportunitiesSelectedCount', { count: selectedRows.length })}
           </span>
-          <button type="button" className={TEXT_BUTTON_CLASS} onClick={onClearSelected}>
+          <button
+            type="button"
+            className={textActionClassName('px-2 md:min-h-9')}
+            onClick={onClearSelected}
+          >
             {t('industry.opportunitiesClearSelection')}
           </button>
-          <Button size="sm" variant="primary" onClick={onCompare}>
+          <Button size="sm" variant="primary" onClick={() => onCompare(selectedRows)}>
             {t('industry.opportunitiesCompare')}
           </Button>
         </div>

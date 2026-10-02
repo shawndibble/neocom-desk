@@ -39,6 +39,7 @@ import type { OpportunityRow } from './opportunities';
 import {
   OWNED_BLUEPRINT_SORT_VALUE,
   buildOwnedBlueprintRows,
+  ownedBlueprintOwnerKey,
   filterOwnedBlueprints,
   ownedBlueprintQuantity,
   resolveBlueprintPlacement,
@@ -71,8 +72,6 @@ const KIND_PARAM = enumParam(['all', 'bpo', 'bpc'] as const, 'all');
 const ACTIVITY_PARAM = enumParam(['all', 'manufacturing', 'reaction'] as const, 'all');
 const SEARCH_PARAM = textParam();
 const CORP_PARAM = boolParam(false);
-const SORT_VALUE = OWNED_BLUEPRINT_SORT_VALUE;
-
 const ownedRowKey = (row: OwnedBlueprintRow) => row.id;
 
 const NO_ASSETS: ReadonlyMap<number, CharacterAsset> = new Map();
@@ -235,7 +234,7 @@ export function OwnedBlueprintsPanel({
       id: 'blueprint',
       header: t('industry.ownedBlueprintsBlueprint'),
       primary: true,
-      sortValue: SORT_VALUE.blueprint,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.blueprint,
       render: (row) => (
         <span className="flex flex-wrap items-center gap-1.5">
           {row.name}
@@ -250,7 +249,7 @@ export function OwnedBlueprintsPanel({
     {
       id: 'kind',
       header: t('industry.ownedBlueprintsKind'),
-      sortValue: SORT_VALUE.kind,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.kind,
       render: (row) => (
         <span className={row.kind === 'bpo' ? 'font-medium text-accent' : undefined}>
           {row.kind === 'bpo' ? t('industry.bpo') : t('industry.bpc')}
@@ -262,7 +261,7 @@ export function OwnedBlueprintsPanel({
       header: t('industry.ownedBlueprintsMe'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: SORT_VALUE.me,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.me,
       render: (row) => row.blueprint.material_efficiency,
     },
     {
@@ -270,7 +269,7 @@ export function OwnedBlueprintsPanel({
       header: t('industry.ownedBlueprintsTe'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: SORT_VALUE.te,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.te,
       render: (row) => row.blueprint.time_efficiency,
     },
     {
@@ -278,7 +277,7 @@ export function OwnedBlueprintsPanel({
       header: t('industry.runs'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: SORT_VALUE.runs,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.runs,
       render: (row) =>
         row.kind === 'bpo' ? t('industry.ownedBlueprintsUnlimitedRuns') : row.blueprint.runs,
     },
@@ -287,7 +286,7 @@ export function OwnedBlueprintsPanel({
       header: t('industry.quantity'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: SORT_VALUE.quantity,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.quantity,
       render: (row) => ownedBlueprintQuantity(row.blueprint),
     },
     {
@@ -299,7 +298,7 @@ export function OwnedBlueprintsPanel({
     {
       id: 'owner',
       header: t('industry.ownedBlueprintsOwner'),
-      sortValue: SORT_VALUE.owner,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.owner,
       render: (row) =>
         row.owner.kind === 'character' ? row.owner.name : t('industry.ownedBlueprintsCorporation'),
     },
@@ -308,7 +307,7 @@ export function OwnedBlueprintsPanel({
       header: t('industry.iskPerHour'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: SORT_VALUE.iskPerHour,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.iskPerHour,
       cellClassName: (row) => (row.iskPerHour !== null ? iskToneClass(row.iskPerHour) : undefined),
       render: (row) =>
         numericCell(
@@ -348,12 +347,13 @@ export function OwnedBlueprintsPanel({
     columns.map((column) => column.id)
   );
 
-  const showOwner =
-    new Set(
-      filteredRows.map((row) =>
-        row.owner.kind === 'character' ? String(row.owner.characterId) : 'corp'
-      )
-    ).size > 1;
+  const showOwner = new Set(filteredRows.map(ownedBlueprintOwnerKey)).size > 1;
+
+  const kindOptions = [
+    { value: 'all' as const, label: t('industry.ownedBlueprintsAll') },
+    { value: 'bpo' as const, label: t('industry.bpo') },
+    { value: 'bpc' as const, label: t('industry.bpc') },
+  ];
 
   const filterValue = { kind, activity, includeCorp };
   // Below `lg` the kind filter sits inline above the cards, not in the sheet,
@@ -406,11 +406,7 @@ export function OwnedBlueprintsPanel({
                 size="sm"
                 value={draft.kind}
                 onChange={(next) => setDraft({ ...draft, kind: next })}
-                options={[
-                  { value: 'all', label: t('industry.ownedBlueprintsAll') },
-                  { value: 'bpo', label: t('industry.bpo') },
-                  { value: 'bpc', label: t('industry.bpc') },
-                ]}
+                options={kindOptions}
               />
             </FilterField>
           )}
@@ -470,11 +466,7 @@ export function OwnedBlueprintsPanel({
                 size="sm"
                 value={kind}
                 onChange={setKind}
-                options={[
-                  { value: 'all', label: t('industry.ownedBlueprintsAll') },
-                  { value: 'bpo', label: t('industry.bpo') },
-                  { value: 'bpc', label: t('industry.bpc') },
-                ]}
+                options={kindOptions}
               />
             </div>
           )}

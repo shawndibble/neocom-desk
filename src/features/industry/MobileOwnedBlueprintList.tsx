@@ -9,16 +9,7 @@
  * one card whose quantity is their sum (`identicalBlueprints.ts`).
  */
 import { useTranslation } from 'react-i18next';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  IskAmount,
-  TypeIcon,
-  nextDataTableSort,
-  sortRows,
-} from '@/components/ui';
+import { IskAmount, TypeIcon, sortRows } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { BlueprintBadge } from '@/features/character/assetBrowserRows';
 import { iskToneClass } from '@/features/character/format';
@@ -29,9 +20,11 @@ import { groupIdentical, identicalBlueprintKey } from './identicalBlueprints';
 import { OWNED_DEFAULT_SORT, OWNED_SORT_KEY } from './opportunitiesUrl';
 import {
   OWNED_BLUEPRINT_SORT_VALUE,
+  ownedBlueprintOwnerKey,
   ownedBlueprintQuantity,
   type OwnedBlueprintRow,
 } from './ownedBlueprints';
+import { MobileSortToolbar } from './MobileSortToolbar';
 import { StartPlanButton } from './StartPlanButton';
 
 interface MobileOwnedBlueprintListProps {
@@ -51,10 +44,8 @@ const ME_MAX = 10;
 const TE_MAX = 20;
 const METER_SEGMENTS = 10;
 
-const ownerKey = (row: OwnedBlueprintRow) =>
-  row.owner.kind === 'character' ? String(row.owner.characterId) : 'corp';
 const identicalRowKey = (row: OwnedBlueprintRow) =>
-  identicalBlueprintKey(ownerKey(row), row.blueprint);
+  identicalBlueprintKey(ownedBlueprintOwnerKey(row), row.blueprint);
 
 /** The badge already says "blueprint", so the card drops the type name's own suffix. */
 function shortName(name: string): string {
@@ -112,41 +103,17 @@ export function MobileOwnedBlueprintList({
     sort.direction
   );
   const groups = groupIdentical(sortedRows, identicalRowKey);
-  const SortIcon = sort.direction === 'asc' ? Icon.Ascending : Icon.Descending;
 
   return (
     // Flush to the panel's edges: the cards carry their own inset.
     <div className="-mx-3 flex flex-col">
-      <div className="flex items-center justify-between gap-2 border-b border-line px-3">
-        <span className="text-xs text-text-dim tabular-nums">
-          {t('industry.opportunitiesCount', { count: groups.length })}
-        </span>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-xs px-2 text-xs font-semibold tracking-widest uppercase hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-9"
-              aria-label={t('industry.opportunitiesSortByField', {
-                field: fieldLabel[activeFieldId],
-              })}
-            >
-              <span className="font-normal text-text-dim">{t('industry.opportunitiesSortBy')}</span>{' '}
-              {fieldLabel[activeFieldId]}
-              <SortIcon aria-hidden="true" size={Icon.ICON_SIZE.sm} className="text-accent" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <p className="px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('industry.opportunitiesSortBy')}
-            </p>
-            {SORT_FIELD_ORDER.map((id) => (
-              <DropdownMenuItem key={id} onSelect={() => setSort(nextDataTableSort(sort, id))}>
-                {fieldLabel[id]}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <MobileSortToolbar
+        count={groups.length}
+        fields={SORT_FIELD_ORDER.map((id) => ({ id, label: fieldLabel[id] }))}
+        sort={sort}
+        onSortChange={setSort}
+        className="px-3"
+      />
 
       <ul className="flex flex-col" aria-label={t('industry.ownedBlueprintsTitle')}>
         {groups.map(({ first: row, members }) => {
@@ -227,7 +194,7 @@ export function MobileOwnedBlueprintList({
                       —
                     </span>
                   )}
-                  <span className="text-[0.625rem] tracking-widest text-text-dim uppercase">
+                  <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">
                     {t('industry.iskPerHour')}
                   </span>
                 </span>

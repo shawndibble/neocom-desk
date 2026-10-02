@@ -30,6 +30,11 @@ export interface OwnedBlueprintRow {
   iskPerHour: number | null;
 }
 
+/** One owner's identity across rows: the Character's id, or the corporation's. */
+export function ownedBlueprintOwnerKey(row: OwnedBlueprintRow): string {
+  return row.owner.kind === 'character' ? String(row.owner.characterId) : 'corp';
+}
+
 /** ESI: `runs` is -1 for an original — the same rule the ranked view and CSV use. */
 export function blueprintKind(blueprint: CharacterBlueprint): BlueprintKind {
   return blueprint.runs === -1 ? 'bpo' : 'bpc';

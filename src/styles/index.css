@@ -985,9 +985,15 @@
      control near the bottom scrolls it only as far as the viewport edge,
      i.e. under the bar (WCAG 2.4.11). Bar: min-h-11 + 1px border + the
      safe-area inset; the extra 0.75rem keeps the focus ring clear too. */
+  :root {
+    /* What a bottom-pinned control must clear on a phone: the tab bar's
+       height plus the safe-area inset. Also the Build Opportunities
+       compare bar's offset. */
+    --bottom-nav-clearance: calc(3.5rem + env(safe-area-inset-bottom));
+  }
   @media (width < 48rem) {
     :root {
-      scroll-padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+      scroll-padding-bottom: var(--bottom-nav-clearance);
     }
   }
 
