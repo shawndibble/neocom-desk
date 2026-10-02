@@ -4,8 +4,10 @@
  * column headers entirely (`.dt-stack thead`, `src/styles/index.css`), so a
  * phone pilot had no way to change sort — and its 8-line stacked card had no
  * single number a glance could land on. `MobileOpportunityList` replaces the
- * table below `lg` with a ranked card list: a rank badge, a "hero" metric
- * that tracks whichever field is the active sort, and a real "Sort by" menu.
+ * table below `lg` with a card list: a leading selection checkbox, a "hero"
+ * metric that tracks whichever field is the active sort, and a real "Sort by"
+ * menu. The panel's title is a view picker there ("Ranked builds" / "Owned
+ * blueprints"), and "All owned" gets its own card list too.
  * Desktop (`isDesktop`, `lg` and up) keeps the exact `DataTable` it always
  * had — this list never mounts there.
  */
@@ -111,8 +113,12 @@ test.describe('Opportunities — ranked phone list', () => {
     await page.goto('./industry/opportunities');
 
     await expect(page.getByRole('table', { name: 'Build Opportunities' })).toHaveCount(0);
-    await expect(page.getByLabel('Rank 1')).toBeVisible();
     await expect(page.getByText('Rifter', { exact: true })).toBeVisible();
+    // The view picker stands in for the title, on the same line as the actions.
+    const picker = page.getByRole('combobox', { name: 'View' });
+    await expect(picker).toHaveText(/Ranked builds/);
+    const header = picker.locator('xpath=ancestor::header');
+    await expect.poll(async () => (await header.boundingBox())?.height ?? 0).toBeLessThan(56);
   });
 
   test('the "Sort by" trigger meets the touch tier at 390px (issue #1174)', async ({ page }) => {
@@ -129,7 +135,7 @@ test.describe('Opportunities — ranked phone list', () => {
       .toBeGreaterThanOrEqual(44);
   });
 
-  test('the selection checkbox is pinned with a real ~44px target', async ({ page }) => {
+  test('the selection checkbox leads the card with a real ~44px target', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./industry/opportunities');
 
@@ -137,8 +143,13 @@ test.describe('Opportunities — ranked phone list', () => {
     await expect(checkbox).toBeVisible();
 
     const wrapper = checkbox.locator('xpath=..');
-    const position = await wrapper.evaluate((el) => getComputedStyle(el).position);
-    expect(position).toBe('absolute');
+    const name = page.getByText('Rifter', { exact: true });
+    await expect
+      .poll(async () => {
+        const [box, nameBox] = [await wrapper.boundingBox(), await name.boundingBox()];
+        return box && nameBox ? box.x < nameBox.x : false;
+      })
+      .toBe(true);
 
     // Polled for the same remount race as the Sort by trigger above.
     await expect
@@ -255,5 +266,89 @@ test.describe('Opportunities — ranked phone list', () => {
     await page.getByRole('menuitem', { name: 'Start a plan' }).click();
 
     await expect(page).toHaveURL(/\/industry\/plans\/[^/]+$/);
+  });
+  test('identical copies share one card; a different ME keeps its own', async ({ page }) => {
+    const copy = {
+      type_id: BLUEPRINT_TYPE_ID,
+      runs: 5,
+      material_efficiency: 10,
+      time_efficiency: 20,
+      quantity: -2,
+      location_id: 60003760,
+      location_flag: 'Hangar',
+    };
+    await page.route(`**/characters/${CHARACTER_ID}/blueprints**`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { ...copy, item_id: 1 },
+          { ...copy, item_id: 2 },
+          { ...copy, item_id: 3, material_efficiency: 4 },
+        ]),
+      })
+    );
+    await page.setViewportSize(PHONE);
+    await page.goto('./industry/opportunities');
+
+    await expect(page.getByRole('checkbox', { name: /Select Rifter/ })).toHaveCount(2);
+    await expect(page.getByText('2 copies', { exact: true })).toBeVisible();
+  });
+
+  test('ticking two cards brings up the Compare bar; Clear dismisses it', async ({ page }) => {
+    const copy = {
+      type_id: BLUEPRINT_TYPE_ID,
+      runs: 5,
+      time_efficiency: 20,
+      quantity: -2,
+      location_id: 60003760,
+      location_flag: 'Hangar',
+    };
+    await page.route(`**/characters/${CHARACTER_ID}/blueprints**`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { ...copy, item_id: 1, material_efficiency: 10 },
+          { ...copy, item_id: 2, material_efficiency: 4 },
+        ]),
+      })
+    );
+    await page.setViewportSize(PHONE);
+    await page.goto('./industry/opportunities');
+
+    const checkboxes = page.getByRole('checkbox', { name: /Select Rifter/ });
+    await expect(checkboxes).toHaveCount(2);
+    const bar = page.getByRole('region', { name: 'Compare selected blueprints' });
+    await checkboxes.nth(0).check();
+    await expect(bar).toHaveCount(0);
+    await checkboxes.nth(1).check();
+    await expect(bar).toBeVisible();
+    await expect(bar).toContainText('2 selected');
+    await bar.getByRole('button', { name: 'Clear' }).click();
+    await expect(bar).toHaveCount(0);
+  });
+
+  test('the card menu holds price history and the market', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto('./industry/opportunities');
+
+    await page.getByRole('button', { name: /More actions for Rifter/ }).click();
+    await expect(page.getByRole('menuitem', { name: 'Price history' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'View in Market' })).toBeVisible();
+  });
+
+  test('"Owned blueprints" lists cards, not the stacked table', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto('./industry/opportunities');
+
+    await page.getByRole('combobox', { name: 'View' }).click();
+    await page.getByRole('option', { name: 'Owned blueprints' }).click();
+
+    const list = page.getByRole('list', { name: 'Owned Blueprints' });
+    await expect(list).toBeVisible();
+    await expect(list.getByText('Rifter', { exact: true })).toBeVisible();
+    await expect(page.getByRole('table')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Start a plan for Rifter' })).toBeVisible();
   });
 });

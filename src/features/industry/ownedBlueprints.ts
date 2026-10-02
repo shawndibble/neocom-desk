@@ -40,6 +40,24 @@ export function ownedBlueprintQuantity(blueprint: CharacterBlueprint): number {
   return blueprint.quantity > 0 ? blueprint.quantity : 1;
 }
 
+/**
+ * Each sortable field's value, at module scope so `DataTable`'s sort memo sees
+ * stable functions (see `OpportunitiesPanel`) — shared by the desktop table
+ * and `MobileOwnedBlueprintList`'s sort menu.
+ */
+export const OWNED_BLUEPRINT_SORT_VALUE = {
+  blueprint: (row: OwnedBlueprintRow) => row.name,
+  kind: (row: OwnedBlueprintRow) => row.kind,
+  me: (row: OwnedBlueprintRow) => row.blueprint.material_efficiency,
+  te: (row: OwnedBlueprintRow) => row.blueprint.time_efficiency,
+  // A BPO's -1 is unlimited: the largest, not the smallest.
+  runs: (row: OwnedBlueprintRow) =>
+    row.kind === 'bpo' ? Number.MAX_SAFE_INTEGER : row.blueprint.runs,
+  quantity: (row: OwnedBlueprintRow) => ownedBlueprintQuantity(row.blueprint),
+  owner: (row: OwnedBlueprintRow) => (row.owner.kind === 'character' ? row.owner.name : ''),
+  iskPerHour: (row: OwnedBlueprintRow) => row.iskPerHour ?? undefined,
+};
+
 export interface BuildOwnedBlueprintRowsInput {
   ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>;
   characterNames: ReadonlyMap<number, string>;

@@ -48,6 +48,7 @@ import { CaretLeft } from '@phosphor-icons/react/dist/csr/CaretLeft';
 import { CaretRight } from '@phosphor-icons/react/dist/csr/CaretRight';
 import { CaretUpDown } from '@phosphor-icons/react/dist/csr/CaretUpDown';
 import { ChartLineUp } from '@phosphor-icons/react/dist/csr/ChartLineUp';
+import { MapPin } from '@phosphor-icons/react/dist/csr/MapPin';
 import { Check } from '@phosphor-icons/react/dist/csr/Check';
 import { CheckCircle } from '@phosphor-icons/react/dist/csr/CheckCircle';
 import { Checks } from '@phosphor-icons/react/dist/csr/Checks';
@@ -304,6 +305,8 @@ export const Industry = withWeight(Factory);
 export const Ships = withWeight(Rocket);
 /** Live order books. */
 export const Market = withWeight(ChartLineUp);
+/** Where something sits — a station, structure or container. */
+export const Location = withWeight(MapPin);
 /** Balance and open orders. */
 export const Wallet = withWeight(WalletGlyph);
 /** Colonies and extraction timers. */
