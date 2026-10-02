@@ -495,26 +495,33 @@
       font-size: 0.9375rem;
     }
 
-    /* Pinned to the card's right edge and centred across both lines, the way
-       a `start` edge control is on the left. In flow on line one, its 44px
-       touch target made that line 44px tall and pushed the meta line a
-       button's height below the title: a dense card should be two text
-       lines, not a button-tall line and a text line. The row pads its right
-       side to clear it, so the headline figure and the meta line's `end`
-       edge stop short of the button. */
+    /* On line one, after the title and headline figure. */
     .dt-stack.dt-stack-dense td.dt-actions {
+      order: -1;
+      flex: none;
+      align-self: center;
+    }
+
+    /* Opt-in (`dt-actions-pinned` on the table, Contacts): the actions button
+       pinned to the card's right edge and centred across both lines, the way
+       a `start` edge control is on the left. In flow on line one its 44px
+       touch target makes that line 44px tall and pushes the meta line a
+       button's height below the title; pinned, the card is two text lines.
+       The row pads its right side to clear it. Not the default because the
+       other dense tables with actions (Hauling, Contract Search, Mining Tax)
+       carry chevrons and `end` edge boxes this has not been checked against. */
+    .dt-stack.dt-stack-dense.dt-actions-pinned td.dt-actions {
       position: absolute;
       top: 50%;
       right: 0.25rem;
       transform: translateY(-50%);
     }
 
-    .dt-stack.dt-stack-dense tr:has(> td.dt-actions) {
+    .dt-stack.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions) {
       padding-right: 3rem;
     }
 
-    /* The expand chevron (`expandableRow`) sits on line one, in flow, right of
-       the headline figure (the actions button is pinned beyond it, above).
+    /* The expand chevron (`expandableRow`) joins the actions on line one.
        Left to the base card rules it flowed onto the meta line carrying the
        labelled card's 7rem label gutter, pushing the first meta value a
        third of the way across. A hidden icon (`hideIcon`) leaves the cell

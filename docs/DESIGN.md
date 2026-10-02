@@ -429,10 +429,11 @@ exactly the markup above.
   there is no header row to show the sort on. A control column sets
   `stackEdge` to stay off that 11px line: `'start'` (a tick box) is pinned
   left and centred across both lines, `'end'` (a quantity box) closes line
-  two at its right end (Hauling). An `expandableRow`'s chevron cell sits
-  on line one (none at all with `hideIcon`); the More actions button is
-  pinned to the right edge across both lines, so line one stays text-tall.
-  A cell holding only a `data-dense-omit` value (an empty cell's dash, a
+  two at its right end (Hauling). An `expandableRow`'s chevron cell joins
+  the actions on line one (none at all with `hideIcon`). A table with no
+  chevron and no `end` box can add `className="dt-actions-pinned"` to pin
+  the More actions button to the right edge across both lines instead, so
+  line one stays text-tall (Contacts). A cell holding only a `data-dense-omit` value (an empty cell's dash, a
   word the card says another way) is left off the meta line. Still pure CSS
   (`.dt-stack-dense`); `stackColumns` is ignored.
 - **`mobileSort`** (+ optional `stackSummary`, e.g. "214 offers") renders an

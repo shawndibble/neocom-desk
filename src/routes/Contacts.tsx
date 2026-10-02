@@ -596,7 +596,11 @@ function AcrossCharactersPanel({
         id: 'type',
         header: t('contacts.type'),
         className: 'text-text-dim',
-        render: (row) => t(contactTypeLabelKey(acrossIdentity(row))),
+        // As the character table: a player's or agent's type stays off the phone card.
+        render: (row) => {
+          const label = t(contactTypeLabelKey(acrossIdentity(row)));
+          return row.contactType === 'character' ? <DenseOmit>{label}</DenseOmit> : label;
+        },
         sortValue: (row) => t(contactTypeLabelKey(acrossIdentity(row))),
       },
       held: {
@@ -640,6 +644,8 @@ function AcrossCharactersPanel({
         id: 'standings',
         header: t('contacts.acrossStandings'),
         align: 'center',
+        // The phone card's headline, as Standing is on the character table.
+        cardCorner: true,
         // Every distinct standing, not an average: two alts at +10 and -10 have
         // no meaningful midpoint, and seeing both is the whole point of the row.
         render: (row) => (
@@ -715,6 +721,7 @@ function AcrossCharactersPanel({
           {...sortProps}
           mobileSort
           stackLayout="dense"
+          className="dt-actions-pinned"
           onRowClick={(row) => {
             const kind = contactPublicInfoKind(acrossIdentity(row));
             if (kind) open(kind, row.contactId);
@@ -1209,6 +1216,7 @@ export function Contacts() {
               {...characterSortProps}
               mobileSort
               stackLayout="dense"
+              className="dt-actions-pinned"
               onRowClick={(contact) => {
                 const kind = contactPublicInfoKind(contact);
                 if (kind) openPublicInfo(kind, contact.contact_id);
