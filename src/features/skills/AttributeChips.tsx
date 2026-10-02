@@ -19,6 +19,14 @@ interface AttributeChipsProps {
    * than showing none).
    */
   boosterBonus?: number;
+  /**
+   * Tighter spacing, for the plan editor's 20rem sidebar. Five chips whose
+   * labels are whole words ("INTELLIGENCE") wrap to four or five rows in a
+   * column that narrow, and the roomy spacing that reads well across a
+   * full-width pane turns them into a block taller than the controls beneath
+   * it.
+   */
+  dense?: boolean;
 }
 
 /**
@@ -42,10 +50,11 @@ export function AttributeChips({
   attributes,
   implantBonuses,
   boosterBonus = 0,
+  dense = false,
 }: AttributeChipsProps) {
   const { t } = useTranslation();
   return (
-    <StatChips>
+    <StatChips dense={dense}>
       {attributes ? (
         ATTRIBUTE_ORDER.map((name) => {
           const effective = attributes[name];

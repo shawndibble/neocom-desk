@@ -139,9 +139,9 @@ describe('PlanHeader', () => {
     // Reported with all chips present: four chips is more than the strip
     // fits beside the sidebar at some widths, and it used to answer that by
     // refusing to wrap (`lg:flex-nowrap`) and scrolling sideways instead.
-    // StatChip is a fixed-height box, so the chips ahead of the scroll got
-    // squeezed until their labels broke over two lines inside a
-    // one-line-tall border.
+    // StatChip is a fixed height, so the chips ahead of the scroll got
+    // squeezed until their labels broke over two lines inside a one-line
+    // row.
     render(
       <PlanHeader
         totalSeconds={1000}

@@ -59,8 +59,8 @@ interface FilterChipProps {
 }
 
 /**
- * Toggleable filter pill. `StatChip`'s look, but interactive: accent when on,
- * and sized from the shared control scale so it lines up with the `Button` and
+ * Toggleable filter pill. `StatChip`'s height, but interactive, so it keeps
+ * the chip box `StatChip` dropped: accent when on, and sized from the shared control scale so it lines up with the `Button` and
  * `Select` it shares a toolbar with — including the touch tier, which a
  * readout chip does not get.
  */

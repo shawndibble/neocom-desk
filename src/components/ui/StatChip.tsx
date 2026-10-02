@@ -47,21 +47,33 @@ export function StatChip({
 
 /**
  * A strip of `StatChip`s, with a short hairline between neighbours. Each
- * child draws the hairline at its own left edge, and the row is pulled left
- * under a clip by exactly that much, so the chip that starts a line, first or
- * wrapped, never shows one. Put only readouts in a strip; a control beside it
- * goes in the parent row.
+ * child draws the hairline at its own left edge, then pads past it, and the
+ * row is pulled left by that padding, so the chip that starts a line, first
+ * or wrapped, has its hairline 8–12px outside the strip. A clip-path cuts
+ * off the left side just there (4px out, room for a focus outline) and
+ * nothing else, so a value's outline and an over-wide chip stay visible. Put
+ * only readouts in a strip; a control beside it goes in the parent row.
  */
 export function StatChips({
+  dense = false,
   className = '',
   children,
 }: {
+  /**
+   * 8px each side of the hairline instead of 12px, for a narrow column (the
+   * plan editor's 20rem sidebar) where the roomy spacing wraps whole-word
+   * labels onto extra lines.
+   */
+  dense?: boolean;
   className?: string;
   children: ReactNode;
 }) {
+  const spacing = dense ? '-ml-2 gap-x-2 *:pl-2' : '-ml-3 gap-x-3 *:pl-3';
   return (
-    <div className={`min-w-0 overflow-hidden ${className}`}>
-      <div className="-ml-[13px] flex flex-wrap items-center gap-x-3 *:relative *:pl-3 *:before:absolute *:before:top-1/2 *:before:left-0 *:before:h-3.5 *:before:w-px *:before:-translate-y-1/2 *:before:bg-line">
+    <div className={`min-w-0 [clip-path:inset(-100vmax_-100vmax_-100vmax_-4px)] ${className}`}>
+      <div
+        className={`${spacing} flex flex-wrap items-center *:relative *:before:absolute *:before:top-1/2 *:before:left-0 *:before:h-3.5 *:before:w-px *:before:-translate-y-1/2 *:before:bg-line`}
+      >
         {children}
       </div>
     </div>

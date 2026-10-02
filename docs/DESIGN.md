@@ -583,10 +583,10 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
   static content with type and colour instead: a status tone on the text,
   `font-semibold`, or the uppercase micro-heading treatment (§2). This rule
   covers inline elements sized like a control. A panel's, table's or
-  section's hairlines divide regions, and nobody reads them as buttons. The other side of the rule: a
-  `<button>` that opens a picker (the stats column's Implants trigger) wears
-  the field chrome (`fieldBaseClassName` + a `fieldSizeClassName` size), so
-  it reads as the control it is.
+  section's hairlines divide regions, and nobody reads them as buttons.
+  The other side of the rule: a `<button>` that opens a picker (the stats
+  column's Implants trigger) wears the field chrome (`fieldBaseClassName` +
+  a `fieldSizeClassName` size), so it reads as the control it is.
 - **Stacked controls line up; they never just wrap.** When a panel body puts
   two or more labelled controls on separate lines, lay them out as a
   two-column grid (`grid-cols-[max-content_minmax(0,1fr)]`): labels in the

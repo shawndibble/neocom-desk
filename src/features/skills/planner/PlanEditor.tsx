@@ -1822,6 +1822,7 @@ export function PlanEditor({
             attributes={attributesResult?.data ?? null}
             implantBonuses={implants}
             boosterBonus={acceleratorBonusOf(attributeBaseline)}
+            dense
           />
           {/* Says which half of this section is fact. An earlier draft read
               "every estimate on this page is costed against these", which is
