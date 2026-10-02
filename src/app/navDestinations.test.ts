@@ -144,6 +144,12 @@ describe('listNavDestinations', () => {
     expect(byPath('/wallet/transactions')).toBeUndefined();
   });
 
+  it("lists no tabs for a page whose tabs are an in-page control (Contacts' character filter)", () => {
+    expect(byPath('/contacts')).toBeDefined();
+    expect(byPath('/contacts/character')).toBeUndefined();
+    expect(byPath('/contacts/across')).toBeUndefined();
+  });
+
   it('includes the footer destinations, Settings sections among them', () => {
     expect(byPath('/settings')).toBeDefined();
     expect(byPath('/settings/display')).toMatchObject({

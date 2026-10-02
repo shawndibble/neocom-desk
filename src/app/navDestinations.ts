@@ -73,6 +73,13 @@ export interface NavPage {
   readonly mobileTab: boolean;
   /** Tab ids listed nowhere as destinations: a redirect alias, not a view of this page. */
   readonly aliasTabs?: readonly string[];
+  /**
+   * The page's `PAGE_TABS` are URL state behind an in-page control, not views
+   * of their own: the nav lists the page alone (Contacts' This character / All
+   * characters is a `CharacterFilterControl`, #2427, but `/contacts/across`
+   * links still resolve).
+   */
+  readonly tablessNav?: true;
   /** Tab ids shown only while the Corp entry is (`visibleSettingsGroups`' Corporation section). */
   readonly corpTabs?: readonly string[];
   /**
@@ -217,6 +224,7 @@ export const NAV_PAGES = [
     group: 'social',
     gating: 'scope',
     mobileTab: true,
+    tablessNav: true,
   },
   /*
    * `ungated` rather than `scope`: every read is public ESI or the local
@@ -384,7 +392,7 @@ export function listNavDestinations({
         ...(searchKeys && { keywords: searchKeys.map(t) }),
       };
     };
-    const tabs = PAGE_TABS[page.path];
+    const tabs = page.tablessNav ? undefined : PAGE_TABS[page.path];
     if (tabs) {
       for (const tab of tabBarTabs(tabs)) {
         if (page.aliasTabs?.includes(tab.id)) continue;

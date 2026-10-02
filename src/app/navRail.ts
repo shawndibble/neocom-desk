@@ -16,11 +16,12 @@ interface OwnedPath {
 
 /**
  * Every page and view path, in nav order: each page, then its tabs, then its
- * sub-views. Alias tabs are left out — they only redirect.
+ * sub-views. Alias tabs are left out — they only redirect — and so are the
+ * tabs of a `tablessNav` page.
  */
 const OWNED_PATHS: readonly OwnedPath[] = (NAV_PAGES as readonly NavPage[]).flatMap((page) => {
   const pagePath = page.path as NavPagePath;
-  const tabs = PAGE_TABS[page.path];
+  const tabs = page.tablessNav ? undefined : PAGE_TABS[page.path];
   const tabPaths = tabs
     ? tabBarTabs(tabs)
         .filter((tab) => !page.aliasTabs?.includes(tab.id))
