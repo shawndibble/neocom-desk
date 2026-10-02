@@ -6243,12 +6243,6 @@
       "corpRolesUnknown": "Corporation roles show once granted."
     }
   },
-  "pasteRouter": {
-    "fitting": "Pasted a fitting",
-    "appraisal": "Pasted an item list",
-    "openFitting": "Open in Fittings",
-    "openAppraisal": "Appraise"
-  },
   "commandPalette": {
     "title": "Command palette",
     "placeholder": "Go to a page, run a command, switch character, find an asset or item…",
@@ -6297,7 +6291,13 @@
     "close": "Close the open dialog",
     "enabledLabel": "Single-key shortcuts",
     "enabledHint": "The keys below work anywhere outside a text field. Turn them off if you set them off by accident, for example with speech input. Stays on this device.",
-    "disabledNote": "Single-key shortcuts are off. Esc still closes an open dialog. Stays on this device."
+    "disabledNote": "Single-key shortcuts are off. Esc still closes an open dialog. Stays on this device.",
+    "pasteTitle": "Paste anywhere",
+    "pasteHint": "Press {{key}} outside a text field to open what's on your clipboard. Back returns you where you were.",
+    "pasteFitting": "EFT fitting",
+    "pasteFittingOpens": "Opens in Fittings",
+    "pasteItems": "Item list (inventory, cargo, contract)",
+    "pasteItemsOpens": "Opens in Appraisal"
   },
   "activityLog": {
     "title": "Activity Log",

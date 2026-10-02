@@ -57,7 +57,12 @@ import { useIsNarrow } from '@/lib/useIsNarrow';
 import { formatAge } from '@/lib/age';
 import { useTicker } from '@/lib/ticker';
 import { formatTimestamp } from '@/lib/timestamp';
-import { SHORTCUTS, commandPaletteDisplayKey, isApplePlatform } from '@/lib/shortcuts';
+import {
+  SHORTCUTS,
+  commandPaletteDisplayKey,
+  isApplePlatform,
+  pasteDisplayKey,
+} from '@/lib/shortcuts';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { useMarketHub } from '@/features/market/hub';
 import { useMiningTaxOreValueMode } from '@/features/miningTax/oreValueMode';
@@ -1241,6 +1246,22 @@ export function Settings() {
                         {shortcut.displayKey}
                       </kbd>
                     </dd>
+                  </div>
+                ))}
+              </dl>
+            </Panel>
+          )}
+          {section === 'shortcuts' && (
+            <Panel title={t('shortcuts.pasteTitle')}>
+              {/* The app-wide paste router (`app/GlobalPasteRouter.tsx`). */}
+              <p className="mb-2 max-w-md text-xs text-text-dim">
+                {t('shortcuts.pasteHint', { key: pasteDisplayKey(isApplePlatform()) })}
+              </p>
+              <dl className="max-w-md divide-y divide-line text-xs">
+                {(['pasteFitting', 'pasteItems'] as const).map((key) => (
+                  <div key={key} className="flex items-center justify-between gap-4 py-2">
+                    <dt className="text-text-dim">{t(`shortcuts.${key}`)}</dt>
+                    <dd className="text-text">{t(`shortcuts.${key}Opens`)}</dd>
                   </div>
                 ))}
               </dl>
