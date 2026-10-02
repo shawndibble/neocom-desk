@@ -1,13 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { OVERLAY_SELECTOR, SHORTCUTS } from '@/lib/shortcuts';
+import { isTypingTarget, OVERLAY_SELECTOR, SHORTCUTS } from '@/lib/shortcuts';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
-}
 
 /**
  * Global shortcut listener, mounted once from `Layout` so every authenticated

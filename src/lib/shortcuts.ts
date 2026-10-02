@@ -20,6 +20,16 @@ export interface MarketAppraiseState {
 }
 
 /**
+ * Router `location.state` shape the app-wide paste router
+ * (`app/GlobalPasteRouter.tsx`) navigates the Fittings tab with: a pasted EFT
+ * fit, opened in the editor on arrival. Shared so the producer and the
+ * consumer (`routes/Fittings.tsx`) can't silently drift apart.
+ */
+export interface FittingLoadState {
+  readonly fittingLoadText: string;
+}
+
+/**
  * Router `location.state` shape a Fitting's Export menu navigates `/industry`
  * with: the fit's EFT text, pre-filled and parsed into the Fit Import dialog
  * on arrival ("Manufacture Plan"). Shared so the producer
@@ -50,6 +60,13 @@ export const KEYBOARD_OVERLAY_ATTRIBUTE = 'data-keyboard-overlay';
  * native element.
  */
 export const OVERLAY_SELECTOR = `dialog[open], [role="menu"], [role="listbox"], [role="dialog"], [${KEYBOARD_OVERLAY_ATTRIBUTE}]`;
+
+/** A field the pilot types into — global keys and pastes leave it alone. */
+export function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
+}
 
 /**
  * Ctrl+K / Cmd+K, the Command Palette (#2318). Not a `SHORTCUTS` row: that

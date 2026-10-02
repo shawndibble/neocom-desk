@@ -26,6 +26,7 @@ import { warmRoute } from './routeWarm';
 import { preloadRouteChunk } from './routeChunks';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
+import { GlobalPasteRouter } from './GlobalPasteRouter';
 import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
 import { useUnreadAlertCount } from '@/features/notifications/useUnreadAlertCount';
@@ -675,6 +676,7 @@ export const Layout = memo(function Layout() {
       </nav>
 
       <KeyboardShortcuts />
+      <GlobalPasteRouter />
       <CommandPaletteHost />
       <NotificationPermissionPrompt />
       {/*
