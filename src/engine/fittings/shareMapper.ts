@@ -1,5 +1,5 @@
 /**
- * The one place a domain `Fitting` (issue #1531) becomes a Share Link's wire
+ * The one place a domain `Fitting` (issue #1531) becomes a Fitting Share Code's wire
  * shape (`FittingShareInput`/`DecodedFittingShare`, issue #1530) and back.
  *
  * Two vocabularies meet here that would otherwise silently drift apart:

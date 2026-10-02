@@ -4,6 +4,7 @@ import {
   MAX_PRICE_PERCENT,
   MIN_PRICE_PERCENT,
   isValidPricePercent,
+  parsePricePercentParam,
 } from './pricePercent';
 
 describe('isValidPricePercent', () => {
@@ -33,5 +34,21 @@ describe('isValidPricePercent', () => {
 
   it('defaults to the order book untouched', () => {
     expect(DEFAULT_PRICE_PERCENT).toBe(100);
+  });
+});
+
+describe('parsePricePercentParam', () => {
+  it('reads a Price Percent from the URL', () => {
+    expect(parsePricePercentParam('90')).toBe(90);
+    expect(parsePricePercentParam('87.5')).toBe(87.5);
+    expect(parsePricePercentParam('0')).toBe(0);
+  });
+
+  it('ignores a missing, blank, non-numeric or out-of-range value', () => {
+    expect(parsePricePercentParam(null)).toBeNull();
+    expect(parsePricePercentParam('')).toBeNull();
+    expect(parsePricePercentParam('abc')).toBeNull();
+    expect(parsePricePercentParam('-5')).toBeNull();
+    expect(parsePricePercentParam('5000')).toBeNull();
   });
 });

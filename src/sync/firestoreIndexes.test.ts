@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { SHARES_COLLECTION } from '@/features/share/shareStore';
 import { REMOTE_COLLECTION_NAMES } from './syncedCollections';
 
 /**
@@ -104,9 +105,20 @@ describe('firestore.indexes.json field overrides', () => {
     });
   });
 
-  it('overrides nothing outside the remotely-owned collections', () => {
-    const groups = new Set(REMOTE_COLLECTION_NAMES);
+  it('overrides nothing outside the remotely-owned collections and shares', () => {
+    const groups = new Set([...REMOTE_COLLECTION_NAMES, SHARES_COLLECTION]);
     expect(config.fieldOverrides.filter((o) => !groups.has(o.collectionGroup))).toEqual([]);
+  });
+
+  it('expires shares by a TTL policy on expiresAt, and indexes none of their fields', () => {
+    // A stored Share Link is only ever read by id (`features/share/shareStore.ts`),
+    // so nothing needs an index; without the wildcard every field of every
+    // shared appraisal item would be auto-indexed for no reader. The TTL policy
+    // is what deletes a week-old share — the rules and the client only hide it.
+    expect(overridesFor(SHARES_COLLECTION)).toEqual([
+      { collectionGroup: SHARES_COLLECTION, fieldPath: '*', ttl: false, indexes: [] },
+      { collectionGroup: SHARES_COLLECTION, fieldPath: 'expiresAt', ttl: true, indexes: [] },
+    ]);
   });
 
   it.each(DISPATCHER_COLLECTION_GROUPS)('leaves %s automatically indexed', (group) => {

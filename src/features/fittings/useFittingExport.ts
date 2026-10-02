@@ -7,7 +7,10 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { downloadTextFile } from '@/lib/download';
 import type { IndustryFitImportState, MarketAppraiseState } from '@/lib/shortcuts';
 import type { Fitting } from '@/engine/fittings/types';
-import { exportFitting, type FittingExportKind } from './fittingExportText';
+import { fittingSharePayload } from '@/engine/fitting/fittingSharePayload';
+import { createShareLink, existingShareLink } from '@/features/share/shareStore';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { exportFitting, fittingShareCode, type FittingExportKind } from './fittingExportText';
 
 const NOTICE_MS = 2500;
 
@@ -18,6 +21,7 @@ const NOTICE_MS = 2500;
 export function useFittingExport(fitting: Fitting) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,6 +41,44 @@ export function useFittingExport(fitting: Fitting) {
       setNotice(t(`fittings.export.copied.${kind}`));
     } catch {
       setNotice(t('fittings.export.copyFailed'));
+    }
+  }
+
+  /**
+   * The short, 7-day **Share Link**: the Fitting Share Code stored under a
+   * `/share/<id>`. The same code shared again gets the same link. When saving
+   * outlasts the click and the browser refuses the copy, the link is already
+   * made — choosing it again copies it straight away, inside the click.
+   */
+  async function copyShareLink() {
+    const code = await fittingShareCode(fitting);
+    if (code === null) {
+      setNotice(t('fittings.export.tooLarge'));
+      return;
+    }
+    let url = existingShareLink('fitting', code);
+    if (url === null) {
+      if (characterId === null) {
+        setNotice(t('fittings.export.shareFailed'));
+        return;
+      }
+      try {
+        url = await createShareLink({
+          type: 'fitting',
+          payload: fittingSharePayload(code),
+          reuseKey: code,
+          characterId,
+        });
+      } catch {
+        setNotice(t('fittings.export.shareFailed'));
+        return;
+      }
+    }
+    try {
+      await writeToClipboard(url);
+      setNotice(t('fittings.export.copied.shareLink'));
+    } catch {
+      setNotice(t('fittings.export.shareCopyRetry'));
     }
   }
 
@@ -75,7 +117,7 @@ export function useFittingExport(fitting: Fitting) {
     });
   }
 
-  return { notice, copy, downloadEveXml, openInAppraisal, openManufacturePlan };
+  return { notice, copy, copyShareLink, downloadEveXml, openInAppraisal, openManufacturePlan };
 }
 
 export type FittingExport = ReturnType<typeof useFittingExport>;

@@ -4,7 +4,7 @@
  * URL be the one source of truth for what's open. Never mutates its input.
  *
  * A module is addressed by rack + position (`slot`, `slotIndex`), the same
- * key the Share Link and `@eveshipfit/dogma-engine` both use. Drones are
+ * key the Fitting Share Code and `@eveshipfit/dogma-engine` both use. Drones are
  * addressed by type: in the domain a type is carried as at most one stack in
  * space (`'active'`) and one in the bay (`'online'`), which is exactly what
  * `shareMapper.ts`'s all-or-nothing stack coarsening round-trips losslessly.

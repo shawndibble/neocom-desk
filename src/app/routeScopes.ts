@@ -106,7 +106,7 @@ export const ROUTE_REQUIREMENTS = {
   // pinned dogma engine, no ESI endpoint of its own.
   '/ships/fittings/compare': UNGATED,
   // The section's old paths, before it became Ships: redirects only
-  // (`LegacyShipsRedirect`), every Share Link ever copied among them.
+  // (`LegacyShipsRedirect`), every Fitting Share Code ever copied among them.
   '/fittings/*': UNGATED,
   // Detail routes off the index (same reasoning as `/skills/plans/:planId`
   // above): each mixes the same blueprints/jobs/skills reads the index does,

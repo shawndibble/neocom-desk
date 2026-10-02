@@ -7,7 +7,14 @@ import { configureClipboard } from '@/lib/clipboard';
 import { decodeFittingShare } from '@/engine/fitting/fittingShare';
 import type { Fitting } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
+import { createShareLink } from '@/features/share/shareStore';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FittingExportMenu } from './FittingExportMenu';
+
+vi.mock('@/features/share/shareStore', () => ({
+  existingShareLink: () => null,
+  createShareLink: vi.fn(async () => 'https://neocomdesk.com/share/abc123XYZ'),
+}));
 
 const download = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/download', () => ({ downloadTextFile: download }));
@@ -64,18 +71,48 @@ async function choose(name: string) {
   await user.click(await screen.findByRole('menuitem', { name }));
 }
 
-afterEach(() => configureClipboard(null));
+afterEach(() => {
+  configureClipboard(null);
+  vi.mocked(createShareLink).mockClear();
+  useActiveCharacter.setState({ activeCharacterId: null });
+});
 
 describe('FittingExportMenu', () => {
-  it('copies a Share Link that decodes back to the Fitting', async () => {
+  it('copies a permanent link that decodes back to the Fitting', async () => {
     const copied = setup();
-    await choose('Copy Share Link');
+    await choose('Copy permanent link');
     await waitFor(() => expect(copied).toHaveLength(1));
     const url = new URL(copied[0]);
     expect(url.pathname.endsWith('/ships/fittings')).toBe(true);
     const decoded = await decodeFittingShare(url.searchParams.get('f') ?? '');
     expect(decoded.ok && decoded.value.hullTypeId).toBe(587);
-    expect(await screen.findByRole('status')).toHaveTextContent('Share Link copied');
+    expect(await screen.findByRole('status')).toHaveTextContent('Permanent link copied');
+  });
+
+  it('copies a short Share Link storing the Fitting Share Code', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+    const copied = setup();
+    await choose('Copy Share Link');
+    await waitFor(() => expect(copied).toEqual(['https://neocomdesk.com/share/abc123XYZ']));
+    const call = vi.mocked(createShareLink).mock.calls[0][0];
+    expect(call).toMatchObject({ type: 'fitting', characterId: 7 });
+    expect(call.payload).toEqual({ v: 1, code: call.reuseKey });
+    const decoded = await decodeFittingShare(call.reuseKey);
+    expect(decoded.ok && decoded.value.hullTypeId).toBe(587);
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Share Link copied — it works for 7 days'
+    );
+  });
+
+  it('says so when the Share Link could not be stored, copying nothing', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+    vi.mocked(createShareLink).mockRejectedValueOnce(new Error('permission-denied'));
+    const copied = setup();
+    await choose('Copy Share Link');
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      "Couldn't create the Share Link. Try again."
+    );
+    expect(copied).toEqual([]);
   });
 
   it('copies EFT, the in-game link and the multibuy list', async () => {

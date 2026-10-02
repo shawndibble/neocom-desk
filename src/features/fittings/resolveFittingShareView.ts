@@ -1,5 +1,5 @@
 /**
- * Resolves a Share Link code into the logged-out share view's Fitting and
+ * Resolves a Fitting Share Code into the logged-out share view's Fitting and
  * profile (issue #1544) — decode, name the hull, then build the All-V
  * profile the scope decision requires (`buildAllVProfile`). The Fitting's own
  * implant set is layered on by the route's `useFittingEvaluation`, on the

@@ -574,7 +574,7 @@ export interface NotificationFeedRecord {
 }
 
 /**
- * A saved Fitting in My Fittings (issue #1538): just the Share Link payload
+ * A saved Fitting in My Fittings (issue #1538): just the Fitting Share Code payload
  * and a name — everything else is recomputed from the code on open. Per
  * Character like every other Editable Data record, so `characterId` rides
  * along as the sync key.

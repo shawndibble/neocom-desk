@@ -1,7 +1,7 @@
 /**
  * "Compare with…": adds a Fitting to an empty compare slot. The same list as
  * the Start screen (minus starting from a hull, and the rows' menus), with
- * Import in place, in a mode that hands back the chosen Fitting's Share Link
+ * Import in place, in a mode that hands back the chosen Fitting Share Code
  * code instead of opening it.
  */
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ interface FittingComparePickerProps {
   open: boolean;
   onClose: () => void;
   characterId: number | null;
-  /** A ready-to-use Share Link code for the newly picked Fitting. */
+  /** A ready-to-use Fitting Share Code for the newly picked Fitting. */
   onAdd: (code: string) => void;
 }
 

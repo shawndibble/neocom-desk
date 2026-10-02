@@ -336,9 +336,15 @@ here — they go one per file in `docs/context/decisions/`.
   `NetworkColony.exportablePerHour`, computed by `colonyExportablePerHour`.
 - **Facility Preset**: Industry location model: NPC station or player structure type + rig level. Manufacturing structures (Raitaru/Azbel/Sotiyo, engineering complexes) and reaction structures (Athanor/Tatara, refineries — no NPC-station equivalent) each use their own **Industry Activity**'s rig bonuses and security-multiplier table (issue #460); the two never mix on one facility. Drives ME/time/cost bonuses in a Build Plan.
 - **Fit Import**: Pasting EFT fit text into Industry to get a **Build Group** holding one **Build Plan** per buildable item in the fit, named from the paste's own `[Ship, Fit]` header. Counts quantities the way a fit expresses them — one line per copy fitted _and_ the `xN` suffix, both reaching the same total — and reports what it could not build (faction, named and meta modules have no blueprint, and a fifth of a routine paste is normally one of those) rather than dropping it silently. New plans take their ME from the assumed-ME preference and their TE from the assumed-TE one rather than 0, since most of a T2 fit needs an invented BPC (ME2 / TE4 without a decryptor) and quoting it unresearched overstates the group's cost and understates its job time. Distinct from the Skill Planner's clipboard import, which reads the same text for the skills it demands, and from **Appraisal**, which reads it for what the loadout costs to buy; all three share `parseEftFit` and nothing else.
-- **Fitting**: One ship hull plus everything loaded into it — modules, charges, drones, fighters, cargo — under a name. The thing the Ships section's Fittings tab opens, edits, shares and compares (**Fitting Compare**). Its numbers (CPU, powergrid, damage, tank, capacitor…) are worked out for the active Character's skills, so switching Character re-states the same Fitting for the new pilot. The implants and combat boosters in play are either that Character's own clone or the set the Fitting itself carries, whichever the pilot has chosen; a Fitting that carries a set opens on it. The one exception to the active Character is a share link opened with nobody logged in, which is stated at every skill level V and says so. Distinct from an **In-game Fitting**, which is a Fitting as the game itself stores it on a Character, and from **Fit Import**, which turns fit text into Build Plans.
+- **Fitting**: One ship hull plus everything loaded into it — modules, charges, drones, fighters, cargo — under a name. The thing the Ships section's Fittings tab opens, edits, shares and compares (**Fitting Compare**). Its numbers (CPU, powergrid, damage, tank, capacitor…) are worked out for the active Character's skills, so switching Character re-states the same Fitting for the new pilot. The implants and combat boosters in play are either that Character's own clone or the set the Fitting itself carries, whichever the pilot has chosen; a Fitting that carries a set opens on it. The one exception to the active Character is a **Fitting Share Code** or **Share Link** opened with nobody logged in, which is stated at every skill level V and says so. Distinct from an **In-game Fitting**, which is a Fitting as the game itself stores it on a Character, and from **Fit Import**, which turns fit text into Build Plans.
 - **Fleet boosts**: The Fittings stats section for what a command ship gives its fleet — each running command or mining foreman burst (with its charge; strength, range, length, reload) and an industrial core's compression (compressor range, fuel per activation), read off the engine's final module attributes (`src/engine/fittings/fleetSupport.ts`). Only there on a fit that has one. **What to train** ranks on these figures too. Distinct from **Support out**, which is what a fit's modules do to another ship (remote repair, webs, ewar), and from **Projected effects**, which is what other ships do to this one.
-- **Fitting Compare**: The Ships section's `/ships/fittings/compare` page (issue #1547; `/fittings/compare` before the section became Ships, which still redirects) — up to three **Fitting**s side by side, their stats worked out for the active Character's skills. The whole comparison lives in the URL as `?f=` **Share Link** codes, so copying the address bar reproduces it. The UI says only "Compare" (button), "Compare Fittings" (page title) and "Compare with…" (picker); the Fittings context tells it apart. Distinct from Market **Compare** / **Compare Set**, Appraisal's **Compare hubs**, and **Build Plan Compare**: it shares no state or code path with them and never touches the Compare Set.
+- **Fitting Compare**: The Ships section's `/ships/fittings/compare` page (issue #1547; `/fittings/compare` before the section became Ships, which still redirects) — up to three **Fitting**s side by side, their stats worked out for the active Character's skills. The whole comparison lives in the URL as `?f=` **Fitting Share Code**s, so copying the address bar reproduces it. The UI says only "Compare" (button), "Compare Fittings" (page title) and "Compare with…" (picker); the Fittings context tells it apart. Distinct from Market **Compare** / **Compare Set**, Appraisal's **Compare hubs**, and **Build Plan Compare**: it shares no state or code path with them and never touches the Compare Set.
+- **Fitting Share Code**: A **Fitting** compressed into its URL: hull,
+  modules and their state, charges, drones, cargo, and any implant set.
+  Permanent and stateless; nothing is stored. Inside the app it is the
+  address bar of an open Fitting while it is edited. Opened with nobody logged
+  in, it shows the Fitting at every skill level V. Distinct from a **Share
+  Link**, the short, expiring kind.
 - **Foreground Poller**: Client-side interval (5 minutes) that checks each
   enabled Notification Event's underlying ESI data while the app is open and
   the tab/window is visible; paused via the Page Visibility API when
@@ -892,18 +898,20 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   reported for it — optional in both, unlike an Offer's, which always carries
   them. Named for the copy it quotes ("Rifter 10/20 ×5"), since a Character
   can hold a plain plan and several seeded plans for one blueprint at once.
-- **Share Link**: A URL an **Appraisal** generates (issue #831) encoding only
-  the pasted pile's `typeId:quantity` pairs plus its **Trade Hub**,
-  **Price Percent** and a generation timestamp — never priced numbers.
-  Opening it, with or without a session, re-runs the same appraisal engine
-  against the decoded pairs and renders a read-only, unauthenticated view; the
-  app's first real unauthenticated content route. Stateless — nothing is
-  stored server-side, and there is nothing to expire or revoke.
-  A **Fitting** has its own Share Link, the same idea: the Fitting itself
-  (hull, modules and their state, charges, drones, cargo, any implant set)
-  compressed into the URL. It opens without a session, stated at every skill
-  level V. Inside the app, that same URL is where an open Fitting lives while it
-  is edited, so the address bar is always a Share Link.
+- **Share Link**: A short `/share/<id>` link to something a pilot chose to
+  share. It lasts a fixed 7 days from creation, then expires; opening it does
+  not extend it. Each one has a type, which names the page it opens: a
+  **Shared Appraisal**, or a **Fitting**. It opens with or without a session,
+  and says when it expires. It never names who shared it. A Fitting's Share
+  Link wraps that Fitting's **Fitting Share Code**: opened with nobody logged
+  in, it shows the Fitting at every skill level V; a logged-in visitor goes
+  straight to the Fitting in the editor. Distinct from a **Fitting Share
+  Code**, which is permanent and is not a Share Link.
+- **Shared Appraisal**: An **Appraisal** frozen at the prices it had when its
+  **Share Link** was made, together with its **Trade Hub**, **Price Percent**
+  and the time it was priced. Never re-priced. Read-only to whoever opens it;
+  "Open Neocom Desk" carries it into the live Appraisal tab. Not a quote: it
+  commits nobody to buying at those prices.
 - **Ship Info window**: The window a hull opens from the **Ship Tree**, after
   the game's own: four tabs — Description (class, faction, bonuses, CCP's
   text), Fitting (base slots and resources; Simulate opens a new **Fitting**

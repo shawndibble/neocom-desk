@@ -1,13 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  buttonClassName,
   DataTable,
   EmptyState,
   IskAmount,
-  LogoMark,
-  Spinner,
   StatChip,
   StatChips,
   type DataTableColumn,
@@ -15,15 +11,14 @@ import {
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { AppraisalRow } from '@/engine/market/appraisal';
-import { appraisalCsvColumns } from '@/features/market/appraisalCsv';
-import { appraisalVolumeColumn } from '@/features/market/appraisalVolume';
-import { AppraisalVolumeChip } from '@/features/market/AppraisalVolumeChip';
-import { formatVolume } from '@/features/market/format';
-import {
-  resolveAppraisalShare,
-  type AppraisalShareView,
-} from '@/features/market/appraisalShareData';
+import { ShareShell, type OpenInApp } from '@/features/share/ShareShell';
 import { formatIskAuto } from '@/lib/isk';
+import { appraisalCsvColumns } from './appraisalCsv';
+import type { AppraisalShareView } from './appraisalShareData';
+import { appraisalVolumeColumn } from './appraisalVolume';
+import { AppraisalVolumeChip } from './AppraisalVolumeChip';
+import { formatVolume } from './format';
+import { FullIskTotal } from './FullIskTotal';
 
 const NO_ROWS: readonly AppraisalRow[] = [];
 
@@ -44,50 +39,25 @@ function totalCell(value: number | null): ReactNode {
   return <IskAmount value={value} revealOn="tap" decimals={0} />;
 }
 
-type LoadState =
-  | { status: 'loading' }
-  | { status: 'invalid' }
-  | { status: 'failed' }
-  | { status: 'ready'; view: AppraisalShareView };
+export type AppraisalShareState =
+  { status: 'invalid' } | { status: 'ready'; view: AppraisalShareView };
+
+interface AppraisalShareScreenProps {
+  state: AppraisalShareState;
+  /** Epoch millis the Share Link dies at — shown, since the recipient never saw the sender's "works for 7 days". */
+  expiresAt: number;
+  openInApp?: OpenInApp;
+}
 
 /**
- * The read-only view a Share link (#831) opens. Outside `RequireCharacter`
- * and `ScopeGate` deliberately — this is the app's first real unauthenticated
- * *content* route (`routeScopes.test.ts` asserts the exemption) — so no
- * navigation chrome renders here, only a link back to the live app.
- *
- * The `d` query param is a `typeId:quantity` payload, never priced numbers;
- * `resolveAppraisalShare` re-runs the same appraisal engine the live tab
- * uses, at view time, so pricing here is exactly as current as opening the
- * live tab would be.
+ * The **Shared Appraisal** a Share Link opens (`routes/SharedLink.tsx`), at
+ * the prices it was shared with. Read-only: no paste box, no hub or percent
+ * controls — "Open Neocom Desk" carries the same pile into the live tab for
+ * that. Never a redirect, even for a signed-in visitor: the live tab
+ * re-prices, and the sender's figures would be gone before anyone read them.
  */
-export function AppraisalShared() {
+export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalShareScreenProps) {
   const { t } = useTranslation();
-  const [searchParams] = useSearchParams();
-  const payload = searchParams.get('d') ?? '';
-  const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' });
-
-  useEffect(() => {
-    // An empty payload needs no async work — handled below, outside the
-    // effect, rather than by calling setState synchronously in here.
-    if (payload === '') return;
-    let cancelled = false;
-    void (async () => {
-      setLoadState({ status: 'loading' });
-      try {
-        const result = await resolveAppraisalShare(payload);
-        if (cancelled) return;
-        setLoadState(result.ok ? { status: 'ready', view: result.value } : { status: 'invalid' });
-      } catch {
-        if (!cancelled) setLoadState({ status: 'failed' });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [payload]);
-
-  const state: LoadState = payload === '' ? { status: 'invalid' } : loadState;
   const shareRows = state.status === 'ready' ? state.view.appraisal.rows : NO_ROWS;
   const csvColumns = useMemo(() => appraisalCsvColumns(t), [t]);
   const tableExport = useTableExport({
@@ -148,41 +118,19 @@ export function AppraisalShared() {
   ];
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-bg p-6 text-text">
-      <div className="flex items-center gap-2">
-        <LogoMark className="size-6" />
-        <h1 className="text-sm font-semibold tracking-widest uppercase">
-          {t('appraisalShare.title')}
-        </h1>
-        {shareRows.length > 0 && (
-          <span className="ml-auto">
-            <TableActionsMenu name={t('appraisalShare.title')} tableExport={tableExport} />
-          </span>
-        )}
-      </div>
-
-      <p className="rounded-xs border border-warning bg-panel-2 px-3 py-2 text-xs text-warning">
-        {t('appraisalShare.banner')}
-      </p>
-
-      {state.status === 'loading' && (
-        <div className="flex justify-center py-10">
-          <Spinner label={t('common.loading')} />
-        </div>
-      )}
-
+    <ShareShell
+      title={t('appraisalShare.title')}
+      openInApp={openInApp}
+      actions={
+        shareRows.length > 0 ? (
+          <TableActionsMenu name={t('appraisalShare.title')} tableExport={tableExport} />
+        ) : undefined
+      }
+    >
       {state.status === 'invalid' && (
         <EmptyState
           title={t('appraisalShare.invalidTitle')}
           hint={t('appraisalShare.invalidHint')}
-          className="py-10"
-        />
-      )}
-
-      {state.status === 'failed' && (
-        <EmptyState
-          title={t('market.loadFailedTitle')}
-          hint={t('market.loadFailedHint')}
           className="py-10"
         />
       )}
@@ -196,38 +144,23 @@ export function AppraisalShared() {
             />
             <StatChip
               label={t('market.appraisal.sellTotal')}
-              value={
-                <IskAmount value={state.view.appraisal.totals.sell} revealOn="tap" decimals={0} />
-              }
+              value={<FullIskTotal value={state.view.appraisal.totals.sell} />}
               tone="accent"
             />
             <StatChip
               label={t('market.appraisal.buyTotal')}
-              value={
-                <IskAmount value={state.view.appraisal.totals.buy} revealOn="tap" decimals={0} />
-              }
+              value={<FullIskTotal value={state.view.appraisal.totals.buy} />}
             />
             <AppraisalVolumeChip totals={state.view.appraisal.totals} />
             <StatChip
               label={t('appraisalShare.generatedLabel')}
               value={new Date(state.view.generatedAt * 1000).toLocaleString()}
             />
+            <StatChip
+              label={t('appraisalShare.expiresLabel')}
+              value={new Date(expiresAt).toLocaleString()}
+            />
           </StatChips>
-
-          {state.view.unresolvedTypeIds.length > 0 && (
-            <div className="rounded-xs border border-line bg-panel-2 px-2.5 py-2">
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
-                {t('appraisalShare.unresolved', { count: state.view.unresolvedTypeIds.length })}
-              </p>
-              <ul className="pt-1">
-                {state.view.unresolvedTypeIds.map((typeId) => (
-                  <li key={typeId} className="font-mono text-[0.6875rem] text-text-dim">
-                    {t('appraisalShare.unresolvedTypeId', { typeId })}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
 
           {state.view.appraisal.rows.length === 0 ? (
             <EmptyState
@@ -251,10 +184,6 @@ export function AppraisalShared() {
           )}
         </>
       )}
-
-      <Link to="/" className={buttonClassName({ size: 'sm' })}>
-        {t('appraisalShare.backToApp')}
-      </Link>
-    </main>
+    </ShareShell>
   );
 }

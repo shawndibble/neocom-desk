@@ -1,5 +1,5 @@
 /**
- * The pure decisions inside `useFittingWorkspace`'s Share Link session —
+ * The pure decisions inside `useFittingWorkspace`'s Fitting Share Code session —
  * extracted so they're unit-testable without mounting the hook. Everything
  * async (the decode itself, its cancellation, the encode sequence number,
  * the save mutex) stays in the hook: it's ordering plumbing a sync function

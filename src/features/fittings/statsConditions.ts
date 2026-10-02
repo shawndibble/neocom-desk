@@ -6,7 +6,7 @@
  * and what other saved Fittings project onto it (bursts, remote reps, webs…). One set for
  * the session, read by the editor, its Variations, the applied-DPS overlay
  * and Fitting Compare alike, so no two numbers on screen are in different
- * conditions. Neither is saved or put in a Share Link: each is a question
+ * conditions. Neither is saved or put in a Fitting Share Code: each is a question
  * asked of a fit, not part of it. The projected sources alone belong to a
  * Character (its saved Fittings), so they go when the active Character does.
  */

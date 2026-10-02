@@ -2,7 +2,7 @@
  * A second, saved Fitting overlaid on the applied-DPS graphs (issue #1546):
  * picked from the active Character's My Fittings or In-game Fittings and calculated under the
  * same pilot and Damage Profile as the open one — cheap once the engine is
- * loaded. Needs a Character, so the Share Link view has no overlay.
+ * loaded. Needs a Character, so the Fitting Share Code view has no overlay.
  */
 import { useEffect, useState } from 'react';
 import type { AppliedDpsInputs } from '@/engine/fittings/appliedDps';

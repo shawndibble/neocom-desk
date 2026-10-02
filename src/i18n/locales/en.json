@@ -590,6 +590,7 @@
     "export": {
       "button": "Export",
       "shareLink": "Copy Share Link",
+      "permanentLink": "Copy permanent link",
       "eft": "Copy EFT",
       "chatLink": "Copy in-game link",
       "multibuy": "Copy multibuy list",
@@ -598,8 +599,11 @@
       "appraise": "Appraise in Market",
       "tooLarge": "Too large to share as a link.",
       "copyFailed": "Couldn't copy to the clipboard.",
+      "shareFailed": "Couldn't create the Share Link. Try again.",
+      "shareCopyRetry": "Share Link ready — choose Copy Share Link again to copy it.",
       "copied": {
-        "shareLink": "Share Link copied",
+        "shareLink": "Share Link copied — it works for 7 days",
+        "permanentLink": "Permanent link copied",
         "eft": "EFT copied",
         "chatLink": "In-game link copied",
         "multibuy": "Multibuy list copied"
@@ -1247,7 +1251,7 @@
       "compare": "Compare with…",
       "duplicate": "Duplicate",
       "copyEft": "Copy EFT",
-      "copyShareLink": "Copy Share Link",
+      "copyPermanentLink": "Copy permanent link",
       "saveToEve": "Save to EVE…",
       "rename": "Rename",
       "delete": "Delete",
@@ -5346,7 +5350,11 @@
       "resultTitle": "Appraisal",
       "atPercent": "{{pricePercent}}%",
       "share": "Copy Share Link",
-      "shareCopied": "Share Link copied",
+      "shareCopied": "Share Link copied — it works for 7 days",
+      "shareSaving": "Creating Share Link…",
+      "shareFailed": "Couldn't create the Share Link. Try again.",
+      "shareReady": "Share Link — works for 7 days",
+      "shareCopy": "Copy",
       "shareTooLarge": "Too large to share as a link — use Export CSV instead.",
       "columnsButton": "Columns",
       "columnsMenuTitle": "Columns",
@@ -5407,6 +5415,7 @@
       "compareHubsShow": "Show hub comparison",
       "compareHubsHide": "Hide hub comparison",
       "copyTotal": "Copy {{amount}}",
+      "totalFull": "{{full}} ISK ({{short}})",
       "copiedToClipboard": "Copied to clipboard",
       "columnHub": "Hub"
     },
@@ -5764,14 +5773,21 @@
   },
   "appraisalShare": {
     "title": "Shared appraisal",
-    "banner": "Unverified, user-generated link — not an official quote.",
     "generatedLabel": "Generated",
+    "expiresLabel": "Expires",
     "invalidTitle": "This link isn't valid",
-    "invalidHint": "The link may be corrupted or incomplete. Ask whoever sent it to share it again.",
-    "unresolved_one": "{{count}} item id from this link isn't recognised",
-    "unresolved_other": "{{count}} item ids from this link aren't recognised",
-    "unresolvedTypeId": "type id {{typeId}}",
-    "backToApp": "Open Neocom Desk"
+    "invalidHint": "The link may be corrupted or incomplete. Ask whoever sent it to share it again."
+  },
+  "share": {
+    "title": "Shared link",
+    "openInApp": "Open Neocom Desk",
+    "expiresOn": "This link expires {{date}}.",
+    "goneTitle": "This link has expired",
+    "goneHint": "Shared links last 7 days. Ask whoever sent it to share it again.",
+    "unsupportedTitle": "This link needs a newer Neocom Desk",
+    "unsupportedHint": "Reload the page to update, then open the link again.",
+    "failedTitle": "Couldn't load this link",
+    "failedHint": "Check your connection and try again."
   },
   "fittingShare": {
     "title": "Shared fitting",

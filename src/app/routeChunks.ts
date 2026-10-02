@@ -132,11 +132,8 @@ export const loadEmploymentHistory = named(
 );
 export const loadSettings = named(() => import('@/routes/Settings'), 'Settings');
 export const loadStyleguide = named(() => import('@/routes/Styleguide'), 'Styleguide');
-export const loadAppraisalShared = named(
-  () => import('@/routes/AppraisalShared'),
-  'AppraisalShared'
-);
 export const loadFittingShared = named(() => import('@/routes/FittingShared'), 'FittingShared');
+export const loadSharedLink = named(() => import('@/routes/SharedLink'), 'SharedLink');
 export const loadErrorProbe = named(() => import('@/routes/ErrorProbe'), 'ErrorProbe');
 
 /**

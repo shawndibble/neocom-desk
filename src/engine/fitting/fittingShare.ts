@@ -1,12 +1,12 @@
 /**
  * Encodes a Fitting into the compact, versioned, URL-safe string that is
- * its Share Link (#1530) — hull, modules with slot/state/charge, drones with
+ * its Fitting Share Code (#1530) — hull, modules with slot/state/charge, drones with
  * active counts, fighters, cargo, an optional implant/booster set and (from
  * version 2, #1718) an optional fit name.
  *
  * Wire grammar, built as plain text before it's ever deflated:
  * `hull|modules|drones|fighters|cargo|implants|name` (version 1 stops after
- * `implants` — six parts, no name — and still decodes so every Share Link
+ * `implants` — six parts, no name — and still decodes so every Fitting Share Code
  * already handed out keeps working). `name` is `encodeURIComponent`'d so it
  * can never contain the `|` separator, or empty when the fit has none.
  * hull/typeId/count/slot
@@ -34,7 +34,7 @@
  * payload can't be a decompression bomb.
  *
  * Type IDs are carried as bare numbers, never checked against a catalog —
- * the same engine/feature split `market/appraisalShare.ts` draws for its
+ * the same engine/feature split `market/appraisalSnapshot.ts` draws for its
  * `hub` field — so a type ID this build's bundled SDE doesn't recognise
  * still survives the round trip; rendering it as an "unknown item" is a
  * feature-layer concern.

@@ -38,7 +38,7 @@ import {
 } from './useLibraryFittings';
 
 interface FittingStartScreenProps {
-  /** The open workspace, or the Compare picker's stand-in that returns a Share Link code. */
+  /** The open workspace, or the Compare picker's stand-in that returns a Fitting Share Code. */
   workspace: FittingLibrarySource;
   catalogue: FittingCatalogue | null;
   characterId: number | null;
@@ -94,7 +94,7 @@ export function FittingStartScreen({
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hullOpen, setHullOpen] = useState(false);
-  // A share link that won't open lands on Import, where its message is.
+  // A Fitting Share Code that won't open lands on Import, where its message is.
   const [importOpen, setImportOpen] = useState(page && workspace.shareError !== null);
   const [renaming, setRenaming] = useState<FittingRecord | null>(null);
   const [deleting, setDeleting] = useState<FittingRecord | null>(null);
@@ -249,7 +249,7 @@ export function FittingStartScreen({
 
       {inGameStatus}
       <FittingExportNotice notice={rowActions.notice} />
-      {/* A picked Fitting the Compare picker couldn't turn into a Share Link. The
+      {/* A picked Fitting the Compare picker couldn't turn into a Fitting Share Code. The
           editor's own workspace flags its open Fitting the same way, so the Open
           dialog never shows it. */}
       {importInline && workspace.tooLargeToShare && (

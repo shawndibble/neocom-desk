@@ -72,7 +72,7 @@ export interface FailedLoad {
 export type LoadOutcome = LoadedFitting | FailedLoad;
 
 /**
- * A text Load that was itself a Share Link: the caller opens the code as-is,
+ * A text Load that was itself a Fitting Share Code: the caller opens the code as-is,
  * so it round-trips unchanged instead of being re-encoded.
  */
 export interface ShareLoad {
@@ -130,7 +130,7 @@ async function readKillmail(
   }
 }
 
-/** Loads EFT text, a DNA string / chat link, a Share Link, an eveship.fit link, or a killmail link. */
+/** Loads EFT text, a DNA string / chat link, a Fitting Share Code, an eveship.fit link, or a killmail link. */
 export async function loadText(
   text: string,
   sources: TextLoadSources

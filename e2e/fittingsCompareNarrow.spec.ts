@@ -35,7 +35,7 @@ async function answerAnyType(page: Page) {
   });
 }
 
-// A compare column's header shows the fit's own name — a Share Link carries it since
+// A compare column's header shows the fit's own name — a Fitting Share Code carries it since
 // version 2 (#1718), so the name typed into the EFT header survives the round trip.
 const FIT_A = ['[Rifter, Fit A]', '125mm Gatling AutoCannon I'].join('\n');
 const FIT_B = ['[Merlin, Fit B]', '125mm Gatling AutoCannon I'].join('\n');

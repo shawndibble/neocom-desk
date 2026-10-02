@@ -10,12 +10,28 @@ import { TRADE_HUBS } from '@/market/hubs';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_REGISTRY } from '@/esi/registry';
+import { resetShareLinksForTests } from '@/features/share/shareStore';
 import { AppraisalPanel } from './AppraisalPanel';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import type { AppraisalController } from './useAppraisal';
 import type { AppraisalOutcome, HubComparisonRow } from './appraisalData';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('@/app/syncStatus', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/app/syncStatus')>()),
+  isSyncConfigured: () => true,
+}));
+// One layer under the share store, so its "same appraisal, same link" reuse
+// runs for real: Firestore's write and the Firebase session are the seams.
+const setDoc = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock('firebase/firestore/lite', () => ({
+  setDoc,
+  doc: (_db: unknown, collection: string, id: string) => ({ path: `${collection}/${id}` }),
+  serverTimestamp: () => 'SERVER_TIME',
+  Timestamp: { fromMillis: (millis: number) => ({ millis }) },
+}));
+vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
+vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => 'char:7') }));
 
 function controller(overrides: Partial<AppraisalController> = {}): AppraisalController {
   return {
@@ -104,6 +120,7 @@ function renderPanel(
           onPricePercentChange={onPricePercentChange}
           hub={TRADE_HUBS[0]}
           standing={ZERO_STANDINGS}
+          characterId={1}
           {...props}
         />
       </FakeItemActions>
@@ -862,5 +879,127 @@ describe('AppraisalPanel — the row as an item', () => {
     });
     fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
     expect(actions.requestBlueprints).toHaveBeenCalled();
+  });
+
+  describe('Share', () => {
+    const SHARED = outcome({
+      appraisal: {
+        ...APPRAISAL,
+        items: [
+          { typeId: 2048, name: 'Damage Control II', quantity: 3, buy: 448_650, sell: 460_800 },
+        ],
+      },
+    });
+
+    afterEach(() => {
+      configureClipboard(null);
+      setDoc.mockClear();
+      resetShareLinksForTests();
+    });
+
+    /** The `shares/<id>` doc each stored share was written to, in order. */
+    function storedPaths(): string[] {
+      return setDoc.mock.calls
+        .map((call) => (call as unknown[])[0] as { path: string })
+        .map((ref) => ref.path);
+    }
+
+    it('stores the appraisal with its prices and copies the short link', async () => {
+      const written: string[] = [];
+      configureClipboard(async (text) => {
+        written.push(text);
+      });
+      renderPanel({ controller: controller({ result: SHARED }), characterId: 7 });
+
+      await userEvent.click(screen.getByRole('button', { name: 'Copy Share Link' }));
+
+      await waitFor(() => expect(written).toHaveLength(1));
+      expect(written[0]).toMatch(/\/share\/[0-9A-Za-z]{9}$/);
+      expect(storedPaths()).toEqual([`shares/${written[0].split('/').pop()}`]);
+      expect((setDoc.mock.calls[0] as unknown[])[1]).toMatchObject({
+        type: 'appraisal',
+        payload: expect.objectContaining({
+          hub: TRADE_HUBS[0].id,
+          pricePercent: 90,
+          items: [
+            {
+              typeId: 2048,
+              name: 'Damage Control II',
+              quantity: 3,
+              buy: 448_650,
+              sell: 460_800,
+              unitVolume: null,
+            },
+          ],
+        }),
+      });
+    });
+
+    it('hands back the same link when the same appraisal is shared again', async () => {
+      const written: string[] = [];
+      configureClipboard(async (text) => {
+        written.push(text);
+      });
+      renderPanel({ controller: controller({ result: SHARED }) });
+      const share = screen.getByRole('button', { name: 'Copy Share Link' });
+
+      await userEvent.click(share);
+      await waitFor(() => expect(written).toHaveLength(1));
+      await userEvent.click(share);
+      await waitFor(() => expect(written).toHaveLength(2));
+
+      expect(written[1]).toBe(written[0]);
+      expect(setDoc).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the link to copy by hand when the copy after saving is refused', async () => {
+      configureClipboard(async () => {
+        throw new Error('not allowed');
+      });
+      renderPanel({ controller: controller({ result: SHARED }) });
+
+      await userEvent.click(screen.getByRole('button', { name: 'Copy Share Link' }));
+
+      const field = await screen.findByLabelText('Share Link — works for 7 days');
+      expect((field as HTMLInputElement).value).toMatch(/\/share\/[0-9A-Za-z]{9}$/);
+    });
+
+    it('copies nothing when the share could not be stored', async () => {
+      const written: string[] = [];
+      configureClipboard(async (text) => {
+        written.push(text);
+      });
+      setDoc.mockRejectedValueOnce(new Error('permission-denied'));
+      renderPanel({ controller: controller({ result: SHARED }) });
+
+      await userEvent.click(screen.getByRole('button', { name: 'Copy Share Link' }));
+
+      await waitFor(() => expect(setDoc).toHaveBeenCalled());
+      expect(written).toEqual([]);
+    });
+
+    it('is disabled with no Character to store the share as', () => {
+      renderPanel({ controller: controller({ result: SHARED }), characterId: null });
+      expect(screen.getByRole('button', { name: 'Copy Share Link' })).toBeDisabled();
+    });
+  });
+
+  describe('Sell and Buy totals', () => {
+    afterEach(() => configureClipboard(null));
+
+    it('read in full with the shorthand after, and copy the full figure on click', async () => {
+      const written: string[] = [];
+      configureClipboard(async (text) => {
+        written.push(text);
+      });
+      renderPanel({ controller: controller({ result: outcome() }) });
+
+      const sell = screen.getByRole('button', { name: 'Copy 1,386,400 ISK' });
+      expect(sell).toHaveTextContent('1,386,400 ISK (1.4M)');
+      await userEvent.click(sell);
+
+      expect(written).toEqual(['1,386,400']);
+      expect(await screen.findByRole('status')).toHaveTextContent('Copied to clipboard');
+    });
   });
 });

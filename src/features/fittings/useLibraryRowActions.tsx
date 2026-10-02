@@ -1,7 +1,7 @@
 /**
  * A saved or In-game Fitting's row menu — the Start screen's list, My
  * Fittings and In-game Fittings: Open, Compare with, Duplicate, Copy EFT,
- * Copy Share Link, Save to EVE, Rename, Delete. Right-click (or
+ * Copy permanent link, Save to EVE, Rename, Delete. Right-click (or
  * touch-and-hold) the row, or its ⋮ button.
  *
  * A row names a Fitting without holding one: a saved row has only its Share
@@ -26,7 +26,7 @@ import type { LibraryRow } from './useLibraryFittings';
 
 const NOTICE_MS = 2500;
 
-/** The row's Fitting and its Share Link code (null when too large for one); null when a saved code no longer decodes. */
+/** The row's Fitting and its Fitting Share Code (null when too large for one); null when a saved code no longer decodes. */
 async function rowFitting(
   row: LibraryRow
 ): Promise<{ fitting: Fitting; code: string | null } | null> {
@@ -86,7 +86,7 @@ export function useLibraryRowActions({
     await then(resolved);
   }
 
-  async function copy(row: LibraryRow, kind: 'eft' | 'shareLink') {
+  async function copy(row: LibraryRow, kind: 'eft' | 'permanentLink') {
     await withFitting(row, async ({ fitting }) => {
       try {
         const text = await exportFitting(kind, fitting);
@@ -141,8 +141,8 @@ export function useLibraryRowActions({
         <MenuItem onSelect={() => void copy(row, 'eft')}>
           {t('fittings.libraryMenu.copyEft')}
         </MenuItem>
-        <MenuItem onSelect={() => void copy(row, 'shareLink')}>
-          {t('fittings.libraryMenu.copyShareLink')}
+        <MenuItem onSelect={() => void copy(row, 'permanentLink')}>
+          {t('fittings.libraryMenu.copyPermanentLink')}
         </MenuItem>
         {/* An In-game Fitting is in EVE already. */}
         {saved && (

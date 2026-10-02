@@ -68,7 +68,7 @@ const OTHER_ROUTE_TITLE_KEYS: Record<string, readonly string[]> = {
   '/callback': [],
   '/styleguide': [],
   '/error': ['error.title'],
-  '/share/appraisal': ['appraisalShare.title'],
+  '/share/:shareId': ['share.title'],
 };
 
 const ROUTE_PATTERNS = Object.entries({ ...OTHER_ROUTE_TITLE_KEYS, ...ROUTE_TITLE_KEYS });

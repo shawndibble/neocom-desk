@@ -393,7 +393,7 @@ function FittingsPage() {
 
   if (fitting === null) {
     // The Start screen renders the header and the Ships tabs itself: it owns
-    // the In-game data age and refresh. A broken share link opens its Import.
+    // the In-game data age and refresh. A broken Fitting Share Code opens its Import.
     return (
       <FittingStartScreen
         workspace={workspace}

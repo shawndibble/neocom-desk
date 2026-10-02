@@ -39,3 +39,18 @@ export const useMarketPricePercent = createSyncedSetting<number>({
   // this reason.
   parse: (raw) => (typeof raw === 'number' && isValidPricePercent(raw) ? raw : null),
 });
+
+/**
+ * `?percent=` on the Appraisal tab: a Price Percent for this visit only, the
+ * way `?hub=` is a Trade Hub for this visit only. A Shared Appraisal's "Open
+ * Neocom Desk" lands with it, so opening someone else's link never rewrites
+ * the visitor's own synced setting.
+ */
+export const PRICE_PERCENT_PARAM = 'percent';
+
+/** A valid `?percent=` value, or null for anything missing or out of range. */
+export function parsePricePercentParam(raw: string | null): number | null {
+  if (raw === null || raw.trim() === '') return null;
+  const value = Number(raw);
+  return isValidPricePercent(value) ? value : null;
+}

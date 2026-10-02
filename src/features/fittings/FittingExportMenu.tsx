@@ -30,7 +30,7 @@ export function FittingExportNotice({ notice }: { notice: string | null }) {
 
 /** Export's menu items, for whichever menu holds them. */
 export function FittingExportItems({
-  actions: { copy, downloadEveXml, openInAppraisal, openManufacturePlan },
+  actions: { copy, copyShareLink, downloadEveXml, openInAppraisal, openManufacturePlan },
   price,
 }: {
   actions: FittingExport;
@@ -39,8 +39,11 @@ export function FittingExportItems({
   const { t } = useTranslation();
   return (
     <>
-      <DropdownMenuItem onSelect={() => void copy('shareLink')}>
+      <DropdownMenuItem onSelect={() => void copyShareLink()}>
         {t('fittings.export.shareLink')}
+      </DropdownMenuItem>
+      <DropdownMenuItem onSelect={() => void copy('permanentLink')}>
+        {t('fittings.export.permanentLink')}
       </DropdownMenuItem>
       <DropdownMenuItem onSelect={() => void copy('eft')}>
         {t('fittings.export.eft')}
@@ -76,7 +79,7 @@ export function FittingExportItems({
 }
 
 /**
- * The Fittings page's one Export menu (issue #1543): copy the Share Link, EFT,
+ * The Fittings page's one Export menu (issue #1543): copy the Share Link or permanent link, EFT,
  * an in-game chat link or a multibuy list, and see the Fitting's Jita price
  * with a way into Appraisal for the same list.
  */

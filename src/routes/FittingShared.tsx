@@ -34,20 +34,36 @@ const COPIED_MS = 2000;
 type TypeName = (typeId: number) => string;
 
 /**
- * The read-only view a Fitting's Share Link (#1544) opens with no session:
+ * The read-only view a Fitting Share Code (#1544) opens with no session:
  * every skill at level V, stated in a banner, the Fitting's own implant set
  * if it carries one (`resolveFittingShareView`). Outside `RequireCharacter`
- * and `ScopeGate` deliberately, the same exemption `/share/appraisal` has
+ * and `ScopeGate` deliberately, the same exemption `/share/:shareId` has
  * (`routeScopes.test.ts` asserts it) — this is the second unauthenticated
  * content route, not the first.
  *
  * A visitor who already has a Character never sees this: the same `?f=` opens
- * straight into the editor instead, per CONTEXT.md's **Share Link** entry.
+ * straight into the editor instead, per CONTEXT.md's **Fitting Share Code**.
  */
 export function FittingShared() {
-  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
-  const code = searchParams.get('f') ?? '';
+  return <FittingShareView code={searchParams.get('f') ?? ''} />;
+}
+
+/**
+ * One Fitting Share Code, read-only at every skill V — what both the
+ * permanent `/share/fitting?f=` URL and a Fitting's short **Share Link**
+ * (`routes/SharedLink.tsx`) open. A visitor with a Character is redirected
+ * into the editor on the code instead.
+ */
+export function FittingShareView({
+  code,
+  expiresAt,
+}: {
+  code: string;
+  /** Epoch millis a Share Link dies at; absent for the permanent URL, which never does. */
+  expiresAt?: number;
+}) {
+  const { t } = useTranslation();
   const characterCount = useLiveQuery(() => db.characters.count());
 
   const [state, setState] = useState<LoadState>({ status: 'loading' });
@@ -125,7 +141,7 @@ export function FittingShared() {
 
   if (characterCount === undefined) return <BootScreen gate="fitting-shared" />;
   // A visitor with a Character never gets the All-V view — the same link
-  // opens in the editor, under their own pilot (CONTEXT.md **Share Link**).
+  // opens in the editor, under their own pilot (CONTEXT.md **Fitting Share Code**).
   if (characterCount > 0) {
     return <Navigate to={fittingEditLocation(code)} replace />;
   }
@@ -157,6 +173,12 @@ export function FittingShared() {
       <p className="rounded-xs border border-warning bg-panel-2 px-3 py-2 text-xs text-warning">
         {t('fittingShare.banner')}
       </p>
+
+      {expiresAt !== undefined && (
+        <p className="text-xs text-text-dim">
+          {t('share.expiresOn', { date: new Date(expiresAt).toLocaleString() })}
+        </p>
+      )}
 
       {state.status === 'loading' && (
         <div className="flex justify-center py-10">

@@ -45,7 +45,15 @@ import {
   type AppraisalRow,
 } from '@/engine/market/appraisal';
 import { countPasteLines } from '@/engine/market/appraisalPaste';
+import {
+  appraisalSnapshotReuseKey,
+  buildAppraisalSnapshot,
+  MAX_SNAPSHOT_ITEMS,
+} from '@/engine/market/appraisalSnapshot';
 import type { ResolvedStandings } from '@/engine/market/standings';
+
+import { isSyncConfigured } from '@/app/syncStatus';
+import { createShareLink, existingShareLink } from '@/features/share/shareStore';
 import { iskToneClass } from '@/features/character/format';
 import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -60,8 +68,8 @@ import { appraisalCsvColumns } from './appraisalCsv';
 import { appraisalSellListText, hasAppraisalSellList } from './appraisalSellListText';
 import { appraisalVolumeColumn } from './appraisalVolume';
 import { AppraisalVolumeChip } from './AppraisalVolumeChip';
-import { buildAppraisalShareLink, MAX_SHARE_ITEMS } from './appraisalShareData';
 import { formatVolume } from './format';
+import { FullIskTotal } from './FullIskTotal';
 import { HubCompareCards } from './HubCompareCards';
 import { ItemContextMenu } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
@@ -72,10 +80,12 @@ interface AppraisalPanelProps {
   controller: AppraisalController;
   pricePercent: number;
   onPricePercentChange: (value: number) => void;
-  /** The hub the figures are quoted at — the panel's own provenance chip, and what a Share link (#831) is generated against. */
+  /** The hub the figures are quoted at — the panel's own provenance chip, and what a Share Link is stored against. */
   hub: TradeHub;
   /** The active Character's standing toward this hub's NPC station owner, for the net-of-fees chips' broker fee. */
   standing: ResolvedStandings;
+  /** Signs in to store a Share Link as this Character if no Firebase session exists yet; null disables Share. */
+  characterId: number | null;
   /** Opens the Compare Hubs panel already expanded — the Quickbar's "View in Appraisal" action (#726) lands directly on the multi-hub view rather than a collapsed one. */
   defaultCompareExpanded?: boolean;
 }
@@ -97,6 +107,19 @@ function totalCell(value: number | null, revealOn: IskRevealGesture): ReactNode 
   return <IskAmount value={value} revealOn={revealOn} decimals={0} />;
 }
 
+/**
+ * The Share button's progress. `manual` is a link that was stored but could
+ * not be copied: the save took long enough that the browser no longer counts
+ * the copy as part of the click (Safari is strict about this), so the link is
+ * shown for a second, in-gesture copy instead of being lost.
+ */
+type ShareState =
+  | { status: 'idle' }
+  | { status: 'saving' }
+  | { status: 'failed' }
+  | { status: 'copied'; url: string }
+  | { status: 'manual'; url: string };
+
 /** Bolds a total only when it actually won a real comparison — never on a row with nothing to compare against. */
 function comparisonCell(total: ReactNode, highlighted: boolean, suffix?: ReactElement | false) {
   return (
@@ -113,12 +136,19 @@ export function AppraisalPanel({
   onPricePercentChange,
   hub,
   standing,
+  characterId,
   defaultCompareExpanded = false,
 }: AppraisalPanelProps) {
   const { t } = useTranslation();
   const { text, setText, result, compare, loading, failed } = controller;
   const [compareExpanded, setCompareExpanded] = useState(defaultCompareExpanded);
-  const [shareCopied, setShareCopied] = useState(false);
+  const [share, setShare] = useState<ShareState>({ status: 'idle' });
+  // A link belongs to the result it was made from; a new appraisal drops it.
+  const [shareResult, setShareResult] = useState(result);
+  if (result !== shareResult) {
+    setShareResult(result);
+    setShare({ status: 'idle' });
+  }
   const [sellListCopied, setSellListCopied] = useState(false);
   const hubName = hub.systemName;
 
@@ -135,18 +165,55 @@ export function AppraisalPanel({
     void setVisibleColumns(next);
   }
 
+  /**
+   * Stores the appraisal as it stands — prices included — and copies its short
+   * `/share/<id>` link. The same appraisal shared again gets the same link, and
+   * a failed save copies nothing.
+   */
   async function handleShare() {
-    if (!result) return;
-    setShareCopied(false);
-    const shared = buildAppraisalShareLink(result, hub, pricePercent);
-    if (!shared.ok) return; // pre-checked by the disabled state below
+    if (!result || characterId === null || share.status === 'saving') return;
+    const snapshot = buildAppraisalSnapshot({
+      hub: hub.id,
+      pricePercent,
+      generatedAt: Math.floor(Date.now() / 1000),
+      items: result.appraisal.items,
+    });
+    if (!snapshot.ok) return; // pre-checked by the disabled state below
+    const reuseKey = appraisalSnapshotReuseKey(snapshot.value);
+    // A link already made copies with no await first, so it stays inside the click.
+    let url = existingShareLink('appraisal', reuseKey);
+    if (url === null) {
+      setShare({ status: 'saving' });
+      try {
+        url = await createShareLink({
+          type: 'appraisal',
+          payload: snapshot.value,
+          reuseKey,
+          characterId,
+        });
+      } catch {
+        setShare({ status: 'failed' });
+        return;
+      }
+    }
     try {
-      await writeToClipboard(shared.url);
-      setShareCopied(true);
+      await writeToClipboard(url);
+      setShare({ status: 'copied', url });
     } catch {
-      setShareCopied(false);
+      setShare({ status: 'manual', url });
     }
   }
+
+  async function handleCopyShareUrl(url: string) {
+    try {
+      await writeToClipboard(url);
+      setShare({ status: 'copied', url });
+    } catch {
+      // Still on screen to copy by hand.
+    }
+  }
+
+  const shareItemCount = result?.appraisal.items.length ?? 0;
 
   const sellListItems = result?.appraisal.items ?? [];
   const canCopySellList = hasAppraisalSellList(sellListItems);
@@ -473,16 +540,26 @@ export function AppraisalPanel({
               />
               <IconButton
                 size="sm"
-                icon={shareCopied ? <Icon.Done /> : <Icon.Share />}
+                icon={share.status === 'copied' ? <Icon.Done /> : <Icon.Share />}
                 label={t('market.appraisal.share')}
                 tooltip={
-                  rows.length > MAX_SHARE_ITEMS
+                  shareItemCount > MAX_SNAPSHOT_ITEMS
                     ? t('market.appraisal.shareTooLarge')
-                    : shareCopied
-                      ? t('market.appraisal.shareCopied')
-                      : undefined
+                    : share.status === 'saving'
+                      ? t('market.appraisal.shareSaving')
+                      : share.status === 'failed'
+                        ? t('market.appraisal.shareFailed')
+                        : share.status === 'copied'
+                          ? t('market.appraisal.shareCopied')
+                          : undefined
                 }
-                disabled={rows.length === 0 || rows.length > MAX_SHARE_ITEMS}
+                disabled={
+                  characterId === null ||
+                  !isSyncConfigured() ||
+                  rows.length === 0 ||
+                  shareItemCount > MAX_SNAPSHOT_ITEMS ||
+                  share.status === 'saving'
+                }
                 onClick={() => void handleShare()}
               />
               <IconButton
@@ -528,17 +605,38 @@ export function AppraisalPanel({
             />
           ) : (
             <>
+              {share.status === 'manual' && (
+                <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+                  <label
+                    htmlFor="market-appraisal-share-url"
+                    className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                  >
+                    {t('market.appraisal.shareReady')}
+                  </label>
+                  <TextInput
+                    id="market-appraisal-share-url"
+                    size="sm"
+                    readOnly
+                    value={share.url}
+                    onFocus={(event) => event.currentTarget.select()}
+                    className="min-w-0 flex-1 font-mono"
+                  />
+                  <Button size="sm" onClick={() => void handleCopyShareUrl(share.url)}>
+                    {t('market.appraisal.shareCopy')}
+                  </Button>
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
                 <StatChips>
                   <StatChip
                     label={t('market.appraisal.sellTotal')}
-                    value={<IskAmount value={totals.sell} revealOn="tap" decimals={0} />}
+                    value={<FullIskTotal value={totals.sell} />}
                     tone="accent"
                     tooltip={t('market.appraisal.sellTotalHelp')}
                   />
                   <StatChip
                     label={t('market.appraisal.buyTotal')}
-                    value={<IskAmount value={totals.buy} revealOn="tap" decimals={0} />}
+                    value={<FullIskTotal value={totals.buy} />}
                     tooltip={t('market.appraisal.buyTotalHelp')}
                   />
                   {net && (
