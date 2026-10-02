@@ -588,11 +588,14 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
   `<button>` that opens a picker (the stats column's Implants trigger) wears
   the field chrome (`fieldBaseClassName` + a `fieldSizeClassName` size), so
   it reads as the control it is.
-- **Stacked controls line up; they never just wrap.** When a panel puts two
-  or more labelled controls on separate lines, lay them out as a two-column
-  grid (`grid-cols-[max-content_minmax(0,1fr)]`): labels in the left column,
-  controls in the right, every select in the group one width, and a
-  control's own action ("Manage", "Appraise") after it on the same line.
+- **Stacked controls line up; they never just wrap.** When a panel body puts
+  two or more labelled controls on separate lines, lay them out as a
+  two-column grid (`grid-cols-[max-content_minmax(0,1fr)]`): labels in the
+  left column, controls in the right, every select in the group one width,
+  and a control's own action ("Manage", "Appraise") after it on the same
+  line (it drops beneath the control only when the column is too narrow
+  for both). The `FilterBar` sheet (§4b) is not covered: it captions each
+  filter above a full-width control.
   An explanation of the current value goes dim beneath its control, in the
   control column, never beside it. Controls that land on new lines only
   because the row ran out of room look accidental. A picker that renders its
@@ -613,9 +616,10 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
   pieces in `features/fittings/StatFacts.tsx` and `statKit.tsx`:
   - `StatRows` / `StatRow` for one row per module. A row has two lines: the
     name, then a dim detail line with the figure at its right. Hairlines go
-    between rows, and a total's is brighter. Only a row with nothing to
-    detail (a total) sits on one line, and it asks for that with `inline`
-    rather than by leaving `detail` empty.
+    between rows. Only a row with nothing to detail (a total) sits on one
+    line, and it asks for that with `inline` rather than by leaving `detail`
+    empty. A total is a hand-built `<li className={statRowClassName(true)}>`
+    around `StatRowContent`, which gives it the brighter hairline.
   - `Facts` for label/value pairs.
   - `StatGroup` for a labelled run inside a section.
   - `StatFields` / `StatField` for the pickers on top, with `sm` controls
