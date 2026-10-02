@@ -550,8 +550,8 @@
 
     /* `end` (a quantity box): closes the meta line, pushed to its right end.
        Not pinned across both lines like `start`: a box that wide would take
-       its width from the title line too, and the title needs it more. */
-    /* `baseline` (the row's own alignment), not `center`: the box's text
+       its width from the title line too, and the title needs it more.
+       `baseline` (the row's own alignment), not `center`: the box's text
        lines up with the meta text, so the two read as one line rather than
        the meta floating at the top of a box-tall line. */
     .dt-stack.dt-stack-dense td.dt-edge-end {

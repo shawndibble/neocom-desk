@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip } from '@/components/ui';
 import { HAULING_THRESHOLDS, lotEconomics } from '@/engine/market/haulingMarket';
 import { formatIsk } from '@/lib/isk';
+import { MarketItemLink } from './MarketItemLink';
 import type { InstantHaulingScanRow, ListHaulingScanRow } from './haulingData';
 import { formatDaysToSell, type HaulingViewRow } from './haulingView';
 
@@ -138,6 +139,20 @@ export function HaulingRowDetail({ row, loadNote }: HaulingRowDetailProps) {
 }
 
 /** The unit volume and what capped the plan's quantity — the facts the compact row no longer prints. */
+/** The item in the Market Browser at the destination hub — its full order book and price history. */
+function MarketLink({ row }: { row: HaulingViewRow }) {
+  const { t } = useTranslation();
+  return (
+    <MarketItemLink
+      typeId={row.typeId}
+      hubId={row.toHub.id}
+      className="self-start text-xs text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+    >
+      {t('market.hauling.detail.openInMarket', { hub: row.toHub.systemName })}
+    </MarketItemLink>
+  );
+}
+
 function LoadNote({ row, note }: { row: HaulingViewRow; note: string | undefined }) {
   const { t } = useTranslation();
   const volume = t('market.hauling.volumeEach', {
@@ -261,6 +276,7 @@ function InstantDetail({ row, loadNote }: DetailProps<HaulingViewRow & InstantHa
               </table>
             </div>
           </OrdersDisclosure>
+          <MarketLink row={row} />
         </Section>
       </div>
     </div>
@@ -482,6 +498,7 @@ function ListingDetail({ row, loadNote }: DetailProps<HaulingViewRow & ListHauli
                 </table>
               </div>
             </OrdersDisclosure>
+            <MarketLink row={row} />
           </Section>
         </div>
       </div>

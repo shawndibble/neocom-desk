@@ -10,7 +10,7 @@
  * quantity, and unticking or typing a number re-sizes the rest through the
  * same `planTrip` the suggestion came from.
  */
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -31,19 +31,15 @@ import {
   Spinner,
   TextInput,
   Toast,
-  Tooltip,
+  IconButton,
   TypeIcon,
   DataTableDenseCell,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsNarrow } from '@/lib/useIsNarrow';
-import {
-  multibuyText,
-  planTrip,
-  type TripLine,
-  type TripOverride,
-} from '@/engine/market/haulingPlan';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { multibuyText, planTrip, type TripOverride } from '@/engine/market/haulingPlan';
 import type { DemandKind, HaulingFlag } from '@/engine/market/haulingMarket';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -160,28 +156,19 @@ const useHaulingColumns = createColumnVisibilitySetting<HaulingColumnId>({
   ids: HAULING_COLUMN_IDS,
 });
 
-const DEMAND_DOT: Record<DemandKind, string> = {
-  'most-days': 'bg-success',
-  bursts: 'bg-warning',
-  rarely: 'bg-danger',
+/**
+ * The demand mark: a filled dot, a hollow ring or a square, so the three
+ * read apart by shape as well as colour — on a phone the mark stands alone,
+ * its words left to screen readers and the row's detail (DESIGN.md §7).
+ */
+const DEMAND_MARK: Record<DemandKind, string> = {
+  'most-days': 'rounded-full bg-success',
+  bursts: 'rounded-full border-2 border-warning',
+  rarely: 'rounded-[1px] bg-danger',
 };
 
 function signed(value: number, fractionDigits: number): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(fractionDigits)}`;
-}
-
-/**
- * An ISK figure in full on a wide screen and compact (`3.41K`) on a phone,
- * where the dense card's meta line holds Buy, Sell and ISK/m³ side by side
- * in about 200px.
- */
-function PhoneCompact({ value, digits }: { value: number; digits: number }) {
-  return (
-    <>
-      <span className="max-sm:hidden">{formatIsk(value, digits)}</span>
-      <span className="sm:hidden">{formatIskCompact(value)}</span>
-    </>
-  );
 }
 
 /** What the page header needs to render Hauling's own reload button beside the page title. */
@@ -246,6 +233,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
   const columnVisibility = useColumnVisibility(useHaulingColumns, HAULING_COLUMN_IDS);
   const isNarrow = useIsNarrow();
+  // A phone's dense card holds Buy, Sell and ISK/m³ on one ~200px line, so
+  // its figures go compact (`3.41K`). Chosen in JS, not by a hidden/shown
+  // pair of spans: one DOM at every width (DESIGN.md, DataTable).
+  const isPhone = useIsPhone();
+  const isk = (value: number, digits: number) =>
+    isPhone ? formatIskCompact(value) : formatIsk(value, digits);
 
   const [groups, setGroups] = useState<MarketGroupNode[] | null>(null);
   useEffect(() => {
@@ -345,6 +338,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     });
   }
 
+  /** Unticks every shown row: Select all's off state, and the menu's Clear all. */
+  const clearAll = () => setOverrides(new Map(shown.map((r) => [r.typeId, { selected: false }])));
+
   const allSelected =
     shown.length > 0 && shown.every((r) => overrides.get(r.typeId)?.selected !== false);
   const selectedCount = shown.filter((r) => overrides.get(r.typeId)?.selected !== false).length;
@@ -359,6 +355,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   // The list itself stays out of the way until asked for (the summary row's
   // menu) — or until the clipboard refuses it, below.
   const [listShown, setShowList] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  // Opened by a refused copy, the list may sit off screen (a phone scrolled
+  // down the rows): bring it into view so "copy the list below" points at it.
+  useEffect(() => {
+    if (copyStatus === 'failed') listRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [copyStatus]);
   async function copyMultibuy() {
     try {
       await writeToClipboard(listText);
@@ -371,7 +373,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     }
   }
 
-  const limitText = (line: TripLine): string => {
+  /** What capped a row's planned quantity ("22 m³ · about a week of sales"), or nothing for a row with no plan line. */
+  const limitTextOf = (row: HaulingViewRow): string | undefined => {
+    const line = lineOf.get(row.typeId);
+    if (!line) return undefined;
     const unit = line.volumeM3 > 0 ? `${Math.round(line.volumeM3).toLocaleString()} m³ · ` : '';
     return `${unit}${t(`market.hauling.limit.${line.limitedBy}`)}`;
   };
@@ -454,23 +459,19 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             {row.name}
           </MarketItemLink>
           {row.flags.length > 0 && (
-            <Tooltip
+            <IconButton
+              variant="plain"
+              tone="warning"
+              size="sm"
               openOnTap
-              content={row.flags
+              icon={<Icon.Warn size={Icon.ICON_SIZE.sm} />}
+              label={t('market.hauling.flagsAria', {
+                flags: row.flags.map((flag) => flagLabel[flag].text).join(', '),
+              })}
+              tooltip={row.flags
                 .map((flag) => `${flagLabel[flag].text}: ${flagLabel[flag].tip}`)
                 .join(' ')}
-            >
-              <button
-                type="button"
-                data-row-control
-                aria-label={t('market.hauling.flagsAria', {
-                  flags: row.flags.map((flag) => flagLabel[flag].text).join(', '),
-                })}
-                className="relative inline-flex shrink-0 text-warning before:absolute before:-inset-2 before:content-[''] focus-visible:outline-2 focus-visible:outline-accent"
-              >
-                <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} />
-              </button>
-            </Tooltip>
+            />
           )}
         </span>
       ),
@@ -500,7 +501,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       className: 'tabular-nums whitespace-nowrap',
       stackAffix: { before: `${t('market.hauling.columns.buy')} ` },
       sortValue: (row) => row.buyLadder[0]?.price,
-      render: (row) => <PhoneCompact value={row.buyLadder[0]?.price ?? 0} digits={2} />,
+      render: (row) => isk(row.buyLadder[0]?.price ?? 0, 2),
     },
     {
       id: 'expected',
@@ -515,7 +516,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         before: `${t(instant ? 'market.hauling.columns.buyOrder' : 'market.hauling.columns.expected')} `,
       },
       sortValue: (row) => row.price,
-      render: (row) => <PhoneCompact value={row.price} digits={2} />,
+      render: (row) => isk(row.price, 2),
     },
     {
       id: 'margin',
@@ -551,12 +552,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       className: 'tabular-nums whitespace-nowrap',
       stackAffix: { after: t('market.hauling.perM3Short') },
       sortValue: (row) => row.iskPerM3,
-      render: (row) => <PhoneCompact value={row.iskPerM3} digits={0} />,
+      render: (row) => isk(row.iskPerM3, 0),
     },
     {
-      // Days to sell and how steadily it sells, in one cell: the demand dot
-      // leads, and its words follow on a wide screen (a phone reads them only
-      // through the screen-reader text and the row's detail).
+      // Days to sell and how steadily it sells, in one cell: the demand mark
+      // leads, and its words follow on a wide screen (a phone keeps the
+      // mark's shape, with the words for screen readers only).
       id: 'days',
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.days'),
@@ -570,7 +571,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             <span
               aria-hidden="true"
               title={t('market.hauling.demandDays', { count: row.demand.daysWithTrades })}
-              className={`size-2 shrink-0 rounded-full ${DEMAND_DOT[row.demand.demand]}`}
+              className={`size-2 shrink-0 ${DEMAND_MARK[row.demand.demand]}`}
             />
             {formatDaysToSell(row.sale.daysToSell)}
             <span className="text-xs text-text-dim max-sm:sr-only">
@@ -592,7 +593,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         return (
           <BringInput
             label={t('market.hauling.bringRow', { item: row.name })}
-            title={limitText(line)}
+            title={limitTextOf(row)}
             value={overrides.get(row.typeId)?.selected === false ? '' : String(line.quantity)}
             onCommit={(quantity) =>
               patchOverride(
@@ -924,11 +925,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                       aria-label={t('market.hauling.selectAll')}
                       checked={allSelected}
                       onChange={(event) =>
-                        setOverrides(
-                          event.target.checked
-                            ? new Map()
-                            : new Map(shown.map((r) => [r.typeId, { selected: false }]))
-                        )
+                        event.target.checked ? setOverrides(new Map()) : clearAll()
                       }
                     />
                     {t('market.hauling.plan.selectedOf', {
@@ -957,20 +954,24 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                           used: Math.round(plan.totals.volumeM3).toLocaleString(),
                           total: Math.round(cargo.m3).toLocaleString(),
                         })}
-                        title={bindingText ?? undefined}
-                        className="h-1 min-w-12 flex-1 bg-line sm:max-w-xs"
+                        className="h-1 min-w-8 flex-1 bg-line sm:max-w-xs"
                       >
                         <div className="h-full bg-accent" style={{ width: `${heldPct}%` }} />
                       </div>
-                      <span className="shrink-0 text-text-dim max-sm:hidden text-[0.6875rem]">
+                      {/* What binds the load prints from `sm` up; a phone has
+                          no room for it here, and each row's detail says what
+                          capped that row. */}
+                      <span className="min-w-0 shrink-0 text-[0.6875rem] text-text-dim">
                         {t('market.hauling.plan.holdUsed', {
                           used: Math.round(plan.totals.volumeM3).toLocaleString(),
                           total: Math.round(cargo.m3).toLocaleString(),
                         })}
+                        {bindingText && <span className="max-sm:hidden"> · {bindingText}</span>}
                       </span>
                     </>
                   ) : (
-                    <span className="min-w-0 flex-1 max-sm:hidden text-[0.6875rem] text-text-dim">
+                    // The ship button beside it says the same on a phone.
+                    <span className="min-w-0 flex-1 text-[0.6875rem] text-text-dim max-sm:hidden">
                       {t('market.hauling.cargo.tip')}
                     </span>
                   )}
@@ -998,13 +999,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                       >
                         {t('market.hauling.fillHold')}
                       </MenuItem>
-                      <MenuItem
-                        onSelect={() =>
-                          setOverrides(new Map(shown.map((r) => [r.typeId, { selected: false }])))
-                        }
-                      >
-                        {t('market.hauling.clearAll')}
-                      </MenuItem>
+                      <MenuItem onSelect={clearAll}>{t('market.hauling.clearAll')}</MenuItem>
                       <MenuItem onSelect={() => setShowList((open) => !open)}>
                         {t(
                           listShown
@@ -1020,7 +1015,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
               {/* The list Copy Multibuy copies, on request — and on its own
                   when the clipboard refused, so it can be copied by hand. */}
               {listShown && (
-                <div className="flex flex-col gap-1 border-b border-line bg-panel-2 px-3 pb-3">
+                <div
+                  ref={listRef}
+                  className="flex flex-col gap-1 border-b border-line bg-panel-2 px-3 pb-3"
+                >
                   <span className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('market.hauling.multibuyList')}
                   </span>
@@ -1045,15 +1043,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                 rowContextMenu={rowContextMenu}
                 rowMoreActions
                 expandableRow={{
-                  renderDetail: (row) => (
-                    <HaulingRowDetail
-                      row={row}
-                      loadNote={(() => {
-                        const line = lineOf.get(row.typeId);
-                        return line ? limitText(line) : undefined;
-                      })()}
-                    />
-                  ),
+                  renderDetail: (row) => <HaulingRowDetail row={row} loadNote={limitTextOf(row)} />,
                   hideIcon: true,
                 }}
                 rowClassName={(row) =>
