@@ -5,9 +5,13 @@
  * like `navDestinations.ts`: no React, no Dexie — the stores that hold the
  * hidden and recent lists live in `navPreferences.ts`.
  */
-import { tabBarTabs, tabPath } from '@/lib/pageTabs';
-import { NAV_PAGES, type NavDestination, type NavPage, type NavPagePath } from './navDestinations';
-import { PAGE_TABS } from './pageTabs';
+import {
+  NAV_PAGES,
+  navTabs,
+  type NavDestination,
+  type NavPage,
+  type NavPagePath,
+} from './navDestinations';
 
 interface OwnedPath {
   readonly path: string;
@@ -16,17 +20,11 @@ interface OwnedPath {
 
 /**
  * Every page and view path, in nav order: each page, then its tabs, then its
- * sub-views. Alias tabs are left out — they only redirect — and so are the
- * tabs of a `tablessNav` page.
+ * sub-views — `navTabs`' tabs, so the rail owns exactly what it lists.
  */
 const OWNED_PATHS: readonly OwnedPath[] = (NAV_PAGES as readonly NavPage[]).flatMap((page) => {
   const pagePath = page.path as NavPagePath;
-  const tabs = page.tablessNav ? undefined : PAGE_TABS[page.path];
-  const tabPaths = tabs
-    ? tabBarTabs(tabs)
-        .filter((tab) => !page.aliasTabs?.includes(tab.id))
-        .map((tab) => tabPath(tabs, tab.id))
-    : [];
+  const tabPaths = navTabs(page).map((tab) => tab.path);
   const viewPaths = (page.subViews ?? []).map((view) => view.path as string);
   return [page.path, ...tabPaths, ...viewPaths].map((path) => ({ path, pagePath }));
 });
