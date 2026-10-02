@@ -63,7 +63,7 @@ describe('loadPublicCorporationInfo', () => {
           ceo_id: 99,
           creator_id: 99,
           member_count: 42,
-          tax_rate: 0.1,
+          tax_rates: { isk: 10 },
         })
       ),
       http.post(`${ESI_BASE_URL}/universe/names`, () =>
@@ -90,7 +90,7 @@ describe('loadPublicCorporationInfo', () => {
           ceo_id: 100,
           creator_id: 100,
           member_count: 1,
-          tax_rate: 0,
+          tax_rates: { isk: 0 },
         })
       ),
       http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.error())

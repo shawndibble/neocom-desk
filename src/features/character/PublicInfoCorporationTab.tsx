@@ -1,9 +1,10 @@
 /**
  * Corporation tab body for `PublicInfoModal`: who the corporation is (logo,
  * ticker, alliance, founding, CEO and founder, home station, its own
- * description), how it fights (zKillboard's figures and its Snuggly↔Dangerous
- * and Solo↔Gang meters, shared with the Character tab), and the alliances it
- * has been in. Lazy-loaded, like the Employment tab.
+ * description), how it fights (zKillboard's Snuggly↔Dangerous and Solo↔Gang
+ * meters first — the question a reader opening a corp mostly came with — then
+ * one line of figures and its most-flown hulls), and the alliances it has
+ * been in. Lazy-loaded, like the Employment tab.
  *
  * The corp record itself is loaded by the modal, which owns the tab's
  * loading/error state; the parts that hang off it — stats, alliance history,
@@ -26,8 +27,14 @@ import {
   fetchCorporationStats,
   type PilotStatsResult,
 } from '@/lib/zkillboard';
-import { ZkillStatsSection } from '@/features/travel/ZkillStatsSection';
-import { corporationAge } from './corporationInfo';
+import {
+  StatTiles,
+  ZkillRatioMeters,
+  ZkillStatsStatus,
+  ZkillTopShips,
+} from '@/features/travel/ZkillStatsSection';
+import { killFigures, type StatTileItem } from '@/features/travel/zkillFigures';
+import { corporationAge, corporationTaxPercent } from './corporationInfo';
 import {
   loadPublicAllianceHistory,
   type PublicAllianceHistory,
@@ -53,6 +60,14 @@ const externalLinkClassName =
   'inline-flex h-11 flex-1 items-center justify-center rounded-xs border border-line-bright px-3 text-xs text-text hover:bg-panel-2 sm:h-8 sm:flex-none';
 /** Status words: type and colour, never a box — a box would read as a button (DESIGN.md §6). */
 const statusWordClassName = 'text-[0.6875rem] font-semibold tracking-widest uppercase';
+/** One line from `md` up however many facts there are (tax and the killboard are optional). */
+const FACT_COLUMNS: Record<number, string> = {
+  2: 'md:grid-cols-2',
+  3: 'md:grid-cols-3',
+  4: 'md:grid-cols-4',
+  5: 'md:grid-cols-5',
+  6: 'md:grid-cols-6',
+};
 const sectionHeading = 'text-xs font-semibold tracking-widest text-text-dim uppercase';
 const termClassName = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
@@ -125,7 +140,12 @@ export default function PublicInfoCorporationTab({
   const allianceSince =
     allianceId !== null && current?.allianceId === allianceId ? current.startDate : null;
 
-  const facts: { label: string; value: string }[] = [
+  const taxPercent = corporationTaxPercent(data);
+  const ready = stats?.kind === 'stats' ? stats.stats : null;
+  const figures = killFigures(t, ready);
+  // One line: who it is (members, age, tax), then how it fights. Tax only when
+  // ESI states it; the zKillboard figures only for a corp players run.
+  const facts: StatTileItem[] = [
     { label: t('publicInfo.memberCount'), value: data.member_count.toLocaleString() },
     {
       label: t('publicInfo.age'),
@@ -134,7 +154,10 @@ export default function PublicInfoCorporationTab({
           ? t('common.unknown')
           : t('publicInfo.ageValue', { years: age.years, months: age.months }),
     },
-    { label: t('publicInfo.taxRate'), value: `${Math.round(data.tax_rate * 1000) / 10}%` },
+    ...(taxPercent === null
+      ? []
+      : [{ label: t('publicInfo.taxRate'), value: `${taxPercent.toLocaleString()}%` }]),
+    ...(npc ? [] : [figures.kills, figures.losses, figures.iskDestroyed]),
   ];
 
   return (
@@ -209,57 +232,55 @@ export default function PublicInfoCorporationTab({
         </div>
       </div>
 
-      <dl className="grid grid-cols-3 gap-3">
-        {facts.map(({ label, value }) => (
-          <div key={label} className="rounded-xs border border-line bg-panel-2 px-3 py-2">
-            <dt className={termClassName}>{label}</dt>
-            <dd className="text-base font-medium tabular-nums text-text">{value}</dd>
-          </div>
-        ))}
-      </dl>
+      {ready && <ZkillRatioMeters stats={ready} />}
+
+      <StatTiles items={facts} className={FACT_COLUMNS[facts.length]} />
 
       <div className="grid gap-4 md:grid-cols-2">
-        <dl className="grid grid-cols-[6.5rem_1fr] items-center gap-x-3 gap-y-2 self-start">
-          <dt className={termClassName}>{t('publicInfo.ceo')}</dt>
-          <dd>
-            <PersonLink id={data.ceo_id} name={data.ceoName} onOpen={onShowCharacter} />
-          </dd>
-          <dt className={termClassName}>{t('publicInfo.founder')}</dt>
-          <dd>
-            <PersonLink id={data.creator_id} name={data.creatorName} onOpen={onShowCharacter} />
-          </dd>
-          {data.date_founded && (
-            <>
-              <dt className={termClassName}>{t('publicInfo.founded')}</dt>
-              <dd>
-                {new Date(data.date_founded).toLocaleDateString(undefined, {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                  timeZone: 'UTC',
-                })}
-              </dd>
-            </>
-          )}
-          {data.home_station_id !== undefined && (
-            <>
-              <dt className={termClassName}>{t('publicInfo.homeStation')}</dt>
-              <dd>{stationName ?? `#${data.home_station_id}`}</dd>
-            </>
-          )}
-          {data.faction_id !== undefined && (
-            <>
-              <dt className={termClassName}>{t('publicInfo.faction')}</dt>
-              <dd>{factionName ?? `#${data.faction_id}`}</dd>
-            </>
-          )}
-          {data.shares !== undefined && (
-            <>
-              <dt className={termClassName}>{t('publicInfo.shares')}</dt>
-              <dd className="tabular-nums">{data.shares.toLocaleString()}</dd>
-            </>
-          )}
-        </dl>
+        <div className="min-w-0 space-y-5 self-start">
+          <dl className="grid grid-cols-[6.5rem_1fr] items-center gap-x-3 gap-y-2">
+            <dt className={termClassName}>{t('publicInfo.ceo')}</dt>
+            <dd>
+              <PersonLink id={data.ceo_id} name={data.ceoName} onOpen={onShowCharacter} />
+            </dd>
+            <dt className={termClassName}>{t('publicInfo.founder')}</dt>
+            <dd>
+              <PersonLink id={data.creator_id} name={data.creatorName} onOpen={onShowCharacter} />
+            </dd>
+            {data.date_founded && (
+              <>
+                <dt className={termClassName}>{t('publicInfo.founded')}</dt>
+                <dd>
+                  {new Date(data.date_founded).toLocaleDateString(undefined, {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    timeZone: 'UTC',
+                  })}
+                </dd>
+              </>
+            )}
+            {data.home_station_id !== undefined && (
+              <>
+                <dt className={termClassName}>{t('publicInfo.homeStation')}</dt>
+                <dd>{stationName ?? `#${data.home_station_id}`}</dd>
+              </>
+            )}
+            {data.faction_id !== undefined && (
+              <>
+                <dt className={termClassName}>{t('publicInfo.faction')}</dt>
+                <dd>{factionName ?? `#${data.faction_id}`}</dd>
+              </>
+            )}
+            {data.shares !== undefined && (
+              <>
+                <dt className={termClassName}>{t('publicInfo.shares')}</dt>
+                <dd className="tabular-nums">{data.shares.toLocaleString()}</dd>
+              </>
+            )}
+          </dl>
+          {ready && ready.topShips.length > 0 && <ZkillTopShips ships={ready.topShips} />}
+        </div>
 
         <div className="min-w-0 space-y-4">
           {description !== '' && (
@@ -310,7 +331,12 @@ export default function PublicInfoCorporationTab({
         </div>
       </div>
 
-      {!npc && <ZkillStatsSection stats={stats} subject="corporation" />}
+      {!npc &&
+        (ready ? (
+          <p className="text-xs text-text-dim">{t('travel.pilot.statsSource')}</p>
+        ) : (
+          <ZkillStatsStatus stats={stats} subject="corporation" />
+        ))}
     </div>
   );
 }

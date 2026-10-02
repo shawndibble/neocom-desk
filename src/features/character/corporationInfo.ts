@@ -3,7 +3,7 @@
  * alliance history as dated stints, and how old it is. `now` is a parameter
  * so both stay deterministic.
  */
-import type { CorporationAllianceHistoryEntry } from '@/esi/endpoints';
+import type { CorporationAllianceHistoryEntry, CorporationPublicInfo } from '@/esi/endpoints';
 
 export interface AllianceHistoryRow {
   recordId: number;
@@ -44,4 +44,12 @@ export function corporationAge(
   if (now.getUTCDate() < founded.getUTCDate()) months -= 1;
   months = Math.max(0, months);
   return { years: Math.floor(months / 12), months: months % 12 };
+}
+
+/** The corporation's ISK tax as a percentage, or null when ESI sent none it can read. */
+export function corporationTaxPercent(
+  info: Pick<CorporationPublicInfo, 'tax_rates'>
+): number | null {
+  const isk = info.tax_rates?.isk;
+  return typeof isk === 'number' && Number.isFinite(isk) ? isk : null;
 }

@@ -94,7 +94,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 99,
       creator_id: 99,
       member_count: 42,
-      tax_rate: 0.1,
+      tax_rates: { isk: 10 },
       alliance_id: 3,
     });
     mockAlliance(3, {
@@ -140,7 +140,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 102,
       creator_id: 102,
       member_count: 10,
-      tax_rate: 0,
+      tax_rates: { isk: 0 },
       alliance_id: 8,
     });
     mockAlliance(8, {
@@ -174,7 +174,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 99,
       creator_id: 99,
       member_count: 42,
-      tax_rate: 0.1,
+      tax_rates: { isk: 10 },
     });
     mockNames([{ id: 99, name: 'CEO Pilot' }]);
 
@@ -201,7 +201,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 100,
       creator_id: 100,
       member_count: 1,
-      tax_rate: 0,
+      tax_rates: { isk: 0 },
     });
     mockNames([{ id: 100, name: 'Solo CEO' }]);
 
@@ -254,7 +254,7 @@ describe('PublicInfoModal', () => {
           ceo_id: 101,
           creator_id: 101,
           member_count: 1,
-          tax_rate: 0,
+          tax_rates: { isk: 0 },
         });
       })
     );
@@ -295,7 +295,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 102,
       creator_id: 102,
       member_count: 3,
-      tax_rate: 0,
+      tax_rates: { isk: 0 },
     });
     mockAlliance(700, {
       name: 'Killboard Alliance',
@@ -355,7 +355,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 103,
       creator_id: 103,
       member_count: 5,
-      tax_rate: 0,
+      tax_rates: { isk: 0 },
     });
     mockNames([
       { id: 9, name: 'Lookup Corp' },
@@ -399,7 +399,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 104,
       creator_id: 104,
       member_count: 2,
-      tax_rate: 0,
+      tax_rates: { isk: 0 },
       // Cached corp record still names an alliance the live affiliation has left.
       alliance_id: 13,
     });
@@ -442,7 +442,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 99,
       creator_id: 99,
       member_count: 42,
-      tax_rate: 0.1,
+      tax_rates: { isk: 10 },
     });
 
     renderModal();
@@ -473,7 +473,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 99,
       creator_id: 99,
       member_count: 42,
-      tax_rate: 0.1,
+      tax_rates: { isk: 10 },
     };
 
     it('lazy-loads the character corporation history only once the tab is opened', async () => {
@@ -565,7 +565,7 @@ describe('PublicInfoModal', () => {
         ceo_id: 90000001,
         creator_id: 90000002,
         member_count: 142,
-        tax_rate: 0.1,
+        tax_rates: { isk: 10 },
         alliance_id: 99000001,
         date_founded: '2019-04-12T00:00:00Z',
         war_eligible: true,
@@ -616,7 +616,7 @@ describe('PublicInfoModal', () => {
         ceo_id: 90000001,
         creator_id: 90000001,
         member_count: 1,
-        tax_rate: 0,
+        tax_rates: { isk: 0 },
       });
       mockNames([{ id: 90000001, name: 'Kaelen Vrask' }]);
 
@@ -638,7 +638,7 @@ describe('PublicInfoModal', () => {
         ceo_id: 3000001,
         creator_id: 1,
         member_count: 0,
-        tax_rate: 0,
+        tax_rates: { isk: 0 },
         faction_id: 500016,
       });
       mockNames([{ id: 500016, name: 'Servant Sisters of EVE' }]);
@@ -670,7 +670,7 @@ describe('PublicInfoModal', () => {
         ceo_id: 3000001,
         creator_id: 1,
         member_count: 0,
-        tax_rate: 0,
+        tax_rates: { isk: 0 },
       });
       mockNames([{ id: 1000125, name: 'Sisters of EVE' }]);
 

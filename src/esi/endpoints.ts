@@ -266,7 +266,12 @@ export interface CorporationPublicInfo {
   ceo_id: number;
   creator_id: number;
   member_count: number;
-  tax_rate: number;
+  /**
+   * Percentages (10 = 10%), not fractions. The compatibility date this app
+   * sends replaced the old fractional `tax_rate` with this pair; reading the
+   * old field gave every corporation's tax as NaN.
+   */
+  tax_rates?: { isk?: number; loyalty_point?: number };
   alliance_id?: number;
   date_founded?: string;
   description?: string;
