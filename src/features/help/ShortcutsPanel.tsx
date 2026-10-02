@@ -21,8 +21,9 @@ const LIST = 'grid grid-cols-1 gap-x-8 text-sm md:grid-cols-2';
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-line py-2">
-      <dt className="text-text-dim">{label}</dt>
-      <dd>{children}</dd>
+      {/* The value never shrinks or wraps and sits flush right; the label takes the rest. */}
+      <dt className="min-w-0 text-text-dim">{label}</dt>
+      <dd className="shrink-0 text-right whitespace-nowrap">{children}</dd>
     </div>
   );
 }

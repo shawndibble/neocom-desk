@@ -6350,8 +6350,8 @@
     "paste": "Paste",
     "pasteFitting": "EFT fitting",
     "pasteFittingOpens": "Opens in Fittings",
-    "pasteItems": "Item list (inventory, cargo, contract)",
-    "pasteItemsOpens": "Opens in the Appraisal"
+    "pasteItems": "Item list (inventory, contract)",
+    "pasteItemsOpens": "Opens in Appraisal"
   },
   "activityLog": {
     "title": "Activity Log",
