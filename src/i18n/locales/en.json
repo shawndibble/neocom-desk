@@ -5051,7 +5051,9 @@
     "dismiss": "Dismiss",
     "installCta": "Install Neocom Desk for quicker access.",
     "install": "Install",
-    "installIosCta": "Install Neocom Desk: tap Share, then Add to Home Screen."
+    "installIosSafariCta": "Install Neocom Desk: tap Share (or ••• then Share), then Add to Home Screen.",
+    "installIosOtherCta": "Install Neocom Desk: open your browser's menu, tap Share, then Add to Home Screen.",
+    "installAndroidCta": "Install Neocom Desk: open your browser's menu (⋮), then choose Install app or Add to Home screen."
   },
   "market": {
     "title": "Market",

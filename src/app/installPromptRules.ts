@@ -20,25 +20,34 @@ export interface BeforeInstallPromptEvent extends Event {
 }
 
 /**
- * iOS Safari never fires `beforeinstallprompt`. Other iPhone/iPad browsers
- * (Chrome, Firefox, Edge for iOS) are required by Apple to embed WebKit and
- * don't expose the event either, so this only needs to rule those UAs out
- * rather than truly identify Safari.
+ * Which phone/tablet install flow this browser has, or `null` on desktop —
+ * the Install Prompt is mobile-only. iOS splits Safari from the other iOS
+ * browsers (Chrome, Firefox, Edge… all WebKit underneath) because they put
+ * "Add to Home Screen" behind different menus. iPadOS 13+ Safari sends a
+ * Mac UA by default, so a "Macintosh" with touch points is an iPad.
  */
-export function isIosSafari(userAgent: string): boolean {
-  return /iphone|ipad|ipod/i.test(userAgent) && !/crios|fxios|edgios|opios/i.test(userAgent);
+export type InstallPlatform = 'ios-safari' | 'ios-other' | 'android';
+
+export function detectInstallPlatform(
+  userAgent: string,
+  maxTouchPoints: number
+): InstallPlatform | null {
+  const isIOS =
+    /iphone|ipad|ipod/i.test(userAgent) || (/macintosh/i.test(userAgent) && maxTouchPoints > 1);
+  if (isIOS) return /crios|fxios|edgios|opios/i.test(userAgent) ? 'ios-other' : 'ios-safari';
+  if (/android/i.test(userAgent)) return 'android';
+  return null;
 }
 
-export type InstallPromptVariant = 'none' | 'native' | 'ios';
+export type InstallPromptVariant = 'none' | 'native' | InstallPlatform;
 
 export function selectInstallPromptVariant(state: {
   seen: boolean;
   isStandalone: boolean;
   deferredPromptAvailable: boolean;
-  isIOS: boolean;
+  platform: InstallPlatform | null;
 }): InstallPromptVariant {
-  if (state.seen || state.isStandalone) return 'none';
+  if (state.seen || state.isStandalone || state.platform === null) return 'none';
   if (state.deferredPromptAvailable) return 'native';
-  if (state.isIOS) return 'ios';
-  return 'none';
+  return state.platform;
 }

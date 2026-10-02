@@ -403,13 +403,15 @@ here — they go one per file in `docs/context/decisions/`.
   `docs/context/decisions/20260910-082559-reaction-location-a-second-facility-context-lets-craft.md`.
 - **Industry Activity**: Which job a **Build Plan** runs — `'manufacturing'` or `'reaction'` (issue #460). Never a field on `BuildPlanRecord`; always derived from the picked blueprint/reaction formula's own `activity`, tagged onto it from the SDE (`industryActivity.csv`'s activity ID 1 vs 11) at build time. Determines which **Facility Preset**s and reactor/engineering rig security multipliers apply — a facility hosts one activity, never both.
 - **Install Prompt**: A one-time, in-app call-to-action to install Neocom
-  Desk as a home-screen/desktop app, layered on top of the browser's own
-  passive PWA affordance (already present via `vite-plugin-pwa`). Platform-
-  appropriate: captures the native `beforeinstallprompt` event on Chrome/Edge
-  desktop and Chrome Android; on iOS Safari, where `beforeinstallprompt`
-  never fires, it's a static "tap Share → Add to Home Screen" instructional
-  banner instead. Shown once ever per device — accepting or dismissing either
-  one permanently suppresses it, no snooze or re-ask.
+  Desk as a home-screen app, layered on top of the browser's own passive PWA
+  affordance (already present via `vite-plugin-pwa`). Phones and tablets
+  only (iOS and Android) — desktop browsers never see it. On Android it uses
+  the native `beforeinstallprompt` event when the browser fires it, else
+  "open the menu → Install app / Add to Home screen" instructions; on iOS,
+  where the event never fires, it's a static instructional banner worded
+  for Safari's Share button or for other iOS browsers' Share menu. Shown
+  once ever per device — accepting or dismissing either one permanently
+  suppresses it, no snooze or re-ask.
 - **Item Detail**: The modal view of one item's own properties — fitting cost,
   volume, bonuses, description. Read live from ESI per item, not from the SDE
   snapshot, so it is the one Market Browser panel that needs the network.

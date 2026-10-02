@@ -8,6 +8,8 @@ import { useInstallPromptSeen, INSTALL_PROMPT_SEEN_KEY } from './installPromptRu
 
 const desktopChromeUA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36';
+const androidChromeUA =
+  'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36';
 const iosSafariUA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 
@@ -48,7 +50,24 @@ describe('InstallPrompt', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('shows the native install CTA after beforeinstallprompt fires', async () => {
+  it('stays hidden on desktop even when beforeinstallprompt fires', async () => {
+    render(<InstallPrompt />);
+    await waitFor(() => expect(useInstallPromptSeen.getState().hydrated).toBe(true));
+    dispatchBeforeInstallPrompt();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows Android menu instructions when no native prompt fires', async () => {
+    setUserAgent(androidChromeUA);
+    render(<InstallPrompt />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /install app or add to home screen/i
+    );
+  });
+
+  it('shows the native install CTA after beforeinstallprompt fires on Android', async () => {
+    setUserAgent(androidChromeUA);
     render(<InstallPrompt />);
     await waitFor(() => expect(useInstallPromptSeen.getState().hydrated).toBe(true));
     dispatchBeforeInstallPrompt();
@@ -58,6 +77,7 @@ describe('InstallPrompt', () => {
   it('calls prompt() and records seen permanently on install click', async () => {
     const user = userEvent.setup();
     const promptFn = vi.fn().mockResolvedValue(undefined);
+    setUserAgent(androidChromeUA);
     render(<InstallPrompt />);
     await waitFor(() => expect(useInstallPromptSeen.getState().hydrated).toBe(true));
     dispatchBeforeInstallPrompt({
@@ -77,7 +97,7 @@ describe('InstallPrompt', () => {
   it('shows the iOS instructional banner on iOS Safari', async () => {
     setUserAgent(iosSafariUA);
     render(<InstallPrompt />);
-    expect(await screen.findByRole('alert')).toHaveTextContent(/add to home screen/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/tap share.*add to home screen/i);
   });
 
   it('dismisses the iOS banner and records seen permanently', async () => {
