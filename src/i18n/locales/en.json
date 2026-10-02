@@ -52,7 +52,7 @@
     "showInNav": "Show {{page}} in navigation",
     "hiddenCount_one": "{{count}} hidden · Edit",
     "hiddenCount_other": "{{count}} hidden · Edit",
-    "searchPlaceholder": "Search pages, items, pilots",
+    "searchPlaceholder": "Search pages, items, pilots…",
     "recent": "Recent",
     "hiddenPages_one": "{{count}} hidden: {{pages}}",
     "hiddenPages_other": "{{count}} hidden: {{pages}}",
@@ -6076,7 +6076,7 @@
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
           "crashes": "Crash reports: the error and the page it happened on. No IP addresses; request and response bodies are never captured; EVE tokens are stripped first.",
           "removal": "Removing a character clears it from this device only; adding it back restores its synced copy. That copy is deleted after 90 days with no device syncing it, or right away from Settings › Data & storage › Delete all data.",
-          "writes": "Writes to EVE, only when you act: opening a mail marks it read, answering a calendar invite sends your reply, Mail sends what you wrote, and saving a Fitting to EVE creates or replaces it there. Nothing else is ever written.",
+          "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account, and saving a Fitting to EVE creates or replaces it there. Nothing else is ever written.",
           "export": "Backups (Settings › Data & storage) are password-encrypted files, login tokens included. One is written only when you press the button, and saved only where you put it. We never see it."
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."

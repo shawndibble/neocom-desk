@@ -364,9 +364,10 @@ test('the header progress chips wrap at 390px without horizontal scroll', async 
   await page.setViewportSize(PHONE);
   await page.goto(`./skills/plans/${PLAN_ID}`);
 
-  // The Skills sub-nav also has a "Trained" tab (a link), so match the chip's
-  // own label span.
-  await expect(page.locator('span', { hasText: /^Trained$/ })).toBeVisible();
+  // The Skills sub-nav also has a "Trained" tab (a link), and the (hidden)
+  // desktop rail lists Skills › Trained, so match the chip's own label span
+  // inside the page.
+  await expect(page.getByRole('main').locator('span', { hasText: /^Trained$/ })).toBeVisible();
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth
   );
