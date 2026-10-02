@@ -129,6 +129,16 @@ export interface DataTableColumn<T> {
    * own content — and the table at `sm` and up — is untouched.
    */
   stackAffix?: { before?: string; after?: string };
+  /**
+   * Dense stack only: pins a control cell to the card's left (`'start'`) or
+   * right (`'end'`) edge instead of printing it as one more `·` value on the
+   * 11px meta line, where a control is neither tappable nor readable. A
+   * `start` cell (a row-selection checkbox) is centred across both lines; an
+   * `end` cell (Hauling's Bring box) closes the second line at its right end,
+   * leaving the title line its full width. At most one column per edge;
+   * elsewhere (the labelled stack, the table) it is an ordinary cell.
+   */
+  stackEdge?: 'start' | 'end';
 }
 
 /**
@@ -553,7 +563,9 @@ function DataTableRowImpl<T>({
       }
     >
       {columns.map((column, i) => {
-        const meta = dense && i !== primaryIndex && i !== cardCornerIndex && i !== cardActionsIndex;
+        const edge = dense ? column.stackEdge : undefined;
+        const meta =
+          dense && !edge && i !== primaryIndex && i !== cardCornerIndex && i !== cardActionsIndex;
         return (
           <td
             key={column.id}
@@ -570,6 +582,7 @@ function DataTableRowImpl<T>({
               i === cardCornerIndex && 'dt-corner',
               i === cardCornerIndex && cardCornerStart && 'dt-corner-start',
               i === cardActionsIndex && 'dt-actions',
+              edge && `dt-edge dt-edge-${edge}`,
               meta && 'dt-meta',
               meta && i === firstMetaIndex && 'dt-meta-first',
               // Inert at every width except the dense card, which has no
@@ -740,12 +753,13 @@ export function DataTable<T>({
   const cardCornerIndex = columns.findIndex((column) => column.cardCorner);
   const cardCornerStart = columns[cardCornerIndex]?.cardCorner === 'start';
   const cardActionsIndex = columns.findIndex((column) => column.cardActions);
-  // The dense card's second line: every cell that is neither title nor
-  // corner. The first gets no leading separator. Only computed (and only
-  // marked in the DOM) when dense, so no other table's markup changes.
+  // The dense card's second line: every cell that is neither title, corner
+  // nor edge-pinned. The first gets no leading separator. Only computed (and
+  // only marked in the DOM) when dense, so no other table's markup changes.
   const firstMetaIndex = dense
     ? columns.findIndex(
-        (_, i) => i !== primaryIndex && i !== cardCornerIndex && i !== cardActionsIndex
+        (column, i) =>
+          !column.stackEdge && i !== primaryIndex && i !== cardCornerIndex && i !== cardActionsIndex
       )
     : -1;
   // A right-aligned sortable header's own sort glyph (`gap-1` + an icon) sits

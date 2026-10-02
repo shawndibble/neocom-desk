@@ -426,8 +426,11 @@ exactly the markup above.
   (`{ before: 'Qty ' }`, `{ after: ' reward' }`) supplies the word a bare
   number needs. The active sort column's meta value turns `text` and bold
   (`dt-sorted`, set on every sorted cell and inert everywhere else), since
-  there is no header row to show the sort on. Still pure CSS
-  (`.dt-stack-dense`); `stackColumns` is ignored.
+  there is no header row to show the sort on. A control column sets
+  `stackEdge` to stay off that 11px line: `'start'` (a tick box) is pinned
+  left and centred across both lines, `'end'` (a quantity box) closes line
+  two at its right end (Hauling). Still pure CSS (`.dt-stack-dense`);
+  `stackColumns` is ignored.
 - **`mobileSort`** (+ optional `stackSummary`, e.g. "214 offers") renders an
   `sm:hidden` bar above the table with a native `<select>` ("Sort: Price ↑")
   driving the same sort state as the header buttons. The stacked card hides
