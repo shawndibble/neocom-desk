@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import type { CharacterContact } from '@/esi/endpoints';
 import {
-  ALL_CONTACT_TYPES,
+  ALL_CONTACT_KINDS,
   EMPTY_CONTACTS_FILTER,
   STANDING_CATEGORIES,
   activeContactsFilterCount,
   contactCountsByStanding,
-  contactCountsByType,
+  contactCountsByKind,
+  contactKind,
+  contactTypeLabelKey,
   filterContacts,
   standingCategory,
 } from './contactsFilter';
@@ -37,6 +39,12 @@ const NAMES = new Map([
   [2, 'Brave Newbies Inc.'],
   [3, 'Goonswarm Federation'],
 ]);
+
+/** An NPC agent and an NPC corporation, by CCP's id blocks. */
+const NPCS: CharacterContact[] = [
+  contact(3008416, 'character', 5),
+  contact(1000125, 'corporation', 5),
+];
 
 function ids(contacts: readonly CharacterContact[]): number[] {
   return contacts.map((c) => c.contact_id);
@@ -124,17 +132,47 @@ describe('counts', () => {
     expect(contactCountsByStanding([])).toEqual({ good: 0, neutral: 0, bad: 0 });
   });
 
-  it('tallies every contact type, including ones with no contacts', () => {
-    expect(contactCountsByType(CONTACTS)).toEqual({
+  it('tallies every contact kind, including ones with no contacts', () => {
+    expect(contactCountsByKind(CONTACTS)).toEqual({
       character: 2,
+      npc: 0,
       corporation: 1,
       alliance: 1,
       faction: 0,
     });
+    expect(contactCountsByKind([...CONTACTS, ...NPCS])).toMatchObject({ character: 2, npc: 2 });
   });
 
   it('exposes both vocabularies in display order', () => {
     expect(STANDING_CATEGORIES).toEqual(['good', 'neutral', 'bad']);
-    expect(ALL_CONTACT_TYPES).toEqual(['character', 'corporation', 'alliance', 'faction']);
+    expect(ALL_CONTACT_KINDS).toEqual(['character', 'npc', 'corporation', 'alliance', 'faction']);
+  });
+});
+
+describe('contactKind', () => {
+  it('splits NPC agents and NPC corporations out of their ESI type', () => {
+    expect(contactKind(NPCS[0])).toBe('npc');
+    expect(contactKind(NPCS[1])).toBe('npc');
+    expect(contactKind(CONTACTS[0])).toBe('character');
+    expect(contactKind(CONTACTS[1])).toBe('corporation');
+  });
+
+  it('never reads an alliance or faction id as an NPC', () => {
+    expect(contactKind(contact(500001, 'faction', 0))).toBe('faction');
+    expect(contactKind(contact(1000125, 'alliance', 0))).toBe('alliance');
+  });
+
+  it('lets the NPCs chip hide NPCs without hiding players or player corps', () => {
+    const filter = {
+      ...EMPTY_CONTACTS_FILTER,
+      types: new Set(ALL_CONTACT_KINDS.filter((kind) => kind !== 'npc')),
+    };
+    expect(ids(filterContacts([...CONTACTS, ...NPCS], filter, NAMES))).toEqual([1, 2, 3, 4]);
+  });
+
+  it('names an NPC by what it is in the Type column', () => {
+    expect(contactTypeLabelKey(NPCS[0])).toBe('contacts.typeNpcAgent');
+    expect(contactTypeLabelKey(NPCS[1])).toBe('contacts.typeNpcCorporation');
+    expect(contactTypeLabelKey(CONTACTS[0])).toBe('contacts.typeCharacter');
   });
 });

@@ -188,32 +188,47 @@ export function parsePilotStats(body: unknown): PilotStatsParse | null {
   };
 }
 
-const pilotStatsCache = new Map<number, { at: number; value: PilotStatsParse }>();
+type StatsEntity = 'characterID' | 'corporationID';
 
-/** Test seam: forget every cached pilot. */
+/** Keyed `kind:id`: a pilot and a corporation can never share an answer. */
+const pilotStatsCache = new Map<string, { at: number; value: PilotStatsParse }>();
+
+/** Test seam: forget every cached pilot and corporation. */
 export function resetPilotStatsCache(): void {
   pilotStatsCache.clear();
 }
 
 /**
- * A pilot's zKillboard stats, for Pilot Lookup. A browser fetch with no custom
- * headers, as `fetchKillmailHash` (scope decision `20260924-195833`). The URL
- * 302s to `.../kills/`; both legs are CORS-open, so the fetch follows it.
- * Answers are reused for `PILOT_STATS_CACHE_MS`; a failure never is.
+ * zKillboard's stats for a pilot or a corporation — one body shape for both,
+ * so `parsePilotStats` reads either. A browser fetch with no custom headers,
+ * as `fetchKillmailHash` (scope decision `20260924-195833`). The URL 302s to
+ * `.../kills/`; both legs are CORS-open, so the fetch follows it. Answers are
+ * reused for `PILOT_STATS_CACHE_MS`; a failure never is.
  */
-export async function fetchPilotStats(characterId: number): Promise<PilotStatsResult> {
-  const cached = pilotStatsCache.get(characterId);
+async function fetchEntityStats(entity: StatsEntity, id: number): Promise<PilotStatsResult> {
+  const key = `${entity}:${id}`;
+  const cached = pilotStatsCache.get(key);
   if (cached && Date.now() - cached.at < PILOT_STATS_CACHE_MS) return cached.value;
   try {
-    const response = await fetch(`https://zkillboard.com/api/stats/characterID/${characterId}/`);
+    const response = await fetch(`https://zkillboard.com/api/stats/${entity}/${id}/`);
     if (!response.ok) return { kind: 'failed' };
     const parsed = parsePilotStats(await response.json());
     if (parsed === null) return { kind: 'failed' };
-    pilotStatsCache.set(characterId, { at: Date.now(), value: parsed });
+    pilotStatsCache.set(key, { at: Date.now(), value: parsed });
     return parsed;
   } catch {
     return { kind: 'failed' };
   }
+}
+
+/** A pilot's zKillboard stats, for Pilot Lookup and the Show Info Character tab. */
+export function fetchPilotStats(characterId: number): Promise<PilotStatsResult> {
+  return fetchEntityStats('characterID', characterId);
+}
+
+/** A corporation's zKillboard stats, for the Show Info Corporation tab. */
+export function fetchCorporationStats(corporationId: number): Promise<PilotStatsResult> {
+  return fetchEntityStats('corporationID', corporationId);
 }
 
 /** How many of a pilot's most recent kills and losses Pilot Lookup lists. */

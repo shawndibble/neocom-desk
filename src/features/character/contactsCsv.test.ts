@@ -41,6 +41,13 @@ describe('contactsCsvColumns', () => {
     ]);
   });
 
+  it('prints the same Type word the table does, NPC agents included', () => {
+    const columns = contactsCsvColumns(t, new Map(), new Map());
+    const type = columns.find((c) => c.header === 'contacts.type')!;
+    expect(type.value(contact())).toBe('contacts.typeCharacter');
+    expect(type.value(contact({ contact_id: 3008416 }))).toBe('contacts.typeNpcAgent');
+  });
+
   it('falls back to the id, never a blank cell, for a name that did not resolve', () => {
     const columns = contactsCsvColumns(t, new Map(), new Map());
     const values = Object.fromEntries(columns.map((c) => [c.header, c.value(contact())]));

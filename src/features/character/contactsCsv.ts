@@ -1,6 +1,6 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { CharacterContact } from '@/esi/endpoints';
-import { CONTACT_TYPE_KEY } from './contactsFilter';
+import { contactTypeLabelKey } from './contactsFilter';
 import type { ContactAffiliationRow } from './contactAffiliation';
 import type { AcrossCharactersRow } from './contactsAcrossCharacters';
 
@@ -29,7 +29,7 @@ export function contactsCsvColumns(
 ): CsvColumn<CharacterContact>[] {
   return [
     { header: t('contacts.name'), value: (contact) => entityName(names, contact.contact_id) },
-    { header: t('contacts.type'), value: (contact) => t(CONTACT_TYPE_KEY[contact.contact_type]) },
+    { header: t('contacts.type'), value: (contact) => t(contactTypeLabelKey(contact)) },
     {
       header: t('contacts.affiliation'),
       value: (contact) => {
@@ -65,7 +65,11 @@ export function contactsAcrossCsvColumns(
 ): CsvColumn<AcrossCharactersRow>[] {
   return [
     { header: t('contacts.name'), value: (row) => entityName(names, row.contactId) },
-    { header: t('contacts.type'), value: (row) => t(CONTACT_TYPE_KEY[row.contactType]) },
+    {
+      header: t('contacts.type'),
+      value: (row) =>
+        t(contactTypeLabelKey({ contact_id: row.contactId, contact_type: row.contactType })),
+    },
     { header: t('contacts.acrossCharacters'), value: (row) => row.held.length },
     { header: t('contacts.acrossStandings'), value: (row) => row.standings.join(', ') },
   ];

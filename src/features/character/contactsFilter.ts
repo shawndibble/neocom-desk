@@ -8,6 +8,8 @@
  * on rather than everything off.
  */
 import type { CharacterContact } from '@/esi/endpoints';
+import { isNpcCharacterId, isNpcCorporationId } from '@/esi/entityIds';
+import type { PublicInfoKind } from '@/stores/publicInfoModal';
 
 export type ContactType = CharacterContact['contact_type'];
 export type StandingCategory = 'good' | 'neutral' | 'bad';
@@ -37,6 +39,57 @@ export const CONTACT_TYPE_KEY: Record<ContactType, string> = {
   faction: 'contacts.typeFaction',
 };
 
+/**
+ * What the type chips and the Type column sort a contact into: ESI's type,
+ * except that an NPC — an agent or an NPC corporation, by CCP's id blocks —
+ * is its own kind. A pilot reading their list wants players and the agents
+ * they run missions for apart, and ESI files both as `character`.
+ */
+export type ContactKind = ContactType | 'npc';
+
+/** The chips' order: people first, NPCs straight after the players they would be mistaken for. */
+export const ALL_CONTACT_KINDS: readonly ContactKind[] = [
+  'character',
+  'npc',
+  'corporation',
+  'alliance',
+  'faction',
+];
+
+/** The chip labels. */
+export const CONTACT_KIND_KEY: Record<ContactKind, string> = {
+  ...CONTACT_TYPE_KEY,
+  npc: 'contacts.typeNpc',
+};
+
+/** Only the identity is read, so a merged Across-Characters row can be sorted too. */
+export type ContactIdentity = Pick<CharacterContact, 'contact_id' | 'contact_type'>;
+
+export function contactKind(contact: ContactIdentity): ContactKind {
+  if (contact.contact_type === 'character' && isNpcCharacterId(contact.contact_id)) return 'npc';
+  if (contact.contact_type === 'corporation' && isNpcCorporationId(contact.contact_id)) {
+    return 'npc';
+  }
+  return contact.contact_type;
+}
+
+/**
+ * Which Show Info tab a contact opens on — the row click and the row menu's
+ * entry alike. No public faction-info endpoint is wired into the modal, so a
+ * faction contact opens nothing.
+ */
+export function contactPublicInfoKind(contact: ContactIdentity): PublicInfoKind | null {
+  return contact.contact_type === 'faction' ? null : contact.contact_type;
+}
+
+/** The Type column's word: "NPC agent" or "NPC corp" for an NPC, else the chip's. */
+export function contactTypeLabelKey(contact: ContactIdentity): string {
+  if (contactKind(contact) !== 'npc') return CONTACT_TYPE_KEY[contact.contact_type];
+  return contact.contact_type === 'character'
+    ? 'contacts.typeNpcAgent'
+    : 'contacts.typeNpcCorporation';
+}
+
 /** Zero is its own category, not a rounding of either side: it is what "no opinion" looks like. */
 export function standingCategory(standing: number): StandingCategory {
   if (standing > 0) return 'good';
@@ -47,13 +100,13 @@ export function standingCategory(standing: number): StandingCategory {
 export interface ContactsFilter {
   /** Matched against the resolved name, falling back to the raw contact id. */
   text: string;
-  types: ReadonlySet<ContactType>;
+  types: ReadonlySet<ContactKind>;
   standings: ReadonlySet<StandingCategory>;
 }
 
 export const EMPTY_CONTACTS_FILTER: ContactsFilter = {
   text: '',
-  types: new Set(ALL_CONTACT_TYPES),
+  types: new Set(ALL_CONTACT_KINDS),
   standings: new Set(STANDING_CATEGORIES),
 };
 
@@ -69,7 +122,7 @@ export function filterContacts(
 ): CharacterContact[] {
   const text = filter.text.trim().toLowerCase();
   return contacts.filter((contact) => {
-    if (!filter.types.has(contact.contact_type)) return false;
+    if (!filter.types.has(contactKind(contact))) return false;
     if (!filter.standings.has(standingCategory(contact.standing))) return false;
     if (text !== '') {
       const name = names.get(contact.contact_id) ?? String(contact.contact_id);
@@ -89,7 +142,7 @@ export function filterContacts(
 export function activeContactsFilterCount(filter: ContactsFilter): number {
   let count = 0;
   if (filter.text.trim() !== '') count += 1;
-  if (filter.types.size !== ALL_CONTACT_TYPES.length) count += 1;
+  if (filter.types.size !== ALL_CONTACT_KINDS.length) count += 1;
   if (filter.standings.size !== STANDING_CATEGORIES.length) count += 1;
   return count;
 }
@@ -103,16 +156,17 @@ export function contactCountsByStanding(
   return counts;
 }
 
-/** Every type, zeros included, for the same reason. */
-export function contactCountsByType(
+/** Every kind, zeros included, for the same reason. */
+export function contactCountsByKind(
   contacts: readonly CharacterContact[]
-): Record<ContactType, number> {
-  const counts: Record<ContactType, number> = {
+): Record<ContactKind, number> {
+  const counts: Record<ContactKind, number> = {
     character: 0,
+    npc: 0,
     corporation: 0,
     alliance: 0,
     faction: 0,
   };
-  for (const contact of contacts) counts[contact.contact_type] += 1;
+  for (const contact of contacts) counts[contactKind(contact)] += 1;
   return counts;
 }
