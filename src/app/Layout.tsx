@@ -409,8 +409,10 @@ function MobileMoreSheet({
       {/* `space-y-2`, not the tighter `space-y-1` a desktop-rail-shared gap
           would use: these rows are now full 44px touch targets, and 4px
           between two of them left almost no dead zone for a thumb to miss
-          into on this phone-only sheet. */}
-      <div className="space-y-2 pb-3">
+          into on this phone-only sheet. `min-h-full justify-end` bottom-aligns
+          the rows in the full-height sheet, next to the tab bar and the thumb
+          that opened it, instead of leaving them at the far top. */}
+      <div className="flex min-h-full flex-col justify-end space-y-2 pb-3">
         <CorpNavItem onClick={onClose} />
         {rows.map((path) => (
           <NavItem
