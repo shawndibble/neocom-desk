@@ -1,7 +1,7 @@
 /**
  * The app-wide paste router (`src/app/GlobalPasteRouter.tsx`): a page-level
- * paste — nothing focused — of an EFT fit offers to open it in Fittings, and
- * of an item list offers to appraise it. Covers the hand-off the unit tests
+ * paste — nothing focused — of an EFT fit opens it in Fittings, and of an
+ * item list opens it in the Appraisal. Covers the hand-off the unit tests
  * stop short of: the route state actually opening the fit in the editor, and
  * actually pricing the list. A paste into a field is left alone — covered by
  * `src/app/GlobalPasteRouter.test.tsx`, where an absence needs no fixed wait.
@@ -78,28 +78,24 @@ const RIFTER_EFT = [
 ].join('\n');
 
 test.describe('Global paste', () => {
-  test('a pasted EFT fit offers Fittings, and opens in the editor', async ({ page }) => {
+  test('a pasted EFT fit opens in the editor', async ({ page }) => {
     await openFittings(page);
     await answerAnyType(page);
 
     await pasteOnPage(page, RIFTER_EFT);
     // Generous: the first paste downloads the market type index.
-    await page.getByRole('button', { name: 'Open in Fittings' }).click({ timeout: 15_000 });
-
-    await expect(page).toHaveURL(/\/ships\/fittings\/edit\?f=/);
+    await expect(page).toHaveURL(/\/ships\/fittings\/edit\?f=/, { timeout: 15_000 });
     await expect(page.getByRole('heading', { name: 'Pasted Fit', level: 1 })).toBeVisible();
     // The autocannon landed in the first high slot.
     await expect(page.getByRole('button', { name: 'High slots 1, active' })).toBeVisible();
   });
 
-  test('a pasted item list offers the Appraisal, and prices it', async ({ page }) => {
+  test('a pasted item list opens the Appraisal, and prices it', async ({ page }) => {
     await openFittings(page);
     await mockHubPrices(page);
 
     await pasteOnPage(page, 'Tritanium\t3,400,000\nPyerite\t1,750,000');
-    await page.getByRole('button', { name: 'Appraise' }).click({ timeout: 15_000 });
-
-    await expect(page).toHaveURL(/\/market\/appraisal/);
+    await expect(page).toHaveURL(/\/market\/appraisal/, { timeout: 15_000 });
     await expect(page.getByRole('table', { name: 'Appraisal' })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('table', { name: 'Appraisal' })).toContainText('Pyerite');
   });

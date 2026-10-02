@@ -93,6 +93,11 @@ export function commandPaletteDisplayKey(apple: boolean): string {
   return apple ? '⌘K' : 'Ctrl K';
 }
 
+/** The page-level paste chord the app-wide paste router listens for. */
+export function pasteDisplayKey(apple: boolean): string {
+  return apple ? '⌘V' : 'Ctrl V';
+}
+
 /** macOS, iOS and iPadOS, where the chord is Cmd rather than Ctrl. */
 export function isApplePlatform(): boolean {
   if (typeof navigator === 'undefined') return false;

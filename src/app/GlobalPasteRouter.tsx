@@ -1,7 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Toast } from '@/components/ui/Toast';
 import type { PasteDestination } from '@/engine/import/pasteDestination';
 import { FITTINGS_PATH } from '@/features/fittings/fittingRoutes';
 import { tabPath } from '@/lib/pageTabs';
@@ -13,33 +11,17 @@ import {
 } from '@/lib/shortcuts';
 import { MARKET_TABS } from './pageTabs';
 
-/** Long enough to read and reach for, short enough not to linger over the page. */
-const OFFER_MS = 8000;
-
-/** Per destination: the toast's words, and where its button goes with the paste. */
-const DESTINATIONS: Record<
-  PasteDestination,
-  { messageKey: string; actionKey: string; to: (text: string) => [string, { state: unknown }] }
-> = {
-  fitting: {
-    messageKey: 'pasteRouter.fitting',
-    actionKey: 'pasteRouter.openFitting',
-    to: (text) => [FITTINGS_PATH, { state: { fittingLoadText: text } satisfies FittingLoadState }],
-  },
-  appraisal: {
-    messageKey: 'pasteRouter.appraisal',
-    actionKey: 'pasteRouter.openAppraisal',
-    to: (text) => [
-      tabPath(MARKET_TABS, 'appraisal'),
-      { state: { appraiseText: text } satisfies MarketAppraiseState },
-    ],
-  },
+/** Per destination: where the paste goes, carrying its text in route state. */
+const DESTINATIONS: Record<PasteDestination, (text: string) => [string, { state: unknown }]> = {
+  fitting: (text) => [
+    FITTINGS_PATH,
+    { state: { fittingLoadText: text } satisfies FittingLoadState },
+  ],
+  appraisal: (text) => [
+    tabPath(MARKET_TABS, 'appraisal'),
+    { state: { appraiseText: text } satisfies MarketAppraiseState },
+  ],
 };
-
-interface Offer {
-  destination: PasteDestination;
-  text: string;
-}
 
 /**
  * Classifies a paste off the critical path: the parsers and the market
@@ -57,19 +39,17 @@ async function classifyPaste(text: string): Promise<PasteDestination | null> {
 
 /**
  * The app-wide paste router: Ctrl+V / Cmd+V anywhere on a page — not into a
- * field — with an EFT fit or an item list on the clipboard offers to open it
- * in Fittings or the Appraisal. An offer, not a jump: the pilot may have
- * pasted by accident, or be mid-edit on the page they're on.
+ * field — with an EFT fit or an item list on the clipboard opens it in
+ * Fittings or the Appraisal straight away. No confirm step: a mistaken paste
+ * is one Back away, and every page keeps its own state across the trip.
  *
  * Mounted once from `Layout`. Steps aside for a focused field and for any
  * open overlay (a dialog's own import box handles its own paste), same as
  * the global keyboard shortcuts.
  */
 export function GlobalPasteRouter() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
-  const [offer, setOffer] = useState<Offer | null>(null);
-  // Only the latest paste may raise an offer, whichever classifies first.
+  // Only the latest paste may navigate, whichever classifies first.
   const latestPaste = useRef(0);
 
   useEffect(() => {
@@ -83,38 +63,17 @@ export function GlobalPasteRouter() {
       const id = ++latestPaste.current;
       classifyPaste(text)
         .then((destination) => {
-          if (id !== latestPaste.current) return;
-          setOffer(destination === null ? null : { destination, text });
+          if (id !== latestPaste.current || destination === null) return;
+          void navigate(...DESTINATIONS[destination](text));
         })
-        // No catalogue (offline, first visit) means no offer — the pilot can
+        // No catalogue (offline, first visit) means no jump — the pilot can
         // still paste into Fittings' Load or the Appraisal box by hand.
         .catch(() => undefined);
     }
 
     document.addEventListener('paste', onPaste);
     return () => document.removeEventListener('paste', onPaste);
-  }, []);
+  }, [navigate]);
 
-  useEffect(() => {
-    if (offer === null) return;
-    const timer = setTimeout(() => setOffer(null), OFFER_MS);
-    return () => clearTimeout(timer);
-  }, [offer]);
-
-  if (offer === null) return null;
-
-  const { messageKey, actionKey, to } = DESTINATIONS[offer.destination];
-  const { text } = offer;
-  return (
-    <Toast
-      message={t(messageKey)}
-      action={{
-        label: t(actionKey),
-        onAction: () => {
-          setOffer(null);
-          void navigate(...to(text));
-        },
-      }}
-    />
-  );
+  return null;
 }

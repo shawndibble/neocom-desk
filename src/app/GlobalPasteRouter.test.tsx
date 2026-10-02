@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import * as pasteDestinationModule from '@/engine/import/pasteDestination';
 import { GlobalPasteRouter } from './GlobalPasteRouter';
 
-// Spied, so a "no offer" test can wait until the paste was really classified
+// Spied, so a "stays put" test can wait until the paste was really classified
 // rather than asserting an absence before the lazy imports have settled.
 vi.mock('@/engine/import/pasteDestination', async (importOriginal) => {
   const actual = await importOriginal<typeof pasteDestinationModule>();
@@ -60,42 +60,45 @@ async function paste(target: Element, text: string) {
 }
 
 describe('GlobalPasteRouter', () => {
-  it('offers to open a pasted fit, and opens it in Fittings', async () => {
+  it('opens a pasted fit in Fittings', async () => {
     renderRouter();
     await paste(document.body, FIT);
-    fireEvent.click(await screen.findByRole('button', { name: 'Open in Fittings' }));
-    expect(screen.getByTestId('where')).toHaveTextContent('/ships/fittings');
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/ships/fittings'));
     expect(screen.getByTestId('where')).toHaveTextContent('"fittingLoadText"');
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('offers to appraise a pasted item list', async () => {
+  it('opens a pasted item list in the Appraisal', async () => {
     renderRouter();
     await paste(document.body, 'Tritanium\t1,000\nDamage Control II\t2');
-    fireEvent.click(await screen.findByRole('button', { name: 'Appraise' }));
-    expect(screen.getByTestId('where')).toHaveTextContent('/market/appraisal');
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/market/appraisal'));
     expect(screen.getByTestId('where')).toHaveTextContent('"appraiseText"');
   });
 
-  it('offers nothing for text that is neither', async () => {
+  it('stays put for text that is neither', async () => {
     renderRouter();
     const classify = vi.mocked(pasteDestinationModule.pasteDestination);
     classify.mockClear();
     await paste(document.body, 'see you in local o7');
     await waitFor(() => expect(classify).toHaveReturnedWith(null));
     await act(async () => {});
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByTestId('where')).toHaveTextContent('/overview');
   });
 
   it('leaves a paste into a field alone', async () => {
     renderRouter(<input aria-label="search" />);
+    const classify = vi.mocked(pasteDestinationModule.pasteDestination);
+    classify.mockClear();
     await paste(screen.getByLabelText('search'), FIT);
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(classify).not.toHaveBeenCalled();
+    expect(screen.getByTestId('where')).toHaveTextContent('/overview');
   });
 
   it('leaves a paste alone while a dialog is open', async () => {
     renderRouter(<div role="dialog" />);
+    const classify = vi.mocked(pasteDestinationModule.pasteDestination);
+    classify.mockClear();
     await paste(document.body, FIT);
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(classify).not.toHaveBeenCalled();
+    expect(screen.getByTestId('where')).toHaveTextContent('/overview');
   });
 });

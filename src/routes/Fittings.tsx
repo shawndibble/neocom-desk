@@ -176,8 +176,9 @@ function FittingsPage() {
   // The app-wide paste router (`app/GlobalPasteRouter.tsx`) lands here with
   // a pasted EFT fit to open. Keyed on the navigation itself so a re-render
   // never re-loads it, and the state is cleared once read: unlike appraising,
-  // loading pushes the editor, so a remount on this entry (Back from another
-  // section) must not open the fit — and push the editor — all over again.
+  // loading opens the editor, so a remount on this entry (Back from another
+  // section) must not open the fit all over again. The editor replaces this
+  // landing entry rather than pushing past it, so one Back undoes the paste.
   const handledLoadKey = useRef<string | null>(null);
   const { loadFromInput } = workspace;
   useEffect(() => {
@@ -185,7 +186,7 @@ function FittingsPage() {
     if (!text || handledLoadKey.current === location.key) return;
     handledLoadKey.current = location.key;
     void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-    void loadFromInput(text);
+    void loadFromInput(text, { replaceEntry: true });
   }, [location.key, location.state, location.pathname, location.search, navigate, loadFromInput]);
   const currentShareCode = new URLSearchParams(location.search).get('f');
   const hasUnsavedEdits =
