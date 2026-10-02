@@ -35,6 +35,7 @@
     "travel": "Travel",
     "pilotLookup": "Pilot Lookup",
     "settings": "Settings",
+    "help": "Help & FAQ",
     "soon": "Soon",
     "switchCharacter": "Switch character",
     "more": "More",
@@ -5902,9 +5903,7 @@
       "travel": "Travel",
       "notifications": "Notifications",
       "data": "Data & storage",
-      "activity": "Activity Log",
-      "faq": "FAQ",
-      "help": "Help & Support"
+      "activity": "Activity Log"
     },
     "groups": {
       "app": "App",
@@ -6036,9 +6035,11 @@
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."
       },
-      "helpPointer": "Looking to report a bug, ask for help, or join the community? See <help>Help & Support</help>."
+      "helpPointer": "Looking to report a bug, ask for help, or join the community? See <help>Help & FAQ › Support</help>."
     },
     "help": {
+      "tabFaq": "FAQ",
+      "tabSupport": "Support",
       "communityTitle": "Report a bug, ask for a feature, or just chat",
       "communityBody": "All of it goes through <discord>Discord</discord> — bug reports, feature requests, questions, and general discussion with other pilots and the developer.",
       "communityHint": "For bugs, please include steps to reproduce and what the expected outcome should be.",

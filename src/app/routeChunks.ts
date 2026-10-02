@@ -132,6 +132,7 @@ export const loadEmploymentHistory = named(
   'EmploymentHistory'
 );
 export const loadSettings = named(() => import('@/routes/Settings'), 'Settings');
+export const loadHelp = named(() => import('@/routes/Help'), 'Help');
 export const loadStyleguide = named(() => import('@/routes/Styleguide'), 'Styleguide');
 export const loadFittingShared = named(() => import('@/routes/FittingShared'), 'FittingShared');
 export const loadSharedLink = named(() => import('@/routes/SharedLink'), 'SharedLink');
@@ -186,6 +187,9 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/travel/pilot': loadPilotLookup,
   '/pilot-lookup': loadPilotLookup,
   '/settings': loadSettings,
+  '/settings/faq': loadHelp,
+  '/settings/help': loadHelp,
+  '/help': loadHelp,
 };
 
 /**

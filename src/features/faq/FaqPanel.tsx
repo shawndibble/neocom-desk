@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Panel } from '@/components/ui';
 import { tabPath } from '@/lib/pageTabs';
-import { SETTINGS_TABS } from '@/app/pageTabs';
+import { HELP_TABS } from '@/app/pageTabs';
 import { WHAT_WE_STORE_GROUPS, WHAT_WE_STORE_NOTES } from './whatWeStore';
 
 /**
@@ -82,7 +82,7 @@ export function FaqPanel() {
         <Trans
           i18nKey="settings.faq.helpPointer"
           components={{
-            help: <Link to={tabPath(SETTINGS_TABS, 'help')} className={LINK} />,
+            help: <Link to={tabPath(HELP_TABS, 'support')} className={LINK} />,
           }}
         />
       </p>

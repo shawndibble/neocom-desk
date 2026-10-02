@@ -75,6 +75,9 @@ export const ROUTE_REQUIREMENTS = {
   '/skills': UNGATED,
   // Device-local display preferences only — no ESI endpoint to gate on.
   '/settings': UNGATED,
+  '/settings/faq': UNGATED,
+  '/settings/help': UNGATED,
+  '/help': UNGATED,
   /**
    * The Notification Feed's own page. Reads Dexie only: the rows were written
    * by the Foreground Poller, whose *own* reads are gated per event

@@ -242,6 +242,18 @@ export const NAV_PAGES = [
     corpTabs: ['corporation'],
   },
   /*
+   * Help is not a setting: FAQ and Support left Settings for this footer page.
+   * Like Settings, it keeps a permanent row in the More sheet rather than a
+   * bar slot.
+   */
+  {
+    path: '/help',
+    labelKey: 'nav.help',
+    group: 'footer',
+    gating: 'ungated',
+    mobileTab: false,
+  },
+  /*
    * Last: on the rail it is reached only via `CharacterFooterLink`'s portrait,
    * and last is where it already sits at the end of the More sheet (#1764).
    */

@@ -915,52 +915,6 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(await screen.findByRole('heading', { name: /^notifications$/i })).toBeInTheDocument();
   });
 
-  it('opens the FAQ tab and shows what the app stores', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    await openTab(user, /^faq$/i);
-
-    expect(await screen.findByRole('heading', { name: /what we store/i })).toBeInTheDocument();
-    // The groups, not just the panel title: the tab is worth nothing if it
-    // renders a heading over an empty body.
-    expect(
-      screen.getByRole('heading', { name: /synced between your devices/i })
-    ).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /kept on this device only/i })).toBeInTheDocument();
-    // Bug reports, feedback, and thanks now live on their own Help & Support
-    // tab; the FAQ tab points there instead of carrying that content itself.
-    // Two matches: the rail's own nav link, and the FAQ body's pointer link.
-    expect(screen.getAllByRole('link', { name: /help & support/i })).toHaveLength(2);
-  });
-
-  it('opens the Help & Support tab and shows all three questions', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    await openTab(user, /^help & support$/i);
-
-    expect(
-      await screen.findByRole('heading', { name: /report a bug, ask for a feature, or just chat/i })
-    ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /discord/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: /see the code, or add something yourself/i })
-    ).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /someone i can thank/i })).toBeInTheDocument();
-  });
-
-  it('lands on the FAQ tab from /settings/faq', async () => {
-    // The link to hand someone who asks what the app stores, from outside the app.
-    window.history.pushState({}, '', '/settings/faq');
-    render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /settings/i });
-
-    expect(await within(settingsNav()).findByRole('link', { name: /^faq$/i })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
-    expect(await screen.findByRole('heading', { name: /what we store/i })).toBeInTheDocument();
-  });
-
   it("names EVE's own notification types in words, not in ESI's CamelCase", async () => {
     render(<App />);
     await notificationsPanel();
@@ -1473,15 +1427,40 @@ describe('Settings defaults', () => {
     expect(await screen.findByLabelText(/assumed me/i)).toHaveValue(7);
   });
 
-  it('shows the shortcut list from the ? shortcut, even from another section', async () => {
-    const user = userEvent.setup();
+  it('sends the old /settings/faq link to the Help page’s FAQ, which shows what the app stores', async () => {
     window.history.pushState({}, '', '/settings/faq');
     render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /help & faq/i });
+
+    expect(window.location.pathname).toBe('/help/faq');
+    expect(await screen.findByRole('heading', { name: /what we store/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /synced between your devices/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /kept on this device only/i })).toBeInTheDocument();
+  });
+
+  it('sends the old /settings/help link to the Help page’s Support tab', async () => {
+    window.history.pushState({}, '', '/settings/help');
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /help & faq/i });
+
+    expect(window.location.pathname).toBe('/help/support');
+    expect(
+      await screen.findByRole('heading', { name: /report a bug, ask for a feature, or just chat/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /discord/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /someone i can thank/i })).toBeInTheDocument();
+  });
+
+  it('shows the shortcut list from the ? shortcut, even from another section', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/activity');
+    render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
-    expect(await within(settingsNav()).findByRole('link', { name: /faq/i })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
+    expect(
+      await within(settingsNav()).findByRole('link', { name: /activity log/i })
+    ).toHaveAttribute('aria-current', 'page');
 
     // The real `?` shortcut, pressed from a section that is not Shortcuts. It
     // navigates to /settings/shortcuts, so it lands correctly regardless of
@@ -1725,8 +1704,6 @@ describe('Settings — sections rail', () => {
       'Notifications',
       'Data & storage',
       'Activity Log',
-      'FAQ',
-      'Help & Support',
     ]);
     for (const group of ['App', 'Defaults', 'Alerts', 'Data & device']) {
       expect(within(nav).getByText(group)).toBeInTheDocument();
@@ -1796,7 +1773,7 @@ describe('Settings — phone list', () => {
     }
     // Corporation is absent: this character has no corp access.
     expect(within(nav).queryByRole('link', { name: /corporation/i })).not.toBeInTheDocument();
-    expect(within(nav).getAllByRole('link')).toHaveLength(13);
+    expect(within(nav).getAllByRole('link')).toHaveLength(11);
     expect(within(nav).getByRole('link', { name: /^display/i })).toHaveTextContent(
       /default text, my local time/i
     );
@@ -1809,7 +1786,6 @@ describe('Settings — phone list', () => {
     expect(within(nav).getByRole('link', { name: /^travel/i })).toHaveTextContent(
       /0 avoided systems/i
     );
-    expect(within(nav).getByRole('link', { name: /^faq$/i })).toBeInTheDocument();
     // Log out lives in Data & storage, not as a row of its own.
     expect(screen.queryByText(/log out/i)).not.toBeInTheDocument();
   });

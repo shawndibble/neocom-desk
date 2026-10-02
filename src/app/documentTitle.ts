@@ -63,6 +63,9 @@ const ROUTE_TITLE_KEYS = {
   '/travel/pilot': ['nav.pilotLookup'],
   '/pilot-lookup': ['nav.pilotLookup'],
   '/settings': ['settings.title'],
+  '/settings/faq': ['nav.help'],
+  '/settings/help': ['nav.help'],
+  '/help': ['nav.help'],
 } satisfies Record<AppRoutePath, readonly string[]>;
 
 /** Routes outside the Layout; an empty list titles as the app alone. */

@@ -170,9 +170,9 @@ describe('FaqPanel — What We Store', () => {
     expect(screen.getByText(/none of it is uploaded/i)).toBeInTheDocument();
   });
 
-  it('points to the Help & Support tab', () => {
+  it('points to the Help page’s Support tab', () => {
     renderFaq();
-    const link = screen.getByRole('link', { name: /help & support/i });
-    expect(link).toHaveAttribute('href', expect.stringContaining('/settings'));
+    const link = screen.getByRole('link', { name: /support/i });
+    expect(link).toHaveAttribute('href', '/help/support');
   });
 });

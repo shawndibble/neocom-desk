@@ -54,13 +54,17 @@ export const SETTINGS_TABS = definePageTabs(
     { id: 'notifications', labelKey: 'settings.tabs.notifications' },
     { id: 'dataAge', labelKey: 'settings.tabs.data' },
     { id: 'activity', labelKey: 'settings.tabs.activity' },
-    { id: 'faq', labelKey: 'settings.tabs.faq' },
-    { id: 'help', labelKey: 'settings.tabs.help' },
   ],
   undefined,
   // A phone lists the sections at `/settings`; `md` up has the rail and lands on Display.
   { hiddenFrom: '(min-width: 48rem)' }
 );
+
+/** Help & FAQ, moved out of Settings (`/settings/faq` and `/settings/help` redirect here). */
+export const HELP_TABS = definePageTabs('/help', [
+  { id: 'faq', labelKey: 'help.tabFaq' },
+  { id: 'support', labelKey: 'help.tabSupport' },
+]);
 
 export const PI_TABS = definePageTabs('/planetary-industry', [
   { id: 'colonies', labelKey: 'piPlan.coloniesTab' },
@@ -129,6 +133,7 @@ export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/industry': INDUSTRY_TABS,
   '/ships': SHIPS_TABS,
   '/settings': SETTINGS_TABS,
+  '/help': HELP_TABS,
   '/market': MARKET_TABS,
   '/planetary-industry': PI_TABS,
   '/mining': MINING_TABS,

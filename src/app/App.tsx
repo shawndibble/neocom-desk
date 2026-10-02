@@ -91,6 +91,7 @@ const Travel = lazy(routeChunks.loadTravel);
 const PilotLookup = lazy(routeChunks.loadPilotLookup);
 const EmploymentHistory = lazy(routeChunks.loadEmploymentHistory);
 const Settings = lazy(routeChunks.loadSettings);
+const Help = lazy(routeChunks.loadHelp);
 const Styleguide = lazy(routeChunks.loadStyleguide);
 const FittingShared = lazy(routeChunks.loadFittingShared);
 const SharedLink = lazy(routeChunks.loadSharedLink);
@@ -200,6 +201,10 @@ const ROUTE_ELEMENTS = {
   '/travel/pilot': <LegacyPathRedirect />,
   '/pilot-lookup': <PilotLookup />,
   '/settings': <Settings />,
+  // FAQ and Help left Settings for their own page; the old paths redirect for good.
+  '/settings/faq': <LegacyPathRedirect />,
+  '/settings/help': <LegacyPathRedirect />,
+  '/help': <Help />,
 } satisfies Record<AppRoutePath, ReactElement>;
 
 // `Object.entries` widens the key back to `string`; the union is the point.

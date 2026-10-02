@@ -22,8 +22,8 @@ describe('documentTitleFor', () => {
     expect(documentTitleFor('/market/history/transactions', t)).toBe(
       `${i18n.t('market.sections.transactions')} — Market — Neocom Desk`
     );
-    expect(documentTitleFor('/settings/faq', t)).toBe(
-      `${i18n.t('settings.tabs.faq')} — Settings — Neocom Desk`
+    expect(documentTitleFor('/help/faq', t)).toBe(
+      `${i18n.t('help.tabFaq')} — ${i18n.t('nav.help')} — Neocom Desk`
     );
   });
 
