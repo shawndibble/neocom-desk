@@ -126,17 +126,3 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
     ],
   },
 ];
-
-/**
- * The "yes, but" cases, stated plainly under the groups above rather than
- * folded into them: each is a real exception a careful reader would otherwise
- * catch us omitting. Writes to EVE lead, as the one thing that leaves this
- * device for EVE rather than for us.
- */
-export const WHAT_WE_STORE_NOTES: readonly string[] = [
-  'settings.faq.store.notes.writes',
-  'settings.faq.store.notes.push',
-  'settings.faq.store.notes.crashes',
-  'settings.faq.store.notes.removal',
-  'settings.faq.store.notes.export',
-];

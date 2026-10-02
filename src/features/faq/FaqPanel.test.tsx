@@ -1,18 +1,29 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { REMOTE_COLLECTIONS } from '@/sync/syncedCollections';
 import { SYNCED_SETTING_KEYS } from '@/sync/syncedSettings';
 import { FaqPanel } from './FaqPanel';
-import { WHAT_WE_STORE_GROUPS, WHAT_WE_STORE_NOTES } from './whatWeStore';
+import { WHAT_WE_STORE_GROUPS } from './whatWeStore';
 
+const QUESTIONS = 8;
+
+/** Renders the FAQ with every question opened, as the content tests read the answers. */
 function renderFaq() {
-  return render(
+  const result = render(
     <MemoryRouter>
       <FaqPanel />
     </MemoryRouter>
   );
+  for (const question of questionButtons()) fireEvent.click(question);
+  return result;
+}
+
+function questionButtons(): HTMLElement[] {
+  return within(screen.getByRole('list', { name: 'FAQ' }))
+    .getAllByRole('button')
+    .filter((button) => button.hasAttribute('aria-expanded'));
 }
 
 /**
@@ -124,21 +135,40 @@ describe('FaqPanel — What We Store', () => {
     }
   });
 
-  it('renders every group and every line', () => {
-    renderFaq();
-
-    expect(screen.getByRole('heading', { name: /what we store/i })).toBeInTheDocument();
+  it('lists the questions closed, so the page reads as a list to scan', () => {
+    render(
+      <MemoryRouter>
+        <FaqPanel />
+      </MemoryRouter>
+    );
+    const questions = questionButtons();
+    expect(questions).toHaveLength(QUESTIONS);
+    for (const question of questions) expect(question).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: 'How do I delete my data?' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'How do I force an update?' })).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /synced between your devices/i })
+      screen.getByRole('button', { name: 'What notifications arrive when the app is closed?' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /kept on this device only/i })).toBeInTheDocument();
+  });
+
+  it('renders every group and every line once opened', () => {
+    renderFaq();
 
     const items = WHAT_WE_STORE_GROUPS.flatMap((g) => g.items);
     const lines =
+      QUESTIONS +
       items.length +
-      items.reduce((sum, item) => sum + (item.detailKeys?.length ?? 0), 0) +
-      WHAT_WE_STORE_NOTES.length;
+      items.reduce((sum, item) => sum + (item.detailKeys?.length ?? 0), 0);
     expect(screen.getAllByRole('listitem')).toHaveLength(lines);
+  });
+
+  it('answers the how-to questions with where to go', () => {
+    renderFaq();
+    expect(
+      screen.getByText(/Delete all data deletes every character's synced data/)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/press Update now/)).toBeInTheDocument();
+    expect(screen.getByText(/Only alerts whose time is known ahead/)).toBeInTheDocument();
   });
 
   it('has no group listing things we do not hold', () => {
@@ -156,7 +186,7 @@ describe('FaqPanel — What We Store', () => {
     renderFaq();
 
     expect(screen.getByText(/push notifications, if on/i)).toBeInTheDocument();
-    expect(screen.getByText(/crash reports/i)).toBeInTheDocument();
+    expect(screen.getByText(/crash reports: the error/i)).toBeInTheDocument();
     expect(screen.getByText(/writes to EVE, only when you act/i)).toBeInTheDocument();
     expect(
       screen.getByText(/removing a character clears it from this device only/i)

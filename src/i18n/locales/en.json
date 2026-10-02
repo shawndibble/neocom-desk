@@ -6008,8 +6008,23 @@
     "deviceDeleteUnpurged_one": "The synced data for {{names}} could not be deleted from the sync server (offline, or the login has expired). The server deletes it automatically after 90 days without a sync. Every other character's synced data is already deleted. Finish deleting to erase this device's data.",
     "deviceDeleteUnpurged_other": "The synced data for {{names}} could not be deleted from the sync server (offline, or the logins have expired). The server deletes it automatically after 90 days without a sync. Every other character's synced data is already deleted. Finish deleting to erase this device's data.",
     "faq": {
-      "storeTitle": "What we store",
       "storeIntro": "We store what you make in the app. What we read from EVE stays on this device.",
+      "q": {
+        "synced": "What syncs between my devices?",
+        "local": "What stays on this device?",
+        "writes": "Does Neocom Desk change anything in EVE?",
+        "delete": "How do I delete my data?",
+        "update": "How do I force an update?",
+        "push": "What notifications arrive when the app is closed?",
+        "crashes": "Do you collect crash reports?",
+        "backups": "How do backups work?"
+      },
+      "a": {
+        "delete": "Settings › Data & storage › Delete all data deletes every character's synced data from our server, then erases everything on this device. Log out of all characters clears this device only.",
+        "update": "The app updates itself in the background. To get a new version now, open Settings › Data & storage and press Update now: it checks and reloads.",
+        "pushKinds": "Only alerts whose time is known ahead: a skill level finishing, training stopping or a queue ending, an industry job finishing, a courier delivery due, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Everything else needs the app open. Turn them on in Settings › Notifications."
+      },
+
       "store": {
         "synced": {
           "title": "Synced between your devices",
@@ -6049,7 +6064,6 @@
           "loginNote": "It never leaves this device.",
           "preferences": "Display settings (text size, time format) and the sorts, filters and sections each page remembers."
         },
-        "notesTitle": "Worth knowing",
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
           "crashes": "Crash reports: the error and the page it happened on. No IP addresses or request bodies; EVE tokens are stripped first.",

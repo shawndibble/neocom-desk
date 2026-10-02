@@ -1414,17 +1414,16 @@ describe('Settings defaults', () => {
     expect(await screen.findByLabelText(/assumed me/i)).toHaveValue(7);
   });
 
-  it('sends the old /settings/faq link to the Help page’s FAQ, which shows what the app stores', async () => {
+  it('sends the old /settings/faq link to the Help page’s FAQ questions', async () => {
     window.history.pushState({}, '', '/settings/faq');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /help & faq/i });
 
     expect(window.location.pathname).toBe('/help/faq');
-    expect(await screen.findByRole('heading', { name: /what we store/i })).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /synced between your devices/i })
+      await screen.findByRole('button', { name: /what syncs between my devices/i })
     ).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /kept on this device only/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /what stays on this device/i })).toBeInTheDocument();
   });
 
   it('sends the old /settings/help link to the Help page’s Support tab', async () => {
