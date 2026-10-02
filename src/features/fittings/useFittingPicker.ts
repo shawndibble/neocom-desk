@@ -1,6 +1,6 @@
 /**
- * The "Compare with…" side of `FittingLibrary`: the same ways in as the
- * workspace (Load, My Fittings, In-game Fittings), but a chosen Fitting is
+ * The "Compare with…" side of `FittingStartScreen`: the same ways in as the
+ * workspace (Import, saved and In-game Fittings), but a chosen Fitting is
  * handed back as a Share Link code instead of being opened in the editor.
  * My Fittings already carries a code; every other source needs one round of
  * `encodeFittingShare` first.
@@ -13,7 +13,7 @@ import type { Fitting } from '@/engine/fittings/types';
 import { loadFittingFromText } from './loadFittingFromText';
 import { resolveFittingXmlDocument, type FittingWorkspace } from './useFittingWorkspace';
 
-/** The slice of the workspace `FittingLibrary` drives; the picker supplies its own. */
+/** The slice of the workspace `FittingStartScreen` drives; the picker supplies its own. */
 export type FittingLibrarySource = Pick<
   FittingWorkspace,
   | 'lastLoad'

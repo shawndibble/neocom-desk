@@ -205,16 +205,9 @@
       "saveAsNewConfirm": "Save as new",
       "needCharacter": "Log in with a Character to save Fittings.",
       "tooLarge": "This Fitting is too large to save.",
-      "searchLabel": "Search My Fittings",
-      "searchPlaceholder": "Search by name or hull…",
-      "empty": "Nothing saved yet. Open a Fitting and choose Save to My Fittings.",
-      "noMatches": "No saved Fitting matches that search.",
       "unknownHull": "Unknown hull",
-      "open": "Open {{name}}",
-      "rename": "Rename {{name}}",
       "renameLabel": "Fitting name",
       "confirmRename": "Rename",
-      "delete": "Delete {{name}}",
       "deleteConfirm": "Delete \"{{name}}\"? This can't be undone.",
       "confirmDelete": "Delete",
       "cancel": "Cancel"
@@ -262,14 +255,10 @@
       }
     },
     "inGame": {
-      "title": "In-game Fittings",
       "refresh": "Refresh",
       "reauthTitle": "Allow fittings access",
       "reauthHint": "Log in again to see this Character's in-game Fittings.",
-      "reauthAction": "Log in again with EVE Online",
-      "emptyTitle": "No in-game Fittings",
-      "emptyHint": "Fittings saved on this Character in EVE will show up here.",
-      "openAction": "Open"
+      "reauthAction": "Log in again with EVE Online"
     },
     "saveToEve": {
       "action": "Save to EVE",
@@ -474,10 +463,7 @@
       "noHulls": "No hull matches that search.",
       "pickAHull": "Pick a hull, then start fitting it. Double-click a hull to start at once.",
       "startFitting": "Start fitting",
-      "tabNew": "New",
-      "tabImport": "Import",
       "tabInGame": "In-game",
-      "tabsLabel": "Ways to open a fitting",
       "searchFittings": "Search fittings",
       "searchFittingsPlaceholder": "Search by name or hull…",
       "newFromHull": "New from hull",
@@ -491,6 +477,8 @@
       "matches_one": "{{count}} matching fitting",
       "matches_other": "{{count}} matching fittings",
       "pickToPreview": "Pick a fitting to preview it.",
+      "backToList": "Back to fittings",
+      "emptyHintList": "Fittings you save, here or in EVE, list here.",
       "preview": {
         "open": "Open fitting",
         "compare": "Compare",
@@ -548,8 +536,7 @@
       "newFromHull": "New from a hull…",
       "import": "Import…",
       "libraryTitle": "Open a fitting",
-      "myFittings": "My Fittings…",
-      "inGame": "In-game Fittings…",
+      "openFitting": "Open a fitting…",
       "moreSave": "More save options",
       "moreActions": "Fitting actions",
       "savedInMyFittings": "Saved in My Fittings"

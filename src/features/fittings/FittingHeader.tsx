@@ -13,18 +13,18 @@ import {
 import { Expanded, More, Rename } from '@/components/ui/icons';
 import type { Fitting } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
-import type { LibraryTab } from './FittingLibrary';
 import { FittingExportItems, FittingExportMenu, FittingExportNotice } from './FittingExportMenu';
 import { useFittingExport } from './useFittingExport';
 import { FittingNameModal } from './SavedFittingModals';
+
+/** What the Fittings menu opens: the hull search, Import, or the list of saved and In-game Fittings. */
+export type LibraryAction = 'new' | 'import' | 'open';
 
 interface FittingHeaderProps {
   fitting: Fitting;
   /** Under the name: the hull (when the name isn't just the hull) and whether it's saved. */
   subtitle: string;
-  /** In-game Fittings need a Character. */
-  hasCharacter: boolean;
-  onLibrary: (tab: LibraryTab) => void;
+  onLibrary: (action: LibraryAction) => void;
   /** Opens Fitting vs Fitting compare (#1547) for this Fitting. */
   onCompare: () => void;
   /** Renames the open Fitting, independent of Save. */
@@ -101,7 +101,6 @@ function CompactFittingHeader({
 export function FittingHeader({
   fitting,
   subtitle,
-  hasCharacter,
   onLibrary,
   onCompare,
   onRename,
@@ -153,14 +152,9 @@ export function FittingHeader({
         {t('fittings.header.import')}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
-      <DropdownMenuItem onSelect={() => onLibrary('mine')}>
-        {t('fittings.header.myFittings')}
+      <DropdownMenuItem onSelect={() => onLibrary('open')}>
+        {t('fittings.header.openFitting')}
       </DropdownMenuItem>
-      {hasCharacter && (
-        <DropdownMenuItem onSelect={() => onLibrary('ingame')}>
-          {t('fittings.header.inGame')}
-        </DropdownMenuItem>
-      )}
     </>
   );
   const compareItem = (
