@@ -91,7 +91,10 @@ function RailPage({
   const listId = useId();
   const label = t(page.labelKey);
   const pageHidden = hidden.has(page.path);
-  const shownViews = editing ? views : views.filter((view) => !hidden.has(view.path));
+  // The view you are on stays listed even if hidden, as its page does.
+  const shownViews = editing
+    ? views
+    : views.filter((view) => !hidden.has(view.path) || view.path === activeViewPath);
 
   return (
     <div>
@@ -107,29 +110,28 @@ function RailPage({
             className={cx('flex-1', pageHidden && 'line-through opacity-60')}
           />
         )}
-        {views.length > 0 && (
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-expanded={open}
-            aria-controls={listId}
-            aria-label={t(open ? 'nav.hideViews' : 'nav.showViews', { page: label })}
-            className="flex min-h-7 shrink-0 items-center gap-0.5 rounded-xs px-1 text-[0.625rem] text-text-dim tabular-nums transition-colors hover:bg-panel-2 hover:text-text"
-          >
-            <span aria-hidden="true">{views.length}</span>
-            {open ? (
-              <Icon.Expanded aria-hidden="true" size={Icon.ICON_SIZE.sm} />
-            ) : (
-              <Icon.Descend aria-hidden="true" size={Icon.ICON_SIZE.sm} />
-            )}
-          </button>
+        {shownViews.length > 0 && (
+          <>
+            <span aria-hidden="true" className="text-[0.625rem] text-text-dim tabular-nums">
+              {shownViews.length}
+            </span>
+            <IconButton
+              variant="plain"
+              size="sm"
+              onClick={onToggle}
+              aria-expanded={open}
+              aria-controls={listId}
+              label={t('nav.pageViews', { page: label, count: shownViews.length })}
+              icon={open ? <Icon.Expanded /> : <Icon.Descend />}
+            />
+          </>
         )}
         {editing && canHide(page.path) && (
           <IconButton
             variant="plain"
             size="sm"
             icon={pageHidden ? <Icon.NavHidden /> : <Icon.NavShown />}
-            label={t(pageHidden ? 'nav.showPage' : 'nav.hidePage', { page: label })}
+            label={t('nav.showInNav', { page: label })}
             pressed={!pageHidden}
             onClick={() => toggleHiddenNav(page.path)}
           />
@@ -167,7 +169,7 @@ function RailPage({
                     variant="plain"
                     size="sm"
                     icon={viewHidden ? <Icon.NavHidden /> : <Icon.NavShown />}
-                    label={t(viewHidden ? 'nav.showPage' : 'nav.hidePage', { page: view.label })}
+                    label={t('nav.showInNav', { page: view.label })}
                     pressed={!viewHidden}
                     onClick={() => toggleHiddenNav(view.path)}
                   />

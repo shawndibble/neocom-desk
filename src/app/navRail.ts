@@ -63,8 +63,9 @@ export function viewPathFor(pathname: string): string | null {
 
 /**
  * Pages that are the only way to something never hide: Corp is already hidden
- * unless the Character has corp access, Settings is where hiding is undone,
- * Characters is the only way to switch, and Help is where a lost pilot goes.
+ * unless the Character has corp access, Settings has no other route on a
+ * phone, Characters is the only way to switch, and Help is where a lost pilot
+ * goes.
  */
 const NEVER_HIDDEN: ReadonlySet<string> = new Set(['/corp', '/settings', '/characters', '/help']);
 

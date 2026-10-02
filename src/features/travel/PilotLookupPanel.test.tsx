@@ -46,7 +46,7 @@ vi.mock('./pilotLookup', async (importOriginal) => ({
   loadPilotProfile: mocks.loadPilotProfile,
 }));
 
-import { PilotLookupTab } from './PilotLookupTab';
+import { PilotLookupPanel } from './PilotLookupPanel';
 
 const PROFILE = {
   characterId: 42,
@@ -87,13 +87,13 @@ function LocationProbe() {
 function renderTab(url = '/travel/pilot') {
   render(
     <MemoryRouter initialEntries={[url]}>
-      <PilotLookupTab />
+      <PilotLookupPanel />
       <LocationProbe />
     </MemoryRouter>
   );
 }
 
-describe('PilotLookupTab', () => {
+describe('PilotLookupPanel', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.granted = false;

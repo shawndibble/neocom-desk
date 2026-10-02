@@ -82,7 +82,7 @@ describe('the rail', () => {
       '/market/lp-store'
     );
     expect(within(rail()).queryByRole('list', { name: 'Industry' })).not.toBeInTheDocument();
-    expect(within(rail()).getByRole('button', { name: 'Show Industry views' })).toHaveAttribute(
+    expect(within(rail()).getByRole('button', { name: /^Industry views/ })).toHaveAttribute(
       'aria-expanded',
       'false'
     );
@@ -97,7 +97,7 @@ describe('the rail', () => {
     const user = userEvent.setup();
     renderAt('/market/appraisal');
 
-    await user.click(within(rail()).getByRole('button', { name: 'Show Industry views' }));
+    await user.click(within(rail()).getByRole('button', { name: /^Industry views/ }));
     const industry = within(rail()).getByRole('list', { name: 'Industry' });
     // One section open at a time: looking inside Industry closes Market.
     expect(within(rail()).queryByRole('list', { name: 'Market' })).not.toBeInTheDocument();
@@ -131,15 +131,25 @@ describe('the rail', () => {
     renderAt('/overview');
 
     await user.click(within(rail()).getByRole('button', { name: /hide pages you don't use/i }));
-    await user.click(within(rail()).getByRole('button', { name: 'Hide Mining' }));
+    // One fixed name; `aria-pressed` says whether it is on.
+    const mining = within(rail()).getByRole('button', { name: 'Show Mining in navigation' });
+    expect(mining).toHaveAttribute('aria-pressed', 'true');
+    await user.click(mining);
     await waitFor(() => expect(useHiddenNav.getState().value).toEqual(['/mining']));
     // Still listed while editing, so it can be shown again.
-    await user.click(within(rail()).getByRole('button', { name: 'Show Mining' }));
+    expect(
+      within(rail()).getByRole('button', { name: 'Show Mining in navigation' })
+    ).toHaveAttribute('aria-pressed', 'false');
+    await user.click(within(rail()).getByRole('button', { name: 'Show Mining in navigation' }));
     await waitFor(() => expect(useHiddenNav.getState().value).toEqual([]));
-    expect(screen.queryByRole('button', { name: 'Hide Settings' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Show Settings in navigation' })
+    ).not.toBeInTheDocument();
 
     await user.click(within(rail()).getByRole('button', { name: 'Done' }));
-    expect(within(rail()).queryByRole('button', { name: 'Hide Overview' })).not.toBeInTheDocument();
+    expect(
+      within(rail()).queryByRole('button', { name: 'Show Overview in navigation' })
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -203,5 +213,33 @@ describe('the Recent row', () => {
   it('records each view visited', async () => {
     renderAt('/market/appraisal');
     await waitFor(() => expect(useRecentNav.getState().value[0]).toBe('/market/appraisal'));
+  });
+
+  it('keeps the stored history when the first visit lands before the store has loaded', async () => {
+    await db.settings.put({ key: 'navRecent', value: ['/travel/thera', '/assets'] });
+    useRecentNav.setState({ value: [], hydrated: false });
+    renderAt('/market/appraisal');
+    await waitFor(() =>
+      expect(useRecentNav.getState().value).toEqual([
+        '/market/appraisal',
+        '/travel/thera',
+        '/assets',
+      ])
+    );
+  });
+});
+
+describe('the More sheet editor', () => {
+  it('hides and shows pages on a phone too', async () => {
+    setPhone(true);
+    renderAt('/overview');
+    const user = userEvent.setup();
+    const nav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+    await user.click(within(nav).getByRole('button', { name: 'More' }));
+    const sheet = screen.getByRole('dialog', { name: 'More' });
+
+    await user.click(within(sheet).getByRole('button', { name: /hide pages you don't use/i }));
+    await user.click(within(sheet).getByRole('button', { name: 'Show Mining in navigation' }));
+    await waitFor(() => expect(useHiddenNav.getState().value).toEqual(['/mining']));
   });
 });

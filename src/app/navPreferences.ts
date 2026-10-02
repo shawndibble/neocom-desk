@@ -29,9 +29,14 @@ export function toggleHiddenNav(path: string): void {
   void setValue(parseHiddenNav(next) ?? []);
 }
 
-/** Records a visit to `viewPath` at the front of the Recent row. */
-export function recordRecentNav(viewPath: string): void {
+/**
+ * Records a visit to `viewPath` at the front of the Recent row. Waits for the
+ * stored list first: the first visit of a cold load lands before `App`'s
+ * hydrate, and writing onto the empty default would wipe the history.
+ */
+export async function recordRecentNav(viewPath: string): Promise<void> {
+  if (!useRecentNav.getState().hydrated) await useRecentNav.getState().hydrate();
   const { value, setValue } = useRecentNav.getState();
   if (value[0] === viewPath) return;
-  void setValue(pushRecentNav(value, viewPath));
+  await setValue(pushRecentNav(value, viewPath));
 }

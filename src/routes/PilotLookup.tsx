@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { PilotLookupTab } from '@/features/travel/PilotLookupTab';
+import { PilotLookupPanel } from '@/features/travel/PilotLookupPanel';
 
 /**
  * Pilot Lookup (issue #2331), a page of its own in the Intel group rather than
@@ -26,7 +26,7 @@ export function PilotLookup() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <PilotLookupTab />
+      <PilotLookupPanel />
     </div>
   );
 }

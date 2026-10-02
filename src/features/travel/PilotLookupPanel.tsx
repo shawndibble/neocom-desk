@@ -42,7 +42,7 @@ const SEARCH_ENDPOINTS = ['getCharacterSearch'] as const;
 /** Same debounce as Mail's recipient search, which calls the same ESI search. */
 const SEARCH_DEBOUNCE_MS = 300;
 
-export function PilotLookupTab() {
+export function PilotLookupPanel() {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(PILOT_PARAMS);
 

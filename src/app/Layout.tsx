@@ -224,7 +224,7 @@ function RecentNavRecorder() {
   const { pathname } = useLocation();
   const viewPath = viewPathFor(pathname);
   useEffect(() => {
-    if (viewPath !== null) recordRecentNav(viewPath);
+    if (viewPath !== null) void recordRecentNav(viewPath);
   }, [viewPath]);
   return null;
 }
