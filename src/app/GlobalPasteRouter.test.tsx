@@ -1,8 +1,16 @@
 import '@/i18n';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
+import * as pasteDestinationModule from '@/engine/import/pasteDestination';
 import { GlobalPasteRouter } from './GlobalPasteRouter';
+
+// Spied, so a "no offer" test can wait until the paste was really classified
+// rather than asserting an absence before the lazy imports have settled.
+vi.mock('@/engine/import/pasteDestination', async (importOriginal) => {
+  const actual = await importOriginal<typeof pasteDestinationModule>();
+  return { ...actual, pasteDestination: vi.fn(actual.pasteDestination) };
+});
 
 vi.mock('@/features/market/appraisalData', () => ({
   loadAppraisalCatalogue: () =>
@@ -71,7 +79,11 @@ describe('GlobalPasteRouter', () => {
 
   it('offers nothing for text that is neither', async () => {
     renderRouter();
+    const classify = vi.mocked(pasteDestinationModule.pasteDestination);
+    classify.mockClear();
     await paste(document.body, 'see you in local o7');
+    await waitFor(() => expect(classify).toHaveReturnedWith(null));
+    await act(async () => {});
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 

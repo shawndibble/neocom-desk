@@ -61,6 +61,13 @@ export const KEYBOARD_OVERLAY_ATTRIBUTE = 'data-keyboard-overlay';
  */
 export const OVERLAY_SELECTOR = `dialog[open], [role="menu"], [role="listbox"], [role="dialog"], [${KEYBOARD_OVERLAY_ATTRIBUTE}]`;
 
+/** A field the pilot types into — global keys and pastes leave it alone. */
+export function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
+}
+
 /**
  * Ctrl+K / Cmd+K, the Command Palette (#2318). Not a `SHORTCUTS` row: that
  * table is single unmodified keys, dispatched by a listener that ignores

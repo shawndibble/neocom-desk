@@ -5,12 +5,36 @@ import { Toast } from '@/components/ui/Toast';
 import type { PasteDestination } from '@/engine/import/pasteDestination';
 import { FITTINGS_PATH } from '@/features/fittings/fittingRoutes';
 import { tabPath } from '@/lib/pageTabs';
-import { OVERLAY_SELECTOR, type FittingLoadState, type MarketAppraiseState } from '@/lib/shortcuts';
+import {
+  isTypingTarget,
+  OVERLAY_SELECTOR,
+  type FittingLoadState,
+  type MarketAppraiseState,
+} from '@/lib/shortcuts';
 import { MARKET_TABS } from './pageTabs';
-import { isTypingTarget } from './useKeyboardShortcuts';
 
 /** Long enough to read and reach for, short enough not to linger over the page. */
 const OFFER_MS = 8000;
+
+/** Per destination: the toast's words, and where its button goes with the paste. */
+const DESTINATIONS: Record<
+  PasteDestination,
+  { messageKey: string; actionKey: string; to: (text: string) => [string, { state: unknown }] }
+> = {
+  fitting: {
+    messageKey: 'pasteRouter.fitting',
+    actionKey: 'pasteRouter.openFitting',
+    to: (text) => [FITTINGS_PATH, { state: { fittingLoadText: text } satisfies FittingLoadState }],
+  },
+  appraisal: {
+    messageKey: 'pasteRouter.appraisal',
+    actionKey: 'pasteRouter.openAppraisal',
+    to: (text) => [
+      tabPath(MARKET_TABS, 'appraisal'),
+      { state: { appraiseText: text } satisfies MarketAppraiseState },
+    ],
+  },
+};
 
 interface Offer {
   destination: PasteDestination;
@@ -79,25 +103,17 @@ export function GlobalPasteRouter() {
 
   if (offer === null) return null;
 
-  function open({ destination, text }: Offer) {
-    setOffer(null);
-    if (destination === 'fitting') {
-      void navigate(FITTINGS_PATH, { state: { fittingLoadText: text } satisfies FittingLoadState });
-    } else {
-      void navigate(tabPath(MARKET_TABS, 'appraisal'), {
-        state: { appraiseText: text } satisfies MarketAppraiseState,
-      });
-    }
-  }
-
+  const { messageKey, actionKey, to } = DESTINATIONS[offer.destination];
+  const { text } = offer;
   return (
     <Toast
-      message={t(offer.destination === 'fitting' ? 'pasteRouter.fitting' : 'pasteRouter.appraisal')}
+      message={t(messageKey)}
       action={{
-        label: t(
-          offer.destination === 'fitting' ? 'pasteRouter.openFitting' : 'pasteRouter.openAppraisal'
-        ),
-        onAction: () => open(offer),
+        label: t(actionKey),
+        onAction: () => {
+          setOffer(null);
+          void navigate(...to(text));
+        },
       }}
     />
   );

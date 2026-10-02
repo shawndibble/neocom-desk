@@ -175,15 +175,18 @@ function FittingsPage() {
   );
   // The app-wide paste router (`app/GlobalPasteRouter.tsx`) lands here with
   // a pasted EFT fit to open. Keyed on the navigation itself so a re-render
-  // never re-loads it (mirrors Market.tsx's `appraiseText` handling).
+  // never re-loads it, and the state is cleared once read: unlike appraising,
+  // loading pushes the editor, so a remount on this entry (Back from another
+  // section) must not open the fit — and push the editor — all over again.
   const handledLoadKey = useRef<string | null>(null);
   const { loadFromInput } = workspace;
   useEffect(() => {
     const text = (location.state as Partial<FittingLoadState> | null)?.fittingLoadText;
     if (!text || handledLoadKey.current === location.key) return;
     handledLoadKey.current = location.key;
+    void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
     void loadFromInput(text);
-  }, [location.key, location.state, loadFromInput]);
+  }, [location.key, location.state, location.pathname, location.search, navigate, loadFromInput]);
   const currentShareCode = new URLSearchParams(location.search).get('f');
   const hasUnsavedEdits =
     workspace.savedId !== null &&

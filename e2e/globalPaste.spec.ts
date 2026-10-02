@@ -3,7 +3,8 @@
  * paste — nothing focused — of an EFT fit offers to open it in Fittings, and
  * of an item list offers to appraise it. Covers the hand-off the unit tests
  * stop short of: the route state actually opening the fit in the editor, and
- * actually pricing the list.
+ * actually pricing the list. A paste into a field is left alone — covered by
+ * `src/app/GlobalPasteRouter.test.tsx`, where an absence needs no fixed wait.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
@@ -101,20 +102,5 @@ test.describe('Global paste', () => {
     await expect(page).toHaveURL(/\/market\/appraisal/);
     await expect(page.getByRole('table', { name: 'Appraisal' })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('table', { name: 'Appraisal' })).toContainText('Pyerite');
-  });
-
-  test('a paste into a field is left alone', async ({ page }) => {
-    await openFittings(page);
-    const field = page.getByRole('searchbox').or(page.getByRole('textbox')).first();
-    await field.focus();
-    await page.evaluate((value) => {
-      const clipboardData = new DataTransfer();
-      clipboardData.setData('text/plain', value);
-      document.activeElement!.dispatchEvent(
-        new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true })
-      );
-    }, RIFTER_EFT);
-    await page.waitForTimeout(1_500);
-    await expect(page.getByRole('button', { name: 'Open in Fittings' })).toHaveCount(0);
   });
 });
