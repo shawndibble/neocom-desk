@@ -205,6 +205,44 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
+    // Stored Share Links (src/features/share/shareStore.ts): a short
+    // /share/{id} URL whose content lives here for a week. Not per-Character
+    // data, and the person opening a link may have no account at all — so
+    // `get` is public, by id only. `list` stays denied: the 9-character
+    // random id is what keeps a share private to whoever holds the link, and
+    // listing would hand every id out. An expired doc is refused here as well
+    // as hidden by the client, because the TTL policy (firestore.indexes.json)
+    // deletes it up to a day late. A missing doc is refused too (no
+    // `resource` to read), which the client reads the same as expired.
+    //
+    // Any signed-in Character may create one. The doc carries no uid: anyone
+    // with the link reads all of it. Create-only — no update or delete — so a
+    // share can't be rewritten after it was sent, and a write to a taken id is
+    // refused rather than merged. `type` mirrors SHARE_TYPES; the appraisal
+    // item cap mirrors MAX_SNAPSHOT_ITEMS, the fitting code cap
+    // MAX_FITTING_SHARE_CODE_LENGTH. `expiresAt` allows a day of client
+    // clock skew past the 7 the client asks for.
+    match /shares/{shareId} {
+      allow get: if resource.data.expiresAt > request.time;
+      allow list: if false;
+      allow create: if request.auth != null
+        && shareId.matches('^[0-9A-Za-z]{9}$')
+        && request.resource.data.keys().hasOnly(['type', 'payload', 'createdAt', 'expiresAt'])
+        && request.resource.data.keys().hasAll(['type', 'payload', 'createdAt', 'expiresAt'])
+        && request.resource.data.type in ['appraisal', 'fitting']
+        && request.resource.data.payload is map
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt < request.time + duration.value(8, 'd')
+        && (request.resource.data.type != 'appraisal'
+          || (request.resource.data.payload.items is list
+            && request.resource.data.payload.items.size() <= 1000))
+        && (request.resource.data.type != 'fitting'
+          || (request.resource.data.payload.code is string
+            && request.resource.data.payload.code.size() <= 20100));
+      allow update, delete: if false;
+    }
     // Everything else: implicit deny.
   }
 }

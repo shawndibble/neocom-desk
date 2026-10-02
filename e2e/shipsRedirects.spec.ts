@@ -1,6 +1,6 @@
 /**
  * The Ships section's old paths (scope decision `20260926-135538`): every
- * Share Link ever copied is `/fittings?f=`, so it must still open the Fitting
+ * Fitting Share Code ever copied is `/fittings?f=`, so it must still open the Fitting
  * in the editor; `/fittings` and `/skills/ships` land on the Fittings and
  * Tree tabs; and the two tabs switch between each other. Structure only — no
  * stat figure is awaited.
@@ -27,7 +27,7 @@ async function answerAnyType(page: Page) {
   });
 }
 
-/** Starts a Rifter from the Fittings tab and returns its Share Link code. */
+/** Starts a Rifter from the Fittings tab and returns its Fitting Share Code. */
 async function rifterShareCode(page: Page): Promise<string> {
   const newFromHull = page.getByRole('button', { name: 'New from hull' });
   const hullSearch = page.getByRole('searchbox', { name: 'Search hulls' });
@@ -42,7 +42,9 @@ async function rifterShareCode(page: Page): Promise<string> {
 }
 
 test.describe('Ships redirects', () => {
-  test('an old /fittings?f= Share Link opens the Fitting in the editor', async ({ page }) => {
+  test('an old /fittings?f= Fitting Share Code opens the Fitting in the editor', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await signInAndGoto(page, './ships/fittings');
     await answerAnyType(page);
@@ -54,7 +56,7 @@ test.describe('Ships redirects', () => {
     );
     await expect(page.getByRole('heading', { level: 1, name: 'Rifter' })).toBeVisible();
 
-    // A Share Link copied today reads /ships/fittings?f=; it opens the editor too.
+    // A Fitting Share Code copied today reads /ships/fittings?f=; it opens the editor too.
     await page.goto(`./ships/fittings?${new URLSearchParams({ f: code })}`);
     await expect(page).toHaveURL(
       (url) => url.pathname.endsWith('/ships/fittings/edit') && url.searchParams.get('f') === code

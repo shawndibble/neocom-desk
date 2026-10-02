@@ -2,7 +2,7 @@
  * The Abyssal weather the stats are worked out in — none by default. One pick
  * for the session, shared by the editor, its Variations, the applied-DPS
  * overlay and Fitting Compare, so every number on screen is in the same
- * weather. Not saved, and not carried in a Share Link: it's a question asked
+ * weather. Not saved, and not carried in a Fitting Share Code: it's a question asked
  * of a fit ("how does it do in an Electrical 3?"), not part of the fit.
  */
 import { useTranslation } from 'react-i18next';

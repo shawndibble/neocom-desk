@@ -86,7 +86,7 @@ export function Callback() {
           // A Character nobody has selected yet is worth far less than the
           // session; /characters is where one is picked anyway.
         }
-        // A Fitting Share Link's "Open in Neocom Desk" (#1544) stashed where
+        // A Fitting Share Code's "Open in Neocom Desk" (#1544) stashed where
         // to land before sending this login to SSO; every other entry point
         // leaves nothing there, so this is the ordinary `/characters` most of
         // the time. A first-ever login has exactly one Character, so the list

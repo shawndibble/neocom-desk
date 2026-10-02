@@ -2,7 +2,7 @@
  * The pilot's Target Profiles (issue #1546): the custom list and which
  * profile is selected, as two synced settings — the same split, and for the
  * same reason, as `damageProfiles.ts`. The selection is global, not per
- * Fitting, and stays out of the `?f=` Share Link.
+ * Fitting, and stays out of the `?f=` Fitting Share Code.
  */
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

@@ -1,8 +1,8 @@
 /**
- * The Appraisal *share* view's stacked result card at 390px (issue #1113) —
+ * The **Shared Appraisal** page's stacked result card at 390px (issue #1113) —
  * the follow-up `marketAppraisalNarrow.spec.ts`'s own ticket (#1097) scoped
  * out so the two pages wouldn't drift mid-ticket. Same defect, same fix
- * (`stackColumns={2}`), different page: `/share/appraisal` hung five short
+ * (`stackColumns={2}`), different page: the share view hung five short
  * numeric columns off the item name at `DataTable`'s default
  * `stackColumns={1}`, so a shared fifteen-item pile was fifteen six-line
  * cards to scroll — on the page most likely to be opened from a chat client
@@ -13,23 +13,23 @@
  * (`src/styles/index.css`), which jsdom cannot evaluate, so only a real
  * engine can tell a paired card from the six-line one that shipped. Hence
  * assertions on bounding boxes — which cells share a line, how wide each
- * is — rather than on the class token, which
- * `src/routes/AppraisalShared.test.tsx` already guards.
+ * is — rather than on the class token, which `src/routes/SharedLink.test.tsx`
+ * already guards.
  *
- * Only one column count exists here. `appraisalShareData.ts` resolves a
- * link with no `characterId` at all, so the refine-then-sell comparison that
- * gives `AppraisalPanel` an optional extra column never applies — this
- * page's `columns` array is fixed. Since the Volume column joined (issue
- * #2337) that is six values, 2+2+2, so the odd trailing cell #1113 asked
- * about no longer arises here; `marketAppraisalNarrow.spec.ts` still covers
- * that shape on the live tab.
+ * Only one column count exists here. A Shared Appraisal carries no
+ * refine-then-sell comparison, so the optional extra column `AppraisalPanel`
+ * can grow never applies — this page's `columns` array is fixed. Since the
+ * Volume column joined (issue #2337) that is six values, 2+2+2, so the odd
+ * trailing cell #1113 asked about no longer arises here;
+ * `marketAppraisalNarrow.spec.ts` still covers that shape on the live tab.
  *
- * No login: this is the app's one unauthenticated content route, which is
- * the whole point of a share link opened by a stranger.
+ * No login: a Share Link opens for anyone, which is the whole point of one
+ * sent to a stranger. The share itself is served by mocking Firestore's
+ * document read — the e2e build carries a placeholder project id for exactly
+ * this (`playwright.config.ts`'s `E2E_ENV`), and no API key, so sync stays off.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { encodeAppraisalShare } from '../src/engine/market/appraisalShare';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
@@ -37,76 +37,89 @@ const DESKTOP = { width: 1280, height: 800 };
 /** The share view's `DataTable` label (`appraisalShare.title`) — not the live tab's `Appraisal`. */
 const TABLE = 'Shared appraisal';
 
-/** Tritanium and Pyerite: both on the market, neither needing a reprocessing entry (which this page would ignore anyway). */
+const SHARE_ID = 'e2eShare1';
+
+/** Tritanium and Pyerite, at quantities large enough that every total renders as a real multi-character ISK figure rather than a two-digit one that would fit anywhere. */
 const TRITANIUM = 34;
 const PYERITE = 35;
 
-const PRICES: Record<number, { buy: number; sell: number }> = {
-  [TRITANIUM]: { buy: 5.41, sell: 5.68 },
-  [PYERITE]: { buy: 11.2, sell: 12.04 },
+const SNAPSHOT = {
+  v: 1,
+  hub: 'jita',
+  pricePercent: 100,
+  generatedAt: 1_750_000_000,
+  items: [
+    {
+      typeId: TRITANIUM,
+      name: 'Tritanium',
+      quantity: 3_400_000,
+      buy: 5.41,
+      sell: 5.68,
+      unitVolume: 0.01,
+    },
+    {
+      typeId: PYERITE,
+      name: 'Pyerite',
+      quantity: 1_750_000,
+      buy: 11.2,
+      sell: 12.04,
+      unitVolume: 0.01,
+    },
+  ],
 };
 
-/** Quantities large enough that every total renders as a real multi-character ISK figure rather than a two-digit one that would fit anywhere. */
-const ITEMS = [
-  { typeId: TRITANIUM, quantity: 3_400_000 },
-  { typeId: PYERITE, quantity: 1_750_000 },
-];
-
-/**
- * A share link for that pile. Built through the real encoder rather than a
- * hand-written base36 string, so a change to the payload format retargets
- * this spec instead of silently landing it on the invalid-link page.
- */
-function shareUrl(): string {
-  const encoded = encodeAppraisalShare({
-    // Must be a hub `getTradeHub` resolves, or the view renders `invalid`.
-    hub: 'jita',
-    pricePercent: 100,
-    generatedAt: 1_750_000_000,
-    items: ITEMS,
-  });
-  if (!encoded.ok) throw new Error(`share encode failed: ${encoded.reason}`);
-  return `./share/appraisal?d=${encodeURIComponent(encoded.payload)}`;
+/** A JS value in Firestore's REST wire encoding — the shape a document read returns. */
+function toFirestoreValue(value: unknown): Record<string, unknown> {
+  if (value === null) return { nullValue: null };
+  if (typeof value === 'string') return { stringValue: value };
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  }
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(toFirestoreValue) } };
+  return {
+    mapValue: {
+      fields: Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, toFirestoreValue(v)])
+      ),
+    },
+  };
 }
 
 /**
- * Answers the aggregates call for whatever types it was asked for, prices as
- * strings because that is how Fuzzwork sends them. Overridden here rather
- * than taken from `support/mockEsi.ts`: the shared `FUZZWORK_AGGREGATES`
- * fixture omits `orderCount`, and `market/fuzzwork.ts`'s `parseSide` reports
- * a side with no order count as *no price*, so against it every figure in
- * this table is an em dash and the pairing assertions would pass on a card
- * holding nothing. A later `page.route` wins over an earlier one — see
- * `support/testBase.ts`.
+ * Answers the share read. Firestore Lite's `getDoc` is a `documents:batchGet`
+ * POST whose response is a JSON array of `{ found }` entries; the document's
+ * own name is echoed from the request so the SDK matches it to the key.
  */
-async function mockHubPrices(page: Page): Promise<void> {
-  await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
-    const types = new URL(route.request().url()).searchParams.get('types') ?? '';
-    const body = Object.fromEntries(
-      types.split(',').map((raw) => {
-        const price = PRICES[Number(raw)];
-        const orderCount = price ? '40' : '0';
-        return [
-          raw,
-          {
-            buy: { max: String(price?.buy ?? 0), volume: '900000000', orderCount },
-            sell: { min: String(price?.sell ?? 0), volume: '900000000', orderCount },
-          },
-        ];
-      })
-    );
+async function mockShare(page: Page): Promise<void> {
+  await page.route(/firestore\.googleapis\.com\/.*documents:batchGet/, async (route) => {
+    const request = route.request().postDataJSON() as { documents: string[] };
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString();
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(body),
+      body: JSON.stringify([
+        {
+          found: {
+            name: request.documents[0],
+            fields: {
+              type: { stringValue: 'appraisal' },
+              payload: toFirestoreValue(SNAPSHOT),
+              createdAt: { timestampValue: now },
+              expiresAt: { timestampValue: expiresAt },
+            },
+            createTime: now,
+            updateTime: now,
+          },
+          readTime: now,
+        },
+      ]),
     });
   });
 }
 
 async function openShare(page: Page): Promise<void> {
-  await page.goto(shareUrl());
-  // Well past the 5s default: opening the link awaits the market type index
-  // (~1.5MB of JSON) plus the Fuzzwork round-trip, cold on a CI runner.
+  await page.goto(`./share/${SHARE_ID}`);
   await expect(page.getByRole('table', { name: TABLE })).toBeVisible({ timeout: 15_000 });
 }
 
@@ -186,7 +199,7 @@ function labelLines(cells: CellBox[]): string[][] {
 
 test.describe('Shared appraisal — stacked result card', () => {
   test.beforeEach(async ({ page }) => {
-    await mockHubPrices(page);
+    await mockShare(page);
   });
 
   test('pairs its six value columns two-per-row at 390px', async ({ page }) => {

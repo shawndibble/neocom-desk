@@ -35,9 +35,12 @@ const E2E_ENV = {
   VITE_EVE_CLIENT_ID: 'e2e-fake-client',
   // Blank out Firebase so isSyncConfigured() is false in E2E — otherwise
   // triggerSync would hit the real cloud function and trip the network guard.
+  // isSyncConfigured() keys on the API key alone, so the project id can carry
+  // a placeholder: a Share Link's Firestore read needs one to build its
+  // request URL, which `appraisalSharedNarrow.spec.ts` then mocks.
   VITE_FIREBASE_API_KEY: '',
   VITE_FIREBASE_AUTH_DOMAIN: '',
-  VITE_FIREBASE_PROJECT_ID: '',
+  VITE_FIREBASE_PROJECT_ID: 'neocom-e2e',
   VITE_FIREBASE_APP_ID: '',
 };
 

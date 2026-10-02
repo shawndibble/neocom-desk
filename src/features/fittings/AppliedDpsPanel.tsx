@@ -104,7 +104,7 @@ export function AppliedDpsPanel({
   /** Active turrets/launchers with no charge loaded — why `applied.weapons` may be empty. */
   chargelessWeaponCount: number;
   targetProfiles: TargetProfiles;
-  /** Absent where there's no Character to have saved Fittings (the Share Link view). */
+  /** Absent where there's no Character to have saved Fittings (the Fitting Share Code view). */
   overlay?: OverlayFitting;
 }) {
   const { t } = useTranslation();

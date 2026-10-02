@@ -1,5 +1,5 @@
 /**
- * Decodes each compare slot's Share Link code into a Fitting. An invalid
+ * Decodes each compare slot's Fitting Share Code into a Fitting. An invalid
  * code becomes its own error slot rather than failing the whole page — a
  * stranger's mis-typed URL shouldn't blank the other two fittings. Decoded
  * slots are cached per code, so adding a third fitting doesn't re-decode

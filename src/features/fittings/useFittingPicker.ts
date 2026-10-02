@@ -1,7 +1,7 @@
 /**
  * The "Compare with…" side of `FittingStartScreen`: the same ways in as the
  * workspace (Import, saved and In-game Fittings), but a chosen Fitting is
- * handed back as a Share Link code instead of being opened in the editor.
+ * handed back as a Fitting Share Code instead of being opened in the editor.
  * My Fittings already carries a code; every other source needs one round of
  * `encodeFittingShare` first.
  */
@@ -29,7 +29,7 @@ export function useFittingPicker(onPick: (code: string) => void): FittingLibrary
   const [lastLoad, setLastLoad] = useState<LoadOutcome | null>(null);
   const [tooLargeToShare, setTooLargeToShare] = useState(false);
 
-  /** Picks a Fitting if it fits a Share Link; otherwise flags it too large. */
+  /** Picks a Fitting if it fits a Fitting Share Code; otherwise flags it too large. */
   const pickFitting = useCallback(
     async (fitting: Fitting) => {
       const encoded = await encodeFittingShare(fittingToShareInput(fitting));

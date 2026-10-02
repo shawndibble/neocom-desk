@@ -120,8 +120,8 @@ interface PasteRow {
  * An EFT `xN` count, made safe to appraise with. `parseEftFit` hands back
  * whatever `N` the text held, and a hand-edited "Nanite Repair Paste x0" is
  * legal to it; this entry's quantity is promised to be >= 1, and a zero would
- * also escape into a share link, where `decodeAppraisalShare` rejects the
- * whole payload over one non-positive count. A count that isn't a positive
+ * also escape into a Shared Appraisal, whose stored snapshot refuses a
+ * non-positive count. A count that isn't a positive
  * whole number is read the way the loose parser reads an unusable one — as
  * one of the thing — rather than dropping the line, which would hide it from
  * the unmatched list too.

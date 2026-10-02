@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { usePageTab } from '@/lib/usePageTab';
 import { MARKET_TABS } from '@/app/pageTabs';
 import {
@@ -88,7 +88,12 @@ import { AppraisalPanel } from '@/features/market/AppraisalPanel';
 import { HaulingPanel, type HaulingRefreshInfo } from '@/features/market/HaulingPanel';
 import { useAppraisal } from '@/features/market/useAppraisal';
 import { tradeHubStanding, useTradeHubStandings } from '@/features/market/useTradeHubStandings';
-import { useMarketPricePercent } from '@/features/market/pricePercent';
+import {
+  PRICE_PERCENT_PARAM,
+  parsePricePercentParam,
+  useMarketPricePercent,
+} from '@/features/market/pricePercent';
+import { useSharedAppraisalSeed } from '@/features/market/sharedAppraisalSeed';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { useMarketCatalogue } from '@/features/market/useMarketCatalogue';
 import { useMarketBrowser } from '@/features/market/useMarketBrowser';
@@ -496,12 +501,31 @@ export function Market() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // The Appraisal tab's other half of the same control pair as the header's hub picker.
-  const pricePercent = useMarketPricePercent((state) => state.value);
+  const savedPricePercent = useMarketPricePercent((state) => state.value);
   const hydratePricePercent = useMarketPricePercent((state) => state.hydrate);
   const setPricePercent = useMarketPricePercent((state) => state.setValue);
   useEffect(() => {
     void hydratePricePercent();
   }, [hydratePricePercent]);
+  // `?percent=` overrides the saved Price Percent for this visit, the way
+  // `?hub=` overrides the saved hub — what a Shared Appraisal's "Open Neocom
+  // Desk" lands with. Typing a percent writes the setting and drops the
+  // override, so the field never fights the URL.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const percentOverride = parsePricePercentParam(searchParams.get(PRICE_PERCENT_PARAM));
+  const pricePercent = percentOverride ?? savedPricePercent;
+  function handlePricePercentChange(value: number) {
+    void setPricePercent(value);
+    if (percentOverride === null) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete(PRICE_PERCENT_PARAM);
+        return next;
+      },
+      { replace: true }
+    );
+  }
 
   const compareCount = useCompareSet((state) => state.items.length);
 
@@ -672,6 +696,9 @@ export function Market() {
     handledAppraiseKey.current = location.key;
     appraisal.appraiseText(text);
   }, [location.key, location.state, appraisal]);
+  // "Open Neocom Desk" on a stored Appraisal Share Link lands here with
+  // `?share=<id>`, its hub and percent riding `?hub=` and `?percent=`.
+  useSharedAppraisalSeed((text) => appraisal.appraiseText(text));
   // Feeds the net-of-fees chips' broker fee — resolved once per character,
   // same as every other configurable-Trade-Hub broker-fee surface.
   const tradeHubStandings = useTradeHubStandings(activeCharacterId);
@@ -1006,9 +1033,10 @@ export function Market() {
           <AppraisalPanel
             controller={appraisal}
             pricePercent={pricePercent}
-            onPricePercentChange={(value) => void setPricePercent(value)}
+            onPricePercentChange={handlePricePercentChange}
             hub={effectiveHub}
             standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
+            characterId={activeCharacterId}
             defaultCompareExpanded={expandCompareOnAppraisal}
           />
         )}

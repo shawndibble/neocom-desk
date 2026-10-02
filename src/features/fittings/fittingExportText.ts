@@ -1,7 +1,8 @@
 /**
  * Builds the text behind each Export menu entry (issue #1543). The pure
  * formats live in `engine/fittings/fittingExport.ts`; this adds what they
- * can't know — item names from the SDE, and the Share Link's encoder and URL.
+ * can't know — item names from the SDE, and the Fitting Share Code's encoder
+ * and permanent URL.
  */
 import { encodeFittingShare } from '@/engine/fitting/fittingShare';
 import {
@@ -15,7 +16,7 @@ import type { Fitting } from '@/engine/fittings/types';
 import { loadTypes } from '@/sde/loadSde';
 import { FITTINGS_PATH } from './fittingRoutes';
 
-export type FittingExportKind = 'shareLink' | 'eft' | 'chatLink' | 'multibuy' | 'eveXml';
+export type FittingExportKind = 'permanentLink' | 'eft' | 'chatLink' | 'multibuy' | 'eveXml';
 
 /**
  * The Fittings tab's own URL with the Fitting in `?f=`, which opens it in the
@@ -28,14 +29,20 @@ export function fittingShareUrl(payload: string): string {
   return `${window.location.origin}${base}${FITTINGS_PATH}?${query}`;
 }
 
-/** The text to copy, or null when a Share Link can't be made (the Fitting is too large to encode). */
+/** The Fitting's **Fitting Share Code**, or null when it is too large to encode. */
+export async function fittingShareCode(fitting: Fitting): Promise<string | null> {
+  const encoded = await encodeFittingShare(fittingToShareInput(fitting));
+  return encoded.ok ? encoded.payload : null;
+}
+
+/** The text to copy, or null when a permanent link can't be made (the Fitting is too large to encode). */
 export async function exportFitting(
   kind: FittingExportKind,
   fitting: Fitting
 ): Promise<string | null> {
-  if (kind === 'shareLink') {
-    const encoded = await encodeFittingShare(fittingToShareInput(fitting));
-    return encoded.ok ? fittingShareUrl(encoded.payload) : null;
+  if (kind === 'permanentLink') {
+    const code = await fittingShareCode(fitting);
+    return code === null ? null : fittingShareUrl(code);
   }
   if (kind === 'chatLink') return fittingToChatLink(fitting);
 

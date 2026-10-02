@@ -1,6 +1,6 @@
 /**
  * Orchestrates the Fittings page (issue #1532): the open Fitting lives in the
- * `?f=` Share Link (CONTEXT.md **Share Link**) — every load rewrites it, a
+ * `?f=` Fitting Share Code (CONTEXT.md **Fitting Share Code**) — every load rewrites it, a
  * reload or a pasted URL decodes it back. Its stats and price come from
  * `useFittingEvaluation`, under the active Character's pilot.
  *
@@ -97,10 +97,10 @@ export interface FittingWorkspace extends FittingEvaluation {
    * The most recent Load's outcome — its warnings, or why it failed —
    * replaced whole by every open, so no earlier Load's warnings outlive it.
    * Null after an open that wasn't a Load (a new hull, a saved Fitting, a
-   * Share Link, Back/Forward).
+   * Fitting Share Code, Back/Forward).
    */
   lastLoad: LoadOutcome | null;
-  /** Set when the open Fitting was too large to fit a Share Link. */
+  /** Set when the open Fitting was too large to fit a Fitting Share Code. */
   tooLargeToShare: boolean;
   /**
    * Loads EFT text, a DNA string / chat link, an eveship.fit link, or a killmail link.
@@ -163,7 +163,7 @@ export function useFittingWorkspace(): FittingWorkspace {
   useLayoutEffect(() => {
     locationRef.current = location;
   });
-  // Every open or edit writes the Fitting's Share Link to the editor's own
+  // Every open or edit writes the Fitting Share Code to the editor's own
   // path, so an open from the Start screen is a history entry Back returns
   // to. `push: false` overwrites the current entry (an edit run coalescing,
   // a Load's drone launch). `replaceEntry` overwrites whatever entry is
@@ -311,7 +311,7 @@ export function useFittingWorkspace(): FittingWorkspace {
   }, [shareCode]);
 
   // Shared tail for "a Fitting is now open, whether it arrived by Load, by
-  // In-game Fittings, or by URL": re-encodes it as a Share Link and writes
+  // In-game Fittings, or by URL": re-encodes it as a Fitting Share Code and writes
   // `?f=`, or — too large to link — keeps it open locally, same as a
   // too-large Load.
   const commitFitting = useCallback(
@@ -356,7 +356,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     async (text: string, { replaceEntry = false }: { replaceEntry?: boolean } = {}) => {
       const outcome = await loadFittingFromText(text);
       if (outcome.kind === 'share') {
-        // Opens like any other Share Link: the decode effect does the rest.
+        // Opens like any other Fitting Share Code: the decode effect does the rest.
         setLastLoad(null);
         setShareCode(outcome.code, { push: true, replaceEntry });
         return;

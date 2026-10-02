@@ -1,6 +1,6 @@
 /**
  * Where a login should land once SSO comes back, instead of the ordinary
- * post-login `/characters`. Two writers: the logged-out Fitting Share Link
+ * post-login `/characters`. Two writers: the logged-out Fitting Share Code
  * view (#1544), whose "Open in Neocom Desk" CTA needs the *same* link to open
  * in the editor, and `app/loginFlow`'s `beginEveLogin`, so a re-auth or a
  * Permission grant returns to the page it was pressed on.

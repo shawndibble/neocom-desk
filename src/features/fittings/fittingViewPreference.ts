@@ -1,7 +1,7 @@
 /**
  * Ring | List choice for the Fittings editor. Device-local and never in the
  * URL (`docs/context/decisions/20260922-221531-*`): it is a view preference,
- * not part of what a Share Link carries. `null` means "never chosen", so the
+ * not part of what a Fitting Share Code carries. `null` means "never chosen", so the
  * breakpoint decides — Ring on desktop, List on a phone.
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';

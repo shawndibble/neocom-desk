@@ -8,6 +8,10 @@
 // same app instance to init Firebase Analytics (GA4) — product usage
 // telemetry, not sync data (see docs/context/decisions/
 // 20260910-113731-add-google-analytics-ga4-via-firebase.md).
+// Third: `features/share/shareStore.ts` writes and reads stored Share Links in
+// the public `shares` collection — content a pilot chose to share, carrying no
+// uid or Character id (docs/context/decisions/
+// 20261002-125432-stored-short-share-links-in-firestore.md).
 
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore/lite';

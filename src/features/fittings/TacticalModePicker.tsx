@@ -1,7 +1,7 @@
 /**
  * A Tactical Destroyer's mode — Defense, Propulsion or Sharpshooter — picked
  * beside the Fitting's other conditions. Part of the Fitting (it rides the
- * Share Link), so a change is an edit. Renders nothing for a hull without modes.
+ * Fitting Share Code), so a change is an edit. Renders nothing for a hull without modes.
  */
 import { useTranslation } from 'react-i18next';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';

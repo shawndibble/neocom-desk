@@ -1,7 +1,7 @@
 /**
  * Fitting evaluation: what the dogma engine sees for a Fitting and a pilot,
  * and the numbers that come back. Every stats caller goes through here —
- * the editor (`useFittingWorkspace`), the logged-out Share Link view, the
+ * the editor (`useFittingWorkspace`), the logged-out Fitting Share Code view, the
  * Variations panel, the applied-DPS overlay and Fitting Compare — so the
  * engine inputs are assembled in one place:
  *

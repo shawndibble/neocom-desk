@@ -217,8 +217,8 @@ describe('parseAppraisalPaste — EFT fits', () => {
   });
 
   it('reads an unusable xN count as one, keeping the "always >= 1" promise', () => {
-    // A zero would ride out into a share link, where decodeAppraisalShare
-    // rejects the whole payload over one non-positive count.
+    // A zero would ride out into a Shared Appraisal, whose stored snapshot
+    // refuses a non-positive count.
     const entries = parseAppraisalPaste('[Rifter, Kite Fit]\n\nNanite Repair Paste x0');
     expect(entries).toEqual([
       { name: 'Rifter', quantity: 1, lines: [1] },

@@ -4,7 +4,7 @@
  * is whole-value last-write-wins per key, so one blob would let "picked
  * Guristas on the laptop" clobber "edited a custom profile on the desktop".
  * The selection is global, not per Fitting: it is the pilot's lens on every
- * fit, and stays out of the `?f=` Share Link.
+ * fit, and stays out of the `?f=` Fitting Share Code.
  */
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

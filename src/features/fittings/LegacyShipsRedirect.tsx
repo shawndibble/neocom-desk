@@ -4,7 +4,7 @@ import { legacyShipsLocation } from './fittingRoutes';
 /**
  * The Ships section's old paths (`/fittings/*`, `/skills/ships`), redirected
  * for good: a history replace, so Back never bounces off the old URL, with
- * query and hash kept — every Share Link ever copied is `/fittings?f=`.
+ * query and hash kept — every Fitting Share Code ever copied is `/fittings?f=`.
  */
 export function LegacyShipsRedirect() {
   const { pathname, search, hash, state } = useLocation();

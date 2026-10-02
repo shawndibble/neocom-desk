@@ -1,5 +1,5 @@
 /**
- * Compare's URL state: up to three Share Link codes as repeated `?f=`
+ * Compare's URL state: up to three Fitting Share Codes as repeated `?f=`
  * params. The house `useUrlParams` (`@/lib/useUrlState.ts`, ADR 0015) reads
  * one value per key, so a repeated key needs its own thin codec instead.
  */

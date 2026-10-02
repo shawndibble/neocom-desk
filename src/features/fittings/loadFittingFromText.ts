@@ -11,7 +11,7 @@ import { loadText, type LoadOutcome, type ShareLoad } from '@/engine/fittings/lo
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadFittingSlots, typeName } from '@/sde/loadSde';
 
-/** Loads EFT text, a DNA string / chat link, a Share Link, an eveship.fit link, or a killmail link. */
+/** Loads EFT text, a DNA string / chat link, a Fitting Share Code, an eveship.fit link, or a killmail link. */
 export function loadFittingFromText(text: string): Promise<LoadOutcome | ShareLoad> {
   return loadText(text, {
     catalog: async () => {

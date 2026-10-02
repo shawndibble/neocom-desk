@@ -56,7 +56,7 @@ function usePreviewFitting(row: LibraryRow): Fitting | null {
   return row.source === 'saved' ? decoded : inGame;
 }
 
-/** The Share Link code compare needs: a saved Fitting has one, an In-game one is encoded once; null when too large. */
+/** The Fitting Share Code compare needs: a saved Fitting has one, an In-game one is encoded once; null when too large. */
 function useShareCode(row: LibraryRow, fitting: Fitting | null): string | null | undefined {
   const [encoded, setEncoded] = useState<{ fitting: Fitting; code: string | null } | null>(null);
   useEffect(() => {

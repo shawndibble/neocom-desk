@@ -1,7 +1,7 @@
 /**
  * The Appraisal's m³ column (issue #2337), shared by the live tab
  * (`AppraisalPanel`) and the read-only share view
- * (`routes/AppraisalShared.tsx`) so the two read the same. The Total volume
+ * (`features/market/AppraisalShareScreen.tsx`) so the two read the same. The Total volume
  * tile beside it is `AppraisalVolumeChip`.
  *
  * Volume is packaged m³ — what a hauler's hold actually takes. A row with no

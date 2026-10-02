@@ -90,13 +90,13 @@ const Travel = lazy(routeChunks.loadTravel);
 const EmploymentHistory = lazy(routeChunks.loadEmploymentHistory);
 const Settings = lazy(routeChunks.loadSettings);
 const Styleguide = lazy(routeChunks.loadStyleguide);
-const AppraisalShared = lazy(routeChunks.loadAppraisalShared);
 const FittingShared = lazy(routeChunks.loadFittingShared);
+const SharedLink = lazy(routeChunks.loadSharedLink);
 const ErrorProbe = lazy(routeChunks.loadErrorProbe);
 
 /**
  * Suspense fallback for the lazy routes outside `Layout` (`/styleguide`,
- * `/share/appraisal`, `/share/fitting`, `/error`). Feature routes suspend inside `Layout`'s own
+ * `/share/fitting`, `/share/:shareId`, `/error`). Feature routes suspend inside `Layout`'s own
  * boundary instead, so the shell stays up. Not `BootScreen`: that one reports
  * a boot stall after ten seconds, and a slow chunk is not a stalled boot.
  */
@@ -165,7 +165,7 @@ const ROUTE_ELEMENTS = {
   // the Ship Tree are all this one route.
   '/ships': <Ships />,
   '/ships/fittings/compare': <FittingCompare />,
-  // The section was `/fittings` before it became Ships. Every Share Link ever
+  // The section was `/fittings` before it became Ships. Every Fitting Share Code ever
   // copied is `/fittings?f=`, so these redirects are for good.
   '/fittings/*': <LegacyShipsRedirect />,
   '/market': <Market />,
@@ -339,15 +339,16 @@ export function App() {
               </Route>
             </Route>
             <Route path="/styleguide" element={<Styleguide />} />
-            {/* The app's first real unauthenticated content route (#831) — a
-              Share link must open with no session and no Character, so it
-              sits outside RequireCharacter/ScopeGate the same way /styleguide
-              does. routeScopes.test.ts asserts this exemption is deliberate. */}
-            <Route path="/share/appraisal" element={<AppraisalShared />} />
-            {/* Same exemption, for a Fitting's own Share Link (#1544) — a
+            {/* A Fitting Share Code opened with no session (#1544) — it must
+              open with no Character, so it sits outside
+              RequireCharacter/ScopeGate the same way /styleguide does. A
               visitor with a Character never sees it: FittingShared redirects
-              straight into the editor instead. */}
+              straight into the editor instead. routeScopes.test.ts asserts
+              this exemption is deliberate. */}
             <Route path="/share/fitting" element={<FittingShared />} />
+            {/* A Share Link (`/share/<id>`), for any share type — same
+              exemption. The literal path above outranks this pattern. */}
+            <Route path="/share/:shareId" element={<SharedLink />} />
             {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
             <Route path="/error" element={<ErrorProbe />} />
             <Route path="*" element={<NotFound />} />
