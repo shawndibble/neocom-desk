@@ -433,7 +433,8 @@ exactly the markup above.
   the actions on line one (none at all with `hideIcon`). A table with no
   chevron and no `end` box can add `className="dt-actions-pinned"` to pin
   the More actions button to the right edge across both lines instead, so
-  line one stays text-tall (Contacts). A cell holding only a `data-dense-omit` value (an empty cell's dash, a
+  line one stays text-tall, with a short `cardCorner` figure (a standing
+  icon) centred beside it (Contacts). A cell holding only a `data-dense-omit` value (an empty cell's dash, a
   word the card says another way) is left off the meta line. Still pure CSS
   (`.dt-stack-dense`); `stackColumns` is ignored.
 - **`mobileSort`** (+ optional `stackSummary`, e.g. "214 offers") renders an

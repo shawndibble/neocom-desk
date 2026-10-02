@@ -521,6 +521,24 @@
       padding-right: 3rem;
     }
 
+    /* The headline figure (`cardCorner`) pinned beside it, centred across both
+       lines too, so the figure and the button read as one column instead of
+       the figure riding the title line's top edge. The row widens its right
+       padding to clear both. Sized for Contacts' standing icons — a short,
+       fixed-width figure; a long one (an ISK amount) would need more room. */
+    .dt-stack.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions) td.dt-corner {
+      position: absolute;
+      top: 50%;
+      right: 2.75rem;
+      transform: translateY(-50%);
+      margin: 0;
+      padding: 0;
+    }
+
+    .dt-stack.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions):has(> td.dt-corner) {
+      padding-right: 5.25rem;
+    }
+
     /* The expand chevron (`expandableRow`) joins the actions on line one.
        Left to the base card rules it flowed onto the meta line carrying the
        labelled card's 7rem label gutter, pushing the first meta value a
