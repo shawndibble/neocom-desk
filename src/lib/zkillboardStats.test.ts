@@ -3,6 +3,7 @@ import recorded from './__fixtures__/zkillCharacterStats.json';
 import {
   PILOT_STATS_CACHE_MS,
   PILOT_TOP_SHIPS,
+  fetchAllianceStats,
   fetchCorporationStats,
   fetchPilotStats,
   parsePilotStats,
@@ -30,6 +31,7 @@ describe('parsePilotStats', () => {
           { shipTypeId: 24688, kills: 89 },
           { shipTypeId: 29984, kills: 43 },
         ],
+        memberCount: null,
       },
     });
     expect(PILOT_TOP_SHIPS).toBe(5);
@@ -64,6 +66,7 @@ describe('parsePilotStats', () => {
         dangerRatio: null,
         gangRatio: null,
         topShips: [],
+        memberCount: null,
       },
     });
   });
@@ -182,5 +185,31 @@ describe('fetchCorporationStats', () => {
     expect((await fetchPilotStats(5)).kind).toBe('stats');
     expect((await fetchCorporationStats(5)).kind).toBe('no-history');
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('fetchAllianceStats', () => {
+  beforeEach(() => resetPilotStatsCache());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("asks zKillboard's stats API for the alliance", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve(recorded) } as Response)
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    expect((await fetchAllianceStats(99005130)).kind).toBe('stats');
+    expect(fetchMock).toHaveBeenCalledWith('https://zkillboard.com/api/stats/allianceID/99005130/');
+  });
+});
+
+describe('parsePilotStats memberCount', () => {
+  it('reads the pilot count zKillboard states for a corporation or alliance', () => {
+    const parsed = parsePilotStats({ shipsDestroyed: 1, info: { memberCount: 335 } });
+    expect(parsed?.kind === 'stats' && parsed.stats.memberCount).toBe(335);
+  });
+
+  it('leaves it unknown when zKillboard states none, as for a pilot', () => {
+    const parsed = parsePilotStats({ shipsDestroyed: 1, info: { name: 'Some Pilot' } });
+    expect(parsed?.kind === 'stats' && parsed.stats.memberCount).toBeNull();
   });
 });

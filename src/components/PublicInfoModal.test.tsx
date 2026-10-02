@@ -11,6 +11,7 @@ vi.mock('@/lib/zkillboard', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/zkillboard')>()),
   fetchPilotStats: vi.fn(async () => ({ kind: 'no-history' })),
   fetchCorporationStats: vi.fn(async () => ({ kind: 'no-history' })),
+  fetchAllianceStats: vi.fn(async () => ({ kind: 'no-history' })),
   fetchPilotKillmails: vi.fn(async () => ({ ok: true, entries: [] })),
 }));
 vi.mock('@/sde/loadSde', () => ({ loadTypes: vi.fn(async () => ({})) }));
@@ -29,7 +30,8 @@ beforeEach(async () => {
   server.use(
     http.post(`${ESI_BASE_URL}/characters/affiliation`, () => HttpResponse.json([])),
     http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.json([])),
-    http.get(`${ESI_BASE_URL}/corporations/:id/alliancehistory`, () => HttpResponse.json([]))
+    http.get(`${ESI_BASE_URL}/corporations/:id/alliancehistory`, () => HttpResponse.json([])),
+    http.get(`${ESI_BASE_URL}/alliances/:id/corporations`, () => HttpResponse.json([]))
   );
 });
 afterEach(() => server.resetHandlers());
@@ -684,6 +686,45 @@ describe('PublicInfoModal', () => {
         expect(within(dialog).getByRole('tab', { name: 'Corporation' })).toBeInTheDocument()
       );
       expect(within(dialog).queryByRole('tab', { name: 'Employment' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Alliance tab', () => {
+    it('shows the executor, founder and every member corporation, each opening in the modal', async () => {
+      mockAlliance(99005130, {
+        name: 'EvE-Scout Enclave',
+        ticker: 'SC0UT',
+        creator_id: 95142600,
+        creator_corporation_id: 98361601,
+        executor_corporation_id: 98361601,
+        date_founded: '2015-01-23T10:37:01Z',
+      });
+      mockNames([
+        { id: 95142600, name: 'G8keeper' },
+        { id: 98361601, name: 'EvE-Scout Rescue' },
+        { id: 98372649, name: 'Signal Cartel' },
+      ]);
+      server.use(
+        http.get(`${ESI_BASE_URL}/alliances/99005130/corporations`, () =>
+          HttpResponse.json([98372649, 98361601])
+        )
+      );
+
+      renderModal();
+      act(() => usePublicInfoModalStore.getState().open('alliance', 99005130));
+
+      const dialog = await screen.findByRole('dialog');
+      await within(dialog).findByText('[SC0UT]');
+      expect(await within(dialog).findByRole('button', { name: 'G8keeper' })).toBeInTheDocument();
+      expect(within(dialog).getByText('Jan 23, 2015')).toBeInTheDocument();
+
+      const members = await within(dialog).findByRole('region', { name: 'Member corporations' });
+      expect(within(members).getByText('2 member corporations')).toBeInTheDocument();
+      within(members).getByRole('button', { name: 'Signal Cartel' }).click();
+      expect(usePublicInfoModalStore.getState().request).toEqual({
+        kind: 'corporation',
+        id: 98372649,
+      });
     });
   });
 });

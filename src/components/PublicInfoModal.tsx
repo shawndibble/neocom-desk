@@ -19,7 +19,7 @@
  * wherever it's opened. Its corporation and alliance come from the live
  * affiliation `loadPilotProfile` resolves, and the Corporation and Alliance
  * tabs follow those ids, not the cached public record's, so the two agree.
- * The dialog is `wide` for a character, since that view needs the room.
+ * The dialog is `wide` for every request: each tab is a full profile now.
  *
  * A link inside the modal that changes page (Open in Fittings) closes it.
  */
@@ -37,12 +37,11 @@ import {
   type PublicCorporationInfo,
 } from '@/features/character/publicInfoData';
 import { loadPilotProfile, type PilotProfile } from '@/features/travel/pilotLookup';
-import { allianceLogoUrl } from '@/lib/eveImages';
-import { allianceZkillUrl } from '@/lib/zkillboard';
 import { usePublicInfoModalStore, type PublicInfoKind } from '@/stores/publicInfoModal';
 
 const LazyEmploymentTab = lazy(() => import('@/features/character/PublicInfoEmploymentTab'));
 const LazyCorporationTab = lazy(() => import('@/features/character/PublicInfoCorporationTab'));
+const LazyAllianceTab = lazy(() => import('@/features/character/PublicInfoAllianceTab'));
 // Lazy: its killmail fits pull in Fittings, and this modal is mounted app-wide.
 const LazyPilotProfileView = lazy(() => import('@/features/travel/PilotProfileView'));
 
@@ -157,12 +156,7 @@ export function PublicInfoModal() {
   const title = activeData.status === 'ready' ? activeData.data.name : t('publicInfo.title');
 
   return (
-    <Modal
-      open
-      onClose={close}
-      title={title}
-      placement={request.kind === 'alliance' ? 'center' : 'wide'}
-    >
+    <Modal open onClose={close} title={title} placement="wide">
       <div className="space-y-3">
         {tabs.length > 0 && (
           <Tabs
@@ -192,7 +186,13 @@ export function PublicInfoModal() {
             onShowAlliance={(id) => open('alliance', id)}
           />
         )}
-        {activeTab === 'alliance' && <AllianceTab state={alliance} />}
+        {activeTab === 'alliance' && (
+          <AllianceTab
+            state={alliance}
+            onShowCharacter={(id) => open('character', id)}
+            onShowCorporation={(id) => open('corporation', id)}
+          />
+        )}
         {activeTab === 'employment' && (
           <Suspense
             fallback={
@@ -206,24 +206,6 @@ export function PublicInfoModal() {
         )}
       </div>
     </Modal>
-  );
-}
-
-/**
- * A corporation's or alliance's kills and losses aren't shown inline (only a
- * character's are, in its tab), so those tabs link out to zKillboard instead.
- */
-function ZkillRow({ href }: { href: string }) {
-  const { t } = useTranslation();
-  return (
-    <>
-      <dt className="text-text-dim uppercase">{t('publicInfo.killboard')}</dt>
-      <dd>
-        <a href={href} target="_blank" rel="noopener noreferrer" className={inlineLinkClassName}>
-          {t('publicInfo.zkillboard')}
-        </a>
-      </dd>
-    </>
   );
 }
 
@@ -332,28 +314,26 @@ function CorporationTab({
   );
 }
 
-function AllianceTab({ state }: { state: TabState<PublicAllianceInfo> }) {
-  const { t } = useTranslation();
+function AllianceTab({
+  state,
+  onShowCharacter,
+  onShowCorporation,
+}: {
+  state: TabState<PublicAllianceInfo>;
+  onShowCharacter: (characterId: number) => void;
+  onShowCorporation: (corporationId: number) => void;
+}) {
   if (state.status !== 'ready')
     return <TabStatus status={state.status === 'idle' ? 'loading' : state.status} />;
-  const { data } = state;
   return (
-    <div className="flex items-start gap-3 text-xs">
-      <img
-        src={allianceLogoUrl(data.alliance_id, 128)}
-        crossOrigin="anonymous"
-        alt=""
-        width={64}
-        height={64}
-        className="shrink-0 rounded-xs border border-line"
+    <Suspense fallback={<TabStatus status="loading" />}>
+      <LazyAllianceTab
+        key={state.data.alliance_id}
+        data={state.data}
+        onShowCharacter={onShowCharacter}
+        onShowCorporation={onShowCorporation}
       />
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-        <dt className="text-text-dim uppercase">{t('publicInfo.ticker')}</dt>
-        <dd>{data.ticker}</dd>
-
-        <ZkillRow href={allianceZkillUrl(data.alliance_id)} />
-      </dl>
-    </div>
+    </Suspense>
   );
 }
 

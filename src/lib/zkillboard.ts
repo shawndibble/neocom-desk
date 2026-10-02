@@ -124,6 +124,8 @@ export interface PilotStats {
   dangerRatio: number | null;
   gangRatio: number | null;
   topShips: PilotTopShip[];
+  /** The pilots zKillboard counts in a corporation or alliance; null for a pilot, or when unstated. */
+  memberCount: number | null;
 }
 
 /** What zKillboard knows of a pilot: their stats, or that it has no kill or loss for them. */
@@ -184,11 +186,12 @@ export function parsePilotStats(body: unknown): PilotStatsParse | null {
       dangerRatio: finiteOrNull(body.dangerRatio),
       gangRatio: finiteOrNull(body.gangRatio),
       topShips: parseTopShips(body.topAllTime),
+      memberCount: isRecord(body.info) ? finiteOrNull(body.info.memberCount) : null,
     },
   };
 }
 
-type StatsEntity = 'characterID' | 'corporationID';
+type StatsEntity = 'characterID' | 'corporationID' | 'allianceID';
 
 /** Keyed `kind:id`: a pilot and a corporation can never share an answer. */
 const pilotStatsCache = new Map<string, { at: number; value: PilotStatsParse }>();
@@ -224,6 +227,11 @@ async function fetchEntityStats(entity: StatsEntity, id: number): Promise<PilotS
 /** A pilot's zKillboard stats, for Pilot Lookup and the Show Info Character tab. */
 export function fetchPilotStats(characterId: number): Promise<PilotStatsResult> {
   return fetchEntityStats('characterID', characterId);
+}
+
+/** An alliance's zKillboard stats, for the Show Info Alliance tab. */
+export function fetchAllianceStats(allianceId: number): Promise<PilotStatsResult> {
+  return fetchEntityStats('allianceID', allianceId);
 }
 
 /** A corporation's zKillboard stats, for the Show Info Corporation tab. */

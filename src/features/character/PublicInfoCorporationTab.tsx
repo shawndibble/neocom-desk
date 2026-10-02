@@ -17,7 +17,6 @@
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CharacterAvatar } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { EveMarkupText } from '@/components/EveMarkupText';
 import { isNpcCorporationId } from '@/esi/entityIds';
@@ -42,6 +41,17 @@ import {
 } from './publicInfoData';
 import { loadStationName } from './stations';
 import { useEntityName } from './useEntityName';
+import { PersonLink } from './PublicInfoParts';
+import {
+  FACT_COLUMNS,
+  externalLinkClassName,
+  fullDate,
+  monthYear,
+  sectionHeading,
+  statusWordClassName,
+  termClassName,
+  websiteUrl,
+} from './publicInfoStyles';
 
 export interface PublicInfoCorporationTabProps {
   data: PublicCorporationInfo;
@@ -53,42 +63,6 @@ export interface PublicInfoCorporationTabProps {
   onShowCharacter: (characterId: number) => void;
   /** Opens a past alliance in the modal, replacing this request. */
   onShowAlliance: (allianceId: number) => void;
-}
-
-/** zKillboard and Website: links, so they wear a control's edge (DESIGN.md §6). */
-const externalLinkClassName =
-  'inline-flex h-11 flex-1 items-center justify-center rounded-xs border border-line-bright px-3 text-xs text-text hover:bg-panel-2 sm:h-8 sm:flex-none';
-/** Status words: type and colour, never a box — a box would read as a button (DESIGN.md §6). */
-const statusWordClassName = 'text-[0.6875rem] font-semibold tracking-widest uppercase';
-/** One line from `md` up however many facts there are (tax and the killboard are optional). */
-const FACT_COLUMNS: Record<number, string> = {
-  2: 'md:grid-cols-2',
-  3: 'md:grid-cols-3',
-  4: 'md:grid-cols-4',
-  5: 'md:grid-cols-5',
-  6: 'md:grid-cols-6',
-};
-const sectionHeading = 'text-xs font-semibold tracking-widest text-text-dim uppercase';
-const termClassName = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
-
-/** Only an absolute http(s) URL becomes a link; anything else a corp typed is left out. */
-function websiteUrl(raw: string | undefined): string | null {
-  if (!raw) return null;
-  try {
-    const url = new URL(raw.trim());
-    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
-  } catch {
-    return null;
-  }
-}
-
-/** ESI's dates are midnight UTC; read in local time, a corp founded on the 12th reads the 11th. */
-function monthYear(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
 }
 
 export default function PublicInfoCorporationTab({
@@ -250,14 +224,7 @@ export default function PublicInfoCorporationTab({
             {data.date_founded && (
               <>
                 <dt className={termClassName}>{t('publicInfo.founded')}</dt>
-                <dd>
-                  {new Date(data.date_founded).toLocaleDateString(undefined, {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    timeZone: 'UTC',
-                  })}
-                </dd>
+                <dd>{fullDate(data.date_founded)}</dd>
               </>
             )}
             {data.home_station_id !== undefined && (
@@ -338,25 +305,5 @@ export default function PublicInfoCorporationTab({
           <ZkillStatsStatus stats={stats} subject="corporation" />
         ))}
     </div>
-  );
-}
-
-function PersonLink({
-  id,
-  name,
-  onOpen,
-}: {
-  id: number;
-  name: string | null;
-  onOpen: (characterId: number) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <span className="flex items-center gap-2">
-      <CharacterAvatar characterId={id} size="sm" loading="lazy" />
-      <button type="button" className={inlineLinkClassName} onClick={() => onOpen(id)}>
-        {name ?? t('common.unknown')}
-      </button>
-    </span>
   );
 }

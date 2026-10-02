@@ -24,6 +24,7 @@ const base: PilotStats = {
   dangerRatio: 78,
   gangRatio: 36,
   topShips: [],
+  memberCount: null,
 };
 
 describe('ZkillStatsSection', () => {

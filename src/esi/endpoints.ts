@@ -400,6 +400,19 @@ export function getAlliancePublicInfo(
   });
 }
 
+// --- GET /alliances/{alliance_id}/corporations (public) ---
+
+/** The ids of every corporation in the alliance, in no stated order. */
+export function getAllianceCorporations(
+  allianceId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<number[]>> {
+  return esiFetch<number[]>(`/alliances/${allianceId}/corporations`, {
+    ...options,
+    endpointId: 'getAllianceCorporations',
+  });
+}
+
 // --- GET /killmails/{killmail_id}/{killmail_hash} (public) ---
 
 export interface Killmail {

@@ -23,6 +23,12 @@ function percent(value: number | null, digits = 0): string {
   return value === null ? '—' : `${(value * 100).toFixed(digits)}%`;
 }
 
+const NO_HISTORY_HINT = {
+  pilot: 'travel.pilot.noHistoryHint',
+  corporation: 'travel.pilot.noHistoryHintCorporation',
+  alliance: 'travel.pilot.noHistoryHintAlliance',
+} as const;
+
 const termClassName =
   'flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
@@ -72,7 +78,7 @@ export function ZkillStatsStatus({
   subject,
 }: {
   stats: PilotStatsResult | null;
-  subject: 'pilot' | 'corporation';
+  subject: 'pilot' | 'corporation' | 'alliance';
 }): ReactNode {
   const { t } = useTranslation();
   if (stats === null) {
@@ -92,14 +98,7 @@ export function ZkillStatsStatus({
   }
   if (stats.kind === 'no-history') {
     return (
-      <EmptyState
-        title={t('travel.pilot.noHistoryTitle')}
-        hint={
-          subject === 'corporation'
-            ? t('travel.pilot.noHistoryHintCorporation')
-            : t('travel.pilot.noHistoryHint')
-        }
-      />
+      <EmptyState title={t('travel.pilot.noHistoryTitle')} hint={t(NO_HISTORY_HINT[subject])} />
     );
   }
   return null;
