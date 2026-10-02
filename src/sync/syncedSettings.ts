@@ -179,6 +179,14 @@
 // a value, not an absence), so the tombstone-expiry edge does not bite it.
 // No `legacyKey`: new, with no device-local life to seed from.
 //
+// sync.navHidden: the pages and views the pilot hid from the rail and the More
+// sheet — a list of nav paths, one for the whole account for the same reason
+// as the Overview's hidden cards below: "I don't do PI" is about the pilot.
+// See app/navPreferences.ts; parseHiddenNav keeps paths this build does not
+// know, so an older build cannot un-hide a newer page. Never deleted, only emptied (showing everything
+// again writes []), so the tombstone edge above does not bite it. No
+// `legacyKey`: new.
+//
 // sync.overviewHiddenCards: which Overview board cards the pilot switched off
 // from the board's edit menu — a list of hidden card keys, one for the whole
 // account rather than per Character, because "I don't do mining tax" is about
@@ -237,6 +245,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.miningTaxManualIgnoredTypeIds',
   'sync.miningTaxManualMoonOreTypeIds',
   'sync.miningTaxOreValueMode',
+  'sync.navHidden',
   'sync.notificationFeedPrefs',
   'sync.overviewCardOrder',
   'sync.overviewHiddenCards',

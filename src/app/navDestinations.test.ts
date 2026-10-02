@@ -72,11 +72,14 @@ describe('NAV_LOCK_PATHS', () => {
         '/calendar',
         '/contracts',
         '/contacts',
-        // Overview's sub-views: the rail never draws them, `OverviewSubNav` does.
+        // Each page's sub-views, which the rail lists under the open page.
         '/clones',
         '/employment-history',
-        // Wallet's LP Store.
         '/market/lp-store',
+        '/skills/plans',
+        '/skills/trained',
+        '/skills/compare',
+        '/skills/certificates',
       ].toSorted()
     );
   });

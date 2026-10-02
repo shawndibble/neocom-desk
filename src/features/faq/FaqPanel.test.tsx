@@ -50,6 +50,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.bpcHidePlex': /hide PLEX contracts/i,
   'sync.targetSkillPlan': /which skill plan you're adding skills to/i,
   'sync.overviewHiddenCards': /Overview cards you hid/i,
+  'sync.navHidden': /pages you hid from the navigation/i,
   'sync.overviewCardOrder': /order you put them in/i,
   'sync.avoidedSystems': /systems you avoid/i,
   'sync.avoidedSystemsEnabled': /systems you avoid/i,

@@ -140,6 +140,13 @@ export const NAV_PAGES = [
     group: 'progression',
     gating: 'scope',
     mobileTab: true,
+    // Routes of their own (`SkillsSubNav`); `/skills` itself redirects to Plans.
+    subViews: [
+      { path: '/skills/plans', labelKey: 'skills.plansTab' },
+      { path: '/skills/trained', labelKey: 'skills.trainedTab' },
+      { path: '/skills/compare', labelKey: 'skills.compareTab' },
+      { path: '/skills/certificates', labelKey: 'skills.certificatesTab' },
+    ],
   },
   {
     path: '/industry',
