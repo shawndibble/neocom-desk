@@ -10,16 +10,23 @@
  *
  * Beside them, the hub's cheapest sell orders as a table with the expected
  * price marked in place, so "units listed ahead of yours" is something you can
- * count rather than a bar to interpret.
+ * count rather than a bar to interpret. Below `lg` that table waits behind a
+ * button, so a phone opens on the figures rather than a screenful of orders.
+ *
+ * The figures speak for themselves; what each one means sits behind a `?`
+ * beside its heading (`InfoTooltip`, tap or hover) rather than printed under
+ * it.
  *
  * A row sold straight into the destination's buy orders has no Expected Sell
  * Price and no Days to Sell: it opens on the load and margin (sales tax only)
  * beside the hub station's buy orders, the ones the load sells into shaded.
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button, InfoTooltip } from '@/components/ui';
 import { HAULING_THRESHOLDS, lotEconomics } from '@/engine/market/haulingMarket';
 import { formatIsk } from '@/lib/isk';
+import { MarketItemLink } from './MarketItemLink';
 import type { InstantHaulingScanRow, ListHaulingScanRow } from './haulingData';
 import { formatDaysToSell, type HaulingViewRow } from './haulingView';
 
@@ -28,20 +35,63 @@ const ORDER_LEVELS = 8;
 /** The row carries its own lane and fees: with Any hub at one end, each row may use a different hub. */
 interface HaulingRowDetailProps {
   row: HaulingViewRow;
+  /** What capped the planned quantity ("22 m³ · about a week of sales") — the Bring box's own `title`, said again here for touch. */
+  loadNote?: string;
 }
 
 interface DetailProps<Row> {
   row: Row;
+  loadNote?: string;
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  tip,
+  children,
+}: {
+  title: string;
+  /** What the section's figures mean, behind a `?` beside the heading. */
+  tip?: string;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
   return (
     <section className="flex flex-col gap-2">
-      <h4 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <h4 className="flex items-center gap-1.5 border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {title}
+        {tip && (
+          <InfoTooltip label={t('market.hauling.detail.about', { section: title })} content={tip} />
+        )}
       </h4>
       {children}
     </section>
+  );
+}
+
+/** The order table: in place from `lg` up, behind a toggle below it. */
+function OrdersDisclosure({
+  showLabel,
+  hideLabel,
+  children,
+}: {
+  showLabel: string;
+  hideLabel: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-col gap-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="self-start lg:hidden"
+        aria-expanded={open}
+        onClick={() => setOpen((was) => !was)}
+      >
+        {open ? hideLabel : showLabel}
+      </Button>
+      <div className={open ? undefined : 'max-lg:hidden'}>{children}</div>
+    </div>
   );
 }
 
@@ -80,11 +130,42 @@ function Line({
   );
 }
 
-export function HaulingRowDetail({ row }: HaulingRowDetailProps) {
-  return row.mode === 'instant' ? <InstantDetail row={row} /> : <ListingDetail row={row} />;
+export function HaulingRowDetail({ row, loadNote }: HaulingRowDetailProps) {
+  return row.mode === 'instant' ? (
+    <InstantDetail row={row} loadNote={loadNote} />
+  ) : (
+    <ListingDetail row={row} loadNote={loadNote} />
+  );
 }
 
-function InstantDetail({ row }: DetailProps<HaulingViewRow & InstantHaulingScanRow>) {
+/** The unit volume and what capped the plan's quantity — the facts the compact row no longer prints. */
+/** The item in the Market Browser at the destination hub — its full order book and price history. */
+function MarketLink({ row }: { row: HaulingViewRow }) {
+  const { t } = useTranslation();
+  return (
+    <MarketItemLink
+      typeId={row.typeId}
+      hubId={row.toHub.id}
+      className="self-start text-xs text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+    >
+      {t('market.hauling.detail.openInMarket', { hub: row.toHub.systemName })}
+    </MarketItemLink>
+  );
+}
+
+function LoadNote({ row, note }: { row: HaulingViewRow; note: string | undefined }) {
+  const { t } = useTranslation();
+  const volume = t('market.hauling.volumeEach', {
+    m3: row.unitVolumeM3.toLocaleString(undefined, { maximumFractionDigits: 3 }),
+  });
+  return (
+    <p className="text-xs text-text-dim">
+      {note ? t('market.hauling.detail.planNote', { volume, note }) : volume}
+    </p>
+  );
+}
+
+function InstantDetail({ row, loadNote }: DetailProps<HaulingViewRow & InstantHaulingScanRow>) {
   const { t } = useTranslation();
   const { fromHub: from, toHub: to, fees } = row;
   const lot = lotEconomics({
@@ -105,18 +186,12 @@ function InstantDetail({ row }: DetailProps<HaulingViewRow & InstantHaulingScanR
   });
 
   return (
-    <div className="flex flex-col gap-4 bg-panel-2/40 p-4">
-      <div>
-        <h3 className="text-base font-semibold">
-          {t('market.hauling.detail.instantTitle', { item: row.name, hub: to.systemName })}
-        </h3>
-        <p className="text-xs text-text-dim">
-          {t('market.hauling.detail.instantNote', { hub: to.systemName })}
-        </p>
-      </div>
-
+    <div className="bg-panel-2/40 p-4">
       <div className="grid gap-x-8 gap-y-5 lg:grid-cols-2">
-        <Section title={t('market.hauling.detail.workingTitle', { count: lot.filled })}>
+        <Section
+          title={t('market.hauling.detail.workingTitle', { count: lot.filled })}
+          tip={t('market.hauling.detail.instantNote', { hub: to.systemName })}
+        >
           {lot.filled === 0 ? (
             <p className="text-xs text-text-dim">{t('market.hauling.detail.noneProfitable')}</p>
           ) : (
@@ -158,48 +233,57 @@ function InstantDetail({ row }: DetailProps<HaulingViewRow & InstantHaulingScanR
                   amount={`${lot.marginPct.toFixed(1)}%`}
                 />
               </div>
+              <LoadNote row={row} note={loadNote} />
             </>
           )}
         </Section>
 
-        <Section title={t('market.hauling.detail.buyOrdersTitle', { hub: to.systemName })}>
-          <div className="overflow-x-auto">
-            <table className="dt-embedded-table w-full min-w-[20rem] text-sm tabular-nums">
-              <thead>
-                <tr className="text-left text-[0.6875rem] tracking-wider text-text-dim uppercase">
-                  <th className="py-1 font-semibold">{t('market.hauling.detail.colPrice')}</th>
-                  <th className="py-1 text-right font-semibold">
-                    {t('market.hauling.detail.colUnits')}
-                  </th>
-                  <th className="py-1 text-right font-semibold">
-                    {t('market.hauling.detail.colTotal')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {orderRows.map((level) => (
-                  <tr
-                    key={level.price}
-                    className={`border-t border-line/60 ${level.soldInto ? 'bg-accent/10' : ''}`}
-                  >
-                    <td className="py-1">{formatIsk(level.price, 2)}</td>
-                    <td className="py-1 text-right">{level.units.toLocaleString()}</td>
-                    <td className="py-1 text-right text-text-dim">
-                      {level.running.toLocaleString()}
-                    </td>
+        <Section
+          title={t('market.hauling.detail.buyOrdersTitle', { hub: to.systemName })}
+          tip={t('market.hauling.detail.buyOrdersNote')}
+        >
+          <OrdersDisclosure
+            showLabel={t('market.hauling.detail.showOrders')}
+            hideLabel={t('market.hauling.detail.hideOrders')}
+          >
+            <div className="overflow-x-auto">
+              <table className="dt-embedded-table w-full min-w-[20rem] text-sm lg:min-w-0 tabular-nums">
+                <thead>
+                  <tr className="text-left text-[0.6875rem] tracking-wider text-text-dim uppercase">
+                    <th className="py-1 font-semibold">{t('market.hauling.detail.colPrice')}</th>
+                    <th className="py-1 text-right font-semibold">
+                      {t('market.hauling.detail.colUnits')}
+                    </th>
+                    <th className="py-1 text-right font-semibold">
+                      {t('market.hauling.detail.colTotal')}
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-xs text-text-dim">{t('market.hauling.detail.buyOrdersNote')}</p>
+                </thead>
+                <tbody>
+                  {orderRows.map((level) => (
+                    <tr
+                      key={level.price}
+                      className={`border-t border-line/60 ${level.soldInto ? 'bg-accent/10' : ''}`}
+                    >
+                      <td className="py-1">{formatIsk(level.price, 2)}</td>
+                      <td className="py-1 text-right">{level.units.toLocaleString()}</td>
+                      <td className="py-1 text-right text-text-dim">
+                        {level.running.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </OrdersDisclosure>
+          <MarketLink row={row} />
         </Section>
       </div>
     </div>
   );
 }
 
-function ListingDetail({ row }: DetailProps<HaulingViewRow & ListHaulingScanRow>) {
+function ListingDetail({ row, loadNote }: DetailProps<HaulingViewRow & ListHaulingScanRow>) {
   const { t } = useTranslation();
   const { fromHub: from, toHub: to, fees } = row;
   const { sale } = row;
@@ -242,20 +326,13 @@ function ListingDetail({ row }: DetailProps<HaulingViewRow & ListHaulingScanRow>
   const usesRecent = sale.recentSalePrice <= sale.undercutPrice;
 
   return (
-    <div className="flex flex-col gap-4 bg-panel-2/40 p-4">
-      <div>
-        <h3 className="text-base font-semibold">
-          {t('market.hauling.detail.title', { item: row.name, hub: to.systemName })}
-        </h3>
-        <p className="text-xs text-text-dim">
-          {t('market.hauling.detail.regionNote', { hub: to.systemName })}
-        </p>
-      </div>
-
-      <div className="grid gap-x-8 gap-y-5 lg:grid-cols-2">
+    <div className="bg-panel-2/40 p-4">
+      <div className="grid gap-x-8 gap-y-5 lg:grid-cols-3">
         <div className="flex flex-col gap-5">
-          <Section title={t('market.hauling.detail.priceTitle')}>
-            <p className="text-xs text-text-dim">{t('market.hauling.detail.priceLowerOf')}</p>
+          <Section
+            title={t('market.hauling.detail.priceTitle')}
+            tip={t('market.hauling.detail.priceTip')}
+          >
             <Line
               indent
               label={t('market.hauling.detail.recentSale')}
@@ -281,7 +358,10 @@ function ListingDetail({ row }: DetailProps<HaulingViewRow & ListHaulingScanRow>
             />
           </Section>
 
-          <Section title={t('market.hauling.detail.speedTitle')}>
+          <Section
+            title={t('market.hauling.detail.speedTitle')}
+            tip={t('market.hauling.detail.regionNote', { hub: to.systemName })}
+          >
             <Line
               label={t('market.hauling.detail.perDay')}
               amount={sale.dailyVolume.toLocaleString(undefined, { maximumFractionDigits: 1 })}
@@ -332,7 +412,24 @@ function ListingDetail({ row }: DetailProps<HaulingViewRow & ListHaulingScanRow>
               <Line
                 strong
                 tone={lot.profit >= 0 ? 'success' : 'danger'}
-                label={t('market.hauling.detail.profit')}
+                label={
+                  listedDiffers ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      {t('market.hauling.detail.profit')}
+                      <InfoTooltip
+                        label={t('market.hauling.detail.about', {
+                          section: t('market.hauling.detail.profit'),
+                        })}
+                        content={t('market.hauling.detail.listedOnlyGap', {
+                          listed: each(listedOnlyEach),
+                          ours: each(row.profitPerUnit),
+                        })}
+                      />
+                    </span>
+                  ) : (
+                    t('market.hauling.detail.profit')
+                  )
+                }
                 detail={t('market.hauling.detail.eachShort', { isk: each(row.profitPerUnit) })}
                 amount={each(lot.profit)}
               />
@@ -343,18 +440,20 @@ function ListingDetail({ row }: DetailProps<HaulingViewRow & ListHaulingScanRow>
                 amount={`${lot.marginPct.toFixed(1)}%`}
               />
             </div>
-            {listedDiffers && (
-              <p className="text-xs text-text-dim">
-                {t('market.hauling.detail.listedOnlyGap', {
-                  listed: each(listedOnlyEach),
-                  ours: each(row.profitPerUnit),
-                })}
-              </p>
-            )}
+            <LoadNote row={row} note={loadNote} />
           </Section>
+        </div>
 
-          <Section title={t('market.hauling.detail.ordersTitle', { hub: to.systemName })}>
-            {/* `min-w` plus `overflow-x-auto`: a narrow phone scrolls this one
+        <div className="flex flex-col gap-5">
+          <Section
+            title={t('market.hauling.detail.ordersTitle', { hub: to.systemName })}
+            tip={t('market.hauling.detail.ordersNote')}
+          >
+            <OrdersDisclosure
+              showLabel={t('market.hauling.detail.showOrders')}
+              hideLabel={t('market.hauling.detail.hideOrders')}
+            >
+              {/* `min-w` plus `overflow-x-auto`: a narrow phone scrolls this one
                 table sideways rather than the whole card losing its columns —
                 unlike `DataTable`, this is a plain `<table>` with no card
                 layout to fall back to, so it must keep row/column shape at
@@ -362,43 +461,44 @@ function ListingDetail({ row }: DetailProps<HaulingViewRow & ListHaulingScanRow>
                 to undo the outer `DataTable`'s phone card-layout CSS, which
                 otherwise leaks into this nested table too — see the comment
                 there. */}
-            <div className="overflow-x-auto">
-              <table className="dt-embedded-table w-full min-w-[20rem] text-sm tabular-nums">
-                <thead>
-                  <tr className="text-left text-[0.6875rem] tracking-wider text-text-dim uppercase">
-                    <th className="py-1 font-semibold">{t('market.hauling.detail.colPrice')}</th>
-                    <th className="py-1 text-right font-semibold">
-                      {t('market.hauling.detail.colUnits')}
-                    </th>
-                    <th className="py-1 text-right font-semibold">
-                      {t('market.hauling.detail.colTotal')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orderRows.flatMap((level, index) => {
-                    const rows = [];
-                    if (index === markerAt)
-                      rows.push(<MarkerRow key="marker" price={sale.price} />);
-                    rows.push(
-                      <tr
-                        key={level.price}
-                        className={`border-t border-line/60 ${level.price <= reach ? 'bg-warning/10' : ''}`}
-                      >
-                        <td className="py-1">{formatIsk(level.price, 2)}</td>
-                        <td className="py-1 text-right">{level.units.toLocaleString()}</td>
-                        <td className="py-1 text-right text-text-dim">
-                          {level.running.toLocaleString()}
-                        </td>
-                      </tr>
-                    );
-                    return rows;
-                  })}
-                  {markerAt === orderRows.length && <MarkerRow price={sale.price} />}
-                </tbody>
-              </table>
-            </div>
-            <p className="text-xs text-text-dim">{t('market.hauling.detail.ordersNote')}</p>
+              <div className="overflow-x-auto">
+                <table className="dt-embedded-table w-full min-w-[20rem] text-sm lg:min-w-0 tabular-nums">
+                  <thead>
+                    <tr className="text-left text-[0.6875rem] tracking-wider text-text-dim uppercase">
+                      <th className="py-1 font-semibold">{t('market.hauling.detail.colPrice')}</th>
+                      <th className="py-1 text-right font-semibold">
+                        {t('market.hauling.detail.colUnits')}
+                      </th>
+                      <th className="py-1 text-right font-semibold">
+                        {t('market.hauling.detail.colTotal')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orderRows.flatMap((level, index) => {
+                      const rows = [];
+                      if (index === markerAt)
+                        rows.push(<MarkerRow key="marker" price={sale.price} />);
+                      rows.push(
+                        <tr
+                          key={level.price}
+                          className={`border-t border-line/60 ${level.price <= reach ? 'bg-warning/10' : ''}`}
+                        >
+                          <td className="py-1">{formatIsk(level.price, 2)}</td>
+                          <td className="py-1 text-right">{level.units.toLocaleString()}</td>
+                          <td className="py-1 text-right text-text-dim">
+                            {level.running.toLocaleString()}
+                          </td>
+                        </tr>
+                      );
+                      return rows;
+                    })}
+                    {markerAt === orderRows.length && <MarkerRow price={sale.price} />}
+                  </tbody>
+                </table>
+              </div>
+            </OrdersDisclosure>
+            <MarketLink row={row} />
           </Section>
         </div>
       </div>

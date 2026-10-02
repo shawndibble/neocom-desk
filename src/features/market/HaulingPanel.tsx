@@ -10,7 +10,7 @@
  * quantity, and unticking or typing a number re-sizes the rest through the
  * same `planTrip` the suggestion came from.
  */
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -27,20 +27,19 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  MenuItem,
   Spinner,
-  StatChip,
-  StatChips,
   TextInput,
   Toast,
+  IconButton,
   TypeIcon,
+  DataTableDenseCell,
   type DataTableColumn,
 } from '@/components/ui';
-import {
-  multibuyText,
-  planTrip,
-  type TripLine,
-  type TripOverride,
-} from '@/engine/market/haulingPlan';
+import * as Icon from '@/components/ui/icons';
+import { useIsNarrow } from '@/lib/useIsNarrow';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { multibuyText, planTrip, type TripOverride } from '@/engine/market/haulingPlan';
 import type { DemandKind, HaulingFlag } from '@/engine/market/haulingMarket';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -141,20 +140,11 @@ const useIntroDismissed = createLocalSetting<boolean>({
  * (issue: hauling toolbar redesign). `select`/`item` stay out of `ids` —
  * hiding either loses the row's own identity or the multibuy checkbox.
  */
-const HAULING_COLUMN_IDS = [
-  'buy',
-  'expected',
-  'margin',
-  'iskPerM3',
-  'days',
-  'demand',
-  'flags',
-  'bring',
-] as const;
+const HAULING_COLUMN_IDS = ['buy', 'expected', 'margin', 'iskPerM3', 'days', 'bring'] as const;
 type HaulingColumnId = (typeof HAULING_COLUMN_IDS)[number];
 
-/** Days to Sell and demand are read for a listing only: an instant sale into buy orders has neither. */
-const LISTING_ONLY_COLUMN_IDS: readonly HaulingColumnId[] = ['days', 'demand'];
+/** Days to Sell (and the demand it carries) is read for a listing only: an instant sale into buy orders has neither. */
+const LISTING_ONLY_COLUMN_IDS: readonly HaulingColumnId[] = ['days'];
 const INSTANT_COLUMN_IDS = HAULING_COLUMN_IDS.filter((id) => !LISTING_ONLY_COLUMN_IDS.includes(id));
 
 function isHaulingColumnId(id: string): id is HaulingColumnId {
@@ -166,10 +156,15 @@ const useHaulingColumns = createColumnVisibilitySetting<HaulingColumnId>({
   ids: HAULING_COLUMN_IDS,
 });
 
-const DEMAND_DOT: Record<DemandKind, string> = {
-  'most-days': 'bg-success',
-  bursts: 'bg-warning',
-  rarely: 'bg-danger',
+/**
+ * The demand mark: a filled dot, a hollow ring or a square, so the three
+ * read apart by shape as well as colour — on a phone the mark stands alone,
+ * its words left to screen readers and the row's detail (DESIGN.md §7).
+ */
+const DEMAND_MARK: Record<DemandKind, string> = {
+  'most-days': 'rounded-full bg-success',
+  bursts: 'rounded-full border-2 border-warning',
+  rarely: 'rounded-[1px] bg-danger',
 };
 
 function signed(value: number, fractionDigits: number): string {
@@ -237,6 +232,13 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const instant = mode === 'instant';
 
   const columnVisibility = useColumnVisibility(useHaulingColumns, HAULING_COLUMN_IDS);
+  const isNarrow = useIsNarrow();
+  // A phone's dense card holds Buy, Sell and ISK/m³ on one ~200px line, so
+  // its figures go compact (`3.41K`). Chosen in JS, not by a hidden/shown
+  // pair of spans: one DOM at every width (DESIGN.md, DataTable).
+  const isPhone = useIsPhone();
+  const isk = (value: number, digits: number) =>
+    isPhone ? formatIskCompact(value) : formatIsk(value, digits);
 
   const [groups, setGroups] = useState<MarketGroupNode[] | null>(null);
   useEffect(() => {
@@ -336,6 +338,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     });
   }
 
+  /** Unticks every shown row: Select all's off state, and the menu's Clear all. */
+  const clearAll = () => setOverrides(new Map(shown.map((r) => [r.typeId, { selected: false }])));
+
   const allSelected =
     shown.length > 0 && shown.every((r) => overrides.get(r.typeId)?.selected !== false);
   const selectedCount = shown.filter((r) => overrides.get(r.typeId)?.selected !== false).length;
@@ -347,18 +352,31 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     return () => clearTimeout(timer);
   }, [copyStatus]);
   const listText = multibuyText(plan.lines);
+  // The list itself stays out of the way until asked for (the summary row's
+  // menu) — or until the clipboard refuses it, below.
+  const [listShown, setShowList] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  // Opened by a refused copy, the list may sit off screen (a phone scrolled
+  // down the rows): bring it into view so "copy the list below" points at it.
+  useEffect(() => {
+    if (copyStatus === 'failed') listRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [copyStatus]);
   async function copyMultibuy() {
     try {
       await writeToClipboard(listText);
       setCopyStatus('copied');
     } catch {
-      // Clipboard refused: the list is still on screen to copy by hand, but
+      // Clipboard refused: open the list so it can be copied by hand, and
       // say so rather than leaving the button looking like it did nothing.
+      setShowList(true);
       setCopyStatus('failed');
     }
   }
 
-  const limitText = (line: TripLine): string => {
+  /** What capped a row's planned quantity ("22 m³ · about a week of sales"), or nothing for a row with no plan line. */
+  const limitTextOf = (row: HaulingViewRow): string | undefined => {
+    const line = lineOf.get(row.typeId);
+    if (!line) return undefined;
     const unit = line.volumeM3 > 0 ? `${Math.round(line.volumeM3).toLocaleString()} m³ · ` : '';
     return `${unit}${t(`market.hauling.limit.${line.limitedBy}`)}`;
   };
@@ -407,13 +425,16 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     );
   }
 
+  // On a phone each row is the dense two-line card: name and margin on top,
+  // Buy · Sell · ISK/m³ · days underneath, the tick box and the Bring box
+  // pinned to its edges (`stackEdge`). A tap opens the row's detail.
   const columns: DataTableColumn<HaulingViewRow>[] = [
     {
       id: 'select',
       header: '',
       headerClassName: 'w-8',
       className: 'w-8',
-      cardCorner: 'start',
+      stackEdge: 'start',
       render: (row) => (
         <Checkbox
           aria-label={t('market.hauling.selectRow', { item: row.name })}
@@ -429,21 +450,29 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       primary: true,
       sortValue: (row) => row.name.toLowerCase(),
       render: (row) => (
-        <span className="flex items-center gap-2">
-          <TypeIcon typeId={row.typeId} size={32} className="size-6 shrink-0" />
-          <span className="flex min-w-0 flex-col">
-            <MarketItemLink
-              typeId={row.typeId}
-              className="font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              {row.name}
-            </MarketItemLink>
-            <span className="text-[0.6875rem] text-text-dim">
-              {t('market.hauling.volumeEach', {
-                m3: row.unitVolumeM3.toLocaleString(undefined, { maximumFractionDigits: 3 }),
+        <span className="flex min-w-0 items-center gap-2">
+          <TypeIcon typeId={row.typeId} size={32} className="size-6 shrink-0 max-sm:hidden" />
+          <MarketItemLink
+            typeId={row.typeId}
+            className="min-w-0 truncate font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            {row.name}
+          </MarketItemLink>
+          {row.flags.length > 0 && (
+            <IconButton
+              variant="plain"
+              tone="warning"
+              size="sm"
+              openOnTap
+              icon={<Icon.Warn size={Icon.ICON_SIZE.sm} />}
+              label={t('market.hauling.flagsAria', {
+                flags: row.flags.map((flag) => flagLabel[flag].text).join(', '),
               })}
-            </span>
-          </span>
+              tooltip={row.flags
+                .map((flag) => `${flagLabel[flag].text}: ${flagLabel[flag].tip}`)
+                .join(' ')}
+            />
+          )}
         </span>
       ),
     },
@@ -470,8 +499,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       header: t('market.hauling.columns.buy'),
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
+      stackAffix: { before: `${t('market.hauling.columns.buy')} ` },
       sortValue: (row) => row.buyLadder[0]?.price,
-      render: (row) => formatIsk(row.buyLadder[0]?.price ?? 0, 2),
+      render: (row) => isk(row.buyLadder[0]?.price ?? 0, 2),
     },
     {
       id: 'expected',
@@ -482,8 +512,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       ),
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
+      stackAffix: {
+        before: `${t(instant ? 'market.hauling.columns.buyOrder' : 'market.hauling.columns.expected')} `,
+      },
       sortValue: (row) => row.price,
-      render: (row) => formatIsk(row.price, 2),
+      render: (row) => isk(row.price, 2),
     },
     {
       id: 'margin',
@@ -494,13 +527,15 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       ),
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
+      // The phone card's headline figure, on the title line.
+      cardCorner: true,
       cellClassName: (row) =>
         row.marginPct >= HAULING_THRESHOLDS.lowMarginPct ? 'text-success' : 'text-text-dim',
       sortValue: (row) => row.marginPct,
       render: (row) => (
-        <span className="flex flex-col items-end font-semibold">
+        <span className="font-semibold">
           {signed(row.marginPct, 1)}%
-          <span className="text-[0.6875rem] font-normal text-text-dim">
+          <span className="ml-1.5 text-[0.6875rem] font-normal text-text-dim max-sm:hidden">
             {t('market.hauling.profitEach', {
               isk: `${row.profitPerUnit >= 0 ? '+' : ''}${formatIsk(row.profitPerUnit, 0)}`,
             })}
@@ -515,55 +550,35 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       headerTooltip: t('market.hauling.columns.iskPerM3Tip'),
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
+      stackAffix: { after: t('market.hauling.perM3Short') },
       sortValue: (row) => row.iskPerM3,
-      render: (row) => formatIsk(row.iskPerM3, 0),
+      render: (row) => isk(row.iskPerM3, 0),
     },
     {
+      // Days to sell and how steadily it sells, in one cell: the demand mark
+      // leads, and its words follow on a wide screen (a phone keeps the
+      // mark's shape, with the words for screen readers only).
       id: 'days',
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.days'),
       headerTooltip: t('market.hauling.columns.daysTip'),
-      align: 'right',
-      className: 'tabular-nums',
+      className: 'tabular-nums whitespace-nowrap',
+      stackAffix: { after: t('market.hauling.daysShort') },
       sortValue: (row) => (row.mode === 'list' ? row.sale.daysToSell : undefined),
-      render: (row) => (row.mode === 'list' ? formatDaysToSell(row.sale.daysToSell) : null),
-    },
-    {
-      id: 'demand',
-      headerClassName: 'whitespace-nowrap',
-      header: t('market.hauling.columns.demand'),
-      sortValue: (row) => (row.mode === 'list' ? row.demand.daysWithTrades : undefined),
       render: (row) =>
         row.mode === 'list' && (
-          <span
-            className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs"
-            title={t('market.hauling.demandDays', { count: row.demand.daysWithTrades })}
-          >
+          <DataTableDenseCell>
             <span
               aria-hidden="true"
-              className={`size-2 rounded-full ${DEMAND_DOT[row.demand.demand]}`}
+              title={t('market.hauling.demandDays', { count: row.demand.daysWithTrades })}
+              className={`size-2 shrink-0 ${DEMAND_MARK[row.demand.demand]}`}
             />
-            {t(`market.hauling.demand.${row.demand.demand}`)}
-          </span>
-        ),
-    },
-    {
-      id: 'flags',
-      headerClassName: 'whitespace-nowrap',
-      header: t('market.hauling.columns.flags'),
-      render: (row) => (
-        <span className="flex flex-wrap gap-1">
-          {row.flags.map((flag) => (
-            <span
-              key={flag}
-              title={flagLabel[flag].tip}
-              className="rounded-xs border border-warning/50 px-1.5 py-0.5 text-[0.6875rem] text-warning"
-            >
-              {flagLabel[flag].text}
+            {formatDaysToSell(row.sale.daysToSell)}
+            <span className="text-xs text-text-dim max-sm:sr-only">
+              · {t(`market.hauling.demand.${row.demand.demand}`)}
             </span>
-          ))}
-        </span>
-      ),
+          </DataTableDenseCell>
+        ),
     },
     {
       id: 'bring',
@@ -571,25 +586,24 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       header: t('market.hauling.columns.bring'),
       align: 'right',
       className: 'whitespace-nowrap',
+      stackEdge: 'end',
       render: (row) => {
         const line = lineOf.get(row.typeId);
         if (!line) return null;
         return (
-          <span className="flex flex-col items-end gap-0.5">
-            <BringInput
-              label={t('market.hauling.bringRow', { item: row.name })}
-              value={overrides.get(row.typeId)?.selected === false ? '' : String(line.quantity)}
-              onCommit={(quantity) =>
-                patchOverride(
-                  row.typeId,
-                  quantity === 0
-                    ? { selected: false, quantity: undefined }
-                    : { selected: true, quantity }
-                )
-              }
-            />
-            <span className="text-[0.6875rem] text-text-dim">{limitText(line)}</span>
-          </span>
+          <BringInput
+            label={t('market.hauling.bringRow', { item: row.name })}
+            title={limitTextOf(row)}
+            value={overrides.get(row.typeId)?.selected === false ? '' : String(line.quantity)}
+            onCommit={(quantity) =>
+              patchOverride(
+                row.typeId,
+                quantity === 0
+                  ? { selected: false, quantity: undefined }
+                  : { selected: true, quantity }
+              )
+            }
+          />
         );
       },
     },
@@ -629,30 +643,15 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     (params.margin !== DEFAULT_HAULING_FILTER.margin ? 1 : 0) +
     (!instant && params.demand !== DEFAULT_HAULING_FILTER.demand ? 1 : 0);
   const hiddenCount = (instant ? 0 : hidden.thin + hidden.slow) + hidden.lowMargin;
-  const filterValue = pickHaulingFilter(params);
+  // Category and mode ride along so the narrow sheet can edit them as part of
+  // its draft; only days/margin/demand are remembered (`rememberedFilter`).
+  const filterValue = { ...pickHaulingFilter(params), cat: categoryId, mode };
 
   return (
-    <Panel
-      title={t('market.hauling.title')}
-      actionsFill
-      actions={
-        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
-          <HaulingCargoControl
-            characterId={activeCharacterId}
-            cargo={cargo}
-            onCargoChange={(next) => void setCargo(next)}
-            budget={budget}
-            onBudgetChange={(next) => void setBudget(next)}
-          />
-          <Button size="sm" disabled={plan.totals.items === 0} onClick={() => void copyMultibuy()}>
-            {t('market.hauling.copyMultibuy')}
-          </Button>
-          {state.status === 'ready' && <DataAgeBadge date={new Date(state.scan.fetchedAt)} />}
-          <TableActionsMenu name={t('market.hauling.title')} tableExport={tableExport} />
-        </div>
-      }
-      padded={false}
-    >
+    // No title bar: the Hauling tab right above already names the panel, and
+    // its old actions (ship, Copy Multibuy, export) live in the trip summary
+    // row now, beside the totals they act on.
+    <Panel padded={false}>
       {/*
         `search` is documented as the route's search box (DESIGN.md §4b) —
         Hauling has none. It carries the From/To/Category controls instead,
@@ -669,176 +668,183 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         signal to give `FilterBar` a real "leading toolbar" slot instead of
         overloading `search` a second time.
 
-        `rowAlign="end"`/`triggerSize="sm"`: the From/To/Category controls
-        are labelled fields (a caption above each `Select`), taller than the
-        plain icon buttons beside them — `items-center` (this row's default)
-        centers those buttons against the *field's* full height instead of
-        lining their bottom edge up with the select boxes', and left the
-        funnel trigger a size bigger than the `sm` column picker beside it.
+        The controls carry no caption: the `→` between From and To and each
+        select's own value say what they are, and the caption row doubled the
+        bar's height. Each keeps its name as its `aria-label`.
+
+        Category and Sell by sit in the row only where it has the width; on a
+        narrow screen they move into the filter sheet (same `useIsNarrow`
+        breakpoint `FilterBar` itself switches on, so they are never in both
+        places or neither), and a one-line summary under the bar keeps the
+        choice visible.
       */}
-      <FilterBar
-        value={filterValue}
-        onChange={(next) => setParams(next)}
-        activeCount={activeFilterCount}
-        title={t('market.hauling.filters.title')}
-        className="border-b border-line px-3 py-3"
-        rowAlign="end"
-        triggerSize="sm"
-        search={
-          <>
-            <HubField
-              label={t('market.hauling.from')}
-              value={params.from}
-              onChange={(id) =>
-                setParams(pickHaulingHub({ from: params.from, to: params.to }, 'from', id))
-              }
-            />
-            {/* `self-center`: the row's own `items-end` lines the labelled
-                fields and icon buttons up by their bottom edge, but this
-                arrow has no label above it — left to that default it would
-                sink to their baseline instead of sitting at the selects'
-                natural mid-height. */}
-            <span aria-hidden="true" className="self-center text-text-faint">
-              →
-            </span>
-            <HubField
-              label={t('market.hauling.to')}
-              value={params.to}
-              onChange={(id) =>
-                setParams(pickHaulingHub({ from: params.from, to: params.to }, 'to', id))
-              }
-            />
-            <label className="flex flex-col gap-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('market.hauling.category')}
-              <Select
-                value={String(categoryId)}
-                onValueChange={(value) => setParams({ cat: Number(value) })}
-              >
-                <SelectTrigger size="sm" aria-label={t('market.hauling.category')} className="w-52">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {HAULING_CATEGORY_IDS.map((id) => (
-                    <SelectItem key={id} value={String(id)}>
-                      {categoryName(id)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-            <label className="flex flex-col gap-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('market.hauling.mode')}
-              <Select
-                value={mode}
-                onValueChange={(value) => setParams({ mode: value as HaulMode })}
-              >
-                <SelectTrigger size="sm" aria-label={t('market.hauling.mode')} className="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {HAUL_MODES.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {t(`market.hauling.modes.${m}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-          </>
-        }
-        actions={
-          <ColumnPickerMenu
-            available={availableColumnIds}
-            visible={columnVisibility.visible}
-            columnsById={hideableColumnsById}
-            onToggle={columnVisibility.toggle}
-            onReset={columnVisibility.reset}
-            resetLabel={t('common.resetColumns')}
-            buttonLabel={t('common.columnsButton')}
-            menuTitle={t('common.columnsMenuTitle')}
-            size="sm"
-          />
-        }
-      >
-        {(draft, setDraft) => (
-          <>
-            {!instant && (
-              <FilterField label={t('market.hauling.filters.sellsWithin')}>
-                <Select
-                  value={String(draft.days)}
-                  onValueChange={(v) => setDraft({ ...draft, days: Number(v) })}
-                >
-                  <SelectTrigger
-                    size="sm"
-                    aria-label={t('market.hauling.filters.sellsWithin')}
-                    className="w-28"
+      <div className="border-b border-line">
+        <FilterBar
+          value={filterValue}
+          onChange={(next) => setParams(next)}
+          activeCount={activeFilterCount}
+          title={t('market.hauling.filters.title')}
+          className="px-3 py-2.5"
+          triggerSize="sm"
+          search={
+            <>
+              <HubField
+                label={t('market.hauling.from')}
+                value={params.from}
+                onChange={(id) =>
+                  setParams(pickHaulingHub({ from: params.from, to: params.to }, 'from', id))
+                }
+              />
+              <span aria-hidden="true" className="text-text-faint">
+                →
+              </span>
+              <HubField
+                label={t('market.hauling.to')}
+                value={params.to}
+                onChange={(id) =>
+                  setParams(pickHaulingHub({ from: params.from, to: params.to }, 'to', id))
+                }
+              />
+              {!isNarrow && (
+                <>
+                  <CategorySelect
+                    value={categoryId}
+                    onChange={(cat) => setParams({ cat })}
+                    nameOf={categoryName}
+                  />
+                  <ModeSelect value={mode} onChange={(next) => setParams({ mode: next })} />
+                </>
+              )}
+            </>
+          }
+          actions={
+            <>
+              {state.status === 'ready' && !isNarrow && (
+                <DataAgeBadge date={new Date(state.scan.fetchedAt)} />
+              )}
+              <ColumnPickerMenu
+                available={availableColumnIds}
+                visible={columnVisibility.visible}
+                columnsById={hideableColumnsById}
+                onToggle={columnVisibility.toggle}
+                onReset={columnVisibility.reset}
+                resetLabel={t('common.resetColumns')}
+                buttonLabel={t('common.columnsButton')}
+                menuTitle={t('common.columnsMenuTitle')}
+                size="sm"
+              />
+            </>
+          }
+        >
+          {(draft, setDraft) => {
+            // Read off the draft, not the committed mode: switching to
+            // instant in the sheet drops the listing-only fields before Apply.
+            const draftInstant = draft.mode === 'instant';
+            return (
+              <>
+                {isNarrow && (
+                  <>
+                    <FilterField label={t('market.hauling.category')}>
+                      <CategorySelect
+                        value={draft.cat}
+                        onChange={(cat) => setDraft({ ...draft, cat })}
+                        nameOf={categoryName}
+                      />
+                    </FilterField>
+                    <FilterField label={t('market.hauling.mode')}>
+                      <ModeSelect
+                        value={draft.mode}
+                        onChange={(next) => setDraft({ ...draft, mode: next })}
+                      />
+                    </FilterField>
+                  </>
+                )}
+                {!draftInstant && (
+                  <FilterField label={t('market.hauling.filters.sellsWithin')}>
+                    <Select
+                      value={String(draft.days)}
+                      onValueChange={(v) => setDraft({ ...draft, days: Number(v) })}
+                    >
+                      <SelectTrigger
+                        size="sm"
+                        aria-label={t('market.hauling.filters.sellsWithin')}
+                        className="w-28"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DAY_CHOICES.map((d) => (
+                          <SelectItem key={d} value={String(d)}>
+                            {d === 0
+                              ? t('market.hauling.filters.anyTime')
+                              : t('market.hauling.filters.days', { count: d })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FilterField>
+                )}
+                <FilterField label={t('market.hauling.filters.marginOver')}>
+                  <Select
+                    value={String(draft.margin)}
+                    onValueChange={(v) => setDraft({ ...draft, margin: Number(v) })}
                   >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DAY_CHOICES.map((d) => (
-                      <SelectItem key={d} value={String(d)}>
-                        {d === 0
-                          ? t('market.hauling.filters.anyTime')
-                          : t('market.hauling.filters.days', { count: d })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FilterField>
-            )}
-            <FilterField label={t('market.hauling.filters.marginOver')}>
-              <Select
-                value={String(draft.margin)}
-                onValueChange={(v) => setDraft({ ...draft, margin: Number(v) })}
-              >
-                <SelectTrigger
-                  size="sm"
-                  aria-label={t('market.hauling.filters.marginOver')}
-                  className="w-24"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MARGIN_CHOICES.map((m) => (
-                    <SelectItem key={m} value={String(m)}>
-                      {m}%
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            {!instant && (
-              <FilterField label={t('market.hauling.filters.demand')}>
-                <Select
-                  value={draft.demand}
-                  onValueChange={(v) => setDraft({ ...draft, demand: v as HaulingDemandFilter })}
-                >
-                  <SelectTrigger
-                    size="sm"
-                    aria-label={t('market.hauling.filters.demand')}
-                    className="w-32"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="steady">{t('market.hauling.filters.steady')}</SelectItem>
-                    <SelectItem value="any">{t('market.hauling.filters.anyDemand')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </FilterField>
-            )}
-            <p className="text-[0.6875rem] text-text-dim">
-              {instant
-                ? t('market.hauling.feesLineInstant', { accounting: fees.accountingLevel })
-                : t('market.hauling.feesLine', {
-                    accounting: fees.accountingLevel,
-                    broker: fees.brokerRelationsLevel,
-                  })}
-            </p>
-          </>
+                    <SelectTrigger
+                      size="sm"
+                      aria-label={t('market.hauling.filters.marginOver')}
+                      className="w-24"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MARGIN_CHOICES.map((m) => (
+                        <SelectItem key={m} value={String(m)}>
+                          {m}%
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FilterField>
+                {!draftInstant && (
+                  <FilterField label={t('market.hauling.filters.demand')}>
+                    <Select
+                      value={draft.demand}
+                      onValueChange={(v) =>
+                        setDraft({ ...draft, demand: v as HaulingDemandFilter })
+                      }
+                    >
+                      <SelectTrigger
+                        size="sm"
+                        aria-label={t('market.hauling.filters.demand')}
+                        className="w-32"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="steady">{t('market.hauling.filters.steady')}</SelectItem>
+                        <SelectItem value="any">{t('market.hauling.filters.anyDemand')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FilterField>
+                )}
+                <p className="text-[0.6875rem] text-text-dim">
+                  {draftInstant
+                    ? t('market.hauling.feesLineInstant', { accounting: fees.accountingLevel })
+                    : t('market.hauling.feesLine', {
+                        accounting: fees.accountingLevel,
+                        broker: fees.brokerRelationsLevel,
+                      })}
+                </p>
+              </>
+            );
+          }}
+        </FilterBar>
+        {isNarrow && (
+          <p className="truncate px-3 pb-2 text-[0.6875rem] text-text-dim">
+            {categoryName(categoryId)} · {t(`market.hauling.modes.${mode}`)}
+          </p>
         )}
-      </FilterBar>
+      </div>
 
       {/* The intro explains the Expected Sell Price: an instant sale has none. */}
       {!introDismissed && !instant && (
@@ -908,109 +914,111 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             />
           ) : (
             <>
-              <div className="flex flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 py-3">
-                <StatChips>
-                  <StatChip
-                    label={t('market.hauling.plan.profit')}
-                    value={formatIskCompact(plan.totals.profit)}
-                    tone={plan.totals.profit > 0 ? 'success' : 'default'}
-                  />
-                  <StatChip
-                    label={t('market.hauling.plan.spend')}
-                    value={formatIskCompact(plan.totals.cost)}
-                  />
-                  <StatChip label={t('market.hauling.plan.items')} value={plan.totals.items} />
-                  <StatChip
-                    label={t('market.hauling.plan.selected')}
-                    value={t('market.hauling.plan.selectedOf', {
+              {/* The trip summary: the totals, then the hold meter and the
+                  actions that act on the whole plan — the ship, Copy
+                  Multibuy, and a menu for the rest. One line on a wide
+                  screen; on a phone the meter and actions take a second. */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-panel-2 px-3 py-2 text-sm tabular-nums">
+                <div className="flex items-center gap-x-4">
+                  <label className="flex items-center gap-2 text-xs text-text-dim">
+                    <Checkbox
+                      aria-label={t('market.hauling.selectAll')}
+                      checked={allSelected}
+                      onChange={(event) =>
+                        event.target.checked ? setOverrides(new Map()) : clearAll()
+                      }
+                    />
+                    {t('market.hauling.plan.selectedOf', {
                       selected: selectedCount,
                       total: shown.length,
                     })}
-                  />
-                </StatChips>
-                {cargo !== null && heldPct !== null && (
-                  <div className="flex min-w-48 flex-col gap-1">
-                    <div
-                      role="img"
-                      aria-label={t('market.hauling.plan.holdAria', {
-                        used: Math.round(plan.totals.volumeM3).toLocaleString(),
-                        total: Math.round(cargo.m3).toLocaleString(),
-                      })}
-                      className="h-2 w-full bg-line"
-                    >
-                      <div className="h-full bg-accent" style={{ width: `${heldPct}%` }} />
-                    </div>
-                    <span className="text-[0.6875rem] text-text-dim">
-                      {t('market.hauling.plan.holdUsed', {
-                        used: Math.round(plan.totals.volumeM3).toLocaleString(),
-                        total: Math.round(cargo.m3).toLocaleString(),
-                      })}
-                      {bindingText ? ` · ${bindingText}` : ''}
-                    </span>
-                  </div>
-                )}
-                {cargo === null && (
-                  <span className="text-[0.6875rem] text-text-dim">
-                    {t('market.hauling.cargo.tip')}
+                  </label>
+                  <span>
+                    <b className={plan.totals.profit > 0 ? 'text-success' : undefined}>
+                      {plan.totals.profit > 0 ? '+' : ''}
+                      {formatIskCompact(plan.totals.profit)}
+                    </b>{' '}
+                    <span className="text-text-dim">{t('market.hauling.plan.profitWord')}</span>
                   </span>
-                )}
-                <div className="flex-1" />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setOverrides(new Map())}
-                  disabled={overrides.size === 0}
-                >
-                  {t('market.hauling.fillHold')}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    setOverrides(new Map(shown.map((r) => [r.typeId, { selected: false }])))
-                  }
-                >
-                  {t('market.hauling.clearAll')}
-                </Button>
+                  <span>
+                    <b>{formatIskCompact(plan.totals.cost)}</b>{' '}
+                    <span className="text-text-dim">{t('market.hauling.plan.spendWord')}</span>
+                  </span>
+                </div>
+                <div className="flex min-w-0 flex-1 basis-full items-center gap-3 sm:basis-auto">
+                  {cargo !== null && heldPct !== null ? (
+                    <>
+                      <div
+                        role="img"
+                        aria-label={t('market.hauling.plan.holdAria', {
+                          used: Math.round(plan.totals.volumeM3).toLocaleString(),
+                          total: Math.round(cargo.m3).toLocaleString(),
+                        })}
+                        className="h-1 min-w-8 flex-1 bg-line sm:max-w-xs"
+                      >
+                        <div className="h-full bg-accent" style={{ width: `${heldPct}%` }} />
+                      </div>
+                      {/* What binds the load prints from `sm` up; a phone has
+                          no room for it here, and each row's detail says what
+                          capped that row. */}
+                      <span className="min-w-0 shrink-0 text-[0.6875rem] text-text-dim">
+                        {t('market.hauling.plan.holdUsed', {
+                          used: Math.round(plan.totals.volumeM3).toLocaleString(),
+                          total: Math.round(cargo.m3).toLocaleString(),
+                        })}
+                        {bindingText && <span className="max-sm:hidden"> · {bindingText}</span>}
+                      </span>
+                    </>
+                  ) : (
+                    // The ship button beside it says the same on a phone.
+                    <span className="min-w-0 flex-1 text-[0.6875rem] text-text-dim max-sm:hidden">
+                      {t('market.hauling.cargo.tip')}
+                    </span>
+                  )}
+                  <div className="ml-auto flex items-center gap-2">
+                    <HaulingCargoControl
+                      characterId={activeCharacterId}
+                      cargo={cargo}
+                      onCargoChange={(next) => void setCargo(next)}
+                      budget={budget}
+                      onBudgetChange={(next) => void setBudget(next)}
+                    />
+                    <Button
+                      size="sm"
+                      disabled={plan.totals.items === 0}
+                      onClick={() => void copyMultibuy()}
+                      aria-label={t('market.hauling.copyMultibuy')}
+                    >
+                      <Icon.CopyToClipboard aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+                      <span className="max-sm:hidden">{t('market.hauling.copyMultibuy')}</span>
+                    </Button>
+                    <TableActionsMenu name={t('market.hauling.title')} tableExport={tableExport}>
+                      <MenuItem
+                        disabled={overrides.size === 0}
+                        onSelect={() => setOverrides(new Map())}
+                      >
+                        {t('market.hauling.fillHold')}
+                      </MenuItem>
+                      <MenuItem onSelect={clearAll}>{t('market.hauling.clearAll')}</MenuItem>
+                      <MenuItem onSelect={() => setShowList((open) => !open)}>
+                        {t(
+                          listShown
+                            ? 'market.hauling.hideMultibuyList'
+                            : 'market.hauling.showMultibuyList'
+                        )}
+                      </MenuItem>
+                    </TableActionsMenu>
+                  </div>
+                </div>
               </div>
 
-              <DataTable
-                {...tableExport.tableProps}
-                label={t('market.hauling.title')}
-                columns={visibleColumns}
-                rows={shown}
-                virtualize="auto"
-                rowKey={(row) => row.typeId}
-                density="compact"
-                stackLayout="labelled"
-                stackColumns={1}
-                rowContextMenu={rowContextMenu}
-                rowMoreActions
-                expandableRow={{
-                  renderDetail: (row) => <HaulingRowDetail row={row} />,
-                  hideIcon: true,
-                }}
-                rowClassName={(row) =>
-                  overrides.get(row.typeId)?.selected === false ? 'opacity-60' : undefined
-                }
-              />
-
-              <div className="flex flex-wrap items-start gap-4 border-t border-accent-dim bg-panel-2 px-3 py-3">
-                <label className="flex items-center gap-2 text-xs text-text-dim">
-                  <Checkbox
-                    aria-label={t('market.hauling.selectAll')}
-                    checked={allSelected}
-                    onChange={(event) =>
-                      setOverrides(
-                        event.target.checked
-                          ? new Map()
-                          : new Map(shown.map((r) => [r.typeId, { selected: false }]))
-                      )
-                    }
-                  />
-                  {t('market.hauling.selectAll')}
-                </label>
-                <div className="flex min-w-60 flex-1 flex-col gap-1">
+              {/* The list Copy Multibuy copies, on request — and on its own
+                  when the clipboard refused, so it can be copied by hand. */}
+              {listShown && (
+                <div
+                  ref={listRef}
+                  className="flex flex-col gap-1 border-b border-line bg-panel-2 px-3 pb-3"
+                >
                   <span className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('market.hauling.multibuyList')}
                   </span>
@@ -1021,10 +1029,27 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                     {listText === '' ? t('market.hauling.multibuyEmpty') : listText}
                   </pre>
                 </div>
-                <Button disabled={plan.totals.items === 0} onClick={() => void copyMultibuy()}>
-                  {t('market.hauling.copyMultibuy')}
-                </Button>
-              </div>
+              )}
+
+              <DataTable
+                {...tableExport.tableProps}
+                label={t('market.hauling.title')}
+                columns={visibleColumns}
+                rows={shown}
+                virtualize="auto"
+                rowKey={(row) => row.typeId}
+                density="compact"
+                stackLayout="dense"
+                rowContextMenu={rowContextMenu}
+                rowMoreActions
+                expandableRow={{
+                  renderDetail: (row) => <HaulingRowDetail row={row} loadNote={limitTextOf(row)} />,
+                  hideIcon: true,
+                }}
+                rowClassName={(row) =>
+                  overrides.get(row.typeId)?.selected === false ? 'opacity-60' : undefined
+                }
+              />
 
               <p className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
                 {hiddenCount === 0
@@ -1047,6 +1072,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   );
 }
 
+/** A hub picker. Uncaptioned: the `→` between From and To says which is which; the name is its `aria-label`. */
 function HubField({
   label,
   value,
@@ -1058,22 +1084,65 @@ function HubField({
 }) {
   const { t } = useTranslation();
   return (
-    <label className="flex flex-col gap-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
-      {label}
-      <Select value={value} onValueChange={(next) => onChange(next as HaulingHubChoice)}>
-        <SelectTrigger size="sm" aria-label={label} className="w-32">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {TRADE_HUBS.map((h) => (
-            <SelectItem key={h.id} value={h.id}>
-              {h.systemName}
-            </SelectItem>
-          ))}
-          <SelectItem value={ANY_HUB}>{t('market.hauling.anyHub')}</SelectItem>
-        </SelectContent>
-      </Select>
-    </label>
+    <Select value={value} onValueChange={(next) => onChange(next as HaulingHubChoice)}>
+      <SelectTrigger size="sm" aria-label={label} className="w-24 sm:w-32">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {TRADE_HUBS.map((h) => (
+          <SelectItem key={h.id} value={h.id}>
+            {h.systemName}
+          </SelectItem>
+        ))}
+        <SelectItem value={ANY_HUB}>{t('market.hauling.anyHub')}</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** The market category to scan — in the route row on a wide screen, in the filter sheet on a narrow one. */
+function CategorySelect({
+  value,
+  onChange,
+  nameOf,
+}: {
+  value: number;
+  onChange: (cat: number) => void;
+  nameOf: (id: number) => string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Select value={String(value)} onValueChange={(next) => onChange(Number(next))}>
+      <SelectTrigger size="sm" aria-label={t('market.hauling.category')} className="w-52">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {HAULING_CATEGORY_IDS.map((id) => (
+          <SelectItem key={id} value={String(id)}>
+            {nameOf(id)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** How the load is sold at the destination — placed like `CategorySelect`. */
+function ModeSelect({ value, onChange }: { value: HaulMode; onChange: (mode: HaulMode) => void }) {
+  const { t } = useTranslation();
+  return (
+    <Select value={value} onValueChange={(next) => onChange(next as HaulMode)}>
+      <SelectTrigger size="sm" aria-label={t('market.hauling.mode')} className="w-48">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {HAUL_MODES.map((m) => (
+          <SelectItem key={m} value={m}>
+            {t(`market.hauling.modes.${m}`)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -1081,14 +1150,17 @@ function HubField({
  * The quantity to bring, typed by hand. Keeps what is being typed in its own
  * state so the box can be emptied and retyped: the planned quantity it would
  * otherwise echo back is clamped and re-sized on every keystroke. Emptying it
- * or typing 0 unticks the row.
+ * or typing 0 unticks the row. `title` says what capped the suggestion (the
+ * row's detail says it too, for touch).
  */
 function BringInput({
   label,
+  title,
   value,
   onCommit,
 }: {
   label: string;
+  title?: string;
   value: string;
   onCommit: (quantity: number) => void;
 }) {
@@ -1098,7 +1170,8 @@ function BringInput({
       size="sm"
       inputMode="numeric"
       aria-label={label}
-      className="w-24 text-right tabular-nums"
+      title={title}
+      className="w-18 text-right tabular-nums sm:w-24"
       value={draft ?? value}
       onChange={(event) => {
         const raw = event.target.value.replace(/[^\d]/g, '');

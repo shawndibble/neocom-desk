@@ -502,6 +502,66 @@
       align-self: center;
     }
 
+    /* The expand chevron (`expandableRow`) joins the actions on line one.
+       Left to the base card rules it flowed onto the meta line carrying the
+       labelled card's 7rem label gutter, pushing the first meta value a
+       third of the way across. A hidden icon (`hideIcon`) leaves the cell
+       empty: it takes no room at all then. */
+    .dt-stack.dt-stack-dense td.dt-disclosure {
+      order: -1;
+      flex: none;
+      align-self: center;
+      width: auto;
+      min-height: 0;
+      padding: 0;
+    }
+
+    .dt-stack.dt-stack-dense td.dt-disclosure::before {
+      content: none;
+    }
+
+    .dt-stack.dt-stack-dense td.dt-disclosure:empty {
+      display: none;
+    }
+
+    /* A control at the card's edge (`stackEdge`), kept off the 11px meta
+       line where it would be neither tappable nor readable. */
+    .dt-stack.dt-stack-dense td.dt-edge {
+      padding: 0;
+      min-height: 0;
+    }
+
+    .dt-stack.dt-stack-dense td.dt-edge::before {
+      content: none;
+    }
+
+    /* `start` (a tick box): pinned to the left edge, centred across both
+       lines; the row pads its left side to clear it. */
+    .dt-stack.dt-stack-dense td.dt-edge-start {
+      position: absolute;
+      top: 50%;
+      left: 0.75rem;
+      transform: translateY(-50%);
+    }
+
+    .dt-stack.dt-stack-dense tr:has(> td.dt-edge-start) {
+      padding-left: 2.5rem;
+    }
+
+    /* `end` (a quantity box): closes the meta line, pushed to its right end.
+       Not pinned across both lines like `start`: a box that wide would take
+       its width from the title line too, and the title needs it more.
+       `baseline` (the row's own alignment), not `center`: the box's text
+       lines up with the meta text, so the two read as one line rather than
+       the meta floating at the top of a box-tall line. */
+    .dt-stack.dt-stack-dense td.dt-edge-end {
+      order: 2;
+      flex: none;
+      align-self: baseline;
+      margin-left: auto;
+      padding-left: 0.5rem;
+    }
+
     .dt-stack.dt-stack-dense td.dt-meta {
       order: 1;
       display: inline;

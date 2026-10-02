@@ -835,6 +835,37 @@ describe('DataTable opt-in phone features', () => {
       expect(id).toHaveAttribute('data-stack-after', ' ref');
     });
 
+    it('pins stackEdge cells to the card edges, off the meta line', () => {
+      renderTable({
+        columns: [
+          { id: 'pick', header: 'Pick', stackEdge: 'start', render: () => 'x' },
+          // The edge cell leads, so the title has to be named.
+          { ...denseColumns[0]!, primary: true },
+          ...denseColumns.slice(1),
+          { id: 'qty', header: 'Qty', stackEdge: 'end', render: () => '5' },
+        ],
+        stackLayout: 'dense',
+      });
+      const [pick, item, amount, , , qty] = screen.getAllByRole('cell');
+      expect(pick).toHaveClass('dt-edge', 'dt-edge-start');
+      expect(pick).not.toHaveClass('dt-meta');
+      expect(qty).toHaveClass('dt-edge', 'dt-edge-end');
+      expect(qty).not.toHaveClass('dt-meta');
+      // A leading edge cell is not the first meta cell: Amount still is.
+      expect(item).toHaveClass('dt-primary');
+      expect(amount).toHaveClass('dt-meta', 'dt-meta-first');
+    });
+
+    it('leaves stackEdge cells as plain cells outside the dense stack', () => {
+      renderTable({
+        columns: [
+          { id: 'pick', header: 'Pick', stackEdge: 'start', render: () => 'x' },
+          ...denseColumns,
+        ],
+      });
+      expect(document.querySelector('.dt-edge')).toBeNull();
+    });
+
     it('is ignored when the table does not stack', () => {
       renderTable({ columns: denseColumns, stackLayout: 'dense', responsive: 'table' });
       expect(screen.getByRole('table')).not.toHaveClass('dt-stack-dense');

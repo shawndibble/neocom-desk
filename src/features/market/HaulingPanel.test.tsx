@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { configureClipboard } from '@/lib/clipboard';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -138,18 +139,65 @@ describe('HaulingPanel item rows', () => {
   });
 });
 
+describe('HaulingPanel trip summary', () => {
+  beforeEach(() => {
+    useActiveCharacter.setState({ activeCharacterId: null });
+  });
+  afterEach(() => configureClipboard(null));
+
+  it('select all in the summary row unticks and reticks every row', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    const all = screen.getByRole('checkbox', { name: 'Select all' });
+    const row = screen.getByRole('checkbox', { name: /Include Damage Control II/ });
+    expect(all).toBeChecked();
+    await user.click(all);
+    expect(row).not.toBeChecked();
+    expect(screen.getByText('0 of 1')).toBeInTheDocument();
+    await user.click(all);
+    expect(row).toBeChecked();
+  });
+
+  it('keeps Fill my hold, Clear all and the multibuy list in the actions menu', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    expect(screen.queryByLabelText('Multibuy list')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Hauling actions' }));
+    expect(screen.getByRole('menuitem', { name: 'Fill my hold' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Clear all' })).toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Show multibuy list' }));
+
+    expect(screen.getByLabelText('Multibuy list')).toHaveTextContent('Damage Control II');
+  });
+
+  it('opens the multibuy list when the clipboard refuses the copy', async () => {
+    const user = userEvent.setup();
+    configureClipboard(async () => {
+      throw new Error('denied');
+    });
+    renderPanel();
+
+    await user.click(screen.getByRole('button', { name: 'Copy Multibuy' }));
+
+    expect(await screen.findByLabelText('Multibuy list')).toHaveTextContent('Damage Control II');
+  });
+});
+
 describe('HaulingPanel modes', () => {
   beforeEach(() => {
     useActiveCharacter.setState({ activeCharacterId: null });
     scanModes.length = 0;
   });
 
-  it('lists for sale by default, with Days, Demand and ISK/m³ columns', () => {
+  it('lists for sale by default, with Days (carrying demand) and ISK/m³ columns', () => {
     renderPanel();
     expect(scanModes.at(-1)).toBe('list');
     expect(screen.getByRole('columnheader', { name: /^Days/ })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: /^Demand/ })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /ISK\/m³/ })).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /Damage Control II/ })).toHaveTextContent(
+      'Sells most days'
+    );
   });
 
   it('selling into buy orders scans that mode and hides Days and Demand', () => {
