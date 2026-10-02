@@ -62,8 +62,8 @@ export const SETTINGS_TABS = definePageTabs(
 
 /** Help & FAQ, moved out of Settings (`/settings/faq` and `/settings/help` redirect here). */
 export const HELP_TABS = definePageTabs('/help', [
-  { id: 'faq', labelKey: 'help.tabFaq' },
-  { id: 'support', labelKey: 'help.tabSupport' },
+  { id: 'faq', labelKey: 'settings.help.tabFaq' },
+  { id: 'support', labelKey: 'settings.help.tabSupport' },
 ]);
 
 export const PI_TABS = definePageTabs('/planetary-industry', [

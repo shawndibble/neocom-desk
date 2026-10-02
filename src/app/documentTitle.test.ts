@@ -23,7 +23,9 @@ describe('documentTitleFor', () => {
       `${i18n.t('market.sections.transactions')} — Market — Neocom Desk`
     );
     expect(documentTitleFor('/help/faq', t)).toBe(
-      `${i18n.t('help.tabFaq')} — ${i18n.t('nav.help')} — Neocom Desk`
+      // Literal on purpose: a label key that resolves to nothing would echo
+      // itself on both sides of a `t()`-built expectation and still pass.
+      'FAQ — Help & FAQ — Neocom Desk'
     );
   });
 

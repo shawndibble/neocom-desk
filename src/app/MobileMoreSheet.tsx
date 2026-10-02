@@ -152,7 +152,9 @@ export function MobileMoreSheet({
       title={t('nav.more')}
       placement="sheet-full"
     >
-      <div className="flex min-h-full flex-col justify-end gap-3 pb-3">
+      {/* Pages from the top; the footer rows sit at the foot, so a tall
+          phone leaves the gap between the two rather than above the search. */}
+      <div className="flex min-h-full flex-col gap-3 pb-3">
         <button
           type="button"
           onClick={openSearch}
@@ -222,30 +224,32 @@ export function MobileMoreSheet({
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={() => setEditing((on) => !on)}
-          className="flex min-h-11 items-center gap-2 text-left text-xs text-text-dim"
-        >
-          <Icon.NavHidden aria-hidden="true" size={Icon.ICON_SIZE.sm} />
-          {editing ? t('nav.editDone') : t('nav.editRail')}
-        </button>
+        <div className="mt-auto flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={() => setEditing((on) => !on)}
+            className="flex min-h-11 items-center gap-2 text-left text-xs text-text-dim"
+          >
+            <Icon.NavHidden aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+            {editing ? t('nav.editDone') : t('nav.editRail')}
+          </button>
 
-        <div className="grid grid-cols-2 gap-1.5 border-t border-line pt-2">
-          <NavItem
-            to="/settings"
-            label={t(navPageLabelKey('/settings'))}
-            locked={false}
-            onClick={onClose}
-          />
-          <NavItem
-            to="/help"
-            label={t(navPageLabelKey('/help'))}
-            locked={false}
-            onClick={onClose}
-          />
+          <div className="grid grid-cols-2 gap-1.5 border-t border-line pt-2">
+            <NavItem
+              to="/settings"
+              label={t(navPageLabelKey('/settings'))}
+              locked={false}
+              onClick={onClose}
+            />
+            <NavItem
+              to="/help"
+              label={t(navPageLabelKey('/help'))}
+              locked={false}
+              onClick={onClose}
+            />
+          </div>
+          {renderCharacterLink(pathname)}
         </div>
-        {renderCharacterLink(pathname)}
       </div>
     </Modal>
   );

@@ -1446,6 +1446,8 @@ describe('Settings defaults', () => {
     await screen.findByRole('heading', { level: 1, name: /help & faq/i });
 
     expect(window.location.pathname).toBe('/help/support');
+    expect(screen.getByRole('tab', { name: 'Support' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'FAQ' })).toBeInTheDocument();
     expect(
       await screen.findByRole('heading', { name: /report a bug, ask for a feature, or just chat/i })
     ).toBeInTheDocument();
