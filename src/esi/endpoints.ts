@@ -266,7 +266,12 @@ export interface CorporationPublicInfo {
   ceo_id: number;
   creator_id: number;
   member_count: number;
-  tax_rate: number;
+  /**
+   * Percentages (10 = 10%), not fractions. The compatibility date this app
+   * sends replaced the old fractional `tax_rate` with this pair; reading the
+   * old field gave every corporation's tax as NaN.
+   */
+  tax_rates?: { isk?: number; loyalty_point?: number };
   alliance_id?: number;
   date_founded?: string;
   description?: string;
@@ -285,6 +290,29 @@ export function getCorporationPublicInfo(
     ...options,
     endpointId: 'getCorporationPublicInfo',
   });
+}
+
+// --- GET /corporations/{corporation_id}/alliancehistory (public) ---
+
+/** One stint; no `alliance_id` is a stretch spent in no alliance. */
+export interface CorporationAllianceHistoryEntry {
+  record_id: number;
+  start_date: string;
+  alliance_id?: number;
+  is_deleted?: boolean;
+}
+
+export function getCorporationAllianceHistory(
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationAllianceHistoryEntry[]>> {
+  return esiFetch<CorporationAllianceHistoryEntry[]>(
+    `/corporations/${corporationId}/alliancehistory`,
+    {
+      ...options,
+      endpointId: 'getCorporationAllianceHistory',
+    }
+  );
 }
 
 // --- GET /universe/types/{type_id} (public) ---
@@ -369,6 +397,19 @@ export function getAlliancePublicInfo(
   return esiFetch<AlliancePublicInfo>(`/alliances/${allianceId}`, {
     ...options,
     endpointId: 'getAlliancePublicInfo',
+  });
+}
+
+// --- GET /alliances/{alliance_id}/corporations (public) ---
+
+/** The ids of every corporation in the alliance, in no stated order. */
+export function getAllianceCorporations(
+  allianceId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<number[]>> {
+  return esiFetch<number[]>(`/alliances/${allianceId}/corporations`, {
+    ...options,
+    endpointId: 'getAllianceCorporations',
   });
 }
 

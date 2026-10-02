@@ -62,6 +62,8 @@ describe('pruneRuleFor', () => {
     'public-character:9000',
     'public-corporation:98000001',
     'public-alliance:99000001',
+    'public-alliance-history:98000001',
+    'public-alliance-corporations:99000001',
     'public-employment:9000',
     'structure:1035466617946:forbidden',
     'structure:1035466617946:roster-forbidden',

@@ -377,6 +377,10 @@ export const ESI_REGISTRY = {
     route: '/corporations/{corporation_id}',
     scope: PUBLIC,
   },
+  getCorporationAllianceHistory: {
+    route: '/corporations/{corporation_id}/alliancehistory',
+    scope: PUBLIC,
+  },
   getCharacterCorporationHistory: {
     route: '/characters/{character_id}/corporationhistory',
     scope: PUBLIC,
@@ -458,6 +462,10 @@ export const ESI_REGISTRY = {
   },
   getAlliancePublicInfo: {
     route: '/alliances/{alliance_id}',
+    scope: PUBLIC,
+  },
+  getAllianceCorporations: {
+    route: '/alliances/{alliance_id}/corporations',
     scope: PUBLIC,
   },
   getKillmail: {

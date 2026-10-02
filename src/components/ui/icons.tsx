@@ -346,6 +346,8 @@ export const CalendarEvent = withWeight(CalendarBlank);
 export const Contracts = withWeight(FileText);
 /** Corporation-owned surfaces: ops board, wallet divisions, roster, corp assets. */
 export const Corporation = withWeight(Buildings);
+/** An NPC faction (Caldari State, Guristas…) — the stand-in where a faction has no logo to show. */
+export const Faction = withWeight(Flag);
 /** The Moon Mining Tax ledger. Its own glyph, not the industry factory — this is rent, not production. */
 export const MoonMining = withWeight(Moon);
 /**

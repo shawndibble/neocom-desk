@@ -10,6 +10,8 @@ import '@/i18n';
 vi.mock('@/lib/zkillboard', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/zkillboard')>()),
   fetchPilotStats: vi.fn(async () => ({ kind: 'no-history' })),
+  fetchCorporationStats: vi.fn(async () => ({ kind: 'no-history' })),
+  fetchAllianceStats: vi.fn(async () => ({ kind: 'no-history' })),
   fetchPilotKillmails: vi.fn(async () => ({ ok: true, entries: [] })),
 }));
 vi.mock('@/sde/loadSde', () => ({ loadTypes: vi.fn(async () => ({})) }));
@@ -27,7 +29,9 @@ beforeEach(async () => {
   // No live affiliation by default, so a character's public record decides its corp and alliance.
   server.use(
     http.post(`${ESI_BASE_URL}/characters/affiliation`, () => HttpResponse.json([])),
-    http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.json([]))
+    http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.json([])),
+    http.get(`${ESI_BASE_URL}/corporations/:id/alliancehistory`, () => HttpResponse.json([])),
+    http.get(`${ESI_BASE_URL}/alliances/:id/corporations`, () => HttpResponse.json([]))
   );
 });
 afterEach(() => server.resetHandlers());
@@ -92,7 +96,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 99,
       creator_id: 99,
       member_count: 42,
-      tax_rate: 0.1,
+      tax_rates: { isk: 10 },
       alliance_id: 3,
     });
     mockAlliance(3, {
@@ -117,8 +121,9 @@ describe('PublicInfoModal', () => {
     );
 
     within(dialog).getByRole('tab', { name: 'Corporation' }).click();
-    await screen.findByText('SOME');
-    expect(screen.getByText('CEO Pilot')).toBeInTheDocument();
+    await screen.findByText('[SOME]');
+    // This corp's founder is also its CEO, so the name shows on both rows.
+    expect(screen.getAllByText('CEO Pilot')).toHaveLength(2);
   });
 
   it('shows resolved corp/alliance names on the Character tab, not bare ids, once the chain resolves', async () => {
@@ -137,7 +142,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 102,
       creator_id: 102,
       member_count: 10,
-      tax_rate: 0,
+      tax_rates: { isk: 0 },
       alliance_id: 8,
     });
     mockAlliance(8, {
@@ -171,7 +176,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 99,
       creator_id: 99,
       member_count: 42,
-      tax_rate: 0.1,
+      tax_rates: { isk: 10 },
     });
     mockNames([{ id: 99, name: 'CEO Pilot' }]);
 
@@ -179,7 +184,7 @@ describe('PublicInfoModal', () => {
     act(() => usePublicInfoModalStore.getState().open('corporation', 2));
 
     const dialog = await screen.findByRole('dialog');
-    await screen.findByText('SOME');
+    await screen.findByText('[SOME]');
     expect(within(dialog).queryByRole('tab', { name: 'Character' })).not.toBeInTheDocument();
   });
 
@@ -198,7 +203,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 100,
       creator_id: 100,
       member_count: 1,
-      tax_rate: 0,
+      tax_rates: { isk: 0 },
     });
     mockNames([{ id: 100, name: 'Solo CEO' }]);
 
@@ -251,7 +256,7 @@ describe('PublicInfoModal', () => {
           ceo_id: 101,
           creator_id: 101,
           member_count: 1,
-          tax_rate: 0,
+          tax_rates: { isk: 0 },
         });
       })
     );
@@ -267,11 +272,11 @@ describe('PublicInfoModal', () => {
     await waitFor(() => expect(corpCalls).toBe(1));
 
     within(dialog).getByRole('tab', { name: 'Corporation' }).click();
-    await screen.findByText('ONCE');
+    await screen.findByText('[ONCE]');
     within(dialog).getByRole('tab', { name: 'Character' }).click();
     await screen.findByText('Repeat Pilot');
     within(dialog).getByRole('tab', { name: 'Corporation' }).click();
-    await screen.findByText('ONCE');
+    await screen.findByText('[ONCE]');
 
     expect(corpCalls).toBe(1);
   });
@@ -292,7 +297,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 102,
       creator_id: 102,
       member_count: 3,
-      tax_rate: 0,
+      tax_rates: { isk: 0 },
     });
     mockAlliance(700, {
       name: 'Killboard Alliance',
@@ -352,7 +357,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 103,
       creator_id: 103,
       member_count: 5,
-      tax_rate: 0,
+      tax_rates: { isk: 0 },
     });
     mockNames([
       { id: 9, name: 'Lookup Corp' },
@@ -369,7 +374,7 @@ describe('PublicInfoModal', () => {
     expect(within(dialog).getByText('Recent kills and losses')).toBeInTheDocument();
 
     within(dialog).getByRole('button', { name: 'Lookup Corp' }).click();
-    expect(await within(dialog).findByText('LOOK')).toBeInTheDocument();
+    expect(await within(dialog).findByText('[LOOK]')).toBeInTheDocument();
     expect(within(dialog).getByRole('tab', { name: 'Corporation' })).toHaveAttribute(
       'aria-selected',
       'true'
@@ -396,7 +401,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 104,
       creator_id: 104,
       member_count: 2,
-      tax_rate: 0,
+      tax_rates: { isk: 0 },
       // Cached corp record still names an alliance the live affiliation has left.
       alliance_id: 13,
     });
@@ -411,7 +416,7 @@ describe('PublicInfoModal', () => {
     const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByRole('button', { name: 'New Home' })).toBeInTheDocument();
     (await within(dialog).findByRole('tab', { name: 'Corporation' })).click();
-    expect(await within(dialog).findByText('NEW')).toBeInTheDocument();
+    expect(await within(dialog).findByText('[NEW]')).toBeInTheDocument();
     expect(within(dialog).queryByText('#13')).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('tab', { name: 'Alliance' })).not.toBeInTheDocument();
   });
@@ -439,12 +444,12 @@ describe('PublicInfoModal', () => {
       ceo_id: 99,
       creator_id: 99,
       member_count: 42,
-      tax_rate: 0.1,
+      tax_rates: { isk: 10 },
     });
 
     renderModal();
     act(() => usePublicInfoModalStore.getState().open('corporation', 2));
-    await screen.findByText('SOME');
+    await screen.findByText('[SOME]');
 
     act(() => navigateTo('/contacts?tab=all'));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -470,7 +475,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 99,
       creator_id: 99,
       member_count: 42,
-      tax_rate: 0.1,
+      tax_rates: { isk: 10 },
     };
 
     it('lazy-loads the character corporation history only once the tab is opened', async () => {
@@ -549,8 +554,177 @@ describe('PublicInfoModal', () => {
       act(() => usePublicInfoModalStore.getState().open('corporation', 2));
 
       const dialog = await screen.findByRole('dialog');
-      await screen.findByText('SOME');
+      await screen.findByText('[SOME]');
       expect(within(dialog).queryByRole('tab', { name: 'Employment' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Corporation tab', () => {
+    it('shows who the corporation is, its alliance history and its description', async () => {
+      mockCorporation(98000001, {
+        name: 'Vrask Holdings',
+        ticker: 'VRSK',
+        ceo_id: 90000001,
+        creator_id: 90000002,
+        member_count: 142,
+        tax_rates: { isk: 10 },
+        alliance_id: 99000001,
+        date_founded: '2019-04-12T00:00:00Z',
+        war_eligible: true,
+        url: 'https://example.com/vrsk',
+        description: '<b>Recruiting</b> nullsec pilots.',
+      });
+      mockAlliance(99000001, { name: 'Brave Collective', ticker: 'BRAVE' });
+      mockNames([
+        { id: 90000001, name: 'Kaelen Vrask' },
+        { id: 90000002, name: 'Oren Vrask' },
+        { id: 99000001, name: 'Brave Collective' },
+        { id: 99000002, name: 'Test Alliance' },
+      ]);
+      server.use(
+        http.get(`${ESI_BASE_URL}/corporations/98000001/alliancehistory`, () =>
+          HttpResponse.json([
+            { record_id: 2, alliance_id: 99000001, start_date: '2022-03-10T00:00:00Z' },
+            { record_id: 1, alliance_id: 99000002, start_date: '2019-06-01T00:00:00Z' },
+          ])
+        )
+      );
+
+      renderModal();
+      act(() => usePublicInfoModalStore.getState().open('corporation', 98000001));
+
+      const dialog = await screen.findByRole('dialog');
+      await within(dialog).findByText('[VRSK]');
+      expect(within(dialog).getByText('War eligible')).toBeInTheDocument();
+      expect(within(dialog).getByText('142')).toBeInTheDocument();
+      expect(within(dialog).getByText('10%')).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: 'Kaelen Vrask' })).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: 'Oren Vrask' })).toBeInTheDocument();
+      expect(within(dialog).getByRole('link', { name: 'Website' })).toHaveAttribute(
+        'href',
+        'https://example.com/vrsk'
+      );
+      expect(within(dialog).getByText('Recruiting').tagName).toBe('B');
+
+      const history = await within(dialog).findByRole('region', { name: 'Alliance history' });
+      expect(within(history).getByRole('button', { name: 'Test Alliance' })).toBeInTheDocument();
+      expect(within(dialog).getByText(/^since /)).toBeInTheDocument();
+    });
+
+    it('opens the CEO in the modal when their name is clicked', async () => {
+      mockCorporation(98000001, {
+        name: 'Vrask Holdings',
+        ticker: 'VRSK',
+        ceo_id: 90000001,
+        creator_id: 90000001,
+        member_count: 1,
+        tax_rates: { isk: 0 },
+      });
+      mockNames([{ id: 90000001, name: 'Kaelen Vrask' }]);
+
+      renderModal();
+      act(() => usePublicInfoModalStore.getState().open('corporation', 98000001));
+
+      const dialog = await screen.findByRole('dialog');
+      (await within(dialog).findAllByRole('button', { name: 'Kaelen Vrask' }))[0].click();
+      expect(usePublicInfoModalStore.getState().request).toEqual({
+        kind: 'character',
+        id: 90000001,
+      });
+    });
+
+    it('gives an NPC corporation no killboard and no alliance history', async () => {
+      mockCorporation(1000125, {
+        name: 'Sisters of EVE',
+        ticker: 'SOE',
+        ceo_id: 3000001,
+        creator_id: 1,
+        member_count: 0,
+        tax_rates: { isk: 0 },
+        faction_id: 500016,
+      });
+      mockNames([{ id: 500016, name: 'Servant Sisters of EVE' }]);
+
+      renderModal();
+      act(() => usePublicInfoModalStore.getState().open('corporation', 1000125));
+
+      const dialog = await screen.findByRole('dialog');
+      expect(await within(dialog).findByText('NPC corporation')).toBeInTheDocument();
+      expect(await within(dialog).findByText('Servant Sisters of EVE')).toBeInTheDocument();
+      expect(within(dialog).queryByRole('link', { name: 'zKillboard' })).not.toBeInTheDocument();
+      expect(within(dialog).queryByRole('region', { name: 'Alliance history' })).toBeNull();
+    });
+  });
+
+  describe('NPC agent', () => {
+    it('shows a slim card and no Employment tab', async () => {
+      mockCharacter(3008416, {
+        name: 'Sister Alitura',
+        corporation_id: 1000125,
+        birthday: '2003-05-06T00:00:00Z',
+        bloodline_id: 1,
+        gender: 'female',
+        race_id: 1,
+      });
+      mockCorporation(1000125, {
+        name: 'Sisters of EVE',
+        ticker: 'SOE',
+        ceo_id: 3000001,
+        creator_id: 1,
+        member_count: 0,
+        tax_rates: { isk: 0 },
+      });
+      mockNames([{ id: 1000125, name: 'Sisters of EVE' }]);
+
+      renderModal();
+      act(() => usePublicInfoModalStore.getState().open('character', 3008416));
+
+      const dialog = await screen.findByRole('dialog');
+      expect(await within(dialog).findByText('NPC agent')).toBeInTheDocument();
+      expect(within(dialog).queryByText('No kills or losses on zKillboard')).toBeNull();
+      await waitFor(() =>
+        expect(within(dialog).getByRole('tab', { name: 'Corporation' })).toBeInTheDocument()
+      );
+      expect(within(dialog).queryByRole('tab', { name: 'Employment' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Alliance tab', () => {
+    it('shows the executor, founder and every member corporation, each opening in the modal', async () => {
+      mockAlliance(99005130, {
+        name: 'EvE-Scout Enclave',
+        ticker: 'SC0UT',
+        creator_id: 95142600,
+        creator_corporation_id: 98361601,
+        executor_corporation_id: 98361601,
+        date_founded: '2015-01-23T10:37:01Z',
+      });
+      mockNames([
+        { id: 95142600, name: 'G8keeper' },
+        { id: 98361601, name: 'EvE-Scout Rescue' },
+        { id: 98372649, name: 'Signal Cartel' },
+      ]);
+      server.use(
+        http.get(`${ESI_BASE_URL}/alliances/99005130/corporations`, () =>
+          HttpResponse.json([98372649, 98361601])
+        )
+      );
+
+      renderModal();
+      act(() => usePublicInfoModalStore.getState().open('alliance', 99005130));
+
+      const dialog = await screen.findByRole('dialog');
+      await within(dialog).findByText('[SC0UT]');
+      expect(await within(dialog).findByRole('button', { name: 'G8keeper' })).toBeInTheDocument();
+      expect(within(dialog).getByText('Jan 23, 2015')).toBeInTheDocument();
+
+      const members = await within(dialog).findByRole('region', { name: 'Member corporations' });
+      expect(within(members).getByText('2 member corporations')).toBeInTheDocument();
+      within(members).getByRole('button', { name: 'Signal Cartel' }).click();
+      expect(usePublicInfoModalStore.getState().request).toEqual({
+        kind: 'corporation',
+        id: 98372649,
+      });
     });
   });
 });

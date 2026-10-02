@@ -23,7 +23,6 @@ import {
   SearchInput,
   Spinner,
   StandingIcon,
-  Tabs,
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
@@ -45,19 +44,26 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport, type UseTableExport } from '@/components/ui/useTableExport';
 import { contactsAcrossCsvColumns, contactsCsvColumns } from '@/features/character/contactsCsv';
 import {
-  ALL_CONTACT_TYPES,
-  CONTACT_TYPE_KEY,
+  ALL_CONTACT_KINDS,
+  CONTACT_KIND_KEY,
   STANDING_CATEGORIES,
   EMPTY_CONTACTS_FILTER,
   activeContactsFilterCount,
+  contactCountsByKind,
   contactCountsByStanding,
-  contactCountsByType,
+  contactKind,
+  contactPublicInfoKind,
+  contactTypeLabelKey,
   filterContacts,
-  type ContactType,
+  type ContactIdentity,
+  type ContactKind,
   type ContactsFilter,
   type StandingCategory,
 } from '@/features/character/contactsFilter';
 import { ContactContextMenu } from '@/features/character/ContactContextMenu';
+import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import { allianceLogoUrl, characterPortraitUrl, corporationLogoUrl } from '@/lib/eveImages';
+import { usePublicInfoModal } from '@/stores/publicInfoModal';
 import {
   loadContactsAcrossCharacters,
   mergeContactsAcrossCharacters,
@@ -183,7 +189,125 @@ function FlagBadge({ icon, label, tone }: { icon: ReactElement; label: string; t
 
 interface ContactCounts {
   standing: Record<StandingCategory, number>;
-  type: Record<ContactType, number>;
+  type: Record<ContactKind, number>;
+}
+
+/**
+ * A contact's face: a pilot's portrait, a corp's or alliance's logo. A faction
+ * has no image on CCP's image server, so it gets a glyph in the same box. Its
+ * own column, pinned to the phone card's left edge (`stackEdge`) so it sits
+ * beside both lines; decorative, since the name beside it says who it is.
+ */
+function ContactPortrait({ contact }: { contact: ContactIdentity }) {
+  // `max-w-none`: the cell is `w-0` (a tight desktop column, and pinned out of
+  // flow on the phone card), and the base `img { max-width: 100% }` would
+  // otherwise collapse the portrait to nothing.
+  const box = 'block size-6 max-w-none shrink-0 rounded-xs border border-line';
+  if (contact.contact_type === 'faction') {
+    return (
+      <span aria-hidden className={cx(box, 'flex items-center justify-center text-text-dim')}>
+        <Icon.Faction size={ICON_SIZE.sm} />
+      </span>
+    );
+  }
+  const src =
+    contact.contact_type === 'character'
+      ? characterPortraitUrl(contact.contact_id, 64)
+      : contact.contact_type === 'corporation'
+        ? corporationLogoUrl(contact.contact_id, 64)
+        : allianceLogoUrl(contact.contact_id, 64);
+  return (
+    <img
+      src={src}
+      alt=""
+      width={24}
+      height={24}
+      loading="lazy"
+      crossOrigin="anonymous"
+      className={cx(box, 'bg-panel-2')}
+    />
+  );
+}
+
+/**
+ * The name, with an "NPC" tag for an agent or NPC corp — the written word, in
+ * the micro-heading treatment rather than a box (DESIGN.md §6), carries it.
+ * `flags`, when given, ride beside the name on the phone card only: there the
+ * Flags column is hidden, and a blocked or watched mark belongs with the name
+ * it is about rather than at the end of the meta line.
+ */
+function ContactNameCell({
+  contact,
+  name,
+  flags,
+}: {
+  contact: ContactIdentity;
+  name: string;
+  flags?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <span className="inline-flex max-w-full min-w-0 items-center gap-1.5">
+      <span className="truncate">{name}</span>
+      {contactKind(contact) === 'npc' && (
+        <span className="shrink-0 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+          {t('contacts.npcBadge')}
+        </span>
+      )}
+      {flags && <span className="inline-flex shrink-0 sm:hidden">{flags}</span>}
+    </span>
+  );
+}
+
+/** A contact's blocked/watched marks, or null for neither. */
+function ContactFlags({ contact }: { contact: CharacterContact }) {
+  const { t } = useTranslation();
+  const blocked = contact.is_blocked === true;
+  const watched = contact.is_watched === true;
+  if (!blocked && !watched) return null;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {blocked && (
+        <FlagBadge
+          icon={<Icon.Blocked size={ICON_SIZE.sm} />}
+          label={t('contacts.blocked')}
+          tone="text-danger"
+        />
+      )}
+      {watched && (
+        <FlagBadge
+          icon={<Icon.Watched size={ICON_SIZE.sm} />}
+          label={t('contacts.watched')}
+          tone="text-warning"
+        />
+      )}
+    </span>
+  );
+}
+
+/**
+ * A value the phone's dense card can do without (`data-dense-omit`,
+ * index.css): an empty cell's dash, which reads as "none" in a table column
+ * but would print as one more "· —" on the meta line, or a word the card
+ * already says another way. The card hides a cell holding nothing else.
+ */
+function DenseOmit({ children }: { children: ReactNode }) {
+  return <span data-dense-omit>{children}</span>;
+}
+
+function EmptyCell() {
+  return <DenseOmit>—</DenseOmit>;
+}
+
+/** The portrait column both tables lead with: no header, never sorted, never hidden. */
+function portraitColumn<T>(identity: (row: T) => ContactIdentity): DataTableColumn<T> {
+  return {
+    id: 'portrait',
+    header: '',
+    className: 'w-0 pr-0',
+    stackEdge: 'start',
+    render: (row) => <ContactPortrait contact={identity(row)} />,
+  };
 }
 
 const STANDING_FILTER_KEY: Record<StandingCategory, string> = {
@@ -272,10 +396,10 @@ function ContactsFilterBar({
             aria-label={t('contacts.typeFilterLabel')}
             className="flex flex-wrap gap-2"
           >
-            {ALL_CONTACT_TYPES.map((type) => (
+            {ALL_CONTACT_KINDS.map((type) => (
               <FilterChip
                 key={type}
-                label={t(CONTACT_TYPE_KEY[type])}
+                label={t(CONTACT_KIND_KEY[type])}
                 selected={draft.types.has(type)}
                 onToggle={() => setDraft({ ...draft, types: toggled(draft.types, type) })}
                 count={counts.type[type]}
@@ -337,7 +461,7 @@ function AffiliationLine({
   dim?: boolean;
 }) {
   return (
-    <span className={cx('flex items-center gap-1.5', dim && 'text-text-dim')}>
+    <span className={cx('inline-flex min-w-0 items-center gap-1.5', dim && 'text-text-dim')}>
       {alsoVia && <StandingIcon value={alsoVia.standing} />}
       <span className="truncate">{name}</span>
       {own && (
@@ -360,11 +484,26 @@ function AffiliationLine({
  */
 const FILTER_PARAMS = {
   q: textParam(),
-  types: enumSetParam(ALL_CONTACT_TYPES),
+  types: enumSetParam(ALL_CONTACT_KINDS),
   standing: enumSetParam(STANDING_CATEGORIES),
   'across.disagree': boolParam(),
 };
 const CHARACTER_SORT = { columnId: 'standing', direction: 'desc' } as const;
+
+/** An Across row as the identity the shared helpers read. */
+function acrossIdentity(row: AcrossCharactersRow): ContactIdentity {
+  return { contact_id: row.contactId, contact_type: row.contactType };
+}
+
+const ACROSS_PORTRAIT_COLUMN = portraitColumn<AcrossCharactersRow>(acrossIdentity);
+const CHARACTER_PORTRAIT_COLUMN = portraitColumn<CharacterContact>((contact) => contact);
+
+/**
+ * A faction row has no Show Info (no public faction endpoint), so it must not
+ * look clickable: the row's own `cursor-pointer` is overridden, not removed —
+ * `onRowClick` is table-wide.
+ */
+const NOT_CLICKABLE = 'cursor-default!';
 const ACROSS_SORT = { columnId: 'held', direction: 'asc' } as const;
 
 interface AcrossCharactersPanelProps {
@@ -405,6 +544,7 @@ function AcrossCharactersPanel({
   tableExport,
 }: AcrossCharactersPanelProps) {
   const { t } = useTranslation();
+  const { open } = usePublicInfoModal();
   const [fetched, setFetched] = useState<readonly CharacterContactList[] | null>(null);
   const [fetching, setFetching] = useState(false);
 
@@ -426,7 +566,7 @@ function AcrossCharactersPanel({
     () =>
       rows.filter((row) => {
         if (disagreementsOnly && !row.disagrees) return false;
-        if (!filter.types.has(row.contactType)) return false;
+        if (!filter.types.has(contactKind(acrossIdentity(row)))) return false;
         if (text === '') return true;
         return entityName(names, row.contactId).toLowerCase().includes(text);
       }),
@@ -456,8 +596,12 @@ function AcrossCharactersPanel({
         id: 'type',
         header: t('contacts.type'),
         className: 'text-text-dim',
-        render: (row) => t(CONTACT_TYPE_KEY[row.contactType]),
-        sortValue: (row) => t(CONTACT_TYPE_KEY[row.contactType]),
+        // As the character table: a player's or agent's type stays off the phone card.
+        render: (row) => {
+          const label = t(contactTypeLabelKey(acrossIdentity(row)));
+          return row.contactType === 'character' ? <DenseOmit>{label}</DenseOmit> : label;
+        },
+        sortValue: (row) => t(contactTypeLabelKey(acrossIdentity(row))),
       },
       held: {
         id: 'held',
@@ -500,6 +644,8 @@ function AcrossCharactersPanel({
         id: 'standings',
         header: t('contacts.acrossStandings'),
         align: 'center',
+        // The phone card's headline, as Standing is on the character table.
+        cardCorner: true,
         // Every distinct standing, not an average: two alts at +10 and -10 have
         // no meaningful midpoint, and seeing both is the whole point of the row.
         render: (row) => (
@@ -519,12 +665,16 @@ function AcrossCharactersPanel({
     () => ({
       id: 'name',
       header: t('contacts.name'),
-      render: (row) => entityName(names, row.contactId),
+      primary: true,
+      render: (row) => (
+        <ContactNameCell contact={acrossIdentity(row)} name={entityName(names, row.contactId)} />
+      ),
       sortValue: (row) => entityName(names, row.contactId),
     }),
     [t, names]
   );
   const columns: DataTableColumn<AcrossCharactersRow>[] = [
+    ACROSS_PORTRAIT_COLUMN,
     nameColumn,
     ...CONTACTS_ACROSS_COLUMN_IDS.filter(isColumnVisible).map((id) => optionalColumns[id]),
   ];
@@ -570,10 +720,19 @@ function AcrossCharactersPanel({
           rowKey={(row) => `${row.contactType}:${row.contactId}`}
           {...sortProps}
           mobileSort
+          stackLayout="dense"
+          className="dt-actions-pinned"
+          onRowClick={(row) => {
+            const kind = contactPublicInfoKind(acrossIdentity(row));
+            if (kind) open(kind, row.contactId);
+          }}
+          rowClassName={(row) =>
+            contactPublicInfoKind(acrossIdentity(row)) ? undefined : NOT_CLICKABLE
+          }
           rowMoreActions
           rowContextMenu={(row, tr) => (
             <ContactContextMenu
-              contact={{ contact_id: row.contactId, contact_type: row.contactType }}
+              contact={acrossIdentity(row)}
               name={entityName(names, row.contactId)}
             >
               {tr}
@@ -605,6 +764,7 @@ export function Contacts() {
   const setFilter = (next: ContactsFilter) =>
     setFilterParams({ q: next.text, types: next.types, standing: next.standings });
   const [tab, setTab] = usePageTab(CONTACTS_TABS);
+  const { open: openPublicInfo } = usePublicInfoModal();
 
   // Lifted out of `AcrossCharactersPanel` (issue #1282): its chip now lives in
   // the shared `ContactsFilterBar`, which neither tab's panel owns.
@@ -644,7 +804,7 @@ export function Contacts() {
   const counts = useMemo(
     () => ({
       standing: contactCountsByStanding(contacts),
-      type: contactCountsByType(contacts),
+      type: contactCountsByKind(contacts),
     }),
     [contacts]
   );
@@ -704,10 +864,16 @@ export function Contacts() {
         id: 'type',
         header: t('contacts.type'),
         className: 'text-text-dim',
-        render: (contact) => t(CONTACT_TYPE_KEY[contact.contact_type]),
+        // A player's "Player" and an NPC's "NPC agent" add nothing to the
+        // phone card — the NPC tag beside the name already tells them apart —
+        // so only a corp, alliance or faction says what it is there.
+        render: (contact) => {
+          const label = t(contactTypeLabelKey(contact));
+          return contact.contact_type === 'character' ? <DenseOmit>{label}</DenseOmit> : label;
+        },
         // Sorts on what is printed, not on ESI's word for it — otherwise
         // "Player" would sort under C and "Corp" under C too, by accident.
-        sortValue: (contact) => t(CONTACT_TYPE_KEY[contact.contact_type]),
+        sortValue: (contact) => t(contactTypeLabelKey(contact)),
       },
       affiliation: {
         id: 'affiliation',
@@ -715,16 +881,22 @@ export function Contacts() {
         headerTooltip: t('contacts.affiliationHeaderTooltip'),
         render: (contact) => {
           const row = affiliationRows.get(contact.contact_id);
-          if (!row || row.corporationId === null) return '—';
+          if (!row || row.corporationId === null) return <EmptyCell />;
           const alsoVia = row.alsoVia;
+          // Stacked in the table; one line, `·`-joined, on the phone's dense card.
           return (
-            <span className="flex min-w-0 flex-col">
+            <span className="inline min-w-0 sm:flex sm:flex-col sm:items-start">
               <AffiliationLine
                 name={entityName(contactNames, row.corporationId)}
                 own={row.inOwnCorporation}
                 ownLabel={t('contacts.ownCorporation')}
                 alsoVia={alsoVia?.source === 'corporation' ? alsoVia : null}
               />
+              {row.allianceId !== null && (
+                <span aria-hidden className="sm:hidden">
+                  {' · '}
+                </span>
+              )}
               {row.allianceId !== null && (
                 <AffiliationLine
                   name={entityName(contactNames, row.allianceId)}
@@ -753,10 +925,10 @@ export function Contacts() {
         // cell's title, so truncation hides nothing.
         render: (contact) => {
           const names = contactLabelNames(contact, contactLabels);
-          if (names.length === 0) return '—';
+          if (names.length === 0) return <EmptyCell />;
           const text = names.join(', ');
           return (
-            <span className="block max-w-56 truncate" title={text}>
+            <span className="inline-block max-w-56 truncate align-bottom" title={text}>
               {text}
             </span>
           );
@@ -767,6 +939,8 @@ export function Contacts() {
         id: 'standing',
         header: t('contacts.standing'),
         align: 'center',
+        // The phone card's headline: the one thing a contact list is scanned by.
+        cardCorner: true,
         // The tag replaces the bar *and* the number: the value is in its
         // accessible name and its tooltip, and the column sorts on the raw
         // number below, so nothing is lost by not printing it.
@@ -777,29 +951,16 @@ export function Contacts() {
         id: 'flags',
         header: t('contacts.flags'),
         align: 'center',
-        render: (contact) => {
-          const blocked = contact.is_blocked === true;
-          const watched = contact.is_watched === true;
-          if (!blocked && !watched) return '—';
-          return (
-            <span className="inline-flex items-center gap-1.5">
-              {blocked && (
-                <FlagBadge
-                  icon={<Icon.Blocked size={ICON_SIZE.sm} />}
-                  label={t('contacts.blocked')}
-                  tone="text-danger"
-                />
-              )}
-              {watched && (
-                <FlagBadge
-                  icon={<Icon.Watched size={ICON_SIZE.sm} />}
-                  label={t('contacts.watched')}
-                  tone="text-warning"
-                />
-              )}
-            </span>
-          );
-        },
+        // On the phone card the marks ride beside the name instead
+        // (`ContactNameCell`). `!`: the dense card's own cell rule would
+        // otherwise outrank a plain utility.
+        className: 'max-sm:hidden!',
+        render: (contact) =>
+          contact.is_blocked === true || contact.is_watched === true ? (
+            <ContactFlags contact={contact} />
+          ) : (
+            <EmptyCell />
+          ),
         // Icon-only, but blocked/watched is a real two-level rank (issue
         // #1282) — blocked outranks watched, and a plain contact has neither
         // so it sinks (`undefined`) rather than sorting as "0".
@@ -818,12 +979,21 @@ export function Contacts() {
     () => CONTACTS_CHARACTER_COLUMN_IDS.filter((id) => id !== 'labels' || hasLabels),
     [hasLabels]
   );
+  const flagsVisible = characterColumnVisibility.isVisible('flags');
   const columns = useMemo<DataTableColumn<CharacterContact>[]>(
     () => [
+      CHARACTER_PORTRAIT_COLUMN,
       {
         id: 'name',
         header: t('contacts.name'),
-        render: (contact) => contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`,
+        primary: true,
+        render: (contact) => (
+          <ContactNameCell
+            contact={contact}
+            name={contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`}
+            flags={flagsVisible && <ContactFlags contact={contact} />}
+          />
+        ),
         sortValue: (contact) => contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`,
       },
       ...availableCharacterColumnIds
@@ -832,6 +1002,7 @@ export function Contacts() {
     ],
     [
       t,
+      flagsVisible,
       contactNames,
       optionalCharacterColumns,
       availableCharacterColumnIds,
@@ -927,6 +1098,16 @@ export function Contacts() {
         meta={contactsResult && <DataAgeBadge date={contactsResult.fetchedAt} />}
         actions={
           <>
+            {/* One character is the whole roster: nothing to compare it against,
+                so there is no "All characters" to offer. */}
+            {acrossLists.length > 1 && (
+              <CharacterFilterControl
+                activeCharacterId={activeCharacterId}
+                value={view === 'across' ? 'all' : 'current'}
+                onChange={(next) => setTab(next === 'all' ? 'across' : 'character')}
+                size="md"
+              />
+            )}
             {view === 'across' ? (
               <TableActionsMenu
                 name={t('contacts.tabAcrossCharacters')}
@@ -949,17 +1130,6 @@ export function Contacts() {
           </>
         }
       />
-
-      {/* One character is the whole roster: there is nothing to compare it
-          against, so the second tab would only ever restate this one. */}
-      {acrossLists.length > 1 && (
-        <Tabs
-          label={t('contacts.title')}
-          value={tab}
-          onChange={(id) => setTab(id as typeof tab)}
-          tabs={CONTACTS_TABS.tabs.map((item) => ({ id: item.id, label: t(item.labelKey) }))}
-        />
-      )}
 
       {/* Shared with the second tab: a name typed into the box, or a type
           switched off, means the same thing on either. The standing chips do
@@ -1045,6 +1215,15 @@ export function Contacts() {
               rowKey={(contact) => contact.contact_id}
               {...characterSortProps}
               mobileSort
+              stackLayout="dense"
+              className="dt-actions-pinned"
+              onRowClick={(contact) => {
+                const kind = contactPublicInfoKind(contact);
+                if (kind) openPublicInfo(kind, contact.contact_id);
+              }}
+              rowClassName={(contact) =>
+                contactPublicInfoKind(contact) ? undefined : NOT_CLICKABLE
+              }
               rowContextMenu={contactRowContextMenu}
               rowMoreActions
             />

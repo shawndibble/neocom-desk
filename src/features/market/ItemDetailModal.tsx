@@ -17,7 +17,7 @@
  * reaction consumes gets "Used in" (`UsedInSection`), off the blueprint
  * catalog — the same SDE files Build Plan reads, not ESI.
  */
-import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -33,7 +33,7 @@ import {
   TypeIcon,
 } from '@/components/ui';
 import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAttributes';
-import { parseItemDescription, type DescriptionRun } from '@/engine/market/itemDescription';
+import { EveMarkupText } from '@/components/EveMarkupText';
 import { marketItemUrl } from '@/engine/market/urlState';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import {
@@ -278,11 +278,7 @@ export function ItemDetailModal({
                 </p>
               )}
               {data.type.description && (
-                <p className="whitespace-pre-line text-text">
-                  {parseItemDescription(data.type.description).map((run, i) => (
-                    <DescriptionRunNode key={i} run={run} />
-                  ))}
-                </p>
+                <EveMarkupText markup={data.type.description} className="text-text" />
               )}
             </div>
           </div>
@@ -522,13 +518,4 @@ function PlanetaryProduction({ pi, typeId }: { pi: PiData | null; typeId: number
       )}
     </div>
   );
-}
-
-/** Renders one parsed description run as nested inline elements — never `dangerouslySetInnerHTML`. */
-function DescriptionRunNode({ run }: { run: DescriptionRun }) {
-  let node: ReactNode = run.text;
-  if (run.underline) node = <u>{node}</u>;
-  if (run.italic) node = <i>{node}</i>;
-  if (run.bold) node = <b>{node}</b>;
-  return <Fragment>{node}</Fragment>;
 }

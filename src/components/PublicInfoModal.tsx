@@ -19,7 +19,7 @@
  * wherever it's opened. Its corporation and alliance come from the live
  * affiliation `loadPilotProfile` resolves, and the Corporation and Alliance
  * tabs follow those ids, not the cached public record's, so the two agree.
- * The dialog is `wide` for a character, since that view needs the room.
+ * The dialog is `wide` for every request: each tab is a full profile now.
  *
  * A link inside the modal that changes page (Open in Fittings) closes it.
  */
@@ -27,7 +27,9 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
-import { EmptyState, Modal, Spinner, Tabs, type TabItem } from '@/components/ui';
+import { CharacterAvatar, EmptyState, Modal, Spinner, Tabs, type TabItem } from '@/components/ui';
+import { isNpcCharacterId } from '@/esi/entityIds';
+import { useEntityName } from '@/features/character/useEntityName';
 import {
   loadPublicAllianceInfo,
   loadPublicCorporationInfo,
@@ -35,11 +37,11 @@ import {
   type PublicCorporationInfo,
 } from '@/features/character/publicInfoData';
 import { loadPilotProfile, type PilotProfile } from '@/features/travel/pilotLookup';
-import { allianceLogoUrl, corporationLogoUrl } from '@/lib/eveImages';
-import { allianceZkillUrl, corporationZkillUrl } from '@/lib/zkillboard';
 import { usePublicInfoModalStore, type PublicInfoKind } from '@/stores/publicInfoModal';
 
 const LazyEmploymentTab = lazy(() => import('@/features/character/PublicInfoEmploymentTab'));
+const LazyCorporationTab = lazy(() => import('@/features/character/PublicInfoCorporationTab'));
+const LazyAllianceTab = lazy(() => import('@/features/character/PublicInfoAllianceTab'));
 // Lazy: its killmail fits pull in Fittings, and this modal is mounted app-wide.
 const LazyPilotProfileView = lazy(() => import('@/features/travel/PilotProfileView'));
 
@@ -55,6 +57,7 @@ export function PublicInfoModal() {
   const { t } = useTranslation();
   const request = usePublicInfoModalStore((state) => state.request);
   const close = usePublicInfoModalStore((state) => state.close);
+  const open = usePublicInfoModalStore((state) => state.open);
   const { pathname } = useLocation();
   const shownPathname = useRef(pathname);
 
@@ -137,8 +140,15 @@ export function PublicInfoModal() {
   if (corporation.status !== 'idle')
     tabs.push({ id: 'corporation', label: t('publicInfo.corporationTab') });
   if (alliance.status !== 'idle') tabs.push({ id: 'alliance', label: t('publicInfo.allianceTab') });
-  // Only a character has a corporation history to show — and not one EVE has no record of.
-  if (request.kind === 'character' && character.status !== 'idle' && character.status !== 'unknown')
+  // Only a character has a corporation history to show — and not one EVE has no record
+  // of, nor an NPC agent, whose "history" is the one corporation CCP placed it in.
+  const npcCharacter = request.kind === 'character' && isNpcCharacterId(request.id);
+  if (
+    request.kind === 'character' &&
+    !npcCharacter &&
+    character.status !== 'idle' &&
+    character.status !== 'unknown'
+  )
     tabs.push({ id: 'employment', label: t('publicInfo.employmentTab') });
 
   const activeData =
@@ -146,12 +156,7 @@ export function PublicInfoModal() {
   const title = activeData.status === 'ready' ? activeData.data.name : t('publicInfo.title');
 
   return (
-    <Modal
-      open
-      onClose={close}
-      title={title}
-      placement={request.kind === 'character' ? 'wide' : 'center'}
-    >
+    <Modal open onClose={close} title={title} placement="wide">
       <div className="space-y-3">
         {tabs.length > 0 && (
           <Tabs
@@ -165,6 +170,8 @@ export function PublicInfoModal() {
         {activeTab === 'character' && (
           <CharacterTab
             state={character}
+            npc={npcCharacter}
+            corporation={corporation}
             onOpenCorporation={() => setActiveTab('corporation')}
             onOpenAlliance={() => setActiveTab('alliance')}
           />
@@ -175,9 +182,17 @@ export function PublicInfoModal() {
             allianceId={character.status === 'ready' ? character.data.allianceId : undefined}
             allianceName={alliance.status === 'ready' ? alliance.data.name : undefined}
             onOpenAlliance={alliance.status !== 'idle' ? () => setActiveTab('alliance') : undefined}
+            onShowCharacter={(id) => open('character', id)}
+            onShowAlliance={(id) => open('alliance', id)}
           />
         )}
-        {activeTab === 'alliance' && <AllianceTab state={alliance} />}
+        {activeTab === 'alliance' && (
+          <AllianceTab
+            state={alliance}
+            onShowCharacter={(id) => open('character', id)}
+            onShowCorporation={(id) => open('corporation', id)}
+          />
+        )}
         {activeTab === 'employment' && (
           <Suspense
             fallback={
@@ -191,24 +206,6 @@ export function PublicInfoModal() {
         )}
       </div>
     </Modal>
-  );
-}
-
-/**
- * A corporation's or alliance's kills and losses aren't shown inline (only a
- * character's are, in its tab), so those tabs link out to zKillboard instead.
- */
-function ZkillRow({ href }: { href: string }) {
-  const { t } = useTranslation();
-  return (
-    <>
-      <dt className="text-text-dim uppercase">{t('publicInfo.killboard')}</dt>
-      <dd>
-        <a href={href} target="_blank" rel="noopener noreferrer" className={inlineLinkClassName}>
-          {t('publicInfo.zkillboard')}
-        </a>
-      </dd>
-    </>
   );
 }
 
@@ -232,10 +229,15 @@ function TabStatus({ status }: { status: 'loading' | 'error' }) {
 
 function CharacterTab({
   state,
+  npc,
+  corporation,
   onOpenCorporation,
   onOpenAlliance,
 }: {
   state: CharacterState;
+  /** An NPC agent (CCP's id block): a slim card, no killboard. */
+  npc: boolean;
+  corporation: TabState<PublicCorporationInfo>;
   onOpenCorporation: () => void;
   onOpenAlliance: () => void;
 }) {
@@ -251,6 +253,15 @@ function CharacterTab({
   }
   if (state.status !== 'ready')
     return <TabStatus status={state.status === 'idle' ? 'loading' : state.status} />;
+  if (npc) {
+    return (
+      <NpcCharacterCard
+        profile={state.data}
+        factionId={corporation.status === 'ready' ? corporation.data.faction_id : undefined}
+        onOpenCorporation={onOpenCorporation}
+      />
+    );
+  }
   return (
     <Suspense fallback={<TabStatus status="loading" />}>
       <LazyPilotProfileView
@@ -269,6 +280,8 @@ function CorporationTab({
   allianceId: liveAllianceId,
   allianceName,
   onOpenAlliance,
+  onShowCharacter,
+  onShowAlliance,
 }: {
   state: TabState<PublicCorporationInfo>;
   /**
@@ -279,74 +292,90 @@ function CorporationTab({
   /** Filled in once the alliance fetch resolves; a bare id shows until then. */
   allianceName?: string;
   onOpenAlliance?: () => void;
+  onShowCharacter: (characterId: number) => void;
+  onShowAlliance: (allianceId: number) => void;
 }) {
-  const { t } = useTranslation();
   if (state.status !== 'ready')
     return <TabStatus status={state.status === 'idle' ? 'loading' : state.status} />;
   const { data } = state;
-  const allianceId = liveAllianceId === undefined ? data.alliance_id : liveAllianceId;
+  const allianceId = liveAllianceId === undefined ? (data.alliance_id ?? null) : liveAllianceId;
   return (
-    <div className="flex items-start gap-3 text-xs">
-      <img
-        src={corporationLogoUrl(data.corporation_id, 128)}
-        crossOrigin="anonymous"
-        alt=""
-        width={64}
-        height={64}
-        className="shrink-0 rounded-xs border border-line"
+    <Suspense fallback={<TabStatus status="loading" />}>
+      <LazyCorporationTab
+        key={data.corporation_id}
+        data={data}
+        allianceId={allianceId}
+        allianceName={allianceName}
+        onOpenAlliance={onOpenAlliance}
+        onShowCharacter={onShowCharacter}
+        onShowAlliance={onShowAlliance}
       />
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-        <dt className="text-text-dim uppercase">{t('publicInfo.ticker')}</dt>
-        <dd>{data.ticker}</dd>
-
-        <dt className="text-text-dim uppercase">{t('publicInfo.memberCount')}</dt>
-        <dd>{data.member_count.toLocaleString()}</dd>
-
-        <dt className="text-text-dim uppercase">{t('publicInfo.ceo')}</dt>
-        <dd>{data.ceoName ?? t('common.unknown')}</dd>
-
-        {allianceId != null && (
-          <>
-            <dt className="text-text-dim uppercase">{t('publicInfo.alliance')}</dt>
-            <dd>
-              {onOpenAlliance ? (
-                <button type="button" onClick={onOpenAlliance} className={inlineLinkClassName}>
-                  {allianceName ?? `#${allianceId}`}
-                </button>
-              ) : (
-                (allianceName ?? `#${allianceId}`)
-              )}
-            </dd>
-          </>
-        )}
-
-        <ZkillRow href={corporationZkillUrl(data.corporation_id)} />
-      </dl>
-    </div>
+    </Suspense>
   );
 }
 
-function AllianceTab({ state }: { state: TabState<PublicAllianceInfo> }) {
-  const { t } = useTranslation();
+function AllianceTab({
+  state,
+  onShowCharacter,
+  onShowCorporation,
+}: {
+  state: TabState<PublicAllianceInfo>;
+  onShowCharacter: (characterId: number) => void;
+  onShowCorporation: (corporationId: number) => void;
+}) {
   if (state.status !== 'ready')
     return <TabStatus status={state.status === 'idle' ? 'loading' : state.status} />;
-  const { data } = state;
   return (
-    <div className="flex items-start gap-3 text-xs">
-      <img
-        src={allianceLogoUrl(data.alliance_id, 128)}
-        crossOrigin="anonymous"
-        alt=""
-        width={64}
-        height={64}
-        className="shrink-0 rounded-xs border border-line"
+    <Suspense fallback={<TabStatus status="loading" />}>
+      <LazyAllianceTab
+        key={state.data.alliance_id}
+        data={state.data}
+        onShowCharacter={onShowCharacter}
+        onShowCorporation={onShowCorporation}
       />
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-        <dt className="text-text-dim uppercase">{t('publicInfo.ticker')}</dt>
-        <dd>{data.ticker}</dd>
+    </Suspense>
+  );
+}
 
-        <ZkillRow href={allianceZkillUrl(data.alliance_id)} />
-      </dl>
+/**
+ * An NPC agent's Character tab. Pilot Lookup's view would show an empty
+ * killboard and a 2003 "character age" for someone CCP placed in a station,
+ * so an agent gets who it is and who it works for, and nothing else.
+ */
+function NpcCharacterCard({
+  profile,
+  factionId,
+  onOpenCorporation,
+}: {
+  profile: PilotProfile;
+  factionId: number | undefined;
+  onOpenCorporation: () => void;
+}) {
+  const { t } = useTranslation();
+  const factionName = useEntityName(factionId);
+  return (
+    <div className="flex flex-wrap items-start gap-4 text-sm">
+      <CharacterAvatar characterId={profile.characterId} size="lg" alt={profile.name} />
+      <div className="min-w-0 flex-1 space-y-3">
+        <span className="block text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {t('publicInfo.npcAgent')}
+        </span>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          <dt className="text-text-dim">{t('publicInfo.corporation')}</dt>
+          <dd>
+            <button type="button" className={inlineLinkClassName} onClick={onOpenCorporation}>
+              {profile.corporationName ?? `#${profile.corporationId}`}
+            </button>
+          </dd>
+          {factionId !== undefined && (
+            <>
+              <dt className="text-text-dim">{t('publicInfo.faction')}</dt>
+              <dd>{factionName ?? `#${factionId}`}</dd>
+            </>
+          )}
+        </dl>
+        <p className="text-xs text-text-dim">{t('publicInfo.npcAgentHint')}</p>
+      </div>
     </div>
   );
 }

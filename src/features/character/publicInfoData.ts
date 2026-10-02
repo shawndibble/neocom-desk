@@ -15,6 +15,8 @@ import {
   getCorporationPublicInfo,
   getAlliancePublicInfo,
   getCharacterCorporationHistory,
+  getCorporationAllianceHistory,
+  getAllianceCorporations,
   type CharacterPublicInfo,
   type CorporationPublicInfo,
   type AlliancePublicInfo,
@@ -27,6 +29,7 @@ import {
 } from '@/esi/cache';
 import { resolveNames } from './names';
 import { deriveEmploymentHistoryRows, type EmploymentHistoryRow } from './employmentHistory';
+import { deriveAllianceHistoryRows, type AllianceHistoryRow } from './corporationInfo';
 
 export interface PublicCharacterInfo extends CharacterPublicInfo {
   character_id: number;
@@ -36,6 +39,8 @@ export interface PublicCorporationInfo extends CorporationPublicInfo {
   corporation_id: number;
   /** Resolved from `ceo_id` via `resolveNames`; null if that lookup failed. */
   ceoName: string | null;
+  /** Resolved from `creator_id` the same way. */
+  creatorName: string | null;
 }
 
 export interface PublicAllianceInfo extends AlliancePublicInfo {
@@ -70,11 +75,12 @@ export async function loadPublicCorporationInfo(
     { staleAfterMs: STALE_AFTER.static, conditional }
   );
   if (!result) return null;
-  const names = await resolveNames([result.data.ceo_id]);
+  const names = await resolveNames([...new Set([result.data.ceo_id, result.data.creator_id])]);
   return {
     ...result.data,
     corporation_id: corporationId,
     ceoName: names.get(result.data.ceo_id) ?? null,
+    creatorName: names.get(result.data.creator_id) ?? null,
   };
 }
 
@@ -121,4 +127,67 @@ export async function loadPublicEmploymentHistory(
   const rows = deriveEmploymentHistoryRows(result.data, Date.now());
   const names = await resolveNames([...new Set(rows.map((r) => r.corporationId))]);
   return { rows, names };
+}
+
+export interface PublicAllianceHistory {
+  rows: AllianceHistoryRow[];
+  names: Map<number, string>;
+}
+
+/**
+ * Another corporation's alliance history, cached under the global sentinel
+ * like `loadPublicEmploymentHistory`. Null when ESI could not be reached and
+ * nothing was cached — the tab hides the section rather than showing an error
+ * for one part of an otherwise-loaded corporation.
+ */
+export async function loadPublicAllianceHistory(
+  corporationId: number
+): Promise<PublicAllianceHistory | null> {
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCorporationAllianceHistory(corporationId, options)
+  );
+  const result = await loadWithCache(
+    GLOBAL_CACHE_CHARACTER_ID,
+    `public-alliance-history:${corporationId}`,
+    fetchLive,
+    { staleAfterMs: STALE_AFTER.static, conditional }
+  );
+  if (!result) return null;
+  const rows = deriveAllianceHistoryRows(result.data);
+  const ids = [
+    ...new Set(rows.flatMap((row) => (row.allianceId === null ? [] : [row.allianceId]))),
+  ];
+  const names = ids.length > 0 ? await resolveNames(ids) : new Map<number, string>();
+  return { rows, names };
+}
+
+export interface PublicAllianceCorporations {
+  /** Member corporations, by name — the order ESI gives them in means nothing. */
+  corporations: { id: number; name: string | null }[];
+}
+
+/**
+ * Another alliance's member corporations, cached under the global sentinel
+ * like the rest of this module. Null when ESI could not be reached and
+ * nothing was cached; the tab then leaves the list out.
+ */
+export async function loadPublicAllianceCorporations(
+  allianceId: number
+): Promise<PublicAllianceCorporations | null> {
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getAllianceCorporations(allianceId, options)
+  );
+  const result = await loadWithCache(
+    GLOBAL_CACHE_CHARACTER_ID,
+    `public-alliance-corporations:${allianceId}`,
+    fetchLive,
+    { staleAfterMs: STALE_AFTER.static, conditional }
+  );
+  if (!result) return null;
+  const names =
+    result.data.length > 0 ? await resolveNames(result.data) : new Map<number, string>();
+  const corporations = result.data
+    .map((id) => ({ id, name: names.get(id) ?? null }))
+    .sort((a, b) => (a.name ?? `#${a.id}`).localeCompare(b.name ?? `#${b.id}`));
+  return { corporations };
 }

@@ -502,6 +502,43 @@
       align-self: center;
     }
 
+    /* Opt-in (`dt-actions-pinned` on the table, Contacts): the actions button
+       pinned to the card's right edge and centred across both lines, the way
+       a `start` edge control is on the left. In flow on line one its 44px
+       touch target makes that line 44px tall and pushes the meta line a
+       button's height below the title; pinned, the card is two text lines.
+       The row pads its right side to clear it. Not the default because the
+       other dense tables with actions (Hauling, Contract Search, Mining Tax)
+       carry chevrons and `end` edge boxes this has not been checked against. */
+    .dt-stack.dt-stack-dense.dt-actions-pinned td.dt-actions {
+      position: absolute;
+      top: 50%;
+      right: 0.25rem;
+      transform: translateY(-50%);
+    }
+
+    .dt-stack.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions) {
+      padding-right: 3rem;
+    }
+
+    /* The headline figure (`cardCorner`) pinned beside it, centred across both
+       lines too, so the figure and the button read as one column instead of
+       the figure riding the title line's top edge. The row widens its right
+       padding to clear both. Sized for Contacts' standing icons — a short,
+       fixed-width figure; a long one (an ISK amount) would need more room. */
+    .dt-stack.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions) td.dt-corner {
+      position: absolute;
+      top: 50%;
+      right: 2.75rem;
+      transform: translateY(-50%);
+      margin: 0;
+      padding: 0;
+    }
+
+    .dt-stack.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions):has(> td.dt-corner) {
+      padding-right: 5.25rem;
+    }
+
     /* The expand chevron (`expandableRow`) joins the actions on line one.
        Left to the base card rules it flowed onto the meta line carrying the
        labelled card's 7rem label gutter, pushing the first meta value a
@@ -615,6 +652,28 @@
     .dt-stack.dt-stack-dense td.dt-meta::after {
       content: attr(data-stack-after);
       white-space: pre;
+    }
+
+    /* A cell holding only a value the card can do without (`data-dense-omit`):
+       a "none" dash reads as "none" in a table column, but on the meta line it
+       would print one more "· —" between real values, so the card leaves it
+       out — likewise a word the card already says another way. */
+    .dt-stack.dt-stack-dense td.dt-meta:has(> [data-dense-omit]:only-child) {
+      display: none;
+    }
+
+    /* `dt-meta-first` is fixed at render, so when the leading meta cells are
+       omitted the first one left standing would open the line with a stray
+       "·". Hand it the first cell's no-separator content instead, past one or
+       two omitted cells (Contacts' Type, then an empty Corp / Alliance). */
+    .dt-stack.dt-stack-dense
+      td.dt-meta-first:has(> [data-dense-omit]:only-child)
+      + td.dt-meta:not(:has(> [data-dense-omit]:only-child))::before,
+    .dt-stack.dt-stack-dense
+      td.dt-meta-first:has(> [data-dense-omit]:only-child)
+      + td.dt-meta:has(> [data-dense-omit]:only-child)
+      + td.dt-meta::before {
+      content: attr(data-stack-before);
     }
 
     /* No header row to show the sort on, so the sorted value itself says it
