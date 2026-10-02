@@ -12,13 +12,20 @@
  * without a Director-tier character: `Notification.permission` is pinned to
  * 'default' (headless Chromium reports 'denied', which suppresses the
  * explainer by design), and a synthetic `beforeinstallprompt` satisfies the
- * install banner's native variant the same way a real Chromium would.
+ * install banner's native variant the same way a real Chromium would. The
+ * Install Prompt is mobile-only, so the page also has to claim to be
+ * Android Chrome — headless Chromium's desktop UA would hide it.
  */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_NAME } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
+
+test.use({
+  userAgent:
+    'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36',
+});
 
 /**
  * Headless Chromium answers 'denied' for notifications, and a denied grant

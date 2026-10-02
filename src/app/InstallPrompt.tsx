@@ -3,18 +3,26 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import {
   useInstallPromptSeen,
-  isIosSafari,
+  detectInstallPlatform,
   selectInstallPromptVariant,
+  type InstallPromptVariant,
   type BeforeInstallPromptEvent,
 } from './installPromptRules';
 import { useOnboardingBannerSlot } from './onboardingBannerSlot';
 
+const INSTRUCTION_KEYS = {
+  'ios-safari': 'pwa.installIosSafariCta',
+  'ios-other': 'pwa.installIosOtherCta',
+  'android-firefox': 'pwa.installAndroidFirefoxCta',
+} as const satisfies Record<Exclude<InstallPromptVariant, 'none' | 'native'>, string>;
+
 /**
- * One-time install CTA: captures the native `beforeinstallprompt` event on
- * Chromium, or shows a static "Add to Home Screen" banner on iOS Safari
- * where that event never fires. Shown once ever per device — accepting or
- * dismissing either variant permanently suppresses it (CONTEXT.md "Install
- * Prompt", round 20).
+ * One-time, phones-and-tablets-only install CTA: uses the native
+ * `beforeinstallprompt` event where Android Chromium fires it, otherwise
+ * shows instructions for this browser's own menu on iOS and Firefox for
+ * Android, which never fire the event. Shown once ever per device —
+ * accepting or dismissing either variant permanently suppresses it
+ * (CONTEXT.md "Install Prompt"; decision 20261002-165619).
  */
 export function InstallPrompt() {
   const { t } = useTranslation();
@@ -37,9 +45,11 @@ export function InstallPrompt() {
   const variant = hydrated
     ? selectInstallPromptVariant({
         seen,
-        isStandalone: window.matchMedia('(display-mode: standalone)').matches,
+        isStandalone:
+          window.matchMedia('(display-mode: standalone)').matches ||
+          (navigator as { standalone?: boolean }).standalone === true,
         deferredPromptAvailable: deferredPrompt !== null,
-        isIOS: isIosSafari(navigator.userAgent),
+        platform: detectInstallPlatform(navigator.userAgent, navigator.maxTouchPoints ?? 0),
       })
     : 'none';
 
@@ -66,7 +76,7 @@ export function InstallPrompt() {
       data-testid="onboarding-banner"
       className="fixed bottom-16 left-4 z-50 flex items-center gap-3 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-4"
     >
-      <span>{variant === 'native' ? t('pwa.installCta') : t('pwa.installIosCta')}</span>
+      <span>{variant === 'native' ? t('pwa.installCta') : t(INSTRUCTION_KEYS[variant])}</span>
       {variant === 'native' && (
         <Button size="sm" variant="primary" onClick={() => void handleInstall()}>
           {t('pwa.install')}
