@@ -69,6 +69,13 @@ const affiliationPayload = [
 ];
 
 /** Every filter now sits behind the funnel (FilterBar, issue #1282). */
+/** Switches the page to every character through the header's character filter. */
+async function showAllCharacters() {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'This character' }));
+  await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+}
+
 function openFilters() {
   fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
 }
@@ -302,7 +309,7 @@ describe('Contacts', () => {
       render(<App />);
       await screen.findByText('Good Friend');
 
-      expect(screen.queryByRole('tab', { name: 'Across characters' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'This character' })).not.toBeInTheDocument();
     });
 
     it('gives each tab its own path, and restores the across tab and its toggle on reload', async () => {
@@ -314,7 +321,7 @@ describe('Contacts', () => {
       expect(window.location.pathname).toBe('/contacts/character');
       expect(window.location.search).toBe('');
 
-      fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+      await showAllCharacters();
       await screen.findByRole('table', { name: /across/i });
       expect(window.location.pathname).toBe('/contacts/across');
 
@@ -330,10 +337,7 @@ describe('Contacts', () => {
       render(<App />);
 
       const table = within(await screen.findByRole('table', { name: /across/i }));
-      expect(screen.getByRole('tab', { name: 'Across characters' })).toHaveAttribute(
-        'aria-selected',
-        'true'
-      );
+      expect(screen.getByRole('button', { name: 'All characters' })).toBeInTheDocument();
       expect(table.queryByText('2 of 2')).not.toBeInTheDocument();
       expect(table.getAllByText('1 of 2').length).toBe(4);
     });
@@ -344,7 +348,7 @@ describe('Contacts', () => {
       render(<App />);
       await screen.findByText('Good Friend');
 
-      fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+      await showAllCharacters();
 
       const table = within(await screen.findByRole('table', { name: /across/i }));
       // Good Friend is on both; the other four are on the main alone.
@@ -360,7 +364,7 @@ describe('Contacts', () => {
       render(<App />);
       await screen.findByText('Good Friend');
 
-      fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+      await showAllCharacters();
 
       const table = within(await screen.findByRole('table', { name: /across/i }));
       const count = table.getAllByText('1 of 2')[0]!;
@@ -374,7 +378,7 @@ describe('Contacts', () => {
       await cacheSecondCharacterContacts([contactsPayload[0]]);
       render(<App />);
       await screen.findByText('Good Friend');
-      fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+      await showAllCharacters();
       await screen.findByRole('table', { name: /across/i });
 
       openFilters();
@@ -391,7 +395,7 @@ describe('Contacts', () => {
       await cacheSecondCharacterContacts([contactsPayload[0]]);
       render(<App />);
       await screen.findByText('Good Friend');
-      fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+      await showAllCharacters();
       await screen.findByRole('table', { name: /across/i });
 
       fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
@@ -414,7 +418,7 @@ describe('Contacts', () => {
       render(<App />);
       await screen.findByText('Good Friend');
 
-      fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+      await showAllCharacters();
 
       const table = within(await screen.findByRole('table', { name: /across/i }));
       expect(table.getByRole('img', { name: 'Excellent standing (10)' })).toBeInTheDocument();
@@ -432,7 +436,7 @@ describe('Contacts', () => {
         await cacheSecondCharacterContacts([contactsPayload[0]]);
         render(<App />);
         await screen.findByText('Good Friend');
-        fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+        await showAllCharacters();
         const table = within(await screen.findByRole('table', { name: /across/i }));
 
         const row = table.getByText('Good Friend').closest('tr');
@@ -466,7 +470,7 @@ describe('Contacts', () => {
       await cacheSecondCharacterContacts([contactsPayload[0]]);
       render(<App />);
       await screen.findByText('Good Friend');
-      fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+      await showAllCharacters();
       const table = within(await screen.findByRole('table', { name: /across/i }));
 
       const row = table.getByText('Good Friend').closest('tr');
@@ -484,7 +488,7 @@ describe('Contacts', () => {
       render(<App />);
       await screen.findByText('Good Friend');
 
-      fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+      await showAllCharacters();
 
       expect(await screen.findByText(/last cached/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Fetch every character' })).toBeInTheDocument();
@@ -532,7 +536,7 @@ describe('Contacts row context menu (issue #403)', () => {
     return row;
   }
 
-  it('offers Copy Name, Copy contact ID, and Show info as the only entry point to the modal', async () => {
+  it('offers Copy Name, Copy contact ID, and Show info', async () => {
     render(<App />);
     await openContactMenu('Good Friend');
 
@@ -561,6 +565,40 @@ describe('Contacts row context menu (issue #403)', () => {
 
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('tab', { name: 'Character' })).toBeInTheDocument();
+  });
+});
+
+describe('Contacts row click', () => {
+  it('opens the shared Public Info Modal on the clicked contact', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`${ESI}/characters/1001`, () =>
+        HttpResponse.json({
+          name: 'Good Friend',
+          birthday: '2020-01-01T00:00:00Z',
+          bloodline_id: 1,
+          gender: 'male',
+          race_id: 1,
+          security_status: 1.5,
+        })
+      )
+    );
+    render(<App />);
+    await user.click(await screen.findByText('Good Friend'));
+
+    expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'character', id: 1001 });
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('tab', { name: 'Character' })).toBeInTheDocument();
+  });
+
+  it("does not open it from the row's own More actions button", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const row = (await screen.findByText('Good Friend')).closest('tr');
+    if (!row) throw new Error('expected a Good Friend row');
+    await user.click(within(row).getByRole('button', { name: /More actions/ }));
+
+    expect(usePublicInfoModalStore.getState().request).toBeNull();
   });
 });
 
@@ -709,7 +747,7 @@ describe('CSV export (issue #2164)', () => {
     });
     render(<App />);
     await screen.findByText('Good Friend');
-    fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+    await showAllCharacters();
     await screen.findByRole('table', { name: /across/i });
 
     await exportCsv('Export Across characters');
@@ -741,7 +779,7 @@ describe('CSV export (issue #2164)', () => {
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
     render(<App />);
     await screen.findByText('Good Friend');
-    fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+    await showAllCharacters();
     await screen.findByRole('table', { name: /across/i });
 
     await exportCsv('Export Across characters');

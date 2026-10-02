@@ -287,6 +287,29 @@ export function getCorporationPublicInfo(
   });
 }
 
+// --- GET /corporations/{corporation_id}/alliancehistory (public) ---
+
+/** One stint; no `alliance_id` is a stretch spent in no alliance. */
+export interface CorporationAllianceHistoryEntry {
+  record_id: number;
+  start_date: string;
+  alliance_id?: number;
+  is_deleted?: boolean;
+}
+
+export function getCorporationAllianceHistory(
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationAllianceHistoryEntry[]>> {
+  return esiFetch<CorporationAllianceHistoryEntry[]>(
+    `/corporations/${corporationId}/alliancehistory`,
+    {
+      ...options,
+      endpointId: 'getCorporationAllianceHistory',
+    }
+  );
+}
+
 // --- GET /universe/types/{type_id} (public) ---
 
 /**

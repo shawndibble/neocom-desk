@@ -1,13 +1,15 @@
 /**
- * Right-click menu on a Contacts row (issue #403): copy identifiers, and the
- * only entry point into the shared Public Info Modal — not a second click
- * target on the row itself (CONTEXT.md round 49).
+ * Right-click menu on a Contacts row (issue #403): copy identifiers, and
+ * Show Info. Clicking the row opens Show Info too (decision
+ * `20261002-145207`); the menu entry stays for the
+ * keyboard and for a reader who reaches for right-click first.
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MenuItem, RowActionsMenu } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
-import { usePublicInfoModal, type PublicInfoKind } from '@/stores/publicInfoModal';
+import { usePublicInfoModal } from '@/stores/publicInfoModal';
+import { contactPublicInfoKind } from './contactsFilter';
 import type { CharacterContact } from '@/esi/endpoints';
 
 /** Only the identity is read, so a merged Across-Characters row can supply one too. */
@@ -19,15 +21,10 @@ export interface ContactContextMenuProps {
   children: ReactElement;
 }
 
-/** No public faction-info endpoint is wired into the modal, so faction contacts get no Show Info. */
-function publicInfoKind(contact: ContactIdentity): PublicInfoKind | null {
-  return contact.contact_type === 'faction' ? null : contact.contact_type;
-}
-
 export function ContactContextMenu({ contact, name, children }: ContactContextMenuProps) {
   const { t } = useTranslation();
   const { open } = usePublicInfoModal();
-  const kind = publicInfoKind(contact);
+  const kind = contactPublicInfoKind(contact);
 
   return (
     <RowActionsMenu

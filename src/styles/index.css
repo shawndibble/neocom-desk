@@ -495,11 +495,22 @@
       font-size: 0.9375rem;
     }
 
-    /* On line one, after the title and headline figure. */
+    /* Pinned to the card's right edge and centred across both lines, the way
+       a `start` edge control is on the left. In flow on line one, its 44px
+       touch target made that line 44px tall and pushed the meta line a
+       button's height below the title: a dense card should be two text
+       lines, not a button-tall line and a text line. The row pads its right
+       side to clear it, so the headline figure and the meta line's `end`
+       edge stop short of the button. */
     .dt-stack.dt-stack-dense td.dt-actions {
-      order: -1;
-      flex: none;
-      align-self: center;
+      position: absolute;
+      top: 50%;
+      right: 0.25rem;
+      transform: translateY(-50%);
+    }
+
+    .dt-stack.dt-stack-dense tr:has(> td.dt-actions) {
+      padding-right: 3rem;
     }
 
     /* The expand chevron (`expandableRow`) joins the actions on line one.
@@ -615,6 +626,13 @@
     .dt-stack.dt-stack-dense td.dt-meta::after {
       content: attr(data-stack-after);
       white-space: pre;
+    }
+
+    /* A cell holding only its "none" dash (`data-dense-empty`): a column of
+       dashes reads as "none" in a table, but on the meta line it would print
+       one more "· —" between real values, so the card leaves it out. */
+    .dt-stack.dt-stack-dense td.dt-meta:has(> [data-dense-empty]:only-child) {
+      display: none;
     }
 
     /* No header row to show the sort on, so the sorted value itself says it

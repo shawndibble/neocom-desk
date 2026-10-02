@@ -130,7 +130,7 @@ describe('PilotLookupTab', () => {
     expect(probe.search).toBe('?pilot=42');
     expect(await screen.findByText('1,043')).toBeTruthy();
     expect(screen.getByText('99.2%')).toBeTruthy();
-    expect(screen.getByText('68%')).toBeTruthy();
+    expect(screen.getByRole('meter', { name: 'Danger' })).toHaveAttribute('aria-valuenow', '68');
     expect(await screen.findByText('Kronos')).toBeTruthy();
     expect(screen.getByText('317 kills')).toBeTruthy();
   });
@@ -202,9 +202,11 @@ describe('PilotLookupTab', () => {
     expect(screen.queryByText('No kills or losses on zKillboard')).toBeNull();
   });
 
+  // zKillboard's own Snuggly/Dangerous scale is quoted, ends and all (decision
+  // 20261002-145207); the app adds no verdict of its own.
   it('states numbers, never a verdict, in its copy (decision 20260912-172628)', () => {
     const copy = JSON.stringify(en.travel.pilot).toLowerCase();
-    for (const word of ['safe', 'hostile', 'threat', 'avoid', 'dangerous']) {
+    for (const word of ['safe', 'hostile', 'threat', 'avoid']) {
       expect(copy).not.toContain(word);
     }
   });
