@@ -77,6 +77,7 @@ import { Info as InfoGlyph } from '@phosphor-icons/react/dist/csr/Info';
 import { ListBullets } from '@phosphor-icons/react/dist/csr/ListBullets';
 import { LockKey } from '@phosphor-icons/react/dist/csr/LockKey';
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
+import { MapPin } from '@phosphor-icons/react/dist/csr/MapPin';
 import { Minus } from '@phosphor-icons/react/dist/csr/Minus';
 import { Moon } from '@phosphor-icons/react/dist/csr/Moon';
 import { Package } from '@phosphor-icons/react/dist/csr/Package';
@@ -304,6 +305,8 @@ export const Industry = withWeight(Factory);
 export const Ships = withWeight(Rocket);
 /** Live order books. */
 export const Market = withWeight(ChartLineUp);
+/** Where something sits — a station, structure or container. */
+export const Location = withWeight(MapPin);
 /** Balance and open orders. */
 export const Wallet = withWeight(WalletGlyph);
 /** Colonies and extraction timers. */

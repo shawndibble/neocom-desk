@@ -29,6 +29,11 @@ import {
   type DataTableColumn,
   Checkbox,
   SegmentedControl,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
@@ -495,7 +500,36 @@ export function OpportunitiesPanel({
     columns.map((column) => column.id)
   );
 
-  const meta = (
+  const characterFilterControl = showCharacterFilter && (
+    <CharacterFilterControl
+      activeCharacterId={activeCharacterId}
+      value={characterFilter}
+      onChange={setCharacterFilter}
+    />
+  );
+  // Below `lg` the view picker *is* the panel's title: a bordered select
+  // reading "Ranked builds" / "Owned blueprints", so the title, the view, the
+  // Character filter and the actions all fit one line on a phone. The
+  // segmented control and the plain title stay on desktop, where they fit.
+  const viewPicker = isDesktop ? undefined : (
+    <span className="flex min-w-0 items-center pl-2">
+      <h2 className="sr-only">{t('industry.opportunitiesTitle')}</h2>
+      <Select value={view} onValueChange={(next) => setView(next as typeof view)}>
+        <SelectTrigger
+          size="sm"
+          aria-label={t('industry.opportunitiesView')}
+          className="min-w-0 text-[0.6875rem] font-semibold tracking-widest uppercase"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="ranked">{t('industry.opportunitiesViewRankedTitle')}</SelectItem>
+          <SelectItem value="owned">{t('industry.opportunitiesViewOwnedTitle')}</SelectItem>
+        </SelectContent>
+      </Select>
+    </span>
+  );
+  const meta = isDesktop ? (
     <span className="flex flex-wrap items-center gap-2">
       <SegmentedControl
         label={t('industry.opportunitiesView')}
@@ -507,15 +541,12 @@ export function OpportunitiesPanel({
           { value: 'owned', label: t('industry.opportunitiesViewOwned') },
         ]}
       />
-      {showCharacterFilter && (
-        <CharacterFilterControl
-          activeCharacterId={activeCharacterId}
-          value={characterFilter}
-          onChange={setCharacterFilter}
-        />
-      )}
+      {characterFilterControl}
     </span>
+  ) : (
+    characterFilterControl
   );
+  const title = isDesktop ? t('industry.opportunitiesTitle') : undefined;
 
   const showProgress = loading && progress.total > 0;
   const pricingActions = (
@@ -543,6 +574,8 @@ export function OpportunitiesPanel({
         rankedRows={rows}
         ownedStockSnapshot={ownedStockSnapshot}
         loading={blueprintsLoading}
+        title={title}
+        leading={viewPicker}
         meta={meta}
         pricingActions={pricingActions}
         onStartPlan={onStartPlan}
@@ -552,12 +585,13 @@ export function OpportunitiesPanel({
 
   return (
     <Panel
-      title={t('industry.opportunitiesTitle')}
+      title={title}
+      leading={viewPicker}
       meta={meta}
       actions={
         <span className="flex items-center gap-2">
           {pricingActions}
-          {selectedRows.length > 1 && (
+          {isDesktop && selectedRows.length > 1 && (
             <Button size="sm" variant="primary" onClick={() => onAddToCompare(selectedRows)}>
               {t('industry.opportunitiesAddToCompare', { count: selectedRows.length })}
             </Button>
@@ -607,6 +641,8 @@ export function OpportunitiesPanel({
           showCharacterColumn={showCharacterColumn}
           selectedIds={selectedIds}
           onToggleSelected={toggleSelected}
+          onClearSelected={() => setSelectedIds(new Set())}
+          onCompare={onAddToCompare}
           onStartPlan={onStartPlan}
           onViewHistory={(typeId, itemName, regionId) =>
             setHistoryItem({ typeId, itemName, regionId })

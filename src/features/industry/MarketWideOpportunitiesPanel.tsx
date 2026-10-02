@@ -62,7 +62,7 @@ import { StartPlanButton } from './StartPlanButton';
 import { formatPercent, numericCell } from './format';
 import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, defineUrlFilter, enumParam, enumSetParam } from '@/lib/urlState';
-import { useIsPhone } from '@/lib/useIsPhone';
+import { useIsNarrow } from '@/lib/useIsNarrow';
 import { RARELY_SOLD_PER_DAY, isRarelySold } from '@/engine/industry/marketWideSanity';
 import { useDailySales } from './useDailySales';
 import { marketWideOpportunitiesCsvColumns } from './opportunitiesCsv';
@@ -173,7 +173,7 @@ export function MarketWideOpportunitiesPanel({
   onStartPlan,
 }: MarketWideOpportunitiesPanelProps) {
   const { t } = useTranslation();
-  const isPhone = useIsPhone();
+  const isNarrow = useIsNarrow();
   const tradeHubStandings = useTradeHubStandings(activeCharacterId);
   const standing = tradeHubStanding(tradeHubStandings, hub.id);
 
@@ -385,15 +385,17 @@ export function MarketWideOpportunitiesPanel({
     columns.map((column) => column.id)
   );
 
-  // On a phone with results, the funnel sits beside the table's sort picker
-  // rather than on a row of its own above it.
-  const filtersInSortBar = isPhone && hasRun && !loading && rows.length > 0;
+  // Below `md` every filter already lives in `FilterBar`'s sheet, so all that
+  // is left inline is its funnel — which sits in the title bar beside Scan,
+  // at Scan's own size, in every state, rather than on a row of its own.
+  const filtersInHeader = isNarrow;
   const filterBar = (
     <FilterBar
       value={filter}
       onChange={applyFilter}
       activeCount={activeFilterCount(filter)}
-      className={filtersInSortBar ? undefined : 'mb-2'}
+      className={filtersInHeader ? undefined : 'mb-2'}
+      triggerSize={filtersInHeader ? 'sm' : undefined}
     >
       {(draft, setDraft) => (
         <>
@@ -504,6 +506,7 @@ export function MarketWideOpportunitiesPanel({
               tableExport={marketWideExport}
             />
           )}
+          {filtersInHeader && filterBar}
           <Button size="sm" onClick={() => run(filter)} disabled={loading || !trees || !catalog}>
             {loading
               ? t('industry.marketOpportunitiesScanning')
@@ -512,7 +515,7 @@ export function MarketWideOpportunitiesPanel({
         </span>
       }
     >
-      {!filtersInSortBar && filterBar}
+      {!filtersInHeader && filterBar}
       {loading ? (
         <div className="flex justify-center py-8">
           <Spinner label={t('industry.marketOpportunitiesScanning')} />
@@ -551,7 +554,6 @@ export function MarketWideOpportunitiesPanel({
               rowMoreActions
               label={t('industry.marketOpportunitiesTitle')}
               mobileSort
-              stackActions={filtersInSortBar ? filterBar : undefined}
               {...sortProps}
             />
           </div>

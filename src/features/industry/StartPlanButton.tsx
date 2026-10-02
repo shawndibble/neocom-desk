@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, IconButton } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 
 interface StartPlanButtonProps {
   /**
@@ -8,6 +9,12 @@ interface StartPlanButtonProps {
    * new plan; false (or a rejection) means nothing opened.
    */
   onStart: () => Promise<boolean>;
+  /**
+   * An icon-only, borderless button at the row touch tier, for a phone card
+   * that has no room for the labelled button. `name` is the blueprint the
+   * accessible label names.
+   */
+  compact?: { name: string };
 }
 
 /**
@@ -18,24 +25,33 @@ interface StartPlanButtonProps {
  * when no plan opened. The pending state is the button's own, so a click
  * re-renders this button rather than the whole Opportunities tab.
  */
-export function StartPlanButton({ onStart }: StartPlanButtonProps) {
+export function StartPlanButton({ onStart, compact }: StartPlanButtonProps) {
   const { t } = useTranslation();
   const [starting, setStarting] = useState(false);
+  const start = () => {
+    setStarting(true);
+    onStart().then(
+      (navigated) => {
+        if (!navigated) setStarting(false);
+      },
+      () => setStarting(false)
+    );
+  };
+  if (compact) {
+    return (
+      <IconButton
+        variant="plain"
+        size="row"
+        icon={<Icon.AddToPlan />}
+        label={t('industry.startPlanFor', { name: compact.name })}
+        disabled={starting}
+        aria-busy={starting}
+        onClick={start}
+      />
+    );
+  }
   return (
-    <Button
-      size="sm"
-      disabled={starting}
-      aria-busy={starting}
-      onClick={() => {
-        setStarting(true);
-        onStart().then(
-          (navigated) => {
-            if (!navigated) setStarting(false);
-          },
-          () => setStarting(false)
-        );
-      }}
-    >
+    <Button size="sm" disabled={starting} aria-busy={starting} onClick={start}>
       {starting
         ? t('industry.marketOpportunitiesStartingPlan')
         : t('industry.marketOpportunitiesStartPlan')}

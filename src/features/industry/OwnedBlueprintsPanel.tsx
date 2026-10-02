@@ -30,12 +30,16 @@ import { loadBlueprintLocation } from '@/features/bpcContracts/blueprintLocation
 import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
 import { boolParam, enumParam, textParam } from '@/lib/urlState';
 import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import { useCorpOwnedBlueprints } from './corpOwnedBlueprints';
 import { numericCell } from './format';
+import { OWNED_DEFAULT_SORT, OWNED_SORT_KEY } from './opportunitiesUrl';
 import type { OpportunityRow } from './opportunities';
 import {
+  OWNED_BLUEPRINT_SORT_VALUE,
   buildOwnedBlueprintRows,
+  ownedBlueprintOwnerKey,
   filterOwnedBlueprints,
   ownedBlueprintQuantity,
   resolveBlueprintPlacement,
@@ -45,6 +49,7 @@ import {
 import { ownedBlueprintsCsvColumns } from './ownedBlueprintsCsv';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { StartPlanButton } from './StartPlanButton';
+import { MobileOwnedBlueprintList } from './MobileOwnedBlueprintList';
 
 const OWNED_BLUEPRINTS_COLUMN_IDS = [
   'kind',
@@ -67,23 +72,6 @@ const KIND_PARAM = enumParam(['all', 'bpo', 'bpc'] as const, 'all');
 const ACTIVITY_PARAM = enumParam(['all', 'manufacturing', 'reaction'] as const, 'all');
 const SEARCH_PARAM = textParam();
 const CORP_PARAM = boolParam(false);
-const OWNED_SORT_KEY = 'opps.ownedSort';
-const OWNED_DEFAULT_SORT = { columnId: 'blueprint', direction: 'asc' } as const;
-
-/** Module scope so `DataTable`'s sort memo sees stable functions (see `OpportunitiesPanel`). */
-const SORT_VALUE = {
-  blueprint: (row: OwnedBlueprintRow) => row.name,
-  kind: (row: OwnedBlueprintRow) => row.kind,
-  me: (row: OwnedBlueprintRow) => row.blueprint.material_efficiency,
-  te: (row: OwnedBlueprintRow) => row.blueprint.time_efficiency,
-  // A BPO's -1 is unlimited: the largest, not the smallest.
-  runs: (row: OwnedBlueprintRow) =>
-    row.kind === 'bpo' ? Number.MAX_SAFE_INTEGER : row.blueprint.runs,
-  quantity: (row: OwnedBlueprintRow) => ownedBlueprintQuantity(row.blueprint),
-  owner: (row: OwnedBlueprintRow) => (row.owner.kind === 'character' ? row.owner.name : ''),
-  iskPerHour: (row: OwnedBlueprintRow) => row.iskPerHour ?? undefined,
-};
-
 const ownedRowKey = (row: OwnedBlueprintRow) => row.id;
 
 const NO_ASSETS: ReadonlyMap<number, CharacterAsset> = new Map();
@@ -102,6 +90,10 @@ interface OwnedBlueprintsPanelProps {
   rankedRows: readonly OpportunityRow[];
   ownedStockSnapshot: OwnedStockSnapshot;
   loading: boolean;
+  /** Desktop's plain title; unset below `lg`, where `leading`'s view picker stands in for it. */
+  title?: string;
+  /** The phone view picker that doubles as the title (see `OpportunitiesPanel`). */
+  leading?: ReactNode;
   /** The view toggle, Character filter and data age, shared with the ranked view. */
   meta: ReactNode;
   /** Ranked pricing's progress / manual Refresh — the ISK/hour column fills from it. */
@@ -117,12 +109,15 @@ export function OwnedBlueprintsPanel({
   rankedRows,
   ownedStockSnapshot,
   loading,
+  title,
+  leading,
   meta,
   pricingActions,
   onStartPlan,
 }: OwnedBlueprintsPanelProps) {
   const { t } = useTranslation();
   const unknown = t('common.unknown');
+  const isDesktop = useIsDesktop();
 
   const [kind, setKind] = useUrlParam('opps.kind', KIND_PARAM);
   const [activity, setActivity] = useUrlParam('opps.activity', ACTIVITY_PARAM);
@@ -239,7 +234,7 @@ export function OwnedBlueprintsPanel({
       id: 'blueprint',
       header: t('industry.ownedBlueprintsBlueprint'),
       primary: true,
-      sortValue: SORT_VALUE.blueprint,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.blueprint,
       render: (row) => (
         <span className="flex flex-wrap items-center gap-1.5">
           {row.name}
@@ -254,7 +249,7 @@ export function OwnedBlueprintsPanel({
     {
       id: 'kind',
       header: t('industry.ownedBlueprintsKind'),
-      sortValue: SORT_VALUE.kind,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.kind,
       render: (row) => (
         <span className={row.kind === 'bpo' ? 'font-medium text-accent' : undefined}>
           {row.kind === 'bpo' ? t('industry.bpo') : t('industry.bpc')}
@@ -266,7 +261,7 @@ export function OwnedBlueprintsPanel({
       header: t('industry.ownedBlueprintsMe'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: SORT_VALUE.me,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.me,
       render: (row) => row.blueprint.material_efficiency,
     },
     {
@@ -274,7 +269,7 @@ export function OwnedBlueprintsPanel({
       header: t('industry.ownedBlueprintsTe'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: SORT_VALUE.te,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.te,
       render: (row) => row.blueprint.time_efficiency,
     },
     {
@@ -282,7 +277,7 @@ export function OwnedBlueprintsPanel({
       header: t('industry.runs'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: SORT_VALUE.runs,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.runs,
       render: (row) =>
         row.kind === 'bpo' ? t('industry.ownedBlueprintsUnlimitedRuns') : row.blueprint.runs,
     },
@@ -291,7 +286,7 @@ export function OwnedBlueprintsPanel({
       header: t('industry.quantity'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: SORT_VALUE.quantity,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.quantity,
       render: (row) => ownedBlueprintQuantity(row.blueprint),
     },
     {
@@ -303,7 +298,7 @@ export function OwnedBlueprintsPanel({
     {
       id: 'owner',
       header: t('industry.ownedBlueprintsOwner'),
-      sortValue: SORT_VALUE.owner,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.owner,
       render: (row) =>
         row.owner.kind === 'character' ? row.owner.name : t('industry.ownedBlueprintsCorporation'),
     },
@@ -312,7 +307,7 @@ export function OwnedBlueprintsPanel({
       header: t('industry.iskPerHour'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: SORT_VALUE.iskPerHour,
+      sortValue: OWNED_BLUEPRINT_SORT_VALUE.iskPerHour,
       cellClassName: (row) => (row.iskPerHour !== null ? iskToneClass(row.iskPerHour) : undefined),
       render: (row) =>
         numericCell(
@@ -352,8 +347,18 @@ export function OwnedBlueprintsPanel({
     columns.map((column) => column.id)
   );
 
+  const showOwner = new Set(filteredRows.map(ownedBlueprintOwnerKey)).size > 1;
+
+  const kindOptions = [
+    { value: 'all' as const, label: t('industry.ownedBlueprintsAll') },
+    { value: 'bpo' as const, label: t('industry.bpo') },
+    { value: 'bpc' as const, label: t('industry.bpc') },
+  ];
+
   const filterValue = { kind, activity, includeCorp };
-  const activeFilterCount = [kind !== 'all', activity !== 'all', includeCorp].filter(
+  // Below `lg` the kind filter sits inline above the cards, not in the sheet,
+  // so it doesn't count toward the funnel's badge there.
+  const activeFilterCount = [isDesktop && kind !== 'all', activity !== 'all', includeCorp].filter(
     Boolean
   ).length;
   function applyFilter(next: typeof filterValue) {
@@ -378,33 +383,33 @@ export function OwnedBlueprintsPanel({
         />
       }
       actions={
-        <ColumnPickerMenu
-          available={OWNED_BLUEPRINTS_COLUMN_IDS}
-          visible={visible}
-          columnsById={columnsById}
-          onToggle={toggle}
-          onReset={reset}
-          buttonLabel={t('common.columnsButton')}
-          menuTitle={t('common.columnsMenuTitle')}
-          resetLabel={t('common.resetColumns')}
-        />
+        isDesktop && (
+          <ColumnPickerMenu
+            available={OWNED_BLUEPRINTS_COLUMN_IDS}
+            visible={visible}
+            columnsById={columnsById}
+            onToggle={toggle}
+            onReset={reset}
+            buttonLabel={t('common.columnsButton')}
+            menuTitle={t('common.columnsMenuTitle')}
+            resetLabel={t('common.resetColumns')}
+          />
+        )
       }
     >
       {(draft, setDraft) => (
         <>
-          <FilterField label={t('industry.ownedBlueprintsKindFilter')} stretch={false}>
-            <SegmentedControl
-              label={t('industry.ownedBlueprintsKindFilter')}
-              size="sm"
-              value={draft.kind}
-              onChange={(next) => setDraft({ ...draft, kind: next })}
-              options={[
-                { value: 'all', label: t('industry.ownedBlueprintsAll') },
-                { value: 'bpo', label: t('industry.bpo') },
-                { value: 'bpc', label: t('industry.bpc') },
-              ]}
-            />
-          </FilterField>
+          {isDesktop && (
+            <FilterField label={t('industry.ownedBlueprintsKindFilter')} stretch={false}>
+              <SegmentedControl
+                label={t('industry.ownedBlueprintsKindFilter')}
+                size="sm"
+                value={draft.kind}
+                onChange={(next) => setDraft({ ...draft, kind: next })}
+                options={kindOptions}
+              />
+            </FilterField>
+          )}
           <FilterField label={t('industry.ownedBlueprintsActivityLabel')} stretch={false}>
             <SegmentedControl
               label={t('industry.ownedBlueprintsActivityLabel')}
@@ -435,7 +440,8 @@ export function OwnedBlueprintsPanel({
 
   return (
     <Panel
-      title={t('industry.opportunitiesTitle')}
+      title={title}
+      leading={leading}
       meta={meta}
       actions={
         <span className="flex items-center gap-2">
@@ -453,6 +459,17 @@ export function OwnedBlueprintsPanel({
       ) : (
         <>
           {filters}
+          {!isDesktop && rows.length > 0 && (
+            <div className="border-b border-line py-2">
+              <SegmentedControl
+                label={t('industry.ownedBlueprintsKindFilter')}
+                size="sm"
+                value={kind}
+                onChange={setKind}
+                options={kindOptions}
+              />
+            </div>
+          )}
           {rows.length === 0 ? (
             <EmptyState
               title={t('industry.ownedBlueprintsEmptyTitle')}
@@ -461,6 +478,13 @@ export function OwnedBlueprintsPanel({
             />
           ) : filteredRows.length === 0 ? (
             <EmptyState title={t('industry.ownedBlueprintsNoMatch')} className="py-8" />
+          ) : !isDesktop ? (
+            <MobileOwnedBlueprintList
+              rows={filteredRows}
+              locationLabel={locationLabel}
+              showOwner={showOwner}
+              onStartPlan={onStartPlan}
+            />
           ) : (
             <div className="overflow-x-auto">
               <DataTable

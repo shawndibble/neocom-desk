@@ -40,6 +40,9 @@ const hookState = vi.hoisted(() => ({
   rows: null as unknown,
 }));
 vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => hookState.isPhone }));
+// Below `md` (`useIsNarrow`) is where `FilterBar` turns into its sheet and
+// the panel moves the funnel into its title bar; the test's phone is both.
+vi.mock('@/lib/useIsNarrow', () => ({ useIsNarrow: () => hookState.isPhone }));
 // Beta sells 1 a day, Gamma 50 — once the filter asks.
 vi.mock('./useDailySales', () => ({
   useDailySales: (_ids: readonly number[], enabled: boolean) => ({
@@ -231,14 +234,19 @@ describe('MarketWideOpportunitiesPanel filters: skill gate, mid-scan, phone', ()
     }
   });
 
-  it('puts the filter button beside the sort picker on a phone', () => {
+  it("puts the filter button in the title bar beside Scan on a phone, at Scan's size", () => {
     hookState.isPhone = true;
     try {
       renderPanel();
-      const sortPicker = screen.getByRole('combobox', { name: 'Sort by' });
-      const sortBar = sortPicker.closest('label')!.parentElement!;
-      expect(within(sortBar).getByRole('button', { name: /Filters/ })).toBeInTheDocument();
+      const filters = screen.getByRole('button', { name: /Filters/ });
+      const scan = screen.getByRole('button', { name: 'Scan' });
+      const header = scan.closest('header')!;
+      expect(header).toContainElement(filters);
       expect(screen.getAllByRole('button', { name: /Filters/ })).toHaveLength(1);
+      // `IconButton size="sm"` and `Button size="sm"` share one control tier:
+      // 36px on a phone, 28px with a pointer.
+      expect(filters).toHaveClass('size-9', 'md:size-7');
+      expect(scan).toHaveClass('h-9', 'md:h-7');
     } finally {
       hookState.isPhone = false;
     }
