@@ -1254,10 +1254,16 @@ export function Settings() {
           {section === 'shortcuts' && (
             <Panel title={t('shortcuts.pasteTitle')}>
               {/* The app-wide paste router (`app/GlobalPasteRouter.tsx`). */}
-              <p className="mb-2 max-w-md text-xs text-text-dim">
-                {t('shortcuts.pasteHint', { key: pasteDisplayKey(isApplePlatform()) })}
-              </p>
+              <p className="mb-2 max-w-md text-xs text-text-dim">{t('shortcuts.pasteHint')}</p>
               <dl className="max-w-md divide-y divide-line text-xs">
+                <div className="flex items-center justify-between gap-4 py-2">
+                  <dt className="text-text-dim">{t('shortcuts.paste')}</dt>
+                  <dd>
+                    <kbd className="rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 font-mono text-[0.6875rem] text-text">
+                      {pasteDisplayKey(isApplePlatform())}
+                    </kbd>
+                  </dd>
+                </div>
                 {(['pasteFitting', 'pasteItems'] as const).map((key) => (
                   <div key={key} className="flex items-center justify-between gap-4 py-2">
                     <dt className="text-text-dim">{t(`shortcuts.${key}`)}</dt>

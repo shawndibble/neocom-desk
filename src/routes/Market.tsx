@@ -662,8 +662,9 @@ export function Market() {
   // Held here rather than inside `AppraisalPanel` so a pasted list survives a
   // trip to the Browser tab, and so the header's refresh button can drive it.
   const appraisal = useAppraisal(effectiveHub, pricePercent, activeCharacterId);
-  // A Fitting's Export menu lands here with its multibuy list to appraise.
-  // Keyed on the navigation itself so a re-render never re-submits it.
+  // A Fitting's Export menu, or a page-level paste (`app/GlobalPasteRouter.tsx`),
+  // lands here with a list to appraise. Keyed on the navigation itself so a
+  // re-render never re-submits it.
   const handledAppraiseKey = useRef<string | null>(null);
   useEffect(() => {
     const text = (location.state as Partial<MarketAppraiseState> | null)?.appraiseText;

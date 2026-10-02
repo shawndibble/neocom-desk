@@ -86,13 +86,19 @@ describe('GlobalPasteRouter', () => {
 
   it('leaves a paste into a field alone', async () => {
     renderRouter(<input aria-label="search" />);
+    const classify = vi.mocked(pasteDestinationModule.pasteDestination);
+    classify.mockClear();
     await paste(screen.getByLabelText('search'), FIT);
+    expect(classify).not.toHaveBeenCalled();
     expect(screen.getByTestId('where')).toHaveTextContent('/overview');
   });
 
   it('leaves a paste alone while a dialog is open', async () => {
     renderRouter(<div role="dialog" />);
+    const classify = vi.mocked(pasteDestinationModule.pasteDestination);
+    classify.mockClear();
     await paste(document.body, FIT);
+    expect(classify).not.toHaveBeenCalled();
     expect(screen.getByTestId('where')).toHaveTextContent('/overview');
   });
 });

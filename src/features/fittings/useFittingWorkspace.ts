@@ -102,8 +102,12 @@ export interface FittingWorkspace extends FittingEvaluation {
   lastLoad: LoadOutcome | null;
   /** Set when the open Fitting was too large to fit a Share Link. */
   tooLargeToShare: boolean;
-  /** Loads EFT text, a DNA string / chat link, an eveship.fit link, or a killmail link. */
-  loadFromInput: (text: string) => Promise<void>;
+  /**
+   * Loads EFT text, a DNA string / chat link, an eveship.fit link, or a killmail link.
+   * `replaceEntry` overwrites the current history entry instead of pushing
+   * one — for a landing that only exists to carry the text (the paste router).
+   */
+  loadFromInput: (text: string, options?: { replaceEntry?: boolean }) => Promise<void>;
   /** Resolves a Loaded fittings-XML document's entries for the picker list — opens nothing itself. */
   loadFittingXmlDocument: (document: FittingXmlDocument) => Promise<FittingXmlListItem[]>;
   /** Opens a Loaded Fitting (a fittings-file entry, an In-game Fitting) as the active one. */
@@ -162,9 +166,13 @@ export function useFittingWorkspace(): FittingWorkspace {
   // Every open or edit writes the Fitting's Share Link to the editor's own
   // path, so an open from the Start screen is a history entry Back returns
   // to. `push: false` overwrites the current entry (an edit run coalescing,
-  // a Load's drone launch). Writing the URL already showing is a no-op.
+  // a Load's drone launch). `replaceEntry` overwrites whatever entry is
+  // current, editor or not. Writing the URL already showing is a no-op.
   const setShareCode = useCallback(
-    (code: string, { push = false }: { push?: boolean } = {}) => {
+    (
+      code: string,
+      { push = false, replaceEntry = false }: { push?: boolean; replaceEntry?: boolean } = {}
+    ) => {
       const now = locationRef.current;
       if (now.pathname === FITTING_EDIT_PATH && new URLSearchParams(now.search).get('f') === code)
         return;
@@ -172,7 +180,7 @@ export function useFittingWorkspace(): FittingWorkspace {
       // anywhere else (the library, a too-large Fitting's `/ships/fittings`) it is a
       // new place, and replacing would erase the way Back.
       void navigate(fittingEditLocation(code), {
-        replace: !push && now.pathname === FITTING_EDIT_PATH,
+        replace: replaceEntry || (!push && now.pathname === FITTING_EDIT_PATH),
       });
     },
     [navigate]
@@ -307,7 +315,13 @@ export function useFittingWorkspace(): FittingWorkspace {
   // `?f=`, or — too large to link — keeps it open locally, same as a
   // too-large Load.
   const commitFitting = useCallback(
-    async (loaded: Fitting, { launchDrones: launch = false }: { launchDrones?: boolean } = {}) => {
+    async (
+      loaded: Fitting,
+      {
+        launchDrones: launch = false,
+        replaceEntry = false,
+      }: { launchDrones?: boolean; replaceEntry?: boolean } = {}
+    ) => {
       const encoded = await encodeFittingShare(fittingToShareInput(loaded));
       setTooLargeToShare(!encoded.ok);
       const current = latestFittingRef.current;
@@ -328,7 +342,7 @@ export function useFittingWorkspace(): FittingWorkspace {
         // wrongly suppressing the *next* external change's reset.
         if (encoded.payload !== shareCode)
           ownWriteRef.current = { code: encoded.payload, fitting: null };
-        setShareCode(encoded.payload, { push: true });
+        setShareCode(encoded.payload, { push: true, replaceEntry });
       } else {
         latestFittingRef.current = loaded;
         setShareError(null);
@@ -339,18 +353,18 @@ export function useFittingWorkspace(): FittingWorkspace {
   );
 
   const loadFromInput = useCallback(
-    async (text: string) => {
+    async (text: string, { replaceEntry = false }: { replaceEntry?: boolean } = {}) => {
       const outcome = await loadFittingFromText(text);
       if (outcome.kind === 'share') {
         // Opens like any other Share Link: the decode effect does the rest.
         setLastLoad(null);
-        setShareCode(outcome.code, { push: true });
+        setShareCode(outcome.code, { push: true, replaceEntry });
         return;
       }
       setLastLoad(outcome);
       if (outcome.kind === 'failed') return;
       setSavedId(null);
-      await commitFitting(outcome.fitting, { launchDrones: true });
+      await commitFitting(outcome.fitting, { launchDrones: true, replaceEntry });
     },
     [commitFitting, setShareCode]
   );

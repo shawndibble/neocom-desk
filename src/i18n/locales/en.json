@@ -6293,11 +6293,12 @@
     "enabledHint": "The keys below work anywhere outside a text field. Turn them off if you set them off by accident, for example with speech input. Stays on this device.",
     "disabledNote": "Single-key shortcuts are off. Esc still closes an open dialog. Stays on this device.",
     "pasteTitle": "Paste anywhere",
-    "pasteHint": "Press {{key}} outside a text field to open what's on your clipboard. Back returns you where you were.",
+    "pasteHint": "Outside a text field, a pasted fit or item list opens where it belongs. Back returns you where you were.",
+    "paste": "Paste",
     "pasteFitting": "EFT fitting",
     "pasteFittingOpens": "Opens in Fittings",
     "pasteItems": "Item list (inventory, cargo, contract)",
-    "pasteItemsOpens": "Opens in Appraisal"
+    "pasteItemsOpens": "Opens in the Appraisal"
   },
   "activityLog": {
     "title": "Activity Log",

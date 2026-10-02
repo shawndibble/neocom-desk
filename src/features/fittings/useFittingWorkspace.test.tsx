@@ -188,6 +188,15 @@ describe('useFittingWorkspace — the editor has its own path', () => {
     await waitFor(() => expect(view.result.current.workspace.fitting).toBeNull());
   });
 
+  it('a Load that replaces its entry overwrites the landing, so one Back leaves Fittings', async () => {
+    const view = renderAtStart();
+    await act(() =>
+      view.result.current.workspace.loadFromInput('[Rifter, Pasted]', { replaceEntry: true })
+    );
+    await waitFor(() => expect(view.result.current.location.pathname).toBe('/ships/fittings/edit'));
+    expect(view.result.current.navigationType).toBe('REPLACE');
+  });
+
   it('opening a saved Fitting lands on /ships/fittings/edit too', async () => {
     const encoded = await encodeFittingShare(fittingToShareInput(NAKED));
     if (!encoded.ok) throw new Error('encode failed');
