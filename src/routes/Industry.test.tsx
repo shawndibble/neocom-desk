@@ -697,7 +697,10 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
     await user.click(
       screen.getByRole('checkbox', { name: 'Select Mechanical Parts to compare plans' })
     );
-    await user.click(screen.getByRole('button', { name: 'Add 2 to Compare' }));
+    // Below `lg` (jsdom matches no media query) Compare lives in the phone
+    // list's bar pinned above the tab bar, not the panel header.
+    const compareBar = screen.getByRole('region', { name: 'Compare selected blueprints' });
+    await user.click(within(compareBar).getByRole('button', { name: 'Compare' }));
 
     expect(await screen.findByRole('table', { name: 'Build plan comparison' })).toBeInTheDocument();
     expect(screen.queryByText('Select at least 2 plans')).not.toBeInTheDocument();
