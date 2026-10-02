@@ -47,7 +47,7 @@ export function createLpStoresProvider({
           id: String(corp.id),
           label: corp.name,
           hint: loyaltyPoints > 0 ? balanceHint(loyaltyPoints) : undefined,
-          run: () => navigate(`/wallet/loyalty/${corp.id}`),
+          run: () => navigate(`/market/lp-store/${corp.id}`),
         };
       }
     );

@@ -49,7 +49,7 @@ describe('railGroups', () => {
         paths: ['/market', '/wallet', '/assets', '/contracts'],
       },
       { labelKey: 'nav.groups.social', paths: ['/mail', '/calendar', '/contacts'] },
-      { labelKey: 'nav.groups.intel', paths: ['/travel'] },
+      { labelKey: 'nav.groups.intel', paths: ['/travel', '/pilot-lookup'] },
     ]);
   });
 });
@@ -72,11 +72,14 @@ describe('NAV_LOCK_PATHS', () => {
         '/calendar',
         '/contracts',
         '/contacts',
-        // Overview's sub-views: the rail never draws them, `OverviewSubNav` does.
+        // Each page's sub-views, which the rail lists under the open page.
         '/clones',
         '/employment-history',
-        // Wallet's LP Store.
-        '/wallet/loyalty',
+        '/market/lp-store',
+        '/skills/plans',
+        '/skills/trained',
+        '/skills/compare',
+        '/skills/certificates',
       ].toSorted()
     );
   });

@@ -35,7 +35,7 @@ async function openPicker(user: ReturnType<typeof userEvent.setup>) {
 
 function renderPicker(corporationName: string | null = null) {
   return render(
-    <MemoryRouter initialEntries={['/wallet/loyalty']}>
+    <MemoryRouter initialEntries={['/market/lp-store']}>
       <Routes>
         <Route
           path="*"
@@ -113,7 +113,7 @@ describe('LpStorePicker', () => {
     expect(navy).toHaveAttribute('aria-selected', 'true');
     expect(box).toHaveAttribute('aria-activedescendant', navy.id);
     await user.keyboard('{Enter}');
-    expect(screen.getByTestId('path')).toHaveTextContent('/wallet/loyalty/1000120');
+    expect(screen.getByTestId('path')).toHaveTextContent('/market/lp-store/1000120');
   });
 
   it('wraps Home/End and closes on Escape', async () => {
@@ -139,7 +139,7 @@ describe('LpStorePicker', () => {
     await user.type(await openPicker(user), 'navy');
     await screen.findByRole('option', { name: 'Federation Navy' });
     await user.keyboard('{Enter}');
-    expect(screen.getByTestId('path')).toHaveTextContent('/wallet/loyalty/1000120');
+    expect(screen.getByTestId('path')).toHaveTextContent('/market/lp-store/1000120');
   });
 
   it('announces when nothing matches', async () => {
@@ -198,7 +198,7 @@ describe('LpStorePicker', () => {
     renderPicker();
     await openPicker(user);
     await user.click(await screen.findByRole('option', { name: 'CONCORD' }));
-    expect(screen.getByTestId('path')).toHaveTextContent('/wallet/loyalty/1000125');
+    expect(screen.getByTestId('path')).toHaveTextContent('/market/lp-store/1000125');
   });
 
   it('shows the open store by name on the closed select, or a prompt', () => {

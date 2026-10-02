@@ -10,7 +10,7 @@ describe('LpStoreLink', () => {
         <LpStoreLink corporationId={1000125} label="850,000 ISK + 400,000 LP (Sisters of EVE)" />
       </MemoryRouter>
     );
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/wallet/loyalty/1000125');
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/market/lp-store/1000125');
   });
 
   it('names the link after the full breakdown, so it is never announced as just "link"', () => {

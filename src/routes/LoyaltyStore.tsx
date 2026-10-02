@@ -9,7 +9,7 @@
  * assembled.
  *
  * The header's `LpStorePicker` opens any NPC corporation's store, LP or not
- * (issue #2321); `/wallet/loyalty` with no corporation is the picker's
+ * (issue #2321); `/market/lp-store` with no corporation is the picker's
  * landing state.
  */
 import {
@@ -376,7 +376,7 @@ const OFFERS_SORT = { columnId: 'iskPerLp', direction: 'desc' } as const;
 /** The picker in the page header, sized so it wraps onto its own line on a phone. */
 const PICKER_CLASS = 'w-72 max-w-full';
 
-/** `/wallet/loyalty` with no corporation chosen yet: just the picker. */
+/** `/market/lp-store` with no corporation chosen yet: just the picker. */
 function LoyaltyStoreLanding() {
   const { t } = useTranslation();
   return (
@@ -393,7 +393,7 @@ function LoyaltyStoreLanding() {
 }
 
 /**
- * The route: `/wallet/loyalty` (landing) or `/wallet/loyalty/:corporationId`.
+ * The route: `/market/lp-store` (landing) or `/market/lp-store/:corporationId`.
  * Keyed on the corporation so switching stores from the picker remounts the
  * page — no previous store's offers, selection or loaded state carried over
  * under the new store's URL.

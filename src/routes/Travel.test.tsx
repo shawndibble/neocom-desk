@@ -294,7 +294,7 @@ describe('Travel › Route Safety', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/travel/pilot');
+    expect(window.location.pathname).toBe('/pilot-lookup');
     expect(window.location.search).toBe('?pilot=42');
     expect(await screen.findByText('No kills or losses on zKillboard')).toBeInTheDocument();
   });

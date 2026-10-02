@@ -25,11 +25,10 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'across', labelKey: 'contacts.tabAcrossCharacters' },
 ]);
 
-/** Travel (issue #2328), with Thera/Turnur (#2330) and Pilot Lookup (#2331). */
+/** Travel (issue #2328), with Thera/Turnur (#2330). Pilot Lookup is its own page now. */
 export const TRAVEL_TABS = definePageTabs('/travel', [
   { id: 'route', labelKey: 'travel.routeTab' },
   { id: 'thera', labelKey: 'travel.thera.tab' },
-  { id: 'pilot', labelKey: 'travel.pilotTab' },
 ]);
 
 /**
@@ -44,7 +43,6 @@ export const SETTINGS_TABS = definePageTabs(
   '/settings',
   [
     { id: 'display', labelKey: 'settings.tabs.display' },
-    { id: 'shortcuts', labelKey: 'settings.tabs.shortcuts' },
     { id: 'permissions', labelKey: 'settings.tabs.permissions' },
     { id: 'industry', labelKey: 'settings.tabs.industry' },
     { id: 'market', labelKey: 'settings.tabs.market' },
@@ -55,13 +53,21 @@ export const SETTINGS_TABS = definePageTabs(
     { id: 'notifications', labelKey: 'settings.tabs.notifications' },
     { id: 'dataAge', labelKey: 'settings.tabs.data' },
     { id: 'activity', labelKey: 'settings.tabs.activity' },
-    { id: 'faq', labelKey: 'settings.tabs.faq' },
-    { id: 'help', labelKey: 'settings.tabs.help' },
   ],
   undefined,
   // A phone lists the sections at `/settings`; `md` up has the rail and lands on Display.
   { hiddenFrom: '(min-width: 48rem)' }
 );
+
+/**
+ * Help & FAQ, moved out of Settings (`/settings/shortcuts`, `/settings/faq` and
+ * `/settings/help` redirect here). Shortcuts first: the tab `/help` opens on.
+ */
+export const HELP_TABS = definePageTabs('/help', [
+  { id: 'shortcuts', labelKey: 'settings.help.tabShortcuts' },
+  { id: 'faq', labelKey: 'settings.help.tabFaq' },
+  { id: 'support', labelKey: 'settings.help.tabSupport' },
+]);
 
 export const PI_TABS = definePageTabs('/planetary-industry', [
   { id: 'colonies', labelKey: 'piPlan.coloniesTab' },
@@ -130,6 +136,7 @@ export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/industry': INDUSTRY_TABS,
   '/ships': SHIPS_TABS,
   '/settings': SETTINGS_TABS,
+  '/help': HELP_TABS,
   '/market': MARKET_TABS,
   '/planetary-industry': PI_TABS,
   '/mining': MINING_TABS,

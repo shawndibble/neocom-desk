@@ -25,9 +25,9 @@ const ItemDetailModal = lazy(() =>
  * `preventDefault` keeps the browser's own Ctrl+K (focus the address bar's
  * search) from firing too. Pressing it again closes the palette.
  *
- * The shortcut is the only way in: there is no on-screen trigger, by the
- * user's call, so the palette takes no room in the rail or atop a phone page.
- * Settings › Keyboard shortcuts lists the chord.
+ * Also opened from the rail's Go to button and the More sheet's search field
+ * (scope decision `20261002-145653-go-to-button-opens-the-command-palette`),
+ * through the same store. Help › Shortcuts lists the chord.
  *
  * The palette mounts only while open, so its live reads (Characters, corp
  * access) cost nothing the rest of the time and every opening starts clean.

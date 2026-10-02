@@ -75,6 +75,10 @@ export const ROUTE_REQUIREMENTS = {
   '/skills': UNGATED,
   // Device-local display preferences only — no ESI endpoint to gate on.
   '/settings': UNGATED,
+  '/settings/shortcuts': UNGATED,
+  '/settings/faq': UNGATED,
+  '/settings/help': UNGATED,
+  '/help': UNGATED,
   /**
    * The Notification Feed's own page. Reads Dexie only: the rows were written
    * by the Foreground Poller, whose *own* reads are gated per event
@@ -210,6 +214,9 @@ export const ROUTE_REQUIREMENTS = {
   // jumps, region names) and the local stargate graph, so no grant can lock
   // it. It still sits behind a signed-in Character like every route here.
   '/travel': UNGATED,
+  '/travel/pilot': UNGATED,
+  // Public ESI only, like Travel it came from.
+  '/pilot-lookup': UNGATED,
   /*
    * UNGATED, and not because it needs no scope — History needs
    * `read_character_contracts`. The page gates that scope per *tab* instead,
@@ -259,9 +266,12 @@ export const ROUTE_REQUIREMENTS = {
   // hold no LP with still works — no LP is a balance of 0, not a missing
   // grant (docs/context/decisions/, "LP Store browsing keeps the loyalty
   // scope gate"). Same reauth copy as `/wallet`'s loyalty panel — it is the
-  // same grant. `/wallet/loyalty` is the same page with no store picked yet.
-  '/wallet/loyalty': LP_STORE_REQUIREMENT,
-  '/wallet/loyalty/:corporationId': LP_STORE_REQUIREMENT,
+  // same grant. `/market/lp-store` is the same page with no store picked yet.
+  '/market/lp-store': LP_STORE_REQUIREMENT,
+  '/market/lp-store/:corporationId': LP_STORE_REQUIREMENT,
+  // Its old home under Wallet: a redirect, so it needs nothing.
+  '/wallet/loyalty': UNGATED,
+  '/wallet/loyalty/:corporationId': UNGATED,
   '/contacts': {
     endpoints: ['getCharacterContacts', 'getCharacterContactLabels', 'postUniverseNames'],
     strings: 'contacts',

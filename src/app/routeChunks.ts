@@ -126,11 +126,13 @@ export const loadCalendar = named(() => import('@/routes/Calendar'), 'Calendar')
 export const loadContracts = named(() => import('@/routes/Contracts'), 'Contracts');
 export const loadContacts = named(() => import('@/routes/Contacts'), 'Contacts');
 export const loadTravel = named(() => import('@/routes/Travel'), 'Travel');
+export const loadPilotLookup = named(() => import('@/routes/PilotLookup'), 'PilotLookup');
 export const loadEmploymentHistory = named(
   () => import('@/routes/EmploymentHistory'),
   'EmploymentHistory'
 );
 export const loadSettings = named(() => import('@/routes/Settings'), 'Settings');
+export const loadHelp = named(() => import('@/routes/Help'), 'Help');
 export const loadStyleguide = named(() => import('@/routes/Styleguide'), 'Styleguide');
 export const loadFittingShared = named(() => import('@/routes/FittingShared'), 'FittingShared');
 export const loadSharedLink = named(() => import('@/routes/SharedLink'), 'SharedLink');
@@ -161,6 +163,8 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/ships/fittings/compare': loadFittingCompare,
   '/market': loadMarket,
   '/wallet': loadWallet,
+  '/market/lp-store': loadLoyaltyStore,
+  '/market/lp-store/:corporationId': loadLoyaltyStore,
   '/wallet/loyalty': loadLoyaltyStore,
   '/wallet/loyalty/:corporationId': loadLoyaltyStore,
   '/mining': loadMoonMiningTax,
@@ -180,7 +184,13 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/bpc-contracts': loadIndustry,
   '/contacts': loadContacts,
   '/travel': loadTravel,
+  '/travel/pilot': loadPilotLookup,
+  '/pilot-lookup': loadPilotLookup,
   '/settings': loadSettings,
+  '/settings/shortcuts': loadHelp,
+  '/settings/faq': loadHelp,
+  '/settings/help': loadHelp,
+  '/help': loadHelp,
 };
 
 /**

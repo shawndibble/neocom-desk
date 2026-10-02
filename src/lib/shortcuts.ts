@@ -1,15 +1,6 @@
 import type { NavigateFunction } from 'react-router-dom';
 
 /**
- * Router `location.state` shape the "jump to search" shortcut navigates
- * `/market` with. Shared so the producer here and the consumer in
- * `routes/Market.tsx` can't silently drift apart.
- */
-export interface MarketFocusSearchState {
-  readonly focusSearch: true;
-}
-
-/**
  * Router `location.state` shape a Fitting's Export menu navigates
  * `/market/appraisal` with: the multibuy text to appraise on arrival. Shared
  * so the producer (`features/fittings`) and the consumer (`routes/Market.tsx`)
@@ -130,19 +121,11 @@ export interface ShortcutDef {
 
 /**
  * The app's global keyboard shortcuts — one source of truth consumed by
- * `app/useKeyboardShortcuts.ts` (dispatch) and `routes/Settings.tsx`
+ * `app/useKeyboardShortcuts.ts` (dispatch) and `features/help/ShortcutsPanel.tsx`
  * (discoverability list). Adding a shortcut is a data change here, not a new
  * `addEventListener` call anywhere.
  */
 export const SHORTCUTS: readonly ShortcutDef[] = [
-  {
-    id: 'jump-to-search',
-    key: '/',
-    displayKey: '/',
-    descriptionKey: 'shortcuts.jumpToSearch',
-    run: (navigate) =>
-      navigate('/market', { state: { focusSearch: true } satisfies MarketFocusSearchState }),
-  },
   {
     id: 'switch-character',
     key: 'c',
@@ -212,9 +195,9 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     displayKey: '?',
     allowsShift: true,
     descriptionKey: 'shortcuts.showShortcuts',
-    // The list this opens is the one rendered from this very array, under the
-    // Shortcuts section of Settings.
-    run: (navigate) => navigate('/settings/shortcuts'),
+    // The list this opens is the one rendered from this very array, on
+    // Help › Shortcuts.
+    run: (navigate) => navigate('/help/shortcuts'),
   },
   {
     id: 'close',

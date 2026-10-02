@@ -45,7 +45,7 @@ test('a phone sort control changes the Offers table order at 390px (issue #2174)
   await mockLoyaltyOffers(page);
   // `affordableOnly` defaults true and the fixture pilot has 0 LP, which
   // would otherwise filter both fixture offers out of `filteredRows`.
-  await signInAndGoto(page, `./wallet/loyalty/${CORPORATION_ID}?affordableOnly=0`);
+  await signInAndGoto(page, `./market/lp-store/${CORPORATION_ID}?affordableOnly=0`);
   await page.setViewportSize(PHONE);
 
   const itemCells = page.getByRole('cell').filter({ hasText: /Tritanium|Pyerite/ });
@@ -72,7 +72,7 @@ test('the phone sort control stays hidden at and above md (768px) (issue #2174)'
   page,
 }) => {
   await mockLoyaltyOffers(page);
-  await signInAndGoto(page, `./wallet/loyalty/${CORPORATION_ID}?affordableOnly=0`);
+  await signInAndGoto(page, `./market/lp-store/${CORPORATION_ID}?affordableOnly=0`);
   await page.setViewportSize(DESKTOP);
 
   const itemCells = page.getByRole('cell').filter({ hasText: /Tritanium|Pyerite/ });
@@ -105,10 +105,10 @@ test('the header corporation picker fits a 390px phone without horizontal scroll
     await page.keyboard.press('Escape');
   }
 
-  await signInAndGoto(page, './wallet/loyalty');
+  await signInAndGoto(page, './market/lp-store');
   await page.setViewportSize(PHONE);
   await expectPickerFits();
 
-  await page.goto(`./wallet/loyalty/${CORPORATION_ID}`);
+  await page.goto(`./market/lp-store/${CORPORATION_ID}`);
   await expectPickerFits();
 });

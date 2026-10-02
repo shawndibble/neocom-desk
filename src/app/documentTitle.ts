@@ -38,8 +38,10 @@ const ROUTE_TITLE_KEYS = {
   '/industry/groups/:groupId': ['nav.industry', 'industry.buildPlansTab'],
   '/market': ['nav.market'],
   '/wallet': ['nav.wallet'],
-  '/wallet/loyalty': ['nav.wallet', 'loyalty.browseStores'],
-  '/wallet/loyalty/:corporationId': ['nav.wallet', 'loyaltyStore.title'],
+  '/market/lp-store': ['nav.market', 'loyalty.browseStores'],
+  '/market/lp-store/:corporationId': ['nav.market', 'loyaltyStore.title'],
+  '/wallet/loyalty': ['nav.market', 'loyalty.browseStores'],
+  '/wallet/loyalty/:corporationId': ['nav.market', 'loyaltyStore.title'],
   '/mining': ['nav.miningTax'],
   '/clones': ['clones.title'],
   '/planetary-industry': ['pi.title'],
@@ -58,7 +60,13 @@ const ROUTE_TITLE_KEYS = {
   '/bpc-contracts': ['nav.industry'],
   '/contacts': ['contacts.title'],
   '/travel': ['travel.title'],
+  '/travel/pilot': ['nav.pilotLookup'],
+  '/pilot-lookup': ['nav.pilotLookup'],
   '/settings': ['settings.title'],
+  '/settings/shortcuts': ['nav.help'],
+  '/settings/faq': ['nav.help'],
+  '/settings/help': ['nav.help'],
+  '/help': ['nav.help'],
 } satisfies Record<AppRoutePath, readonly string[]>;
 
 /** Routes outside the Layout; an empty list titles as the app alone. */

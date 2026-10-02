@@ -76,7 +76,7 @@ import {
 } from '@/engine/market/orderBook';
 import { ALL_REGIONS } from '@/engine/market/locationMode';
 import type { RegionOrder } from '@/esi/endpoints';
-import type { MarketAppraiseState, MarketFocusSearchState } from '@/lib/shortcuts';
+import type { MarketAppraiseState } from '@/lib/shortcuts';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -642,14 +642,6 @@ export function Market() {
     itemTab,
     setItemTab,
   } = useMarketBrowser({ groups, types, marketRegions, groupsById });
-
-  // The "jump to search" shortcut (`lib/shortcuts.ts`) navigates here with
-  // this state to focus the box in one step, from anywhere in the app.
-  useEffect(() => {
-    if ((location.state as Partial<MarketFocusSearchState> | null)?.focusSearch) {
-      searchInputRef.current?.focus();
-    }
-  }, [location.state]);
 
   // Focus management for the finder <-> item panel swap below the `lg:`
   // breakpoint (issue #1485): selecting an item hides the finder and shows

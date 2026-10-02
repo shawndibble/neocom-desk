@@ -24,7 +24,7 @@
  * exported backup file (issue #789) — the one case that is not automatic:
  * it only happens when the pilot presses the button, and the file (including
  * sign-in tokens) goes wherever they choose to put it, not to us. Each is
- * stated in {@link WHAT_WE_STORE_NOTES} rather than buried.
+ * stated in the FAQ's own answers (`FaqPanel.tsx`, `settings.faq.store.notes.*`) rather than buried.
  */
 
 import type { SyncedFaqItemId } from '@/sync/syncedCollections';
@@ -34,6 +34,12 @@ export interface WhatWeStoreItem {
   id: string;
   labelKey: string;
   noteKey?: string;
+  /**
+   * Sub-bullets under the label, one per area, for a line that covers too much
+   * to read as one sentence (the synced preferences) — skimmable, where a
+   * single run-on note was not.
+   */
+  detailKeys?: readonly string[];
 }
 
 /**
@@ -88,7 +94,17 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
       {
         id: 'settings',
         labelKey: 'settings.faq.store.synced.settings',
-        noteKey: 'settings.faq.store.synced.settingsNote',
+        detailKeys: [
+          'settings.faq.store.synced.settingsDetail.notifications',
+          'settings.faq.store.synced.settingsDetail.defaults',
+          'settings.faq.store.synced.settingsDetail.industry',
+          'settings.faq.store.synced.settingsDetail.market',
+          'settings.faq.store.synced.settingsDetail.skills',
+          'settings.faq.store.synced.settingsDetail.fittings',
+          'settings.faq.store.synced.settingsDetail.pi',
+          'settings.faq.store.synced.settingsDetail.layout',
+          'settings.faq.store.synced.settingsDetail.travel',
+        ],
       },
     ] satisfies readonly SyncedWhatWeStoreItem[],
   },
@@ -109,16 +125,4 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
       { id: 'preferences', labelKey: 'settings.faq.store.local.preferences' },
     ],
   },
-];
-
-/**
- * The four "yes, but" cases, stated plainly under the groups above rather
- * than folded into them: each is a real exception a careful reader would
- * otherwise catch us omitting.
- */
-export const WHAT_WE_STORE_NOTES: readonly string[] = [
-  'settings.faq.store.notes.push',
-  'settings.faq.store.notes.crashes',
-  'settings.faq.store.notes.removal',
-  'settings.faq.store.notes.export',
 ];

@@ -27,14 +27,15 @@
  * specifiers below are unchanged; only where they come from is. `eslint`'s
  * `no-restricted-imports` rule keeps the barrel from creeping back.
  */
+import { AddressBook } from '@phosphor-icons/react/dist/csr/AddressBook';
 import { ArrowBendUpLeft } from '@phosphor-icons/react/dist/csr/ArrowBendUpLeft';
 import { ArrowBendUpRight } from '@phosphor-icons/react/dist/csr/ArrowBendUpRight';
 import { ArrowClockwise } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
 import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
 import { ArrowDown } from '@phosphor-icons/react/dist/csr/ArrowDown';
-import { ArrowUp } from '@phosphor-icons/react/dist/csr/ArrowUp';
 import { ArrowsDownUp } from '@phosphor-icons/react/dist/csr/ArrowsDownUp';
 import { ArrowsLeftRight } from '@phosphor-icons/react/dist/csr/ArrowsLeftRight';
+import { ArrowUp } from '@phosphor-icons/react/dist/csr/ArrowUp';
 import { Bell } from '@phosphor-icons/react/dist/csr/Bell';
 import { BellSlash } from '@phosphor-icons/react/dist/csr/BellSlash';
 import { BlueprintIcon } from '@phosphor-icons/react/dist/csr/Blueprint';
@@ -52,11 +53,14 @@ import { Check } from '@phosphor-icons/react/dist/csr/Check';
 import { CheckCircle } from '@phosphor-icons/react/dist/csr/CheckCircle';
 import { Checks } from '@phosphor-icons/react/dist/csr/Checks';
 import { Clipboard } from '@phosphor-icons/react/dist/csr/Clipboard';
+import { ClockCounterClockwise } from '@phosphor-icons/react/dist/csr/ClockCounterClockwise';
 import { CloudSlash } from '@phosphor-icons/react/dist/csr/CloudSlash';
 import { Code } from '@phosphor-icons/react/dist/csr/Code';
 import { Columns as ColumnsGlyph } from '@phosphor-icons/react/dist/csr/Columns';
 import { Copy } from '@phosphor-icons/react/dist/csr/Copy';
+import { Diamond } from '@phosphor-icons/react/dist/csr/Diamond';
 import { DotsSixVertical } from '@phosphor-icons/react/dist/csr/DotsSixVertical';
+import { DotsThree } from '@phosphor-icons/react/dist/csr/DotsThree';
 import { DotsThreeVertical } from '@phosphor-icons/react/dist/csr/DotsThreeVertical';
 import { DownloadSimple } from '@phosphor-icons/react/dist/csr/DownloadSimple';
 import { EnvelopeSimple } from '@phosphor-icons/react/dist/csr/EnvelopeSimple';
@@ -71,13 +75,16 @@ import { FolderSimple } from '@phosphor-icons/react/dist/csr/FolderSimple';
 import { Funnel } from '@phosphor-icons/react/dist/csr/Funnel';
 import { Gauge } from '@phosphor-icons/react/dist/csr/Gauge';
 import { Gear } from '@phosphor-icons/react/dist/csr/Gear';
+import { GearSix } from '@phosphor-icons/react/dist/csr/GearSix';
 import { GraduationCap } from '@phosphor-icons/react/dist/csr/GraduationCap';
 import { Hammer } from '@phosphor-icons/react/dist/csr/Hammer';
+import { Handshake } from '@phosphor-icons/react/dist/csr/Handshake';
 import { Info as InfoGlyph } from '@phosphor-icons/react/dist/csr/Info';
 import { ListBullets } from '@phosphor-icons/react/dist/csr/ListBullets';
 import { LockKey } from '@phosphor-icons/react/dist/csr/LockKey';
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
 import { MapPin } from '@phosphor-icons/react/dist/csr/MapPin';
+import { MapTrifold } from '@phosphor-icons/react/dist/csr/MapTrifold';
 import { Minus } from '@phosphor-icons/react/dist/csr/Minus';
 import { Moon } from '@phosphor-icons/react/dist/csr/Moon';
 import { Package } from '@phosphor-icons/react/dist/csr/Package';
@@ -87,9 +94,11 @@ import { Planet } from '@phosphor-icons/react/dist/csr/Planet';
 import { Play } from '@phosphor-icons/react/dist/csr/Play';
 import { Plus } from '@phosphor-icons/react/dist/csr/Plus';
 import { Prohibit } from '@phosphor-icons/react/dist/csr/Prohibit';
+import { Question } from '@phosphor-icons/react/dist/csr/Question';
 import { Queue } from '@phosphor-icons/react/dist/csr/Queue';
 import { Receipt } from '@phosphor-icons/react/dist/csr/Receipt';
 import { Rocket } from '@phosphor-icons/react/dist/csr/Rocket';
+import { RocketLaunch } from '@phosphor-icons/react/dist/csr/RocketLaunch';
 import { Scales } from '@phosphor-icons/react/dist/csr/Scales';
 import { ShareNetwork } from '@phosphor-icons/react/dist/csr/ShareNetwork';
 import { ShieldCheck } from '@phosphor-icons/react/dist/csr/ShieldCheck';
@@ -103,8 +112,9 @@ import { Table as TableGlyph } from '@phosphor-icons/react/dist/csr/Table';
 import { Target } from '@phosphor-icons/react/dist/csr/Target';
 import { TextAa } from '@phosphor-icons/react/dist/csr/TextAa';
 import { Tray } from '@phosphor-icons/react/dist/csr/Tray';
-import { UsersFour } from '@phosphor-icons/react/dist/csr/UsersFour';
+import { UserFocus } from '@phosphor-icons/react/dist/csr/UserFocus';
 import { UserPlus } from '@phosphor-icons/react/dist/csr/UserPlus';
+import { UsersFour } from '@phosphor-icons/react/dist/csr/UsersFour';
 import { UsersThree } from '@phosphor-icons/react/dist/csr/UsersThree';
 import { Wallet as WalletGlyph } from '@phosphor-icons/react/dist/csr/Wallet';
 import { Warning } from '@phosphor-icons/react/dist/csr/Warning';
@@ -386,3 +396,38 @@ export const CardsView = withWeight(SquaresFour);
 export const TableView = withWeight(TableGlyph);
 /** Opens the column-visibility picker for a table. */
 export const ColumnsPicker = withWeight(ColumnsGlyph);
+
+/*
+ * The nav's page glyphs (`app/navIcons.ts`): one per destination, shown beside
+ * its label in the rail and on its More-sheet tile.
+ */
+export const NavOverview = withWeight(SquaresFour);
+export const NavAlerts = withWeight(Bell);
+export const NavCorp = withWeight(Buildings);
+export const NavSkills = withWeight(GraduationCap);
+export const NavIndustry = withWeight(Factory);
+export const NavShips = withWeight(RocketLaunch);
+export const NavMining = withWeight(Diamond);
+export const NavPlanetaryIndustry = withWeight(Planet);
+export const NavMarket = withWeight(ChartLineUp);
+export const NavWallet = withWeight(WalletGlyph);
+export const NavAssets = withWeight(Package);
+export const NavContracts = withWeight(Handshake);
+export const NavMail = withWeight(EnvelopeSimple);
+export const NavCalendar = withWeight(CalendarBlank);
+export const NavContacts = withWeight(AddressBook);
+export const NavTravel = withWeight(MapTrifold);
+export const NavPilotLookup = withWeight(UserFocus);
+export const NavSettings = withWeight(GearSix);
+export const NavHelp = withWeight(Question);
+export const NavCharacters = withWeight(UsersThree);
+/** The rail's Go to button: a caret, not a magnifier, so it never reads as the page's own search. */
+export const GoTo = withWeight(CaretRight);
+/** The phone tab bar's More button. */
+export const NavMore = withWeight(DotsThree);
+/** A place visited recently — the More sheet's Recent row. */
+export const Recent = withWeight(ClockCounterClockwise);
+/** Shown in the rail and the More sheet (the rail editor's toggle, on). */
+export const NavShown = withWeight(Eye);
+/** Hidden from the rail and the More sheet (the rail editor's toggle, off). */
+export const NavHidden = withWeight(EyeSlash);

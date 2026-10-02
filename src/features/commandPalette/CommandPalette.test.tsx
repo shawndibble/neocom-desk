@@ -5,7 +5,6 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
 import { CommandPaletteHost } from './CommandPaletteHost';
@@ -118,8 +117,7 @@ afterEach(() => {
 });
 
 describe('CommandPalette', () => {
-  it('opens on Ctrl+K from inside a text field, even with single-key shortcuts off', async () => {
-    useSingleKeyShortcuts.setState({ value: false, hydrated: true });
+  it('opens on Ctrl+K from inside a text field', async () => {
     const user = userEvent.setup();
     renderShell();
     const pageSearch = screen.getByRole('textbox', { name: 'Page search' });
@@ -367,7 +365,7 @@ describe('CommandPalette', () => {
       const option = await within(stores).findByRole('option', { name: 'Sisters of EVE' });
       expect(option).toHaveAttribute('aria-selected', 'true');
       await user.keyboard('{Enter}');
-      expect(screen.getByTestId('where')).toHaveTextContent('/wallet/loyalty/1000130');
+      expect(screen.getByTestId('where')).toHaveTextContent('/market/lp-store/1000130');
     });
 
     it('shows the balance only for a corp the active Character holds LP with', async () => {

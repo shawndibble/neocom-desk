@@ -19,7 +19,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
     id: 'app',
     labelKey: 'settings.groups.app',
-    sections: ['display', 'shortcuts', 'permissions'],
+    sections: ['display', 'permissions'],
   },
   {
     id: 'defaults',
@@ -30,7 +30,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
     id: 'data',
     labelKey: 'settings.groups.data',
-    sections: ['dataAge', 'activity', 'faq', 'help'],
+    sections: ['dataAge', 'activity'],
   },
 ];
 

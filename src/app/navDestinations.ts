@@ -140,6 +140,13 @@ export const NAV_PAGES = [
     group: 'progression',
     gating: 'scope',
     mobileTab: true,
+    // Routes of their own (`SkillsSubNav`); `/skills` itself redirects to Plans.
+    subViews: [
+      { path: '/skills/plans', labelKey: 'skills.plansTab' },
+      { path: '/skills/trained', labelKey: 'skills.trainedTab' },
+      { path: '/skills/compare', labelKey: 'skills.compareTab' },
+      { path: '/skills/certificates', labelKey: 'skills.certificatesTab' },
+    ],
   },
   {
     path: '/industry',
@@ -167,7 +174,18 @@ export const NAV_PAGES = [
    * Leads Economy: it is the one economy view that answers a question before
    * you own anything, and the only one here that isn't Character-scoped.
    */
-  { path: '/market', labelKey: 'nav.market', group: 'economy', gating: 'scope', mobileTab: true },
+  {
+    path: '/market',
+    labelKey: 'nav.market',
+    group: 'economy',
+    gating: 'scope',
+    mobileTab: true,
+    // Shopping an LP store is a market errand; the balances stay on Wallet
+    // (scope decision `20261002-145653-lp-store-under-market-pilot-lookup-its-own`).
+    subViews: [
+      { path: '/market/lp-store', labelKey: 'loyaltyStore.title', searchKeys: ['loyalty.title'] },
+    ],
+  },
   {
     path: '/wallet',
     labelKey: 'nav.wallet',
@@ -176,9 +194,6 @@ export const NAV_PAGES = [
     mobileTab: true,
     // Sends an old link on to Market › Transactions (`WALLET_TABS`).
     aliasTabs: ['transactions'],
-    subViews: [
-      { path: '/wallet/loyalty', labelKey: 'loyaltyStore.title', searchKeys: ['loyalty.title'] },
-    ],
   },
   { path: '/assets', labelKey: 'nav.assets', group: 'economy', gating: 'scope', mobileTab: true },
   {
@@ -213,6 +228,29 @@ export const NAV_PAGES = [
     group: 'intel',
     gating: 'ungated',
     mobileTab: true,
+  },
+  /*
+   * Its own page, not a Travel tab: "who is this pilot" is not a travel
+   * question, and the Intel heading no longer sits over a single item.
+   */
+  {
+    path: '/pilot-lookup',
+    labelKey: 'nav.pilotLookup',
+    group: 'intel',
+    gating: 'ungated',
+    mobileTab: true,
+  },
+  /*
+   * Help is not a setting: FAQ and Support left Settings for this footer page.
+   * Like Settings, it keeps a permanent row in the More sheet rather than a
+   * bar slot.
+   */
+  {
+    path: '/help',
+    labelKey: 'nav.help',
+    group: 'footer',
+    gating: 'ungated',
+    mobileTab: false,
   },
   {
     path: '/settings',

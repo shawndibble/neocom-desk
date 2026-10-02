@@ -458,7 +458,9 @@ describe('Skills opens on Plans', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(await screen.findByRole('link', { name: 'Trained' }));
+    // The sub-nav's own link: the rail lists Skills › Trained too.
+    const subNav = await screen.findByRole('navigation', { name: 'Skills' });
+    await user.click(within(subNav).getByRole('link', { name: 'Trained' }));
     await waitFor(() => expect(window.location.pathname).toBe('/skills/trained'));
   });
 });

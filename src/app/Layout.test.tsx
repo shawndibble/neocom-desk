@@ -11,7 +11,6 @@ import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
 import { useCorpAccess, type CorpAccessState } from '@/features/corp/useCorpAccess';
 import { DEFAULT_MOBILE_TABS, useMobileTabs } from '@/lib/mobileTabs';
 import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
-import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { Layout } from './Layout';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
@@ -92,10 +91,11 @@ function renderLayoutWithRoutes(initialEntry = '/overview') {
           />
           <Route path="/market" element={<div>market page</div>} />
           <Route path="/characters" element={<CharactersPageStub />} />
-          {/* `/*`: Settings' tabs are real path segments now (ADR 0015), so the
-              `?` shortcut's `/settings/shortcuts` target has to match
-              this route too, not just the bare page path. */}
+          {/* `/*`: Settings' tabs are real path segments (ADR 0015), so `,`'s
+              target has to match this route too, not just the bare path. */}
           <Route path="/settings/*" element={<div>settings page</div>} />
+          {/* `?` lands on Help › Shortcuts. */}
+          <Route path="/help/*" element={<div>help page</div>} />
         </Route>
       </Routes>
     </MemoryRouter>
@@ -116,7 +116,6 @@ beforeEach(async () => {
   await db.characters.clear();
   // Module-scope singleton: a bar chosen by one test must not reach the next.
   useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: true });
-  useSingleKeyShortcuts.setState({ value: true, hydrated: true });
 });
 
 describe('Layout sync status dot', () => {
@@ -207,7 +206,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     }
   });
 
-  it('trails with a divider, then Settings and the active Character (with photo)', async () => {
+  it('trails with Help, Settings and the active Character (with photo), after the page tiles', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     await db.characters.put({
       characterId: CHARACTER_ID,
@@ -224,8 +223,8 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     const sheet = screen.getByRole('dialog', { name: 'More' });
 
     const contacts = within(sheet).getByRole('link', { name: 'Contacts' });
-    const divider = within(sheet).getByRole('separator');
     const settings = await within(sheet).findByRole('link', { name: 'Settings' });
+    const help = within(sheet).getByRole('link', { name: 'Help & FAQ' });
     const character = within(sheet).getByRole('link', { name: 'Pilot One' });
 
     expect(settings).toHaveAttribute('href', '/settings');
@@ -234,13 +233,9 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     // submenu to expand.
     expect(within(sheet).queryByRole('button', { name: 'Pilot One' })).not.toBeInTheDocument();
 
-    // Reading order: ..., Contacts, divider, Settings, Character.
-    expect(
-      contacts.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
-    expect(
-      divider.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+    // Reading order: ..., Contacts, Help, Settings, Character — the rail's order.
+    expect(contacts.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(help.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(
       settings.compareDocumentPosition(character) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
@@ -410,10 +405,16 @@ describe('Layout desktop rail domain grouping', () => {
     mockIsSyncConfigured.mockReturnValue(false);
     renderLayout();
 
-    const rail = screen.getAllByRole('navigation')[0];
-    const items = Array.from(rail.children).map((el) =>
-      el.tagName === 'P' ? `[${el.textContent}]` : el.textContent
-    );
+    const rail = screen.getByRole('navigation', { name: 'Main navigation' });
+    // A page row is its link (the caret beside it is a button); the last child
+    // is the rail editor's button, not a page.
+    const items = Array.from(rail.children)
+      .filter((el) => el.tagName !== 'BUTTON')
+      .map((el) =>
+        el.tagName === 'P'
+          ? `[${el.textContent}]`
+          : within(el as HTMLElement).getAllByRole('link')[0].textContent
+      );
     expect(items).toEqual([
       'Overview',
       // Directly under Overview rather than in Social: an alert is what the
@@ -440,6 +441,7 @@ describe('Layout desktop rail domain grouping', () => {
       'Contacts',
       '[Intel]',
       'Travel',
+      'Pilot Lookup',
     ]);
   });
 
@@ -505,15 +507,6 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     mockIsSyncConfigured.mockReturnValue(false);
   });
 
-  it('"/" jumps to Market', async () => {
-    const user = userEvent.setup();
-    renderLayoutWithRoutes();
-    await screen.findByText('overview page');
-
-    await user.keyboard('/');
-    expect(await screen.findByText('market page')).toBeInTheDocument();
-  });
-
   it('"c" switches character', async () => {
     const user = userEvent.setup();
     renderLayoutWithRoutes();
@@ -541,19 +534,6 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     expect(await screen.findByText('settings page')).toBeInTheDocument();
   });
 
-  it('fires none of the single-key shortcuts once they are turned off (issue #1494)', async () => {
-    useSingleKeyShortcuts.setState({ value: false, hydrated: true });
-    const user = userEvent.setup();
-    renderLayoutWithRoutes();
-    await screen.findByText('overview page');
-
-    await user.keyboard('/c,{Shift>}?{/Shift}');
-    expect(screen.getByText('overview page')).toBeInTheDocument();
-    expect(screen.queryByText('market page')).not.toBeInTheDocument();
-    expect(screen.queryByText('characters page')).not.toBeInTheDocument();
-    expect(screen.queryByText('settings page')).not.toBeInTheDocument();
-  });
-
   it('does not fire while the user is typing in an input', async () => {
     const user = userEvent.setup();
     renderLayoutWithRoutes();
@@ -569,7 +549,7 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     renderLayoutWithRoutes();
     await screen.findByText('overview page');
 
-    await user.keyboard('{Control>}/{/Control}');
+    await user.keyboard('{Control>}m{/Control}');
     expect(screen.queryByText('market page')).not.toBeInTheDocument();
   });
 
@@ -582,7 +562,7 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     // entry for '?', so a bare press dispatches `shiftKey: false` and would
     // pass even with `allowsShift` deleted — testing nothing.
     await user.keyboard('{Shift>}?{/Shift}');
-    expect(await screen.findByText('settings page')).toBeInTheDocument();
+    expect(await screen.findByText('help page')).toBeInTheDocument();
   });
 
   it('does not turn a capital letter into a shortcut', async () => {

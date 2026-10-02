@@ -1,7 +1,8 @@
 /**
  * Command Palette smoke (#2318): Ctrl+K opens it over a signed-in page, a
- * search finds a tab, Enter navigates there. The shortcut is the only way in:
- * no on-screen trigger shows, on desktop or phone.
+ * search finds a tab, Enter navigates there. The rail's Go to button and the
+ * phone's More-sheet search open it too (scope decision
+ * `20261002-145653-go-to-button-opens-the-command-palette`).
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
@@ -52,18 +53,27 @@ test('Escape closes the palette even with text typed', async ({ page }) => {
   await expect(input).toBeHidden();
 });
 
-for (const viewport of [
-  { width: 1280, height: 800 },
-  { width: 390, height: 844 },
-]) {
-  test(`no palette trigger shows at ${viewport.width}px`, async ({ page }) => {
-    await page.setViewportSize(viewport);
-    await signInAndGoto(page, './overview');
-    await expect(page.getByRole('link', { name: 'Overview' }).first()).toBeAttached();
-    // Neither the old "Search" row nor any other opener advertising the chord.
-    await expect(page.getByRole('button', { name: /^Search/ })).toHaveCount(0);
-    await expect(
-      page.locator('[aria-keyshortcuts="Control+K"], [aria-keyshortcuts="Meta+K"]')
-    ).toHaveCount(0);
-  });
-}
+test('the rail’s Go to button opens the palette', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await signInAndGoto(page, './overview');
+  await shellReady(page);
+
+  await page.getByRole('button', { name: /go to/i }).click();
+  await expect(page.getByRole('combobox')).toBeFocused();
+});
+
+test('the phone’s More sheet search opens the palette', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signInAndGoto(page, './overview');
+
+  await page
+    .getByRole('navigation', { name: 'Mobile navigation' })
+    .getByRole('button', { name: 'More' })
+    .click();
+  await page
+    .getByRole('dialog', { name: 'More' })
+    .getByRole('button', { name: /search pages, items, pilots/i })
+    .click();
+  await expect(page.getByRole('dialog', { name: 'More' })).toBeHidden();
+  await expect(page.getByRole('combobox')).toBeFocused();
+});

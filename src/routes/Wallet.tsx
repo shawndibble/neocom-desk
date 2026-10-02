@@ -321,7 +321,7 @@ export function Wallet() {
         // it leads to the LP Store. DataTable ignores row clicks that land on
         // a link, so the two never double-navigate.
         render: (entry) => (
-          <Link to={`/wallet/loyalty/${entry.corporation_id}`} className="hover:text-accent">
+          <Link to={`/market/lp-store/${entry.corporation_id}`} className="hover:text-accent">
             {corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
           </Link>
         ),
@@ -708,7 +708,7 @@ export function Wallet() {
                 sort={loyaltySortProps.sort}
                 onSortChange={loyaltySortProps.onSortChange}
                 responsive="table"
-                onRowClick={(entry) => navigate(`/wallet/loyalty/${entry.corporation_id}`)}
+                onRowClick={(entry) => navigate(`/market/lp-store/${entry.corporation_id}`)}
                 rowMoreActions
                 rowContextMenu={(entry, tr) => (
                   <CorpHistoryContextMenu
@@ -716,7 +716,7 @@ export function Wallet() {
                     name={corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
                     leadingItems={
                       <MenuItem
-                        onSelect={() => navigate(`/wallet/loyalty/${entry.corporation_id}`)}
+                        onSelect={() => navigate(`/market/lp-store/${entry.corporation_id}`)}
                       >
                         {t('loyalty.openStore')}
                       </MenuItem>

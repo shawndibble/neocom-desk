@@ -35,6 +35,8 @@ import { TabRoute } from './TabRoute';
 import { PAGE_TABS, routePatternFor } from './pageTabs';
 import { AuthFailureRedirect } from './AuthFailureNotice';
 import { LegacyShipsRedirect } from '@/features/fittings/LegacyShipsRedirect';
+import { LegacyPathRedirect } from './LegacyPathRedirect';
+import { useHiddenNav, useRecentNav } from './navPreferences';
 import { PublicInfoModal } from '@/components/PublicInfoModal';
 import { SkillDetailModal } from '@/components/SkillDetailModal';
 import { getAccessTokenReportingFailures } from './tokenProvider';
@@ -43,7 +45,6 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale } from '@/lib/fontScale';
 import { useTimeFormat } from '@/lib/timeFormat';
 import { useMobileTabs } from '@/lib/mobileTabs';
-import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 
 // Wire authenticated ESI calls to stored tokens once, at module load. Wrapped
 // (tokenProvider.ts) so a dead refresh grant is reported centrally instead of
@@ -87,8 +88,10 @@ const Calendar = lazy(routeChunks.loadCalendar);
 const Contracts = lazy(routeChunks.loadContracts);
 const Contacts = lazy(routeChunks.loadContacts);
 const Travel = lazy(routeChunks.loadTravel);
+const PilotLookup = lazy(routeChunks.loadPilotLookup);
 const EmploymentHistory = lazy(routeChunks.loadEmploymentHistory);
 const Settings = lazy(routeChunks.loadSettings);
+const Help = lazy(routeChunks.loadHelp);
 const Styleguide = lazy(routeChunks.loadStyleguide);
 const FittingShared = lazy(routeChunks.loadFittingShared);
 const SharedLink = lazy(routeChunks.loadSharedLink);
@@ -169,9 +172,12 @@ const ROUTE_ELEMENTS = {
   // copied is `/fittings?f=`, so these redirects are for good.
   '/fittings/*': <LegacyShipsRedirect />,
   '/market': <Market />,
+  // LP Store moved from Wallet to Market; the old paths redirect for good.
+  '/market/lp-store': <LoyaltyStore />,
+  '/market/lp-store/:corporationId': <LoyaltyStore />,
   '/wallet': <Wallet />,
-  '/wallet/loyalty': <LoyaltyStore />,
-  '/wallet/loyalty/:corporationId': <LoyaltyStore />,
+  '/wallet/loyalty': <LegacyPathRedirect />,
+  '/wallet/loyalty/:corporationId': <LegacyPathRedirect />,
   '/mining': <MoonMiningTax />,
   '/clones': <Clones />,
   '/planetary-industry': <PlanetaryIndustry />,
@@ -191,7 +197,15 @@ const ROUTE_ELEMENTS = {
   '/bpc-contracts': <Navigate to={industryTabHref('sourcing')} replace />,
   '/contacts': <Contacts />,
   '/travel': <Travel />,
+  // Pilot Lookup was a Travel tab; the old path redirects for good.
+  '/travel/pilot': <LegacyPathRedirect />,
+  '/pilot-lookup': <PilotLookup />,
   '/settings': <Settings />,
+  // Shortcuts, FAQ and Help left Settings for their own page; the old paths redirect for good.
+  '/settings/shortcuts': <LegacyPathRedirect />,
+  '/settings/faq': <LegacyPathRedirect />,
+  '/settings/help': <LegacyPathRedirect />,
+  '/help': <Help />,
 } satisfies Record<AppRoutePath, ReactElement>;
 
 // `Object.entries` widens the key back to `string`; the union is the point.
@@ -254,12 +268,13 @@ export function App() {
     void hydrateMobileTabs();
   }, [hydrateMobileTabs]);
 
-  // The shortcut listener in `Layout` reads the off switch on every route; a
-  // pilot who turned them off must not get a live "c" on a cold load.
-  const hydrateSingleKeyShortcuts = useSingleKeyShortcuts((state) => state.hydrate);
+  // The rail's and More sheet's hidden pages and Recent row: same reason.
+  const hydrateHiddenNav = useHiddenNav((state) => state.hydrate);
+  const hydrateRecentNav = useRecentNav((state) => state.hydrate);
   useEffect(() => {
-    void hydrateSingleKeyShortcuts();
-  }, [hydrateSingleKeyShortcuts]);
+    void hydrateHiddenNav();
+    void hydrateRecentNav();
+  }, [hydrateHiddenNav, hydrateRecentNav]);
 
   // `esi` publishes auth failures; the store is subscribed here so `esi` keeps
   // no dependency on `src/stores` (docs/ARCHITECTURE.md §2).

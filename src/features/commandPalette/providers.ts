@@ -75,7 +75,7 @@ export const PALETTE_COMMANDS: readonly PaletteCommand[] = [
   {
     id: 'keyboard-shortcuts',
     labelKey: 'commandPalette.commands.keyboardShortcuts',
-    run: ({ navigate }) => navigate('/settings/shortcuts'),
+    run: ({ navigate }) => navigate('/help/shortcuts'),
   },
   {
     id: 'add-character',

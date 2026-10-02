@@ -32,7 +32,7 @@ describe('createLpStoresProvider', () => {
     const results = await search(p, 'sisters');
     expect(results.map((r) => r.label)).toEqual(['Sisters of EVE']);
     results[0].run();
-    expect(navigate).toHaveBeenCalledWith('/wallet/loyalty/1000130');
+    expect(navigate).toHaveBeenCalledWith('/market/lp-store/1000130');
   });
 
   it('is its own group after the synchronous ones, and needs a typed query', () => {

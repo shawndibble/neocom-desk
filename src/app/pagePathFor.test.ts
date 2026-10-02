@@ -14,7 +14,7 @@ describe('pagePathFor', () => {
 
   it('collapses a param route to its pattern, not the raw id', () => {
     expect(pagePathFor('/skills/plans/abc123')).toBe('/skills/plans/:planId');
-    expect(pagePathFor('/wallet/loyalty/98000001')).toBe('/wallet/loyalty/:corporationId');
+    expect(pagePathFor('/market/lp-store/98000001')).toBe('/market/lp-store/:corporationId');
   });
 
   it('reports a tabbed page’s declared tab as its own path', () => {

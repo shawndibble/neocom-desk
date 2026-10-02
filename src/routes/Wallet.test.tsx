@@ -130,7 +130,7 @@ describe('Wallet', () => {
     // reaches the LP Store by name.
     expect(screen.getByRole('link', { name: 'Caldari Navy' })).toHaveAttribute(
       'href',
-      '/wallet/loyalty/1000167'
+      '/market/lp-store/1000167'
     );
   });
 

@@ -41,7 +41,7 @@ const DESTINATIONS: NavDestination[] = [
   }),
   destination({ path: '/assets', label: 'Assets', breadcrumb: 'Assets', locked: true }),
   destination({
-    path: '/wallet/loyalty',
+    path: '/market/lp-store',
     kind: 'tab',
     label: 'LP Store',
     breadcrumb: 'Wallet › LP Store',
@@ -124,7 +124,7 @@ describe('createCommandsProvider', () => {
     runFirst('settings');
     expect(navigate).toHaveBeenLastCalledWith('/settings');
     runFirst('keyboard');
-    expect(navigate).toHaveBeenLastCalledWith('/settings/shortcuts');
+    expect(navigate).toHaveBeenLastCalledWith('/help/shortcuts');
     runFirst('notification');
     expect(navigate).toHaveBeenLastCalledWith('/alerts');
     runFirst('add char');
