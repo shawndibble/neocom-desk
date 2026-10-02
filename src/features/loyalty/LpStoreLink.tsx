@@ -1,5 +1,5 @@
 /**
- * A compact link to one corp's LP Store page (`/wallet/loyalty/:corporationId`,
+ * A compact link to one corp's LP Store page (`/market/lp-store/:corporationId`,
  * `routes/LoyaltyStore.tsx`) — icon-only so it fits beside an already-tight
  * ISK figure at any width, the way `IconButton` does for an action. This is
  * a real navigation, not an action, so it renders a `Link` styled to match
@@ -23,7 +23,7 @@ export function LpStoreLink({ corporationId, label }: LpStoreLinkProps) {
   return (
     <Tooltip content={label}>
       <Link
-        to={`/wallet/loyalty/${corporationId}`}
+        to={`/market/lp-store/${corporationId}`}
         aria-label={label}
         className={iconButtonClassName({ variant: 'plain', size: 'sm' })}
       >

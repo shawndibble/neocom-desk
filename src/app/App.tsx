@@ -35,6 +35,7 @@ import { TabRoute } from './TabRoute';
 import { PAGE_TABS, routePatternFor } from './pageTabs';
 import { AuthFailureRedirect } from './AuthFailureNotice';
 import { LegacyShipsRedirect } from '@/features/fittings/LegacyShipsRedirect';
+import { LegacyPathRedirect } from './LegacyPathRedirect';
 import { PublicInfoModal } from '@/components/PublicInfoModal';
 import { SkillDetailModal } from '@/components/SkillDetailModal';
 import { getAccessTokenReportingFailures } from './tokenProvider';
@@ -169,9 +170,12 @@ const ROUTE_ELEMENTS = {
   // copied is `/fittings?f=`, so these redirects are for good.
   '/fittings/*': <LegacyShipsRedirect />,
   '/market': <Market />,
+  // LP Store moved from Wallet to Market; the old paths redirect for good.
+  '/market/lp-store': <LoyaltyStore />,
+  '/market/lp-store/:corporationId': <LoyaltyStore />,
   '/wallet': <Wallet />,
-  '/wallet/loyalty': <LoyaltyStore />,
-  '/wallet/loyalty/:corporationId': <LoyaltyStore />,
+  '/wallet/loyalty': <LegacyPathRedirect />,
+  '/wallet/loyalty/:corporationId': <LegacyPathRedirect />,
   '/mining': <MoonMiningTax />,
   '/clones': <Clones />,
   '/planetary-industry': <PlanetaryIndustry />,

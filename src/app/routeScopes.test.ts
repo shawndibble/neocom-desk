@@ -84,10 +84,10 @@ describe('gated routes', () => {
       '/clones',
       '/contacts',
       '/mail',
+      '/market/lp-store',
+      '/market/lp-store/:corporationId',
       '/mining',
       '/planetary-industry',
-      '/wallet/loyalty',
-      '/wallet/loyalty/:corporationId',
     ]);
   });
 

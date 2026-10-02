@@ -113,10 +113,10 @@ describe('a tabbed page with its own nested detail routes (Industry)', () => {
 });
 
 describe('a tabbed page with its own nested detail route (Wallet’s Loyalty Store)', () => {
-  it('leaves /wallet/loyalty/:corporationId out of the tabbed page', () => {
-    expect(pageKeyFor('/wallet/loyalty/98000001')).toBe('/wallet/loyalty/98000001');
-    expect(isTabRedirectPath('/wallet/loyalty/98000001')).toBe(false);
-    expect(tabbedPagePathFor('/wallet/loyalty/98000001')).toBeNull();
+  it('leaves /market/lp-store/:corporationId out of the tabbed page', () => {
+    expect(pageKeyFor('/market/lp-store/98000001')).toBe('/market/lp-store/98000001');
+    expect(isTabRedirectPath('/market/lp-store/98000001')).toBe(false);
+    expect(tabbedPagePathFor('/market/lp-store/98000001')).toBeNull();
   });
 });
 

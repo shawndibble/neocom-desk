@@ -5,7 +5,7 @@
  * select-style button (the open store's name, or a prompt); opening it shows a
  * search field pinned above the full list, which the field narrows. Corps the active Character holds LP with are pinned first with their
  * balance (`lpStorePickerOptions`). Picking one navigates to
- * `/wallet/loyalty/:corporationId`, so the chosen store lives in the URL.
+ * `/market/lp-store/:corporationId`, so the chosen store lives in the URL.
  *
  * Hand-built ARIA (decision 20260905-114550, reshaped by
  * 20260930-select-box-lp-store-picker): the button opens a dialog popover,
@@ -124,7 +124,7 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
 
   function pick(option: LpStorePickerOption) {
     close();
-    navigate(`/wallet/loyalty/${option.corporationId}`);
+    navigate(`/market/lp-store/${option.corporationId}`);
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {

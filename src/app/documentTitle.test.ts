@@ -64,10 +64,18 @@ describe('documentTitleFor', () => {
     expect(documentTitleFor('/no-such-page', t)).toBe(`${i18n.t('notFound.title')} — Neocom Desk`);
   });
 
+  const REDIRECT_ONLY = new Set<string>([
+    '/skills',
+    '/bpc-contracts',
+    '/skills/ships',
+    '/wallet/loyalty',
+    '/wallet/loyalty/:corporationId',
+  ]);
+
   it('gives every feature route a distinct title', () => {
     const concrete = (Object.keys(ROUTE_REQUIREMENTS) as AppRoutePath[])
       // Redirect-only routes never render a page of their own.
-      .filter((path) => path !== '/skills' && path !== '/bpc-contracts' && path !== '/skills/ships')
+      .filter((path) => !REDIRECT_ONLY.has(path))
       .map((path) => path.replace(/:\w+/g, '1').replace('/*', '/x'))
       // `/assets/x` is the same page as `/assets`, one drill-down deeper.
       .filter((path) => !path.endsWith('/x'));

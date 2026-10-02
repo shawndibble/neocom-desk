@@ -161,6 +161,8 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/ships/fittings/compare': loadFittingCompare,
   '/market': loadMarket,
   '/wallet': loadWallet,
+  '/market/lp-store': loadLoyaltyStore,
+  '/market/lp-store/:corporationId': loadLoyaltyStore,
   '/wallet/loyalty': loadLoyaltyStore,
   '/wallet/loyalty/:corporationId': loadLoyaltyStore,
   '/mining': loadMoonMiningTax,

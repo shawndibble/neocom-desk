@@ -367,7 +367,7 @@ describe('CommandPalette', () => {
       const option = await within(stores).findByRole('option', { name: 'Sisters of EVE' });
       expect(option).toHaveAttribute('aria-selected', 'true');
       await user.keyboard('{Enter}');
-      expect(screen.getByTestId('where')).toHaveTextContent('/wallet/loyalty/1000130');
+      expect(screen.getByTestId('where')).toHaveTextContent('/market/lp-store/1000130');
     });
 
     it('shows the balance only for a corp the active Character holds LP with', async () => {

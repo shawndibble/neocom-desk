@@ -76,7 +76,7 @@ describe('NAV_LOCK_PATHS', () => {
         '/clones',
         '/employment-history',
         // Wallet's LP Store.
-        '/wallet/loyalty',
+        '/market/lp-store',
       ].toSorted()
     );
   });

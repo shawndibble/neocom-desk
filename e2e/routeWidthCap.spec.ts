@@ -14,7 +14,7 @@ const DESKTOP = { width: 1440, height: 900 };
 const MAX_WIDTH = 1152; // max-w-6xl
 
 test('LP Store root content is capped at max-w-6xl on desktop', async ({ page }) => {
-  await signInAndGoto(page, `./wallet/loyalty/${CORPORATION_ID}`);
+  await signInAndGoto(page, `./market/lp-store/${CORPORATION_ID}`);
   await page.setViewportSize(DESKTOP);
 
   // Level 2, not 1: the route's `PageHeader` h1 races the corp-name fetch —

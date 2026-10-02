@@ -167,7 +167,18 @@ export const NAV_PAGES = [
    * Leads Economy: it is the one economy view that answers a question before
    * you own anything, and the only one here that isn't Character-scoped.
    */
-  { path: '/market', labelKey: 'nav.market', group: 'economy', gating: 'scope', mobileTab: true },
+  {
+    path: '/market',
+    labelKey: 'nav.market',
+    group: 'economy',
+    gating: 'scope',
+    mobileTab: true,
+    // Shopping an LP store is a market errand; the balances stay on Wallet
+    // (scope decision `20261002-145653-lp-store-under-market-pilot-lookup-its-own`).
+    subViews: [
+      { path: '/market/lp-store', labelKey: 'loyaltyStore.title', searchKeys: ['loyalty.title'] },
+    ],
+  },
   {
     path: '/wallet',
     labelKey: 'nav.wallet',
@@ -176,9 +187,6 @@ export const NAV_PAGES = [
     mobileTab: true,
     // Sends an old link on to Market › Transactions (`WALLET_TABS`).
     aliasTabs: ['transactions'],
-    subViews: [
-      { path: '/wallet/loyalty', labelKey: 'loyaltyStore.title', searchKeys: ['loyalty.title'] },
-    ],
   },
   { path: '/assets', labelKey: 'nav.assets', group: 'economy', gating: 'scope', mobileTab: true },
   {
