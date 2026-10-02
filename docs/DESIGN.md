@@ -584,16 +584,42 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
   covers inline elements sized like a control. A panel's, table's or
   section's hairlines divide regions, and nobody reads them as buttons.
   `StatChip` predates the rule: it is static but drawn with a chip box.
-  Don't copy it for new static content.
+  Don't copy it for new static content. The other side of the rule: a
+  `<button>` that opens a picker (the stats column's Implants trigger) wears
+  the field chrome (`fieldBaseClassName` + a `fieldSizeClassName` size), so
+  it reads as the control it is.
+- **Stacked controls line up; they never just wrap.** When a panel puts two
+  or more labelled controls on separate lines, lay them out as a two-column
+  grid (`grid-cols-[max-content_minmax(0,1fr)]`): labels in the left column,
+  controls in the right, every select in the group one width, and a
+  control's own action ("Manage", "Appraise") after it on the same line.
+  An explanation of the current value goes dim beneath its control, in the
+  control column, never beside it. Controls that land on new lines only
+  because the row ran out of room look accidental. A picker that renders its
+  own label takes a `field` or `bare` prop so the grid supplies the label.
+  Its accessible name still says what it is, and so does a shortened
+  action's ("Manage" keeps "Manage targets" as its `aria-label`).
+  The grid lines controls up within one block. Neighbouring blocks don't
+  have to share an x position. The reference version is the stats column's
+  `StatFields` / `StatField`. Move it into `src/components/ui` when a second
+  feature needs it, rather than re-rolling the grid.
+- **One separator inside a detail line.** A dim line that strings facts
+  together (charge · range · duration · reload) joins them with a spaced
+  middle dot, " · ", never commas or slashes. In the stats column `joinDetail`
+  (`statKit.tsx`) does it and drops empty parts.
 - **The fitting stats column is built from one kit.** Each section's row is
   shaded `panel-2` with an uppercase micro-heading title and a
   `text-sm font-semibold` headline figure. Section bodies use only the
   pieces in `features/fittings/StatFacts.tsx` and `statKit.tsx`:
-  - `StatRows` / `StatRow` for one row per module (name, then a dim detail
-    line with the figure at its right, hairlines between rows).
+  - `StatRows` / `StatRow` for one row per module. A row has two lines: the
+    name, then a dim detail line with the figure at its right. Hairlines go
+    between rows, and a total's is brighter. Only a row with nothing to
+    detail (a total) sits on one line, and it asks for that with `inline`
+    rather than by leaving `detail` empty.
   - `Facts` for label/value pairs.
   - `StatGroup` for a labelled run inside a section.
-  - `StatControls` for the pickers on top, with `sm` controls.
+  - `StatFields` / `StatField` for the pickers on top, with `sm` controls
+    `STAT_FIELD_WIDTH` wide (see "Stacked controls line up" above).
   - `StatNote` for footnotes and empty states.
 
   That keeps the column to three sizes: 14px headlines, 12px names and
