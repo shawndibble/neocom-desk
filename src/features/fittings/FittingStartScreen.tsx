@@ -249,8 +249,10 @@ export function FittingStartScreen({
 
       {inGameStatus}
       <FittingExportNotice notice={rowActions.notice} />
-      {/* A picked Fitting the Compare picker couldn't turn into a Share Link. */}
-      {!page && workspace.tooLargeToShare && (
+      {/* A picked Fitting the Compare picker couldn't turn into a Share Link. The
+          editor's own workspace flags its open Fitting the same way, so the Open
+          dialog never shows it. */}
+      {importInline && workspace.tooLargeToShare && (
         <p className="text-xs text-warning" role="status">
           {t('fittings.load.tooLargeToShare')}
         </p>

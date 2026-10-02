@@ -409,8 +409,14 @@ describe('FittingStartScreen in a dialog', () => {
   });
 
   it('says why a picked fitting went nowhere when it is too large for a Share Link', async () => {
-    renderDialog({}, { ...makeWorkspace(), tooLargeToShare: true });
+    renderDialog({ importInline: true }, { ...makeWorkspace(), tooLargeToShare: true });
     await screen.findByText('Armor Drake');
     expect(screen.getByRole('status')).toHaveTextContent(/too large/i);
+  });
+
+  it('never shows that in the editor’s Open dialog, where it is about the open Fitting', async () => {
+    renderDialog({}, { ...makeWorkspace(), tooLargeToShare: true });
+    await screen.findByText('Armor Drake');
+    expect(screen.queryByText(/too large/i)).not.toBeInTheDocument();
   });
 });
