@@ -75,6 +75,7 @@ export const ROUTE_REQUIREMENTS = {
   '/skills': UNGATED,
   // Device-local display preferences only — no ESI endpoint to gate on.
   '/settings': UNGATED,
+  '/settings/shortcuts': UNGATED,
   '/settings/faq': UNGATED,
   '/settings/help': UNGATED,
   '/help': UNGATED,

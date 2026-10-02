@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isTypingTarget, OVERLAY_SELECTOR, SHORTCUTS } from '@/lib/shortcuts';
-import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 
 /**
  * Global shortcut listener, mounted once from `Layout` so every authenticated
@@ -9,19 +8,12 @@ import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
  * `<dialog>` already closes on it (`components/ui/Modal.tsx`), and a second
  * handler here would race that behaviour rather than add to it.
  *
- * Every dispatched shortcut is a single unmodified key, so the Settings off
- * switch (`lib/singleKeyShortcuts.ts`, WCAG 2.1.4) simply leaves the listener
- * unattached.
+ * Always on: the owner removed the Settings off switch (Help › Shortcuts lists
+ * the keys). Typing in a field never fires one (`isTypingTarget`).
  */
 export function useKeyboardShortcuts(): void {
   const navigate = useNavigate();
-  // Off until hydrated, so a pilot who turned them off never gets a live key
-  // in the window before the stored choice loads.
-  const enabled = useSingleKeyShortcuts((state) => state.hydrated && state.value);
-
   useEffect(() => {
-    if (!enabled) return;
-
     function onKeyDown(event: KeyboardEvent) {
       // Shift stays out of this list: `?` is typed with it. Opt-in below.
       if (event.ctrlKey || event.metaKey || event.altKey) return;
@@ -48,5 +40,5 @@ export function useKeyboardShortcuts(): void {
 
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [navigate, enabled]);
+  }, [navigate]);
 }

@@ -43,7 +43,6 @@ export const SETTINGS_TABS = definePageTabs(
   '/settings',
   [
     { id: 'display', labelKey: 'settings.tabs.display' },
-    { id: 'shortcuts', labelKey: 'settings.tabs.shortcuts' },
     { id: 'permissions', labelKey: 'settings.tabs.permissions' },
     { id: 'industry', labelKey: 'settings.tabs.industry' },
     { id: 'market', labelKey: 'settings.tabs.market' },
@@ -60,8 +59,12 @@ export const SETTINGS_TABS = definePageTabs(
   { hiddenFrom: '(min-width: 48rem)' }
 );
 
-/** Help & FAQ, moved out of Settings (`/settings/faq` and `/settings/help` redirect here). */
+/**
+ * Help & FAQ, moved out of Settings (`/settings/shortcuts`, `/settings/faq` and
+ * `/settings/help` redirect here). Shortcuts first: the tab `/help` opens on.
+ */
 export const HELP_TABS = definePageTabs('/help', [
+  { id: 'shortcuts', labelKey: 'settings.tabs.shortcuts' },
   { id: 'faq', labelKey: 'settings.help.tabFaq' },
   { id: 'support', labelKey: 'settings.help.tabSupport' },
 ]);

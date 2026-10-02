@@ -214,7 +214,7 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     descriptionKey: 'shortcuts.showShortcuts',
     // The list this opens is the one rendered from this very array, under the
     // Shortcuts section of Settings.
-    run: (navigate) => navigate('/settings/shortcuts'),
+    run: (navigate) => navigate('/help/shortcuts'),
   },
   {
     id: 'close',

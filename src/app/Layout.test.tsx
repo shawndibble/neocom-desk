@@ -11,7 +11,6 @@ import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
 import { useCorpAccess, type CorpAccessState } from '@/features/corp/useCorpAccess';
 import { DEFAULT_MOBILE_TABS, useMobileTabs } from '@/lib/mobileTabs';
 import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
-import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { Layout } from './Layout';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
@@ -96,6 +95,8 @@ function renderLayoutWithRoutes(initialEntry = '/overview') {
               `?` shortcut's `/settings/shortcuts` target has to match
               this route too, not just the bare page path. */}
           <Route path="/settings/*" element={<div>settings page</div>} />
+          {/* `?` lands on Help › Shortcuts. */}
+          <Route path="/help/*" element={<div>help page</div>} />
         </Route>
       </Routes>
     </MemoryRouter>
@@ -116,7 +117,6 @@ beforeEach(async () => {
   await db.characters.clear();
   // Module-scope singleton: a bar chosen by one test must not reach the next.
   useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: true });
-  useSingleKeyShortcuts.setState({ value: true, hydrated: true });
 });
 
 describe('Layout sync status dot', () => {
@@ -544,19 +544,6 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     expect(await screen.findByText('settings page')).toBeInTheDocument();
   });
 
-  it('fires none of the single-key shortcuts once they are turned off (issue #1494)', async () => {
-    useSingleKeyShortcuts.setState({ value: false, hydrated: true });
-    const user = userEvent.setup();
-    renderLayoutWithRoutes();
-    await screen.findByText('overview page');
-
-    await user.keyboard('/c,{Shift>}?{/Shift}');
-    expect(screen.getByText('overview page')).toBeInTheDocument();
-    expect(screen.queryByText('market page')).not.toBeInTheDocument();
-    expect(screen.queryByText('characters page')).not.toBeInTheDocument();
-    expect(screen.queryByText('settings page')).not.toBeInTheDocument();
-  });
-
   it('does not fire while the user is typing in an input', async () => {
     const user = userEvent.setup();
     renderLayoutWithRoutes();
@@ -585,7 +572,7 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     // entry for '?', so a bare press dispatches `shiftKey: false` and would
     // pass even with `allowsShift` deleted — testing nothing.
     await user.keyboard('{Shift>}?{/Shift}');
-    expect(await screen.findByText('settings page')).toBeInTheDocument();
+    expect(await screen.findByText('help page')).toBeInTheDocument();
   });
 
   it('does not turn a capital letter into a shortcut', async () => {

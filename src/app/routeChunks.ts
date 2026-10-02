@@ -187,6 +187,7 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/travel/pilot': loadPilotLookup,
   '/pilot-lookup': loadPilotLookup,
   '/settings': loadSettings,
+  '/settings/shortcuts': loadHelp,
   '/settings/faq': loadHelp,
   '/settings/help': loadHelp,
   '/help': loadHelp,

@@ -45,8 +45,7 @@
     "alertsWithCount_other": "Alerts, {{count}} waiting",
     "railLabel": "Main navigation",
     "goTo": "Go to…",
-    "pageViews_one": "{{page}} views ({{count}})",
-    "pageViews_other": "{{page}} views ({{count}})",
+    "pageViews": "{{page}} views",
     "editRail": "Hide pages you don't use",
     "editHint": "Hide pages and views you never use. They stay in Go to and in More, and a page's own tabs never change.",
     "editDone": "Done",
@@ -5877,7 +5876,7 @@
     },
     "corp": {
       "label": "Corporation",
-      "caption": "Everything on the Corporation pages — wallet, members, structures, assets and moon extractions."
+      "caption": "Corporation data: wallet, members, structures, assets and moon extractions."
     },
     "structureMarkets": {
       "label": "Structure markets",
@@ -5931,8 +5930,6 @@
     "backToList": "Settings",
     "summary": {
       "display": "{{size}} text, {{format}}",
-      "on": "On",
-      "off": "Off",
       "industry": "ME {{me}}, TE {{te}}",
       "charactersCurrent": "Current character",
       "charactersAll": "All characters",
@@ -6012,59 +6009,70 @@
     "deviceDeleteUnpurged_other": "The synced data for {{names}} could not be deleted from the sync server (offline, or the logins have expired). The server deletes it automatically after 90 days without a sync. Every other character's synced data is already deleted. Finish deleting to erase this device's data.",
     "faq": {
       "storeTitle": "What we store",
-      "storeIntro": "Neocom Desk keeps as little as possible on a server. The short version: we store the things you make in the app, and none of what we read from EVE on your behalf.",
+      "storeIntro": "We store what you make in the app. What we read from EVE stays on this device.",
       "store": {
         "synced": {
           "title": "Synced between your devices",
-          "description": "Saved so your work looks the same on your phone, your laptop and your desktop. Filed under each character’s EVE character ID — never a name, an email address, or an account we invented.",
-          "skillPlans": "Skill Plans — the plans you build. The skills you have actually trained come from EVE and stay on this device.",
-          "buildPlans": "Build Plans — the blueprint, runs, ME/TE, facility and hub you picked.",
-          "productionRuns": "Production Runs — what you logged as built, and the sales and orders you linked to it.",
-          "quickbar": "Your Quickbar — the items you saved in the Market browser.",
-          "stationPins": "The stations and structures you pinned in Assets.",
-          "piPicks": "The resources you chose to pull on each planet in the PI Advisor.",
+          "description": "Filed under each character's EVE ID — never a name or an email address.",
+          "skillPlans": "Skill Plans you build. Trained skills come from EVE and stay on this device.",
+          "buildPlans": "Build Plans: blueprint, runs, ME/TE, facility and hub.",
+          "productionRuns": "Production Runs, with the sales and orders you linked.",
+          "quickbar": "Your Market Quickbar.",
+          "stationPins": "Stations and structures you pinned in Assets.",
+          "piPicks": "Resources you picked per planet in the PI Advisor.",
           "miningTax": "Moon Mining payees and assignments.",
-          "fittings": "The Fittings you saved to My Fittings: name and share code.",
-          "miningTaxNote": "The payees you named and the entries you assigned to them, including the ore and ISK figures snapshotted at that moment — that snapshot is the invoice, so it has to travel with it.",
-          "notificationFeed": "Your Alerts.",
-          "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
-          "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown, the courier collateral warning multiple, and whether BPC Sourcing opens set to hide auctions and hide PLEX contracts — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, whether the Moon Mining Tax ledger's Assign form edits ore values individually, which skill plan you're adding skills to from Fit Check and Market, the fitting damage profiles you made along with which one fittings are measured against, and the fitting target profiles you made along with which one applied DPS is worked out against, and which Overview cards you hid and the order you put them in, the pages you hid from the navigation, and your travel settings — the default route preference and security penalty, the systems you avoid and whether that list is on, and whether routes keep out of EDENCOM systems, Triglavian minor victory systems, and systems with recent pod kills (with the threshold you set). Nothing else on this page leaves your device."
+          "fittings": "Fittings saved to My Fittings: name and share code.",
+          "miningTaxNote": "Includes the ore and ISK snapshot, because that snapshot is the invoice.",
+          "notificationFeed": "Alerts you've already seen.",
+          "notificationFeedNote": "Kept 30 days, so your other devices catch up.",
+          "settings": "These preferences. Nothing else you set leaves your device:",
+          "settingsDetail": {
+            "notifications": "Notifications: your notification preferences.",
+            "defaults": "Defaults: trade hub, industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
+            "industry": "Industry: build groups, and whether blueprint cost counts toward profit.",
+            "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, and BPC Sourcing's hide auctions / hide PLEX.",
+            "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold.",
+            "fittings": "Fittings: your damage and target profiles, and which ones are active.",
+            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, and how the Assign form edits ore values.",
+            "layout": "Layout: hidden and reordered Overview cards, and pages hidden from the navigation.",
+            "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold)."
+          }
         },
         "local": {
           "title": "Kept on this device only",
-          "description": "Everything Neocom Desk reads from EVE is cached on this device and refetched from ESI when it goes stale. None of it is uploaded. Four things Neocom Desk writes back to your account: opening a mail here marks it read in EVE too, so it stays read after you reload; responding to a calendar invite here sends that response to EVE; sending a reply or forward you compose in Mail sends that mail through your account; and saving a Fitting to EVE creates or replaces your in-game fitting there. Nothing else — no orders, no colony changes, no mail you didn't write and send yourself — is ever written.",
-          "esi": "Your assets, wallet, contracts, mail, contacts, clones, calendar, skills, skill queue, industry jobs and colonies.",
+          "description": "Everything read from EVE is cached here and never uploaded.",
+          "esi": "Your characters' EVE data: assets, wallet, contracts, mail, contacts, clones, calendar, skills, industry jobs and colonies.",
           "corp": "Everything on the Corporation pages — wallet, members, structures, assets and moon extractions.",
-          "market": "Market prices, order books and the LP store.",
-          "miningHistory": "Up to 90 days of your mining ledger, kept past the 30 days EVE itself returns so the Mining Overview can show longer ranges.",
-          "login": "Your EVE login.",
-          "loginNote": "The token that keeps you logged in is stored on this device and nowhere else.",
-          "preferences": "The rest of Settings — text size and time format, which answer for the screen you are looking at — and every sort, filter and expanded section a page remembers as you use it."
+          "market": "Market prices, order books and LP stores.",
+          "miningHistory": "90 days of mining ledger, longer than the 30 EVE returns.",
+          "login": "Your EVE login token.",
+          "loginNote": "It never leaves this device.",
+          "preferences": "Display settings (text size, time format) and the sorts, filters and sections each page remembers."
         },
         "notesTitle": "Worth knowing",
         "notes": {
-          "push": "Push notifications, if you turn them on: we store a token for this device, the character IDs it covers, and the alerts due in the next 72 hours — including their text, so they can be delivered while the app is closed. Each character is verified with EVE at that moment, and the token used for that check is discarded straight after.",
-          "crashes": "Crash reports: when something goes wrong we receive the error and which page it happened on, so it can be fixed. IP addresses are switched off, request and response bodies are never captured, and your EVE tokens are stripped before anything is sent.",
-          "removal": "Removing a character only clears it from this device. Its synced copy stays on our servers, so adding the character back restores it. We delete it automatically once no device has synced that character for 90 days. To delete it right away, use Delete all data in Settings → Data & storage.",
-          "export": "Exporting a backup (Data tab) writes a password-encrypted file — including your login tokens — to your device. This only happens when you press the button, and the file goes wherever you choose to put it; we never see it."
+          "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
+          "crashes": "Crash reports: the error and the page it happened on. No IP addresses or request bodies; EVE tokens are stripped first.",
+          "removal": "Removing a character clears it from this device only. Its synced copy is deleted after 90 days with no device syncing it, or right away from Settings › Data & storage › Delete all data.",
+          "writes": "Writes to EVE, only when you act: opening a mail marks it read, answering a calendar invite sends your reply, Mail sends what you wrote, and saving a Fitting to EVE creates or replaces it there. Nothing else is ever written.",
+          "export": "Backups (Settings › Data & storage) are password-encrypted files, login tokens included, saved only where you put them. We never see them."
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."
       },
-      "helpPointer": "Looking to report a bug, ask for help, or join the community? See <help>Help & FAQ › Support</help>."
+      "helpPointer": "Bug, question or idea? See <help>Support</help>."
     },
     "help": {
       "tabFaq": "FAQ",
       "tabSupport": "Support",
-      "communityTitle": "Report a bug, ask for a feature, or just chat",
-      "communityBody": "All of it goes through <discord>Discord</discord> — bug reports, feature requests, questions, and general discussion with other pilots and the developer.",
-      "communityHint": "For bugs, please include steps to reproduce and what the expected outcome should be.",
-      "sourceTitle": "Want to see the code, or add something yourself?",
-      "sourceBody": "Neocom Desk is open source: <repo>github.com/shawndibble/neocom-desk</repo>. Read the code, or open a pull request.",
-      "sourceHint": "Not for bug reports or feature requests — see Discord above for those.",
-      "thanksTitle": "Is there someone I can thank?",
-      "thanksBody": "In Game Name: <pilot>Mero Otichoda</pilot>.",
-      "thanksHint": "Donations are welcome and never expected — the app is free, open source, and stays that way."
+      "communityTitle": "Bugs, ideas and chat",
+      "communityBody": "It all goes through <discord>Discord</discord>.",
+      "communityHint": "For a bug, include the steps and what you expected to happen.",
+      "sourceTitle": "Source code",
+      "sourceBody": "Open source on <repo>GitHub</repo>. Pull requests welcome.",
+      "sourceHint": "Report bugs and ideas on Discord, not GitHub.",
+      "thanksTitle": "Say thanks",
+      "thanksBody": "In game: <pilot>Mero Otichoda</pilot>.",
+      "thanksHint": "Donations welcome, never expected. The app stays free."
     },
     "displayTitle": "Display",
     "fontScaleLabel": "Text size",
@@ -6324,9 +6332,6 @@
     "openSettings": "Open Settings",
     "showShortcuts": "Show this shortcut list",
     "close": "Close the open dialog",
-    "enabledLabel": "Single-key shortcuts",
-    "enabledHint": "The keys below work anywhere outside a text field. Turn them off if you set them off by accident, for example with speech input. Stays on this device.",
-    "disabledNote": "Single-key shortcuts are off. Esc still closes an open dialog. Stays on this device.",
     "pasteTitle": "Paste anywhere",
     "pasteHint": "Outside a text field, a pasted fit or item list opens where it belongs. Back returns you where you were.",
     "paste": "Paste",

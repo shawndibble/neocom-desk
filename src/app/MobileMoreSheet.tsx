@@ -7,7 +7,7 @@ import { mobileSheetPaths, type MobileTabPath } from '@/lib/mobileTabs';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
 import { useCommandPalette } from '@/features/commandPalette/store';
 import { listNavDestinations, navPageLabelKey, railGroups, type NavPage } from './navDestinations';
-import { canHide, recentNavFor, viewPathFor, viewsByPage } from './navRail';
+import { canHide, recentNavFor, viewPathFor } from './navRail';
 import { toggleHiddenNav, useHiddenNav, useRecentNav } from './navPreferences';
 import { CorpNavItem, NavItem } from './NavItem';
 import type { AppRoutePath } from './routeScopes';
@@ -67,7 +67,7 @@ export function MobileMoreSheet({
   // The phone's own hide editor: the rail's lives on desktop only.
   const [editing, setEditing] = useState(false);
 
-  // Labels and view counts only, so no live lock or corp reads: those decide
+  // Recent's labels only, so no live lock or corp reads: those decide
   // what a destination is marked with, not what it is called.
   const destinations = useMemo(
     () =>
@@ -79,7 +79,6 @@ export function MobileMoreSheet({
       }),
     [t]
   );
-  const views = useMemo(() => viewsByPage(destinations), [destinations]);
   const byPath = useMemo(
     () => new Map(destinations.map((destination) => [destination.path, destination])),
     [destinations]
@@ -138,7 +137,6 @@ export function MobileMoreSheet({
         label={t(page.labelKey)}
         locked={locked.has(page.path)}
         badge={page.path === '/alerts' ? unreadAlerts : undefined}
-        viewCount={views.get(page.path)?.length}
         presentation="tile"
         onClick={onClose}
       />

@@ -63,6 +63,7 @@ const ROUTE_TITLE_KEYS = {
   '/travel/pilot': ['nav.pilotLookup'],
   '/pilot-lookup': ['nav.pilotLookup'],
   '/settings': ['settings.title'],
+  '/settings/shortcuts': ['nav.help'],
   '/settings/faq': ['nav.help'],
   '/settings/help': ['nav.help'],
   '/help': ['nav.help'],

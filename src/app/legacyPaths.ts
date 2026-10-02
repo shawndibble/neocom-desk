@@ -7,6 +7,7 @@
 const MOVES: readonly (readonly [from: string, to: string])[] = [
   ['/wallet/loyalty', '/market/lp-store'],
   ['/travel/pilot', '/pilot-lookup'],
+  ['/settings/shortcuts', '/help/shortcuts'],
   ['/settings/faq', '/help/faq'],
   ['/settings/help', '/help/support'],
 ];

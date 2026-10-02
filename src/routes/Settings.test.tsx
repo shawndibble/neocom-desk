@@ -49,7 +49,6 @@ import { useDefaultCharacterFilter } from '@/features/character/defaultCharacter
 import { VIEW_PREFERENCE_KEYS } from '@/lib/viewPreferenceKeys';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { DEFAULT_MOBILE_TABS, MOBILE_TABS_KEY, useMobileTabs } from '@/lib/mobileTabs';
-import { SINGLE_KEY_SHORTCUTS_SETTING_KEY, useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -153,7 +152,6 @@ beforeEach(async () => {
   useDarkThreshold.setState({ value: 30, hydrated: false });
   useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
   useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: false });
-  useSingleKeyShortcuts.setState({ value: true, hydrated: false });
   useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: false });
   useNotificationPromptState.setState({
     value: { ...DEFAULT_NOTIFICATION_PROMPT_STATE, seen: true },
@@ -197,35 +195,24 @@ describe('Settings', () => {
     expect((await db.settings.get(FONT_SCALE_KEY))?.value).toBe(1.125);
   });
 
-  it('lists the keyboard shortcuts, so they are discoverable (issue #25)', async () => {
+  it('lists the keyboard shortcuts on Help, its first tab, and redirects the old Settings link (issue #25)', async () => {
     window.history.pushState({}, '', '/settings/shortcuts');
     render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    await screen.findByRole('heading', { level: 1, name: /help & faq/i });
+
+    expect(window.location.pathname).toBe('/help/shortcuts');
+    const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent);
+    expect(tabs).toEqual(['Shortcuts', 'FAQ', 'Support']);
+    // Always on now: no switch.
+    expect(
+      screen.queryByRole('checkbox', { name: /single-key shortcuts/i })
+    ).not.toBeInTheDocument();
 
     expect(screen.getByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
     expect(screen.getByText('Jump to search')).toBeInTheDocument();
     expect(screen.getByText('Switch character')).toBeInTheDocument();
     expect(screen.getByText('Open Settings')).toBeInTheDocument();
     expect(screen.getByText('Close the open dialog')).toBeInTheDocument();
-  });
-
-  it('turns the single-key shortcuts off, persists it, and says so in the list (issue #1494)', async () => {
-    const user = userEvent.setup();
-    window.history.pushState({}, '', '/settings/shortcuts');
-    render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /settings/i });
-
-    const toggle = screen.getByRole('checkbox', { name: /single-key shortcuts/i });
-    expect(toggle).toBeChecked();
-    expect(screen.queryByText(/single-key shortcuts are off/i)).not.toBeInTheDocument();
-
-    await user.click(toggle);
-
-    expect(toggle).not.toBeChecked();
-    expect(screen.getByText(/single-key shortcuts are off/i)).toBeInTheDocument();
-    await waitFor(async () =>
-      expect((await db.settings.get(SINGLE_KEY_SHORTCUTS_SETTING_KEY))?.value).toBe(false)
-    );
   });
 
   it('shows an empty state when nothing has been fetched yet (issue #32)', async () => {
@@ -1449,10 +1436,10 @@ describe('Settings defaults', () => {
     expect(screen.getByRole('tab', { name: 'Support' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: 'FAQ' })).toBeInTheDocument();
     expect(
-      await screen.findByRole('heading', { name: /report a bug, ask for a feature, or just chat/i })
+      await screen.findByRole('heading', { name: /bugs, ideas and chat/i })
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /discord/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /someone i can thank/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /say thanks/i })).toBeInTheDocument();
   });
 
   it('shows the shortcut list from the ? shortcut, even from another section', async () => {
@@ -1464,12 +1451,11 @@ describe('Settings defaults', () => {
       await within(settingsNav()).findByRole('link', { name: /activity log/i })
     ).toHaveAttribute('aria-current', 'page');
 
-    // The real `?` shortcut, pressed from a section that is not Shortcuts. It
-    // navigates to /settings/shortcuts, so it lands correctly regardless of
-    // which section was showing before.
+    // The real `?` shortcut. It navigates to Help › Shortcuts.
     await user.keyboard('{Shift>}?{/Shift}');
 
     expect(await screen.findByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/help/shortcuts');
   });
 
   it('offers the PI expiring-soon window, defaulting to 24 hours', async () => {
@@ -1695,7 +1681,6 @@ describe('Settings — sections rail', () => {
         .map((link) => link.textContent)
     ).toEqual([
       'Display',
-      'Shortcuts',
       'Permissions',
       'Industry',
       'Market',
@@ -1725,12 +1710,12 @@ describe('Settings — sections rail', () => {
     expect(window.location.pathname).toBe('/settings/market');
   });
 
-  it('carries an old /settings/general#shortcuts link on to the Shortcuts section', async () => {
+  it('carries an old /settings/general#shortcuts link on to Help › Shortcuts', async () => {
     window.history.pushState({}, '', '/settings/general#shortcuts');
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/settings/shortcuts');
+    expect(window.location.pathname).toBe('/help/shortcuts');
   });
 
   it('carries an old #corp-access link on to the Permissions section', async () => {
@@ -1775,11 +1760,10 @@ describe('Settings — phone list', () => {
     }
     // Corporation is absent: this character has no corp access.
     expect(within(nav).queryByRole('link', { name: /corporation/i })).not.toBeInTheDocument();
-    expect(within(nav).getAllByRole('link')).toHaveLength(11);
+    expect(within(nav).getAllByRole('link')).toHaveLength(10);
     expect(within(nav).getByRole('link', { name: /^display/i })).toHaveTextContent(
       /default text, my local time/i
     );
-    expect(within(nav).getByRole('link', { name: /^shortcuts/i })).toHaveTextContent(/on/i);
     expect(within(nav).getByRole('link', { name: /^industry/i })).toHaveTextContent(/ME 0, TE 0/);
     expect(within(nav).getByRole('link', { name: /^market/i })).toHaveTextContent(/jita/i);
     expect(within(nav).getByRole('link', { name: /^characters/i })).toHaveTextContent(
@@ -1835,7 +1819,7 @@ describe('Settings — phone list', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/settings/shortcuts');
+    expect(window.location.pathname).toBe('/help/shortcuts');
   });
 
   it('keeps redirecting /settings to Display from md up', async () => {

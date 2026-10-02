@@ -3,7 +3,8 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Panel } from '@/components/ui';
 import { DISCORD_URL, REPO_URL } from '@/lib/links';
 
-const PROSE = 'max-w-2xl space-y-3 text-sm';
+/** No width cap of its own: see `FaqPanel`'s `PROSE`. */
+const PROSE = 'space-y-3 text-sm';
 
 const LINK = inlineLinkClassName;
 
@@ -43,7 +44,7 @@ export function HelpPanel() {
               }}
             />
           </p>
-          <p className="text-xs text-text-dim">{t('settings.help.communityHint')}</p>
+          <p className="text-text-dim">{t('settings.help.communityHint')}</p>
         </div>
       </Panel>
 
@@ -59,7 +60,7 @@ export function HelpPanel() {
               }}
             />
           </p>
-          <p className="text-xs text-text-dim">{t('settings.help.sourceHint')}</p>
+          <p className="text-text-dim">{t('settings.help.sourceHint')}</p>
         </div>
       </Panel>
 
@@ -71,7 +72,7 @@ export function HelpPanel() {
               components={{ pilot: <span className="font-semibold text-text" /> }}
             />
           </p>
-          <p className="text-xs text-text-dim">{t('settings.help.thanksHint')}</p>
+          <p className="text-text-dim">{t('settings.help.thanksHint')}</p>
         </div>
       </Panel>
     </div>

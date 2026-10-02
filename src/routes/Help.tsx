@@ -4,6 +4,7 @@ import { usePageTab } from '@/lib/usePageTab';
 import { HELP_TABS } from '@/app/pageTabs';
 import { FaqPanel } from '@/features/faq/FaqPanel';
 import { HelpPanel } from '@/features/help/HelpPanel';
+import { ShortcutsPanel } from '@/features/help/ShortcutsPanel';
 
 /**
  * Help & FAQ, a footer page of its own rather than two Settings sections
@@ -16,7 +17,9 @@ export function Help() {
   const [tab, setTab] = usePageTab(HELP_TABS);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
+    // Prose, so narrower than the app-wide `max-w-6xl` data width: the cards
+    // sit at a readable line length and the text fills them edge to edge.
+    <div className="mx-auto max-w-3xl space-y-4">
       <PageHeader title={t('nav.help')} />
       <Tabs
         label={t('nav.help')}
@@ -24,7 +27,9 @@ export function Help() {
         onChange={(id) => setTab(id as typeof tab)}
         tabs={HELP_TABS.tabs.map((item) => ({ id: item.id, label: t(item.labelKey) }))}
       />
-      {tab === 'support' ? <HelpPanel /> : <FaqPanel />}
+      {tab === 'shortcuts' && <ShortcutsPanel />}
+      {tab === 'faq' && <FaqPanel />}
+      {tab === 'support' && <HelpPanel />}
     </div>
   );
 }

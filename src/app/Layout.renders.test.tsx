@@ -7,7 +7,6 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { DEFAULT_MOBILE_TABS, useMobileTabs } from '@/lib/mobileTabs';
-import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 import { Layout } from './Layout';
 
@@ -111,7 +110,6 @@ beforeEach(() => {
     roles: [],
   });
   useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: true });
-  useSingleKeyShortcuts.setState({ value: true, hydrated: true });
 });
 
 describe('Layout render isolation from the query string', () => {

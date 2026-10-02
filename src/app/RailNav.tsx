@@ -111,20 +111,15 @@ function RailPage({
           />
         )}
         {shownViews.length > 0 && (
-          <>
-            <span aria-hidden="true" className="text-[0.625rem] text-text-dim tabular-nums">
-              {shownViews.length}
-            </span>
-            <IconButton
-              variant="plain"
-              size="sm"
-              onClick={onToggle}
-              aria-expanded={open}
-              aria-controls={listId}
-              label={t('nav.pageViews', { page: label, count: shownViews.length })}
-              icon={open ? <Icon.Expanded /> : <Icon.Descend />}
-            />
-          </>
+          <IconButton
+            variant="plain"
+            size="sm"
+            onClick={onToggle}
+            aria-expanded={open}
+            aria-controls={listId}
+            label={t('nav.pageViews', { page: label })}
+            icon={open ? <Icon.Expanded /> : <Icon.Descend />}
+          />
         )}
         {editing && canHide(page.path) && (
           <IconButton

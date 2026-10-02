@@ -73,6 +73,7 @@ describe('documentTitleFor', () => {
     '/wallet/loyalty',
     '/wallet/loyalty/:corporationId',
     '/travel/pilot',
+    '/settings/shortcuts',
     '/settings/faq',
     '/settings/help',
   ]);

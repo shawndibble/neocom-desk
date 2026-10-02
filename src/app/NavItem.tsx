@@ -67,8 +67,6 @@ export interface NavItemProps {
    * say different things in the places a destination appears.
    */
   presentation?: 'rail' | 'tab' | 'tile';
-  /** How many views the page holds — the More-sheet tile's corner count. */
-  viewCount?: number;
   className?: string;
   onClick?: () => void;
 }
@@ -87,7 +85,6 @@ export function NavItem({
   locked,
   badge,
   presentation = 'rail',
-  viewCount,
   className,
   onClick,
 }: NavItemProps) {
@@ -139,14 +136,6 @@ export function NavItem({
         <Glyph aria-hidden="true" className="shrink-0" size={tile ? ICON_SIZE.lg : ICON_SIZE.sm} />
       )}
       <span className="min-w-0 truncate">{label}</span>
-      {tile && viewCount !== undefined && viewCount > 0 && (
-        <span
-          aria-hidden="true"
-          className="absolute top-1 right-1.5 text-[0.625rem] font-medium text-text-dim tabular-nums"
-        >
-          {viewCount}
-        </span>
-      )}
       {counted && (
         <span
           aria-hidden="true"

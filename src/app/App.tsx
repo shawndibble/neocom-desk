@@ -45,7 +45,6 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale } from '@/lib/fontScale';
 import { useTimeFormat } from '@/lib/timeFormat';
 import { useMobileTabs } from '@/lib/mobileTabs';
-import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 
 // Wire authenticated ESI calls to stored tokens once, at module load. Wrapped
 // (tokenProvider.ts) so a dead refresh grant is reported centrally instead of
@@ -202,7 +201,8 @@ const ROUTE_ELEMENTS = {
   '/travel/pilot': <LegacyPathRedirect />,
   '/pilot-lookup': <PilotLookup />,
   '/settings': <Settings />,
-  // FAQ and Help left Settings for their own page; the old paths redirect for good.
+  // Shortcuts, FAQ and Help left Settings for their own page; the old paths redirect for good.
+  '/settings/shortcuts': <LegacyPathRedirect />,
   '/settings/faq': <LegacyPathRedirect />,
   '/settings/help': <LegacyPathRedirect />,
   '/help': <Help />,
@@ -275,13 +275,6 @@ export function App() {
     void hydrateHiddenNav();
     void hydrateRecentNav();
   }, [hydrateHiddenNav, hydrateRecentNav]);
-
-  // The shortcut listener in `Layout` reads the off switch on every route; a
-  // pilot who turned them off must not get a live "c" on a cold load.
-  const hydrateSingleKeyShortcuts = useSingleKeyShortcuts((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateSingleKeyShortcuts();
-  }, [hydrateSingleKeyShortcuts]);
 
   // `esi` publishes auth failures; the store is subscribed here so `esi` keeps
   // no dependency on `src/stores` (docs/ARCHITECTURE.md §2).

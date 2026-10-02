@@ -2,7 +2,7 @@
 //
 // Adding a key here is deliberately a THREE-file edit: this list, the pinned
 // literal in syncedSettings.test.ts, and the words that account for it in the
-// FAQ's "What We Store" line — `settings.faq.store.synced.settingsNote` plus
+// FAQ's "What We Store" line — `settings.faq.store.synced.settingsDetail.*` plus
 // its entry in FaqPanel.test.tsx's SETTING_KEY_TO_PHRASE, which fails until
 // whoever added the key decides what the reader is told. (That third file is
 // easy to miss running narrow tests; CI catches it.) The friction is the

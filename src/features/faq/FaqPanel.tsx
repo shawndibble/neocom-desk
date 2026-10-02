@@ -7,12 +7,11 @@ import { HELP_TABS } from '@/app/pageTabs';
 import { WHAT_WE_STORE_GROUPS, WHAT_WE_STORE_NOTES } from './whatWeStore';
 
 /**
- * `max-w-2xl` for the same reason the shortcuts list constrains itself: this is
- * prose, and prose set to the full page width at a wide viewport is measurably
- * harder to read. The page keeps one container width app-wide; content a wide
- * row would spoil narrows itself here.
+ * No width cap of its own: the Help page, the only place this renders, is
+ * narrowed to a readable measure as a whole (`routes/Help.tsx`), so the text
+ * fills its card rather than stopping short of the card's edge.
  */
-const PROSE = 'max-w-2xl space-y-3 text-sm';
+const PROSE = 'space-y-3 text-sm';
 
 const LINK = inlineLinkClassName;
 
@@ -42,13 +41,20 @@ export function FaqPanel() {
               <h3 className="text-xs font-semibold uppercase tracking-widest text-text">
                 {t(group.titleKey)}
               </h3>
-              <p className="text-xs text-text-dim">{t(group.descriptionKey)}</p>
+              <p className="text-text-dim">{t(group.descriptionKey)}</p>
               <ul className="list-disc space-y-1 pl-5 marker:text-text-faint">
                 {group.items.map((item) => (
                   <li key={item.id}>
                     {t(item.labelKey)}
                     {item.noteKey !== undefined && (
                       <span className="text-text-dim"> {t(item.noteKey)}</span>
+                    )}
+                    {item.detailKeys !== undefined && (
+                      <ul className="mt-1 list-[circle] space-y-1 pl-5 text-text-dim marker:text-text-faint">
+                        {item.detailKeys.map((key) => (
+                          <li key={key}>{t(key)}</li>
+                        ))}
+                      </ul>
                     )}
                   </li>
                 ))}
@@ -60,14 +66,14 @@ export function FaqPanel() {
             <h3 className="text-xs font-semibold uppercase tracking-widest text-text">
               {t('settings.faq.store.notesTitle')}
             </h3>
-            <ul className="space-y-2 text-xs text-text-dim">
+            <ul className="list-disc space-y-1.5 pl-5 text-text-dim marker:text-text-faint">
               {WHAT_WE_STORE_NOTES.map((key) => (
                 <li key={key}>{t(key)}</li>
               ))}
             </ul>
           </section>
 
-          <p className="text-xs text-text-dim">
+          <p className="text-text-dim">
             <Trans
               i18nKey="settings.faq.store.privacyLink"
               components={{

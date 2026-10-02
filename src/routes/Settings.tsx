@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { SETTINGS_TABS } from '@/app/pageTabs';
+import { HELP_TABS, SETTINGS_TABS } from '@/app/pageTabs';
 import { useIsPageIndex, usePageTab } from '@/lib/usePageTab';
 import { tabPath } from '@/lib/pageTabs';
 import {
@@ -57,12 +57,6 @@ import { useIsNarrow } from '@/lib/useIsNarrow';
 import { formatAge } from '@/lib/age';
 import { useTicker } from '@/lib/ticker';
 import { formatTimestamp } from '@/lib/timestamp';
-import {
-  SHORTCUTS,
-  commandPaletteDisplayKey,
-  isApplePlatform,
-  pasteDisplayKey,
-} from '@/lib/shortcuts';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { useMarketHub } from '@/features/market/hub';
 import { useMiningTaxOreValueMode } from '@/features/miningTax/oreValueMode';
@@ -95,7 +89,6 @@ import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { NotificationsPanel } from '@/features/notifications/NotificationsPanel';
 import { PermissionsPanel } from '@/features/permissions/PermissionsPanel';
 import { db } from '@/db';
-import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { exportBackupToFile, importBackup, type ImportSummary } from '@/backup/io';
 import { ENDPOINT_ROUTES } from '@/esi/endpointRoutes';
 import { useActivityLog, type ActivityLogEntry } from '@/stores/activityLog';
@@ -1045,10 +1038,12 @@ function CorpDefaultsPanel() {
  * the hash), and this is what carries it on to where the anchor's content now
  * lives.
  */
-const LEGACY_HASH_SECTIONS = {
-  '#shortcuts': 'shortcuts',
-  '#corp-access': 'permissions',
-} as const satisfies Record<string, SettingsSectionId>;
+const LEGACY_HASH_TARGETS: Readonly<Record<string, string>> = {
+  // Shortcuts left Settings for Help (scope decision
+  // `20261002-145653-lp-store-under-market-pilot-lookup-its-own`).
+  '#shortcuts': tabPath(HELP_TABS, 'shortcuts'),
+  '#corp-access': tabPath(SETTINGS_TABS, 'permissions'),
+};
 
 /**
  * One line per section for the phone list, from settings already in memory —
@@ -1059,7 +1054,6 @@ function usePhoneSummaries(): Partial<Record<SettingsSectionId, string>> {
   const { t } = useTranslation();
   const scale = useFontScale((state) => state.value);
   const timeFormat = useTimeFormat((state) => state.value);
-  const singleKeyShortcuts = useSingleKeyShortcuts((state) => state.value);
   const assumedMe = useAssumedMe((state) => state.value);
   const assumedTe = useAssumedTe((state) => state.value);
   const hub = useMarketHub((state) => state.value);
@@ -1076,7 +1070,6 @@ function usePhoneSummaries(): Partial<Record<SettingsSectionId, string>> {
       size: t(FONT_SCALE_LABEL_KEYS[scale]),
       format: t(`settings.timeFormat.${timeFormat}`),
     }),
-    shortcuts: t(singleKeyShortcuts ? 'settings.summary.on' : 'settings.summary.off'),
     industry: t('settings.summary.industry', {
       me: assumedMe,
       te: assumedTe,
@@ -1117,13 +1110,11 @@ export function Settings() {
   // needs its own hydrate here too, or the chip would paint the default until
   // Calendar happened to be visited (see `useHydratedStore`'s doc comment).
   const weekStartHydrated = useHydratedStore(useCalendarWeekStart);
-  const singleKeyShortcuts = useSingleKeyShortcuts((state) => state.value);
-  const setSingleKeyShortcuts = useSingleKeyShortcuts((state) => state.setValue);
   const { hash } = useLocation();
   const navigate = useNavigate();
   const [section] = usePageTab(SETTINGS_TABS);
-  // An old `#shortcuts` link is about to be carried on to its section: skip the list.
-  const isIndex = useIsPageIndex(SETTINGS_TABS) && !Object.hasOwn(LEGACY_HASH_SECTIONS, hash);
+  // An old `#shortcuts` link is about to be carried on to where it lives now: skip the list.
+  const isIndex = useIsPageIndex(SETTINGS_TABS) && !Object.hasOwn(LEGACY_HASH_TARGETS, hash);
   const corpAccess = useCorpAccess();
   const groups = useMemo(
     () => visibleSettingsGroups({ corp: corpAccess.state === 'ready' }),
@@ -1132,9 +1123,8 @@ export function Settings() {
 
   useEffect(() => {
     // `hasOwn`: a hash like `#constructor` must not resolve to an inherited member.
-    if (!Object.hasOwn(LEGACY_HASH_SECTIONS, hash)) return;
-    const target = LEGACY_HASH_SECTIONS[hash as keyof typeof LEGACY_HASH_SECTIONS];
-    navigate({ pathname: tabPath(SETTINGS_TABS, target) }, { replace: true });
+    if (!Object.hasOwn(LEGACY_HASH_TARGETS, hash)) return;
+    navigate({ pathname: LEGACY_HASH_TARGETS[hash] }, { replace: true });
   }, [hash, navigate]);
 
   if (isIndex) {
@@ -1205,71 +1195,6 @@ export function Settings() {
               </Panel>
               {isNarrow && <MobileTabsPanel />}
             </>
-          )}
-          {section === 'shortcuts' && (
-            <Panel title={t('shortcuts.title')}>
-              {/* `max-w-md` inside the full-width page frame: a description and its
-                key are a pair, and at the page's own width `justify-between` threw
-                them a thousand pixels apart with nothing in between. The page
-                keeps one container width app-wide (§3); content that a wide row
-                would make unreadable constrains itself, here. */}
-              <div className="mb-2 max-w-md space-y-1.5">
-                <label className="flex items-center gap-2 text-xs font-semibold">
-                  <Checkbox
-                    checked={singleKeyShortcuts}
-                    onChange={() => void setSingleKeyShortcuts(!singleKeyShortcuts)}
-                  />
-                  {t('shortcuts.enabledLabel')}
-                </label>
-                <p className="text-xs text-text-dim">
-                  {t(singleKeyShortcuts ? 'shortcuts.enabledHint' : 'shortcuts.disabledNote')}
-                </p>
-              </div>
-              <dl className="max-w-md divide-y divide-line text-xs">
-                {/* First, and outside `SHORTCUTS`: a modified chord, live
-                    whatever the single-key switch above says (`lib/shortcuts.ts`). */}
-                <div className="flex items-center justify-between gap-4 py-2">
-                  <dt className="text-text-dim">{t('shortcuts.openCommandPalette')}</dt>
-                  <dd>
-                    <kbd className="rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 font-mono text-[0.6875rem] text-text">
-                      {commandPaletteDisplayKey(isApplePlatform())}
-                    </kbd>
-                  </dd>
-                </div>
-                {SHORTCUTS.map((shortcut) => (
-                  <div key={shortcut.id} className="flex items-center justify-between gap-4 py-2">
-                    <dt className="text-text-dim">{t(shortcut.descriptionKey)}</dt>
-                    <dd>
-                      <kbd className="rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 font-mono text-[0.6875rem] text-text">
-                        {shortcut.displayKey}
-                      </kbd>
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </Panel>
-          )}
-          {section === 'shortcuts' && (
-            <Panel title={t('shortcuts.pasteTitle')}>
-              {/* The app-wide paste router (`app/GlobalPasteRouter.tsx`). */}
-              <p className="mb-2 max-w-md text-xs text-text-dim">{t('shortcuts.pasteHint')}</p>
-              <dl className="max-w-md divide-y divide-line text-xs">
-                <div className="flex items-center justify-between gap-4 py-2">
-                  <dt className="text-text-dim">{t('shortcuts.paste')}</dt>
-                  <dd>
-                    <kbd className="rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 font-mono text-[0.6875rem] text-text">
-                      {pasteDisplayKey(isApplePlatform())}
-                    </kbd>
-                  </dd>
-                </div>
-                {(['pasteFitting', 'pasteItems'] as const).map((key) => (
-                  <div key={key} className="flex items-center justify-between gap-4 py-2">
-                    <dt className="text-text-dim">{t(`shortcuts.${key}`)}</dt>
-                    <dd className="text-text">{t(`shortcuts.${key}Opens`)}</dd>
-                  </div>
-                ))}
-              </dl>
-            </Panel>
           )}
           {/*
             The Corporation row in here is the only way in to corp access for a

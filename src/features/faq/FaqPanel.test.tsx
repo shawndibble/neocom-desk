@@ -22,44 +22,44 @@ function renderFaq() {
  */
 const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.notificationFeedPrefs': /notification preferences/i,
-  'sync.piCustomsRates': /customs rates/i,
+  'sync.piCustomsRates': /customs rate overrides/i,
   'sync.marketHub': /trade hub/i,
-  'sync.marketPricePercent': /appraisal price percentage/i,
+  'sync.marketPricePercent': /appraisal price %/i,
   'sync.industryFacilityDefaults': /industry facility/i,
   'sync.industryReactionFacilityDefaults': /reaction facility/i,
-  'sync.industryAssumedMe': /assumed ME/,
-  'sync.industryAssumedTe': /assumed TE/,
-  'sync.industryBuildGroups': /industry build groups/i,
+  'sync.industryAssumedMe': /assumed ME\/TE/,
+  'sync.industryAssumedTe': /assumed ME\/TE/,
+  'sync.industryBuildGroups': /build groups/i,
   'sync.piExpiringSoonHours': /expiring-soon window/i,
   'sync.corpDarkAfterDays': /dark threshold/i,
   'sync.defaultCharacterFilter': /default characters shown/i,
-  'sync.spExtractionMonitoringEnabled': /SP Extraction monitoring is on/i,
-  'sync.spExtractionThresholdSp': /SP threshold you set/i,
-  'sync.industryIncludeBlueprintCost': /blueprint cost counts toward Industry profit/i,
+  'sync.spExtractionMonitoringEnabled': /SP Extraction monitoring/i,
+  'sync.spExtractionThresholdSp': /SP Extraction monitoring and its threshold/i,
+  'sync.industryIncludeBlueprintCost': /blueprint cost counts toward profit/i,
   'sync.loyaltyLpValue': /ISK-per-LP value/i,
-  'sync.fittingDamageProfiles': /fitting damage profiles you made/i,
-  'sync.fittingDamageProfileId': /which one fittings are measured against/i,
-  'sync.fittingTargetProfiles': /fitting target profiles you made/i,
-  'sync.fittingTargetProfileId': /which one applied DPS is worked out against/i,
-  'sync.skillCloneStates': /Alpha or Omega/i,
+  'sync.fittingDamageProfiles': /damage and target profiles/i,
+  'sync.fittingDamageProfileId': /which ones are active/i,
+  'sync.fittingTargetProfiles': /damage and target profiles/i,
+  'sync.fittingTargetProfileId': /which ones are active/i,
+  'sync.skillCloneStates': /Alpha\/Omega/i,
   'sync.miningTaxManualMoonOreTypeIds': /ore types you tagged/i,
   'sync.miningTaxManualIgnoredTypeIds': /ore types you tagged/i,
-  'sync.miningTaxOreValueMode': /edits ore values individually/i,
+  'sync.miningTaxOreValueMode': /Assign form edits ore values/i,
   'sync.courierHighCollateralRatio': /courier collateral warning/i,
   'sync.bpcHideAuctions': /hide auctions/i,
-  'sync.bpcHidePlex': /hide PLEX contracts/i,
-  'sync.targetSkillPlan': /which skill plan you're adding skills to/i,
-  'sync.overviewHiddenCards': /Overview cards you hid/i,
-  'sync.navHidden': /pages you hid from the navigation/i,
-  'sync.overviewCardOrder': /order you put them in/i,
-  'sync.avoidedSystems': /systems you avoid/i,
-  'sync.avoidedSystemsEnabled': /systems you avoid/i,
+  'sync.bpcHidePlex': /hide PLEX/i,
+  'sync.targetSkillPlan': /target skill plan/i,
+  'sync.overviewHiddenCards': /hidden and reordered Overview cards/i,
+  'sync.navHidden': /pages hidden from the navigation/i,
+  'sync.overviewCardOrder': /hidden and reordered Overview cards/i,
+  'sync.avoidedSystems': /avoided systems/i,
+  'sync.avoidedSystemsEnabled': /whether the list is on/i,
   'sync.routePreference': /route preference/i,
   'sync.routeSecurityPenalty': /security penalty/i,
   'sync.avoidEdencom': /EDENCOM/,
   'sync.avoidTriglavian': /Triglavian/,
-  'sync.avoidPodKills': /pod kills/i,
-  'sync.podKillThreshold': /pod kills/i,
+  'sync.avoidPodKills': /pod-kill/i,
+  'sync.podKillThreshold': /with your threshold/i,
 };
 
 function syncedItemIds(): Set<string> {
@@ -133,7 +133,11 @@ describe('FaqPanel — What We Store', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /kept on this device only/i })).toBeInTheDocument();
 
-    const lines = WHAT_WE_STORE_GROUPS.flatMap((g) => g.items).length + WHAT_WE_STORE_NOTES.length;
+    const items = WHAT_WE_STORE_GROUPS.flatMap((g) => g.items);
+    const lines =
+      items.length +
+      items.reduce((sum, item) => sum + (item.detailKeys?.length ?? 0), 0) +
+      WHAT_WE_STORE_NOTES.length;
     expect(screen.getAllByRole('listitem')).toHaveLength(lines);
   });
 
@@ -146,14 +150,17 @@ describe('FaqPanel — What We Store', () => {
     expect(screen.queryByRole('heading', { name: /never collected/i })).not.toBeInTheDocument();
   });
 
-  it('states the three cases where something does leave the device', () => {
+  it('states the cases where something does leave the device', () => {
     // The section is worth less than nothing if it overclaims. These three are
     // the real exceptions, and each is named rather than implied.
     renderFaq();
 
-    expect(screen.getByText(/push notifications, if you turn them on/i)).toBeInTheDocument();
+    expect(screen.getByText(/push notifications, if on/i)).toBeInTheDocument();
     expect(screen.getByText(/crash reports/i)).toBeInTheDocument();
-    expect(screen.getByText(/removing a character only clears it/i)).toBeInTheDocument();
+    expect(screen.getByText(/writes to EVE, only when you act/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/removing a character clears it from this device only/i)
+    ).toBeInTheDocument();
   });
 
   it('says when a removed character’s synced copy actually leaves our servers', () => {
@@ -162,13 +169,13 @@ describe('FaqPanel — What We Store', () => {
     // would be the one outright false sentence in the section.
     renderFaq();
     expect(
-      screen.getByText(/no device has synced that character for 90 days/i)
+      screen.getByText(/deleted after 90 days with no device syncing it/i)
     ).toBeInTheDocument();
   });
 
   it('does not claim EVE data is uploaded', () => {
     renderFaq();
-    expect(screen.getByText(/none of it is uploaded/i)).toBeInTheDocument();
+    expect(screen.getByText(/never uploaded/i)).toBeInTheDocument();
   });
 
   it('points to the Help page’s Support tab', () => {

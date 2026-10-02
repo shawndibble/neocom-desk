@@ -124,7 +124,7 @@ describe('createCommandsProvider', () => {
     runFirst('settings');
     expect(navigate).toHaveBeenLastCalledWith('/settings');
     runFirst('keyboard');
-    expect(navigate).toHaveBeenLastCalledWith('/settings/shortcuts');
+    expect(navigate).toHaveBeenLastCalledWith('/help/shortcuts');
     runFirst('notification');
     expect(navigate).toHaveBeenLastCalledWith('/alerts');
     runFirst('add char');
