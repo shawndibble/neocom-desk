@@ -13,6 +13,7 @@ import {
   SkillBar,
   Spinner,
   StatChip,
+  StatChips,
   IconButton,
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -360,7 +361,7 @@ export function Skills() {
       />
       <SkillsSubNav />
 
-      <div className="flex flex-wrap items-center gap-2">
+      <StatChips>
         <StatChip
           label={t('skills.totalSp')}
           value={
@@ -377,7 +378,7 @@ export function Skills() {
               : t('common.unknown')
           }
         />
-      </div>
+      </StatChips>
 
       {loading && !data ? (
         <div className="flex justify-center py-16">

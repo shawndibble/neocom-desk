@@ -29,6 +29,7 @@ import {
   SelectValue,
   Spinner,
   StatChip,
+  StatChips,
   STAT_CHIP_TONE_TEXT_CLASS,
   TextInput,
   Toast,
@@ -400,7 +401,7 @@ function CharacterCard({
           />
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <StatChips>
         <StatChip
           label={t('characters.spLabel')}
           value={
@@ -440,7 +441,7 @@ function CharacterCard({
             }
           />
         )}
-      </div>
+      </StatChips>
     </li>
   );
 }

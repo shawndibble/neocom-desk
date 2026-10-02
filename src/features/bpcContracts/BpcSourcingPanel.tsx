@@ -26,6 +26,7 @@ import {
   SearchInput,
   Spinner,
   StatChip,
+  StatChips,
   TextInput,
   type DataTableColumn,
 } from '@/components/ui';
@@ -1597,30 +1598,32 @@ export function BpcSourcingPanel() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 md:ml-auto">
-                {summary.cheapest !== null && (
-                  <StatChip
-                    label={t('bpcContracts.cheapestLabel')}
-                    value={<IskAmount value={summary.cheapest} revealOn="tap" />}
-                  />
-                )}
-                {summary.cheapestPerRun !== null && (
-                  <StatChip
-                    label={t('bpcContracts.cheapestPerRunLabel')}
-                    value={<IskAmount value={summary.cheapestPerRun} revealOn="tap" />}
-                  />
-                )}
-                {summary.median !== null && (
-                  <StatChip
-                    label={t('bpcContracts.medianLabel')}
-                    value={<IskAmount value={summary.median} revealOn="tap" />}
-                  />
-                )}
-                {summary.bestMe !== null && summary.bestTe !== null && (
-                  <StatChip
-                    label={t('bpcContracts.bestMeTeLabel')}
-                    value={`${summary.bestMe} / ${summary.bestTe}`}
-                  />
-                )}
+                <StatChips>
+                  {summary.cheapest !== null && (
+                    <StatChip
+                      label={t('bpcContracts.cheapestLabel')}
+                      value={<IskAmount value={summary.cheapest} revealOn="tap" />}
+                    />
+                  )}
+                  {summary.cheapestPerRun !== null && (
+                    <StatChip
+                      label={t('bpcContracts.cheapestPerRunLabel')}
+                      value={<IskAmount value={summary.cheapestPerRun} revealOn="tap" />}
+                    />
+                  )}
+                  {summary.median !== null && (
+                    <StatChip
+                      label={t('bpcContracts.medianLabel')}
+                      value={<IskAmount value={summary.median} revealOn="tap" />}
+                    />
+                  )}
+                  {summary.bestMe !== null && summary.bestTe !== null && (
+                    <StatChip
+                      label={t('bpcContracts.bestMeTeLabel')}
+                      value={`${summary.bestMe} / ${summary.bestTe}`}
+                    />
+                  )}
+                </StatChips>
                 <IconButton
                   icon={<Icon.Close />}
                   label={t('bpcContracts.clearBlueprint', { name: selectedName })}

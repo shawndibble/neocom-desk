@@ -13,7 +13,7 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { IskAmount, Panel, StatChip } from '@/components/ui';
+import { IskAmount, Panel, StatChip, StatChips } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { VITALS_WINDOW_DAYS, vitalsFigures, type VitalsJournalEntry } from '@/engine/corp/vitals';
 import type { WalletDivision } from './divisions';
@@ -110,7 +110,7 @@ export function CorpVitalsRail({
             );
           })}
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <StatChips>
           <StatChip
             label={t('corp.vitals.total')}
             value={<IskAmount value={total} revealOn="tap" />}
@@ -138,7 +138,7 @@ export function CorpVitalsRail({
             }
             tone={runway !== null && runway < RUNWAY_WARNING_DAYS ? 'warning' : 'default'}
           />
-        </div>
+        </StatChips>
       </div>
     </Panel>
   );

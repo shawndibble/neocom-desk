@@ -45,6 +45,7 @@ import {
   SelectValue,
   Spinner,
   StatChip,
+  StatChips,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -698,15 +699,17 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           meta={
             <div className="flex flex-wrap items-center gap-2">
               {offersFetchedAt && <DataAgeBadge date={offersFetchedAt} />}
-              <StatChip
-                label={t('loyaltyStore.yourLp')}
-                value={playerLp.toLocaleString()}
-                tone="accent"
-              />
-              <StatChip
-                label={t('loyaltyStore.offersShown')}
-                value={`${filteredRows.length} / ${rows.length}`}
-              />
+              <StatChips>
+                <StatChip
+                  label={t('loyaltyStore.yourLp')}
+                  value={playerLp.toLocaleString()}
+                  tone="accent"
+                />
+                <StatChip
+                  label={t('loyaltyStore.offersShown')}
+                  value={`${filteredRows.length} / ${rows.length}`}
+                />
+              </StatChips>
             </div>
           }
           actions={<LpStorePicker corporationName={corpName} className={PICKER_CLASS} />}
