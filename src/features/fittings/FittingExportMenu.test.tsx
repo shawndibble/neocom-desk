@@ -7,13 +7,17 @@ import { configureClipboard } from '@/lib/clipboard';
 import { decodeFittingShare } from '@/engine/fitting/fittingShare';
 import type { Fitting } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
-import { createShareLink } from '@/features/share/shareStore';
+import { createShareLink, existingShareLink } from '@/features/share/shareStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FittingExportMenu } from './FittingExportMenu';
 
 vi.mock('@/features/share/shareStore', () => ({
-  existingShareLink: () => null,
+  existingShareLink: vi.fn(() => null),
   createShareLink: vi.fn(async () => 'https://neocomdesk.com/share/abc123XYZ'),
+}));
+vi.mock('@/app/syncStatus', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/app/syncStatus')>()),
+  isSyncConfigured: () => true,
 }));
 
 const download = vi.hoisted(() => vi.fn());
@@ -102,6 +106,16 @@ describe('FittingExportMenu', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Share Link copied — it works for 7 days'
     );
+  });
+
+  it('copies a link already made for this fit without storing another', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+    vi.mocked(existingShareLink).mockReturnValue('https://neocomdesk.com/share/made1Earl');
+    const copied = setup();
+    await choose('Copy Share Link');
+    await waitFor(() => expect(copied).toEqual(['https://neocomdesk.com/share/made1Earl']));
+    expect(createShareLink).not.toHaveBeenCalled();
+    vi.mocked(existingShareLink).mockReturnValue(null);
   });
 
   it('says so when the Share Link could not be stored, copying nothing', async () => {

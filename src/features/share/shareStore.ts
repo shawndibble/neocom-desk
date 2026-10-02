@@ -48,14 +48,17 @@ export async function saveShare(input: {
   payload: unknown;
   /** Signs in as this Character if no Firebase session exists yet. */
   characterId: number;
-}): Promise<void> {
+}): Promise<number> {
   await ensureAnySession(input.characterId);
+  const expiresAt = Date.now() + SHARE_TTL_MS;
   await setDoc(doc(getSyncFirestore(), SHARES_COLLECTION, input.id), {
     type: input.type,
     payload: input.payload,
     createdAt: serverTimestamp(),
-    expiresAt: Timestamp.fromMillis(Date.now() + SHARE_TTL_MS),
+    expiresAt: Timestamp.fromMillis(expiresAt),
   });
+  /** Epoch millis the stored share expires at — exactly what was written. */
+  return expiresAt;
 }
 
 /**
@@ -92,8 +95,12 @@ export async function createShareLink(input: {
   const existing = existingShareLink(input.type, input.reuseKey);
   if (existing !== null) return existing;
   const id = generateShareId();
-  const expiresAt = Date.now() + SHARE_TTL_MS;
-  await saveShare({ id, type: input.type, payload: input.payload, characterId: input.characterId });
+  const expiresAt = await saveShare({
+    id,
+    type: input.type,
+    payload: input.payload,
+    characterId: input.characterId,
+  });
   const url = shareUrl(id);
   madeThisSession.set(reuseSlot(input.type, input.reuseKey), { url, expiresAt });
   return url;

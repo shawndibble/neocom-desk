@@ -86,7 +86,9 @@ _Recorded 2026-10-02._
 - **The id is minted on the client, and the link is copied only once the doc
   is stored.** A failed save copies nothing. A save can outlast the click's
   user activation, as on Safari, and the copy is then refused. The panel then
-  shows the link in a field with its own Copy button instead of losing it.
+  shows the link in a field with its own Copy button instead of losing it. The
+  Fitting Export menu instead says to choose Copy Share Link again: the link is
+  made by then, so that press copies it with no await.
 
 - **"Open Neocom Desk" lands on the page the share came from, filled in.** For
   a Shared Appraisal that is

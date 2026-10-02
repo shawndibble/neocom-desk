@@ -10,6 +10,7 @@ import type { Fitting } from '@/engine/fittings/types';
 import { fittingSharePayload } from '@/engine/fitting/fittingSharePayload';
 import { createShareLink, existingShareLink } from '@/features/share/shareStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { isSyncConfigured } from '@/app/syncStatus';
 import { exportFitting, fittingShareCode, type FittingExportKind } from './fittingExportText';
 
 const NOTICE_MS = 2500;
@@ -23,6 +24,20 @@ export function useFittingExport(fitting: Fitting) {
   const navigate = useNavigate();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // This Fitting's Fitting Share Code, encoded as it changes rather than on
+  // the click — encoding awaits a compressor, and a copy after that await can
+  // fall outside the click on Safari.
+  const [encoded, setEncoded] = useState<{ fitting: Fitting; code: string | null } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void fittingShareCode(fitting).then((code) => {
+      if (!cancelled) setEncoded({ fitting, code });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fitting]);
 
   useEffect(() => {
     if (notice === null) return;
@@ -51,14 +66,16 @@ export function useFittingExport(fitting: Fitting) {
    * made — choosing it again copies it straight away, inside the click.
    */
   async function copyShareLink() {
-    const code = await fittingShareCode(fitting);
+    // The code encoded ahead of time keeps a reused link's copy free of any
+    // await, so it stays inside the click — which is the whole retry path.
+    const code = encoded?.fitting === fitting ? encoded.code : await fittingShareCode(fitting);
     if (code === null) {
       setNotice(t('fittings.export.tooLarge'));
       return;
     }
     let url = existingShareLink('fitting', code);
     if (url === null) {
-      if (characterId === null) {
+      if (characterId === null || !isSyncConfigured()) {
         setNotice(t('fittings.export.shareFailed'));
         return;
       }

@@ -34,6 +34,10 @@ export function ShareShell({ title, actions, openInApp, children }: ShareShellPr
   const { t } = useTranslation();
   const characterCount = useLiveQuery(() => db.characters.count());
   const signedOut = characterCount === 0;
+  // Until the count loads, the link goes straight to the target but still
+  // stashes it: a visitor who turns out to have no Character is bounced to
+  // login by `RequireCharacter`, and lands back on the target after.
+  const loading = characterCount === undefined;
   const target = openInApp ?? { path: '/' };
 
   return (
@@ -49,7 +53,7 @@ export function ShareShell({ title, actions, openInApp, children }: ShareShellPr
       <Link
         to={signedOut ? '/login' : target.path}
         state={signedOut ? undefined : target.state}
-        onClick={signedOut ? () => setLoginReturnTo(target.path) : undefined}
+        onClick={signedOut || loading ? () => setLoginReturnTo(target.path) : undefined}
         className={buttonClassName({ size: 'sm' })}
       >
         {t('share.openInApp')}
