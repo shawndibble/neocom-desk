@@ -20,6 +20,16 @@ export interface MarketAppraiseState {
 }
 
 /**
+ * Router `location.state` shape the app-wide paste router
+ * (`app/GlobalPasteRouter.tsx`) navigates the Fittings tab with: a pasted EFT
+ * fit, opened in the editor on arrival. Shared so the producer and the
+ * consumer (`routes/Fittings.tsx`) can't silently drift apart.
+ */
+export interface FittingLoadState {
+  readonly fittingLoadText: string;
+}
+
+/**
  * Router `location.state` shape a Fitting's Export menu navigates `/industry`
  * with: the fit's EFT text, pre-filled and parsed into the Fit Import dialog
  * on arrival ("Manufacture Plan"). Shared so the producer

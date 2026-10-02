@@ -7,6 +7,8 @@ export interface ToastProps {
   message: ReactNode;
   /** Present together, or not at all — a toast with an undo action needs both. */
   undo?: { label: string; onUndo: () => void };
+  /** Any other single follow-up the toast offers ("Open", "Appraise"). */
+  action?: { label: string; onAction: () => void };
 }
 
 /**
@@ -26,7 +28,7 @@ export interface ToastProps {
  * layer, so a toast on `document.body` would render behind its backdrop. That
  * container has no transformed ancestor, so `fixed` still pins to the viewport.
  */
-export function Toast({ message, undo }: ToastProps) {
+export function Toast({ message, undo, action }: ToastProps) {
   const portalContainer = usePortalContainer();
   return createPortal(
     <div
@@ -37,6 +39,11 @@ export function Toast({ message, undo }: ToastProps) {
       {undo && (
         <button type="button" className={inlineLinkClassName} onClick={undo.onUndo}>
           {undo.label}
+        </button>
+      )}
+      {action && (
+        <button type="button" className={inlineLinkClassName} onClick={action.onAction}>
+          {action.label}
         </button>
       )}
     </div>,

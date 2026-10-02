@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fittingCompareHref, fittingsRedirect } from '@/features/fittings/fittingRoutes';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -7,6 +7,7 @@ import { formatIskCompact } from '@/lib/isk';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import type { FittingLoadState } from '@/lib/shortcuts';
 import { Button, Disclosure, Modal, Panel, SlideOver, Tabs, TextInput } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
@@ -172,6 +173,17 @@ function FittingsPage() {
     () => (workspace.savedId === null ? undefined : db.fittings.get(workspace.savedId)),
     [workspace.savedId]
   );
+  // The app-wide paste router (`app/GlobalPasteRouter.tsx`) lands here with
+  // a pasted EFT fit to open. Keyed on the navigation itself so a re-render
+  // never re-loads it (mirrors Market.tsx's `appraiseText` handling).
+  const handledLoadKey = useRef<string | null>(null);
+  const { loadFromInput } = workspace;
+  useEffect(() => {
+    const text = (location.state as Partial<FittingLoadState> | null)?.fittingLoadText;
+    if (!text || handledLoadKey.current === location.key) return;
+    handledLoadKey.current = location.key;
+    void loadFromInput(text);
+  }, [location.key, location.state, loadFromInput]);
   const currentShareCode = new URLSearchParams(location.search).get('f');
   const hasUnsavedEdits =
     workspace.savedId !== null &&

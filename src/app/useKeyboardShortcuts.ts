@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { OVERLAY_SELECTOR, SHORTCUTS } from '@/lib/shortcuts';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 
-function isTypingTarget(target: EventTarget | null): boolean {
+/** A field the pilot types into — global keys and pastes leave it alone. */
+export function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
   return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';

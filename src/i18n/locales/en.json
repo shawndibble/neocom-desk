@@ -6221,6 +6221,12 @@
       "corpRolesUnknown": "Corporation roles show once granted."
     }
   },
+  "pasteRouter": {
+    "fitting": "Pasted a fitting",
+    "appraisal": "Pasted an item list",
+    "openFitting": "Open in Fittings",
+    "openAppraisal": "Appraise"
+  },
   "commandPalette": {
     "title": "Command palette",
     "placeholder": "Go to a page, run a command, switch character, find an asset or item…",
