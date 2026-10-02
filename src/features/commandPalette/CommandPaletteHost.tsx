@@ -27,7 +27,7 @@ const ItemDetailModal = lazy(() =>
  *
  * Also opened from the rail's Go to button and the More sheet's search field
  * (scope decision `20261002-145653-go-to-button-opens-the-command-palette`),
- * through the same store. Settings › Keyboard shortcuts lists the chord.
+ * through the same store. Help › Shortcuts lists the chord.
  *
  * The palette mounts only while open, so its live reads (Characters, corp
  * access) cost nothing the rest of the time and every opening starts clean.

@@ -240,14 +240,6 @@ export const NAV_PAGES = [
     gating: 'ungated',
     mobileTab: true,
   },
-  {
-    path: '/settings',
-    labelKey: 'nav.settings',
-    group: 'footer',
-    gating: 'ungated',
-    mobileTab: false,
-    corpTabs: ['corporation'],
-  },
   /*
    * Help is not a setting: FAQ and Support left Settings for this footer page.
    * Like Settings, it keeps a permanent row in the More sheet rather than a
@@ -259,6 +251,14 @@ export const NAV_PAGES = [
     group: 'footer',
     gating: 'ungated',
     mobileTab: false,
+  },
+  {
+    path: '/settings',
+    labelKey: 'nav.settings',
+    group: 'footer',
+    gating: 'ungated',
+    mobileTab: false,
+    corpTabs: ['corporation'],
   },
   /*
    * Last: on the rail it is reached only via `CharacterFooterLink`'s portrait,

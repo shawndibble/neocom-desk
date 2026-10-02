@@ -1,12 +1,13 @@
-import { Fragment, useId, useMemo, useState } from 'react';
+import { Fragment, memo, useCallback, useId, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton } from '@/components/ui';
+import { Caret } from '@/components/ui/Disclosure';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { commandPaletteDisplayKey, isApplePlatform } from '@/lib/shortcuts';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
-import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
+import { useActiveCorporationId } from '@/features/corp/owner';
 import { useCommandPalette } from '@/features/commandPalette/store';
 import { useLockedRoutes } from './useGrantedScopes';
 import {
@@ -17,9 +18,9 @@ import {
   type NavPage,
   type NavPagePath,
 } from './navDestinations';
-import { canHide, currentPagePath, viewPathFor, viewsByPage } from './navRail';
-import { toggleHiddenNav, useHiddenNav } from './navPreferences';
-import { CorpNavItem, NavItem } from './NavItem';
+import { canHide, navPlaceFor, viewsByPage } from './navRail';
+import { useHiddenNav } from './navPreferences';
+import { NavHideToggle, NavItem } from './NavItem';
 
 const APPLE = isApplePlatform();
 const RAIL_GROUPS = railGroups();
@@ -63,7 +64,7 @@ interface RailPageProps {
   page: NavPage;
   views: readonly NavDestination[];
   open: boolean;
-  onToggle: () => void;
+  onToggle: (path: string) => void;
   locked: boolean;
   badge?: number;
   hidden: ReadonlySet<string>;
@@ -76,7 +77,7 @@ interface RailPageProps {
  * navigates; the caret beside it only opens or closes the list, so a pilot can
  * look inside a page without leaving the one they are on.
  */
-function RailPage({
+const RailPage = memo(function RailPage({
   page,
   views,
   open,
@@ -99,37 +100,27 @@ function RailPage({
   return (
     <div>
       <div className="flex items-center gap-0.5">
-        {page.gating === 'corp' ? (
-          <CorpNavItem className="flex-1" />
-        ) : (
-          <NavItem
-            to={page.path}
-            label={label}
-            locked={locked}
-            badge={badge}
-            className={cx('flex-1', pageHidden && 'line-through opacity-60')}
-          />
-        )}
+        {/* Corp is listed only while visible (`RailNavBody` filters it), and never locked. */}
+        <NavItem
+          to={page.path}
+          label={label}
+          locked={locked}
+          badge={badge}
+          className={cx('flex-1', pageHidden && 'line-through opacity-60')}
+        />
         {shownViews.length > 0 && (
           <IconButton
             variant="plain"
             size="sm"
-            onClick={onToggle}
+            onClick={() => onToggle(page.path)}
             aria-expanded={open}
             aria-controls={listId}
             label={t('nav.pageViews', { page: label })}
-            icon={open ? <Icon.Expanded /> : <Icon.Descend />}
+            icon={<Caret expanded={open} />}
           />
         )}
         {editing && canHide(page.path) && (
-          <IconButton
-            variant="plain"
-            size="sm"
-            icon={pageHidden ? <Icon.NavHidden /> : <Icon.NavShown />}
-            label={t('nav.showInNav', { page: label })}
-            pressed={!pageHidden}
-            onClick={() => toggleHiddenNav(page.path)}
-          />
+          <NavHideToggle path={page.path} label={label} hidden={pageHidden} />
         )}
       </div>
       {open && shownViews.length > 0 && (
@@ -160,14 +151,7 @@ function RailPage({
                   )}
                 </Link>
                 {editing && (
-                  <IconButton
-                    variant="plain"
-                    size="sm"
-                    icon={viewHidden ? <Icon.NavHidden /> : <Icon.NavShown />}
-                    label={t('nav.showInNav', { page: view.label })}
-                    pressed={!viewHidden}
-                    onClick={() => toggleHiddenNav(view.path)}
-                  />
+                  <NavHideToggle path={view.path} label={view.label} hidden={viewHidden} />
                 )}
               </li>
             );
@@ -176,7 +160,7 @@ function RailPage({
       )}
     </div>
   );
-}
+});
 
 /**
  * The desktop rail's pages (scope decision
@@ -187,16 +171,31 @@ function RailPage({
  * hid stay out, unless one is where they are — the rail always shows the
  * pilot where they stand.
  *
- * Its own component because it reads the location, which `Layout` must not.
+ * Its own component because it reads the location, which `Layout` must not;
+ * the body is memoized on the place it derives, so a query-string write (a
+ * page's filters, as the pilot types) re-renders this wrapper alone.
  */
 export function RailNav({ unreadAlerts }: { unreadAlerts: number }) {
-  const { t } = useTranslation();
   const { pathname } = useLocation();
-  const current = currentPagePath(pathname);
-  const activeViewPath = viewPathFor(pathname);
+  const { pagePath, viewPath } = navPlaceFor(pathname);
+  return <RailNavBody unreadAlerts={unreadAlerts} current={pagePath} activeViewPath={viewPath} />;
+}
+
+const RailNavBody = memo(function RailNavBody({
+  unreadAlerts,
+  current,
+  activeViewPath,
+}: {
+  unreadAlerts: number;
+  current: NavPagePath | null;
+  activeViewPath: string | null;
+}) {
+  const { t } = useTranslation();
   const locked = useLockedRoutes(NAV_LOCK_PATHS);
-  const corpVisible = useCorpNavVisible();
-  const { capabilities } = useCorpAccess();
+  // One corp-access read for the rail (`useCorpNavVisible` is the same read).
+  const { state: corpState, capabilities } = useCorpAccess();
+  const corporationId = useActiveCorporationId();
+  const corpVisible = corpState === 'ready' && corporationId !== null;
   const hiddenList = useHiddenNav((state) => state.value);
   const hidden = useMemo(() => new Set(hiddenList), [hiddenList]);
   const [editing, setEditing] = useState(false);
@@ -216,6 +215,10 @@ export function RailNav({ unreadAlerts }: { unreadAlerts: number }) {
   );
 
   const hiddenCount = hiddenList.filter((path) => canHide(path)).length;
+  const toggleOpen = useCallback(
+    (path: string) => setOpen((state) => ({ ...state, path: state.path === path ? null : path })),
+    []
+  );
 
   return (
     <>
@@ -249,12 +252,7 @@ export function RailNav({ unreadAlerts }: { unreadAlerts: number }) {
                   page={page}
                   views={views.get(page.path) ?? []}
                   open={open.path === page.path}
-                  onToggle={() =>
-                    setOpen((state) => ({
-                      ...state,
-                      path: state.path === page.path ? null : page.path,
-                    }))
-                  }
+                  onToggle={toggleOpen}
                   locked={page.gating === 'scope' && locked.has(page.path)}
                   badge={page.path === '/alerts' ? unreadAlerts : undefined}
                   hidden={hidden}
@@ -278,4 +276,4 @@ export function RailNav({ unreadAlerts }: { unreadAlerts: number }) {
       </nav>
     </>
   );
-}
+});

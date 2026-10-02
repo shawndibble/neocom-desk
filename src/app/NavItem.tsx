@@ -1,14 +1,14 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ICON_SIZE } from '@/components/ui/icons';
+import { IconButton } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
 import { useGrantedScopes } from './useGrantedScopes';
 import { warmRoute } from './routeWarm';
 import { preloadRouteChunk } from './routeChunks';
-import { navPageLabelKey, type NavPagePath } from './navDestinations';
-import { NAV_ICONS } from './navIcons';
+import { NAV_ICON_BY_PATH } from './navIcons';
+import { toggleHiddenNav } from './navPreferences';
 import type { AppRoutePath } from './routeScopes';
 
 // `min-h-11 md:min-h-0`: the rail row is mouse-operated with room to spare, so
@@ -116,7 +116,7 @@ export function NavItem({
   const tab = presentation === 'tab';
   const tile = presentation === 'tile';
   const counted = badge !== undefined && badge > 0;
-  const Glyph = NAV_ICONS[to as NavPagePath];
+  const Glyph = NAV_ICON_BY_PATH[to];
   const linkClass = tab ? mobileNavClass : tile ? tileClass : navClass;
   // The lock marker rides on `title`, and the count on `aria-label`: a second
   // string inside the link would rewrite its accessible name from "Assets" to
@@ -133,7 +133,11 @@ export function NavItem({
       aria-label={counted ? t('nav.alertsWithCount', { count: badge }) : undefined}
     >
       {Glyph && (
-        <Glyph aria-hidden="true" className="shrink-0" size={tile ? ICON_SIZE.lg : ICON_SIZE.sm} />
+        <Glyph
+          aria-hidden="true"
+          className="shrink-0"
+          size={tile ? Icon.ICON_SIZE.lg : Icon.ICON_SIZE.sm}
+        />
       )}
       <span className="min-w-0 truncate">{label}</span>
       {counted && (
@@ -163,28 +167,30 @@ export function NavItem({
 }
 
 /**
- * The Corp section's entry, present only while `useCorpNavVisible()` says so.
- *
- * `locked` is hard-wired false rather than read from `useLockedRoutes`: there
- * is no state in which this renders and is unusable, and the amber dot would
- * offer a re-login for a role only CCP can grant.
+ * The hide editor's toggle for one page or view, in the rail and the More
+ * sheet: one fixed name, with `aria-pressed` saying whether it is shown.
  */
-export function CorpNavItem({
-  presentation,
+export function NavHideToggle({
+  path,
+  label,
+  hidden,
   className,
-  onClick,
-}: Pick<NavItemProps, 'presentation' | 'className' | 'onClick'>) {
+}: {
+  path: string;
+  label: string;
+  hidden: boolean;
+  className?: string;
+}) {
   const { t } = useTranslation();
-  const visible = useCorpNavVisible();
-  if (!visible) return null;
   return (
-    <NavItem
-      to="/corp"
-      label={t(navPageLabelKey('/corp'))}
-      locked={false}
-      presentation={presentation}
+    <IconButton
+      variant="plain"
+      size="sm"
       className={className}
-      onClick={onClick}
+      icon={hidden ? <Icon.NavHidden /> : <Icon.NavShown />}
+      label={t('nav.showInNav', { page: label })}
+      pressed={!hidden}
+      onClick={() => toggleHiddenNav(path)}
     />
   );
 }

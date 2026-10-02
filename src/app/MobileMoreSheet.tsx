@@ -1,15 +1,15 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { IconButton, Modal } from '@/components/ui';
+import { Modal } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { mobileSheetPaths, type MobileTabPath } from '@/lib/mobileTabs';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
 import { useCommandPalette } from '@/features/commandPalette/store';
-import { listNavDestinations, navPageLabelKey, railGroups, type NavPage } from './navDestinations';
-import { canHide, recentNavFor, viewPathFor } from './navRail';
-import { toggleHiddenNav, useHiddenNav, useRecentNav } from './navPreferences';
-import { CorpNavItem, NavItem } from './NavItem';
+import { listNavDestinations, railGroups, type NavPage } from './navDestinations';
+import { canHide, FOOTER_PAGES, recentNavFor, viewPathFor } from './navRail';
+import { useHiddenNav, useRecentNav } from './navPreferences';
+import { NavHideToggle, NavItem } from './NavItem';
 import type { AppRoutePath } from './routeScopes';
 
 export const MORE_SHEET_ID = 'mobile-more-sheet';
@@ -106,41 +106,33 @@ export function MobileMoreSheet({
     setTimeout(() => useCommandPalette.getState().show(), 0);
   }
 
+  // Corp is in `groups` only while visible (`inSheet`), and never locked.
   const tile = (page: NavPage) => {
-    const link = plainTile(page);
-    if (!editing || !canHide(page.path)) return link;
-    const pageHidden = hiddenSet.has(page.path);
-    const label = t(page.labelKey);
-    return (
-      <div key={page.path} className={pageHidden ? 'relative opacity-60' : 'relative'}>
-        {link}
-        <IconButton
-          variant="plain"
-          size="sm"
-          className="absolute bottom-0.5 left-0.5"
-          icon={pageHidden ? <Icon.NavHidden /> : <Icon.NavShown />}
-          label={t('nav.showInNav', { page: label })}
-          pressed={!pageHidden}
-          onClick={() => toggleHiddenNav(page.path)}
-        />
-      </div>
-    );
-  };
-
-  const plainTile = (page: NavPage) =>
-    page.gating === 'corp' ? (
-      <CorpNavItem key={page.path} presentation="tile" onClick={onClose} />
-    ) : (
+    const link = (
       <NavItem
         key={page.path}
         to={page.path}
         label={t(page.labelKey)}
-        locked={locked.has(page.path)}
+        locked={page.gating === 'scope' && locked.has(page.path)}
         badge={page.path === '/alerts' ? unreadAlerts : undefined}
         presentation="tile"
         onClick={onClose}
       />
     );
+    if (!editing || !canHide(page.path)) return link;
+    const pageHidden = hiddenSet.has(page.path);
+    return (
+      <div key={page.path} className={pageHidden ? 'relative opacity-60' : 'relative'}>
+        {link}
+        <NavHideToggle
+          path={page.path}
+          label={t(page.labelKey)}
+          hidden={pageHidden}
+          className="absolute bottom-0.5 left-0.5"
+        />
+      </div>
+    );
+  };
 
   return (
     <Modal
@@ -233,18 +225,15 @@ export function MobileMoreSheet({
           </button>
 
           <div className="grid grid-cols-2 gap-1.5 border-t border-line pt-2">
-            <NavItem
-              to="/settings"
-              label={t(navPageLabelKey('/settings'))}
-              locked={false}
-              onClick={onClose}
-            />
-            <NavItem
-              to="/help"
-              label={t(navPageLabelKey('/help'))}
-              locked={false}
-              onClick={onClose}
-            />
+            {FOOTER_PAGES.map((page) => (
+              <NavItem
+                key={page.path}
+                to={page.path}
+                label={t(page.labelKey)}
+                locked={false}
+                onClick={onClose}
+              />
+            ))}
           </div>
           {renderCharacterLink(pathname)}
         </div>

@@ -26,8 +26,8 @@ import { useUnreadAlertCount } from '@/features/notifications/useUnreadAlertCoun
 import { barTabs, NAV_LABEL_KEYS, useMobileTabs } from '@/lib/mobileTabs';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
 import { CommandPaletteHost } from '@/features/commandPalette/CommandPaletteHost';
-import { NAV_LOCK_PATHS, navPageLabelKey } from './navDestinations';
-import { viewPathFor } from './navRail';
+import { NAV_LOCK_PATHS } from './navDestinations';
+import { FOOTER_PAGES, viewPathFor } from './navRail';
 import { recordRecentNav } from './navPreferences';
 import { MOBILE_NAV_ACTIVE, MOBILE_NAV_IDLE, MOBILE_NAV_ITEM, NavItem } from './NavItem';
 import { RailNav } from './RailNav';
@@ -362,8 +362,9 @@ export const Layout = memo(function Layout() {
           Character link below rather than from the scrollable nav above.
         */}
         <div className="flex shrink-0 flex-col gap-0.5 border-b border-line p-2">
-          <NavItem to="/help" label={t(navPageLabelKey('/help'))} locked={false} />
-          <NavItem to="/settings" label={t(navPageLabelKey('/settings'))} locked={false} />
+          {FOOTER_PAGES.map((page) => (
+            <NavItem key={page.path} to={page.path} label={t(page.labelKey)} locked={false} />
+          ))}
         </div>
         <CharacterFooterLink activeCharacter={activeCharacter} />
       </aside>

@@ -61,13 +61,36 @@ export function viewPathFor(pathname: string): string | null {
   return deepestOwner(pathname)?.path ?? null;
 }
 
+/** Both of the above from one scan, for a caller that needs the two. */
+export function navPlaceFor(pathname: string): {
+  pagePath: NavPagePath | null;
+  viewPath: string | null;
+} {
+  const owner = deepestOwner(pathname);
+  return { pagePath: owner?.pagePath ?? null, viewPath: owner?.path ?? null };
+}
+
 /**
- * Pages that are the only way to something never hide: Corp is already hidden
- * unless the Character has corp access, Settings has no other route on a
+ * The footer's own links (Help, then Settings), in descriptor order, for the
+ * rail's foot and the More sheet's. Characters is a footer page too, but both
+ * surfaces give it its own portrait link.
+ */
+export const FOOTER_PAGES: readonly NavPage[] = (NAV_PAGES as readonly NavPage[]).filter(
+  (page) => page.group === 'footer' && page.path !== '/characters'
+);
+
+/**
+ * Pages that are the only way to something never hide, read off the
+ * descriptor rather than listed: Corp (already hidden unless the Character
+ * has corp access) and every footer page — Settings has no other route on a
  * phone, Characters is the only way to switch, and Help is where a lost pilot
  * goes.
  */
-const NEVER_HIDDEN: ReadonlySet<string> = new Set(['/corp', '/settings', '/characters', '/help']);
+const NEVER_HIDDEN: ReadonlySet<string> = new Set(
+  (NAV_PAGES as readonly NavPage[])
+    .filter((page) => page.group === 'footer' || page.gating === 'corp')
+    .map((page) => page.path)
+);
 
 export function canHide(path: string): boolean {
   return NAV_ORDER.has(path) && !NEVER_HIDDEN.has(path);

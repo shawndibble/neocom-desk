@@ -29,3 +29,7 @@ export const NAV_ICONS: Record<NavPagePath, ComponentType<Icon.IconProps>> = {
   '/help': Icon.NavHelp,
   '/characters': Icon.NavCharacters,
 };
+
+/** The same map, read by any route path: a path that is not a nav page has no icon. */
+export const NAV_ICON_BY_PATH: Readonly<Partial<Record<string, ComponentType<Icon.IconProps>>>> =
+  NAV_ICONS;
