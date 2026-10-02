@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { StatChip, Tooltip } from '@/components/ui';
-import { cx } from '@/lib/cx';
+import { StatChip, StatChips, Tooltip } from '@/components/ui';
 import type { CharacterAttributes } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
 
@@ -21,13 +20,11 @@ interface AttributeChipsProps {
    */
   boosterBonus?: number;
   /**
-   * Tighter gaps, for the plan editor's 20rem sidebar. Five chips whose
+   * Tighter spacing, for the plan editor's 20rem sidebar. Five chips whose
    * labels are whole words ("INTELLIGENCE") wrap to four or five rows in a
-   * column that narrow, and the roomy `gap-4` that reads well across a
+   * column that narrow, and the roomy spacing that reads well across a
    * full-width pane turns them into a block taller than the controls beneath
-   * it. A prop rather than a `className` override because two `gap-*`
-   * utilities in one class list resolve by stylesheet order, not by which
-   * caller wrote theirs last.
+   * it.
    */
   dense?: boolean;
 }
@@ -57,7 +54,7 @@ export function AttributeChips({
 }: AttributeChipsProps) {
   const { t } = useTranslation();
   return (
-    <div className={cx('flex flex-wrap', dense ? 'gap-x-2 gap-y-1.5' : 'gap-2 sm:gap-4')}>
+    <StatChips dense={dense}>
       {attributes ? (
         ATTRIBUTE_ORDER.map((name) => {
           const effective = attributes[name];
@@ -104,6 +101,6 @@ export function AttributeChips({
       ) : (
         <span className="text-xs text-text-dim">{t('common.unknown')}</span>
       )}
-    </div>
+    </StatChips>
   );
 }

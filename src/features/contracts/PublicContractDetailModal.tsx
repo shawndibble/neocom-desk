@@ -32,7 +32,15 @@
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, IconButton, Modal, Spinner, StatChip, TypeIcon } from '@/components/ui';
+import {
+  EmptyState,
+  IconButton,
+  Modal,
+  Spinner,
+  StatChip,
+  StatChips,
+  TypeIcon,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -209,11 +217,11 @@ export function PublicContractDetailModal({
   return (
     <Modal open onClose={onClose} title={title}>
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+        <StatChips>
           {statChips.map((chip) => (
             <StatChip key={chip.label} label={chip.label} value={chip.value} />
           ))}
-        </div>
+        </StatChips>
 
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
           <dt className="text-text-dim">{t('contractDetail.regionLabel')}</dt>

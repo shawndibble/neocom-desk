@@ -29,6 +29,7 @@ import {
   SelectValue,
   Spinner,
   StatChip,
+  StatChips,
   TextInput,
   Toast,
   TypeIcon,
@@ -908,23 +909,25 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 py-3">
-                <StatChip
-                  label={t('market.hauling.plan.profit')}
-                  value={formatIskCompact(plan.totals.profit)}
-                  tone={plan.totals.profit > 0 ? 'success' : 'default'}
-                />
-                <StatChip
-                  label={t('market.hauling.plan.spend')}
-                  value={formatIskCompact(plan.totals.cost)}
-                />
-                <StatChip label={t('market.hauling.plan.items')} value={plan.totals.items} />
-                <StatChip
-                  label={t('market.hauling.plan.selected')}
-                  value={t('market.hauling.plan.selectedOf', {
-                    selected: selectedCount,
-                    total: shown.length,
-                  })}
-                />
+                <StatChips>
+                  <StatChip
+                    label={t('market.hauling.plan.profit')}
+                    value={formatIskCompact(plan.totals.profit)}
+                    tone={plan.totals.profit > 0 ? 'success' : 'default'}
+                  />
+                  <StatChip
+                    label={t('market.hauling.plan.spend')}
+                    value={formatIskCompact(plan.totals.cost)}
+                  />
+                  <StatChip label={t('market.hauling.plan.items')} value={plan.totals.items} />
+                  <StatChip
+                    label={t('market.hauling.plan.selected')}
+                    value={t('market.hauling.plan.selectedOf', {
+                      selected: selectedCount,
+                      total: shown.length,
+                    })}
+                  />
+                </StatChips>
                 {cargo !== null && heldPct !== null && (
                   <div className="flex min-w-48 flex-col gap-1">
                     <div

@@ -14,6 +14,7 @@ import {
   SeverityIcon,
   Spinner,
   StatChip,
+  StatChips,
 } from '@/components/ui';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { characterAvatarBoxClassName } from '@/components/ui/characterAvatarBox';
@@ -313,10 +314,10 @@ export function Login() {
               </p>
               <p className="truncate text-xs text-text-dim">{t('login.previewCorp')}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <StatChips>
               <StatChip label={t('skills.totalSp')} value={PREVIEW.totalSp} />
               <StatChip label={t('skills.unallocatedSp')} value={PREVIEW.unallocatedSp} />
-            </div>
+            </StatChips>
           </div>
 
           <div className={`${tabScrollerClassName} mt-3`}>

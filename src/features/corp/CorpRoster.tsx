@@ -21,6 +21,7 @@ import {
   DataTable,
   EmptyState,
   StatChip,
+  StatChips,
   type DataTableColumn,
 } from '@/components/ui';
 import type { UseTableExport } from '@/components/ui/useTableExport';
@@ -107,14 +108,14 @@ export function CorpRosterStats({ rows }: { rows: readonly RosterRow[] }) {
   const darkAfterDays = useDarkThreshold((state) => state.value);
   const dark = rows.filter((row) => row.standing.isDark).length;
   return (
-    <div className="flex flex-wrap gap-2">
+    <StatChips>
       <StatChip label={t('corp.members.total')} value={rows.length} />
       <StatChip
         label={t('corp.members.dark', { days: darkAfterDays })}
         value={dark}
         tooltip={t('corp.members.darkHint', { days: darkAfterDays })}
       />
-    </div>
+    </StatChips>
   );
 }
 

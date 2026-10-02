@@ -39,6 +39,7 @@ import {
   SegmentedControl,
   Spinner,
   StatChip,
+  StatChips,
   TextInput,
   IskAmount,
   type DataTableColumn,
@@ -1186,30 +1187,32 @@ export function ContractSearchPanel({
 
                 {summary !== null && (
                   <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-                    <StatChip
-                      label={t('contractSearch.offersLabel')}
-                      value={summary.offerCount.toLocaleString()}
-                    />
-                    <StatChip
-                      label={t('contractSearch.cheapestLabel')}
-                      value={
-                        summary.cheapest === null ? (
-                          '—'
-                        ) : (
-                          <IskAmount value={summary.cheapest} revealOn="tap" />
-                        )
-                      }
-                    />
-                    <StatChip
-                      label={t('contractSearch.medianLabel')}
-                      value={
-                        summary.median === null ? (
-                          '—'
-                        ) : (
-                          <IskAmount value={summary.median} revealOn="tap" />
-                        )
-                      }
-                    />
+                    <StatChips>
+                      <StatChip
+                        label={t('contractSearch.offersLabel')}
+                        value={summary.offerCount.toLocaleString()}
+                      />
+                      <StatChip
+                        label={t('contractSearch.cheapestLabel')}
+                        value={
+                          summary.cheapest === null ? (
+                            '—'
+                          ) : (
+                            <IskAmount value={summary.cheapest} revealOn="tap" />
+                          )
+                        }
+                      />
+                      <StatChip
+                        label={t('contractSearch.medianLabel')}
+                        value={
+                          summary.median === null ? (
+                            '—'
+                          ) : (
+                            <IskAmount value={summary.median} revealOn="tap" />
+                          )
+                        }
+                      />
+                    </StatChips>
                     <Button size="sm" onClick={clearType}>
                       {t('contractSearch.clearItem')}
                     </Button>

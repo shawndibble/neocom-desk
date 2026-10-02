@@ -26,6 +26,7 @@ import {
   Panel,
   Spinner,
   StatChip,
+  StatChips,
   TextArea,
   TextInput,
   type DataTableColumn,
@@ -528,73 +529,75 @@ export function AppraisalPanel({
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-                <StatChip
-                  label={t('market.appraisal.sellTotal')}
-                  value={<IskAmount value={totals.sell} revealOn="tap" decimals={0} />}
-                  tone="accent"
-                  tooltip={t('market.appraisal.sellTotalHelp')}
-                />
-                <StatChip
-                  label={t('market.appraisal.buyTotal')}
-                  value={<IskAmount value={totals.buy} revealOn="tap" decimals={0} />}
-                  tooltip={t('market.appraisal.buyTotalHelp')}
-                />
-                {net && (
+                <StatChips>
                   <StatChip
-                    label={t('market.appraisal.instantNet')}
-                    value={
-                      <span className={iskToneClass(net.instantNet)}>
-                        <IskAmount value={net.instantNet} revealOn="tap" decimals={0} />
-                      </span>
-                    }
-                    tooltip={t('market.appraisal.instantNetHelp', {
-                      tax: net.salesTaxPct.toFixed(2),
-                    })}
-                  />
-                )}
-                {net && (
-                  <StatChip
-                    label={t('market.appraisal.listNet')}
-                    value={
-                      <span className={iskToneClass(net.listNet)}>
-                        <IskAmount value={net.listNet} revealOn="tap" decimals={0} />
-                      </span>
-                    }
-                    tooltip={t('market.appraisal.listNetHelp', {
-                      tax: net.salesTaxPct.toFixed(2),
-                      broker: net.brokerFeePct.toFixed(2),
-                    })}
-                  />
-                )}
-                <StatChip
-                  label={t('market.appraisal.spread')}
-                  value={
-                    <span className={iskToneClass(totals.spread)}>
-                      <IskAmount value={totals.spread} revealOn="tap" decimals={0} />
-                    </span>
-                  }
-                />
-                {hasRefine && (
-                  <StatChip
-                    label={t('market.appraisal.refineTotal')}
-                    value={<IskAmount value={totals.refine} revealOn="tap" decimals={0} />}
-                    tooltip={
-                      implantBonusPct > 0
-                        ? `${t('market.appraisal.refineTotalHelp')} ${t('market.appraisal.refineImplantHint', { pct: implantBonusPct })}`
-                        : t('market.appraisal.refineTotalHelp')
-                    }
-                  />
-                )}
-                {hasLpOption && (
-                  <StatChip
-                    label={t('market.appraisal.cheapestBuy')}
-                    value={<IskAmount value={totals.cheapestBuy} revealOn="tap" decimals={0} />}
+                    label={t('market.appraisal.sellTotal')}
+                    value={<IskAmount value={totals.sell} revealOn="tap" decimals={0} />}
                     tone="accent"
-                    tooltip={t('market.appraisal.cheapestBuyHelp')}
+                    tooltip={t('market.appraisal.sellTotalHelp')}
                   />
-                )}
-                <AppraisalVolumeChip totals={totals} />
-                <StatChip label={t('market.appraisal.items')} value={rows.length} />
+                  <StatChip
+                    label={t('market.appraisal.buyTotal')}
+                    value={<IskAmount value={totals.buy} revealOn="tap" decimals={0} />}
+                    tooltip={t('market.appraisal.buyTotalHelp')}
+                  />
+                  {net && (
+                    <StatChip
+                      label={t('market.appraisal.instantNet')}
+                      value={
+                        <span className={iskToneClass(net.instantNet)}>
+                          <IskAmount value={net.instantNet} revealOn="tap" decimals={0} />
+                        </span>
+                      }
+                      tooltip={t('market.appraisal.instantNetHelp', {
+                        tax: net.salesTaxPct.toFixed(2),
+                      })}
+                    />
+                  )}
+                  {net && (
+                    <StatChip
+                      label={t('market.appraisal.listNet')}
+                      value={
+                        <span className={iskToneClass(net.listNet)}>
+                          <IskAmount value={net.listNet} revealOn="tap" decimals={0} />
+                        </span>
+                      }
+                      tooltip={t('market.appraisal.listNetHelp', {
+                        tax: net.salesTaxPct.toFixed(2),
+                        broker: net.brokerFeePct.toFixed(2),
+                      })}
+                    />
+                  )}
+                  <StatChip
+                    label={t('market.appraisal.spread')}
+                    value={
+                      <span className={iskToneClass(totals.spread)}>
+                        <IskAmount value={totals.spread} revealOn="tap" decimals={0} />
+                      </span>
+                    }
+                  />
+                  {hasRefine && (
+                    <StatChip
+                      label={t('market.appraisal.refineTotal')}
+                      value={<IskAmount value={totals.refine} revealOn="tap" decimals={0} />}
+                      tooltip={
+                        implantBonusPct > 0
+                          ? `${t('market.appraisal.refineTotalHelp')} ${t('market.appraisal.refineImplantHint', { pct: implantBonusPct })}`
+                          : t('market.appraisal.refineTotalHelp')
+                      }
+                    />
+                  )}
+                  {hasLpOption && (
+                    <StatChip
+                      label={t('market.appraisal.cheapestBuy')}
+                      value={<IskAmount value={totals.cheapestBuy} revealOn="tap" decimals={0} />}
+                      tone="accent"
+                      tooltip={t('market.appraisal.cheapestBuyHelp')}
+                    />
+                  )}
+                  <AppraisalVolumeChip totals={totals} />
+                  <StatChip label={t('market.appraisal.items')} value={rows.length} />
+                </StatChips>
                 {loading && <Spinner label={t('common.loading')} size="sm" />}
               </div>
 

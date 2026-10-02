@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Panel, StatChip, TextInput, type StatChipTone } from '@/components/ui';
+import { Panel, StatChip, StatChips, TextInput, type StatChipTone } from '@/components/ui';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { formatCompactNumber } from '@/lib/compactNumber';
@@ -117,8 +117,7 @@ export function PlanHeader({
       }
       className="lg:sticky lg:top-0 lg:z-10"
     >
-      {/* A plain wrapping strip, like every other row of StatChips in the app. */}
-      <div className="flex flex-wrap gap-2">
+      <StatChips>
         <StatChip label={t('plans.headerTrainingTime')} value={formatCountdown(totalSeconds)} />
         <StatChip label={t('plans.headerSkillCount')} value={skillCount} />
         <StatChip
@@ -187,7 +186,7 @@ export function PlanHeader({
             })}
           />
         )}
-      </div>
+      </StatChips>
     </Panel>
   );
 }

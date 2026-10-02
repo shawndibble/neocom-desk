@@ -21,6 +21,7 @@ import {
   InfoTooltip,
   Modal,
   StatChip,
+  StatChips,
   TypeIcon,
   IskAmount,
   type DataTableColumn,
@@ -307,7 +308,7 @@ export function YieldDetailModal({
       <div className="space-y-3 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <span className="text-text-dim">{row.characterName}</span>
-          <div className="flex flex-wrap gap-2">
+          <StatChips>
             <StatChip
               label={t('miningTax.overview.volumeStat')}
               value={
@@ -322,7 +323,7 @@ export function YieldDetailModal({
               label={t('miningTax.overview.detail.oreTypesStat')}
               value={valuation.lines.length.toLocaleString()}
             />
-          </div>
+          </StatChips>
         </div>
 
         {/* The whole point of the row: which exit was worth more, and by how

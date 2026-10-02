@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { CharacterAvatar, StatChip } from '@/components/ui';
+import { CharacterAvatar, StatChip, StatChips } from '@/components/ui';
 import { usePublicInfo } from '@/stores/publicInfo';
 
 interface CharacterHeaderProps {
@@ -77,10 +77,10 @@ export function CharacterHeader({ characterId, totalSp, unallocatedSp }: Charact
           {publicInfo?.allianceName ? ` / ${publicInfo.allianceName}` : ''}
         </p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <StatChips>
         <StatChip label={t('skills.totalSp')} value={sp(totalSp)} />
         <StatChip label={t('skills.unallocatedSp')} value={sp(unallocatedSp)} />
-      </div>
+      </StatChips>
     </header>
   );
 }

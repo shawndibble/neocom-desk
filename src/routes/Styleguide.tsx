@@ -35,6 +35,7 @@ import {
   SelectValue,
   Spinner,
   StatChip,
+  StatChips,
   Tabs,
   TextInput,
 } from '@/components/ui';
@@ -251,12 +252,22 @@ export function Styleguide() {
 
       <Section title="StatChip">
         <Panel>
-          <div className="flex flex-wrap gap-2">
+          <StatChips>
             <StatChip label="Wallet" value="1.2B ISK" />
             <StatChip label="SP" value="54.3M" tone="accent" />
             <StatChip label="Training" value="Active" tone="success" />
             <StatChip label="Queue" value="2d left" tone="warning" />
             <StatChip label="Clone" value="Expired" tone="danger" />
+          </StatChips>
+          {/* Narrow enough to wrap: the chip that starts the second line has no divider. */}
+          <div className="mt-4 max-w-xs">
+            <StatChips>
+              <StatChip label="Wallet" value="1.2B ISK" />
+              <StatChip label="SP" value="54.3M" tone="accent" />
+              <StatChip label="Training" value="Active" tone="success" />
+              <StatChip label="Queue" value="2d left" tone="warning" />
+              <StatChip label="Clone" value="Expired" tone="danger" />
+            </StatChips>
           </div>
         </Panel>
       </Section>

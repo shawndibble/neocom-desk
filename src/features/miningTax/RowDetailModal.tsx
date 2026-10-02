@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Button, InfoTooltip, Modal, StatChip, TypeIcon } from '@/components/ui';
+import { Button, InfoTooltip, Modal, StatChip, StatChips, TypeIcon } from '@/components/ui';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
@@ -121,7 +121,7 @@ export function RowDetailModal({
       <div className="space-y-3 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <span className="text-text-dim">{row.characterName}</span>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <StatChips>
             {assignment?.paidAt !== undefined && (
               <StatChip
                 label={t('miningTax.paidAtLabel')}
@@ -133,7 +133,7 @@ export function RowDetailModal({
               value={t(`miningTax.status.${STATUS_LABEL_KEY[status]}`)}
               tone={STATUS_TONE[status]}
             />
-          </div>
+          </StatChips>
         </div>
 
         {status === 'paid' && (onLinkTransaction || assignment?.payment) && (

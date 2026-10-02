@@ -9,6 +9,7 @@ import {
   LogoMark,
   Spinner,
   StatChip,
+  StatChips,
   type DataTableColumn,
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -188,7 +189,7 @@ export function AppraisalShared() {
 
       {state.status === 'ready' && (
         <>
-          <div className="flex flex-wrap items-center gap-2 border-b border-line px-1 py-2">
+          <StatChips className="border-b border-line px-1 py-2">
             <StatChip
               label={state.view.hub.systemName}
               value={t('market.appraisal.atPercent', { pricePercent: state.view.pricePercent })}
@@ -211,7 +212,7 @@ export function AppraisalShared() {
               label={t('appraisalShare.generatedLabel')}
               value={new Date(state.view.generatedAt * 1000).toLocaleString()}
             />
-          </div>
+          </StatChips>
 
           {state.view.unresolvedTypeIds.length > 0 && (
             <div className="rounded-xs border border-line bg-panel-2 px-2.5 py-2">

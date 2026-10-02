@@ -35,7 +35,7 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Panel, StatChip, buttonClassName } from '@/components/ui';
+import { Panel, StatChip, StatChips, buttonClassName } from '@/components/ui';
 import {
   label,
   memberStanding,
@@ -103,7 +103,7 @@ export function CorpPeopleRail({ members, highlights, names, diff, nowMs }: Corp
         </Link>
       }
     >
-      <div className="flex flex-wrap gap-1.5">
+      <StatChips>
         {/*
           The same two strings the roster page's own stat strip uses, not
           copies of them — a label that drifts is as confusing as a figure
@@ -145,7 +145,7 @@ export function CorpPeopleRail({ members, highlights, names, diff, nowMs }: Corp
             />
           </>
         )}
-      </div>
+      </StatChips>
 
       {/*
         Two lists, each present only when it has something to say. A heading
