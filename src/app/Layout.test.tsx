@@ -91,9 +91,8 @@ function renderLayoutWithRoutes(initialEntry = '/overview') {
           />
           <Route path="/market" element={<div>market page</div>} />
           <Route path="/characters" element={<CharactersPageStub />} />
-          {/* `/*`: Settings' tabs are real path segments now (ADR 0015), so the
-              `?` shortcut's `/settings/shortcuts` target has to match
-              this route too, not just the bare page path. */}
+          {/* `/*`: Settings' tabs are real path segments (ADR 0015), so `,`'s
+              target has to match this route too, not just the bare path. */}
           <Route path="/settings/*" element={<div>settings page</div>} />
           {/* `?` lands on Help › Shortcuts. */}
           <Route path="/help/*" element={<div>help page</div>} />

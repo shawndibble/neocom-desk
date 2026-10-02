@@ -29,9 +29,8 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /**
- * Help › Shortcuts: every key the app answers to. Moved here from Settings —
- * a list to look up, not a setting — and the first Help tab. The single keys
- * are always on.
+ * Help › Shortcuts: every key the app answers to, and the first Help tab
+ * (scope decision `20261002-165816-shortcuts-move-to-help-always-on-and-lose`).
  */
 export function ShortcutsPanel() {
   const { t } = useTranslation();

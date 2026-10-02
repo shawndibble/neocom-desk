@@ -1040,7 +1040,7 @@ function CorpDefaultsPanel() {
  */
 const LEGACY_HASH_TARGETS: Readonly<Record<string, string>> = {
   // Shortcuts left Settings for Help (scope decision
-  // `20261002-145653-lp-store-under-market-pilot-lookup-its-own`).
+  // `20261002-165816-shortcuts-move-to-help-always-on-and-lose`).
   '#shortcuts': tabPath(HELP_TABS, 'shortcuts'),
   '#corp-access': tabPath(SETTINGS_TABS, 'permissions'),
 };

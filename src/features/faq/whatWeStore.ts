@@ -24,7 +24,7 @@
  * exported backup file (issue #789) — the one case that is not automatic:
  * it only happens when the pilot presses the button, and the file (including
  * sign-in tokens) goes wherever they choose to put it, not to us. Each is
- * stated in {@link WHAT_WE_STORE_NOTES} rather than buried.
+ * stated in the FAQ's own answers (`FaqPanel.tsx`, `settings.faq.store.notes.*`) rather than buried.
  */
 
 import type { SyncedFaqItemId } from '@/sync/syncedCollections';

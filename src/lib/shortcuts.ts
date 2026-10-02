@@ -121,7 +121,7 @@ export interface ShortcutDef {
 
 /**
  * The app's global keyboard shortcuts — one source of truth consumed by
- * `app/useKeyboardShortcuts.ts` (dispatch) and `routes/Settings.tsx`
+ * `app/useKeyboardShortcuts.ts` (dispatch) and `features/help/ShortcutsPanel.tsx`
  * (discoverability list). Adding a shortcut is a data change here, not a new
  * `addEventListener` call anywhere.
  */
@@ -195,8 +195,8 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     displayKey: '?',
     allowsShift: true,
     descriptionKey: 'shortcuts.showShortcuts',
-    // The list this opens is the one rendered from this very array, under the
-    // Shortcuts section of Settings.
+    // The list this opens is the one rendered from this very array, on
+    // Help › Shortcuts.
     run: (navigate) => navigate('/help/shortcuts'),
   },
   {

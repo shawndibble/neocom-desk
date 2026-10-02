@@ -64,7 +64,7 @@ export const SETTINGS_TABS = definePageTabs(
  * `/settings/help` redirect here). Shortcuts first: the tab `/help` opens on.
  */
 export const HELP_TABS = definePageTabs('/help', [
-  { id: 'shortcuts', labelKey: 'settings.tabs.shortcuts' },
+  { id: 'shortcuts', labelKey: 'settings.help.tabShortcuts' },
   { id: 'faq', labelKey: 'settings.help.tabFaq' },
   { id: 'support', labelKey: 'settings.help.tabSupport' },
 ]);

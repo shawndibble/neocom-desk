@@ -58,7 +58,7 @@ function FaqItem({
       <button
         type="button"
         aria-expanded={expanded}
-        aria-controls={answerId}
+        aria-controls={expanded ? answerId : undefined}
         onClick={onToggle}
         className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-text hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
       >

@@ -13,3 +13,5 @@ _Recorded 2026-09-24 · issue #1494._
 - **The shortcut list stays visible when off**, dimmed with a note, rather
   than hidden — it is also where the switch lives, and `?` can no longer
   reach it, so the page must still explain what was turned off.
+
+> **Superseded** by `20261002-165816-shortcuts-move-to-help-always-on-and-lose`: single-key shortcuts are always on, and `/` is gone.

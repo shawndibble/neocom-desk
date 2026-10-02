@@ -3,7 +3,7 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Panel } from '@/components/ui';
 import { DISCORD_URL, REPO_URL } from '@/lib/links';
 
-/** No width cap of its own: see `FaqPanel`'s `PROSE`. */
+/** No width cap of its own: the Help page narrows itself to a readable measure (`routes/Help.tsx`). */
 const PROSE = 'space-y-3 text-sm';
 
 const LINK = inlineLinkClassName;

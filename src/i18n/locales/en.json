@@ -3660,8 +3660,14 @@
     "crossCharacterBadge": "From {{character}}",
     "crossCharacterCsvNote": "CSV export only includes this character's own items.",
     "blueprintBadge": {
-      "original": { "label": "BPO", "name": "Blueprint original" },
-      "copy": { "label": "BPC", "name": "Blueprint copy" }
+      "original": {
+        "label": "BPO",
+        "name": "Blueprint original"
+      },
+      "copy": {
+        "label": "BPC",
+        "name": "Blueprint copy"
+      }
     },
     "bay": {
       "cargoHold": "Cargo Hold",
@@ -5876,7 +5882,7 @@
     },
     "corp": {
       "label": "Corporation",
-      "caption": "Corporation data: wallet, members, structures, assets and moon extractions."
+      "caption": "Everything on the Corporation pages — wallet, members, structures, assets and moon extractions."
     },
     "structureMarkets": {
       "label": "Structure markets",
@@ -5908,7 +5914,6 @@
     "title": "Settings",
     "tabs": {
       "display": "Display",
-      "shortcuts": "Shortcuts",
       "permissions": "Permissions",
       "industry": "Industry",
       "market": "Market",
@@ -6020,15 +6025,14 @@
         "backups": "How do backups work?"
       },
       "a": {
-        "delete": "Settings › Data & storage › Delete all data deletes every character's synced data from our server, then erases everything on this device. Log out of all characters clears this device only.",
+        "delete": "Settings › Data & storage › Delete all data deletes every character's synced data from our server, then erases everything on this device. Another device still logged in keeps its own copy and can sync it back. Log out of all characters clears this device only.",
         "update": "The app updates itself in the background. To get a new version now, open Settings › Data & storage and press Update now: it checks and reloads.",
         "pushKinds": "Only alerts whose time is known ahead: a skill level finishing, training stopping or a queue ending, an industry job finishing, a courier delivery due, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Everything else needs the app open. Turn them on in Settings › Notifications."
       },
-
       "store": {
         "synced": {
           "title": "Synced between your devices",
-          "description": "Filed under each character's EVE ID — never a name or an email address.",
+          "description": "Filed under each character's EVE ID — never a name, an email address, or an account we invented.",
           "skillPlans": "Skill Plans you build. Trained skills come from EVE and stay on this device.",
           "buildPlans": "Build Plans: blueprint, runs, ME/TE, facility and hub.",
           "productionRuns": "Production Runs, with the sales and orders you linked.",
@@ -6040,7 +6044,7 @@
           "miningTaxNote": "Includes the ore and ISK snapshot, because that snapshot is the invoice.",
           "notificationFeed": "Alerts you've already seen.",
           "notificationFeedNote": "Kept 30 days, so your other devices catch up.",
-          "settings": "These preferences. Nothing else you set leaves your device:",
+          "settings": "These preferences. Every other preference stays on this device:",
           "settingsDetail": {
             "notifications": "Notifications: your notification preferences.",
             "defaults": "Defaults: trade hub, industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
@@ -6056,8 +6060,8 @@
         "local": {
           "title": "Kept on this device only",
           "description": "Everything read from EVE is cached here and never uploaded.",
-          "esi": "Your characters' EVE data: assets, wallet, contracts, mail, contacts, clones, calendar, skills, industry jobs and colonies.",
-          "corp": "Everything on the Corporation pages — wallet, members, structures, assets and moon extractions.",
+          "esi": "Your characters' EVE data: assets, wallet, contracts, mail, contacts, clones, calendar, skills, skill queue, industry jobs and colonies.",
+          "corp": "Corporation data: wallet, members, structures, assets and moon extractions.",
           "market": "Market prices, order books and LP stores.",
           "miningHistory": "90 days of mining ledger, longer than the 30 EVE returns.",
           "login": "Your EVE login token.",
@@ -6066,10 +6070,10 @@
         },
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
-          "crashes": "Crash reports: the error and the page it happened on. No IP addresses or request bodies; EVE tokens are stripped first.",
-          "removal": "Removing a character clears it from this device only. Its synced copy is deleted after 90 days with no device syncing it, or right away from Settings › Data & storage › Delete all data.",
+          "crashes": "Crash reports: the error and the page it happened on. No IP addresses; request and response bodies are never captured; EVE tokens are stripped first.",
+          "removal": "Removing a character clears it from this device only; adding it back restores its synced copy. That copy is deleted after 90 days with no device syncing it, or right away from Settings › Data & storage › Delete all data.",
           "writes": "Writes to EVE, only when you act: opening a mail marks it read, answering a calendar invite sends your reply, Mail sends what you wrote, and saving a Fitting to EVE creates or replaces it there. Nothing else is ever written.",
-          "export": "Backups (Settings › Data & storage) are password-encrypted files, login tokens included, saved only where you put them. We never see them."
+          "export": "Backups (Settings › Data & storage) are password-encrypted files, login tokens included. One is written only when you press the button, and saved only where you put it. We never see it."
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."
       },
@@ -6086,7 +6090,8 @@
       "sourceHint": "Report bugs and ideas on Discord, not GitHub.",
       "thanksTitle": "Say thanks",
       "thanksBody": "In game: <pilot>Mero Otichoda</pilot>.",
-      "thanksHint": "Donations welcome, never expected. The app stays free."
+      "thanksHint": "Donations welcome, never expected. The app stays free.",
+      "tabShortcuts": "Shortcuts"
     },
     "displayTitle": "Display",
     "fontScaleLabel": "Text size",
@@ -6346,11 +6351,11 @@
     "showShortcuts": "Show this shortcut list",
     "close": "Close the open dialog",
     "pasteTitle": "Paste anywhere",
-    "pasteHint": "Outside a text field, a pasted fit or item list opens where it belongs. Back returns you where you were.",
+    "pasteHint": "Outside a text field, a pasted fit or item list (inventory, cargo or contract) opens where it belongs. Back returns you where you were.",
     "paste": "Paste",
     "pasteFitting": "EFT fitting",
     "pasteFittingOpens": "Opens in Fittings",
-    "pasteItems": "Item list (inventory, contract)",
+    "pasteItems": "Item list",
     "pasteItemsOpens": "Opens in Appraisal"
   },
   "activityLog": {

@@ -8,8 +8,8 @@ import { isTypingTarget, OVERLAY_SELECTOR, SHORTCUTS } from '@/lib/shortcuts';
  * `<dialog>` already closes on it (`components/ui/Modal.tsx`), and a second
  * handler here would race that behaviour rather than add to it.
  *
- * Always on: the owner removed the Settings off switch (Help › Shortcuts lists
- * the keys). Typing in a field never fires one (`isTypingTarget`).
+ * Always on (scope decision `20261002-165816-shortcuts-move-to-help-always-on-and-lose`;
+ * Help › Shortcuts lists the keys). Typing in a field never fires one (`isTypingTarget`).
  */
 export function useKeyboardShortcuts(): void {
   const navigate = useNavigate();
