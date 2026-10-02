@@ -206,7 +206,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     }
   });
 
-  it('trails with Settings, Help and the active Character (with photo), after the page tiles', async () => {
+  it('trails with Help, Settings and the active Character (with photo), after the page tiles', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     await db.characters.put({
       characterId: CHARACTER_ID,
@@ -233,12 +233,12 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     // submenu to expand.
     expect(within(sheet).queryByRole('button', { name: 'Pilot One' })).not.toBeInTheDocument();
 
-    // Reading order: ..., Contacts, Settings, Help, Character.
+    // Reading order: ..., Contacts, Help, Settings, Character — the rail's order.
+    expect(contacts.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(help.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(
-      contacts.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING
+      settings.compareDocumentPosition(character) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    expect(settings.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(help.compareDocumentPosition(character) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('closes on Escape and returns focus to the More trigger', async () => {
