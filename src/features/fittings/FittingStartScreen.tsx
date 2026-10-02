@@ -175,6 +175,17 @@ export function FittingStartScreen({
     savedPending ||
     (hasCharacter && (inGame.granted === undefined || (inGame.loading && !inGame.result)));
 
+  const refreshInGameButton =
+    hasCharacter && inGame.granted === true ? (
+      <IconButton
+        size={isPhone ? 'md' : 'sm'}
+        icon={<Icon.Refresh />}
+        label={t('fittings.inGame.refresh')}
+        onClick={() => void inGame.refresh()}
+        disabled={inGame.loading}
+      />
+    ) : null;
+
   // A dialog's Import, in place of the list until Back.
   if (importInline && importOpen) {
     return (
@@ -188,8 +199,11 @@ export function FittingStartScreen({
     );
   }
 
-  // The page scrolls a phone's list itself; a dialog keeps it inside the sheet.
-  const listHeight = previewing ? 'max-h-72 lg:max-h-[36rem]' : page ? '' : 'max-h-[60vh]';
+  // Beside a preview the list scrolls in its own box; elsewhere the page or
+  // the dialog's body scrolls it.
+  const listHeight = previewing ? 'max-h-72 lg:max-h-[36rem]' : '';
+  const showNew = page && onStartHull !== undefined;
+  const showImport = page || importInline;
 
   return (
     <div className="space-y-3">
@@ -201,17 +215,7 @@ export function FittingStartScreen({
               <DataAgeBadge date={inGame.result.fetchedAt} />
             ) : undefined
           }
-          actions={
-            hasCharacter && inGame.granted === true ? (
-              <IconButton
-                size={isPhone ? 'md' : 'sm'}
-                icon={<Icon.Refresh />}
-                label={t('fittings.inGame.refresh')}
-                onClick={() => void inGame.refresh()}
-                disabled={inGame.loading}
-              />
-            ) : undefined
-          }
+          actions={refreshInGameButton ?? undefined}
         />
       )}
       {pageTabs}
@@ -224,17 +228,23 @@ export function FittingStartScreen({
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
+        {/* A dialog has no page header for the In-game refresh: it sits by the search. */}
+        {!pageTitle && refreshInGameButton}
         {/* On a phone they share the row beneath the search, half each. */}
-        <div className={`flex gap-2 ${isPhone ? 'w-full *:flex-1' : ''}`}>
-          {page && onStartHull && (
-            <Button variant="primary" onClick={() => setHullOpen(true)}>
-              {t('fittings.start.newFromHull')}
-            </Button>
-          )}
-          {(page || importInline) && (
-            <Button onClick={() => setImportOpen(true)}>{t('fittings.start.importButton')}</Button>
-          )}
-        </div>
+        {(showNew || showImport) && (
+          <div className={`flex gap-2 ${isPhone ? 'w-full *:flex-1' : ''}`}>
+            {showNew && (
+              <Button variant="primary" onClick={() => setHullOpen(true)}>
+                {t('fittings.start.newFromHull')}
+              </Button>
+            )}
+            {showImport && (
+              <Button onClick={() => setImportOpen(true)}>
+                {t('fittings.start.importButton')}
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {inGameStatus}
@@ -251,7 +261,10 @@ export function FittingStartScreen({
           <Spinner label={t('common.loading')} />
         </div>
       ) : rows.length === 0 ? (
-        <EmptyState title={t('fittings.start.emptyTitle')} hint={t('fittings.start.emptyHint')} />
+        <EmptyState
+          title={t('fittings.start.emptyTitle')}
+          hint={t(showNew ? 'fittings.start.emptyHint' : 'fittings.start.emptyHintList')}
+        />
       ) : (
         <div
           className={`grid grid-cols-1 items-start gap-3 ${previewing ? 'lg:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]' : ''}`}
@@ -262,7 +275,10 @@ export function FittingStartScreen({
             onKeyDown={(event) => {
               // Arrow keys walk the list: focus moves, and with a preview the pick too.
               if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-              const focusedId = (document.activeElement as HTMLElement | null)?.dataset.rowId;
+              // From a row's ⋮ too, not just the row itself.
+              const focusedId = document.activeElement
+                ?.closest('li')
+                ?.querySelector<HTMLElement>('[data-row-id]')?.dataset.rowId;
               const from = visible.findIndex(
                 (row) => row.id === (previewing ? selected?.id : focusedId)
               );
@@ -352,7 +368,7 @@ export function FittingStartScreen({
         </div>
       )}
 
-      {page && onStartHull && (
+      {showNew && onStartHull && (
         <NewFromHullDialog
           open={hullOpen}
           onClose={() => setHullOpen(false)}

@@ -39,6 +39,7 @@ export function ImportFittingCard({
   onOpened,
 }: {
   workspace: FittingLibrarySource;
+  /** A Fitting the card listed (an EVE XML file's) was opened. */
   onOpened?: () => void;
 }) {
   return (

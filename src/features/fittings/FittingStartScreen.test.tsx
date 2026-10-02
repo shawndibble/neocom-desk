@@ -371,6 +371,25 @@ describe('FittingStartScreen in a dialog', () => {
     expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument();
   });
 
+  it('keeps the In-game refresh by the search, with no page header to hold it', async () => {
+    renderDialog();
+    expect(
+      await screen.findByRole('button', { name: 'Refresh' }, { timeout: 5000 })
+    ).toBeInTheDocument();
+  });
+
+  it('empty, says where fittings come from rather than offering buttons it lacks', async () => {
+    await db.fittings.clear();
+    loadInGameFittingsMock.mockResolvedValue({
+      cached: { data: [], fetchedAt: new Date(), fromCache: false, truncated: false },
+      needsReauth: false,
+    });
+    renderDialog();
+    expect(
+      await screen.findByText('Fittings you save, here or in EVE, list here.')
+    ).toBeInTheDocument();
+  });
+
   it('never pops Import by itself over a broken share link', async () => {
     renderDialog({}, { ...makeWorkspace(), shareError: 'invalid' });
     await screen.findByText('Armor Drake');
