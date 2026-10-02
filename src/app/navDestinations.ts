@@ -222,6 +222,17 @@ export const NAV_PAGES = [
     gating: 'ungated',
     mobileTab: true,
   },
+  /*
+   * Its own page, not a Travel tab: "who is this pilot" is not a travel
+   * question, and the Intel heading no longer sits over a single item.
+   */
+  {
+    path: '/pilot-lookup',
+    labelKey: 'nav.pilotLookup',
+    group: 'intel',
+    gating: 'ungated',
+    mobileTab: true,
+  },
   {
     path: '/settings',
     labelKey: 'nav.settings',

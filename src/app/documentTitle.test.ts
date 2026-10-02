@@ -70,6 +70,9 @@ describe('documentTitleFor', () => {
     '/skills/ships',
     '/wallet/loyalty',
     '/wallet/loyalty/:corporationId',
+    '/travel/pilot',
+    '/settings/faq',
+    '/settings/help',
   ]);
 
   it('gives every feature route a distinct title', () => {

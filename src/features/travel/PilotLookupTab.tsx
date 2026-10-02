@@ -1,5 +1,5 @@
 /**
- * Travel › Pilot Lookup (issue #2331): search a pilot by name and see who they
+ * Pilot Lookup (issue #2331): search a pilot by name and see who they
  * are (public ESI) and what zKillboard states about their kills and losses.
  *
  * Numbers, never verdicts (decision `20260912-172628`): the card states a
@@ -7,15 +7,7 @@
  *
  * The selected pilot lives in the URL (`?pilot=<id>`) so a lookup can be shared.
  */
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type FormEvent,
-  type KeyboardEvent,
-  type ReactNode,
-} from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -50,14 +42,13 @@ const SEARCH_ENDPOINTS = ['getCharacterSearch'] as const;
 /** Same debounce as Mail's recipient search, which calls the same ESI search. */
 const SEARCH_DEBOUNCE_MS = 300;
 
-export function PilotLookupTab({ tabBar }: { tabBar: ReactNode }) {
+export function PilotLookupTab() {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(PILOT_PARAMS);
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t('travel.title')} />
-      {tabBar}
+      <PageHeader title={t('nav.pilotLookup')} />
       <Panel>
         <PilotSearch
           onSelect={(pilot) => setParams({ pilot: pilot.characterId }, { push: true })}

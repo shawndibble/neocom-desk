@@ -440,6 +440,7 @@ describe('Layout desktop rail domain grouping', () => {
       'Contacts',
       '[Intel]',
       'Travel',
+      'Pilot Lookup',
     ]);
   });
 

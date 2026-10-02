@@ -60,6 +60,8 @@ const ROUTE_TITLE_KEYS = {
   '/bpc-contracts': ['nav.industry'],
   '/contacts': ['contacts.title'],
   '/travel': ['travel.title'],
+  '/travel/pilot': ['nav.pilotLookup'],
+  '/pilot-lookup': ['nav.pilotLookup'],
   '/settings': ['settings.title'],
 } satisfies Record<AppRoutePath, readonly string[]>;
 

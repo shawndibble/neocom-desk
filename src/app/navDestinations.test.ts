@@ -49,7 +49,7 @@ describe('railGroups', () => {
         paths: ['/market', '/wallet', '/assets', '/contracts'],
       },
       { labelKey: 'nav.groups.social', paths: ['/mail', '/calendar', '/contacts'] },
-      { labelKey: 'nav.groups.intel', paths: ['/travel'] },
+      { labelKey: 'nav.groups.intel', paths: ['/travel', '/pilot-lookup'] },
     ]);
   });
 });
