@@ -11,6 +11,7 @@ vi.mock('@/lib/zkillboard', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/zkillboard')>()),
   fetchPilotStats: vi.fn(async () => ({ kind: 'no-history' })),
   fetchCorporationStats: vi.fn(async () => ({ kind: 'no-history' })),
+  fetchAllianceStats: vi.fn(async () => ({ kind: 'no-history' })),
   fetchPilotKillmails: vi.fn(async () => ({ ok: true, entries: [] })),
 }));
 vi.mock('@/sde/loadSde', () => ({ loadTypes: vi.fn(async () => ({})) }));
@@ -29,7 +30,8 @@ beforeEach(async () => {
   server.use(
     http.post(`${ESI_BASE_URL}/characters/affiliation`, () => HttpResponse.json([])),
     http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.json([])),
-    http.get(`${ESI_BASE_URL}/corporations/:id/alliancehistory`, () => HttpResponse.json([]))
+    http.get(`${ESI_BASE_URL}/corporations/:id/alliancehistory`, () => HttpResponse.json([])),
+    http.get(`${ESI_BASE_URL}/alliances/:id/corporations`, () => HttpResponse.json([]))
   );
 });
 afterEach(() => server.resetHandlers());
@@ -94,7 +96,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 99,
       creator_id: 99,
       member_count: 42,
-      tax_rate: 0.1,
+      tax_rates: { isk: 10 },
       alliance_id: 3,
     });
     mockAlliance(3, {
@@ -140,7 +142,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 102,
       creator_id: 102,
       member_count: 10,
-      tax_rate: 0,
+      tax_rates: { isk: 0 },
       alliance_id: 8,
     });
     mockAlliance(8, {
@@ -174,7 +176,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 99,
       creator_id: 99,
       member_count: 42,
-      tax_rate: 0.1,
+      tax_rates: { isk: 10 },
     });
     mockNames([{ id: 99, name: 'CEO Pilot' }]);
 
@@ -201,7 +203,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 100,
       creator_id: 100,
       member_count: 1,
-      tax_rate: 0,
+      tax_rates: { isk: 0 },
     });
     mockNames([{ id: 100, name: 'Solo CEO' }]);
 
@@ -254,7 +256,7 @@ describe('PublicInfoModal', () => {
           ceo_id: 101,
           creator_id: 101,
           member_count: 1,
-          tax_rate: 0,
+          tax_rates: { isk: 0 },
         });
       })
     );
@@ -295,7 +297,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 102,
       creator_id: 102,
       member_count: 3,
-      tax_rate: 0,
+      tax_rates: { isk: 0 },
     });
     mockAlliance(700, {
       name: 'Killboard Alliance',
@@ -355,7 +357,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 103,
       creator_id: 103,
       member_count: 5,
-      tax_rate: 0,
+      tax_rates: { isk: 0 },
     });
     mockNames([
       { id: 9, name: 'Lookup Corp' },
@@ -399,7 +401,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 104,
       creator_id: 104,
       member_count: 2,
-      tax_rate: 0,
+      tax_rates: { isk: 0 },
       // Cached corp record still names an alliance the live affiliation has left.
       alliance_id: 13,
     });
@@ -442,7 +444,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 99,
       creator_id: 99,
       member_count: 42,
-      tax_rate: 0.1,
+      tax_rates: { isk: 10 },
     });
 
     renderModal();
@@ -473,7 +475,7 @@ describe('PublicInfoModal', () => {
       ceo_id: 99,
       creator_id: 99,
       member_count: 42,
-      tax_rate: 0.1,
+      tax_rates: { isk: 10 },
     };
 
     it('lazy-loads the character corporation history only once the tab is opened', async () => {
@@ -565,7 +567,7 @@ describe('PublicInfoModal', () => {
         ceo_id: 90000001,
         creator_id: 90000002,
         member_count: 142,
-        tax_rate: 0.1,
+        tax_rates: { isk: 10 },
         alliance_id: 99000001,
         date_founded: '2019-04-12T00:00:00Z',
         war_eligible: true,
@@ -616,7 +618,7 @@ describe('PublicInfoModal', () => {
         ceo_id: 90000001,
         creator_id: 90000001,
         member_count: 1,
-        tax_rate: 0,
+        tax_rates: { isk: 0 },
       });
       mockNames([{ id: 90000001, name: 'Kaelen Vrask' }]);
 
@@ -638,7 +640,7 @@ describe('PublicInfoModal', () => {
         ceo_id: 3000001,
         creator_id: 1,
         member_count: 0,
-        tax_rate: 0,
+        tax_rates: { isk: 0 },
         faction_id: 500016,
       });
       mockNames([{ id: 500016, name: 'Servant Sisters of EVE' }]);
@@ -670,7 +672,7 @@ describe('PublicInfoModal', () => {
         ceo_id: 3000001,
         creator_id: 1,
         member_count: 0,
-        tax_rate: 0,
+        tax_rates: { isk: 0 },
       });
       mockNames([{ id: 1000125, name: 'Sisters of EVE' }]);
 
@@ -684,6 +686,45 @@ describe('PublicInfoModal', () => {
         expect(within(dialog).getByRole('tab', { name: 'Corporation' })).toBeInTheDocument()
       );
       expect(within(dialog).queryByRole('tab', { name: 'Employment' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Alliance tab', () => {
+    it('shows the executor, founder and every member corporation, each opening in the modal', async () => {
+      mockAlliance(99005130, {
+        name: 'EvE-Scout Enclave',
+        ticker: 'SC0UT',
+        creator_id: 95142600,
+        creator_corporation_id: 98361601,
+        executor_corporation_id: 98361601,
+        date_founded: '2015-01-23T10:37:01Z',
+      });
+      mockNames([
+        { id: 95142600, name: 'G8keeper' },
+        { id: 98361601, name: 'EvE-Scout Rescue' },
+        { id: 98372649, name: 'Signal Cartel' },
+      ]);
+      server.use(
+        http.get(`${ESI_BASE_URL}/alliances/99005130/corporations`, () =>
+          HttpResponse.json([98372649, 98361601])
+        )
+      );
+
+      renderModal();
+      act(() => usePublicInfoModalStore.getState().open('alliance', 99005130));
+
+      const dialog = await screen.findByRole('dialog');
+      await within(dialog).findByText('[SC0UT]');
+      expect(await within(dialog).findByRole('button', { name: 'G8keeper' })).toBeInTheDocument();
+      expect(within(dialog).getByText('Jan 23, 2015')).toBeInTheDocument();
+
+      const members = await within(dialog).findByRole('region', { name: 'Member corporations' });
+      expect(within(members).getByText('2 member corporations')).toBeInTheDocument();
+      within(members).getByRole('button', { name: 'Signal Cartel' }).click();
+      expect(usePublicInfoModalStore.getState().request).toEqual({
+        kind: 'corporation',
+        id: 98372649,
+      });
     });
   });
 });

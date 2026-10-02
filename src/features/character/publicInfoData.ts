@@ -16,6 +16,7 @@ import {
   getAlliancePublicInfo,
   getCharacterCorporationHistory,
   getCorporationAllianceHistory,
+  getAllianceCorporations,
   type CharacterPublicInfo,
   type CorporationPublicInfo,
   type AlliancePublicInfo,
@@ -158,4 +159,35 @@ export async function loadPublicAllianceHistory(
   ];
   const names = ids.length > 0 ? await resolveNames(ids) : new Map<number, string>();
   return { rows, names };
+}
+
+export interface PublicAllianceCorporations {
+  /** Member corporations, by name — the order ESI gives them in means nothing. */
+  corporations: { id: number; name: string | null }[];
+}
+
+/**
+ * Another alliance's member corporations, cached under the global sentinel
+ * like the rest of this module. Null when ESI could not be reached and
+ * nothing was cached; the tab then leaves the list out.
+ */
+export async function loadPublicAllianceCorporations(
+  allianceId: number
+): Promise<PublicAllianceCorporations | null> {
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getAllianceCorporations(allianceId, options)
+  );
+  const result = await loadWithCache(
+    GLOBAL_CACHE_CHARACTER_ID,
+    `public-alliance-corporations:${allianceId}`,
+    fetchLive,
+    { staleAfterMs: STALE_AFTER.static, conditional }
+  );
+  if (!result) return null;
+  const names =
+    result.data.length > 0 ? await resolveNames(result.data) : new Map<number, string>();
+  const corporations = result.data
+    .map((id) => ({ id, name: names.get(id) ?? null }))
+    .sort((a, b) => (a.name ?? `#${a.id}`).localeCompare(b.name ?? `#${b.id}`));
+  return { corporations };
 }

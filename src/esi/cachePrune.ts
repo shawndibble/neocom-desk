@@ -91,6 +91,8 @@ export const PRUNE_RULES: readonly PruneRule[] = [
     'public-character',
     'public-corporation',
     'public-alliance',
+    'public-alliance-history',
+    'public-alliance-corporations',
     'public-employment',
     'station',
     'universeType',

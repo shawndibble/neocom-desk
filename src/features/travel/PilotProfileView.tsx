@@ -44,7 +44,7 @@ export function PilotProfileView(props: PilotProfileViewProps) {
   return (
     <div className="space-y-4">
       <PilotIdentity {...props} />
-      <ZkillStatsSection stats={stats} subject="pilot" />
+      <ZkillStatsSection stats={stats} />
       <PilotKillmailsSection characterId={characterId} />
     </div>
   );

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { corporationAge, deriveAllianceHistoryRows } from './corporationInfo';
+import {
+  corporationAge,
+  corporationTaxPercent,
+  deriveAllianceHistoryRows,
+} from './corporationInfo';
 
 describe('deriveAllianceHistoryRows', () => {
   it('lists the most recent first, each ending where the next one began', () => {
@@ -60,5 +64,18 @@ describe('corporationAge', () => {
   it('is unknown with no founding date, or one it cannot read', () => {
     expect(corporationAge(undefined, now)).toBeNull();
     expect(corporationAge('not a date', now)).toBeNull();
+  });
+});
+
+describe('corporationTaxPercent', () => {
+  it("reads ESI's ISK tax rate, which it states as a percentage", () => {
+    expect(corporationTaxPercent({ tax_rates: { isk: 10, loyalty_point: 10 } })).toBe(10);
+    expect(corporationTaxPercent({ tax_rates: { isk: 0 } })).toBe(0);
+  });
+
+  it('is unknown when ESI sends no ISK rate, rather than NaN', () => {
+    expect(corporationTaxPercent({})).toBeNull();
+    expect(corporationTaxPercent({ tax_rates: {} })).toBeNull();
+    expect(corporationTaxPercent({ tax_rates: { isk: Number.NaN } })).toBeNull();
   });
 });
