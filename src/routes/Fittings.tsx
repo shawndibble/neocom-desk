@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { fittingCompareHref, fittingsRedirect } from '@/features/fittings/fittingRoutes';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -7,16 +7,7 @@ import { formatIskCompact } from '@/lib/isk';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import {
-  Button,
-  Disclosure,
-  Modal,
-  PageHeader,
-  Panel,
-  SlideOver,
-  Tabs,
-  TextInput,
-} from '@/components/ui';
+import { Button, Disclosure, Modal, Panel, SlideOver, Tabs, TextInput } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
 import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
@@ -48,10 +39,12 @@ import { useChargeLoading } from '@/features/fittings/useChargeLoading';
 import { useEditorItemActions } from '@/features/fittings/useEditorItemActions';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
 import { writeCompareCodes } from '@/features/fittings/compareUrl';
-import { FittingHeader } from '@/features/fittings/FittingHeader';
+import { FittingHeader, type LibraryAction } from '@/features/fittings/FittingHeader';
+import type { HullEntry } from '@/engine/fittings/hullCatalogue';
 import { FittingSaveButton } from '@/features/fittings/FittingSaveButton';
 import { LoadWarnings } from '@/features/fittings/FittingLoadCard';
-import { FittingLibrary, type LibraryTab } from '@/features/fittings/FittingLibrary';
+import { FittingStartScreen } from '@/features/fittings/FittingStartScreen';
+import { ImportFittingDialog, NewFromHullDialog } from '@/features/fittings/FittingStartDialogs';
 import { SaveToEveDialog } from '@/features/fittings/SaveToEveDialog';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
@@ -158,7 +151,7 @@ function FittingsPage() {
   );
   // The Fittings menu's dialog, and the Fitting it was opened over: opening
   // any other Fitting from it closes it (adjusted during render, not in an effect).
-  const [library, setLibrary] = useState<LibraryTab | null>(null);
+  const [library, setLibrary] = useState<LibraryAction | null>(null);
   const [libraryOver, setLibraryOver] = useState<Fitting | null>(null);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const characterName = useLiveQuery(
@@ -267,9 +260,9 @@ function FittingsPage() {
       openCargoQuantity: setCargoQuantityFor,
     });
 
-  function openLibrary(tab: LibraryTab) {
+  function openLibrary(action: LibraryAction) {
     setLibraryOver(fitting);
-    setLibrary(tab);
+    setLibrary(action);
   }
 
   function handleAdd(typeId: number, rack: CandidateRack) {
@@ -376,42 +369,25 @@ function FittingsPage() {
     damageProfile: workspace.damageProfiles.selected,
   });
 
-  const renderLibrary = (
-    layout: 'page' | 'tabs',
-    initialTab?: LibraryTab,
-    pageTabs?: ReactNode
-  ) => (
-    <FittingLibrary
-      workspace={workspace}
-      catalogue={catalogue}
-      characterId={activeCharacterId}
-      inGameKey={inGameFittingsKey}
-      onStartHull={(hull) => void workspace.openFitting(newFitting(hull.typeId, hull.name))}
-      // Reopening the Fitting already open changes nothing to close on, so
-      // an explicit open closes the dialog itself.
-      onOpened={() => setLibrary(null)}
-      layout={layout}
-      initialTab={initialTab}
-      pageTitle={t('nav.ships')}
-      pageTabs={pageTabs}
-    />
-  );
+  const startHull = (hull: HullEntry) =>
+    void workspace.openFitting(newFitting(hull.typeId, hull.name));
+  // Reopening the Fitting already open changes nothing to close on, so an
+  // explicit open closes the Fittings menu's dialog itself.
+  const closeLibrary = () => setLibrary(null);
 
   if (fitting === null) {
+    // The Start screen renders the header and the Ships tabs itself: it owns
+    // the In-game data age and refresh. A broken share link opens its Import.
     return (
-      <div className="space-y-3">
-        {/* Desktop's Start screen renders the header and the Ships tabs itself: it owns the In-game data age and refresh. */}
-        {isPhone && (
-          <>
-            <PageHeader title={t('nav.ships')} />
-            <ShipsTabBar />
-          </>
-        )}
-        {/* A broken share link's message is on the Import tab; start there. */}
-        {isPhone
-          ? renderLibrary('tabs', workspace.shareError ? 'import' : undefined)
-          : renderLibrary('page', workspace.shareError ? 'import' : undefined, <ShipsTabBar />)}
-      </div>
+      <FittingStartScreen
+        workspace={workspace}
+        catalogue={catalogue}
+        characterId={activeCharacterId}
+        inGameKey={inGameFittingsKey}
+        onStartHull={startHull}
+        pageTitle={t('nav.ships')}
+        pageTabs={<ShipsTabBar />}
+      />
     );
   }
 
@@ -610,7 +586,6 @@ function FittingsPage() {
             fitting={fitting}
             subtitle={subtitle}
             onRename={workspace.rename}
-            hasCharacter={activeCharacterId !== null}
             onLibrary={openLibrary}
             onCompare={() => {
               // Unsaved edits against a saved Fitting: Compare opens saved vs.
@@ -806,13 +781,41 @@ function FittingsPage() {
             />
           )}
           <Modal
-            open={library !== null}
-            onClose={() => setLibrary(null)}
+            open={library === 'open'}
+            onClose={closeLibrary}
             title={t('fittings.header.libraryTitle')}
             placement={isPhone ? 'sheet' : 'wide'}
           >
-            {library !== null && renderLibrary('tabs', library)}
+            {library === 'open' && (
+              <FittingStartScreen
+                variant="dialog"
+                workspace={workspace}
+                catalogue={catalogue}
+                characterId={activeCharacterId}
+                inGameKey={inGameFittingsKey}
+                onOpened={closeLibrary}
+              />
+            )}
           </Modal>
+          <NewFromHullDialog
+            open={library === 'new'}
+            onClose={closeLibrary}
+            catalogue={catalogue}
+            onStart={(hull) => {
+              startHull(hull);
+              closeLibrary();
+            }}
+            onOpenPopular={async (loaded) => {
+              await workspace.openLoaded(loaded);
+              closeLibrary();
+            }}
+          />
+          <ImportFittingDialog
+            open={library === 'import'}
+            onClose={closeLibrary}
+            workspace={workspace}
+            onOpened={closeLibrary}
+          />
           <Modal
             open={openModule !== null}
             onClose={() => setModuleSlot(null)}

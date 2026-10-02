@@ -474,10 +474,7 @@
       "noHulls": "No hull matches that search.",
       "pickAHull": "Pick a hull, then start fitting it. Double-click a hull to start at once.",
       "startFitting": "Start fitting",
-      "tabNew": "New",
-      "tabImport": "Import",
       "tabInGame": "In-game",
-      "tabsLabel": "Ways to open a fitting",
       "searchFittings": "Search fittings",
       "searchFittingsPlaceholder": "Search by name or hull…",
       "newFromHull": "New from hull",
@@ -491,6 +488,7 @@
       "matches_one": "{{count}} matching fitting",
       "matches_other": "{{count}} matching fittings",
       "pickToPreview": "Pick a fitting to preview it.",
+      "backToList": "Back to fittings",
       "preview": {
         "open": "Open fitting",
         "compare": "Compare",
@@ -548,8 +546,7 @@
       "newFromHull": "New from a hull…",
       "import": "Import…",
       "libraryTitle": "Open a fitting",
-      "myFittings": "My Fittings…",
-      "inGame": "In-game Fittings…",
+      "openFitting": "Open a fitting…",
       "moreSave": "More save options",
       "moreActions": "Fitting actions",
       "savedInMyFittings": "Saved in My Fittings"

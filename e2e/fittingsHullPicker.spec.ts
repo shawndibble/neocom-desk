@@ -18,8 +18,7 @@ test.describe('Fittings — hull picker', () => {
       await page.setViewportSize(viewport);
       await signInAndGoto(page, './ships/fittings');
 
-      // On a desktop the picker is behind the Start screen's "New from hull"
-      // button; a phone shows it as the first tab.
+      // The picker is behind the Start screen's "New from hull" button.
       const newFromHull = page.getByRole('button', { name: 'New from hull' });
       const hullSearch = page.getByRole('searchbox', { name: 'Search hulls' });
       await newFromHull.or(hullSearch).first().waitFor();

@@ -1,11 +1,12 @@
 /**
- * "Compare with…": adds a Fitting to an empty compare slot. The ways in are
- * `FittingLibrary`'s (minus starting from a hull), in a mode that hands back
- * the chosen Fitting's Share Link code instead of opening it.
+ * "Compare with…": adds a Fitting to an empty compare slot. The same list as
+ * the Start screen (minus starting from a hull, and the rows' menus), with
+ * Import in place, in a mode that hands back the chosen Fitting's Share Link
+ * code instead of opening it.
  */
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
-import { FittingLibrary } from './FittingLibrary';
+import { FittingStartScreen } from './FittingStartScreen';
 import { useFittingPicker } from './useFittingPicker';
 
 interface FittingComparePickerProps {
@@ -30,13 +31,14 @@ export function FittingComparePicker({
 
   return (
     <Modal open={open} onClose={onClose} title={t('fittings.compare.picker.title')}>
-      <FittingLibrary
+      <FittingStartScreen
+        variant="dialog"
+        importInline
+        rowMenus={false}
         workspace={source}
         catalogue={null}
         characterId={characterId}
         inGameKey={0}
-        layout="tabs"
-        initialTab="mine"
       />
     </Modal>
   );
