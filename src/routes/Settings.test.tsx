@@ -209,7 +209,8 @@ describe('Settings', () => {
     ).not.toBeInTheDocument();
 
     expect(screen.getByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
-    expect(screen.getByText('Jump to search')).toBeInTheDocument();
+    expect(screen.getByText('Open the command palette')).toBeInTheDocument();
+    expect(screen.queryByText('Jump to search')).not.toBeInTheDocument();
     expect(screen.getByText('Switch character')).toBeInTheDocument();
     expect(screen.getByText('Open Settings')).toBeInTheDocument();
     expect(screen.getByText('Close the open dialog')).toBeInTheDocument();

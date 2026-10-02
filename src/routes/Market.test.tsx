@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import { delay, http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -28,7 +27,6 @@ import { useCompareSet } from '@/features/market/compareSet';
 import { ESI_BASE_URL } from '@/esi/client';
 import { configureClipboard } from '@/lib/clipboard';
 import { App } from '@/app/App';
-import { Market } from './Market';
 import type {
   MarketGroupNode,
   MarketTypeEntry,
@@ -1904,27 +1902,7 @@ describe('Market Browser narrow-screen layout (issue #4)', () => {
   });
 });
 
-describe('Market search focus (issue #25 "jump to search" shortcut)', () => {
-  it('focuses the search box when navigated here with focusSearch router state', async () => {
-    render(
-      <MemoryRouter initialEntries={[{ pathname: '/market', state: { focusSearch: true } }]}>
-        <Market />
-      </MemoryRouter>
-    );
-
-    await waitFor(() => expect(screen.getByRole('searchbox')).toHaveFocus());
-  });
-
-  it('leaves focus alone on an ordinary visit', async () => {
-    render(
-      <MemoryRouter initialEntries={['/market']}>
-        <Market />
-      </MemoryRouter>
-    );
-
-    expect(await screen.findByRole('searchbox')).not.toHaveFocus();
-  });
-
+describe('Market Browser', () => {
   it('points an empty blueprint order book at the BPC search, since copies are contract-only', async () => {
     // 638 is BLUEPRINTS' own key, so the real blueprint catalogue indexes it —
     // that catalogue loads lazily on demand, and the hint silently never

@@ -508,15 +508,6 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     mockIsSyncConfigured.mockReturnValue(false);
   });
 
-  it('"/" jumps to Market', async () => {
-    const user = userEvent.setup();
-    renderLayoutWithRoutes();
-    await screen.findByText('overview page');
-
-    await user.keyboard('/');
-    expect(await screen.findByText('market page')).toBeInTheDocument();
-  });
-
   it('"c" switches character', async () => {
     const user = userEvent.setup();
     renderLayoutWithRoutes();
@@ -559,7 +550,7 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     renderLayoutWithRoutes();
     await screen.findByText('overview page');
 
-    await user.keyboard('{Control>}/{/Control}');
+    await user.keyboard('{Control>}m{/Control}');
     expect(screen.queryByText('market page')).not.toBeInTheDocument();
   });
 
