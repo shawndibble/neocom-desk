@@ -11,7 +11,7 @@ export interface StatTileItem {
   value: string;
   /** A one-line explanation behind a "?" beside the label. */
   help?: string;
-  /** Colours the value: kills and ISK destroyed read green, losses red. */
+  /** Colours the value: kills read green, losses red (decision `20261002-163430`). */
   tone?: 'positive' | 'negative';
 }
 

@@ -193,7 +193,7 @@ export function parsePilotStats(body: unknown): PilotStatsParse | null {
 
 type StatsEntity = 'characterID' | 'corporationID' | 'allianceID';
 
-/** Keyed `kind:id`: a pilot and a corporation can never share an answer. */
+/** Keyed `kind:id`: a pilot, a corporation and an alliance can never share an answer. */
 const pilotStatsCache = new Map<string, { at: number; value: PilotStatsParse }>();
 
 /** Test seam: forget every cached pilot and corporation. */

@@ -29,7 +29,7 @@ import {
 import {
   StatTiles,
   ZkillRatioMeters,
-  ZkillStatsStatus,
+  ZkillStatsNote,
   ZkillTopShips,
 } from '@/features/travel/ZkillStatsSection';
 import { killFigures, type StatTileItem } from '@/features/travel/zkillFigures';
@@ -209,6 +209,7 @@ export default function PublicInfoCorporationTab({
       {ready && <ZkillRatioMeters stats={ready} />}
 
       <StatTiles items={facts} className={FACT_COLUMNS[facts.length]} />
+      {!npc && <ZkillStatsNote stats={stats} subject="corporation" />}
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="min-w-0 space-y-5 self-start">
@@ -297,13 +298,6 @@ export default function PublicInfoCorporationTab({
           )}
         </div>
       </div>
-
-      {!npc &&
-        (ready ? (
-          <p className="text-xs text-text-dim">{t('travel.pilot.statsSource')}</p>
-        ) : (
-          <ZkillStatsStatus stats={stats} subject="corporation" />
-        ))}
     </div>
   );
 }

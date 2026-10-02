@@ -6857,6 +6857,7 @@
       "gang": "Gang",
       "gangShare": "{{value}}% in gangs",
       "soloShare": "{{value}}% solo",
+      "evenShare": "Even, 50/50",
       "statsSource": "All-time figures as zKillboard states them.",
       "topShips": "Ships used most on kills",
       "shipKills_one": "{{formatted}} kill",

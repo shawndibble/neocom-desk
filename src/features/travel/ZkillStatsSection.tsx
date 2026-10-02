@@ -1,11 +1,11 @@
 /**
- * A pilot's or a corporation's zKillboard stats, in parts: stat tiles, the
- * Snuggly↔Dangerous and Solo↔Gang meters, and the ships used most on kills.
- * `ZkillStatsSection` assembles them for Pilot Lookup / the Show Info
- * Character tab (`PilotProfileView`); the Corporation tab lays the same parts
- * out around the corporation's own facts. The meters quote zKillboard's own
- * scales, ends and all (decision `20261002-145207`); the app adds no reading
- * of its own.
+ * A pilot's, corporation's or alliance's zKillboard stats, in parts: stat
+ * tiles, the Snuggly↔Dangerous and Solo↔Gang meters, and the ships used most
+ * on kills. `ZkillStatsSection` assembles them for Pilot Lookup / the Show
+ * Info Character tab (`PilotProfileView`); the Corporation and Alliance tabs
+ * lay the same parts out around their own facts. The meters quote
+ * zKillboard's own scales, ends and all (decision `20261002-145207`), and are
+ * coloured by the end they lean to (`20261002-163430`).
  *
  * zKillboard sends the same body for either kind of id (`parsePilotStats`);
  * only the no-history wording names which one it is.
@@ -104,6 +104,25 @@ export function ZkillStatsStatus({
   return null;
 }
 
+/**
+ * The line under the figures: where they come from once they are in, or why
+ * they are not — next to the "—" tiles it explains rather than at the foot of
+ * the tab.
+ */
+export function ZkillStatsNote({
+  stats,
+  subject,
+}: {
+  stats: PilotStatsResult | null;
+  subject: 'pilot' | 'corporation' | 'alliance';
+}) {
+  const { t } = useTranslation();
+  if (stats?.kind === 'stats') {
+    return <p className="text-xs text-text-dim">{t('travel.pilot.statsSource')}</p>;
+  }
+  return <ZkillStatsStatus stats={stats} subject={subject} />;
+}
+
 /** The pilot's full block, as Pilot Lookup and the Character tab show it. */
 export function ZkillStatsSection({ stats }: { stats: PilotStatsResult | null }) {
   const { t } = useTranslation();
@@ -129,7 +148,7 @@ export function ZkillStatsSection({ stats }: { stats: PilotStatsResult | null })
           { label: t('travel.pilot.soloKills'), value: s.soloKills.toLocaleString() },
         ]}
       />
-      <p className="text-xs text-text-dim">{t('travel.pilot.statsSource')}</p>
+      <ZkillStatsNote stats={stats} subject="pilot" />
       {/* Half the modal's width on desktop: bars stretched across all of it
           make the spread between hulls harder to compare, not easier. */}
       {s.topShips.length > 0 && (
@@ -155,9 +174,11 @@ export function ZkillRatioMeters({ stats }: { stats: PilotStats }) {
           high={t('travel.pilot.dangerous')}
           value={stats.dangerRatio}
           valueText={(v) =>
-            v >= 50
+            v > 50
               ? t('travel.pilot.dangerousShare', { value: v })
-              : t('travel.pilot.snugglyShare', { value: 100 - v })
+              : v < 50
+                ? t('travel.pilot.snugglyShare', { value: 100 - v })
+                : t('travel.pilot.evenShare')
           }
         />
       )}
@@ -169,9 +190,11 @@ export function ZkillRatioMeters({ stats }: { stats: PilotStats }) {
           high={t('travel.pilot.gang')}
           value={stats.gangRatio}
           valueText={(v) =>
-            v >= 50
+            v > 50
               ? t('travel.pilot.gangShare', { value: v })
-              : t('travel.pilot.soloShare', { value: 100 - v })
+              : v < 50
+                ? t('travel.pilot.soloShare', { value: 100 - v })
+                : t('travel.pilot.evenShare')
           }
         />
       )}

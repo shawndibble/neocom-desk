@@ -19,7 +19,7 @@ import { allianceZkillUrl, fetchAllianceStats, type PilotStatsResult } from '@/l
 import {
   StatTiles,
   ZkillRatioMeters,
-  ZkillStatsStatus,
+  ZkillStatsNote,
   ZkillTopShips,
 } from '@/features/travel/ZkillStatsSection';
 import { killFigures, type StatTileItem } from '@/features/travel/zkillFigures';
@@ -151,6 +151,7 @@ export default function PublicInfoAllianceTab({
       {ready && <ZkillRatioMeters stats={ready} />}
 
       <StatTiles items={facts} className={FACT_COLUMNS[facts.length]} />
+      <ZkillStatsNote stats={stats} subject="alliance" />
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="min-w-0 space-y-5 self-start">
@@ -205,12 +206,6 @@ export default function PublicInfoAllianceTab({
           </section>
         )}
       </div>
-
-      {ready ? (
-        <p className="text-xs text-text-dim">{t('travel.pilot.statsSource')}</p>
-      ) : (
-        <ZkillStatsStatus stats={stats} subject="alliance" />
-      )}
     </div>
   );
 }

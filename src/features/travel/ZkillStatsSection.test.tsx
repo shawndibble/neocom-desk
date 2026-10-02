@@ -44,6 +44,13 @@ describe('ZkillStatsSection', () => {
     expect(screen.getByText('64% solo')).toHaveClass('text-success');
   });
 
+  it('reads exactly 50 as even, in words and in colour', () => {
+    render(<ZkillStatsSection stats={{ kind: 'stats', stats: { ...base, dangerRatio: 50 } }} />);
+    const danger = screen.getByRole('meter', { name: 'Danger' });
+    expect(danger).toHaveAttribute('aria-valuetext', 'Even, 50/50');
+    expect(screen.getByText('Even, 50/50')).toHaveClass('text-text');
+  });
+
   it('leaves out a meter zKillboard sent no ratio for', () => {
     render(<ZkillStatsSection stats={{ kind: 'stats', stats: { ...base, dangerRatio: null } }} />);
     expect(screen.queryByRole('meter', { name: 'Danger' })).toBeNull();
