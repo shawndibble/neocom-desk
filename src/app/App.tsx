@@ -36,6 +36,7 @@ import { PAGE_TABS, routePatternFor } from './pageTabs';
 import { AuthFailureRedirect } from './AuthFailureNotice';
 import { LegacyShipsRedirect } from '@/features/fittings/LegacyShipsRedirect';
 import { LegacyPathRedirect } from './LegacyPathRedirect';
+import { useHiddenNav, useRecentNav } from './navPreferences';
 import { PublicInfoModal } from '@/components/PublicInfoModal';
 import { SkillDetailModal } from '@/components/SkillDetailModal';
 import { getAccessTokenReportingFailures } from './tokenProvider';
@@ -266,6 +267,14 @@ export function App() {
   useEffect(() => {
     void hydrateMobileTabs();
   }, [hydrateMobileTabs]);
+
+  // The rail's and More sheet's hidden pages and Recent row: same reason.
+  const hydrateHiddenNav = useHiddenNav((state) => state.hydrate);
+  const hydrateRecentNav = useRecentNav((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateHiddenNav();
+    void hydrateRecentNav();
+  }, [hydrateHiddenNav, hydrateRecentNav]);
 
   // The shortcut listener in `Layout` reads the off switch on every route; a
   // pilot who turned them off must not get a live "c" on a cold load.

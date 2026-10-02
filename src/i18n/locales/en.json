@@ -42,7 +42,24 @@
     "mobileLabel": "Mobile navigation",
     "alerts": "Alerts",
     "alertsWithCount_one": "Alerts, {{count}} waiting",
-    "alertsWithCount_other": "Alerts, {{count}} waiting"
+    "alertsWithCount_other": "Alerts, {{count}} waiting",
+    "railLabel": "Main navigation",
+    "goTo": "Go to…",
+    "showViews": "Show {{page}} views",
+    "hideViews": "Hide {{page}} views",
+    "editRail": "Hide pages you don't use",
+    "editHint": "Hide pages and views you never use. They stay in Go to and in More, and a page's own tabs never change.",
+    "editDone": "Done",
+    "hidePage": "Hide {{page}}",
+    "showPage": "Show {{page}}",
+    "hiddenCount_one": "{{count}} hidden · Edit",
+    "hiddenCount_other": "{{count}} hidden · Edit",
+    "searchPlaceholder": "Search pages, items, pilots",
+    "recent": "Recent",
+    "hiddenPages_one": "{{count}} hidden: {{pages}}",
+    "hiddenPages_other": "{{count}} hidden: {{pages}}",
+    "hiddenExpand": "Show",
+    "hiddenCollapse": "Hide"
   },
   "reauth": {
     "navLocked": "Needs a new login",
@@ -6262,6 +6279,7 @@
     }
   },
   "commandPalette": {
+    "scopeNote": "Jumps to pages, items, assets and contacts. It doesn't filter the page you're on.",
     "title": "Command palette",
     "placeholder": "Go to a page, run a command, switch character, find an asset or item…",
     "inputLabel": "Search pages, commands, characters, assets and items",

@@ -60,6 +60,7 @@ import { Columns as ColumnsGlyph } from '@phosphor-icons/react/dist/csr/Columns'
 import { Copy } from '@phosphor-icons/react/dist/csr/Copy';
 import { Diamond } from '@phosphor-icons/react/dist/csr/Diamond';
 import { DotsSixVertical } from '@phosphor-icons/react/dist/csr/DotsSixVertical';
+import { DotsThree } from '@phosphor-icons/react/dist/csr/DotsThree';
 import { DotsThreeVertical } from '@phosphor-icons/react/dist/csr/DotsThreeVertical';
 import { DownloadSimple } from '@phosphor-icons/react/dist/csr/DownloadSimple';
 import { EnvelopeSimple } from '@phosphor-icons/react/dist/csr/EnvelopeSimple';
@@ -420,6 +421,8 @@ export const NavHelp = withWeight(Question);
 export const NavCharacters = withWeight(UsersThree);
 /** The rail's Go to button: a caret, not a magnifier, so it never reads as the page's own search. */
 export const GoTo = withWeight(CaretRight);
+/** The phone tab bar's More button. */
+export const NavMore = withWeight(DotsThree);
 /** A place visited recently — the More sheet's Recent row. */
 export const Recent = withWeight(ClockCounterClockwise);
 /** Shown in the rail and the More sheet (the rail editor's toggle, on). */

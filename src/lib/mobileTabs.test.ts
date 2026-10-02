@@ -94,7 +94,7 @@ describe('the default bar', () => {
 });
 
 describe('the choice list', () => {
-  it('is the rail order without /corp and /settings, /characters last (derived from the nav descriptor)', () => {
+  it('is the rail order without /corp, /settings and /help, /characters last (derived from the nav descriptor)', () => {
     expect(MOBILE_TAB_CHOICES).toEqual([
       '/overview',
       '/alerts',
@@ -111,6 +111,7 @@ describe('the choice list', () => {
       '/calendar',
       '/contacts',
       '/travel',
+      '/pilot-lookup',
       '/characters',
     ]);
   });

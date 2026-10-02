@@ -6,7 +6,7 @@
  * hidden and recent lists live in `navPreferences.ts`.
  */
 import { tabBarTabs, tabPath } from '@/lib/pageTabs';
-import { NAV_PAGES, type NavPage, type NavPagePath } from './navDestinations';
+import { NAV_PAGES, type NavDestination, type NavPage, type NavPagePath } from './navDestinations';
 import { PAGE_TABS } from './pageTabs';
 
 interface OwnedPath {
@@ -109,4 +109,18 @@ export function recentNavFor(recent: readonly string[], currentViewPath: string 
 export function parseRecentNav(raw: unknown): string[] | null {
   const kept = knownPaths(raw, (path) => NAV_ORDER.has(path));
   return kept && kept.slice(0, RECENT_KEPT);
+}
+
+/** Each page's views (its tabs and sub-views), keyed by the page. */
+export function viewsByPage(
+  destinations: readonly NavDestination[]
+): Map<string, NavDestination[]> {
+  const byPage = new Map<string, NavDestination[]>();
+  for (const destination of destinations) {
+    if (destination.kind !== 'tab') continue;
+    const views = byPage.get(destination.pagePath) ?? [];
+    views.push(destination);
+    byPage.set(destination.pagePath, views);
+  }
+  return byPage;
 }

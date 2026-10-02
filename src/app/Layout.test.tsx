@@ -207,7 +207,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     }
   });
 
-  it('trails with a divider, then Settings and the active Character (with photo)', async () => {
+  it('trails with Settings, Help and the active Character (with photo), after the page tiles', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     await db.characters.put({
       characterId: CHARACTER_ID,
@@ -224,8 +224,8 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     const sheet = screen.getByRole('dialog', { name: 'More' });
 
     const contacts = within(sheet).getByRole('link', { name: 'Contacts' });
-    const divider = within(sheet).getByRole('separator');
     const settings = await within(sheet).findByRole('link', { name: 'Settings' });
+    const help = within(sheet).getByRole('link', { name: 'Help & FAQ' });
     const character = within(sheet).getByRole('link', { name: 'Pilot One' });
 
     expect(settings).toHaveAttribute('href', '/settings');
@@ -234,16 +234,12 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     // submenu to expand.
     expect(within(sheet).queryByRole('button', { name: 'Pilot One' })).not.toBeInTheDocument();
 
-    // Reading order: ..., Contacts, divider, Settings, Character.
+    // Reading order: ..., Contacts, Settings, Help, Character.
     expect(
-      contacts.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING
+      contacts.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    expect(
-      divider.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
-    expect(
-      settings.compareDocumentPosition(character) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+    expect(settings.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(help.compareDocumentPosition(character) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('closes on Escape and returns focus to the More trigger', async () => {
@@ -410,10 +406,16 @@ describe('Layout desktop rail domain grouping', () => {
     mockIsSyncConfigured.mockReturnValue(false);
     renderLayout();
 
-    const rail = screen.getAllByRole('navigation')[0];
-    const items = Array.from(rail.children).map((el) =>
-      el.tagName === 'P' ? `[${el.textContent}]` : el.textContent
-    );
+    const rail = screen.getByRole('navigation', { name: 'Main navigation' });
+    // A page row is its link (the caret beside it is a button); the last child
+    // is the rail editor's button, not a page.
+    const items = Array.from(rail.children)
+      .filter((el) => el.tagName !== 'BUTTON')
+      .map((el) =>
+        el.tagName === 'P'
+          ? `[${el.textContent}]`
+          : within(el as HTMLElement).getAllByRole('link')[0].textContent
+      );
     expect(items).toEqual([
       'Overview',
       // Directly under Overview rather than in Social: an alert is what the

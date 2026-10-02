@@ -1,5 +1,5 @@
-import { Fragment, memo, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { memo, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import { pageKeyFor } from './pageTabs';
 import { useRouteFocus } from './routeFocus';
 import { useTranslation } from 'react-i18next';
@@ -11,37 +11,27 @@ import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
 import { SyncErrorNote } from './SyncErrorNote';
 import { useSyncStatus } from './useSyncStatus';
-import {
-  CharacterAvatar,
-  characterAvatarBoxClassName,
-  LogoMark,
-  Modal,
-  Spinner,
-} from '@/components/ui';
+import { CharacterAvatar, characterAvatarBoxClassName, LogoMark, Spinner } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { AlertCharacterSwitch } from './AlertCharacterSwitch';
 import { AuthFailureNotice } from './AuthFailureNotice';
 import { StandingsScopeNotice } from './StandingsScopeNotice';
-import { useGrantedScopes, useLockedRoutes } from './useGrantedScopes';
-import { warmRoute } from './routeWarm';
-import { preloadRouteChunk } from './routeChunks';
+import { useLockedRoutes } from './useGrantedScopes';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { GlobalPasteRouter } from './GlobalPasteRouter';
 import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
 import { useUnreadAlertCount } from '@/features/notifications/useUnreadAlertCount';
-import {
-  barTabs,
-  mobileSheetPaths,
-  NAV_LABEL_KEYS,
-  useMobileTabs,
-  type MobileTabPath,
-} from '@/lib/mobileTabs';
+import { barTabs, NAV_LABEL_KEYS, useMobileTabs } from '@/lib/mobileTabs';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
-import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
 import { CommandPaletteHost } from '@/features/commandPalette/CommandPaletteHost';
-import { NAV_LOCK_PATHS, navPageLabelKey, railGroups } from './navDestinations';
-import type { AppRoutePath } from './routeScopes';
+import { NAV_LOCK_PATHS, navPageLabelKey } from './navDestinations';
+import { viewPathFor } from './navRail';
+import { recordRecentNav } from './navPreferences';
+import { MOBILE_NAV_ACTIVE, MOBILE_NAV_IDLE, MOBILE_NAV_ITEM, NavItem } from './NavItem';
+import { RailNav } from './RailNav';
+import { MobileMoreSheet, MORE_SHEET_ID } from './MobileMoreSheet';
 
 /**
  * Hidden entirely when Firebase isn't configured, rather than shown permanently
@@ -92,165 +82,6 @@ function PrefetchIndicator() {
       aria-label={label}
       className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-accent"
     />
-  );
-}
-
-// `min-h-11 md:min-h-0`: this class is shared by the desktop rail (`hidden
-// md:flex`, mouse-operated, room to spare) and the mobile-only More sheet
-// (`MobileMoreSheet`, reached only through the `md:hidden` bottom tab bar).
-// Unqualified, both got the rail's compact ~34px row — fine for a pointer,
-// too short for adjacent full-width rows a thumb taps in a scrolling sheet.
-// The `md:` qualifier means only the phone-only rendering ever sees `min-h-11`.
-const NAV_LINK =
-  'flex min-h-11 items-center gap-2 rounded-xs border border-transparent px-3 py-2 text-xs font-semibold tracking-widest uppercase transition-colors md:min-h-0';
-const NAV_ACTIVE = 'border-line-bright bg-panel-2 text-accent';
-const NAV_IDLE = 'text-text-dim hover:bg-panel-2 hover:text-text';
-
-function navClass({ isActive }: { isActive: boolean }): string {
-  return `${NAV_LINK} ${isActive ? NAV_ACTIVE : NAV_IDLE}`;
-}
-
-// Distinct from NAV_LINK (used by the desktop rail and the More sheet, both
-// of which scroll and have room to spare): the bottom tab bar is a fixed
-// four-way split of a viewport that can be as narrow as ~320px. `flex-1
-// min-w-0` forces every tab — including "More" — to always get an equal,
-// bounded share of the width, so a long label truncates instead of pushing
-// later tabs off-screen. `min-h-11` (44px) meets the mobile touch-target
-// minimum regardless of how little padding the text needs.
-const MOBILE_NAV_ITEM =
-  'flex min-h-11 min-w-0 flex-1 items-center justify-center border-t-2 border-transparent px-1 py-2 text-[0.625rem] font-semibold uppercase transition-colors';
-const MOBILE_NAV_ACTIVE = 'border-accent bg-panel-2 text-accent';
-const MOBILE_NAV_IDLE = 'text-text-dim hover:bg-panel-2 hover:text-text';
-
-function mobileNavClass({ isActive }: { isActive: boolean }): string {
-  return `${MOBILE_NAV_ITEM} ${isActive ? MOBILE_NAV_ACTIVE : MOBILE_NAV_IDLE}`;
-}
-
-/**
- * The desktop rail's scrolling groups (`navDestinations.ts`), computed once.
- * The footer — Settings, then the Character link — is placed by hand below.
- */
-const RAIL_GROUPS = railGroups();
-
-interface NavItemProps {
-  to: AppRoutePath;
-  label: string;
-  locked: boolean;
-  /**
-   * What is waiting at this destination, rendered beside the label. Zero and
-   * `undefined` both render nothing: a badge reading "0" is a badge you stop
-   * looking at. It is a number, not a dot, because "some" and "seventy" are
-   * different situations and an accent tint conveys neither (DESIGN.md §7) —
-   * and it rides in the link's accessible name rather than as a bare numeral a
-   * screen reader would read out as "Alerts 12".
-   */
-  badge?: number;
-  /**
-   * `rail` (default) is the desktop rail's full-width row, which the More
-   * sheet also uses; `tab` is the phone tab bar's equal share of the viewport.
-   * One component for both so the lock marker, the badge and the accessible
-   * name cannot say different things in the two places a destination appears.
-   */
-  presentation?: 'rail' | 'tab';
-  onClick?: () => void;
-}
-
-/**
- * A nav destination, wherever it appears.
- *
- * A `locked` one is marked, never disabled: the link still navigates and the
- * route's `ScopeGate` explains why, and disabling it would leave no way to
- * reach the explanation.
- */
-function NavItem({ to, label, locked, badge, presentation = 'rail', onClick }: NavItemProps) {
-  const { t } = useTranslation();
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const granted = useGrantedScopes();
-  const location = useLocation();
-  // Only `/characters` carries an origin — it is the one destination a
-  // pilot needs to come back *from* (#1764); every other nav item is a
-  // destination in its own right.
-  const originState = to === '/characters' ? { from: location.pathname } : undefined;
-  /*
-   * Compose this route's snapshot while the pointer is still travelling to the
-   * link (`routeWarm.ts`). `focus` covers the keyboard, where tabbing to a link
-   * is the same declaration of intent. Both are fire-and-forget: `warmRoute`
-   * never rejects, and it no-ops for a route that is already warm, already
-   * warming, short of a grant, or simply has no warmer.
-   *
-   * The grant, not `locked`, is what gates it — an `UNGATED` route can still
-   * compose scope-gated reads, so `routeWarm.ts` filters on the endpoints its
-   * loader actually reaches.
-   *
-   * The route's code chunk (`routeChunks.ts`) is preloaded on the same
-   * intent, ungated: fetching JavaScript spends no ESI request.
-   *
-   * A touch device fires neither event until the tap itself, so on the phone's
-   * two surfaces this is inert rather than wasted.
-   */
-  const warm = () => {
-    preloadRouteChunk(to);
-    void warmRoute(to, activeCharacterId, granted);
-  };
-  const tab = presentation === 'tab';
-  const counted = badge !== undefined && badge > 0;
-  // The lock marker rides on `title`, and the count on `aria-label`: a second
-  // string inside the link would rewrite its accessible name from "Assets" to
-  // "Assets, needs a new login", which is not what the link is called.
-  return (
-    <NavLink
-      to={to}
-      state={originState}
-      onClick={onClick}
-      onMouseEnter={warm}
-      onFocus={warm}
-      className={tab ? mobileNavClass : navClass}
-      title={locked ? t('reauth.navLocked') : undefined}
-      aria-label={counted ? t('nav.alertsWithCount', { count: badge }) : undefined}
-    >
-      <span className="min-w-0 truncate">{label}</span>
-      {counted && (
-        <span
-          aria-hidden="true"
-          className={`shrink-0 rounded-xs bg-panel-2 tabular-nums text-text-dim ${
-            tab ? 'ml-1 px-1' : 'ml-auto px-1.5 text-[0.6875rem] font-medium'
-          }`}
-        >
-          {badge}
-        </span>
-      )}
-      {locked && (
-        <span
-          aria-hidden="true"
-          className={`size-1.5 shrink-0 rounded-full bg-warning ${tab ? 'ml-1' : 'ml-auto'}`}
-        />
-      )}
-    </NavLink>
-  );
-}
-
-/**
- * The Corp section's entry, present only while `useCorpNavVisible()` says so.
- *
- * `locked` is hard-wired false rather than read from `useLockedRoutes`: there
- * is no state in which this renders and is unusable, and the amber dot would
- * offer a re-login for a role only CCP can grant.
- */
-function CorpNavItem({ onClick }: { onClick?: () => void }) {
-  const { t } = useTranslation();
-  const visible = useCorpNavVisible();
-  if (!visible) return null;
-  return (
-    <NavItem to="/corp" label={t(navPageLabelKey('/corp'))} locked={false} onClick={onClick} />
-  );
-}
-
-/** Small heading introducing a group of NavItems in the desktop rail. */
-function NavGroupLabel({ children }: { children: string }) {
-  return (
-    <p className="mt-3 px-3 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
-      {children}
-    </p>
   );
 }
 
@@ -350,99 +181,6 @@ function CharacterFooterLink({
   );
 }
 
-/** A plain rule, styled like the Radix menu separators elsewhere in the app (`DropdownMenuSeparator` et al.) but usable outside a menu. */
-function FooterDivider() {
-  return <div role="separator" aria-orientation="horizontal" className="my-1 h-px bg-line" />;
-}
-
-const MORE_SHEET_ID = 'mobile-more-sheet';
-
-interface MobileMoreSheetProps {
-  open: boolean;
-  onClose: () => void;
-  activeCharacter: ActiveCharacter | undefined;
-  locked: ReadonlySet<AppRoutePath>;
-  tabs: readonly MobileTabPath[];
-  unreadAlerts: number;
-}
-
-/**
- * Mobile-only overflow sheet: `mobileSheetPaths(tabs)`, everything the bottom
- * tab bar does not hold, in the desktop rail's order.
- *
- * Three entries sit outside that rotation, because nothing may evict them:
- * Corp (hidden rather than locked, and this is the phone's only route to it),
- * and Settings plus the active Character below the divider — Settings has no
- * other route on a phone, and the Character link is the only way to switch or
- * add one. A real modal, not a drawer: it covers the viewport, so the tab bar
- * underneath must not stay reachable — hence the shared `Modal` and its
- * dismissal contract. Links close it on click so it never hangs over the next
- * route.
- */
-function MobileMoreSheet({
-  open,
-  onClose,
-  activeCharacter,
-  locked,
-  tabs,
-  unreadAlerts,
-}: MobileMoreSheetProps) {
-  const { t } = useTranslation();
-  // The page open when the sheet was opened — the Character link's
-  // return-to-origin (#1764). Read here rather than passed down, because
-  // `Layout` must not read the location (see `RouteOutlet`).
-  const currentPath = useLocation().pathname;
-  // `/characters` always has its own dedicated row below (the portrait+name
-  // `CharacterFooterLink`) — an ordinary row for it here too, whenever it
-  // isn't chosen for the tab bar, would be a second link to the same
-  // destination rather than the one `mobileSheetPaths`' own invariant intends.
-  const rows = mobileSheetPaths(tabs).filter((path) => path !== '/characters');
-
-  return (
-    <Modal
-      open={open}
-      id={MORE_SHEET_ID}
-      onClose={onClose}
-      title={t('nav.more')}
-      placement="sheet-full"
-    >
-      {/* `space-y-2`, not the tighter `space-y-1` a desktop-rail-shared gap
-          would use: these rows are now full 44px touch targets, and 4px
-          between two of them left almost no dead zone for a thumb to miss
-          into on this phone-only sheet. `min-h-full justify-end` bottom-aligns
-          the rows in the full-height sheet, next to the tab bar and the thumb
-          that opened it, instead of leaving them at the far top. */}
-      <div className="flex min-h-full flex-col justify-end space-y-2 pb-3">
-        <CorpNavItem onClick={onClose} />
-        {rows.map((path) => (
-          <NavItem
-            key={path}
-            to={path}
-            label={t(NAV_LABEL_KEYS[path])}
-            locked={locked.has(path)}
-            badge={path === '/alerts' ? unreadAlerts : undefined}
-            onClick={onClose}
-          />
-        ))}
-        <FooterDivider />
-        <NavItem
-          to="/settings"
-          label={t(navPageLabelKey('/settings'))}
-          locked={false}
-          onClick={onClose}
-        />
-        <CharacterFooterLink
-          activeCharacter={activeCharacter}
-          size="sm"
-          className="min-h-11 rounded-xs"
-          onClick={onClose}
-          originPath={currentPath}
-        />
-      </div>
-    </Modal>
-  );
-}
-
 /**
  * Fades the route outlet in whenever the page changes — `pageKeyFor`'s
  * pathname, in which a tab segment (`/contacts/across`) collapses to its page:
@@ -476,6 +214,19 @@ function useRouteFade(pageKey: string) {
   }, [pageKey]);
 
   return ref;
+}
+
+/**
+ * Records each view visited for the More sheet's Recent row. Renders nothing;
+ * its own component because it reads the location, which `Layout` must not.
+ */
+function RecentNavRecorder() {
+  const { pathname } = useLocation();
+  const viewPath = viewPathFor(pathname);
+  useEffect(() => {
+    if (viewPath !== null) recordRecentNav(viewPath);
+  }, [viewPath]);
+  return null;
 }
 
 /**
@@ -582,7 +333,7 @@ export const Layout = memo(function Layout() {
   return (
     <div className="flex min-h-screen bg-bg text-text">
       {/* Desktop left rail */}
-      <aside className="sticky top-0 hidden h-screen w-48 flex-col border-r border-line bg-panel/85 backdrop-blur-sm md:flex">
+      <aside className="sticky top-0 hidden h-screen w-52 flex-col border-r border-line bg-panel/85 backdrop-blur-sm md:flex">
         <div className="flex items-center gap-2 border-b border-line px-3 py-3">
           {/* Logo and wordmark navigate together, as one unit: a site name
               that goes home beside an inert logo is the odd half-measure.
@@ -600,38 +351,18 @@ export const Layout = memo(function Layout() {
           <PrefetchIndicator />
           {isSyncConfigured() && <SyncStatusIndicator />}
         </div>
-        {/* `overflow-y-auto` is what makes the character menu below actually
-            pinned: the rail is `h-screen`, so without it a tall list (large
-            text scale) would push the footer off the bottom instead of
-            scrolling. */}
-        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
-          {RAIL_GROUPS.map((group) => (
-            <Fragment key={group.id}>
-              {group.labelKey !== null && <NavGroupLabel>{t(group.labelKey)}</NavGroupLabel>}
-              {group.pages.map((page) =>
-                page.gating === 'corp' ? (
-                  <CorpNavItem key={page.path} />
-                ) : (
-                  <NavItem
-                    key={page.path}
-                    to={page.path}
-                    label={t(page.labelKey)}
-                    locked={locked.has(page.path)}
-                    badge={page.path === '/alerts' ? unreadAlerts : undefined}
-                  />
-                )
-              )}
-            </Fragment>
-          ))}
-        </nav>
+        {/* The pages scroll (`RailNav`'s `overflow-y-auto`), which is what keeps
+            the footer below pinned: the rail is `h-screen`, so a tall list
+            (large text scale) would otherwise push it off the bottom. */}
+        <RailNav unreadAlerts={unreadAlerts} />
         {/*
-          Footer: Settings then the active Character, in that reading order —
-          Settings sits just above the Character link, which is the very
-          bottom of the rail. Its `border-b` rules off the bottom of Settings,
-          separating it from the Character link below rather than from the
-          scrollable nav above.
+          Footer: Help and Settings, then the active Character, in that reading
+          order — the Character link is the very bottom of the rail. The
+          `border-b` rules off the bottom of Settings, separating it from the
+          Character link below rather than from the scrollable nav above.
         */}
-        <div className="shrink-0 border-b border-line p-2">
+        <div className="flex shrink-0 flex-col gap-0.5 border-b border-line p-2">
+          <NavItem to="/help" label={t(navPageLabelKey('/help'))} locked={false} />
           <NavItem to="/settings" label={t(navPageLabelKey('/settings'))} locked={false} />
         </div>
         <CharacterFooterLink activeCharacter={activeCharacter} />
@@ -673,6 +404,7 @@ export const Layout = memo(function Layout() {
           onClick={() => setMoreOpen((open) => !open)}
           className={`${MOBILE_NAV_ITEM} ${moreOpen ? MOBILE_NAV_ACTIVE : MOBILE_NAV_IDLE}`}
         >
+          <Icon.NavMore aria-hidden="true" size={Icon.ICON_SIZE.md} />
           <span className="truncate">{t('nav.more')}</span>
         </button>
       </nav>
@@ -689,14 +421,24 @@ export const Layout = memo(function Layout() {
       <CorpGrantPrompt />
       <ForegroundNotificationPoller />
 
+      <RecentNavRecorder />
+
       {!isDesktop && (
         <MobileMoreSheet
           open={moreOpen}
           onClose={() => setMoreOpen(false)}
-          activeCharacter={activeCharacter}
           locked={locked}
           tabs={tabs}
           unreadAlerts={unreadAlerts}
+          renderCharacterLink={(originPath) => (
+            <CharacterFooterLink
+              activeCharacter={activeCharacter}
+              size="sm"
+              className="min-h-11 rounded-xs"
+              onClick={() => setMoreOpen(false)}
+              originPath={originPath}
+            />
+          )}
         />
       )}
     </div>

@@ -343,6 +343,11 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
             <p className="px-2 py-1.5 text-sm text-text-dim">{t('commandPalette.noResults')}</p>
           )
         )}
+        {/* The rail's Go to button opens this too, so say it is not the page's
+            own search: a page's search box filters that page; this goes elsewhere. */}
+        <p className="border-t border-line px-2 pt-2 text-xs text-text-dim">
+          {t('commandPalette.scopeNote')}
+        </p>
         <span role="status" aria-live="polite" className="sr-only">
           {trimmed === ''
             ? ''
