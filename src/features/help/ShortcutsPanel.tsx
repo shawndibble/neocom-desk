@@ -54,7 +54,8 @@ export function ShortcutsPanel() {
       <Panel title={t('shortcuts.pasteTitle')}>
         {/* The app-wide paste router (`app/GlobalPasteRouter.tsx`). */}
         <p className="mb-2 text-sm text-text-dim">{t('shortcuts.pasteHint')}</p>
-        <dl className={LIST}>
+        {/* One column: its rows name a destination, not a key, and wrap in a half-width column. */}
+        <dl className="text-sm">
           <Row label={t('shortcuts.paste')}>
             <kbd className={KBD}>{pasteDisplayKey(apple)}</kbd>
           </Row>
