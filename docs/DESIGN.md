@@ -594,7 +594,7 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
 - **Dark only.** No light theme. `color-scheme: dark` is set globally.
 - **No gradients, anywhere.** Flat fills only (`bg-accent/10`, `bg-panel-2`,
   …). Depth comes from the layering step below, not a fade.
-  - One exception, and it is not a fade: `.calendar-map-past`
+  - One exception (and its one sibling below), and it is not a fade: `.calendar-map-past`
     (`styles/index.css`) draws a 45° hairline hatch with a
     `repeating-linear-gradient`, because CSS has no other one-declaration way
     to make a texture. The rule exists to keep depth coming from layering

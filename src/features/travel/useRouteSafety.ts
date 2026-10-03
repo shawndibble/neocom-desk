@@ -29,11 +29,12 @@ import {
   type RouteSafetySummary,
   type RouteSafetySystemEntry,
 } from '@/engine/route/routeSafety';
-import type { JumpGraph } from '@/engine/route/jumpRoute';
 import {
-  holeBetween,
   holeNetworkFromKey,
   holeNetworkKey,
+  holeStepFinder,
+  holeStepIndexes,
+  type HoleAt,
   type HoleNetwork,
 } from '@/engine/route/routeHoles';
 import type { TheraConnection } from '@/engine/route/theraConnections';
@@ -61,8 +62,7 @@ export interface RouteSafetyTrip {
   holeJumps: number;
 }
 
-/** The hole a step between two systems crosses, or `null` for a stargate jump. */
-export type HoleAt = (from: number, to: number) => TheraConnection | null;
+export type { HoleAt };
 
 export type RouteSafetyState =
   | { kind: 'incomplete' }
@@ -187,7 +187,7 @@ export function useRouteSafety(
     const { result } = resolved;
     if (result.kind === 'unknown') return result;
     const { plan, graph } = result;
-    const holeAt = holeStepFinder(graph, holes);
+    const holeAt: HoleAt = holeStepFinder(graph, holes);
     // One stop is the page as it always was: no route is the whole answer.
     if (stops.length === 1 && plan.legs[0]?.route.kind !== 'route') return { kind: 'no-route' };
     const inputs = {
@@ -214,8 +214,9 @@ export function useRouteSafety(
               rows: joined.rows,
               stopIndexes: joined.stopIndexes,
               summary: summarizeTrip(legRows),
-              holeJumps: joined.rows.filter(
-                (row, index) => index > 0 && holeAt(joined.rows[index - 1].systemId, row.systemId)
+              holeJumps: holeStepIndexes(
+                joined.rows.map((row) => row.systemId),
+                holeAt
               ).length,
             }
           : null,
@@ -230,14 +231,4 @@ export function useRouteSafety(
       networkKey,
     };
   }, [fromId, stops, resolved, requestKey, activity, holes, network, networkKey]);
-}
-
-/**
- * One answer to "was this step a hole?" for the table, the strip, the facts
- * and the folds alike: a hole joins the two systems and no stargate does —
- * Turnur has gates, and a gate to the same neighbour is the jump flown.
- */
-function holeStepFinder(graph: JumpGraph, holes: readonly TheraConnection[]): HoleAt {
-  if (holes.length === 0) return () => null;
-  return (from, to) => (graph.get(from)?.includes(to) ? null : holeBetween(holes, from, to));
 }

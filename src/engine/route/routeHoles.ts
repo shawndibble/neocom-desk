@@ -8,6 +8,7 @@
  * Thera and Turnur): the hole jumps and the hub itself carry no security
  * cost; the entrance and exit systems are charged as any other system.
  */
+import type { JumpGraph } from './jumpRoute';
 import {
   HUB_SYSTEM_IDS,
   shipSizeRank,
@@ -16,8 +17,11 @@ import {
   type WormholeShipSize,
 } from './theraConnections';
 
+/** Which hubs' holes a route may use. */
+export type RouteHoleHubs = TheraHub | 'all';
+
 export interface RouteHoleSettings {
-  hubs: TheraHub | 'all';
+  hubs: RouteHoleHubs;
   /** The pilot's ship: only holes passing this size or bigger are used. */
   shipSize: WormholeShipSize;
   /** Holes with less life than this left are skipped. */
@@ -105,4 +109,32 @@ export function holeBetween<T extends TheraConnection>(
     if (joins && (best === null || hole.expiresAt > best.expiresAt)) best = hole;
   }
   return best;
+}
+
+/** The hole a step between two systems crosses, or `null` for a stargate jump. */
+export type HoleAt<T extends TheraConnection = TheraConnection> = (
+  from: number,
+  to: number
+) => T | null;
+
+/**
+ * One answer to "was this step a hole?" for everything that draws a route: a
+ * hole joins the two systems and no stargate does. Turnur has gates, and a
+ * gate to the same neighbour costs the same, so it is the jump shown.
+ */
+export function holeStepFinder<T extends TheraConnection>(
+  graph: JumpGraph,
+  holes: readonly T[]
+): HoleAt<T> {
+  if (holes.length === 0) return () => null;
+  return (from, to) => (graph.get(from)?.includes(to) ? null : holeBetween(holes, from, to));
+}
+
+/** The positions along a route entered through a hole: index `i` is the step from `i - 1`. */
+export function holeStepIndexes(systemIds: readonly number[], holeAt: HoleAt): number[] {
+  const indexes: number[] = [];
+  for (let index = 1; index < systemIds.length; index += 1) {
+    if (holeAt(systemIds[index - 1], systemIds[index])) indexes.push(index);
+  }
+  return indexes;
 }

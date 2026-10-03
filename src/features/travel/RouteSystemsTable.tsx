@@ -202,7 +202,7 @@ function RowDetail({ row, cell }: { row: RouteSafetyRow; cell: RouteKillsCell })
   );
 }
 
-const NO_HOLES: HoleAt = () => null;
+const GATES_ONLY: HoleAt = () => null;
 
 /** What a table needs to draw hole rows (issue #2476); a gate-only route passes none. */
 export interface HoleRowProps {
@@ -219,7 +219,7 @@ export function RouteSystemsTable({
   killsOf,
   avoidAction,
   label,
-  holeAt = NO_HOLES,
+  holeAt = GATES_ONLY,
   holesFetchedAt = null,
   now = 0,
 }: {

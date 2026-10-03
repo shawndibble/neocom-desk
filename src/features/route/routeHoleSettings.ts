@@ -9,11 +9,10 @@
  * overridable in the page's link.
  */
 import { useEffect } from 'react';
-import type { RouteHoleSettings } from '@/engine/route/routeHoles';
+import type { RouteHoleHubs, RouteHoleSettings } from '@/engine/route/routeHoles';
 import {
   THERA_HUBS,
   WORMHOLE_SHIP_SIZES,
-  type TheraHub,
   type WormholeShipSize,
 } from '@/engine/route/theraConnections';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
@@ -23,7 +22,7 @@ export const ROUTE_HOLE_SHIP_SIZE_KEY = 'sync.routeHoleShipSize';
 export const ROUTE_HOLE_MIN_LIFE_KEY = 'sync.routeHoleMinLife';
 export const ROUTE_HOLE_HUBS_KEY = 'sync.routeHoleHubs';
 
-export type RouteHoleHubs = TheraHub | 'all';
+export type { RouteHoleHubs };
 export const ROUTE_HOLE_HUBS: readonly RouteHoleHubs[] = ['all', ...THERA_HUBS];
 
 export const DEFAULT_ROUTE_HOLE_SHIP_SIZE: WormholeShipSize = 'medium';

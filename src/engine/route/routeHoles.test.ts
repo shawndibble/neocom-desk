@@ -4,6 +4,8 @@ import {
   holeNetwork,
   holeNetworkFromKey,
   holeNetworkKey,
+  holeStepFinder,
+  holeStepIndexes,
   routeHoles,
   type RouteHoleSettings,
 } from './routeHoles';
@@ -118,5 +120,44 @@ describe('holeBetween', () => {
   it('finds nothing for a step no hole joins', () => {
     expect(holeBetween(holes, 1, TURNUR)).toBeNull();
     expect(holeBetween(holes, 1, 2)).toBeNull();
+  });
+});
+
+describe('holeStepFinder', () => {
+  const gates = new Map<number, readonly number[]>([
+    [1, [TURNUR]],
+    [TURNUR, [1]],
+    [2, []],
+    [THERA, []],
+  ]);
+  const holes = [
+    hole({ id: 'gated', hub: 'turnur', exitSystemId: 1 }),
+    hole({ id: 'thera', exitSystemId: 2 }),
+  ];
+
+  it('calls a step a hole only where no stargate joins the two systems', () => {
+    const holeAt = holeStepFinder(gates, holes);
+    expect(holeAt(2, THERA)?.id).toBe('thera');
+    expect(holeAt(THERA, 2)?.id).toBe('thera');
+    expect(holeAt(1, TURNUR)).toBeNull();
+  });
+
+  it('finds nothing with no holes', () => {
+    expect(holeStepFinder(gates, [])(2, THERA)).toBeNull();
+  });
+});
+
+describe('holeStepIndexes', () => {
+  it('lists each position entered through a hole', () => {
+    const holeAt = holeStepFinder(
+      new Map([
+        [2, []],
+        [THERA, []],
+        [3, []],
+      ]),
+      [hole({ exitSystemId: 2 }), hole({ exitSystemId: 3 })]
+    );
+    expect(holeStepIndexes([2, THERA, 3], holeAt)).toEqual([1, 2]);
+    expect(holeStepIndexes([3], holeAt)).toEqual([]);
   });
 });

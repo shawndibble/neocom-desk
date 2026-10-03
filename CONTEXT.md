@@ -494,12 +494,9 @@ here — they go one per file in `docs/context/decisions/`.
   trip.
 - **Hole jump**: one jump of a Route Safety route through an open Thera or
   Turnur wormhole EVE-Scout lists, between the hole's exit system and its hub.
-  Used only with Route Safety's "Route through Thera / Turnur" on, and only
-  holes the pilot's ship fits with enough life left. The hole jumps and the
-  hub carry no security cost; the systems either side are charged as usual.
-  Shown as its own row (where to warp, the signature with Copy, size, life
-  left, EVE-Scout's age) and a hatched **Route strip** cell. Never counted by
-  any other page: their jumps stay stargate-only.
+  Shown as its own row between those two systems and as a hatched **Route
+  strip** cell. How it is costed and where it applies: decision
+  `20261003-181618`.
 - **Pilot Lookup**: Travel's view of one pilot, found by name — portrait,
   corporation, alliance and character age from public ESI, and the all-time
   kills, losses, ISK, solo kills, danger and gang ratios and most-used hulls

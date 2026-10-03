@@ -30,6 +30,7 @@ import { WORMHOLE_SHIP_SIZES } from '@/engine/route/theraConnections';
 import {
   MAX_ROUTE_HOLE_MIN_LIFE,
   MIN_ROUTE_HOLE_MIN_LIFE,
+  parseRouteHoleMinLife,
   ROUTE_HOLE_HUBS,
   type RouteHoleOverrides,
   type RouteHoleQuery,
@@ -118,15 +119,9 @@ function RouteHoleFields({
           value={settings.minLifeHours}
           aria-label={t('travel.holes.minLifeLabel')}
           onChange={(event) => {
-            const next = Number(event.target.value);
-            if (
-              event.target.value !== '' &&
-              Number.isInteger(next) &&
-              next >= MIN_ROUTE_HOLE_MIN_LIFE &&
-              next <= MAX_ROUTE_HOLE_MIN_LIFE
-            ) {
-              onChange({ field: 'minLifeHours', value: next });
-            }
+            const next =
+              event.target.value === '' ? null : parseRouteHoleMinLife(Number(event.target.value));
+            if (next !== null) onChange({ field: 'minLifeHours', value: next });
           }}
         />
         <span>{t('travel.holes.minLifeAfter')}</span>
@@ -236,7 +231,8 @@ export function RouteRulesPanel({
       collapsible={isPhone}
       labels={{ show: t('travel.rules.show'), hide: t('travel.rules.hide') }}
       collapsedSummary={
-        settingsHydrated && <ActiveRuleChips preference={preference} holeQuery={holeQuery} />
+        settingsHydrated &&
+        holeQuery.hydrated && <ActiveRuleChips preference={preference} holeQuery={holeQuery} />
       }
     >
       {settingsHydrated && holeQuery.hydrated ? (

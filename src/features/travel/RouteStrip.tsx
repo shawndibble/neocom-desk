@@ -18,6 +18,7 @@ import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { Tooltip } from '@/components/ui';
+import { holeStepIndexes } from '@/engine/route/routeHoles';
 import { routeStripKeySystems, type RouteSafetyRow } from '@/engine/route/routeSafety';
 import { securityStatusColor } from '@/engine/securityStatus';
 import { routeSystemName } from './routeSystemName';
@@ -66,11 +67,15 @@ export function RouteStrip({
       : t('travel.strip.system', { name: routeSystemName(row), security: securityText(row) });
   const withKills = rows.filter((row) => hasKills(row, killsOf(row.systemId)));
   // Whether the step into each row was through a hole.
-  const holeInto = rows.map((row, index) => {
-    const previous = rows[index - 1];
-    return previous !== undefined && holeAt?.(previous.systemId, row.systemId) != null;
-  });
-  const holeJumps = holeInto.filter(Boolean).length;
+  const holeInto = new Set(
+    holeAt
+      ? holeStepIndexes(
+          rows.map((row) => row.systemId),
+          holeAt
+        )
+      : []
+  );
+  const holeJumps = holeInto.size;
   const label = [
     t('travel.strip.label', {
       count: rows.length,
@@ -97,7 +102,7 @@ export function RouteStrip({
           const previous = rows[index - 1];
           return (
             <Fragment key={index}>
-              {holeInto[index] && previous && (
+              {holeInto.has(index) && previous && (
                 <Tooltip
                   content={t('travel.holes.stripCell', {
                     from: routeSystemName(previous),
