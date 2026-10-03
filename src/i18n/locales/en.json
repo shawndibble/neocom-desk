@@ -4883,7 +4883,8 @@
       "expiresAffix": "Exp ",
       "offerCount_one": "{{count}} offer",
       "offerCount_other": "{{count}} offers",
-      "offerCountCapped": "Top {{shown}} of {{total}} offers"
+      "offerCountCapped": "Top {{shown}} of {{total}} offers",
+      "copyQuality": "ME {{me}} · TE {{te}} · {{runs}} runs"
     },
     "resultsCapped": "Showing {{shown}} of {{total}} results. Narrow the search to see the rest.",
     "cheapestByRegionCapped": "Cheapest by region ({{shown}} of {{total}})",

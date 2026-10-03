@@ -761,6 +761,33 @@ describe('BpcSourcingPanel result cap', () => {
   });
 });
 
+describe('BpcSourcingPanel active filter chips', () => {
+  it('shows a chip per active filter and clears just that one when tapped', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, typeId: 638, me: 10 }),
+        row({ contractId: 2, typeId: 870, me: 2 }),
+      ])
+    );
+    window.history.pushState({}, '', '/industry/sourcing?sourcing.minMe=8&sourcing.hidePlex=1');
+    const user = userEvent.setup();
+    render(<App />);
+
+    const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+    expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'No PLEX contracts' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'ME ≥ 8' }));
+
+    await waitFor(() => {
+      const widened = screen.getByRole('table', { name: 'BPC Sourcing' });
+      expect(within(widened).getByText('Caracal Blueprint')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: 'ME ≥ 8' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'No PLEX contracts' })).toBeInTheDocument();
+  });
+});
+
 describe('BpcSourcingPanel search matching', () => {
   /**
    * Every blueprint in the catalogue is named "… Blueprint", so a substring

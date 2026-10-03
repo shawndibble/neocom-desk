@@ -1,6 +1,11 @@
 /**
  * BPC Sourcing's multi-type price cell at 390px (issue #1165).
  *
+ * Since the phone card went dense, Price is the card's headline figure at
+ * the right end of its title line (`cardCorner`), so the wrapper now hugs
+ * the right at every width; before, as one labelled field among five, it
+ * had to start at the label gutter below `sm`.
+ *
  * `DataTable`'s stacked-card CSS (`.dt-stack td { text-align: left }`) can
  * override a column's own `align: 'right'`, but cannot reach alignment a
  * cell renders for itself — the multi-type price cell wraps its amount and
@@ -153,7 +158,7 @@ async function priceWrapperAlignItems(page: Page): Promise<string> {
 }
 
 test.describe('BPC Sourcing — multi-type price cell alignment', () => {
-  test('starts at the card label gutter below sm', async ({ page }) => {
+  test('hugs the right of the dense card’s title line below sm', async ({ page }) => {
     await stubSyncConfigured(page);
     await refuseSyncBackend(page);
     await page.setViewportSize(PHONE);
@@ -163,7 +168,7 @@ test.describe('BPC Sourcing — multi-type price cell alignment', () => {
 
     await page.goto('./industry/sourcing');
 
-    expect(await priceWrapperAlignItems(page)).toBe('flex-start');
+    expect(await priceWrapperAlignItems(page)).toBe('flex-end');
   });
 
   test('stays right-aligned at and above sm', async ({ page }) => {

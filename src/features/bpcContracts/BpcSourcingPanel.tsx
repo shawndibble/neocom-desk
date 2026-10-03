@@ -260,8 +260,24 @@ const RESULT_LIMIT = 200;
 const SOURCING_GROUP_HEADER =
   'pb-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
-/** One card width for region and BPO cards alike: two across on a phone, fixed from `sm` so the groups share a row. */
-const SOURCING_CARD_WIDTH = 'w-[calc(50%-0.25rem)] sm:w-36';
+/**
+ * One card width for region and BPO cards alike from `sm`, so the groups
+ * share a row. On a phone a region cell is narrower and the row scrolls
+ * sideways rather than wrapping six cells into three rows above the offers.
+ */
+const REGION_CELL_WIDTH = 'w-28 shrink-0 sm:w-36';
+
+/** A BPO card on a phone is one full-width line (price · system · detail), not a third half-width box. */
+const BPO_CARD_LAYOUT =
+  'w-full max-sm:flex-row max-sm:flex-wrap max-sm:items-baseline max-sm:gap-x-2 sm:w-36';
+
+/**
+ * The Cheapest chip as the picked blueprint's headline on a phone: its own
+ * line, label over a large figure, instead of one more 11px chip. CSS only,
+ * so the same chip reads as the desktop strip's first chip from `sm` up.
+ */
+const CHEAPEST_HEADLINE_CHIP =
+  'max-sm:h-auto max-sm:basis-full max-sm:flex-col max-sm:items-start max-sm:gap-0 max-sm:before:hidden max-sm:[&>span:last-child]:text-2xl max-sm:[&>span:last-child]:font-bold max-sm:[&>span:last-child]:text-accent';
 
 /** One row of the search's autocomplete: a candidate blueprint plus what its listings look like, so a dead blueprint is visible before it is chosen. */
 type BlueprintSuggestion = BlueprintTypeOption & BlueprintOfferStats;
@@ -1146,6 +1162,7 @@ export function BpcSourcingPanel() {
     selectedBpoCards
   );
 
+  const blueprintPicked = selectedTypeId !== null;
   const bpcColumnsById = useMemo<Record<BpcSearchColumnId, DataTableColumn<BpcSearchRow>>>(
     () => ({
       source: {
@@ -1223,7 +1240,7 @@ export function BpcSourcingPanel() {
         stackAffix: { before: t('bpcContracts.mobile.meAffix') },
         // Full text, not the meta line's dim: on the phone card the copy's
         // quality is what a buyer reads after its price.
-        render: (row) => <span className="max-sm:text-text">{row.me}</span>,
+        render: (row) => <QualityValue omitOnCard={blueprintPicked}>{row.me}</QualityValue>,
       },
       te: {
         id: 'te',
@@ -1232,7 +1249,7 @@ export function BpcSourcingPanel() {
         className: 'tabular-nums',
         sortValue: (row) => row.te,
         stackAffix: { before: t('bpcContracts.mobile.teAffix') },
-        render: (row) => <span className="max-sm:text-text">{row.te}</span>,
+        render: (row) => <QualityValue omitOnCard={blueprintPicked}>{row.te}</QualityValue>,
       },
       runs: {
         id: 'runs',
@@ -1243,9 +1260,9 @@ export function BpcSourcingPanel() {
         stackAffix: { after: t('bpcContracts.mobile.runsAffix') },
         // A BPO's -1 renders as ∞, not a nonsensical negative count.
         render: (row) => (
-          <span className="max-sm:text-text">
+          <QualityValue omitOnCard={blueprintPicked}>
             {row.runs === -1 ? t('bpcContracts.unlimitedRuns') : row.runs}
-          </span>
+          </QualityValue>
         ),
       },
       qty: {
@@ -1284,16 +1301,12 @@ export function BpcSourcingPanel() {
           if (row.source === 'market') return <IskAmount value={row.price} revealOn="longPress" />;
           const contract = asContract(row);
           if (!contract) return t('bpcContracts.notApplicable');
-          // Only the plain ask becomes shorthand, so this column mixes
-          // precisions: "5M" on an exchange row, "Buyout: 5,000,000.00" on an
-          // auction one. An auction's figure is wrapped in
-          // "Buyout: {{price}}" / "Starting bid: {{price}}" — an i18next
-          // interpolation value, which takes a string, not a node, and
-          // splitting the suffix off would need a new short key
-          // (`contractSearch` has `buyoutShort`/`startingBidShort`;
-          // `bpcContracts` does not). Sorting is unaffected: `sortValue`
-          // reads `effectivePrice`. Long press, not tap: a row tap opens the
-          // contract.
+          // An auction's figure carries a short "buyout"/"bid" tag after
+          // it, Contract Search's own, rather than "Starting bid: 12,000,000"
+          // — too wide for the phone card's headline corner, and the number
+          // alone would read as a fixed ask. Sorting is unaffected:
+          // `sortValue` reads `effectivePrice`. Long press, not tap: a row
+          // tap opens the contract.
           //
           // A contract asking for PLEX (issue #1105) usually has an ISK
           // `price` of `0` — the ask is the PLEX, not a real zero — so its
@@ -1312,15 +1325,14 @@ export function BpcSourcingPanel() {
               t('bpcContracts.plexPrice', { plex: contract.requestedPlex.toLocaleString() })
             )
           ) : contract.isAuction ? (
-            contract.buyout !== undefined ? (
-              t('bpcContracts.buyout', {
-                price: formatIskAuto(contract.buyout, CONTRACT_ISK_CENTS_BELOW),
-              })
-            ) : (
-              t('bpcContracts.startingBid', {
-                price: formatIskAuto(contract.price, CONTRACT_ISK_CENTS_BELOW),
-              })
-            )
+            <>
+              <IskAmount value={contract.buyout ?? contract.price} revealOn="longPress" />
+              <span className="ml-1 text-[0.6875rem] font-normal text-text-dim uppercase">
+                {contract.buyout !== undefined
+                  ? t('contractSearch.buyoutShort')
+                  : t('contractSearch.startingBidShort')}
+              </span>
+            </>
           ) : (
             <IskAmount value={contract.price} revealOn="longPress" />
           );
@@ -1418,7 +1430,7 @@ export function BpcSourcingPanel() {
         },
       },
     }),
-    [t, regionNames, timeZone, bpcRowJumps, solarSystems]
+    [t, regionNames, timeZone, bpcRowJumps, solarSystems, blueprintPicked]
   );
 
   const itemSortValue = useCallback(
@@ -1470,12 +1482,32 @@ export function BpcSourcingPanel() {
           // one, so the Item cell carries the tag instead — independent of
           // which columns are visible.
           const owned = row.source === 'owned';
-          if (!bpo && !owned) return name;
+          // One blueprint picked: every phone card would repeat its name, so
+          // the card's title is the copy's quality instead, and ME/TE/runs
+          // leave the meta line under it (`QualityValue`). The table keeps
+          // the name.
+          const title = blueprintPicked ? (
+            <>
+              <span className="max-sm:hidden">{name}</span>
+              <span className="tabular-nums sm:hidden">
+                {t('bpcContracts.mobile.copyQuality', {
+                  me: row.me,
+                  te: row.te,
+                  runs: row.runs === -1 ? t('bpcContracts.unlimitedRuns') : row.runs,
+                })}
+              </span>
+            </>
+          ) : (
+            // Ellipsised on the phone card, so a long name stops short of the
+            // price beside it instead of running under it.
+            <span className="max-sm:block max-sm:truncate">{name}</span>
+          );
+          if (!bpo && !owned) return title;
           return (
             // One wrapping line on the phone card, so a tag sits beside the
             // name rather than pushing the title line into three.
             <span className="flex min-w-0 flex-wrap items-center gap-1.5 sm:flex-col sm:flex-nowrap sm:items-start sm:gap-1">
-              <span>{name}</span>
+              <span className="min-w-0 max-w-full">{title}</span>
               {owned && (
                 <span className="inline-flex w-fit items-center rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-normal text-text-dim">
                   {t('bpcContracts.sourceOwned')}
@@ -1506,6 +1538,7 @@ export function BpcSourcingPanel() {
     badgedRows,
     bpoLocationName,
     regionLabel,
+    blueprintPicked,
   ]);
   // Item plus the visible columns, like the table itself.
   const csvColumns = useMemo(
@@ -1714,16 +1747,18 @@ export function BpcSourcingPanel() {
 
           {selectedName !== null && summary !== null && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-3 py-2">
-              <div className="min-w-0">
+              <div className="min-w-0 max-sm:w-full">
                 <p className="truncate text-base font-semibold">{selectedName}</p>
-                <p className="text-[0.6875rem] text-text-dim">
+                {/* The phone's sort bar counts the offers instead. */}
+                <p className="text-[0.6875rem] text-text-dim max-sm:hidden">
                   {t('bpcContracts.offersOnContract', { count: summary.offerCount })}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2 md:ml-auto">
-                <StatChips>
+              <div className="flex flex-wrap items-start gap-2 max-sm:w-full sm:items-center md:ml-auto">
+                <StatChips className="max-sm:flex-1">
                   {summary.cheapest !== null && (
                     <StatChip
+                      className={CHEAPEST_HEADLINE_CHIP}
                       label={t('bpcContracts.cheapestLabel')}
                       value={<IskAmount value={summary.cheapest} revealOn="tap" />}
                     />
@@ -1760,8 +1795,9 @@ export function BpcSourcingPanel() {
 
           {(regionPrices.length > 1 || selectedBpoCards.length > 0) && (
             // One wrapping row: [Cheapest by region] [Market BPOs] [Contract BPOs],
-            // every card the same width; groups stack on a phone. A group with
-            // no card is left out.
+            // every card the same width; groups stack on a phone, where the
+            // region cells scroll sideways and a BPO is one line. A group
+            // with no card is left out.
             <div className="flex flex-col gap-3 border-b border-line px-3 py-2 sm:flex-row sm:flex-wrap sm:gap-x-4">
               {regionPrices.length > 1 && (
                 <div className="min-w-0 max-w-full">
@@ -1778,13 +1814,13 @@ export function BpcSourcingPanel() {
                   </p>
                   {/* Cheapest first, so the ordering carries the answer and the
                     accent on the leading cell is only reinforcement (DESIGN.md §7). */}
-                  <ul className="flex flex-wrap gap-2">
+                  <ul className="flex gap-2 max-sm:-mx-3 max-sm:overflow-x-auto max-sm:px-3 sm:flex-wrap">
                     {regionPrices.slice(0, REGION_CELL_LIMIT).map((region, index) => (
                       <li
                         key={region.regionId}
                         className={cx(
                           'flex flex-col gap-0.5 rounded-xs border bg-panel-2 px-2.5 py-2',
-                          SOURCING_CARD_WIDTH,
+                          REGION_CELL_WIDTH,
                           index === 0 && cheapestCard === 'region'
                             ? 'border-accent-dim'
                             : 'border-line'
@@ -1824,7 +1860,7 @@ export function BpcSourcingPanel() {
                         mayBeCheaper={cheapestCopy !== null && bpoMayBeCheaper(bpo, cheapestCopy)}
                         cheapest={cheapestCard === bpo.kind}
                         location={bpoCardLocations.get(bpo.locationId)}
-                        className={SOURCING_CARD_WIDTH}
+                        className={BPO_CARD_LAYOUT}
                       />
                     </ul>
                   </div>
@@ -1949,6 +1985,20 @@ export function BpcSourcingPanel() {
         />
       )}
     </Panel>
+  );
+}
+
+/**
+ * ME, TE or runs: full text on the phone card's dim meta line, since the
+ * copy's quality is what a buyer reads after its price — or left off that
+ * line entirely when one blueprint is picked and the card's title already
+ * says it.
+ */
+function QualityValue({ omitOnCard, children }: { omitOnCard: boolean; children: ReactNode }) {
+  return (
+    <span className="max-sm:text-text" data-dense-omit={omitOnCard ? '' : undefined}>
+      {children}
+    </span>
   );
 }
 
