@@ -311,7 +311,7 @@ export function ImplantFinder({
             {visible.length === 0 && (
               <p className="text-sm text-text-dim">
                 {slotLabel && !q
-                  ? t('fittings.implantFinder.slotHelpsNothing', { slot: slotLabel })
+                  ? t('fittings.implantFinder.slotNoGoals', { slot: slotLabel })
                   : t('fittings.implantFinder.noGoalMatch')}
               </p>
             )}
@@ -568,7 +568,12 @@ function SlotBar({
             label={t('fittings.implantFinder.info', { name })}
             onClick={() => onInfo(occupant)}
           />
-          <Button size="sm" variant="ghost" onClick={() => onRemove(occupant)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label={t('fittings.implantFinder.removeItem', { name })}
+            onClick={() => onRemove(occupant)}
+          >
             {t('fittings.implantFinder.remove')}
           </Button>
         </>
@@ -900,10 +905,11 @@ function GoalResults({
 
       {!off && slot && results?.length === 0 && (
         <p className="text-sm text-text-dim">
-          {t('fittings.implantFinder.slotNothingHelps', { slot: slot.label, goal: label })}
+          {t('fittings.implantFinder.slotNoHelpersForGoal', { slot: slot.label, goal: label })}
         </p>
       )}
 
+      {/* A booster slot has no implants to list; still loading (null) shows the spinner. */}
       {!off && (!slot || (slot.kind === 'implant' && results?.length !== 0)) && (
         <div className="space-y-1.5">
           <SectionHeading>{t('fittings.implantFinder.helpersHeading')}</SectionHeading>
