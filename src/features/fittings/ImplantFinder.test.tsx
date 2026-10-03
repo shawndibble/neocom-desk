@@ -98,14 +98,14 @@ const { ImplantFinder } = await import('./ImplantFinder');
 const fitting = { name: 'Drake', shipTypeId: 24698, modules: [] } as unknown as Fitting;
 const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] };
 
-function renderFinder(onChange = vi.fn()) {
+function renderFinder(onChange = vi.fn(), implants: number[] = []) {
   render(
     <ImplantFinder
       open
-      fitting={fitting}
+      fitting={{ ...fitting, implantSet: { implants, boosters: [] } }}
       profile={profile}
       basis="fitting"
-      implantSet={{ implants: [], boosters: [] }}
+      implantSet={{ implants, boosters: [] }}
       onChange={onChange}
     />
   );
@@ -139,10 +139,21 @@ describe('ImplantFinder', () => {
       'Still 2.4 tf over'
     );
     expect(screen.getByRole('button', { name: /^Add .*WU-1001$/ }).closest('li')).toHaveTextContent(
-      'Not for sale at any trade hub'
+      'Not for sale at any Trade Hub'
     );
 
     await user.click(within(firstFix).getByRole('button', { name: 'Add all' }));
     expect(onChange).toHaveBeenLastCalledWith({ implants: [603, 1003], boosters: [] });
+  });
+
+  it('keeps a family already in the set, with its Remove and its lower grades', async () => {
+    const user = userEvent.setup();
+    const onChange = renderFinder(vi.fn(), [606]);
+    // EE-606 gives 424 tf: the fit already fits, so CPU is under Improve, not Fix this fit.
+    await user.click(await screen.findByRole('button', { name: /^CPU$/ }));
+    const remove = await screen.findByRole('button', { name: /^Remove .*EE-606$/ });
+    expect(screen.getByRole('button', { name: /^Replace .*EE-605$/ })).toBeInTheDocument();
+    await user.click(remove);
+    expect(onChange).toHaveBeenLastCalledWith({ implants: [], boosters: [] });
   });
 });

@@ -5,6 +5,8 @@ import {
   goalById,
   goalGain,
   groupImplantFamilies,
+  headroom,
+  keepMoreHeadroom,
   implantEntriesFromMarket,
   parseImplantGrade,
   pickSource,
@@ -217,14 +219,38 @@ describe('cheapestFixes', () => {
     expect(fixes.map((f) => f.typeIds)).toEqual([[606]]);
   });
 
-  it('lists a dearer fix only when it buys more headroom than every cheaper one', () => {
+  it('lists every combination that fits, cheapest first', () => {
     const fixes = cheapestFixes([ee(5, 20, 20e6), ee(6, 24, 60e6), wu(6, 5, 70e6)], 18.4);
-    // 605+1006 (90M, 25) is dearer than 606 (60M, 24) but buys more, so it stays.
     expect(fixes.map((f) => f.typeIds)).toEqual([[605], [606], [605, 1006], [606, 1006]]);
+  });
+
+  it('drops a grade beaten in its own slot on both price and headroom', () => {
+    // EE-606 here is dearer and frees less than EE-605: no fix should ever use it.
+    const fixes = cheapestFixes([ee(5, 24, 20e6), ee(6, 20, 60e6)], 18.4);
+    expect(fixes.map((f) => f.typeIds)).toEqual([[605]]);
   });
 
   it('keeps at most the asked-for number of options', () => {
     const fixes = cheapestFixes([ee(5, 20, 20e6), ee(6, 24, 60e6), wu(6, 5, 70e6)], 18.4, 2);
     expect(fixes).toHaveLength(2);
+  });
+});
+
+describe('keepMoreHeadroom', () => {
+  it('keeps a dearer option only when it frees more than every cheaper one', () => {
+    const options = [
+      { id: 'a', cost: 10, headroom: 2 },
+      { id: 'b', cost: 20, headroom: 1.5 },
+      { id: 'c', cost: 30, headroom: 5 },
+      { id: 'd', cost: 40, headroom: 5 },
+    ];
+    expect(keepMoreHeadroom(options).map((o) => o.id)).toEqual(['a', 'c']);
+  });
+});
+
+describe('headroom', () => {
+  it('is what is left of a budget, negative when over', () => {
+    expect(headroom({ used: 418.4, total: 400 })).toBeCloseTo(-18.4);
+    expect(headroom({ used: 380, total: 400 })).toBe(20);
   });
 });

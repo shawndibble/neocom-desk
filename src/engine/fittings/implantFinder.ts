@@ -170,6 +170,11 @@ export function goalById(id: ImplantGoalId): ImplantGoal {
   return goal;
 }
 
+/** What is left of a budget: negative when the fit is over. */
+export function headroom(budget: Budget): number {
+  return budget.total - budget.used;
+}
+
 /** CPU or powergrid still needed for the fit to fit; 0 when it already does. */
 export function shortfall(budget: Budget): number {
   return Math.max(0, budget.used - budget.total);
@@ -185,7 +190,7 @@ export function goalGain(goal: ImplantGoal, before: FittingStats, after: Fitting
     const b = goal.read(before);
     const a = goal.read(after);
     if (b.total <= 0) return 0;
-    return (a.total - a.used - (b.total - b.used)) / b.total;
+    return (headroom(a) - headroom(b)) / b.total;
   }
   const b = goal.read(before);
   const a = goal.read(after);
@@ -196,9 +201,7 @@ export function goalGain(goal: ImplantGoal, before: FittingStats, after: Fitting
 /** Headroom an implant frees on a budget goal, in its own unit (tf, MW). */
 export function headroomGain(goal: ImplantGoal, before: FittingStats, after: FittingStats): number {
   if (goal.kind !== 'budget') return 0;
-  const b = goal.read(before);
-  const a = goal.read(after);
-  return a.total - a.used - (b.total - b.used);
+  return headroom(goal.read(after)) - headroom(goal.read(before));
 }
 
 export interface HubPrice {
@@ -253,18 +256,29 @@ export interface FixOption {
 }
 
 /**
- * Combinations of implants (one per slot) whose headroom covers
- * `needed`, cheapest first. A dearer option is kept only when it frees
- * more headroom than every cheaper one, so each extra line buys something.
+ * Combinations of implants (one per slot) whose estimated headroom covers
+ * `needed`, cheapest first. A grade that another in its slot beats on both
+ * price and headroom is never used. The estimates sum each implant's own
+ * gain, which stacking can sink, so the caller re-runs each option whole and
+ * then thins the confirmed list with `keepMoreHeadroom`.
  */
 export function cheapestFixes(
   candidates: readonly FixCandidate[],
   needed: number,
   limit = 4
 ): FixOption[] {
+  const usable = candidates.filter((c) => Number.isFinite(c.price) && c.headroomGain > 0);
   const bySlot = new Map<number, FixCandidate[]>();
-  for (const c of candidates) {
-    if (!Number.isFinite(c.price) || c.headroomGain <= 0) continue;
+  for (const c of usable) {
+    const beaten = usable.some(
+      (o) =>
+        o !== c &&
+        o.slot === c.slot &&
+        o.price <= c.price &&
+        o.headroomGain >= c.headroomGain &&
+        (o.price < c.price || o.headroomGain > c.headroomGain)
+    );
+    if (beaten) continue;
     const list = bySlot.get(c.slot) ?? [];
     list.push(c);
     bySlot.set(c.slot, list);
@@ -285,13 +299,23 @@ export function cheapestFixes(
   };
   walk(0, [], 0, 0);
   found.sort((a, b) => a.cost - b.cost || b.headroomGain - a.headroomGain);
-  const kept: FixOption[] = [];
-  let bestGain = -Infinity;
-  for (const option of found) {
-    if (option.headroomGain > bestGain) {
+  return found.slice(0, limit);
+}
+
+/**
+ * Cheapest first, keeping a dearer option only when it leaves more
+ * headroom than every cheaper one — so each extra line buys something.
+ */
+export function keepMoreHeadroom<T extends { cost: number; headroom: number }>(
+  options: readonly T[]
+): T[] {
+  const kept: T[] = [];
+  let best = -Infinity;
+  for (const option of [...options].sort((a, b) => a.cost - b.cost)) {
+    if (option.headroom > best) {
       kept.push(option);
-      bestGain = option.headroomGain;
+      best = option.headroom;
     }
   }
-  return kept.slice(0, limit);
+  return kept;
 }
