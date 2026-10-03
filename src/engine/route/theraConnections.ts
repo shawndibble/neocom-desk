@@ -9,7 +9,7 @@
  * Conditions, never verdicts (decision `20260912-172628`): a row carries the
  * exit's security, remaining life and ship size; nothing ranks a connection.
  */
-import { classifySpace, isWormholeSystemName, type SpaceKind } from '@/engine/space';
+import { classifySpace, isWormholeSystemName, SPACE_KINDS, type SpaceKind } from '@/engine/space';
 
 export type TheraHub = 'thera' | 'turnur';
 export const THERA_HUBS: readonly TheraHub[] = ['thera', 'turnur'];
@@ -110,10 +110,10 @@ function jumpsTo(
   space: SpaceKind | null,
   distances: ConnectionDistances
 ): ConnectionJumps {
-  if (distances.kind !== 'known') return { kind: distances.kind };
-  // Wormhole space has no stargates; the local graph must never be asked to
-  // route into it (Thera itself included).
+  // Wormhole space has no stargates, whatever the origin or the map's state;
+  // the local graph must never be asked to route into it (Thera included).
   if (space === 'wormhole') return { kind: 'no-route' };
+  if (distances.kind !== 'known') return { kind: distances.kind };
   const jumps = distances.jumps.get(connection.exitSystemId);
   return jumps === undefined ? { kind: 'no-route' } : { kind: 'known', jumps };
 }
@@ -147,7 +147,6 @@ export function buildTheraConnectionRows(
 
 export interface TheraConnectionFilter {
   hub: TheraHub | 'all';
-  space: SpaceKind | 'all';
   /** Keep connections passing at least this size; `any` keeps every one. */
   shipSize: WormholeShipSize | 'any';
 }
@@ -159,7 +158,6 @@ export function filterTheraConnections(
   const minSize = filter.shipSize === 'any' ? -1 : shipSizeRank(filter.shipSize);
   return rows.filter((row) => {
     if (filter.hub !== 'all' && row.hub !== filter.hub) return false;
-    if (filter.space !== 'all' && row.exitSpace !== filter.space) return false;
     if (minSize >= 0) {
       if (row.maxShipSize === null) return false;
       if (shipSizeRank(row.maxShipSize) < minSize) return false;
@@ -171,4 +169,40 @@ export function filterTheraConnections(
 /** The jumps column's sort value: a known distance, else nothing (sorted last). */
 export function jumpsSortValue(row: TheraConnectionRow): number | undefined {
   return row.jumps.kind === 'known' ? row.jumps.jumps : undefined;
+}
+
+/** The page's four columns, one per space a hole comes out in (issue #2473). */
+export type TheraBands = Readonly<Record<SpaceKind, readonly TheraConnectionRow[]>>;
+
+const byLongestLife = (a: TheraConnectionRow, b: TheraConnectionRow) =>
+  b.remainingMs - a.remainingMs || (a.exitSystemName ?? '').localeCompare(b.exitSystemName ?? '');
+
+/** Nearest first; a row with no known distance goes after every one with one. */
+function byNearest(a: TheraConnectionRow, b: TheraConnectionRow): number {
+  const ja = jumpsSortValue(a) ?? Infinity;
+  const jb = jumpsSortValue(b) ?? Infinity;
+  return ja === jb ? byLongestLife(a, b) : ja - jb;
+}
+
+/**
+ * Groups rows into Highsec, Lowsec, Nullsec and J-space by the band
+ * `buildTheraConnectionRows` gave each exit — the same banding Route Safety's
+ * summary uses. A k-space column reads nearest first; J-space has no gate
+ * distance, so it reads longest-lived first. A row whose band nothing could
+ * tell (no security on record and no feed class) has no column and is left out.
+ */
+export function groupTheraConnectionsByBand(rows: readonly TheraConnectionRow[]): TheraBands {
+  const bands: Record<SpaceKind, TheraConnectionRow[]> = {
+    highsec: [],
+    lowsec: [],
+    nullsec: [],
+    wormhole: [],
+  };
+  for (const row of rows) {
+    if (row.exitSpace !== null) bands[row.exitSpace].push(row);
+  }
+  for (const band of SPACE_KINDS) {
+    bands[band].sort(band === 'wormhole' ? byLongestLife : byNearest);
+  }
+  return bands;
 }

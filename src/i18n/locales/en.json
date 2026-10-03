@@ -7378,43 +7378,66 @@
       "originLabel": "Jumps from",
       "changeOrigin": "Change the system jumps are counted from — {{current}}",
       "hubLabel": "Hub",
-      "exitLabel": "Exit security",
-      "sizeLabel": "Ship size",
-      "anyExit": "Any exit",
+      "fitsLabel": "Fits",
       "hub": {
-        "all": "Both hubs",
+        "all": "Both",
         "thera": "Thera",
         "turnur": "Turnur"
       },
+      "fits": {
+        "any": "Any",
+        "small": "S",
+        "medium": "M",
+        "large": "L",
+        "xlarge": "XL",
+        "capital": "Cap"
+      },
       "size": {
-        "any": "Any size",
         "small": "Small",
         "medium": "Medium",
         "large": "Large",
         "xlarge": "Very large",
         "capital": "Capital"
       },
-      "col": {
-        "hub": "Hub",
-        "signatures": "Signatures (hub → exit)",
-        "exit": "Exit system",
-        "security": "Security",
-        "region": "Region",
-        "type": "Wormhole",
-        "size": "Max ship size",
-        "life": "Remaining life",
-        "jumps": "Jumps"
+      "band": {
+        "highsec": "Highsec",
+        "lowsec": "Lowsec",
+        "nullsec": "Nullsec",
+        "wormhole": "J-space"
       },
+      "bandTabsLabel": "Where the holes come out",
+      "bandTab": {
+        "highsec": "High {{count}}",
+        "lowsec": "Low {{count}}",
+        "nullsec": "Null {{count}}",
+        "wormhole": "J {{count}}"
+      },
+      "emptyBand": {
+        "highsec": "No open holes into highsec right now",
+        "lowsec": "No open holes into lowsec right now",
+        "nullsec": "No open holes into nullsec right now",
+        "wormhole": "No open holes into J-space right now"
+      },
+      "maxSize": "Up to {{size}}",
+      "lifeLeft": "{{time}} left",
+      "jumps_one": "{{count}} jump",
+      "jumps_other": "{{count}} jumps",
+      "jumpsBlank": "— jumps",
+      "wormholeType": "Wormhole type {{type}}",
+      "hubSignature": "{{hub}} sig",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copySignature": "Copy {{hub}} signature for {{system}}",
+      "copiedSignature": "Copied {{hub}} signature for {{system}}",
       "noGateRoute": "No gate route",
       "noOrigin": "Pick a system to count jumps from, or set your current system.",
       "originUngated": "{{system}} has no stargates, so no exit can be reached by gate from it.",
       "jumpsLoading": "Counting jumps from the stargate map…",
       "jumpsUnknown": "The local stargate map couldn't be read, so jumps show as —.",
-      "tableLabel": "Thera and Turnur connections",
       "emptyTitle": "EVE-Scout lists no open connections right now",
       "emptyHint": "Scouts add connections as they find them. Check back later.",
       "noMatchTitle": "No connections match these filters",
-      "noMatchHint": "Widen the hub, exit security or ship size filter.",
+      "noMatchHint": "Widen the hub or ship size filter.",
       "unavailableTitle": "Connections can't be loaded right now",
       "unavailableHint": "EVE-Scout couldn't be reached. Check your connection and try again.",
       "dataAgeNote": "Connections come from EVE-Scout's volunteer scouts and are refreshed every 5 minutes."
