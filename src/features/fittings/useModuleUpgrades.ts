@@ -15,7 +15,6 @@ import {
   moduleUpgradeCandidates,
   type ModuleUpgradeGain,
 } from '@/engine/fittings/moduleUpgrades';
-import type { CandidateRack } from '@/engine/fittings/candidates';
 import { levelGain, type LevelGain } from '@/engine/fittings/skillGains';
 import { fitsResourceBudget } from '@/engine/fittings/skillGaps';
 import { buildVariationIndex } from '@/engine/market/variations';
@@ -74,8 +73,7 @@ export function useModuleUpgrades(
         {
           fitting,
           levels: profile.skillLevels,
-          requirements: (typeId, rack) =>
-            moduleSkillRequirements(fitting.shipTypeId, rack as CandidateRack, typeId),
+          requirements: (typeId, rack) => moduleSkillRequirements(fitting.shipTypeId, rack, typeId),
           schedule,
           compare: evaluator.compareTrained,
           gain: levelGain,

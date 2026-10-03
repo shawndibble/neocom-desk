@@ -54,13 +54,13 @@ import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
 import { SkillNameButton } from '@/features/skills/SkillNameButton';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { useTargetPlan } from '@/features/skills/useTargetPlan';
-import { changeLabel } from './fittingVariationsCsv';
 import { WhatToTrainPrerequisites } from './FittingWhatToTrainPrerequisites';
 import { useSkillOverrides } from './statsConditions';
 import type { SkillGainEvaluator } from './useFittingEvaluation';
 import { useSkillGains } from './useSkillGains';
 import { useSkillLevelGain } from './useSkillLevelGain';
 import { ModuleUpgradeList } from './FittingModuleUpgrades';
+import { gainChangeLabels } from './whatToTrainChanges';
 import { useModuleUpgrades, type ScheduleEntries } from './useModuleUpgrades';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import { rankModuleUpgrades } from '@/engine/fittings/moduleUpgrades';
@@ -263,26 +263,31 @@ function WhatToTrainRanking({
           </StatField>
         )}
       </StatFields>
-      {ranked.length === 0 && <StatNote>{t('fittings.whatToTrain.none')}</StatNote>}
-      <ul
-        aria-label={t('fittings.stats.section.whatToTrain')}
-        className="m-0 list-none p-0 text-xs"
-      >
-        {ranked.map((row, index) => (
-          <WhatToTrainItem
-            key={row.skillTypeId}
-            row={row}
-            rank={index + 1}
-            evaluator={evaluator}
-            plan={plan}
-            plannedLevels={plannedLevels}
-            scheduleFor={scheduleFor}
-            skills={catalog?.engineSkills}
-            trainedSkills={trainedSkills}
-            onAdd={add}
-          />
-        ))}
-      </ul>
+      {/* Only once no Tech II upgrade is left to suggest either: else it reads as "nothing to train". */}
+      {ranked.length === 0 && rankedUpgrades?.length === 0 && (
+        <StatNote>{t('fittings.whatToTrain.none')}</StatNote>
+      )}
+      {ranked.length > 0 && (
+        <ul
+          aria-label={t('fittings.stats.section.whatToTrain')}
+          className="m-0 list-none p-0 text-xs"
+        >
+          {ranked.map((row, index) => (
+            <WhatToTrainItem
+              key={row.skillTypeId}
+              row={row}
+              rank={index + 1}
+              evaluator={evaluator}
+              plan={plan}
+              plannedLevels={plannedLevels}
+              scheduleFor={scheduleFor}
+              skills={catalog?.engineSkills}
+              trainedSkills={trainedSkills}
+              onAdd={add}
+            />
+          ))}
+        </ul>
+      )}
       <ModuleUpgradeList
         rows={rankedUpgrades}
         typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
@@ -372,15 +377,7 @@ function WhatToTrainItem({
       ? [t('common.loading')]
       : changeCount === 0
         ? [t('fittings.whatToTrain.noChange')]
-        : [
-            ...gain.delta.changes.map((change) => changeLabel(change, t)),
-            ...gain.roleChanges.map((change) =>
-              t(`fittings.whatToTrain.role.${change.key}`, {
-                before: change.before.toLocaleString(),
-                after: change.after.toLocaleString(),
-              })
-            ),
-          ];
+        : gainChangeLabels(gain, t);
   const canAdd = plan !== undefined && level !== null;
 
   return (

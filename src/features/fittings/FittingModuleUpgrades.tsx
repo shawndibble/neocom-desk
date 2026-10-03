@@ -4,6 +4,7 @@
  * those skills together do to the Fitting, the time to train them (their
  * prerequisites listed on click) and "Add to plan" for the skills it needs.
  */
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { scheduleTimeFor } from '@/engine/fittings/moduleUpgrades';
@@ -13,7 +14,7 @@ import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
 import { formatCountdown } from '@/lib/duration';
 import { buildFitCheckRows } from '@/features/skills/ships/fitCheckRows';
 import type { SkillPlanRecord } from '@/db';
-import { changeLabel } from './fittingVariationsCsv';
+import { gainChangeLabels } from './whatToTrainChanges';
 import { WhatToTrainPrerequisites } from './FittingWhatToTrainPrerequisites';
 import type { ModuleUpgradeRow } from './useModuleUpgrades';
 import { STAT_DETAIL, joinDetail, statRowClassName } from './statKit';
@@ -33,11 +34,13 @@ export interface ModuleUpgradeListProps {
 /** Nothing at all once worked out and empty: most fits have no Tech II a pilot is short of. */
 export function ModuleUpgradeList({ rows, ...item }: ModuleUpgradeListProps) {
   const { t } = useTranslation();
+  const headingId = useId();
   if (rows !== null && rows.length === 0) return null;
-  const title = t('fittings.whatToTrain.upgrades.title');
   return (
-    <section aria-label={title} className="space-y-1">
-      <h4 className="m-0 text-xs font-semibold text-text-dim">{title}</h4>
+    <section aria-labelledby={headingId} className="space-y-1">
+      <h4 id={headingId} className="m-0 text-xs font-semibold text-text-dim">
+        {t('fittings.whatToTrain.upgrades.title')}
+      </h4>
       {rows === null ? (
         <p className={STAT_DETAIL}>{t('fittings.whatToTrain.upgrades.loading')}</p>
       ) : (
@@ -71,7 +74,8 @@ function ModuleUpgradeItem({
     row.scheduled,
     row.required.map((entry) => entry.skillTypeID)
   );
-  const needs = t('fittings.whatToTrain.upgrades.needs', {
+  // The changes below are the swap with these trained, so the row says so.
+  const needs = t('fittings.whatToTrain.upgrades.withTrained', {
     skills: row.required
       .map(
         (entry) =>
@@ -79,15 +83,7 @@ function ModuleUpgradeItem({
       )
       .join(', '),
   });
-  const changes = [
-    ...row.delta.changes.map((change) => changeLabel(change, t)),
-    ...row.roleChanges.map((change) =>
-      t(`fittings.whatToTrain.role.${change.key}`, {
-        before: change.before.toLocaleString(),
-        after: change.after.toLocaleString(),
-      })
-    ),
-  ];
+  const changes = gainChangeLabels(row, t);
   const prerequisiteRows = skills
     ? buildFitCheckRows(scheduledSkillTargets(row.scheduled), skills, trainedSkills, row.scheduled)
     : [];
@@ -118,7 +114,7 @@ function ModuleUpgradeItem({
         <div className="mt-1 flex justify-end">
           <Button
             size="sm"
-            aria-label={t('fittings.whatToTrain.addToPlanLabel', { skill: toName })}
+            aria-label={t('fittings.whatToTrain.upgrades.addToPlanLabel', { module: toName })}
             onClick={() => void onAdd(row.required)}
           >
             {t('fittings.whatToTrain.addToPlan')}

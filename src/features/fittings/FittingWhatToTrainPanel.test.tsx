@@ -75,9 +75,13 @@ function gain(skillTypeId: number, fromLevel: number, overall: number): SkillGai
   };
 }
 
+// Every skill row by default; a test empties it to see the empty state.
+const skillGainsState = vi.hoisted(() => ({ empty: false }));
 vi.mock('./useSkillGains', () => ({
   useSkillGains: () => ({
-    gains: [gain(3315, 0, 0.2), gain(3436, 2, 0.1), gain(3300, 1, 0.05)],
+    gains: skillGainsState.empty
+      ? []
+      : [gain(3315, 0, 0.2), gain(3436, 2, 0.1), gain(3300, 1, 0.05)],
     loading: false,
     failed: false,
   }),
@@ -143,6 +147,7 @@ const evaluator = {} as SkillGainEvaluator;
 afterEach(async () => {
   await db.skillPlans.clear();
   upgradeState.rows = [];
+  skillGainsState.empty = false;
 });
 
 function renderPanel() {
@@ -398,7 +403,7 @@ describe('FittingWhatToTrainPanel — skill detail', () => {
 
     const section = await screen.findByRole('region', { name: 'Tech II upgrades' });
     const row = within(section).getByText('8× 425mm Railgun I → 425mm Railgun II').closest('li')!;
-    expect(row).toHaveTextContent('Needs Surgical Strike I');
+    expect(row).toHaveTextContent('With Surgical Strike I trained');
     expect(row).toHaveTextContent('Total DPS +136');
     expect(within(row).getByRole('button', { name: /incl\. prerequisites/i })).toBeInTheDocument();
   });
@@ -410,7 +415,7 @@ describe('FittingWhatToTrainPanel — skill detail', () => {
 
     const section = await screen.findByRole('region', { name: 'Tech II upgrades' });
     await user.click(
-      within(section).getByRole('button', { name: 'Add to plan: 425mm Railgun II' })
+      within(section).getByRole('button', { name: 'Add to plan: the skills for 425mm Railgun II' })
     );
     await waitFor(async () => {
       expect(await planEntries()).toEqual([{ skillTypeID: 3315, targetLevel: 1 }]);
@@ -421,5 +426,27 @@ describe('FittingWhatToTrainPanel — skill detail', () => {
     renderPanel();
     await screen.findByText('Surgical Strike');
     expect(screen.queryByRole('region', { name: 'Tech II upgrades' })).not.toBeInTheDocument();
+  });
+
+  it('says nothing is left to train only when no Tech II upgrade is left either', async () => {
+    skillGainsState.empty = true;
+    upgradeState.rows = [railgunUpgrade()];
+    const { unmount } = render(
+      <MemoryRouter>
+        <FittingWhatToTrainPanel
+          evaluator={evaluator}
+          characterId={CHARACTER_ID}
+          fittingName="Rifter"
+          catalogue={catalogue}
+        />
+      </MemoryRouter>
+    );
+    await screen.findByRole('region', { name: 'Tech II upgrades' });
+    expect(screen.queryByText(/no single skill level/i)).not.toBeInTheDocument();
+    unmount();
+
+    upgradeState.rows = [];
+    renderPanel();
+    expect(await screen.findByText(/no single skill level/i)).toBeInTheDocument();
   });
 });

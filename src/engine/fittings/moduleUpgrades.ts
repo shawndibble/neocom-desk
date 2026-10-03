@@ -13,7 +13,7 @@ import { getVariations } from '../market/variations';
 import type { PlanEntry } from '../types';
 import { swapModuleType, type ModuleAt } from './fittingEdit';
 import { scheduledSkillTargets } from './skillGains';
-import type { Fitting, FittingModule } from './types';
+import type { Fitting, FittingModule, FittingSlotKind } from './types';
 
 const TECH_I = 1;
 const TECH_II = 2;
@@ -125,7 +125,7 @@ export interface EvaluateModuleUpgradesOptions<
   /** The pilot's skill levels: what a requirement is met against. */
   levels: ReadonlyMap<number, number>;
   /** Every skill `typeId` needs in `rack`, at the level it asks. */
-  requirements: (typeId: number, rack: string) => readonly PlanEntry[];
+  requirements: (typeId: number, rack: FittingSlotKind) => readonly PlanEntry[];
   /** The schedule that trains `entries`, prerequisites included; null when it can't be worked out yet. */
   schedule: (entries: readonly PlanEntry[]) => readonly Step[] | null;
   /** `variant`'s stats once `trained` is, beside the open Fitting's own. */

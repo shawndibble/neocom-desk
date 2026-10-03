@@ -16,7 +16,6 @@ import {
   fittingSkillSources,
   moduleSkillRequirements,
 } from './dogmaFittingEngine';
-import type { CandidateRack } from '@/engine/fittings/candidates';
 import {
   evaluateModuleUpgrades,
   moduleUpgradeCandidates,
@@ -203,8 +202,7 @@ describe('Tech II upgrades on that Rokh (real WASM + real pinned SDE)', () => {
       {
         fitting,
         levels: pilot.skillLevels,
-        requirements: (typeId, rack) =>
-          moduleSkillRequirements(fitting.shipTypeId, rack as CandidateRack, typeId),
+        requirements: (typeId, rack) => moduleSkillRequirements(fitting.shipTypeId, rack, typeId),
         // The engine's requirements already reach down the prerequisite
         // chain; a real schedule only adds training times.
         schedule: (entries) =>
