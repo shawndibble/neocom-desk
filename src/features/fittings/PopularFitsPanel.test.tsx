@@ -1,11 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@/i18n';
 import type { PopularFit } from '@/engine/fittings/popularFits';
 import type { PopularFitsResult } from './popularFits';
+import type { WorkbenchFit, WorkbenchFitsResult } from './workbenchFits';
 
-const { usePopularFitsMock } = vi.hoisted(() => ({ usePopularFitsMock: vi.fn() }));
+const { usePopularFitsMock, useWorkbenchFitsMock, loadFittingFromTextMock } = vi.hoisted(() => ({
+  usePopularFitsMock: vi.fn(),
+  useWorkbenchFitsMock: vi.fn(),
+  loadFittingFromTextMock: vi.fn(),
+}));
 vi.mock('./popularFits', () => ({ usePopularFits: usePopularFitsMock }));
+vi.mock('./workbenchFits', () => ({
+  useWorkbenchFits: useWorkbenchFitsMock,
+  workbenchFitUrl: (id: string) => `https://eveworkbench.com/fit/${id}`,
+}));
+vi.mock('./loadFittingFromText', () => ({ loadFittingFromText: loadFittingFromTextMock }));
 vi.mock('@/sde/loadSde', () => ({
   typeName: (typeId: number) =>
     Promise.resolve(
@@ -117,5 +127,92 @@ describe('PopularFitsPanel', () => {
   it('notes when there is nothing to show', () => {
     renderPanel({ ok: true, fits: [] });
     expect(screen.getByText('No recent losses of this hull with a full fit.')).toBeTruthy();
+  });
+});
+
+describe('PopularFitsPanel EVE Workbench tab', () => {
+  beforeEach(() => {
+    usePopularFitsMock.mockReset().mockReturnValue({ ok: true, fits: [] });
+    useWorkbenchFitsMock.mockReset();
+    loadFittingFromTextMock.mockReset();
+  });
+
+  function wbFit(id: string, extra: Partial<WorkbenchFit> = {}): WorkbenchFit {
+    return {
+      id,
+      name: `Fit ${id}`,
+      authorId: 1,
+      authorName: 'Saryna Dach',
+      dateAdded: Date.now() - 2.5 * 86_400_000,
+      eft: `[Vexor, Fit ${id}]`,
+      ...extra,
+    };
+  }
+
+  function openWorkbench(result: WorkbenchFitsResult | null, onOpen = vi.fn()) {
+    useWorkbenchFitsMock.mockReturnValue(result);
+    render(<PopularFitsPanel shipTypeId={626} hullName="Vexor" onOpen={onOpen} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'EVE Workbench' }));
+    return onOpen;
+  }
+
+  it('starts on zKillboard and only reads Workbench once its tab is picked', () => {
+    render(<PopularFitsPanel shipTypeId={626} hullName="Vexor" onOpen={vi.fn()} />);
+    expect(screen.getByRole('tab', { name: 'zKillboard', selected: true })).toBeTruthy();
+    expect(useWorkbenchFitsMock).not.toHaveBeenCalled();
+  });
+
+  it('lists fits with name, author and date added, linking each to Workbench', () => {
+    openWorkbench({ ok: true, fits: [wbFit('a'), wbFit('b', { name: '', authorName: '' })] });
+    const link = screen.getByRole('link', { name: 'Fit a' });
+    expect(link.getAttribute('href')).toBe('https://eveworkbench.com/fit/a');
+    expect(screen.getByText('by Saryna Dach · added 2d ago')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Unnamed fit' })).toBeTruthy();
+    expect(screen.getByText('by unknown pilot · added 2d ago')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'eveworkbench.com' })).toBeTruthy();
+  });
+
+  it('Loads the picked fit from its stored EFT', async () => {
+    const loaded = {
+      kind: 'fitting',
+      source: 'text',
+      fitting: { name: 'Fit b', shipTypeId: 626, modules: [], drones: [], cargo: [] },
+      unresolved: [],
+    };
+    loadFittingFromTextMock.mockResolvedValue(loaded);
+    const onOpen = openWorkbench({ ok: true, fits: [wbFit('a'), wbFit('b')] });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Load' })[1]);
+    await waitFor(() => expect(onOpen).toHaveBeenCalledWith(loaded));
+    expect(loadFittingFromTextMock).toHaveBeenCalledWith('[Vexor, Fit b]');
+  });
+
+  it('says so when a fit will not Load', async () => {
+    loadFittingFromTextMock.mockResolvedValue({
+      kind: 'failed',
+      source: 'text',
+      error: 'unrecognised',
+      unresolved: [],
+    });
+    const onOpen = openWorkbench({ ok: true, fits: [wbFit('a')] });
+    fireEvent.click(screen.getByRole('button', { name: 'Load' }));
+    expect((await screen.findByRole('alert')).textContent).toBe("Couldn't load this fit.");
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('tells loading, empty and unreachable apart', async () => {
+    openWorkbench(null);
+    expect(
+      await screen.findByRole('status', { name: 'Loading fits from EVE Workbench…' })
+    ).toBeTruthy();
+    cleanup();
+    openWorkbench({ ok: true, fits: [] });
+    expect(
+      screen.getByText('Nobody has published a fit for this hull on EVE Workbench yet.')
+    ).toBeTruthy();
+    cleanup();
+    openWorkbench({ ok: false });
+    expect(screen.getByRole('status').textContent).toMatch(
+      /Couldn't reach the EVE Workbench fit list/
+    );
   });
 });

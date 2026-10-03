@@ -725,6 +725,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   losses (about 40), grouped by the set of fitted modules — charges, drones and
   cargo don't split a group. Shows how many losses flew it, when it was last
   seen and roughly what it cost, and **Load**s the group's most recent loss.
+- **EVE Workbench fit**: A fit a pilot published on EVE Workbench, listed for its
+  hull in the **Popular fit** panel's EVE Workbench tab (beside its zKillboard
+  tab) with its name, author and date added, linked to its page there.
+  **Load**s from its EFT. Comes from our own copy of Workbench's public list,
+  synced by a Cloud Function, since Workbench can't list fits by hull.
 - **Price History**: The Market Browser item tab charting one item's daily
   history in a Region: **Daily Range**, average price and its moving average
   above, **Traded Volume** and **Order Count** below, on one shared date axis.
