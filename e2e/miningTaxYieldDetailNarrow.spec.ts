@@ -8,7 +8,7 @@
  * `PriceHistoryChart.tsx`'s own day list already is: `stackColumns={2}`.
  *
  * Playwright rather than jsdom because the pairing lives in `.dt-stack-2col`'s
- * `@media (width < 40rem)` grid (`src/styles/index.css`), which jsdom cannot
+ * phone grid (`.dt-stacked`, `src/styles/index.css`), which jsdom cannot
  * evaluate — only a real engine can tell a paired card from the five-line one
  * that shipped. So the assertions are on bounding boxes, which cells share a
  * line and how wide each is; the class token itself is already guarded by

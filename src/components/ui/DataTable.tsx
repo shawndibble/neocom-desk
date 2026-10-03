@@ -735,8 +735,8 @@ export function DataTable<T>({
   const isPhone = useIsPhone();
   // Card width: the caller's say where it has one, else the viewport's. The
   // `.dt-stacked` rules (src/styles/index.css) key off the class this sets.
-  const cardWidth = stacked ?? isPhone;
-  const isStacked = responsive === 'stack' && cardWidth;
+  const cardsWanted = stacked ?? isPhone;
+  const isStacked = responsive === 'stack' && cardsWanted;
   const tableRef = useRef<HTMLTableElement>(null);
   const dense = responsive === 'stack' && stackLayout === 'dense';
 
@@ -758,7 +758,7 @@ export function DataTable<T>({
     )
   );
   // Which cell titles the card once the rows stack. Marked on every row's
-  // cell rather than positionally, so `.dt-stack` can hoist it out of column
+  // cell rather than positionally, so `.dt-stacked` can hoist it out of column
   // order without the markup differing by width.
   const primaryIndex = Math.max(
     0,
@@ -841,7 +841,7 @@ export function DataTable<T>({
     [exportable, sortedRows]
   );
 
-  const grouping = groupBy !== undefined && cardWidth;
+  const grouping = groupBy !== undefined && cardsWanted;
   // Grouped over (row, index) pairs so `rowKey` still gets each row's index
   // in sort order, exactly as the ungrouped table passes it.
   const groups = useMemo(() => {
@@ -934,7 +934,7 @@ export function DataTable<T>({
   // for that on mount.
   useEffect(() => {
     if (windowed) rowVirtualizer.measure();
-  }, [cardWidth, windowed, rowVirtualizer]);
+  }, [cardsWanted, windowed, rowVirtualizer]);
 
   // A row's own re-measure (see `DataTableRow`'s `remeasure`): straight to
   // `resizeItem`, through the same `measureElement` the virtualizer uses.

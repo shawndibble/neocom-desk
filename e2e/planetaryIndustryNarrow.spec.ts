@@ -10,7 +10,7 @@
  * Yield Detail already are: `stackColumns={2}`.
  *
  * Playwright rather than jsdom because the pairing lives in `.dt-stack-2col`'s
- * `@media (width < 40rem)` grid (`src/styles/index.css`), which jsdom cannot
+ * phone grid (`.dt-stacked`, `src/styles/index.css`), which jsdom cannot
  * evaluate. The class token itself is already guarded beside the component in
  * `src/features/pi/PlanPanel.test.tsx`; what only a real engine can tell is a
  * paired card from the one-line-per-rate card that shipped, so the assertions
@@ -110,7 +110,7 @@ async function openSensitivity(page: Page, typeId: number, ratePercent: string):
   // A real gate only for a rate outside the fixed five: there the column
   // appears once the fill has moved the sweep. At 10% — the highsec untrained
   // default, and already one of the five — nothing moves and this just says
-  // the sweep is up. Attached, not visible: `.dt-stack thead` is clipped to
+  // the sweep is up. Attached, not visible: `.dt-stacked thead` is clipped to
   // 1px on a phone, so the header is deliberately invisible there.
   await expect(
     table.getByRole('columnheader', { name: `${ratePercent}%`, exact: true })

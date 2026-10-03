@@ -10,8 +10,8 @@
  * pairing the short figures two per line.
  *
  * Playwright rather than jsdom, same reasoning `miningTaxYieldDetailNarrow.spec.ts`
- * gives: the pairing lives in `.dt-stack-2col`'s `@media (width < 40rem)`
- * grid (`src/styles/index.css`), which jsdom cannot evaluate. Assertions are
+ * gives: the pairing lives in `.dt-stack-2col`'s phone
+ * grid (`.dt-stacked`, `src/styles/index.css`), which jsdom cannot evaluate. Assertions are
  * bounding boxes: which cells share a line, and that a long station name and
  * an 8-figure quantity still fit without overlap or sideways scroll.
  *

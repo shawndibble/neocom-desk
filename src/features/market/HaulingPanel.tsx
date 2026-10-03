@@ -102,12 +102,13 @@ const DAY_CHOICES = [7, 14, 30, 0] as const;
  * The table widths (rem) the layout changes at, measured in Chrome: below
  * `compact` the figures go compact (`12.08M`; the full ones need about 54rem
  * with "ISK each", which the CSS drops at the same 56rem), and below `cards`
- * the rows become the phone's cards (the compact columns need about 46rem).
+ * the rows become the phone's cards (the compact columns need about 46rem;
+ * a rem and more of headroom, so a longer figure never brings the scroll back).
  * Any hub's Hub column needs about 5.3rem more of each.
  */
 const TABLE_WIDTHS = {
-  oneHub: { compact: 56, cards: 46.5 },
-  anyHub: { compact: 60, cards: 52 },
+  oneHub: { compact: 56, cards: 47.5 },
+  anyHub: { compact: 60, cards: 53 },
 } as const;
 const MARGIN_CHOICES = [0, 3, 5, 10] as const;
 
@@ -566,7 +567,14 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       render: (row) => (
         <span className="font-semibold">
           {signed(row.marginPct, 1)}%
-          <span className="ml-1.5 hidden text-[0.6875rem] font-normal text-text-dim @min-[56rem]:inline">
+          <span
+            className={cx(
+              'ml-1.5 hidden text-[0.6875rem] font-normal text-text-dim',
+              // `TABLE_WIDTHS`' `compact`, per hub mode: the full figures and
+              // this suffix come and go together.
+              anyEnd === null ? '@min-[56rem]:inline' : '@min-[60rem]:inline'
+            )}
+          >
             {t('market.hauling.profitEach', {
               isk: `${row.profitPerUnit >= 0 ? '+' : ''}${formatIsk(row.profitPerUnit, 0)}`,
             })}
