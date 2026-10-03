@@ -1,8 +1,9 @@
 /**
  * The non-EFT "Load" sources (issue #1541): an in-game DNA string or
- * `<url=fitting:…>` chat link, an eveship.fit link, and a killmail (the
- * victim's fit). All of it is pure — fetching a killmail lives with the
- * caller; here a killmail is already an ESI `victim` object.
+ * `<url=fitting:…>` chat link, an eveship.fit link, an EVE Workbench fit link
+ * (#2483) and a killmail (the victim's fit). All of it is pure — fetching a
+ * killmail or a Workbench fit's EFT lives with the caller; here a killmail is
+ * already an ESI `victim` object, and a Workbench link is only its fit id.
  *
  * Every loader returns `LoadParts` (`load.ts`), the same as the EFT loader,
  * so `toLoadOutcome` and the "lines that weren't recognised" list carry over
@@ -30,10 +31,11 @@ export type LoadInput =
   | { kind: 'share'; code: string }
   | { kind: 'killmail'; killmailId: number; hash?: string }
   /**
-   * An EVE Workbench fit page. Its API sends no CORS headers, so a browser
-   * can't read the fit from it — Load says how to copy the EFT across instead.
+   * An EVE Workbench fit page (`/fit/<id>[/<slug>]`). The id is a GUID on a
+   * real link but is passed through as written, so a malformed one still
+   * reads as "Workbench has no such fit" rather than "unrecognised".
    */
-  | { kind: 'eveWorkbench' }
+  | { kind: 'eveWorkbench'; fitId: string }
   | { kind: 'unknown' };
 
 const DNA = /^\d+(?::\d+_?;\d+)+:*$/;
@@ -43,6 +45,8 @@ const EFT_HEADER = /^\s*\[[^\]\n]+,[^\]\n]*\]/;
 const BARE_EFT_HEADER = /^\s*\[[^\]\n]+\]/;
 const ZKILL = /zkillboard\.com\/kill\/(\d+)/i;
 const ESI_KILL = /\/killmails\/(\d+)\/([0-9a-f]{40})/i;
+/** `/fit/<id>[/<slug>]`; the id may be empty, which still reads as a Workbench link. */
+const WORKBENCH_FIT_PATH = /^\/fit(?:\/([^/]*))?(?:\/|$)/i;
 
 function classifyPlain(text: string): LoadInput {
   // eveship.fit may tag the payload with its kind (`dna:587:…`).
@@ -71,8 +75,9 @@ export function classifyLoadInput(input: string): LoadInput {
       // Matched on the path's end, so both `/ships/fittings` (since the
       // section became Ships) and the older `/fittings` read back.
       if (code && /\/fittings(\/edit)?\/?$/.test(url.pathname)) return { kind: 'share', code };
-      if (/(^|\.)eveworkbench\.com$/i.test(url.hostname) && /^\/fit\//i.test(url.pathname)) {
-        return { kind: 'eveWorkbench' };
+      const workbenchFit = WORKBENCH_FIT_PATH.exec(url.pathname);
+      if (/(^|\.)eveworkbench\.com$/i.test(url.hostname) && workbenchFit) {
+        return { kind: 'eveWorkbench', fitId: (workbenchFit[1] ?? '').toLowerCase() };
       }
       if (/(^|\.)eveship\.fit$/i.test(url.hostname)) {
         const fit = url.searchParams.get('fit') ?? decodeURIComponent(url.hash.replace(/^#/, ''));

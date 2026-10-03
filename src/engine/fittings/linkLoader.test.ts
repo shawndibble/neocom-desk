@@ -98,6 +98,37 @@ describe('classifyLoadInput', () => {
     });
   });
 
+  it('reads the fit id out of an EVE Workbench link, with or without its slug', () => {
+    const fitId = '69dfd552-9a17-4628-92de-9f07c28ac659';
+    for (const link of [
+      `https://eveworkbench.com/fit/${fitId}`,
+      `https://eveworkbench.com/fit/${fitId}/`,
+      `https://eveworkbench.com/fit/${fitId}/rifter-pve`,
+      `https://www.eveworkbench.com/fit/${fitId.toUpperCase()}/rifter-pve/`,
+    ]) {
+      expect(classifyLoadInput(link)).toEqual({ kind: 'eveWorkbench', fitId });
+    }
+  });
+
+  it.each([
+    'https://eveworkbench.com/fit',
+    'https://eveworkbench.com/fit/',
+    'https://eveworkbench.com/fit//x',
+  ])('keeps an EVE Workbench fit link with no id (%s) as a Workbench link', (link) => {
+    expect(classifyLoadInput(link)).toEqual({ kind: 'eveWorkbench', fitId: '' });
+  });
+
+  it('does not take another eveworkbench.com page for a fit link', () => {
+    expect(classifyLoadInput('https://eveworkbench.com/fitting/abc')).toEqual({ kind: 'unknown' });
+  });
+
+  it('keeps an EVE Workbench fit link whose id is malformed, so Load can say Workbench has no such fit', () => {
+    expect(classifyLoadInput('https://eveworkbench.com/fit/not-a-fit/slug')).toEqual({
+      kind: 'eveWorkbench',
+      fitId: 'not-a-fit',
+    });
+  });
+
   it('marks anything else unknown', () => {
     expect(classifyLoadInput('hello world')).toEqual({ kind: 'unknown' });
     expect(classifyLoadInput('https://example.com/')).toEqual({ kind: 'unknown' });

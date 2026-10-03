@@ -1,6 +1,6 @@
 /**
  * One outcome for every **Load** (CONTEXT.md): EFT text, a DNA string or
- * chat link, an eveship.fit link, a killmail, a Loaded fittings-file entry
+ * chat link, an eveship.fit link, an EVE Workbench fit link, a killmail, a Loaded fittings-file entry
  * and an In-game Fitting all end as either a Fitting plus what it couldn't
  * place, or a failure. A caller holds the last outcome whole, so a new Load
  * replaces the previous one's warnings rather than leaving a stale list
@@ -8,7 +8,7 @@
  *
  * `loadText` is the text half: it works out which source a pasted string is
  * and reads it. Everything it needs from outside — the type catalog, hull
- * names, zKillboard and ESI — comes in through `TextLoadSources`, so this
+ * names, zKillboard, ESI and EVE Workbench — comes in through `TextLoadSources`, so this
  * stays fetch-free.
  */
 import { loadEftFitting, type EftSlotLookup, type EftTypeLookup } from './eftLoader';
@@ -37,7 +37,12 @@ export interface LoadWarning {
 export type LoadSource = 'text' | 'file' | 'in-game';
 
 /** Why a Load produced no Fitting, beyond its warnings. */
-export type LoadError = 'unrecognised' | 'eve-workbench' | 'killmail-not-found' | 'killmail-failed';
+export type LoadError =
+  | 'unrecognised'
+  | 'eve-workbench-not-found'
+  | 'eve-workbench-failed'
+  | 'killmail-not-found'
+  | 'killmail-failed';
 
 /** A Fitting's parts as each loader resolves them, before it has a name. */
 export type LoadParts =
@@ -100,6 +105,14 @@ export function toLoadOutcome(parts: LoadParts, name: string, source: LoadSource
   };
 }
 
+/**
+ * What EVE Workbench answered for a fit id. `not-found` covers a fit that was
+ * deleted, never existed, or isn't published — Workbench's API doesn't tell
+ * those apart. `failed` is Workbench unreachable or answering nonsense.
+ */
+export type EveWorkbenchEft =
+  { status: 'ok'; eft: string } | { status: 'not-found' } | { status: 'failed' };
+
 export interface TextLoadSources {
   /** Name → typeId and typeId → rack; read only for text that needs them. */
   catalog: () => Promise<{ typeByName: EftTypeLookup; slotByTypeId: EftSlotLookup }>;
@@ -108,6 +121,8 @@ export interface TextLoadSources {
   killmailHash: (killmailId: number) => Promise<string | null>;
   /** ESI's killmail victim; null or a throw when ESI couldn't supply it. */
   killmailVictim: (killmailId: number, hash: string) => Promise<KillmailVictim | null>;
+  /** A published EVE Workbench fit's EFT; a throw reads as unreachable. */
+  eveWorkbenchEft: (fitId: string) => Promise<EveWorkbenchEft>;
 }
 
 function failed(error: LoadError): FailedLoad {
@@ -130,20 +145,51 @@ async function readKillmail(
   }
 }
 
-/** Loads EFT text, a DNA string / chat link, a Fitting Share Code, an eveship.fit link, or a killmail link. */
+/** For EFT the pilot never saw: a warning names the item, not a line number. */
+function withoutLineNumbers(parts: LoadParts): LoadParts {
+  return { ...parts, unresolved: parts.unresolved.map(({ text, reason }) => ({ text, reason })) };
+}
+
+async function readEveWorkbench(
+  fitId: string,
+  sources: TextLoadSources
+): Promise<{ eft: string } | LoadError> {
+  if (fitId === '') return 'eve-workbench-not-found';
+  try {
+    const answer = await sources.eveWorkbenchEft(fitId);
+    if (answer.status === 'ok') return { eft: answer.eft };
+    return answer.status === 'not-found' ? 'eve-workbench-not-found' : 'eve-workbench-failed';
+  } catch {
+    return 'eve-workbench-failed';
+  }
+}
+
+/**
+ * Loads EFT text, a DNA string / chat link, a Fitting Share Code, an
+ * eveship.fit link, an EVE Workbench fit link, or a killmail link.
+ */
 export async function loadText(
   text: string,
   sources: TextLoadSources
 ): Promise<LoadOutcome | ShareLoad> {
   const input = classifyLoadInput(text);
   if (input.kind === 'unknown') return failed('unrecognised');
-  if (input.kind === 'eveWorkbench') return failed('eve-workbench');
   if (input.kind === 'share') return { kind: 'share', code: input.code };
+
+  // Read before the catalog, so a fit Workbench won't serve costs nothing else.
+  let workbenchEft = '';
+  if (input.kind === 'eveWorkbench') {
+    const read = await readEveWorkbench(input.fitId, sources);
+    if (typeof read === 'string') return failed(read);
+    workbenchEft = read.eft;
+  }
 
   const { typeByName, slotByTypeId } = await sources.catalog();
   let parts: LoadParts;
   if (input.kind === 'eft') {
     parts = loadEftFitting(input.text, typeByName, slotByTypeId);
+  } else if (input.kind === 'eveWorkbench') {
+    parts = withoutLineNumbers(loadEftFitting(workbenchEft, typeByName, slotByTypeId));
   } else if (input.kind === 'dna') {
     parts = loadDnaFitting(input.dna, slotByTypeId);
   } else {

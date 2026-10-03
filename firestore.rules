@@ -205,6 +205,19 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
+    // EVE Workbench fits by hull (issue #2484): the Popular fit panel's EVE
+    // Workbench tab. Written only by the syncWorkbenchFits scheduled function
+    // (admin privileges). Readable with no session at all, unlike the public
+    // collections above: the data is EVE Workbench's own public fit list, and
+    // the fitter works with nobody logged in, so a sign-in gate would hide
+    // public fits from exactly the pilot browsing hulls before adding a
+    // Character. `list` is needed too: the client queries a hull's parts by
+    // shipTypeId. The sync's checkpoint lives in workbenchFitsSync, which has
+    // no rule and so stays denied by the implicit deny below.
+    match /workbenchFits/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
     // Stored Share Links (src/features/share/shareStore.ts): a short
     // /share/{id} URL whose content lives here for a week. Not per-Character
     // data, and the person opening a link may have no account at all — so
