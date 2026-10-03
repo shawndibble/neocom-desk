@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -10,6 +11,15 @@ import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 import { clearRouteKillCaches } from '@/features/travel/routeKillsData';
 import { App } from '@/app/App';
+import { AVOIDED_SYSTEMS_KEY, useAvoidedSystems } from '@/features/route/avoidedSystems';
+import {
+  AVOIDED_SYSTEMS_ENABLED_KEY,
+  clearPodKillsLoad,
+  ROUTE_RULE_STORES,
+  useAvoidEdencom,
+  useAvoidedSystemsEnabled,
+  useDefaultRoutePreference,
+} from '@/features/route/routeRules';
 import { clearEveScoutCache, EVE_SCOUT_SIGNATURES_URL } from '@/lib/eveScout';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -297,6 +307,100 @@ describe('Travel › Route Safety', () => {
     expect(window.location.pathname).toBe('/pilot-lookup');
     expect(window.location.search).toBe('?pilot=42');
     expect(await screen.findByText('No kills or losses on zKillboard')).toBeInTheDocument();
+  });
+});
+
+describe('Travel › Route Safety › Route rules', () => {
+  beforeEach(() => {
+    // The Travel Settings stores outlive a test; make each one read its seeded rows afresh.
+    for (const store of ROUTE_RULE_STORES) {
+      (store.setState as (partial: { hydrated: boolean }) => void)({ hydrated: false });
+    }
+    useDefaultRoutePreference.setState({ value: 'prefer-highsec' });
+    useAvoidEdencom.setState({ value: false });
+    useAvoidedSystems.setState({ value: [] });
+    useAvoidedSystemsEnabled.setState({ value: true });
+    clearPodKillsLoad();
+  });
+
+  async function avoidButton(name: string) {
+    const table = await screen.findByRole('table', { name: 'Systems on the route' });
+    return within(table).findByRole('button', { name: `Avoid ${name}` });
+  }
+
+  it('changes the Route Preference in the link only, never the saved default', async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    const group = await screen.findByRole('group', { name: 'Route preference' });
+    expect(within(group).getByRole('button', { name: 'Safer' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await user.click(within(group).getByRole('button', { name: 'Shorter' }));
+
+    expect(new URLSearchParams(window.location.search).get('pref')).toBe('shortest');
+    expect(useDefaultRoutePreference.getState().value).toBe('prefer-highsec');
+    // Prefer shorter counts jumps only, so the penalty is off — as in Settings.
+    expect(screen.getByRole('spinbutton', { name: 'Security penalty' })).toBeDisabled();
+  });
+
+  it('edits the same Travel Settings Settings → Travel does', async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    await user.click(
+      await screen.findByRole('checkbox', { name: /EDENCOM systems \(137 systems\)/ })
+    );
+
+    expect(useAvoidEdencom.getState().value).toBe(true);
+  });
+
+  it('offers Avoid on every row but the two ends', async () => {
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    await avoidButton('Perimeter');
+    const table = screen.getByRole('table', { name: 'Systems on the route' });
+    expect(within(table).queryByRole('button', { name: 'Avoid Jita' })).not.toBeInTheDocument();
+    expect(within(table).queryByRole('button', { name: 'Avoid Uedama' })).not.toBeInTheDocument();
+  });
+
+  it('previews the route before saving, and says plainly when there is no way around', async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    await user.click(await avoidButton('Perimeter'));
+    const dialog = await screen.findByRole('dialog', { name: 'Avoid Perimeter?' });
+    expect(
+      await within(dialog).findByText('The route becomes 2 jumps (+0), lowest 0.5')
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText(/no way around Perimeter/)).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/jump counts change everywhere in the app/)
+    ).toBeInTheDocument();
+    // Previewing saved nothing.
+    expect(useAvoidedSystems.getState().value).toEqual([]);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Avoid Perimeter' }));
+
+    expect(useAvoidedSystems.getState().value).toEqual([PERIMETER]);
+    expect(await db.settings.get(AVOIDED_SYSTEMS_KEY)).toMatchObject({ value: [PERIMETER] });
+  });
+
+  it('says the Avoided Systems switch is off, and switches it on along with the add', async () => {
+    await db.settings.put({ key: AVOIDED_SYSTEMS_ENABLED_KEY, value: false });
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    await user.click(await avoidButton('Perimeter'));
+    const dialog = await screen.findByRole('dialog', { name: 'Avoid Perimeter?' });
+    expect(within(dialog).getByText(/Avoided Systems is switched off/)).toBeInTheDocument();
+    await within(dialog).findByText(/The route becomes 2 jumps/);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Switch on and avoid' }));
+
+    expect(useAvoidedSystems.getState().value).toEqual([PERIMETER]);
+    await waitFor(() => expect(useAvoidedSystemsEnabled.getState().value).toBe(true));
   });
 });
 
