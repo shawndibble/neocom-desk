@@ -233,10 +233,11 @@ describe('Travel › Route Safety', () => {
   it('draws the route strip with a spoken description and its key systems', async () => {
     visit(`?from=${JITA}&to=${UEDAMA}`);
 
-    const strip = await screen.findByRole('img', { name: /^Route strip, 3 systems/ });
-    expect(strip).toHaveAccessibleName(
-      'Route strip, 3 systems from Jita to Uedama. Key systems: Jita 0.9, Uedama 0.5, Gank Chokepoint.'
-    );
+    expect(
+      await screen.findByRole('img', {
+        name: 'Route strip, 3 systems from Jita to Uedama. Key systems: Jita 0.9, Uedama 0.5, Gank Chokepoint. Kills in the last hour in: Uedama.',
+      })
+    ).toBeInTheDocument();
     expect(screen.getAllByTestId('route-strip-cell')).toHaveLength(3);
   });
 

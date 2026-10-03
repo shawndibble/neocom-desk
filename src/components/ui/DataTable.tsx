@@ -1341,7 +1341,12 @@ export function DataTable<T>({
                         onClick={() =>
                           setGroupExpanded((previous) => ({ ...previous, [key]: !expanded }))
                         }
-                        className="flex min-h-12 w-full items-center gap-2 px-3 py-2 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+                        className={cx(
+                          'flex min-h-12 w-full items-center gap-2 px-3 py-2 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                          // Off a phone an all-widths fold sits among table
+                          // rows, so it takes their height, not a card's.
+                          groupBy?.allWidths && 'sm:min-h-0'
+                        )}
                       >
                         <span className="min-w-0 flex-1">{groupBy?.renderHeader(memberRows)}</span>
                         <Chevron

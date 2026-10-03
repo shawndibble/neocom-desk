@@ -170,9 +170,11 @@ export function RouteSystemsTable({
   // Which fold each folded system sits in. A route never repeats a system,
   // so the system id is enough; the fold is named after its first system.
   const foldKey = new Map<number, string>();
+  const lowestOf = new Map<string, number>();
   for (const stretch of stretches) {
     if (stretch.kind !== 'quiet') continue;
     const key = `quiet:${stretch.rows[0]?.systemId}`;
+    lowestOf.set(key, stretch.lowestSecurity);
     for (const row of stretch.rows) foldKey.set(row.systemId, key);
   }
 
@@ -182,14 +184,14 @@ export function RouteSystemsTable({
     renderHeader: (members) => {
       const first = members[0];
       const last = members[members.length - 1];
-      const securities = members.flatMap((m) => (m.security === null ? [] : [m.security]));
+      const lowest = first ? lowestOf.get(foldKey.get(first.systemId) ?? '') : undefined;
       return (
         <span className="block text-text-dim sm:truncate">
           {t('travel.fold', {
             count: members.length,
             from: first ? routeSystemName(first) : '',
             to: last ? routeSystemName(last) : '',
-            security: securities.length === 0 ? DASH : Math.min(...securities).toFixed(1),
+            security: lowest === undefined ? DASH : lowest.toFixed(1),
           })}
         </span>
       );

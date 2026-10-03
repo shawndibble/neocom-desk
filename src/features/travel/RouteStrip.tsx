@@ -52,18 +52,24 @@ export function RouteStrip({
           security: securityText(row),
         })
       : t('travel.strip.system', { name: routeSystemName(row), security: securityText(row) });
-  const label = t('travel.strip.label', {
-    count: rows.length,
-    from: routeSystemName(first),
-    to: routeSystemName(last),
-    keys: keys.map(describe).join(', '),
-  });
+  const withKills = rows.filter((row) => hasKills(row, killsOf(row.systemId)));
+  const label = [
+    t('travel.strip.label', {
+      count: rows.length,
+      from: routeSystemName(first),
+      to: routeSystemName(last),
+      keys: keys.map(describe).join(', '),
+    }),
+    ...(withKills.length === 0
+      ? []
+      : [t('travel.strip.killsIn', { names: withKills.map(routeSystemName).join(', ') })]),
+  ].join(' ');
 
   return (
     <div>
       <div role="img" aria-label={label} className="flex h-4 gap-px pt-1">
         {rows.map((row) => {
-          const kills = hasKills(row, killsOf(row.systemId));
+          const kills = withKills.includes(row);
           const tip = [describe(row), ...(kills ? [t('travel.strip.kills')] : [])].join('\n');
           return (
             <Tooltip key={row.systemId} content={tip}>
@@ -97,7 +103,10 @@ export function RouteStrip({
       >
         {keys.map((row) => (
           <li key={row.systemId} className="inline-flex min-w-0 items-center gap-1">
-            <span className={`truncate ${row.chokepoint ? 'text-warning' : ''}`}>
+            {/* The strip's own top line, so a chokepoint is never colour alone. */}
+            <span
+              className={`truncate ${row.chokepoint ? 'border-t-2 border-warning text-warning' : ''}`}
+            >
               {routeSystemName(row)}
             </span>
             {row.security !== null && <SecurityStatus security={row.security} />}

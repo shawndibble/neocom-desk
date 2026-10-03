@@ -7317,7 +7317,8 @@
       "label_other": "Route strip, {{count}} systems from {{from}} to {{to}}. Key systems: {{keys}}.",
       "system": "{{name}} {{security}}",
       "systemChokepoint": "{{name}} {{security}}, Gank Chokepoint",
-      "kills": "Kills in the last hour"
+      "kills": "Kills in the last hour",
+      "killsIn": "Kills in the last hour in: {{names}}."
     },
     "rules": {
       "title": "Route rules",

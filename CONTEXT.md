@@ -472,6 +472,16 @@ here — they go one per file in `docs/context/decisions/`.
   tagged when an Interdictor/HIC (nullsec) or a smartbomb was on the mail.
   States conditions, never a verdict: no system or route is ever called safe
   or not. A figure ESI or zKillboard could not supply is unknown, never zero.
+- **Route strip**: Route Safety's one-glance picture of a route — one cell per
+  system, coloured by security, a line over each **Gank Chokepoint** and a
+  mark on each system with kills in the last hour, with the ends, the lowest
+  security and the chokepoints written out under it.
+- **Quiet stretch**: a run of two or more consecutive middle systems on a
+  route (or a leg) that Route Safety folds into one row: ESI reported zero
+  ship and pod kills, zKillboard zero kills, none is a **Gank Chokepoint**,
+  and none is in J-space. A figure still loading or unavailable never counts
+  as zero, so such a system never folds. Named for the figures, never a
+  verdict on the systems.
 - **Pilot Lookup**: Travel's view of one pilot, found by name — portrait,
   corporation, alliance and character age from public ESI, and the all-time
   kills, losses, ISK, solo kills, danger and gang ratios and most-used hulls
