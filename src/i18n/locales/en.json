@@ -906,6 +906,9 @@
         "align": "Align time",
         "capacitor": "Capacitor",
         "lockRange": "Lock range",
+        "optimal": "Optimal range",
+        "falloff": "Falloff",
+        "tracking": "Tracking",
         "miningYield": "Mining yield",
         "hold": "Hold space",
         "remoteRepair": "Remote repair",
@@ -918,6 +921,9 @@
         "coreFuel": "Core fuel"
       },
       "role": {
+        "optimal": "Optimal range {{before}} → {{after}} km",
+        "falloff": "Falloff {{before}} → {{after}} km",
+        "tracking": "Tracking {{before}} → {{after}}",
         "miningYield": "Mining yield {{before}} → {{after}} m³/h",
         "hold": "Hold space {{before}} → {{after}} m³",
         "remoteRepair": "Remote repair {{before}} → {{after}} HP/s",

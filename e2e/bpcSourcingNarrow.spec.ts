@@ -32,6 +32,12 @@ import { signInAndGoto } from './support/authSeed';
 import type { Page } from '@playwright/test';
 
 const PHONE = { width: 390, height: 844 };
+/**
+ * The first assertion after `goto`: a cold dev server on a CI runner was seen
+ * taking ~6s just to serve the Industry route's module graph, past
+ * Playwright's default 5s, with the page still on its route spinner.
+ */
+const COLD_LOAD = { timeout: 15_000 };
 const DESKTOP = { width: 1280, height: 800 };
 
 /** Rifter Blueprint — a real blueprint typeId out of `public/data/blueprints.json`. */
@@ -138,7 +144,7 @@ async function refuseSyncBackend(page: Page): Promise<void> {
 async function priceWrapperAlignItems(page: Page): Promise<string> {
   const table = page.getByRole('table', { name: 'BPC Sourcing' });
   const priceCell = table.locator('tbody tr').first().locator('td[data-label="Price"]');
-  await expect(priceCell).toContainText('Whole contract');
+  await expect(priceCell).toContainText('Whole contract', COLD_LOAD);
   return priceCell.evaluate((cell) => {
     const wrapper = cell.querySelector(':scope > span');
     if (!wrapper) throw new Error('Price cell has no wrapper span');
@@ -185,7 +191,7 @@ test.describe('BPC Sourcing — multi-type price cell alignment', () => {
 
     const table = page.getByRole('table', { name: 'BPC Sourcing' });
     const priceCell = table.locator('tbody tr').first().locator('td[data-label="Price"]');
-    await expect(priceCell).toBeVisible();
+    await expect(priceCell).toBeVisible(COLD_LOAD);
     await expect(priceCell).not.toContainText('Whole contract');
     // `IskAmount` renders its own direct-child `<span>` (the long-press
     // reveal target) — a non-multi-type row still has one of those, so the
@@ -223,7 +229,7 @@ test.describe('BPC Sourcing — cheapest-per-run chip (issue #1782)', () => {
     // chips must disagree, which is the bug this ticket fixes.
     const cheapestChip = page.getByText('Cheapest', { exact: true }).locator('..');
     const perRunChip = page.getByText('Cheapest per run', { exact: true }).locator('..');
-    await expect(cheapestChip).toContainText('6M');
+    await expect(cheapestChip).toContainText('6M', COLD_LOAD);
     await expect(perRunChip).toContainText('950K');
 
     // Same wrapping strip as the existing chips (`StatChip`'s fixed height +

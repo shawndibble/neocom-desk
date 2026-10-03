@@ -144,7 +144,37 @@ describe('gainMetrics', () => {
     expect(metrics.dps).toBeCloseTo(0.1);
     expect(metrics.align).toBeCloseTo(0.1);
     expect(metrics.ehp).toBe(0);
-    expect(metrics.overall).toBeCloseTo(0.2);
+    // Align counts half towards overall: damage and tank come first.
+    expect(metrics.overall).toBeCloseTo(0.15);
+  });
+
+  it('weighs overall: damage and tank whole, mobility and reach half, cap time a quarter', () => {
+    const unstable = withStats({ capacitor: { stable: false, depletesInSeconds: 200 } });
+    const sooner = withStats({
+      capacitor: { stable: false, depletesInSeconds: 180 },
+      offense: { ...baseStats.offense, dps: 105 },
+    });
+    // Rapid Firing: +5% DPS outweighs running dry 10% sooner.
+    const metrics = gainMetrics(unstable, sooner);
+    expect(metrics.capacitor).toBeCloseTo(-0.1);
+    expect(metrics.overall).toBeCloseTo(0.05 - 0.025);
+    // Each metric itself stays unweighted, so ranking by one stat is unchanged.
+    expect(metrics.dps).toBeCloseTo(0.05);
+  });
+
+  it('counts every metric whole on a fit that fires nothing: a hauler lives by its align time', () => {
+    const hauler = withStats({ offense: { ...baseStats.offense, dps: 0 }, droneDps: 0 });
+    const nimbler = withStats({
+      ...hauler,
+      navigation: { ...baseStats.navigation, agility: 3.6 },
+    });
+    expect(gainMetrics(hauler, nimbler).overall).toBeCloseTo(0.1);
+  });
+
+  it('counts the capacitor turning stable, or unstable, in full', () => {
+    const unstable = withStats({ capacitor: { stable: false, depletesInSeconds: 120 } });
+    expect(gainMetrics(unstable, baseStats).overall).toBe(1);
+    expect(gainMetrics(baseStats, unstable).overall).toBe(-1);
   });
 
   it('scores active tank from all three repairs, and a new rep from zero as a whole gain', () => {
@@ -206,6 +236,83 @@ describe('gainMetrics — non-combat roles', () => {
     const farther = withStats({ jumpDrive: { ...drive, rangeLightYears: 6 } });
     expect(gainMetrics(jumper, farther).jumpRange).toBeCloseTo(0.2);
     expect(gainMetrics(baseStats, baseStats).jumpRange).toBe(0);
+  });
+});
+
+describe('gainMetrics — weapon reach', () => {
+  function turret(optimal: number, falloff: number, tracking: number) {
+    return {
+      kind: 'turret' as const,
+      dps: 400,
+      optimal,
+      falloff,
+      tracking,
+      optimalSigRadius: 400,
+    };
+  }
+  function railgunFit(optimal: number, falloff: number, tracking: number): FittingStats {
+    return withStats({
+      applied: {
+        droneControlRange: 60000,
+        weapons: [
+          turret(optimal, falloff, tracking),
+          // A drone's reach is not the guns': never compared.
+          {
+            kind: 'drone',
+            dps: 100,
+            speed: 3000,
+            optimal: 0,
+            falloff: 0,
+            tracking: 3,
+            optimalSigRadius: 0,
+          },
+        ],
+      },
+    });
+  }
+  const rails = railgunFit(100000, 30000, 2);
+
+  it('scores optimal range, falloff and tracking (Sharpshooter, Trajectory Analysis, Motion Prediction)', () => {
+    expect(gainMetrics(rails, railgunFit(105000, 30000, 2)).optimal).toBeCloseTo(0.05);
+    expect(gainMetrics(rails, railgunFit(100000, 33000, 2)).falloff).toBeCloseTo(0.1);
+    expect(gainMetrics(rails, railgunFit(100000, 30000, 2.1)).tracking).toBeCloseTo(0.05);
+  });
+
+  it('counts reach half towards overall', () => {
+    expect(gainMetrics(rails, railgunFit(105000, 30000, 2)).overall).toBeCloseTo(0.025);
+  });
+
+  it('lists each as a change, range in km', () => {
+    expect(roleChanges(rails, railgunFit(105000, 33000, 2.1))).toEqual([
+      { key: 'optimal', before: 100, after: 105 },
+      { key: 'falloff', before: 30, after: 33 },
+      { key: 'tracking', before: 2, after: 2.1 },
+    ]);
+  });
+
+  it("takes a missile's flight range as its optimal", () => {
+    const launcher = (range: number) =>
+      withStats({
+        applied: {
+          droneControlRange: 0,
+          weapons: [
+            {
+              kind: 'missile',
+              dps: 300,
+              range,
+              explosionRadius: 100,
+              explosionVelocity: 100,
+              damageReductionFactor: 0.5,
+            },
+          ],
+        },
+      });
+    expect(gainMetrics(launcher(50000), launcher(55000)).optimal).toBeCloseTo(0.1);
+  });
+
+  it('is zero on a fit with no guns or launchers', () => {
+    const metrics = gainMetrics(baseStats, baseStats);
+    expect([metrics.optimal, metrics.falloff, metrics.tracking]).toEqual([0, 0, 0]);
   });
 });
 
@@ -449,6 +556,9 @@ describe('rankSkillGains', () => {
         align: 0,
         capacitor: 0,
         lockRange: 0,
+        optimal: 0,
+        falloff: 0,
+        tracking: 0,
         miningYield: 0,
         hold: 0,
         remoteRepair: 0,
