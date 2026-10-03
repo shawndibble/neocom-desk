@@ -676,6 +676,38 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
     expect(screen.getAllByTestId('route-strip-cell')).toHaveLength(3);
   });
 
+  it('sets in-game waypoints only up to the hole entrance', async () => {
+    const user = userEvent.setup();
+    loadSolarSystemJumps.mockResolvedValue({
+      ...LONG_WAY,
+      [PERIMETER]: [JITA],
+      [JITA]: [PERIMETER, NIYABAINEN],
+    });
+    await db.tokens.update(CHAR_ID, {
+      scopes: ['esi-location.read_location.v1', 'esi-ui.write_waypoint.v1'],
+    });
+    const sent: string[] = [];
+    server.use(
+      http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json(HOLES)),
+      http.post(`${ESI}/ui/autopilot/waypoint`, ({ request }) => {
+        sent.push(new URL(request.url).searchParams.get('destination_id') ?? '');
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    visit(`?from=${PERIMETER}&to=${UEDAMA}&wh=1`);
+
+    expect(await screen.findAllByTestId('route-strip-hole')).toHaveLength(2);
+    const button = await screen.findByRole('button', { name: 'Set waypoints in game' });
+    await waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+    expect(
+      await screen.findByText(
+        /Waypoints set to Jita\. Take the wormhole there, then set the rest from Thera\./
+      )
+    ).toBeInTheDocument();
+    expect(sent).toEqual([String(JITA)]);
+  });
+
   it('skips holes the ship does not fit, and flies the gates', async () => {
     server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json(HOLES)));
     visit(`?from=${JITA}&to=${UEDAMA}&wh=1&whsize=large`);
