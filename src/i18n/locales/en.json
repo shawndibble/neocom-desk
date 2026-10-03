@@ -1496,8 +1496,7 @@
       "turnInUnbuyable_one": "need {{count}}× {{name}}, nobody sells it",
       "turnInUnbuyable_other": "need {{count}}× {{name}}, nobody sells it",
       "turnInToBuy_one": "buy {{count}}× {{name}} ({{isk}} ISK, included)",
-      "turnInToBuy_other": "buy {{count}}× {{name}} ({{isk}} ISK, included)",
-      "lpBalanceUnknown": "LP balance unknown"
+      "turnInToBuy_other": "buy {{count}}× {{name}} ({{isk}} ISK, included)"
     }
   },
   "skills": {

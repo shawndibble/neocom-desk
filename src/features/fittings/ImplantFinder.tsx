@@ -838,7 +838,7 @@ function SourceLine({ source, hubName }: { source: Source; hubName: (id: string)
       })
     );
   }
-  if (!source.balanceKnown) status.push(t('fittings.implantFinder.lpBalanceUnknown'));
+  // An unreadable LP balance is said once, in the toolbar — not on every offer.
   return (
     <>
       <Trans
