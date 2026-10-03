@@ -9,11 +9,17 @@
  * From, To and the Route Preference live in the URL so a route can be shared.
  * The preference is never persisted (`features/route/routePreferences.ts`).
  * From falls back to the Current System when the link does not name one.
+ *
+ * Planner layout (issue #2472): a left column with the Route rules panel —
+ * the Route Preference for this route, and the pilot's Travel Settings edited
+ * in place — and the route on the right. Every middle row can Avoid its
+ * system, previewing the new route before it saves.
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import {
+  Button,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -25,15 +31,17 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import type { RouteSafetyRow, RouteSafetySummary } from '@/engine/route/routeSafety';
+import { useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { useCurrentSystem } from '@/features/route/currentSystem';
 import { ROUTE_PREFERENCES } from '@/features/route/routePreferences';
-import { useRouteQuery } from '@/features/route/routeRules';
+import { useAvoidedSystemsEnabled, useRouteQuery } from '@/features/route/routeRules';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { useSystemName } from '@/features/route/useSolarSystems';
 import { optionalEnumParam, optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
-import { PreferenceField } from './PreferenceField';
+import { AvoidSystemDialog, type AvoidTarget } from './AvoidSystemDialog';
 import { RecentKillsCell } from './RecentKillsCell';
+import { RouteRulesPanel } from './RouteRulesPanel';
 import { useRouteKills, type RouteKillsCell } from './useRouteKills';
 import { useRouteSafety } from './useRouteSafety';
 
@@ -46,12 +54,19 @@ const ROUTE_PARAMS = {
 
 const DASH = '—';
 
+/** A system the snapshot cannot name still needs one to act on. */
+function systemName(row: RouteSafetyRow): string {
+  return row.name ?? `#${row.systemId}`;
+}
+
 function count(value: number | null): string {
   return value === null ? DASH : value.toLocaleString();
 }
 
 function useColumns(
-  killsOf: (systemId: number) => RouteKillsCell
+  killsOf: (systemId: number) => RouteKillsCell,
+  /** `null` for a row with nothing to offer: either end, or a system already avoided. */
+  avoidAction: (row: RouteSafetyRow) => (() => void) | null
 ): DataTableColumn<RouteSafetyRow>[] {
   const { t } = useTranslation();
   return [
@@ -120,6 +135,22 @@ function useColumns(
       header: t('travel.col.recentKills'),
       render: (row) => <RecentKillsCell systemId={row.systemId} cell={killsOf(row.systemId)} />,
     },
+    {
+      id: 'avoid',
+      header: t('travel.col.avoid'),
+      headerClassName: 'sr-only',
+      align: 'right',
+      cardCorner: true,
+      render: (row) => {
+        const onAvoid = avoidAction(row);
+        const name = systemName(row);
+        return onAvoid === null ? null : (
+          <Button size="sm" onClick={onAvoid} aria-label={t('travel.avoid.actionLabel', { name })}>
+            {t('travel.avoid.action')}
+          </Button>
+        );
+      },
+    },
   ];
 }
 
@@ -173,7 +204,17 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
       ? state.rows.map((row) => ({ systemId: row.systemId, band: row.band }))
       : null
   );
-  const columns = useColumns(killsOf);
+  const avoided = useAvoidedSystems((s) => s.value);
+  const avoidedEnabled = useAvoidedSystemsEnabled((s) => s.value);
+  const [avoidTarget, setAvoidTarget] = useState<AvoidTarget | null>(null);
+  // The route's own ends cannot be avoided; a system already on an active list has nothing to add.
+  const columns = useColumns(killsOf, (row) =>
+    row.systemId === fromId ||
+    row.systemId === params.to ||
+    (avoidedEnabled && avoided.includes(row.systemId))
+      ? null
+      : () => setAvoidTarget({ systemId: row.systemId, name: systemName(row) })
+  );
 
   const fromTrigger =
     fromId === null
@@ -193,33 +234,50 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
         }
       />
       {tabBar}
-      <Panel>
-        <div className="flex flex-wrap items-end gap-3">
-          <FilterField label={t('travel.fromLabel')} stretch={false}>
-            <SolarSystemPicker
-              value={fromId}
-              onChange={(systemId) => setParams({ from: systemId }, { push: true })}
-              ariaLabel={t('travel.changeFrom', { current: fromTrigger })}
-              triggerLabel={fromTrigger}
-            />
-          </FilterField>
-          <FilterField label={t('travel.toLabel')} stretch={false}>
-            <SolarSystemPicker
-              value={params.to}
-              onChange={(systemId) => setParams({ to: systemId }, { push: true })}
-              ariaLabel={t('travel.changeTo', {
-                current: params.to === null ? t('travel.pickSystem') : (toName ?? '…'),
-              })}
-              placeholder={t('travel.pickSystem')}
-            />
-          </FilterField>
-          <PreferenceField
-            value={routeQuery.rules.preference}
-            onChange={(pref) => setParams({ pref })}
+      <div className="grid items-start gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+        {/* A stack, so a panel can sit above Route rules in the same column. */}
+        <div className="space-y-4">
+          <RouteRulesPanel
+            preference={routeQuery.rules.preference}
+            onPreferenceChange={(pref) => setParams({ pref })}
           />
         </div>
-      </Panel>
-      <RouteBody state={state} columns={columns} />
+        <div className="min-w-0 space-y-4">
+          <Panel>
+            <div className="flex flex-wrap items-end gap-3">
+              <FilterField label={t('travel.fromLabel')} stretch={false}>
+                <SolarSystemPicker
+                  value={fromId}
+                  onChange={(systemId) => setParams({ from: systemId }, { push: true })}
+                  ariaLabel={t('travel.changeFrom', { current: fromTrigger })}
+                  triggerLabel={fromTrigger}
+                />
+              </FilterField>
+              <FilterField label={t('travel.toLabel')} stretch={false}>
+                <SolarSystemPicker
+                  value={params.to}
+                  onChange={(systemId) => setParams({ to: systemId }, { push: true })}
+                  ariaLabel={t('travel.changeTo', {
+                    current: params.to === null ? t('travel.pickSystem') : (toName ?? '…'),
+                  })}
+                  placeholder={t('travel.pickSystem')}
+                />
+              </FilterField>
+            </div>
+          </Panel>
+          <RouteBody state={state} columns={columns} />
+        </div>
+      </div>
+      {state.kind === 'route' && fromId !== null && params.to !== null && (
+        <AvoidSystemDialog
+          target={avoidTarget}
+          fromId={fromId}
+          toId={params.to}
+          rules={routeQuery.rules}
+          currentJumps={state.summary.jumps}
+          onClose={() => setAvoidTarget(null)}
+        />
+      )}
     </div>
   );
 }
