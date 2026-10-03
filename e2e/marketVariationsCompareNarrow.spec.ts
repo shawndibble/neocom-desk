@@ -23,7 +23,7 @@
  * `SkillCompare` precedent ever exercised, which is the ticket's hostile-review
  * objection.
  */
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
@@ -65,6 +65,25 @@ async function stubEveryType(page: Page) {
         ],
       }),
     });
+  });
+}
+
+/**
+ * How many distinct sideways scroll containers hold the drawer's tables —
+ * one means every category scrolls together, so scrolling Fitting to column
+ * 12 can't leave Capacitor on column 1.
+ */
+async function scrollerCount(drawer: Locator) {
+  return drawer.getByRole('table').evaluateAll((tables) => {
+    const found = new Set<Element>();
+    for (const table of tables) {
+      let node = table.parentElement;
+      while (node && !['auto', 'scroll'].includes(getComputedStyle(node).overflowX)) {
+        node = node.parentElement;
+      }
+      if (node) found.add(node);
+    }
+    return found.size;
   });
 }
 
@@ -110,18 +129,7 @@ test('Variations compare is a full-screen matrix at 390px, scrolling sideways un
   // Eighteen-odd variants can't fit 390px, so the matrix scrolls sideways —
   // in one scroller, with the attribute names pinned at its left edge.
   const attribute = fitting.getByRole('cell').first();
-  const scroller = await drawer.getByRole('table').evaluateAll((tables) => {
-    const found = new Set<Element>();
-    for (const table of tables) {
-      let node = table.parentElement;
-      while (node && !['auto', 'scroll'].includes(getComputedStyle(node).overflowX)) {
-        node = node.parentElement;
-      }
-      if (node) found.add(node);
-    }
-    return found.size;
-  });
-  expect(scroller).toBe(1);
+  expect(await scrollerCount(drawer)).toBe(1);
   // Columns keep their set widths rather than being squeezed to the screen
   // (DataTable's own `w-full` once won, crushing every column to a letter):
   // the attribute column lines up with the one header row's corner cell.
@@ -189,16 +197,5 @@ test('Variations compare keeps real item columns above sm (1280px)', async ({ pa
   // Every category scrolls together: one scroll container for the whole
   // matrix, not one per table, or scrolling Fitting to column 12 would leave
   // Capacitor on column 1.
-  const scrollers = await drawer.getByRole('table').evaluateAll((tables) => {
-    const found = new Set<Element>();
-    for (const table of tables) {
-      let node = table.parentElement;
-      while (node && !['auto', 'scroll'].includes(getComputedStyle(node).overflowX)) {
-        node = node.parentElement;
-      }
-      if (node) found.add(node);
-    }
-    return found.size;
-  });
-  expect(scrollers).toBe(1);
+  expect(await scrollerCount(drawer)).toBe(1);
 });

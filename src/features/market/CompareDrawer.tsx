@@ -190,9 +190,24 @@ export function CompareDrawer({
   });
   const attributesExport = useCompareAttributesExport(rows, attributes.data);
 
-  function close() {
-    setMode('closed');
+  // One header row on a phone: Clear all joins the export's overflow menu
+  // instead of a button of its own that would wrap the header.
+  const clearAllMenuItem = narrow ? (
+    <MenuItem onSelect={clearSet}>{t('market.compare.clearAll')}</MenuItem>
+  ) : undefined;
+
+  // The handle is `inert` under a full-screen sheet, so it can only take
+  // focus back once the closed state has rendered.
+  const focusHandleOnClose = useRef(false);
+  useEffect(() => {
+    if (mode !== 'closed' || !focusHandleOnClose.current) return;
+    focusHandleOnClose.current = false;
     handleRef.current?.focus();
+  }, [mode]);
+
+  function close() {
+    focusHandleOnClose.current = true;
+    setMode('closed');
   }
 
   function startDrag(event: ReactPointerEvent<HTMLDivElement>) {
@@ -363,6 +378,9 @@ export function CompareDrawer({
       <button
         ref={handleRef}
         type="button"
+        // Covered by the full-screen sheet: out of the tab order rather than
+        // a focus stop the reader can't see.
+        inert={fullScreen}
         aria-expanded={mode !== 'closed'}
         aria-controls={DRAWER_ID}
         onClick={() => setMode((m) => (m === 'closed' ? 'open' : 'closed'))}
@@ -428,39 +446,22 @@ export function CompareDrawer({
               )}
             </div>
             <div className="flex items-center gap-2">
-              {narrow ? (
-                // One header row on a phone: Clear all and the export
-                // share one overflow menu instead of wrapping the header.
-                view === 'attributes' && attributes.data ? (
+              {view === 'prices' ? (
+                <TableActionsMenu name={t('market.compare.viewPrices')} tableExport={pricesExport}>
+                  {clearAllMenuItem}
+                </TableActionsMenu>
+              ) : (
+                attributes.data && (
                   <TableActionsMenu
                     name={t('market.compare.viewAttributes')}
                     tableExport={attributesExport}
                   >
-                    <MenuItem onSelect={clearSet}>{t('market.compare.clearAll')}</MenuItem>
-                  </TableActionsMenu>
-                ) : (
-                  <TableActionsMenu
-                    name={t('market.compare.viewPrices')}
-                    tableExport={pricesExport}
-                  >
-                    <MenuItem onSelect={clearSet}>{t('market.compare.clearAll')}</MenuItem>
+                    {clearAllMenuItem}
                   </TableActionsMenu>
                 )
-              ) : (
+              )}
+              {!narrow && (
                 <>
-                  {view === 'prices' ? (
-                    <TableActionsMenu
-                      name={t('market.compare.viewPrices')}
-                      tableExport={pricesExport}
-                    />
-                  ) : (
-                    attributes.data && (
-                      <TableActionsMenu
-                        name={t('market.compare.viewAttributes')}
-                        tableExport={attributesExport}
-                      />
-                    )
-                  )}
                   <Button
                     size="sm"
                     onClick={() => setMode((m) => (m === 'full' ? 'open' : 'full'))}

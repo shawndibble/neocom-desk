@@ -4,9 +4,12 @@
  * views, Prices rows and the Attributes column headers alike.
  *
  * The badge is drawn small (so it reads as belonging to the icon, not as a
- * toolbar button) but its hit area is padded out by an `after:` box to the
- * 44px touch floor, since a phone has no hover to reveal it and no other way
- * to remove a single item. Always visible, for the same reason.
+ * toolbar button) but below `md` its hit area is padded out by an `after:`
+ * box toward the touch floor (DESIGN.md §3's touch tier), since a phone has
+ * no hover to reveal it and no other way to remove a single item. That box
+ * grows sideways and down, barely up: reaching up would cover the row above
+ * and remove the wrong item. Pointer widths get only a few px of slop.
+ * Always visible, for the same no-hover reason.
  */
 import { useTranslation } from 'react-i18next';
 import { TypeIcon } from '@/components/ui';
@@ -42,7 +45,7 @@ export function RemovableTypeIcon({
           event.stopPropagation();
           onRemove(typeId);
         }}
-        className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full border border-line-bright bg-panel-2 text-text after:absolute after:-inset-3.5 after:content-[''] hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-accent"
+        className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full border border-line-bright bg-panel-2 text-text after:absolute after:-inset-x-3.5 after:-top-0.5 after:-bottom-5 after:content-[''] md:after:-inset-1 hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-accent"
       >
         <Icon.Close size="0.625rem" aria-hidden="true" />
       </button>
