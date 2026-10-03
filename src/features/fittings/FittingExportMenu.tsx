@@ -42,14 +42,8 @@ export function FittingExportItems({
       <DropdownMenuItem onSelect={() => void copyShareLink()}>
         {t('fittings.export.shareLink')}
       </DropdownMenuItem>
-      <DropdownMenuItem onSelect={() => void copy('permanentLink')}>
-        {t('fittings.export.permanentLink')}
-      </DropdownMenuItem>
       <DropdownMenuItem onSelect={() => void copy('eft')}>
         {t('fittings.export.eft')}
-      </DropdownMenuItem>
-      <DropdownMenuItem onSelect={() => void copy('chatLink')}>
-        {t('fittings.export.chatLink')}
       </DropdownMenuItem>
       <DropdownMenuItem onSelect={() => void copy('multibuy')}>
         {t('fittings.export.multibuy')}

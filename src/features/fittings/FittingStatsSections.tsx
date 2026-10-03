@@ -46,6 +46,7 @@ import {
   withSectionExpanded,
 } from './statsSectionsPreference';
 import { CapacitorFacts, TankFacts } from './FittingTankStats';
+import { capacitorTone, type CapacitorTone } from './capacitorTone';
 import { SupportFacts } from './FittingSupportStats';
 import { MiningFacts } from './FittingMiningStats';
 import { FleetBoostFacts } from './FittingFleetBoostStats';
@@ -82,6 +83,19 @@ const RESONANCE_KEY = {
   kinetic: 'kineticResonance',
   explosive: 'explosiveResonance',
 } as const satisfies Record<DamageType, keyof Resonances>;
+
+const CAPACITOR_TONE_CLASS = {
+  success: 'text-success',
+  warning: 'text-warning',
+  danger: 'text-danger',
+} as const satisfies Record<CapacitorTone, string>;
+
+const EHP_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 0 });
+
+/** Whole hit points, grouped: "64,745". */
+function formatEhp(ehp: number): string {
+  return EHP_FORMAT.format(ehp);
+}
 
 /** One resist, as the game draws it: the damage type's colour filling the share resisted. */
 function ResistCell({
@@ -185,7 +199,7 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
                   : t('fittings.stats.unheated', { value: row.unheated.ehp })
               }
             >
-              {row.ehp === undefined ? '' : row.ehp.toFixed(0)}
+              {row.ehp === undefined ? '' : formatEhp(row.ehp)}
               {row.unheated?.ehp !== undefined && (
                 <span className="sr-only">
                   {' '}
@@ -606,8 +620,8 @@ export function FittingStatsSections({
    * A figure off the stats as `format` shows it, in the warning tone under
    * "Overheat all" only where heat changed it; nothing until the stats are in.
    */
-  const figure = (format: (s: FittingStats) => string) =>
-    stats ? <HeatFigure stats={stats} format={format} /> : undefined;
+  const figure = (format: (s: FittingStats) => string, toneClassName?: string) =>
+    stats ? <HeatFigure stats={stats} format={format} toneClassName={toneClassName} /> : undefined;
 
   function section(id: Section, meta: ReactNode, body: ReactNode, warning?: string) {
     return (
@@ -650,7 +664,7 @@ export function FittingStatsSections({
         const was = unheatedIfChanged(s, (x) => resistPct(x[key][RESONANCE_KEY[type]]).toFixed(0));
         if (was !== null) unheated[type] = `${was}%`;
       }
-      const wasEhp = unheatedIfChanged(s, (x) => x[key].ehp.toFixed(0));
+      const wasEhp = unheatedIfChanged(s, (x) => formatEhp(x[key].ehp));
       if (wasEhp !== null) unheated.ehp = wasEhp;
       rows.push({
         key,
@@ -831,7 +845,7 @@ export function FittingStatsSections({
 
       {section(
         'defense',
-        figure((s) => t('fittings.stats.defenseEhp', { value: s.ehp.toFixed(0) })),
+        figure((s) => t('fittings.stats.defenseEhp', { value: formatEhp(s.ehp) })),
         <>
           <StatFields>
             <DamageProfilePicker damageProfiles={damageProfiles} field />
@@ -854,14 +868,16 @@ export function FittingStatsSections({
 
       {section(
         'capacitor',
-        figure((s) =>
-          s.capacitor.stable
-            ? t('fittings.stats.capacitorStable', {
-                pct: s.capacitor.stablePercentage.toFixed(0),
-              })
-            : t('fittings.stats.capacitorDepletes', {
-                seconds: s.capacitor.depletesInSeconds.toFixed(0),
-              })
+        figure(
+          (s) =>
+            s.capacitor.stable
+              ? t('fittings.stats.capacitorStable', {
+                  pct: s.capacitor.stablePercentage.toFixed(0),
+                })
+              : t('fittings.stats.capacitorDepletes', {
+                  seconds: s.capacitor.depletesInSeconds.toFixed(0),
+                }),
+          stats ? CAPACITOR_TONE_CLASS[capacitorTone(stats.capacitor)] : undefined
         ),
         stats ? <CapacitorFacts stats={stats} /> : placeholder
       )}
