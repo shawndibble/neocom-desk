@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import {
   Checkbox,
+  Field,
+  Fields,
   Panel,
   Select,
   SelectContent,
@@ -61,116 +63,119 @@ export function TravelSettingsPanel() {
     <div className="space-y-4">
       <Panel title={t('settings.travel.routeTitle')}>
         {hydrated ? (
-          <div className="max-w-md space-y-4">
-            <p className="text-xs text-text-dim">{t('settings.travel.hint')}</p>
+          <div className="space-y-4">
+            <p className="max-w-2xl text-xs text-text-dim">{t('settings.travel.hint')}</p>
 
-            <div className="space-y-1.5">
-              <label htmlFor="settings-route-preference" className="block text-xs font-semibold">
-                {t('settings.travel.preferenceLabel')}
-              </label>
-              <p className="text-xs text-text-dim">{t('settings.travel.preferenceHint')}</p>
-              <Select
-                value={preference}
-                onValueChange={(value) => void setPreference(value as RoutePreferenceKind)}
+            <Fields variant="form">
+              <Field
+                label={t('settings.travel.preferenceLabel')}
+                htmlFor="settings-route-preference"
+                note={t('settings.travel.preferenceHint')}
               >
-                <SelectTrigger
-                  id="settings-route-preference"
-                  aria-label={t('settings.travel.preferenceLabel')}
+                <Select
+                  value={preference}
+                  onValueChange={(value) => void setPreference(value as RoutePreferenceKind)}
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROUTE_PREFERENCES.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {t(ROUTE_PREFERENCE_LABEL_KEYS[option])}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                  <SelectTrigger
+                    id="settings-route-preference"
+                    aria-label={t('settings.travel.preferenceLabel')}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROUTE_PREFERENCES.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {t(ROUTE_PREFERENCE_LABEL_KEYS[option])}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
 
-            <div className="space-y-1.5 border-t border-line pt-3">
-              <label htmlFor="settings-security-penalty" className="block text-xs font-semibold">
-                {t('settings.travel.penaltyLabel')}
-              </label>
-              <p className="text-xs text-text-dim">
-                {preference === 'shortest'
-                  ? t('settings.travel.penaltyShorterHint')
-                  : t('settings.travel.penaltyHint')}
-              </p>
-              <TextInput
-                id="settings-security-penalty"
-                type="number"
-                min={MIN_SECURITY_PENALTY}
-                max={MAX_SECURITY_PENALTY}
-                step={1}
-                value={penalty}
-                disabled={preference === 'shortest'}
-                onChange={(event) => {
-                  const next = clampedInt(
-                    event.target.value,
-                    MIN_SECURITY_PENALTY,
-                    MAX_SECURITY_PENALTY
-                  );
-                  if (next !== null) void setPenalty(next);
-                }}
-              />
-            </div>
-
-            <div className="space-y-2 border-t border-line pt-3">
-              <p className="text-xs font-semibold">{t('settings.travel.avoidTitle')}</p>
-              <label className="flex items-center gap-2 text-xs">
-                <Checkbox
-                  checked={avoidEdencom}
-                  onChange={() => void setAvoidEdencom(!avoidEdencom)}
-                />
-                {t('settings.travel.avoidEdencom', { count: EDENCOM_SYSTEMS.length })}
-              </label>
-              <label className="flex items-center gap-2 text-xs">
-                <Checkbox
-                  checked={avoidTriglavian}
-                  onChange={() => void setAvoidTriglavian(!avoidTriglavian)}
-                />
-                {t('settings.travel.avoidTriglavian', {
-                  count: TRIGLAVIAN_MINOR_VICTORY_SYSTEMS.length,
-                })}
-              </label>
-              <label className="flex items-center gap-2 text-xs">
-                <Checkbox
-                  checked={avoidPodKills}
-                  onChange={() => void setAvoidPodKills(!avoidPodKills)}
-                />
-                {t('settings.travel.avoidPodKills')}
-              </label>
-              <div className="flex flex-wrap items-center gap-2 pl-6 text-xs">
-                <span>{t('settings.travel.podKillsAtLeast')}</span>
+              <Field
+                label={t('settings.travel.penaltyLabel')}
+                htmlFor="settings-security-penalty"
+                note={
+                  preference === 'shortest'
+                    ? t('settings.travel.penaltyShorterHint')
+                    : t('settings.travel.penaltyHint')
+                }
+              >
                 <TextInput
+                  id="settings-security-penalty"
                   type="number"
-                  className="w-16"
-                  min={MIN_POD_KILL_THRESHOLD}
-                  max={MAX_POD_KILL_THRESHOLD}
+                  min={MIN_SECURITY_PENALTY}
+                  max={MAX_SECURITY_PENALTY}
                   step={1}
-                  value={podKillThreshold}
-                  disabled={!avoidPodKills}
-                  aria-label={t('settings.travel.podKillThresholdLabel')}
+                  value={penalty}
+                  disabled={preference === 'shortest'}
                   onChange={(event) => {
                     const next = clampedInt(
                       event.target.value,
-                      MIN_POD_KILL_THRESHOLD,
-                      MAX_POD_KILL_THRESHOLD
+                      MIN_SECURITY_PENALTY,
+                      MAX_SECURITY_PENALTY
                     );
-                    if (next !== null) void setPodKillThreshold(next);
+                    if (next !== null) void setPenalty(next);
                   }}
+                  className="w-24"
                 />
-                <span>{t('settings.travel.podKillsSuffix', { count: podKillThreshold })}</span>
-              </div>
-              <p className="text-xs text-text-dim">{t('settings.travel.avoidHint')}</p>
-              {podKillsUnavailable && (
-                <p role="status" className="text-xs text-warning">
-                  {t('settings.travel.podKillsUnavailable')}
-                </p>
-              )}
-            </div>
+              </Field>
+
+              <Field label={t('settings.travel.avoidTitle')} note={t('settings.travel.avoidHint')}>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-xs">
+                    <Checkbox
+                      checked={avoidEdencom}
+                      onChange={() => void setAvoidEdencom(!avoidEdencom)}
+                    />
+                    {t('settings.travel.avoidEdencom', { count: EDENCOM_SYSTEMS.length })}
+                  </label>
+                  <label className="flex items-center gap-2 text-xs">
+                    <Checkbox
+                      checked={avoidTriglavian}
+                      onChange={() => void setAvoidTriglavian(!avoidTriglavian)}
+                    />
+                    {t('settings.travel.avoidTriglavian', {
+                      count: TRIGLAVIAN_MINOR_VICTORY_SYSTEMS.length,
+                    })}
+                  </label>
+                  <label className="flex items-center gap-2 text-xs">
+                    <Checkbox
+                      checked={avoidPodKills}
+                      onChange={() => void setAvoidPodKills(!avoidPodKills)}
+                    />
+                    {t('settings.travel.avoidPodKills')}
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2 pl-6 text-xs">
+                    <span>{t('settings.travel.podKillsAtLeast')}</span>
+                    <TextInput
+                      type="number"
+                      className="w-16"
+                      min={MIN_POD_KILL_THRESHOLD}
+                      max={MAX_POD_KILL_THRESHOLD}
+                      step={1}
+                      value={podKillThreshold}
+                      disabled={!avoidPodKills}
+                      aria-label={t('settings.travel.podKillThresholdLabel')}
+                      onChange={(event) => {
+                        const next = clampedInt(
+                          event.target.value,
+                          MIN_POD_KILL_THRESHOLD,
+                          MAX_POD_KILL_THRESHOLD
+                        );
+                        if (next !== null) void setPodKillThreshold(next);
+                      }}
+                    />
+                    <span>{t('settings.travel.podKillsSuffix', { count: podKillThreshold })}</span>
+                  </div>
+                  {podKillsUnavailable && (
+                    <p role="status" className="text-xs text-warning">
+                      {t('settings.travel.podKillsUnavailable')}
+                    </p>
+                  )}
+                </div>
+              </Field>
+            </Fields>
           </div>
         ) : (
           <Spinner />

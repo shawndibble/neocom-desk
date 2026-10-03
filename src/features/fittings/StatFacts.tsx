@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Field, Fields } from '@/components/ui';
 import { unheatedIfChanged } from '@/engine/fittings/stats';
 import { STAT_DETAIL, STAT_EYEBROW, statRowClassName } from './statKit';
 
@@ -128,44 +129,15 @@ export function StatRows({ children }: { children: ReactNode }) {
 
 /**
  * The pickers at the top of a section, as a two-column grid of `StatField`s:
- * labels in one column, controls lined up in the other.
+ * labels in one column, controls lined up in the other. The stats column's
+ * name for the shared `Fields` grid, in its `compact` look.
  */
 export function StatFields({ children }: { children: ReactNode }) {
-  return (
-    <div className="grid grid-cols-[max-content_minmax(0,1fr)] items-center gap-x-3 gap-y-2 text-xs">
-      {children}
-    </div>
-  );
+  return <Fields variant="compact">{children}</Fields>;
 }
 
-/**
- * One labelled control in a `StatFields` grid: the label in the left column,
- * the control (`STAT_FIELD_WIDTH` wide) and its own action in the right, so
- * stacked controls line up however long their labels or values. `note` reads
- * dim beneath the control; a `warning` label marks a setting moved off its
- * default.
- */
-export function StatField({
-  label,
-  tone,
-  note,
-  children,
-}: {
-  label: ReactNode;
-  tone?: 'warning';
-  note?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <>
-      <span className={tone === 'warning' ? 'text-warning' : 'text-text-dim'}>{label}</span>
-      <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>
-      {note !== undefined && note !== null && note !== false && (
-        <p className="col-start-2 -mt-1 text-[0.6875rem] text-text-dim">{note}</p>
-      )}
-    </>
-  );
-}
+/** One labelled control in a `StatFields` grid; see `Field`. */
+export const StatField = Field;
 
 export interface Fact {
   /** Tells two facts with the same label apart (two of one repairer); the label otherwise. */

@@ -33,6 +33,8 @@ import {
   TextInput,
   type DataTableColumn,
   Checkbox,
+  Field,
+  Fields,
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -352,24 +354,27 @@ function ExportPanel() {
 
   return (
     <Panel title={t('settings.backup.exportTitle')}>
-      <div className="max-w-md space-y-2">
+      <div className="space-y-2">
         <p className="text-xs text-text-dim">{t('settings.backup.exportHint')}</p>
         <p className="text-xs text-warning">{t('settings.backup.passwordWarning')}</p>
-        <TextInput
-          type="password"
-          autoComplete="new-password"
-          aria-label={t('settings.backup.passwordLabel')}
-          placeholder={t('settings.backup.passwordLabel')}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <Button
-          size="sm"
-          disabled={!canExport || status === 'exporting'}
-          onClick={() => void handleExport()}
-        >
-          {t('settings.backup.exportButton')}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <TextInput
+            type="password"
+            autoComplete="new-password"
+            aria-label={t('settings.backup.passwordLabel')}
+            placeholder={t('settings.backup.passwordLabel')}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="max-w-xs min-w-0 flex-1 basis-48"
+          />
+          <Button
+            size="sm"
+            disabled={!canExport || status === 'exporting'}
+            onClick={() => void handleExport()}
+          >
+            {t('settings.backup.exportButton')}
+          </Button>
+        </div>
         {status === 'done' && <ActionConfirmation message={t('settings.backup.exportDone')} />}
         {status === 'error' && (
           <p role="alert" className="text-xs text-danger">
@@ -420,7 +425,7 @@ function ImportPanel() {
 
   return (
     <Panel title={t('settings.backup.importTitle')}>
-      <div className="max-w-md space-y-2">
+      <div className="space-y-2">
         <p className="text-xs text-text-dim">{t('settings.backup.importHint')}</p>
         <input
           ref={fileInputRef}
@@ -438,21 +443,24 @@ function ImportPanel() {
             {file ? file.name : t('settings.backup.noFileChosen')}
           </span>
         </div>
-        <TextInput
-          type="password"
-          autoComplete="current-password"
-          aria-label={t('settings.backup.passwordLabel')}
-          placeholder={t('settings.backup.passwordLabel')}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <Button
-          size="sm"
-          disabled={!file || password.length === 0 || status === 'importing'}
-          onClick={() => void handleImport()}
-        >
-          {t('settings.backup.importButton')}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <TextInput
+            type="password"
+            autoComplete="current-password"
+            aria-label={t('settings.backup.passwordLabel')}
+            placeholder={t('settings.backup.passwordLabel')}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="max-w-xs min-w-0 flex-1 basis-48"
+          />
+          <Button
+            size="sm"
+            disabled={!file || password.length === 0 || status === 'importing'}
+            onClick={() => void handleImport()}
+          >
+            {t('settings.backup.importButton')}
+          </Button>
+        </div>
         {status === 'error' && (
           <p role="alert" className="text-xs text-danger">
             {t('settings.backup.importError')}
@@ -537,7 +545,13 @@ function ResetViewPreferences() {
   );
 }
 
-/** A labelled row of preset chips — the shape every threshold control here uses. */
+/** The line every synced-defaults panel opens with. */
+function DefaultsSyncHint() {
+  const { t } = useTranslation();
+  return <p className="max-w-2xl text-xs text-text-dim">{t('settings.defaultsSyncHint')}</p>;
+}
+
+/** A labelled row of preset chips — the shape every threshold control here uses; a `Fields` row. */
 function ChipRow<T extends string | number>({
   label,
   hint,
@@ -554,9 +568,7 @@ function ChipRow<T extends string | number>({
   labelFor: (value: T) => string;
 }) {
   return (
-    <div className="space-y-1.5">
-      <p className="text-xs font-semibold">{label}</p>
-      {hint && <p className="text-xs text-text-dim">{hint}</p>}
+    <Field label={label} note={hint}>
       <div role="group" aria-label={label} className="flex flex-wrap gap-2">
         {options.map((option) => (
           <FilterChip
@@ -567,7 +579,7 @@ function ChipRow<T extends string | number>({
           />
         ))}
       </div>
-    </div>
+    </Field>
   );
 }
 
@@ -719,64 +731,69 @@ function IndustryDefaultsPanel() {
 
   return (
     <Panel title={t('settings.industryDefaultsTitle')}>
-      <div className="max-w-md space-y-4">
-        <p className="text-xs text-text-dim">{t('settings.defaultsSyncHint')}</p>
+      <div className="space-y-4">
+        <DefaultsSyncHint />
+        <Fields variant="form">
+          <Field
+            label={t('settings.assumedMeLabel')}
+            htmlFor="settings-assumed-me"
+            note={t('settings.assumedMeHint')}
+          >
+            <TextInput
+              id="settings-assumed-me"
+              type="number"
+              min={MIN_ASSUMED_ME}
+              max={MAX_ASSUMED_ME}
+              step={1}
+              value={assumedMe}
+              onChange={(event) => {
+                const parsed = Math.round(Number(event.target.value));
+                if (!Number.isFinite(parsed)) return;
+                void setAssumedMe(Math.min(MAX_ASSUMED_ME, Math.max(MIN_ASSUMED_ME, parsed)));
+              }}
+              className="w-24"
+            />
+          </Field>
 
-        <div className="space-y-1.5 border-t border-line pt-3">
-          <label htmlFor="settings-assumed-me" className="block text-xs font-semibold">
-            {t('settings.assumedMeLabel')}
-          </label>
-          <p className="text-xs text-text-dim">{t('settings.assumedMeHint')}</p>
-          <TextInput
-            id="settings-assumed-me"
-            type="number"
-            min={MIN_ASSUMED_ME}
-            max={MAX_ASSUMED_ME}
-            step={1}
-            value={assumedMe}
-            onChange={(event) => {
-              const parsed = Math.round(Number(event.target.value));
-              if (!Number.isFinite(parsed)) return;
-              void setAssumedMe(Math.min(MAX_ASSUMED_ME, Math.max(MIN_ASSUMED_ME, parsed)));
-            }}
-          />
-        </div>
+          {/*
+            Beside its ME twin rather than merged with it: the two answer
+            different questions (material cost, job time), and TE's range is
+            0..20 where ME's is 0..10 (issue #634).
+          */}
+          <Field
+            label={t('settings.assumedTeLabel')}
+            htmlFor="settings-assumed-te"
+            note={t('settings.assumedTeHint')}
+          >
+            <TextInput
+              id="settings-assumed-te"
+              type="number"
+              min={MIN_ASSUMED_TE}
+              max={MAX_ASSUMED_TE}
+              step={1}
+              value={assumedTe}
+              onChange={(event) => {
+                const parsed = Math.round(Number(event.target.value));
+                if (!Number.isFinite(parsed)) return;
+                void setAssumedTe(Math.min(MAX_ASSUMED_TE, Math.max(MIN_ASSUMED_TE, parsed)));
+              }}
+              className="w-24"
+            />
+          </Field>
 
-        {/*
-          Beside its ME twin rather than merged with it: the two answer
-          different questions (material cost, job time), and TE's range is
-          0..20 where ME's is 0..10 (issue #634).
-        */}
-        <div className="space-y-1.5 border-t border-line pt-3">
-          <label htmlFor="settings-assumed-te" className="block text-xs font-semibold">
-            {t('settings.assumedTeLabel')}
-          </label>
-          <p className="text-xs text-text-dim">{t('settings.assumedTeHint')}</p>
-          <TextInput
-            id="settings-assumed-te"
-            type="number"
-            min={MIN_ASSUMED_TE}
-            max={MAX_ASSUMED_TE}
-            step={1}
-            value={assumedTe}
-            onChange={(event) => {
-              const parsed = Math.round(Number(event.target.value));
-              if (!Number.isFinite(parsed)) return;
-              void setAssumedTe(Math.min(MAX_ASSUMED_TE, Math.max(MIN_ASSUMED_TE, parsed)));
-            }}
-          />
-        </div>
-
-        <div className="space-y-1.5 border-t border-line pt-3">
-          <label className="flex items-center gap-2 text-xs font-semibold">
+          <Field
+            label={t('settings.includeBlueprintCostLabel')}
+            htmlFor="settings-include-blueprint-cost"
+            inline
+            note={t('settings.includeBlueprintCostHint')}
+          >
             <Checkbox
+              id="settings-include-blueprint-cost"
               checked={includeBlueprintCost}
               onChange={() => void setIncludeBlueprintCost(!includeBlueprintCost)}
             />
-            {t('settings.includeBlueprintCostLabel')}
-          </label>
-          <p className="text-xs text-text-dim">{t('settings.includeBlueprintCostHint')}</p>
-        </div>
+          </Field>
+        </Fields>
       </div>
     </Panel>
   );
@@ -792,7 +809,7 @@ function PiDefaultsPanel() {
   return (
     <Panel title={t('settings.piDefaultsTitle')}>
       {hydrated ? (
-        <div className="max-w-md space-y-4">
+        <Fields variant="form">
           <ChipRow
             label={t('settings.piExpiringLabel')}
             hint={t('settings.piExpiringHint')}
@@ -801,7 +818,7 @@ function PiDefaultsPanel() {
             onSelect={(hours) => void setExpiringHours(hours)}
             labelFor={(hours) => t('settings.hours', { count: hours })}
           />
-        </div>
+        </Fields>
       ) : (
         <Spinner />
       )}
@@ -828,50 +845,61 @@ function MarketDefaultsPanel() {
   return (
     <Panel title={t('settings.marketDefaultsTitle')}>
       {hydrated ? (
-        <div className="max-w-md space-y-4">
-          <p className="text-xs text-text-dim">{t('settings.defaultsSyncHint')}</p>
-          <div className="space-y-1.5">
-            <label htmlFor="settings-hub" className="block text-xs font-semibold">
-              {t('settings.tradeHubLabel')}
-            </label>
-            <p className="text-xs text-text-dim">{t('settings.tradeHubHint')}</p>
-            <Select value={hub} onValueChange={(value) => void setHub(value as TradeHub['id'])}>
-              <SelectTrigger id="settings-hub" aria-label={t('settings.tradeHubLabel')}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TRADE_HUBS.map((tradeHub) => (
-                  <SelectItem key={tradeHub.id} value={tradeHub.id}>
-                    {tradeHub.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="space-y-4">
+          <DefaultsSyncHint />
+          <Fields variant="form">
+            <Field
+              label={t('settings.tradeHubLabel')}
+              htmlFor="settings-hub"
+              note={t('settings.tradeHubHint')}
+            >
+              <Select value={hub} onValueChange={(value) => void setHub(value as TradeHub['id'])}>
+                <SelectTrigger id="settings-hub" aria-label={t('settings.tradeHubLabel')}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TRADE_HUBS.map((tradeHub) => (
+                    <SelectItem key={tradeHub.id} value={tradeHub.id}>
+                      {tradeHub.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
 
-          <ChipRow
-            label={t('settings.courierCollateralLabel')}
-            hint={t('settings.courierCollateralHint')}
-            options={COLLATERAL_RATIO_OPTIONS}
-            selected={collateralRatio}
-            onSelect={(ratio) => void setCollateralRatio(ratio)}
-            labelFor={(ratio) => t('settings.courierCollateralOption', { count: ratio })}
-          />
+            <ChipRow
+              label={t('settings.courierCollateralLabel')}
+              hint={t('settings.courierCollateralHint')}
+              options={COLLATERAL_RATIO_OPTIONS}
+              selected={collateralRatio}
+              onSelect={(ratio) => void setCollateralRatio(ratio)}
+              labelFor={(ratio) => t('settings.courierCollateralOption', { count: ratio })}
+            />
 
-          <div className="space-y-1.5 border-t border-line pt-3">
-            <label className="flex items-center gap-2 text-xs font-semibold">
+            <Field
+              label={t('settings.bpcHideAuctionsLabel')}
+              htmlFor="settings-bpc-hide-auctions"
+              inline
+            >
               <Checkbox
+                id="settings-bpc-hide-auctions"
                 checked={hideAuctions}
                 onChange={() => void setHideAuctions(!hideAuctions)}
               />
-              {t('settings.bpcHideAuctionsLabel')}
-            </label>
-            <label className="flex items-center gap-2 text-xs font-semibold">
-              <Checkbox checked={hidePlex} onChange={() => void setHidePlex(!hidePlex)} />
-              {t('settings.bpcHidePlexLabel')}
-            </label>
-            <p className="text-xs text-text-dim">{t('settings.bpcHideHint')}</p>
-          </div>
+            </Field>
+            <Field
+              label={t('settings.bpcHidePlexLabel')}
+              htmlFor="settings-bpc-hide-plex"
+              inline
+              note={t('settings.bpcHideHint')}
+            >
+              <Checkbox
+                id="settings-bpc-hide-plex"
+                checked={hidePlex}
+                onChange={() => void setHidePlex(!hidePlex)}
+              />
+            </Field>
+          </Fields>
         </div>
       ) : (
         <Spinner />
@@ -889,13 +917,22 @@ function MiningTaxDefaultsPanel() {
   return (
     <Panel title={t('settings.miningTaxDefaultsTitle')}>
       {hydrated ? (
-        <div className="max-w-md space-y-4">
-          <p className="text-xs text-text-dim">{t('settings.defaultsSyncHint')}</p>
-          <label className="flex items-center gap-2 text-xs font-semibold">
-            <Checkbox checked={oreValueMode} onChange={() => void setOreValueMode(!oreValueMode)} />
-            {t('settings.miningTaxOreValueModeLabel')}
-          </label>
-          <p className="text-xs text-text-dim">{t('settings.miningTaxOreValueModeHint')}</p>
+        <div className="space-y-4">
+          <DefaultsSyncHint />
+          <Fields variant="form">
+            <Field
+              label={t('settings.miningTaxOreValueModeLabel')}
+              htmlFor="settings-mining-tax-ore-value-mode"
+              inline
+              note={t('settings.miningTaxOreValueModeHint')}
+            >
+              <Checkbox
+                id="settings-mining-tax-ore-value-mode"
+                checked={oreValueMode}
+                onChange={() => void setOreValueMode(!oreValueMode)}
+              />
+            </Field>
+          </Fields>
         </div>
       ) : (
         <Spinner />
@@ -935,35 +972,40 @@ function CharacterDefaultsPanel() {
 
   return (
     <Panel title={t('settings.characterDefaultsTitle')}>
-      <div className="max-w-md space-y-4">
-        <p className="text-xs text-text-dim">{t('settings.defaultsSyncHint')}</p>
-        <div className="space-y-1.5">
-          <span className="block text-xs font-semibold">
-            {t('settings.defaultCharacterFilterLabel')}
-          </span>
-          <p className="text-xs text-text-dim">{t('settings.defaultCharacterFilterHint')}</p>
-          <CharacterFilterControl
-            activeCharacterId={activeCharacterId}
-            value={fromStoredCharacterFilterValue(defaultCharacterFilter)}
-            onChange={(next) => void setDefaultCharacterFilter(toStoredCharacterFilterValue(next))}
-          />
-        </div>
+      <div className="space-y-4">
+        <DefaultsSyncHint />
+        <Fields variant="form">
+          <Field
+            label={t('settings.defaultCharacterFilterLabel')}
+            note={t('settings.defaultCharacterFilterHint')}
+          >
+            <CharacterFilterControl
+              activeCharacterId={activeCharacterId}
+              value={fromStoredCharacterFilterValue(defaultCharacterFilter)}
+              onChange={(next) =>
+                void setDefaultCharacterFilter(toStoredCharacterFilterValue(next))
+              }
+            />
+          </Field>
 
-        <div className="space-y-1.5 border-t border-line pt-3">
-          <label className="flex items-center gap-2 text-xs font-semibold">
+          <Field
+            label={t('settings.spExtractionEnabledLabel')}
+            htmlFor="settings-sp-extraction-enabled"
+            inline
+            note={t('settings.spExtractionEnabledHint')}
+          >
             <Checkbox
+              id="settings-sp-extraction-enabled"
               checked={spExtractionEnabled}
               onChange={() => void setSpExtractionEnabled(!spExtractionEnabled)}
             />
-            {t('settings.spExtractionEnabledLabel')}
-          </label>
-          <p className="text-xs text-text-dim">{t('settings.spExtractionEnabledHint')}</p>
+          </Field>
           {spExtractionEnabled && (
-            <div className="ml-6 space-y-1.5">
-              <label htmlFor="settings-sp-extraction-threshold" className="block text-xs">
-                {t('settings.spExtractionThresholdLabel')}
-              </label>
-              <p className="text-xs text-text-dim">{t('settings.spExtractionThresholdHint')}</p>
+            <Field
+              label={t('settings.spExtractionThresholdLabel')}
+              htmlFor="settings-sp-extraction-threshold"
+              note={t('settings.spExtractionThresholdHint')}
+            >
               <TextInput
                 id="settings-sp-extraction-threshold"
                 type="number"
@@ -977,9 +1019,9 @@ function CharacterDefaultsPanel() {
                 }}
                 className="w-40"
               />
-            </div>
+            </Field>
           )}
-        </div>
+        </Fields>
       </div>
     </Panel>
   );
@@ -1016,16 +1058,18 @@ function CorpDefaultsPanel() {
 
   return (
     <Panel title={t('settings.corpDefaultsTitle')}>
-      <div className="max-w-md space-y-4">
-        <p className="text-xs text-text-dim">{t('settings.defaultsSyncHint')}</p>
-        <ChipRow
-          label={t('settings.darkThresholdLabel')}
-          hint={t('settings.darkThresholdHint')}
-          options={DARK_AFTER_DAY_OPTIONS}
-          selected={darkAfterDays}
-          onSelect={(days) => void setDarkAfterDays(days)}
-          labelFor={(days) => t('settings.days', { count: days })}
-        />
+      <div className="space-y-4">
+        <DefaultsSyncHint />
+        <Fields variant="form">
+          <ChipRow
+            label={t('settings.darkThresholdLabel')}
+            hint={t('settings.darkThresholdHint')}
+            options={DARK_AFTER_DAY_OPTIONS}
+            selected={darkAfterDays}
+            onSelect={(days) => void setDarkAfterDays(days)}
+            labelFor={(days) => t('settings.days', { count: days })}
+          />
+        </Fields>
       </div>
     </Panel>
   );
@@ -1145,22 +1189,23 @@ export function Settings() {
           {section === 'display' && (
             <>
               <Panel title={t('settings.displayTitle')}>
-                <div className="space-y-2">
-                  <p className="text-xs text-text-dim">{t('settings.fontScaleHint')}</p>
-                  <div
-                    role="group"
-                    aria-label={t('settings.fontScaleLabel')}
-                    className="flex flex-wrap gap-2"
-                  >
-                    {FONT_SCALE_STEPS.map((step) => (
-                      <FilterChip
-                        key={step}
-                        label={t(FONT_SCALE_LABEL_KEYS[step])}
-                        selected={scale === step}
-                        onToggle={() => void setScale(step)}
-                      />
-                    ))}
-                  </div>
+                <Fields variant="form">
+                  <Field label={t('settings.fontScaleLabel')} note={t('settings.fontScaleHint')}>
+                    <div
+                      role="group"
+                      aria-label={t('settings.fontScaleLabel')}
+                      className="flex flex-wrap gap-2"
+                    >
+                      {FONT_SCALE_STEPS.map((step) => (
+                        <FilterChip
+                          key={step}
+                          label={t(FONT_SCALE_LABEL_KEYS[step])}
+                          selected={scale === step}
+                          onToggle={() => void setScale(step)}
+                        />
+                      ))}
+                    </div>
+                  </Field>
                   {/*
                   EVE runs on UTC and so does every timer other players quote,
                   which is why one column already rendered it before this was
@@ -1169,29 +1214,25 @@ export function Settings() {
                   rendered string would file a late-evening event under the wrong
                   day.
                 */}
-                  <div className="border-t border-line pt-3">
-                    <ChipRow
-                      label={t('settings.timeFormatLabel')}
-                      hint={t('settings.timeFormatHint')}
-                      options={TIME_FORMATS}
-                      selected={timeFormat}
-                      onSelect={(format) => void setTimeFormat(format)}
-                      labelFor={(format) => t(`settings.timeFormat.${format}`)}
-                    />
-                  </div>
+                  <ChipRow
+                    label={t('settings.timeFormatLabel')}
+                    hint={t('settings.timeFormatHint')}
+                    options={TIME_FORMATS}
+                    selected={timeFormat}
+                    onSelect={(format) => void setTimeFormat(format)}
+                    labelFor={(format) => t(`settings.timeFormat.${format}`)}
+                  />
                   {weekStartHydrated && (
-                    <div className="border-t border-line pt-3">
-                      <ChipRow
-                        label={t('settings.weekStartLabel')}
-                        hint={t('settings.weekStartHint')}
-                        options={CALENDAR_WEEK_START_DAYS}
-                        selected={weekStart}
-                        onSelect={(day) => void setWeekStart(day)}
-                        labelFor={(day) => t(`settings.weekStart.${day}`)}
-                      />
-                    </div>
+                    <ChipRow
+                      label={t('settings.weekStartLabel')}
+                      hint={t('settings.weekStartHint')}
+                      options={CALENDAR_WEEK_START_DAYS}
+                      selected={weekStart}
+                      onSelect={(day) => void setWeekStart(day)}
+                      labelFor={(day) => t(`settings.weekStart.${day}`)}
+                    />
                   )}
-                </div>
+                </Fields>
               </Panel>
               {isNarrow && <MobileTabsPanel />}
             </>
@@ -1216,13 +1257,20 @@ export function Settings() {
           {section === 'travel' && <TravelSettingsPanel />}
           {/* The Overview feed's "Settings" link targets `/settings/notifications` directly. */}
           {section === 'notifications' && <NotificationsPanel />}
+          {/*
+            The five short action panels sit two-up from `xl`: one column of
+            them left most of each card empty. Export beside Import, since
+            they are one round trip; the device's log-out row stays full width.
+          */}
           {section === 'dataAge' && (
             <>
               <DataAgePanel />
-              <DataPanel />
-              <ExportPanel />
-              <ImportPanel />
-              <UpdatePanel />
+              <div className="grid items-start gap-4 xl:grid-cols-2">
+                <DataPanel />
+                <UpdatePanel />
+                <ExportPanel />
+                <ImportPanel />
+              </div>
               <DevicePanel />
             </>
           )}
