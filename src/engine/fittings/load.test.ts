@@ -21,6 +21,7 @@ function sources(overrides: Partial<TextLoadSources> = {}): TextLoadSources {
     hullName: vi.fn(async (typeId: number) => (typeId === 587 ? 'Rifter' : 'Other')),
     killmailHash: vi.fn(async () => HASH),
     killmailVictim: vi.fn(async () => VICTIM),
+    eveWorkbenchEft: vi.fn(async () => ({ status: 'not-found' as const })),
     ...overrides,
   };
 }
@@ -89,14 +90,88 @@ describe('loadText', () => {
     expect(src.catalog).not.toHaveBeenCalled();
   });
 
-  it('says how to bring an EVE Workbench fit across, since its link cannot be read from here', async () => {
+  const WORKBENCH_LINK = 'https://eveworkbench.com/fit/69dfd552-9a17-4628-92de-9f07c28ac659/rifter';
+
+  it('opens an EVE Workbench fit through the EFT path, warning about items as items', async () => {
+    const src = sources({
+      eveWorkbenchEft: vi.fn(async () => ({
+        status: 'ok' as const,
+        eft: [
+          '[Rifter, Workbench Fit]',
+          '125mm Gatling AutoCannon I',
+          'Not A Real Module',
+          '',
+        ].join('\n'),
+      })),
+    });
+    const outcome = await loadText(WORKBENCH_LINK, src);
+    expect(src.eveWorkbenchEft).toHaveBeenCalledWith('69dfd552-9a17-4628-92de-9f07c28ac659');
+    expect(outcome).toEqual({
+      kind: 'fitting',
+      source: 'text',
+      fitting: {
+        name: 'Workbench Fit',
+        shipTypeId: 587,
+        modules: RIFTER_MODULES,
+        drones: [],
+        cargo: [],
+      },
+      // The pilot never saw the EFT's lines, so a warning names the item, not a line number.
+      unresolved: [{ text: 'Not A Real Module', reason: 'unknown item' }],
+    });
+  });
+
+  it.each([
+    ['not-found', 'eve-workbench-not-found'],
+    ['failed', 'eve-workbench-failed'],
+  ] as const)(
+    'reports an EVE Workbench fit it could not get (%s), reading nothing else',
+    async (status, error) => {
+      const src = sources({ eveWorkbenchEft: vi.fn(async () => ({ status })) });
+      expect(await loadText(WORKBENCH_LINK, src)).toEqual({
+        kind: 'failed',
+        source: 'text',
+        error,
+        unresolved: [],
+      });
+      expect(src.catalog).not.toHaveBeenCalled();
+    }
+  );
+
+  it("carries a Workbench fit's too-many-slots warning over, by item", async () => {
+    const src = sources({
+      eveWorkbenchEft: vi.fn(async () => ({
+        status: 'ok' as const,
+        eft: ['[Rifter, Overfit]', ...Array(9).fill('125mm Gatling AutoCannon I')].join(
+          String.fromCharCode(10)
+        ),
+      })),
+    });
+    expect(await loadText(WORKBENCH_LINK, src)).toMatchObject({
+      kind: 'fitting',
+      unresolved: [{ text: '125mm Gatling AutoCannon I', reason: 'too many high slots' }],
+    });
+  });
+
+  it('reports a Workbench link with no fit id as not found, asking Workbench nothing', async () => {
     const src = sources();
-    const outcome = await loadText(
-      'https://eveworkbench.com/fit/69dfd552-9a17-4628-92de-9f07c28ac659',
-      src
-    );
-    expect(outcome).toMatchObject({ kind: 'failed', error: 'eve-workbench' });
-    expect(src.catalog).not.toHaveBeenCalled();
+    expect(await loadText('https://eveworkbench.com/fit/', src)).toMatchObject({
+      kind: 'failed',
+      error: 'eve-workbench-not-found',
+    });
+    expect(src.eveWorkbenchEft).not.toHaveBeenCalled();
+  });
+
+  it('reports EVE Workbench as unreachable when its source throws', async () => {
+    const src = sources({
+      eveWorkbenchEft: vi.fn(async () => {
+        throw new Error('offline');
+      }),
+    });
+    expect(await loadText(WORKBENCH_LINK, src)).toMatchObject({
+      kind: 'failed',
+      error: 'eve-workbench-failed',
+    });
   });
 
   it('opens EFT text under its fit name, with the lines it could not place', async () => {
