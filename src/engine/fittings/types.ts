@@ -635,6 +635,15 @@ export const ITEM_DOGMA_ATTRIBUTE = {
   // or ice harvester, cap booster, ancillary repairer or scripted module —
   // so it marks a module that needs its charge to fire.
   rateOfFire: 51,
+  // On a charge, by name in public/data/market/attributes.json (2026-10-03):
+  // "Tech Level", and a frequency crystal's wear — "Crystals Take Damage"
+  // (1/0), "Volatility" (chance per shot) and "Volatility Damage" (HP lost
+  // when it hits) against the crystal's own "Structure Hitpoints".
+  techLevel: 422,
+  crystalsTakeDamage: 786,
+  crystalVolatility: 783,
+  crystalVolatilityDamage: 784,
+  structureHitpoints: 9,
   // Patched per-item damage (EVEShipFit/sde-patched `patches/ids.yaml`,
   // `damagePerSecondWithoutReload`/`damageVolley`), verified 2026-09-24 by a
   // live run of the pinned engine: a drone stack reports them per drone, and

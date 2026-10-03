@@ -124,6 +124,11 @@ function damageSplit(
   };
 }
 
+/** A charge's own damage split by type, as shares; null when it deals no damage. */
+export function chargeDamageSplit(charge: AttributeMap | undefined): DamageSplit | null {
+  return damageSplit(charge).damage ?? null;
+}
+
 /** Metres a missile flies: its charge's speed × flight time. */
 function missileFlightRange(charge: AttributeMap): number {
   return (

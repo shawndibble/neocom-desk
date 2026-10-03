@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Caret,
@@ -26,7 +26,10 @@ import type {
   FittingSlotKind,
   PilotProfile,
 } from '@/engine/fittings/types';
-import { checkCharges, type CandidateCheck } from './dogmaFittingEngine';
+import type { CandidateCheck } from './dogmaFittingEngine';
+import { ChargePickerControls, ChargePickerGroup } from './ChargePicker';
+import { DEFAULT_PICKER_SETTINGS, type ChargePickerSettings } from './chargePickerSettings';
+import { useChargeChoices } from './useChargeChoices';
 import { endFittingDrag, startFittingDrag } from './fittingDrag';
 import { AddCargoMenuItems, AddItemMenuItems, FittingItemMenu } from './FittingItemMenu';
 import { useFittingItemActions } from './fittingItemActions';
@@ -545,7 +548,12 @@ interface ChargesTabProps {
   dragToFit: boolean;
 }
 
-/** Per fitted module type that takes charges: what it has loaded, and every charge it takes. */
+/**
+ * Per fitted module type that takes charges: for a weapon, the Charge
+ * Picker (grouped by type or faction, with this Fitting's damage, range and
+ * the hub's price); for anything else (cap boosters, scripts, paste), the
+ * plain list of what it takes.
+ */
 function ChargesTab({
   fitting,
   catalogue,
@@ -557,129 +565,113 @@ function ChargesTab({
 }: ChargesTabProps) {
   const { t } = useTranslation();
   const actions = useFittingItemActions();
-  const weapons = useMemo(() => {
-    if (moduleResults === null) return [];
-    const byType = new Map<
-      number,
-      {
-        typeId: number;
-        slot: FittingSlotKind;
-        count: number;
-        groups: number[];
-        loaded: Set<number>;
-      }
-    >();
-    fitting.modules.forEach((module, index) => {
-      const groups = moduleResults[index]?.chargeGroupIds ?? [];
-      if (groups.length === 0) return;
-      const entry = byType.get(module.typeId) ?? {
-        typeId: module.typeId,
-        slot: module.slot,
-        count: 0,
-        groups,
-        loaded: new Set<number>(),
-      };
-      entry.count += 1;
-      if (module.chargeTypeId !== undefined) entry.loaded.add(module.chargeTypeId);
-      byType.set(module.typeId, entry);
-    });
-    return [...byType.values()];
-  }, [fitting.modules, moduleResults]);
-
-  const options = useMemo(() => {
-    const map = new Map<number, number[]>();
-    if (catalogue === null || !engineReady || profile === null) return map;
-    for (const weapon of weapons) {
-      const candidates = weapon.groups.flatMap((id) => catalogue.typeIdsByGroup.get(id) ?? []);
-      const fits = checkCharges(
-        fitting.shipTypeId,
-        { slot: weapon.slot, typeId: weapon.typeId },
-        candidates,
-        profile
-      );
-      map.set(
-        weapon.typeId,
-        candidates
-          .filter((id) => fits.has(id) && catalogue.types[String(id)] !== undefined)
-          .sort((a, b) =>
-            (catalogue.types[String(a)]?.name ?? '').localeCompare(
-              catalogue.types[String(b)]?.name ?? ''
-            )
-          )
-      );
-    }
-    return map;
-  }, [catalogue, engineReady, profile, weapons, fitting.shipTypeId]);
+  const [settings, setSettings] = useState<ChargePickerSettings>(DEFAULT_PICKER_SETTINGS);
+  const { groups, pricesLoading } = useChargeChoices({
+    fitting,
+    catalogue,
+    engineReady,
+    profile,
+    moduleResults,
+  });
 
   const name = (typeId: number) => catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
 
-  if (moduleResults === null || !engineReady) {
+  /** The Add panel's own row behaviour around any loadable charge: drag onto the modules that take it, right-click menu. */
+  const wrapRow = (chargeTypeId: number, row: ReactNode) => {
+    const draggable = dragToFit && actions !== null;
+    const inner = (
+      <div
+        className="flex items-center"
+        draggable={draggable}
+        onDragStart={
+          draggable
+            ? (event) =>
+                startFittingDrag(event, {
+                  kind: 'charge',
+                  typeId: chargeTypeId,
+                  fromCargo: false,
+                  targets: actions.charges.targetsFor(chargeTypeId),
+                })
+            : undefined
+        }
+        onDragEnd={draggable ? endFittingDrag : undefined}
+      >
+        <div className="min-w-0 flex-1">{row}</div>
+        {actions && <RowMoreActions />}
+      </div>
+    );
+    return actions ? (
+      <FittingItemMenu name={name(chargeTypeId)} items={<AddItemMenuItems typeId={chargeTypeId} />}>
+        {inner}
+      </FittingItemMenu>
+    ) : (
+      inner
+    );
+  };
+
+  if (moduleResults === null || !engineReady || groups === null) {
     return <p className="text-xs text-warning">{t('fittings.add.waitingForShipData')}</p>;
   }
-  if (weapons.length === 0) {
+  if (groups.length === 0) {
     return <p className="text-xs text-text-dim">{t('fittings.add.noChargeTakers')}</p>;
   }
+  const weaponChoices = groups.filter((g) => g.isWeapon).flatMap((g) => g.choices);
+  const maxKm = Math.ceil(
+    (Math.max(0, ...weaponChoices.map((c) => c.optimal + c.falloff)) / 1000) * 1.2
+  );
   return (
     <div className="space-y-3">
-      {weapons.map((weapon) => (
-        <section key={weapon.typeId} className="space-y-1">
+      {weaponChoices.length > 0 && (
+        <ChargePickerControls settings={settings} onChange={setSettings} maxKm={maxKm} />
+      )}
+      {groups.map((group) => (
+        <section key={group.moduleTypeId} className="space-y-1">
           <h3 className="flex items-center gap-2 text-xs font-semibold">
-            <TypeIcon typeId={weapon.typeId} size={32} width={20} height={20} />
+            <TypeIcon typeId={group.moduleTypeId} size={32} width={20} height={20} />
             <span className="min-w-0 flex-1 truncate">
-              {t('fittings.add.chargeTaker', { count: weapon.count, name: name(weapon.typeId) })}
+              {t('fittings.add.chargeTaker', {
+                count: group.count,
+                name: name(group.moduleTypeId),
+              })}
             </span>
           </h3>
-          <ul>
-            {(options.get(weapon.typeId) ?? []).map((chargeTypeId) => {
-              const loaded = weapon.loaded.has(chargeTypeId);
-              const draggable = dragToFit && actions !== null;
-              const row = (
-                <li
-                  key={chargeTypeId}
-                  className="flex items-center"
-                  draggable={draggable}
-                  onDragStart={
-                    draggable
-                      ? (event) =>
-                          startFittingDrag(event, {
-                            kind: 'charge',
-                            typeId: chargeTypeId,
-                            fromCargo: false,
-                            targets: actions.charges.targetsFor(chargeTypeId),
-                          })
-                      : undefined
-                  }
-                  onDragEnd={draggable ? endFittingDrag : undefined}
-                >
-                  <button
-                    type="button"
-                    aria-pressed={loaded}
-                    disabled={!onLoadCharge}
-                    onClick={() => onLoadCharge?.(chargeTypeId)}
-                    className={`flex min-h-11 w-full items-center gap-2 border-l-2 px-2 text-left text-xs hover:bg-panel-2 md:min-h-9 ${loaded ? 'border-accent text-accent' : 'border-transparent'}`}
-                  >
-                    <TypeIcon typeId={chargeTypeId} size={32} width={20} height={20} />
-                    <span className="min-w-0 flex-1 truncate">{name(chargeTypeId)}</span>
-                    {loaded && (
-                      <span className="shrink-0 text-[0.6875rem]">{t('fittings.add.loaded')}</span>
+          {group.isWeapon ? (
+            <ChargePickerGroup
+              group={group}
+              settings={settings}
+              onLoad={onLoadCharge}
+              wrapRow={wrapRow}
+              pricesLoading={pricesLoading}
+            />
+          ) : (
+            <ul>
+              {group.choices.map((choice) => {
+                const loaded = group.loaded.has(choice.typeId);
+                return (
+                  <li key={choice.typeId}>
+                    {wrapRow(
+                      choice.typeId,
+                      <button
+                        type="button"
+                        aria-pressed={loaded}
+                        disabled={!onLoadCharge}
+                        onClick={() => onLoadCharge?.(choice.typeId)}
+                        className={`flex min-h-11 w-full items-center gap-2 border-l-2 px-2 text-left text-xs hover:bg-panel-2 md:min-h-9 ${loaded ? 'border-accent text-accent' : 'border-transparent'}`}
+                      >
+                        <TypeIcon typeId={choice.typeId} size={32} width={20} height={20} />
+                        <span className="min-w-0 flex-1 truncate">{choice.name}</span>
+                        {loaded && (
+                          <span className="shrink-0 text-[0.6875rem]">
+                            {t('fittings.add.loaded')}
+                          </span>
+                        )}
+                      </button>
                     )}
-                  </button>
-                  {actions && <RowMoreActions />}
-                </li>
-              );
-              return actions ? (
-                <FittingItemMenu
-                  key={chargeTypeId}
-                  name={name(chargeTypeId)}
-                  items={<AddItemMenuItems typeId={chargeTypeId} />}
-                >
-                  {row}
-                </FittingItemMenu>
-              ) : (
-                row
-              );
-            })}
-          </ul>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
       ))}
     </div>

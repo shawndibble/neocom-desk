@@ -187,6 +187,7 @@ here — they go one per file in `docs/context/decisions/`.
   finished queue entry while training continues, and from **Skill Queue
   Ending**, which warns ahead of this state rather than reporting it once
   reached.
+- **Charge Picker**: How a **Fitting**'s weapon group chooses its charge — the Add panel's Charges tab and the "Change charge ▸" menu (a Ring tile, a List row, an Offense row). Groups the charges by type (Iron … Antimatter, each with its faction versions) or by faction, or plots range against damage, with this Fitting's DPS and range (one engine calculation per charge, the whole Fitting loaded) and the Trade Hub's price. **Fighting at** turns every figure into what lands at one target distance; the quick picks name the most damage, the longest reach and the best value (the cheapest per minute within 10% of the most damage). A faction version that does no more for more ISK is "strictly worse" and says which one beats it. Modules whose charges don't shoot (cap boosters, scripts, paste) keep the plain list. Pure arithmetic in `src/engine/fittings/chargeChoice.ts`.
 - **Clock Kind**: Which of the eight sources a **Character Board Item** came
   from. The `/calendar` page's one colour scale names this and nothing else —
   a **nominal** palette (`--color-kind-*`, DESIGN.md §1), unlike every other

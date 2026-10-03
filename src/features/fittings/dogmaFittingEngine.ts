@@ -23,7 +23,13 @@ import {
   extractOverheatedStats,
   type OffenseItem,
 } from '@/engine/fittings/stats';
-import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
+import {
+  APPLIED_DPS_ATTRIBUTE,
+  chargeDamageSplit,
+  extractAppliedDpsInputs,
+  weaponRange,
+} from '@/engine/fittings/appliedWeapons';
+import { chargesUsedPerMinute, type ChargeChoice } from '@/engine/fittings/chargeChoice';
 import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes, type AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { skillSourceTypeIds } from '@/engine/fittings/skillGains';
@@ -798,4 +804,112 @@ export function moduleChargeCapacity(
   });
   // `capacity` is one attribute for both: a ship's cargo hold, a module's charge room.
   return items[0]?.attributes.get(DOGMA_ATTRIBUTE.cargoCapacity)?.value ?? 0;
+}
+
+/** Which of `chargeTypeIds` need a skill the pilot lacks — checked the way `checkCharges` is, keeping what it drops. */
+export function chargesMissingSkills(
+  shipTypeId: number,
+  module: { slot: FittingSlotKind; typeId: number },
+  chargeTypeIds: readonly number[],
+  profile: PilotProfile
+): Set<number> {
+  assertReady();
+  const missing = new Set<number>();
+  for (const chargeTypeId of chargeTypeIds) {
+    const { violations } = calculate(
+      {
+        ship: { type_id: shipTypeId },
+        items: [
+          {
+            type_id: module.typeId,
+            slot: { type: module.slot, index: 0 },
+            state: 'online',
+            charge: { type_id: chargeTypeId },
+          },
+        ],
+        character: { skills: profile.skillLevels },
+      },
+      { validate: true }
+    );
+    if (rulesNaming(violations, 'charge').some((v) => v.rule.type === 'skill')) {
+      missing.add(chargeTypeId);
+    }
+  }
+  return missing;
+}
+
+/** One charge's figures for a weapon group, from the Fitting calculated with it loaded. */
+export interface ChargeEngineStats extends Pick<
+  ChargeChoice,
+  'typeId' | 'dps' | 'optimal' | 'falloff' | 'damage' | 'roundsPerMinute'
+> {
+  techLevel: number;
+}
+
+/**
+ * The Charge Picker's figures (`engine/fittings/chargeChoice.ts`): for each
+ * of `chargeTypeIds`, the whole Fitting calculated once with that charge in
+ * every module of `moduleTypeId` and those modules active — so the hull,
+ * skills, implants and damage mods all count, as they do on the loaded
+ * charge. One `calculate` per charge (no overheated pass): the Charges tab
+ * pays this only while it is open, memoized by its caller.
+ */
+export function compareCharges(
+  fitting: Fitting,
+  profile: PilotProfile,
+  moduleTypeId: number,
+  chargeTypeIds: readonly number[]
+): ChargeEngineStats[] {
+  assertReady();
+  const indices = fitting.modules.flatMap((module, index) =>
+    module.typeId === moduleTypeId ? [index] : []
+  );
+  if (indices.length === 0) return [];
+  const first = indices[0]!;
+  return chargeTypeIds.map((chargeTypeId) => {
+    const trial: Fitting = {
+      ...fitting,
+      modules: fitting.modules.map((module) =>
+        module.typeId === moduleTypeId
+          ? {
+              ...module,
+              chargeTypeId,
+              state: module.state === 'overload' ? 'overload' : 'active',
+            }
+          : module
+      ),
+    };
+    // `fittingToDogmaFit` puts the modules first, so module i is items[i].
+    const { items } = calculate(fittingToDogmaFit(trial, profile));
+    const item = items[first];
+    const charge = item?.charge?.attributes;
+    const read = (attrs: typeof charge, id: number) => attrs?.get(id)?.value ?? 0;
+    const range = item ? weaponRange(item.attributes, charge) : null;
+    const isCrystal =
+      read(charge, ITEM_DOGMA_ATTRIBUTE.crystalVolatility) > 0 ||
+      charge?.get(ITEM_DOGMA_ATTRIBUTE.crystalsTakeDamage) !== undefined;
+    return {
+      typeId: chargeTypeId,
+      dps: indices.reduce(
+        (sum, index) => sum + read(items[index]?.attributes, APPLIED_DPS_ATTRIBUTE.dps),
+        0
+      ),
+      optimal: range?.optimal ?? 0,
+      falloff: range?.falloff ?? 0,
+      damage: chargeDamageSplit(charge),
+      roundsPerMinute: chargesUsedPerMinute({
+        rateOfFireMs: read(item?.attributes, ITEM_DOGMA_ATTRIBUTE.rateOfFire),
+        guns: indices.length,
+        crystal: isCrystal
+          ? {
+              takesDamage: read(charge, ITEM_DOGMA_ATTRIBUTE.crystalsTakeDamage) === 1,
+              volatility: read(charge, ITEM_DOGMA_ATTRIBUTE.crystalVolatility),
+              volatilityDamage: read(charge, ITEM_DOGMA_ATTRIBUTE.crystalVolatilityDamage),
+              hitpoints: read(charge, ITEM_DOGMA_ATTRIBUTE.structureHitpoints),
+            }
+          : null,
+      }),
+      techLevel: read(charge, ITEM_DOGMA_ATTRIBUTE.techLevel),
+    };
+  });
 }

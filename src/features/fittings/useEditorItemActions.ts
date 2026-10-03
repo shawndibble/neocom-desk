@@ -11,7 +11,7 @@
  * Fitting they change rather than close over the one last rendered, and
  * keep their identity across edits that leave their inputs alone.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import {
   addDronesWithinBay,
@@ -44,7 +44,7 @@ import { buildVariationIndex, getVariations } from '@/engine/market/variations';
 import type { AddTarget } from './addTarget';
 import { chargeGroupIdsFor, checkCharges } from './dogmaFittingEngine';
 import type { FittingDragPayload, FittingDropTarget } from './fittingDrag';
-import type { FittingItemActions } from './fittingItemActions';
+import type { ChargePickerInput, FittingItemActions } from './fittingItemActions';
 import type { ChargeLoading } from './useChargeLoading';
 import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
@@ -242,6 +242,15 @@ export function useEditorItemActions({
   const cargoCapacity = stats?.holds.cargo ?? null;
   const open = fitting !== null;
   const shipTypeId = fitting?.shipTypeId ?? null;
+  // Read by "Change charge ▸" only when it opens: a ref, so each edit doesn't rebuild the actions.
+  const chargePickerRef = useRef<ChargePickerInput | null>(null);
+  const statModules = stats?.modules ?? null;
+  useLayoutEffect(() => {
+    chargePickerRef.current =
+      fitting === null || catalogue === null
+        ? null
+        : { fitting, catalogue, engineReady, profile, moduleResults: statModules };
+  }, [fitting, catalogue, engineReady, profile, statModules]);
 
   const itemActions = useMemo<FittingItemActions | null>(
     () =>
@@ -256,6 +265,7 @@ export function useEditorItemActions({
             unloadGroup: (at) => edit((f) => unloadCharges(f, at)),
             chargesFor: (module) =>
               shipTypeId === null ? [] : defaultCharges(shipTypeId, module.slot, module.typeId),
+            chargePickerInput: () => chargePickerRef.current,
             copyToAllOfType: (rack, index) => edit((f) => copyToAllOfType(f, rack, index)),
             variantsOf: (typeId) =>
               variationIndex === null
