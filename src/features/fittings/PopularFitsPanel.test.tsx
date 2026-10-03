@@ -16,6 +16,8 @@ vi.mock('./workbenchFits', () => ({
   workbenchFitUrl: (id: string) => `https://eveworkbench.com/fit/${id}`,
 }));
 vi.mock('./loadFittingFromText', () => ({ loadFittingFromText: loadFittingFromTextMock }));
+// Sightings (#2486) have their own tests: WorkbenchSightingBadge.test.tsx.
+vi.mock('./workbenchSightings', () => ({ useWorkbenchSightings: () => new Map() }));
 vi.mock('@/sde/loadSde', () => ({
   typeName: (typeId: number) =>
     Promise.resolve(

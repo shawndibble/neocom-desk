@@ -14,6 +14,8 @@ import { usePopularFits } from './popularFits';
 import { useWorkbenchFits, workbenchFitUrl, type WorkbenchFit } from './workbenchFits';
 import { useWorkbenchFitList } from './workbenchFitCurrency';
 import { OutOfDateReasons, OutOfDateToggle } from './WorkbenchOutOfDate';
+import { useWorkbenchSightings } from './workbenchSightings';
+import { WorkbenchSightingBadge } from './WorkbenchSightingBadge';
 
 interface PopularFitsPanelProps {
   shipTypeId: number;
@@ -190,6 +192,7 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
   const result = useWorkbenchFits(shipTypeId);
   // Out-of-date fits (issue #2485) sort below, shown only on request.
   const list = useWorkbenchFitList(result?.ok ? result.fits : null);
+  const sightings = useWorkbenchSightings(shipTypeId, result?.ok ? result.fits : null);
   const now = useNow();
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [failedId, setFailedId] = useState<string | null>(null);
@@ -253,6 +256,7 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
                   })}
                 </p>
                 <OutOfDateReasons reasons={list.reasonsFor(fit.id)} />
+                <WorkbenchSightingBadge sighting={sightings.get(fit.id)} />
                 {failedId === fit.id && (
                   <p role="alert" className="text-xs text-danger">
                     {t('fittings.popular.workbench.loadFailed')}

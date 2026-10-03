@@ -5,7 +5,9 @@ import {
   indexSystemJumps,
   routeStripKeySystems,
   indexSystemKills,
+  joinLegs,
   summarizeRouteSafety,
+  summarizeTrip,
   type RouteSafetyInputs,
   type RouteSafetyRow,
 } from './routeSafety';
@@ -264,5 +266,50 @@ describe('routeStripKeySystems', () => {
       row(3, { security: null }),
     ];
     expect(routeStripKeySystems(rows)).toEqual([0, 2]);
+  });
+});
+
+describe('routeStripKeySystems with stops', () => {
+  it('also names each stop the trip passes', () => {
+    const rows = [row(1), row(2), row(3), row(4), row(5)];
+    expect(routeStripKeySystems(rows, [2])).toEqual([0, 2, 4]);
+  });
+});
+
+describe('joinLegs', () => {
+  it('joins legs end to end, each joining stop once, and marks where every stop falls', () => {
+    const trip = joinLegs([
+      [row(1), row(2), row(3)],
+      [row(3), row(4)],
+      [row(4), row(2), row(1)],
+    ]);
+    expect(trip.rows.map((r) => r.systemId)).toEqual([1, 2, 3, 4, 2, 1]);
+    expect(trip.stopIndexes).toEqual([2, 3, 5]);
+  });
+
+  it('is empty with no legs', () => {
+    expect(joinLegs([])).toEqual({ rows: [], stopIndexes: [] });
+  });
+});
+
+describe('summarizeTrip', () => {
+  it('sums the jumps of every leg', () => {
+    const legs = [
+      buildRouteSafetyRows([JITA, PERIMETER, UEDAMA], inputs()),
+      buildRouteSafetyRows([UEDAMA, PERIMETER, JITA], inputs()),
+    ];
+    expect(summarizeTrip(legs).jumps).toBe(4);
+  });
+
+  it('counts a system crossed twice once for its kills and its chokepoint', () => {
+    const legs = [
+      buildRouteSafetyRows([JITA, PERIMETER, UEDAMA, AMAMAKE], inputs()),
+      buildRouteSafetyRows([AMAMAKE, UEDAMA, PERIMETER], inputs()),
+    ];
+    const summary = summarizeTrip(legs);
+    expect(summary.shipKills).toBe(15);
+    expect(summary.podKills).toBe(5);
+    expect(summary.chokepoints).toEqual(['Uedama']);
+    expect(summary.lowestSecurity).toBe(0.3);
   });
 });

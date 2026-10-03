@@ -33,17 +33,21 @@ function hasKills(row: RouteSafetyRow, cell: RouteKillsCell): boolean {
 export function RouteStrip({
   rows,
   killsOf,
+  stopIndexes,
 }: {
   rows: readonly RouteSafetyRow[];
   killsOf: (systemId: number) => RouteKillsCell;
+  /** On a trip through several Stops, where each one falls: those are key systems too. */
+  stopIndexes?: readonly number[];
 }) {
   const { t } = useTranslation();
   const first = rows[0];
   const last = rows[rows.length - 1];
   if (!first || !last) return null;
-  const keys = routeStripKeySystems(rows).flatMap((index) => {
+  // A trip can cross a system twice, so cells key by position, not system.
+  const keys = routeStripKeySystems(rows, stopIndexes).flatMap((index) => {
     const row = rows[index];
-    return row ? [row] : [];
+    return row ? [{ index, row }] : [];
   });
   const describe = (row: RouteSafetyRow) =>
     row.chokepoint
@@ -58,21 +62,25 @@ export function RouteStrip({
       count: rows.length,
       from: routeSystemName(first),
       to: routeSystemName(last),
-      keys: keys.map(describe).join(', '),
+      keys: keys.map((key) => describe(key.row)).join(', '),
     }),
     ...(withKills.length === 0
       ? []
-      : [t('travel.strip.killsIn', { names: withKills.map(routeSystemName).join(', ') })]),
+      : [
+          t('travel.strip.killsIn', {
+            names: [...new Set(withKills.map(routeSystemName))].join(', '),
+          }),
+        ]),
   ].join(' ');
 
   return (
     <div>
       <div role="img" aria-label={label} className="flex h-4 gap-px pt-1">
-        {rows.map((row) => {
+        {rows.map((row, index) => {
           const kills = withKills.includes(row);
           const tip = [describe(row), ...(kills ? [t('travel.strip.kills')] : [])].join('\n');
           return (
-            <Tooltip key={row.systemId} content={tip}>
+            <Tooltip key={index} content={tip}>
               <span
                 data-testid="route-strip-cell"
                 className={`relative min-w-0 flex-1 rounded-[1px] ${row.security === null ? 'bg-line' : ''}`}
@@ -101,8 +109,8 @@ export function RouteStrip({
         aria-hidden="true"
         className="mt-1 flex flex-wrap justify-between gap-x-3 text-[0.75rem] text-text-dim"
       >
-        {keys.map((row) => (
-          <li key={row.systemId} className="inline-flex min-w-0 items-center gap-1">
+        {keys.map(({ index, row }) => (
+          <li key={index} className="inline-flex min-w-0 items-center gap-1">
             {/* The strip's own top line, so a chokepoint is never colour alone. */}
             <span
               className={`truncate ${row.chokepoint ? 'border-t-2 border-warning text-warning' : ''}`}

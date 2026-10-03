@@ -6,9 +6,10 @@
  * ship kills in the last hour" and marks a Gank Chokepoint by name. It never
  * calls a system or a route safe, unsafe or anything else — the pilot decides.
  *
- * From, To and the Route Preference live in the URL so a route can be shared.
- * The preference is never persisted (`features/route/routePreferences.ts`).
- * From falls back to the Current System when the link does not name one.
+ * From, the Stops and the Route Preference live in the URL so a route can be
+ * shared. The preference is never persisted
+ * (`features/route/routePreferences.ts`). From falls back to the Current
+ * System when the link does not name one.
  *
  * Planner layout (issue #2472): a left column with the Route rules panel —
  * the Route Preference for this route, and the pilot's Travel Settings edited
@@ -18,33 +19,60 @@
  * Itinerary (issue #2474): one panel holds the route's facts on one line,
  * the route strip (`RouteStrip`), and one-line rows with quiet stretches
  * folded (`RouteSystemsTable`).
+ *
+ * Several Stops (issue #2475): the Stops panel sits above Route rules, and a
+ * trip of more than one stop lists its Legs, each with its own header and
+ * rows (`TripLegs`); the facts line and strip cover the whole trip. The stops
+ * live in the link as `stops`, in the order typed; a legacy `to` link still
+ * opens as a single stop. One stop is the page exactly as it was.
  */
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, EmptyState, FilterField, PageHeader, Panel, Spinner } from '@/components/ui';
+import { DataAgeBadge, EmptyState, PageHeader, Panel, Spinner } from '@/components/ui';
 import type { RouteSafetyRow, RouteSafetySummary } from '@/engine/route/routeSafety';
+import { MAX_STOPS } from '@/engine/route/tripPlan';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { useCurrentSystem } from '@/features/route/currentSystem';
 import { ROUTE_PREFERENCES } from '@/features/route/routePreferences';
 import { useAvoidedSystemsEnabled, useRouteQuery } from '@/features/route/routeRules';
-import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
-import { useSystemName } from '@/features/route/useSolarSystems';
-import { optionalEnumParam, optionalIdParam } from '@/lib/urlState';
+import { useSolarSystemIndex, useSystemName } from '@/features/route/useSolarSystems';
+import { boolParam, optionalEnumParam, optionalIdParam, orderedIdListParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { AvoidSystemDialog, type AvoidTarget } from './AvoidSystemDialog';
 import { RouteRulesPanel } from './RouteRulesPanel';
 import { RouteStrip } from './RouteStrip';
 import { RouteSystemsTable } from './RouteSystemsTable';
 import { routeSystemName } from './routeSystemName';
+import { StopsPanel, type StopOrderSettings } from './StopsPanel';
+import { TripLegs } from './TripLegs';
 import { useRouteKills, type RouteKillsCell } from './useRouteKills';
-import { useRouteSafety } from './useRouteSafety';
+import { useRouteSafety, type RouteSafetyLeg } from './useRouteSafety';
 
 const ROUTE_PARAMS = {
   from: optionalIdParam(),
+  // The stops in the order typed. `to` is the single-stop link from before
+  // stops, still read so an old link opens; nothing writes it any more.
+  stops: orderedIdListParam(),
   to: optionalIdParam(),
+  opt: boolParam(),
+  ret: boolParam(),
+  keep: boolParam(),
   // Absent means the pilot's Travel default (Settings → Travel).
   pref: optionalEnumParam(ROUTE_PREFERENCES),
 };
+
+/** The stops a link names: `stops`, else a legacy `to`, each once, at most `MAX_STOPS`. */
+function stopsFromLink(stops: readonly number[], to: number | null): number[] {
+  const named = stops.length > 0 ? stops : to === null ? [] : [to];
+  return [...new Set(named)].slice(0, MAX_STOPS);
+}
+
+/** The leg an Avoid was asked from: its preview re-plans that leg alone. */
+interface AvoidLeg {
+  from: number;
+  to: number;
+  jumps: number;
+}
 
 /** The route's facts on one line: jumps · bands · lowest · last hour's kills · chokepoints. */
 function RouteFacts({ summary }: { summary: RouteSafetySummary }) {
@@ -96,29 +124,54 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
   const fromId = params.from ?? current.systemId;
   const fromIsCurrent = params.from === null && current.systemId !== null;
   const fromName = useSystemName(fromId);
-  const toName = useSystemName(params.to);
+  const systems = useSolarSystemIndex();
+  const stopsKey = stopsFromLink(params.stops, params.to).join(',');
+  const stops = useMemo(() => (stopsKey === '' ? [] : stopsKey.split(',').map(Number)), [stopsKey]);
+  const settings: StopOrderSettings = {
+    optimize: params.opt,
+    returnToStart: params.ret,
+    keepLastStopLast: params.keep,
+  };
+  // The two options are the optimizer's own: with it off, the typed order is flown as typed.
+  const optimizing = settings.optimize && stops.length > 1;
   const routeQuery = useRouteQuery(params.pref);
-  const state = useRouteSafety(fromId, params.to, routeQuery);
-  const killsOf = useRouteKills(
-    state.kind === 'route'
-      ? state.rows.map((row) => ({ systemId: row.systemId, band: row.band }))
-      : null
+  const state = useRouteSafety(
+    fromId,
+    stops,
+    {
+      optimize: optimizing,
+      returnToStart: optimizing && settings.returnToStart,
+      keepLastStopLast: optimizing && settings.keepLastStopLast,
+    },
+    routeQuery
   );
+  // Each system once, in flight order: a trip can cross one twice.
+  const routeSystems = useMemo(() => {
+    if (state.kind !== 'route') return null;
+    const seen = new Map<number, RouteSafetyRow>();
+    for (const leg of state.legs) {
+      for (const row of leg.rows ?? []) if (!seen.has(row.systemId)) seen.set(row.systemId, row);
+    }
+    return [...seen.values()].map((row) => ({ systemId: row.systemId, band: row.band }));
+  }, [state]);
+  const killsOf = useRouteKills(routeSystems);
   const avoided = useAvoidedSystems((s) => s.value);
   const avoidedEnabled = useAvoidedSystemsEnabled((s) => s.value);
   const [avoidTarget, setAvoidTarget] = useState<AvoidTarget | null>(null);
-  // The last drawn route's jump count, held while the route reloads, so an
-  // open Avoid dialog stays mounted instead of blinking out and back.
-  const routeJumps = state.kind === 'route' ? state.summary.jumps : null;
-  const [lastJumps, setLastJumps] = useState<number | null>(routeJumps);
-  if (routeJumps !== null && routeJumps !== lastJumps) setLastJumps(routeJumps);
-  // The route's own ends cannot be avoided; a system already on an active list has nothing to add.
-  const avoidAction = (row: RouteSafetyRow) =>
+  // The leg the last Avoid was asked from, kept after the dialog closes so it
+  // stays mounted rather than blinking out and back while the route reloads.
+  const [avoidLeg, setAvoidLeg] = useState<AvoidLeg | null>(null);
+  // The trip's own start and stops cannot be avoided; a system already on an
+  // active list has nothing to add.
+  const avoidAction = (leg: RouteSafetyLeg, row: RouteSafetyRow) =>
     row.systemId === fromId ||
-    row.systemId === params.to ||
+    stops.includes(row.systemId) ||
     (avoidedEnabled && avoided.includes(row.systemId))
       ? null
-      : () => setAvoidTarget({ systemId: row.systemId, name: routeSystemName(row) });
+      : () => {
+          setAvoidLeg({ from: leg.from, to: leg.to, jumps: leg.summary?.jumps ?? 0 });
+          setAvoidTarget({ systemId: row.systemId, name: routeSystemName(row) });
+        };
 
   const fromTrigger =
     fromId === null
@@ -126,6 +179,16 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
       : fromIsCurrent
         ? t('travel.currentSystem', { system: fromName ?? '…' })
         : (fromName ?? '…');
+  const nameOf = (systemId: number) =>
+    systems?.get(systemId)?.name ?? t('travel.stops.unnamed', { id: systemId });
+  const orderNote =
+    state.kind === 'route' && state.reordered
+      ? t('travel.stops.orderChanged', {
+          order: state.reordered.stops.map(nameOf).join(t('travel.stops.orderSeparator')),
+          typed: t('travel.summary.jumps', { count: state.reordered.typedJumps }),
+          jumps: t('travel.summary.jumps', { count: state.reordered.jumps }),
+        })
+      : null;
 
   return (
     <div className="space-y-4">
@@ -139,46 +202,48 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
       />
       {tabBar}
       <div className="grid items-start gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-        {/* A stack, so a panel can sit above Route rules in the same column. */}
         <div className="space-y-4">
+          <StopsPanel
+            fromId={fromId}
+            fromName={fromId === null ? fromTrigger : nameOf(fromId)}
+            fromTrigger={fromTrigger}
+            onFromChange={(systemId) => setParams({ from: systemId }, { push: true })}
+            stops={stops}
+            onStopsChange={(next) => setParams({ stops: next, to: null }, { push: true })}
+            settings={settings}
+            onSettingsChange={(patch) =>
+              setParams({
+                ...(patch.optimize === undefined ? {} : { opt: patch.optimize }),
+                ...(patch.returnToStart === undefined ? {} : { ret: patch.returnToStart }),
+                ...(patch.keepLastStopLast === undefined ? {} : { keep: patch.keepLastStopLast }),
+              })
+            }
+            optimizeBlocked={state.kind === 'route' && state.unreachable}
+            orderNote={orderNote}
+            nameOf={nameOf}
+          />
           <RouteRulesPanel
             preference={routeQuery.rules.preference}
             onPreferenceChange={(pref) => setParams({ pref })}
           />
         </div>
         <div className="min-w-0 space-y-4">
-          <Panel>
-            <div className="flex flex-wrap items-end gap-3">
-              <FilterField label={t('travel.fromLabel')} stretch={false}>
-                <SolarSystemPicker
-                  value={fromId}
-                  onChange={(systemId) => setParams({ from: systemId }, { push: true })}
-                  ariaLabel={t('travel.changeFrom', { current: fromTrigger })}
-                  triggerLabel={fromTrigger}
-                />
-              </FilterField>
-              <FilterField label={t('travel.toLabel')} stretch={false}>
-                <SolarSystemPicker
-                  value={params.to}
-                  onChange={(systemId) => setParams({ to: systemId }, { push: true })}
-                  ariaLabel={t('travel.changeTo', {
-                    current: params.to === null ? t('travel.pickSystem') : (toName ?? '…'),
-                  })}
-                  placeholder={t('travel.pickSystem')}
-                />
-              </FilterField>
-            </div>
-          </Panel>
-          <RouteBody state={state} killsOf={killsOf} avoidAction={avoidAction} />
+          <RouteBody
+            state={state}
+            multiStop={stops.length > 1}
+            nameOf={nameOf}
+            killsOf={killsOf}
+            avoidAction={avoidAction}
+          />
         </div>
       </div>
-      {lastJumps !== null && fromId !== null && params.to !== null && (
+      {avoidLeg !== null && (
         <AvoidSystemDialog
           target={avoidTarget}
-          fromId={fromId}
-          toId={params.to}
+          fromId={avoidLeg.from}
+          toId={avoidLeg.to}
           rules={routeQuery.rules}
-          currentJumps={lastJumps}
+          currentJumps={avoidLeg.jumps}
           onClose={() => setAvoidTarget(null)}
         />
       )}
@@ -188,12 +253,16 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
 
 function RouteBody({
   state,
+  multiStop,
+  nameOf,
   killsOf,
   avoidAction,
 }: {
   state: ReturnType<typeof useRouteSafety>;
+  multiStop: boolean;
+  nameOf: (systemId: number) => string;
   killsOf: (systemId: number) => RouteKillsCell;
-  avoidAction: (row: RouteSafetyRow) => (() => void) | null;
+  avoidAction: (leg: RouteSafetyLeg, row: RouteSafetyRow) => (() => void) | null;
 }) {
   const { t } = useTranslation();
   switch (state.kind) {
@@ -211,12 +280,20 @@ function RouteBody({
           <Spinner label={t('common.loading')} />
         </div>
       );
-    case 'route':
+    case 'route': {
+      const { trip } = state;
+      const onlyLeg = state.legs[0];
       return (
         <Panel>
           <div className="space-y-3">
-            <RouteFacts summary={state.summary} />
-            <RouteStrip rows={state.rows} killsOf={killsOf} />
+            {trip && <RouteFacts summary={trip.summary} />}
+            {trip && (
+              <RouteStrip
+                rows={trip.rows}
+                killsOf={killsOf}
+                stopIndexes={multiStop ? trip.stopIndexes : undefined}
+              />
+            )}
             {state.activityLoading && (
               <p role="status" className="text-text-dim">
                 {t('travel.activityLoading')}
@@ -227,14 +304,26 @@ function RouteBody({
                 {t('travel.activityUnavailable')}
               </p>
             )}
-            <RouteSystemsTable
-              rows={state.rows}
-              killsOf={killsOf}
-              avoidAction={avoidAction}
-              label={t('travel.tableLabel')}
-            />
+            {!multiStop && onlyLeg?.rows ? (
+              <RouteSystemsTable
+                rows={onlyLeg.rows}
+                killsOf={killsOf}
+                avoidAction={(row) => avoidAction(onlyLeg, row)}
+                label={t('travel.tableLabel')}
+              />
+            ) : (
+              <TripLegs
+                // A new order is a new itinerary: it opens on its own first leg.
+                key={state.legs.map((leg) => `${leg.from}-${leg.to}`).join(',')}
+                legs={state.legs}
+                nameOf={nameOf}
+                killsOf={killsOf}
+                avoidAction={avoidAction}
+              />
+            )}
           </div>
         </Panel>
       );
+    }
   }
 }

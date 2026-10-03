@@ -11,6 +11,7 @@ import {
   optionalEnumParam,
   optionalIdParam,
   optionalSortParam,
+  orderedIdListParam,
   resolveSort,
   sortParam,
   textParam,
@@ -129,6 +130,26 @@ describe('optionalEnumParam', () => {
 
   it('round-trips a non-null member', () => {
     expect(codec.serialize('outstanding')).toBe('outstanding');
+  });
+});
+
+describe('orderedIdListParam', () => {
+  const codec = orderedIdListParam();
+
+  it('keeps the order written, repeats included', () => {
+    expect(codec.parse('3,1,3')).toEqual([3, 1, 3]);
+    expect(codec.serialize([5, 2, 5])).toBe('5,2,5');
+  });
+
+  it('drops the whole list on any garbage entry', () => {
+    expect(codec.parse('1,x')).toEqual([]);
+    expect(codec.parse('1,0')).toEqual([]);
+  });
+
+  it('omits an empty list', () => {
+    expect(codec.parse(null)).toEqual([]);
+    expect(codec.parse('')).toEqual([]);
+    expect(codec.serialize([])).toBeNull();
   });
 });
 

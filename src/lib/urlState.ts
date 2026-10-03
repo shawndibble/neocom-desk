@@ -115,6 +115,22 @@ export function idListParam(): UrlParamCodec<readonly number[]> {
   };
 }
 
+/**
+ * A comma-separated list of positive ids in the order written — a trip's
+ * Stops, where the order is the point. Unlike `idListParam` it neither sorts
+ * nor de-duplicates. One unreadable entry discards the whole list.
+ */
+export function orderedIdListParam(): UrlParamCodec<readonly number[]> {
+  return {
+    parse: (raw) => {
+      if (raw === null || raw === '') return [];
+      const ids = raw.split(',').map(parsePositiveInt);
+      return ids.some((id) => id === null) ? [] : (ids as number[]);
+    },
+    serialize: (value) => (value.length === 0 ? null : value.join(',')),
+  };
+}
+
 /** One positive id (a region, a blueprint type…), or `null` for "none chosen". */
 export function optionalIdParam(): UrlParamCodec<number | null> {
   return {

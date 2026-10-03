@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findJumpRoute, jumpDistancesFrom, type JumpGraph } from './jumpRoute';
+import { findJumpRoute, jumpDistancesFrom, routeSweepFrom, type JumpGraph } from './jumpRoute';
 
 /**
  * A hand-built stand-in for the stargate graph, shaped so the three
@@ -314,5 +314,51 @@ describe('security penalty', () => {
       avoid: new Set([L]),
     });
     expect(route).toEqual({ kind: 'route', systems: [S, H1, H2, H3, E] });
+  });
+});
+
+describe('routeSweepFrom', () => {
+  it('costs one per jump under the shortest preference', () => {
+    const sweep = routeSweepFrom(GRAPH, HUB, { preference: 'shortest', securityOf });
+    expect(sweep.costs.get(FAR)).toBe(2);
+    expect(sweep.jumps.get(FAR)).toBe(2);
+    expect(sweep.costs.get(HUB)).toBe(0);
+  });
+
+  it('weights the cost by the preference while still counting jumps', () => {
+    const sweep = routeSweepFrom(GRAPH, HUB, {
+      preference: 'prefer-highsec',
+      securityOf,
+      securityPenalty: 50,
+    });
+    // The long highsec way round: four wanted jumps at 0.9 each.
+    expect(sweep.costs.get(FAR)).toBeCloseTo(3.6);
+    expect(sweep.jumps.get(FAR)).toBe(4);
+  });
+
+  it('charges an avoided system its penalty', () => {
+    const sweep = routeSweepFrom(GRAPH, HUB, { avoid: new Set([FAR]) });
+    expect(sweep.costs.get(FAR)).toBeGreaterThan(1e12);
+  });
+
+  it('gives the same route a single-pair lookup does', () => {
+    const options = { preference: 'prefer-highsec' as const, securityOf };
+    const sweep = routeSweepFrom(GRAPH, HUB, options);
+    const single = findJumpRoute(GRAPH, HUB, UNCHARTED, options);
+    expect(sweep.routeTo(UNCHARTED)).toEqual(single.kind === 'route' ? single.systems : null);
+    expect(sweep.routeTo(HUB)).toEqual([HUB]);
+  });
+
+  it('has no route to a system it cannot reach or does not know', () => {
+    const sweep = routeSweepFrom(GRAPH, HUB);
+    expect(sweep.costs.has(ISLAND)).toBe(false);
+    expect(sweep.routeTo(ISLAND)).toBeNull();
+    expect(sweep.routeTo(NOT_A_SYSTEM)).toBeNull();
+  });
+
+  it('reaches nothing from an origin the graph does not hold', () => {
+    const sweep = routeSweepFrom(GRAPH, NOT_A_SYSTEM);
+    expect(sweep.costs.size).toBe(0);
+    expect(sweep.routeTo(NOT_A_SYSTEM)).toBeNull();
   });
 });
