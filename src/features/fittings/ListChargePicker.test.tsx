@@ -88,7 +88,9 @@ describe('ListChargePicker', () => {
   it('names the loaded charge and opens the picker; a pick loads into every gun of the type', async () => {
     const user = userEvent.setup();
     const { applied } = renderPicker();
-    const trigger = screen.getByRole('button', { name: 'Charge in 425mm Railgun I' });
+    const trigger = screen.getByRole('button', {
+      name: 'Charge in 425mm Railgun I: Lead Charge L',
+    });
     expect(trigger).toHaveTextContent('Lead Charge L');
 
     await user.click(trigger);
@@ -100,14 +102,38 @@ describe('ListChargePicker', () => {
   it('"This gun" loads into this module only; "No charge" unloads it', async () => {
     const user = userEvent.setup();
     const { applied } = renderPicker();
-    await user.click(screen.getByRole('button', { name: 'Charge in 425mm Railgun I' }));
-    await user.click(screen.getByRole('button', { name: 'This gun' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Charge in 425mm Railgun I: Lead Charge L' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Just this one' }));
     await user.click(screen.getByRole('button', { name: /^Max damage/ }));
     expect(applied()!.modules.map((m) => m.chargeTypeId)).toEqual([238, 230]);
 
-    await user.click(screen.getByRole('button', { name: 'Charge in 425mm Railgun I' }));
-    await user.click(screen.getByRole('button', { name: 'This gun' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Charge in 425mm Railgun I: Lead Charge L' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Just this one' }));
     await user.click(screen.getByRole('button', { name: 'No charge' }));
     expect(applied()!.modules.map((m) => m.chargeTypeId)).toEqual([undefined, 230]);
+  });
+
+  it('before the engine is ready, still lists every charge its groups name', async () => {
+    const user = userEvent.setup();
+    render(
+      <ListChargePicker
+        module={gun(0)}
+        result={{ state: 'active', maxState: 'overload', chargeGroupIds: [85] }}
+        fitting={fitting}
+        catalogue={catalogue}
+        engineReady={false}
+        profile={null}
+        edit={vi.fn()}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: /^Charge in 425mm Railgun I/ }));
+    expect(screen.getByRole('button', { name: /Antimatter Charge L/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Lead Charge L/, pressed: true })
+    ).toBeInTheDocument();
   });
 });

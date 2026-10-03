@@ -395,7 +395,6 @@
     },
     "edit": {
       "stateLabel": "State of {{name}}",
-      "chargeLabel": "Charge in {{name}}",
       "noCharge": "No charge",
       "remove": "Remove {{name}}",
       "emptySlot": "Empty — add to {{rack}}",
@@ -542,9 +541,10 @@
       "pirate": "Pirate",
       "sheetTitle": "Charge · {{name}}",
       "scopeLabel": "Load into",
-      "scopeAll_one": "This gun",
-      "scopeAll_other": "All {{count}}",
-      "scopeOne": "This gun"
+      "scopeOne": "Just this one",
+      "scopeAll": "All {{count}}",
+      "triggerLabel": "Charge in {{name}}: {{charge}}",
+      "loadedOffList": "Loaded {{name}}, which this module can't use."
     },
     "popular": {
       "title": "Popular fits",

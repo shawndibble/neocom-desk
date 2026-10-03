@@ -66,7 +66,11 @@ export function ListChargePicker({
   const trigger = (
     <button
       type="button"
-      aria-label={t('fittings.edit.chargeLabel', { name: moduleName })}
+      aria-label={t('fittings.chargePicker.triggerLabel', {
+        name: moduleName,
+        charge:
+          loaded === undefined ? t('fittings.edit.noCharge') : catalogueTypeName(catalogue, loaded),
+      })}
       aria-haspopup="dialog"
       aria-expanded={open}
       onClick={narrow ? () => setOpen(true) : undefined}
@@ -169,6 +173,20 @@ function ChargePickerPanel({
     moduleTypeId: module.typeId,
   });
   const group = groups?.[0];
+  const loaded = module.chargeTypeId;
+  // A charge the engine doesn't list for this module (pasted in, say) stays named, as the old select kept it.
+  const offList =
+    loaded !== undefined && group !== undefined && !group.choices.some((c) => c.typeId === loaded);
+  // Before the engine (or a pilot) is ready there are no figures: every charge its groups name, by name.
+  const plainIds = useMemo(() => {
+    if (group) return group.choices.map((c) => c.typeId);
+    if (catalogue === null) return [];
+    return (result?.chargeGroupIds ?? [])
+      .flatMap((id) => catalogue.typeIdsByGroup.get(id) ?? [])
+      .sort((a, b) =>
+        catalogueTypeName(catalogue, a).localeCompare(catalogueTypeName(catalogue, b))
+      );
+  }, [group, catalogue, result]);
 
   const targets = scope === 'all' ? at : [{ slot: module.slot, slotIndex: module.slotIndex }];
   const load = (chargeTypeId: number | null) => {
@@ -194,9 +212,12 @@ function ChargePickerPanel({
           ]}
         />
       )}
-      {!group ? (
-        <p className="text-xs text-warning">{t('fittings.add.waitingForShipData')}</p>
-      ) : group.isWeapon ? (
+      {offList && (
+        <p className="text-[0.6875rem] text-warning">
+          {t('fittings.chargePicker.loadedOffList', { name: catalogueTypeName(catalogue, loaded) })}
+        </p>
+      )}
+      {group?.isWeapon ? (
         <ChargePickerGroup
           group={group}
           settings={DEFAULT_PICKER_SETTINGS}
@@ -205,24 +226,27 @@ function ChargePickerPanel({
         />
       ) : (
         <ul>
-          {group.choices.map((choice) => (
-            <li key={choice.typeId}>
-              <button
-                type="button"
-                aria-pressed={group.loaded.has(choice.typeId)}
-                onClick={() => load(choice.typeId)}
-                className={cx(
-                  'flex min-h-11 w-full items-center gap-2 border-l-2 px-2 text-left text-xs hover:bg-panel-2 md:min-h-9',
-                  group.loaded.has(choice.typeId)
-                    ? 'border-accent text-accent'
-                    : 'border-transparent'
-                )}
-              >
-                <TypeIcon typeId={choice.typeId} size={32} width={20} height={20} />
-                <span className="min-w-0 flex-1 truncate">{choice.name}</span>
-              </button>
-            </li>
-          ))}
+          {plainIds.map((typeId) => {
+            const isLoaded = typeId === loaded;
+            return (
+              <li key={typeId}>
+                <button
+                  type="button"
+                  aria-pressed={isLoaded}
+                  onClick={() => load(typeId)}
+                  className={cx(
+                    'flex min-h-11 w-full items-center gap-2 border-l-2 px-2 text-left text-xs hover:bg-panel-2 md:min-h-9',
+                    isLoaded ? 'border-accent text-accent' : 'border-transparent'
+                  )}
+                >
+                  <TypeIcon typeId={typeId} size={32} width={20} height={20} />
+                  <span className="min-w-0 flex-1 truncate">
+                    {catalogueTypeName(catalogue, typeId)}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
       {module.chargeTypeId !== undefined && (
