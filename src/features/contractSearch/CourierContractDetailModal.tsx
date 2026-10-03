@@ -22,7 +22,7 @@
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal } from '@/components/ui';
+import { Modal, Tooltip } from '@/components/ui';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { formatIsk, formatIskAuto, formatIskCompact } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -110,7 +110,10 @@ function useRouteExposure(
   row: CourierRouteRow,
   preference: RoutePreferenceKind
 ): RouteExposure | null {
-  const [exposure, setExposure] = useState<RouteExposure | null>(null);
+  // Tagged with the rules it was measured under, so a change to Travel
+  // Settings while this is open reads as "measuring" rather than showing the
+  // old path under the board's new jump count.
+  const [measured, setMeasured] = useState<{ key: string; exposure: RouteExposure } | null>(null);
   const originSystemId = row.origin.systemId;
   const destinationSystemId = row.destination.systemId;
   const { rules, key: routeKey, hydrated } = useRouteQuery(preference);
@@ -121,14 +124,14 @@ function useRouteExposure(
     void routeExposure(originSystemId, destinationSystemId, rules)
       .catch((): RouteExposure => ({ kind: 'unknown' }))
       .then((result) => {
-        if (!cancelled) setExposure(result);
+        if (!cancelled) setMeasured({ key: routeKey, exposure: result });
       });
     return () => {
       cancelled = true;
     };
   }, [originSystemId, destinationSystemId, rules, routeKey, hydrated]);
 
-  return exposure;
+  return measured?.key === routeKey ? measured.exposure : null;
 }
 
 /**
@@ -377,7 +380,13 @@ export function CourierContractDetailModal({
                   <span>{system.name ?? `#${system.systemId}`}</span>
                   {system.security !== null && <SecurityStatus security={system.security} />}
                   {system.chokepoint && (
-                    <span className="text-[0.6875rem] text-warning">{t('travel.chokepoint')}</span>
+                    // The same tag and hint Route Safety gives it, so the term
+                    // is explained wherever a route is listed.
+                    <Tooltip content={t('travel.chokepointHint')} openOnTap>
+                      <span tabIndex={0} className="text-[0.6875rem] text-warning">
+                        {t('travel.chokepoint')}
+                      </span>
+                    </Tooltip>
                   )}
                 </li>
               ))}
