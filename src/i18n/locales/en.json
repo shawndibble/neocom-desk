@@ -2924,7 +2924,7 @@
   "login": {
     "button": "Log in with EVE Online",
     "permissionsHint": "Logging in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, your in-game fittings, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions. Want to share less from the start? Use Log in with custom permissions, next to the Log in button, to choose exactly what you grant.",
-    "writeExceptions": "It also asks for four permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client; and saving a Fitting to EVE creates or replaces your in-game fitting there, the same as fitting it in the client. Nothing else in the app writes to EVE.",
+    "writeExceptions": "It also asks for five permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client; saving a Fitting to EVE creates or replaces your in-game fitting there, the same as fitting it in the client; and setting a route's waypoints in game replaces your autopilot waypoints in the EVE client. Nothing else in the app writes to EVE.",
     "eyebrow": "Free · Open source · Runs on your device",
     "heading": "Answers, not API dumps.",
     "previewLabel": "Example — logged-in view",
@@ -3091,8 +3091,8 @@
     "trustHeading": "It reads. It writes only when you act.",
     "trust": {
       "readOnly": {
-        "name": "Four writes, and nothing else",
-        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, a reply or forward you write goes out through your account, and saving a Fitting to EVE recreates it on the game's side. Nothing else in the app writes to EVE."
+        "name": "Five writes, and nothing else",
+        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, a reply or forward you write goes out through your account, saving a Fitting to EVE recreates it on the game's side, and setting a route's waypoints replaces your autopilot waypoints in the client. Nothing else in the app writes to EVE."
       },
       "token": {
         "name": "Your refresh token stays on this device",
@@ -6254,6 +6254,10 @@
       "label": "Character details",
       "caption": "Implants, clones, location, contacts, standings and loyalty."
     },
+    "autopilot": {
+      "label": "Autopilot waypoints",
+      "caption": "Set a route's waypoints in your EVE client from Route Safety."
+    },
     "fittings": {
       "label": "Fittings",
       "caption": "Your in-game Fittings, and saving Fittings to EVE."
@@ -6450,7 +6454,7 @@
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
           "crashes": "Crash reports: the error and the page it happened on. No IP addresses; request and response bodies are never captured; EVE tokens are stripped first.",
           "removal": "Removing a character clears it from this device only; adding it back restores its synced copy. That copy is deleted after 90 days with no device syncing it, or right away from Settings › Data & storage › Delete all data.",
-          "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account, and saving a Fitting to EVE creates or replaces it there. Nothing else is ever written.",
+          "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account, saving a Fitting to EVE creates or replaces it there, and Route Safety's Set waypoints in game replaces your autopilot waypoints. Nothing else is ever written.",
           "export": "Backups (Settings › Data & storage) are password-encrypted files, login tokens included. One is written only when you press the button, and saved only where you put it. We never see it."
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."
@@ -7439,6 +7443,31 @@
       "kills": "{{ships}} ship · {{pods}} pod kills in the last hour",
       "chokepoints": "Gank Chokepoints: {{names}}",
       "noChokepoints": "no Gank Chokepoints"
+    },
+    "waypoints": {
+      "action": "Set waypoints in game",
+      "sending": "Setting waypoints…",
+      "character": "Character to set waypoints for",
+      "needCharacter": "Log in a character to set waypoints in its EVE client.",
+      "needPermission": "This character hasn't granted the Autopilot waypoints permission.",
+      "grantTitle": "Setting waypoints needs a permission this character hasn't granted",
+      "grantHint": "Characters that logged in before this button existed must log in again to let Neocom Desk set autopilot waypoints in the EVE client.",
+      "grantAction": "Log in again",
+      "done": "Waypoints set. Your client plans the path between them with its own settings.",
+      "cutOff": {
+        "wormhole": "Waypoints set to {{entrance}}. Take the wormhole there, then set the rest from {{exit}}. Your client plans the path to {{entrance}} with its own settings.",
+        "bridge": "Waypoints set to {{entrance}}. Take the bridge there, then set the rest from {{exit}}. Your client plans the path to {{entrance}} with its own settings."
+      },
+      "nothing": {
+        "wormhole": "No waypoints set: the trip leaves {{entrance}} by wormhole. Take it, then set the rest from {{exit}}.",
+        "bridge": "No waypoints set: the trip leaves {{entrance}} by bridge. Take it, then set the rest from {{exit}}."
+      },
+      "nothingToSet": "No waypoints to set: the trip has no jumps.",
+      "noMap": "The stargate map couldn't be read, so no waypoints were set.",
+      "failed": "Waypoints not set: {{message}}",
+      "failedPartway": "{{set}} of {{total}} waypoints set, then ESI refused the rest: {{message}}",
+      "permissionReason": "this character hasn't granted the Autopilot waypoints permission",
+      "unknownError": "ESI gave no reason. Is the character logged in to the game?"
     },
     "activityLoading": "Loading the last hour of jumps and kills…",
     "activityUnavailable": "Some of ESI's last-hour figures couldn't be read, so they show as —, not as zero.",
