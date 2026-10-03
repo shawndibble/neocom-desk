@@ -177,9 +177,9 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     expect(useWorkbenchFitsMock).not.toHaveBeenCalled();
   });
 
-  it('lists fits with name, author and date added, linking each to Workbench', () => {
+  it('lists fits with name, author and date added, linking each to Workbench', async () => {
     openWorkbench({ ok: true, fits: [wbFit('a'), wbFit('b', { name: '', authorName: '' })] });
-    const link = screen.getByRole('link', { name: 'Fit a' });
+    const link = await screen.findByRole('link', { name: 'Fit a' });
     expect(link.getAttribute('href')).toBe('https://eveworkbench.com/fit/a');
     expect(screen.getByText('by Saryna Dach · added 2d ago')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Unnamed fit' })).toBeTruthy();
@@ -196,7 +196,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     };
     loadFittingFromTextMock.mockResolvedValue(loaded);
     const onOpen = openWorkbench({ ok: true, fits: [wbFit('a'), wbFit('b')] });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Load' })[1]);
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Load' }))[1]);
     await waitFor(() => expect(onOpen).toHaveBeenCalledWith(loaded));
     expect(loadFittingFromTextMock).toHaveBeenCalledWith('[Vexor, Fit b]');
   });
@@ -209,7 +209,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
       unresolved: [],
     });
     const onOpen = openWorkbench({ ok: true, fits: [wbFit('a')] });
-    fireEvent.click(screen.getByRole('button', { name: 'Load' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Load' }));
     expect((await screen.findByRole('alert')).textContent).toBe("Couldn't load this fit.");
     expect(onOpen).not.toHaveBeenCalled();
   });
@@ -242,6 +242,8 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
         wbFit('c', { eft: '[Vexor, Fit c]\nHeavy Neutron Blaster II' }),
       ],
     });
+    // Nothing is listed until the check lands, so an out-of-date fit never flashes up.
+    expect(screen.queryByRole('link', { name: 'Fit a' })).toBeNull();
     const show = await screen.findByRole('button', { name: 'Show 2 out-of-date fits' });
     expect(screen.queryByRole('link', { name: 'Fit a' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Fit b' })).toBeNull();
@@ -253,7 +255,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
       .map((link) => link.textContent)
       .filter((name) => name?.startsWith('Fit '));
     expect(names).toEqual(['Fit c', 'Fit a', 'Fit b']);
-    expect(screen.getByText('Out of date: uses a removed module: Old Gun I')).toBeTruthy();
+    expect(screen.getByText('Out of date: uses a removed item: Old Gun I')).toBeTruthy();
     expect(screen.getByText('Out of date: this ship has fewer high slots now')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Hide out-of-date fits' })).toBeTruthy();
   });

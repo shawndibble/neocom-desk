@@ -137,6 +137,8 @@ export function useWorkbenchFitCurrency(
 
 /** What the Workbench tab lists: current fits, then out-of-date ones only on request. */
 export interface WorkbenchFitList {
+  /** Still checking: nothing is listed yet, so an out-of-date fit never shows unasked. */
+  checking: boolean;
   listed: WorkbenchFit[];
   /** Why a listed fit is out of date; `undefined` for a current one. */
   reasonsFor: (id: string) => OutOfDateReason[] | undefined;
@@ -147,10 +149,12 @@ export interface WorkbenchFitList {
   setShowOutOfDate: (show: boolean) => void;
 }
 
-/** The Workbench tab's list for `fits`; until the check lands, every fit, unmarked. */
+/** The Workbench tab's list for `fits`; empty until the check lands. */
 export function useWorkbenchFitList(fits: readonly WorkbenchFit[] | null): WorkbenchFitList {
   const verdicts = useWorkbenchFitCurrency(fits);
-  const [showOutOfDate, setShowOutOfDate] = useState(false);
+  // Held against the fits it was asked for, so another hull starts hidden again.
+  const [shownFor, setShownFor] = useState<readonly WorkbenchFit[] | null>(null);
+  const showOutOfDate = fits !== null && shownFor === fits;
   const { current, outOfDate } = useMemo(
     () => partitionByCurrency(fits ?? [], verdicts ?? NO_VERDICTS),
     [fits, verdicts]
@@ -159,12 +163,18 @@ export function useWorkbenchFitList(fits: readonly WorkbenchFit[] | null): Workb
     () => new Map(outOfDate.map(({ fit, reasons }) => [fit.id, reasons])),
     [outOfDate]
   );
+  const checking = fits !== null && verdicts === null;
   return {
-    listed: showOutOfDate ? [...current, ...outOfDate.map(({ fit }) => fit)] : current,
+    checking,
+    listed: checking
+      ? []
+      : showOutOfDate
+        ? [...current, ...outOfDate.map(({ fit }) => fit)]
+        : current,
     reasonsFor: (id) => reasonsById.get(id),
     outOfDateCount: outOfDate.length,
     allOutOfDate: outOfDate.length > 0 && current.length === 0,
     showOutOfDate,
-    setShowOutOfDate,
+    setShowOutOfDate: (show) => setShownFor(show ? fits : null),
   };
 }

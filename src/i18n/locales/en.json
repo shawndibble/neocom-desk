@@ -627,7 +627,7 @@
         "loadFailed": "Couldn't load this fit.",
         "outOfDate": {
           "label": "Out of date: {{reasons}}",
-          "removedItem": "uses a removed module: {{name}}",
+          "removedItem": "uses a removed item: {{name}}",
           "removedHull": "this hull is no longer in the game: {{name}}",
           "lostSlots": {
             "high": "this ship has fewer high slots now",
@@ -639,6 +639,7 @@
           "show_one": "Show {{count}} out-of-date fit",
           "show_other": "Show {{count}} out-of-date fits",
           "hide": "Hide out-of-date fits",
+          "checking": "Checking fits against today's game…",
           "allOutOfDate_one": "This hull's only EVE Workbench fit is out of date with today's game.",
           "allOutOfDate_other": "All {{count}} of this hull's EVE Workbench fits are out of date with today's game."
         }

@@ -33,6 +33,8 @@ function isSlotKind(value: string): value is FittingSlotKind {
 /**
  * A Tech 3 cruiser's high, mid and low slots come from its subsystems, which
  * the bare hull's counts (all zero) don't include — so they can't be counted.
+ * Any other hull reading 0/0/0 is skipped the same way: missing data, not a
+ * reason to call a fit out of date.
  */
 function subsystemSetsRacks(parts: LoadParts & { hullTypeId: number }, slots: HullSlotCounts) {
   return (

@@ -4,7 +4,7 @@
  * current ones. The check itself is `workbenchFitCurrency.ts`.
  */
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, Spinner } from '@/components/ui';
 import type { OutOfDateReason } from '@/engine/fittings/fitCurrency';
 import type { WorkbenchFitList } from './workbenchFitCurrency';
 
@@ -13,13 +13,16 @@ export function OutOfDateReasons({ reasons }: { reasons: OutOfDateReason[] | und
   const { t } = useTranslation();
   if (reasons === undefined) return null;
   const text = reasons
-    .map((reason) =>
-      reason.kind === 'lost-slots'
-        ? t(`fittings.popular.workbench.outOfDate.lostSlots.${reason.rack}`)
-        : reason.kind === 'unknown-hull'
-          ? t('fittings.popular.workbench.outOfDate.removedHull', { name: reason.name })
-          : t('fittings.popular.workbench.outOfDate.removedItem', { name: reason.name })
-    )
+    .map((reason) => {
+      switch (reason.kind) {
+        case 'lost-slots':
+          return t(`fittings.popular.workbench.outOfDate.lostSlots.${reason.rack}`);
+        case 'unknown-hull':
+          return t('fittings.popular.workbench.outOfDate.removedHull', { name: reason.name });
+        case 'removed-item':
+          return t('fittings.popular.workbench.outOfDate.removedItem', { name: reason.name });
+      }
+    })
     .join(' · ');
   return (
     <p className="text-xs text-warning">
@@ -28,16 +31,24 @@ export function OutOfDateReasons({ reasons }: { reasons: OutOfDateReason[] | und
   );
 }
 
-/** Shows or hides the out-of-date fits; says so when there are only those. */
+/**
+ * Below the list: the check's progress, then a toggle that shows or hides the
+ * out-of-date fits, saying so when there are only those.
+ */
 export function OutOfDateToggle({
   list,
 }: {
   list: Pick<
     WorkbenchFitList,
-    'outOfDateCount' | 'allOutOfDate' | 'showOutOfDate' | 'setShowOutOfDate'
+    'checking' | 'outOfDateCount' | 'allOutOfDate' | 'showOutOfDate' | 'setShowOutOfDate'
   >;
 }) {
   const { t } = useTranslation();
+  if (list.checking) {
+    return (
+      <Spinner size="sm" delayMs={200} label={t('fittings.popular.workbench.outOfDate.checking')} />
+    );
+  }
   if (list.outOfDateCount === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
