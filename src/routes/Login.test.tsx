@@ -49,6 +49,7 @@ const WRITE_SCOPE_PHRASES: Record<string, string> = {
   'esi-calendar.respond_calendar_events.v1': 'sends that response to EVE',
   'esi-mail.send_mail.v1': 'sends it through your EVE account',
   'esi-fittings.write_fittings.v1': 'creates or replaces your in-game fitting',
+  'esi-ui.write_waypoint.v1': 'autopilot waypoints in the EVE client',
 };
 
 const BASE_GRANT_PHRASES: Record<string, string> = {
@@ -264,7 +265,7 @@ describe('Login', () => {
       await screen.findByRole('heading', { name: /it writes only when you act/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /four writes, and nothing else/i })
+      screen.getByRole('heading', { name: /five writes, and nothing else/i })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: /your refresh token stays on this device/i })

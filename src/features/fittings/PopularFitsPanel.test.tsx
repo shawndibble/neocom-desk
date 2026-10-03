@@ -16,12 +16,29 @@ vi.mock('./workbenchFits', () => ({
   workbenchFitUrl: (id: string) => `https://eveworkbench.com/fit/${id}`,
 }));
 vi.mock('./loadFittingFromText', () => ({ loadFittingFromText: loadFittingFromTextMock }));
+// Sightings (#2486) have their own tests: WorkbenchSightingBadge.test.tsx.
+vi.mock('./workbenchSightings', () => ({ useWorkbenchSightings: () => new Map() }));
 vi.mock('@/sde/loadSde', () => ({
   typeName: (typeId: number) =>
     Promise.resolve(
       { 100: 'Heavy Neutron Blaster II', 200: 'Warp Scrambler II', 300: 'Damage Control II' }[
         typeId
       ] ?? `Type ${typeId}`
+    ),
+  // The out-of-date check's game data (issue #2485): a Vexor with one high slot.
+  loadFittingSlots: () => Promise.resolve({ 3001: 'high' }),
+  loadShipTree: () =>
+    Promise.resolve({
+      ships: [{ typeID: 626, stats: { highSlots: 1, medSlots: 4, lowSlots: 5, rigSlots: 3 } }],
+    }),
+}));
+vi.mock('@/features/skills/typeCatalog', () => ({
+  loadItemNameMap: () =>
+    Promise.resolve(
+      new Map([
+        ['vexor', { typeID: 626 }],
+        ['heavy neutron blaster ii', { typeID: 3001 }],
+      ])
     ),
 }));
 
@@ -162,9 +179,9 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     expect(useWorkbenchFitsMock).not.toHaveBeenCalled();
   });
 
-  it('lists fits with name, author and date added, linking each to Workbench', () => {
+  it('lists fits with name, author and date added, linking each to Workbench', async () => {
     openWorkbench({ ok: true, fits: [wbFit('a'), wbFit('b', { name: '', authorName: '' })] });
-    const link = screen.getByRole('link', { name: 'Fit a' });
+    const link = await screen.findByRole('link', { name: 'Fit a' });
     expect(link.getAttribute('href')).toBe('https://eveworkbench.com/fit/a');
     expect(screen.getByText('by Saryna Dach · added 2d ago')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Unnamed fit' })).toBeTruthy();
@@ -181,7 +198,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     };
     loadFittingFromTextMock.mockResolvedValue(loaded);
     const onOpen = openWorkbench({ ok: true, fits: [wbFit('a'), wbFit('b')] });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Load' })[1]);
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Load' }))[1]);
     await waitFor(() => expect(onOpen).toHaveBeenCalledWith(loaded));
     expect(loadFittingFromTextMock).toHaveBeenCalledWith('[Vexor, Fit b]');
   });
@@ -194,7 +211,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
       unresolved: [],
     });
     const onOpen = openWorkbench({ ok: true, fits: [wbFit('a')] });
-    fireEvent.click(screen.getByRole('button', { name: 'Load' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Load' }));
     expect((await screen.findByRole('alert')).textContent).toBe("Couldn't load this fit.");
     expect(onOpen).not.toHaveBeenCalled();
   });
@@ -214,5 +231,46 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     expect(screen.getByRole('status').textContent).toMatch(
       /Couldn't reach the EVE Workbench fit list/
     );
+  });
+
+  it('lists current fits first and out-of-date ones, with why, only on request', async () => {
+    openWorkbench({
+      ok: true,
+      fits: [
+        wbFit('a', { eft: '[Vexor, Fit a]\nOld Gun I' }),
+        wbFit('b', {
+          eft: '[Vexor, Fit b]\nHeavy Neutron Blaster II\nHeavy Neutron Blaster II',
+        }),
+        wbFit('c', { eft: '[Vexor, Fit c]\nHeavy Neutron Blaster II' }),
+      ],
+    });
+    // Nothing is listed until the check lands, so an out-of-date fit never flashes up.
+    expect(screen.queryByRole('link', { name: 'Fit a' })).toBeNull();
+    const show = await screen.findByRole('button', { name: 'Show 2 out-of-date fits' });
+    expect(screen.queryByRole('link', { name: 'Fit a' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Fit b' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Fit c' })).toBeTruthy();
+
+    fireEvent.click(show);
+    const names = screen
+      .getAllByRole('link')
+      .map((link) => link.textContent)
+      .filter((name) => name?.startsWith('Fit '));
+    expect(names).toEqual(['Fit c', 'Fit a', 'Fit b']);
+    expect(screen.getByText('Out of date: uses a removed item: Old Gun I')).toBeTruthy();
+    expect(screen.getByText('Out of date: this ship has fewer high slots now')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Hide out-of-date fits' })).toBeTruthy();
+  });
+
+  it('says so when every fit for the hull is out of date, rather than looking empty', async () => {
+    openWorkbench({ ok: true, fits: [wbFit('a', { eft: '[Vexor, Fit a]\nOld Gun I' })] });
+    expect(
+      await screen.findByText(
+        "This hull's only EVE Workbench fit is out of date with today's game."
+      )
+    ).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Fit a' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show 1 out-of-date fit' }));
+    expect(screen.getByRole('link', { name: 'Fit a' })).toBeTruthy();
   });
 });

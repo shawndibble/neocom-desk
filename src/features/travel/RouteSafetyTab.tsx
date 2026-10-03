@@ -33,6 +33,8 @@
  * in the link (`wh`, `whsize`, `whlife`, `whhub`). While the list loads the
  * gate route shows and says so; if EVE-Scout cannot be reached the route is
  * gates only, and says that too.
+ *
+ * Set waypoints in game (issue #2479) closes the facts line (`SetWaypoints`).
  */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -69,6 +71,7 @@ import { RouteRulesPanel, type RouteHoleChange } from './RouteRulesPanel';
 import { RouteStrip } from './RouteStrip';
 import { RouteSystemsTable, type HoleRowProps } from './RouteSystemsTable';
 import { routeSystemName } from './routeSystemName';
+import { SetWaypoints } from './SetWaypoints';
 import { StopsPanel, type StopOrderSettings } from './StopsPanel';
 import { TripLegs } from './TripLegs';
 import { useRouteHoles, type RouteHolesState } from './useRouteHoles';
@@ -378,7 +381,11 @@ function RouteBody({
       return (
         <Panel>
           <div className="space-y-3">
-            {trip && <RouteFacts summary={trip.summary} holeJumps={trip.holeJumps} />}
+            {trip && (
+              <SetWaypoints legs={state.legs} nameOf={nameOf}>
+                <RouteFacts summary={trip.summary} holeJumps={trip.holeJumps} />
+              </SetWaypoints>
+            )}
             {trip && (
               <RouteStrip
                 rows={trip.rows}

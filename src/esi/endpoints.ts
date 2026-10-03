@@ -1913,6 +1913,32 @@ export async function postRoute(
   return { ...result, data: result.data?.route ?? null };
 }
 
+// --- POST /ui/autopilot/waypoint (esi-ui.write_waypoint.v1) ---
+
+/**
+ * Sets one autopilot waypoint in the Character's EVE client — Route Safety's
+ * Set waypoints in game (issue #2479). `destinationId` is a solar system,
+ * station or structure id. ESI answers 204 with no body. Both flags are
+ * required query parameters, so both are always sent, `false` included.
+ */
+export function postAutopilotWaypoint(
+  characterId: number,
+  destinationId: number,
+  { clearOtherWaypoints, signal }: { clearOtherWaypoints: boolean; signal?: AbortSignal }
+): Promise<EsiResult<null>> {
+  return esiFetch<null>('/ui/autopilot/waypoint', {
+    signal,
+    characterId,
+    method: 'POST',
+    query: {
+      destination_id: destinationId,
+      clear_other_waypoints: clearOtherWaypoints,
+      add_to_beginning: false,
+    },
+    endpointId: 'postAutopilotWaypoint',
+  });
+}
+
 // ---------------------------------------------------------------------------
 // The `corp` scope group (issue #295).
 //
