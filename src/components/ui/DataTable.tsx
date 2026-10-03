@@ -222,9 +222,9 @@ export interface DataTableExpandableRow<T> {
 }
 
 /**
- * Phone-only row grouping (`DataTable`'s `groupBy`): rows sharing a key fold
- * behind one toggle row, so a list with many near-duplicates (ten courier
- * offers on one route) reads as one line per distinct thing.
+ * Row grouping (`DataTable`'s `groupBy`): rows sharing a key fold behind one
+ * toggle row, so a list with many near-duplicates (ten courier offers on one
+ * route) reads as one line per distinct thing. Phone-only unless `allWidths`.
  */
 export interface DataTableGroupBy<T> {
   /** Rows with equal non-null keys group; null never groups. */
@@ -233,6 +233,12 @@ export interface DataTableGroupBy<T> {
   renderHeader: (rows: readonly T[]) => ReactNode;
   /** Initial expansion per group; default collapsed. */
   defaultExpanded?: (rows: readonly T[]) => boolean;
+  /**
+   * Groups at every width, not only on a phone — for a fold that is part of
+   * what the table says rather than a space saving (Route Safety's quiet
+   * stretches of a route).
+   */
+  allWidths?: boolean;
 }
 
 interface DataTableProps<T> {
@@ -372,9 +378,10 @@ interface DataTableProps<T> {
   /** Phone-only controls right of the sort picker (e.g. a filter trigger). Only rendered with `mobileSort`. */
   stackActions?: ReactNode;
   /**
-   * Phone-only grouping of equal-keyed rows behind a toggle row — see
-   * `DataTableGroupBy`. Never applied at `sm` and up, where the rows have the
-   * width to sit side by side and a reader compares them column-wise.
+   * Grouping of equal-keyed rows behind a toggle row — see
+   * `DataTableGroupBy`. Phone-only by default: at `sm` and up the rows have
+   * the width to sit side by side and a reader compares them column-wise,
+   * unless the group sets `allWidths`.
    */
   groupBy?: DataTableGroupBy<T>;
   /**
@@ -848,7 +855,7 @@ export function DataTable<T>({
     [exportable, sortedRows]
   );
 
-  const grouping = groupBy !== undefined && cardsWanted;
+  const grouping = groupBy !== undefined && (cardsWanted || groupBy.allWidths === true);
   // Grouped over (row, index) pairs so `rowKey` still gets each row's index
   // in sort order, exactly as the ungrouped table passes it.
   const groups = useMemo(() => {

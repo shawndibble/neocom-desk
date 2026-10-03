@@ -7295,14 +7295,29 @@
     "tableLabel": "Systems on the route",
     "col": {
       "system": "System",
-      "security": "Security",
+      "security": "Sec.",
       "region": "Region",
-      "jumps": "Jumps (1h)",
-      "shipKills": "Ship kills (1h)",
-      "podKills": "Pod kills (1h)",
-      "npcKills": "NPC kills (1h)",
+      "lastHour": "Last hour",
+      "lastHourHint": "Ship kills · pod kills · jumps in the last hour, as ESI reports them.",
       "recentKills": "zKillboard (1h)",
       "avoid": "Avoid"
+    },
+    "lastHour": {
+      "ships": "ship kills",
+      "pods": "pod kills",
+      "jumps": "jumps"
+    },
+    "detail": {
+      "npcKills": "NPC kills in the last hour: {{count}}"
+    },
+    "fold_one": "{{count}} system · {{from}} → {{to}} · lowest {{security}} · no kills reported in the last hour",
+    "fold_other": "{{count}} systems · {{from}} → {{to}} · lowest {{security}} · no kills reported in the last hour",
+    "strip": {
+      "label_one": "Route strip, {{count}} system from {{from}} to {{to}}. Key systems: {{keys}}.",
+      "label_other": "Route strip, {{count}} systems from {{from}} to {{to}}. Key systems: {{keys}}.",
+      "system": "{{name}} {{security}}",
+      "systemChokepoint": "{{name}} {{security}}, Gank Chokepoint",
+      "kills": "Kills in the last hour"
     },
     "rules": {
       "title": "Route rules",
@@ -7356,19 +7371,20 @@
       "elsewhere_other": "{{count}} kills elsewhere in the system, last one {{minutes}} min ago",
       "onPath": "On your route",
       "bubbles": "Interdictor or HIC on the mail",
-      "smartbombs": "Smartbombs involved"
+      "smartbombs": "Smartbombs involved",
+      "noneElsewhere": "No zKillboard kills elsewhere in the system in the last hour."
     },
     "chokepoint": "Gank Chokepoint",
     "chokepointHint": "One of the systems haulers are most often killed in, as named by the community. A property of traffic, not of security status.",
     "summary": {
       "label": "Route summary",
-      "jumps_one": "{{count}} jump from start to destination",
-      "jumps_other": "{{count}} jumps from start to destination",
-      "bands": "{{highsec}} highsec, {{lowsec}} lowsec, {{nullsec}} nullsec systems",
-      "lowest": "Lowest security {{security}}",
-      "kills": "Last hour along the route: {{ships}} ship kills, {{pods}} pod kills",
-      "chokepoints": "Passes through Gank Chokepoints: {{names}}",
-      "noChokepoints": "Passes through no Gank Chokepoints"
+      "jumps_one": "{{count}} jump",
+      "jumps_other": "{{count}} jumps",
+      "bands": "{{highsec}} highsec / {{lowsec}} lowsec / {{nullsec}} nullsec",
+      "lowest": "lowest {{security}}",
+      "kills": "{{ships}} ship · {{pods}} pod kills in the last hour",
+      "chokepoints": "Gank Chokepoints: {{names}}",
+      "noChokepoints": "no Gank Chokepoints"
     },
     "activityLoading": "Loading the last hour of jumps and kills…",
     "activityUnavailable": "Some of ESI's last-hour figures couldn't be read, so they show as —, not as zero.",

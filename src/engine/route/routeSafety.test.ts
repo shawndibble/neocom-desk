@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildRouteSafetyRows,
+  foldQuietStretches,
   indexSystemJumps,
+  routeStripKeySystems,
   indexSystemKills,
   summarizeRouteSafety,
   type RouteSafetyInputs,
+  type RouteSafetyRow,
 } from './routeSafety';
 
 const JITA = 30000142;
@@ -122,5 +125,144 @@ describe('summarizeRouteSafety', () => {
     const summary = summarizeRouteSafety(rows);
     expect(summary.shipKills).toBeNull();
     expect(summary.podKills).toBeNull();
+  });
+});
+
+/** A hand-built row: zero kills, known security, not a chokepoint, unless overridden. */
+function row(systemId: number, overrides: Partial<RouteSafetyRow> = {}): RouteSafetyRow {
+  return {
+    systemId,
+    name: `S${systemId}`,
+    security: 0.8,
+    band: 'highsec',
+    regionId: 10000002,
+    regionName: 'The Forge',
+    jumps: 10,
+    shipKills: 0,
+    podKills: 0,
+    npcKills: 0,
+    chokepoint: false,
+    ...overrides,
+  };
+}
+
+const noZkill = () => 0;
+
+/** Each stretch as a short string: a system's id, or `quiet[a,b,c]`. */
+function shape(stretches: ReturnType<typeof foldQuietStretches>): string[] {
+  return stretches.map((stretch) =>
+    stretch.kind === 'system'
+      ? String(stretch.row.systemId)
+      : `quiet[${stretch.rows.map((r) => r.systemId).join(',')}]`
+  );
+}
+
+describe('foldQuietStretches', () => {
+  it('folds a run of quiet middle systems, never either end', () => {
+    const rows = [row(1), row(2), row(3), row(4), row(5)];
+    expect(shape(foldQuietStretches(rows, noZkill))).toEqual(['1', 'quiet[2,3,4]', '5']);
+  });
+
+  it('reports each run with its lowest security', () => {
+    const rows = [row(1), row(2, { security: 0.6 }), row(3, { security: 0.5 }), row(4)];
+    const [, run] = foldQuietStretches(rows, noZkill);
+    expect(run).toMatchObject({ kind: 'quiet', lowestSecurity: 0.5 });
+  });
+
+  it('leaves a lone quiet system as its own row', () => {
+    const rows = [row(1), row(2), row(3, { shipKills: 1 }), row(4), row(5)];
+    expect(shape(foldQuietStretches(rows, noZkill))).toEqual(['1', '2', '3', '4', '5']);
+  });
+
+  it('splits runs around a system with ship or pod kills', () => {
+    const rows = [
+      row(1),
+      row(2),
+      row(3),
+      row(4, { podKills: 1 }),
+      row(5),
+      row(6),
+      row(7, { shipKills: 2 }),
+      row(8),
+    ];
+    expect(shape(foldQuietStretches(rows, noZkill))).toEqual([
+      '1',
+      'quiet[2,3]',
+      '4',
+      'quiet[5,6]',
+      '7',
+      '8',
+    ]);
+  });
+
+  it('still folds a system with only NPC kills', () => {
+    const rows = [row(1), row(2, { npcKills: 40 }), row(3), row(4)];
+    expect(shape(foldQuietStretches(rows, noZkill))).toEqual(['1', 'quiet[2,3]', '4']);
+  });
+
+  it('never folds a Gank Chokepoint', () => {
+    const rows = [row(1), row(2), row(3, { chokepoint: true }), row(4), row(5)];
+    expect(shape(foldQuietStretches(rows, noZkill))).toEqual(['1', '2', '3', '4', '5']);
+  });
+
+  it('never folds a system with zKillboard kills', () => {
+    const rows = [row(1), row(2), row(3), row(4), row(5)];
+    const zkill = (systemId: number) => (systemId === 3 ? 1 : 0);
+    expect(shape(foldQuietStretches(rows, zkill))).toEqual(['1', '2', '3', '4', '5']);
+  });
+
+  it('treats an unknown ESI figure as unknown, never zero', () => {
+    for (const unknown of [{ shipKills: null }, { podKills: null }] as const) {
+      const rows = [row(1), row(2), row(3, unknown), row(4), row(5)];
+      expect(shape(foldQuietStretches(rows, noZkill))).toEqual(['1', '2', '3', '4', '5']);
+    }
+  });
+
+  it('treats a zKillboard figure still loading or unavailable as unknown, never zero', () => {
+    const rows = [row(1), row(2), row(3), row(4), row(5)];
+    const zkill = (systemId: number) => (systemId === 3 ? null : 0);
+    expect(shape(foldQuietStretches(rows, zkill))).toEqual(['1', '2', '3', '4', '5']);
+  });
+
+  it('never folds a J-space system, even reported as zero', () => {
+    const rows = [row(1), row(31000005), row(31000006), row(4)];
+    expect(shape(foldQuietStretches(rows, noZkill))).toEqual(['1', '31000005', '31000006', '4']);
+  });
+
+  it('never folds a system of unknown security', () => {
+    const rows = [row(1), row(2), row(3, { security: null, band: null }), row(4), row(5)];
+    expect(shape(foldQuietStretches(rows, noZkill))).toEqual(['1', '2', '3', '4', '5']);
+  });
+
+  it('folds within whatever list it is given, so a leg folds between its own ends', () => {
+    expect(shape(foldQuietStretches([row(1), row(2)], noZkill))).toEqual(['1', '2']);
+    expect(shape(foldQuietStretches([], noZkill))).toEqual([]);
+  });
+});
+
+describe('routeStripKeySystems', () => {
+  it('names the ends, the first lowest-security system and every chokepoint, in route order', () => {
+    const rows = [
+      row(1, { security: 0.9 }),
+      row(2, { security: 0.5 }),
+      row(3, { security: 0.7, chokepoint: true }),
+      row(4, { security: 0.5 }),
+      row(5, { security: 0.8 }),
+    ];
+    expect(routeStripKeySystems(rows)).toEqual([0, 1, 2, 4]);
+  });
+
+  it('names a system once when it is several kinds of key', () => {
+    const rows = [row(1, { security: 0.4, chokepoint: true }), row(2, { security: 0.9 })];
+    expect(routeStripKeySystems(rows)).toEqual([0, 1]);
+  });
+
+  it('skips the lowest when no security is known', () => {
+    const rows = [
+      row(1, { security: null }),
+      row(2, { security: null }),
+      row(3, { security: null }),
+    ];
+    expect(routeStripKeySystems(rows)).toEqual([0, 2]);
   });
 });

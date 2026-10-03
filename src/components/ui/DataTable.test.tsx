@@ -1075,6 +1075,20 @@ describe('DataTable opt-in phone features', () => {
       });
     });
 
+    it('groups at every width when the grouping asks to, and a member row still opens', async () => {
+      const user = userEvent.setup();
+      renderOffers({
+        groupBy: { ...groupBy, allWidths: true },
+        expandableRow: { renderDetail: (row) => `detail-${row.id}` },
+      });
+      const toggle = screen.getByRole('button', { name: 'Jita→Amarr ×2' });
+      expect(offerIds()).toEqual(['2', '4']);
+      await user.click(toggle);
+      expect(offerIds()).toEqual(['1', '3', '2', '4']);
+      await user.click(screen.getByText('offer-3'));
+      expect(screen.getByText('detail-3')).toBeInTheDocument();
+    });
+
     it('never groups off a phone', () => {
       renderOffers();
       expect(document.querySelector('.dt-group-header')).toBeNull();
