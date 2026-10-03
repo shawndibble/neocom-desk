@@ -662,7 +662,7 @@ function SlotTile({
             <AddRow aria-hidden className="text-text-dim" />
           )}
           {module?.chargeTypeId !== undefined && (
-            <span className="absolute right-0 bottom-0 h-3/4 w-3/4 border border-line bg-panel">
+            <span className="absolute inset-0 bg-panel">
               <TypeIcon typeId={module.chargeTypeId} size={64} className="h-full w-full" />
             </span>
           )}
