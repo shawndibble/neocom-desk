@@ -27,7 +27,7 @@ import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes } from '@/engine/fittings/affectedBy';
 import { skillSourceTypeIds } from '@/engine/fittings/skillGains';
-import { extractMining, miningYield } from '@/engine/fittings/mining';
+import { extractCrystalFigures, extractMining, miningYield } from '@/engine/fittings/mining';
 import { extractFleetSupport } from '@/engine/fittings/fleetSupport';
 import { capacitorStatusAtDrain } from '@/engine/fittings/tank';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
@@ -984,6 +984,42 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(
       mine(hulk([strip(0)], [{ typeId: MINING_DRONE_II, quantity: 5, state: 'online' }])).perSecond
     ).toBeCloseTo(bare.perSecond, 9);
+  });
+
+  it('backs the crystal guide: A keeps the most per rock, B mines fastest, C empties the rock', () => {
+    // Looked up by exact name in `public/data/types.json`, 2026-10-03.
+    const [SIMPLE_B_II, SIMPLE_C_II] = [60283, 60284];
+    const figures = (chargeTypeId: number) => {
+      const fitting: Fitting = {
+        name: 'Hulk',
+        shipTypeId: HULK,
+        modules: [0, 1].map((slotIndex) => ({
+          slot: 'high' as const,
+          slotIndex,
+          typeId: MODULATED_STRIP_MINER_II,
+          state: 'active' as const,
+          chargeTypeId,
+        })),
+        drones: [],
+        cargo: [],
+      };
+      const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(MINING_SKILL_IDS));
+      return extractCrystalFigures(dogmaFit.items, calculate(dogmaFit).items, [0, 1])!;
+    };
+    const a = figures(SIMPLE_ASTEROID_MINING_CRYSTAL_TYPE_A_II);
+    const b = figures(SIMPLE_B_II);
+    const c = figures(SIMPLE_C_II);
+
+    // B: A's yield a cycle on a shorter cycle, so more a second, with more residue.
+    expect(b.cycleSeconds).toBeLessThan(a.cycleSeconds);
+    expect(b.m3PerSecond).toBeGreaterThan(a.m3PerSecond);
+    expect(b.residueChance).toBeGreaterThan(a.residueChance);
+    // A keeps the most of what leaves the rock.
+    expect(a.m3PerSecond / a.removedM3s).toBeGreaterThan(b.m3PerSecond / b.removedM3s);
+    // C: little yield, but the rock empties fastest.
+    expect(c.m3PerSecond).toBeLessThan(a.m3PerSecond);
+    expect(c.removedM3s).toBeGreaterThan(b.removedM3s);
+    expect(c.residueMultiplier).toBeGreaterThan(1);
   });
 
   it('reads fleet boosts off an Orca and a Vulture, each skill moving the figure it should', () => {

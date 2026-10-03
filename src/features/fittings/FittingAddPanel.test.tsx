@@ -469,6 +469,54 @@ describe('FittingAddPanel', () => {
     expect(screen.queryByRole('button', { name: 'Usable' })).not.toBeInTheDocument();
   });
 
+  it('gives a mining laser its crystal guide, by ore family', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation(() => new Map());
+    checkCharges.mockImplementation(() => new Set([60281]));
+    compareCharges.mockImplementation(() => [
+      {
+        typeId: 60281,
+        dps: 0,
+        optimal: 0,
+        falloff: 0,
+        damage: null,
+        roundsPerMinute: null,
+        techLevel: 2,
+        mining: {
+          m3PerSecond: 12.7,
+          cycleSeconds: 37.1,
+          residueChance: 0.376,
+          residueMultiplier: 1,
+          residueM3s: 4.7,
+          removedM3s: 17.4,
+        },
+      },
+    ]);
+    renderPanel({
+      fitting: {
+        ...fitting,
+        modules: [{ slot: 'high', slotIndex: 0, typeId: 17912, state: 'active' }],
+      },
+      target: null,
+      catalogue: {
+        ...catalogue,
+        types: {
+          17912: { name: 'Modulated Strip Miner II' },
+          60281: { name: 'Simple Asteroid Mining Crystal Type A II' },
+        } as unknown as FittingCatalogue['types'],
+        typeIdsByGroup: new Map([[482, [60281]]]),
+      },
+      moduleResults: [{ state: 'active', maxState: 'active', chargeGroupIds: [482] }],
+    });
+    await user.click(screen.getByRole('tab', { name: 'Charges' }));
+    expect(screen.getByRole('list', { name: 'Crystal types' })).toBeInTheDocument();
+    const simple = screen.getByRole('button', { name: /^Simple Asteroid: Veldspar/ });
+    await user.click(simple);
+    expect(
+      screen.getByRole('button', { name: /^Simple Asteroid Mining Crystal Type A II, 12\.7 m³\/s/ })
+    ).toBeInTheDocument();
+  });
+
   it('adds any item to the cargo hold, in the quantity asked, from the Cargo tab', async () => {
     const user = userEvent.setup();
     const onAddCargo = vi.fn();

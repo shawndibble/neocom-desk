@@ -71,6 +71,7 @@ const group: WeaponChargeGroup = {
   loaded: new Set([11289]),
   isWeapon: false,
   isCapBooster: true,
+  isMiner: false,
   choices,
 };
 

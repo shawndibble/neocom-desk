@@ -9,6 +9,7 @@
  */
 import { turretDamageMultiplier, turretHitChance, type DamageSplit } from './appliedDps';
 import type { CapBoosterFigures } from './capBoosterChoice';
+import type { CrystalFigures } from './mining';
 
 export type ChargeTier = 'tech1' | 'faction' | 'tech2';
 
@@ -42,6 +43,8 @@ export interface ChargeChoice {
   skillMissing: boolean;
   /** A cap booster charge's figures (`capBoosterChoice.ts`); absent for anything else. */
   cap?: CapBoosterFigures;
+  /** A mining crystal's figures (`mining.ts`); absent for anything else. */
+  mining?: CrystalFigures;
 }
 
 export interface ChargeTypeGroup {

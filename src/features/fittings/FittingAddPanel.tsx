@@ -28,6 +28,7 @@ import type {
 } from '@/engine/fittings/types';
 import type { CandidateCheck } from './dogmaFittingEngine';
 import { CapBoosterGuide } from './CapBoosterGuide';
+import { MiningCrystalGuide } from './MiningCrystalGuide';
 import { ChargePickerControls, ChargePickerGroup } from './ChargePicker';
 import { DEFAULT_PICKER_SETTINGS, type ChargePickerSettings } from './chargePickerSettings';
 import { useChargeChoices } from './useChargeChoices';
@@ -553,7 +554,9 @@ interface ChargesTabProps {
  * Per fitted module type that takes charges: for a weapon, the Charge
  * Picker (grouped by type or faction, with this Fitting's damage, range and
  * the hub's price); for a cap booster, its guide (how the capacitor fares on
- * each charge, GJ/s, ISK per GJ); for anything else (scripts, paste), the
+ * each charge, GJ/s, ISK per GJ); for a mining laser, its crystal guide
+ * (what A, B and C are for, each ore family's crystals side by side); for
+ * anything else (scripts, paste), the
  * plain list of what it takes. Each module's section collapses under its
  * header, which then names the charge loaded in it.
  */
@@ -677,7 +680,14 @@ function ChargesTab({
             </h3>
             {/* Hidden rather than unmounted, so a type opened inside stays open. */}
             <div id={bodyId} hidden={!open}>
-              {group.isCapBooster ? (
+              {group.isMiner ? (
+                <MiningCrystalGuide
+                  group={group}
+                  onLoad={onLoadCharge}
+                  wrapRow={wrapRow}
+                  pricesLoading={pricesLoading}
+                />
+              ) : group.isCapBooster ? (
                 <CapBoosterGuide
                   group={group}
                   onLoad={onLoadCharge}

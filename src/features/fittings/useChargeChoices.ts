@@ -46,6 +46,8 @@ export interface WeaponChargeGroup {
   isWeapon: boolean;
   /** Its charges inject capacitor: the cap booster guide. Neither (scripts, paste…): a plain list. */
   isCapBooster: boolean;
+  /** Its charges are mining crystals: the crystal guide. */
+  isMiner: boolean;
   /** Every charge the module takes, by name. */
   choices: ChargeChoice[];
 }
@@ -98,6 +100,7 @@ export function buildChargeChoices({
         cargo: cargo.get(typeId) ?? 0,
         skillMissing: skillMissing.has(typeId),
         ...(s?.cap ? { cap: s.cap } : {}),
+        ...(s?.mining ? { mining: s.mining } : {}),
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -276,6 +279,7 @@ export function useChargeChoices({
         loaded: group.loaded,
         isWeapon: choices.some((c) => c.dps > 0),
         isCapBooster: choices.some((c) => c.cap !== undefined),
+        isMiner: choices.some((c) => c.mining !== undefined),
         choices,
       };
     });

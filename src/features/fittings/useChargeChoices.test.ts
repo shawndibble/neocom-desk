@@ -90,4 +90,25 @@ describe('buildChargeChoices', () => {
     expect(booster?.cap).toEqual(cap);
     expect(byId(238)).not.toHaveProperty('cap');
   });
+
+  it("carries a crystal's mining figures", () => {
+    const mining = {
+      m3PerSecond: 12,
+      cycleSeconds: 37,
+      residueChance: 0.376,
+      residueMultiplier: 1,
+      residueM3s: 4.5,
+      removedM3s: 16.5,
+    };
+    const [crystal] = buildChargeChoices({
+      typeIds: [238],
+      stats: new Map([[238, { ...stat(238, 0), mining }]]),
+      skillMissing: new Set(),
+      prices: new Map(),
+      cargo: new Map(),
+      catalogue,
+    });
+    expect(crystal?.mining).toEqual(mining);
+    expect(byId(238)).not.toHaveProperty('mining');
+  });
 });

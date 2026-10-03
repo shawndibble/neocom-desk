@@ -168,3 +168,49 @@ export function extractMining(
   });
   return [...miners.values()];
 }
+
+/** A miner group's figures with one crystal loaded in every module (the Charge Picker's crystal guide). */
+export interface CrystalFigures {
+  /** m³ the whole group mines a second, crits expected in. */
+  m3PerSecond: number;
+  cycleSeconds: number;
+  /** Chance (0–1) a cycle leaves residue. */
+  residueChance: number;
+  /** Residue, as a multiple of the cycle's amount. */
+  residueMultiplier: number;
+  /** m³ of residue a second, expected: ore the rock loses that nobody gets. */
+  residueM3s: number;
+  /** Yield and residue: how fast the rock empties. */
+  removedM3s: number;
+}
+
+/**
+ * The miner modules at `indices` (one type, one crystal), off the same
+ * calculation `extractMining` reads. Null when they mine nothing.
+ */
+export function extractCrystalFigures(
+  items: readonly ItemLike[],
+  results: readonly ResultLike[],
+  indices: readonly number[]
+): CrystalFigures | null {
+  const picked = indices.flatMap((index) => {
+    const item = items[index];
+    const result = results[index];
+    return item && result ? [{ item, result }] : [];
+  });
+  const miners = extractMining(
+    picked.map((p) => p.item),
+    picked.map((p) => p.result)
+  ).filter((miner) => !miner.isDrone);
+  const miner = miners[0];
+  if (!miner) return null;
+  const totals = miningYield(miners);
+  return {
+    m3PerSecond: totals.perSecond,
+    cycleSeconds: miner.cycleSeconds,
+    residueChance: miner.wasteChance,
+    residueMultiplier: miner.wasteMultiplier,
+    residueM3s: totals.wastePerSecond,
+    removedM3s: totals.perSecond + totals.wastePerSecond,
+  };
+}

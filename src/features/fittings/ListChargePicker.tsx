@@ -21,6 +21,7 @@ import type {
 import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { CapBoosterGuide } from './CapBoosterGuide';
+import { MiningCrystalGuide } from './MiningCrystalGuide';
 import { ChargePickerGroup } from './ChargePicker';
 import { DEFAULT_PICKER_SETTINGS } from './chargePickerSettings';
 import { useChargeChoices } from './useChargeChoices';
@@ -218,7 +219,13 @@ function ChargePickerPanel({
           {t('fittings.chargePicker.loadedOffList', { name: catalogueTypeName(catalogue, loaded) })}
         </p>
       )}
-      {group?.isCapBooster ? (
+      {group?.isMiner ? (
+        <MiningCrystalGuide
+          group={group}
+          onLoad={(chargeTypeId) => load(chargeTypeId)}
+          pricesLoading={pricesLoading}
+        />
+      ) : group?.isCapBooster ? (
         <CapBoosterGuide
           group={group}
           onLoad={(chargeTypeId) => load(chargeTypeId)}
