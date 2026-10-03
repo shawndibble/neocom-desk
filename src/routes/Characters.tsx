@@ -1608,7 +1608,7 @@ export function Characters() {
                       }
                     >
                       <SelectTrigger
-                        size="md"
+                        size="sm"
                         aria-label={t('characters.filterCorpLabel')}
                         className="w-48"
                       >
@@ -1637,7 +1637,7 @@ export function Characters() {
                       }
                     >
                       <SelectTrigger
-                        size="md"
+                        size="sm"
                         aria-label={t('characters.filterGroupLabel')}
                         className="w-48"
                       >
@@ -1674,7 +1674,7 @@ export function Characters() {
                       setDraft({ ...draft, sortKey: value as CharacterSortKey })
                     }
                   >
-                    <SelectTrigger size="md" aria-label={t('characters.sortBy')} className="w-40">
+                    <SelectTrigger size="sm" aria-label={t('characters.sortBy')} className="w-40">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1688,7 +1688,7 @@ export function Characters() {
                 </FilterField>
                 <FilterField label={t('characters.sortDirection')} stretch={false}>
                   <IconButton
-                    size="md"
+                    size="sm"
                     icon={draft.sortDirection === 'asc' ? <Icon.Ascending /> : <Icon.Descending />}
                     label={t('characters.sortDirection')}
                     onClick={() =>
