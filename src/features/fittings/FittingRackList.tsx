@@ -53,7 +53,11 @@ import {
   FittingItemMenu,
   ModuleMenuItems,
 } from './FittingItemMenu';
-import { useFittingDropTarget, useFittingItemActions } from './fittingItemActions';
+import {
+  cargoDragPayload,
+  useFittingDropTarget,
+  useFittingItemActions,
+} from './fittingItemActions';
 import type { AddTarget } from './addTarget';
 import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
@@ -873,6 +877,7 @@ export function FittingRackList({
 /**
  * The cargo hold: how full it is, each item with its count — a charge drags
  * onto the modules that take it, and its menu loads it — and "Add cargo".
+ * An Add panel item or charge dropped on it goes in the hold.
  * The List's Cargo section; the Ring shows the same items as tiles.
  */
 export function CargoSection({
@@ -882,11 +887,15 @@ export function CargoSection({
 }: Pick<EditContext, 'fitting' | 'catalogue' | 'edit'>) {
   const { t } = useTranslation();
   const actions = useFittingItemActions();
+  const drop = useFittingDropTarget({ kind: 'cargo' });
   const cargo = cargoGroups(fitting);
   if (cargo.length === 0 && actions === null) return null;
   const draggable = actions?.dropHandlers.loadCharge ?? false;
   return (
-    <div className="space-y-1.5">
+    <div
+      {...drop.props}
+      className={`space-y-1.5 rounded-xs ${drop.over ? 'ring-2 ring-accent/60' : drop.accepts ? 'outline-1 outline-dashed outline-accent' : ''}`}
+    >
       <p className={RACK_LABEL_CLASS}>{t('fittings.list.cargo')}</p>
       {actions && (
         <ResourceBar
@@ -903,15 +912,18 @@ export function CargoSection({
             menu={actions && { name, items: <CargoMenuItems typeId={item.typeId} /> }}
             grip={
               draggable && actions
-                ? {
-                    payload: {
-                      kind: 'charge',
-                      typeId: item.typeId,
-                      fromCargo: true,
-                      targets: actions.charges.targetsFor(item.typeId),
-                    },
-                    label: t('fittings.item.dragToLoad', { name }),
-                  }
+                ? (() => {
+                    const payload = cargoDragPayload(actions, item.typeId);
+                    return {
+                      payload,
+                      label: t(
+                        payload.kind === 'type'
+                          ? 'fittings.item.dragToFit'
+                          : 'fittings.item.dragToLoad',
+                        { name }
+                      ),
+                    };
+                  })()
                 : undefined
             }
             identity={

@@ -37,6 +37,7 @@ import {
   setModuleState,
   setModulesState,
   swapModuleType,
+  takeCargo,
   unloadCharges,
 } from './fittingEdit';
 import type { Fitting, FittingModule } from './types';
@@ -996,6 +997,24 @@ describe('addCargo / cargoVolumeUsed', () => {
       { typeId: 3001, quantity: 2 },
     ]);
     expect(addCargo(fit, 3001, 0)).toBe(fit);
+  });
+
+  it('takes some out of a type’s stacks, the stack going once empty', () => {
+    const fit: Fitting = {
+      ...base,
+      cargo: [
+        { typeId: 3001, quantity: 2 },
+        { typeId: 209, quantity: 10 },
+        { typeId: 3001, quantity: 1 },
+      ],
+    };
+    expect(takeCargo(fit, 3001, 1).cargo).toEqual([
+      { typeId: 3001, quantity: 2 },
+      { typeId: 209, quantity: 10 },
+    ]);
+    expect(takeCargo(fit, 3001, 5).cargo).toEqual([{ typeId: 209, quantity: 10 }]);
+    expect(takeCargo(fit, 999, 1)).toBe(fit);
+    expect(takeCargo(fit, 209, 0)).toBe(fit);
   });
 
   it('sums m3 over every stack', () => {

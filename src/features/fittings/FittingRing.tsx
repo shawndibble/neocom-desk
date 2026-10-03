@@ -53,6 +53,7 @@ import {
   chargeDragLights,
   dropEffectFor,
   endFittingDrag,
+  ringDropFor,
   startFittingDrag,
   useFittingDrag,
   type FittingDragPayload,
@@ -64,8 +65,10 @@ import {
   ModuleMenuItems,
 } from './FittingItemMenu';
 import {
+  cargoDragPayload,
   deleteKeyHandler,
   openItemMenu,
+  useFittingDropTarget,
   useFittingItemActions,
   type FittingItemActions,
 } from './fittingItemActions';
@@ -598,12 +601,14 @@ function SlotTile({
     setOver(false);
     if (payload === null || !slotAccepts(payload, slot, handlers, actions)) return;
     event.preventDefault();
-    if (payload.kind === 'type') onDropType?.(slot.rack, slot.index, payload.typeId);
+    // A module out of the cargo goes through the page, which takes it off the stack.
+    if (payload.kind === 'type' && !payload.fromCargo)
+      onDropType?.(slot.rack, slot.index, payload.typeId);
     else if (payload.kind === 'slot') onMoveModule?.(slot.rack, payload.index, slot.index);
     else
       actions?.drop(
         payload,
-        { kind: 'slot', rack: slot.rack, index: slot.index, filled: true },
+        { kind: 'slot', rack: slot.rack, index: slot.index, filled: module !== undefined },
         event.altKey
       );
     endFittingDrag();
@@ -731,13 +736,7 @@ function CargoTile({ typeId, count, tooltip }: { typeId: number; count: number; 
       draggable={draggable}
       onDragStart={
         draggable && actions
-          ? (event) =>
-              startFittingDrag(event, {
-                kind: 'charge',
-                typeId,
-                fromCargo: true,
-                targets: actions.charges.targetsFor(typeId),
-              })
+          ? (event) => startFittingDrag(event, cargoDragPayload(actions, typeId))
           : undefined
       }
       onDragEnd={draggable ? endFittingDrag : undefined}
@@ -797,9 +796,11 @@ function CargoHoldReadout({ actions }: { actions: FittingItemActions }) {
  * dropping the outlines to make room (`ringSlotAngles`). Cargo sits in a row
  * below; the page puts the drones in a panel of their own.
  *
- * Tiles take drops: an Add panel item on a slot of its rack, or a fitted
- * module dragged along its rack. The phone overview (`compact`) is read-only;
- * its rack buttons are the way in.
+ * Tiles take drops: an Add panel item on a slot of its rack (replacing what
+ * it holds), or a fitted module dragged along its rack. Dropped anywhere else
+ * on the ring, an item goes where it should (`ringDropFor`); dropped on the
+ * cargo row, it goes in the hold. The phone overview (`compact`) is
+ * read-only; its rack buttons are the way in.
  */
 export function FittingRing({
   fitting,
@@ -825,6 +826,14 @@ export function FittingRing({
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const layout = stats?.slotCounts ?? null;
   const slots = buildRingSlots(fitting, layout);
+  // Anywhere on the ring that isn't a slot taking the drag: it goes where it should.
+  const openSpace = useFittingDropTarget({ kind: 'ring' }, (payload, handlers) => {
+    const placed = ringDropFor(payload, fitting.modules, layout);
+    return placed?.kind === 'fit'
+      ? !!handlers.addType
+      : placed?.kind === 'load' && !!handlers.loadCharge;
+  });
+  const cargoTarget = useFittingDropTarget({ kind: 'cargo' });
   const centre = RING_VIEW / 2;
   const nameOf = (typeId: number) => typeName?.(typeId) ?? `#${typeId}`;
 
@@ -965,11 +974,17 @@ export function FittingRing({
     subsystems.length > 0 ? [...RING_RACKS, 'subsystem'] : [...RING_RACKS];
 
   const disc = RING_INNER_RADIUS;
+  const ringStroke = !compact && openSpace.over ? 'stroke-accent' : 'stroke-line';
+  const cargoDrop = !compact && cargoTarget.accepts;
 
   return (
     <RingFrame bare={bare} title={t('fittings.ring.title')} actions={actions}>
       <div className="space-y-3">
-        <div className="relative mx-auto aspect-square w-full" style={{ maxWidth: RING_MAX_WIDTH }}>
+        <div
+          className="relative mx-auto aspect-square w-full"
+          style={{ maxWidth: RING_MAX_WIDTH }}
+          {...(compact ? {} : openSpace.props)}
+        >
           <div
             className="absolute overflow-hidden rounded-full bg-bg"
             style={{
@@ -1000,13 +1015,13 @@ export function FittingRing({
                 cx={centre}
                 cy={centre}
                 r={RING_OUTER_RADIUS}
-                className="fill-none stroke-line"
+                className={`fill-none ${ringStroke}`}
               />
               <circle
                 cx={centre}
                 cy={centre}
                 r={RING_INNER_RADIUS}
-                className="fill-none stroke-line"
+                className={`fill-none ${ringStroke}`}
               />
             </g>
             {gauges.map((gauge) => (
@@ -1125,7 +1140,10 @@ export function FittingRing({
 
         {/* What the ring has no slot for; the drones get a panel of their own beneath it. */}
         {(cargo.length > 0 || (itemActions !== null && !compact)) && (
-          <div>
+          <div
+            {...(compact ? {} : cargoTarget.props)}
+            className={`rounded-xs ${!cargoDrop ? '' : cargoTarget.over ? 'ring-2 ring-accent/60' : 'outline-1 outline-dashed outline-accent'}`}
+          >
             <div className="flex items-baseline justify-between gap-2">
               <p className={MICRO_LABEL}>{t('fittings.list.cargo')}</p>
               {itemActions && <CargoHoldReadout actions={itemActions} />}

@@ -39,6 +39,8 @@ export interface ChargePickerInput {
 /** Everything the menus (and the drops they stand in for) do — the page's own edits. */
 export interface FittingItemActions {
   typeName: (typeId: number) => string;
+  /** The rack a module fits (or `drone`); null for anything else, a charge included. */
+  rackOf: (typeId: number) => CandidateRack | null;
   charges: ChargeLoading;
 
   setState: (rack: FittingSlotKind, index: number, state: FittingItemState) => void;
@@ -132,16 +134,26 @@ export function openItemMenu(event: MouseEvent<HTMLElement>) {
 }
 
 /**
- * Makes an element a drop target for the List's drags (the Ring's tiles
- * handle their own): the props to spread on it, whether a drag is over it,
- * whether the drag in progress would land, and — for a slot — whether a
- * charge drag lights or dims it.
+ * Makes an element a drop target for the List's drags, the cargo, and the
+ * Ring's open space (the Ring's tiles handle their own): the props to spread
+ * on it, whether a drag is over it, whether the drag in progress would land,
+ * and — for a slot — whether a charge drag lights or dims it. A drop a
+ * target nested inside already took (`defaultPrevented`) is left alone, so a
+ * drag over a slot that takes it never also lands on what holds the slot.
  */
-export function useFittingDropTarget(target: FittingDropTarget) {
+export function useFittingDropTarget(
+  target: FittingDropTarget,
+  /** Whether a drag lands, for a target `acceptsDrop` can't judge alone (the Ring's open space). */
+  lands?: (payload: FittingDragPayload | null, handlers: FittingDropHandlers) => boolean
+) {
   const actions = useFittingItemActions();
   const drag = useFittingDrag((state) => state.payload);
   const [over, setOver] = useState(false);
   const handlers = actions?.dropHandlers ?? {};
+  const takes = (payload: FittingDragPayload | null) =>
+    lands
+      ? lands(payload, handlers)
+      : target.kind !== 'ring' && acceptsDrop(payload, target, handlers);
   const lights = target.kind === 'slot' ? chargeDragLights(drag, target.rack, target.index) : null;
   const props =
     actions === null
@@ -149,7 +161,10 @@ export function useFittingDropTarget(target: FittingDropTarget) {
       : {
           onDragOver: (event: DragEvent) => {
             const payload = activeFittingDrag(event);
-            if (payload === null || !acceptsDrop(payload, target, handlers)) return;
+            if (event.defaultPrevented || payload === null || !takes(payload)) {
+              setOver(false);
+              return;
+            }
             event.preventDefault();
             event.dataTransfer.dropEffect = dropEffectFor(payload);
             setOver(true);
@@ -161,13 +176,24 @@ export function useFittingDropTarget(target: FittingDropTarget) {
           onDrop: (event: DragEvent) => {
             const payload = activeFittingDrag(event);
             setOver(false);
-            if (payload === null || !acceptsDrop(payload, target, handlers)) return;
+            if (event.defaultPrevented || payload === null || !takes(payload)) return;
             event.preventDefault();
             actions.drop(payload, target, event.altKey);
             endFittingDrag();
           },
         };
-  return { props, over, accepts: acceptsDrop(drag, target, handlers), lights };
+  return { props, over, accepts: takes(drag), lights };
+}
+
+/**
+ * What dragging a cargo item carries: a module drags as an Add panel one
+ * does (fitting it takes one off the stack), anything else as a charge onto
+ * the modules that take it.
+ */
+export function cargoDragPayload(actions: FittingItemActions, typeId: number): FittingDragPayload {
+  const rack = actions.rackOf(typeId);
+  if (rack !== null && rack !== 'drone') return { kind: 'type', typeId, rack, fromCargo: true };
+  return { kind: 'charge', typeId, fromCargo: true, targets: actions.charges.targetsFor(typeId) };
 }
 
 /** The Del key's edit on a focused module (the item menu's Remove), else nothing. */

@@ -13,10 +13,23 @@
 import type { DragEvent } from 'react';
 import { create } from 'zustand';
 import type { CandidateRack } from '@/engine/fittings/candidates';
-import type { FittingSlotKind } from '@/engine/fittings/types';
+import type { ModuleAt } from '@/engine/fittings/fittingEdit';
+import type { SlotLayout } from '@/engine/fittings/ringLayout';
+import { moduleKey } from '@/engine/fittings/skillGaps';
+import {
+  sortFittingModules,
+  type FittingModule,
+  type FittingSlotKind,
+} from '@/engine/fittings/types';
 
 export type FittingDragPayload =
-  | { kind: 'type'; typeId: number; rack: CandidateRack }
+  | {
+      kind: 'type';
+      typeId: number;
+      rack: CandidateRack;
+      /** A module out of the Fitting's own cargo: fitting it takes one off the stack. */
+      fromCargo?: boolean;
+    }
   | { kind: 'slot'; rack: FittingSlotKind; index: number }
   | {
       kind: 'charge';
@@ -38,7 +51,14 @@ export type FittingDropTarget =
   /** A rack's heading in the List: a module goes in its first free slot, a charge into every module that takes it (with one in this rack). */
   | { kind: 'rack'; rack: FittingSlotKind }
   /** The Drones rack: a drone launches. */
-  | { kind: 'drones' };
+  | { kind: 'drones' }
+  /** The cargo hold: an Add panel item or charge goes in, one of it. */
+  | { kind: 'cargo' }
+  /**
+   * Anywhere else on the Ring: the item goes where it should (`ringDropFor`).
+   * Whether it lands depends on the fitting, so `acceptsDrop` never sees it.
+   */
+  | { kind: 'ring' };
 
 /** Which drops the surface handles at all — a drop it has no handler for is never offered. */
 export interface FittingDropHandlers {
@@ -49,6 +69,8 @@ export interface FittingDropHandlers {
   loadCharge?: boolean;
   /** A drone, from the bay or the Add panel, launched. */
   launchDrone?: boolean;
+  /** An Add panel item or charge put in the cargo. */
+  addCargo?: boolean;
 }
 
 /** The `moduleKey` of a slot, as `targets` holds them. */
@@ -63,10 +85,15 @@ function slotKey(rack: FittingSlotKind, index: number): string {
  */
 export function acceptsDrop(
   payload: FittingDragPayload | null,
-  target: FittingDropTarget,
+  target: Exclude<FittingDropTarget, { kind: 'ring' }>,
   handlers: FittingDropHandlers
 ): boolean {
   if (payload === null) return false;
+  if (target.kind === 'cargo') {
+    // An item already in the hold dropped back would only inflate its stack.
+    const fromPanel = (payload.kind === 'type' || payload.kind === 'charge') && !payload.fromCargo;
+    return fromPanel && !!handlers.addCargo;
+  }
   switch (payload.kind) {
     case 'type':
       if (payload.rack === 'drone') return target.kind === 'drones' && !!handlers.launchDrone;
@@ -86,6 +113,64 @@ export function acceptsDrop(
     case 'drone':
       return target.kind === 'drones' && !!handlers.launchDrone;
   }
+}
+
+/** What a drop on the Ring's open space does, once `ringDropFor` has placed it. */
+export type RingDrop =
+  | { kind: 'fit'; rack: FittingSlotKind; index: number; typeId: number }
+  | { kind: 'load'; typeId: number; fromCargo: boolean; only: ModuleAt[] };
+
+/**
+ * Where a drag dropped anywhere on the Ring — not on a slot that takes it —
+ * goes, so only replacing what a slot holds needs aiming: a module into its
+ * rack's first free slot; a high-slot charge into every high module that
+ * takes it; a mid or low charge into its one taker, or with several the
+ * first still unloaded. Null where it has nowhere obvious to go (a full
+ * rack, every taker loaded), and for moves and drones, which have their own
+ * targets.
+ */
+export function ringDropFor(
+  payload: FittingDragPayload | null,
+  modules: readonly FittingModule[],
+  slotCounts: SlotLayout | null
+): RingDrop | null {
+  if (payload?.kind === 'type') {
+    const { rack, typeId } = payload;
+    if (rack === 'drone' || slotCounts === null) return null;
+    const taken = new Set(modules.filter((m) => m.slot === rack).map((m) => m.slotIndex));
+    for (let index = 0; index < slotCounts[rack]; index++)
+      if (!taken.has(index)) return { kind: 'fit', rack, index, typeId };
+    return null;
+  }
+  if (payload?.kind !== 'charge') return null;
+  const takers = sortFittingModules(modules.filter((m) => payload.targets.includes(moduleKey(m))));
+  const highs = takers.filter((m) => m.slot === 'high');
+  const picked =
+    highs.length > 0
+      ? highs
+      : takers.length === 1
+        ? takers
+        : takers.filter((m) => m.chargeTypeId === undefined).slice(0, 1);
+  if (picked.length === 0) return null;
+  return {
+    kind: 'load',
+    typeId: payload.typeId,
+    fromCargo: payload.fromCargo,
+    only: picked.map(({ slot, slotIndex }) => ({ slot, slotIndex })),
+  };
+}
+
+/**
+ * Which modules a charge dropped on one slot loads: a high slot's goes into
+ * every module that takes it (Alt for just that one), a mid or low slot's
+ * replaces only what that slot holds. Undefined for all of them.
+ */
+export function chargeSlotDropOnly(
+  rack: FittingSlotKind,
+  index: number,
+  alt: boolean
+): ModuleAt | undefined {
+  return alt || rack !== 'high' ? { slot: rack, slotIndex: index } : undefined;
 }
 
 /** A slot a charge drag would load into — lit while the drag lasts, the rest dimmed. */

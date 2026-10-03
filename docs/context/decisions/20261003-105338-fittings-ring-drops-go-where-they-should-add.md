@@ -1,0 +1,9 @@
+# Scope decisions — Fittings Ring drops go where they should; Add panel never dims for a full rack
+
+_Recorded 2026-10-03._
+
+- **Anything dropped on the Ring that isn't a slot taking it goes where it should.** Aiming at a slot is only needed to replace what it holds. An Add panel module goes into its rack's first free slot; with the rack full it goes nowhere (the drop isn't offered). A high-slot charge goes into every high module that takes it, loaded or not. A mid or low charge with one taker goes into it, even over a loaded charge; with several takers it goes into the first one still unloaded, and with all of them loaded it goes nowhere. Moves along a rack and drones keep their own targets. This extends `20260924-205720`, where a drop only ever landed on a slot of its rack.
+- **A charge dropped on a mid or low slot replaces that slot's charge only.** A high slot's still loads every module that takes the charge (Alt for just that one), since a high rack's weapons are normally loaded alike. A mid or low slot's charge (a cap booster, a script) is usually chosen per module, and a drop on one specific slot is the "replace this one" gesture.
+- **The cargo, on the Ring and in the List, takes an Add panel item or charge.** One goes in; a charge then asks how many with the cargo quantity dialog. A charge dragged out of the cargo isn't taken back, as that would only inflate its own stack.
+- **A module in the cargo drags as an Add panel module does.** Onto a slot, a rack, or anywhere on the Ring, by the same rules; fitting it takes one off its cargo stack. Whatever it replaces is removed, as an Add panel drop's is, not put back in the hold. Cargo drones and charges drag as before.
+- **The Add panel's items never dim for a full rack.** A dimmed (disabled) row couldn't be dragged at all, so a module couldn't go into the cargo or onto a slot to replace it. Clicking one with no free slot adds nothing. Items that don't fit the hull still dim.
