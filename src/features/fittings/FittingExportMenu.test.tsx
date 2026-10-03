@@ -10,6 +10,7 @@ import type { Appraisal } from '@/engine/market/appraisal';
 import { createShareLink, existingShareLink } from '@/features/share/shareStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FittingExportMenu } from './FittingExportMenu';
+import { exportFitting } from './fittingExportText';
 
 vi.mock('@/features/share/shareStore', () => ({
   existingShareLink: vi.fn(() => null),
@@ -82,15 +83,21 @@ afterEach(() => {
 });
 
 describe('FittingExportMenu', () => {
-  it('copies a permanent link that decodes back to the Fitting', async () => {
-    const copied = setup();
-    await choose('Copy permanent link');
-    await waitFor(() => expect(copied).toHaveLength(1));
-    const url = new URL(copied[0]);
+  it('leaves the permanent link to the address bar, and offers no in-game link', async () => {
+    setup();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Export' }));
+    expect(await screen.findByRole('menuitem', { name: 'Copy Fitting' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Copy permanent link' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Copy in-game link' })).toBeNull();
+  });
+
+  // The Fittings library's row menu still copies one.
+  it('builds a permanent link that decodes back to the Fitting', async () => {
+    const url = new URL((await exportFitting('permanentLink', FITTING)) ?? '');
     expect(url.pathname.endsWith('/ships/fittings')).toBe(true);
     const decoded = await decodeFittingShare(url.searchParams.get('f') ?? '');
     expect(decoded.ok && decoded.value.hullTypeId).toBe(587);
-    expect(await screen.findByRole('status')).toHaveTextContent('Permanent link copied');
   });
 
   it('copies a short Share Link storing the Fitting Share Code', async () => {
@@ -129,19 +136,15 @@ describe('FittingExportMenu', () => {
     expect(copied).toEqual([]);
   });
 
-  it('copies EFT, the in-game link and the multibuy list', async () => {
+  it('copies the Fitting as EFT text and the multibuy list', async () => {
     const copied = setup();
-    await choose('Copy EFT');
+    await choose('Copy Fitting');
     await waitFor(() => expect(copied).toHaveLength(1));
     expect(copied[0]).toBe('[Rifter, Brawler]\n200mm AutoCannon II');
 
-    await choose('Copy in-game link');
-    await waitFor(() => expect(copied).toHaveLength(2));
-    expect(copied[1]).toBe('<url=fitting:587:1;1::>Brawler</url>');
-
     await choose('Copy multibuy list');
-    await waitFor(() => expect(copied).toHaveLength(3));
-    expect(copied[2]).toBe('Rifter\t1\n200mm AutoCannon II\t1');
+    await waitFor(() => expect(copied).toHaveLength(2));
+    expect(copied[1]).toBe('Rifter\t1\n200mm AutoCannon II\t1');
   });
 
   it('shows the Jita price and hands the multibuy list to Appraisal', async () => {

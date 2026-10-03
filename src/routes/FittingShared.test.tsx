@@ -81,7 +81,7 @@ describe('FittingShared', () => {
     expect(await screen.findByText("This link isn't valid")).toBeInTheDocument();
   });
 
-  it('renders the read-only view at All V with no session, and Copy EFT writes the fit as text', async () => {
+  it('renders the read-only view at All V with no session, and Copy Fitting writes the fit as text', async () => {
     const encoded = await encodeFittingShare(fittingToShareInput(RIFTER));
     expect(encoded.ok).toBe(true);
     if (!encoded.ok) return;
@@ -100,7 +100,7 @@ describe('FittingShared', () => {
       '/login'
     );
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Copy EFT' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Copy Fitting' }));
     expect(clipboardText).toContain('[Rifter, Rifter]');
     expect(clipboardText).toContain('125mm Gatling AutoCannon I');
   });

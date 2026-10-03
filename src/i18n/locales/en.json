@@ -609,9 +609,7 @@
     "export": {
       "button": "Export",
       "shareLink": "Copy Share Link",
-      "permanentLink": "Copy permanent link",
-      "eft": "Copy EFT",
-      "chatLink": "Copy in-game link",
+      "eft": "Copy Fitting",
       "multibuy": "Copy multibuy list",
       "eveXml": "Download EVE XML",
       "manufacturePlan": "Manufacture Plan",
@@ -623,8 +621,7 @@
       "copied": {
         "shareLink": "Share Link copied — it works for 7 days",
         "permanentLink": "Permanent link copied",
-        "eft": "EFT copied",
-        "chatLink": "In-game link copied",
+        "eft": "Fitting copied",
         "multibuy": "Multibuy list copied"
       },
       "downloaded": {
@@ -1283,7 +1280,7 @@
       "open": "Open",
       "compare": "Compare with…",
       "duplicate": "Duplicate",
-      "copyEft": "Copy EFT",
+      "copyEft": "Copy Fitting",
       "copyPermanentLink": "Copy permanent link",
       "saveToEve": "Save to EVE…",
       "rename": "Rename",
@@ -5974,7 +5971,7 @@
     "loadFailedHint": "Something went wrong working out its stats. Try again.",
     "moduleListTitle": "Modules",
     "openInApp": "Open in Neocom Desk",
-    "copyEft": "Copy EFT",
+    "copyEft": "Copy Fitting",
     "copied": "Copied",
     "copyFailed": "Couldn't copy"
   },

@@ -5,18 +5,13 @@
  * and permanent URL.
  */
 import { encodeFittingShare } from '@/engine/fitting/fittingShare';
-import {
-  fittingToChatLink,
-  fittingToEft,
-  fittingToEveXml,
-  fittingToMultibuy,
-} from '@/engine/fittings/fittingExport';
+import { fittingToEft, fittingToEveXml, fittingToMultibuy } from '@/engine/fittings/fittingExport';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import { loadTypes } from '@/sde/loadSde';
 import { FITTINGS_PATH } from './fittingRoutes';
 
-export type FittingExportKind = 'permanentLink' | 'eft' | 'chatLink' | 'multibuy' | 'eveXml';
+export type FittingExportKind = 'permanentLink' | 'eft' | 'multibuy' | 'eveXml';
 
 /**
  * The Fittings tab's own URL with the Fitting in `?f=`, which opens it in the
@@ -44,7 +39,6 @@ export async function exportFitting(
     const code = await fittingShareCode(fitting);
     return code === null ? null : fittingShareUrl(code);
   }
-  if (kind === 'chatLink') return fittingToChatLink(fitting);
 
   const types = await loadTypes();
   const nameFor = (typeId: number) => types[String(typeId)]?.name ?? `Type ${typeId}`;
