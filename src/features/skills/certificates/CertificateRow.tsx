@@ -98,7 +98,7 @@ export function CertificateRow({
 
   return (
     <li className="border-t border-line text-xs">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-3 py-2 sm:grid-cols-[minmax(0,1.3fr)_auto_minmax(0,1.4fr)_auto]">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-3 py-2 sm:grid-cols-[minmax(0,1.3fr)_auto_minmax(0,1.4fr)_12rem]">
         {/* Every row opens, Elite included: the description is there for all. */}
         <button
           type="button"
