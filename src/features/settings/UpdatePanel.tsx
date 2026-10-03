@@ -20,8 +20,8 @@ export function UpdatePanel() {
 
   return (
     <Panel title={t('settings.updateTitle')}>
-      <div className="max-w-md space-y-1.5">
-        <p className="text-xs text-text-dim">{t('settings.updateHint')}</p>
+      <div className="space-y-1.5">
+        <p className="max-w-2xl text-xs text-text-dim">{t('settings.updateHint')}</p>
         <Button size="sm" disabled={updating} onClick={() => void update()}>
           {t(updating ? 'settings.updateWorking' : 'settings.updateAction')}
         </Button>

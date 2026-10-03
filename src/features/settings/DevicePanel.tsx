@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Button, Modal, Panel } from '@/components/ui';
+import { Button, Field, Fields, Modal, Panel } from '@/components/ui';
 import { db } from '@/db';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { logoutAllCharacters } from '@/features/character/logoutAll';
@@ -79,40 +79,44 @@ export function DevicePanel() {
 
   return (
     <Panel title={t('settings.deviceTitle')}>
-      <div className="max-w-md space-y-2">
-        <p className="text-xs text-text-dim">
+      <div className="space-y-4">
+        <p className="max-w-2xl text-xs text-text-dim">
           {loggedIn > 0
             ? t('settings.deviceCharacters', { count: loggedIn })
             : t('settings.deviceCharactersNone')}
         </p>
-        <div className="space-y-1.5 border-t border-line pt-3">
-          <span className="block text-xs font-semibold">{t('settings.deviceLogoutLabel')}</span>
-          <p className="text-xs text-text-dim">
-            {t(syncConfigured ? 'settings.deviceLogoutHint' : 'settings.deviceLogoutHintLocalOnly')}
-          </p>
-          <Button
-            variant="danger"
-            size="sm"
-            disabled={loggedIn === 0}
-            onClick={() => openDialog('logout')}
+        <Fields variant="form">
+          <Field
+            label={t('settings.deviceLogoutLabel')}
+            note={t(
+              syncConfigured ? 'settings.deviceLogoutHint' : 'settings.deviceLogoutHintLocalOnly'
+            )}
           >
-            {t('settings.deviceLogoutAction')}
-          </Button>
-        </div>
-        <div className="space-y-1.5 border-t border-line pt-3">
-          <span className="block text-xs font-semibold">{t('settings.deviceDeleteLabel')}</span>
-          <p className="text-xs text-text-dim">
-            {t(syncConfigured ? 'settings.deviceDeleteHint' : 'settings.deviceDeleteHintLocalOnly')}
-          </p>
-          <Button
-            variant="danger"
-            size="sm"
-            disabled={loggedIn === 0}
-            onClick={() => openDialog('delete')}
+            <Button
+              variant="danger"
+              size="sm"
+              disabled={loggedIn === 0}
+              onClick={() => openDialog('logout')}
+            >
+              {t('settings.deviceLogoutAction')}
+            </Button>
+          </Field>
+          <Field
+            label={t('settings.deviceDeleteLabel')}
+            note={t(
+              syncConfigured ? 'settings.deviceDeleteHint' : 'settings.deviceDeleteHintLocalOnly'
+            )}
           >
-            {t('settings.deviceDeleteAction')}
-          </Button>
-        </div>
+            <Button
+              variant="danger"
+              size="sm"
+              disabled={loggedIn === 0}
+              onClick={() => openDialog('delete')}
+            >
+              {t('settings.deviceDeleteAction')}
+            </Button>
+          </Field>
+        </Fields>
       </div>
       <Modal
         open={dialog === 'logout'}

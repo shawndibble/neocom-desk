@@ -69,8 +69,8 @@ export function PermissionsPanel() {
 
   return (
     <Panel title={t('settings.permissions.title')}>
-      <div className="max-w-xl space-y-2">
-        <p className="text-xs text-text-dim">
+      <div className="space-y-2">
+        <p className="max-w-2xl text-xs text-text-dim">
           <Trans
             i18nKey="settings.permissions.hint"
             components={{
@@ -86,15 +86,21 @@ export function PermissionsPanel() {
           />
         </p>
         {activeCharacterId === null ? (
-          <p className="text-xs text-text-dim">{t('settings.permissions.selectCharacter')}</p>
+          <p className="max-w-2xl text-xs text-text-dim">
+            {t('settings.permissions.selectCharacter')}
+          </p>
         ) : (
-          <ul className="divide-y divide-line text-xs">
+          // Two columns from `xl`: one full-width list put each status a screen away from its name.
+          <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">
             {groups.map((group) => {
               const label = t(PERMISSIONS[group].labelKey);
               const status = statusOf(group);
               const note = group === 'corp' ? corpNote() : null;
               return (
-                <li key={group} className="flex items-center justify-between gap-4 py-2">
+                <li
+                  key={group}
+                  className="flex items-center justify-between gap-4 border-t border-line py-2"
+                >
                   <div className="min-w-0">
                     <div className="text-text">{label}</div>
                     <div className="text-text-dim">{t(PERMISSIONS[group].captionKey)}</div>
