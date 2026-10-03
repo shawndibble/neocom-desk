@@ -4822,6 +4822,7 @@
     "regionOffers_other": "{{count}} offers",
     "offersOnContract_one": "{{count}} offer on contract",
     "offersOnContract_other": "{{count}} offers on contract",
+    "resultsCapped": "Showing {{shown}} of {{total}} results. Narrow the search to see the rest.",
     "cheapestByRegionCapped": "Cheapest by region ({{shown}} of {{total}})",
     "suggestionsHeading": "Pick a blueprint",
     "priceLabel": "Price",
