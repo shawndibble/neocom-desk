@@ -26,6 +26,11 @@ no app server. Two kinds of data:
   the same archive fetch, also writes `publicCourierContracts` (issue #909):
   public courier contracts as a route and a fee, a sibling collection because
   they carry no item lines. Ingestion only so far — nothing reads it yet.
+  A second, separate job (`syncWorkbenchFits`, issue #2484) copies EVE
+  Workbench's public fits into `workbenchFits`, grouped by hull, because
+  Workbench's API can't filter by hull; it is the one collection readable with
+  no Firebase session at all, since the fitter works logged out
+  (`features/fittings/workbenchFits.ts` reads it).
 
 Auth is browser-only OAuth2 PKCE against `login.eveonline.com`; refresh
 tokens never leave the device. Market prices come from Fuzzwork aggregates,

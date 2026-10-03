@@ -611,7 +611,21 @@
       "lastSeen": "last seen {{age}}",
       "value": "~{{value}} ISK",
       "open": "Open",
-      "fitName": "{{hullName}} popular fit {{rank}}"
+      "fitName": "{{hullName}} popular fit {{rank}}",
+      "sourceLabel": "Popular fits source",
+      "tabZkillboard": "zKillboard",
+      "tabWorkbench": "EVE Workbench",
+      "workbench": {
+        "attribution": "Community fits published on EVE Workbench:",
+        "loading": "Loading fits from EVE Workbench…",
+        "failed": "Couldn't reach the EVE Workbench fit list right now. Everything else still works.",
+        "empty": "Nobody has published a fit for this hull on EVE Workbench yet.",
+        "unnamed": "Unnamed fit",
+        "unknownAuthor": "unknown pilot",
+        "byline": "by {{author}} · added {{age}}",
+        "load": "Load",
+        "loadFailed": "Couldn't load this fit."
+      }
     },
     "start": {
       "newTitle": "New fitting from a hull",

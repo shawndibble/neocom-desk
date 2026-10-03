@@ -74,6 +74,8 @@ import {
   type PublicContractOfferRow,
   type PublicCourierContractRow,
 } from './publicContracts.js';
+import { runWorkbenchSync } from './workbenchFits.js';
+import { firestoreWorkbenchFitsStore } from './workbenchFitsStore.js';
 
 initializeApp();
 
@@ -701,5 +703,53 @@ export const syncPublicContractOffers = onSchedule(
     const db = getFirestore();
     await writePublicContractOffersSnapshot(db, sortContractOfferRows(rows));
     await writePublicCourierContractsSnapshot(db, sortCourierContractRows(courierRows));
+  }
+);
+
+/**
+ * syncWorkbenchFits: EVE Workbench's public fits, grouped by hull into
+ * `workbenchFits` for the Popular fit panel's EVE Workbench tab (issue
+ * #2484). Workbench's list can't be filtered by hull, so this keeps our own
+ * copy — see workbenchFits.ts for the pass/checkpoint design, and the
+ * decision doc it ships with.
+ *
+ * Every 30 minutes, each run fetching for at most `WORKBENCH_FETCH_BUDGET_MS`
+ * then flushing to Firestore. Requests are sequential with a 250ms gap (≤ 4/s
+ * against a free, unauthenticated API), so a run stores roughly 1,000 fits:
+ * the first pass over ~38k fits takes ~40 runs, about a day, after which a run
+ * is one list page plus however many fits were published since.
+ *
+ * The 360s budget leaves 180s of the 540s timeout for the flush, which reads
+ * and rewrites every hull the run touched (a few hundred during the first
+ * pass). A flush that overran the timeout would never save the checkpoint, so
+ * every later run would redo the same pages — this margin is what prevents it.
+ *
+ * 1GiB because a run reads back every hull it touches whole (merge, then
+ * re-split), and the most-fitted hulls are a few MB of EFT each.
+ *
+ * Another Cloud Scheduler job past the free three — the same trade
+ * `captureMiningPriceSnapshot` already made.
+ */
+const WORKBENCH_FETCH_BUDGET_MS = 360_000;
+const WORKBENCH_REQUEST_GAP_MS = 250;
+
+export const syncWorkbenchFits = onSchedule(
+  { schedule: 'every 30 minutes', memory: '1GiB', timeoutSeconds: 540 },
+  async () => {
+    const result = await runWorkbenchSync({
+      store: firestoreWorkbenchFitsStore(getFirestore()),
+      fetchJson: async (url) => {
+        const response = await fetch(url, {
+          headers: { 'User-Agent': MARKET_HISTORY_USER_AGENT, Accept: 'application/json' },
+        });
+        const body: unknown = response.ok ? await response.json().catch(() => null) : null;
+        return { status: response.status, retryAfter: response.headers.get('Retry-After'), body };
+      },
+      now: Date.now,
+      sleep,
+      budgetMs: WORKBENCH_FETCH_BUDGET_MS,
+      requestGapMs: WORKBENCH_REQUEST_GAP_MS,
+    });
+    logInfo('EVE Workbench fits sync', { ...result });
   }
 );
