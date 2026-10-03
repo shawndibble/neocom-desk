@@ -344,10 +344,13 @@ describe('lpPickPrice', () => {
     expect(lpPickPrice(12_000_000, 950_000, 1_000)).toBe(962_000_000);
   });
 
-  it('is the ISK cost alone at a zero rate', () => {
-    expect(lpPickPrice(12_000_000, 950_000, 0)).toBe(12_000_000);
+  it('is the ISK cost alone when nothing prices the LP', () => {
+    expect(lpPickPrice(12_000_000, 950_000, null)).toBe(12_000_000);
   });
 });
+
+const yours = (rate: number) => () => ({ rate, source: 'yours' as const });
+const unpriced = () => ({ rate: null, source: null });
 
 describe('lpOfferRows', () => {
   it('prices every offer at ISK + LP x rate, cheapest first, as ME0/TE0', () => {
@@ -359,7 +362,7 @@ describe('lpOfferRows', () => {
           offer: { ...LP_OFFER, isk_cost: 5_000_000, lp_cost: 2_000_000 },
         }),
       ],
-      10
+      yours(10)
     );
     expect(rows.map((row) => [row.corporationId, row.price])).toEqual([
       [1, 21_500_000],
@@ -368,17 +371,37 @@ describe('lpOfferRows', () => {
     expect(rows[0]).toMatchObject({ me: 0, te: 0, pickable: true, lpPriced: true });
   });
 
-  it('says the price is ISK only when no rate is set', () => {
-    expect(lpOfferRows([lpMatch()], 0)[0]).toMatchObject({ price: 12_000_000, lpPriced: false });
+  it('says the price is ISK only when nothing prices the LP', () => {
+    expect(lpOfferRows([lpMatch()], unpriced)[0]).toMatchObject({
+      price: 12_000_000,
+      lpPriced: false,
+      lpRate: null,
+    });
+  });
+
+  it('prices each store’s LP at its own market rate, and says which rate it used', () => {
+    const rates = new Map([
+      [1, 1_000],
+      [2, 2_000],
+    ]);
+    const rows = lpOfferRows(
+      [lpMatch({ corporationId: 1 }), lpMatch({ corporationId: 2 })],
+      (corp) => ({ rate: rates.get(corp)!, source: 'market' })
+    );
+    // 12M ISK + 950k LP at each store's own rate.
+    expect(rows.map((row) => [row.corporationId, row.price, row.lpRateSource])).toEqual([
+      [1, 962_000_000, 'market'],
+      [2, 1_912_000_000, 'market'],
+    ]);
   });
 
   it('adds the turn-ins still to buy, so the row costs what automatic pricing charges', () => {
-    const [row] = lpOfferRows([lpMatch({ offer: WITH_TURN_IN })], 0, () => 300_000);
+    const [row] = lpOfferRows([lpMatch({ offer: WITH_TURN_IN })], unpriced, () => 300_000);
     expect(row).toMatchObject({ price: 12_300_000, turnInCost: 300_000 });
   });
 
   it('prices the ISK/LP side alone when the turn-ins cannot be priced, and says so', () => {
-    const [row] = lpOfferRows([lpMatch({ offer: WITH_TURN_IN })], 0, () => null);
+    const [row] = lpOfferRows([lpMatch({ offer: WITH_TURN_IN })], unpriced, () => null);
     expect(row).toMatchObject({ price: 12_000_000, turnInCost: null });
   });
 });
@@ -438,7 +461,7 @@ describe('overridePatchFor', () => {
   });
 
   it('forces an LP copy at ME0/TE0 and its ISK + LP-at-rate price', () => {
-    const [row] = lpOfferRows([lpMatch()], 10);
+    const [row] = lpOfferRows([lpMatch()], yours(10));
     expect(overridePatchFor(row)).toEqual({
       acquisitionTierOverride: { me: 0, te: 0 },
       overridePrice: 21_500_000,
@@ -491,7 +514,7 @@ describe('runsForPickedRow — job runs the in-game Industry window would fill i
   });
 
   it('leaves runs alone for an LP copy, whose run count the offer never states', () => {
-    const [row] = lpOfferRows([lpMatch()], 10);
+    const [row] = lpOfferRows([lpMatch()], yours(10));
     expect(runsForPickedRow(row)).toBeNull();
   });
 });

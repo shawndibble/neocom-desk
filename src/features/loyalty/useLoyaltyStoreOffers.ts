@@ -26,7 +26,12 @@ import {
 } from '@/features/industry/useDetectedOwnedStock';
 import type { MaterialSourcingMap, SkillLevels } from '@/engine/industry/types';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
-import { collectNameableTypeIds, computeLoyaltyOfferRows, type LoyaltyOfferRow } from './offerRows';
+import {
+  collectNameableTypeIds,
+  computeLoyaltyOfferRows,
+  offerPriceTypeIds,
+  type LoyaltyOfferRow,
+} from './offerRows';
 
 export interface LoyaltyStoreResult {
   corpName: string | null;
@@ -114,23 +119,10 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     };
   }, [activeCharacterId, corporationId]);
 
-  // typeIds worth pricing at the hub: every offer's own item, any
-  // required_items turn-ins, and — for a catalog-known blueprint offer — its
-  // product and its materials.
-  const typeIds = useMemo(() => {
-    if (!offers || !catalog) return [];
-    const ids = new Set<number>();
-    for (const offer of offers) {
-      ids.add(offer.type_id);
-      for (const req of offer.required_items) ids.add(req.type_id);
-      const entry = catalog.byBlueprintTypeID.get(offer.type_id);
-      if (entry) {
-        if (entry.productTypeID !== null) ids.add(entry.productTypeID);
-        for (const m of entry.blueprint.materials) ids.add(m.typeID);
-      }
-    }
-    return [...ids];
-  }, [offers, catalog]);
+  const typeIds = useMemo(
+    () => (offers && catalog ? offerPriceTypeIds(offers, catalog) : []),
+    [offers, catalog]
+  );
 
   const materialTypeIds = useMemo(() => {
     if (!offers || !catalog) return [];

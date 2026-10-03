@@ -26,6 +26,8 @@
  * from the local SDE snapshot only (`loadContractLocationInfo`) — no ESI
  * call per row; a player structure stays unnamed.
  */
+import { lpRate } from '@/engine/loyalty/marketLpValue';
+import { loadMarketLpValues } from '@/features/loyalty/marketLpValue';
 import {
   useEffect,
   useId,
@@ -292,12 +294,29 @@ export function BlueprintAcquisitionModal({
     () => loadLpTurnInPricer(hub, lpOffers),
     `${hub.id}:${lpOffers.map((o) => o.offer_id).join(',')}`
   );
+  // Each store's own market LP Value, for when the pilot has set none.
+  const lpCorpIds = lp.status === 'ready' ? [...new Set(lp.data.map((m) => m.corporationId))] : [];
+  const marketLpValues = useLoad(
+    () =>
+      lpValue > 0
+        ? Promise.resolve(new Map<number, number | null>())
+        : loadMarketLpValues(lpCorpIds, hub),
+    `${hub.id}:${lpValue > 0}:${lpCorpIds.join(',')}`
+  );
   const lpRows = useMemo(
     () =>
       lp.status === 'ready'
-        ? lpOfferRows(lp.data, lpValue, turnIns.status === 'ready' ? turnIns.data : () => null)
+        ? lpOfferRows(
+            lp.data,
+            (corp) =>
+              lpRate(
+                lpValue,
+                marketLpValues.status === 'ready' ? (marketLpValues.data.get(corp) ?? null) : null
+              ),
+            turnIns.status === 'ready' ? turnIns.data : () => null
+          )
         : [],
-    [lp, lpValue, turnIns]
+    [lp, lpValue, marketLpValues, turnIns]
   );
   const lpSection = sectionRows(lpRows, (r) => r.pickable);
   const contractRows = contractSection.shown.map((g) => g.row);
@@ -395,8 +414,13 @@ export function BlueprintAcquisitionModal({
         lp: formatIsk(row.lpCost),
       }),
       tier(row),
-      row.lpPriced
-        ? t('industry.bpAcqLpPriced', { isk: formatIsk(row.price) })
+      row.lpPriced && row.lpRate !== null
+        ? t(
+            row.lpRateSource === 'market'
+              ? 'industry.bpAcqLpPricedMarket'
+              : 'industry.bpAcqLpPriced',
+            { isk: formatIsk(row.price), rate: formatIsk(row.lpRate) }
+          )
         : t('industry.bpAcqLpIskOnly'),
     ];
     if (row.quantity > 1)

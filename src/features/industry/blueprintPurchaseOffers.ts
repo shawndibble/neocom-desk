@@ -6,9 +6,10 @@
  * never opens with an empty blueprint price while the market or an LP Store
  * sells the blueprint.
  *
- * An LP redemption is priced ISK + LP × the pilot's LP Value (default 0) +
- * whatever turn-in items the pilot does not already hold in their assets, at
- * hub sell price (`loadLpTurnInPricer`) — the same number the Blueprint
+ * An LP redemption is priced ISK + LP × its LP Value (`lpRate`: the pilot's
+ * own when set, else the store's market value; a redemption nothing prices
+ * the LP of is left out rather than counted free) + whatever turn-in items
+ * the pilot does not already hold in their assets, at hub sell price (`loadLpTurnInPricer`) — the same number the Blueprint
  * Acquisition modal's LP rows and an LP Store "Plan in Industry" use. One
  * Fuzzwork call per region covers every blueprint in the plan, and the LP
  * lookup reads only corps a Character holds LP with — both cached — so this
@@ -28,6 +29,8 @@ import type { LoyaltyStoreOffer } from '@/esi/endpoints';
 import { findLpOfferMatches, type LpOfferMatch } from '@/features/market/appraisalLpAcquisition';
 import { loadGlobalMarketOverrides } from '@/features/market/orderBookView';
 import { useLpValue } from '@/features/loyalty/lpValue';
+import { loadMarketLpValues } from '@/features/loyalty/marketLpValue';
+import { lpRate } from '@/engine/loyalty/marketLpValue';
 import { getHubPrices, getRegionSellPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
 import { lpPickPrice } from './blueprintAcquisitionSources';
@@ -48,13 +51,28 @@ export function blueprintTypeIdsIn(
   return typeIds.filter((typeId) => catalog.byBlueprintTypeID.has(typeId));
 }
 
-async function lpValue(): Promise<number> {
+async function ownLpValue(): Promise<number> {
   try {
     await useLpValue.getState().hydrate();
   } catch {
     // An unreadable setting is the default rate, as everywhere else.
   }
   return useLpValue.getState().value;
+}
+
+/**
+ * ISK per LP each of `corporationIds`' LP is priced at, at `hub`: the
+ * pilot's own LP Value when set, else that store's market value (`lpRate`).
+ * Null for a store nothing prices.
+ */
+export async function loadLpRates(
+  corporationIds: Iterable<number>,
+  hub: TradeHub
+): Promise<(corporationId: number) => number | null> {
+  const own = await ownLpValue();
+  const market =
+    own > 0 ? new Map<number, number | null>() : await loadMarketLpValues(corporationIds, hub);
+  return (corporationId) => lpRate(own, market.get(corporationId) ?? null).rate;
 }
 
 function redemptionOf(offer: LoyaltyStoreOffer): LpBlueprintRedemption {
@@ -165,24 +183,31 @@ export async function loadBlueprintPurchaseOffers(
   const ids = [...new Set(blueprintTypeIds)];
   if (ids.length === 0) return NO_BLUEPRINT_PURCHASE_OFFERS;
 
-  const [market, lpByType, rate] = await Promise.all([
+  const [market, lpByType] = await Promise.all([
     marketSellPrices(hub, ids).catch(() => new Map<number, number | null>()),
     accountCharacterIds(characterId).then((characterIds) => accountLpMatches(characterIds, ids)),
-    lpValue(),
   ]);
-  const turnIns = await loadLpTurnInPricer(
-    hub,
-    [...lpByType.values()].flat().map((match) => match.offer)
-  );
+  const matches = [...lpByType.values()].flat();
+  const [turnIns, rateFor] = await Promise.all([
+    loadLpTurnInPricer(
+      hub,
+      matches.map((match) => match.offer)
+    ),
+    loadLpRates(
+      matches.map((match) => match.corporationId),
+      hub
+    ),
+  ]);
 
   const byType = new Map<number, BpcOffer[]>();
   for (const typeId of ids) {
     const offers: BpcOffer[] = [];
     const sell = marketSellOffer(market.get(typeId) ?? null);
     if (sell) offers.push(sell);
-    for (const { offer } of lpByType.get(typeId) ?? []) {
+    for (const { offer, corporationId } of lpByType.get(typeId) ?? []) {
       const turnInsCost = turnIns(offer);
-      if (turnInsCost === null) continue;
+      const rate = rateFor(corporationId);
+      if (turnInsCost === null || (rate === null && offer.lp_cost > 0)) continue;
       const redemption = lpRedemptionOffer(
         { quantity: offer.quantity, requiredItems: [] },
         lpPickPrice(offer.isk_cost, offer.lp_cost, rate) + turnInsCost,
@@ -200,18 +225,22 @@ export async function loadBlueprintPurchaseOffers(
  * What one LP Store redemption costs as a blueprint pick — the price an LP
  * Store "Plan in Industry" seeds the plan with (`parseBlueprintPriceSeed`).
  * Priced exactly as automatic selection and the modal price it: ISK + LP ×
- * LP Value + the turn-ins the pilot doesn't already own, at `hub`. `null`
- * when a turn-in still to buy has no price.
+ * its LP Value + the turn-ins the pilot doesn't already own, at `hub`.
+ * `null` when a turn-in still to buy has no price, or nothing prices the LP.
  */
 export async function lpBlueprintPickPrice(
   offer: LoyaltyStoreOffer,
+  corporationId: number,
   hub: TradeHub
 ): Promise<number | null> {
-  const [rate, turnIns] = await Promise.all([lpValue(), loadLpTurnInPricer(hub, [offer])]);
+  const [rateFor, turnIns] = await Promise.all([
+    loadLpRates([corporationId], hub),
+    loadLpTurnInPricer(hub, [offer]),
+  ]);
   const turnInsCost = turnIns(offer);
-  return turnInsCost === null
-    ? null
-    : lpPickPrice(offer.isk_cost, offer.lp_cost, rate) + turnInsCost;
+  const rate = rateFor(corporationId);
+  if (turnInsCost === null || (rate === null && offer.lp_cost > 0)) return null;
+  return lpPickPrice(offer.isk_cost, offer.lp_cost, rate) + turnInsCost;
 }
 
 /** `useBlueprintPurchaseOffers`' result: the offers, and whether they are the ones for the current inputs. */
