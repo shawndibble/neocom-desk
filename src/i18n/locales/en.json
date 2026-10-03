@@ -395,7 +395,6 @@
     },
     "edit": {
       "stateLabel": "State of {{name}}",
-      "chargeLabel": "Charge in {{name}}",
       "noCharge": "No charge",
       "remove": "Remove {{name}}",
       "emptySlot": "Empty — add to {{rack}}",
@@ -539,7 +538,13 @@
       "ladderHint": "Long range ↓ more damage",
       "priceyLabel": "over 10× the Tech I cost per minute",
       "navy": "Navy",
-      "pirate": "Pirate"
+      "pirate": "Pirate",
+      "sheetTitle": "Charge · {{name}}",
+      "scopeLabel": "Load into",
+      "scopeOne": "Just this one",
+      "scopeAll": "All {{count}}",
+      "triggerLabel": "Charge in {{name}}: {{charge}}",
+      "loadedOffList": "Loaded {{name}}, which this module can't use."
     },
     "popular": {
       "title": "Popular fits",
