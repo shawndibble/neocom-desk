@@ -576,6 +576,9 @@
     .dt-stack.dt-stack-dense.dt-dense-tight td.dt-edge-end {
       position: relative;
       z-index: 1;
+      /* A tighter gap than the base rule's, so a 360px phone still fits the
+         meta line and the box on one line. */
+      padding-left: 0.25rem;
     }
 
     /* The expand chevron (`expandableRow`) joins the actions on line one.

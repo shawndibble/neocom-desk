@@ -456,7 +456,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       // The column that gives way: it takes the table's spare width and its
       // name truncates, rather than the longest name setting the table's
       // minimum and scrolling the page sideways (the card has its own rules).
-      className: 'sm:w-full sm:max-w-0',
+      // Never below a short name's width, though: past that the table
+      // scrolls in its own wrapper instead.
+      className: 'sm:w-full sm:max-w-0 sm:min-w-28',
       sortValue: (row) => row.name.toLowerCase(),
       render: (row) => (
         <span className="flex min-w-0 items-center gap-2">
@@ -1042,8 +1044,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
               {/* A container, not a viewport, query: the rail's width decides
                   how much room the table has, so the secondary words (profit
-                  each, the demand label) drop by the table's own width. */}
-              <div ref={tableRef} className="@container">
+                  each, the demand label) drop by the table's own width. Where
+                  even the compact table cannot fit (a tablet with the rail
+                  open), it scrolls inside this wrapper, never the page. */}
+              <div ref={tableRef} className="@container overflow-x-auto">
                 <DataTable
                   {...tableExport.tableProps}
                   label={t('market.hauling.title')}
@@ -1188,8 +1192,9 @@ function BringInput({
       inputMode="numeric"
       aria-label={label}
       title={title}
-      // Shorter on the phone card, where its height sets the meta line's.
-      className="w-18 text-right tabular-nums max-sm:h-7 sm:w-20"
+      // Shorter and narrower on the phone card: its height sets the meta
+      // line's, and a 360px card still fits it beside that line.
+      className="w-16 text-right tabular-nums max-sm:h-7 sm:w-20"
       value={draft ?? value}
       onChange={(event) => {
         const raw = event.target.value.replace(/[^\d]/g, '');
