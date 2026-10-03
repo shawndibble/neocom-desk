@@ -13,15 +13,42 @@ import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 /** Market Group ids, by name in the SDE: Ammunition & Charges, Ship Equipment, Drones, Implants & Boosters, Trade Goods, Ship and Module Modifications, Planetary Infrastructure. */
 export const HAULING_CATEGORY_IDS = [11, 9, 157, 24, 19, 955, 1320] as const;
 
+/** Not a Market Group: _Everything_ scans every offered category at once — still no ships. */
+export const ALL_HAULING_CATEGORIES = 0;
+
+/** What the Category select lists: Everything first, then each category. */
+export const HAULING_CATEGORY_OPTIONS = [ALL_HAULING_CATEGORIES, ...HAULING_CATEGORY_IDS] as const;
+
 export const DEFAULT_HAULING_CATEGORY_ID = 11;
 
 export function isHaulingCategoryId(id: number): boolean {
-  return (HAULING_CATEGORY_IDS as readonly number[]).includes(id);
+  return (HAULING_CATEGORY_OPTIONS as readonly number[]).includes(id);
+}
+
+/** The type ids a scan of `categoryId` covers: one category's, or for Everything every offered one's. */
+export function typeIdsInHaulingCategory(
+  categoryId: number,
+  groups: readonly MarketGroupNode[],
+  types: readonly MarketTypeEntry[]
+): number[] {
+  return typeIdsInCategories(
+    categoryId === ALL_HAULING_CATEGORIES ? HAULING_CATEGORY_IDS : [categoryId],
+    groups,
+    types
+  );
 }
 
 /** Every type id under `rootId`, at any depth of the market-group tree, ascending. */
 export function typeIdsInCategory(
   rootId: number,
+  groups: readonly MarketGroupNode[],
+  types: readonly MarketTypeEntry[]
+): number[] {
+  return typeIdsInCategories([rootId], groups, types);
+}
+
+function typeIdsInCategories(
+  rootIds: readonly number[],
   groups: readonly MarketGroupNode[],
   types: readonly MarketTypeEntry[]
 ): number[] {
@@ -32,8 +59,8 @@ export function typeIdsInCategory(
     siblings.push(group.id);
     children.set(group.parentId, siblings);
   }
-  const inTree = new Set<number>([rootId]);
-  const queue = [rootId];
+  const inTree = new Set<number>(rootIds);
+  const queue = [...rootIds];
   while (queue.length > 0) {
     for (const child of children.get(queue.shift()!) ?? []) {
       if (!inTree.has(child)) {

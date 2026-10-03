@@ -73,8 +73,9 @@ import {
 import { ItemContextMenu } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
 import {
+  ALL_HAULING_CATEGORIES,
   DEFAULT_HAULING_CATEGORY_ID,
-  HAULING_CATEGORY_IDS,
+  HAULING_CATEGORY_OPTIONS,
   isHaulingCategoryId,
 } from './haulingCategories';
 import {
@@ -281,7 +282,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     };
   }, []);
   const categoryName = (id: number) =>
-    groups?.find((g) => g.id === id)?.name ?? t('market.hauling.categoryFallback', { id });
+    id === ALL_HAULING_CATEGORIES
+      ? t('market.hauling.categoryAll')
+      : (groups?.find((g) => g.id === id)?.name ?? t('market.hauling.categoryFallback', { id }));
 
   const cargo = useHaulingCargo((s) => s.value);
   const hydrateCargo = useHaulingCargo((s) => s.hydrate);
@@ -1177,7 +1180,7 @@ function CategorySelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {HAULING_CATEGORY_IDS.map((id) => (
+        {HAULING_CATEGORY_OPTIONS.map((id) => (
           <SelectItem key={id} value={String(id)}>
             {nameOf(id)}
           </SelectItem>
