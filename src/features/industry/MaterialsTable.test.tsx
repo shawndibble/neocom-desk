@@ -896,7 +896,11 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     // The offer is the only thing on the row — the total it would apply is on
     // its hover tooltip rather than printed beside it.
     const offer = useOffer('Tritanium');
-    expect(offer).toHaveTextContent('Use 1,000');
+    // "Use assets", not the number: the number made the Have column wrap, and
+    // Need beside it plus the tooltip already say how much. The accessible
+    // name still carries what a click will write.
+    expect(offer).toHaveTextContent(/^Use assets$/);
+    expect(offer).toHaveAccessibleName(/^Use assets: 1,000 of the Tritanium you own/);
     expect(await tooltipOf(offer)).toHaveTextContent('You own 9,000');
     expect(
       within(row('Pyerite')).queryByRole('button', { name: /you own/ })
@@ -971,7 +975,7 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     );
 
     expect(await tooltipOf(useOffer('Tritanium'))).toHaveTextContent('You own 6,000');
-    expect(useOffer('Tritanium')).toHaveTextContent('Use 1,000');
+    expect(useOffer('Tritanium')).toHaveAccessibleName(/^Use assets: 1,000 of the Tritanium/);
   });
 
   it('offers nothing when a material’s stock all sits outside the selected scope (#454)', () => {
