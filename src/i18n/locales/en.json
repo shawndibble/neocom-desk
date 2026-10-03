@@ -462,6 +462,33 @@
       "cargoAddCount_one": "+{{count}}",
       "cargoAddCount_other": "+{{count}}"
     },
+    "crystalGuide": {
+      "helpLabel": "Crystal types",
+      "help": {
+        "aLabel": "Type A",
+        "a": "Most ore from each rock: full yield bonus, no extra residue. The default, and the one for a fleet sharing a belt.",
+        "bLabel": "Type B",
+        "b": "Most ore an hour: A's yield a cycle on a shorter cycle, but more residue, so rocks run out sooner.",
+        "cLabel": "Type C",
+        "c": "Clears rocks: little yield, heavy residue. For emptying a belt or site fast, not for profit.",
+        "tech2Label": "II vs I",
+        "tech2": "Tech II A and B mine more (B II cycles faster still); C II mines less and clears faster still. Needs the skill."
+      },
+      "m3PerSecond": "{{value}} m³/s",
+      "cycle": "{{time}} cycle",
+      "residue": "{{value}} m³/s residue ({{pct}}% chance at {{multiplier}}×)",
+      "ownOres": "Each crystal works only on its own family's ores; pick the family first.",
+      "familyLoaded": "loaded",
+      "cutFor": "For {{ores}}.",
+      "typeName": "Type {{letter}} {{tier}}",
+      "colCrystal": "Crystal",
+      "colYield": "m³/s",
+      "colCycle": "Cycle",
+      "colResidue": "Residue",
+      "colResidueTitle": "Ore the rock loses a second that nobody gets, m³/s",
+      "hint_one": "m³/s and residue with that crystal loaded, crits included.",
+      "hint_other": "m³/s and residue with that crystal in all {{count}}, crits included."
+    },
     "capGuide": {
       "stableAt": "Stable at {{pct}}%",
       "emptyIn": "Empty in {{time}}",

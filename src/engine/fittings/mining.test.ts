@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MINING_ATTRIBUTE as A, extractMining, holdFillSeconds, miningYield } from './mining';
+import {
+  MINING_ATTRIBUTE as A,
+  extractCrystalFigures,
+  extractMining,
+  holdFillSeconds,
+  miningYield,
+} from './mining';
 
 describe('miningYield', () => {
   it('gives each miner its m³ a second, crits expected in, and the residue it wastes', () => {
@@ -138,5 +144,61 @@ describe('extractMining', () => {
         critBonus: 0,
       },
     ]);
+  });
+});
+
+describe('extractCrystalFigures', () => {
+  const attributes = (values: Record<number, number>) =>
+    new Map(Object.entries(values).map(([id, value]) => [Number(id), { value }]));
+  const strip = (charge: number, amount: number, ms: number, waste: number, mult: number) => ({
+    item: { type_id: 17912, slot: { type: 'high' }, state: 'active', charge: { type_id: charge } },
+    result: {
+      state: 'active',
+      attributes: attributes({
+        [A.miningAmount]: amount,
+        [A.duration]: ms,
+        [A.wasteProbability]: waste,
+        [A.wasteMultiplier]: mult,
+        [A.critChance]: 0.01,
+        [A.critBonus]: 2,
+      }),
+    },
+  });
+
+  it("gives a miner group's yield, cycle and residue with a crystal in every one", () => {
+    // Two strip miners with Simple C II, a drone that must not count.
+    const fit = [
+      strip(60284, 26.2, 37102, 93, 29),
+      {
+        item: { type_id: 2, slot: { type: 'drone_bay' }, state: 'active' },
+        result: strip(0, 50, 60000, 0, 1).result,
+      },
+      strip(60284, 26.2, 37102, 93, 29),
+    ];
+    const figures = extractCrystalFigures(
+      fit.map((f) => f.item),
+      fit.map((f) => f.result),
+      [0, 2]
+    );
+    const perSecond = (2 * 26.2 * 1.02) / 37.102;
+    const residue = (2 * 26.2 * 0.93 * 29) / 37.102;
+    expect(figures?.m3PerSecond).toBeCloseTo(perSecond, 9);
+    expect(figures?.cycleSeconds).toBeCloseTo(37.102, 9);
+    expect(figures?.residueChance).toBeCloseTo(0.93, 9);
+    expect(figures?.residueMultiplier).toBe(29);
+    expect(figures?.residueM3s).toBeCloseTo(residue, 9);
+    // What leaves the rock: the yield and the residue.
+    expect(figures?.removedM3s).toBeCloseTo(perSecond + residue, 9);
+  });
+
+  it('is null for a group that mines nothing', () => {
+    const fit = [strip(1, 0, 1000, 0, 1)];
+    expect(
+      extractCrystalFigures(
+        fit.map((f) => f.item),
+        fit.map((f) => f.result),
+        [0]
+      )
+    ).toBeNull();
   });
 });

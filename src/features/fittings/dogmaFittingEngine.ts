@@ -34,7 +34,7 @@ import { chargesUsedPerMinute, type ChargeChoice } from '@/engine/fittings/charg
 import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes, type AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { skillSourceTypeIds } from '@/engine/fittings/skillGains';
-import { extractMining, miningYield } from '@/engine/fittings/mining';
+import { extractCrystalFigures, extractMining, miningYield } from '@/engine/fittings/mining';
 import { extractFleetSupport } from '@/engine/fittings/fleetSupport';
 import { projectsNothing } from '@/engine/fittings/projection';
 import {
@@ -842,7 +842,7 @@ export function chargesMissingSkills(
 /** One charge's figures for a weapon group, from the Fitting calculated with it loaded. */
 export interface ChargeEngineStats extends Pick<
   ChargeChoice,
-  'typeId' | 'dps' | 'optimal' | 'falloff' | 'damage' | 'roundsPerMinute' | 'cap'
+  'typeId' | 'dps' | 'optimal' | 'falloff' | 'damage' | 'roundsPerMinute' | 'cap' | 'mining'
 > {
   techLevel: number;
 }
@@ -852,7 +852,8 @@ export interface ChargeEngineStats extends Pick<
  * of `chargeTypeIds`, the whole Fitting calculated once with that charge in
  * every module of `moduleTypeId` and those modules active — so the hull,
  * skills, implants and damage mods all count, as they do on the loaded
- * charge. A cap booster's charge also gets its capacitor figures off the
+ * charge. A cap booster's charge also gets its capacitor figures, and a
+ * mining crystal its yield and residue, off the
  * same calculation. One `calculate` per charge (no overheated pass): the Charges tab
  * pays this only while it is open, memoized by its caller.
  */
@@ -885,6 +886,7 @@ export function compareCharges(
     const dogmaFit = fittingToDogmaFit(trial, profile);
     const { items, ship } = calculate(dogmaFit);
     const cap = extractCapBoosterFigures(dogmaFit.items, ship.attributes, items, indices);
+    const mining = extractCrystalFigures(dogmaFit.items, items, indices);
     const item = items[first];
     const charge = item?.charge?.attributes;
     const read = (attrs: typeof charge, id: number) => attrs?.get(id)?.value ?? 0;
@@ -915,6 +917,7 @@ export function compareCharges(
       }),
       techLevel: read(charge, ITEM_DOGMA_ATTRIBUTE.techLevel),
       ...(cap ? { cap } : {}),
+      ...(mining ? { mining } : {}),
     };
   });
 }
