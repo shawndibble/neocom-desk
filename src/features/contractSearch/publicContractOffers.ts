@@ -1,7 +1,7 @@
 /**
  * Reads the Public Contract Offers snapshot (issues #906, #908, ADR 0013)
  * whole — every for-sale line of a public item_exchange/auction contract, any
- * item type — for the Contracts page's Search tab.
+ * item type — for the Contracts page's Item search tab.
  *
  * The sibling of `features/bpcContracts/syncedContracts.ts`, which reads the
  * same Firestore collection but narrows it to blueprint copies as it goes.

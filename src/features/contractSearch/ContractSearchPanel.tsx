@@ -1,5 +1,5 @@
 /**
- * The Contracts page's Search tab (issue #908): search every public
+ * The Contracts page's Item search and Courier tabs (issue #908): search every public
  * item_exchange/auction contract line in the shared Public Contract Offers
  * snapshot, any item type.
  *
@@ -21,7 +21,6 @@
  * trigger (#931), and so is each line of the detail modal's contents.
  */
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -36,7 +35,6 @@ import {
   Panel,
   RegionSelect,
   SearchInput,
-  SegmentedControl,
   Spinner,
   StatChip,
   StatChips,
@@ -93,7 +91,6 @@ import { rankedSearch } from '@/lib/rankedSearch';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import {
   boolParam,
@@ -134,9 +131,8 @@ const TYPE_SEARCH_LIMIT = 50;
 
 const SALE_KINDS: ContractSaleKind[] = ['exchange', 'auction'];
 
-/** Which corpus the tab is showing. Items is the landing mode — it is what the tab was before #910. */
-const CONTRACT_MODES = ['items', 'courier'] as const;
-export type ContractMode = (typeof CONTRACT_MODES)[number];
+/** Which corpus is showing — the route's Item search or Courier tab. Items is the landing mode. */
+export type ContractMode = 'items' | 'courier';
 
 /**
  * Guarded so a build with no sync backend reads nothing at all — not even the
@@ -389,63 +385,19 @@ export interface ContractSearchStatus {
 }
 
 interface ContractSearchPanelProps {
-  /** Which corpus is showing — a path segment on the route (`CONTRACTS_TABS`), owned there. */
+  /** Which corpus is showing — the route's own tab (`CONTRACTS_TABS`), owned there. */
   mode: ContractMode;
-  onModeChange: (mode: ContractMode) => void;
   /**
    * Called whenever the freshness/refresh state changes. The page header owns
    * the badge and the Refresh button; this panel owns the data behind them.
    */
   onStatusChange?: (status: ContractSearchStatus) => void;
-  /**
-   * Phone only: an element in the route's tab row the Items/Courier switch is
-   * portalled into, so the Search/History tabs and the corpus switch share
-   * one line instead of stacking a tab bar over a panel header holding two
-   * chips — two rows of chrome above a list that is the whole point of the
-   * page. Ignored at `sm` and up, and when absent the switch falls back to the
-   * panel header, so the panel still works alone.
-   */
-  modeSwitchSlot?: HTMLElement | null;
-}
-
-interface ContractModeSegmentsProps {
-  mode: ContractMode;
-  onChange: (mode: ContractMode) => void;
-}
-
-/**
- * The phone's Items/Courier switch: the same two pressed/unpressed toggles as
- * the desktop chips (`aria-pressed`, exactly one on, same accessible names),
- * drawn as one joined control. Beside a tab bar, two free-standing chips read
- * as two more filters; a shared border reads as one either/or choice. Each
- * segment takes the control scale's `md` height (44px on a phone), since it
- * sits where a thumb lands.
- */
-function ContractModeSegments({ mode, onChange }: ContractModeSegmentsProps) {
-  const { t } = useTranslation();
-  return (
-    <SegmentedControl
-      label={t('contractSearch.modeLabel')}
-      options={CONTRACT_MODES.map((candidate) => ({
-        value: candidate,
-        label: t(`contractSearch.mode.${candidate}`),
-      }))}
-      value={mode}
-      onChange={onChange}
-    />
-  );
 }
 
 /** Search every public item_exchange/auction contract line, any item type. Read-only, cached for offline. */
-export function ContractSearchPanel({
-  mode,
-  onModeChange,
-  onStatusChange,
-  modeSwitchSlot,
-}: ContractSearchPanelProps) {
+export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPanelProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  const isPhone = useIsPhone();
   /**
    * One hook per corpus, so neither board waits on the other's snapshot. The
    * two used to arrive together out of a single loader, on the argument that
@@ -986,61 +938,18 @@ export function ContractSearchPanel({
     );
   }
 
-  // Exactly one switch per render, chosen here rather than by CSS: two copies
-  // with one hidden would still be two buttons named "Courier". The panel
-  // mounts a render before the route's slot ref lands, so the header copy
-  // shows first and the portal takes over on the next pass.
-  const portalSwitch = syncConfigured && isPhone && modeSwitchSlot != null;
-
   return (
     <>
-      {portalSwitch &&
-        createPortal(<ContractModeSegments mode={mode} onChange={onModeChange} />, modeSwitchSlot)}
       <Panel
         padded={false}
         // Frameless on a phone, bleeding through `<main>`'s `px-2`: the dense
         // list is the page there, and a border plus gutter on each side costs
-        // a 390px screen the width the card's two lines need. The switch that
-        // held the header strip has moved up into the tab row (see
-        // `modeSwitchSlot`), so the strip goes with it.
+        // a 390px screen the width the card's two lines need.
         className="max-sm:-mx-2 max-sm:rounded-none max-sm:border-0"
-        // No title of its own: the tab immediately above already reads
-        // "Search", and repeating it in the panel header beneath reads as a
-        // stutter. The table keeps its own accessible name from
-        // `contractSearch.title`.
-        //
-        // The corpus switch takes the header strip the freshness badge and
-        // Refresh used to hold — those now sit on the page header beside the
-        // route title, the way every other route draws them, and this strip
-        // would otherwise be a hairline holding nothing while the chips kept a
-        // whole rule of vertical space to themselves.
-        //
-        // Chips rather than a second `Tabs` bar: the page's own tab strip sits
-        // immediately above this panel, and stacking a full-width tablist under
-        // it reads as the same stutter the panel drops its title to avoid.
-        // Exactly one is always on — picking the active chip again leaves it on
-        // rather than clearing to no corpus at all. Gone entirely when the
-        // build has no sync backend: there is nothing to switch between, and
-        // dropping it takes the empty header with it.
-        meta={
-          syncConfigured &&
-          !portalSwitch && (
-            <div
-              role="group"
-              aria-label={t('contractSearch.modeLabel')}
-              className="flex flex-wrap gap-2"
-            >
-              {CONTRACT_MODES.map((candidate) => (
-                <FilterChip
-                  key={candidate}
-                  label={t(`contractSearch.mode.${candidate}`)}
-                  selected={mode === candidate}
-                  onToggle={() => onModeChange(candidate)}
-                />
-              ))}
-            </div>
-          )
-        }
+        // No title or header strip: the route's tab immediately above already
+        // reads "Item search" or "Courier", and the freshness badge and
+        // Refresh sit on the page header. The table keeps its own accessible
+        // name from `contractSearch.title`.
       >
         {!syncConfigured ? (
           <EmptyState

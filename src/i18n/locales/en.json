@@ -4657,7 +4657,8 @@
     "title": "Contracts",
     "tabsLabel": "Contracts sections",
     "historyTab": "History",
-    "searchTab": "Search",
+    "itemSearchTab": "Item search",
+    "courierTab": "Courier",
     "refresh": "Refresh",
     "emptyTitle": "No contracts cached",
     "emptyHint": "Reconnect to fetch this character's contracts.",
@@ -6912,11 +6913,6 @@
     "notConfiguredHint": "This requires the app's sync backend, which isn't configured here.",
     "noFilterMatches": "No public contracts match your filters.",
     "noFilterMatchesHint": "Clear the item search or widen the region, price and quantity filters.",
-    "modeLabel": "Contract kind",
-    "mode": {
-      "items": "Items",
-      "courier": "Courier"
-    },
     "mobile": {
       "qtyAffix": "Qty ",
       "jumpsAffix": "Jumps ",

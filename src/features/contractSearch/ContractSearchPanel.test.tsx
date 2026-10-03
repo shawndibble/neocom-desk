@@ -353,7 +353,8 @@ async function bodyRows() {
  * The panel no longer draws its own Refresh: it reports freshness and the
  * reload upward, and `routes/Contracts.tsx` renders both in the page header.
  * This stands in for that header, so a test can still click Refresh without
- * mounting the whole route.
+ * mounting the whole route — and for the route's Item search / Courier tabs,
+ * as an "Items" and a "Courier" button.
  */
 function SearchTabHarness() {
   const [status, setStatus] = useState<ContractSearchStatus | null>(null);
@@ -367,7 +368,13 @@ function SearchTabHarness() {
       >
         Refresh
       </button>
-      <ContractSearchPanel mode={mode} onModeChange={setMode} onStatusChange={setStatus} />
+      <button type="button" onClick={() => setMode('items')}>
+        Items
+      </button>
+      <button type="button" onClick={() => setMode('courier')}>
+        Courier
+      </button>
+      <ContractSearchPanel mode={mode} onStatusChange={setStatus} />
     </>
   );
 }
@@ -529,16 +536,16 @@ describe('ContractSearchPanel', () => {
     expect(screen.queryByRole('group', { name: 'Filters' })).not.toBeInTheDocument();
   });
 
-  it('keeps the Items/Courier switch in the results panel header on desktop', async () => {
-    renderWithRouter();
+  it('draws no Items/Courier switch of its own — the route tabs pick the corpus', async () => {
+    render(
+      <MemoryRouter>
+        <ContractSearchPanel mode="items" />
+      </MemoryRouter>
+    );
     await bodyRows();
 
-    const modes = screen.getByRole('group', { name: 'Contract kind' });
-    expect(modes.closest('section')).not.toBeNull();
-    expect(within(modes).getByRole('button', { name: 'Items' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
+    expect(screen.queryByRole('group', { name: 'Contract kind' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Courier' })).not.toBeInTheDocument();
   });
 
   it('names a listed type the market catalogue lacks, such as an unmarketable blueprint copy', async () => {
@@ -1177,9 +1184,8 @@ describe('ContractSearchPanel — Courier mode', () => {
     await showCourier();
 
     expect(await screen.findByText('No public courier contracts synced yet')).toBeInTheDocument();
-    // The offers corpus is not empty, and the Items chip is still there to
-    // switch back to it.
-    expect(screen.getByRole('button', { name: 'Items' })).toBeInTheDocument();
+    // Not the offers corpus's empty state: that one is not empty.
+    expect(screen.queryByText('No public contracts synced yet')).not.toBeInTheDocument();
   });
 
   it('keeps the item results reachable after a trip through Courier', async () => {
@@ -1236,7 +1242,7 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
   function renderWithProbe() {
     return render(
       <MemoryRouter>
-        <ContractSearchPanel mode="items" onModeChange={() => {}} />
+        <ContractSearchPanel mode="items" />
         <LocationProbe />
       </MemoryRouter>
     );
