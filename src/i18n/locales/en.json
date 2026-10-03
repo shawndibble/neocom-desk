@@ -1098,7 +1098,7 @@
         "clone": "My clone",
         "fitting": "Fitting's"
       },
-      "editSet": "Edit Fitting's set",
+      "setImplants": "Set implants…",
       "label": "Implants",
       "popoverTitle": "Implants in these stats",
       "cloneExplain": "The implants in {{name}}'s current clone.",
