@@ -21,9 +21,12 @@ vi.mock('./workbenchSightings', () => ({ useWorkbenchSightings: () => new Map() 
 vi.mock('@/sde/loadSde', () => ({
   typeName: (typeId: number) =>
     Promise.resolve(
-      { 100: 'Heavy Neutron Blaster II', 200: 'Warp Scrambler II', 300: 'Damage Control II' }[
-        typeId
-      ] ?? `Type ${typeId}`
+      {
+        100: 'Heavy Neutron Blaster II',
+        200: 'Warp Scrambler II',
+        300: 'Damage Control II',
+        3001: 'Heavy Neutron Blaster II',
+      }[typeId] ?? `Type ${typeId}`
     ),
   // The out-of-date check's game data (issue #2485): a Vexor with one high slot.
   loadFittingSlots: () => Promise.resolve({ 3001: 'high' }),
@@ -260,6 +263,39 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     expect(screen.getByText('Out of date: uses a removed item: Old Gun I')).toBeTruthy();
     expect(screen.getByText('Out of date: this ship has fewer high slots now')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Hide out-of-date fits' })).toBeTruthy();
+  });
+
+  it("shows a fit's modules by rack, from the out-of-date check's own load", async () => {
+    openWorkbench({
+      ok: true,
+      fits: [wbFit('a', { eft: '[Vexor, Fit a]\nHeavy Neutron Blaster II' }), wbFit('b')],
+    });
+    const row = (await screen.findByRole('link', { name: 'Fit a' })).closest('li');
+    if (row === null) throw new Error('no row');
+    const highs = within(row).getByRole('group', { name: 'High slots' });
+    expect(
+      await within(highs).findByRole('img', { name: 'Heavy Neutron Blaster II' })
+    ).toBeTruthy();
+    expect(within(row).queryByRole('group', { name: 'Mid slots' })).toBeNull();
+    // A fit with nothing fitted draws no strip at all.
+    const bare = screen.getByRole('link', { name: 'Fit b' }).closest('li');
+    if (bare === null) throw new Error('no row');
+    expect(within(bare).queryByRole('group')).toBeNull();
+  });
+
+  it('shows the modules that did load on an out-of-date fit, without the unread line', async () => {
+    openWorkbench({
+      ok: true,
+      fits: [wbFit('a', { eft: '[Vexor, Fit a]\nOld Gun I\nHeavy Neutron Blaster II' })],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Show 1 out-of-date fit' }));
+    const row = screen.getByRole('link', { name: 'Fit a' }).closest('li');
+    if (row === null) throw new Error('no row');
+    const highs = within(row).getByRole('group', { name: 'High slots' });
+    expect(
+      await within(highs).findAllByRole('img', { name: 'Heavy Neutron Blaster II' })
+    ).toHaveLength(1);
+    expect(within(row).queryByRole('img', { name: /Old Gun/ })).toBeNull();
   });
 
   it('says so when every fit for the hull is out of date, rather than looking empty', async () => {
