@@ -50,11 +50,17 @@ export function firestoreWorkbenchFitsStore(db: Firestore): WorkbenchFitsStore {
     },
 
     async writeHull(shipTypeId, parts, previousPartCount) {
-      const ops: ((batch: FirebaseFirestore.WriteBatch) => void)[] = parts.map((partFits, part) => {
-        const ref = fits.doc(hullPartDocId(shipTypeId, part));
-        const doc: HullPartDoc = { shipTypeId, part, fits: partFits };
-        return (batch) => batch.set(ref, doc);
-      });
+      // Last part first. Parts are newest first, so new fits push older ones
+      // into later parts; writing the later parts before the earlier ones
+      // means a crash between batches leaves a fit in two parts (the client
+      // dedupes by id) rather than overwritten out of both. Deletes go last.
+      const ops: ((batch: FirebaseFirestore.WriteBatch) => void)[] = parts
+        .map((partFits, part) => {
+          const ref = fits.doc(hullPartDocId(shipTypeId, part));
+          const doc: HullPartDoc = { shipTypeId, part, fits: partFits };
+          return (batch: FirebaseFirestore.WriteBatch) => batch.set(ref, doc);
+        })
+        .reverse();
       for (let part = parts.length; part < previousPartCount; part += 1) {
         const ref = fits.doc(hullPartDocId(shipTypeId, part));
         ops.push((batch) => batch.delete(ref));

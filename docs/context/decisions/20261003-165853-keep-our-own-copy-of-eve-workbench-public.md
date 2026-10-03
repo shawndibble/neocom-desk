@@ -14,9 +14,13 @@ _Recorded 2026-10-03 · issue #2484._
 - **The first walk is spread over many runs; later runs stop at the first
   stored fit.** ~38k EFT fetches can't fit one 540s invocation at a polite
   ≤ 4 requests/s, so a pass is checkpointed in `workbenchFitsSync/state` and
-  resumed — about 15 hours to backfill, then a page or so per run. Workbench ids
+  resumed — about a day to backfill, then a page or so per run. Workbench ids
   are GUIDs, so "already stored" is the previous pass's newest ids or anything
-  not newer than its newest date.
+  not newer than its newest date. That assumes the list is ordered by
+  `DateAdded`: a fit that turns public later under an older `DateAdded` is
+  never picked up. Accepted — a periodic full re-walk can be added if it shows.
+- **A Retry-After longer than a minute ends the run** instead of idling it;
+  the next scheduled run is the retry.
 - **A hull too big for one document is split across `{shipTypeId}_{part}` docs**
   under a ~900KB budget; the client reads them all with one `shipTypeId` query.
 - **`workbenchFits` is readable with no Firebase session** — a first for this

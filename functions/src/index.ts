@@ -715,9 +715,14 @@ export const syncPublicContractOffers = onSchedule(
  *
  * Every 30 minutes, each run fetching for at most `WORKBENCH_FETCH_BUDGET_MS`
  * then flushing to Firestore. Requests are sequential with a 250ms gap (≤ 4/s
- * against a free, unauthenticated API), so a run stores roughly 1,000–1,500
- * fits: the first pass over ~38k fits takes ~30 runs, about 15 hours, after
- * which a run is one list page plus however many fits were published since.
+ * against a free, unauthenticated API), so a run stores roughly 1,000 fits:
+ * the first pass over ~38k fits takes ~40 runs, about a day, after which a run
+ * is one list page plus however many fits were published since.
+ *
+ * The 360s budget leaves 180s of the 540s timeout for the flush, which reads
+ * and rewrites every hull the run touched (a few hundred during the first
+ * pass). A flush that overran the timeout would never save the checkpoint, so
+ * every later run would redo the same pages — this margin is what prevents it.
  *
  * 1GiB because a run reads back every hull it touches whole (merge, then
  * re-split), and the most-fitted hulls are a few MB of EFT each.
@@ -725,7 +730,7 @@ export const syncPublicContractOffers = onSchedule(
  * Another Cloud Scheduler job past the free three — the same trade
  * `captureMiningPriceSnapshot` already made.
  */
-const WORKBENCH_FETCH_BUDGET_MS = 420_000;
+const WORKBENCH_FETCH_BUDGET_MS = 360_000;
 const WORKBENCH_REQUEST_GAP_MS = 250;
 
 export const syncWorkbenchFits = onSchedule(

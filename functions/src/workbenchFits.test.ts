@@ -460,6 +460,30 @@ describe('runWorkbenchSync', () => {
     expect(store.state.pass?.nextPage).toBe(2);
   });
 
+  it('stops the run, rather than retrying early, when Retry-After asks for longer than a run idles', async () => {
+    const store = new MemoryStore();
+    const c = clock();
+    const api = fakeApi(LIST, 2, {
+      'https://api.eveworkbench.com/v1/fits/public?page=1': [
+        { status: 429, retryAfter: '3600', body: null },
+      ],
+    });
+    const result = await runWorkbenchSync({
+      store,
+      fetchJson: api.fetchJson,
+      now: c.now,
+      sleep: c.sleep,
+      budgetMs: 60_000,
+      requestGapMs: 0,
+    });
+    expect(result).toMatchObject({
+      pages: 0,
+      stoppedBy: expect.stringMatching(/Retry-After 3600s/),
+    });
+    expect(api.calls).toHaveLength(1);
+    expect(c.now()).toBe(0);
+  });
+
   it('keeps what it stored when the network drops mid-walk', async () => {
     const store = new MemoryStore();
     const c = clock();

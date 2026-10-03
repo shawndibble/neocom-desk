@@ -49,7 +49,10 @@ export function mergeWorkbenchParts(parts: readonly { fits?: unknown }[]): Workb
       if (typeof fit?.id === 'string' && typeof fit.eft === 'string') byId.set(fit.id, fit);
     }
   }
-  return [...byId.values()].sort((a, b) => b.dateAdded - a.dateAdded);
+  // Same order as the Functions side's `newestFirst`: newest, then by id.
+  return [...byId.values()].sort(
+    (a, b) => b.dateAdded - a.dateAdded || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  );
 }
 
 const cache = new Map<number, { at: number; result: WorkbenchFitsResult }>();

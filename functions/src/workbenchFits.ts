@@ -46,7 +46,7 @@ const PART_OVERHEAD_BYTES = 64;
 
 /** Attempts per request before a run gives up on it (and stops, checkpointed). */
 const MAX_ATTEMPTS = 3;
-/** Ceiling on any one Retry-After wait; a longer ask ends the run instead of idling it. */
+/** Longest Retry-After a run waits out; a longer ask ends the run (see `request`). */
 const MAX_RETRY_WAIT_MS = 60_000;
 /** Backoff for a 5xx with no Retry-After, times the attempt number. */
 const SERVER_ERROR_BACKOFF_MS = 2_000;
@@ -349,9 +349,13 @@ export async function runWorkbenchSync(deps: WorkbenchSyncDeps): Promise<Workben
       }
       const retryable = response.status === 0 || response.status === 429 || response.status >= 500;
       if (!retryable || attempt >= MAX_ATTEMPTS) return response;
-      const wait =
-        parseRetryAfterMs(response.retryAfter, now(), MAX_RETRY_WAIT_MS) ??
-        SERVER_ERROR_BACKOFF_MS * attempt;
+      const asked = parseRetryAfterMs(response.retryAfter, now(), Number.POSITIVE_INFINITY);
+      // Asked to back off longer than a run should idle: stop here, checkpointed.
+      // The next scheduled run (30 minutes on) is the retry — one request, not a burst.
+      if (asked !== null && asked > MAX_RETRY_WAIT_MS) {
+        throw new StopRun(`${url}: Retry-After ${Math.ceil(asked / 1000)}s`);
+      }
+      const wait = asked ?? SERVER_ERROR_BACKOFF_MS * attempt;
       if (now() - start + wait >= budgetMs) throw new StopRun('budget');
       await sleep(wait);
     }
