@@ -40,7 +40,7 @@ describe('fittingVariationsCsvColumns', () => {
   it('exports the stat changes as one cell, the verdicts as words and the price raw', () => {
     expect(fittingVariationsCsvColumns(t).map((c) => c.value(variation()))).toEqual([
       'Small Shield Booster II',
-      'fittings.variations.stat.cpuUsed(+5); fittings.variations.stat.capacitorUnstable(120)',
+      'fittings.variations.stat.cpuUsed(+5); fittings.variations.stat.capacitorUnstable(2m 0s)',
       'fittings.variations.fitsYes',
       'fittings.variations.canFlyNo',
       1250000.5,

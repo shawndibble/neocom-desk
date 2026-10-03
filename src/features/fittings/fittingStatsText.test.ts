@@ -58,7 +58,7 @@ describe('fittingStatsText', () => {
       'EHP 24187 · shield 5000 HP · armor 4000 HP · hull 3000 HP',
       'Resists EM/Th/Kin/Exp: shield 50/50/50/50 · armor 60/60/60/60 · hull 33/33/33/33',
       'Tank 90.0 EHP/s burst · 50.0 EHP/s sustained',
-      'Capacitor Depletes in 105s · delta −4.2 GJ/s',
+      'Capacitor Depletes in 1m 45s · delta −4.2 GJ/s',
       'Speed 350 m/s · align 6.9 s · warp 3.0 AU/s',
       'Targeting 60.0 km · 6 targets · 400 mm · signature 120 m',
       'Drones 124.6 DPS · 25 / 75 Mbit/s',

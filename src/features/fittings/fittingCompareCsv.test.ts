@@ -53,7 +53,7 @@ describe('fittingCompareCsvColumns', () => {
     expect(columns.map((c) => c.value(compareRow('capacitor', [42.4, -95])))).toEqual([
       'fittings.compare.stat.capacitor',
       'fittings.compare.stat.capacitorStable(42)',
-      'fittings.compare.stat.capacitorUnstable(95)',
+      'fittings.compare.stat.capacitorUnstable(1m 35s)',
       null,
     ]);
   });

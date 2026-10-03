@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import type { CompareRow } from '@/engine/fittings/fittingCompare';
 import { STAT_DIGITS } from '@/engine/fittings/fittingStatFields';
+import { formatSeconds } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -17,7 +18,7 @@ function formatValue(row: CompareRow, index: number, t: Translate): string {
     const value = row.values[index]!;
     return value >= 0
       ? t('fittings.compare.stat.capacitorStable', { pct: value.toFixed(0) })
-      : t('fittings.compare.stat.capacitorUnstable', { seconds: (-value).toFixed(0) });
+      : t('fittings.compare.stat.capacitorUnstable', { time: formatSeconds(-value) });
   }
   if (row.key === 'appliedDps' || row.key === 'bestRange') return row.values[index]!.toFixed(1);
   if (row.key === 'priceSell' || row.key === 'priceBuy') {

@@ -444,7 +444,7 @@ describe('FittingStatsSections — Defense', () => {
     unmount();
 
     const lasting = renderSections(stats({ capacitor: { stable: false, depletesInSeconds: 240 } }));
-    expect(screen.getByText('Depletes in 240s')).toHaveClass('text-warning');
+    expect(screen.getByText('Depletes in 4m 0s')).toHaveClass('text-warning');
     lasting.unmount();
 
     renderSections(stats({ capacitor: { stable: false, depletesInSeconds: 30 } }));
