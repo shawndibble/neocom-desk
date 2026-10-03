@@ -423,7 +423,7 @@ describe('FittingAddPanel', () => {
     });
   });
 
-  it("keeps a plain list for a module whose charges don't shoot (a cap booster)", async () => {
+  it('gives a cap booster its guide: how the capacitor fares on each charge', async () => {
     const user = userEvent.setup();
     checkCandidates.mockImplementation(() => new Map());
     checkCharges.mockImplementation(() => new Set([700]));
@@ -436,6 +436,12 @@ describe('FittingAddPanel', () => {
         damage: null,
         roundsPerMinute: null,
         techLevel: 1,
+        cap: {
+          injection: 400,
+          gjPerSecond: 30,
+          boostsPerLoad: 3,
+          capacitor: { stable: true, stablePercentage: 55 },
+        },
       },
     ]);
     renderPanel({
@@ -455,8 +461,12 @@ describe('FittingAddPanel', () => {
       moduleResults: [{ state: 'active', maxState: 'active', chargeGroupIds: [9] }],
     });
     await user.click(screen.getByRole('tab', { name: 'Charges' }));
-    expect(screen.getByRole('button', { name: /Navy Cap Booster 400/ })).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Quick picks' })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^Navy Cap Booster 400, stable at 55%, 30 GJ\/s/ })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Smallest stable/ })).toBeInTheDocument();
+    // The weapon picker's View/Sort controls aren't a cap booster's.
+    expect(screen.queryByRole('button', { name: 'Usable' })).not.toBeInTheDocument();
   });
 
   it('adds any item to the cargo hold, in the quantity asked, from the Cargo tab', async () => {

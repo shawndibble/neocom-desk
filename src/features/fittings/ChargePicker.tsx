@@ -36,13 +36,10 @@ import {
 } from '@/engine/fittings/chargeChoice';
 import type { WeaponChargeGroup } from './useChargeChoices';
 import { ChargeChart } from './ChargeChart';
+import { formatIsk } from './chargeFormat';
 import { pickerDistance, type ChargePickerSettings, type ChargeView } from './chargePickerSettings';
 
 const km = (metres: number) => Math.round(metres / 1000);
-
-function formatIsk(value: number): string {
-  return value >= 10_000 ? formatCompactNumber(value) : Math.round(value).toLocaleString('en-US');
-}
 
 interface ControlsProps {
   settings: ChargePickerSettings;

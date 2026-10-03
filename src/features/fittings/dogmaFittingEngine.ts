@@ -13,6 +13,7 @@ import { racksWithSlots } from '@/engine/fittings/hullFitKey';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import {
   extractCapacitorBudget,
+  extractCapBoosterFigures,
   extractTank,
   extractDroneLimits,
   extractFittingStats,
@@ -841,7 +842,7 @@ export function chargesMissingSkills(
 /** One charge's figures for a weapon group, from the Fitting calculated with it loaded. */
 export interface ChargeEngineStats extends Pick<
   ChargeChoice,
-  'typeId' | 'dps' | 'optimal' | 'falloff' | 'damage' | 'roundsPerMinute'
+  'typeId' | 'dps' | 'optimal' | 'falloff' | 'damage' | 'roundsPerMinute' | 'cap'
 > {
   techLevel: number;
 }
@@ -851,7 +852,8 @@ export interface ChargeEngineStats extends Pick<
  * of `chargeTypeIds`, the whole Fitting calculated once with that charge in
  * every module of `moduleTypeId` and those modules active — so the hull,
  * skills, implants and damage mods all count, as they do on the loaded
- * charge. One `calculate` per charge (no overheated pass): the Charges tab
+ * charge. A cap booster's charge also gets its capacitor figures off the
+ * same calculation. One `calculate` per charge (no overheated pass): the Charges tab
  * pays this only while it is open, memoized by its caller.
  */
 export function compareCharges(
@@ -880,7 +882,9 @@ export function compareCharges(
       ),
     };
     // `fittingToDogmaFit` puts the modules first, so module i is items[i].
-    const { items } = calculate(fittingToDogmaFit(trial, profile));
+    const dogmaFit = fittingToDogmaFit(trial, profile);
+    const { items, ship } = calculate(dogmaFit);
+    const cap = extractCapBoosterFigures(dogmaFit.items, ship.attributes, items, indices);
     const item = items[first];
     const charge = item?.charge?.attributes;
     const read = (attrs: typeof charge, id: number) => attrs?.get(id)?.value ?? 0;
@@ -910,6 +914,7 @@ export function compareCharges(
           : null,
       }),
       techLevel: read(charge, ITEM_DOGMA_ATTRIBUTE.techLevel),
+      ...(cap ? { cap } : {}),
     };
   });
 }

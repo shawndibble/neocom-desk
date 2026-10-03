@@ -71,4 +71,23 @@ describe('buildChargeChoices', () => {
     expect(byId(238)).toMatchObject({ tier: 'tech1', price: 62, cargo: 1000, dps: 380 });
     expect(byId(21740).price).toBeNull();
   });
+
+  it("carries a cap booster charge's capacitor figures, and leaves them off a weapon's", () => {
+    const cap = {
+      injection: 400,
+      gjPerSecond: 26,
+      boostsPerLoad: 3,
+      capacitor: { stable: true as const, stablePercentage: 55 },
+    };
+    const [booster] = buildChargeChoices({
+      typeIds: [238],
+      stats: new Map([[238, { ...stat(238, 0), cap }]]),
+      skillMissing: new Set(),
+      prices: new Map(),
+      cargo: new Map(),
+      catalogue,
+    });
+    expect(booster?.cap).toEqual(cap);
+    expect(byId(238)).not.toHaveProperty('cap');
+  });
 });

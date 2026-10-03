@@ -8,6 +8,7 @@
  * the hub's order book, gathered by `features/fittings/useChargeChoices`.
  */
 import { turretDamageMultiplier, turretHitChance, type DamageSplit } from './appliedDps';
+import type { CapBoosterFigures } from './capBoosterChoice';
 
 export type ChargeTier = 'tech1' | 'faction' | 'tech2';
 
@@ -39,6 +40,8 @@ export interface ChargeChoice {
   cargo: number;
   /** The pilot lacks a skill the charge needs: shown, but not loadable. */
   skillMissing: boolean;
+  /** A cap booster charge's figures (`capBoosterChoice.ts`); absent for anything else. */
+  cap?: CapBoosterFigures;
 }
 
 export interface ChargeTypeGroup {

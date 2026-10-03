@@ -3,6 +3,7 @@ import {
   alignTimeSeconds,
   showsDrones,
   extractCapacitorBudget,
+  extractCapBoosterFigures,
   extractDroneLimits,
   extractTank,
   extractLockedTargets,
@@ -970,6 +971,63 @@ describe('extractCapacitorBudget', () => {
     };
     const budget = extractCapacitorBudget([drone.item], [drone.result], attrs({}));
     expect(budget.drain).toBe(0);
+  });
+});
+
+describe('extractCapBoosterFigures', () => {
+  const booster = (typeId: number) =>
+    running(
+      typeId,
+      {
+        capacitorPeakLoad: -400 / 12,
+        capacitorInjectionAmount: 400,
+        chargeAmount: 3,
+        chargeRate: 1,
+        cycleTime: 12000,
+        reloadTime: 10000,
+      },
+      { chargeTypeId: 32006 }
+    );
+
+  it("sums a booster group's reload-averaged injection, with its boosts per load and the capacitor", () => {
+    const modules = [booster(2024), running(1, { capacitorPeakLoad: 20 }), booster(2024)];
+    const items = modules.map((m) => m.item);
+    const results = modules.map((m) => m.result);
+    const ship = attrs({
+      capacitorDepletesIn: -1,
+      capacitorStablePercentage: 62,
+      capacitorCapacity: 2000,
+      capacitorRechargeTime: 300_000,
+      capacitorPeakRecharge: 16.7,
+    });
+    const figures = extractCapBoosterFigures(items, ship, results, [0, 2]);
+    expect(figures?.injection).toBe(400);
+    expect(figures?.boostsPerLoad).toBe(3);
+    // Two boosters, each 1200 GJ over three 12 s cycles and a 10 s reload.
+    expect(figures?.gjPerSecond).toBeCloseTo((2 * 1200) / 46, 6);
+    // The reloads cost injection, so the headline is the stats panel's reload-aware one, not the engine's 62%.
+    expect(figures?.capacitor).toEqual(extractFittingStats(items, ship, results).capacitor);
+    expect(figures?.capacitor).not.toEqual({ stable: true, stablePercentage: 62 });
+  });
+
+  it("is null for modules that inject nothing, or an ancillary shield booster's charge", () => {
+    const modules = [running(1, { capacitorPeakLoad: 20 })];
+    const ancillary = running(
+      2,
+      { capacitorPeakLoad: 0, capacitorInjectionAmount: 400, chargeAmount: 3 },
+      { chargeTypeId: 32006 }
+    );
+    expect(
+      extractCapBoosterFigures([ancillary.item], attrs({}), [ancillary.result], [0])
+    ).toBeNull();
+    expect(
+      extractCapBoosterFigures(
+        modules.map((m) => m.item),
+        attrs({}),
+        modules.map((m) => m.result),
+        [0]
+      )
+    ).toBeNull();
   });
 });
 
