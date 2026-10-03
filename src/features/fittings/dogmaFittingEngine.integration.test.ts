@@ -1012,6 +1012,7 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
 
     // B: A's yield a cycle on a shorter cycle, so more a second, with more residue.
     expect(b.cycleSeconds).toBeLessThan(a.cycleSeconds);
+    expect(b.m3PerSecond * b.cycleSeconds).toBeCloseTo(a.m3PerSecond * a.cycleSeconds, 6);
     expect(b.m3PerSecond).toBeGreaterThan(a.m3PerSecond);
     expect(b.residueChance).toBeGreaterThan(a.residueChance);
     // A keeps the most of what leaves the rock.

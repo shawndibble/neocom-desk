@@ -17,7 +17,7 @@ interface Props {
   pricesLoading: boolean;
 }
 
-const COLUMNS = 'grid-cols-[minmax(0,1fr)_2.8rem_2.4rem_3.2rem_2.8rem]';
+const COLUMNS = 'grid-cols-[minmax(0,1fr)_3.2rem_2.4rem_3.2rem_2.8rem]';
 const HELP_KEYS = ['a', 'b', 'c', 'tech2'] as const;
 
 const m3s = (value: number) =>
@@ -29,7 +29,8 @@ function rowLabel(t: TFunction, { choice }: CrystalChoice): string {
     choice.name,
     t('fittings.crystalGuide.m3PerSecond', { value: m3s(mining.m3PerSecond) }),
     t('fittings.crystalGuide.cycle', { time: formatSeconds(mining.cycleSeconds) }),
-    t('fittings.crystalGuide.residueChance', {
+    t('fittings.crystalGuide.residue', {
+      value: m3s(mining.residueM3s),
       pct: Math.round(mining.residueChance * 100),
       multiplier: m3s(mining.residueMultiplier),
     }),
@@ -90,23 +91,24 @@ export function MiningCrystalGuide({ group, onLoad, wrapRow, pricesLoading }: Pr
         )}
       </div>
 
-      <ul
-        aria-label={t('fittings.crystalGuide.helpLabel')}
-        className="space-y-0.5 bg-panel-2 px-2 py-1.5 text-[0.6875rem] text-text-dim"
-      >
-        {HELP_KEYS.map((key) => (
-          <li key={key}>
-            <span className="font-semibold text-text">
-              {t(`fittings.crystalGuide.help.${key}Label`)}
-            </span>{' '}
-            {t(`fittings.crystalGuide.help.${key}`)}
-          </li>
-        ))}
-      </ul>
+      <div className="space-y-1 bg-panel-2 px-2 py-1.5 text-[0.6875rem] text-text-dim">
+        <p>{t('fittings.crystalGuide.ownOres')}</p>
+        <ul aria-label={t('fittings.crystalGuide.helpLabel')} className="space-y-0.5">
+          {HELP_KEYS.map((key) => (
+            <li key={key}>
+              <span className="font-semibold text-text">
+                {t(`fittings.crystalGuide.help.${key}Label`)}
+              </span>{' '}
+              {t(`fittings.crystalGuide.help.${key}`)}
+            </li>
+          ))}
+        </ul>
+      </div>
 
-      {families.map((family) => {
+      {families.map((family, index) => {
         const isOpen = open.has(family.family);
-        const bodyId = `${sectionId}-${family.family}`;
+        // Family names have spaces; an id (and aria-controls' list of them) can't.
+        const bodyId = `${sectionId}-family-${index}`;
         const holdsLoaded = family.crystals.some((c) => group.loaded.has(c.choice.typeId));
         return (
           <section key={family.family}>
@@ -114,11 +116,12 @@ export function MiningCrystalGuide({ group, onLoad, wrapRow, pricesLoading }: Pr
               type="button"
               aria-expanded={isOpen}
               aria-controls={bodyId}
-              aria-label={
+              aria-label={[
                 family.ores.length > 0
                   ? `${family.family}: ${family.ores.join(', ')}`
-                  : family.family
-              }
+                  : family.family,
+                ...(holdsLoaded ? [t('fittings.crystalGuide.familyLoaded')] : []),
+              ].join(', ')}
               onClick={() => toggle(family.family)}
               className="flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
             >
@@ -132,6 +135,11 @@ export function MiningCrystalGuide({ group, onLoad, wrapRow, pricesLoading }: Pr
               </span>
             </button>
             <div id={bodyId} hidden={!isOpen} className="pb-1 pl-6 text-[0.6875rem]">
+              {family.ores.length > 0 && (
+                <p className="px-1 pb-1 text-text-dim">
+                  {t('fittings.crystalGuide.cutFor', { ores: family.ores.join(', ') })}
+                </p>
+              )}
               <div className={cx('grid gap-1 px-1 pb-1 text-text-dim', COLUMNS)}>
                 <span>{t('fittings.crystalGuide.colCrystal')}</span>
                 <span className="text-right">{t('fittings.crystalGuide.colYield')}</span>
