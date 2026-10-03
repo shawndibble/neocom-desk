@@ -16,6 +16,11 @@ const PAD = { left: 34, right: 10, top: 24, bottom: 30 };
 /** Faction versions sit straight above their Tech I charge; a nudge keeps equal ones apart. */
 const NUDGE = 4;
 
+/** An empire navy's faction charge ("Caldari Navy", "Republic Fleet") rather than a pirate faction's. */
+function isNavy(c: ChargeChoice): boolean {
+  return /\b(?:Navy|Fleet)\b/.test(c.faction ?? '');
+}
+
 function niceStep(max: number): number {
   if (max <= 200) return 50;
   if (max <= 500) return 100;
@@ -25,8 +30,9 @@ function niceStep(max: number): number {
 
 /**
  * Range against damage: one mark per charge, told apart by shape (DESIGN.md
- * §1: by form, not a new colour) — Tech I hollow circle, faction filled
- * square, Tech II hollow triangle. The dashed line joins the charges nothing
+ * §1: by form, not a new colour) — Tech I hollow circle, navy filled circle,
+ * pirate filled square, Tech II hollow triangle; accent marks only the
+ * selected one. The dashed line joins the charges nothing
  * else beats at their range. A mark selects; the box under the chart loads.
  */
 export function ChargeChart({
@@ -61,7 +67,7 @@ export function ChargeChart({
       .filter((c) => c.tier === 'faction')
       .forEach((c, i) => nudge.set(c.typeId, (i % 2 === 0 ? -1 : 1) * NUDGE));
   }
-  const cx_ = (c: ChargeChoice) => x(c.optimal) + (nudge.get(c.typeId) ?? 0);
+  const markX = (c: ChargeChoice) => x(c.optimal) + (nudge.get(c.typeId) ?? 0);
 
   const front: ChargeChoice[] = [];
   let runMax = -1;
@@ -92,7 +98,7 @@ export function ChargeChart({
   };
 
   const mark = (c: ChargeChoice) => {
-    const px = cx_(c);
+    const px = markX(c);
     const py = y(score(c));
     const on = c.typeId === selected.typeId;
     if (c.tier === 'tech2') {
@@ -103,6 +109,16 @@ export function ChargeChart({
         />
       );
     }
+    if (c.tier === 'faction' && isNavy(c)) {
+      return (
+        <circle
+          cx={px}
+          cy={py}
+          r={4}
+          className={cx('fill-text-dim', on && 'stroke-accent stroke-2')}
+        />
+      );
+    }
     if (c.tier === 'faction') {
       return (
         <rect
@@ -110,7 +126,7 @@ export function ChargeChart({
           y={py - 4}
           width={8}
           height={8}
-          className={cx('fill-accent-dim', on && 'stroke-accent stroke-2')}
+          className={cx('fill-text', on && 'stroke-accent stroke-2')}
         />
       );
     }
@@ -134,7 +150,7 @@ export function ChargeChart({
         viewBox={`0 0 ${W} ${H}`}
         role="img"
         aria-label={t('fittings.chargePicker.chartLabel')}
-        className="block h-auto w-full text-[11px]"
+        className="block h-auto w-full text-[0.6875rem]"
       >
         {ticksY.map((v) => (
           <g key={`y${v}`}>
@@ -171,18 +187,18 @@ export function ChargeChart({
               y1={PAD.top}
               y2={H - PAD.bottom}
               strokeDasharray="3 3"
-              className="stroke-warning"
+              className="stroke-text"
             />
-            <text x={x(distance) + 3} y={PAD.top + 8} className="fill-warning">
+            <text x={x(distance) + 3} y={PAD.top + 8} className="fill-text">
               {t('fittings.chargePicker.km', { km: Math.round(distance / 1000) })}
             </text>
           </g>
         )}
         {front.length > 1 && (
           <polyline
-            points={front.map((c) => `${cx_(c)},${y(score(c))}`).join(' ')}
+            points={front.map((c) => `${markX(c)},${y(score(c))}`).join(' ')}
             strokeDasharray="4 3"
-            className="fill-none stroke-success stroke-[1.25]"
+            className="fill-none stroke-line-bright stroke-[1.25]"
           />
         )}
         {choices.map((c) => (
@@ -200,7 +216,7 @@ export function ChargeChart({
             onKeyDown={(event) => onKey(event, c.typeId)}
             className="cursor-pointer outline-none focus-visible:[&>circle:first-child]:stroke-accent"
           >
-            <circle cx={cx_(c)} cy={y(score(c))} r={8} className="fill-transparent" />
+            <circle cx={markX(c)} cy={y(score(c))} r={8} className="fill-transparent" />
             {mark(c)}
           </g>
         ))}
@@ -214,9 +230,15 @@ export function ChargeChart({
         </span>
         <span className="inline-flex items-center gap-1 whitespace-nowrap">
           <svg width="10" height="10" aria-hidden="true">
-            <rect x="1" y="1" width="8" height="8" className="fill-accent-dim" />
+            <circle cx="5" cy="5" r="4" className="fill-text-dim" />
           </svg>
-          {t('fittings.chargePicker.faction')}
+          {t('fittings.chargePicker.navy')}
+        </span>
+        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+          <svg width="10" height="10" aria-hidden="true">
+            <rect x="1" y="1" width="8" height="8" className="fill-text" />
+          </svg>
+          {t('fittings.chargePicker.pirate')}
         </span>
         {choices.some((c) => c.tier === 'tech2') && (
           <span className="inline-flex items-center gap-1 whitespace-nowrap">
@@ -228,7 +250,14 @@ export function ChargeChart({
         )}
         <span className="inline-flex items-center gap-1 whitespace-nowrap">
           <svg width="14" height="10" aria-hidden="true">
-            <line x1="0" y1="5" x2="14" y2="5" strokeDasharray="4 3" className="stroke-success" />
+            <line
+              x1="0"
+              y1="5"
+              x2="14"
+              y2="5"
+              strokeDasharray="4 3"
+              className="stroke-line-bright"
+            />
           </svg>
           {t('fittings.chargePicker.legendBest')}
         </span>

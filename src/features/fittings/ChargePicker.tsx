@@ -159,15 +159,15 @@ function RangeBar({
       className="relative block h-1.5 min-w-0 flex-1 border border-line bg-bg"
     >
       <span
-        className="absolute inset-y-0 left-0 bg-[repeating-linear-gradient(90deg,rgb(87_199_244/0.35)_0_2px,transparent_2px_4px)]"
+        className="absolute inset-y-0 left-0 bg-[repeating-linear-gradient(90deg,var(--color-line-bright)_0_2px,transparent_2px_4px)]"
         style={{ width: pct(reach(choice)) }}
       />
       <span
-        className="absolute inset-y-0 left-0 bg-accent-dim"
+        className="absolute inset-y-0 left-0 bg-text-dim"
         style={{ width: pct(choice.optimal) }}
       />
       {distance !== null && (
-        <span className="absolute -inset-y-1 w-px bg-warning" style={{ left: pct(distance) }} />
+        <span className="absolute -inset-y-1 w-px bg-text" style={{ left: pct(distance) }} />
       )}
     </span>
   );
@@ -467,17 +467,17 @@ function TypeList({
               </span>
             )}
             {isBest && (
-              <span className="shrink-0 border border-current px-1 text-[0.6875rem] text-success">
+              <span className="shrink-0 text-[0.6875rem] text-success">
                 {t('fittings.chargePicker.bestAt', { km: settings.distanceKm })}
               </span>
             )}
             {cargo > 0 && (
-              <span className="shrink-0 border border-current px-1 text-[0.6875rem] font-normal text-text-dim">
+              <span className="shrink-0 text-[0.6875rem] font-normal text-text-dim">
                 {t('fittings.chargePicker.inCargo', { count: formatCompactNumber(cargo) })}
               </span>
             )}
             {rep.skillMissing && (
-              <span className="shrink-0 border border-current px-1 text-[0.6875rem] font-normal text-warning">
+              <span className="shrink-0 text-[0.6875rem] text-warning">
                 {t('fittings.chargePicker.skillTag')}
               </span>
             )}
@@ -571,7 +571,9 @@ function TypeDetail({
         ) : (
           <>
             <span className={rep.dps >= loaded.dps ? 'text-success' : 'text-danger'}>
-              {t('fittings.chargePicker.deltaDps', { value: signedPct(rep.dps / loaded.dps - 1) })}
+              {t('fittings.chargePicker.deltaDps', {
+                value: signedPct(rep.dps / Math.max(1, loaded.dps) - 1),
+              })}
             </span>
             <span className={rep.optimal >= loaded.optimal ? 'text-success' : 'text-danger'}>
               {t('fittings.chargePicker.deltaOptimal', {
@@ -583,7 +585,7 @@ function TypeDetail({
         )}
       </div>
       <div className="text-[0.6875rem]">
-        <div className="grid grid-cols-[minmax(0,1fr)_2.4rem_3rem_3.2rem] gap-0.5 pb-1 text-text-dim">
+        <div className="grid grid-cols-[minmax(0,1fr)_2.4rem_3rem_3.6rem] gap-0.5 pb-1 text-text-dim">
           <span>{t('fittings.chargePicker.colTier')}</span>
           <span className="text-right">{t('fittings.chargePicker.dpsUnit')}</span>
           <span className="text-right">{t('fittings.chargePicker.colIsk')}</span>
@@ -606,14 +608,15 @@ function TypeDetail({
                   aria-pressed={isLoaded}
                   aria-label={rowLabel(t, c, distance)}
                   className={cx(
-                    'grid w-full grid-cols-[minmax(0,1fr)_2.4rem_3rem_3.2rem] gap-0.5 border-t border-line py-1 text-left tabular-nums hover:bg-panel-2 disabled:cursor-not-allowed',
+                    'grid w-full grid-cols-[minmax(0,1fr)_2.4rem_3rem_3.6rem] gap-0.5 border-t border-line py-1 text-left tabular-nums hover:bg-panel-2 disabled:cursor-not-allowed',
                     (worse || c.skillMissing) && 'opacity-50'
                   )}
                 >
                   <span className={cx('truncate', isLoaded && 'text-accent')}>
                     {isLoaded && '● '}
                     {tierLabel(t, c)}
-                    {c.cargo > 0 && ` · ${formatIsk(c.cargo)}`}
+                    {c.cargo > 0 &&
+                      ` · ${t('fittings.chargePicker.inCargo', { count: formatCompactNumber(c.cargo) })}`}
                   </span>
                   <span className="text-right">{Math.round(chargeScore(c, distance))}</span>
                   <span className="text-right">{c.price === null ? '—' : formatIsk(c.price)}</span>
@@ -626,6 +629,8 @@ function TypeDetail({
                     }
                   >
                     {perMin === null ? '—' : formatIsk(perMin)}
+                    {/* Colour is never the only signal (DESIGN.md §7). */}
+                    {pricey && <span aria-label={t('fittings.chargePicker.priceyLabel')}> ▲</span>}
                   </span>
                   {(worse || c.skillMissing) && (
                     <span className="col-span-full text-text-dim">
@@ -688,7 +693,7 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
                 </span>
                 <span className="truncate">{name}</span>
                 {hasLoaded && (
-                  <span className="shrink-0 border border-current px-1 text-[0.6875rem] text-accent">
+                  <span className="shrink-0 text-[0.6875rem] text-accent">
                     {t('fittings.chargePicker.loadedTag')}
                   </span>
                 )}
@@ -704,15 +709,25 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
             </button>
             {isOpen && (
               <div className="pb-1">
-                <div className="grid grid-cols-[5.6rem_minmax(0,1fr)_2.2rem_2.8rem] gap-1.5 py-0.5 pr-1.5 pl-3.5 text-[0.6875rem] text-text-dim">
+                <div className="grid grid-cols-[5.6rem_minmax(0,1fr)_2.2rem_3.4rem] gap-1.5 py-0.5 pr-1.5 pl-3.5 text-[0.6875rem] text-text-dim">
                   <span>{t('fittings.chargePicker.colCargo')}</span>
                   <span>{t('fittings.chargePicker.colRange')}</span>
                   <span className="text-right">{t('fittings.chargePicker.dpsUnit')}</span>
                   <span className="text-right">{t('fittings.chargePicker.colIsk')}</span>
                 </div>
-                {rows.map((c) => {
+                {rows.map((c, i) => {
                   const score = chargeScore(c, distance);
                   const isLoaded = group.loaded.has(c.typeId);
+                  const tech1 = choices.find(
+                    (x) => x.tier === 'tech1' && x.baseTypeId === c.baseTypeId
+                  );
+                  const perMin = iskPerMinute(c);
+                  const tech1PerMin = tech1 ? iskPerMinute(tech1) : null;
+                  const pricey =
+                    c.tier === 'faction' &&
+                    perMin !== null &&
+                    tech1PerMin !== null &&
+                    perMin > tech1PerMin * PRICEY_RATIO;
                   return (
                     <Fragment key={c.typeId}>
                       {wrap(
@@ -724,23 +739,26 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
                           aria-pressed={isLoaded}
                           aria-label={rowLabel(t, c, distance)}
                           className={cx(
-                            'grid w-full grid-cols-[5.6rem_minmax(0,1fr)_2.2rem_2.8rem] items-center gap-1.5 border-l-2 py-1.5 pr-1.5 pl-3 text-left text-[0.6875rem] tabular-nums hover:bg-panel-2 disabled:cursor-not-allowed',
+                            'grid w-full grid-cols-[5.6rem_minmax(0,1fr)_2.2rem_3.4rem] items-center gap-1.5 border-l-2 py-1.5 pr-1.5 pl-3 text-left text-[0.6875rem] tabular-nums hover:bg-panel-2 disabled:cursor-not-allowed',
                             isLoaded ? 'border-accent text-accent' : 'border-transparent',
                             distance !== null &&
                               !c.skillMissing &&
                               score < groupBest * WEAK_SHARE &&
                               'opacity-45',
-                            c.skillMissing && 'opacity-50'
+                            (c.skillMissing || (!allWorse && worse[i] !== null)) && 'opacity-50'
                           )}
                         >
                           <span className="truncate">
-                            {chargeShortName({ ...c, tier: 'tech1' })}
+                            {chargeLabel(c.baseName)}
                             {c.cargo > 0 && <span className="text-text-dim"> ●</span>}
                           </span>
                           <RangeBar choice={c} maxReach={maxReach} distance={distance} />
                           <span className="text-right">{Math.round(score)}</span>
-                          <span className="text-right">
+                          <span className={cx('text-right', pricey && 'text-warning')}>
                             {c.price === null ? '—' : formatIsk(c.price)}
+                            {pricey && (
+                              <span aria-label={t('fittings.chargePicker.priceyLabel')}> ▲</span>
+                            )}
                           </span>
                         </button>
                       )}

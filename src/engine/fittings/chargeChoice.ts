@@ -58,7 +58,7 @@ export interface ChargeFactionGroup {
   /** The faction's name; null for Tech I and Tech II. */
   faction: string | null;
   choices: ChargeChoice[];
-  /** Median damage over the listed Tech I versions, minus 1; null without any. */
+  /** Median of each charge's DPS over its Tech I version's, minus 1 (+0.15 = 15% more); null without any. */
   damageGain: number | null;
   /** Median price over the listed Tech I versions; null without any priced pair. */
   priceRatio: number | null;
@@ -217,6 +217,8 @@ export function groupByFaction(choices: readonly ChargeChoice[]): ChargeFactionG
     group.damageGain = gain === null ? null : gain - 1;
     group.priceRatio = median(price);
   }
+  // Tech I, then the factions from the least extra damage to the most (cheapest
+  // first at equal damage), then Tech II: the order they climb in price.
   return [...groups.values()].sort(
     (a, b) =>
       TIER_ORDER[a.tier] - TIER_ORDER[b.tier] ||
@@ -231,13 +233,8 @@ export function sortGroups(
   sort: ChargeSort,
   distance: number | null
 ): ChargeTypeGroup[] {
-  return groups.slice().sort((a, b) => {
-    const x = a.representative;
-    const y = b.representative;
-    if (sort === 'damage') return chargeScore(y, distance) - chargeScore(x, distance);
-    if (sort === 'price') return comparePrice(x.price, y.price) || reach(y) - reach(x);
-    return y.optimal - x.optimal || y.falloff - x.falloff || y.dps - x.dps;
-  });
+  const compare = chargeComparator(sort, distance);
+  return groups.slice().sort((a, b) => compare(a.representative, b.representative));
 }
 
 /** The same sort, for one faction group's charges. */
@@ -246,17 +243,15 @@ export function sortChoices(
   sort: ChargeSort,
   distance: number | null
 ): ChargeChoice[] {
-  return sortGroups(
-    choices.map((c) => ({
-      baseTypeId: c.typeId,
-      name: c.name,
-      tier: 'tech1' as const,
-      choices: [c],
-      representative: c,
-    })),
-    sort,
-    distance
-  ).map((g) => g.representative);
+  return choices.slice().sort(chargeComparator(sort, distance));
+}
+
+function chargeComparator(sort: ChargeSort, distance: number | null) {
+  return (x: ChargeChoice, y: ChargeChoice): number => {
+    if (sort === 'damage') return chargeScore(y, distance) - chargeScore(x, distance);
+    if (sort === 'price') return comparePrice(x.price, y.price) || reach(y) - reach(x);
+    return y.optimal - x.optimal || y.falloff - x.falloff || y.dps - x.dps;
+  };
 }
 
 /** Whether the groups reach different distances — a missile group's all reach the same. */

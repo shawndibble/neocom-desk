@@ -29,8 +29,7 @@ import {
   extractAppliedDpsInputs,
   weaponRange,
 } from '@/engine/fittings/appliedWeapons';
-import type { DamageSplit } from '@/engine/fittings/appliedDps';
-import { chargesUsedPerMinute } from '@/engine/fittings/chargeChoice';
+import { chargesUsedPerMinute, type ChargeChoice } from '@/engine/fittings/chargeChoice';
 import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes, type AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { skillSourceTypeIds } from '@/engine/fittings/skillGains';
@@ -840,16 +839,10 @@ export function chargesMissingSkills(
 }
 
 /** One charge's figures for a weapon group, from the Fitting calculated with it loaded. */
-export interface ChargeEngineStats {
-  typeId: number;
-  /** The whole group's DPS. */
-  dps: number;
-  /** Metres; a missile's flight range, with falloff 0. */
-  optimal: number;
-  falloff: number;
-  damage: DamageSplit | null;
-  /** Charges the group uses per minute of nonstop fire; null when it never wears out. */
-  roundsPerMinute: number | null;
+export interface ChargeEngineStats extends Pick<
+  ChargeChoice,
+  'typeId' | 'dps' | 'optimal' | 'falloff' | 'damage' | 'roundsPerMinute'
+> {
   techLevel: number;
 }
 

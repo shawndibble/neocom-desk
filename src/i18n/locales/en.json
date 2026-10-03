@@ -503,7 +503,6 @@
       "skillTag": "SKILL",
       "tech1": "Tech I",
       "tech2": "Tech II",
-      "faction": "Faction",
       "typeLoaded": "This type is loaded ({{tier}}).",
       "deltaDps": "{{value}} dps",
       "deltaOptimal": "{{value}} optimal",
@@ -537,7 +536,10 @@
       "typeRowLabel": "{{name}}, {{dps}} dps, {{range}}",
       "changeChargeGroup_one": "Change charge",
       "changeChargeGroup_other": "Change charge (all {{count}})",
-      "ladderHint": "Long range ↓ more damage"
+      "ladderHint": "Long range ↓ more damage",
+      "priceyLabel": "over 10× the Tech I cost per minute",
+      "navy": "Navy",
+      "pirate": "Pirate"
     },
     "popular": {
       "title": "Popular fits",
