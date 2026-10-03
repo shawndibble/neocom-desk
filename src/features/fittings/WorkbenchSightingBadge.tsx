@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { formatAge } from '@/lib/age';
 import { useNow } from '@/lib/useNow';
-import type { WorkbenchSighting } from './workbenchSightings';
+import type { WorkbenchSighting } from '@/engine/fittings/workbenchSightings';
 
 /**
  * "Seen on zKillboard: 3 recent losses · last seen 2d ago" under an EVE
@@ -13,13 +13,15 @@ export function WorkbenchSightingBadge({ sighting }: { sighting: WorkbenchSighti
   const { t } = useTranslation();
   const now = useNow();
   if (sighting === undefined) return null;
+  // `success`: a positive status ("still flown"). Interactive `accent` is for controls.
   return (
-    <p className="text-xs text-accent">
-      {t('fittings.popular.seenOnZkillboard', { count: sighting.count })}
-      {sighting.lastSeen !== null &&
-        ` · ${t('fittings.popular.lastSeen', {
-          age: formatAge(Math.max(0, now - Date.parse(sighting.lastSeen)), t),
-        })}`}
+    <p className="text-xs text-success">
+      {sighting.lastSeen === null
+        ? t('fittings.popular.seenOnZkillboard', { count: sighting.count })
+        : t('fittings.popular.seenOnZkillboardLastSeen', {
+            count: sighting.count,
+            age: formatAge(Math.max(0, now - Date.parse(sighting.lastSeen)), t),
+          })}
     </p>
   );
 }

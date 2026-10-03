@@ -16,8 +16,6 @@ import { loadFittingSlots } from '@/sde/loadSde';
 import { loadPopularFits } from './popularFits';
 import type { WorkbenchFit } from './workbenchFits';
 
-export type { WorkbenchSighting };
-
 const NONE: ReadonlyMap<string, WorkbenchSighting> = new Map();
 
 /** Each Workbench fit seen among the hull's recent losses, by fit id. Never throws. */

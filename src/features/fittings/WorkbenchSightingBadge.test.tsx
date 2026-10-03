@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import '@/i18n';
 import type { WorkbenchFit } from './workbenchFits';
-import type { WorkbenchSighting } from './workbenchSightings';
+import type { WorkbenchSighting } from '@/engine/fittings/workbenchSightings';
 
 const { useWorkbenchSightingsMock } = vi.hoisted(() => ({ useWorkbenchSightingsMock: vi.fn() }));
 vi.mock('./workbenchSightings', () => ({ useWorkbenchSightings: useWorkbenchSightingsMock }));
