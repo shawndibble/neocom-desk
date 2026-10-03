@@ -1,7 +1,8 @@
 /**
  * One route system's zKillboard kills from the last hour (issue #2329): a
  * count linking to zKillboard, then where they happened. Gates on the path
- * are highlighted.
+ * are highlighted, and sit on the row itself; the rest open in the row's
+ * detail (issue #2474).
  *
  * Counts, places and times only (decision `20260912-172628`): "3 kills at
  * Stargate (Nourvukaiken), last one 32 min ago", "Smartbombs involved" —
@@ -48,7 +49,7 @@ function LocationLine({ location }: { location: RecentKillLocation }) {
           minutes: location.minutesSinceLast,
         });
   return (
-    <li className="flex flex-wrap items-center gap-1.5">
+    <span className="inline-flex items-center gap-1.5 sm:whitespace-nowrap">
       <span className={location.onPath ? 'font-semibold text-accent' : 'text-text-dim'}>
         {text}
       </span>
@@ -56,10 +57,15 @@ function LocationLine({ location }: { location: RecentKillLocation }) {
         <span className={`${BADGE} border-accent/60 text-accent`}>{t('travel.kills.onPath')}</span>
       )}
       <Tags tags={location} />
-    </li>
+    </span>
   );
 }
 
+/**
+ * The row's own line (issue #2474): the count, then only the kills on a gate
+ * along the route. Kills anywhere else wait in the row's detail
+ * (`RecentKillsDetail`), so every row stays one line high.
+ */
 export function RecentKillsCell({ systemId, cell }: { systemId: number; cell: RouteKillsCell }) {
   const { t } = useTranslation();
   if (cell.status === 'loading') return <Spinner size="sm" label={t('travel.kills.loading')} />;
@@ -68,7 +74,7 @@ export function RecentKillsCell({ systemId, cell }: { systemId: number; cell: Ro
   }
   const { summary } = cell;
   return (
-    <div className="space-y-1 text-left">
+    <span className="inline-flex flex-wrap items-center gap-x-3 text-left sm:flex-nowrap sm:whitespace-nowrap">
       <a
         href={systemZkillUrl(systemId)}
         target="_blank"
@@ -77,13 +83,29 @@ export function RecentKillsCell({ systemId, cell }: { systemId: number; cell: Ro
       >
         {t('travel.kills.count', { count: summary.count })}
       </a>
-      {summary.locations.length > 0 && (
-        <ul className="space-y-0.5 text-[0.8125rem]">
-          {summary.locations.map((location) => (
-            <LocationLine key={location.key} location={location} />
-          ))}
-        </ul>
-      )}
-    </div>
+      {summary.locations
+        .filter((location) => location.onPath)
+        .map((location) => (
+          <LocationLine key={location.key} location={location} />
+        ))}
+    </span>
+  );
+}
+
+/** Every kill location off the route's own gates, for the row's expanded detail. */
+export function RecentKillsDetail({ cell }: { cell: RouteKillsCell }) {
+  const { t } = useTranslation();
+  if (cell.status !== 'ready') return null;
+  const elsewhere = cell.summary.locations.filter((location) => !location.onPath);
+  if (elsewhere.length === 0)
+    return <p className="text-text-dim">{t('travel.kills.noneElsewhere')}</p>;
+  return (
+    <ul className="space-y-0.5">
+      {elsewhere.map((location) => (
+        <li key={location.key}>
+          <LocationLine location={location} />
+        </li>
+      ))}
+    </ul>
   );
 }

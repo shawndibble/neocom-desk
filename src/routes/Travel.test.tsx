@@ -55,12 +55,19 @@ const JITA = 30000142;
 const PERIMETER = 30000144;
 const UEDAMA = 30002768;
 const THERA = 31000005;
+// A longer highsec run for the quiet-stretch fold: no ESI or zKillboard kills.
+const NIYABAINEN = 30000150;
+const MUVOLAILEN = 30000151;
+const SOBASEKI = 30000152;
 
 const SYSTEMS = [
   { id: JITA, name: 'Jita', security: 0.9459, regionId: 10000002 },
   { id: PERIMETER, name: 'Perimeter', security: 0.95, regionId: 10000002 },
   { id: UEDAMA, name: 'Uedama', security: 0.505, regionId: 10000033 },
   { id: THERA, name: 'Thera', security: -0.99, regionId: 11000031 },
+  { id: NIYABAINEN, name: 'Niyabainen', security: 0.71, regionId: 10000002 },
+  { id: MUVOLAILEN, name: 'Muvolailen', security: 0.62, regionId: 10000002 },
+  { id: SOBASEKI, name: 'Sobaseki', security: 0.84, regionId: 10000002 },
 ];
 
 const JUMPS = {
@@ -215,11 +222,63 @@ describe('Travel › Route Safety', () => {
     expect(await uedama.findByText('The Citadel')).toBeInTheDocument();
     expect(within(body[0]).getByText('The Forge')).toBeInTheDocument();
 
-    expect(screen.getByText('Passes through Gank Chokepoints: Uedama')).toBeInTheDocument();
-    expect(screen.getByText('2 jumps from start to destination')).toBeInTheDocument();
+    const facts = within(screen.getByRole('list', { name: 'Route summary' }));
+    expect(facts.getByText('Gank Chokepoints: Uedama')).toBeInTheDocument();
+    expect(facts.getByText('2 jumps')).toBeInTheDocument();
+    expect(facts.getByText('3 highsec / 0 lowsec / 0 nullsec')).toBeInTheDocument();
+    expect(facts.getByText('lowest 0.5')).toBeInTheDocument();
+    expect(facts.getByText('12 ship · 4 pod kills in the last hour')).toBeInTheDocument();
+  });
+
+  it('draws the route strip with a spoken description and its key systems', async () => {
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
     expect(
-      screen.getByText('Last hour along the route: 12 ship kills, 4 pod kills')
+      await screen.findByRole('img', {
+        name: 'Route strip, 3 systems from Jita to Uedama. Key systems: Jita 0.9, Uedama 0.5, Gank Chokepoint. Kills in the last hour in: Uedama.',
+      })
     ).toBeInTheDocument();
+    expect(screen.getAllByTestId('route-strip-cell')).toHaveLength(3);
+  });
+
+  it('opens NPC kills and kills off the route in the row detail', async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    const table = await screen.findByRole('table', { name: 'Systems on the route' });
+    const body = (await within(table).findAllByRole('row')).slice(1);
+    await within(body[2]).findByRole('link', { name: '2 player kills' });
+    await user.click(within(body[2]).getByText('Uedama'));
+    expect(await within(table).findByText('NPC kills in the last hour: 2')).toBeInTheDocument();
+    expect(
+      within(table).getByText('No zKillboard kills elsewhere in the system in the last hour.')
+    ).toBeInTheDocument();
+  });
+
+  it('folds a quiet stretch into one row that opens in place', async () => {
+    const user = userEvent.setup();
+    loadSolarSystemJumps.mockResolvedValue({
+      [JITA]: [NIYABAINEN],
+      [NIYABAINEN]: [JITA, MUVOLAILEN],
+      [MUVOLAILEN]: [NIYABAINEN, SOBASEKI],
+      [SOBASEKI]: [MUVOLAILEN],
+    });
+    visit(`?from=${JITA}&to=${SOBASEKI}`);
+
+    const table = await screen.findByRole('table', { name: 'Systems on the route' });
+    const fold = await within(table).findByRole('button', {
+      name: '2 systems · Niyabainen → Muvolailen · lowest 0.6 · no kills reported in the last hour',
+    });
+    expect(fold).toHaveAttribute('aria-expanded', 'false');
+    expect(within(table).queryByText('Niyabainen')).not.toBeInTheDocument();
+    // The ends never fold.
+    expect(within(table).getByText('Jita')).toBeInTheDocument();
+    expect(within(table).getByText('Sobaseki')).toBeInTheDocument();
+
+    await user.click(fold);
+    expect(fold).toHaveAttribute('aria-expanded', 'true');
+    expect(within(table).getByText('Niyabainen')).toBeInTheDocument();
+    expect(within(table).getByRole('button', { name: 'Avoid Muvolailen' })).toBeInTheDocument();
   });
 
   it("fills in each system's zKillboard kills by location, one row at a time", async () => {

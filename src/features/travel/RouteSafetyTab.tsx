@@ -14,22 +14,14 @@
  * the Route Preference for this route, and the pilot's Travel Settings edited
  * in place — and the route on the right. Every middle row can Avoid its
  * system, previewing the new route before it saves.
+ *
+ * Itinerary (issue #2474): one panel holds the route's facts on one line,
+ * the route strip (`RouteStrip`), and one-line rows with quiet stretches
+ * folded (`RouteSystemsTable`).
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SecurityStatus } from '@/components/SecurityStatus';
-import {
-  Button,
-  DataAgeBadge,
-  DataTable,
-  EmptyState,
-  FilterField,
-  PageHeader,
-  Panel,
-  Spinner,
-  Tooltip,
-  type DataTableColumn,
-} from '@/components/ui';
+import { DataAgeBadge, EmptyState, FilterField, PageHeader, Panel, Spinner } from '@/components/ui';
 import type { RouteSafetyRow, RouteSafetySummary } from '@/engine/route/routeSafety';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { useCurrentSystem } from '@/features/route/currentSystem';
@@ -40,8 +32,10 @@ import { useSystemName } from '@/features/route/useSolarSystems';
 import { optionalEnumParam, optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { AvoidSystemDialog, type AvoidTarget } from './AvoidSystemDialog';
-import { RecentKillsCell } from './RecentKillsCell';
 import { RouteRulesPanel } from './RouteRulesPanel';
+import { RouteStrip } from './RouteStrip';
+import { RouteSystemsTable } from './RouteSystemsTable';
+import { routeSystemName } from './routeSystemName';
 import { useRouteKills, type RouteKillsCell } from './useRouteKills';
 import { useRouteSafety } from './useRouteSafety';
 
@@ -52,111 +46,10 @@ const ROUTE_PARAMS = {
   pref: optionalEnumParam(ROUTE_PREFERENCES),
 };
 
-const DASH = '—';
-
-/** A system the snapshot cannot name still needs one to act on. */
-function systemName(row: RouteSafetyRow): string {
-  return row.name ?? `#${row.systemId}`;
-}
-
-function count(value: number | null): string {
-  return value === null ? DASH : value.toLocaleString();
-}
-
-function useColumns(
-  killsOf: (systemId: number) => RouteKillsCell,
-  /** `null` for a row with nothing to offer: either end, or a system already avoided. */
-  avoidAction: (row: RouteSafetyRow) => (() => void) | null
-): DataTableColumn<RouteSafetyRow>[] {
+/** The route's facts on one line: jumps · bands · lowest · last hour's kills · chokepoints. */
+function RouteFacts({ summary }: { summary: RouteSafetySummary }) {
   const { t } = useTranslation();
-  return [
-    {
-      id: 'system',
-      header: t('travel.col.system'),
-      primary: true,
-      render: (row) => (
-        <span className="inline-flex items-center gap-2">
-          <span className="font-semibold">{row.name ?? DASH}</span>
-          {row.chokepoint && (
-            <Tooltip content={t('travel.chokepointHint')} openOnTap>
-              <span
-                tabIndex={0}
-                className="rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] text-warning"
-              >
-                {t('travel.chokepoint')}
-              </span>
-            </Tooltip>
-          )}
-        </span>
-      ),
-    },
-    {
-      id: 'security',
-      header: t('travel.col.security'),
-      align: 'right',
-      render: (row) => (row.security === null ? DASH : <SecurityStatus security={row.security} />),
-    },
-    {
-      id: 'region',
-      header: t('travel.col.region'),
-      className: 'text-text-dim',
-      render: (row) => row.regionName ?? DASH,
-    },
-    {
-      id: 'jumps',
-      header: t('travel.col.jumps'),
-      align: 'right',
-      className: 'tabular-nums',
-      render: (row) => count(row.jumps),
-    },
-    {
-      id: 'shipKills',
-      header: t('travel.col.shipKills'),
-      align: 'right',
-      className: 'tabular-nums',
-      render: (row) => count(row.shipKills),
-    },
-    {
-      id: 'podKills',
-      header: t('travel.col.podKills'),
-      align: 'right',
-      className: 'tabular-nums',
-      render: (row) => count(row.podKills),
-    },
-    {
-      id: 'npcKills',
-      header: t('travel.col.npcKills'),
-      align: 'right',
-      className: 'tabular-nums',
-      render: (row) => count(row.npcKills),
-    },
-    {
-      id: 'recentKills',
-      header: t('travel.col.recentKills'),
-      render: (row) => <RecentKillsCell systemId={row.systemId} cell={killsOf(row.systemId)} />,
-    },
-    {
-      id: 'avoid',
-      header: t('travel.col.avoid'),
-      headerClassName: 'sr-only',
-      align: 'right',
-      cardCorner: true,
-      render: (row) => {
-        const onAvoid = avoidAction(row);
-        const name = systemName(row);
-        return onAvoid === null ? null : (
-          <Button size="sm" onClick={onAvoid} aria-label={t('travel.avoid.actionLabel', { name })}>
-            {t('travel.avoid.action')}
-          </Button>
-        );
-      },
-    },
-  ];
-}
-
-function RouteSummary({ summary }: { summary: RouteSafetySummary }) {
-  const { t } = useTranslation();
-  const lines: string[] = [
+  const facts: string[] = [
     t('travel.summary.jumps', { count: summary.jumps }),
     t('travel.summary.bands', {
       highsec: summary.highsec,
@@ -165,25 +58,32 @@ function RouteSummary({ summary }: { summary: RouteSafetySummary }) {
     }),
   ];
   if (summary.lowestSecurity !== null) {
-    lines.push(t('travel.summary.lowest', { security: summary.lowestSecurity.toFixed(1) }));
+    facts.push(t('travel.summary.lowest', { security: summary.lowestSecurity.toFixed(1) }));
   }
   if (summary.shipKills !== null && summary.podKills !== null) {
-    lines.push(
+    facts.push(
       t('travel.summary.kills', {
         ships: summary.shipKills.toLocaleString(),
         pods: summary.podKills.toLocaleString(),
       })
     );
   }
-  lines.push(
+  facts.push(
     summary.chokepoints.length === 0
       ? t('travel.summary.noChokepoints')
       : t('travel.summary.chokepoints', { names: summary.chokepoints.join(', ') })
   );
   return (
-    <ul aria-label={t('travel.summary.label')} className="flex flex-wrap gap-x-4 gap-y-1">
-      {lines.map((line) => (
-        <li key={line}>{line}</li>
+    <ul aria-label={t('travel.summary.label')} className="flex flex-wrap gap-x-2 gap-y-1">
+      {facts.map((fact, index) => (
+        <li key={fact} className="inline-flex gap-2">
+          {index > 0 && (
+            <span aria-hidden="true" className="text-text-faint">
+              ·
+            </span>
+          )}
+          <span>{fact}</span>
+        </li>
       ))}
     </ul>
   );
@@ -207,14 +107,18 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
   const avoided = useAvoidedSystems((s) => s.value);
   const avoidedEnabled = useAvoidedSystemsEnabled((s) => s.value);
   const [avoidTarget, setAvoidTarget] = useState<AvoidTarget | null>(null);
+  // The last drawn route's jump count, held while the route reloads, so an
+  // open Avoid dialog stays mounted instead of blinking out and back.
+  const routeJumps = state.kind === 'route' ? state.summary.jumps : null;
+  const [lastJumps, setLastJumps] = useState<number | null>(routeJumps);
+  if (routeJumps !== null && routeJumps !== lastJumps) setLastJumps(routeJumps);
   // The route's own ends cannot be avoided; a system already on an active list has nothing to add.
-  const columns = useColumns(killsOf, (row) =>
+  const avoidAction = (row: RouteSafetyRow) =>
     row.systemId === fromId ||
     row.systemId === params.to ||
     (avoidedEnabled && avoided.includes(row.systemId))
       ? null
-      : () => setAvoidTarget({ systemId: row.systemId, name: systemName(row) })
-  );
+      : () => setAvoidTarget({ systemId: row.systemId, name: routeSystemName(row) });
 
   const fromTrigger =
     fromId === null
@@ -265,16 +169,16 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
               </FilterField>
             </div>
           </Panel>
-          <RouteBody state={state} columns={columns} />
+          <RouteBody state={state} killsOf={killsOf} avoidAction={avoidAction} />
         </div>
       </div>
-      {state.kind === 'route' && fromId !== null && params.to !== null && (
+      {lastJumps !== null && fromId !== null && params.to !== null && (
         <AvoidSystemDialog
           target={avoidTarget}
           fromId={fromId}
           toId={params.to}
           rules={routeQuery.rules}
-          currentJumps={state.summary.jumps}
+          currentJumps={lastJumps}
           onClose={() => setAvoidTarget(null)}
         />
       )}
@@ -284,10 +188,12 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
 
 function RouteBody({
   state,
-  columns,
+  killsOf,
+  avoidAction,
 }: {
   state: ReturnType<typeof useRouteSafety>;
-  columns: DataTableColumn<RouteSafetyRow>[];
+  killsOf: (systemId: number) => RouteKillsCell;
+  avoidAction: (row: RouteSafetyRow) => (() => void) | null;
 }) {
   const { t } = useTranslation();
   switch (state.kind) {
@@ -309,7 +215,8 @@ function RouteBody({
       return (
         <Panel>
           <div className="space-y-3">
-            <RouteSummary summary={state.summary} />
+            <RouteFacts summary={state.summary} />
+            <RouteStrip rows={state.rows} killsOf={killsOf} />
             {state.activityLoading && (
               <p role="status" className="text-text-dim">
                 {t('travel.activityLoading')}
@@ -320,10 +227,10 @@ function RouteBody({
                 {t('travel.activityUnavailable')}
               </p>
             )}
-            <DataTable
-              columns={columns}
+            <RouteSystemsTable
               rows={state.rows}
-              rowKey={(row) => String(row.systemId)}
+              killsOf={killsOf}
+              avoidAction={avoidAction}
               label={t('travel.tableLabel')}
             />
           </div>

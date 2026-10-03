@@ -14,6 +14,12 @@
  * - A feed that could not be fetched at all is unknown for every system.
  * - Both feeds exclude wormhole space, so a J-space system is always unknown.
  *
+ * Quiet stretches (issue #2474): a run of consecutive systems where every
+ * figure is a known zero folds into one row. Unknown is never zero here
+ * either — a system whose ESI or zKillboard figure is missing, or a J-space
+ * system, never folds — and the ends of the list never fold, so a caller can
+ * fold each leg of a multi-stop trip between its own ends.
+ *
  * Pure, per CLAUDE.md: the caller supplies every lookup.
  */
 import { isGankChokepoint, chokepointsOnRoute } from '@/engine/route/chokepoints';
@@ -152,4 +158,86 @@ export function summarizeRouteSafety(rows: readonly RouteSafetyRow[]): RouteSafe
     podKills: totalOf(rows.map((row) => row.podKills)),
     chokepoints: chokepointsOnRoute(rows.map((row) => row.systemId)),
   };
+}
+
+/** A fold needs at least this many systems: one quiet system is no shorter as a fold. */
+export const MIN_QUIET_RUN = 2;
+
+export type RouteStretch =
+  | { kind: 'system'; row: RouteSafetyRow }
+  | {
+      kind: 'quiet';
+      /** In route order; always at least `MIN_QUIET_RUN`. */
+      rows: RouteSafetyRow[];
+      lowestSecurity: number;
+    };
+
+/**
+ * `zkillCount` is the system's zKillboard kills in the last hour, or `null`
+ * while that figure is loading or could not be read.
+ */
+function isQuiet(row: RouteSafetyRow, zkillCount: (systemId: number) => number | null): boolean {
+  return (
+    !isWormholeSystem(row.systemId) &&
+    !row.chokepoint &&
+    row.security !== null &&
+    row.shipKills === 0 &&
+    row.podKills === 0 &&
+    zkillCount(row.systemId) === 0
+  );
+}
+
+/**
+ * Folds each run of quiet middle systems into one stretch. A system is quiet
+ * only when ESI reported zero ship and pod kills, zKillboard reported zero
+ * kills, it is not a Gank Chokepoint, its security is known and it is not in
+ * J-space. NPC kills do not count. The list's first and last systems never
+ * fold.
+ */
+export function foldQuietStretches(
+  rows: readonly RouteSafetyRow[],
+  zkillCount: (systemId: number) => number | null
+): RouteStretch[] {
+  const stretches: RouteStretch[] = [];
+  let run: RouteSafetyRow[] = [];
+  const flush = () => {
+    if (run.length >= MIN_QUIET_RUN) {
+      const lowestSecurity = Math.min(...run.map((r) => r.security ?? Infinity));
+      stretches.push({ kind: 'quiet', rows: run, lowestSecurity });
+    } else {
+      for (const r of run) stretches.push({ kind: 'system', row: r });
+    }
+    run = [];
+  };
+  rows.forEach((row, index) => {
+    const middle = index > 0 && index < rows.length - 1;
+    if (middle && isQuiet(row, zkillCount)) {
+      run.push(row);
+      return;
+    }
+    flush();
+    stretches.push({ kind: 'system', row });
+  });
+  flush();
+  return stretches;
+}
+
+/**
+ * Which systems the route strip labels, as indexes in route order: both
+ * ends, the first system at the route's lowest security, and every Gank
+ * Chokepoint.
+ */
+export function routeStripKeySystems(rows: readonly RouteSafetyRow[]): number[] {
+  const keys = new Set<number>();
+  if (rows.length > 0) keys.add(0);
+  if (rows.length > 1) keys.add(rows.length - 1);
+  const securities = rows.flatMap((row) => (row.security === null ? [] : [row.security]));
+  if (securities.length > 0) {
+    const lowest = Math.min(...securities);
+    keys.add(rows.findIndex((row) => row.security === lowest));
+  }
+  rows.forEach((row, index) => {
+    if (row.chokepoint) keys.add(index);
+  });
+  return [...keys].sort((a, b) => a - b);
 }
