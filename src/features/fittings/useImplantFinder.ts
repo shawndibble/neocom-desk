@@ -120,6 +120,8 @@ export interface GoalSummary {
   helpers: number;
   /** The Fitting has something this goal measures (a budget always; missiles for "Missiles"). */
   used: boolean;
+  /** Which slots (`slotKey`) those families go in. */
+  slots: ReadonlySet<string>;
 }
 
 export interface ImplantFinderState {
@@ -167,7 +169,8 @@ interface Baselines {
   emptied: Map<string, FittingStats>;
 }
 
-const slotKey = (kind: string, slot: number) => `${kind}:${slot}`;
+/** One slot, kind and number: implant slot 3 and booster slot 3 are different slots. */
+export const slotKey = (kind: string, slot: number) => `${kind}:${slot}`;
 
 async function runBaselines(
   evaluate: Evaluate,
@@ -315,11 +318,15 @@ export function useImplantFinder({
   const goals = useMemo<GoalSummary[]>(() => {
     if (!helpersOf || !screening) return [];
     const base = screening.baselines.stats;
-    return IMPLANT_GOALS.map((goal) => ({
-      goal,
-      helpers: helpersOf(goal).length,
-      used: goal.kind === 'budget' || goal.read(base, context) !== 0,
-    }));
+    return IMPLANT_GOALS.map((goal) => {
+      const helpers = helpersOf(goal);
+      return {
+        goal,
+        helpers: helpers.length,
+        used: goal.kind === 'budget' || goal.read(base, context) !== 0,
+        slots: new Set(helpers.map((f) => slotKey(f.kind, f.slot))),
+      };
+    });
   }, [helpersOf, screening, context]);
 
   const goal = goalId ? goalById(goalId) : null;
