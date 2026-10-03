@@ -59,22 +59,26 @@ for (const width of [1024, 1249, 1250, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(`./industry/plans/${PLAN_ID}`);
 
-    const table = page.getByRole('table', { name: 'Materials' });
-    await expect(table).toBeVisible();
-
-    // Every horizontal scroller between the table and the page must fit its
-    // content — a clipped column behind one of them is the bug.
-    const overflows = await table.evaluate((el) => {
-      const scrollers: { scrollWidth: number; clientWidth: number }[] = [];
-      for (let node = el.parentElement; node; node = node.parentElement) {
-        const { overflowX } = getComputedStyle(node);
-        if (overflowX === 'auto' || overflowX === 'scroll') {
-          scrollers.push({ scrollWidth: node.scrollWidth, clientWidth: node.clientWidth });
+    // One table per errand section (To buy, Building, …); every one of them
+    // has to fit.
+    const tables = page.getByRole('table', { name: /^Materials: / });
+    // A cold dev server can take well past the 5s default to price the plan.
+    await expect(tables.first()).toBeVisible({ timeout: 15000 });
+    for (const table of await tables.all()) {
+      // Every horizontal scroller between the table and the page must fit its
+      // content — a clipped column behind one of them is the bug.
+      const overflows = await table.evaluate((el) => {
+        const scrollers: { scrollWidth: number; clientWidth: number }[] = [];
+        for (let node = el.parentElement; node; node = node.parentElement) {
+          const { overflowX } = getComputedStyle(node);
+          if (overflowX === 'auto' || overflowX === 'scroll') {
+            scrollers.push({ scrollWidth: node.scrollWidth, clientWidth: node.clientWidth });
+          }
         }
-      }
-      return scrollers;
-    });
-    expect(overflows.length).toBeGreaterThan(0);
-    for (const s of overflows) expect(s.scrollWidth).toBeLessThanOrEqual(s.clientWidth);
+        return scrollers;
+      });
+      expect(overflows.length).toBeGreaterThan(0);
+      for (const s of overflows) expect(s.scrollWidth).toBeLessThanOrEqual(s.clientWidth);
+    }
   });
 }

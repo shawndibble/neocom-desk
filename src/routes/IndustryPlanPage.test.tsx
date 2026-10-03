@@ -191,7 +191,9 @@ function useDesktopViewport() {
   window.matchMedia = (media: string) =>
     ({
       media,
-      matches: true,
+      // Every min-width breakpoint is met, and no max-width one is — a
+      // desktop is not also a phone (`useIsPhone` asks a max-width query).
+      matches: !media.includes('max-width'),
       onchange: null,
       addEventListener: () => {},
       removeEventListener: () => {},
@@ -532,7 +534,9 @@ describe('IndustryPlanPage: materials row context menu', () => {
     // Round-trips through `/industry?product=` (`BuildPlanContextMenu`), the
     // same deep link the Market Browser's menu uses — the material's own
     // plan is created if missing, and the browser lands on its own page.
-    await screen.findByRole('heading', { name: 'Mechanical Parts' });
+    // The new plan's page loads the blueprint catalog before its heading
+    // renders — well past findBy's 1s default once other files share the CPU.
+    await screen.findByRole('heading', { name: 'Mechanical Parts' }, { timeout: 5000 });
     await waitFor(() => expect(window.location.pathname).not.toBe('/industry/plans'));
     await waitFor(() => expect(window.location.search).toBe(''));
     const stored = await db.buildPlans.where('characterId').equals(CHAR_ID).toArray();
@@ -634,7 +638,7 @@ describe('IndustryPlanPage: make-or-buy marker on materials', () => {
     // The control needs no prices to appear — only its tooltip's price
     // rationale does, so that's what has to wait for the market snapshot.
     const control = await screen.findByRole('button', {
-      name: 'Build Mechanical Parts here instead of buying it',
+      name: 'Build instead: Mechanical Parts',
     });
     fireEvent.pointerMove(control);
     const tooltip = await screen.findByRole('tooltip');
@@ -671,7 +675,7 @@ describe('IndustryPlanPage: make-or-buy marker on materials', () => {
     render(<App />);
 
     const control = await screen.findByRole('button', {
-      name: 'Build Mechanical Parts here instead of buying it',
+      name: 'Build instead: Mechanical Parts',
     });
     fireEvent.pointerMove(control);
     const tooltip = await screen.findByRole('tooltip');
@@ -685,7 +689,7 @@ describe('IndustryPlanPage: make-or-buy marker on materials', () => {
     render(<App />);
     // Wait for the row that does get a control, so this can't pass just by
     // reading the table before it renders.
-    await screen.findByRole('button', { name: 'Build Mechanical Parts here instead of buying it' });
+    await screen.findByRole('button', { name: 'Build instead: Mechanical Parts' });
 
     expect(await controlFor('Tritanium')).toBeNull();
     expect(await controlFor('Pyerite')).toBeNull();
@@ -705,7 +709,7 @@ describe('IndustryPlanPage: make-or-buy marker on materials', () => {
     // what a click will do — never the bare action label, which read as a
     // recommendation rather than a description.
     const control = await screen.findByRole('button', {
-      name: 'Build Mechanical Parts here instead of buying it',
+      name: 'Build instead: Mechanical Parts',
     });
     fireEvent.pointerMove(control);
     const tooltip = await screen.findByRole('tooltip');

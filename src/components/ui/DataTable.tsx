@@ -59,6 +59,13 @@ export interface DataTableColumn<T> {
    */
   headerClassName?: string;
   /**
+   * Classes for the `<th>` element itself, sortable column or not —
+   * `headerClassName` moves onto a sortable column's button, where a width
+   * does not size the column. For a `table-fixed` table whose column widths
+   * have to match another table's (Materials' per-section tables).
+   */
+  headerCellClassName?: string;
+  /**
    * Pins the column at the left edge while the rest scroll sideways under it
    * (a table that overflows its wrapper, e.g. `responsive="table"` on a
    * phone), so row labels stay on screen. Below `md` it also gets a right
@@ -1222,7 +1229,8 @@ export function DataTable<T>({
                 scope="col"
                 className={cx(
                   sortable ? 'p-0' : headerTextClass[i],
-                  column.stickyStart && STICKY_START
+                  column.stickyStart && STICKY_START,
+                  column.headerCellClassName
                 )}
                 aria-sort={
                   sortable
