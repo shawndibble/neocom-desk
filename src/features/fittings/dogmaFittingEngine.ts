@@ -8,6 +8,7 @@ import wasmInit, {
   type Violation,
 } from '@eveshipfit/dogma-engine';
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
+import type { PlanEntry } from '@/engine/types';
 import { racksWithSlots } from '@/engine/fittings/hullFitKey';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import {
@@ -672,6 +673,27 @@ export function checkHullCandidate(
     (v) => v.rule.type !== 'skill' || (skillLevels.get(v.rule.type_id) ?? 0) >= v.rule.required
   );
   return { fitsHull: true, canFly, fitsResources: true };
+}
+
+/**
+ * The skills `typeId` needs, each at the level it asks — read off the
+ * engine's own fitting rules for the module alone on the bare hull with no
+ * skills, where every skill rule it names is one it requires. Offline and
+ * from the pinned SDE, so no ESI round trip per module. Its direct
+ * requirements only: a Skill Plan's schedule adds their prerequisites.
+ */
+export function moduleSkillRequirements(
+  shipTypeId: number,
+  rack: CandidateRack,
+  typeId: number
+): PlanEntry[] {
+  assertReady();
+  return rulesNaming(validateCandidate(shipTypeId, rack, typeId, NO_SKILLS), 'item').flatMap(
+    (violation) =>
+      violation.rule.type === 'skill'
+        ? [{ skillTypeID: violation.rule.type_id, targetLevel: violation.rule.required }]
+        : []
+  );
 }
 
 /** How many slots the bare hull has in each rack — a Tech 3's are 0 until subsystems are fitted. */

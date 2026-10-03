@@ -897,6 +897,14 @@
       "prerequisitesOpen": "incl. prerequisites: {{skill}}",
       "prerequisitesTitle": "Skills needed for {{skill}}",
       "prerequisitesTotal": "Total {{time}}",
+      "upgrades": {
+        "title": "Tech II upgrades",
+        "loading": "Working out which Tech II modules are a few skills away…",
+        "swap_one": "{{from}} → {{to}}",
+        "swap_other": "{{count}}× {{from}} → {{to}}",
+        "withTrained": "With {{skills}} trained",
+        "addToPlanLabel": "Add to plan: the skills for {{module}}"
+      },
       "sort": {
         "overall": "Overall",
         "dps": "DPS",

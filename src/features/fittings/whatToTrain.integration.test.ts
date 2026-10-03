@@ -11,7 +11,24 @@ import {
   type SkillGain,
 } from '@/engine/fittings/skillGains';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
-import { computeFittingStats, fittingSkillSources } from './dogmaFittingEngine';
+import {
+  computeFittingStats,
+  fittingSkillSources,
+  moduleSkillRequirements,
+} from './dogmaFittingEngine';
+import {
+  evaluateModuleUpgrades,
+  moduleUpgradeCandidates,
+  raisedSkillLevels,
+  type ModuleUpgradeGain,
+} from '@/engine/fittings/moduleUpgrades';
+import { levelGain, type LevelGain } from '@/engine/fittings/skillGains';
+import { fitsResourceBudget } from '@/engine/fittings/skillGaps';
+import {
+  buildVariationIndex,
+  type MetaGroupNameMap,
+  type VariationTypeMap,
+} from '@/engine/market/variations';
 
 const require = createRequire(import.meta.url);
 
@@ -77,6 +94,10 @@ async function stubEngineAssets() {
     keys: async () => [],
     delete: async () => false,
   });
+}
+
+async function readJson<T>(path: string): Promise<T> {
+  return JSON.parse(await readFile(require.resolve(`../../../public/data/${path}`), 'utf8')) as T;
 }
 
 async function allSkillTypeIds(): Promise<number[]> {
@@ -147,5 +168,77 @@ describe('What to train on a railgun Rokh (real WASM + real pinned SDE)', () => 
 
   it('leaves each single-stat ranking unweighted', () => {
     expect(rankSkillGains(gains, 'dps')[0]?.skillTypeId).toBe(RAPID_FIRING);
+  });
+});
+
+describe('Tech II upgrades on that Rokh (real WASM + real pinned SDE)', () => {
+  const RAILGUN_425_I = 574;
+  const RAILGUN_425_II = 3090;
+  const LARGE_RAILGUN_SPECIALIZATION = 12207;
+  const REPUBLIC_FLEET_LARGE_CAP_BATTERY = 41218;
+  let rows: ModuleUpgradeGain<LevelGain>[];
+
+  beforeAll(async () => {
+    await stubEngineAssets();
+    const decoded = await decodeFittingShare(ROKH_SHARE);
+    if (!decoded.ok) throw new Error('share code did not decode');
+    const fitting = shareToFitting(decoded.value, 'Boom');
+    const levels = new Map((await allSkillTypeIds()).map((id): [number, number] => [id, 5]));
+    for (const [id, level] of PLAYER_LEVELS) levels.set(id, level);
+    // The player flies Tech I rails: no Large Railgun Specialization yet.
+    levels.set(LARGE_RAILGUN_SPECIALIZATION, 0);
+    const pilot = buildPilotProfile(levels, []);
+
+    const [variations, rackOf] = await Promise.all([
+      readJson<{ types: VariationTypeMap; metaGroups: MetaGroupNameMap }>('market/variations.json'),
+      readJson<Record<string, string>>('fittingSlots.json'),
+    ]);
+    const index = buildVariationIndex(variations.types, variations.metaGroups);
+    const statsOf = (fit: Fitting, profile: PilotProfile) =>
+      computeFittingStats(fit, profile, undefined, undefined, { overheated: false });
+    const before = await statsOf(fitting, pilot);
+    const evaluated = await evaluateModuleUpgrades(
+      moduleUpgradeCandidates(fitting.modules, index, rackOf),
+      {
+        fitting,
+        levels: pilot.skillLevels,
+        requirements: (typeId, rack) => moduleSkillRequirements(fitting.shipTypeId, rack, typeId),
+        // The engine's requirements already reach down the prerequisite
+        // chain; a real schedule only adds training times.
+        schedule: (entries) =>
+          entries.map((e) => ({ skillTypeID: e.skillTypeID, level: e.targetLevel, seconds: 1 })),
+        compare: async (variant, trained) => ({
+          before,
+          after: await statsOf(variant, {
+            ...pilot,
+            skillLevels: raisedSkillLevels(pilot.skillLevels, trained),
+          }),
+        }),
+        gain: levelGain,
+        fits: fitsResourceBudget,
+      }
+    );
+    if (evaluated === null) throw new Error('evaluation was cancelled');
+    rows = evaluated;
+  }, 60_000);
+
+  afterAll(() => vi.unstubAllGlobals());
+
+  it('suggests all eight 425mm Railgun I as IIs, behind Large Railgun Specialization', () => {
+    const rails = rows.find((row) => row.fromTypeId === RAILGUN_425_I);
+    expect(rails?.toTypeId).toBe(RAILGUN_425_II);
+    expect(rails?.at).toHaveLength(8);
+    expect(rails?.required).toContainEqual({
+      skillTypeID: LARGE_RAILGUN_SPECIALIZATION,
+      targetLevel: 1,
+    });
+    expect(rails?.required).toContainEqual({ skillTypeID: LARGE_HYBRID_TURRET, targetLevel: 5 });
+    expect(rails?.metrics.dps).toBeGreaterThan(0);
+  });
+
+  it('never suggests a faction module, nor a module already Tech II', () => {
+    const from = rows.map((row) => row.fromTypeId);
+    expect(from).not.toContain(REPUBLIC_FLEET_LARGE_CAP_BATTERY);
+    for (const row of rows) expect(row.fromTypeId).not.toBe(row.toTypeId);
   });
 });

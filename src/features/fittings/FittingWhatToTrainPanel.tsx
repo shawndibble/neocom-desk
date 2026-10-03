@@ -54,12 +54,16 @@ import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
 import { SkillNameButton } from '@/features/skills/SkillNameButton';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { useTargetPlan } from '@/features/skills/useTargetPlan';
-import { changeLabel } from './fittingVariationsCsv';
 import { WhatToTrainPrerequisites } from './FittingWhatToTrainPrerequisites';
 import { useSkillOverrides } from './statsConditions';
 import type { SkillGainEvaluator } from './useFittingEvaluation';
 import { useSkillGains } from './useSkillGains';
 import { useSkillLevelGain } from './useSkillLevelGain';
+import { ModuleUpgradeList } from './FittingModuleUpgrades';
+import { gainChangeLabels } from './whatToTrainChanges';
+import { useModuleUpgrades, type ScheduleEntries } from './useModuleUpgrades';
+import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
+import { rankModuleUpgrades } from '@/engine/fittings/moduleUpgrades';
 import type { SkillPlanRecord } from '@/db';
 import { StatField, StatFields, StatNote } from './StatFacts';
 import { STAT_DETAIL, STAT_FIELD_WIDTH, joinDetail, statRowClassName } from './statKit';
@@ -76,12 +80,15 @@ export interface FittingWhatToTrainPanelProps {
   characterId: number | null;
   /** Names the Skill Plan "Add to plan" creates when the Character has none yet. */
   fittingName: string;
+  /** Module names, racks and variations, for the Tech II upgrades; null while loading. */
+  catalogue: FittingCatalogue | null;
 }
 
 export function FittingWhatToTrainPanel({
   evaluator,
   characterId,
   fittingName,
+  catalogue,
 }: FittingWhatToTrainPanelProps) {
   const { t } = useTranslation();
   const overridden = useSkillOverrides((state) => hasSkillOverrides(state.skills));
@@ -94,6 +101,7 @@ export function FittingWhatToTrainPanel({
       evaluator={evaluator}
       characterId={characterId}
       fittingName={fittingName}
+      catalogue={catalogue}
     />
   );
 }
@@ -102,10 +110,12 @@ function WhatToTrainRanking({
   evaluator,
   characterId,
   fittingName,
+  catalogue,
 }: {
   evaluator: SkillGainEvaluator | null;
   characterId: number;
   fittingName: string;
+  catalogue: FittingCatalogue | null;
 }) {
   const { t } = useTranslation();
   const [sort, setSort] = useState<GainSort>('overall');
@@ -138,33 +148,46 @@ function WhatToTrainRanking({
       name: catalog?.engineSkills.get(gain.skillTypeId)?.name ?? `#${gain.skillTypeId}`,
     }));
   }, [gains, catalog]);
-  // The schedule for one skill at a level; null before the Character's skills are in,
+  // The schedule for some skill levels; null before the Character's skills are in,
   // or every row would time from level 0.
-  const scheduleFor = useCallback(
-    (skillTypeId: number, level: number): readonly ScheduledStep[] | null =>
+  const scheduleEntriesFor = useMemo(
+    (): ScheduleEntries | null =>
       catalog && trainedSkillsKnown
-        ? scheduleEntries([{ skillTypeID: skillTypeId, targetLevel: level }], {
-            skills: catalog.engineSkills,
-            trainedSkills,
-            attributes,
-            implants,
-            cloneState,
-          })
+        ? (entries) =>
+            scheduleEntries(entries, {
+              skills: catalog.engineSkills,
+              trainedSkills,
+              attributes,
+              implants,
+              cloneState,
+            })
         : null,
     [catalog, trainedSkills, trainedSkillsKnown, attributes, implants, cloneState]
   );
+  const scheduleFor = useCallback(
+    (skillTypeId: number, level: number): readonly ScheduledStep[] | null =>
+      scheduleEntriesFor?.([{ skillTypeID: skillTypeId, targetLevel: level }]) ?? null,
+    [scheduleEntriesFor]
+  );
+  const upgrades = useModuleUpgrades(evaluator, catalogue, scheduleEntriesFor);
   // Only the stats some suggestion moves: a mining sort on a warship would rank nothing.
   const sorts = useMemo(
     (): GainSort[] => [
       'overall',
-      ...GAIN_METRICS.filter((metric) => rows?.some((row) => row.metrics[metric] !== 0)),
+      ...GAIN_METRICS.filter((metric) =>
+        [...(rows ?? []), ...(upgrades.rows ?? [])].some((row) => row.metrics[metric] !== 0)
+      ),
     ],
-    [rows]
+    [rows, upgrades.rows]
   );
   const activeSort = sorts.includes(sort) ? sort : 'overall';
   const ranked = useMemo(
     () => (rows === null ? null : rankSkillGains(rows, activeSort)),
     [rows, activeSort]
+  );
+  const rankedUpgrades = useMemo(
+    () => (upgrades.rows === null ? null : rankModuleUpgrades(upgrades.rows, activeSort)),
+    [upgrades.rows, activeSort]
   );
 
   const targetPlan = target.plans?.find((plan) => plan.id === target.targetPlanId);
@@ -193,16 +216,15 @@ function WhatToTrainRanking({
   if (evaluator === null || loading)
     return <StatNote>{t('fittings.whatToTrain.loading')}</StatNote>;
   if (failed || ranked === null) return <StatNote>{t('fittings.whatToTrain.failed')}</StatNote>;
-  if (ranked.length === 0) return <StatNote>{t('fittings.whatToTrain.none')}</StatNote>;
 
-  async function add(row: WhatToTrainRow, level: number) {
-    const result = await target.addEntries(
-      [{ skillTypeID: row.skillTypeId, targetLevel: level }],
-      fittingName
-    );
+  async function addEntries(entries: readonly PlanEntry[]) {
+    const result = await target.addEntries(entries, fittingName);
     if (result.added.length === 0) return;
     setAdded({ planId: result.planId, planName: result.planName, entries: result.added });
   }
+  const add = (row: WhatToTrainRow, level: number) =>
+    addEntries([{ skillTypeID: row.skillTypeId, targetLevel: level }]);
+  const plan = target.plans === undefined ? undefined : (targetPlan ?? null);
 
   const rankByLabel = t('fittings.whatToTrain.rankBy');
   return (
@@ -241,25 +263,40 @@ function WhatToTrainRanking({
           </StatField>
         )}
       </StatFields>
-      <ul
-        aria-label={t('fittings.stats.section.whatToTrain')}
-        className="m-0 list-none p-0 text-xs"
-      >
-        {ranked.map((row, index) => (
-          <WhatToTrainItem
-            key={row.skillTypeId}
-            row={row}
-            rank={index + 1}
-            evaluator={evaluator}
-            plan={target.plans === undefined ? undefined : (targetPlan ?? null)}
-            plannedLevels={plannedLevels}
-            scheduleFor={scheduleFor}
-            skills={catalog?.engineSkills}
-            trainedSkills={trainedSkills}
-            onAdd={add}
-          />
-        ))}
-      </ul>
+      {/* Only once no Tech II upgrade is left to suggest either: else it reads as "nothing to train". */}
+      {ranked.length === 0 && rankedUpgrades?.length === 0 && (
+        <StatNote>{t('fittings.whatToTrain.none')}</StatNote>
+      )}
+      {ranked.length > 0 && (
+        <ul
+          aria-label={t('fittings.stats.section.whatToTrain')}
+          className="m-0 list-none p-0 text-xs"
+        >
+          {ranked.map((row, index) => (
+            <WhatToTrainItem
+              key={row.skillTypeId}
+              row={row}
+              rank={index + 1}
+              evaluator={evaluator}
+              plan={plan}
+              plannedLevels={plannedLevels}
+              scheduleFor={scheduleFor}
+              skills={catalog?.engineSkills}
+              trainedSkills={trainedSkills}
+              onAdd={add}
+            />
+          ))}
+        </ul>
+      )}
+      <ModuleUpgradeList
+        rows={rankedUpgrades}
+        typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
+        skills={catalog?.engineSkills}
+        trainedSkills={trainedSkills}
+        plan={plan}
+        plannedLevels={plannedLevels}
+        onAdd={addEntries}
+      />
       {added && (
         <Toast
           message={t('skills.fitCheck.addedToast', {
@@ -340,15 +377,7 @@ function WhatToTrainItem({
       ? [t('common.loading')]
       : changeCount === 0
         ? [t('fittings.whatToTrain.noChange')]
-        : [
-            ...gain.delta.changes.map((change) => changeLabel(change, t)),
-            ...gain.roleChanges.map((change) =>
-              t(`fittings.whatToTrain.role.${change.key}`, {
-                before: change.before.toLocaleString(),
-                after: change.after.toLocaleString(),
-              })
-            ),
-          ];
+        : gainChangeLabels(gain, t);
   const canAdd = plan !== undefined && level !== null;
 
   return (
