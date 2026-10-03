@@ -12,7 +12,7 @@ import { loadCharacterModifiers } from '@/features/character/characterModifiers'
 import type { TradeHub } from '@/market/hubs';
 import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
 import { loadTypes } from '@/sde/loadSde';
-import { typeIdsInCategory } from './haulingCategories';
+import { typeIdsInHaulingCategory } from './haulingCategories';
 import {
   clearHaulingScanCache,
   runHaulingScan,
@@ -51,7 +51,7 @@ export function useHaulingScan(
           loadMarketTypes(),
           loadTypes(),
         ]);
-        const typeIds = typeIdsInCategory(categoryId, groups, marketTypes);
+        const typeIds = typeIdsInHaulingCategory(categoryId, groups, marketTypes);
         const scan = await runHaulingScan({
           from,
           to,

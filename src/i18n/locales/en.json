@@ -5477,6 +5477,7 @@
       "to": "To",
       "anyHub": "Any hub",
       "category": "Category",
+      "categoryAll": "Everything",
       "categoryFallback": "Category {{id}}",
       "mode": "Sell by",
       "modes": {
