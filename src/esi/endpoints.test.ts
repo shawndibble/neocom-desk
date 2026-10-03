@@ -37,6 +37,7 @@ import {
   getCharacterIndustryJobs,
   getMarketsPrices,
   getIndustrySystemCostIndices,
+  postAutopilotWaypoint,
   postRoute,
 } from './endpoints';
 import type { CharacterSkills, SkillQueueEntry, CharacterAttributes } from './endpoints';
@@ -427,6 +428,32 @@ describe('public info endpoints', () => {
 
     expect(result.data).toEqual([30003893, 30000142]);
     expect(body).toEqual({ preference: 'Safer', security_penalty: 60, avoid_systems: [30045328] });
+  });
+
+  it('postAutopilotWaypoint sends the destination and both required flags, false included', async () => {
+    let query: Record<string, string> = {};
+    let auth: string | null = null;
+    server.use(
+      http.post(`${ESI_BASE_URL}/ui/autopilot/waypoint`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        auth = request.headers.get('authorization');
+        query = Object.fromEntries(new URL(request.url).searchParams);
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+
+    const result = await postAutopilotWaypoint(CHARACTER_ID, 30000142, {
+      clearOtherWaypoints: false,
+    });
+
+    expect(result.data).toBeNull();
+    expect(auth).toBe(`Bearer token-${CHARACTER_ID}`);
+    expect(query).toEqual({
+      destination_id: '30000142',
+      clear_other_waypoints: 'false',
+      add_to_beginning: 'false',
+    });
   });
 });
 

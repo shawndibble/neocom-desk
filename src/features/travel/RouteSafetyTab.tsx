@@ -25,6 +25,8 @@
  * rows (`TripLegs`); the facts line and strip cover the whole trip. The stops
  * live in the link as `stops`, in the order typed; a legacy `to` link still
  * opens as a single stop. One stop is the page exactly as it was.
+ *
+ * Set waypoints in game (issue #2479) closes the facts line (`SetWaypoints`).
  */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -43,6 +45,7 @@ import { RouteRulesPanel } from './RouteRulesPanel';
 import { RouteStrip } from './RouteStrip';
 import { RouteSystemsTable } from './RouteSystemsTable';
 import { routeSystemName } from './routeSystemName';
+import { SetWaypoints } from './SetWaypoints';
 import { StopsPanel, type StopOrderSettings } from './StopsPanel';
 import { TripLegs } from './TripLegs';
 import { useRouteKills, type RouteKillsCell } from './useRouteKills';
@@ -286,7 +289,11 @@ function RouteBody({
       return (
         <Panel>
           <div className="space-y-3">
-            {trip && <RouteFacts summary={trip.summary} />}
+            {trip && (
+              <SetWaypoints legs={state.legs} nameOf={nameOf}>
+                <RouteFacts summary={trip.summary} />
+              </SetWaypoints>
+            )}
             {trip && (
               <RouteStrip
                 rows={trip.rows}
