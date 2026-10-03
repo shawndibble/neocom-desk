@@ -15,7 +15,18 @@ import { computeFittingStats, fittingSkillSources } from './dogmaFittingEngine';
 
 const require = createRequire(import.meta.url);
 
-/** A player's railgun Rokh, as shared from the live site. */
+/**
+ * "What to train" end to end on a player's railgun Rokh, through the real
+ * `computeFittingStats` (fetch and Cache Storage stubbed to serve the pinned
+ * engine and SDE from node_modules), pinning the Overall order that scope
+ * decision `20261002-234731-what-to-train-weighted-overall-weapon-reach-ranked`
+ * set. The order rests on the pinned `@eveshipfit/dogma-engine` +
+ * `@eveshipfit/sde` (ADR 0016): if a bump moves it, re-check the order
+ * against that decision rather than just re-pinning. Skill type ids were
+ * looked up by exact name in `public/data/skills.json`, 2026-10-02.
+ */
+
+/** The fit, as shared from the live site. */
 const ROKH_SHARE =
   '2.RcvLCoMwEIXhF5pFZnJRjrs-SisGo6kSwUvJwxdTaFbzDYc_8JYVhgsCnw7iSqnUlabSVrrK5s9OgdMJIYaZBwgJ9u2CkAanD4QM2j5CyILHu4n9TA66T5BO4VpK2uxS0t_V4BDKPL3ulDGprezl77JfDSws8THCQpFf5b45xz6AyY0Q15JPB_j5JjdB9hc1Gkx8neCcH8sSvw';
 
@@ -94,7 +105,7 @@ describe('What to train on a railgun Rokh (real WASM + real pinned SDE)', () => 
     const before = await computeFittingStats(fitting, pilot, undefined, undefined, {
       overheated: false,
     });
-    gains = (await evaluateSkillGains(candidates, async (skillTypeId, level) => {
+    const evaluated = await evaluateSkillGains(candidates, async (skillTypeId, level) => {
       const skillLevels = new Map(pilot.skillLevels);
       skillLevels.set(skillTypeId, level);
       const after = await computeFittingStats(
@@ -105,7 +116,9 @@ describe('What to train on a railgun Rokh (real WASM + real pinned SDE)', () => 
         { overheated: false }
       );
       return { before, after };
-    }))!;
+    });
+    if (evaluated === null) throw new Error('evaluation was cancelled');
+    gains = evaluated;
   }, 60_000);
 
   afterAll(() => vi.unstubAllGlobals());
@@ -120,6 +133,7 @@ describe('What to train on a railgun Rokh (real WASM + real pinned SDE)', () => 
   });
 
   it('ranks the gun damage skills above a few more seconds of capacitor', () => {
+    expect(rank(RAPID_FIRING)).toBeLessThan(rank(CONTROLLED_BURSTS));
     expect(rank(LARGE_HYBRID_TURRET)).toBeLessThan(rank(CONTROLLED_BURSTS));
     expect(rank(SURGICAL_STRIKE)).toBeLessThan(rank(CONTROLLED_BURSTS));
   });

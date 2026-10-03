@@ -162,6 +162,15 @@ describe('gainMetrics', () => {
     expect(metrics.dps).toBeCloseTo(0.05);
   });
 
+  it('counts every metric whole on a fit that fires nothing: a hauler lives by its align time', () => {
+    const hauler = withStats({ offense: { ...baseStats.offense, dps: 0 }, droneDps: 0 });
+    const nimbler = withStats({
+      ...hauler,
+      navigation: { ...baseStats.navigation, agility: 3.6 },
+    });
+    expect(gainMetrics(hauler, nimbler).overall).toBeCloseTo(0.1);
+  });
+
   it('counts the capacitor turning stable, or unstable, in full', () => {
     const unstable = withStats({ capacitor: { stable: false, depletesInSeconds: 120 } });
     expect(gainMetrics(unstable, baseStats).overall).toBe(1);

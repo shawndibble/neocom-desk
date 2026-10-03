@@ -10,7 +10,9 @@ _Recorded 2026-10-02._
   Controlled Bursts (+19 s before a Rokh runs dry, +8%) above Large Hybrid
   Turret (+3.4% DPS), and Rapid Firing (+3.9% DPS, cap dry 5% sooner) below
   a +0.4% drone skill — backwards for nearly every pilot. Each single-stat
-  "Rank by" stays unweighted. The weights are a judgement call, pinned by
+  "Rank by" stays unweighted, and the weights apply only to a fit that
+  shoots: on a hauler or miner align time and speed are what keep it alive,
+  so an unarmed fit keeps the plain sum. The weights are a judgement call, pinned by
   `whatToTrain.integration.test.ts` against that real fit, not tuned per
   hull or doctrine.
 - **Weapon reach is ranked: optimal, falloff, tracking.** Read off the

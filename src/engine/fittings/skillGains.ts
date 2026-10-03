@@ -145,9 +145,7 @@ type ShipWeapon = Extract<AppliedWeapon, { kind: 'turret' | 'missile' }>;
 const shipWeapons = (s: FittingStats) =>
   s.applied.weapons.filter((w): w is ShipWeapon => w.kind === 'turret' || w.kind === 'missile');
 const turrets = (s: FittingStats) =>
-  s.applied.weapons.filter(
-    (w): w is Extract<AppliedWeapon, { kind: 'turret' }> => w.kind === 'turret'
-  );
+  shipWeapons(s).filter((w): w is Extract<ShipWeapon, { kind: 'turret' }> => w.kind === 'turret');
 
 /** One role stat's before/after, at the digits it is shown with. */
 export interface RoleChange {
@@ -288,8 +286,10 @@ export function roleChanges(before: FittingStats, after: FittingStats): RoleChan
  * fraction of `before` — so a DPS gain and an EHP gain add up on one scale.
  * Align time is better lower; the capacitor is scored in stable-% points,
  * or relative depletion time, with turning stable a whole gain. `overall`
- * weighs each by `OVERALL_WEIGHTS`, except that the capacitor turning stable
- * (or unstable) always counts whole.
+ * weighs each by `OVERALL_WEIGHTS` on a fit that shoots, except that the
+ * capacitor turning stable (or unstable) always counts whole; on a hauler,
+ * miner or other unarmed fit, align time and the like are what keep it
+ * alive, so every metric counts whole.
  */
 export function gainMetrics(before: FittingStats, after: FittingStats): GainMetrics {
   const roleGains = Object.fromEntries([
@@ -307,8 +307,9 @@ export function gainMetrics(before: FittingStats, after: FittingStats): GainMetr
     ...roleGains,
   };
   const flipped = before.capacitor.stable !== after.capacitor.stable;
+  const weighted = isArmed(before);
   const weight = (metric: GainMetric) =>
-    metric === 'capacitor' && flipped ? 1 : (OVERALL_WEIGHTS[metric] ?? 1);
+    !weighted || (metric === 'capacitor' && flipped) ? 1 : (OVERALL_WEIGHTS[metric] ?? 1);
   const overall = GAIN_METRICS.reduce((sum, metric) => sum + metrics[metric] * weight(metric), 0);
   return { overall, ...metrics };
 }
