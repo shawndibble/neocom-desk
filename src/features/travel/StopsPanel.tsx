@@ -34,16 +34,13 @@ import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { Checkbox, CollapsiblePanel, IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { MAX_STOPS } from '@/engine/route/tripPlan';
+import { MAX_STOPS, type TripOptions } from '@/engine/route/tripPlan';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import { useIsPhone } from '@/lib/useIsPhone';
 
-export interface StopOrderSettings {
-  optimize: boolean;
-  returnToStart: boolean;
-  keepLastStopLast: boolean;
-}
+/** What the pilot set, kept in the link; the page decides when it applies. */
+export type StopOrderSettings = Required<TripOptions>;
 
 function Badge({ children }: { children: ReactNode }) {
   return (
@@ -124,6 +121,7 @@ function StopRow({
 
 export function StopsPanel({
   fromId,
+  fromName,
   fromTrigger,
   onFromChange,
   stops,
@@ -132,8 +130,11 @@ export function StopsPanel({
   onSettingsChange,
   optimizeBlocked,
   orderNote,
+  nameOf,
 }: {
   fromId: number | null;
+  /** The start's name alone, for the folded phone summary. */
+  fromName: string;
   /** The start's trigger text: its name, marked when it is the Current System. */
   fromTrigger: string;
   onFromChange: (systemId: number) => void;
@@ -146,6 +147,7 @@ export function StopsPanel({
   optimizeBlocked: boolean;
   /** Set when the flown order differs from the typed one. */
   orderNote: string | null;
+  nameOf: (systemId: number) => string;
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -155,15 +157,13 @@ export function StopsPanel({
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
-  const nameOf = (systemId: number | string) =>
-    systems?.get(Number(systemId))?.name ?? t('travel.stops.unnamed', { id: systemId });
   const position = (systemId: number | string) => stops.indexOf(Number(systemId)) + 1;
   const announcements: Announcements = {
-    onDragStart: ({ active }) => t('travel.stops.dragStart', { name: nameOf(active.id) }),
+    onDragStart: ({ active }) => t('travel.stops.dragStart', { name: nameOf(Number(active.id)) }),
     onDragOver: ({ active, over }) =>
       over
         ? t('travel.stops.dragOver', {
-            name: nameOf(active.id),
+            name: nameOf(Number(active.id)),
             position: position(over.id),
             total: stops.length,
           })
@@ -171,12 +171,12 @@ export function StopsPanel({
     onDragEnd: ({ active, over }) =>
       over
         ? t('travel.stops.dragEnd', {
-            name: nameOf(active.id),
+            name: nameOf(Number(active.id)),
             position: position(over.id),
             total: stops.length,
           })
         : undefined,
-    onDragCancel: ({ active }) => t('travel.stops.dragCancel', { name: nameOf(active.id) }),
+    onDragCancel: ({ active }) => t('travel.stops.dragCancel', { name: nameOf(Number(active.id)) }),
   };
   const taken = useMemo(
     () => new Set(fromId === null ? stops : [fromId, ...stops]),
@@ -204,8 +204,8 @@ export function StopsPanel({
       collapsedSummary={
         <p className="text-xs">
           {stops.length === 0
-            ? fromTrigger
-            : t('travel.stops.summary', { from: fromTrigger, count: stops.length })}
+            ? fromName
+            : t('travel.stops.summary', { from: fromName, count: stops.length })}
         </p>
       }
     >
@@ -267,7 +267,6 @@ export function StopsPanel({
             <Checkbox
               role="switch"
               checked={settings.optimize}
-              aria-checked={settings.optimize}
               disabled={!canOptimize}
               onChange={(event) => onSettingsChange({ optimize: event.target.checked })}
             />
@@ -276,7 +275,7 @@ export function StopsPanel({
           <div className="space-y-1.5 pl-6">
             <label className="flex items-center gap-2">
               <Checkbox
-                checked={settings.returnToStart}
+                checked={optionsOn && settings.returnToStart}
                 disabled={!optionsOn}
                 onChange={(event) => onSettingsChange({ returnToStart: event.target.checked })}
               />
@@ -284,7 +283,7 @@ export function StopsPanel({
             </label>
             <label className="flex items-center gap-2">
               <Checkbox
-                checked={settings.keepLastStopLast}
+                checked={optionsOn && settings.keepLastStopLast}
                 disabled={!optionsOn}
                 onChange={(event) => onSettingsChange({ keepLastStopLast: event.target.checked })}
               />

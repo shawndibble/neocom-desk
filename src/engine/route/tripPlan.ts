@@ -14,6 +14,7 @@ import {
   type FindJumpRouteOptions,
   type JumpGraph,
   type JumpRouteResult,
+  type RouteSweep,
 } from './jumpRoute';
 
 /** The most stops a trip takes after its start: Held-Karp stays instant to here. */
@@ -72,17 +73,21 @@ export function pairwiseRouteCosts(
   points: readonly number[],
   options: FindJumpRouteOptions = {}
 ): RouteCostMatrix {
-  return points.map((from) => {
-    const sweep = routeSweepFrom(graph, from, options);
-    return points.map((to) => costTo(sweep, graph, to));
-  });
+  return sweepPoints(graph, points, options).matrix;
 }
 
-function costTo(
-  sweep: ReturnType<typeof routeSweepFrom>,
+/** One sweep per point, and the matrix read off them — the legs reuse the sweeps. */
+function sweepPoints(
   graph: JumpGraph,
-  to: number
-): RouteCost | null {
+  points: readonly number[],
+  options: FindJumpRouteOptions
+): { sweeps: RouteSweep[]; matrix: RouteCostMatrix } {
+  const sweeps = points.map((from) => routeSweepFrom(graph, from, options));
+  const matrix = sweeps.map((sweep) => points.map((to) => costTo(sweep, graph, to)));
+  return { sweeps, matrix };
+}
+
+function costTo(sweep: RouteSweep, graph: JumpGraph, to: number): RouteCost | null {
   const cost = sweep.costs.get(to);
   const jumps = sweep.jumps.get(to);
   if (!graph.has(to) || cost === undefined || jumps === undefined) return null;
@@ -197,10 +202,7 @@ export function planTrip(
 ): TripPlan {
   const { optimize = false, returnToStart = false, keepLastStopLast = false } = tripOptions;
   const points = [start, ...stops];
-  const sweeps = points.map((from) => routeSweepFrom(graph, from, routeOptions));
-  const matrix: RouteCostMatrix = sweeps.map((sweep) =>
-    points.map((to) => costTo(sweep, graph, to))
-  );
+  const { sweeps, matrix } = sweepPoints(graph, points, routeOptions);
   const unreachable = matrix.some((row) => row.some((cell) => cell === null));
 
   const typed = stops.map((_, index) => index + 1);

@@ -73,7 +73,7 @@ export function TripLegs({
               <Caret expanded={expanded} />
               <span className="flex flex-wrap gap-x-2">
                 {parts.map((part, at) => (
-                  <span key={part} className={at === 0 ? 'font-semibold' : 'text-text-dim'}>
+                  <span key={at} className={at === 0 ? 'font-semibold' : 'text-text-dim'}>
                     {at > 0 && (
                       <span aria-hidden="true" className="mr-2 text-text-faint">
                         ·

@@ -184,7 +184,7 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
   const orderNote =
     state.kind === 'route' && state.reordered
       ? t('travel.stops.orderChanged', {
-          order: state.reordered.stops.map(nameOf).join(' → '),
+          order: state.reordered.stops.map(nameOf).join(t('travel.stops.orderSeparator')),
           typed: t('travel.summary.jumps', { count: state.reordered.typedJumps }),
           jumps: t('travel.summary.jumps', { count: state.reordered.jumps }),
         })
@@ -205,6 +205,7 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
         <div className="space-y-4">
           <StopsPanel
             fromId={fromId}
+            fromName={fromId === null ? fromTrigger : nameOf(fromId)}
             fromTrigger={fromTrigger}
             onFromChange={(systemId) => setParams({ from: systemId }, { push: true })}
             stops={stops}
@@ -219,6 +220,7 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
             }
             optimizeBlocked={state.kind === 'route' && state.unreachable}
             orderNote={orderNote}
+            nameOf={nameOf}
           />
           <RouteRulesPanel
             preference={routeQuery.rules.preference}
@@ -311,6 +313,8 @@ function RouteBody({
               />
             ) : (
               <TripLegs
+                // A new order is a new itinerary: it opens on its own first leg.
+                key={state.legs.map((leg) => `${leg.from}-${leg.to}`).join(',')}
                 legs={state.legs}
                 nameOf={nameOf}
                 killsOf={killsOf}

@@ -7305,6 +7305,7 @@
       "returnToStart": "Return to start",
       "keepLastStopLast": "Keep last stop last",
       "optimizeBlocked": "A stop no stargate route reaches can't be put in order. Remove it to optimize the stop order.",
+      "orderSeparator": " → ",
       "orderChanged": "Order changed: {{order}} · {{typed}} in typed order → {{jumps}}",
       "summary_one": "{{from}} → {{count}} stop",
       "summary_other": "{{from}} → {{count}} stops",

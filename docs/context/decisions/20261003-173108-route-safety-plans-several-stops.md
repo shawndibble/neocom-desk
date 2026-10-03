@@ -31,7 +31,9 @@ _Recorded 2026-10-03 · issue #2475._
   optimized order is drawn in the legs and named in the note, never written
   back, so turning the switch off restores the trip as the pilot wrote it. A
   legacy `?to=` link opens as a single stop, and with one stop the page is
-  exactly what it was.
+  exactly what it was. A system is a stop once: the picker offers neither the
+  start nor a stop already listed, and a link naming one twice keeps the
+  first, so a stop is one row to drag, move or remove.
 
 - **An unreachable stop is a fact about its legs.** A stop no stargate route
   reaches (J-space, say) gets its legs' no-route message while the other legs

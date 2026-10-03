@@ -485,7 +485,7 @@ describe('Travel › Route Safety › Stops', () => {
       const user = userEvent.setup();
       visit(`?stops=${SOBASEKI},${UEDAMA}`);
 
-      expect(await screen.findByText('Jita (current system) → 2 stops')).toBeInTheDocument();
+      expect(await screen.findByText('Jita → 2 stops')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Add a stop' })).not.toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Edit stops' }));
       expect(screen.getByRole('button', { name: 'Add a stop' })).toBeInTheDocument();
