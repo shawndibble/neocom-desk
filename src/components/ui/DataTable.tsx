@@ -344,6 +344,15 @@ interface DataTableProps<T> {
    */
   stackLayout?: 'labelled' | 'dense';
   /**
+   * Whether the table shows as cards, in place of the viewport check (below
+   * `sm`) every other table uses — for a table that knows its own width and
+   * is narrower than its columns on a wide screen (Hauling's panel on a
+   * tablet with the rail open). Cards still need `responsive="stack"`. The
+   * caller's `max-sm:`/`sm:` cell classes keep following the viewport, so a
+   * table that forces cards picks those in JS (ADR 0017).
+   */
+  stacked?: boolean;
+  /**
    * A phone-only (below `sm`) sort picker above the table. The stacked card
    * hides the header row, and with it every sort button — so a sortable
    * table is unsortable on a phone without this. Drives the same sort state
@@ -700,6 +709,7 @@ export function DataTable<T>({
   responsive = 'stack',
   stackColumns = 1,
   stackLayout = 'labelled',
+  stacked,
   mobileSort = false,
   stackSummary,
   stackActions,
@@ -723,6 +733,10 @@ export function DataTable<T>({
   // key, not a set.
   const [expandedRowKey, setExpandedRowKey] = useState<string | number | null>(null);
   const isPhone = useIsPhone();
+  // Card width: the caller's say where it has one, else the viewport's. The
+  // `.dt-stacked` rules (src/styles/index.css) key off the class this sets.
+  const cardWidth = stacked ?? isPhone;
+  const isStacked = responsive === 'stack' && cardWidth;
   const tableRef = useRef<HTMLTableElement>(null);
   const dense = responsive === 'stack' && stackLayout === 'dense';
 
@@ -827,7 +841,7 @@ export function DataTable<T>({
     [exportable, sortedRows]
   );
 
-  const grouping = groupBy !== undefined && isPhone;
+  const grouping = groupBy !== undefined && cardWidth;
   // Grouped over (row, index) pairs so `rowKey` still gets each row's index
   // in sort order, exactly as the ungrouped table passes it.
   const groups = useMemo(() => {
@@ -844,14 +858,13 @@ export function DataTable<T>({
   const expandable = expandableRow !== undefined;
   // Rough per-layout heights; each mounted row is then measured, so these
   // only have to be close enough to size the rows not yet seen.
-  const estimatedRowHeight =
-    !isPhone || responsive === 'table'
-      ? density === 'compact'
-        ? 25
-        : 29
-      : dense
-        ? 52
-        : 16 + (stackColumns === 2 ? Math.ceil(columns.length / 2) * 36 : columns.length * 20);
+  const estimatedRowHeight = !isStacked
+    ? density === 'compact'
+      ? 25
+      : 29
+    : dense
+      ? 52
+      : 16 + (stackColumns === 2 ? Math.ceil(columns.length / 2) * 36 : columns.length * 20);
   // Where the body starts on the page: the virtualizer's positions are
   // measured from the top of the document, not this table. A callback ref
   // plus a body-resize observer, as `NotificationsPanel` does, since
@@ -914,14 +927,14 @@ export function DataTable<T>({
     // unmount every row (and drop its focus) for one commit.
     initialRect: { width: window.innerWidth, height: window.innerHeight },
   });
-  // Crossing `sm` swaps table rows for cards of a different height; drop
+  // Switching between table rows and cards swaps in rows of a different height; drop
   // the sizes measured under the old layout (TanStack Virtual's documented
   // reset, as `NotificationsPanel` does on its own breakpoint).
   // Guarded: `measure()` re-renders, and every non-windowed table would pay
   // for that on mount.
   useEffect(() => {
     if (windowed) rowVirtualizer.measure();
-  }, [isPhone, windowed, rowVirtualizer]);
+  }, [cardWidth, windowed, rowVirtualizer]);
 
   // A row's own re-measure (see `DataTableRow`'s `remeasure`): straight to
   // `resizeItem`, through the same `measureElement` the virtualizer uses.
@@ -1101,8 +1114,14 @@ export function DataTable<T>({
   }
 
   const sortableColumns = columns.filter((column) => column.sortValue !== undefined);
-  const sortBar = mobileSort && sortableColumns.length > 0 && (
-    <div className="flex min-h-[52px] items-center justify-between gap-3 px-3 sm:hidden">
+  // Hidden by CSS above `sm` when the viewport decides; by JS when the caller does.
+  const sortBar = mobileSort && sortableColumns.length > 0 && stacked !== false && (
+    <div
+      className={cx(
+        'flex min-h-[52px] items-center justify-between gap-3 px-3',
+        stacked === undefined && 'sm:hidden'
+      )}
+    >
       {stackSummary !== undefined && (
         <span className="min-w-0 text-[0.6875rem] text-text-dim">{stackSummary}</span>
       )}
@@ -1168,6 +1187,7 @@ export function DataTable<T>({
       className={cx(
         'w-full text-xs',
         responsive === 'stack' && 'dt-stack',
+        isStacked && 'dt-stacked',
         responsive === 'stack' && !dense && stackColumns === 2 && 'dt-stack-2col',
         dense && 'dt-stack-dense',
         className

@@ -37,6 +37,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -96,6 +97,13 @@ import {
 import { useHaulingFees, useHaulingScan } from './useHaulingScan';
 import { HAUL_MODES, type HaulMode } from './haulingData';
 const DAY_CHOICES = [7, 14, 30, 0] as const;
+
+/**
+ * Below these table widths the rows show as cards: just under what the
+ * compact columns need (about 46rem; Any hub's Hub column adds about TODO).
+ */
+const CARDS_BELOW_REM = 46.5;
+const CARDS_BELOW_REM_ANY_HUB = 51;
 const MARGIN_CHOICES = [0, 3, 5, 10] as const;
 
 const HAULING_URL_FILTERS = {
@@ -241,7 +249,17 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   // A narrow desktop table goes compact too: below 56rem its full figures
   // (`12,080,000.00`) left the Item column no room and scrolled the page
   // sideways. The same width drops the margin's "ISK each" (the CSS below).
-  const [tableRef, tableNarrow] = useElementNarrowerThan<HTMLDivElement>(56);
+  // Narrower than the compact columns themselves (a tablet with the rail
+  // open leaves the panel slimmer than a phone), the rows become the phone's
+  // cards; Any hub's Hub column needs that much more room.
+  const [tableRef, [tableNarrow = false, tableCards = false]] =
+    useElementNarrowerThan<HTMLDivElement>([
+      56,
+      anyEnd === null ? CARDS_BELOW_REM : CARDS_BELOW_REM_ANY_HUB,
+    ]);
+  // The table's `stacked`, and every cell class that would otherwise follow
+  // the viewport (`max-sm:`) picks by it instead (ADR 0017).
+  const cards = isPhone || tableCards;
   const isk = (value: number, digits: number) =>
     isPhone || tableNarrow ? formatIskCompact(value) : formatIsk(value, digits);
 
@@ -458,11 +476,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       // minimum and scrolling the page sideways (the card has its own rules).
       // Never below a short name's width, though: past that the table
       // scrolls in its own wrapper instead.
-      className: 'sm:w-full sm:max-w-0 sm:min-w-28',
+      className: cards ? undefined : 'w-full max-w-0 min-w-28',
       sortValue: (row) => row.name.toLowerCase(),
       render: (row) => (
         <span className="flex min-w-0 items-center gap-2">
-          <TypeIcon typeId={row.typeId} size={32} className="size-6 shrink-0 max-sm:hidden" />
+          {!cards && <TypeIcon typeId={row.typeId} size={32} className="size-6 shrink-0" />}
           <MarketItemLink
             typeId={row.typeId}
             className="min-w-0 truncate font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -603,6 +621,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         if (!line) return null;
         return (
           <BringInput
+            card={cards}
             label={t('market.hauling.bringRow', { item: row.name })}
             title={limitTextOf(row)}
             value={overrides.get(row.typeId)?.selected === false ? '' : String(line.quantity)}
@@ -1057,6 +1076,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   rowKey={(row) => row.typeId}
                   density="compact"
                   stackLayout="dense"
+                  stacked={cards}
                   className="dt-dense-tight"
                   rowContextMenu={rowContextMenu}
                   rowMoreActions
@@ -1175,11 +1195,14 @@ function ModeSelect({ value, onChange }: { value: HaulMode; onChange: (mode: Hau
  * row's detail says it too, for touch).
  */
 function BringInput({
+  card,
   label,
   title,
   value,
   onCommit,
 }: {
+  /** On the dense card rather than in a table row. */
+  card: boolean;
   label: string;
   title?: string;
   value: string;
@@ -1192,9 +1215,11 @@ function BringInput({
       inputMode="numeric"
       aria-label={label}
       title={title}
-      // Shorter and narrower on the phone card: its height sets the meta
-      // line's, and a 360px card still fits it beside that line.
-      className="w-16 text-right tabular-nums max-sm:h-7 sm:w-20"
+      // Shorter and narrower on the card: its height sets the meta line's,
+      // and a 360px card still fits it beside that line. 28px is under the
+      // touch tier's 36px on purpose (DESIGN.md §3); `max-md:` because the
+      // `sm` field is already 28px from `md` up.
+      className={cx('text-right tabular-nums', card ? 'w-16 max-md:h-7' : 'w-20')}
       value={draft ?? value}
       onChange={(event) => {
         const raw = event.target.value.replace(/[^\d]/g, '');
