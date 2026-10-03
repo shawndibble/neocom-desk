@@ -7,6 +7,7 @@ import { IconButton } from './IconButton';
 import * as Icon from './icons';
 import { FilterSurfaceContext, useFilterSurface } from './filterSurface';
 import { Modal } from './Modal';
+import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 
 interface FilterFieldProps {
   /** Already-translated. Rendered in the sheet only; inline the control's own `aria-label` carries it. */
@@ -106,6 +107,13 @@ interface FilterBarProps<T> {
    * read as one pair rather than two different-sized buttons.
    */
   triggerSize?: ComponentProps<typeof IconButton>['size'];
+  /**
+   * Where the controls open on a pointer-width screen. `row` (default) is the
+   * box under the row. `popover` anchors them to the funnel instead, for a
+   * funnel that sits where no box can open beneath it — a panel's title bar,
+   * beside its primary action. Below `md` it is the sheet either way.
+   */
+  pointerSurface?: 'row' | 'popover';
 }
 
 /**
@@ -143,8 +151,25 @@ export function FilterBar<T>({
   className = '',
   rowAlign = 'center',
   triggerSize,
+  pointerSurface = 'row',
 }: FilterBarProps<T>) {
   const isNarrow = useIsNarrow();
+
+  if (!isNarrow && pointerSurface === 'popover') {
+    return (
+      <FilterPopover
+        search={search}
+        activeCount={activeCount}
+        title={title}
+        actions={actions}
+        className={className}
+        rowAlign={rowAlign}
+        triggerSize={triggerSize}
+      >
+        {children(value, onChange)}
+      </FilterPopover>
+    );
+  }
 
   if (!isNarrow) {
     return (
@@ -195,24 +220,29 @@ function FilterTrigger({
   size,
 }: {
   activeCount: number;
-  expanded: boolean;
-  haspopup: 'dialog' | 'true';
-  onClick: () => void;
+  /** All three omitted for a `PopoverTrigger` child, which Radix wires itself. */
+  expanded?: boolean;
+  haspopup?: 'dialog' | 'true';
+  onClick?: () => void;
   size?: ComponentProps<typeof IconButton>['size'];
 }) {
   const { t } = useTranslation();
+  const button = (
+    <IconButton
+      icon={<Icon.Filter />}
+      label={
+        activeCount > 0 ? t('filters.openWithCount', { count: activeCount }) : t('filters.open')
+      }
+      size={size}
+      // Spread, not passed as `undefined`: `asChild` merges the trigger's own
+      // aria-expanded/onClick under the child's, so an explicit undefined
+      // would erase them.
+      {...(onClick && { 'aria-haspopup': haspopup, 'aria-expanded': expanded, onClick })}
+    />
+  );
   return (
     <span className="relative inline-flex shrink-0">
-      <IconButton
-        icon={<Icon.Filter />}
-        label={
-          activeCount > 0 ? t('filters.openWithCount', { count: activeCount }) : t('filters.open')
-        }
-        aria-haspopup={haspopup}
-        aria-expanded={expanded}
-        onClick={onClick}
-        size={size}
-      />
+      {onClick ? button : <PopoverTrigger asChild>{button}</PopoverTrigger>}
       {activeCount > 0 && (
         <span
           aria-hidden
@@ -282,6 +312,55 @@ function CollapsibleFilterRow({
           {children}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The pointer-width surface for a funnel in a title bar: the same live (no
+ * Apply) controls as `CollapsibleFilterRow`, anchored to the funnel rather
+ * than unfolding beneath it — beneath it is the inside of the bar.
+ */
+function FilterPopover({
+  search,
+  activeCount,
+  title,
+  actions,
+  children,
+  className = '',
+  rowAlign = 'center',
+  triggerSize,
+}: {
+  search?: ReactNode;
+  activeCount: number;
+  title?: string;
+  actions?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  rowAlign?: 'center' | 'end';
+  triggerSize?: ComponentProps<typeof IconButton>['size'];
+}) {
+  const { t } = useTranslation();
+  return (
+    <div
+      className={cx(
+        'flex flex-wrap gap-2',
+        rowAlign === 'end' ? 'items-end' : 'items-center',
+        className
+      )}
+    >
+      {search}
+      {actions}
+      <Popover>
+        <FilterTrigger activeCount={activeCount} size={triggerSize} />
+        <PopoverContent
+          align="end"
+          aria-label={title ?? t('filters.title')}
+          className="flex w-max max-w-[min(44rem,calc(100vw-2rem))] flex-wrap items-center gap-2 p-2"
+        >
+          {children}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
