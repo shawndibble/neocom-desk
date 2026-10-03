@@ -27,15 +27,17 @@ import {
   EmptyState,
   IconButton,
   IskAmount,
+  MenuItem,
   RowMoreActions,
   SegmentedControl,
   Spinner,
-  TypeIcon,
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { controlHeightClassName } from '@/components/ui/controlStyles';
 import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
+import { useIsNarrow } from '@/lib/useIsNarrow';
+import { RemovableTypeIcon } from './RemovableTypeIcon';
 import { useCompareSet } from './compareSet';
 import { useCompareRows, type CompareRow } from './useCompareRows';
 import { useCompareAttributes } from './useCompareAttributes';
@@ -120,6 +122,11 @@ export function CompareDrawer({
     useCompareSet.getState().openRequest > 0 ? (isDesktopWidth() ? 'open' : 'full') : 'closed'
   );
   const [heightPx, setHeightPx] = useState(DEFAULT_HEIGHT);
+  // Below `md` an open drawer is a full-screen sheet, not a resizable strip:
+  // a phone has no order book worth keeping in view beside it, and a 280px
+  // strip above the bottom nav showed about one item.
+  const narrow = useIsNarrow();
+  const fullScreen = narrow && mode !== 'closed';
   const handleRef = useRef<HTMLButtonElement>(null);
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
@@ -235,12 +242,19 @@ export function CompareDrawer({
         id: 'item',
         header: t('market.compare.columnItem'),
         sortValue: (row) => row.itemName,
-        // The menu wraps only this cell, not the row (unlike sibling surfaces):
-        // the row also holds a Remove button, which must not open it.
+        // The menu wraps only this cell, not the row (unlike sibling surfaces).
+        // The "×" on the icon removes the item; it stops its own click so it
+        // never opens the menu.
+        primary: true,
         render: (row) => (
           <ItemContextMenu typeId={row.typeId} itemName={row.itemName}>
-            <span className="flex items-center gap-1.5">
-              <TypeIcon typeId={row.typeId} size={32} className="h-4 w-4 shrink-0" />
+            <span className="flex items-center gap-2.5">
+              <RemovableTypeIcon
+                typeId={row.typeId}
+                itemName={row.itemName}
+                onRemove={removeItem}
+                sizeClassName="size-6"
+              />
               <span>{row.itemName}</span>
               <RowMoreActions />
             </span>
@@ -250,6 +264,8 @@ export function CompareDrawer({
       {
         id: 'bestSell',
         header: t('market.compare.columnBestSell'),
+        // The figure a phone's two-line card leads with, beside the name.
+        cardCorner: true,
         align: 'right',
         className: 'tabular-nums',
         render: (row) =>
@@ -265,6 +281,7 @@ export function CompareDrawer({
       {
         id: 'bestBuy',
         header: t('market.compare.columnBestBuy'),
+        stackAffix: { before: t('market.compare.stackBuy') },
         align: 'right',
         className: 'tabular-nums',
         render: (row) =>
@@ -280,6 +297,7 @@ export function CompareDrawer({
       {
         id: 'spread',
         header: t('market.compare.columnSpread'),
+        stackAffix: { before: t('market.compare.stackSpread') },
         align: 'right',
         className: 'tabular-nums',
         render: (row) =>
@@ -308,6 +326,7 @@ export function CompareDrawer({
         id: 'afterFees',
         header: t('market.compare.columnAfterFees'),
         headerTooltip: t('market.compare.columnAfterFeesHelp'),
+        stackAffix: { before: t('market.compare.stackNet') },
         align: 'right',
         className: 'tabular-nums',
         render: (row) => {
@@ -320,24 +339,11 @@ export function CompareDrawer({
       {
         id: 'volume',
         header: t('market.compare.columnVolume'),
+        stackAffix: { before: t('market.compare.stackVolume') },
         align: 'right',
         className: 'tabular-nums',
         render: (row) => (row.loading ? '…' : formatVolume(row.summary?.availableVolume ?? 0)),
         sortValue: (row) => row.summary?.availableVolume ?? undefined,
-      },
-      {
-        id: 'remove',
-        header: '',
-        align: 'right',
-        render: (row) => (
-          <IconButton
-            size="row"
-            variant="plain"
-            icon={<Icon.Close />}
-            label={t('market.compare.remove', { name: row.itemName })}
-            onClick={() => removeItem(row.typeId)}
-          />
-        ),
       },
     ],
     [t, marginFor, removeItem]
@@ -349,7 +355,11 @@ export function CompareDrawer({
     // `flex-col-reverse` with the handle as the *first* DOM child (below)
     // keeps it visually below the drawer while keeping it before the drawer's
     // content in tab order, so Tab from the handle enters the drawer next.
-    <div className="fixed inset-x-0 bottom-16 z-30 flex flex-col-reverse items-stretch md:bottom-0">
+    // Raised over the bottom nav (`z-40`, Layout.tsx) while full-screen:
+    // this wrapper is the stacking context, so the sheet's own z can't.
+    <div
+      className={`fixed inset-x-0 bottom-16 flex flex-col-reverse items-stretch md:bottom-0 ${fullScreen ? 'z-50' : 'z-30'}`}
+    >
       <button
         ref={handleRef}
         type="button"
@@ -374,21 +384,23 @@ export function CompareDrawer({
               close();
             }
           }}
-          style={{ height: mode === 'full' ? FULL_HEIGHT : heightPx }}
-          className="flex flex-col border border-b-0 border-line bg-panel"
+          style={fullScreen ? undefined : { height: mode === 'full' ? FULL_HEIGHT : heightPx }}
+          className={`flex flex-col border-line bg-panel ${fullScreen ? 'fixed inset-0 h-dvh pb-[env(safe-area-inset-bottom)]' : 'border border-b-0'}`}
         >
-          <div
-            role="separator"
-            aria-orientation="horizontal"
-            aria-label={t('market.compare.resize')}
-            aria-valuenow={mode === 'open' ? heightPx : undefined}
-            aria-valuemin={MIN_HEIGHT}
-            aria-valuemax={MAX_HEIGHT}
-            tabIndex={mode === 'open' ? 0 : -1}
-            onPointerDown={startDrag}
-            onKeyDown={onHandleKeyDown}
-            className={`h-1.5 shrink-0 border-b border-line ${mode === 'open' ? 'cursor-row-resize hover:bg-panel-2' : ''}`}
-          />
+          {!fullScreen && (
+            <div
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label={t('market.compare.resize')}
+              aria-valuenow={mode === 'open' ? heightPx : undefined}
+              aria-valuemin={MIN_HEIGHT}
+              aria-valuemax={MAX_HEIGHT}
+              tabIndex={mode === 'open' ? 0 : -1}
+              onPointerDown={startDrag}
+              onKeyDown={onHandleKeyDown}
+              className={`h-1.5 shrink-0 border-b border-line ${mode === 'open' ? 'cursor-row-resize hover:bg-panel-2' : ''}`}
+            />
+          )}
           <header className="flex min-h-11 flex-wrap items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
             <div className="flex items-center gap-2">
               <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -409,32 +421,57 @@ export function CompareDrawer({
                 value={view}
                 onChange={setView}
               />
-              {view === 'prices' && (
+              {view === 'prices' && !narrow && (
                 <span className="text-[0.6875rem] text-text-dim">
                   {t('market.compare.pricesFrom', { place: sourceLabel })}
                 </span>
               )}
             </div>
             <div className="flex items-center gap-2">
-              {view === 'prices' ? (
-                <TableActionsMenu
-                  name={t('market.compare.viewPrices')}
-                  tableExport={pricesExport}
-                />
-              ) : (
-                attributes.data && (
+              {narrow ? (
+                // One header row on a phone: Clear all and the export
+                // share one overflow menu instead of wrapping the header.
+                view === 'attributes' && attributes.data ? (
                   <TableActionsMenu
                     name={t('market.compare.viewAttributes')}
                     tableExport={attributesExport}
-                  />
+                  >
+                    <MenuItem onSelect={clearSet}>{t('market.compare.clearAll')}</MenuItem>
+                  </TableActionsMenu>
+                ) : (
+                  <TableActionsMenu
+                    name={t('market.compare.viewPrices')}
+                    tableExport={pricesExport}
+                  >
+                    <MenuItem onSelect={clearSet}>{t('market.compare.clearAll')}</MenuItem>
+                  </TableActionsMenu>
                 )
+              ) : (
+                <>
+                  {view === 'prices' ? (
+                    <TableActionsMenu
+                      name={t('market.compare.viewPrices')}
+                      tableExport={pricesExport}
+                    />
+                  ) : (
+                    attributes.data && (
+                      <TableActionsMenu
+                        name={t('market.compare.viewAttributes')}
+                        tableExport={attributesExport}
+                      />
+                    )
+                  )}
+                  <Button
+                    size="sm"
+                    onClick={() => setMode((m) => (m === 'full' ? 'open' : 'full'))}
+                  >
+                    {mode === 'full' ? t('market.compare.restore') : t('market.compare.expand')}
+                  </Button>
+                  <Button size="sm" onClick={clearSet}>
+                    {t('market.compare.clearAll')}
+                  </Button>
+                </>
               )}
-              <Button size="sm" onClick={() => setMode((m) => (m === 'full' ? 'open' : 'full'))}>
-                {mode === 'full' ? t('market.compare.restore') : t('market.compare.expand')}
-              </Button>
-              <Button size="sm" onClick={clearSet}>
-                {t('market.compare.clearAll')}
-              </Button>
               <IconButton
                 size="sm"
                 icon={<Icon.Close />}
@@ -475,6 +512,11 @@ export function CompareDrawer({
               </div>
             ) : (
               <>
+                {narrow && (
+                  <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                    {t('market.compare.pricesFrom', { place: sourceLabel })}
+                  </p>
+                )}
                 {fees && (
                   <AssumesBaseStandingsNote
                     className="border-b border-line px-3"
@@ -487,6 +529,10 @@ export function CompareDrawer({
                   rows={rows}
                   rowKey={(row) => row.typeId}
                   label={t('market.compare.title')}
+                  // Two lines per item on a phone — name and best sell, then
+                  // the rest inline — instead of an eight-line labelled card.
+                  stackLayout="dense"
+                  mobileSort
                 />
               </>
             )}
