@@ -371,6 +371,148 @@ describe('Travel › Route Safety', () => {
   });
 });
 
+describe('Travel › Route Safety › Stops', () => {
+  /** Uedama ─ Perimeter ─ Jita ─ Niyabainen ─ Muvolailen ─ Sobaseki, and Thera with no gates. */
+  const LINE = {
+    [UEDAMA]: [PERIMETER],
+    [PERIMETER]: [UEDAMA, JITA],
+    [JITA]: [PERIMETER, NIYABAINEN],
+    [NIYABAINEN]: [JITA, MUVOLAILEN],
+    [MUVOLAILEN]: [NIYABAINEN, SOBASEKI],
+    [SOBASEKI]: [MUVOLAILEN],
+    [THERA]: [],
+  };
+
+  beforeEach(() => {
+    loadSolarSystemJumps.mockResolvedValue(LINE);
+  });
+
+  const stopsInLink = () => new URLSearchParams(window.location.search).get('stops');
+
+  function legHeader(name: RegExp) {
+    return within(screen.getByRole('list', { name: 'Itinerary by leg' })).getByRole('button', {
+      name,
+    });
+  }
+
+  it('lists the trip by leg, the first open, under facts covering the whole trip', async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&stops=${SOBASEKI},${UEDAMA}`);
+
+    expect(await screen.findByRole('table', { name: 'Systems on leg 1' })).toBeInTheDocument();
+    expect(legHeader(/^Leg 1 · Jita → Sobaseki · 3 j/)).toHaveAttribute('aria-expanded', 'true');
+    const second = legHeader(
+      /^Leg 2 · Sobaseki → Uedama · 5 j · lowest 0\.5 · Gank Chokepoints: Uedama/
+    );
+    expect(second).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('table', { name: 'Systems on leg 2' })).not.toBeInTheDocument();
+
+    const facts = within(screen.getByRole('list', { name: 'Route summary' }));
+    expect(facts.getByText('8 jumps')).toBeInTheDocument();
+    expect(screen.getAllByTestId('route-strip-cell')).toHaveLength(9);
+
+    await user.click(second);
+    expect(screen.getByRole('table', { name: 'Systems on leg 2' })).toBeInTheDocument();
+  });
+
+  it('adds a stop from the picker, writing the stops into the link', async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    await screen.findByRole('table', { name: 'Systems on the route' });
+    await user.click(screen.getByRole('button', { name: 'Add a stop' }));
+    await user.type(await screen.findByRole('combobox'), 'Sobas');
+    await user.click(await screen.findByRole('option', { name: /Sobaseki/ }));
+
+    expect(stopsInLink()).toBe(`${UEDAMA},${SOBASEKI}`);
+    expect(new URLSearchParams(window.location.search).get('to')).toBeNull();
+    expect(await screen.findByRole('list', { name: 'Itinerary by leg' })).toBeInTheDocument();
+  });
+
+  it('reorders and removes stops with each row’s buttons', async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&stops=${UEDAMA},${SOBASEKI}`);
+
+    await user.click(await screen.findByRole('button', { name: 'Move Sobaseki up' }));
+    expect(stopsInLink()).toBe(`${SOBASEKI},${UEDAMA}`);
+    expect(screen.getByRole('button', { name: 'Move Sobaseki up' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Remove Uedama' }));
+    expect(stopsInLink()).toBe(String(SOBASEKI));
+    // One stop is the page as it always was.
+    expect(await screen.findByRole('table', { name: 'Systems on the route' })).toBeInTheDocument();
+  });
+
+  it('optimizes the stop order and says what changed', async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&stops=${SOBASEKI},${UEDAMA},${NIYABAINEN}&pref=shortest`);
+
+    await screen.findByRole('list', { name: 'Itinerary by leg' });
+    await user.click(screen.getByRole('switch', { name: 'Optimize stop order' }));
+
+    expect(new URLSearchParams(window.location.search).get('opt')).toBe('1');
+    expect(
+      await screen.findByText(
+        'Order changed: Uedama → Niyabainen → Sobaseki · 11 jumps in typed order → 7 jumps'
+      )
+    ).toBeInTheDocument();
+    expect(legHeader(/^Leg 1 · Jita → Uedama/)).toBeInTheDocument();
+    // The typed order stays in the link and the list.
+    expect(stopsInLink()).toBe(`${SOBASEKI},${UEDAMA},${NIYABAINEN}`);
+  });
+
+  it('keeps the last stop last when asked', async () => {
+    visit(`?from=${JITA}&stops=${SOBASEKI},${UEDAMA},${NIYABAINEN}&pref=shortest&opt=1&keep=1`);
+
+    expect(
+      await screen.findByText(
+        'Order changed: Uedama → Sobaseki → Niyabainen · 11 jumps in typed order → 9 jumps'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('folds the stops to one line on a phone, with Edit to open them', async () => {
+    const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation(
+      (media: string) =>
+        ({
+          media,
+          matches: media === PHONE_QUERY,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList
+    );
+    try {
+      const user = userEvent.setup();
+      visit(`?stops=${SOBASEKI},${UEDAMA}`);
+
+      expect(await screen.findByText('Jita (current system) → 2 stops')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Add a stop' })).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Edit stops' }));
+      expect(screen.getByRole('button', { name: 'Add a stop' })).toBeInTheDocument();
+    } finally {
+      matchMedia.mockRestore();
+    }
+  });
+
+  it('gives an unreachable stop its leg’s no-route message and turns optimizing off', async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&stops=${UEDAMA},${THERA}&opt=1`);
+
+    const leg = await screen.findByRole('button', {
+      name: /^Leg 2 · Uedama → Thera · no stargate route/,
+    });
+    expect(screen.getByRole('switch', { name: 'Optimize stop order' })).toBeDisabled();
+    expect(
+      screen.getByText(/A stop no stargate route reaches can't be put in order/)
+    ).toBeInTheDocument();
+    // The reachable leg still draws.
+    expect(screen.getByRole('table', { name: 'Systems on leg 1' })).toBeInTheDocument();
+
+    await user.click(leg);
+    expect(screen.getByText(/No stargate route connects Uedama and Thera/)).toBeInTheDocument();
+  });
+});
+
 describe('Travel › Route Safety › Route rules', () => {
   beforeEach(() => {
     // The Travel Settings stores outlive a test; make each one read its seeded rows afresh.

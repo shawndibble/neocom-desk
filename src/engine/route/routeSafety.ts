@@ -160,6 +160,44 @@ export function summarizeRouteSafety(rows: readonly RouteSafetyRow[]): RouteSafe
   };
 }
 
+/** A trip's legs as one route, and where along it each leg ends. */
+export interface JoinedLegs {
+  rows: RouteSafetyRow[];
+  /** Index in `rows` of each leg's last system: the stops, in flying order. */
+  stopIndexes: number[];
+}
+
+/**
+ * A trip's legs end to end, for the whole-trip strip and facts (issue #2475).
+ * Each leg starts where the last one ended, so that joining stop is kept once.
+ */
+export function joinLegs(legs: readonly (readonly RouteSafetyRow[])[]): JoinedLegs {
+  const rows: RouteSafetyRow[] = [];
+  const stopIndexes: number[] = [];
+  legs.forEach((leg, index) => {
+    rows.push(...(index === 0 ? leg : leg.slice(1)));
+    stopIndexes.push(rows.length - 1);
+  });
+  return { rows, stopIndexes };
+}
+
+/**
+ * The whole trip's facts. Jumps and bands count every system flown through,
+ * as a leg's do; a system crossed on two legs still has one hour of kills and
+ * is one Gank Chokepoint, so those count each system once.
+ */
+export function summarizeTrip(legs: readonly (readonly RouteSafetyRow[])[]): RouteSafetySummary {
+  const { rows } = joinLegs(legs);
+  const distinct = [...new Map(rows.map((row) => [row.systemId, row])).values()];
+  const distinctSummary = summarizeRouteSafety(distinct);
+  return {
+    ...summarizeRouteSafety(rows),
+    shipKills: distinctSummary.shipKills,
+    podKills: distinctSummary.podKills,
+    chokepoints: distinctSummary.chokepoints,
+  };
+}
+
 /** A fold needs at least this many systems: one quiet system is no shorter as a fold. */
 export const MIN_QUIET_RUN = 2;
 
@@ -224,11 +262,14 @@ export function foldQuietStretches(
 
 /**
  * Which systems the route strip labels, as indexes in route order: both
- * ends, the first system at the route's lowest security, and every Gank
- * Chokepoint.
+ * ends, the first system at the route's lowest security, every Gank
+ * Chokepoint, and — on a trip — each stop (`stopIndexes`, from `joinLegs`).
  */
-export function routeStripKeySystems(rows: readonly RouteSafetyRow[]): number[] {
-  const keys = new Set<number>();
+export function routeStripKeySystems(
+  rows: readonly RouteSafetyRow[],
+  stopIndexes: readonly number[] = []
+): number[] {
+  const keys = new Set<number>(stopIndexes.filter((index) => index < rows.length));
   if (rows.length > 0) keys.add(0);
   if (rows.length > 1) keys.add(rows.length - 1);
   const securities = rows.flatMap((row) => (row.security === null ? [] : [row.security]));

@@ -482,6 +482,15 @@ here — they go one per file in `docs/context/decisions/`.
   and none is in J-space. A figure still loading or unavailable never counts
   as zero, so such a system never folds. Named for the figures, never a
   verdict on the systems.
+- **Stop**: one of up to ten systems a Route Safety trip visits after its
+  start (the **Current System** unless the link names another), kept in the
+  link in the order typed. Optimize stop order may fly them in a cheaper
+  order under the active route rules; the typed order stays as written.
+- **Leg**: one stargate route of a trip, from its start or a **Stop** to the
+  next stop (and, with Return to start, the last stop home). Route Safety
+  lists a trip leg by leg, each with its own jumps, lowest security and
+  **Gank Chokepoints**; the facts line and **Route strip** cover the whole
+  trip.
 - **Pilot Lookup**: Travel's view of one pilot, found by name — portrait,
   corporation, alliance and character age from public ESI, and the all-time
   kills, losses, ISK, solo kills, danger and gang ratios and most-used hulls
