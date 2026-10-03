@@ -93,10 +93,10 @@ describe('recent views', () => {
 
   it('keeps a short list', () => {
     let recent: string[] = [];
-    for (const path of ['/alerts', '/mail', '/assets', '/wallet/journal', '/contacts/across']) {
+    for (const path of ['/alerts', '/mail', '/assets', '/wallet/journal', '/travel/thera']) {
       recent = pushRecentNav(recent, path);
     }
-    expect(recent).toEqual(['/contacts/across', '/wallet/journal', '/assets', '/mail']);
+    expect(recent).toEqual(['/travel/thera', '/wallet/journal', '/assets', '/mail']);
   });
 
   it('shows the three newest other than the one you are on', () => {

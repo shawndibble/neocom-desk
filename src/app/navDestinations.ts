@@ -73,6 +73,13 @@ export interface NavPage {
   readonly mobileTab: boolean;
   /** Tab ids listed nowhere as destinations: a redirect alias, not a view of this page. */
   readonly aliasTabs?: readonly string[];
+  /**
+   * The page's `PAGE_TABS` are URL state behind an in-page control, not views
+   * of their own: the nav lists the page alone (Contacts' This character / All
+   * characters is a `CharacterFilterControl`, #2427, but `/contacts/across`
+   * links still resolve).
+   */
+  readonly tablessNav?: true;
   /** Tab ids shown only while the Corp entry is (`visibleSettingsGroups`' Corporation section). */
   readonly corpTabs?: readonly string[];
   /**
@@ -217,6 +224,7 @@ export const NAV_PAGES = [
     group: 'social',
     gating: 'scope',
     mobileTab: true,
+    tablessNav: true,
   },
   /*
    * `ungated` rather than `scope`: every read is public ESI or the local
@@ -274,6 +282,25 @@ export const NAV_PAGES = [
 ] as const satisfies readonly NavPage[];
 
 export type NavPagePath = (typeof NAV_PAGES)[number]['path'];
+
+export interface NavTab {
+  readonly id: string;
+  readonly labelKey: string;
+  readonly path: string;
+}
+
+/**
+ * The `PAGE_TABS` tabs the nav lists under a page: the tab bar's tabs, less
+ * redirect aliases, and none at all for a `tablessNav` page. The one rule the
+ * destination list and the rail's path ownership (`navRail.ts`) both read.
+ */
+export function navTabs(page: NavPage): readonly NavTab[] {
+  const tabs = page.tablessNav ? undefined : PAGE_TABS[page.path];
+  if (!tabs) return [];
+  return tabBarTabs(tabs)
+    .filter((tab) => !page.aliasTabs?.includes(tab.id))
+    .map((tab) => ({ id: tab.id, labelKey: tab.labelKey, path: tabPath(tabs, tab.id) }));
+}
 
 /**
  * Every scope-gated destination the shell asks `useLockedRoutes` about: the
@@ -384,13 +411,9 @@ export function listNavDestinations({
         ...(searchKeys && { keywords: searchKeys.map(t) }),
       };
     };
-    const tabs = PAGE_TABS[page.path];
-    if (tabs) {
-      for (const tab of tabBarTabs(tabs)) {
-        if (page.aliasTabs?.includes(tab.id)) continue;
-        if (page.corpTabs?.includes(tab.id) && !corpVisible) continue;
-        out.push(tabEntry(tabPath(tabs, tab.id), tab.labelKey, pageLocked));
-      }
+    for (const tab of navTabs(page)) {
+      if (page.corpTabs?.includes(tab.id) && !corpVisible) continue;
+      out.push(tabEntry(tab.path, tab.labelKey, pageLocked));
     }
     for (const view of page.subViews ?? []) {
       if (view.corpCapability && !corpCapabilities[view.corpCapability]) continue;

@@ -22,7 +22,7 @@ const DESKTOP = { width: 1280, height: 800 };
 async function gotoTrainedSkills(page: Page) {
   await signInAndGoto(page);
   await page.getByRole('link', { name: 'Skills' }).click();
-  await page.getByRole('link', { name: 'Trained' }).click();
+  await page.getByRole('main').getByRole('link', { name: 'Trained' }).click();
   await page.waitForURL(/\/skills\/trained$/);
 }
 

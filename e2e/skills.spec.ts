@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
   await signInAndGoto(page);
   // Skills opens on Plans, so the trained view is one sub-nav click away.
   await page.getByRole('link', { name: 'Skills' }).click();
-  await page.getByRole('link', { name: 'Trained' }).click();
+  await page.getByRole('main').getByRole('link', { name: 'Trained' }).click();
   await page.waitForURL(/\/skills\/trained$/);
 });
 
