@@ -8,8 +8,12 @@
  *
  * Given the open Fitting and pilot (`finder`), it opens on "Find by goal"
  * (`ImplantFinder`) instead, with this list under "Your set".
+ *
+ * It's a planner: on "My clone" with no set of the Fitting's own, it starts
+ * from the clone's implants, and the first change saves that plan to the
+ * Fitting and switches the page to it — opening it alone changes nothing.
  */
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -36,7 +40,13 @@ interface ImplantSetPickerProps {
   implantSet: FittingImplantSet | undefined;
   onChange: (implantSet: FittingImplantSet | undefined) => void;
   /** The open Fitting and pilot: turns on "Find by goal". */
-  finder?: { fitting: Fitting; profile: PilotProfile; basis: ImplantBasis };
+  finder?: {
+    fitting: Fitting;
+    profile: PilotProfile;
+    basis: ImplantBasis;
+    /** Called with "fitting" when a change is made on "My clone", so the page shows the plan. */
+    onBasisChange?: (basis: ImplantBasis) => void;
+  };
 }
 
 /** Stable identity: a fresh `{implants: [], boosters: []}` every render would
@@ -183,7 +193,28 @@ export function ImplantSetPicker({
   const [implantError, setImplantError] = useState<string | null>(null);
   const [boosterError, setBoosterError] = useState<string | null>(null);
 
-  const set = implantSet ?? EMPTY_SET;
+  const fitting = finder?.fitting;
+  const onClone = finder?.basis === 'clone';
+  const cloneImplants = finder?.profile.implantTypeIds;
+  /** The clone's implants, as the plan to start from — see this file's own doc. */
+  const seed = useMemo<FittingImplantSet | undefined>(
+    () =>
+      onClone && implantSet === undefined && cloneImplants && cloneImplants.length > 0
+        ? { implants: [...cloneImplants], boosters: [] }
+        : undefined,
+    [onClone, implantSet, cloneImplants]
+  );
+  // Stable per Fitting and seed: the finder re-screens every family whenever this changes.
+  const plannedFitting = useMemo(
+    () => (fitting && seed ? { ...fitting, implantSet: seed } : fitting),
+    [fitting, seed]
+  );
+  const set = implantSet ?? seed ?? EMPTY_SET;
+  const onBasisChange = finder?.onBasisChange;
+  function change(next: FittingImplantSet | undefined) {
+    onChange(next);
+    if (onClone) onBasisChange?.('fitting');
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -203,15 +234,13 @@ export function ImplantSetPicker({
       return;
     }
     setError(null);
-    void onChange({ ...set, [kind]: [...set[kind], entry.typeID] });
+    change({ ...set, [kind]: [...set[kind], entry.typeID] });
   }
 
   function removeFrom(kind: 'implants' | 'boosters', index: number) {
     const remaining = set[kind].filter((_, i) => i !== index);
     // A side effect whose booster is gone goes with it.
-    void onChange(
-      kind === 'boosters' ? withBoosters(set, remaining) : { ...set, implants: remaining }
-    );
+    change(kind === 'boosters' ? withBoosters(set, remaining) : { ...set, implants: remaining });
   }
 
   function toggleSideEffect(effectId: number, on: boolean) {
@@ -219,7 +248,7 @@ export function ImplantSetPicker({
     const sideEffects = on
       ? [...current.filter((id) => id !== effectId), effectId]
       : current.filter((id) => id !== effectId);
-    void onChange({
+    change({
       implants: set.implants,
       boosters: set.boosters,
       ...(sideEffects.length > 0 ? { boosterSideEffects: sideEffects } : {}),
@@ -256,7 +285,7 @@ export function ImplantSetPicker({
     </div>
   );
 
-  if (!finder) {
+  if (!finder || !plannedFitting) {
     return (
       <Modal open={open} onClose={onClose} title={t('fittings.implants.modalTitle')}>
         <div className="p-3">{setEditor}</div>
@@ -279,11 +308,11 @@ export function ImplantSetPicker({
         {tab === 'find' ? (
           <ImplantFinder
             open={open}
-            fitting={finder.fitting}
+            fitting={plannedFitting}
             profile={finder.profile}
             basis={finder.basis}
-            implantSet={implantSet}
-            onChange={onChange}
+            implantSet={set}
+            onChange={change}
           />
         ) : (
           setEditor

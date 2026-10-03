@@ -1,9 +1,10 @@
 /**
  * Which implants the Fitting's numbers assume — "My clone" (the active
  * Character's) or "Fitting's" (the set saved with it) — as one chip that
- * says both what it is and what it's set to, opening the choice and the
- * set's editor. The Fittings route otherwise shows no Character identity,
- * so this reads the name straight from Dexie.
+ * says both what it is and what it's set to, opening the choice, with the
+ * set's editor on a button beside it (as Skills' "Set levels…"). The
+ * Fittings route otherwise shows no Character identity, so this reads the
+ * name straight from Dexie.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -67,7 +68,7 @@ export function ImplantBasisControl({
     <StatField label={label}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          {/* Drawn as the select beside it: it picks one of two, then opens the set. */}
+          {/* Drawn as the select beside it: it picks one of two. */}
           <button
             type="button"
             aria-label={`${label}: ${t(`fittings.implants.basis.${effective}`)}`}
@@ -95,24 +96,20 @@ export function ImplantBasisControl({
                   : t('fittings.implants.cloneExplainNoName')
                 : t('fittings.implants.fittingExplain')}
             </p>
-            <Button
-              size="sm"
-              onClick={() => {
-                setOpen(false);
-                setPickerOpen(true);
-              }}
-            >
-              {t('fittings.implants.editSet')}
-            </Button>
           </div>
         </PopoverContent>
       </Popover>
+      <Button size="sm" className="min-h-11 md:min-h-7" onClick={() => setPickerOpen(true)}>
+        {t('fittings.implants.setImplants')}
+      </Button>
       <ImplantSetPicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         implantSet={implantSet}
         onChange={onImplantSetChange}
-        {...(fitting && profile ? { finder: { fitting, profile, basis: effective } } : {})}
+        {...(fitting && profile
+          ? { finder: { fitting, profile, basis: effective, onBasisChange } }
+          : {})}
       />
     </StatField>
   );

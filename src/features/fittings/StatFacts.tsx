@@ -10,23 +10,33 @@ import { STAT_DETAIL, STAT_EYEBROW, statRowClassName } from './statKit';
  * shown, with the unheated figure on hover; a figure heat leaves as it is
  * (a hold, the mass, a fitting budget) stays in the normal tone. `note`
  * joins the unheated figure on hover, since this title hides any the caller
- * set around it.
+ * set around it. `toneClassName` tints the figure by its own reading (the
+ * capacitor's stability) and then wins over the heat tone; the unheated
+ * figure still shows on hover.
  */
 export function HeatFigure<S extends { unheated: S | null }>({
   stats,
   format,
   note,
+  toneClassName,
 }: {
   stats: S;
   format: (stats: S) => string;
   note?: string;
+  toneClassName?: string;
 }) {
   const { t } = useTranslation();
   const unheated = unheatedIfChanged(stats, format);
-  if (unheated === null) return <>{format(stats)}</>;
+  if (unheated === null) {
+    return toneClassName ? (
+      <span className={toneClassName}>{format(stats)}</span>
+    ) : (
+      <>{format(stats)}</>
+    );
+  }
   const was = t('fittings.stats.unheated', { value: unheated });
   return (
-    <span className="text-warning" title={note ? `${was} · ${note}` : was}>
+    <span className={toneClassName ?? 'text-warning'} title={note ? `${was} · ${note}` : was}>
       {format(stats)}
       <span className="sr-only"> ({was})</span>
     </span>

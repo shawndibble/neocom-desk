@@ -427,15 +427,36 @@ describe('FittingStatsSections — Defense', () => {
 
     for (const [layer, hp, ehp] of [
       ['Shield', '450 HP', '514'],
-      ['Armor', '405 HP', '3234'],
+      ['Armor', '405 HP', '3,234'],
       ['Hull', '350 HP', '871'],
     ]) {
       const row = within(screen.getByRole('row', { name: new RegExp(`^${layer}`) }));
       expect(row.getByText(hp)).toBeInTheDocument();
       expect(row.getByText(ehp)).toBeInTheDocument();
     }
-    expect(screen.getByText('4619 EHP')).toBeInTheDocument();
+    expect(screen.getByText('4,619 EHP')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Damage profile' })).toHaveTextContent('Guristas');
+  });
+
+  it('tints the Capacitor headline by how long it lasts', () => {
+    const { unmount } = renderSections(stats());
+    expect(screen.getByText('Stable at 60%')).toHaveClass('text-success');
+    unmount();
+
+    const lasting = renderSections(stats({ capacitor: { stable: false, depletesInSeconds: 240 } }));
+    expect(screen.getByText('Depletes in 240s')).toHaveClass('text-warning');
+    lasting.unmount();
+
+    renderSections(stats({ capacitor: { stable: false, depletesInSeconds: 30 } }));
+    expect(screen.getByText('Depletes in 30s')).toHaveClass('text-danger');
+  });
+
+  it('keeps the Capacitor tone over the heat tone, with the unheated figure on hover', () => {
+    renderSections(stats({ capacitor: { stable: true, stablePercentage: 40 }, unheated: stats() }));
+    const headline = screen.getByText('Stable at 40%');
+    expect(headline).toHaveClass('text-success');
+    expect(headline).not.toHaveClass('text-warning');
+    expect(headline).toHaveAttribute('title', 'Unheated: Stable at 60%');
   });
 
   it("labels a Reactive Armor Hardener's resists as adapted to the chosen profile", () => {
@@ -835,11 +856,11 @@ describe('FittingStatsSections — Overheat all and Copy stats', () => {
     renderSections(allOverheatedStats());
 
     // The Defense headline: heated, and what it reads unheated.
-    const ehp = screen.getByText('17400 EHP');
+    const ehp = screen.getByText('17,400 EHP');
     expect(inWarningTone(ehp)).toBe(true);
-    expect(ehp).toHaveAttribute('title', 'Unheated: 4619 EHP');
+    expect(ehp).toHaveAttribute('title', 'Unheated: 4,619 EHP');
     // Colour and hover alone reach neither touch nor screen readers: the value is also in the text.
-    expect(ehp).toHaveTextContent('(Unheated: 4619 EHP)');
+    expect(ehp).toHaveTextContent('(Unheated: 4,619 EHP)');
     expect(inWarningTone(screen.getByText('81.8 HP/s'))).toBe(true);
 
     // Offense: the blasters' DPS moved, their volley and the drones didn't.

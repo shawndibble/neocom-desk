@@ -87,7 +87,8 @@ import { useMediaQuery } from '@/lib/useMediaQuery';
 
 /**
  * Wide enough for browser | Ring | stats side by side: the 12rem nav, a 20rem
- * browser, a Ring column that shows the ring at (or near) its 36rem cap, and
+ * browser, a Ring column wide enough for a ring of ~36rem (it grows to 48rem when
+ * there's more), and
  * 22-26rem of stats, with gaps and page padding.
  */
 const THREE_COLUMN_QUERY = '(min-width: 100rem)';
@@ -731,12 +732,14 @@ function FittingsPage() {
                 )}
                 {/* Ring | List as the app's own tabs over the column they switch. */}
                 {/* The Ring stays in view while the tall stats column is read (lg+). The List
-                  needs the width and the stacked layout has nothing beside it. */}
+                  needs the width and the stacked layout has nothing beside it. At its max
+                  height the column also clears the page's bottom padding, so at the page's
+                  end, where it rests on the grid's bottom, its top is still on screen. */}
                 <div
                   data-testid="fitting-editor-column"
                   className={`min-w-0 space-y-3 ${
                     view === 'ring' && (addMode === 'docked' || !addOpen)
-                      ? 'lg:sticky lg:top-3 lg:max-h-[calc(100vh-1.5rem)] lg:overflow-y-auto'
+                      ? 'lg:sticky lg:top-3 lg:max-h-[calc(100vh-2.5rem)] lg:overflow-y-auto'
                       : ''
                   }`}
                 >

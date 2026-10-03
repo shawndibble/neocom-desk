@@ -208,7 +208,8 @@ describe('ImplantFinder', () => {
     expect(screen.getByRole('button', { name: /^Add .*WU-1001$/ }).closest('li')).toHaveTextContent(
       'Not for sale at any Trade Hub or LP Store'
     );
-    expect(screen.getByText(/Your LP:/).parentElement).toHaveTextContent('Caldari Navy 3,200');
+    // Every store's LP balance isn't spelled out: each offer says what it's short instead.
+    expect(screen.queryByText(/Your LP/)).not.toBeInTheDocument();
 
     // Cheapest fix: EE-603 by LP (1.5M) + WU-1003 at Jita (9M).
     const fixes = await screen.findByText('Ways to fix it · cheapest first');
@@ -239,6 +240,34 @@ describe('ImplantFinder', () => {
     expect(await screen.findByText('Boosters that help · best first')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^Add Standard Crash Booster$/ }));
     expect(onChange).toHaveBeenLastCalledWith({ implants: [], boosters: [CRASH] });
+  });
+
+  it('narrows goals and results to a slot picked on the strip, and shows what is in it', async () => {
+    const user = userEvent.setup();
+    const onChange = renderFinder(vi.fn(), { implants: [1002], boosters: [] });
+    const slot10 = await screen.findByRole('button', { name: /^Slot 10: .*WU-1002$/ });
+
+    // Slot 6 holds CPU and speed implants; slot 10 only the CPU one.
+    await user.click(screen.getByRole('button', { name: /^Slot 6: Empty$/ }));
+    expect(screen.getByRole('button', { name: /^Max velocity/ })).toBeInTheDocument();
+    await user.click(slot10);
+    expect(slot10).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: /^Max velocity/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Showing Slot 10/).parentElement).toHaveTextContent(
+      "Zainou 'Gnome' Weapon Upgrades WU-1002"
+    );
+
+    await user.click(screen.getByRole('button', { name: /^CPU/ }));
+    expect(await screen.findByRole('button', { name: /^Replace .*WU-1005$/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /EE-60\d$/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Replace .*WU-1005$/ }));
+    expect(onChange).toHaveBeenLastCalledWith({ implants: [1005], boosters: [] });
+
+    // A booster slot: nothing there helps CPU.
+    await user.click(screen.getByRole('button', { name: /^Booster 3: Empty$/ }));
+    expect(screen.getByText('Nothing in Booster 3 helps CPU on this fit.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'All slots' }));
+    expect((await screen.findAllByRole('button', { name: /EE-605$/ })).length).toBeGreaterThan(0);
   });
 
   it('opens an implant’s full details from its info button', async () => {
