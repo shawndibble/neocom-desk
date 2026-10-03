@@ -27,6 +27,7 @@ import type { CandidateRack } from '@/engine/fittings/candidates';
 import { reachableModuleStates } from '@/engine/fittings/fittingEdit';
 import type { FittingItemState, FittingModule, FittingSlotKind } from '@/engine/fittings/types';
 import { ShowInfoMenuItem, ViewInMarketMenuItem } from '@/features/market/ItemContextMenu';
+import { ChargePickerMenuItems } from './ChargePickerMenu';
 import { useFittingItemActions, type FittingItemActions } from './fittingItemActions';
 
 /**
@@ -100,6 +101,41 @@ function ModuleChargeItems({
   );
 }
 
+/**
+ * "Change charge (all N) ▸" on a Ring tile or List row: the Charge Picker for
+ * every fitted module of this type — the weapon group the Offense row's own
+ * menu changes. Only with the editor's Fitting to work it out from.
+ */
+function GroupChangeCharge({
+  actions,
+  module,
+}: {
+  actions: FittingItemActions;
+  module: FittingModule;
+}) {
+  const { t } = useTranslation();
+  const input = actions.chargePickerInput?.() ?? null;
+  if (input === null) return null;
+  const at = input.fitting.modules
+    .filter((m) => m.typeId === module.typeId)
+    .map(({ slot, slotIndex }) => ({ slot, slotIndex }));
+  return (
+    <MenuSub>
+      <MenuSubTrigger>
+        {t('fittings.chargePicker.changeChargeGroup', { count: at.length })}
+      </MenuSubTrigger>
+      <MenuSubContent className="max-h-96 min-w-64 overflow-y-auto">
+        <ChargePickerMenuItems
+          actions={actions}
+          module={module}
+          at={at}
+          fallback={<ChangeChargeItems actions={actions} module={module} at={at} />}
+        />
+      </MenuSubContent>
+    </MenuSub>
+  );
+}
+
 /** A fitted module's actions — the Ring tile, the List row, the module dialog. */
 export function ModuleMenuItems({
   module,
@@ -154,6 +190,7 @@ export function ModuleMenuItems({
         </MenuSub>
       )}
       {takesCharges !== false && <ModuleChargeItems actions={actions} module={module} />}
+      {takesCharges !== false && <GroupChangeCharge actions={actions} module={module} />}
       {module.chargeTypeId !== undefined && (
         <>
           <MenuItem
@@ -294,9 +331,14 @@ export function WeaponMenuItems({
     <>
       <MenuSub>
         <MenuSubTrigger>{t('fittings.item.changeCharge')}</MenuSubTrigger>
-        <MenuSubContent className="max-h-80 overflow-y-auto">
+        <MenuSubContent className="max-h-96 min-w-64 overflow-y-auto">
           {/* Its own component, so the engine is only asked once the submenu opens. */}
-          <ChangeChargeItems actions={actions} module={first} at={at} />
+          <ChargePickerMenuItems
+            actions={actions}
+            module={first}
+            at={at}
+            fallback={<ChangeChargeItems actions={actions} module={first} at={at} />}
+          />
         </MenuSubContent>
       </MenuSub>
       {first.chargeTypeId !== undefined && (

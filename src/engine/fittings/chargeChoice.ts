@@ -98,6 +98,17 @@ export function factionName(name: string, baseName: string): string | null {
   return prefix === '' ? null : prefix;
 }
 
+/** "Antimatter" for "Antimatter Charge L": the size is the weapon's, and the same on every row. */
+export function chargeLabel(name: string): string {
+  return name.replace(/\s+Charge\s+(?:XL|[SML])$|\s+(?:XL|[SML])$/, '');
+}
+
+/** "Caldari Navy Antimatter": a quick pick's or the loaded line's name. */
+export function chargeShortName(choice: ChargeChoice): string {
+  const base = chargeLabel(choice.baseName);
+  return choice.tier === 'faction' && choice.faction ? `${choice.faction} ${base}` : base;
+}
+
 /** DPS landing on a still target `distance` metres away: falloff for a turret, all-or-nothing for a missile. */
 export function appliedDpsAt(choice: ChargeChoice, distance: number): number {
   if (choice.falloff <= 0) return distance > choice.optimal ? 0 : choice.dps;

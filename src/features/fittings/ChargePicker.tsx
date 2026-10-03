@@ -13,7 +13,9 @@ import {
 import { cx } from '@/lib/cx';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import {
+  chargeLabel,
   chargeScore,
+  chargeShortName,
   filterChoices,
   groupByFaction,
   groupByType,
@@ -182,17 +184,6 @@ function tierLabel(t: TFunction, choice: ChargeChoice): string {
   return t(choice.tier === 'tech2' ? 'fittings.chargePicker.tech2' : 'fittings.chargePicker.tech1');
 }
 
-/** "Antimatter" for "Antimatter Charge L": the size is the weapon's, and the same on every row. */
-function baseLabel(name: string): string {
-  return name.replace(/\s+Charge\s+(?:XL|[SML])$|\s+(?:XL|[SML])$/, '');
-}
-
-/** "Caldari Navy Antimatter" — a quick pick's or the loaded line's name. */
-function shortName(choice: ChargeChoice): string {
-  const base = baseLabel(choice.baseName);
-  return choice.tier === 'faction' && choice.faction ? `${choice.faction} ${base}` : base;
-}
-
 function DamageText({ choice }: { choice: ChargeChoice }) {
   const { t } = useTranslation();
   if (!choice.damage) return null;
@@ -272,7 +263,7 @@ export function ChargePickerGroup({ group, settings, onLoad, wrapRow, pricesLoad
             <TypeIcon typeId={loaded.typeId} size={32} width={20} height={20} />
             <span className="min-w-0 truncate">
               {t('fittings.chargePicker.loaded')}{' '}
-              <span className="font-semibold text-accent">{shortName(loaded)}</span>
+              <span className="font-semibold text-accent">{chargeShortName(loaded)}</span>
             </span>
             <span className="ml-auto shrink-0 text-text-dim tabular-nums">
               {t('fittings.chargePicker.dps', { value: Math.round(loaded.dps) })} ·{' '}
@@ -317,7 +308,7 @@ export function ChargePickerGroup({ group, settings, onLoad, wrapRow, pricesLoad
                     group.loaded.has(choice.typeId) && 'text-accent'
                   )}
                 >
-                  {shortName(choice)}
+                  {chargeShortName(choice)}
                 </span>
                 <span className="text-[0.6875rem] whitespace-nowrap text-text-dim tabular-nums">
                   {key === 'maxDamage'
@@ -448,7 +439,7 @@ function TypeList({
           aria-expanded={isOpen}
           aria-label={[
             t('fittings.chargePicker.typeRowLabel', {
-              name: baseLabel(g.name),
+              name: chargeLabel(g.name),
               dps: Math.round(score),
               range: rangeText(t, rep),
             }),
@@ -469,7 +460,7 @@ function TypeList({
             <TypeIcon typeId={rep.typeId} size={32} width={20} height={20} />
           </span>
           <span className="flex min-w-0 items-baseline gap-1.5 text-xs font-semibold">
-            <span className="shrink-0">{baseLabel(g.name)}</span>
+            <span className="shrink-0">{chargeLabel(g.name)}</span>
             {rank && (
               <span className="min-w-0 truncate text-[0.6875rem] font-normal text-text-dim">
                 {rank}
@@ -743,7 +734,7 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
                           )}
                         >
                           <span className="truncate">
-                            {shortName({ ...c, tier: 'tech1' })}
+                            {chargeShortName({ ...c, tier: 'tech1' })}
                             {c.cargo > 0 && <span className="text-text-dim"> ●</span>}
                           </span>
                           <RangeBar choice={c} maxReach={maxReach} distance={distance} />

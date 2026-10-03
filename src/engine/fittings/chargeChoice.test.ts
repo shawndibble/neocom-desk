@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   appliedDpsAt,
+  chargeLabel,
+  chargeShortName,
   chargesUsedPerMinute,
   factionName,
   filterChoices,
@@ -280,5 +282,18 @@ describe('chargesUsedPerMinute', () => {
 
   it('is null without a rate of fire', () => {
     expect(chargesUsedPerMinute({ rateOfFireMs: 0, guns: 6, crystal: null })).toBeNull();
+  });
+});
+
+describe('chargeLabel / chargeShortName', () => {
+  it("drops the size, which is the weapon's and the same on every row", () => {
+    expect(chargeLabel('Antimatter Charge L')).toBe('Antimatter');
+    expect(chargeLabel('Multifrequency XL')).toBe('Multifrequency');
+    expect(chargeLabel('Scourge Heavy Missile')).toBe('Scourge Heavy Missile');
+  });
+
+  it('puts the faction ahead of a faction charge', () => {
+    expect(chargeShortName(cnAntimatter)).toBe('Caldari Navy Antimatter');
+    expect(chargeShortName(spike)).toBe('Spike');
   });
 });

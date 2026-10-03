@@ -534,7 +534,10 @@
       "loadButton": "Load",
       "loadedButton": "Loaded",
       "rowLabel": "{{name}}, {{dps}} dps, {{price}}",
-      "typeRowLabel": "{{name}}, {{dps}} dps, {{range}}"
+      "typeRowLabel": "{{name}}, {{dps}} dps, {{range}}",
+      "changeChargeGroup_one": "Change charge",
+      "changeChargeGroup_other": "Change charge (all {{count}})",
+      "ladderHint": "Long range ↓ more damage"
     },
     "popular": {
       "title": "Popular fits",

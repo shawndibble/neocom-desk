@@ -6,7 +6,14 @@
 import { createContext, useContext, useState, type DragEvent, type MouseEvent } from 'react';
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import type { ModuleAt } from '@/engine/fittings/fittingEdit';
-import type { FittingItemState, FittingModule, FittingSlotKind } from '@/engine/fittings/types';
+import type {
+  Fitting,
+  FittingItemState,
+  FittingModule,
+  FittingModuleResult,
+  FittingSlotKind,
+  PilotProfile,
+} from '@/engine/fittings/types';
 import {
   acceptsDrop,
   activeFittingDrag,
@@ -19,6 +26,15 @@ import {
   type FittingDropTarget,
 } from './fittingDrag';
 import type { ChargeLoading } from './useChargeLoading';
+import type { FittingCatalogue } from './useFittingCatalogue';
+
+export interface ChargePickerInput {
+  fitting: Fitting;
+  catalogue: FittingCatalogue;
+  engineReady: boolean;
+  profile: PilotProfile | null;
+  moduleResults: FittingModuleResult[] | null;
+}
 
 /** Everything the menus (and the drops they stand in for) do — the page's own edits. */
 export interface FittingItemActions {
@@ -31,6 +47,12 @@ export interface FittingItemActions {
   setGroupState: (at: readonly ModuleAt[], state: FittingItemState) => void;
   /** Every charge `module` takes, whether carried or not (alphabetical) — worked out on the engine, so ask only when a menu opens. */
   chargesFor: (module: FittingModule) => number[];
+  /**
+   * What "Change charge ▸"'s Charge Picker works its figures out from — read
+   * when the submenu opens, so a new Fitting doesn't rebuild every menu's
+   * actions. Absent (a surface without the editor) leaves the plain list.
+   */
+  chargePickerInput?: () => ChargePickerInput | null;
   /** A weapon group's charges out, in one edit. */
   unloadGroup: (at: readonly ModuleAt[]) => void;
   copyToAllOfType: (rack: FittingSlotKind, index: number) => void;
