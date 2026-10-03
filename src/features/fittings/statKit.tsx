@@ -19,6 +19,9 @@ export const STAT_EYEBROW = `${STAT_EYEBROW_TYPE} text-text-dim`;
  */
 export const STAT_FIELD_WIDTH = 'w-36';
 
+/** Implants & skills' two short-valued chips: 30% narrower than the rest. */
+export const STAT_FIELD_WIDTH_NARROW = 'w-25';
+
 /** The dim line under a row's name: its charge, range, cycle — or what it changes. */
 export const STAT_DETAIL = 'text-[0.6875rem] font-normal text-text-dim tabular-nums';
 

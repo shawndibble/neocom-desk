@@ -25,7 +25,7 @@ import { loadSkills } from '@/sde/loadSde';
 import type { SkillType } from '@/sde/types';
 import { useSkillOverrides } from './statsConditions';
 import { StatField } from './StatFacts';
-import { STAT_FIELD_WIDTH } from './statKit';
+import { STAT_FIELD_WIDTH_NARROW } from './statKit';
 
 const BASES: readonly SkillBase[] = ['character', 'all0', 'allV'];
 const LEVELS = [0, 1, 2, 3, 4, 5];
@@ -174,7 +174,7 @@ export function SkillOverridesControl() {
         value={skills.base}
         onValueChange={(base) => setSkills({ ...skills, base: base as SkillBase })}
       >
-        <SelectTrigger aria-label={label} size="sm" className={STAT_FIELD_WIDTH}>
+        <SelectTrigger aria-label={label} size="sm" className={STAT_FIELD_WIDTH_NARROW}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
