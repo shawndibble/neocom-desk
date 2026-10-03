@@ -49,11 +49,19 @@ beforeEach(async () => {
 });
 
 const RULES = { preference: 'shortest', securityPenalty: 50, avoid: [] } as const;
+const LIST_ON = { avoidList: [], avoidListEnabled: true };
 
 describe('previewAvoid', () => {
   it('routes with the candidate avoid list, giving the new jumps and lowest security', async () => {
     await expect(
-      previewAvoid({ fromId: START, toId: END, rules: RULES, systemId: MID, currentJumps: 2 })
+      previewAvoid({
+        fromId: START,
+        toId: END,
+        rules: RULES,
+        systemId: MID,
+        currentJumps: 2,
+        ...LIST_ON,
+      })
     ).resolves.toEqual({
       kind: 'preview',
       jumps: 3,
@@ -72,17 +80,26 @@ describe('previewAvoid', () => {
         rules: { ...RULES, avoid: [AYE] },
         systemId: MID,
         currentJumps: 2,
+        ...LIST_ON,
       })
     ).resolves.toMatchObject({ kind: 'preview', jumps: 2, jumpDelta: 0, stillCrosses: true });
   });
 
   it('says plainly when there is no way around the system', async () => {
     await expect(
-      previewAvoid({ fromId: START, toId: LONE, rules: RULES, systemId: MID, currentJumps: 2 })
+      previewAvoid({
+        fromId: START,
+        toId: LONE,
+        rules: RULES,
+        systemId: MID,
+        currentJumps: 2,
+        ...LIST_ON,
+      })
     ).resolves.toMatchObject({ kind: 'preview', jumps: 2, jumpDelta: 0, stillCrosses: true });
   });
 
   it('adds the stored list too when the Avoided Systems switch is off', async () => {
+    // Without Bee the route would detour through Aye and Bee (3 jumps); with it both ways cost an avoid.
     useAvoidedSystems.setState({ value: [BEE] });
     await expect(
       previewAvoid({
@@ -99,7 +116,14 @@ describe('previewAvoid', () => {
 
   it('saves nothing', async () => {
     useAvoidedSystems.setState({ value: [BEE] });
-    await previewAvoid({ fromId: START, toId: END, rules: RULES, systemId: MID, currentJumps: 2 });
+    await previewAvoid({
+      fromId: START,
+      toId: END,
+      rules: RULES,
+      systemId: MID,
+      currentJumps: 2,
+      ...LIST_ON,
+    });
 
     expect(useAvoidedSystems.getState().value).toEqual([BEE]);
     expect(await db.settings.count()).toBe(0);
@@ -108,7 +132,14 @@ describe('previewAvoid', () => {
   it('says it cannot tell when the stargate map is unreadable', async () => {
     loadSolarSystemJumps.mockRejectedValue(new Error('offline'));
     await expect(
-      previewAvoid({ fromId: START, toId: END, rules: RULES, systemId: MID, currentJumps: 2 })
+      previewAvoid({
+        fromId: START,
+        toId: END,
+        rules: RULES,
+        systemId: MID,
+        currentJumps: 2,
+        ...LIST_ON,
+      })
     ).resolves.toEqual({ kind: 'unknown' });
   });
 });

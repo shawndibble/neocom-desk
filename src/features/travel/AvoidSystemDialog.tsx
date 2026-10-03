@@ -29,7 +29,8 @@ function formatJumpDelta(delta: number): string {
 
 function PreviewText({ preview, name }: { preview: AvoidPreviewResult; name: string }) {
   const { t } = useTranslation();
-  if (preview.kind !== 'preview') return <p>{t('travel.avoid.unknown', { name })}</p>;
+  if (preview.kind === 'no-route') return <p>{t('travel.avoid.noRoute', { name })}</p>;
+  if (preview.kind === 'unknown') return <p>{t('travel.avoid.unknown', { name })}</p>;
   const delta = formatJumpDelta(preview.jumpDelta);
   return (
     <>

@@ -365,6 +365,17 @@ describe('Travel › Route Safety › Route rules', () => {
     expect(within(table).queryByRole('button', { name: 'Avoid Uedama' })).not.toBeInTheDocument();
   });
 
+  it('offers no Avoid for a system already on the Avoided Systems', async () => {
+    await db.settings.put({ key: AVOIDED_SYSTEMS_KEY, value: [PERIMETER] });
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    const table = await screen.findByRole('table', { name: 'Systems on the route' });
+    await within(table).findByText('Perimeter');
+    expect(
+      within(table).queryByRole('button', { name: 'Avoid Perimeter' })
+    ).not.toBeInTheDocument();
+  });
+
   it('previews the route before saving, and says plainly when there is no way around', async () => {
     const user = userEvent.setup();
     visit(`?from=${JITA}&to=${UEDAMA}`);

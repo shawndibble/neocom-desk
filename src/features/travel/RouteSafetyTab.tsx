@@ -54,6 +54,11 @@ const ROUTE_PARAMS = {
 
 const DASH = '—';
 
+/** A system the snapshot cannot name still needs one to act on. */
+function systemName(row: RouteSafetyRow): string {
+  return row.name ?? `#${row.systemId}`;
+}
+
 function count(value: number | null): string {
   return value === null ? DASH : value.toLocaleString();
 }
@@ -138,7 +143,7 @@ function useColumns(
       cardCorner: true,
       render: (row) => {
         const onAvoid = avoidAction(row);
-        const name = row.name ?? `#${row.systemId}`;
+        const name = systemName(row);
         return onAvoid === null ? null : (
           <Button size="sm" onClick={onAvoid} aria-label={t('travel.avoid.actionLabel', { name })}>
             {t('travel.avoid.action')}
@@ -208,7 +213,7 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
     row.systemId === params.to ||
     (avoidedEnabled && avoided.includes(row.systemId))
       ? null
-      : () => setAvoidTarget({ systemId: row.systemId, name: row.name ?? `#${row.systemId}` })
+      : () => setAvoidTarget({ systemId: row.systemId, name: systemName(row) })
   );
 
   const fromTrigger =

@@ -16,7 +16,11 @@ import { useTranslation } from 'react-i18next';
 import { CollapsiblePanel, SegmentedControl, Spinner, StatChip, StatChips } from '@/components/ui';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
-import { ROUTE_PREFERENCE_LABEL_KEYS, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
+import {
+  ROUTE_PREFERENCE_LABEL_KEYS,
+  ROUTE_PREFERENCE_SHORT_LABEL_KEYS,
+  ROUTE_PREFERENCES,
+} from '@/features/route/routePreferences';
 import {
   useAvoidedSystemsEnabled,
   useAvoidEdencom,
@@ -33,13 +37,6 @@ import {
   SecurityPenaltyNote,
 } from '@/features/route/TravelRuleFields';
 import { useIsPhone } from '@/lib/useIsPhone';
-
-/** Literal keys, so the locale split finds them. */
-const SEGMENT_LABEL_KEYS: Readonly<Record<RoutePreferenceKind, string>> = {
-  'prefer-highsec': 'travel.rules.preference.prefer-highsec',
-  shortest: 'travel.rules.preference.shortest',
-  'avoid-highsec': 'travel.rules.preference.avoid-highsec',
-};
 
 function GroupLabel({ children }: { children: string }) {
   return (
@@ -126,7 +123,7 @@ export function RouteRulesPanel({
               label={t('travel.rules.preferenceLabel')}
               options={ROUTE_PREFERENCES.map((value) => ({
                 value,
-                label: t(SEGMENT_LABEL_KEYS[value]),
+                label: t(ROUTE_PREFERENCE_SHORT_LABEL_KEYS[value]),
               }))}
               value={preference}
               onChange={onPreferenceChange}

@@ -28,17 +28,17 @@ export interface AvoidPreviewRequest {
   /** The page's route now, for the change. */
   currentJumps: number;
   /** The stored Avoided Systems; only read with the switch off. */
-  avoidList?: readonly number[];
+  avoidList: readonly number[];
   /** The Avoided Systems switch; off previews it turned on along with the add. */
-  avoidListEnabled?: boolean;
+  avoidListEnabled: boolean;
 }
 
 export async function previewAvoid(request: AvoidPreviewRequest): Promise<AvoidPreviewResult> {
   const avoid = candidateAvoid({
     effective: request.rules.avoid,
     systemId: request.systemId,
-    avoidList: request.avoidList ?? [],
-    avoidListEnabled: request.avoidListEnabled ?? true,
+    avoidList: request.avoidList,
+    avoidListEnabled: request.avoidListEnabled,
   });
   const [result, systems] = await Promise.all([
     findLocalRoute(request.fromId, request.toId, { ...request.rules, avoid }),

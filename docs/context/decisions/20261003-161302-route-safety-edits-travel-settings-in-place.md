@@ -30,8 +30,10 @@ _Recorded 2026-10-03 · issue #2472._
   `20260912-172628`). Avoidance is a cost, never a wall, so a trip only
   possible through the system still crosses it; the preview says "+0" and
   that there is no way around, rather than implying the avoid worked. The
-  route's two ends offer no Avoid, and neither does a system already on an
-  active list.
+  route's two ends offer no Avoid, and neither does a system already on the
+  Avoided Systems with the switch on (nothing to add). A system avoided only
+  by the EDENCOM, Triglavian or pod-kill rules still offers it: those rules
+  can be switched off, the list entry stays.
 
 - **With the Avoided Systems switch off, the preview counts it switched on.**
   Adding to a list the routes ignore changes nothing, so the dialog says the

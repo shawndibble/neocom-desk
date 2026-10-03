@@ -19,3 +19,10 @@ export const ROUTE_PREFERENCE_LABEL_KEYS: Readonly<Record<RoutePreferenceKind, s
   shortest: 'contractSearch.routePreference.shortest',
   'avoid-highsec': 'contractSearch.routePreference.avoid-highsec',
 };
+
+/** The same, shortened for a segmented control in a side column (Route Safety's Route rules). */
+export const ROUTE_PREFERENCE_SHORT_LABEL_KEYS: Readonly<Record<RoutePreferenceKind, string>> = {
+  'prefer-highsec': 'travel.rules.preference.prefer-highsec',
+  shortest: 'travel.rules.preference.shortest',
+  'avoid-highsec': 'travel.rules.preference.avoid-highsec',
+};

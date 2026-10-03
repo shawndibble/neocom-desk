@@ -7340,6 +7340,7 @@
       "switchedOff": "Avoided Systems is switched off, so routes don't use your list right now. This preview counts it switched on, with every system already on the list.",
       "appWide": "{{name}} goes on your Avoided Systems, one of your travel settings: jump counts change everywhere in the app, not only on this route.",
       "unknown": "The route with {{name}} avoided can't be worked out right now.",
+      "noRoute": "No stargate route connects these systems with {{name}} avoided.",
       "confirm": "Avoid {{name}}",
       "confirmSwitchOn": "Switch on and avoid",
       "addOnly": "Add to the list only"
