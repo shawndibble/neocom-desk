@@ -284,7 +284,7 @@ test.describe('BPC Sourcing — cheapest by region on a phone', () => {
     await seedBpcSnapshot(page, offers, regions);
     await page.goto(`./industry/sourcing?sourcing.type=${BLUEPRINT_TYPE_ID}`);
 
-    const row = page.getByText('Cheapest by region', { exact: true }).locator('..').locator('ul');
+    const row = page.getByRole('list', { name: 'Cheapest by region' });
     await expect(row).toContainText('Metropolis', COLD_LOAD);
 
     const { pageWidth, rowScrolls } = await row.evaluate((ul) => ({

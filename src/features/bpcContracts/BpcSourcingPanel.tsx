@@ -1828,7 +1828,10 @@ export function BpcSourcingPanel() {
                     (`IskAmount`'s `sr-only`). Without it that text escaped
                     the row's scroll clip and the whole page scrolled
                     sideways on a phone, not just this row. */}
-                  <ul className="relative flex gap-2 max-sm:-mx-3 max-sm:overflow-x-auto max-sm:px-3 sm:flex-wrap">
+                  <ul
+                    aria-label={t('bpcContracts.cheapestByRegion')}
+                    className="relative flex gap-2 max-sm:-mx-3 max-sm:overflow-x-auto max-sm:px-3 sm:flex-wrap"
+                  >
                     {regionPrices.slice(0, REGION_CELL_LIMIT).map((region, index) => (
                       <li
                         key={region.regionId}
