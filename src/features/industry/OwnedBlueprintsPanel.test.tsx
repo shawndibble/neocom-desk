@@ -171,11 +171,11 @@ describe('OwnedBlueprintsPanel', () => {
   it('starts a plan from a catalogued row only', async () => {
     const user = userEvent.setup();
     const onStartPlan = renderPanel();
-    const buttons = screen.getAllByRole('button', { name: 'Start a plan' });
+    const buttons = screen.getAllByRole('button', { name: 'Plan' });
     // Merlin isn't in the catalog, so it has nothing to plan.
     expect(buttons).toHaveLength(2);
     const rifterRow = screen.getByText('Rifter Blueprint').closest('tr')!;
-    await user.click(within(rifterRow).getByRole('button', { name: 'Start a plan' }));
+    await user.click(within(rifterRow).getByRole('button', { name: 'Plan' }));
     expect(onStartPlan).toHaveBeenCalledWith(RIFTER);
   });
 

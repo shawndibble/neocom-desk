@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui';
+import { STAT_CHIP_TONE_TEXT_CLASS } from '@/components/ui/statChipTone';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
@@ -451,11 +452,11 @@ export function OpportunitiesPanel({
       sortValue: SORT_VALUE.orderDepth,
       render: (row) => (
         <span className="flex items-center gap-1">
-          <StatChip
-            label={t('industry.opportunitiesOrderDepthLabel')}
-            value={t(`industry.opportunitiesOrderDepth.${row.orderDepth}`)}
-            tone={ORDER_DEPTH_TONE[row.orderDepth]}
-          />
+          <span
+            className={`font-medium ${STAT_CHIP_TONE_TEXT_CLASS[ORDER_DEPTH_TONE[row.orderDepth]]}`}
+          >
+            {t(`industry.opportunitiesOrderDepth.${row.orderDepth}`)}
+          </span>
           {row.result.profit !== null && row.result.profit < 0 && (
             <InfoTooltip
               label={t('industry.opportunitiesLossBreakdownFor', {

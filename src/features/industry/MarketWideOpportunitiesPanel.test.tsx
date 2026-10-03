@@ -123,7 +123,7 @@ describe('MarketWideOpportunitiesPanel row context menu', () => {
     fireEvent.click(await screen.findByText('Add to Quickbar'));
 
     expect(actions.addToQuickbar).toHaveBeenCalledWith(200, 'Widget Beta');
-    expect(screen.getAllByRole('button', { name: 'Start a plan' })[0]).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Plan' })[0]).toBeInTheDocument();
   });
 
   it('shows no blueprint for a product the catalog has no entry for', async () => {
