@@ -4,6 +4,7 @@ import {
   cheapestFixes,
   goalById,
   goalGain,
+  displayValue,
   groupImplantFamilies,
   headroom,
   keepMoreHeadroom,
@@ -11,6 +12,7 @@ import {
   parseImplantGrade,
   pickSource,
   withImplant,
+  withImplants,
 } from './implantFinder';
 import type { FittingStats } from './types';
 
@@ -252,5 +254,32 @@ describe('headroom', () => {
   it('is what is left of a budget, negative when over', () => {
     expect(headroom({ used: 418.4, total: 400 })).toBeCloseTo(-18.4);
     expect(headroom({ used: 380, total: 400 })).toBe(20);
+  });
+});
+
+describe('displayValue', () => {
+  it('shows each goal in the page’s unit — recharge in seconds, lock range in km', () => {
+    const s = stats({
+      capacitorRechargeTime: 312_500,
+      targeting: {
+        maxTargetRange: 72_000,
+        maxLockedTargets: 5,
+        scanResolution: 300,
+        signatureRadius: 0,
+      },
+    });
+    expect(displayValue(goalById('capacitorRecharge'), s)).toBe(312.5);
+    expect(displayValue(goalById('lockRange'), s)).toBe(72);
+  });
+});
+
+describe('withImplants', () => {
+  it('adds several implants, each replacing its own slot', () => {
+    const slots = new Map([
+      [10, 6],
+      [30, 6],
+      [40, 10],
+    ]);
+    expect(withImplants([10], (id) => slots.get(id), [30, 40])).toEqual([30, 40]);
   });
 });

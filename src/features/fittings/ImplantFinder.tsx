@@ -5,15 +5,16 @@
  * powergrid, the cheapest ways back under budget come first.
  */
 import { useMemo, useState, type ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Button, SearchInput, Spinner, TypeIcon } from '@/components/ui';
+import { Trans, useTranslation } from 'react-i18next';
+import { Button, IskAmount, SearchInput, Spinner, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { formatIskCompact } from '@/lib/isk';
 import {
+  displayValue,
+  goalById,
   headroom,
   shortfall,
-  withImplant,
+  withImplants,
   type ImplantGoal,
   type ImplantGoalId,
 } from '@/engine/fittings/implantFinder';
@@ -27,32 +28,13 @@ import type {
 import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub } from '@/market/hubs';
 import { PriceHubSelect } from './PriceHubSelect';
+import { STAT_EYEBROW_TYPE } from './statKit';
 import {
   useImplantFinder,
   type FamilyResult,
   type FixResult,
   type GradeResult,
 } from './useImplantFinder';
-
-/** How a goal's figure is shown: decimals, and a divisor into the page's unit (lock range m → km). */
-const GOAL_DISPLAY: Record<ImplantGoalId, { decimals: number; divisor?: number }> = {
-  cpu: { decimals: 1 },
-  powergrid: { decimals: 1 },
-  capacitorCapacity: { decimals: 0 },
-  capacitorRecharge: { decimals: 1 },
-  damage: { decimals: 1 },
-  ehp: { decimals: 0 },
-  repair: { decimals: 1 },
-  speed: { decimals: 0 },
-  agility: { decimals: 3 },
-  lockRange: { decimals: 1, divisor: 1000 },
-  scanResolution: { decimals: 0 },
-};
-
-function displayValue(goal: ImplantGoal, stats: FittingStats): number {
-  const value = goal.kind === 'budget' ? goal.read(stats).used : goal.read(stats);
-  return value / (GOAL_DISPLAY[goal.id].divisor ?? 1);
-}
 
 function fmt(value: number, decimals: number): string {
   return value.toLocaleString(undefined, {
@@ -63,14 +45,7 @@ function fmt(value: number, decimals: number): string {
 
 function SectionHeading({ children, warning }: { children: ReactNode; warning?: boolean }) {
   return (
-    <p
-      className={cx(
-        'text-[0.6875rem] font-semibold tracking-widest uppercase',
-        warning ? 'text-warning' : 'text-text-dim'
-      )}
-    >
-      {children}
-    </p>
+    <p className={cx(STAT_EYEBROW_TYPE, warning ? 'text-warning' : 'text-text-dim')}>{children}</p>
   );
 }
 
@@ -125,25 +100,20 @@ export function ImplantFinder({
     onChange({ ...(implantSet ?? { boosters: [] }), implants: [...next] });
   }
   function addAll(typeIds: readonly number[]) {
-    if (!catalog) return;
-    let next: readonly number[] = implantSet?.implants ?? [];
-    for (const id of typeIds) next = withImplant(next, catalog.slotOf, id);
-    setImplants(next);
+    if (catalog) setImplants(withImplants(implantSet?.implants ?? [], catalog.slotOf, typeIds));
   }
   function remove(typeId: number) {
     setImplants((implantSet?.implants ?? []).filter((id) => id !== typeId));
   }
 
   const q = query.trim().toLowerCase();
-  const visibleGoals = finder.goals.filter(
-    ({ goal }) => !q || label(goal.id).toLowerCase().includes(q)
-  );
+  const visibleGoals = finder.goals.filter((g) => !q || label(g.id).toLowerCase().includes(q));
   /** How far over budget a goal is; 0 for one that fits or isn't a budget. */
   const overBy = (g: ImplantGoal) =>
     baseline && g.kind === 'budget' ? shortfall(g.read(baseline)) : 0;
-  const problems = visibleGoals.filter(({ goal }) => overBy(goal) > 0);
-  const others = visibleGoals.filter(({ goal }) => overBy(goal) === 0);
-  const goal = finder.goals.find((g) => g.goal.id === goalId)?.goal ?? null;
+  const problems = visibleGoals.filter((g) => overBy(g) > 0);
+  const others = visibleGoals.filter((g) => overBy(g) === 0);
+  const goal = goalId ? goalById(goalId) : null;
 
   if (finder.status === 'error') {
     return <p className="p-3 text-sm text-danger">{t('fittings.implantFinder.error')}</p>;
@@ -208,11 +178,11 @@ export function ImplantFinder({
             <div className="space-y-1">
               <SectionHeading warning>{t('fittings.implantFinder.fixHeading')}</SectionHeading>
               <ul className="space-y-0.5">
-                {problems.map(({ goal: g }) =>
+                {problems.map((g) =>
                   goalButton(
                     g.id,
                     t('fittings.implantFinder.over', {
-                      value: fmt(overBy(g), GOAL_DISPLAY[g.id].decimals),
+                      value: fmt(overBy(g), g.display.decimals),
                       unit: unit(g.id),
                     })
                   )
@@ -223,7 +193,7 @@ export function ImplantFinder({
           {others.length > 0 && (
             <div className="space-y-1">
               <SectionHeading>{t('fittings.implantFinder.improveHeading')}</SectionHeading>
-              <ul className="space-y-0.5">{others.map(({ goal: g }) => goalButton(g.id))}</ul>
+              <ul className="space-y-0.5">{others.map((g) => goalButton(g.id))}</ul>
             </div>
           )}
           {visibleGoals.length === 0 && (
@@ -293,7 +263,7 @@ function GoalResults({
   onRemove,
 }: GoalResultsProps) {
   const { t } = useTranslation();
-  const { decimals } = GOAL_DISPLAY[goal.id];
+  const { decimals } = goal.display;
   const hubName = (id: string) => getTradeHub(id)?.systemName ?? id;
   const n = (value: number) => fmt(value, decimals);
 
@@ -325,8 +295,6 @@ function GoalResults({
   const budget = goal.kind === 'budget' ? goal.read(baseline) : null;
   const over = budget ? shortfall(budget) : 0;
   const firstFix = fixes[0];
-  const fixHeadroom = (fix: FixResult) =>
-    goal.kind === 'budget' ? headroom(goal.read(fix.stats)) : 0;
 
   return (
     <>
@@ -357,7 +325,7 @@ function GoalResults({
         </p>
       </div>
 
-      {fixes.length > 0 && firstFix && (
+      {firstFix && (
         <div className="space-y-1.5">
           <SectionHeading>{t('fittings.implantFinder.fixesHeading')}</SectionHeading>
           <ul className="space-y-1.5">
@@ -378,18 +346,23 @@ function GoalResults({
                       <SuccessBadge>{t('fittings.implantFinder.cheapest')}</SuccessBadge>
                     ) : (
                       <span className="text-xs text-text-dim">
-                        {t('fittings.implantFinder.moreHeadroom', {
-                          cost: formatIskCompact(fix.cost - firstFix.cost),
-                          value: n(fixHeadroom(fix) - fixHeadroom(firstFix)),
-                          unit,
-                        })}
+                        <Trans
+                          i18nKey="fittings.implantFinder.moreHeadroom"
+                          values={{ value: n(fix.headroom - firstFix.headroom), unit }}
+                          components={{
+                            cost: <IskAmount value={fix.cost - firstFix.cost} revealOn="tap" />,
+                          }}
+                        />
                       </span>
                     )}
                   </p>
                   <p className="text-xs text-success tabular-nums">{effect(fix.stats).text}</p>
                 </div>
                 <span className="font-semibold whitespace-nowrap tabular-nums">
-                  {t('fittings.implantFinder.isk', { value: formatIskCompact(fix.cost) })}
+                  <Trans
+                    i18nKey="fittings.implantFinder.isk"
+                    components={{ value: <IskAmount value={fix.cost} revealOn="tap" /> }}
+                  />
                 </span>
                 <Button variant="primary" disabled={busy} onClick={() => onAdd(fix.typeIds)}>
                   {fix.typeIds.length > 1
@@ -516,18 +489,20 @@ function GradeRow({
           !source ? 'text-text-dim' : source.atSelectedHub ? 'text-text' : 'text-warning'
         )}
       >
-        {!source
-          ? t('fittings.implantFinder.noSource')
-          : t(
+        {!source ? (
+          t('fittings.implantFinder.noSource')
+        ) : (
+          <Trans
+            i18nKey={
               source.atSelectedHub
                 ? 'fittings.implantFinder.sourceHub'
-                : 'fittings.implantFinder.sourceOther',
-              {
-                hub: hubName(source.hubId),
-                price: formatIskCompact(source.price),
-                count: source.volume,
-              }
-            )}
+                : 'fittings.implantFinder.sourceOther'
+            }
+            count={source.volume}
+            values={{ hub: hubName(source.hubId) }}
+            components={{ price: <IskAmount value={source.price} revealOn="tap" decimals={0} /> }}
+          />
+        )}
         {replacesName && !row.inSet && (
           <span className="block text-text-dim">
             {t('fittings.implantFinder.replaces', { name: replacesName })}

@@ -124,6 +124,15 @@ export function withImplant(
   return [...implants.filter((id) => slot === undefined || slotOf(id) !== slot), typeId];
 }
 
+/** `implants` with each of `typeIds` added in turn, one per slot. */
+export function withImplants(
+  implants: readonly number[],
+  slotOf: (typeId: number) => number | undefined,
+  typeIds: readonly number[]
+): number[] {
+  return typeIds.reduce<number[]>((set, id) => withImplant(set, slotOf, id), [...implants]);
+}
+
 export type ImplantGoalId =
   | 'cpu'
   | 'powergrid'
@@ -142,27 +151,72 @@ export interface Budget {
   total: number;
 }
 
-export type ImplantGoal =
-  | { id: ImplantGoalId; kind: 'budget'; read: (stats: FittingStats) => Budget }
-  | { id: ImplantGoalId; kind: 'more' | 'less'; read: (stats: FittingStats) => number };
+/** How a goal's figure is shown: decimals, and a divisor into the page's unit (ms → s, m → km). */
+export interface GoalDisplay {
+  decimals: number;
+  divisor?: number;
+}
+
+export type ImplantGoal = { id: ImplantGoalId; display: GoalDisplay } & (
+  | { kind: 'budget'; read: (stats: FittingStats) => Budget }
+  | { kind: 'more' | 'less'; read: (stats: FittingStats) => number }
+);
 
 export const IMPLANT_GOALS: readonly ImplantGoal[] = [
-  { id: 'cpu', kind: 'budget', read: (s) => ({ used: s.cpuUsed, total: s.cpuTotal }) },
+  {
+    id: 'cpu',
+    kind: 'budget',
+    display: { decimals: 1 },
+    read: (s) => ({ used: s.cpuUsed, total: s.cpuTotal }),
+  },
   {
     id: 'powergrid',
     kind: 'budget',
+    display: { decimals: 1 },
     read: (s) => ({ used: s.powergridUsed, total: s.powergridTotal }),
   },
-  { id: 'capacitorCapacity', kind: 'more', read: (s) => s.capacitorCapacity },
-  { id: 'capacitorRecharge', kind: 'less', read: (s) => s.capacitorRechargeTime },
-  { id: 'damage', kind: 'more', read: (s) => s.offense.dps },
-  { id: 'ehp', kind: 'more', read: (s) => s.ehp },
-  { id: 'repair', kind: 'more', read: (s) => s.tank?.burstEffective ?? 0 },
-  { id: 'speed', kind: 'more', read: (s) => s.navigation.maxVelocity },
-  { id: 'agility', kind: 'less', read: (s) => s.navigation.agility },
-  { id: 'lockRange', kind: 'more', read: (s) => s.targeting.maxTargetRange },
-  { id: 'scanResolution', kind: 'more', read: (s) => s.targeting.scanResolution },
+  {
+    id: 'capacitorCapacity',
+    kind: 'more',
+    display: { decimals: 0 },
+    read: (s) => s.capacitorCapacity,
+  },
+  // The engine's recharge time is in milliseconds; the page shows seconds.
+  {
+    id: 'capacitorRecharge',
+    kind: 'less',
+    display: { decimals: 1, divisor: 1000 },
+    read: (s) => s.capacitorRechargeTime,
+  },
+  { id: 'damage', kind: 'more', display: { decimals: 1 }, read: (s) => s.offense.dps },
+  { id: 'ehp', kind: 'more', display: { decimals: 0 }, read: (s) => s.ehp },
+  {
+    id: 'repair',
+    kind: 'more',
+    display: { decimals: 1 },
+    read: (s) => s.tank?.burstEffective ?? 0,
+  },
+  { id: 'speed', kind: 'more', display: { decimals: 0 }, read: (s) => s.navigation.maxVelocity },
+  { id: 'agility', kind: 'less', display: { decimals: 3 }, read: (s) => s.navigation.agility },
+  {
+    id: 'lockRange',
+    kind: 'more',
+    display: { decimals: 1, divisor: 1000 },
+    read: (s) => s.targeting.maxTargetRange,
+  },
+  {
+    id: 'scanResolution',
+    kind: 'more',
+    display: { decimals: 0 },
+    read: (s) => s.targeting.scanResolution,
+  },
 ];
+
+/** A goal's figure in the unit the page shows it in. */
+export function displayValue(goal: ImplantGoal, stats: FittingStats): number {
+  const value = goal.kind === 'budget' ? goal.read(stats).used : goal.read(stats);
+  return value / (goal.display.divisor ?? 1);
+}
 
 export function goalById(id: ImplantGoalId): ImplantGoal {
   const goal = IMPLANT_GOALS.find((g) => g.id === id);
@@ -189,8 +243,7 @@ export function goalGain(goal: ImplantGoal, before: FittingStats, after: Fitting
   if (goal.kind === 'budget') {
     const b = goal.read(before);
     const a = goal.read(after);
-    if (b.total <= 0) return 0;
-    return (headroom(a) - headroom(b)) / b.total;
+    return b.total > 0 ? (headroom(a) - headroom(b)) / b.total : 0;
   }
   const b = goal.read(before);
   const a = goal.read(after);

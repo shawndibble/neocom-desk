@@ -131,7 +131,8 @@ describe('ImplantFinder', () => {
     const firstFix = within(fixes.parentElement!).getAllByRole('listitem')[0]!;
     expect(firstFix).toHaveTextContent('EE-603');
     expect(firstFix).toHaveTextContent('WU-1003');
-    expect(firstFix).toHaveTextContent('18M ISK');
+    expect(firstFix).toHaveTextContent('18M');
+    expect(firstFix).toHaveTextContent('18,000,000.00 ISK');
 
     const ee605 = screen.getByRole('button', { name: /^Add .*EE-605$/ });
     expect(ee605.closest('li')).toHaveTextContent('Fits · 1.6 tf spare');
