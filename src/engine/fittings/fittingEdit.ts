@@ -658,6 +658,14 @@ export function addCargo(fitting: Fitting, typeId: number, quantity: number): Fi
   return setCargoQuantity(fitting, typeId, held + whole);
 }
 
+/** Takes `quantity` of a type out of the cargo (a module fitted from it), down to none. */
+export function takeCargo(fitting: Fitting, typeId: number, quantity: number): Fitting {
+  const held = cargoQuantity(fitting.cargo, typeId);
+  const taken = Math.min(wholeCount(quantity), held);
+  if (taken === 0) return fitting;
+  return setCargoQuantity(fitting, typeId, held - taken);
+}
+
 /** m3 the cargo takes, every stack of it. */
 export function cargoVolumeUsed(
   fitting: Pick<Fitting, 'cargo'>,

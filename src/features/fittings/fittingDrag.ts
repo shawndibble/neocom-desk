@@ -23,7 +23,13 @@ import {
 } from '@/engine/fittings/types';
 
 export type FittingDragPayload =
-  | { kind: 'type'; typeId: number; rack: CandidateRack }
+  | {
+      kind: 'type';
+      typeId: number;
+      rack: CandidateRack;
+      /** A module out of the Fitting's own cargo: fitting it takes one off the stack. */
+      fromCargo?: boolean;
+    }
   | { kind: 'slot'; rack: FittingSlotKind; index: number }
   | {
       kind: 'charge';
@@ -84,8 +90,8 @@ export function acceptsDrop(
 ): boolean {
   if (payload === null) return false;
   if (target.kind === 'cargo') {
-    // A charge already in the hold dropped back would only inflate its stack.
-    const fromPanel = payload.kind === 'type' || (payload.kind === 'charge' && !payload.fromCargo);
+    // An item already in the hold dropped back would only inflate its stack.
+    const fromPanel = (payload.kind === 'type' || payload.kind === 'charge') && !payload.fromCargo;
     return fromPanel && !!handlers.addCargo;
   }
   switch (payload.kind) {

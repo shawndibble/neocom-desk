@@ -1348,6 +1348,7 @@
       "dragToMove": "Drag {{name}} to another slot",
       "dragToLaunch": "Drag {{name}} onto Drones to launch it",
       "dragToLoad": "Drag {{name}} onto a module that takes it",
+      "dragToFit": "Drag {{name}} onto a slot to fit it",
       "loaded_one": "Loaded {{name}} into {{count}} module.",
       "loaded_other": "Loaded {{name}} into {{count}} modules.",
       "loadRanOut_one": "Loaded {{name}} into {{loaded}} of {{count}} module — cargo ran out.",

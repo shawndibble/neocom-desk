@@ -72,6 +72,9 @@ describe('acceptsDrop', () => {
     expect(acceptsDrop({ ...charge, fromCargo: false }, cargo, all)).toBe(true);
     // Already in the hold: dropping it back would only inflate the stack.
     expect(acceptsDrop({ ...charge, fromCargo: true }, cargo, all)).toBe(false);
+    expect(
+      acceptsDrop({ kind: 'type', typeId: 1, rack: 'high', fromCargo: true }, cargo, all)
+    ).toBe(false);
     expect(acceptsDrop({ kind: 'slot', rack: 'high', index: 0 }, cargo, all)).toBe(false);
     expect(acceptsDrop({ kind: 'drone', typeId: 2488 }, cargo, all)).toBe(false);
     expect(

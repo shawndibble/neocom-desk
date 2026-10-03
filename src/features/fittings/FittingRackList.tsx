@@ -53,7 +53,11 @@ import {
   FittingItemMenu,
   ModuleMenuItems,
 } from './FittingItemMenu';
-import { useFittingDropTarget, useFittingItemActions } from './fittingItemActions';
+import {
+  cargoDragPayload,
+  useFittingDropTarget,
+  useFittingItemActions,
+} from './fittingItemActions';
 import type { AddTarget } from './addTarget';
 import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
@@ -908,15 +912,18 @@ export function CargoSection({
             menu={actions && { name, items: <CargoMenuItems typeId={item.typeId} /> }}
             grip={
               draggable && actions
-                ? {
-                    payload: {
-                      kind: 'charge',
-                      typeId: item.typeId,
-                      fromCargo: true,
-                      targets: actions.charges.targetsFor(item.typeId),
-                    },
-                    label: t('fittings.item.dragToLoad', { name }),
-                  }
+                ? (() => {
+                    const payload = cargoDragPayload(actions, item.typeId);
+                    return {
+                      payload,
+                      label: t(
+                        payload.kind === 'type'
+                          ? 'fittings.item.dragToFit'
+                          : 'fittings.item.dragToLoad',
+                        { name }
+                      ),
+                    };
+                  })()
                 : undefined
             }
             identity={

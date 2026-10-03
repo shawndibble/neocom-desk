@@ -588,6 +588,29 @@ describe('FittingRing with the editor’s item actions', () => {
     expect(actions.drop).toHaveBeenCalledWith(payload, { kind: 'cargo' }, undefined);
   });
 
+  it('drags a module out of the cargo as a module, which a slot hands to the page', () => {
+    const actions = fakeItemActions({ names, racks: { 12: 'high' } });
+    const onDropType = vi.fn();
+    renderRing(actions, {
+      onDropType,
+      fitting: { ...fitting, cargo: [{ typeId: 12, quantity: 1 }] },
+    });
+    const tile = screen.getByLabelText(/^#12 ×1|×1/);
+    const setData = vi.fn();
+    fireEvent.dragStart(tile, { dataTransfer: { setData, effectAllowed: 'all' } });
+    const payload = useFittingDrag.getState().payload;
+    expect(payload).toEqual({ kind: 'type', typeId: 12, rack: 'high', fromCargo: true });
+
+    // Onto a high slot: through the page's drop, which takes it off the stack.
+    fireEvent.drop(screen.getByLabelText('High slots 2, empty'), dropWith(payload!));
+    expect(onDropType).not.toHaveBeenCalled();
+    expect(actions.drop).toHaveBeenCalledWith(
+      payload,
+      { kind: 'slot', rack: 'high', index: 1, filled: false },
+      undefined
+    );
+  });
+
   it('opens a cargo tile’s actions on a click, and loads it into every module that takes it', async () => {
     const actions = fakeItemActions({ names, takes: { 21: ['high-0'] } });
     renderRing(actions, { fitting: { ...fitting, cargo: [{ typeId: 21, quantity: 200 }] } });

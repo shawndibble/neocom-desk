@@ -65,6 +65,7 @@ import {
   ModuleMenuItems,
 } from './FittingItemMenu';
 import {
+  cargoDragPayload,
   deleteKeyHandler,
   openItemMenu,
   useFittingDropTarget,
@@ -600,12 +601,14 @@ function SlotTile({
     setOver(false);
     if (payload === null || !slotAccepts(payload, slot, handlers, actions)) return;
     event.preventDefault();
-    if (payload.kind === 'type') onDropType?.(slot.rack, slot.index, payload.typeId);
+    // A module out of the cargo goes through the page, which takes it off the stack.
+    if (payload.kind === 'type' && !payload.fromCargo)
+      onDropType?.(slot.rack, slot.index, payload.typeId);
     else if (payload.kind === 'slot') onMoveModule?.(slot.rack, payload.index, slot.index);
     else
       actions?.drop(
         payload,
-        { kind: 'slot', rack: slot.rack, index: slot.index, filled: true },
+        { kind: 'slot', rack: slot.rack, index: slot.index, filled: module !== undefined },
         event.altKey
       );
     endFittingDrag();
@@ -747,13 +750,7 @@ function CargoTile({ typeId, count, tooltip }: { typeId: number; count: number; 
       draggable={draggable}
       onDragStart={
         draggable && actions
-          ? (event) =>
-              startFittingDrag(event, {
-                kind: 'charge',
-                typeId,
-                fromCargo: true,
-                targets: actions.charges.targetsFor(typeId),
-              })
+          ? (event) => startFittingDrag(event, cargoDragPayload(actions, typeId))
           : undefined
       }
       onDragEnd={draggable ? endFittingDrag : undefined}

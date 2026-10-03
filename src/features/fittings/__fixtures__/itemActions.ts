@@ -4,6 +4,7 @@
  * one behaviour it is about.
  */
 import { vi } from 'vitest';
+import type { CandidateRack } from '@/engine/fittings/candidates';
 import type { FittingItemActions } from '../fittingItemActions';
 import type { ChargeLoading } from '../useChargeLoading';
 
@@ -12,12 +13,15 @@ export function fakeItemActions(
     names = {},
     takes = {},
     cargoCharges = [],
+    racks = {},
   }: {
     names?: Record<number, string>;
     /** Charge type id -> the `moduleKey`s of the modules that take it. */
     takes?: Record<number, string[]>;
     /** What a module's "Load charge ▸" lists. */
     cargoCharges?: number[];
+    /** Type id -> the rack it fits; anything absent is no module. */
+    racks?: Record<number, CandidateRack>;
   } = {},
   overrides: Partial<FittingItemActions> = {}
 ): FittingItemActions {
@@ -31,6 +35,7 @@ export function fakeItemActions(
   };
   return {
     typeName: (typeId) => names[typeId] ?? `#${typeId}`,
+    rackOf: (typeId) => racks[typeId] ?? null,
     charges,
     setState: vi.fn(),
     unloadCharge: vi.fn(),

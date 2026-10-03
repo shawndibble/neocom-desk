@@ -39,6 +39,8 @@ export interface ChargePickerInput {
 /** Everything the menus (and the drops they stand in for) do — the page's own edits. */
 export interface FittingItemActions {
   typeName: (typeId: number) => string;
+  /** The rack a module fits (or `drone`); null for anything else, a charge included. */
+  rackOf: (typeId: number) => CandidateRack | null;
   charges: ChargeLoading;
 
   setState: (rack: FittingSlotKind, index: number, state: FittingItemState) => void;
@@ -181,6 +183,17 @@ export function useFittingDropTarget(
           },
         };
   return { props, over, accepts: takes(drag), lights };
+}
+
+/**
+ * What dragging a cargo item carries: a module drags as an Add panel one
+ * does (fitting it takes one off the stack), anything else as a charge onto
+ * the modules that take it.
+ */
+export function cargoDragPayload(actions: FittingItemActions, typeId: number): FittingDragPayload {
+  const rack = actions.rackOf(typeId);
+  if (rack !== null && rack !== 'drone') return { kind: 'type', typeId, rack, fromCargo: true };
+  return { kind: 'charge', typeId, fromCargo: true, targets: actions.charges.targetsFor(typeId) };
 }
 
 /** The Del key's edit on a focused module (the item menu's Remove), else nothing. */

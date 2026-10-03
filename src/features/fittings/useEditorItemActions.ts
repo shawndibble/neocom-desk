@@ -36,6 +36,7 @@ import {
   setModuleState,
   setModulesState,
   swapModuleType,
+  takeCargo,
   unloadCharges,
   type DroneBay,
   type DroneLaunchLimits,
@@ -78,8 +79,16 @@ interface EditorItemActionsInput {
 export interface EditorItemActions {
   /** Null with no Fitting open. */
   itemActions: FittingItemActions | null;
-  /** A module into `slotIndex`, or its rack's first free slot with `'firstFree'`; charged as the Add panel's are. */
-  fitAt: (rack: FittingSlotKind, slotIndex: number | 'firstFree', typeId: number) => void;
+  /**
+   * A module into `slotIndex`, or its rack's first free slot with `'firstFree'`;
+   * charged as the Add panel's are. `fromCargo` takes it off the cargo's stack.
+   */
+  fitAt: (
+    rack: FittingSlotKind,
+    slotIndex: number | 'firstFree',
+    typeId: number,
+    fromCargo?: boolean
+  ) => void;
   /** Whether an Add panel item has anywhere to go: the chosen slot, a free one in its rack, room in the bay. */
   canPlace: (rack: CandidateRack, typeId: number) => boolean;
   /** Null before the ship data, so nothing is capped yet. */
@@ -162,7 +171,7 @@ export function useEditorItemActions({
   );
 
   const fitAt = useCallback(
-    (rack: FittingSlotKind, slotIndex: number | 'firstFree', typeId: number) => {
+    (rack: FittingSlotKind, slotIndex: number | 'firstFree', typeId: number, fromCargo = false) => {
       const count = slotCounts?.[rack];
       edit((f) => {
         const index =
@@ -173,7 +182,10 @@ export function useEditorItemActions({
             : slotIndex;
         if (index === null) return f;
         noteRecent(rack, typeId);
-        return addModule(f, rack, index, typeId, () => defaultCharges(f.shipTypeId, rack, typeId));
+        const next = addModule(f, rack, index, typeId, () =>
+          defaultCharges(f.shipTypeId, rack, typeId)
+        );
+        return fromCargo ? takeCargo(next, typeId, 1) : next;
       });
     },
     [edit, slotCounts, noteRecent, defaultCharges]
@@ -201,7 +213,8 @@ export function useEditorItemActions({
     (payload: FittingDragPayload, onto: FittingDropTarget, alt: boolean) => {
       if (onto.kind === 'ring') {
         const placed = fitting === null ? null : ringDropFor(payload, fitting.modules, slotCounts);
-        if (placed?.kind === 'fit') fitAt(placed.rack, placed.index, placed.typeId);
+        const fromCargo = payload.kind === 'type' && !!payload.fromCargo;
+        if (placed?.kind === 'fit') fitAt(placed.rack, placed.index, placed.typeId, fromCargo);
         else if (placed?.kind === 'load')
           charges.load(placed.typeId, { fromCargo: placed.fromCargo, only: placed.only });
         return;
@@ -234,10 +247,10 @@ export function useEditorItemActions({
         });
         return;
       }
-      const { rack, typeId } = payload;
+      const { rack, typeId, fromCargo } = payload;
       if (onto.kind === 'drones' || rack !== onto.rack) return;
       // A rack heading takes it into the rack's first free slot.
-      fitAt(rack, onto.kind === 'slot' ? onto.index : 'firstFree', typeId);
+      fitAt(rack, onto.kind === 'slot' ? onto.index : 'firstFree', typeId, fromCargo);
     },
     [charges, edit, droneBay, launchLimits, fitAt, fitting, slotCounts, openCargoQuantity]
   );
@@ -278,6 +291,7 @@ export function useEditorItemActions({
         ? null
         : {
             typeName: (typeId) => catalogueTypeName(catalogue, typeId),
+            rackOf: (typeId) => catalogue?.rackOf[typeId] ?? null,
             charges,
             setState: (rack, index, state) => edit((f) => setModuleState(f, rack, index, state)),
             unloadCharge: (rack, index) => edit((f) => setModuleCharge(f, rack, index, null)),
