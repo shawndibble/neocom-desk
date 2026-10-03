@@ -1403,7 +1403,7 @@
       "loading": "Trying implants on this fit: {{done}} of {{total}}…",
       "loadingGrades": "Working out every grade…",
       "error": "Couldn’t work out what implants would do to this fit.",
-      "cloneBasisNote": "Starting from your clone’s implants. Change one and the page switches to this plan.",
+      "cloneBasisNote": "The page uses your clone’s implants until you change something here — then it switches to this plan.",
       "back": "All goals",
       "over": "{{value}} {{unit}} over",
       "stillOver": "Still {{value}} {{unit}} over",
