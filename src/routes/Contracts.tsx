@@ -67,7 +67,6 @@ import { formatCountdown } from '@/lib/duration';
 import { useTicker } from '@/lib/ticker';
 import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { contractsCsvColumns } from '@/features/character/contractsCsv';
@@ -329,15 +328,6 @@ export function Contracts() {
    */
   const [searchStatus, setSearchStatus] = useState<ContractSearchStatus | null>(null);
 
-  /**
-   * Phone only: where the Search panel portals its Items/Courier switch, so
-   * it shares the tab row rather than taking a panel header strip of its own
-   * under it. State (a callback ref), not a ref object, so the panel
-   * re-renders with the element once it exists.
-   */
-  const isPhone = useIsPhone();
-  const [modeSwitchSlot, setModeSwitchSlot] = useState<HTMLElement | null>(null);
-
   const rememberedMode = useContractSearchMode((state) => state.value);
   const rememberedModeHydrated = useContractSearchMode((state) => state.hydrated);
   const hydrateRememberedMode = useContractSearchMode((state) => state.hydrate);
@@ -346,10 +336,11 @@ export function Contracts() {
     void hydrateRememberedMode();
   }, [hydrateRememberedMode]);
   /**
-   * A bare `/contracts` visit lands on the last-used Search mode (issue
-   * #1719), while a link naming a tab — even `search/items` itself — keeps
-   * it. The route/tab itself stays unpersisted (decision `20260912-141100`);
-   * only the mode is remembered, and only `setMode` stores it.
+   * A bare `/contracts` visit lands on whichever of Item search and Courier
+   * was last used (issue #1719), while a link naming a tab — even
+   * `search/items` itself — keeps it. The route/tab itself stays unpersisted
+   * (decision `20260912-141100`); only the mode is remembered, and only
+   * picking one of those two tabs stores it.
    */
   const rememberedTab = useMemo(
     () => ({
@@ -359,30 +350,30 @@ export function Contracts() {
     [rememberedMode, rememberedModeHydrated]
   );
   /**
-   * The page's own tab id is a full path suffix (`search/items`,
-   * `search/courier`, `history`) rather than one segment, since Search has
-   * its own Items/Courier sub-tab — see `CONTRACTS_TABS`. `tab` and `mode`
-   * are both read out of it; switching *to* Search from History restores
-   * whichever mode was last active rather than always landing on Items.
+   * The page's tab id is a full path suffix (`search/items`, `search/courier`,
+   * `history`) — see `CONTRACTS_TABS`. Item search and Courier are one
+   * public-contracts panel showing either corpus, so `tab` folds them together
+   * for what the page header and body draw, and `mode` says which corpus.
    */
   const [tabId, setTabId] = useRememberedPageTab(CONTRACTS_TABS, rememberedTab);
   const tab: 'search' | 'history' = tabId === 'history' ? 'history' : 'search';
   const mode: ContractMode = tabId === 'search/courier' ? 'courier' : 'items';
-  const setTab = useCallback(
-    (next: 'search' | 'history') => setTabId(next === 'history' ? 'history' : `search/${mode}`),
-    [setTabId, mode]
-  );
-  const setMode = useCallback(
-    (next: ContractMode) => {
-      setTabId(`search/${next}`);
-      void setRememberedMode(next);
+  const selectTab = useCallback(
+    (next: string) => {
+      if (next === 'search/items' || next === 'search/courier') {
+        setTabId(next);
+        void setRememberedMode(next === 'search/courier' ? 'courier' : 'items');
+      } else {
+        setTabId('history');
+      }
     },
     [setTabId, setRememberedMode]
   );
   const pageTabs = useMemo(
     () => [
-      { id: 'search' as const, label: t('contracts.searchTab') },
-      { id: 'history' as const, label: t('contracts.historyTab') },
+      { id: 'search/items', label: t('contracts.itemSearchTab') },
+      { id: 'search/courier', label: t('contracts.courierTab') },
+      { id: 'history', label: t('contracts.historyTab') },
     ],
     [t]
   );
@@ -566,39 +557,13 @@ export function Contracts() {
         }
       />
 
-      {/* On a phone the Search tab's corpus switch sits at the right of this
-          row, portalled in by the panel. The wrapper exists only then, so the
-          desktop markup is the bare tab bar it always was. */}
-      {isPhone && tab === 'search' ? (
-        <div className="flex items-center gap-2">
-          <Tabs
-            tabs={pageTabs}
-            value={tab}
-            onChange={(id) => setTab(id as 'search' | 'history')}
-            label={t('contracts.tabsLabel')}
-            className="min-w-0 flex-1"
-          />
-          <div ref={setModeSwitchSlot} className="shrink-0" />
-        </div>
-      ) : (
-        <Tabs
-          tabs={pageTabs}
-          value={tab}
-          onChange={(id) => setTab(id as 'search' | 'history')}
-          label={t('contracts.tabsLabel')}
-        />
-      )}
+      <Tabs tabs={pageTabs} value={tabId} onChange={selectTab} label={t('contracts.tabsLabel')} />
 
       {/* Switched outside the history chain below, not inside it: Search needs
           neither this character's contracts nor its `contracts` scope, so a
           character with an empty history or a 403 must still reach it. */}
       {tab === 'search' ? (
-        <ContractSearchPanel
-          mode={mode}
-          onModeChange={setMode}
-          onStatusChange={setSearchStatus}
-          modeSwitchSlot={modeSwitchSlot}
-        />
+        <ContractSearchPanel mode={mode} onStatusChange={setSearchStatus} />
       ) : loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />

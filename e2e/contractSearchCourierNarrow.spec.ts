@@ -248,9 +248,9 @@ test.describe('courier board — 390px width', () => {
     await signInAndGoto(page);
     await seedCourierSnapshot(page, courierSnapshotRows());
 
-    // Search is the tab this page opens on, so it needs no `?tab=`.
+    // Item search is the tab this page opens on; Courier is one tab over.
     await page.goto('./contracts');
-    await page.getByRole('button', { name: 'Courier' }).click();
+    await page.getByRole('main').getByRole('tab', { name: 'Courier' }).click();
 
     const table = page.getByRole('table', { name: 'Courier Contract Search' });
     // The collapsed lane must still carry its bait haul's warning — a folded
@@ -344,7 +344,7 @@ test.describe('courier board — 390px width', () => {
     await seedCourierSnapshot(page, courierSnapshotRowsWithReverseLane());
 
     await page.goto('./contracts');
-    await page.getByRole('button', { name: 'Courier' }).click();
+    await page.getByRole('main').getByRole('tab', { name: 'Courier' }).click();
 
     const table = page.getByRole('table', { name: 'Courier Contract Search' });
     // The haul is folded behind its lane's header until that is opened; the
@@ -376,7 +376,7 @@ test.describe('courier board — 390px width', () => {
     await seedCourierSnapshot(page, courierSnapshotRows());
 
     await page.goto('./contracts');
-    await page.getByRole('button', { name: 'Courier' }).click();
+    await page.getByRole('main').getByRole('tab', { name: 'Courier' }).click();
     await page.getByRole('button', { name: /^Filters/ }).click();
 
     await page.getByRole('textbox', { name: 'Min reward' }).fill('1b');

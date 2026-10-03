@@ -17,7 +17,6 @@ import {
 import { formatTimestamp } from '@/lib/timestamp';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
-import { PHONE_QUERY } from '@/lib/useIsPhone';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -658,16 +657,19 @@ describe('Contracts row context menu (issue #676)', () => {
 describe('Contracts tab strip (issue #908)', () => {
   const SEARCH_UNAVAILABLE = "Contract search isn't available";
 
-  it('lands on Search Items with no tab in the URL', async () => {
+  it('lands on Item search with no tab in the URL', async () => {
     window.history.pushState({}, '', '/contracts');
     render(<App />);
     expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Search' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Item search' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
     expect(screen.queryByRole('table', { name: 'Contracts' })).not.toBeInTheDocument();
     expect(window.location.pathname).toBe('/contracts/search/items');
   });
 
-  it('remembers the last-used Courier mode across a fresh visit (issue #1719)', async () => {
+  it('remembers the last-used Courier tab across a fresh visit (issue #1719)', async () => {
     useContractSearchMode.setState({ value: 'courier', hydrated: true });
     window.history.pushState({}, '', '/contracts');
     render(<App />);
@@ -675,7 +677,7 @@ describe('Contracts tab strip (issue #908)', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/contracts/search/courier'));
   });
 
-  it('never overrides an explicit deep link to Search Items with a remembered Courier mode', async () => {
+  it('never overrides an explicit deep link to Item search with a remembered Courier tab', async () => {
     // `tabId` reads identically for this and a bare `/contracts` visit
     // (issue #1719) — only `TabRoute`'s own `tabRouteDefaulted` marker tells
     // them apart, and a URL that already names a real tab never gets one.
@@ -698,14 +700,14 @@ describe('Contracts tab strip (issue #908)', () => {
     expect(window.location.pathname).toBe('/contracts/history');
   });
 
-  it('opens History from a deep link, and returns to Search Items on the way back', async () => {
+  it('opens History from a deep link, and returns to Item search on the way back', async () => {
     const user = userEvent.setup();
     render(<App />);
 
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
 
-    await user.click(screen.getByRole('tab', { name: 'Search' }));
+    await user.click(screen.getByRole('tab', { name: 'Item search' }));
 
     expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
     expect(window.location.pathname).toBe('/contracts/search/items');
@@ -716,11 +718,14 @@ describe('Contracts tab strip (issue #908)', () => {
     render(<App />);
 
     expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Search' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Item search' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
     expect(window.location.pathname).toBe('/contracts/search/items');
   });
 
-  it('reaches Search even when this character has no contracts of its own', async () => {
+  it('reaches Item search even when this character has no contracts of its own', async () => {
     // The empty-history state used to be the whole page; the Search tab reads
     // a public snapshot and must not be gated behind it.
     server.use(
@@ -732,13 +737,13 @@ describe('Contracts tab strip (issue #908)', () => {
     render(<App />);
     expect(await screen.findByText(/^no contracts$/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: 'Search' }));
+    await user.click(screen.getByRole('tab', { name: 'Item search' }));
 
     expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
     expect(screen.queryByText(/^no contracts$/i)).not.toBeInTheDocument();
   });
 
-  it('reaches Search even when the contracts scope was revoked', async () => {
+  it('reaches Item search even when the contracts scope was revoked', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () =>
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })
@@ -748,7 +753,7 @@ describe('Contracts tab strip (issue #908)', () => {
     render(<App />);
     expect(await screen.findByText('Log in again to see your contracts')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: 'Search' }));
+    await user.click(screen.getByRole('tab', { name: 'Item search' }));
 
     expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your contracts')).not.toBeInTheDocument();
@@ -800,62 +805,26 @@ describe('Contracts Search tab page header', () => {
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
   });
 
-  it('puts the Items/Courier switch in the results panel header the badge vacated', async () => {
+  it('picks Item search, Courier and History from one tab row, with no switch in the panel', async () => {
+    const user = userEvent.setup();
     window.history.pushState({}, '', '/contracts/search/items');
     render(<App />);
 
-    const modes = await screen.findByRole('group', { name: 'Contract kind' });
-    expect(within(modes).getByRole('button', { name: 'Items' })).toBeInTheDocument();
-    expect(within(modes).getByRole('button', { name: 'Courier' })).toBeInTheDocument();
-    // Desktop keeps it in the panel's own header strip — Panel is the only
-    // `<section>` on the page.
-    expect(modes.closest('section')).not.toBeNull();
-  });
+    const tabs = await screen.findByRole('tablist', { name: 'Contracts sections' });
+    expect(
+      within(tabs)
+        .getAllByRole('tab')
+        .map((tab) => tab.textContent)
+    ).toEqual(['Item search', 'Courier', 'History']);
+    expect(screen.queryByRole('group', { name: 'Contract kind' })).not.toBeInTheDocument();
 
-  describe('on a phone', () => {
-    let restore: () => void;
-    beforeEach(() => {
-      const real = window.matchMedia;
-      window.matchMedia = ((media: string) =>
-        ({
-          media,
-          matches: media === PHONE_QUERY,
-          onchange: null,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-          addListener: () => {},
-          removeListener: () => {},
-          dispatchEvent: () => false,
-        }) as unknown as MediaQueryList) as typeof window.matchMedia;
-      restore = () => {
-        window.matchMedia = real;
-      };
-    });
-    afterEach(() => restore());
+    await user.click(within(tabs).getByRole('tab', { name: 'Courier' }));
 
-    it('moves the Items/Courier switch up into the tab row, out of the panel', async () => {
-      const user = userEvent.setup();
-      window.history.pushState({}, '', '/contracts/search/items');
-      render(<App />);
-
-      const modes = await screen.findByRole('group', { name: 'Contract kind' });
-      await waitFor(() => expect(modes.closest('section')).toBeNull());
-      // The tablist's scroller sits in the same row wrapper as the switch.
-      const tabRow = screen.getByRole('tablist', { name: 'Contracts sections' }).parentElement
-        ?.parentElement;
-      expect(tabRow).toContainElement(modes);
-      // One switch, not a portalled copy beside a hidden header one.
-      expect(screen.getAllByRole('button', { name: 'Courier' })).toHaveLength(1);
-
-      await user.click(within(modes).getByRole('button', { name: 'Courier' }));
-      expect(within(modes).getByRole('button', { name: 'Courier' })).toHaveAttribute(
-        'aria-pressed',
-        'true'
-      );
-      expect(within(modes).getByRole('button', { name: 'Items' })).toHaveAttribute(
-        'aria-pressed',
-        'false'
-      );
-    });
+    expect(within(tabs).getByRole('tab', { name: 'Courier' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(window.location.pathname).toBe('/contracts/search/courier');
+    expect(useContractSearchMode.getState().value).toBe('courier');
   });
 });

@@ -94,16 +94,17 @@ export const WALLET_TABS = definePageTabs('/wallet', [
 ]);
 
 /**
- * Search has its own Items/Courier sub-tab, so each leaf's id is the full
+ * Item search and Courier keep their `search/…` ids from when they were one
+ * Search tab's sub-modes, so links copied then still open; each id is the full
  * path suffix below `/contracts` rather than one segment (see `lib/pageTabs.ts`).
  * `/contracts/search` alone names no tab and redirects like any unknown
- * segment, landing on Items.
+ * segment, landing on Item search.
  */
 export const CONTRACTS_TABS = definePageTabs(
   '/contracts',
   [
-    { id: 'search/items', labelKey: 'contractSearch.mode.items' },
-    { id: 'search/courier', labelKey: 'contractSearch.mode.courier' },
+    { id: 'search/items', labelKey: 'contracts.itemSearchTab' },
+    { id: 'search/courier', labelKey: 'contracts.courierTab' },
     { id: 'history', labelKey: 'contracts.historyTab' },
   ],
   'search/items'
