@@ -91,6 +91,8 @@ function evaluator(sources: number[] = [10, 20, 30, 40]): SkillGainEvaluator {
             ? { ...baseStats, offense: { ...baseStats.offense, dps: 120 } }
             : baseStats,
     })),
+    fitting: { name: 'Fit', shipTypeId: 1, modules: [], drones: [], cargo: [] } as never,
+    compareTrained: vi.fn(async () => ({ before: baseStats, after: baseStats })),
   };
 }
 

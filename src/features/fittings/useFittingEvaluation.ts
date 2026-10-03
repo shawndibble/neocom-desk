@@ -51,6 +51,8 @@ import type { AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { loadFittingPrice } from './fittingPrice';
 import { NO_SKILL_OVERRIDES, withSkillLevel } from '@/engine/fittings/skillOverrides';
 import { allVSkillLevels } from '@/engine/fittings/pilotProfile';
+import { raisedSkillLevels } from '@/engine/fittings/moduleUpgrades';
+import type { PlanEntry } from '@/engine/types';
 import { loadSkills } from '@/sde/loadSde';
 
 /**
@@ -82,6 +84,16 @@ export interface SkillGainEvaluator {
   compare: (
     skillTypeId: number,
     level: number
+  ) => Promise<{ before: FittingStats; after: FittingStats }>;
+  /** The open Fitting — what a module upgrade swaps modules on. */
+  fitting: Fitting;
+  /**
+   * `variant`'s stats once `trained` is — each skill at least its level, none
+   * lowered — beside the open Fitting's own, both without overheat.
+   */
+  compareTrained: (
+    variant: Fitting,
+    trained: readonly PlanEntry[]
   ) => Promise<{ before: FittingStats; after: FittingStats }>;
 }
 
@@ -222,6 +234,24 @@ function skillGainEvaluator(
         basis.damageProfile,
         statsOptions(basis.conditions)
       );
+    },
+    fitting,
+    async compareTrained(variant, trained) {
+      const raised = raisedSkillLevels(basis.pilot.skillLevels, trained);
+      const skills = trained.reduce(
+        (overrides, { skillTypeID }) =>
+          withSkillLevel(overrides, skillTypeID, raised.get(skillTypeID) ?? 0),
+        basis.conditions.skills ?? NO_SKILL_OVERRIDES
+      );
+      const [before, after] = await Promise.all([
+        baseline(),
+        statsUnder(
+          variant,
+          { ...basis, conditions: { ...basis.conditions, skills } },
+          { overheated: false }
+        ),
+      ]);
+      return { before, after };
     },
     async compare(skillTypeId, level) {
       const skills = withSkillLevel(
