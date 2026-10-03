@@ -12,6 +12,8 @@ import { useNow } from '@/lib/useNow';
 import { loadFittingFromText } from './loadFittingFromText';
 import { usePopularFits } from './popularFits';
 import { useWorkbenchFits, workbenchFitUrl, type WorkbenchFit } from './workbenchFits';
+import { useWorkbenchSightings } from './workbenchSightings';
+import { WorkbenchSightingBadge } from './WorkbenchSightingBadge';
 
 interface PopularFitsPanelProps {
   shipTypeId: number;
@@ -186,6 +188,7 @@ function ZkillboardFits({
 function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: PopularFitsPanelProps) {
   const { t } = useTranslation();
   const result = useWorkbenchFits(shipTypeId);
+  const sightings = useWorkbenchSightings(shipTypeId, result?.ok ? result.fits : null);
   const now = useNow();
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [failedId, setFailedId] = useState<string | null>(null);
@@ -248,6 +251,7 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
                     age: formatAge(Math.max(0, now - fit.dateAdded), t),
                   })}
                 </p>
+                <WorkbenchSightingBadge sighting={sightings.get(fit.id)} />
                 {failedId === fit.id && (
                   <p role="alert" className="text-xs text-danger">
                     {t('fittings.popular.workbench.loadFailed')}

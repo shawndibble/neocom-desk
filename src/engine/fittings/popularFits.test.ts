@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EftSlotLookup } from './eftLoader';
 import type { KillmailVictim } from './linkLoader';
-import { groupPopularFits, popularFitLoad, type HullLoss } from './popularFits';
+import { groupPopularFits, popularFitKey, popularFitLoad, type HullLoss } from './popularFits';
 
 const SLOTS: EftSlotLookup = {
   100: 'high',
@@ -134,5 +134,19 @@ describe('groupPopularFits', () => {
       ])
     );
     expect(loaded.fitting.modules).toHaveLength(5);
+  });
+});
+
+describe('popularFitKey', () => {
+  it('is the fitted modules as a sorted multiset of typeIds', () => {
+    expect(popularFitKey([{ typeId: 300 }, { typeId: 100 }, { typeId: 300 }])).toBe('100,300,300');
+    expect(popularFitKey([{ typeId: 100 }, { typeId: 300 }])).not.toBe(
+      popularFitKey([{ typeId: 100 }, { typeId: 300 }, { typeId: 300 }])
+    );
+  });
+
+  it('is the key groupPopularFits gives a group', () => {
+    const [fit] = groupPopularFits([loss(1, FIT_A)], SLOTS);
+    expect(fit.key).toBe(popularFitKey(fit.parts.modules));
   });
 });

@@ -615,6 +615,8 @@
       "sourceLabel": "Popular fits source",
       "tabZkillboard": "zKillboard",
       "tabWorkbench": "EVE Workbench",
+      "seenOnZkillboard_one": "Seen on zKillboard: {{count}} recent loss",
+      "seenOnZkillboard_other": "Seen on zKillboard: {{count}} recent losses",
       "workbench": {
         "attribution": "Community fits published on EVE Workbench:",
         "loading": "Loading fits from EVE Workbench…",

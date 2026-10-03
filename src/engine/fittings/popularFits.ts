@@ -48,6 +48,18 @@ function byRecency(a: HullLoss, b: HullLoss): number {
   return timeMs(b) - timeMs(a) || b.killmailId - a.killmailId;
 }
 
+/**
+ * A Popular fit's identity: its fitted modules' typeIds as a sorted multiset.
+ * Charges, drones, cargo and slot order never reach it. The one definition of
+ * "the same fit" — the Workbench "Seen on zKillboard" match uses it too.
+ */
+export function popularFitKey(modules: readonly { typeId: number }[]): string {
+  return modules
+    .map((module) => module.typeId)
+    .sort((a, b) => a - b)
+    .join(',');
+}
+
 /** Groups a hull's losses into distinct fits, most flown first, ties to the most recent. */
 export function groupPopularFits(
   losses: readonly HullLoss[],
@@ -57,10 +69,7 @@ export function groupPopularFits(
   for (const loss of [...losses].sort(byRecency)) {
     const parts = killmailVictimToLoadResult(loss.victim, slotByTypeId);
     if (parts.hullTypeId === null || parts.modules.length < MIN_FITTED_MODULES) continue;
-    const key = parts.modules
-      .map((module) => module.typeId)
-      .sort((a, b) => a - b)
-      .join(',');
+    const key = popularFitKey(parts.modules);
     const group = groups.get(key);
     if (group) group.losses.push(loss);
     else groups.set(key, { losses: [loss], parts: { ...parts, cargo: [] } });
