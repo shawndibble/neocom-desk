@@ -38,7 +38,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsNarrow } from '@/lib/useIsNarrow';
-import { useIsNarrowerThan } from '@/lib/useIsNarrowerThan';
+import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { multibuyText, planTrip, type TripOverride } from '@/engine/market/haulingPlan';
 import type { DemandKind, HaulingFlag } from '@/engine/market/haulingMarket';
@@ -241,7 +241,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   // A narrow desktop table goes compact too: below 56rem its full figures
   // (`12,080,000.00`) left the Item column no room and scrolled the page
   // sideways. The same width drops the margin's "ISK each" (the CSS below).
-  const [tableRef, tableNarrow] = useIsNarrowerThan<HTMLDivElement>(56);
+  const [tableRef, tableNarrow] = useElementNarrowerThan<HTMLDivElement>(56);
   const isk = (value: number, digits: number) =>
     isPhone || tableNarrow ? formatIskCompact(value) : formatIsk(value, digits);
 

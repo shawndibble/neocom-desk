@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useIsNarrowerThan } from './useIsNarrowerThan';
+import { useElementNarrowerThan } from './useElementNarrowerThan';
 
 type Callback = (entries: { contentRect: { width: number } }[]) => void;
 
@@ -23,10 +23,10 @@ function stubResizeObserver() {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('useIsNarrowerThan', () => {
+describe('useElementNarrowerThan', () => {
   it('follows the element across the threshold, in rem at the root font size', () => {
     const resize = stubResizeObserver();
-    const { result } = renderHook(() => useIsNarrowerThan<HTMLDivElement>(56));
+    const { result } = renderHook(() => useElementNarrowerThan<HTMLDivElement>(56));
     act(() => result.current[0](document.createElement('div')));
 
     resize(895);
@@ -37,7 +37,7 @@ describe('useIsNarrowerThan', () => {
 
   it('reads as wide with no element yet', () => {
     stubResizeObserver();
-    const { result } = renderHook(() => useIsNarrowerThan<HTMLDivElement>(56));
+    const { result } = renderHook(() => useElementNarrowerThan<HTMLDivElement>(56));
     expect(result.current[1]).toBe(false);
   });
 });

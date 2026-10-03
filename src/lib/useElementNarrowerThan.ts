@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
  * shown once its data loads). Without `ResizeObserver` (jsdom) it reads as
  * not narrower: the wide layout the tests query.
  */
-export function useIsNarrowerThan<T extends HTMLElement>(
+export function useElementNarrowerThan<T extends HTMLElement>(
   rem: number
 ): [ref: (element: T | null) => void, narrower: boolean] {
   const [element, setElement] = useState<T | null>(null);
@@ -24,5 +24,7 @@ export function useIsNarrowerThan<T extends HTMLElement>(
     observer.observe(element);
     return () => observer.disconnect();
   }, [element, rem]);
-  return [setElement, narrower];
+  // No element reads as wide, so a table that remounts starts wide rather
+  // than with the width its last mount ended on.
+  return [setElement, element !== null && narrower];
 }
