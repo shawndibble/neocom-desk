@@ -14,8 +14,10 @@ import {
   ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
+  DataTableDenseCell,
   EmptyState,
   FilterBar,
+  FilterChip,
   CheckboxSelect,
   FilterField,
   IconButton,
@@ -29,6 +31,7 @@ import {
   StatChips,
   TextInput,
   sortRows,
+  textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -127,6 +130,15 @@ import type { CachedResult } from '@/esi/cache';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
+import {
+  bpcActiveFilterChips,
+  bpcActiveFilterCount,
+  type BpcFilterChip,
+  type BpcFilterState,
+  type BpcSourcingFilter,
+} from './bpcActiveFilters';
+import { SecurityStatus } from '@/components/SecurityStatus';
+import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto, parseIskAmount } from '@/lib/isk';
@@ -222,16 +234,7 @@ async function loadBpcContractsSnapshot(
   };
 }
 
-interface UiFilter {
-  typeQuery: string;
-  regionId: number | null;
-  minMe: string;
-  minTe: string;
-  minRuns: string;
-  maxPrice: string;
-  hideAuctions: boolean;
-  hidePlex: boolean;
-}
+type UiFilter = BpcSourcingFilter;
 
 const TYPE_SEARCH_LIMIT = 50;
 
@@ -302,13 +305,6 @@ function hubStationIn(regionId: number | null): number {
 
 const OFFERS_DEFAULT_SORT = { columnId: 'price', direction: 'asc' } as const;
 
-function isDefaultSources(sources: ReadonlySet<SourceToggle>): boolean {
-  return (
-    sources.size === DEFAULT_SOURCE_TOGGLES.length &&
-    DEFAULT_SOURCE_TOGGLES.every((s) => sources.has(s))
-  );
-}
-
 const SOURCE_LABEL_KEYS: Record<SourceToggle, string> = {
   contract: 'bpcContracts.sourceContracts',
   contractBpo: 'bpcContracts.sourceContractBpos',
@@ -353,19 +349,7 @@ function BpcFilterBar({
   actions,
 }: BpcFilterBarProps) {
   const { t } = useTranslation();
-  const activeCount = [
-    filter.typeQuery,
-    filter.regionId !== null,
-    filter.minMe,
-    filter.minTe,
-    filter.minRuns,
-    filter.maxPrice,
-    filter.hideAuctions,
-    filter.hidePlex,
-    !isDefaultSources(sources),
-    spaceKinds.length !== SPACE_KINDS.length,
-    jumps !== DEFAULT_JUMP_RANGE,
-  ].filter(Boolean).length;
+  const activeCount = bpcActiveFilterCount({ filter, sources, spaceKinds, jumps });
 
   const compositeValue = { ...filter, sources, spaceKinds, jumps };
 
@@ -621,6 +605,8 @@ export function BpcSourcingPanel() {
   const jumps = params['sourcing.jumps'];
   const currentSystem = useCurrentSystem();
   const jumpFilter = useJumpRangeFilter(currentSystem, jumps);
+  // Names each row's system on the phone card (the Location cell).
+  const solarSystems = useSolarSystemIndex();
   const bpcRowJumps = useCallback(
     (row: BpcSearchRow): JumpsCellValue => {
       if (row.systemId === null) return { kind: 'value', count: null };
@@ -846,6 +832,48 @@ export function BpcSourcingPanel() {
   }
 
   /** Includes the Dexie-backed space filter — unlike the sourcing.* params here, nothing else resets it. */
+  const filterState: BpcFilterState = {
+    filter: uiFilter,
+    sources,
+    spaceKinds: spaceFilter,
+    jumps,
+  };
+  const activeChips = bpcActiveFilterChips(filterState);
+
+  /** Writes a whole filter state back: the URL group, then the Space preference. */
+  function applyFilterState(next: BpcFilterState) {
+    changeFilter(next.filter);
+    if (next.sources !== sources || next.jumps !== jumps) {
+      setParams({ 'sourcing.src': next.sources, 'sourcing.jumps': next.jumps });
+    }
+    if (next.spaceKinds !== spaceFilter) void setSpaceFilter(next.spaceKinds);
+  }
+
+  function filterChipLabel(chip: BpcFilterChip): string {
+    switch (chip.id) {
+      case 'region':
+        return regionNames.get(chip.value) ?? `#${chip.value}`;
+      case 'jumps':
+        return t(`jumpRange.option.${chip.value}`);
+      case 'minMe':
+      case 'minTe':
+      case 'minRuns':
+      case 'maxPrice':
+        return t(`bpcContracts.chips.${chip.id}`, { value: chip.value });
+      case 'hideAuctions':
+      case 'hidePlex':
+        return t(`bpcContracts.chips.${chip.id}`);
+      case 'sources':
+        return t('bpcContracts.chips.sources', {
+          list: chip.value.map((source) => t(SOURCE_LABEL_KEYS[source])).join(', '),
+        });
+      case 'space':
+        return t('bpcContracts.chips.space', {
+          list: chip.value.map((kind) => t(`common.spaceOption.${kind}`)).join(', '),
+        });
+    }
+  }
+
   function resetSourcingFilters() {
     changeFilter({
       typeQuery: '',
@@ -1140,11 +1168,25 @@ export function BpcSourcingPanel() {
         sortValue: (row) => row.locationName ?? '',
         render: (row) => {
           const name = row.locationName ?? t('bpcContracts.notApplicable');
+          // The phone card's meta line has room for "Jita 0.9", not a
+          // fifty-character station name; the table keeps the station.
+          const system = row.systemId == null ? undefined : solarSystems?.get(row.systemId);
+          const place = (
+            <>
+              <span className={cx(system && 'max-sm:hidden')}>{name}</span>
+              {system && (
+                <span className="sm:hidden">
+                  {system.name} <SecurityStatus security={system.security} />
+                </span>
+              )}
+            </>
+          );
           // The owner's #1240 rule for market BPOs: the whole region, the hub's own station marked.
-          if (row.source !== 'market' || !row.atHub) return name;
+          if (row.source !== 'market' || !row.atHub)
+            return <DataTableDenseCell>{place}</DataTableDenseCell>;
           return (
             <span className="inline-flex flex-wrap items-center gap-x-1.5">
-              <span>{name}</span>
+              {place}
               <span className="text-[0.625rem] tracking-widest text-accent uppercase">
                 {t('bpcContracts.atTradeHub')}
               </span>
@@ -1167,6 +1209,9 @@ export function BpcSourcingPanel() {
           const cell = bpcRowJumps(row);
           return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;
         },
+        // The dense phone card has no header row, and a bare "7" beside a
+        // system name says nothing about what it counts.
+        stackAffix: { before: t('bpcContracts.mobile.jumpsAffix') },
         render: (row) => renderJumpsCell(bpcRowJumps(row), t, 'bpcContracts.jumpsUnavailableHint'),
       },
       me: {
@@ -1175,7 +1220,10 @@ export function BpcSourcingPanel() {
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => row.me,
-        render: (row) => row.me,
+        stackAffix: { before: t('bpcContracts.mobile.meAffix') },
+        // Full text, not the meta line's dim: on the phone card the copy's
+        // quality is what a buyer reads after its price.
+        render: (row) => <span className="max-sm:text-text">{row.me}</span>,
       },
       te: {
         id: 'te',
@@ -1183,7 +1231,8 @@ export function BpcSourcingPanel() {
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => row.te,
-        render: (row) => row.te,
+        stackAffix: { before: t('bpcContracts.mobile.teAffix') },
+        render: (row) => <span className="max-sm:text-text">{row.te}</span>,
       },
       runs: {
         id: 'runs',
@@ -1191,8 +1240,13 @@ export function BpcSourcingPanel() {
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => row.runs,
+        stackAffix: { after: t('bpcContracts.mobile.runsAffix') },
         // A BPO's -1 renders as ∞, not a nonsensical negative count.
-        render: (row) => (row.runs === -1 ? t('bpcContracts.unlimitedRuns') : row.runs),
+        render: (row) => (
+          <span className="max-sm:text-text">
+            {row.runs === -1 ? t('bpcContracts.unlimitedRuns') : row.runs}
+          </span>
+        ),
       },
       qty: {
         id: 'qty',
@@ -1200,12 +1254,15 @@ export function BpcSourcingPanel() {
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => row.quantity,
+        stackAffix: { before: t('bpcContracts.mobile.qtyAffix') },
         render: (row) => row.quantity,
       },
       price: {
         id: 'price',
         header: t('bpcContracts.priceColumn'),
         align: 'right',
+        // The headline figure of the dense phone card, on the title line.
+        cardCorner: true,
         className: 'tabular-nums whitespace-nowrap',
         // `effectivePrice`, not the `buyout ?? price` this used to inline: EVE
         // Ref's CSV carries a buyout on non-auction contracts too whenever the
@@ -1273,7 +1330,9 @@ export function BpcSourcingPanel() {
           // both sides of a bundle.
           if (!contract.isMultiType) return amount;
           return (
-            <span className="flex flex-col items-start sm:items-end">
+            // Right-hugging at every width: on the phone card the price is
+            // the title line's right-hand figure, not a labelled field.
+            <span className="flex flex-col items-end">
               <span>{amount}</span>
               <span className="text-[0.625rem] text-text-dim">
                 {t('bpcContracts.wholeContractMarker')}
@@ -1302,16 +1361,17 @@ export function BpcSourcingPanel() {
             ) ?? undefined
           );
         },
+        stackAffix: { after: t('bpcContracts.mobile.perRunAffix') },
         render: (row) => {
           const contract = asContract(row);
-          if (!contract) return t('bpcContracts.notApplicable');
+          if (!contract) return <DenseOmit>{t('bpcContracts.notApplicable')}</DenseOmit>;
           const rate = iskPerRun(
             effectivePrice(contract),
             contract.runs,
             contract.quantity,
             contract.isMultiType
           );
-          if (rate === null) return t('bpcContracts.notApplicable');
+          if (rate === null) return <DenseOmit>{t('bpcContracts.notApplicable')}</DenseOmit>;
           return formatIskAuto(rate, CONTRACT_ISK_CENTS_BELOW);
         },
       },
@@ -1347,15 +1407,18 @@ export function BpcSourcingPanel() {
         // Infinity sorts an owned row last, same as price, rather than epoch 0
         // reading as "expires soonest."
         sortValue: (row) => asContract(row)?.dateExpired ?? Infinity,
+        stackAffix: { before: t('bpcContracts.mobile.expiresAffix') },
         render: (row) => {
           const contract = asContract(row);
-          return contract
-            ? formatTimestamp(new Date(contract.dateExpired), timeZone)
-            : t('bpcContracts.notApplicable');
+          return contract ? (
+            formatTimestamp(new Date(contract.dateExpired), timeZone)
+          ) : (
+            <DenseOmit>{t('bpcContracts.notApplicable')}</DenseOmit>
+          );
         },
       },
     }),
-    [t, regionNames, timeZone, bpcRowJumps]
+    [t, regionNames, timeZone, bpcRowJumps, solarSystems]
   );
 
   const itemSortValue = useCallback(
@@ -1409,7 +1472,9 @@ export function BpcSourcingPanel() {
           const owned = row.source === 'owned';
           if (!bpo && !owned) return name;
           return (
-            <span className="flex min-w-0 flex-col items-start gap-1">
+            // One wrapping line on the phone card, so a tag sits beside the
+            // name rather than pushing the title line into three.
+            <span className="flex min-w-0 flex-wrap items-center gap-1.5 sm:flex-col sm:flex-nowrap sm:items-start sm:gap-1">
               <span>{name}</span>
               {owned && (
                 <span className="inline-flex w-fit items-center rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-normal text-text-dim">
@@ -1555,6 +1620,33 @@ export function BpcSourcingPanel() {
               />
             }
           />
+          {activeChips.length > 0 && (
+            // Phone only: from `md` up every filter sits inline in the bar
+            // above, so it already shows what it is set to. Below it they
+            // hide in the funnel's sheet, where a count badge was the only
+            // sign any was on.
+            <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2 md:hidden">
+              {activeChips.map((chip) => (
+                <FilterChip
+                  key={chip.id}
+                  label={filterChipLabel(chip)}
+                  selected
+                  onToggle={() => applyFilterState(chip.clear(filterState))}
+                />
+              ))}
+              <button
+                type="button"
+                className={textActionClassName()}
+                onClick={() =>
+                  applyFilterState(
+                    activeChips.reduce((state, chip) => chip.clear(state), filterState)
+                  )
+                }
+              >
+                {t('bpcContracts.chips.clearAll')}
+              </button>
+            </div>
+          )}
           {/* Outside the bar: collapsed, its controls unmount, and this is
               exactly when the pilot needs telling the range is not applied. */}
           {(jumpFilter.status === 'no-origin' || jumpFilter.status === 'unknown') && (
@@ -1779,7 +1871,8 @@ export function BpcSourcingPanel() {
           ) : (
             <>
               {displayRows.length > shownRows.length && (
-                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                // The phone's sort bar says it instead (`stackSummary` below).
+                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim max-sm:hidden">
                   {t('bpcContracts.resultsCapped', {
                     shown: shownRows.length.toLocaleString(),
                     total: displayRows.length.toLocaleString(),
@@ -1805,6 +1898,21 @@ export function BpcSourcingPanel() {
                       : `owned:${row.itemId}`
                 }
                 {...sortProps}
+                // A two-line card per offer on a phone — price at the right of
+                // the title line, everything else on one dim line under it —
+                // and a sort picker, since the header row it would sort from
+                // is gone. The cap above follows that same sort.
+                stackLayout="dense"
+                className="dt-actions-pinned"
+                mobileSort
+                stackSummary={
+                  displayRows.length > shownRows.length
+                    ? t('bpcContracts.mobile.offerCountCapped', {
+                        shown: shownRows.length.toLocaleString(),
+                        total: displayRows.length.toLocaleString(),
+                      })
+                    : t('bpcContracts.mobile.offerCount', { count: displayRows.length })
+                }
                 // No contract exists for an owned row — nothing to open.
                 onRowClick={(row) => setOpenRow(asContract(row))}
                 rowMoreActions
@@ -1820,7 +1928,7 @@ export function BpcSourcingPanel() {
                     trigger={tr}
                   />
                 )}
-                // At most RESULT_LIMIT rows, but each can be a tall card on a phone.
+                // At most RESULT_LIMIT rows, but a phone still mounts only a screenful.
                 virtualize
               />
             </>
@@ -1842,6 +1950,11 @@ export function BpcSourcingPanel() {
       )}
     </Panel>
   );
+}
+
+/** A "—" the dense phone card drops from its meta line rather than printing as one more `·` field. */
+function DenseOmit({ children }: { children: ReactNode }) {
+  return <span data-dense-omit>{children}</span>;
 }
 
 /** Stable identity, so a missing snapshot doesn't invalidate memoized columns/options every render. */

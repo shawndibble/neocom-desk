@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { loadSolarSystems } from '@/sde/loadMarketSde';
 import type { SolarSystemEntry } from '@/sde/marketTypes';
-import { lookupSolarSystem } from '@/sde/solarSystems';
+import { loadSolarSystemsById, lookupSolarSystem } from '@/sde/solarSystems';
 
 /** Every solar system, fetched only once `enabled` first turns true. */
 export function useSolarSystems(enabled: boolean): readonly SolarSystemEntry[] | null {
@@ -42,4 +42,26 @@ export function useSystemName(systemId: number | null): string | null {
     };
   }, [systemId]);
   return systemId !== null && name?.id === systemId ? name.name : null;
+}
+
+/**
+ * Every system keyed by id, for a list that names one system per row (BPC
+ * Sourcing's phone card) — one load, then synchronous lookups, rather than
+ * `useSystemName`'s one effect per id. `null` until it loads, or if the
+ * snapshot could not be read.
+ */
+export function useSolarSystemIndex(): ReadonlyMap<number, SolarSystemEntry> | null {
+  const [index, setIndex] = useState<ReadonlyMap<number, SolarSystemEntry> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void loadSolarSystemsById()
+      .catch(() => null)
+      .then((byId) => {
+        if (!cancelled) setIndex(byId);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return index;
 }
