@@ -178,6 +178,8 @@ interface SearchResult {
   cameFrom: ReadonlyMap<number, number>;
   /** Jumps along that path — the trip's length, not its preference-weighted cost. */
   jumps: ReadonlyMap<number, number>;
+  /** The path's preference-weighted cost — what the search minimised. */
+  costs: ReadonlyMap<number, number>;
   /** Set when the search was given a `stopAt` and reached it. */
   reachedStopAt: boolean;
 }
@@ -213,7 +215,7 @@ function search(
     // cost, so later copies are stale and skipped rather than re-expanded.
     if (settled.has(systemId)) continue;
     settled.add(systemId);
-    if (systemId === stopAt) return { cameFrom, jumps, reachedStopAt: true };
+    if (systemId === stopAt) return { cameFrom, jumps, costs: best, reachedStopAt: true };
     for (const neighbour of graph.get(systemId) ?? []) {
       const neighbourCost = cost + stepCost(neighbour);
       // Also rejects an already-settled neighbour: its recorded cost is final,
@@ -226,7 +228,7 @@ function search(
     }
   }
 
-  return { cameFrom, jumps, reachedStopAt: false };
+  return { cameFrom, jumps, costs: best, reachedStopAt: false };
 }
 
 /**
@@ -278,4 +280,39 @@ export function jumpDistancesFrom(
   if (!graph.has(originSystemId)) return new Map();
   const stepCost = stepCostFor(options);
   return search(graph, originSystemId, stepCost).jumps;
+}
+
+/** Every route from one origin, from a single sweep. */
+export interface RouteSweep {
+  /** Preference-weighted cost to each reachable system — what the route minimised. */
+  costs: ReadonlyMap<number, number>;
+  /** Jumps along each of those routes. */
+  jumps: ReadonlyMap<number, number>;
+  /** The route to one system, both ends included, or `null` when none reaches it. */
+  routeTo(systemId: number): number[] | null;
+}
+
+/**
+ * The cost, jumps and route from one origin to every system it reaches —
+ * the same search, under the same options, that `findJumpRoute` runs for one
+ * pair, so a cost read here is the cost of the route a leg is drawn with.
+ *
+ * Multi-stop planning reads its pairwise costs from these: one sweep per stop
+ * rather than one search per pair of stops.
+ */
+export function routeSweepFrom(
+  graph: JumpGraph,
+  originSystemId: number,
+  options: FindJumpRouteOptions = {}
+): RouteSweep {
+  if (!graph.has(originSystemId)) {
+    return { costs: new Map(), jumps: new Map(), routeTo: () => null };
+  }
+  const { cameFrom, jumps, costs } = search(graph, originSystemId, stepCostFor(options));
+  return {
+    costs,
+    jumps,
+    routeTo: (systemId) =>
+      graph.has(systemId) && costs.has(systemId) ? reconstruct(cameFrom, systemId) : null,
+  };
 }

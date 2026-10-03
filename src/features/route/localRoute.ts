@@ -23,6 +23,7 @@ import {
   type RoutePreferenceKind,
 } from '@/engine/route/jumpRoute';
 import { jumpCountsForRoutes, type RouteEnds } from '@/engine/route/jumpCounts';
+import { planTrip, type TripOptions, type TripPlan } from '@/engine/route/tripPlan';
 import { loadJumpGraph } from '@/sde/jumpGraph';
 import type { RouteRules } from './routeRules';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
@@ -164,5 +165,29 @@ export async function localJumpCountsForRoutes(
   return {
     kind: 'known',
     counts: jumpCountsForRoutes(graph, routes, engineOptions(rules, securityOf)),
+  };
+}
+
+export type LocalTripResult = { kind: 'trip'; plan: TripPlan } | { kind: 'unknown' };
+
+/**
+ * A trip from `start` through several Stops (issue #2475): every leg, and the
+ * cheapest stop order when asked, all under the same rules a single route is
+ * drawn with — the graph and security lookup load once for the whole trip.
+ */
+export async function planLocalTrip(
+  start: number,
+  stops: readonly number[],
+  rules: LocalRouteRules = {},
+  tripOptions: TripOptions = {}
+): Promise<LocalTripResult> {
+  const [graph, securityOf] = await Promise.all([
+    loadJumpGraph(),
+    securityLookupFor(rules.preference ?? 'shortest'),
+  ]);
+  if (!graph) return { kind: 'unknown' };
+  return {
+    kind: 'trip',
+    plan: planTrip(graph, start, stops, engineOptions(rules, securityOf), tripOptions),
   };
 }
