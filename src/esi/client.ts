@@ -17,6 +17,7 @@ import { passEsiGate, observeEsiResponse } from './budget';
 import { EsiError, EsiBudgetError, EsiTimeoutError } from './errors';
 import { currentEsiLane, gateLane, type EsiLane } from './lane';
 import type { EsiEndpointId } from './registry';
+import { USER_AGENT } from './userAgent';
 
 // `EsiError` lives in `./errors` so the budget can throw one without importing
 // the client back (issue #655), but this stays its canonical import path.
@@ -24,7 +25,7 @@ export { EsiError, EsiBudgetError, EsiTimeoutError, attachEndpointId } from './e
 
 export const ESI_BASE_URL = 'https://esi.evetech.net';
 export const COMPATIBILITY_DATE = '2026-08-01';
-export const USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
+export { USER_AGENT };
 
 /**
  * How long one `esiFetch` call may take, **queue included**, before it is
