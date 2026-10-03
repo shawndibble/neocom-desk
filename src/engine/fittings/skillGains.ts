@@ -8,6 +8,7 @@
  * engine and no event loop of its own. Pure.
  */
 import type { AttributeWithSources } from './affectedBy';
+import type { AppliedWeapon } from './appliedDps';
 import { alignTimeSeconds } from './stats';
 import type { PlanEntry } from '../types';
 import type { FittingStats } from './types';
@@ -72,11 +73,16 @@ const COMBAT_METRICS = [
 ] as const;
 
 /**
- * What a miner, hauler, logistics or jump pilot ranks by. Each is zero on a
- * fit with no such role — no miners, a fit that shoots, no remote repairers,
- * no jump drive — so a combat fit's list never grows a cargo or mining row.
+ * The stats the Variations delta doesn't show, each described as its own
+ * change: the guns' and launchers' reach, then what a miner, hauler,
+ * logistics or jump pilot ranks by. Each is zero on a fit with no such role —
+ * no guns, no miners, a fit that shoots, no remote repairers, no jump drive —
+ * so a combat fit's list never grows a cargo or mining row.
  */
 export const ROLE_METRICS = [
+  'optimal',
+  'falloff',
+  'tracking',
   'miningYield',
   'hold',
   'remoteRepair',
@@ -95,7 +101,24 @@ export const GAIN_METRICS = [...COMBAT_METRICS, ...ROLE_METRICS] as const;
 export type GainMetric = (typeof GAIN_METRICS)[number];
 export type GainSort = 'overall' | GainMetric;
 
-/** Each metric's improvement (positive: better), plus `overall`, their sum. */
+/**
+ * How much each metric counts towards `overall` (scope decision
+ * `20261002-234731-what-to-train-weighted-overall-weapon-reach-ranked`): damage, tank and a role's own
+ * output whole; mobility and reach half; time until the capacitor runs dry
+ * (or stable % points) a quarter — a few seconds more of it must not outrank
+ * real damage, nor running dry sooner bury a big DPS gain. Absent: 1.
+ */
+const OVERALL_WEIGHTS: Partial<Record<GainMetric, number>> = {
+  speed: 0.5,
+  align: 0.5,
+  lockRange: 0.5,
+  optimal: 0.5,
+  falloff: 0.5,
+  tracking: 0.5,
+  capacitor: 0.25,
+};
+
+/** Each metric's improvement (positive: better), plus `overall`, their weighted sum. */
 export type GainMetrics = Record<GainSort, number>;
 
 /** `(after − before) / |before|`, with something from nothing counting as a whole gain. */
@@ -116,6 +139,15 @@ function capacitorGain(before: FittingStats['capacitor'], after: FittingStats['c
 const activeTank = (s: FittingStats) => s.repair.shield + s.repair.armor + s.repair.hull;
 const alignTime = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navigation.agility);
 const isArmed = (s: FittingStats) => s.offense.dps > 0 || s.droneDps > 0;
+
+type ShipWeapon = Extract<AppliedWeapon, { kind: 'turret' | 'missile' }>;
+/** The fit's own firing guns and launchers, in fit order — not its drones or fighters. */
+const shipWeapons = (s: FittingStats) =>
+  s.applied.weapons.filter((w): w is ShipWeapon => w.kind === 'turret' || w.kind === 'missile');
+const turrets = (s: FittingStats) =>
+  s.applied.weapons.filter(
+    (w): w is Extract<AppliedWeapon, { kind: 'turret' }> => w.kind === 'turret'
+  );
 
 /** One role stat's before/after, at the digits it is shown with. */
 export interface RoleChange {
@@ -145,6 +177,21 @@ interface RoleField {
  * the rest need no such gate — a fit without them never changes them.
  */
 const ROLE_FIELDS: readonly RoleField[] = [
+  {
+    key: 'optimal',
+    digits: 1,
+    values: (s) => shipWeapons(s).map((w) => (w.kind === 'turret' ? w.optimal : w.range) / 1000),
+  },
+  {
+    key: 'falloff',
+    digits: 1,
+    values: (s) => turrets(s).map((w) => w.falloff / 1000),
+  },
+  {
+    key: 'tracking',
+    digits: 3,
+    values: (s) => turrets(s).map((w) => w.tracking),
+  },
   {
     key: 'miningYield',
     digits: 0,
@@ -240,7 +287,9 @@ export function roleChanges(before: FittingStats, after: FittingStats): RoleChan
  * How much better `after` is than `before` in each tracked stat, as a
  * fraction of `before` — so a DPS gain and an EHP gain add up on one scale.
  * Align time is better lower; the capacitor is scored in stable-% points,
- * or relative depletion time, with turning stable a whole gain.
+ * or relative depletion time, with turning stable a whole gain. `overall`
+ * weighs each by `OVERALL_WEIGHTS`, except that the capacitor turning stable
+ * (or unstable) always counts whole.
  */
 export function gainMetrics(before: FittingStats, after: FittingStats): GainMetrics {
   const roleGains = Object.fromEntries([
@@ -257,14 +306,17 @@ export function gainMetrics(before: FittingStats, after: FittingStats): GainMetr
     lockRange: relative(before.targeting.maxTargetRange, after.targeting.maxTargetRange),
     ...roleGains,
   };
-  const overall = GAIN_METRICS.reduce((sum, metric) => sum + metrics[metric], 0);
+  const flipped = before.capacitor.stable !== after.capacitor.stable;
+  const weight = (metric: GainMetric) =>
+    metric === 'capacitor' && flipped ? 1 : (OVERALL_WEIGHTS[metric] ?? 1);
+  const overall = GAIN_METRICS.reduce((sum, metric) => sum + metrics[metric] * weight(metric), 0);
   return { overall, ...metrics };
 }
 
 export interface SkillGain extends SkillGainCandidate {
   /** Every displayed stat the +1 level changes, as the Variations table words them. */
   delta: FittingStatsDelta;
-  /** Mining, hold, remote-repair and jump-range changes, which `delta` leaves out. */
+  /** Weapon reach, mining, hold, remote-repair and jump-range changes, which `delta` leaves out. */
   roleChanges: RoleChange[];
   metrics: GainMetrics;
 }
