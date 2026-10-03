@@ -588,9 +588,9 @@ export function launchNewDrone(
  * out.
  */
 export function recallDrones(fitting: Fitting, typeId: number): Fitting {
-  const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
+  const group = droneGroupOf(fitting, typeId);
   if (!group || group.inSpace === 0) return fitting;
-  return setDroneCounts(fitting, typeId, { inSpace: 0, inBay: group.inSpace + group.inBay });
+  return setDroneCounts(fitting, typeId, { inSpace: 0, inBay: droneCarried(group) });
 }
 
 const MODULE_STATES: readonly FittingItemState[] = ['offline', 'online', 'active', 'overload'];
@@ -623,7 +623,7 @@ export function shownModuleState(
 
 /** Puts `quantity` more of `typeId` in the bay. */
 export function addDrones(fitting: Fitting, typeId: number, quantity: number): Fitting {
-  const current = droneGroups(fitting).find((group) => group.typeId === typeId);
+  const current = droneGroupOf(fitting, typeId);
   return setDroneCounts(fitting, typeId, {
     inSpace: current?.inSpace ?? 0,
     inBay: (current?.inBay ?? 0) + quantity,
@@ -727,7 +727,8 @@ function droneGroupOf(fitting: Fitting, typeId: number): DroneGroup | undefined 
   return droneGroups(fitting).find((entry) => entry.typeId === typeId);
 }
 
-function carried(group: DroneGroup | undefined): number {
+/** How many of a type the Fitting carries: in space and in the bay together. */
+export function droneCarried(group: DroneGroup | undefined): number {
   return group ? group.inSpace + group.inBay : 0;
 }
 
@@ -737,7 +738,7 @@ function carried(group: DroneGroup | undefined): number {
  */
 export function droneCarriedMax(fitting: Fitting, typeId: number, bay: DroneBay | null): number {
   const group = droneGroupOf(fitting, typeId);
-  return carried(group) + droneRoom(fitting, typeId, bay);
+  return droneCarried(group) + droneRoom(fitting, typeId, bay);
 }
 
 /**
@@ -768,7 +769,10 @@ export function droneLaunchedMax(
   launch: DroneLaunchLimits | null
 ): number {
   const group = droneGroupOf(fitting, typeId);
-  return Math.min(carried(group), (group?.inSpace ?? 0) + droneLaunchRoom(fitting, typeId, launch));
+  return Math.min(
+    droneCarried(group),
+    (group?.inSpace ?? 0) + droneLaunchRoom(fitting, typeId, launch)
+  );
 }
 
 /**
@@ -785,7 +789,7 @@ export function setDronesLaunched(
   const group = droneGroupOf(fitting, typeId);
   if (!group) return fitting;
   const inSpace = wholeCount(Math.min(count, droneLaunchedMax(fitting, typeId, launch)));
-  return setDroneCounts(fitting, typeId, { inSpace, inBay: carried(group) - inSpace });
+  return setDroneCounts(fitting, typeId, { inSpace, inBay: droneCarried(group) - inSpace });
 }
 
 /** Drones launched and drones carried (launched or not), every type together. */
@@ -793,7 +797,7 @@ export function droneTotals(fitting: Fitting): { inSpace: number; carried: numbe
   return droneGroups(fitting).reduce(
     (sum, group) => ({
       inSpace: sum.inSpace + group.inSpace,
-      carried: sum.carried + carried(group),
+      carried: sum.carried + droneCarried(group),
     }),
     { inSpace: 0, carried: 0 }
   );

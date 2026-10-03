@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -15,6 +15,7 @@ import { AddRow, Close, Compare, DragHandle } from '@/components/ui/icons';
 import {
   cargoGroups,
   droneBayUsed,
+  droneCarried,
   droneCarriedMax,
   droneGroups,
   droneLaunchedMax,
@@ -475,7 +476,6 @@ function LaunchSquares({
         const blocked = !lit && count > max;
         const square = (
           <button
-            key={count}
             type="button"
             aria-label={t('fittings.edit.launchCount', { count })}
             aria-pressed={lit}
@@ -490,12 +490,14 @@ function LaunchSquares({
             />
           </button>
         );
-        return blocked ? (
-          <Tooltip key={count} content={t('fittings.edit.launchBlocked')}>
-            {square}
-          </Tooltip>
-        ) : (
-          square
+        return (
+          <Fragment key={count}>
+            {blocked ? (
+              <Tooltip content={t('fittings.edit.launchBlocked')}>{square}</Tooltip>
+            ) : (
+              square
+            )}
+          </Fragment>
         );
       })}
     </div>
@@ -767,7 +769,7 @@ export function DroneSection({
               />
               <CountInput
                 label={t('fittings.edit.inBay')}
-                value={group.inSpace + group.inBay}
+                value={droneCarried(group)}
                 max={droneCarriedMax(fitting, group.typeId, bay)}
                 onCommit={(count) =>
                   edit(
