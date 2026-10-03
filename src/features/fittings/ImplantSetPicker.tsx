@@ -21,7 +21,7 @@ import {
   TypeIcon,
   type TabItem,
 } from '@/components/ui';
-import { boosterSideEffects } from '@/engine/fittings/boosterSideEffects';
+import { boosterSideEffects, withBoosters } from '@/engine/fittings/boosterSideEffects';
 import * as Icon from '@/components/ui/icons';
 import { MAX_BOOSTERS, MAX_IMPLANTS } from '@/engine/fitting/fittingShare';
 import type { ImplantBasis } from '@/engine/fittings/implantBasis';
@@ -207,17 +207,11 @@ export function ImplantSetPicker({
   }
 
   function removeFrom(kind: 'implants' | 'boosters', index: number) {
-    const next = { ...set, [kind]: set[kind].filter((_, i) => i !== index) };
+    const remaining = set[kind].filter((_, i) => i !== index);
     // A side effect whose booster is gone goes with it.
-    if (kind === 'boosters' && set.boosterSideEffects) {
-      const kept = next.boosters.flatMap((typeId) =>
-        boosterSideEffects(typeId).map((effect) => effect.effectId)
-      );
-      const sideEffects = set.boosterSideEffects.filter((id) => kept.includes(id));
-      if (sideEffects.length > 0) next.boosterSideEffects = sideEffects;
-      else delete next.boosterSideEffects;
-    }
-    void onChange(next);
+    void onChange(
+      kind === 'boosters' ? withBoosters(set, remaining) : { ...set, implants: remaining }
+    );
   }
 
   function toggleSideEffect(effectId: number, on: boolean) {
