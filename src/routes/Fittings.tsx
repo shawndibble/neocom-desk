@@ -536,6 +536,8 @@ function FittingsPage() {
             onBasisChange={workspace.setImplantBasis}
             implantSet={fitting.implantSet}
             onImplantSetChange={workspace.setImplantSet}
+            fitting={fitting}
+            profile={workspace.profile}
           />
           {workspace.implantBasis === 'clone' && workspace.canUseCloneBasis && (
             // Across both columns of the stats column's controls grid.

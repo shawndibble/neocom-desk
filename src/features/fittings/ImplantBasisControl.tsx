@@ -20,7 +20,7 @@ import {
 } from '@/components/ui';
 import { Expanded } from '@/components/ui/icons';
 import type { ImplantBasis } from '@/engine/fittings/implantBasis';
-import type { FittingImplantSet } from '@/engine/fittings/types';
+import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
 import { ImplantSetPicker } from './ImplantSetPicker';
 import { StatField } from './StatFacts';
 import { STAT_FIELD_WIDTH } from './statKit';
@@ -32,6 +32,9 @@ interface ImplantBasisControlProps {
   onBasisChange: (basis: ImplantBasis) => void;
   implantSet: FittingImplantSet | undefined;
   onImplantSetChange: (implantSet: FittingImplantSet | undefined) => void;
+  /** The open Fitting and pilot, for the set editor's "Find by goal"; absent until the pilot loads. */
+  fitting?: Fitting;
+  profile?: PilotProfile | null;
 }
 
 export function ImplantBasisControl({
@@ -40,6 +43,8 @@ export function ImplantBasisControl({
   onBasisChange,
   implantSet,
   onImplantSetChange,
+  fitting,
+  profile,
 }: ImplantBasisControlProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -107,6 +112,7 @@ export function ImplantBasisControl({
         onClose={() => setPickerOpen(false)}
         implantSet={implantSet}
         onChange={onImplantSetChange}
+        {...(fitting && profile ? { finder: { fitting, profile, basis: effective } } : {})}
       />
     </StatField>
   );
