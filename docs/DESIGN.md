@@ -445,7 +445,9 @@ exactly the markup above.
   and an `end` box can add `className="dt-dense-tight"` instead: the tick
   box, title, figure and button share line one, centred on each other (the
   button's 44px target overhangs rather than heightening the line), and line
-  two centres on a 28px `end` box (Hauling). The box is under §3's 36px
+  two centres on a 28px `end` box (Hauling). BPC Sourcing uses it too,
+  with neither box: its `cardCorner` is an ISK amount, wider than the
+  pinned corner's room for a standing icon. The box is under §3's 36px
   touch tier on purpose: at 36px its height set the meta line's and opened a
   gap under the title, which is what the card's reader complained about. A
   cell holding only a `data-dense-omit` value (an empty cell's dash, a word
