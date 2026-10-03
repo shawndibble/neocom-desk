@@ -6,7 +6,10 @@ import {
   bpcActiveFilterChips,
   bpcActiveFilterCount,
   type BpcFilterState,
+  type BpcHideDefaults,
 } from './bpcActiveFilters';
+
+const NO_HIDE: BpcHideDefaults = { hideAuctions: false, hidePlex: false };
 
 const EMPTY: BpcFilterState = {
   filter: {
@@ -42,11 +45,11 @@ const EVERYTHING: BpcFilterState = {
 
 describe('bpcActiveFilterChips', () => {
   it('has no chips at the defaults', () => {
-    expect(bpcActiveFilterChips(EMPTY)).toEqual([]);
+    expect(bpcActiveFilterChips(EMPTY, NO_HIDE)).toEqual([]);
   });
 
   it('has one chip per filter set away from its default, in the filter sheet’s order', () => {
-    expect(bpcActiveFilterChips(EVERYTHING).map((chip) => chip.id)).toEqual([
+    expect(bpcActiveFilterChips(EVERYTHING, NO_HIDE).map((chip) => chip.id)).toEqual([
       'region',
       'jumps',
       'minMe',
@@ -61,7 +64,7 @@ describe('bpcActiveFilterChips', () => {
   });
 
   it('carries the value a label needs', () => {
-    const byId = new Map(bpcActiveFilterChips(EVERYTHING).map((chip) => [chip.id, chip]));
+    const byId = new Map(bpcActiveFilterChips(EVERYTHING, NO_HIDE).map((chip) => [chip.id, chip]));
     expect(byId.get('region')?.value).toBe(10000002);
     expect(byId.get('jumps')?.value).toBe('10');
     expect(byId.get('minMe')?.value).toBe('8');
@@ -72,30 +75,53 @@ describe('bpcActiveFilterChips', () => {
 
   it('ignores a whitespace-only number field, the same as the filter does', () => {
     const state = { ...EMPTY, filter: { ...EMPTY.filter, minMe: '  ' } };
-    expect(bpcActiveFilterChips(state)).toEqual([]);
+    expect(bpcActiveFilterChips(state, NO_HIDE)).toEqual([]);
   });
 
   it('never chips the search text — the search box already shows it', () => {
     const state = { ...EMPTY, filter: { ...EMPTY.filter, typeQuery: 'rifter' } };
-    expect(bpcActiveFilterChips(state)).toEqual([]);
+    expect(bpcActiveFilterChips(state, NO_HIDE)).toEqual([]);
   });
 
   it('clears exactly its own filter back to the default', () => {
-    for (const chip of bpcActiveFilterChips(EVERYTHING)) {
+    for (const chip of bpcActiveFilterChips(EVERYTHING, NO_HIDE)) {
       const cleared = chip.clear(EVERYTHING);
-      const remaining = bpcActiveFilterChips(cleared).map((c) => c.id);
+      const remaining = bpcActiveFilterChips(cleared, NO_HIDE).map((c) => c.id);
       expect(remaining).not.toContain(chip.id);
-      expect(remaining).toHaveLength(bpcActiveFilterChips(EVERYTHING).length - 1);
+      expect(remaining).toHaveLength(bpcActiveFilterChips(EVERYTHING, NO_HIDE).length - 1);
       expect(cleared.filter.typeQuery).toBe('rifter');
     }
   });
 });
 
+describe('bpcActiveFilterChips with Exclude defaults', () => {
+  const HIDE_PLEX: BpcHideDefaults = { hideAuctions: false, hidePlex: true };
+  const hidingPlex = { ...EMPTY, filter: { ...EMPTY.filter, hidePlex: true } };
+
+  it('gives no chip to hiding something the pilot hides by default', () => {
+    expect(bpcActiveFilterChips(hidingPlex, HIDE_PLEX)).toEqual([]);
+    expect(bpcActiveFilterCount(hidingPlex, HIDE_PLEX)).toBe(0);
+  });
+
+  it('clears a chip back to the default, which Clear all then leaves alone', () => {
+    const both = { ...hidingPlex, filter: { ...hidingPlex.filter, hideAuctions: true } };
+    const [auctions] = bpcActiveFilterChips(both, HIDE_PLEX);
+    expect(auctions.id).toBe('hideAuctions');
+    const cleared = auctions.clear(both);
+    expect(cleared.filter.hideAuctions).toBe(false);
+    expect(cleared.filter.hidePlex).toBe(true);
+  });
+});
+
 describe('bpcActiveFilterCount', () => {
   it('is the chips plus the search text, so the funnel badge and the chips never disagree', () => {
-    expect(bpcActiveFilterCount(EMPTY)).toBe(0);
-    expect(bpcActiveFilterCount(EVERYTHING)).toBe(bpcActiveFilterChips(EVERYTHING).length + 1);
+    expect(bpcActiveFilterCount(EMPTY, NO_HIDE)).toBe(0);
+    expect(bpcActiveFilterCount(EVERYTHING, NO_HIDE)).toBe(
+      bpcActiveFilterChips(EVERYTHING, NO_HIDE).length + 1
+    );
     const noSearch = { ...EVERYTHING, filter: { ...EVERYTHING.filter, typeQuery: '' } };
-    expect(bpcActiveFilterCount(noSearch)).toBe(bpcActiveFilterChips(noSearch).length);
+    expect(bpcActiveFilterCount(noSearch, NO_HIDE)).toBe(
+      bpcActiveFilterChips(noSearch, NO_HIDE).length
+    );
   });
 });

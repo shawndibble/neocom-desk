@@ -29,6 +29,16 @@ export interface BpcFilterState {
   jumps: JumpRange;
 }
 
+/**
+ * The pilot's own Exclude defaults (Settings › BPC Sourcing). Hiding auctions
+ * when that is the pilot's default is not an active filter: it gets no chip,
+ * and clearing a chip returns to the default rather than to "show".
+ */
+export interface BpcHideDefaults {
+  hideAuctions: boolean;
+  hidePlex: boolean;
+}
+
 export type BpcFilterChip =
   | { id: 'region'; value: number; clear: Clear }
   | { id: 'jumps'; value: JumpRange; clear: Clear }
@@ -55,7 +65,10 @@ function isDefaultSources(sources: ReadonlySet<SourceToggle>): boolean {
  * Never the search text: the search box above the chips already shows it,
  * and clearing it has its own control there.
  */
-export function bpcActiveFilterChips(state: BpcFilterState): BpcFilterChip[] {
+export function bpcActiveFilterChips(
+  state: BpcFilterState,
+  hideDefaults: BpcHideDefaults
+): BpcFilterChip[] {
   const { filter, sources, spaceKinds, jumps } = state;
   const chips: BpcFilterChip[] = [];
   if (filter.regionId !== null) {
@@ -72,11 +85,13 @@ export function bpcActiveFilterChips(state: BpcFilterState): BpcFilterChip[] {
     const value = filter[id].trim();
     if (value !== '') chips.push({ id, value, clear: (s) => withFilter(s, { [id]: '' }) });
   }
-  if (filter.hideAuctions) {
-    chips.push({ id: 'hideAuctions', clear: (s) => withFilter(s, { hideAuctions: false }) });
-  }
-  if (filter.hidePlex) {
-    chips.push({ id: 'hidePlex', clear: (s) => withFilter(s, { hidePlex: false }) });
+  for (const id of ['hideAuctions', 'hidePlex'] as const) {
+    // Labelled by what it does now ("No auctions"), so a chip only ever
+    // says "hiding" — set against a default of hiding, showing is the
+    // default and gets none.
+    if (filter[id] && !hideDefaults[id]) {
+      chips.push({ id, clear: (s) => withFilter(s, { [id]: false }) });
+    }
   }
   if (!isDefaultSources(sources)) {
     chips.push({
@@ -96,6 +111,9 @@ export function bpcActiveFilterChips(state: BpcFilterState): BpcFilterChip[] {
 }
 
 /** The funnel's badge: every chip, plus the search text, which narrows the table too. */
-export function bpcActiveFilterCount(state: BpcFilterState): number {
-  return bpcActiveFilterChips(state).length + (state.filter.typeQuery.trim() === '' ? 0 : 1);
+export function bpcActiveFilterCount(state: BpcFilterState, hideDefaults: BpcHideDefaults): number {
+  return (
+    bpcActiveFilterChips(state, hideDefaults).length +
+    (state.filter.typeQuery.trim() === '' ? 0 : 1)
+  );
 }

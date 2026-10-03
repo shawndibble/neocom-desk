@@ -135,10 +135,12 @@ import {
   bpcActiveFilterCount,
   type BpcFilterChip,
   type BpcFilterState,
+  type BpcHideDefaults,
   type BpcSourcingFilter,
 } from './bpcActiveFilters';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto, parseIskAmount } from '@/lib/isk';
@@ -277,7 +279,7 @@ const BPO_CARD_LAYOUT =
  * so the same chip reads as the desktop strip's first chip from `sm` up.
  */
 const CHEAPEST_HEADLINE_CHIP =
-  'max-sm:h-auto max-sm:basis-full max-sm:flex-col max-sm:items-start max-sm:gap-0 max-sm:before:hidden max-sm:[&>span:last-child]:text-2xl max-sm:[&>span:last-child]:font-bold max-sm:[&>span:last-child]:text-accent';
+  'max-sm:h-auto max-sm:basis-full max-sm:flex-col max-sm:items-start max-sm:gap-0 max-sm:before:hidden max-sm:[&>span:last-child]:text-3xl max-sm:[&>span:last-child]:font-bold';
 
 /** One row of the search's autocomplete: a candidate blueprint plus what its listings look like, so a dead blueprint is visible before it is chosen. */
 type BlueprintSuggestion = BlueprintTypeOption & BlueprintOfferStats;
@@ -344,6 +346,8 @@ interface BpcFilterBarProps {
   jumps: JumpRange;
   onJumpsChange: (next: JumpRange) => void;
   currentSystem: CurrentSystemState;
+  /** The pilot's own Exclude defaults (Settings): hiding at the default is not an active filter. */
+  hideDefaults: BpcHideDefaults;
   /** The blueprint box's combobox wiring — role, expanded state, active option and arrow keys — owned by the panel, which renders the listbox. */
   searchComboboxProps: InputHTMLAttributes<HTMLInputElement>;
   /** The column picker, inline between the search box and the funnel. */
@@ -361,11 +365,12 @@ function BpcFilterBar({
   jumps,
   onJumpsChange,
   currentSystem,
+  hideDefaults,
   searchComboboxProps,
   actions,
 }: BpcFilterBarProps) {
   const { t } = useTranslation();
-  const activeCount = bpcActiveFilterCount({ filter, sources, spaceKinds, jumps });
+  const activeCount = bpcActiveFilterCount({ filter, sources, spaceKinds, jumps }, hideDefaults);
 
   const compositeValue = { ...filter, sources, spaceKinds, jumps };
 
@@ -847,14 +852,14 @@ export function BpcSourcingPanel() {
     setParams({ 'sourcing.type': null, 'sourcing.q': '' });
   }
 
-  /** Includes the Dexie-backed space filter — unlike the sourcing.* params here, nothing else resets it. */
   const filterState: BpcFilterState = {
     filter: uiFilter,
     sources,
     spaceKinds: spaceFilter,
     jumps,
   };
-  const activeChips = bpcActiveFilterChips(filterState);
+  const hideDefaults = { hideAuctions: hideAuctionsDefault, hidePlex: hidePlexDefault };
+  const activeChips = bpcActiveFilterChips(filterState, hideDefaults);
 
   /** Writes a whole filter state back: the URL group, then the Space preference. */
   function applyFilterState(next: BpcFilterState) {
@@ -890,6 +895,7 @@ export function BpcSourcingPanel() {
     }
   }
 
+  /** Includes the Dexie-backed space filter — unlike the sourcing.* params here, nothing else resets it. */
   function resetSourcingFilters() {
     changeFilter({
       typeQuery: '',
@@ -1163,6 +1169,7 @@ export function BpcSourcingPanel() {
   );
 
   const blueprintPicked = selectedTypeId !== null;
+  const isPhone = useIsPhone();
   const bpcColumnsById = useMemo<Record<BpcSearchColumnId, DataTableColumn<BpcSearchRow>>>(
     () => ({
       source: {
@@ -1185,17 +1192,17 @@ export function BpcSourcingPanel() {
         sortValue: (row) => row.locationName ?? '',
         render: (row) => {
           const name = row.locationName ?? t('bpcContracts.notApplicable');
-          // The phone card's meta line has room for "Jita 0.9", not a
-          // fifty-character station name; the table keeps the station.
+          // The station's security after its name, the figure a buyer weighs
+          // a trip by. On the phone card's meta line a fifty-character
+          // station name is cut short — it opens with its system's name, so
+          // "Jita IV - Moon 4 -…" still says where.
           const system = row.systemId == null ? undefined : solarSystems?.get(row.systemId);
           const place = (
             <>
-              <span className={cx(system && 'max-sm:hidden')}>{name}</span>
-              {system && (
-                <span className="sm:hidden">
-                  {system.name} <SecurityStatus security={system.security} />
-                </span>
-              )}
+              <span className="max-sm:inline-block max-sm:max-w-36 max-sm:truncate max-sm:align-bottom">
+                {name}
+              </span>
+              {system && <SecurityStatus security={system.security} />}
             </>
           );
           // The owner's #1240 rule for market BPOs: the whole region, the hub's own station marked.
@@ -1486,22 +1493,22 @@ export function BpcSourcingPanel() {
           // the card's title is the copy's quality instead, and ME/TE/runs
           // leave the meta line under it (`QualityValue`). The table keeps
           // the name.
-          const title = blueprintPicked ? (
-            <>
-              <span className="max-sm:hidden">{name}</span>
-              <span className="tabular-nums sm:hidden">
+          // Decided in JS (`useIsPhone`, the line `DataTable` stacks at), not
+          // a CSS pair, so the cell holds one title at any width.
+          const title =
+            blueprintPicked && isPhone ? (
+              <span className="tabular-nums">
                 {t('bpcContracts.mobile.copyQuality', {
                   me: row.me,
                   te: row.te,
                   runs: row.runs === -1 ? t('bpcContracts.unlimitedRuns') : row.runs,
                 })}
               </span>
-            </>
-          ) : (
-            // Ellipsised on the phone card, so a long name stops short of the
-            // price beside it instead of running under it.
-            <span className="max-sm:block max-sm:truncate">{name}</span>
-          );
+            ) : (
+              // Ellipsised on the phone card, so a long name stops short of the
+              // price beside it instead of running under it.
+              <span className="max-sm:block max-sm:truncate">{name}</span>
+            );
           if (!bpo && !owned) return title;
           return (
             // One wrapping line on the phone card, so a tag sits beside the
@@ -1539,6 +1546,7 @@ export function BpcSourcingPanel() {
     bpoLocationName,
     regionLabel,
     blueprintPicked,
+    isPhone,
   ]);
   // Item plus the visible columns, like the table itself.
   const csvColumns = useMemo(
@@ -1633,6 +1641,7 @@ export function BpcSourcingPanel() {
           <BpcFilterBar
             filter={uiFilter}
             onChange={changeFilter}
+            hideDefaults={hideDefaults}
             regionOptions={regionOptions}
             sources={sources}
             onSourcesChange={(next) => setParams({ 'sourcing.src': next })}
@@ -1939,7 +1948,6 @@ export function BpcSourcingPanel() {
                 // and a sort picker, since the header row it would sort from
                 // is gone. The cap above follows that same sort.
                 stackLayout="dense"
-                className="dt-actions-pinned"
                 mobileSort
                 stackSummary={
                   displayRows.length > shownRows.length
