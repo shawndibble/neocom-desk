@@ -355,8 +355,8 @@ function ExportPanel() {
   return (
     <Panel title={t('settings.backup.exportTitle')}>
       <div className="space-y-2">
-        <p className="text-xs text-text-dim">{t('settings.backup.exportHint')}</p>
-        <p className="text-xs text-warning">{t('settings.backup.passwordWarning')}</p>
+        <p className="max-w-2xl text-xs text-text-dim">{t('settings.backup.exportHint')}</p>
+        <p className="max-w-2xl text-xs text-warning">{t('settings.backup.passwordWarning')}</p>
         <div className="flex flex-wrap items-center gap-2">
           <TextInput
             type="password"
@@ -426,7 +426,7 @@ function ImportPanel() {
   return (
     <Panel title={t('settings.backup.importTitle')}>
       <div className="space-y-2">
-        <p className="text-xs text-text-dim">{t('settings.backup.importHint')}</p>
+        <p className="max-w-2xl text-xs text-text-dim">{t('settings.backup.importHint')}</p>
         <input
           ref={fileInputRef}
           type="file"
@@ -497,7 +497,7 @@ function DataPanel() {
   return (
     <Panel title={t('settings.dataTitle')}>
       <div className="space-y-2">
-        <p className="text-xs text-text-dim">{t('settings.dataHint')}</p>
+        <p className="max-w-2xl text-xs text-text-dim">{t('settings.dataHint')}</p>
         <Button size="sm" onClick={() => void handleClearCache()}>
           {t('settings.clearCache')}
         </Button>
@@ -536,7 +536,7 @@ function ResetViewPreferences() {
 
   return (
     <div className="space-y-2 border-t border-line pt-3">
-      <p className="text-xs text-text-dim">{t('settings.resetViewPrefsHint')}</p>
+      <p className="max-w-2xl text-xs text-text-dim">{t('settings.resetViewPrefsHint')}</p>
       <Button size="sm" onClick={() => void handleReset()}>
         {t('settings.resetViewPrefs')}
       </Button>
@@ -657,7 +657,7 @@ function MobileTabsPanel() {
   return (
     <Panel title={t('settings.mobileTabs.title')}>
       <div className="space-y-2">
-        <p className="text-xs text-text-dim">{t('settings.mobileTabs.hint')}</p>
+        <p className="max-w-2xl text-xs text-text-dim">{t('settings.mobileTabs.hint')}</p>
         <div
           role="group"
           aria-label={t('settings.mobileTabs.group')}
@@ -1258,7 +1258,7 @@ export function Settings() {
           {/* The Overview feed's "Settings" link targets `/settings/notifications` directly. */}
           {section === 'notifications' && <NotificationsPanel />}
           {/*
-            The five short action panels sit two-up from `xl`: one column of
+            The four short action panels sit two-up from `xl`: one column of
             them left most of each card empty. Export beside Import, since
             they are one round trip; the device's log-out row stays full width.
           */}

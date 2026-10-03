@@ -18,10 +18,13 @@ const GRID: Record<FieldsVariant, string> = {
   form: 'grid-cols-1 gap-y-3 lg:grid-cols-[fit-content(16rem)_minmax(0,1fr)] lg:gap-x-6',
 };
 
+const FORM_ROW =
+  'items-center gap-x-6 gap-y-1.5 border-t border-line pt-3 first:border-t-0 first:pt-0';
+
 // `form` lines a label up with its control's first line, not the middle of a tall stack.
 const ROW: Record<FieldsVariant, string> = {
   compact: 'grid-cols-subgrid items-center gap-x-3 gap-y-2',
-  form: 'grid-cols-subgrid items-center gap-x-6 gap-y-1.5 border-t border-line pt-3 first:border-t-0 first:pt-0 lg:items-baseline',
+  form: `grid-cols-subgrid lg:items-baseline ${FORM_ROW}`,
 };
 
 // Each tone spelled whole, so two colour utilities never meet on one element.
@@ -39,8 +42,7 @@ const NOTE: Record<FieldsVariant, string> = {
  * A stacked `form` row whose control is one small toggle keeps it on the
  * label's line, at the far edge, rather than alone on a line of its own.
  */
-const INLINE_ROW =
-  'grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-1.5 border-t border-line pt-3 first:border-t-0 first:pt-0 lg:grid-cols-subgrid';
+const INLINE_ROW = `grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-subgrid ${FORM_ROW}`;
 const INLINE_NOTE = 'col-span-full max-w-2xl text-text-dim lg:col-span-1 lg:col-start-2';
 
 /**

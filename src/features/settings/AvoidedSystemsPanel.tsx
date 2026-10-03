@@ -76,12 +76,12 @@ export function AvoidedSystemsPanel() {
             // Columns rather than one long strip: the names are short and the list can run long.
             <ul
               aria-label={t('settings.avoidedSystems.title')}
-              className="grid gap-px border border-line bg-line text-xs sm:grid-cols-2 xl:grid-cols-3"
+              className="grid border-t border-line text-xs sm:grid-cols-2 sm:gap-x-6 xl:grid-cols-3"
             >
               {rows.map(({ id, system }) => {
                 const name = system?.name ?? `#${id}`;
                 return (
-                  <li key={id} className="flex items-center gap-2 bg-panel px-2 py-1">
+                  <li key={id} className="flex items-center gap-2 border-b border-line px-2 py-1">
                     <span className="flex-1 truncate">
                       {name}
                       {system && <SecurityStatus security={system.security} className="ml-1" />}

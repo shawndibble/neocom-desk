@@ -80,7 +80,7 @@ export function DevicePanel() {
   return (
     <Panel title={t('settings.deviceTitle')}>
       <div className="space-y-4">
-        <p className="text-xs text-text-dim">
+        <p className="max-w-2xl text-xs text-text-dim">
           {loggedIn > 0
             ? t('settings.deviceCharacters', { count: loggedIn })
             : t('settings.deviceCharactersNone')}

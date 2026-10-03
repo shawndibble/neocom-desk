@@ -86,7 +86,9 @@ export function PermissionsPanel() {
           />
         </p>
         {activeCharacterId === null ? (
-          <p className="text-xs text-text-dim">{t('settings.permissions.selectCharacter')}</p>
+          <p className="max-w-2xl text-xs text-text-dim">
+            {t('settings.permissions.selectCharacter')}
+          </p>
         ) : (
           // Two columns from `xl`: one full-width list put each status a screen away from its name.
           <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">
