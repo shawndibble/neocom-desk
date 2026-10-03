@@ -20,6 +20,7 @@ import type {
 } from '@/engine/fittings/types';
 import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
+import { CapBoosterGuide } from './CapBoosterGuide';
 import { ChargePickerGroup } from './ChargePicker';
 import { DEFAULT_PICKER_SETTINGS } from './chargePickerSettings';
 import { useChargeChoices } from './useChargeChoices';
@@ -217,7 +218,13 @@ function ChargePickerPanel({
           {t('fittings.chargePicker.loadedOffList', { name: catalogueTypeName(catalogue, loaded) })}
         </p>
       )}
-      {group?.isWeapon ? (
+      {group?.isCapBooster ? (
+        <CapBoosterGuide
+          group={group}
+          onLoad={(chargeTypeId) => load(chargeTypeId)}
+          pricesLoading={pricesLoading}
+        />
+      ) : group?.isWeapon ? (
         <ChargePickerGroup
           group={group}
           settings={DEFAULT_PICKER_SETTINGS}

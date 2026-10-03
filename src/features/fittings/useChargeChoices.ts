@@ -42,8 +42,10 @@ export interface WeaponChargeGroup {
   count: number;
   /** Charges loaded in them now. */
   loaded: ReadonlySet<number>;
-  /** Some charge deals damage: the picker. Otherwise (cap boosters, scripts, paste…) a plain list. */
+  /** Some charge deals damage: the picker. */
   isWeapon: boolean;
+  /** Its charges inject capacitor: the cap booster guide. Neither (scripts, paste…): a plain list. */
+  isCapBooster: boolean;
   /** Every charge the module takes, by name. */
   choices: ChargeChoice[];
 }
@@ -95,6 +97,7 @@ export function buildChargeChoices({
         roundsPerMinute: s?.roundsPerMinute ?? null,
         cargo: cargo.get(typeId) ?? 0,
         skillMissing: skillMissing.has(typeId),
+        ...(s?.cap ? { cap: s.cap } : {}),
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -272,6 +275,7 @@ export function useChargeChoices({
         count: group.count,
         loaded: group.loaded,
         isWeapon: choices.some((c) => c.dps > 0),
+        isCapBooster: choices.some((c) => c.cap !== undefined),
         choices,
       };
     });

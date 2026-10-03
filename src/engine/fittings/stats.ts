@@ -37,6 +37,7 @@ import {
   type Repairer,
 } from './tank';
 import { droneSpeed, weaponRange } from './appliedWeapons';
+import type { CapBoosterFigures } from './capBoosterChoice';
 
 const REPAIR_LAYERS: readonly RepairLayer[] = ['shield', 'armor', 'hull'];
 
@@ -630,6 +631,37 @@ export function extractCapacitorBudget(
     capacitorUsers(items, results),
     readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakRecharge)
   );
+}
+
+/**
+ * A cap booster group's figures for the Charge Picker, from the Fitting
+ * calculated with its charge loaded: one charge's injection, the boosts a
+ * module holds, the whole group's reload-averaged GJ/s and the capacitor
+ * headline the stats show. Null when the modules at `indices` inject nothing.
+ */
+export function extractCapBoosterFigures(
+  items: readonly CalculatedItem[],
+  shipAttributes: AttributeMap,
+  itemResults: readonly ItemCalculationResult[],
+  indices: readonly number[]
+): CapBoosterFigures | null {
+  const first = itemResults[indices[0] ?? -1];
+  if (!first) return null;
+  const injection = readAttribute(first.attributes, ITEM_DOGMA_ATTRIBUTE.capacitorInjectionAmount);
+  if (injection <= 0) return null;
+  const magazine = magazineOf((id) => readAttribute(first.attributes, id));
+  const gjPerSecond = indices.reduce((sum, index) => {
+    const result = itemResults[index];
+    if (!result || !isFiring(result.state ?? 'offline')) return sum;
+    const read = (id: number) => readAttribute(result.attributes, id);
+    return sum - read(ITEM_DOGMA_ATTRIBUTE.capacitorPeakLoad) * reloadDuty(magazineOf(read));
+  }, 0);
+  return {
+    injection,
+    gjPerSecond,
+    boostsPerLoad: magazine.cycles,
+    capacitor: reloadAwareCapacitorStatus(items, shipAttributes, itemResults),
+  };
 }
 
 const REPAIR_RATE_ATTRIBUTE: Record<RepairLayer, number> = {

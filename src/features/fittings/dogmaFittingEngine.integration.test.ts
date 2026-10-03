@@ -14,6 +14,7 @@ import {
 } from './dogmaFittingEngine';
 import {
   extractCapacitorBudget,
+  extractCapBoosterFigures,
   extractLockedTargets,
   extractFighterStats,
   extractTank,
@@ -597,6 +598,48 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(tank.burst.shield).toBeGreaterThan(0);
     // Passive regeneration peaks at 2.5 × shield HP over the shield recharge time.
     expect(tank.passiveShield).toBeCloseTo((2.5 * stats.shield.hp) / (read(479) / 1000), 6);
+  });
+
+  it("gives the Charge Picker a cap booster charge's real figures: Navy injects the same, fits more", () => {
+    const figuresWith = (chargeTypeId: number) => {
+      const fitting: Fitting = {
+        name: 'Integration Test Caracal cap booster figures',
+        shipTypeId: CARACAL,
+        modules: [
+          { slot: 'medium', slotIndex: 0, typeId: MEDIUM_SHIELD_BOOSTER_II, state: 'active' },
+          {
+            slot: 'medium',
+            slotIndex: 1,
+            typeId: MEDIUM_CAPACITOR_BOOSTER_II,
+            state: 'active',
+            chargeTypeId,
+          },
+        ],
+        drones: [],
+        cargo: [],
+      };
+      const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(SUPPORT_SKILL_IDS));
+      const calculation = calculate(dogmaFit);
+      return {
+        figures: extractCapBoosterFigures(
+          dogmaFit.items,
+          calculation.ship.attributes,
+          calculation.items,
+          [1]
+        ),
+        stats: extractFittingStats(dogmaFit.items, calculation.ship.attributes, calculation.items),
+      };
+    };
+    const tech1 = figuresWith(CAP_BOOSTER_400);
+    const navy = figuresWith(NAVY_CAP_BOOSTER_400);
+    // Both inject 400 GJ; the Navy charge is 12 m3 to the Tech I's 16, so 3 fit in 40 m3, not 2.
+    expect(tech1.figures).toMatchObject({ injection: 400, boostsPerLoad: 2 });
+    expect(navy.figures).toMatchObject({ injection: 400, boostsPerLoad: 3 });
+    // A 12 s cycle and a 10 s reload: 800 GJ every 34 s against 1200 every 46.
+    expect(tech1.figures!.gjPerSecond).toBeCloseTo(800 / 34, 6);
+    expect(navy.figures!.gjPerSecond).toBeCloseTo(1200 / 46, 6);
+    // The capacitor is the stats panel's own headline.
+    expect(tech1.figures!.capacitor).toEqual(tech1.stats.capacitor);
   });
 
   it('averages a Navy Cap Booster 400 over its reload: 26.1 GJ/s, not 33.3', () => {
