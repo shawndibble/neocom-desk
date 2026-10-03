@@ -28,8 +28,8 @@ import {
   type EftTypeLookup,
 } from '@/engine/fittings/eftLoader';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
+import type { RackModule } from '@/engine/fittings/types';
 import { loadFittingSlots, loadShipTree } from '@/sde/loadSde';
-import type { RackModule } from './RackIconStrip';
 import type { WorkbenchFit } from './workbenchFits';
 
 /** What the check reads: the loader's catalog and each hull's slots. */
@@ -163,8 +163,8 @@ export interface WorkbenchFitList {
   reasonsFor: (id: string) => OutOfDateReason[] | undefined;
   /** A fit's loaded modules, from the same check; `undefined` while checking or unchecked. */
   modulesFor: (id: string) => readonly RackModule[] | undefined;
-  /** Every module type across the checked fits, for looking their names up once. */
-  moduleTypeIds: readonly number[];
+  /** Every module type across the checked fits, for looking their names up once; `null` while checking. */
+  moduleTypeIds: readonly number[] | null;
   outOfDateCount: number;
   /** Every fit is out of date — the list would otherwise look empty. */
   allOutOfDate: boolean;
@@ -183,11 +183,8 @@ export function useWorkbenchFitList(fits: readonly WorkbenchFit[] | null): Workb
     [checks]
   );
   const moduleTypeIds = useMemo(
-    () => [
-      ...new Set(
-        [...(checks ?? NO_CHECKS).values()].flatMap((c) => c.modules.map((m) => m.typeId))
-      ),
-    ],
+    () =>
+      checks === null ? null : [...checks.values()].flatMap((c) => c.modules.map((m) => m.typeId)),
     [checks]
   );
   // Held against the fits it was asked for, so another hull starts hidden again.

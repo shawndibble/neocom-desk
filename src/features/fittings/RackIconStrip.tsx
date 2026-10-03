@@ -1,19 +1,12 @@
 /**
- * A Popular fit row's modules as icons, rack by rack (issues #2327, #2493) —
+ * A Popular fits panel row's modules as icons, rack by rack (issues #2327, #2493) —
  * shared by the zKillboard and EVE Workbench tabs so both draw modules the
  * same way.
  */
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TypeIcon } from '@/components/ui';
-import {
-  FITTING_SLOT_KINDS,
-  type FittingModule,
-  type FittingSlotKind,
-} from '@/engine/fittings/types';
+import { FITTING_SLOT_KINDS, type FittingSlotKind, type RackModule } from '@/engine/fittings/types';
 import { cx } from '@/lib/cx';
-
-/** A fitted module as the strip draws it: its rack and type. */
-export type RackModule = Pick<FittingModule, 'slot' | 'typeId'>;
 
 /** A row's fitted modules by rack, in rack order; empty racks left out. */
 function modulesByRack(

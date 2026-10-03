@@ -1,4 +1,4 @@
-/** Module names for a Popular fit row's rack icon strip (`RackIconStrip.tsx`). */
+/** Module names for a Popular fits panel row's rack icon strip (`RackIconStrip.tsx`). */
 import { useEffect, useState } from 'react';
 import { typeName } from '@/sde/loadSde';
 
