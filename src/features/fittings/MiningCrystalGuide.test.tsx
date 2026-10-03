@@ -69,11 +69,18 @@ const group: WeaponChargeGroup = {
 };
 
 describe('MiningCrystalGuide', () => {
-  it('says what A, B and C are for, in a line each', () => {
+  it('keeps the A, B and C explanation behind a ? that opens it, not in the panel', async () => {
+    const user = userEvent.setup();
     render(<MiningCrystalGuide group={group} pricesLoading={false} />);
-    const help = within(screen.getByRole('list', { name: 'Crystal types' }));
-    expect(help.getAllByRole('listitem')).toHaveLength(4);
-    expect(help.getByText(/most ore from each rock/i)).toBeInTheDocument();
+    expect(screen.getByText('Pick the family for your ore, then the type.')).toBeInTheDocument();
+    expect(screen.queryByText(/most ore from each rock/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'What the crystal types do' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Mining crystal types' }));
+    for (const term of ['Type A', 'Type B', 'Type C', 'Tech II vs Tech I']) {
+      expect(dialog.getByText(term)).toBeInTheDocument();
+    }
+    expect(dialog.getByText(/most ore from each rock/i)).toBeInTheDocument();
   });
 
   it('names the loaded crystal and its yield', () => {

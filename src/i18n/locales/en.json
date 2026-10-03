@@ -463,21 +463,24 @@
       "cargoAddCount_other": "+{{count}}"
     },
     "crystalGuide": {
-      "helpLabel": "Crystal types",
+      "pickHint": "Pick the family for your ore, then the type.",
+      "helpButton": "What the crystal types do",
+      "helpTitle": "Mining crystal types",
       "help": {
+        "intro": "A crystal works only on its own family's ores: each section header lists them. Within a family, the type trades how much ore you keep against residue, the ore a rock loses that nobody gets.",
         "aLabel": "Type A",
-        "a": "Most ore from each rock: full yield bonus, no extra residue. The default, and the one for a fleet sharing a belt.",
+        "a": "Most ore from each rock. The full yield bonus with little or no extra residue. The default, and the pick when rocks are scarce or shared, like a fleet working one belt.",
         "bLabel": "Type B",
-        "b": "Most ore an hour: A's yield a cycle on a shorter cycle, but more residue, so rocks run out sooner.",
+        "b": "Most ore an hour. A's yield each cycle on a shorter cycle (10% shorter on Tech I, 20% on Tech II), but a higher residue chance, so each rock runs out sooner.",
         "cLabel": "Type C",
-        "c": "Clears rocks: little yield, heavy residue. For emptying a belt or site fast, not for profit.",
-        "tech2Label": "II vs I",
-        "tech2": "Tech II A and B mine more (B II cycles faster still); C II mines less and clears faster still. Needs the skill."
+        "c": "Clears rocks. A fraction of the yield, with a very high chance of heavy residue, so the rock empties fastest. For clearing a belt or site, not for profit.",
+        "tech2Label": "Tech II vs Tech I",
+        "tech2": "Tech II A and B mine more than Tech I, and B II cycles faster still. C II mines even less than C I and clears faster still. Tech II needs more skill and costs more.",
+        "table": "The table under each family shows this Fitting's own figures with that crystal loaded."
       },
       "m3PerSecond": "{{value}} m³/s",
       "cycle": "{{time}} cycle",
       "residue": "{{value}} m³/s residue ({{pct}}% chance at {{multiplier}}×)",
-      "ownOres": "Each crystal works only on its own family's ores; pick the family first.",
       "familyLoaded": "loaded",
       "cutFor": "For {{ores}}.",
       "typeName": "Type {{letter}} {{tier}}",

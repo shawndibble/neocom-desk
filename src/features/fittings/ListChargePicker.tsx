@@ -130,6 +130,20 @@ export function ListChargePicker({
         align="start"
         aria-label={t('fittings.chargePicker.sheetTitle', { name: moduleName })}
         className="max-h-[min(36rem,80vh)] w-80 overflow-y-auto p-2"
+        onEscapeKeyDown={(event) => {
+          // An Escape inside a dialog opened from the picker (the crystal
+          // guide's help) is that dialog's. The popover hears it first, on the
+          // document, and cancels it whether it closes or not, and a browser
+          // won't close a dialog on a cancelled Escape. So the popover stays
+          // open and hands the dialog its close request itself.
+          const dialog =
+            event.target instanceof Element
+              ? event.target.closest<HTMLDialogElement>('dialog[open]')
+              : null;
+          if (!dialog) return;
+          event.preventDefault();
+          if (dialog.dispatchEvent(new Event('cancel', { cancelable: true }))) dialog.close();
+        }}
       >
         {panel}
       </PopoverContent>

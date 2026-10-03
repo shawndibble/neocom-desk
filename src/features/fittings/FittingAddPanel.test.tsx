@@ -508,7 +508,7 @@ describe('FittingAddPanel', () => {
       moduleResults: [{ state: 'active', maxState: 'active', chargeGroupIds: [482] }],
     });
     await user.click(screen.getByRole('tab', { name: 'Charges' }));
-    expect(screen.getByRole('list', { name: 'Crystal types' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'What the crystal types do' })).toBeInTheDocument();
     const simple = screen.getByRole('button', { name: /^Simple Asteroid: Veldspar/ });
     await user.click(simple);
     expect(
