@@ -1,5 +1,5 @@
 /**
- * The Contracts page's Search tab (issue #908): search every public
+ * The Contracts page's Item search and Courier tabs (issue #908): search every public
  * item_exchange/auction contract line in the shared Public Contract Offers
  * snapshot, any item type.
  *

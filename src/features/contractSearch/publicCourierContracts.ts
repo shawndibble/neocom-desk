@@ -1,7 +1,7 @@
 /**
  * Reads the Public Courier Contracts snapshot (issue #909) whole — every
  * outstanding public courier contract as a route and a fee — for the
- * Contracts page's Search tab (issue #910).
+ * Contracts page's Courier tab (issue #910).
  *
  * The sibling of `publicContractOffers.ts` beside it; the chunk/meta layout
  * and the caching trade the two share live in `chunkedSnapshot.ts`.

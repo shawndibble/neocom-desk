@@ -1,5 +1,5 @@
 /**
- * Contracts Search's last-used mode (Items/Courier), remembered across visits
+ * Contracts Search's last-used tab (Item search or Courier), remembered across visits
  * (issue #1719) — a bare `/contracts` visit always lands on Items otherwise,
  * forcing a hauler back through Items every time they open the page.
  *

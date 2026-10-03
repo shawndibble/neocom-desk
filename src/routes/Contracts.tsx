@@ -321,7 +321,7 @@ export function Contracts() {
   const highlightedContractId = useHighlightParam();
 
   /**
-   * The Search tab's own freshness and reload, reported up by the panel so the
+   * Item search's and Courier's own freshness and reload, reported up by the panel so the
    * page header can draw them beside the route title — the same slot the
    * History tab's badge and Refresh use, and the same slot every other route
    * puts them in. Null until that panel has mounted and loaded something.

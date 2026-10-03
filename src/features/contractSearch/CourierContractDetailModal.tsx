@@ -1,6 +1,6 @@
 /**
  * Full detail for one public courier contract, opened from a row in the
- * Courier half of Contracts Search's Search tab.
+ * Contracts page's Courier tab.
  *
  * Unlike `PublicContractDetailModal` (item_exchange/auction contracts), a
  * courier haul has no item list — ESI's public items route only ever answers

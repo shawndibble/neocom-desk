@@ -1,5 +1,5 @@
 /**
- * The Courier half of the Contracts page's Search tab (issue #910): public
+ * The Contracts page's Courier tab (issue #910): public
  * courier contracts as hauls to take, not items to buy.
  *
  * Its own component rather than a branch inside `ContractSearchPanel` because
