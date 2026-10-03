@@ -28,9 +28,8 @@ import { detectOwnedStock } from '@/engine/industry/ownedStock';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
 import { findLpOfferMatches, type LpOfferMatch } from '@/features/market/appraisalLpAcquisition';
 import { loadGlobalMarketOverrides } from '@/features/market/orderBookView';
+import { loadLpRates } from '@/features/loyalty/lpRates';
 import { useLpValue } from '@/features/loyalty/lpValue';
-import { loadMarketLpValues } from '@/features/loyalty/marketLpValue';
-import { lpRate } from '@/engine/loyalty/marketLpValue';
 import { getHubPrices, getRegionSellPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
 import { lpPickPrice } from './blueprintAcquisitionSources';
@@ -49,30 +48,6 @@ export function blueprintTypeIdsIn(
   catalog: Pick<BlueprintCatalog, 'byBlueprintTypeID'>
 ): number[] {
   return typeIds.filter((typeId) => catalog.byBlueprintTypeID.has(typeId));
-}
-
-async function ownLpValue(): Promise<number> {
-  try {
-    await useLpValue.getState().hydrate();
-  } catch {
-    // An unreadable setting is the default rate, as everywhere else.
-  }
-  return useLpValue.getState().value;
-}
-
-/**
- * ISK per LP each of `corporationIds`' LP is priced at, at `hub`: the
- * pilot's own LP Value when set, else that store's market value (`lpRate`).
- * Null for a store nothing prices.
- */
-export async function loadLpRates(
-  corporationIds: Iterable<number>,
-  hub: TradeHub
-): Promise<(corporationId: number) => number | null> {
-  const own = await ownLpValue();
-  const market =
-    own > 0 ? new Map<number, number | null>() : await loadMarketLpValues(corporationIds, hub);
-  return (corporationId) => lpRate(own, market.get(corporationId) ?? null).rate;
 }
 
 function redemptionOf(offer: LoyaltyStoreOffer): LpBlueprintRedemption {
@@ -206,7 +181,7 @@ export async function loadBlueprintPurchaseOffers(
     if (sell) offers.push(sell);
     for (const { offer, corporationId } of lpByType.get(typeId) ?? []) {
       const turnInsCost = turnIns(offer);
-      const rate = rateFor(corporationId);
+      const { rate } = rateFor(corporationId);
       if (turnInsCost === null || (rate === null && offer.lp_cost > 0)) continue;
       const redemption = lpRedemptionOffer(
         { quantity: offer.quantity, requiredItems: [] },
@@ -238,7 +213,7 @@ export async function lpBlueprintPickPrice(
     loadLpTurnInPricer(hub, [offer]),
   ]);
   const turnInsCost = turnIns(offer);
-  const rate = rateFor(corporationId);
+  const { rate } = rateFor(corporationId);
   if (turnInsCost === null || (rate === null && offer.lp_cost > 0)) return null;
   return lpPickPrice(offer.isk_cost, offer.lp_cost, rate) + turnInsCost;
 }

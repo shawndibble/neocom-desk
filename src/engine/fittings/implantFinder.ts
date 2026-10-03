@@ -5,7 +5,10 @@
  * least ISK. The engine runs and price fetches live in
  * `features/fittings/useImplantFinder.ts`.
  */
-import type { FittingStats } from './types';
+import { appliedDpsVsRange, graphMaxRange, type AppliedWeapon } from './appliedDps';
+import type { TargetProfile } from './targetProfile';
+import { withBoosters } from './boosterSideEffects';
+import type { FittingImplantSet, FittingStats } from './types';
 
 /** A hardwiring's family and grade, read from its name: `EE-605` is grade 5 of `EE-60x`. */
 export interface ImplantGradeName {
@@ -23,10 +26,30 @@ export function parseImplantGrade(name: string): ImplantGradeName | null {
   return { family: family!, code: `${prefix}${grade}`, grade: Number(grade) };
 }
 
+/** A combat booster's strengths, weakest first: "Strong Crash Booster" is grade 4 of "Crash Booster". */
+const BOOSTER_GRADES = ['Synth', 'Standard', 'Improved', 'Strong'] as const;
+const BOOSTER_GRADED = new RegExp(`^(${BOOSTER_GRADES.join('|')}) (.+)$`);
+
+export function parseBoosterGrade(name: string): ImplantGradeName | null {
+  const match = BOOSTER_GRADED.exec(name);
+  if (!match) return null;
+  const [, strength, family] = match;
+  return {
+    family: family!,
+    code: strength!,
+    grade: BOOSTER_GRADES.indexOf(strength as (typeof BOOSTER_GRADES)[number]) + 1,
+  };
+}
+
+/** What goes in a slot: an implant (slots 1–10) or a combat booster (its own slots). */
+export type ImplantKind = 'implant' | 'booster';
+
 export interface ImplantEntry {
   typeId: number;
   name: string;
   slot: number;
+  /** Absent: an implant. */
+  kind?: ImplantKind;
 }
 
 interface MarketGroupLike {
@@ -40,23 +63,21 @@ interface MarketTypeLike {
   marketGroupId: number;
 }
 
-const SLOT_GROUP = /^Implant Slot (\d+)$/;
-
 /**
- * Every implant in the market tree, with its slot read from the "Implant
- * Slot NN" group it sits under — the baked SDE carries no slot attribute.
- * Boosters sit elsewhere in the tree and are left out.
+ * Every type in the market tree under a slot group (`slotGroup` captures the
+ * slot number), with that slot — the baked SDE carries no slot attribute.
  */
-export function implantEntriesFromMarket(
+function entriesUnderSlotGroups(
   types: readonly MarketTypeLike[],
-  groups: readonly MarketGroupLike[]
+  groups: readonly MarketGroupLike[],
+  slotGroup: RegExp
 ): ImplantEntry[] {
   const byId = new Map(groups.map((g) => [g.id, g]));
   const slotOfGroup = new Map<number, number | null>();
   const resolve = (groupId: number): number | null => {
     if (slotOfGroup.has(groupId)) return slotOfGroup.get(groupId)!;
     const group = byId.get(groupId);
-    const match = group ? SLOT_GROUP.exec(group.name) : null;
+    const match = group ? slotGroup.exec(group.name) : null;
     const slot = match
       ? Number(match[1])
       : group && group.parentId !== null
@@ -73,17 +94,37 @@ export function implantEntriesFromMarket(
   return entries;
 }
 
+/** Every implant, slotted by its "Implant Slot NN" market group. */
+export function implantEntriesFromMarket(
+  types: readonly MarketTypeLike[],
+  groups: readonly MarketGroupLike[]
+): ImplantEntry[] {
+  return entriesUnderSlotGroups(types, groups, /^Implant Slot (\d+)$/);
+}
+
+/** Every booster, slotted by its "Booster Slot NN" market group. */
+export function boosterEntriesFromMarket(
+  types: readonly MarketTypeLike[],
+  groups: readonly MarketGroupLike[]
+): ImplantEntry[] {
+  return entriesUnderSlotGroups(types, groups, /^Booster Slot (\d+)$/).map((entry) => ({
+    ...entry,
+    kind: 'booster' as const,
+  }));
+}
+
 export interface ImplantGrade {
   typeId: number;
-  /** `EE-605`; null for an implant sold in one version only. */
+  /** `EE-605`, or a booster's strength (`Strong`); null for one sold in one version only. */
   code: string | null;
   grade: number | null;
 }
 
-/** Every grade of one implant — the same bonus at 1% to 6%, each its own item. */
+/** Every grade of one implant or booster — the same bonus at each strength, each its own item. */
 export interface ImplantFamily {
   key: string;
   name: string;
+  kind: ImplantKind;
   slot: number;
   /** Lowest grade first. */
   grades: ImplantGrade[];
@@ -92,11 +133,20 @@ export interface ImplantFamily {
 export function groupImplantFamilies(entries: readonly ImplantEntry[]): ImplantFamily[] {
   const families = new Map<string, ImplantFamily>();
   for (const entry of entries) {
-    const parsed = parseImplantGrade(entry.name);
-    const key = parsed ? `${parsed.family} ${parsed.code.slice(0, -1)}` : entry.name;
+    const implant = parseImplantGrade(entry.name);
+    const parsed = implant ?? parseBoosterGrade(entry.name);
+    const key = implant
+      ? `${implant.family} ${implant.code.slice(0, -1)}`
+      : (parsed?.family ?? entry.name);
     let family = families.get(key);
     if (!family) {
-      family = { key, name: parsed?.family ?? entry.name, slot: entry.slot, grades: [] };
+      family = {
+        key,
+        name: parsed?.family ?? entry.name,
+        kind: entry.kind ?? 'implant',
+        slot: entry.slot,
+        grades: [],
+      };
       families.set(key, family);
     }
     family.grades.push({
@@ -111,26 +161,37 @@ export function groupImplantFamilies(entries: readonly ImplantEntry[]): ImplantF
   return [...families.values()];
 }
 
+/** Where an item goes: which kind of slot, and which one. */
+export type SlotOf = (typeId: number) => { kind: ImplantKind; slot: number } | undefined;
+
 /**
- * `implants` with `typeId` added, replacing whatever already sits in its
- * slot — the game takes one implant per slot, and the engine doesn't check.
+ * `set` with `typeId` added to its own kind of slot, replacing whatever of that
+ * kind is already there — implant slot 3 and booster slot 3 are different slots.
+ * A replaced booster takes its switched-on side effects with it.
  */
-export function withImplant(
-  implants: readonly number[],
-  slotOf: (typeId: number) => number | undefined,
+export function placeInSet(
+  set: FittingImplantSet,
+  slotOf: SlotOf,
   typeId: number
-): number[] {
-  const slot = slotOf(typeId);
-  return [...implants.filter((id) => slot === undefined || slotOf(id) !== slot), typeId];
+): FittingImplantSet {
+  const place = slotOf(typeId);
+  const sameSlot = (id: number) => {
+    const other = slotOf(id);
+    return place !== undefined && other?.kind === place.kind && other.slot === place.slot;
+  };
+  if (place?.kind === 'booster') {
+    return withBoosters(set, [...set.boosters.filter((id) => !sameSlot(id)), typeId]);
+  }
+  return { ...set, implants: [...set.implants.filter((id) => !sameSlot(id)), typeId] };
 }
 
-/** `implants` with each of `typeIds` added in turn, one per slot. */
-export function withImplants(
-  implants: readonly number[],
-  slotOf: (typeId: number) => number | undefined,
+/** `set` with each of `typeIds` placed in turn. */
+export function placeAllInSet(
+  set: FittingImplantSet,
+  slotOf: SlotOf,
   typeIds: readonly number[]
-): number[] {
-  return typeIds.reduce<number[]>((set, id) => withImplant(set, slotOf, id), [...implants]);
+): FittingImplantSet {
+  return typeIds.reduce((next, id) => placeInSet(next, slotOf, id), set);
 }
 
 export type ImplantGoalId =
@@ -138,13 +199,19 @@ export type ImplantGoalId =
   | 'powergrid'
   | 'capacitorCapacity'
   | 'capacitorRecharge'
-  | 'damage'
+  | 'turretDps'
+  | 'missileDps'
+  | 'droneDps'
+  | 'fighterDps'
   | 'ehp'
   | 'repair'
   | 'speed'
   | 'agility'
   | 'lockRange'
-  | 'scanResolution';
+  | 'scanResolution'
+  | 'appliedDps'
+  | 'weaponRange'
+  | 'signatureRadius';
 
 export interface Budget {
   used: number;
@@ -157,26 +224,69 @@ export interface GoalDisplay {
   divisor?: number;
 }
 
-export type ImplantGoal = { id: ImplantGoalId; display: GoalDisplay } & (
+/** What some goals are measured against: the Fitting page's selected Target Profile. */
+export interface GoalContext {
+  target?: TargetProfile;
+}
+
+/** Where a goal sits in the goal list. */
+export type GoalGroup = 'fitting' | 'weapons' | 'tank' | 'navigation';
+
+export type ImplantGoal = { id: ImplantGoalId; group: GoalGroup; display: GoalDisplay } & (
   | { kind: 'budget'; read: (stats: FittingStats) => Budget }
-  | { kind: 'more' | 'less'; read: (stats: FittingStats) => number }
+  | { kind: 'more' | 'less'; read: (stats: FittingStats, context: GoalContext) => number }
 );
+
+/** Peak applied DPS against `target` at any range — so an implant or booster that only improves application or reach still counts. */
+const peakCache = new WeakMap<FittingStats, Map<TargetProfile, number>>();
+
+function peakAppliedDps(stats: FittingStats, target: TargetProfile | undefined): number {
+  if (!target || stats.applied.weapons.length === 0) return 0;
+  // Screening reads the same baseline for every family it tries: work it out once.
+  let byTarget = peakCache.get(stats);
+  if (!byTarget) peakCache.set(stats, (byTarget = new Map()));
+  let peak = byTarget.get(target);
+  if (peak === undefined) {
+    const maxRange = graphMaxRange([stats.applied]);
+    peak = Math.max(0, ...appliedDpsVsRange(stats.applied, target, maxRange, 30).map((p) => p.dps));
+    byTarget.set(target, peak);
+  }
+  return peak;
+}
+
+/** Raw DPS of one kind of weapon the Fitting fires. */
+function weaponDps(stats: FittingStats, kind: AppliedWeapon['kind']): number {
+  return stats.applied.weapons.reduce((sum, w) => (w.kind === kind ? sum + w.dps : sum), 0);
+}
+
+/** Metres: the longest turret optimal + falloff or missile flight among the firing weapons. */
+function longestWeaponReach(stats: FittingStats): number {
+  let reach = 0;
+  for (const weapon of stats.applied.weapons) {
+    if (weapon.kind === 'turret') reach = Math.max(reach, weapon.optimal + weapon.falloff);
+    else if (weapon.kind === 'missile') reach = Math.max(reach, weapon.range);
+  }
+  return reach;
+}
 
 export const IMPLANT_GOALS: readonly ImplantGoal[] = [
   {
     id: 'cpu',
+    group: 'fitting',
     kind: 'budget',
     display: { decimals: 1 },
     read: (s) => ({ used: s.cpuUsed, total: s.cpuTotal }),
   },
   {
     id: 'powergrid',
+    group: 'fitting',
     kind: 'budget',
     display: { decimals: 1 },
     read: (s) => ({ used: s.powergridUsed, total: s.powergridTotal }),
   },
   {
     id: 'capacitorCapacity',
+    group: 'fitting',
     kind: 'more',
     display: { decimals: 0 },
     read: (s) => s.capacitorCapacity,
@@ -184,37 +294,105 @@ export const IMPLANT_GOALS: readonly ImplantGoal[] = [
   // The engine's recharge time is in milliseconds; the page shows seconds.
   {
     id: 'capacitorRecharge',
+    group: 'fitting',
     kind: 'less',
     display: { decimals: 1, divisor: 1000 },
     read: (s) => s.capacitorRechargeTime,
   },
-  { id: 'damage', kind: 'more', display: { decimals: 1 }, read: (s) => s.offense.dps },
-  { id: 'ehp', kind: 'more', display: { decimals: 0 }, read: (s) => s.ehp },
+  {
+    id: 'turretDps',
+    group: 'weapons',
+    kind: 'more',
+    display: { decimals: 1 },
+    read: (s) => weaponDps(s, 'turret'),
+  },
+  {
+    id: 'missileDps',
+    group: 'weapons',
+    kind: 'more',
+    display: { decimals: 1 },
+    read: (s) => weaponDps(s, 'missile'),
+  },
+  {
+    id: 'droneDps',
+    group: 'weapons',
+    kind: 'more',
+    display: { decimals: 1 },
+    read: (s) => weaponDps(s, 'drone'),
+  },
+  {
+    id: 'fighterDps',
+    group: 'weapons',
+    kind: 'more',
+    display: { decimals: 1 },
+    read: (s) => weaponDps(s, 'fighter'),
+  },
+  { id: 'ehp', group: 'tank', kind: 'more', display: { decimals: 0 }, read: (s) => s.ehp },
   {
     id: 'repair',
+    group: 'tank',
     kind: 'more',
     display: { decimals: 1 },
     read: (s) => s.tank?.burstEffective ?? 0,
   },
-  { id: 'speed', kind: 'more', display: { decimals: 0 }, read: (s) => s.navigation.maxVelocity },
-  { id: 'agility', kind: 'less', display: { decimals: 3 }, read: (s) => s.navigation.agility },
+  {
+    id: 'speed',
+    group: 'navigation',
+    kind: 'more',
+    display: { decimals: 0 },
+    read: (s) => s.navigation.maxVelocity,
+  },
+  {
+    id: 'agility',
+    group: 'navigation',
+    kind: 'less',
+    display: { decimals: 3 },
+    read: (s) => s.navigation.agility,
+  },
   {
     id: 'lockRange',
+    group: 'navigation',
     kind: 'more',
     display: { decimals: 1, divisor: 1000 },
     read: (s) => s.targeting.maxTargetRange,
   },
   {
     id: 'scanResolution',
+    group: 'navigation',
     kind: 'more',
     display: { decimals: 0 },
     read: (s) => s.targeting.scanResolution,
   },
+  {
+    id: 'appliedDps',
+    group: 'weapons',
+    kind: 'more',
+    display: { decimals: 1 },
+    read: (s, context) => peakAppliedDps(s, context.target),
+  },
+  {
+    id: 'weaponRange',
+    group: 'weapons',
+    kind: 'more',
+    display: { decimals: 1, divisor: 1000 },
+    read: (s) => longestWeaponReach(s),
+  },
+  {
+    id: 'signatureRadius',
+    group: 'tank',
+    kind: 'less',
+    display: { decimals: 0 },
+    read: (s) => s.targeting.signatureRadius,
+  },
 ];
 
 /** A goal's figure in the unit the page shows it in. */
-export function displayValue(goal: ImplantGoal, stats: FittingStats): number {
-  const value = goal.kind === 'budget' ? goal.read(stats).used : goal.read(stats);
+export function displayValue(
+  goal: ImplantGoal,
+  stats: FittingStats,
+  context: GoalContext = {}
+): number {
+  const value = goal.kind === 'budget' ? goal.read(stats).used : goal.read(stats, context);
   return value / (goal.display.divisor ?? 1);
 }
 
@@ -239,14 +417,19 @@ export function shortfall(budget: Budget): number {
  * over the total for a budget, the relative rise (or fall, for "less is
  * better") otherwise. Comparable across candidates for one goal only.
  */
-export function goalGain(goal: ImplantGoal, before: FittingStats, after: FittingStats): number {
+export function goalGain(
+  goal: ImplantGoal,
+  before: FittingStats,
+  after: FittingStats,
+  context: GoalContext = {}
+): number {
   if (goal.kind === 'budget') {
     const b = goal.read(before);
     const a = goal.read(after);
     return b.total > 0 ? (headroom(a) - headroom(b)) / b.total : 0;
   }
-  const b = goal.read(before);
-  const a = goal.read(after);
+  const b = goal.read(before, context);
+  const a = goal.read(after, context);
   if (b === 0) return 0;
   return goal.kind === 'more' ? (a - b) / Math.abs(b) : (b - a) / Math.abs(b);
 }
@@ -293,7 +476,8 @@ export function pickSource(
 
 export interface FixCandidate {
   typeId: number;
-  slot: number;
+  /** Which slot it takes — one item per key in a fix. */
+  slot: number | string;
   /** Headroom this implant frees on its own, in the budget's unit. */
   headroomGain: number;
   /** NaN when it can't be bought anywhere. */
@@ -321,7 +505,7 @@ export function cheapestFixes(
   limit = 4
 ): FixOption[] {
   const usable = candidates.filter((c) => Number.isFinite(c.price) && c.headroomGain > 0);
-  const bySlot = new Map<number, FixCandidate[]>();
+  const bySlot = new Map<number | string, FixCandidate[]>();
   for (const c of usable) {
     const beaten = usable.some(
       (o) =>
@@ -336,7 +520,11 @@ export function cheapestFixes(
     list.push(c);
     bySlot.set(c.slot, list);
   }
-  const slots = [...bySlot.keys()].sort((a, b) => a - b);
+  const slots = [...bySlot.keys()].sort((a, b) =>
+    typeof a === 'number' && typeof b === 'number'
+      ? a - b
+      : String(a).localeCompare(String(b), undefined, { numeric: true })
+  );
   const found: FixOption[] = [];
   const walk = (i: number, picks: FixCandidate[], cost: number, gain: number) => {
     if (i === slots.length) {

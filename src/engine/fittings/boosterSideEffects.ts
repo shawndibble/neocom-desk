@@ -11,6 +11,7 @@
  * the penalty is the value of the attribute the effect's modifier reads.
  * Bump with the SDE if CCP adds a booster.
  */
+import type { FittingImplantSet } from './types';
 
 export interface BoosterSideEffect {
   effectId: number;
@@ -82,4 +83,22 @@ export function sideEffectsSwitchedOn(
   if (!switchedOn || switchedOn.length === 0) return [];
   const own = new Set(boosterSideEffects(boosterTypeId).map((effect) => effect.effectId));
   return switchedOn.filter((effectId) => own.has(effectId));
+}
+
+/**
+ * `set` with `boosters` in place of its own, keeping only the switched-on
+ * side effects that belong to a booster still in it — a side effect whose
+ * booster is gone goes with it.
+ */
+export function withBoosters(
+  set: FittingImplantSet,
+  boosters: readonly number[]
+): FittingImplantSet {
+  const kept = new Set(boosters.flatMap((id) => boosterSideEffects(id).map((e) => e.effectId)));
+  const sideEffects = (set.boosterSideEffects ?? []).filter((id) => kept.has(id));
+  return {
+    implants: set.implants,
+    boosters: [...boosters],
+    ...(sideEffects.length > 0 ? { boosterSideEffects: sideEffects } : {}),
+  };
 }

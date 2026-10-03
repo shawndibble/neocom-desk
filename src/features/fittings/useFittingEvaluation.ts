@@ -22,7 +22,13 @@ import {
   defaultImplantBasis,
   type ImplantBasis,
 } from '@/engine/fittings/implantBasis';
-import type { DamageProfile, Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
+import type {
+  DamageProfile,
+  Fitting,
+  FittingImplantSet,
+  FittingStats,
+  PilotProfile,
+} from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
@@ -257,23 +263,19 @@ export function evaluateFitting(
 }
 
 /**
- * `fitting` with `implants` in place of its own carried implants (boosters
- * kept), without overheat — the implant finder's "what would this implant
- * do" run. Always on the Fitting's own set, since that is what the finder
- * adds to, whichever basis the page shows.
+ * `fitting` with `set`'s implants and boosters in place of its own carried
+ * ones, without overheat — the Implant Finder's "what would this do" run.
+ * Always on the Fitting's own set, since that is what the finder adds to,
+ * whichever basis the page shows.
  */
 export function evaluateImplantSet(
   fitting: Fitting,
   profile: PilotProfile,
   damageProfile: DamageProfile | undefined,
   conditions: StatsConditions,
-  implants: readonly number[]
+  set: FittingImplantSet
 ): Promise<FittingStats> {
-  const pilot = applyImplantBasis(
-    profile,
-    { ...(fitting.implantSet ?? { boosters: [] }), implants: [...implants] },
-    'fitting'
-  );
+  const pilot = applyImplantBasis(profile, set, 'fitting');
   return statsUnder(
     fitting,
     { pilot, conditions, ...(damageProfile === undefined ? {} : { damageProfile }) },
