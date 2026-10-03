@@ -18,7 +18,7 @@ interface StartPlanButtonProps {
 }
 
 /**
- * "Start a plan" for an Opportunities row. Saving the plan and opening its
+ * "Plan" for an Opportunities row. Saving the plan and opening its
  * page takes a moment, and without a busy state the button looked like it
  * ignored the click and invited a second one (a second plan). It stays busy
  * after navigating, until the page it sits on unmounts; it only comes back

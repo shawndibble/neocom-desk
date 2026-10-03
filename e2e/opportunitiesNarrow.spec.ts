@@ -263,7 +263,7 @@ test.describe('Opportunities — ranked phone list', () => {
 
     await expect(page.getByText('Rifter', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: /More actions for Rifter/ }).click();
-    await page.getByRole('menuitem', { name: 'Plan' }).click();
+    await page.getByRole('menuitem', { name: 'Plan', exact: true }).click();
 
     await expect(page).toHaveURL(/\/industry\/plans\/[^/]+$/);
   });

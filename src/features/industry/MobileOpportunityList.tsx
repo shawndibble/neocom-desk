@@ -6,7 +6,7 @@
  * with a promoted "hero" metric (whichever field the pilot is sorting by)
  * parked at the right of its row, and every other field folded into one
  * quiet secondary line. Every row action
- * (Start a plan, price history, the market) lives in one borderless ⋯ menu.
+ * (Plan, price history, the market) lives in one borderless ⋯ menu.
  *
  * Identical copies — same owner, print, location, ME/TE and runs — fold into
  * one card with a count (`identicalBlueprints.ts`); they price identically,
