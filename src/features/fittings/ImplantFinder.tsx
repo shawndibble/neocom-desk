@@ -136,7 +136,7 @@ export function ImplantFinder({
         aria-pressed={goalId === id}
         onClick={() => setGoalId(id)}
         className={cx(
-          'flex min-h-11 w-full items-center gap-2 rounded-xs border px-2 text-left text-sm md:min-h-8',
+          'flex min-h-11 w-full items-center gap-2 rounded-xs border px-2 text-left text-sm md:min-h-9',
           goalId === id
             ? 'border-accent-dim bg-panel-2 text-accent'
             : 'border-transparent hover:bg-panel-2'
