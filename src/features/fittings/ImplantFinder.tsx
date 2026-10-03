@@ -14,6 +14,7 @@ import {
   type ReactNode,
 } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Button, IconButton, IskAmount, SearchInput, Spinner, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -28,6 +29,7 @@ import {
   type ImplantGoal,
   type ImplantGoalId,
   type ImplantKind,
+  type SlotOf,
 } from '@/engine/fittings/implantFinder';
 import { alternativeSource, type Source } from '@/engine/fittings/implantSources';
 import { withBoosters } from '@/engine/fittings/boosterSideEffects';
@@ -47,6 +49,7 @@ import { PriceHubSelect } from './PriceHubSelect';
 import { STAT_EYEBROW_TYPE } from './statKit';
 import { useTargetProfiles } from './targetProfiles';
 import {
+  slotKey,
   useImplantFinder,
   type FamilyResult,
   type FixResult,
@@ -104,6 +107,8 @@ export function ImplantFinder({
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const { selected: target } = useTargetProfiles();
   const [goalId, setGoalId] = useState<ImplantGoalId | null>(null);
+  /** The slot picked on the strip (`slotKey`): goals and results narrow to what goes in it. */
+  const [slot, setSlot] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [infoTypeId, setInfoTypeId] = useState<number | null>(null);
   const finder = useImplantFinder({
@@ -154,7 +159,12 @@ export function ImplantFinder({
   }
 
   const q = query.trim().toLowerCase();
-  const visible = finder.goals.filter(({ goal }) => !q || label(goal.id).toLowerCase().includes(q));
+  const visible = finder.goals.filter(
+    ({ goal, slots }) =>
+      (!q || label(goal.id).toLowerCase().includes(q)) &&
+      // The open goal stays put, so picking a slot never pulls it out from under the pilot.
+      (slot === null || slots.has(slot) || goal.id === goalId)
+  );
   /** How far over budget a goal is; 0 for one that fits or isn't a budget. */
   const overBy = (g: ImplantGoal) =>
     baseline && g.kind === 'budget' ? shortfall(g.read(baseline)) : 0;
@@ -167,9 +177,19 @@ export function ImplantFinder({
   /** Slots an item that helps the selected goal could go in, for the set strip. */
   const helpfulSlots = useMemo(() => {
     const slots = new Set<string>();
-    for (const r of finder.results ?? []) slots.add(`${r.family.kind}:${r.family.slot}`);
+    for (const r of finder.results ?? []) slots.add(slotKey(r.family.kind, r.family.slot));
     return slots;
   }, [finder.results]);
+
+  const inSlot = (kind: ImplantKind, at: number) => slot === null || slotKey(kind, at) === slot;
+  const slotResults = finder.results?.filter((r) => inSlot(r.family.kind, r.family.slot)) ?? null;
+  // A fix for another slot isn't what the pilot is looking at here.
+  const slotFixes = finder.fixes.filter((fix) =>
+    fix.typeIds.some((id) => {
+      const at = catalog?.slotOf(id);
+      return at !== undefined && inSlot(at.kind, at.slot);
+    })
+  );
 
   if (finder.status === 'error') {
     return <p className="p-3 text-sm text-danger">{t('fittings.implantFinder.error')}</p>;
@@ -215,6 +235,8 @@ export function ImplantFinder({
   );
 
   const budgetGoal = goal?.kind === 'budget' ? goal : null;
+  const slotPlace = slot === null ? null : parseSlotKey(slot);
+  const slotLabel = slotPlace === null ? null : slotName(t, slotPlace.kind, slotPlace.slot);
 
   return (
     <SourceNames.Provider
@@ -230,9 +252,21 @@ export function ImplantFinder({
           names={names}
           helpfulSlots={helpfulSlots}
           goalLabel={goal ? label(goal.id) : null}
+          selected={slot}
+          onSelect={(key) => setSlot((current) => (current === key ? null : key))}
           onRemove={remove}
-          onInfo={setInfoTypeId}
         />
+
+        {slotPlace && slotLabel && (
+          <SlotBar
+            label={slotLabel}
+            occupant={occupantOf(set, catalog.slotOf, slotPlace.kind, slotPlace.slot)}
+            nameOf={nameOf}
+            onInfo={setInfoTypeId}
+            onRemove={remove}
+            onClear={() => setSlot(null)}
+          />
+        )}
 
         <Toolbar
           purchase={finder.purchase}
@@ -275,21 +309,30 @@ export function ImplantFinder({
               </div>
             )}
             {visible.length === 0 && (
-              <p className="text-sm text-text-dim">{t('fittings.implantFinder.noGoalMatch')}</p>
+              <p className="text-sm text-text-dim">
+                {slotLabel && !q
+                  ? t('fittings.implantFinder.slotNoGoals', { slot: slotLabel })
+                  : t('fittings.implantFinder.noGoalMatch')}
+              </p>
             )}
           </nav>
 
           <section className={cx('min-w-0 flex-1 space-y-3', !goal && 'hidden md:block')}>
             {!goal ? (
-              <p className="text-sm text-text-dim">{t('fittings.implantFinder.pickGoal')}</p>
+              <p className="text-sm text-text-dim">
+                {slotLabel
+                  ? t('fittings.implantFinder.pickGoalForSlot', { slot: slotLabel })
+                  : t('fittings.implantFinder.pickGoal')}
+              </p>
             ) : (
               <GoalResults
                 goal={goal}
                 off={goalIsOff}
                 baseline={baseline}
                 context={finder.context}
-                results={finder.results}
-                fixes={finder.fixes}
+                results={slotResults}
+                fixes={slotFixes}
+                slot={slotPlace && slotLabel ? { kind: slotPlace.kind, label: slotLabel } : null}
                 hubId={hubId}
                 nameOf={nameOf}
                 busy={finder.updating}
@@ -317,23 +360,53 @@ export function ImplantFinder({
   );
 }
 
-/** "Your set": slots 1–10 and the booster slots, marking the ones that can help the chosen goal. */
+function parseSlotKey(key: string): { kind: ImplantKind; slot: number } {
+  const [kind, slot] = key.split(':');
+  return { kind: kind === 'booster' ? 'booster' : 'implant', slot: Number(slot) };
+}
+
+function slotName(t: TFunction, kind: ImplantKind, slot: number): string {
+  return kind === 'booster'
+    ? t('fittings.implantFinder.boosterSlot', { slot })
+    : t('fittings.implantFinder.slotShort', { slot });
+}
+
+/** What the set has in one slot, if anything. */
+function occupantOf(
+  set: FittingImplantSet,
+  slotOf: SlotOf,
+  kind: ImplantKind,
+  slot: number
+): number | undefined {
+  return [...set.implants, ...set.boosters].find((id) => {
+    const at = slotOf(id);
+    return at?.kind === kind && at.slot === slot;
+  });
+}
+
+/**
+ * "Your set": slots 1–10 and the booster slots, marking the ones that can help
+ * the chosen goal. Each slot is a button: picking one narrows the goals and
+ * results to what goes in it.
+ */
 function SetStrip({
   set,
   slotOf,
   names,
   helpfulSlots,
   goalLabel,
+  selected,
+  onSelect,
   onRemove,
-  onInfo,
 }: {
   set: FittingImplantSet;
-  slotOf: (typeId: number) => { kind: ImplantKind; slot: number } | undefined;
+  slotOf: SlotOf;
   names: Map<number, { full: string; short: string }>;
   helpfulSlots: Set<string>;
   goalLabel: string | null;
+  selected: string | null;
+  onSelect: (key: string) => void;
   onRemove: (typeId: number) => void;
-  onInfo: (typeId: number) => void;
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
@@ -341,35 +414,56 @@ function SetStrip({
     { length: Math.max(MIN_BOOSTER_SLOTS, ...set.boosters.map((id) => slotOf(id)?.slot ?? 0)) },
     (_, i) => i + 1
   );
-  const occupant = (kind: ImplantKind, slot: number) =>
-    [...set.implants, ...set.boosters].find((id) => {
-      const at = slotOf(id);
-      return at?.kind === kind && at.slot === slot;
-    });
   const cells = [
     ...IMPLANT_SLOTS.map((slot) => ({ kind: 'implant' as const, slot })),
     ...boosterSlots.map((slot) => ({ kind: 'booster' as const, slot })),
   ];
-  const filled = cells.filter((c) => occupant(c.kind, c.slot) !== undefined).length;
+  const filled = cells.filter((c) => occupantOf(set, slotOf, c.kind, c.slot) !== undefined).length;
 
   const cell = ({ kind, slot }: { kind: ImplantKind; slot: number }) => {
-    const id = occupant(kind, slot);
-    const helps = helpfulSlots.has(`${kind}:${slot}`);
+    const key = slotKey(kind, slot);
+    const id = occupantOf(set, slotOf, kind, slot);
+    const helps = helpfulSlots.has(key);
+    const picked = selected === key;
     const name = id === undefined ? undefined : names.get(id);
+    const label = slotName(t, kind, slot);
     return (
-      <li
-        key={`${kind}:${slot}`}
-        title={name?.full}
-        className={cx(
-          'flex min-w-0 flex-col justify-between rounded-xs border px-1.5 py-1',
-          helps ? 'border-dashed border-accent bg-accent/10' : 'border-line bg-panel-2'
-        )}
-      >
-        <span className="flex items-center justify-between gap-1 text-[0.625rem] tracking-wider text-text-dim uppercase">
-          {kind === 'booster'
-            ? t('fittings.implantFinder.boosterSlot', { slot })
-            : t('fittings.implantFinder.slotShort', { slot })}
-          {id !== undefined && (
+      <li key={key} className="relative min-w-0">
+        <button
+          type="button"
+          aria-pressed={picked}
+          aria-label={t('fittings.implantFinder.pickSlot', {
+            slot: label,
+            item: name?.full ?? (id === undefined ? t('fittings.implantFinder.empty') : `#${id}`),
+          })}
+          title={name?.full}
+          onClick={() => onSelect(key)}
+          className={cx(
+            'flex min-h-11 w-full min-w-0 flex-col justify-between rounded-xs border px-1.5 py-1 text-left md:min-h-0',
+            picked
+              ? 'border-accent bg-panel-2 ring-1 ring-accent'
+              : helps
+                ? 'border-dashed border-accent bg-accent/10 hover:bg-accent/20'
+                : 'border-line bg-panel-2 hover:border-line-bright'
+          )}
+        >
+          <span
+            className={cx(
+              'text-[0.625rem] tracking-wider uppercase',
+              picked ? 'text-accent' : 'text-text-dim',
+              id !== undefined && 'pr-5'
+            )}
+          >
+            {label}
+          </span>
+          {id === undefined ? (
+            <span className="text-xs text-text-dim">{t('fittings.implantFinder.empty')}</span>
+          ) : (
+            <span className="truncate text-xs font-semibold">{name?.short ?? `#${id}`}</span>
+          )}
+        </button>
+        {id !== undefined && (
+          <span className="absolute top-0.5 right-0.5">
             <IconButton
               variant="plain"
               size="row"
@@ -377,18 +471,7 @@ function SetStrip({
               label={t('fittings.implantFinder.removeItem', { name: name?.full ?? id })}
               onClick={() => onRemove(id)}
             />
-          )}
-        </span>
-        {id === undefined ? (
-          <span className="text-xs text-text-dim">{t('fittings.implantFinder.empty')}</span>
-        ) : (
-          <button
-            type="button"
-            onClick={() => onInfo(id)}
-            className="truncate text-left text-xs font-semibold hover:text-accent"
-          >
-            {name?.short ?? `#${id}`}
-          </button>
+          </span>
         )}
       </li>
     );
@@ -406,10 +489,12 @@ function SetStrip({
         <span className="flex flex-1 gap-0.5" aria-hidden>
           {cells.map((c) => (
             <span
-              key={`${c.kind}:${c.slot}`}
+              key={slotKey(c.kind, c.slot)}
               className={cx(
                 'size-2',
-                occupant(c.kind, c.slot) !== undefined ? 'bg-accent' : 'border border-line-bright'
+                occupantOf(set, slotOf, c.kind, c.slot) !== undefined
+                  ? 'bg-accent'
+                  : 'border border-line-bright'
               )}
             />
           ))}
@@ -422,11 +507,11 @@ function SetStrip({
       <div className={cx('space-y-1', !expanded && 'hidden md:block')}>
         <div className="hidden items-baseline gap-2 md:flex">
           <SectionHeading>{t('fittings.implantFinder.yourSet')}</SectionHeading>
-          {goalLabel && helpfulSlots.size > 0 && (
-            <span className="text-xs text-text-dim">
-              {t('fittings.implantFinder.helpfulSlots', { goal: goalLabel })}
-            </span>
-          )}
+          <span className="text-xs text-text-dim">
+            {goalLabel && helpfulSlots.size > 0
+              ? t('fittings.implantFinder.helpfulSlots', { goal: goalLabel })
+              : t('fittings.implantFinder.slotHint')}
+          </span>
         </div>
         <ul
           style={{ '--booster-slots': boosterSlots.length } as CSSProperties}
@@ -437,6 +522,65 @@ function SetStrip({
           {cells.slice(10).map(cell)}
         </ul>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The slot picked on the strip: what's in it, in full, with its details and
+ * Remove — and the way back to every slot. Kept outside the strip so it stays
+ * in view on a phone, where the strip folds away.
+ */
+function SlotBar({
+  label,
+  occupant,
+  nameOf,
+  onInfo,
+  onRemove,
+  onClear,
+}: {
+  label: string;
+  occupant: number | undefined;
+  nameOf: (typeId: number) => string;
+  onInfo: (typeId: number) => void;
+  onRemove: (typeId: number) => void;
+  onClear: () => void;
+}) {
+  const { t } = useTranslation();
+  const name = occupant === undefined ? null : nameOf(occupant);
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xs border border-accent-dim bg-panel-2 px-2.5 py-1.5 text-sm">
+      {occupant !== undefined && <TypeIcon typeId={occupant} size={32} width={24} height={24} />}
+      <span className="min-w-0 flex-1">
+        <span className="text-text-dim">
+          {t('fittings.implantFinder.showingSlot', { slot: label })}
+        </span>{' '}
+        <span className={name ? 'font-semibold' : 'text-text-dim'}>
+          {name ?? t('fittings.implantFinder.empty')}
+        </span>
+      </span>
+      {occupant !== undefined && name !== null && (
+        <>
+          <IconButton
+            variant="plain"
+            size="sm"
+            icon={<Icon.Info />}
+            label={t('fittings.implantFinder.info', { name })}
+            onClick={() => onInfo(occupant)}
+          />
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label={t('fittings.implantFinder.removeItem', { name })}
+            onClick={() => onRemove(occupant)}
+          >
+            {t('fittings.implantFinder.remove')}
+          </Button>
+        </>
+      )}
+      <Button size="sm" variant="ghost" onClick={onClear}>
+        {t('fittings.implantFinder.allSlots')}
+      </Button>
     </div>
   );
 }
@@ -455,7 +599,7 @@ function Toolbar({
   const { t } = useTranslation();
   const stores = purchase?.stores ?? [];
   const ownRate = stores.find((s) => s.rate.source === 'yours')?.rate.rate ?? null;
-  const balancesKnown = stores.some((s) => s.balance !== null);
+  const balancesUnknown = stores.length > 0 && stores.every((s) => s.balance === null);
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xs border border-line bg-bg px-2.5 py-2 text-xs text-text-dim">
       <PriceHubSelect />
@@ -466,20 +610,7 @@ function Toolbar({
             : t('fittings.implantFinder.lpValueMarket')}
         </span>
       )}
-      {stores.length > 0 && (
-        <span>
-          {balancesKnown ? (
-            <>
-              {t('fittings.implantFinder.yourLp')}{' '}
-              <span className="text-text tabular-nums">
-                {stores.map((s) => `${s.corpName} ${fmt(s.balance ?? 0, 0)}`).join(' · ')}
-              </span>
-            </>
-          ) : (
-            t('fittings.implantFinder.lpUnknown')
-          )}
-        </span>
-      )}
+      {balancesUnknown && <span>{t('fittings.implantFinder.lpUnknown')}</span>}
       {storeProgress && (
         <span className="flex items-center gap-1.5">
           <Spinner size="sm" />
@@ -536,6 +667,8 @@ interface GoalResultsProps {
   context: GoalContext;
   results: FamilyResult[] | null;
   fixes: FixResult[];
+  /** The slot picked on the strip, when `results` and `fixes` are narrowed to it. */
+  slot: { kind: ImplantKind; label: string } | null;
   hubId: string;
   nameOf: (typeId: number) => string;
   /** The shown results are from before the last change; their buttons wait for the new ones. */
@@ -559,6 +692,7 @@ function GoalResults({
   context,
   results,
   fixes,
+  slot,
   hubId,
   nameOf,
   busy,
@@ -769,7 +903,14 @@ function GoalResults({
         </div>
       )}
 
-      {!off && (
+      {!off && slot && results?.length === 0 && (
+        <p className="text-sm text-text-dim">
+          {t('fittings.implantFinder.slotNoHelpersForGoal', { slot: slot.label, goal: label })}
+        </p>
+      )}
+
+      {/* A booster slot has no implants to list; still loading (null) shows the spinner. */}
+      {!off && (!slot || (slot.kind === 'implant' && results?.length !== 0)) && (
         <div className="space-y-1.5">
           <SectionHeading>{t('fittings.implantFinder.helpersHeading')}</SectionHeading>
           {results === null ? (

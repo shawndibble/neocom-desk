@@ -107,7 +107,9 @@ export function ImplantBasisControl({
         onClose={() => setPickerOpen(false)}
         implantSet={implantSet}
         onChange={onImplantSetChange}
-        {...(fitting && profile ? { finder: { fitting, profile, basis: effective } } : {})}
+        {...(fitting && profile
+          ? { finder: { fitting, profile, basis: effective, onBasisChange } }
+          : {})}
       />
     </StatField>
   );

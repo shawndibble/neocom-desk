@@ -2,10 +2,34 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
 
 vi.mock('@/features/skills/typeCatalog', () => ({ loadItemNameMap: async () => new Map() }));
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: async () => new Map([[9950, 'Standard Blue Pill Booster']]),
+}));
+// What the finder is handed, and one change made through it.
+vi.mock('./ImplantFinder', () => ({
+  ImplantFinder: ({
+    fitting,
+    implantSet,
+    onChange,
+  }: {
+    fitting: Fitting;
+    implantSet: FittingImplantSet;
+    onChange: (set: FittingImplantSet) => void;
+  }) => (
+    <>
+      <p>Plan: {implantSet.implants.join(',')}</p>
+      <p>Measured on: {fitting.implantSet?.implants.join(',') ?? 'none'}</p>
+      <button
+        type="button"
+        onClick={() => onChange({ ...implantSet, implants: [...implantSet.implants, 999] })}
+      >
+        Plan one more
+      </button>
+    </>
+  ),
 }));
 
 const { ImplantSetPicker } = await import('./ImplantSetPicker');
@@ -58,5 +82,60 @@ describe('ImplantSetPicker — booster side effects', () => {
       await screen.findByRole('button', { name: 'Remove Standard Blue Pill Booster' })
     );
     expect(onChange).toHaveBeenLastCalledWith({ implants: [], boosters: [] });
+  });
+});
+
+describe('ImplantSetPicker — planning from the clone', () => {
+  const fitting = { name: 'Drake', shipTypeId: 24698, modules: [] } as unknown as Fitting;
+  const profile: PilotProfile = {
+    skillLevels: new Map(),
+    implantTypeIds: [10228, 13283],
+    boosterTypeIds: [],
+  };
+
+  it('starts from the clone’s implants, and the first change saves them with it and switches the page to the plan', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const onBasisChange = vi.fn();
+    render(
+      <ImplantSetPicker
+        open
+        onClose={vi.fn()}
+        implantSet={undefined}
+        onChange={onChange}
+        finder={{ fitting, profile, basis: 'clone', onBasisChange }}
+      />
+    );
+    expect(screen.getByText('Plan: 10228,13283')).toBeInTheDocument();
+    expect(screen.getByText('Measured on: 10228,13283')).toBeInTheDocument();
+    // Opening it alone saves nothing.
+    expect(onChange).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Plan one more' }));
+    expect(onChange).toHaveBeenLastCalledWith({ implants: [10228, 13283, 999], boosters: [] });
+    expect(onBasisChange).toHaveBeenLastCalledWith('fitting');
+  });
+
+  it('keeps a Fitting’s own set, and leaves the basis alone on "Fitting’s"', async () => {
+    const user = userEvent.setup();
+    const onBasisChange = vi.fn();
+    const own = { implants: [5], boosters: [] };
+    render(
+      <ImplantSetPicker
+        open
+        onClose={vi.fn()}
+        implantSet={own}
+        onChange={vi.fn()}
+        finder={{
+          fitting: { ...fitting, implantSet: own },
+          profile,
+          basis: 'fitting',
+          onBasisChange,
+        }}
+      />
+    );
+    expect(screen.getByText('Plan: 5')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Plan one more' }));
+    expect(onBasisChange).not.toHaveBeenCalled();
   });
 });
