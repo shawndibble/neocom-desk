@@ -15,6 +15,7 @@ import {
   DataTable,
   IconButton,
   IskAmount,
+  NativeSelect,
   TextInput,
   Toast,
   Tooltip,
@@ -82,7 +83,7 @@ interface MaterialsTableProps {
   onToggleBuildHere?: (typeID: number) => void;
   /**
    * Opens the "Build it" modal for a material being built here — the runs and
-   * ingredient list this flat table no longer nests under the row. Omitted
+   * ingredient list the Building row's Recipe link opens. Omitted
    * where the caller has no modal to open, which simply drops the link.
    */
   onShowRecipe?: (typeID: number) => void;
@@ -415,9 +416,17 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
   );
 }
 
-/**
 /** `xl` (78.125rem, src/styles/index.css) up to `2xl`: where BuildPlanDetail puts Costs & revenue beside Materials. */
 const BESIDE_COSTS_QUERY = '(min-width: 78.125rem) and (max-width: 95.999rem)';
+
+/** The phone list's own sort — the header sort buttons are a table's, and a phone gets no table. */
+type PhoneSort = 'plan' | 'total' | 'toBuy' | 'name';
+const PHONE_SORTS: readonly PhoneSort[] = ['plan', 'total', 'toBuy', 'name'];
+
+/** A material being built here rather than bought. */
+function isBuilt(material: MaterialTableRow): boolean {
+  return material.subBuilds.length > 0;
+}
 
 /** How long the "moved to …" confirmation stays up — the same beat every other Undo toast in the app keeps. */
 const TOAST_MS = 8000;
@@ -591,6 +600,7 @@ export function MaterialsTable({
   // doc: null means nothing is held and every row sits in its own section.
   const [held, setHeld] = useState<ReadonlyMap<number, MaterialErrand> | null>(null);
   const [haveOpen, setHaveOpen] = useState(false);
+  const [phoneSort, setPhoneSort] = useState<PhoneSort>('plan');
   const [toast, setToast] = useState<{ message: string; undo: () => void } | null>(null);
 
   // Have edits not yet seen to land: what the field held before, and what the
@@ -604,7 +614,11 @@ export function MaterialsTable({
   const toggled = useRef(new Set<number>());
   // After a toggle, the same row's swap control in its new section takes
   // focus, so a keyboard user isn't dropped back at the top of the page.
-  const pendingFocus = useRef<{ typeID: number; kind: 'build' | 'buy' } | null>(null);
+  const pendingFocus = useRef<{
+    typeID: number;
+    kind: 'build' | 'buy';
+    from: MaterialErrand;
+  } | null>(null);
   const lastShown = useRef<ReadonlyMap<number, MaterialErrand> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -669,7 +683,8 @@ export function MaterialsTable({
     // An edit is settled once the plan holds what it wrote and its row is no
     // longer held in place; whatever it moved has been confirmed above.
     for (const [typeID, edit] of pending) {
-      if (sourcing?.[typeID]?.ownedQuantity === edit.after && !held?.has(typeID)) {
+      const stored = sourcing?.[typeID]?.ownedQuantity ?? 0;
+      if (stored === (edit.after ?? 0) && !held?.has(typeID)) {
         pending.delete(typeID);
       }
     }
@@ -686,6 +701,10 @@ export function MaterialsTable({
     if (el) {
       pendingFocus.current = null;
       el.focus();
+    } else if (shown.get(target.typeID) !== target.from) {
+      // It moved somewhere its control isn't mounted — the folded Already
+      // have section. Give up rather than steal focus whenever that opens.
+      pendingFocus.current = null;
     }
   });
 
@@ -708,7 +727,11 @@ export function MaterialsTable({
       const { typeID } = material;
       const building = material.subBuilds.length > 0;
       toggled.current.add(typeID);
-      pendingFocus.current = { typeID, kind: building ? 'build' : 'buy' };
+      pendingFocus.current = {
+        typeID,
+        kind: building ? 'build' : 'buy',
+        from: shown.get(typeID) ?? (building ? 'building' : 'toBuy'),
+      };
       // Released from any hold: this is a move the player asked for outright.
       setHeld((current) => {
         if (!current?.has(typeID)) return current;
@@ -729,16 +752,30 @@ export function MaterialsTable({
         },
       });
     },
-    [onToggleBuildHere, nameFor, sectionLabel, t]
+    [onToggleBuildHere, nameFor, sectionLabel, t, shown]
   );
+
+  /** The make-or-buy advice for a row, and whether a Build/Buy instead switch is offered on it. */
+  function buildChoice(material: MaterialTableRow) {
+    return {
+      advice: makeOrBuy?.get(material.typeID),
+      toggleable: canBuildHere?.(material.typeID) === true && onToggleBuildHere !== undefined,
+    };
+  }
+
+  /** What building saves over buying, when the advice says building is cheaper. */
+  function buildSavings(material: MaterialTableRow): number | null {
+    const { advice } = buildChoice(material);
+    return advice?.verdict === 'build' && advice.savings > 0 && material.remainingQuantity > 0
+      ? advice.savings
+      : null;
+  }
 
   /** The name, any advice/skill marker, and — unless the caller places it itself — the row's text action. */
   function renderName(material: MaterialTableRow, withAction: boolean) {
     const name = nameFor(material.typeID);
-    const advice = makeOrBuy?.get(material.typeID);
-    const building = material.subBuilds.length > 0;
-    const skillGate = building ? skillGates?.get(material.typeID) : undefined;
-    const toggleable = canBuildHere?.(material.typeID) && onToggleBuildHere !== undefined;
+    const { advice, toggleable } = buildChoice(material);
+    const skillGate = isBuilt(material) ? skillGates?.get(material.typeID) : undefined;
     return (
       <span className="flex min-w-0 flex-col items-start gap-0.5">
         <span className="inline-flex min-w-0 items-center gap-1.5">
@@ -777,12 +814,18 @@ export function MaterialsTable({
         </button>
       ) : null;
     }
-    const advice = makeOrBuy?.get(material.typeID);
-    const toggleable = canBuildHere?.(material.typeID) && onToggleBuildHere !== undefined;
-    if (material.subBuilds.length > 0) {
-      if (!onShowRecipe && !toggleable) return null;
+    const { advice, toggleable } = buildChoice(material);
+    if (isBuilt(material)) {
+      const savings = buildSavings(material);
+      if (!onShowRecipe && !toggleable && savings === null) return null;
       return (
         <span className="inline-flex flex-wrap items-center gap-x-2">
+          {/* What this build is worth, in the same green its heading uses. */}
+          {savings !== null && (
+            <span className="text-[0.6875rem] text-success tabular-nums">
+              {t('industry.errands.savesVsBuying', { amount: formatIsk(savings) })}
+            </span>
+          )}
           {onShowRecipe && (
             <button
               type="button"
@@ -840,7 +883,7 @@ export function MaterialsTable({
       <span className="flex flex-col items-start gap-0.5 sm:items-end">
         <SourcingInput
           value={owned}
-          label={t('industry.ownedQuantityFor', { material: nameFor(material.typeID) })}
+          label={t('industry.errands.haveFor', { material: nameFor(material.typeID) })}
           inputMode="numeric"
           widthClassName="w-20"
           placeholder="0"
@@ -1053,8 +1096,10 @@ export function MaterialsTable({
   const tableColumns = besideCosts ? columns.filter((column) => column.id !== 'volume') : columns;
 
   function holdSection(errand: MaterialErrand) {
-    if (held) return;
-    setHeld(new Map(groups[errand].map((row) => [row.typeID, errand])));
+    // Functional: tabbing straight from one section into the next queues the
+    // first one's release before this, and a closure would still see it held.
+    const rows = groups[errand];
+    setHeld((current) => current ?? new Map(rows.map((row) => [row.typeID, errand])));
   }
 
   function releaseSection(event: FocusEvent<HTMLElement>) {
@@ -1069,6 +1114,8 @@ export function MaterialsTable({
       errand === 'toBuy' || errand === 'blueprint'
         ? errandSubtotal(rows, sourcing, pricesReady)
         : null;
+    const saved =
+      errand === 'building' ? rows.reduce((sum, row) => sum + (buildSavings(row) ?? 0), 0) : 0;
     const title = (
       <span className="inline-flex items-center gap-1.5">
         {Glyph && <Glyph size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
@@ -1090,7 +1137,7 @@ export function MaterialsTable({
               type="button"
               aria-expanded={haveOpen}
               onClick={() => setHaveOpen((open) => !open)}
-              className="inline-flex items-center gap-1 uppercase hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+              className="inline-flex min-h-11 items-center gap-1 uppercase hover:text-text focus-visible:outline-2 focus-visible:outline-accent md:min-h-0"
             >
               <Caret expanded={haveOpen} />
               {title}
@@ -1099,6 +1146,11 @@ export function MaterialsTable({
             title
           )}
         </h3>
+        {saved > 0 && (
+          <span className="text-[0.6875rem] font-semibold text-success tabular-nums">
+            {t('industry.errands.saves', { amount: formatIsk(saved) })}
+          </span>
+        )}
         {errand === 'have' && !haveOpen ? (
           <span className="min-w-0 truncate text-[0.6875rem] text-text-dim">
             {rows.map((row) => nameFor(row.typeID)).join(', ')}
@@ -1120,8 +1172,8 @@ export function MaterialsTable({
   }
 
   /** One phone row: name and total, then Need − Have = To buy on one line, then the row's action and price. */
-  function renderPhoneRow(errand: MaterialErrand, material: MaterialTableRow) {
-    const building = errand === 'building';
+  function renderPhoneRow(material: MaterialTableRow) {
+    const building = isBuilt(material);
     const item = (
       <li key={material.typeID} className="flex flex-col gap-1.5 py-2">
         <div className="flex items-start justify-between gap-2">
@@ -1137,7 +1189,8 @@ export function MaterialsTable({
               {t('industry.errands.needValue', { quantity: material.quantity.toLocaleString() })}
             </span>
             <span aria-hidden="true">{t('industry.errands.minus')}</span>
-            <span>{t('industry.errands.haveColumn')}</span>
+            {/* The field's own accessible name starts with this word. */}
+            <span aria-hidden="true">{t('industry.errands.haveColumn')}</span>
             {renderHave(material)}
             {!building && (
               <>
@@ -1172,10 +1225,50 @@ export function MaterialsTable({
     );
   }
 
+  /** Within one section only — a sort never pulls a row out of its errand. */
+  function sortForPhone(rows: readonly MaterialTableRow[]): readonly MaterialTableRow[] {
+    if (phoneSort === 'plan') return rows;
+    const keyed = rows.map((row) => ({
+      row,
+      key:
+        phoneSort === 'name'
+          ? nameFor(row.typeID)
+          : phoneSort === 'toBuy'
+            ? isBuilt(row)
+              ? null
+              : row.remainingQuantity
+            : isBuilt(row)
+              ? null
+              : materialRowState(row, sourcing, pricesReady).lineCost,
+    }));
+    keyed.sort((a, b) => {
+      // Rows with nothing to sort by sink, as the table's own sort does.
+      if (a.key === null || b.key === null) return a.key === b.key ? 0 : a.key === null ? 1 : -1;
+      if (typeof a.key === 'string' && typeof b.key === 'string') return a.key.localeCompare(b.key);
+      return (b.key as number) - (a.key as number);
+    });
+    return keyed.map((entry) => entry.row);
+  }
+
   const visible = MATERIAL_ERRANDS.filter((errand) => groups[errand].length > 0);
 
   return (
     <div ref={containerRef} className="flex flex-col gap-3">
+      {isPhone && (
+        <NativeSelect
+          size="sm"
+          className="ml-auto w-44 [&>select]:min-h-11"
+          aria-label={t('industry.errands.sortLabel')}
+          value={phoneSort}
+          onChange={(event) => setPhoneSort(event.target.value as PhoneSort)}
+        >
+          {PHONE_SORTS.map((key) => (
+            <option key={key} value={key}>
+              {t(`industry.errands.sort.${key}`)}
+            </option>
+          ))}
+        </NativeSelect>
+      )}
       {visible.map((errand) => {
         const rows = groups[errand];
         const open = errand !== 'have' || haveOpen;
@@ -1190,7 +1283,7 @@ export function MaterialsTable({
             {open &&
               (isPhone ? (
                 <ul className="divide-y divide-line px-2">
-                  {rows.map((material) => renderPhoneRow(errand, material))}
+                  {sortForPhone(rows).map((material) => renderPhoneRow(material))}
                 </ul>
               ) : (
                 <div className="overflow-x-auto">

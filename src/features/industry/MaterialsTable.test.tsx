@@ -112,8 +112,7 @@ function row(name: string): HTMLElement {
 
 // Textboxes, not spinbuttons: the fields mask their value ("338,600"), which
 // a `type="number"` input cannot hold.
-const ownedInput = (material: string) =>
-  screen.getByRole('textbox', { name: `Owned quantity for ${material}` });
+const ownedInput = (material: string) => screen.getByRole('textbox', { name: `Have: ${material}` });
 const priceInput = (material: string) =>
   screen.getByRole('textbox', { name: `Price for ${material}` });
 const revertButton = (material: string) =>
@@ -476,9 +475,7 @@ describe('MaterialsTable on a phone', () => {
     expect(screen.queryByRole('table')).toBeNull();
     const item = screen.getByText('Tritanium').closest('li')!;
     expect(within(item).getByText('Need 1,000')).toBeTruthy();
-    expect(
-      within(item).getByRole('textbox', { name: 'Owned quantity for Tritanium' })
-    ).toBeTruthy();
+    expect(within(item).getByRole('textbox', { name: 'Have: Tritanium' })).toBeTruthy();
     expect(within(item).getByText('600 to buy')).toBeTruthy();
     expect(within(item).getByRole('textbox', { name: 'Price for Tritanium' })).toBeTruthy();
   });
@@ -486,6 +483,18 @@ describe('MaterialsTable on a phone', () => {
   it('keeps the section headings and their subtotals', () => {
     render(<Harness />);
     expect(screen.getByRole('heading', { name: /^To buy · 2/ })).toBeTruthy();
+  });
+
+  it('sorts within each section from its own picker, since a phone has no table header', () => {
+    render(<Harness />);
+    const names = () =>
+      Array.from(document.querySelectorAll('li')).map((li) => li.querySelector('a')?.textContent);
+    expect(names()).toEqual(['Tritanium', 'Pyerite']);
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Sort materials' }), {
+      target: { value: 'name' },
+    });
+    expect(names()).toEqual(['Pyerite', 'Tritanium']);
   });
 });
 
@@ -910,9 +919,7 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
 
     // 9,000 detected against a 1,000-unit requirement.
     expect(onChange).toHaveBeenCalledWith(34, { ownedQuantity: 1000 });
-    expect(within(row('Tritanium')).getByLabelText('Owned quantity for Tritanium')).toHaveValue(
-      '1,000'
-    );
+    expect(within(row('Tritanium')).getByLabelText('Have: Tritanium')).toHaveValue('1,000');
   });
 
   it('drops the use action once the row already holds the clamped suggestion', () => {
@@ -1205,6 +1212,29 @@ describe('MaterialsTable build-here control', () => {
     ).toBeInTheDocument();
   });
 
+  it('says in green what a build saves, on the row and in the Building heading', () => {
+    const cheaper: MakeOrBuy = {
+      method: 'manufacturing',
+      verdict: 'build',
+      makeUnitPrice: 40,
+      buyUnitPrice: 50,
+      savings: 100,
+      me: 0,
+      blueprintCost: 0,
+    };
+    renderTable({
+      materials: building(),
+      canBuildHere: buildable,
+      onToggleBuildHere: vi.fn(),
+      makeOrBuy: new Map([[9840, cheaper]]),
+    });
+    expect(within(row('Mechanical Parts')).getByText('saves 100 vs buying')).toHaveClass(
+      'text-success'
+    );
+    const heading = screen.getByRole('heading', { name: /^Building · 1/ });
+    expect(within(heading.parentElement!).getByText('saves 100')).toHaveClass('text-success');
+  });
+
   it('turns Build instead green, with what it saves, only when building is cheaper', () => {
     const cheaper: MakeOrBuy = {
       method: 'manufacturing',
@@ -1435,7 +1465,7 @@ describe('Blueprint Acquisition row (issue #838)', () => {
     renderTable({ materials: [acquisitionRow(1)] });
 
     expect(
-      screen.queryByRole('textbox', { name: `Owned quantity for Widget Blueprint` })
+      screen.queryByRole('textbox', { name: `Have: Widget Blueprint` })
     ).not.toBeInTheDocument();
   });
 

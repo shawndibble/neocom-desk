@@ -2216,7 +2216,6 @@
     "groupVerdictVolume": "volume {{volume}}",
     "groupVerdictVolumeAtLeast": "volume at least {{volume}}",
     "ownedQuantity": "Owned",
-    "ownedQuantityFor": "Owned quantity for {{material}}",
     "detectedOwned": "You own {{quantity}}",
     "detectedOwnedAtLeast": "You own ≥ {{quantity}}",
     "detectedOwnedPlacement": "{{character}} — {{location}}",
@@ -2895,7 +2894,16 @@
       "undo": "Undo",
       "minus": "−",
       "equals": "=",
-      "changeTierFor": "Change tier: {{material}}"
+      "changeTierFor": "Change tier: {{material}}",
+      "haveFor": "Have: {{material}}",
+      "savesVsBuying": "saves {{amount}} vs buying",
+      "sortLabel": "Sort materials",
+      "sort": {
+        "plan": "Plan order",
+        "total": "Total, highest first",
+        "toBuy": "To buy, most first",
+        "name": "Name, A to Z"
+      }
     }
   },
   "login": {

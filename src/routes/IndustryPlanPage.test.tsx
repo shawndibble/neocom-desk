@@ -9,6 +9,7 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useAuthFailure } from '@/stores/authFailure';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import { useBuildGroups } from '@/features/industry/buildGroups';
@@ -173,7 +174,6 @@ function seedPlan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
   };
 }
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 
 /** The plan's inputs fold behind "Edit setup"; tests that read them open it first. */
@@ -187,7 +187,7 @@ async function openSetup(user: ReturnType<typeof userEvent.setup>) {
 // unstubbed `matchMedia` never matches, i.e. it reads as narrow, which would
 // collapse that panel by default and hide everything this file asserts on.
 const realMatchMedia = window.matchMedia;
-function useDesktopViewport() {
+function stubDesktopViewport() {
   window.matchMedia = (media: string) =>
     ({
       media,
@@ -209,8 +209,9 @@ afterEach(() => {
   clearCostIndexCache();
   window.matchMedia = realMatchMedia;
 });
-beforeEach(async () => {
-  useDesktopViewport();
+/** A signed-in Pilot One on `/industry/plans/bp-1`, with nothing left over from the last test. */
+async function resetSession() {
+  stubDesktopViewport();
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -244,7 +245,28 @@ beforeEach(async () => {
   // nothing here falls back into a plan; a test that needs a different one
   // pushes its own path after seeding it.
   window.history.pushState({}, '', '/industry/plans/bp-1');
-});
+}
+
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render of the plan page, so no test pays for the first one.
+  // A worker's first `App` render — compiling the lazy route chunks, warming
+  // jsdom and React — cost 3-6s on top of the ~1s a warm render takes, and
+  // it landed on whichever test ran first, tipping that one past the 10s test
+  // timeout under parallel load. Done here under the hook's own budget.
+  await Promise.all([routeChunks.loadIndustryPlanPage(), routeChunks.loadIndustry()]);
+  await resetSession();
+  await db.buildPlans.add(seedPlan());
+  const { unmount } = render(<App />);
+  await screen.findByRole('heading', { name: 'Rifter' }, { timeout: 25_000 });
+  unmount();
+  server.resetHandlers();
+  clearMarketPriceCache();
+  clearCostIndexCache();
+  window.matchMedia = realMatchMedia;
+}, 30_000);
+
+beforeEach(resetSession);
 
 describe('IndustryPlanPage: jargon tooltips (UX-REVIEW #8)', () => {
   it('gives the facility tax input an accessible tooltip without polluting its label', async () => {
@@ -474,15 +496,23 @@ describe('IndustryPlanPage: Log production prefill from a job (#1787)', () => {
     await db.buildPlans.add(seedPlan());
     render(<App />);
 
-    await screen.findByRole('heading', { name: 'Rifter' });
-    await userEvent.click(await screen.findByRole('button', { name: 'Show job list' }));
+    // Label and text queries, and role queries only inside the dialog: every
+    // `findByRole` poll walks the whole plan page's accessibility tree, and
+    // polling for the job list and the dialog that way cost this test 3-5s
+    // under parallel load on its own.
+    await userEvent.click(await screen.findByLabelText('Show job list'));
     const row = screen.getAllByText('#638')[0].closest('tr')!;
     fireEvent.contextMenu(row);
     fireEvent.click(await screen.findByText('Log production…'));
 
-    expect(await screen.findByRole('heading', { name: 'Log Production' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Qty')).toHaveValue('3');
-    expect(screen.getByLabelText('Total job cost')).toHaveValue('4,500');
+    const dialog = await waitFor(() => {
+      const open = document.querySelector<HTMLElement>('dialog[open]');
+      if (!open) throw new Error('no open dialog yet');
+      return open;
+    });
+    expect(within(dialog).getByRole('heading', { name: 'Log Production' })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Qty')).toHaveValue('3');
+    expect(within(dialog).getByLabelText('Total job cost')).toHaveValue('4,500');
   });
 });
 
@@ -534,9 +564,7 @@ describe('IndustryPlanPage: materials row context menu', () => {
     // Round-trips through `/industry?product=` (`BuildPlanContextMenu`), the
     // same deep link the Market Browser's menu uses — the material's own
     // plan is created if missing, and the browser lands on its own page.
-    // The new plan's page loads the blueprint catalog before its heading
-    // renders — well past findBy's 1s default once other files share the CPU.
-    await screen.findByRole('heading', { name: 'Mechanical Parts' }, { timeout: 5000 });
+    await screen.findByRole('heading', { name: 'Mechanical Parts' });
     await waitFor(() => expect(window.location.pathname).not.toBe('/industry/plans'));
     await waitFor(() => expect(window.location.search).toBe(''));
     const stored = await db.buildPlans.where('characterId').equals(CHAR_ID).toArray();
