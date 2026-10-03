@@ -87,7 +87,8 @@ import { useMediaQuery } from '@/lib/useMediaQuery';
 
 /**
  * Wide enough for browser | Ring | stats side by side: the 12rem nav, a 20rem
- * browser, a Ring column that shows the ring at (or near) its 36rem cap, and
+ * browser, a Ring column wide enough for a ring of ~36rem (it grows to 48rem when
+ * there's more), and
  * 22-26rem of stats, with gaps and page padding.
  */
 const THREE_COLUMN_QUERY = '(min-width: 100rem)';

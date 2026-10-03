@@ -75,7 +75,8 @@ import { MODULE_STATE_STYLE } from './moduleStateStyle';
 /**
  * The ring grows with its column up to 48rem, where a tile is 48/648 of it —
  * about 57px — but never taller than the window leaves beside the tabs and
- * readouts, so the sticky column still shows it whole; a short window (a
+ * readouts (16rem is an estimate of them; past it the column scrolls), so
+ * the sticky column still shows it whole; a short window (a
  * landscape phone) keeps at least 20rem.
  */
 const RING_MAX_WIDTH = 'max(20rem, min(48rem, calc(100dvh - 16rem)))';
@@ -561,6 +562,7 @@ function SlotTile({
   const pressed = !compact && module === undefined ? selected : undefined;
   // A charge drag lights every module that takes it and dims the rest.
   const lights = chargeDragLights(drag, slot.rack, slot.index);
+  const upright = { transform: `rotate(${(-angle).toFixed(1)}deg)` };
   const chargePip =
     module?.chargeTypeId !== undefined ? 'loaded' : module && takesCharges ? 'empty' : undefined;
 
@@ -649,10 +651,7 @@ function SlotTile({
       {/* Counter-turned so the module reads upright wherever its tile sits, as in the game;
           clipped to the tile, so a full-size icon on a slanted tile can't spill onto its neighbours. */}
       <span className="absolute inset-0 overflow-hidden">
-        <span
-          className="absolute inset-0 flex items-center justify-center"
-          style={{ transform: `rotate(${(-angle).toFixed(1)}deg)` }}
-        >
+        <span className="absolute inset-0 flex items-center justify-center" style={upright}>
           {module ? (
             <TypeIcon
               typeId={module.typeId}
@@ -669,7 +668,7 @@ function SlotTile({
           )}
         </span>
       </span>
-      <span className="absolute inset-0" style={{ transform: `rotate(${(-angle).toFixed(1)}deg)` }}>
+      <span className="absolute inset-0" style={upright}>
         {/* The hardpoint it takes, matching the icon heading that kind's pips on the rim. */}
         {module && hardpoint && (
           <span
