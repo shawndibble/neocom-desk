@@ -261,21 +261,20 @@ function FittingsPage() {
     setTarget(next);
     setAddOpen(true);
   }, []);
-  const { itemActions, fitAt, canPlace, droneBay, noteRecent, defaultCharges } =
-    useEditorItemActions({
-      fitting,
-      stats,
-      edit,
-      engineReady: workspace.engineReady,
-      profile: workspace.profile,
-      catalogue,
-      charges,
-      target,
-      dronesShown,
-      dragEnabled: isDesktop,
-      selectTarget,
-      openCargoQuantity: setCargoQuantityFor,
-    });
+  const { itemActions, fitAt, droneBay, noteRecent, defaultCharges } = useEditorItemActions({
+    fitting,
+    stats,
+    edit,
+    engineReady: workspace.engineReady,
+    profile: workspace.profile,
+    catalogue,
+    charges,
+    target,
+    dronesShown,
+    dragEnabled: isDesktop,
+    selectTarget,
+    openCargoQuantity: setCargoQuantityFor,
+  });
 
   function openLibrary(action: LibraryAction) {
     setLibraryOver(fitting);
@@ -351,7 +350,6 @@ function FittingsPage() {
       target={target}
       engineReady={workspace.engineReady}
       profile={workspace.profile}
-      canPlace={canPlace}
       onAdd={handleAdd}
       onClearTarget={() => setTarget(null)}
       moduleResults={moduleResults}

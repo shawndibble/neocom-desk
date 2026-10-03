@@ -59,7 +59,6 @@ function renderPanel(overrides: Partial<Parameters<typeof FittingAddPanel>[0]> =
       target={{ kind: 'slot', slot: 'low', slotIndex: 0 }}
       engineReady
       profile={profile}
-      canPlace={() => true}
       onAdd={onAdd}
       {...overrides}
     />
@@ -424,7 +423,6 @@ describe('FittingAddPanel', () => {
               target={{ kind: 'cargo' }}
               engineReady
               profile={profile}
-              canPlace={() => true}
               onAdd={vi.fn()}
               onAddCargo={onAddCargo}
             />
@@ -476,7 +474,6 @@ describe('FittingAddPanel', () => {
               target={{ kind: 'cargo' }}
               engineReady
               profile={profile}
-              canPlace={() => true}
               onAdd={vi.fn()}
               onAddCargo={vi.fn()}
             />

@@ -538,8 +538,10 @@ describe('FittingRing with the editor’s item actions', () => {
     expect(screen.getByLabelText('Low slots 1, online').className).toContain('opacity-35');
     expect(screen.getByLabelText('High slots 1, active').className).not.toContain('opacity-35');
 
+    // A dim tile doesn't take it, so it falls through to the ring, which places it.
     fireEvent.drop(screen.getByLabelText('Low slots 1, online'), dropWith(payload));
-    expect(actions.drop).not.toHaveBeenCalled();
+    expect(actions.drop).toHaveBeenCalledWith(payload, { kind: 'ring' }, undefined);
+    vi.mocked(actions.drop).mockClear();
 
     // jsdom has no DragEvent, so the drop can't carry altKey on its own.
     const target = screen.getByLabelText('High slots 1, active');
@@ -551,6 +553,39 @@ describe('FittingRing with the editor’s item actions', () => {
       { kind: 'slot', rack: 'high', index: 0, filled: true },
       true
     );
+  });
+
+  it('places a module dropped anywhere on the ring, but only while its rack has a free slot', () => {
+    const actions = fakeItemActions({ names });
+    renderRing(actions, { onDropType: vi.fn() });
+    const medium: FittingDragPayload = { kind: 'type', typeId: 99, rack: 'medium' };
+    // Over a low tile, which doesn't take a mid-slot module.
+    fireEvent.drop(screen.getByLabelText('Low slots 1, online'), dropWith(medium));
+    expect(actions.drop).toHaveBeenCalledWith(medium, { kind: 'ring' }, undefined);
+    vi.mocked(actions.drop).mockClear();
+
+    // The one low slot is taken: nowhere to go.
+    const low: FittingDragPayload = { kind: 'type', typeId: 98, rack: 'low' };
+    fireEvent.drop(screen.getByLabelText('High slots 2, empty'), dropWith(low));
+    expect(actions.drop).not.toHaveBeenCalled();
+  });
+
+  it('lets a slot that takes the drop have it, rather than the ring around it too', () => {
+    const actions = fakeItemActions({ names });
+    const onDropType = vi.fn();
+    renderRing(actions, { onDropType });
+    const high: FittingDragPayload = { kind: 'type', typeId: 99, rack: 'high' };
+    fireEvent.drop(screen.getByLabelText('High slots 1, active'), dropWith(high));
+    expect(onDropType).toHaveBeenCalledWith('high', 0, 99);
+    expect(actions.drop).not.toHaveBeenCalled();
+  });
+
+  it('puts an Add panel item dropped on the cargo row in the hold', () => {
+    const actions = fakeItemActions({ names });
+    renderRing(actions);
+    const payload: FittingDragPayload = { kind: 'type', typeId: 99, rack: 'low' };
+    fireEvent.drop(screen.getByText('Cargo'), dropWith(payload));
+    expect(actions.drop).toHaveBeenCalledWith(payload, { kind: 'cargo' }, undefined);
   });
 
   it('opens a cargo tile’s actions on a click, and loads it into every module that takes it', async () => {

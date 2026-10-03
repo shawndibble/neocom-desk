@@ -61,7 +61,13 @@ export function fakeItemActions(
     removeCargo: vi.fn(),
     canFitFirstFree: () => true,
     fitFirstFree: vi.fn(),
-    dropHandlers: { addType: true, moveModule: true, loadCharge: true, launchDrone: true },
+    dropHandlers: {
+      addType: true,
+      moveModule: true,
+      loadCharge: true,
+      launchDrone: true,
+      addCargo: true,
+    },
     drop: vi.fn(),
     ...overrides,
   };

@@ -14,6 +14,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import {
+  addCargo,
   addDronesWithinBay,
   addModule,
   cargoVolumeUsed,
@@ -43,7 +44,12 @@ import type { Fitting, FittingSlotKind, FittingStats, PilotProfile } from '@/eng
 import { buildVariationIndex, getVariations } from '@/engine/market/variations';
 import type { AddTarget } from './addTarget';
 import { chargeGroupIdsFor, checkCharges } from './dogmaFittingEngine';
-import type { FittingDragPayload, FittingDropTarget } from './fittingDrag';
+import {
+  chargeSlotDropOnly,
+  ringDropFor,
+  type FittingDragPayload,
+  type FittingDropTarget,
+} from './fittingDrag';
 import type { ChargePickerInput, FittingItemActions } from './fittingItemActions';
 import type { ChargeLoading } from './useChargeLoading';
 import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
@@ -82,7 +88,7 @@ export interface EditorItemActions {
   noteRecent: (rack: FittingSlotKind, typeId: number) => void;
   /** Charges a not-yet-fitted `typeId` could default to at `rack` on `shipTypeId`. */
   defaultCharges: (shipTypeId: number, rack: FittingSlotKind, typeId: number) => number[];
-  /** A drop on the List (the Ring's module drops come through its own props). */
+  /** A drop on the List, the cargo, or the Ring's open space (the Ring's slots fit modules through its own props). */
   drop: (payload: FittingDragPayload, target: FittingDropTarget, alt: boolean) => void;
 }
 
@@ -193,11 +199,25 @@ export function useEditorItemActions({
    */
   const drop = useCallback(
     (payload: FittingDragPayload, onto: FittingDropTarget, alt: boolean) => {
+      if (onto.kind === 'ring') {
+        const placed = fitting === null ? null : ringDropFor(payload, fitting.modules, slotCounts);
+        if (placed?.kind === 'fit') fitAt(placed.rack, placed.index, placed.typeId);
+        else if (placed?.kind === 'load')
+          charges.load(placed.typeId, { fromCargo: placed.fromCargo, only: placed.only });
+        return;
+      }
+      if (onto.kind === 'cargo') {
+        if (payload.kind !== 'type' && payload.kind !== 'charge') return;
+        const { typeId } = payload;
+        edit((f) => addCargo(f, typeId, 1));
+        // One charge is rarely what's wanted: ask how many.
+        if (payload.kind === 'charge') openCargoQuantity(typeId);
+        return;
+      }
       if (payload.kind === 'charge') {
         charges.load(payload.typeId, {
           fromCargo: payload.fromCargo,
-          only:
-            alt && onto.kind === 'slot' ? { slot: onto.rack, slotIndex: onto.index } : undefined,
+          only: onto.kind === 'slot' ? chargeSlotDropOnly(onto.rack, onto.index, alt) : undefined,
         });
         return;
       }
@@ -219,7 +239,7 @@ export function useEditorItemActions({
       // A rack heading takes it into the rack's first free slot.
       fitAt(rack, onto.kind === 'slot' ? onto.index : 'firstFree', typeId);
     },
-    [charges, edit, droneBay, launchLimits, fitAt]
+    [charges, edit, droneBay, launchLimits, fitAt, fitting, slotCounts, openCargoQuantity]
   );
 
   const variationIndex = useMemo(
@@ -320,7 +340,13 @@ export function useEditorItemActions({
             },
             // Drag is pointer-only: a touch screen has the menus instead.
             dropHandlers: dragEnabled
-              ? { addType: true, moveModule: true, loadCharge: true, launchDrone: true }
+              ? {
+                  addType: true,
+                  moveModule: true,
+                  loadCharge: true,
+                  launchDrone: true,
+                  addCargo: true,
+                }
               : {},
             drop,
           },

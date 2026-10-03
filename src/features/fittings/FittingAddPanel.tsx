@@ -45,8 +45,6 @@ interface FittingAddPanelProps {
   /** Ship data (dogma engine) loaded — slot and fit checks can run. */
   engineReady: boolean;
   profile: PilotProfile | null;
-  /** Whether this item (of this rack) has somewhere to go right now — a free slot, or room in the drone bay. */
-  canPlace: (rack: CandidateRack, typeId: number) => boolean;
   onAdd: (typeId: number, rack: CandidateRack) => void;
   /** Drops the chosen slot, so the browser shows every rack again. */
   onClearTarget?: () => void;
@@ -229,7 +227,6 @@ export function FittingAddPanel({
   target,
   engineReady,
   profile,
-  canPlace,
   onAdd,
   onClearTarget,
   moduleResults,
@@ -385,7 +382,9 @@ export function FittingAddPanel({
         entry={entry}
         rack={rack}
         check={check}
-        placeable={fitsHull && engineReady && canPlace(rack, entry.typeId)}
+        // Not gated on a free slot: a full rack's item still drags into the cargo
+        // (or onto a slot, replacing it); a click with no room adds nothing.
+        placeable={fitsHull && engineReady}
         draggable={fitsHull && dragToRing && engineReady}
         onAdd={onAdd}
       />
