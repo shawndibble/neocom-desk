@@ -93,6 +93,28 @@ describe('capStrictlyWorseThan', () => {
     expect(capStrictlyWorseThan(navy, [t1, navy])).toBeNull();
   });
 
+  it('names the charge that beats it, not one that is itself beaten', () => {
+    const worst = booster(
+      1,
+      'Cap Booster 800',
+      { injection: 800, gjPerSecond: 50 },
+      { price: 300 }
+    );
+    const middle = booster(
+      2,
+      'Navy Cap Booster 800',
+      { injection: 800, gjPerSecond: 52 },
+      { price: 280 }
+    );
+    const best = booster(
+      3,
+      'Cap Booster 1600',
+      { injection: 800, gjPerSecond: 60 },
+      { price: 200 }
+    );
+    expect(capStrictlyWorseThan(worst, [worst, middle, best])).toBe(best);
+  });
+
   it('keeps a pricier charge that holds the capacitor higher', () => {
     const small = booster(
       1,

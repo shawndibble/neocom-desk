@@ -92,6 +92,10 @@ describe('CapBoosterGuide', () => {
     ).toBeTruthy();
     expect(picks.getByRole('button', { name: /Most GJ\/s.*Cap Booster 800/ })).toBeTruthy();
     // 110 ISK / 400 GJ beats 300 / 800 and 120 / 400; the 200 is cheaper per GJ but runs dry.
+    expect(picks.getByRole('button', { name: /Most GJ\/s/ })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
     await user.click(picks.getByRole('button', { name: /Best value.*Navy Cap Booster 400/ }));
     expect(onLoad).toHaveBeenCalledWith(32006);
   });
@@ -101,7 +105,7 @@ describe('CapBoosterGuide', () => {
     const rows = screen.getAllByRole('button', { name: /, (stable at|empty in)/i });
     expect(rows.map((r) => r.getAttribute('aria-label'))).toEqual([
       'Cap Booster 200, empty in 1m 35s, 15 GJ/s, 8 per load, 40 ISK, 0.2 ISK/GJ',
-      'Cap Booster 400, stable at 38%, 28 GJ/s, 4 per load, 120 ISK, 0.3 ISK/GJ',
+      'Cap Booster 400, stable at 38%, 28 GJ/s, 4 per load, 120 ISK, 0.3 ISK/GJ, Navy Cap Booster 400 does as much for less',
       'Navy Cap Booster 400, stable at 44%, 30 GJ/s, 5 per load, 110 ISK, 0.28 ISK/GJ',
       'Cap Booster 800, stable at 71%, 52 GJ/s, 2 per load, 300 ISK, 0.38 ISK/GJ',
     ]);
@@ -113,6 +117,8 @@ describe('CapBoosterGuide', () => {
     const t1 = screen.getByRole('button', { name: /^Cap Booster 400,/ });
     expect(t1).toHaveClass('opacity-50');
     expect(t1).toHaveTextContent('Navy Cap Booster 400 does as much for less');
+    // The label replaces the row's text, so it carries the reason too.
+    expect(t1).toHaveAccessibleName(/, Navy Cap Booster 400 does as much for less$/);
   });
 
   it('says when no charge holds the capacitor', () => {

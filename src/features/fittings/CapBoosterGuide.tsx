@@ -48,7 +48,7 @@ const gjText = (gj: number) =>
   gj.toLocaleString('en-US', { maximumFractionDigits: gj < 10 ? 1 : 0 });
 const iskGjText = (isk: number) => isk.toLocaleString('en-US', { maximumSignificantDigits: 2 });
 
-function rowLabel(t: TFunction, c: ChargeChoice): string {
+function rowLabel(t: TFunction, c: ChargeChoice, worse: ChargeChoice | null): string {
   const cap = c.cap!;
   const perGj = iskPerGj(c);
   return [
@@ -60,6 +60,12 @@ function rowLabel(t: TFunction, c: ChargeChoice): string {
       ? t('fittings.capGuide.noPrice')
       : t('fittings.chargePicker.isk', { isk: formatIsk(c.price) }),
     ...(perGj === null ? [] : [t('fittings.capGuide.iskPerGj', { value: iskGjText(perGj) })]),
+    // The dimmed row's reason, which the label would otherwise hide.
+    ...(c.skillMissing
+      ? [t('fittings.chargePicker.needsSkill')]
+      : worse
+        ? [t('fittings.capGuide.worseThan', { name: worse.name })]
+        : []),
   ].join(', ');
 }
 
@@ -121,6 +127,7 @@ export function CapBoosterGuide({ group, onLoad, wrapRow, pricesLoading }: Props
               <button
                 key={key}
                 type="button"
+                aria-pressed={group.loaded.has(choice.typeId)}
                 disabled={!onLoad}
                 onClick={() => onLoad?.(choice.typeId)}
                 className={cx(
@@ -184,7 +191,7 @@ export function CapBoosterGuide({ group, onLoad, wrapRow, pricesLoading }: Props
                   disabled={!onLoad || c.skillMissing}
                   onClick={() => onLoad?.(c.typeId)}
                   aria-pressed={isLoaded}
-                  aria-label={rowLabel(t, c)}
+                  aria-label={rowLabel(t, c, worse)}
                   className={cx(
                     'grid w-full gap-1 border-t border-line px-1 py-1 text-left tabular-nums hover:bg-panel-2 disabled:cursor-not-allowed',
                     COLUMNS,

@@ -640,6 +640,33 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(navy.figures!.gjPerSecond).toBeCloseTo(1200 / 46, 6);
     // The capacitor is the stats panel's own headline.
     expect(tech1.figures!.capacitor).toEqual(tech1.stats.capacitor);
+
+    // An ancillary shield booster burns the same charges but injects nothing: no guide for it.
+    const ancillary: Fitting = {
+      name: 'Integration Test Caracal ancillary',
+      shipTypeId: CARACAL,
+      modules: [
+        {
+          slot: 'medium',
+          slotIndex: 0,
+          typeId: MEDIUM_ANCILLARY_SHIELD_BOOSTER,
+          state: 'active',
+          chargeTypeId: NAVY_CAP_BOOSTER_400,
+        },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const ancillaryFit = fittingToDogmaFit(ancillary, buildAllVProfile(SUPPORT_SKILL_IDS));
+    const ancillaryCalc = calculate(ancillaryFit);
+    expect(
+      extractCapBoosterFigures(
+        ancillaryFit.items,
+        ancillaryCalc.ship.attributes,
+        ancillaryCalc.items,
+        [0]
+      )
+    ).toBeNull();
   });
 
   it('averages a Navy Cap Booster 400 over its reload: 26.1 GJ/s, not 33.3', () => {

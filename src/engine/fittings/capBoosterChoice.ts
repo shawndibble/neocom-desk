@@ -56,7 +56,8 @@ export function sortCapChoices(choices: readonly ChargeChoice[]): ChargeChoice[]
 
 /**
  * A usable, cheaper charge that injects at least as many GJ/s and leaves the
- * capacitor at least as well off — so `choice` has no reason to be picked.
+ * capacitor at least as well off — so `choice` has no reason to be picked;
+ * of several, one that isn't itself beaten.
  * Null when there is none, or when `choice` has no price to compare.
  */
 export function capStrictlyWorseThan(
@@ -66,18 +67,18 @@ export function capStrictlyWorseThan(
   const cap = choice.cap;
   if (choice.price === null || !cap) return null;
   const price = choice.price;
-  return (
-    all.find(
-      (other) =>
-        other.typeId !== choice.typeId &&
-        !other.skillMissing &&
-        other.cap !== undefined &&
-        other.price !== null &&
-        other.price < price &&
-        other.cap.gjPerSecond >= cap.gjPerSecond &&
-        compareCapacitor(other.cap.capacitor, cap.capacitor) >= 0
-    ) ?? null
+  const beaters = all.filter(
+    (other) =>
+      other.typeId !== choice.typeId &&
+      !other.skillMissing &&
+      other.cap !== undefined &&
+      other.price !== null &&
+      other.price < price &&
+      other.cap.gjPerSecond >= cap.gjPerSecond &&
+      compareCapacitor(other.cap.capacitor, cap.capacitor) >= 0
   );
+  // Name one nothing beats in turn (there always is one: each beater is cheaper).
+  return beaters.find((other) => capStrictlyWorseThan(other, all) === null) ?? beaters[0] ?? null;
 }
 
 export function capQuickPicks(choices: readonly ChargeChoice[]): CapQuickPicks | null {

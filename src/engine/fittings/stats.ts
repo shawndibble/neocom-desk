@@ -637,7 +637,8 @@ export function extractCapacitorBudget(
  * A cap booster group's figures for the Charge Picker, from the Fitting
  * calculated with its charge loaded: one charge's injection, the boosts a
  * module holds, the whole group's reload-averaged GJ/s and the capacitor
- * headline the stats show. Null when the modules at `indices` inject nothing.
+ * headline the stats show. Null when the modules at `indices` aren't cap
+ * boosters (nothing injected, or an ancillary shield booster's charge).
  */
 export function extractCapBoosterFigures(
   items: readonly CalculatedItem[],
@@ -648,7 +649,10 @@ export function extractCapBoosterFigures(
   const first = itemResults[indices[0] ?? -1];
   if (!first) return null;
   const injection = readAttribute(first.attributes, ITEM_DOGMA_ATTRIBUTE.capacitorInjectionAmount);
-  if (injection <= 0) return null;
+  // An ancillary shield booster carries the charge's injection too, but runs
+  // free on it: only a cap booster nets it into a negative draw (`tank.ts`).
+  const peakLoad = readAttribute(first.attributes, ITEM_DOGMA_ATTRIBUTE.capacitorPeakLoad);
+  if (injection <= 0 || peakLoad >= 0) return null;
   const magazine = magazineOf((id) => readAttribute(first.attributes, id));
   const gjPerSecond = indices.reduce((sum, index) => {
     const result = itemResults[index];

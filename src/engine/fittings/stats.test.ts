@@ -1010,8 +1010,16 @@ describe('extractCapBoosterFigures', () => {
     expect(figures?.capacitor).not.toEqual({ stable: true, stablePercentage: 62 });
   });
 
-  it('is null for modules that inject nothing', () => {
+  it("is null for modules that inject nothing, or an ancillary shield booster's charge", () => {
     const modules = [running(1, { capacitorPeakLoad: 20 })];
+    const ancillary = running(
+      2,
+      { capacitorPeakLoad: 0, capacitorInjectionAmount: 400, chargeAmount: 3 },
+      { chargeTypeId: 32006 }
+    );
+    expect(
+      extractCapBoosterFigures([ancillary.item], attrs({}), [ancillary.result], [0])
+    ).toBeNull();
     expect(
       extractCapBoosterFigures(
         modules.map((m) => m.item),
