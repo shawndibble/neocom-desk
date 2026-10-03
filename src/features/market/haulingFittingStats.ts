@@ -6,10 +6,14 @@
 import { computeFittingStats } from '@/features/fittings/dogmaFittingEngine';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 
-/** The cargo hold, in m³, of a Fitting under a pilot's skills. */
+/**
+ * The m³ a Fitting can haul under a pilot's skills: its cargo hold plus its
+ * fleet hangar, which takes any item — a Deep Space Transport carries most of
+ * its load there. A mining hold takes only ore, so it is left out.
+ */
 export async function computeCargoM3(fitting: Fitting, profile: PilotProfile): Promise<number> {
   const stats = await computeFittingStats(fitting, profile, undefined, undefined, {
     overheated: false,
   });
-  return stats.holds.cargo;
+  return stats.holds.cargo + stats.holds.fleetHangar;
 }

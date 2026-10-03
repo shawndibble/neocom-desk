@@ -5452,7 +5452,7 @@
         "tabCustom": "Enter m³",
         "searchShips": "Search ships",
         "searchShipsPlaceholder": "Search all ships…",
-        "shipHint": "The hold this ship has with your skills and nothing fitted. A saved fitting includes cargo expanders.",
+        "shipHint": "The cargo hold and fleet hangar this ship has with your skills and nothing fitted. A saved fitting includes cargo expanders.",
         "noFittings": "No saved fittings for this character yet.",
         "custom": "Custom",
         "customLabel": "Cargo space (m³)",

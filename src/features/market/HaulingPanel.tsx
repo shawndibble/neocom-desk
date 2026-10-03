@@ -38,6 +38,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsNarrow } from '@/lib/useIsNarrow';
+import { useIsNarrowerThan } from '@/lib/useIsNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { multibuyText, planTrip, type TripOverride } from '@/engine/market/haulingPlan';
 import type { DemandKind, HaulingFlag } from '@/engine/market/haulingMarket';
@@ -237,8 +238,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   // its figures go compact (`3.41K`). Chosen in JS, not by a hidden/shown
   // pair of spans: one DOM at every width (DESIGN.md, DataTable).
   const isPhone = useIsPhone();
+  // A narrow desktop table goes compact too: below 56rem its full figures
+  // (`12,080,000.00`) left the Item column no room and scrolled the page
+  // sideways. The same width drops the margin's "ISK each" (the CSS below).
+  const [tableRef, tableNarrow] = useIsNarrowerThan<HTMLDivElement>(56);
   const isk = (value: number, digits: number) =>
-    isPhone ? formatIskCompact(value) : formatIsk(value, digits);
+    isPhone || tableNarrow ? formatIskCompact(value) : formatIsk(value, digits);
 
   const [groups, setGroups] = useState<MarketGroupNode[] | null>(null);
   useEffect(() => {
@@ -448,6 +453,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       header: t('market.hauling.columns.item'),
       headerClassName: 'whitespace-nowrap',
       primary: true,
+      // The column that gives way: it takes the table's spare width and its
+      // name truncates, rather than the longest name setting the table's
+      // minimum and scrolling the page sideways (the card has its own rules).
+      className: 'sm:w-full sm:max-w-0',
       sortValue: (row) => row.name.toLowerCase(),
       render: (row) => (
         <span className="flex min-w-0 items-center gap-2">
@@ -535,7 +544,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       render: (row) => (
         <span className="font-semibold">
           {signed(row.marginPct, 1)}%
-          <span className="ml-1.5 text-[0.6875rem] font-normal text-text-dim max-sm:hidden">
+          <span className="ml-1.5 hidden text-[0.6875rem] font-normal text-text-dim @min-[56rem]:inline">
             {t('market.hauling.profitEach', {
               isk: `${row.profitPerUnit >= 0 ? '+' : ''}${formatIsk(row.profitPerUnit, 0)}`,
             })}
@@ -556,8 +565,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     },
     {
       // Days to sell and how steadily it sells, in one cell: the demand mark
-      // leads, and its words follow on a wide screen (a phone keeps the
-      // mark's shape, with the words for screen readers only).
+      // leads, and its words follow in a wide table (a narrower one, and the
+      // phone card, keep the mark's shape, with the words for screen readers only).
       id: 'days',
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.days'),
@@ -574,7 +583,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
               className={`size-2 shrink-0 ${DEMAND_MARK[row.demand.demand]}`}
             />
             {formatDaysToSell(row.sale.daysToSell)}
-            <span className="text-xs text-text-dim max-sm:sr-only">
+            <span className="text-xs text-text-dim @max-[62rem]:sr-only">
               · {t(`market.hauling.demand.${row.demand.demand}`)}
             </span>
           </DataTableDenseCell>
@@ -1031,25 +1040,33 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                 </div>
               )}
 
-              <DataTable
-                {...tableExport.tableProps}
-                label={t('market.hauling.title')}
-                columns={visibleColumns}
-                rows={shown}
-                virtualize="auto"
-                rowKey={(row) => row.typeId}
-                density="compact"
-                stackLayout="dense"
-                rowContextMenu={rowContextMenu}
-                rowMoreActions
-                expandableRow={{
-                  renderDetail: (row) => <HaulingRowDetail row={row} loadNote={limitTextOf(row)} />,
-                  hideIcon: true,
-                }}
-                rowClassName={(row) =>
-                  overrides.get(row.typeId)?.selected === false ? 'opacity-60' : undefined
-                }
-              />
+              {/* A container, not a viewport, query: the rail's width decides
+                  how much room the table has, so the secondary words (profit
+                  each, the demand label) drop by the table's own width. */}
+              <div ref={tableRef} className="@container">
+                <DataTable
+                  {...tableExport.tableProps}
+                  label={t('market.hauling.title')}
+                  columns={visibleColumns}
+                  rows={shown}
+                  virtualize="auto"
+                  rowKey={(row) => row.typeId}
+                  density="compact"
+                  stackLayout="dense"
+                  className="dt-dense-tight"
+                  rowContextMenu={rowContextMenu}
+                  rowMoreActions
+                  expandableRow={{
+                    renderDetail: (row) => (
+                      <HaulingRowDetail row={row} loadNote={limitTextOf(row)} />
+                    ),
+                    hideIcon: true,
+                  }}
+                  rowClassName={(row) =>
+                    overrides.get(row.typeId)?.selected === false ? 'opacity-60' : undefined
+                  }
+                />
+              </div>
 
               <p className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
                 {hiddenCount === 0
@@ -1171,7 +1188,8 @@ function BringInput({
       inputMode="numeric"
       aria-label={label}
       title={title}
-      className="w-18 text-right tabular-nums sm:w-24"
+      // Shorter on the phone card, where its height sets the meta line's.
+      className="w-18 text-right tabular-nums max-sm:h-7 sm:w-20"
       value={draft ?? value}
       onChange={(event) => {
         const raw = event.target.value.replace(/[^\d]/g, '');
