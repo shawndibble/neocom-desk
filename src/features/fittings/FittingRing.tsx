@@ -73,11 +73,12 @@ import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { MODULE_STATE_STYLE } from './moduleStateStyle';
 
 /**
- * The ring never grows past this: bigger only spreads the same tiles further
- * apart, and a smaller ring leaves room for the stats beside it. At the cap a
- * tile is 48/648 of it — about 43px.
+ * The ring grows with its column up to 48rem, where a tile is 48/648 of it —
+ * about 57px — but never taller than the window leaves beside the tabs and
+ * readouts, so the sticky column still shows it whole; a short window (a
+ * landscape phone) keeps at least 20rem.
  */
-const RING_MAX_WIDTH = '36rem';
+const RING_MAX_WIDTH = 'max(20rem, min(48rem, calc(100dvh - 16rem)))';
 
 const MICRO_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
@@ -645,25 +646,30 @@ function SlotTile({
           style={{ top: '-12%' }}
         />
       )}
-      {/* Counter-turned so the module reads upright wherever its tile sits, as in the game. */}
-      <span
-        className="absolute inset-0 flex items-center justify-center"
-        style={{ transform: `rotate(${(-angle).toFixed(1)}deg)` }}
-      >
-        {module ? (
-          <TypeIcon
-            typeId={module.typeId}
-            size={64}
-            className={`h-[88%] w-[88%] ${shownState === 'offline' ? 'opacity-35 grayscale' : ''}`}
-          />
-        ) : (
-          <AddRow aria-hidden className="text-text-dim" />
-        )}
-        {module?.chargeTypeId !== undefined && (
-          <span className="absolute right-0 bottom-0 h-1/2 w-1/2 border border-line bg-panel">
-            <TypeIcon typeId={module.chargeTypeId} size={64} className="h-full w-full" />
-          </span>
-        )}
+      {/* Counter-turned so the module reads upright wherever its tile sits, as in the game;
+          clipped to the tile, so a full-size icon on a slanted tile can't spill onto its neighbours. */}
+      <span className="absolute inset-0 overflow-hidden">
+        <span
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ transform: `rotate(${(-angle).toFixed(1)}deg)` }}
+        >
+          {module ? (
+            <TypeIcon
+              typeId={module.typeId}
+              size={64}
+              className={`h-full w-full ${shownState === 'offline' ? 'opacity-35 grayscale' : ''}`}
+            />
+          ) : (
+            <AddRow aria-hidden className="text-text-dim" />
+          )}
+          {module?.chargeTypeId !== undefined && (
+            <span className="absolute right-0 bottom-0 h-3/4 w-3/4 border border-line bg-panel">
+              <TypeIcon typeId={module.chargeTypeId} size={64} className="h-full w-full" />
+            </span>
+          )}
+        </span>
+      </span>
+      <span className="absolute inset-0" style={{ transform: `rotate(${(-angle).toFixed(1)}deg)` }}>
         {/* The hardpoint it takes, matching the icon heading that kind's pips on the rim. */}
         {module && hardpoint && (
           <span
