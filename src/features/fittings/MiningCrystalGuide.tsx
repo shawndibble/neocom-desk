@@ -1,7 +1,8 @@
 import { Fragment, useId, useMemo, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { Caret, TypeIcon } from '@/components/ui';
+import { Caret, IconButton, Modal, TypeIcon } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { formatSeconds } from '@/lib/duration';
 import { groupCrystals, type CrystalChoice } from '@/engine/fittings/crystalChoice';
@@ -42,7 +43,8 @@ function rowLabel(t: TFunction, { choice }: CrystalChoice): string {
 }
 
 /**
- * A mining laser group's Charge Picker: what A, B and C crystals are for,
+ * A mining laser group's Charge Picker: one line on how to pick (what A,
+ * B and C are for sits behind its ? in a modal, out of the panel's way),
  * then one section per ore family (its ores named), each family's six
  * crystals side by side with this Fitting's yield, cycle and residue
  * (`engine/fittings/crystalChoice.ts`, `mining.ts`). The loaded crystal's
@@ -70,6 +72,7 @@ export function MiningCrystalGuide({ group, onLoad, wrapRow, pricesLoading }: Pr
       if (!next.delete(family)) next.add(family);
       return next;
     });
+  const [helpOpen, setHelpOpen] = useState(false);
   const wrap = (typeId: number, row: ReactNode) => (wrapRow ? wrapRow(typeId, row) : row);
 
   return (
@@ -91,19 +94,33 @@ export function MiningCrystalGuide({ group, onLoad, wrapRow, pricesLoading }: Pr
         )}
       </div>
 
-      <div className="space-y-1 bg-panel-2 px-2 py-1.5 text-[0.6875rem] text-text-dim">
-        <p>{t('fittings.crystalGuide.ownOres')}</p>
-        <ul aria-label={t('fittings.crystalGuide.helpLabel')} className="space-y-0.5">
-          {HELP_KEYS.map((key) => (
-            <li key={key}>
-              <span className="font-semibold text-text">
-                {t(`fittings.crystalGuide.help.${key}Label`)}
-              </span>{' '}
-              {t(`fittings.crystalGuide.help.${key}`)}
-            </li>
-          ))}
-        </ul>
+      <div className="flex items-center gap-1 px-2 text-[0.6875rem] text-text-dim">
+        <span className="min-w-0 flex-1">{t('fittings.crystalGuide.pickHint')}</span>
+        <IconButton
+          icon={<Icon.NavHelp />}
+          size="sm"
+          label={t('fittings.crystalGuide.helpButton')}
+          onClick={() => setHelpOpen(true)}
+        />
       </div>
+      <Modal
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        title={t('fittings.crystalGuide.helpTitle')}
+      >
+        <div className="space-y-3 text-sm">
+          <p className="text-text-dim">{t('fittings.crystalGuide.help.intro')}</p>
+          <dl className="space-y-2">
+            {HELP_KEYS.map((key) => (
+              <div key={key}>
+                <dt className="font-semibold">{t(`fittings.crystalGuide.help.${key}Label`)}</dt>
+                <dd className="text-text-dim">{t(`fittings.crystalGuide.help.${key}`)}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="text-text-dim">{t('fittings.crystalGuide.help.table')}</p>
+        </div>
+      </Modal>
 
       {families.map((family, index) => {
         const isOpen = open.has(family.family);
