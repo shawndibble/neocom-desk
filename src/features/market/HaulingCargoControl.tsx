@@ -58,12 +58,30 @@ export function HaulingCargoControl({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        className={buttonClassName({ variant: cargo === null ? 'primary' : 'ghost', size: 'sm' })}
+        // Gives way first when the summary bar is short of room (a phone, or a
+        // tablet with the rail open): in a bar under 30rem the m³ goes, since
+        // the bar's hold meter prints it beside the button, and past that the
+        // name truncates on one line rather than wrapping inside a
+        // fixed-height button.
+        className={buttonClassName({
+          variant: cargo === null ? 'primary' : 'ghost',
+          size: 'sm',
+          className: 'min-w-0',
+        })}
         aria-label={t('market.hauling.cargo.label')}
       >
-        {cargo === null
-          ? t('market.hauling.cargo.choose')
-          : t('market.hauling.cargo.chosen', { label: cargo.label, m3: formatM3(cargo.m3) })}
+        <span className="truncate">
+          {cargo === null ? (
+            t('market.hauling.cargo.choose')
+          ) : (
+            <>
+              {cargo.label}
+              <span className="@max-[30rem]:hidden">
+                {t('market.hauling.cargo.chosenM3', { m3: formatM3(cargo.m3) })}
+              </span>
+            </>
+          )}
+        </span>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[min(24rem,calc(100vw-2rem))] p-3">
         {open && (

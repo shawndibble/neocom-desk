@@ -5530,7 +5530,7 @@
       "cargo": {
         "label": "Cargo space",
         "choose": "Your Ship",
-        "chosen": "{{label}} · {{m3}}",
+        "chosenM3": " · {{m3}}",
         "tip": "Choose your ship to size the load to your hold.",
         "tabShip": "Ship",
         "tabFitting": "Saved fitting",

@@ -374,11 +374,17 @@ desktop, but a card titled "9/1/2026, 9:34:21 PM" says nothing, so `refType`
 
 Three rules hold this together:
 
-- **One DOM at every width.** The collapse is pure CSS (`.dt-stack` in
+- **One DOM at every width.** The collapse is CSS (`.dt-stacked` in
   `src/styles/index.css`) — no `sm:hidden`/`hidden sm:flex` pair, nothing
   rendered twice, same rule the Assets page follows. Labels come from
   `data-label`, so they can't drift from the headers, and they add no i18n
-  strings.
+  strings. The one thing JS decides is _when_: `DataTable` sets the
+  `dt-stacked` class below `sm` (`useIsPhone`), or wherever the caller says
+  with `stacked` — a table that measures its own width and is narrower than
+  its columns on a wide screen. Hauling does: on a tablet with the rail open
+  its panel is slimmer than a phone's (ADR 0017). A table that forces cards
+  this way picks its own `max-sm:`/`sm:` cell classes in JS, since those
+  still follow the viewport.
 - **It lives in the `utilities` layer.** A cascade layer beats every earlier
   layer regardless of specificity, so from `components` these rules would lose
   to the `px-3`/`text-right`/`whitespace-nowrap` utilities on the very cells
@@ -439,8 +445,11 @@ exactly the markup above.
   and an `end` box can add `className="dt-dense-tight"` instead: the tick
   box, title, figure and button share line one, centred on each other (the
   button's 44px target overhangs rather than heightening the line), and line
-  two centres on a `max-sm:h-7` `end` box (Hauling). A cell holding only a `data-dense-omit` value (an empty cell's dash, a
-  word the card says another way) is left off the meta line. Still pure CSS
+  two centres on a 28px `end` box (Hauling). The box is under §3's 36px
+  touch tier on purpose: at 36px its height set the meta line's and opened a
+  gap under the title, which is what the card's reader complained about. A
+  cell holding only a `data-dense-omit` value (an empty cell's dash, a word
+  the card says another way) is left off the meta line. Still CSS
   (`.dt-stack-dense`); `stackColumns` is ignored.
 - **`mobileSort`** (+ optional `stackSummary`, e.g. "214 offers") renders an
   `sm:hidden` bar above the table with a native `<select>` ("Sort: Price ↑")
