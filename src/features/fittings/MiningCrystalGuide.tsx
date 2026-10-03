@@ -99,6 +99,7 @@ export function MiningCrystalGuide({ group, onLoad, wrapRow, pricesLoading }: Pr
         <IconButton
           icon={<Icon.NavHelp />}
           size="sm"
+          variant="plain"
           label={t('fittings.crystalGuide.helpButton')}
           onClick={() => setHelpOpen(true)}
         />
