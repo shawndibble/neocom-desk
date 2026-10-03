@@ -615,6 +615,10 @@
       "sourceLabel": "Popular fits source",
       "tabZkillboard": "zKillboard",
       "tabWorkbench": "EVE Workbench",
+      "seenOnZkillboard_one": "Seen on zKillboard: {{count}} recent loss",
+      "seenOnZkillboard_other": "Seen on zKillboard: {{count}} recent losses",
+      "seenOnZkillboardLastSeen_one": "Seen on zKillboard: {{count}} recent loss · last seen {{age}}",
+      "seenOnZkillboardLastSeen_other": "Seen on zKillboard: {{count}} recent losses · last seen {{age}}",
       "workbench": {
         "attribution": "Community fits published on EVE Workbench:",
         "loading": "Loading fits from EVE Workbench…",

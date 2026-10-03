@@ -3,7 +3,10 @@
  * hull's recent losses, each victim read inline or — for zKillboard's
  * hash-only shape — from ESI's killmail endpoint, grouped by
  * `engine/fittings/popularFits.ts`. A good result is held in memory per hull
- * for ten minutes, so clicking back to a hull doesn't refetch 40 killmails.
+ * for ten minutes, so clicking back to a hull doesn't refetch 40 killmails,
+ * and a load already under way is shared — the EVE Workbench tab's "Seen on
+ * zKillboard" badges (#2486) ask for the same hull's losses as the zKillboard
+ * tab, and must never fetch them a second time.
  */
 import { useEffect, useState } from 'react';
 import { groupPopularFits, type HullLoss, type PopularFit } from '@/engine/fittings/popularFits';
@@ -18,10 +21,12 @@ const CACHE_TTL_MS = 10 * 60_000;
 export type PopularFitsResult = { ok: true; fits: PopularFit[] } | { ok: false };
 
 const cache = new Map<number, { at: number; result: PopularFitsResult }>();
+const pending = new Map<number, Promise<PopularFitsResult>>();
 
 /** For tests: forget every cached hull. */
 export function resetPopularFitsCache(): void {
   cache.clear();
+  pending.clear();
 }
 
 async function resolveLosses(shipTypeId: number): Promise<HullLoss[] | null> {
@@ -57,6 +62,16 @@ export async function loadPopularFits(
 ): Promise<PopularFitsResult> {
   const hit = cache.get(shipTypeId);
   if (hit && now - hit.at < CACHE_TTL_MS) return hit.result;
+  const inFlight = pending.get(shipTypeId);
+  if (inFlight) return inFlight;
+  const load: Promise<PopularFitsResult> = fetchPopularFits(shipTypeId, now).finally(() => {
+    if (pending.get(shipTypeId) === load) pending.delete(shipTypeId);
+  });
+  pending.set(shipTypeId, load);
+  return load;
+}
+
+async function fetchPopularFits(shipTypeId: number, now: number): Promise<PopularFitsResult> {
   try {
     const losses = await resolveLosses(shipTypeId);
     if (losses === null) return { ok: false };

@@ -84,4 +84,15 @@ describe('loadPopularFits', () => {
     await loadPopularFits(626, 11 * 60_000);
     expect(fetchHullLossesMock).toHaveBeenCalledTimes(3);
   });
+
+  it('shares one load between callers asking for the same hull at once', async () => {
+    let settle: (value: unknown) => void = () => undefined;
+    fetchHullLossesMock.mockReturnValue(new Promise((resolve) => (settle = resolve)));
+    const first = loadPopularFits(626, 0);
+    const second = loadPopularFits(626, 0);
+    settle({ ok: true, losses: [] });
+    expect(await first).toEqual({ ok: true, fits: [] });
+    expect(await second).toEqual({ ok: true, fits: [] });
+    expect(fetchHullLossesMock).toHaveBeenCalledTimes(1);
+  });
 });
