@@ -388,7 +388,7 @@
       },
       "cargoTile": "{{name}} ×{{quantity}}",
       "rackHint": "Tap a rack to edit its slots",
-      "droneCount": "{{inSpace}} launched · {{inBay}} in bay",
+      "droneCount": "{{inSpace}} of {{carried}} launched",
       "rackCount": "{{fitted}} / {{total}}",
       "rackCantUse_one": "{{count}} can’t use",
       "rackCantUse_other": "{{count}} can’t use"
@@ -399,9 +399,11 @@
       "noCharge": "No charge",
       "remove": "Remove {{name}}",
       "emptySlot": "Empty — add to {{rack}}",
-      "dronesHint": "Launched drones count toward DPS and bandwidth; the rest wait in the bay.",
+      "dronesHint": "The bay count is every drone the fit carries. Click the squares to launch them — launched drones count toward DPS and bandwidth.",
       "addDrones": "Add drones",
-      "inSpace": "In space",
+      "launched": "{{name}} launched",
+      "launchCount": "{{count}} in space",
+      "launchBlocked": "Can’t launch more: not enough carried, bandwidth, or drones you can control",
       "inBay": "In bay",
       "quantity": "Quantity",
       "slotsWaitForShipData": "Empty slots appear once the ship data has downloaded."

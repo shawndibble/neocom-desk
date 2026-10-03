@@ -27,6 +27,7 @@ import { useCompareSet } from '@/features/market/compareSet';
 import { ESI_BASE_URL } from '@/esi/client';
 import { configureClipboard } from '@/lib/clipboard';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import type {
   MarketGroupNode,
   MarketTypeEntry,
@@ -329,7 +330,14 @@ function historyHandler(
 
 const server = setupServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // The page is code-split: the first render waits on a cold import of the
+  // Layout and Market chunks. Under CI load that alone outran the first
+  // test's findBy budget, leaving an empty <main> ("Unable to find
+  // role=button Ships"), so import them before any test renders.
+  await Promise.all([routeChunks.loadLayout(), routeChunks.loadMarket()]);
+});
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
 beforeEach(async () => {

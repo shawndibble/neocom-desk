@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -7,6 +7,7 @@ import {
   Panel,
   RowMoreActions,
   TextInput,
+  Tooltip,
   TypeIcon,
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -14,11 +15,13 @@ import { AddRow, Close, Compare, DragHandle } from '@/components/ui/icons';
 import {
   cargoGroups,
   droneBayUsed,
-  droneCountMax,
+  droneCarried,
+  droneCarriedMax,
   droneGroups,
-  droneRecallRoom,
+  droneLaunchedMax,
   launchLimitsFrom,
-  setDroneCountWithinLimits,
+  setDronesCarried,
+  setDronesLaunched,
   type DroneBay,
   reachableModuleStates,
   shownModuleState,
@@ -441,6 +444,66 @@ function CountInput({
   );
 }
 
+/** Squares a drone row always shows — a full flight at Drones V. */
+const LAUNCH_SQUARES = 5;
+
+/**
+ * A drone type's launch squares: one lit per drone of it in space. Clicking
+ * a square launches up to it; clicking the highest lit one recalls it. A
+ * square past what the Fitting carries, or past what bandwidth and the
+ * pilot's drone count allow, is disabled — `aria-disabled` rather than the
+ * native attribute, so its tooltip saying why stays reachable by hover, focus
+ * and touch-and-hold.
+ */
+function LaunchSquares({
+  name,
+  inSpace,
+  max,
+  onLaunch,
+}: {
+  name: string;
+  inSpace: number;
+  max: number;
+  onLaunch: (count: number) => void;
+}) {
+  const { t } = useTranslation();
+  const squares = Math.max(LAUNCH_SQUARES, inSpace);
+  return (
+    <div role="group" aria-label={t('fittings.edit.launched', { name })} className="flex">
+      {Array.from({ length: squares }, (_, index) => {
+        const count = index + 1;
+        const lit = count <= inSpace;
+        const blocked = !lit && count > max;
+        const square = (
+          <button
+            type="button"
+            aria-label={t('fittings.edit.launchCount', { count })}
+            aria-pressed={lit}
+            aria-disabled={blocked || undefined}
+            onClick={() => {
+              if (!blocked) onLaunch(count === inSpace ? count - 1 : count);
+            }}
+            className="group flex size-11 items-center justify-center aria-disabled:cursor-not-allowed md:size-6"
+          >
+            <span
+              className={`size-3.5 rounded-xs border ${lit ? 'border-accent bg-accent' : blocked ? 'border-line-bright opacity-40' : 'border-line-bright group-hover:border-accent'}`}
+            />
+          </button>
+        );
+        return (
+          <Fragment key={count}>
+            {blocked ? (
+              <Tooltip content={t('fittings.edit.launchBlocked')}>{square}</Tooltip>
+            ) : (
+              square
+            )}
+          </Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
 function AddSlotButton({
   label,
   selected,
@@ -611,11 +674,12 @@ interface DroneSectionProps {
 }
 
 /**
- * The Fitting's drones: each type with how many are launched (these count
- * toward DPS and bandwidth, capped by it) and how many wait in the bay
- * (capped at what the bay holds — drones in space take none of it), and a
- * way to add more. The List's Drones section, the Ring's drone panel, and the
- * phone Ring's Drones sheet. Nothing on a hull that takes no drones.
+ * The Fitting's drones: each type with how many it carries (the bay count,
+ * capped at what the bay holds — launched drones included) and launch
+ * squares for how many of those are in space (these count toward DPS and
+ * bandwidth, capped by it), and a way to add more. The List's Drones
+ * section, the Ring's drone panel, and the phone Ring's Drones sheet.
+ * Nothing on a hull that takes no drones.
  */
 export function DroneSection({
   fitting,
@@ -672,7 +736,7 @@ export function DroneSection({
                   items: (
                     <DroneMenuItems
                       typeId={group.typeId}
-                      recallable={droneRecallRoom(fitting, group.typeId, bay)}
+                      inSpace={group.inSpace}
                       inBay={group.inBay}
                     />
                   ),
@@ -697,24 +761,19 @@ export function DroneSection({
                 edit((f) => setDroneCounts(f, group.typeId, { inSpace: 0, inBay: 0 }))
               }
             >
-              <CountInput
-                label={t('fittings.edit.inSpace')}
-                value={group.inSpace}
-                max={droneCountMax(fitting, group.typeId, 'inSpace', bay, launch)}
-                onCommit={(inSpace) =>
-                  edit(
-                    (f) => setDroneCountWithinLimits(f, group.typeId, { inSpace }, bay, launch),
-                    `drone-space-${group.typeId}`
-                  )
-                }
+              <LaunchSquares
+                name={name}
+                inSpace={group.inSpace}
+                max={droneLaunchedMax(fitting, group.typeId, launch)}
+                onLaunch={(count) => edit((f) => setDronesLaunched(f, group.typeId, count, launch))}
               />
               <CountInput
                 label={t('fittings.edit.inBay')}
-                value={group.inBay}
-                max={droneCountMax(fitting, group.typeId, 'inBay', bay, launch)}
-                onCommit={(inBay) =>
+                value={droneCarried(group)}
+                max={droneCarriedMax(fitting, group.typeId, bay)}
+                onCommit={(count) =>
                   edit(
-                    (f) => setDroneCountWithinLimits(f, group.typeId, { inBay }, bay, launch),
+                    (f) => setDronesCarried(f, group.typeId, count, bay),
                     `drone-bay-${group.typeId}`
                   )
                 }
@@ -748,7 +807,7 @@ interface FittingRackListProps extends EditContext {
 /**
  * The editable List view (issue #1533): every slot the hull has, filled or
  * empty — tap an empty one to add there — with each module's state, charge
- * and remove control, and the drones split between space and bay. Empty
+ * and remove control, and the drones with their launch squares. Empty
  * slots need the ship data (a rack's size is a ship attribute), so until it
  * has loaded only what's fitted shows.
  */

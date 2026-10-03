@@ -208,7 +208,7 @@ export function useEditorItemActions({
       if (payload.kind === 'drone' || payload.rack === 'drone') {
         const { typeId } = payload;
         edit((f) => {
-          // From the Add panel, one more goes straight into space — a full bay doesn't stop it.
+          // From the Add panel, one more is carried (if the bay has room) and launches.
           if (payload.kind === 'type') return launchNewDrone(f, typeId, droneBay, launchLimits);
           return launchLimits === null ? f : launchDrones(f, launchLimits, typeId);
         });
@@ -288,13 +288,10 @@ export function useEditorItemActions({
             launchDrones: (typeId) => {
               if (launchLimits !== null) edit((f) => launchDrones(f, launchLimits, typeId));
             },
-            recallDrones: (typeId) => edit((f) => recallDrones(f, typeId, droneBay)),
+            recallDrones: (typeId) => edit((f) => recallDrones(f, typeId)),
             recallAllDrones: () =>
               edit((f) =>
-                droneGroups(f).reduce(
-                  (next, group) => recallDrones(next, group.typeId, droneBay),
-                  f
-                )
+                droneGroups(f).reduce((next, group) => recallDrones(next, group.typeId), f)
               ),
             removeDrones: (typeId) =>
               edit((f) => setDroneCounts(f, typeId, { inSpace: 0, inBay: 0 })),
