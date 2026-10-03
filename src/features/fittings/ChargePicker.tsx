@@ -182,9 +182,14 @@ function tierLabel(t: TFunction, choice: ChargeChoice): string {
   return t(choice.tier === 'tech2' ? 'fittings.chargePicker.tech2' : 'fittings.chargePicker.tech1');
 }
 
-/** "Caldari Navy Antimatter" — a quick pick's or the loaded line's name, without the size suffix the row already implies. */
+/** "Antimatter" for "Antimatter Charge L": the size is the weapon's, and the same on every row. */
+function baseLabel(name: string): string {
+  return name.replace(/\s+Charge\s+(?:XL|[SML])$|\s+(?:XL|[SML])$/, '');
+}
+
+/** "Caldari Navy Antimatter" — a quick pick's or the loaded line's name. */
 function shortName(choice: ChargeChoice): string {
-  const base = choice.baseName.replace(/\s+Charge\s+[SMLX]+$|\s+[SMLX]+$/, '');
+  const base = baseLabel(choice.baseName);
   return choice.tier === 'faction' && choice.faction ? `${choice.faction} ${base}` : base;
 }
 
@@ -194,6 +199,12 @@ function DamageText({ choice }: { choice: ChargeChoice }) {
   const parts = (['em', 'thermal', 'kinetic', 'explosive'] as const)
     .filter((key) => choice.damage![key] > 0.005)
     .map((key) => ({ key, share: Math.round(choice.damage![key] * 100) }));
+  // Rounded shares can sum to 99 or 101: the largest takes up the difference.
+  const largest = parts.reduce<(typeof parts)[number] | null>(
+    (a, b) => (a === null || b.share > a.share ? b : a),
+    null
+  );
+  if (largest) largest.share += 100 - parts.reduce((sum, p) => sum + p.share, 0);
   const swatch: Record<string, string> = {
     em: 'bg-dmg-em',
     thermal: 'bg-dmg-thermal',
@@ -435,6 +446,19 @@ function TypeList({
         <button
           type="button"
           aria-expanded={isOpen}
+          aria-label={[
+            t('fittings.chargePicker.typeRowLabel', {
+              name: baseLabel(g.name),
+              dps: Math.round(score),
+              range: rangeText(t, rep),
+            }),
+            cargo > 0
+              ? t('fittings.chargePicker.inCargo', { count: formatCompactNumber(cargo) })
+              : null,
+            rep.skillMissing ? t('fittings.chargePicker.needsSkill') : null,
+          ]
+            .filter(Boolean)
+            .join(', ')}
           onClick={() => setOpen(isOpen ? null : g.baseTypeId)}
           className={cx(
             'grid w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 border-l-2 px-1.5 py-1.5 text-left hover:bg-panel-2',
@@ -445,9 +469,11 @@ function TypeList({
             <TypeIcon typeId={rep.typeId} size={32} width={20} height={20} />
           </span>
           <span className="flex min-w-0 items-baseline gap-1.5 text-xs font-semibold">
-            <span className="truncate">{g.name}</span>
+            <span className="shrink-0">{baseLabel(g.name)}</span>
             {rank && (
-              <span className="shrink-0 text-[0.6875rem] font-normal text-text-dim">{rank}</span>
+              <span className="min-w-0 truncate text-[0.6875rem] font-normal text-text-dim">
+                {rank}
+              </span>
             )}
             {isBest && (
               <span className="shrink-0 border border-current px-1 text-[0.6875rem] text-success">
@@ -456,7 +482,7 @@ function TypeList({
             )}
             {cargo > 0 && (
               <span className="shrink-0 border border-current px-1 text-[0.6875rem] font-normal text-text-dim">
-                {t('fittings.chargePicker.inCargo', { count: formatIsk(cargo) })}
+                {t('fittings.chargePicker.inCargo', { count: formatCompactNumber(cargo) })}
               </span>
             )}
             {rep.skillMissing && (

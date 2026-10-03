@@ -108,7 +108,10 @@ export function appliedDpsAt(choice: ChargeChoice, distance: number): number {
     tracking: 1,
     optimalSigRadius: 1,
   };
-  return choice.dps * turretDamageMultiplier(turretHitChance(weapon, STILL_TARGET, distance));
+  // Capped at the listed DPS: the wrecking-shot average lifts a sure hit about
+  // 1.5% over it, which would read as more damage than the row lists.
+  const multiplier = turretDamageMultiplier(turretHitChance(weapon, STILL_TARGET, distance));
+  return choice.dps * Math.min(1, multiplier);
 }
 
 /** Listed DPS, or what lands at `distance` when one is set. */

@@ -171,8 +171,8 @@ describe('rangesDiffer', () => {
 });
 
 describe('appliedDpsAt', () => {
-  it('is full damage inside optimal (with the wrecking-shot average)', () => {
-    expect(appliedDpsAt(lead, 10_000)).toBeCloseTo(lead.dps * 1.0, -1);
+  it('is the listed DPS inside optimal — never above it, wrecking shots and all', () => {
+    expect(appliedDpsAt(lead, 10_000)).toBe(lead.dps);
   });
 
   it('halves the chance to hit one falloff past optimal', () => {

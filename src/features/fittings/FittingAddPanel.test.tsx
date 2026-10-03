@@ -323,8 +323,10 @@ describe('FittingAddPanel', () => {
       // Within 10% of the top, it's also the cheapest per minute: best value too.
       expect(await within(picks).findAllByText('Caldari Navy Antimatter')).toHaveLength(2);
       expect(picks).toHaveTextContent(/Max range\s*Lead/);
-      expect(screen.getByRole('button', { name: /Antimatter Charge L/ })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Spike L/ })).toHaveTextContent('SKILL');
+      expect(screen.getByRole('button', { name: /^Antimatter, / })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Spike, .*Needs a skill/ })).toHaveTextContent(
+        'SKILL'
+      );
     });
 
     it("loads a faction version from its type's table, and names a strictly worse one", async () => {
@@ -335,7 +337,7 @@ describe('FittingAddPanel', () => {
         'Caldari Navy Antimatter'
       );
 
-      await user.click(screen.getByRole('button', { name: /Antimatter Charge L/ }));
+      await user.click(screen.getByRole('button', { name: /^Antimatter, / }));
       expect(screen.getByText(/Thermal 44%/)).toBeInTheDocument();
       expect(screen.getByText(/Same as Caldari Navy, costs more/)).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: /^Caldari Navy\b/ }));
@@ -352,7 +354,7 @@ describe('FittingAddPanel', () => {
       expect(screen.getByLabelText('Target at')).toBeInTheDocument();
 
       await user.click(screen.getByRole('button', { name: 'Usable' }));
-      expect(screen.queryByRole('button', { name: /Spike L/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Spike, / })).not.toBeInTheDocument();
     });
   });
 

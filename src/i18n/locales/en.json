@@ -533,7 +533,8 @@
       "legendBest": "Best per range",
       "loadButton": "Load",
       "loadedButton": "Loaded",
-      "rowLabel": "{{name}}, {{dps}} dps, {{price}}"
+      "rowLabel": "{{name}}, {{dps}} dps, {{price}}",
+      "typeRowLabel": "{{name}}, {{dps}} dps, {{range}}"
     },
     "popular": {
       "title": "Popular fits",
