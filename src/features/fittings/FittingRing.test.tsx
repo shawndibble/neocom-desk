@@ -595,7 +595,7 @@ describe('FittingRing with the editor’s item actions', () => {
       onDropType,
       fitting: { ...fitting, cargo: [{ typeId: 12, quantity: 1 }] },
     });
-    const tile = screen.getByLabelText(/^#12 ×1|×1/);
+    const tile = screen.getByLabelText(/^#12 ×1/);
     const setData = vi.fn();
     fireEvent.dragStart(tile, { dataTransfer: { setData, effectAllowed: 'all' } });
     const payload = useFittingDrag.getState().payload;

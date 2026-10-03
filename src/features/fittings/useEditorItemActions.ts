@@ -89,8 +89,6 @@ export interface EditorItemActions {
     typeId: number,
     fromCargo?: boolean
   ) => void;
-  /** Whether an Add panel item has anywhere to go: the chosen slot, a free one in its rack, room in the bay. */
-  canPlace: (rack: CandidateRack, typeId: number) => boolean;
   /** Null before the ship data, so nothing is capped yet. */
   droneBay: DroneBay | null;
   /** The types last fitted to a rack, newest first; `fitAt` notes them itself. */
@@ -181,6 +179,8 @@ export function useEditorItemActions({
               : firstFreeSlotIndex(f, rack, count)
             : slotIndex;
         if (index === null) return f;
+        // A stale drag out of a stack already emptied fits nothing.
+        if (fromCargo && takeCargo(f, typeId, 1) === f) return f;
         noteRecent(rack, typeId);
         const next = addModule(f, rack, index, typeId, () =>
           defaultCharges(f.shipTypeId, rack, typeId)
@@ -214,7 +214,8 @@ export function useEditorItemActions({
       if (onto.kind === 'ring') {
         const placed = fitting === null ? null : ringDropFor(payload, fitting.modules, slotCounts);
         const fromCargo = payload.kind === 'type' && !!payload.fromCargo;
-        if (placed?.kind === 'fit') fitAt(placed.rack, placed.index, placed.typeId, fromCargo);
+        // Placed afresh against the Fitting being changed, so a stale index can't overwrite.
+        if (placed?.kind === 'fit') fitAt(placed.rack, 'firstFree', placed.typeId, fromCargo);
         else if (placed?.kind === 'load')
           charges.load(placed.typeId, { fromCargo: placed.fromCargo, only: placed.only });
         return;
@@ -388,5 +389,5 @@ export function useEditorItemActions({
     ]
   );
 
-  return { itemActions, fitAt, canPlace, droneBay, noteRecent, defaultCharges, drop };
+  return { itemActions, fitAt, droneBay, noteRecent, defaultCharges, drop };
 }
