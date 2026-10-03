@@ -8,5 +8,6 @@ export type CapacitorTone = 'success' | 'warning' | 'danger';
 /** How the Capacitor section's headline is tinted: stable, lasts a minute or more, or less. */
 export function capacitorTone(capacitor: CapacitorStatus): CapacitorTone {
   if (capacitor.stable) return 'success';
-  return capacitor.depletesInSeconds < DANGER_BELOW_SECONDS ? 'danger' : 'warning';
+  // Whole seconds, as the headline shows them: "60s" never reads in red.
+  return Math.round(capacitor.depletesInSeconds) < DANGER_BELOW_SECONDS ? 'danger' : 'warning';
 }

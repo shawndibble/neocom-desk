@@ -451,6 +451,14 @@ describe('FittingStatsSections — Defense', () => {
     expect(screen.getByText('Depletes in 30s')).toHaveClass('text-danger');
   });
 
+  it('keeps the Capacitor tone over the heat tone, with the unheated figure on hover', () => {
+    renderSections(stats({ capacitor: { stable: true, stablePercentage: 40 }, unheated: stats() }));
+    const headline = screen.getByText('Stable at 40%');
+    expect(headline).toHaveClass('text-success');
+    expect(headline).not.toHaveClass('text-warning');
+    expect(headline).toHaveAttribute('title', 'Unheated: Stable at 60%');
+  });
+
   it("labels a Reactive Armor Hardener's resists as adapted to the chosen profile", () => {
     renderSections(
       stats({
