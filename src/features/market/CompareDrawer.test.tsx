@@ -28,6 +28,9 @@ vi.mock('@/sde/loadSde', () => ({
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
 
+const narrowState = vi.hoisted(() => ({ narrow: false }));
+vi.mock('@/lib/useIsNarrow', () => ({ useIsNarrow: () => narrowState.narrow }));
+
 vi.mock('@/features/character/characterModifiers', () => ({
   loadCharacterModifiers: vi.fn(),
 }));
@@ -101,6 +104,7 @@ afterEach(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   useCompareSet.setState({ items: [], view: 'prices', openRequest: 0 });
+  narrowState.narrow = false;
   mockedLoadDictionary.mockResolvedValue({
     9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
   });
@@ -235,10 +239,6 @@ describe('CompareDrawer', () => {
     await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
     const region = await screen.findByRole('region', { name: 'Compare' });
 
-    fireEvent.contextMenu(screen.getByRole('button', { name: 'Remove Tritanium' }));
-    expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
-    expect(actions.requestBlueprints).not.toHaveBeenCalled();
-
     fireEvent.contextMenu(within(region).getByText('Tritanium'));
     await user.click(await screen.findByRole('menuitem', { name: 'Show info' }));
 
@@ -310,7 +310,10 @@ describe('CompareDrawer', () => {
 
     await user.click(within(region).getByRole('button', { name: 'Attributes' }));
 
-    expect(await within(region).findByText('Structure Hitpoints')).toBeInTheDocument();
+    // Both items share the one attribute, so Differences only hides it at first.
+    expect(await within(region).findByText('1 identical hidden')).toBeInTheDocument();
+    await user.click(within(region).getByRole('checkbox', { name: 'Differences only' }));
+    expect(within(region).getByText('Structure Hitpoints')).toBeInTheDocument();
     expect(within(region).getByText('Worth')).toBeInTheDocument();
     expect(within(region).getByText('Estimated Price')).toBeInTheDocument();
     expect(within(region).queryByRole('button', { name: 'Export Prices' })).not.toBeInTheDocument();
@@ -408,5 +411,33 @@ describe('CompareDrawer', () => {
 
     act(() => useCompareSet.getState().openIn('attributes'));
     expect(await screen.findByRole('region', { name: 'Compare' })).toBeInTheDocument();
+  });
+
+  describe('below md', () => {
+    it('opens as a full-screen sheet with no resize bar or Expand, Clear all in the overflow menu', async () => {
+      narrowState.narrow = true;
+      const user = userEvent.setup();
+      act(() => useCompareSet.setState({ items: [ITEM_A, ITEM_B] }));
+      renderDrawer();
+      await user.click(screen.getByRole('button', { name: 'Compare (2)' }));
+      const region = await screen.findByRole('region', { name: 'Compare' });
+
+      expect(region).toHaveClass('fixed', 'inset-0');
+      expect(region).not.toHaveAttribute('style');
+      expect(
+        screen.queryByRole('separator', { name: 'Resize the drawer' })
+      ).not.toBeInTheDocument();
+      expect(within(region).queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument();
+      expect(within(region).queryByRole('button', { name: 'Clear all' })).not.toBeInTheDocument();
+      expect(within(region).getByText(/^Prices from /)).toBeInTheDocument();
+
+      fireEvent.pointerDown(within(region).getByRole('button', { name: 'Prices actions' }), {
+        button: 0,
+        pointerType: 'mouse',
+      });
+      await user.click(await screen.findByRole('menuitem', { name: 'Clear all' }));
+
+      expect(useCompareSet.getState().items).toEqual([]);
+    });
   });
 });

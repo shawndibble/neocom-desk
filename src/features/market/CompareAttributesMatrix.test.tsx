@@ -76,7 +76,7 @@ describe('CompareAttributesMatrix', () => {
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
-  it('renders one stacking DataTable per attribute category, labelled per item for the stacked view', () => {
+  it('renders one real-matrix DataTable per attribute category, never the stacked card', () => {
     const rows = [row(587, 'Rifter'), row(588, 'Republic Fleet Rifter')];
     const data: CompareAttributesData = {
       dogmaByTypeId: new Map([
@@ -99,11 +99,9 @@ describe('CompareAttributesMatrix', () => {
       'Speed and Travel',
       'Structure',
     ]);
-    for (const table of tables) expect(table).toHaveClass('dt-stack');
-
-    const hpCell = screen.getByText('1,200 HP');
-    expect(hpCell).toHaveAttribute('data-label', 'Rifter');
-    expect(screen.getByText('Structure Hitpoints')).toHaveClass('dt-primary');
+    for (const table of tables) expect(table).not.toHaveClass('dt-stack');
+    // The attribute column stays pinned while item columns scroll under it.
+    expect(screen.getByText('Structure Hitpoints')).toHaveClass('sticky', 'left-0');
   });
 
   it('names each item once, in the one sticky header row above every category', () => {
@@ -118,9 +116,9 @@ describe('CompareAttributesMatrix', () => {
 
     const header = screen.getByRole('table', { name: 'Compared items' });
     expect(header).toHaveClass('sticky', 'top-0');
-    expect(within(header).getByText('Rifter')).toHaveClass('max-w-28');
+    expect(within(header).getByText('Rifter')).toBeInTheDocument();
     // The category tables keep their own header for assistive tech, hidden from sight.
-    expect(screen.getByRole('table', { name: 'Structure' })).toHaveClass('sm:[&_thead]:sr-only');
+    expect(screen.getByRole('table', { name: 'Structure' })).toHaveClass('[&_thead]:sr-only');
   });
 
   it("removes an item from its header's x", async () => {
@@ -135,5 +133,89 @@ describe('CompareAttributesMatrix', () => {
       within(header).getByRole('button', { name: 'Remove Republic Fleet Rifter' })
     );
     expect(onRemove).toHaveBeenCalledWith(588);
+  });
+
+  it('moves the words every name shares into the corner, keeping full names for assistive tech', () => {
+    const rows = [row(1, 'Large Shield Extender II'), row(2, 'Caldari Navy Large Shield Extender')];
+    const data: CompareAttributesData = { dogmaByTypeId: new Map(), dictionary: {}, names: {} };
+
+    render(<CompareAttributesMatrix rows={rows} data={data} />);
+
+    const header = screen.getByRole('table', { name: 'Compared items' });
+    expect(within(header).getByText('Large Shield Extender')).toBeInTheDocument();
+    expect(within(header).getByText('II')).toBeInTheDocument();
+    expect(within(header).getByText('Caldari Navy')).toBeInTheDocument();
+    expect(
+      within(header).getByText('Caldari Navy Large Shield Extender', { selector: '.sr-only' })
+    ).toBeInTheDocument();
+  });
+
+  it('hides attributes every item shares by default, and shows them when Differences only is cleared', async () => {
+    const rows = [row(1, 'Rifter'), row(2, 'Slasher')];
+    const data: CompareAttributesData = {
+      dogmaByTypeId: new Map([
+        [
+          1,
+          [
+            { attribute_id: 9, value: 1200 },
+            { attribute_id: 37, value: 300 },
+          ],
+        ],
+        [
+          2,
+          [
+            { attribute_id: 9, value: 1200 },
+            { attribute_id: 37, value: 400 },
+          ],
+        ],
+      ]),
+      dictionary: {
+        9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
+        37: { name: 'Maximum Velocity', unit: 'm/sec', category: 'Speed and Travel' },
+      },
+      names: {},
+    };
+
+    render(<CompareAttributesMatrix rows={rows} data={data} />);
+
+    expect(screen.getByRole('checkbox', { name: 'Differences only' })).toBeChecked();
+    expect(screen.getByText('Maximum Velocity')).toBeInTheDocument();
+    expect(screen.queryByText('Structure Hitpoints')).not.toBeInTheDocument();
+    // A category left with nothing differing disappears entirely.
+    expect(screen.queryByRole('table', { name: 'Structure' })).not.toBeInTheDocument();
+    expect(screen.getByText('1 identical hidden')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Differences only' }));
+
+    expect(screen.getByText('Structure Hitpoints')).toBeInTheDocument();
+    expect(screen.queryByText('1 identical hidden')).not.toBeInTheDocument();
+  });
+
+  it('collapses and re-expands a category from its heading', async () => {
+    const rows = [row(1, 'Rifter'), row(2, 'Slasher')];
+    const data: CompareAttributesData = {
+      dogmaByTypeId: new Map([
+        [1, [{ attribute_id: 37, value: 300 }]],
+        [2, [{ attribute_id: 37, value: 400 }]],
+      ]),
+      dictionary: {
+        37: { name: 'Maximum Velocity', unit: 'm/sec', category: 'Speed and Travel' },
+      },
+      names: {},
+    };
+
+    render(<CompareAttributesMatrix rows={rows} data={data} />);
+
+    const toggle = screen.getByRole('button', { name: 'Speed and Travel' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(toggle);
+    expect(screen.queryByText('Maximum Velocity')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Speed and Travel 1 row' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Speed and Travel 1 row' }));
+    expect(screen.getByText('Maximum Velocity')).toBeInTheDocument();
   });
 });

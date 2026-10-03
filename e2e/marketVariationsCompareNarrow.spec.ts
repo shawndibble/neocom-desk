@@ -7,22 +7,23 @@
  * went through `DataTable`, so it had no responsive behaviour at all — at
  * 390px it showed about two of up to `VARIATIONS_LIMIT` (20) 96px item
  * columns and made the reader scroll sideways once per attribute row. It now
- * renders one `DataTable` per attribute category, inheriting the default
- * below-`sm` stack (DESIGN.md §4a, the same move #406 made for
- * `SkillCompare`).
+ * renders one `DataTable` per attribute category. Below `sm` that first
+ * meant the stacked card (#1128), which truncated every item name into one
+ * label gutter; it is now a real matrix at every width, narrower columns on
+ * a phone and a sideways scroll under a pinned attribute column past ~5
+ * items, inside a full-screen sheet.
  *
- * jsdom has no layout and no media queries, so
- * `CompareAttributesMatrix.test.tsx` can only assert the markup carries
- * `.dt-stack` and its `data-label`s — not that the cards actually lay out
- * without a sideways scroll. That needs a real browser at a real viewport,
- * the same reasoning `marketCompareNarrow.spec.ts` gives.
+ * jsdom has no layout, so `CompareAttributesMatrix.test.tsx` can only assert
+ * the markup — not that the sheet fills the screen or the attribute column
+ * really stays put while the items scroll. That needs a real browser at a
+ * real viewport, the same reasoning `marketCompareNarrow.spec.ts` gives.
  *
  * `1MN Afterburner I` is the fixture item because its variation group is 18
  * members deep in the bundled SDE — well past the 2-3 item happy path the
  * `SkillCompare` precedent ever exercised, which is the ticket's hostile-review
  * objection.
  */
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
@@ -67,6 +68,25 @@ async function stubEveryType(page: Page) {
   });
 }
 
+/**
+ * How many distinct sideways scroll containers hold the drawer's tables —
+ * one means every category scrolls together, so scrolling Fitting to column
+ * 12 can't leave Capacitor on column 1.
+ */
+async function scrollerCount(drawer: Locator) {
+  return drawer.getByRole('table').evaluateAll((tables) => {
+    const found = new Set<Element>();
+    for (const table of tables) {
+      let node = table.parentElement;
+      while (node && !['auto', 'scroll'].includes(getComputedStyle(node).overflowX)) {
+        node = node.parentElement;
+      }
+      if (node) found.add(node);
+    }
+    return found.size;
+  });
+}
+
 /** Market Browser → search the fixture item → Variations panel → "Compare". */
 async function openCompareDrawer(page: Page) {
   await signInAndGoto(page);
@@ -84,61 +104,65 @@ async function openCompareDrawer(page: Page) {
   return drawer;
 }
 
-test('Variations compare stacks into labelled cards at 390px', async ({ page }) => {
+test('Variations compare is a full-screen matrix at 390px, scrolling sideways under a pinned attribute column', async ({
+  page,
+}) => {
   await page.setViewportSize(PHONE);
   const drawer = await openCompareDrawer(page);
 
-  // Non-modal (round 8): the order book beside it stays interactive rather
-  // than being inerted, which is exactly what the old modal did wrong. The
-  // heading, not a table: `stubEveryType` serves empty books, so the section
-  // renders its empty state. Inert content drops out of the accessibility
-  // tree, so a role query still fails if the drawer blocks the book.
-  await expect(page.getByRole('heading', { name: 'Sell Orders' })).toBeVisible();
+  // Below `md` the drawer is a full-screen sheet over the bottom nav, not an
+  // 80vh strip above it.
+  const box = (await drawer.boundingBox())!;
+  expect(box.x).toBe(0);
+  expect(box.y).toBe(0);
+  // Against the page's own width, which a desktop browser's classic
+  // scrollbar narrows below the 390px window (a phone's overlay one doesn't).
+  expect(box.width).toBe(
+    await page.evaluate(() => document.documentElement.getBoundingClientRect().width)
+  );
+  expect(Math.abs(box.height - PHONE.height)).toBeLessThanOrEqual(1);
 
-  // A phone can't hold a stacked matrix at the 280px default drawer height,
-  // so opening on Attributes goes straight to `full` (80vh).
-  expect(await drawer.evaluate((el) => el.style.height)).toBe('80vh');
-
-  // Both stubbed categories plus the synthetic "Worth" group, so what follows
-  // measures the real multi-table shape and not one table passing for all.
-  // That each carries `.dt-stack` is `CompareAttributesMatrix.test.tsx`'s job;
-  // this spec exists for what the class does once a browser lays it out.
-  const tables = drawer.getByRole('table');
-  expect(await tables.count()).toBeGreaterThanOrEqual(3);
-  await expect(drawer.getByRole('table', { name: 'Capacitor' })).toBeAttached();
-
-  // An attribute table, named rather than positional: `buildCompareMatrix`
-  // returns "Worth" first, so `.first()` would measure the one-row price
-  // group and never touch an attribute card.
+  // A real matrix, never the stacked card: comparing means reading across.
   const fitting = drawer.getByRole('table', { name: 'Fitting' });
+  expect(await fitting.evaluate((table) => getComputedStyle(table).display)).toBe('table');
 
-  // The stack is what's rendering, not columns. `.dt-stack` makes the table
-  // itself a block and clips the header row off-screen, so read the computed
-  // layout rather than visibility — a clipped 1px `thead` still counts as
-  // "visible" to a bounding-box check.
-  expect(await fitting.evaluate((table) => getComputedStyle(table).display)).toBe('block');
+  // Eighteen-odd variants can't fit 390px, so the matrix scrolls sideways —
+  // in one scroller, with the attribute names pinned at its left edge.
+  const attribute = fitting.getByRole('cell').first();
+  expect(await scrollerCount(drawer)).toBe(1);
+  // Columns keep their set widths rather than being squeezed to the screen
+  // (DataTable's own `w-full` once won, crushing every column to a letter):
+  // the attribute column lines up with the one header row's corner cell.
+  const corner = drawer
+    .getByRole('table', { name: 'Compared items' })
+    .getByRole('columnheader')
+    .first();
+  const fittingFirstColumn = fitting.locator('tbody tr').first().locator('td').first();
   expect(
-    await fitting.evaluate((table) => {
-      const head = table.querySelector('thead')!;
-      return head.getBoundingClientRect().width;
-    })
+    Math.abs((await corner.boundingBox())!.width - (await fittingFirstColumn.boundingBox())!.width)
   ).toBeLessThanOrEqual(1);
+  const before = (await attribute.boundingBox())!.x;
+  const scrolled = await fitting.evaluate((table) => {
+    let node = table.parentElement;
+    while (node && !['auto', 'scroll'].includes(getComputedStyle(node).overflowX)) {
+      node = node.parentElement;
+    }
+    node!.scrollLeft = 300;
+    return node!.scrollLeft;
+  });
+  expect(scrolled).toBeGreaterThan(0);
+  // Pinned: it slides at most the scroller's own padding (to its edge),
+  // where unpinned it would have gone 300px off-screen.
+  const after = (await attribute.boundingBox())!.x;
+  expect(after).toBeGreaterThanOrEqual(0);
+  expect(after).toBeLessThanOrEqual(before);
 
-  // Every compared item is a labelled line in the card. A floor rather than
-  // the exact 18 variants plus the selected item, so an SDE update that adds
-  // a variation doesn't fail this.
-  const labels = await fitting
-    .locator('td[data-label]')
-    .evaluateAll((cells) => [...new Set(cells.map((cell) => cell.getAttribute('data-label')))]);
-  expect(labels.length).toBeGreaterThanOrEqual(10);
-
-  // Nothing forces a sideways scroll — the failure the ticket describes.
-  // Measured on the tables themselves: `overflow-x-auto` on the matrix's own
-  // wrapper clips an overflowing table rather than widening `documentElement`.
-  for (const table of await tables.all()) {
-    const overflow = await table.evaluate((el) => el.scrollWidth - el.clientWidth);
-    expect(overflow).toBeLessThanOrEqual(1);
-  }
+  // The page itself never scrolls sideways.
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    )
+  ).toBeLessThanOrEqual(1);
 });
 
 test('Variations compare keeps real item columns above sm (1280px)', async ({ page }) => {
@@ -152,7 +176,12 @@ test('Variations compare keeps real item columns above sm (1280px)', async ({ pa
   // substring, so this asserts on a variant's exact name instead.
   const header = drawer.getByRole('columnheader', { name: '1MN Afterburner II', exact: true });
   await expect(header.first()).toBeVisible();
-  const attribute = drawer.getByRole('columnheader', { name: 'Attribute', exact: true }).first();
+  // The corner cell of the one visible header row — it shows the words
+  // every item's name shares, so it is found by position, not by name.
+  const attribute = drawer
+    .getByRole('table', { name: 'Compared items' })
+    .getByRole('columnheader')
+    .first();
   await expect(attribute).toBeVisible();
 
   expect(
@@ -168,16 +197,5 @@ test('Variations compare keeps real item columns above sm (1280px)', async ({ pa
   // Every category scrolls together: one scroll container for the whole
   // matrix, not one per table, or scrolling Fitting to column 12 would leave
   // Capacitor on column 1.
-  const scrollers = await drawer.getByRole('table').evaluateAll((tables) => {
-    const found = new Set<Element>();
-    for (const table of tables) {
-      let node = table.parentElement;
-      while (node && !['auto', 'scroll'].includes(getComputedStyle(node).overflowX)) {
-        node = node.parentElement;
-      }
-      if (node) found.add(node);
-    }
-    return found.size;
-  });
-  expect(scrollers).toBe(1);
+  expect(await scrollerCount(drawer)).toBe(1);
 });

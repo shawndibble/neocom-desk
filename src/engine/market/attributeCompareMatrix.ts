@@ -122,3 +122,27 @@ export function buildCompareMatrix(
 
   return [worthGroup, ...attributeGroups];
 }
+
+function cellText(cell: CompareCell): string {
+  return cell.displayValue ?? `${cell.value}|${cell.unit ?? ''}`;
+}
+
+/**
+ * True when every one of `typeIds` has this attribute at the same value —
+ * the rows the Compare drawer's "Differences only" filter hides. An item
+ * missing the attribute is a difference, not a match. The price row is never
+ * uniform (it is why the matrix is open at all), and neither is anything
+ * with fewer than two items, where there is nothing to compare.
+ */
+export function isUniformRow(row: CompareAttributeRow, typeIds: readonly number[]): boolean {
+  if (row.kind === 'price' || typeIds.length < 2) return false;
+  let first: string | undefined;
+  for (const typeId of typeIds) {
+    const cell = row.cells.get(typeId);
+    if (!cell) return false;
+    const text = cellText(cell);
+    if (first === undefined) first = text;
+    else if (text !== first) return false;
+  }
+  return true;
+}

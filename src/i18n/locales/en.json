@@ -5572,7 +5572,17 @@
       "worth": "Worth",
       "estimatedPrice": "Estimated Price",
       "errorTitle": "Couldn't load comparison",
-      "errorHint": "Try again, or reload the page."
+      "errorHint": "Try again, or reload the page.",
+      "differencesOnly": "Differences only",
+      "identicalHidden_one": "{{count}} identical hidden",
+      "identicalHidden_other": "{{count}} identical hidden",
+      "rowCount_one": "{{count}} row",
+      "rowCount_other": "{{count}} rows",
+      "noDifferences": "Every attribute is the same across the compared items.",
+      "stackBuy": "buy ",
+      "stackSpread": "spread ",
+      "stackNet": "net ",
+      "stackVolume": "vol "
     },
     "quickbar": {
       "title": "Quickbar",

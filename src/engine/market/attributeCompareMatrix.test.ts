@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildCompareMatrix, type CompareMatrixItem } from './attributeCompareMatrix';
+import {
+  buildCompareMatrix,
+  isUniformRow,
+  type CompareAttributeRow,
+  type CompareCell,
+  type CompareMatrixItem,
+} from './attributeCompareMatrix';
 import type { AttributeDictionary } from './itemAttributes';
 
 /** The engine takes these already translated; the values match `market.compare.*`. */
@@ -137,5 +143,84 @@ describe('buildCompareMatrix', () => {
     const groups = buildCompareMatrix(items, DICTIONARY, LABELS);
     const structureRow = groups.find((g) => g.category === 'Structure')!.rows[0];
     expect(structureRow.kind).toBe('attribute');
+  });
+});
+
+describe('isUniformRow', () => {
+  const row = (cells: [number, CompareCell][]): CompareAttributeRow => ({
+    key: 'attr:1',
+    name: 'X',
+    kind: 'attribute',
+    cells: new Map(cells),
+  });
+  const typeIds = [1, 2, 3];
+
+  it('is true when every item has the same value', () => {
+    expect(
+      isUniformRow(
+        row([
+          [1, { value: 5, unit: 'm' }],
+          [2, { value: 5, unit: 'm' }],
+          [3, { value: 5, unit: 'm' }],
+        ]),
+        typeIds
+      )
+    ).toBe(true);
+  });
+
+  it('is false when any value differs', () => {
+    expect(
+      isUniformRow(
+        row([
+          [1, { value: 5, unit: 'm' }],
+          [2, { value: 6, unit: 'm' }],
+          [3, { value: 5, unit: 'm' }],
+        ]),
+        typeIds
+      )
+    ).toBe(false);
+  });
+
+  it('is false when an item lacks the attribute — absent is a difference', () => {
+    expect(
+      isUniformRow(
+        row([
+          [1, { value: 5, unit: 'm' }],
+          [2, { value: 5, unit: 'm' }],
+        ]),
+        typeIds
+      )
+    ).toBe(false);
+  });
+
+  it('compares display values, so two different required skills differ', () => {
+    expect(
+      isUniformRow(
+        row([
+          [1, { value: 1, unit: null, displayValue: 'Gunnery I' }],
+          [2, { value: 1, unit: null, displayValue: 'Shields I' }],
+          [3, { value: 1, unit: null, displayValue: 'Gunnery I' }],
+        ]),
+        typeIds
+      )
+    ).toBe(false);
+  });
+
+  it('never treats the price row as uniform, so Differences only always keeps it', () => {
+    const price: CompareAttributeRow = {
+      key: 'price',
+      name: 'Estimated Price',
+      kind: 'price',
+      cells: new Map([
+        [1, { value: 5, unit: null }],
+        [2, { value: 5, unit: null }],
+        [3, { value: 5, unit: null }],
+      ]),
+    };
+    expect(isUniformRow(price, typeIds)).toBe(false);
+  });
+
+  it('is false with fewer than two items — nothing to compare', () => {
+    expect(isUniformRow(row([[1, { value: 5, unit: 'm' }]]), [1])).toBe(false);
   });
 });
