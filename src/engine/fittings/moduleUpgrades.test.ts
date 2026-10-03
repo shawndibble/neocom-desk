@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildVariationIndex } from '../market/variations';
 import {
   applyModuleUpgrade,
+  evaluateModuleUpgrades,
   moduleUpgradeCandidates,
   raisedSkillLevels,
+  rankModuleUpgrades,
   scheduleTimeFor,
   unmetRequirements,
 } from './moduleUpgrades';
@@ -188,5 +190,125 @@ describe('scheduleTimeFor', () => {
       seconds: 650,
       includesPrerequisites: false,
     });
+  });
+});
+
+describe('evaluateModuleUpgrades', () => {
+  const fit = rokh();
+  const [railguns, afterburner] = moduleUpgradeCandidates(fit.modules, index, rackOf);
+  const stats = (dps: number, cpuUsed = 100) =>
+    ({
+      offense: { dps, sustainedDps: dps, volley: dps, weapons: [], overheated: null },
+      cpuUsed,
+      cpuTotal: 400,
+    }) as never;
+  const steps = (entries: readonly { skillTypeID: number; targetLevel: number }[]) =>
+    entries.map((e) => ({ skillTypeID: e.skillTypeID, level: e.targetLevel, seconds: 60 }));
+
+  it('works out each upgrade under its whole schedule, keeping only those that need training and help', async () => {
+    // Both arguments typed, so the call's `trained` can be read back below.
+    const compare = vi.fn(async (...[variant]: [Fitting, readonly unknown[]]) => ({
+      before: stats(500),
+      after: stats(variant.modules[0]!.typeId === RAILGUN_II ? 550 : 500),
+    }));
+    const rows = await evaluateModuleUpgrades([railguns!, afterburner!], {
+      fitting: fit,
+      levels: new Map([[3307, 3]]),
+      requirements: (typeId) =>
+        typeId === RAILGUN_II
+          ? [
+              { skillTypeID: 3307, targetLevel: 5 },
+              { skillTypeID: 12207, targetLevel: 1 },
+            ]
+          : [],
+      schedule: steps,
+      compare,
+      gain: (_before, after) => ({
+        metrics: { overall: (after as { offense: { dps: number } }).offense.dps / 500 - 1 },
+      }),
+      fits: () => true,
+    });
+    expect(rows).toEqual([
+      expect.objectContaining({
+        fromTypeId: RAILGUN_I,
+        toTypeId: RAILGUN_II,
+        required: [
+          { skillTypeID: 3307, targetLevel: 5 },
+          { skillTypeID: 12207, targetLevel: 1 },
+        ],
+      }),
+    ]);
+    // The afterburner needs nothing trained: never calculated.
+    expect(compare).toHaveBeenCalledTimes(1);
+    expect(compare.mock.calls[0]![1]).toEqual([
+      { skillTypeID: 3307, targetLevel: 5 },
+      { skillTypeID: 12207, targetLevel: 1 },
+    ]);
+  });
+
+  it('drops an upgrade that no longer fits, or comes out no better', async () => {
+    const common = {
+      fitting: fit,
+      levels: new Map<number, number>(),
+      requirements: () => [{ skillTypeID: 1, targetLevel: 1 }],
+      schedule: steps,
+      compare: async () => ({ before: stats(500), after: stats(550) }),
+    };
+    expect(
+      await evaluateModuleUpgrades([railguns!], {
+        ...common,
+        gain: () => ({ metrics: { overall: 0.1 } }),
+        fits: () => false,
+      })
+    ).toEqual([]);
+    expect(
+      await evaluateModuleUpgrades([railguns!], {
+        ...common,
+        gain: () => ({ metrics: { overall: 0 } }),
+        fits: () => true,
+      })
+    ).toEqual([]);
+  });
+
+  it('leaves out an upgrade whose calculation throws, and stops once cancelled', async () => {
+    const options = {
+      fitting: fit,
+      levels: new Map<number, number>(),
+      requirements: () => [{ skillTypeID: 1, targetLevel: 1 }],
+      schedule: steps,
+      gain: () => ({ metrics: { overall: 0.1 } }),
+      fits: () => true,
+    };
+    const rows = await evaluateModuleUpgrades([railguns!, afterburner!], {
+      ...options,
+      compare: async (variant) => {
+        if (variant.modules[0]!.typeId === RAILGUN_II) throw new Error('boom');
+        return { before: stats(500), after: stats(550) };
+      },
+    });
+    expect(rows?.map((row) => row.toTypeId)).toEqual([AB_II]);
+    expect(
+      await evaluateModuleUpgrades([railguns!], {
+        ...options,
+        compare: async () => ({ before: stats(500), after: stats(550) }),
+        cancelled: () => true,
+      })
+    ).toBeNull();
+  });
+});
+
+describe('rankModuleUpgrades', () => {
+  const row = (toTypeId: number, overall: number, dps: number) => ({
+    fromTypeId: 1,
+    toTypeId,
+    at: [],
+    metrics: { overall, dps },
+  });
+
+  it('orders by the chosen stat, largest gain first, ties by Tech II type id, without sorting in place', () => {
+    const rows = [row(3, 0.1, 0.3), row(1, 0.2, 0.1), row(2, 0.2, 0.2)];
+    expect(rankModuleUpgrades(rows, 'overall').map((r) => r.toTypeId)).toEqual([1, 2, 3]);
+    expect(rankModuleUpgrades(rows, 'dps').map((r) => r.toTypeId)).toEqual([3, 2, 1]);
+    expect(rows.map((r) => r.toTypeId)).toEqual([3, 1, 2]);
   });
 });

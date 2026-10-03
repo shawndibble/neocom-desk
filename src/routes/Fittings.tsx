@@ -526,6 +526,7 @@ function FittingsPage() {
           evaluator={workspace.skillGains}
           characterId={activeCharacterId}
           fittingName={fitting.name}
+          catalogue={catalogue}
         />
       }
       implants={

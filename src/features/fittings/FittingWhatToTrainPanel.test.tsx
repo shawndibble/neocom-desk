@@ -11,6 +11,7 @@ import { newPlan } from '@/features/skills/planner/newPlan';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import { FittingWhatToTrainPanel } from './FittingWhatToTrainPanel';
 import type { SkillGainEvaluator } from './useFittingEvaluation';
+import type { FittingCatalogue } from './useFittingCatalogue';
 
 const CHARACTER_ID = 4242;
 
@@ -95,6 +96,38 @@ vi.mock('./useSkillLevelGain', () => ({
           },
   }),
 }));
+// Tech II upgrades: none by default; a test sets a row to see the section.
+const upgradeState = vi.hoisted(() => ({ rows: [] as unknown[] | null }));
+vi.mock('./useModuleUpgrades', () => ({
+  useModuleUpgrades: () => ({ rows: upgradeState.rows, loading: upgradeState.rows === null }),
+}));
+const RAILGUN_I = 574;
+const RAILGUN_II = 3090;
+const catalogue = {
+  types: {
+    [RAILGUN_I]: { name: '425mm Railgun I' },
+    [RAILGUN_II]: { name: '425mm Railgun II' },
+  },
+} as unknown as FittingCatalogue;
+function railgunUpgrade() {
+  const base = gain(3315, 0, 0.4);
+  return {
+    fromTypeId: RAILGUN_I,
+    toTypeId: RAILGUN_II,
+    at: Array.from({ length: 8 }, (_, slotIndex) => ({ slot: 'high', slotIndex })),
+    delta: { changes: [{ key: 'totalDps', before: 529.5, after: 665.5 }], count: 1 },
+    roleChanges: [],
+    metrics: base.metrics,
+    required: [{ skillTypeID: 3315, targetLevel: 1 }],
+    // Gunnery II and III first: the prerequisites the pilot lacks.
+    scheduled: [
+      { skillTypeID: 3300, level: 2, seconds: 600, sp: 0, cumulativeSeconds: 600 },
+      { skillTypeID: 3300, level: 3, seconds: 3000, sp: 0, cumulativeSeconds: 3600 },
+      { skillTypeID: 3315, level: 1, seconds: 3600, sp: 0, cumulativeSeconds: 7200 },
+    ],
+  };
+}
+
 vi.mock('@/features/skills/planner/usePlanEditorData', () => ({
   usePlanEditorData: () => ({
     catalog: { engineSkills: SKILLS },
@@ -109,6 +142,7 @@ const evaluator = {} as SkillGainEvaluator;
 
 afterEach(async () => {
   await db.skillPlans.clear();
+  upgradeState.rows = [];
 });
 
 function renderPanel() {
@@ -118,6 +152,7 @@ function renderPanel() {
         evaluator={evaluator}
         characterId={CHARACTER_ID}
         fittingName="Rifter"
+        catalogue={catalogue}
       />
     </MemoryRouter>
   );
@@ -355,5 +390,36 @@ describe('FittingWhatToTrainPanel — skill detail', () => {
       typeID: 3315,
       planEntries: plan.entries,
     });
+  });
+
+  it('lists a Tech II upgrade: every copy swapped, the skills it needs, what it does and the time', async () => {
+    upgradeState.rows = [railgunUpgrade()];
+    renderPanel();
+
+    const section = await screen.findByRole('region', { name: 'Tech II upgrades' });
+    const row = within(section).getByText('8× 425mm Railgun I → 425mm Railgun II').closest('li')!;
+    expect(row).toHaveTextContent('Needs Surgical Strike I');
+    expect(row).toHaveTextContent('Total DPS +136');
+    expect(within(row).getByRole('button', { name: /incl\. prerequisites/i })).toBeInTheDocument();
+  });
+
+  it("adds the upgrade's missing skills to the plan", async () => {
+    const user = userEvent.setup();
+    upgradeState.rows = [railgunUpgrade()];
+    renderPanel();
+
+    const section = await screen.findByRole('region', { name: 'Tech II upgrades' });
+    await user.click(
+      within(section).getByRole('button', { name: 'Add to plan: 425mm Railgun II' })
+    );
+    await waitFor(async () => {
+      expect(await planEntries()).toEqual([{ skillTypeID: 3315, targetLevel: 1 }]);
+    });
+  });
+
+  it('shows no upgrade section once none is found', async () => {
+    renderPanel();
+    await screen.findByText('Surgical Strike');
+    expect(screen.queryByRole('region', { name: 'Tech II upgrades' })).not.toBeInTheDocument();
   });
 });

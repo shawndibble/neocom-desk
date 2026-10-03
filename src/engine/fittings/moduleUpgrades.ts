@@ -12,6 +12,7 @@ import type { VariationIndex } from '../market/variations';
 import { getVariations } from '../market/variations';
 import type { PlanEntry } from '../types';
 import { swapModuleType, type ModuleAt } from './fittingEdit';
+import { scheduledSkillTargets } from './skillGains';
 import type { Fitting, FittingModule } from './types';
 
 const TECH_I = 1;
@@ -104,4 +105,95 @@ export function scheduleTimeFor(
     seconds: scheduled.reduce((sum, step) => sum + step.seconds, 0),
     includesPrerequisites: scheduled.some((step) => !asked.has(step.skillTypeID)),
   };
+}
+
+/** One step of a Skill Plan schedule, as far as an upgrade needs it. */
+export interface ScheduleStepLike {
+  skillTypeID: number;
+  level: number;
+  seconds: number;
+}
+
+/** What `evaluateModuleUpgrades` works from — the engine and the schedule, injected. */
+export interface EvaluateModuleUpgradesOptions<
+  S,
+  G extends { metrics: { overall: number } },
+  Step extends ScheduleStepLike = ScheduleStepLike,
+> {
+  /** The open Fitting the upgrades swap modules on. */
+  fitting: Fitting;
+  /** The pilot's skill levels: what a requirement is met against. */
+  levels: ReadonlyMap<number, number>;
+  /** Every skill `typeId` needs in `rack`, at the level it asks. */
+  requirements: (typeId: number, rack: string) => readonly PlanEntry[];
+  /** The schedule that trains `entries`, prerequisites included; null when it can't be worked out yet. */
+  schedule: (entries: readonly PlanEntry[]) => readonly Step[] | null;
+  /** `variant`'s stats once `trained` is, beside the open Fitting's own. */
+  compare: (variant: Fitting, trained: readonly PlanEntry[]) => Promise<{ before: S; after: S }>;
+  /** How the upgraded fit compares — `levelGain`. */
+  gain: (before: S, after: S) => G;
+  /** Whether the upgraded fit still fits its CPU, powergrid and calibration. */
+  fits: (after: S) => boolean;
+  /** Awaited before each calculation — hands the main thread back between them. */
+  between?: () => Promise<void>;
+  /** Checked after each wait; true stops the run, which then resolves null. */
+  cancelled?: () => boolean;
+}
+
+export type ModuleUpgradeGain<G, Step extends ScheduleStepLike = ScheduleStepLike> = ModuleUpgrade &
+  G & {
+    /** The Tech II's requirements the pilot lacks — what a Skill Plan gets. */
+    required: PlanEntry[];
+    /** The schedule that trains them, prerequisites first. */
+    scheduled: readonly Step[];
+  };
+
+/**
+ * Works out each upgrade, one at a time, with every copy swapped and the
+ * whole schedule that unlocks the Tech II trained — prerequisites too, since
+ * the pilot will have them by then. Keeps, in candidate order, those that
+ * need something trained (a swap the pilot can already make is the
+ * Variations panel's), still fit, and come out better overall. An upgrade
+ * whose calculation throws is left out, not the run.
+ */
+export async function evaluateModuleUpgrades<
+  S,
+  G extends { metrics: { overall: number } },
+  Step extends ScheduleStepLike = ScheduleStepLike,
+>(
+  candidates: readonly ModuleUpgrade[],
+  options: EvaluateModuleUpgradesOptions<S, G, Step>
+): Promise<ModuleUpgradeGain<G, Step>[] | null> {
+  const { fitting, levels, requirements, schedule, compare, gain, fits, between, cancelled } =
+    options;
+  const rows: ModuleUpgradeGain<G, Step>[] = [];
+  for (const upgrade of candidates) {
+    if (between) await between();
+    if (cancelled?.()) return null;
+    try {
+      const rack = upgrade.at[0]?.slot;
+      if (!rack) continue;
+      const required = unmetRequirements(requirements(upgrade.toTypeId, rack), levels);
+      if (required.length === 0) continue;
+      const scheduled = schedule(required);
+      if (!scheduled) continue;
+      const trained = scheduledSkillTargets(scheduled);
+      const { before, after } = await compare(applyModuleUpgrade(fitting, upgrade), trained);
+      const described = gain(before, after);
+      if (!fits(after) || described.metrics.overall <= 0) continue;
+      rows.push({ ...upgrade, ...described, required, scheduled });
+    } catch {
+      // Left out — see above.
+    }
+  }
+  if (cancelled?.()) return null;
+  return rows;
+}
+
+/** `rows` ordered by `sort`, largest improvement first, ties by Tech II type id. A new array. */
+export function rankModuleUpgrades<
+  K extends string,
+  T extends ModuleUpgrade & { metrics: Record<K, number> },
+>(rows: readonly T[], sort: K): T[] {
+  return [...rows].sort((a, b) => b.metrics[sort] - a.metrics[sort] || a.toTypeId - b.toTypeId);
 }
