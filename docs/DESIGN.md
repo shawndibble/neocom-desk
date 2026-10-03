@@ -473,6 +473,15 @@ deciding their fate on desktop, where they must always show. Grouping reads
 a `highlightRowKey` pointing inside a collapsed group has no row to scroll
 to.
 
+One narrower exception lives in a column's own `render`: a stacked card's
+**title may change content when every row shares the primary value**. BPC
+Sourcing with one blueprint picked lists only that blueprint, so a phone card
+titled with its name says the same thing on every row; there the title reads
+the copy's "ME 10 · TE 20 · 5 runs" instead. It is decided in JS with
+`useIsPhone` (the line `DataTable` stacks at), so the cell still holds one
+title at any width. Never a `sm:hidden` pair. Where the phone only needs
+_less_ of the same text (a long station name), cut it with CSS instead.
+
 ## 4b. Filters
 
 A filter row is fine at 1280px and is most of the screen at 390px. Wallet's
