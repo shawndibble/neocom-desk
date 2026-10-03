@@ -19,7 +19,20 @@
 import { findLocalRoute, type LocalRouteRules } from '@/features/route/localRoute';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { shownSecurity } from '@/engine/securityStatus';
-import { chokepointsOnRoute } from '@/engine/route/chokepoints';
+import { chokepointsOnRoute, isGankChokepoint } from '@/engine/route/chokepoints';
+
+/**
+ * One system on the route, as the jump list in the detail prints it.
+ * A system the snapshot does not hold keeps its place with no name or
+ * security rather than dropping out: a list one short of the jump count above
+ * it reads as a different route.
+ */
+export interface RouteSystem {
+  systemId: number;
+  name: string | null;
+  security: number | null;
+  chokepoint: boolean;
+}
 
 /** Security at or below which a system is counted. 0.5 rounds to 0.5 and is included. */
 const EXPOSED_AT_OR_BELOW = 0.5;
@@ -31,6 +44,8 @@ export type RouteExposure =
       totalSystems: number;
       /** Named gank chokepoints on the way, in the order they are flown. */
       chokepoints: string[];
+      /** Every system crossed, in flown order, both ends included. */
+      path: RouteSystem[];
     }
   /** There is no gate route at all — a fact about New Eden, not a gap in the data. */
   | { kind: 'no-route' }
@@ -52,8 +67,16 @@ export async function routeExposure(
   if (route.kind === 'unknown' || !systems) return { kind: 'unknown' };
 
   let exposedSystems = 0;
+  const path: RouteSystem[] = [];
   for (const systemId of route.systems) {
-    const security = systems.get(systemId)?.security;
+    const entry = systems.get(systemId);
+    const security = entry?.security;
+    path.push({
+      systemId,
+      name: entry?.name ?? null,
+      security: security ?? null,
+      chokepoint: isGankChokepoint(systemId),
+    });
     // A system the snapshot does not hold is not counted as exposed: an
     // unknown security is not a low one, and guessing would inflate a figure
     // the hauler is about to weigh.
@@ -66,5 +89,6 @@ export async function routeExposure(
     exposedSystems,
     totalSystems: route.systems.length,
     chokepoints: chokepointsOnRoute(route.systems),
+    path,
   };
 }

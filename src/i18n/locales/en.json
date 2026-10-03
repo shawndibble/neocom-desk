@@ -6873,6 +6873,7 @@
     "jumpsShort_one": "{{count}} jump",
     "jumpsShort_other": "{{count}} jumps",
     "jumpsUnknownLabel": "Jumps unknown",
+    "routePathLabel": "Route, system by system",
     "pickUpLabel": "Pick up",
     "dropOffLabel": "Drop off",
     "playerStructureShort": "Player structure",

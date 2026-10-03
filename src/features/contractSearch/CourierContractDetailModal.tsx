@@ -227,6 +227,9 @@ export function CourierContractDetailModal({
       : []),
   ];
   const exposure = useRouteExposure(row, preference);
+  // A same-system haul has a one-system path, which is no trip to review.
+  const path = exposure?.kind === 'known' && exposure.path.length > 1 ? exposure.path : null;
+  const [showPath, setShowPath] = useState(false);
   // Where the return hauls set out from, which is this haul's drop-off region.
   // Narrowed at the render site rather than defaulted to a blank here: a lane
   // is only counted when both ends have a region, so there is no honest empty
@@ -336,14 +339,50 @@ export function CourierContractDetailModal({
 
           <div className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
             <span aria-hidden className="h-4 w-px bg-line" />
-            <span className="tabular-nums">
-              {jumps.kind === 'pending'
-                ? t('common.loading')
-                : jumpCount === null
-                  ? t('contractSearch.jumpsUnknownLabel')
-                  : t('contractSearch.jumpsShort', { count: jumpCount })}
-            </span>
+            {/*
+              A link only once there is a path to show and a trip to show it
+              for — the same rule as the reverse lane below: a control that
+              opens nothing is a dead link. The count stays the board's, which
+              measures the same route under the same rules as the path.
+            */}
+            {path !== null && jumpCount !== null ? (
+              <button
+                type="button"
+                aria-expanded={showPath}
+                onClick={() => setShowPath((shown) => !shown)}
+                className={`-my-2.5 flex min-h-11 items-center tabular-nums md:my-0 md:min-h-0 ${inlineLinkClassName}`}
+              >
+                {t('contractSearch.jumpsShort', { count: jumpCount })}
+              </button>
+            ) : (
+              <span className="tabular-nums">
+                {jumps.kind === 'pending'
+                  ? t('common.loading')
+                  : jumpCount === null
+                    ? t('contractSearch.jumpsUnknownLabel')
+                    : t('contractSearch.jumpsShort', { count: jumpCount })}
+              </span>
+            )}
           </div>
+
+          {path !== null && showPath && (
+            // In place between the two ends, so it reads as the trip itself.
+            // Ordered: the order is the route.
+            <ol
+              aria-label={t('contractSearch.routePathLabel')}
+              className="flex flex-col gap-0.5 border-l border-line pl-3 text-xs"
+            >
+              {path.map((system) => (
+                <li key={system.systemId} className="flex items-baseline gap-1.5">
+                  <span>{system.name ?? `#${system.systemId}`}</span>
+                  {system.security !== null && <SecurityStatus security={system.security} />}
+                  {system.chokepoint && (
+                    <span className="text-[0.6875rem] text-warning">{t('travel.chokepoint')}</span>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
 
           <div className="flex flex-col gap-0.5">
             <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
