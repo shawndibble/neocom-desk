@@ -47,7 +47,15 @@ afterEach(() => {
   restoreMatchMedia = undefined;
 });
 
-function Harness({ initial = EMPTY, actions }: { initial?: Filter; actions?: ReactNode }) {
+function Harness({
+  initial = EMPTY,
+  actions,
+  pointerSurface,
+}: {
+  initial?: Filter;
+  actions?: ReactNode;
+  pointerSurface?: 'row' | 'popover';
+}) {
   const [filter, setFilter] = useState(initial);
   const activeCount = (filter.unreadOnly ? 1 : 0) + (filter.from === '' ? 0 : 1);
   return (
@@ -57,6 +65,7 @@ function Harness({ initial = EMPTY, actions }: { initial?: Filter; actions?: Rea
         onChange={setFilter}
         activeCount={activeCount}
         actions={actions}
+        pointerSurface={pointerSurface}
         search={
           <SearchInput
             aria-label="Search"
@@ -198,5 +207,20 @@ describe('FilterBar', () => {
     render(<Harness />);
     await user.click(screen.getByRole('button', { name: 'Filters' }));
     expect(screen.getByText('From')).toBeInTheDocument();
+  });
+
+  it('opens the controls in a popover off the funnel when asked to', async () => {
+    const user = userEvent.setup();
+    render(<Harness pointerSurface="popover" />);
+    const trigger = screen.getByRole('button', { name: 'Filters' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    const popover = screen.getByRole('dialog');
+    // Uncaptioned and live, like the box under the row — not the sheet's draft.
+    expect(screen.queryByText('From')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Unread only' }));
+    expect(popover).toContainElement(screen.getByRole('button', { name: 'Unread only' }));
+    expect(screen.getByText('unread:true from:')).toBeInTheDocument();
   });
 });

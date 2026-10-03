@@ -19,6 +19,8 @@ import * as Icon from '@/components/ui/icons';
 interface MobileSortToolbarProps<Id extends string> {
   /** Cards shown — identical copies fold into one, so this counts cards. */
   count: number;
+  /** Replaces the "N blueprints" count, for a list whose cards aren't blueprints. */
+  summary?: string;
   fields: readonly { id: Id; label: string }[];
   sort: DataTableSort;
   onSortChange: (next: DataTableSort) => void;
@@ -27,6 +29,7 @@ interface MobileSortToolbarProps<Id extends string> {
 
 export function MobileSortToolbar<Id extends string>({
   count,
+  summary,
   fields,
   sort,
   onSortChange,
@@ -38,7 +41,7 @@ export function MobileSortToolbar<Id extends string>({
   return (
     <div className={`flex items-center justify-between gap-2 border-b border-line ${className}`}>
       <span className="text-xs text-text-dim tabular-nums">
-        {t('industry.opportunitiesCount', { count })}
+        {summary ?? t('industry.opportunitiesCount', { count })}
       </span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

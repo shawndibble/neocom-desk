@@ -5,7 +5,7 @@
  * starting from nothing" answer. Opt-in: nothing runs until the pilot hits
  * "Scan".
  */
-import { useMemo, type ReactElement } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -62,7 +62,9 @@ import { StartPlanButton } from './StartPlanButton';
 import { formatPercent, numericCell } from './format';
 import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, defineUrlFilter, enumParam, enumSetParam } from '@/lib/urlState';
-import { useIsNarrow } from '@/lib/useIsNarrow';
+import { MARKET_WIDE_PAGE_SIZE, topRows } from './marketWidePage';
+import { MobileMarketWideList } from './MobileMarketWideList';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { RARELY_SOLD_PER_DAY, isRarelySold } from '@/engine/industry/marketWideSanity';
 import { useDailySales } from './useDailySales';
 import { marketWideOpportunitiesCsvColumns } from './opportunitiesCsv';
@@ -173,7 +175,9 @@ export function MarketWideOpportunitiesPanel({
   onStartPlan,
 }: MarketWideOpportunitiesPanelProps) {
   const { t } = useTranslation();
-  const isNarrow = useIsNarrow();
+  const unknownName = t('common.unknown');
+  // Below `lg` the ranking is cards, the same breakpoint Ranked and All owned switch at.
+  const isDesktop = useIsDesktop();
   const tradeHubStandings = useTradeHubStandings(activeCharacterId);
   const standing = tradeHubStanding(tradeHubStandings, hub.id);
 
@@ -202,14 +206,21 @@ export function MarketWideOpportunitiesPanel({
   });
   // A tier, category or source change re-scans (they apply before the top-N
   // cut); the build-cost cap only narrows the rows already ranked.
+  const [shownLimit, setShownLimit] = useState(MARKET_WIDE_PAGE_SIZE);
+  const scan = (next: MarketWideFilterState) => {
+    setShownLimit(MARKET_WIDE_PAGE_SIZE);
+    run(next);
+  };
   const applyFilter = (next: MarketWideFilterState) => {
     setFilter(next);
+    // Any narrowing starts the pilot back at the top of the ranking.
+    setShownLimit(MARKET_WIDE_PAGE_SIZE);
     const rescan =
       !sameMembers(next.tiers, filter.tiers) ||
       !sameMembers(next.categories, filter.categories) ||
       !sameMembers(next.sources, filter.sources);
     // Mid-scan too: otherwise the scan already running lands with the old filters.
-    if ((hasRun || loading) && rescan) run(next);
+    if ((hasRun || loading) && rescan) scan(next);
   };
   const accountSkills = useAccountSkillLevels(characterIds);
 
@@ -257,6 +268,13 @@ export function MarketWideOpportunitiesPanel({
     rows: visibleRows,
     columns: csvColumns,
   });
+
+  const startPlanFor = (row: MarketWideResultRow) => {
+    const entry = catalog?.byProductTypeID.get(row.productTypeID);
+    return entry ? onStartPlan(entry) : Promise.resolve(false);
+  };
+  const blueprintTypeIDFor = (productTypeID: number) =>
+    catalog ? (catalog.byProductTypeID.get(productTypeID)?.blueprintTypeID ?? null) : undefined;
 
   const columns: DataTableColumn<MarketWideResultRow>[] = [
     {
@@ -356,46 +374,54 @@ export function MarketWideOpportunitiesPanel({
     {
       id: 'action',
       header: '',
-      render: (row) => (
-        <StartPlanButton
-          onStart={() => {
-            const entry = catalog?.byProductTypeID.get(row.productTypeID);
-            return entry ? onStartPlan(entry) : Promise.resolve(false);
-          }}
-        />
-      ),
+      render: (row) => <StartPlanButton onStart={() => startPlanFor(row)} />,
     },
   ];
   const rowContextMenu = (row: MarketWideResultRow, tr: ReactElement): ReactElement => (
     <ItemContextMenu
       typeId={row.productTypeID}
       itemName={row.productName}
-      blueprintTypeID={
-        catalog
-          ? (catalog.byProductTypeID.get(row.productTypeID)?.blueprintTypeID ?? null)
-          : undefined
-      }
+      blueprintTypeID={blueprintTypeIDFor(row.productTypeID)}
     >
       {tr}
     </ItemContextMenu>
   );
-  const sortProps = useUrlSort(
+  const { sort, onSortChange } = useUrlSort(
     'marketWide.sort',
     MARKET_WIDE_DEFAULT_SORT,
     columns.map((column) => column.id)
   );
+  const sortProps = {
+    sort,
+    onSortChange: (next: typeof sort) => {
+      setShownLimit(MARKET_WIDE_PAGE_SIZE);
+      onSortChange(next);
+    },
+  };
+  // Cut under the active sort, so a re-sort ranks the whole scan rather than
+  // re-ordering whichever 200 the last sort happened to show.
+  const shownRows = useMemo(
+    () =>
+      topRows(
+        visibleRows,
+        SORT_VALUE[sort.columnId as keyof typeof SORT_VALUE],
+        sort.direction,
+        shownLimit
+      ),
+    [visibleRows, sort.columnId, sort.direction, shownLimit]
+  );
+  const remaining = visibleRows.length - shownRows.length;
 
-  // Below `md` every filter already lives in `FilterBar`'s sheet, so all that
-  // is left inline is its funnel — which sits in the title bar beside Scan,
-  // at Scan's own size, in every state, rather than on a row of its own.
-  const filtersInHeader = isNarrow;
+  // The funnel sits in the title bar beside Scan, at Scan's own size, in every
+  // state: below `md` it opens `FilterBar`'s sheet, with a pointer a popover
+  // off the funnel — a box unfolding beneath it would open inside the bar.
   const filterBar = (
     <FilterBar
       value={filter}
       onChange={applyFilter}
       activeCount={activeFilterCount(filter)}
-      className={filtersInHeader ? undefined : 'mb-2'}
-      triggerSize={filtersInHeader ? 'sm' : undefined}
+      triggerSize="sm"
+      pointerSurface="popover"
     >
       {(draft, setDraft) => (
         <>
@@ -506,8 +532,8 @@ export function MarketWideOpportunitiesPanel({
               tableExport={marketWideExport}
             />
           )}
-          {filtersInHeader && filterBar}
-          <Button size="sm" onClick={() => run(filter)} disabled={loading || !trees || !catalog}>
+          {filterBar}
+          <Button size="sm" onClick={() => scan(filter)} disabled={loading || !trees || !catalog}>
             {loading
               ? t('industry.marketOpportunitiesScanning')
               : t('industry.marketOpportunitiesRunScan')}
@@ -515,7 +541,6 @@ export function MarketWideOpportunitiesPanel({
         </span>
       }
     >
-      {!filtersInHeader && filterBar}
       {loading ? (
         <div className="flex justify-center py-8">
           <Spinner label={t('industry.marketOpportunitiesScanning')} />
@@ -544,19 +569,50 @@ export function MarketWideOpportunitiesPanel({
               {t('industry.marketOpportunitiesCheckingSales', { count: dailySales.pending })}
             </p>
           )}
-          <div className="overflow-x-auto">
-            <DataTable
-              {...marketWideExport.tableProps}
-              columns={columns}
-              rows={visibleRows}
-              rowKey={(row) => row.productTypeID}
-              rowContextMenu={rowContextMenu}
-              rowMoreActions
-              label={t('industry.marketOpportunitiesTitle')}
-              mobileSort
+          {isDesktop ? (
+            <div className="overflow-x-auto">
+              <DataTable
+                {...marketWideExport.tableProps}
+                columns={columns}
+                rows={shownRows}
+                rowKey={(row) => row.productTypeID}
+                rowContextMenu={rowContextMenu}
+                rowMoreActions
+                label={t('industry.marketOpportunitiesTitle')}
+                {...sortProps}
+              />
+            </div>
+          ) : (
+            <MobileMarketWideList
+              rows={shownRows}
+              total={visibleRows.length}
               {...sortProps}
+              blueprintTypeIDFor={blueprintTypeIDFor}
+              skillGateFor={(productTypeID) => skillGateByProductTypeID.get(productTypeID)}
+              nameForSkill={(typeID) => (catalog ? nameForType(catalog, typeID) : unknownName)}
+              nameForCharacter={(id) => characterNames.get(id) ?? unknownName}
+              onStartPlan={startPlanFor}
             />
-          </div>
+          )}
+          {remaining > 0 && (
+            // A full-width bar under the cards; beside the count with a pointer.
+            <div className="flex flex-col items-stretch gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <p className="text-center text-[0.6875rem] text-text-dim tabular-nums lg:text-left">
+                {t('industry.marketOpportunitiesShowing', {
+                  shown: shownRows.length,
+                  total: visibleRows.length,
+                })}
+              </p>
+              <Button
+                size="sm"
+                onClick={() => setShownLimit((limit) => limit + MARKET_WIDE_PAGE_SIZE)}
+              >
+                {remaining > MARKET_WIDE_PAGE_SIZE
+                  ? t('industry.marketOpportunitiesShowNext', { count: MARKET_WIDE_PAGE_SIZE })
+                  : t('industry.marketOpportunitiesShowLast', { count: remaining })}
+              </Button>
+            </div>
+          )}
           {gatedCount > 0 && (
             <p className="text-[0.6875rem] text-text-dim">
               {t('industry.marketOpportunitiesSkillGateRule')}
