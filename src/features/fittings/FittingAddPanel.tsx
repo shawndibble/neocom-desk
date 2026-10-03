@@ -625,12 +625,14 @@ function ChargesTab({
     return <p className="text-xs text-text-dim">{t('fittings.add.noChargeTakers')}</p>;
   }
   const weaponChoices = groups.filter((g) => g.isWeapon).flatMap((g) => g.choices);
+  // The shared View/Sort/distance controls go with the weapon sections they drive.
+  const anyWeaponOpen = groups.some((g) => g.isWeapon && !collapsed.has(g.moduleTypeId));
   const maxKm = Math.ceil(
     (Math.max(0, ...weaponChoices.map((c) => c.optimal + c.falloff)) / 1000) * 1.2
   );
   return (
     <div className="space-y-3">
-      {weaponChoices.length > 0 && (
+      {weaponChoices.length > 0 && anyWeaponOpen && (
         <ChargePickerControls settings={settings} onChange={setSettings} maxKm={maxKm} />
       )}
       {groups.map((group) => {
@@ -645,7 +647,7 @@ function ChargesTab({
                 aria-expanded={open}
                 aria-controls={bodyId}
                 onClick={() => toggleSection(group.moduleTypeId)}
-                className="flex min-h-11 w-full items-center gap-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
+                className="flex min-h-11 w-full items-center gap-2 px-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
               >
                 <Caret expanded={open} />
                 <TypeIcon typeId={group.moduleTypeId} size={32} width={20} height={20} />
@@ -655,8 +657,17 @@ function ChargesTab({
                     name: name(group.moduleTypeId),
                   })}
                 </span>
+                {/* The name always carries what's loaded, so it reads the same open or shut. */}
+                {loadedNames !== '' && (
+                  <span className="sr-only">
+                    {t('fittings.add.chargeTakerLoaded', { names: loadedNames })}
+                  </span>
+                )}
                 {!open && loadedNames !== '' && (
-                  <span className="max-w-[45%] shrink-0 truncate font-normal text-text-dim">
+                  <span
+                    aria-hidden="true"
+                    className="max-w-40 shrink-0 truncate font-normal text-text-dim"
+                  >
                     {loadedNames}
                   </span>
                 )}

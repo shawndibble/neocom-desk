@@ -238,6 +238,18 @@ describe('FittingAddPanel', () => {
     const user = userEvent.setup();
     checkCandidates.mockImplementation(() => new Map());
     checkCharges.mockImplementation(() => new Set([501, 700]));
+    // Scourge shoots, so the launcher gets the Charge Picker; the cap booster's charge doesn't.
+    compareCharges.mockImplementation(() => [
+      {
+        typeId: 501,
+        dps: 100,
+        optimal: 20_000,
+        falloff: 0,
+        damage: null,
+        roundsPerMinute: 6,
+        techLevel: 1,
+      },
+    ]);
     renderPanel({
       fitting: {
         ...fitting,
@@ -269,15 +281,18 @@ describe('FittingAddPanel', () => {
     await user.click(screen.getByRole('tab', { name: 'Charges' }));
     const launcher = screen.getByRole('button', { name: /1× Light Missile Launcher II/ });
     expect(launcher).toHaveAttribute('aria-expanded', 'true');
-    // Open: the header doesn't repeat the loaded charge, its row says it.
-    expect(screen.getAllByRole('button', { name: /Scourge Light Missile/ })).not.toContain(
-      launcher
+    expect(launcher).toHaveAccessibleName(
+      /Light Missile Launcher II, loaded: Scourge Light Missile/
     );
+    expect(screen.getByRole('button', { name: 'Usable' })).toBeInTheDocument();
 
     await user.click(launcher);
     expect(launcher).toHaveAttribute('aria-expanded', 'false');
     // Only the header is left, and it still says what the launchers fire.
     expect(screen.getAllByRole('button', { name: /Scourge Light Missile/ })).toEqual([launcher]);
+    expect(launcher).toHaveTextContent('Scourge Light Missile');
+    // With no weapon section open, the picker's shared controls go too.
+    expect(screen.queryByRole('button', { name: 'Usable' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Navy Cap Booster 400/ })).toBeInTheDocument();
 
     await user.click(launcher);

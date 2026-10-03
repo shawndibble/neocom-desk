@@ -20,9 +20,10 @@ interface DisclosureProps {
 
 /**
  * The open/closed caret shared by every disclosure surface in the app —
- * `Disclosure` itself, the Skills group headers and the Market Group tree,
- * which each own too much of their own frame to reuse the component but must
- * still point the same way with the same glyph.
+ * `Disclosure` itself, the Skills group headers, the Market Group tree and
+ * the Fittings Charges tab's module sections, which each own too much of
+ * their own frame to reuse the component but must still point the same way
+ * with the same glyph.
  */
 export function Caret({ expanded }: { expanded: boolean }) {
   const Glyph = expanded ? Icon.Expanded : Icon.Descend;
