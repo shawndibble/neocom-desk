@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { TypeIcon } from '@/components/ui';
 import { cx } from '@/lib/cx';
-import { formatDuration } from '@/lib/duration';
+import { formatSeconds } from '@/lib/duration';
 import {
   capQuickPicks,
   capStrictlyWorseThan,
@@ -31,23 +31,17 @@ function shortName(name: string): string {
   return name.replace(/\s*Cap Booster\s*/, ' ').trim();
 }
 
-function capTime(seconds: number): string {
-  const s = Math.max(0, Math.round(seconds));
-  if (s >= 3600) return formatDuration(s);
-  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
-}
-
 /** "62%" stable, "1m 35s" to empty: the two read apart without colour. */
 function capShort(capacitor: CapacitorStatus): string {
   return capacitor.stable
     ? `${Math.round(capacitor.stablePercentage)}%`
-    : capTime(capacitor.depletesInSeconds);
+    : formatSeconds(capacitor.depletesInSeconds);
 }
 
 function capText(t: TFunction, capacitor: CapacitorStatus): string {
   return capacitor.stable
     ? t('fittings.capGuide.stableAt', { pct: Math.round(capacitor.stablePercentage) })
-    : t('fittings.capGuide.emptyIn', { time: capTime(capacitor.depletesInSeconds) });
+    : t('fittings.capGuide.emptyIn', { time: formatSeconds(capacitor.depletesInSeconds) });
 }
 
 const gjText = (gj: number) =>
