@@ -433,6 +433,34 @@ describe('Travel › Thera / Turnur', () => {
       matchMedia.mockRestore();
     }
   });
+
+  it('opens the phone tabs on the first band that has holes', async () => {
+    const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation(
+      (media: string) =>
+        ({
+          media,
+          matches: media === PHONE_QUERY,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList
+    );
+    try {
+      server.use(
+        http.get(EVE_SCOUT_SIGNATURES_URL, () =>
+          HttpResponse.json(SIGNATURES.filter((entry) => entry.id === 'jspace'))
+        )
+      );
+      visitThera('');
+      const tabs = await screen.findByRole('tablist', { name: 'Where the holes come out' });
+      expect(within(tabs).getByRole('tab', { name: 'J 1' })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
+      expect(await exitsIn(/^J-space/)).toEqual(['J120704']);
+    } finally {
+      matchMedia.mockRestore();
+    }
+  });
 });
 
 describe('Travel copy', () => {

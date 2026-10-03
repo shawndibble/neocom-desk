@@ -9,7 +9,7 @@
  * Conditions, never verdicts (decision `20260912-172628`): a row carries the
  * exit's security, remaining life and ship size; nothing ranks a connection.
  */
-import { classifySpace, isWormholeSystemName, type SpaceKind } from '@/engine/space';
+import { classifySpace, isWormholeSystemName, SPACE_KINDS, type SpaceKind } from '@/engine/space';
 
 export type TheraHub = 'thera' | 'turnur';
 export const THERA_HUBS: readonly TheraHub[] = ['thera', 'turnur'];
@@ -201,9 +201,8 @@ export function groupTheraConnectionsByBand(rows: readonly TheraConnectionRow[])
   for (const row of rows) {
     if (row.exitSpace !== null) bands[row.exitSpace].push(row);
   }
-  bands.highsec.sort(byNearest);
-  bands.lowsec.sort(byNearest);
-  bands.nullsec.sort(byNearest);
-  bands.wormhole.sort(byLongestLife);
+  for (const band of SPACE_KINDS) {
+    bands[band].sort(band === 'wormhole' ? byLongestLife : byNearest);
+  }
   return bands;
 }

@@ -36,7 +36,7 @@ import {
   type TheraConnectionFilter,
   type TheraConnectionRow,
 } from '@/engine/route/theraConnections';
-import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
+import { isSpaceKind, SPACE_KINDS, type SpaceKind } from '@/engine/space';
 import { useCurrentSystem } from '@/features/route/currentSystem';
 import { ROUTE_PREFERENCES } from '@/features/route/routePreferences';
 import { useRouteQuery } from '@/features/route/routeRules';
@@ -170,6 +170,9 @@ function TheraBody({
   }
   const bands = groupTheraConnectionsByBand(filterTheraConnections(state.rows, filter));
   const shown = SPACE_KINDS.reduce((sum, band) => sum + bands[band].length, 0);
+  // A connection with no column (its exit space unknown) is not something the
+  // filters hid, so it doesn't turn "none listed" into "none match".
+  const listed = state.rows.some((row) => row.exitSpace !== null);
   // One live region, always mounted, so a change of message is announced.
   const jumpsNote = !hasOrigin
     ? t('travel.thera.noOrigin')
@@ -188,14 +191,8 @@ function TheraBody({
         </p>
         {shown === 0 ? (
           <EmptyState
-            title={
-              state.rows.length === 0
-                ? t('travel.thera.emptyTitle')
-                : t('travel.thera.noMatchTitle')
-            }
-            hint={
-              state.rows.length === 0 ? t('travel.thera.emptyHint') : t('travel.thera.noMatchHint')
-            }
+            title={listed ? t('travel.thera.noMatchTitle') : t('travel.thera.emptyTitle')}
+            hint={listed ? t('travel.thera.noMatchHint') : t('travel.thera.emptyHint')}
           />
         ) : (
           <BandColumns bands={bands} />
@@ -214,7 +211,9 @@ function TheraBody({
 function BandColumns({ bands }: { bands: TheraBands }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
-  const [phoneBand, setPhoneBand] = useState<SpaceKind>('highsec');
+  // Opens on the first band with holes in it, until the pilot picks one.
+  const [pickedBand, setPhoneBand] = useState<SpaceKind | null>(null);
+  const phoneBand = pickedBand ?? SPACE_KINDS.find((band) => bands[band].length > 0) ?? 'highsec';
 
   if (isPhone) {
     return (
@@ -222,7 +221,9 @@ function BandColumns({ bands }: { bands: TheraBands }) {
         <Tabs
           label={t('travel.thera.bandTabsLabel')}
           value={phoneBand}
-          onChange={(id) => setPhoneBand(id as SpaceKind)}
+          onChange={(id) => {
+            if (isSpaceKind(id)) setPhoneBand(id);
+          }}
           tabs={SPACE_KINDS.map((band) => ({
             id: band,
             label: t(`travel.thera.bandTab.${band}`, { count: bands[band].length }),
