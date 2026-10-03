@@ -569,8 +569,7 @@ describe('BuildPlanDetail shopping list', () => {
 });
 
 describe('BuildPlanDetail sub-builds', () => {
-  const buildButton = () =>
-    screen.getByRole('button', { name: 'Build Tritanium here instead of buying it' });
+  const buildButton = () => screen.getByRole('button', { name: 'Build instead: Tritanium' });
 
   afterEach(() => configureClipboard(null));
 
@@ -580,7 +579,9 @@ describe('BuildPlanDetail sub-builds', () => {
     // prices, so the offer must survive that.
     render(<Harness />);
 
-    expect(await screen.findByRole('button', { name: /Build Tritanium here/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Build instead: Tritanium' })
+    ).toBeInTheDocument();
   });
 
   it('records the choice on the plan', async () => {
@@ -602,7 +603,7 @@ describe('BuildPlanDetail sub-builds', () => {
     // 1000 Tritanium at 4 a run is 250 runs, each eating 5 Pyerite.
     expect(await screen.findByText('250 runs')).toBeInTheDocument();
     const pyerite = screen.getByText('Pyerite').closest('tr');
-    expect(within(pyerite as HTMLElement).getByText('1,250')).toBeInTheDocument();
+    expect(pyerite?.querySelector('[data-label="Need"]')).toHaveTextContent('1,250');
   });
 
   it('offers the build control on an expanded input too, not just an advisory marker', async () => {
@@ -615,7 +616,7 @@ describe('BuildPlanDetail sub-builds', () => {
     await user.click(buildButton());
 
     expect(
-      await screen.findByRole('button', { name: 'Build Pyerite here instead of buying it' })
+      await screen.findByRole('button', { name: 'Build instead: Pyerite' })
     ).toBeInTheDocument();
   });
 
@@ -624,13 +625,11 @@ describe('BuildPlanDetail sub-builds', () => {
     render(<Harness plan={{ runs: 10 }} />);
 
     await user.click(buildButton());
-    await user.click(
-      await screen.findByRole('button', { name: 'Build Pyerite here instead of buying it' })
-    );
+    await user.click(await screen.findByRole('button', { name: 'Build instead: Pyerite' }));
 
     // 1250 Pyerite needed at 1 a run is 1250 runs, each eating 2 Mexallon.
     const mexallon = (await screen.findByText('Mexallon')).closest('tr') as HTMLElement;
-    expect(within(mexallon).getByText('2,500')).toBeInTheDocument();
+    expect(mexallon.querySelector('[data-label="Need"]')).toHaveTextContent('2,500');
     // Mexallon has no producer in this catalog, so the tree bottoms out here
     // on its own rather than at an artificial depth limit.
     expect(within(mexallon).queryByRole('button', { name: /Build|Buy/ })).not.toBeInTheDocument();
@@ -647,9 +646,7 @@ describe('BuildPlanDetail sub-builds', () => {
     render(<Harness plan={{ runs: 10 }} />);
 
     await user.click(buildButton());
-    await user.click(
-      await screen.findByRole('button', { name: 'Build Pyerite here instead of buying it' })
-    );
+    await user.click(await screen.findByRole('button', { name: 'Build instead: Pyerite' }));
 
     // One row per material, whatever depth introduced it — the flat shopping
     // list this table now is, rather than a branch of the resolved tree.
@@ -664,7 +661,7 @@ describe('BuildPlanDetail sub-builds', () => {
     render(<Harness plan={{ runs: 10 }} />);
 
     await user.click(buildButton());
-    await user.click(await screen.findByRole('button', { name: 'Build it: Tritanium' }));
+    await user.click(await screen.findByRole('button', { name: 'Recipe: Tritanium' }));
 
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/250 runs x 4 per run makes 1,000/)).toBeInTheDocument();
@@ -710,7 +707,7 @@ describe('BuildPlanDetail sub-builds', () => {
     render(<Harness plan={{ runs: 10 }} />);
 
     await user.click(buildButton());
-    await user.click(screen.getByRole('button', { name: 'Buy Tritanium instead of building it' }));
+    await user.click(screen.getByRole('button', { name: 'Buy instead: Tritanium' }));
     await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
 
     // Undone: Tritanium is bought again, not built, so its own "Tritanium
@@ -724,7 +721,7 @@ describe('BuildPlanDetail sub-builds', () => {
 describe('BuildPlanDetail Auto Build (issue #695)', () => {
   const strategySelect = () => screen.getByRole('combobox', { name: 'Build Strategy' });
   const tritaniumBuildButton = () =>
-    screen.getByRole('button', { name: 'Build Tritanium here instead of buying it' });
+    screen.getByRole('button', { name: 'Build instead: Tritanium' });
 
   // Selecting a Build Strategy applies immediately — no separate Apply press.
   async function applyBuildStrategy(
@@ -774,7 +771,7 @@ describe('BuildPlanDetail Auto Build (issue #695)', () => {
 
     expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [] });
     expect(
-      await screen.findByRole('button', { name: 'Build Tritanium here instead of buying it' })
+      await screen.findByRole('button', { name: 'Build instead: Tritanium' })
     ).toBeInTheDocument();
   });
 });
@@ -1422,10 +1419,8 @@ describe('BuildPlanDetail item context menu', () => {
     const user = userEvent.setup();
     render(<Harness plan={{ runs: 10 }} />);
 
-    await user.click(
-      screen.getByRole('button', { name: 'Build Tritanium here instead of buying it' })
-    );
-    await user.click(await screen.findByRole('button', { name: 'Build it: Tritanium' }));
+    await user.click(screen.getByRole('button', { name: 'Build instead: Tritanium' }));
+    await user.click(await screen.findByRole('button', { name: 'Recipe: Tritanium' }));
     const dialog = await screen.findByRole('dialog');
 
     fireEvent.contextMenu(within(dialog).getByText(text));

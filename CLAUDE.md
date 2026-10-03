@@ -63,6 +63,14 @@ dev`) — Shawn frequently has another agent working there at the same
   from a pre-existing flake; if it passes locally but fails intermittently in
   CI, fix the flake in the same PR before merging, even though the file
   isn't otherwise part of your diff.
+- **Tests stay under 10 seconds each.** `testTimeout` is 10000 in
+  `vite.config.ts`, and that is a budget to stay under, not a number to raise.
+  A test that needs more is too slow: make it faster instead of adding a
+  per-test timeout or a longer `findBy*` wait. Find out where the time goes
+  first. The usual culprit in a route test is the worker's first cold `App`
+  render (lazy route chunks, jsdom, React warm-up), which lands on whichever
+  test happens to run first. Pay it once in a `beforeAll` warm-up render with
+  its own hook timeout, as `src/routes/IndustryPlanPage.test.tsx` does.
 - i18n: all UI strings through i18next (`src/i18n/locales/en.json`). English only for now.
 
 ## Agent skills

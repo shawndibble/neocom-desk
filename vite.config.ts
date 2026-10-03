@@ -381,11 +381,11 @@ export default defineConfig({
     // stack of jsdom polyfills 462 times for matchers it never calls.
     setupFiles: ['./vitest.setup.ts'],
     // Default 5000ms. A test can chain several `findBy*`/`waitFor` calls,
-    // each now with up to 5000ms of its own headroom (vitest.setup.ts) for
-    // CPU contention under parallel `/next-ticket` runs — give the overall
-    // test enough room that a slow-but-real render doesn't hit this ceiling
-    // first.
-    testTimeout: 15000,
+    // each with up to 5000ms of its own headroom (vitest.setup.ts) for CPU
+    // contention under parallel runs. The ceiling is 10s, and it is a budget
+    // to stay under, not one to raise: a test that needs more is too slow and
+    // gets made faster (CLAUDE.md, "Tests stay under 10 seconds").
+    testTimeout: 10000,
     // Vitest's default is availableParallelism() - 1 forked processes, each
     // spinning up its own jsdom — on this 16-core dev box that's ~15
     // concurrent Node processes, multiplied further by however many

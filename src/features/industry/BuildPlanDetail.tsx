@@ -952,6 +952,9 @@ export function BuildPlanDetail({
     surface: 'build-materials',
     rows: visibleMaterials,
     columns: materialsCsv,
+    // Materials renders one table per section (To buy, Building, …), so no
+    // single mounted table holds every row — export the plan's own list.
+    source: 'rows',
   });
 
   if (!entry || !blueprint) {
