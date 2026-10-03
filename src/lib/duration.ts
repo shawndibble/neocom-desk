@@ -17,6 +17,23 @@ export function formatDuration(totalSeconds: number): string {
 }
 
 /**
+ * Format a short span to the second: "59s", "5m 54s", "1h 2m 5s". For values
+ * where the seconds matter (capacitor depletion), unlike `formatDuration`
+ * which floors to whole minutes.
+ */
+export function formatSeconds(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  const hours = Math.floor(seconds / 3_600);
+  const minutes = Math.floor((seconds % 3_600) / 60);
+
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (hours > 0 || minutes > 0) parts.push(`${minutes}m`);
+  parts.push(`${seconds % 60}s`);
+  return parts.join(' ');
+}
+
+/**
  * Format a live countdown (seconds), one unit coarser than `formatDuration`
  * once there is a day on the clock: "4d 4h", not "4d 4h 19m".
  *

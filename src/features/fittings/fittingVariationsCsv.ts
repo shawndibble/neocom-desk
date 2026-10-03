@@ -1,4 +1,5 @@
 import type { CsvColumn } from '@/lib/csv';
+import { formatSeconds } from '@/lib/duration';
 import { type StatChange, STAT_DIGITS } from '@/engine/fittings/variationDelta';
 import type { VariationRow } from './useModuleVariations';
 
@@ -16,7 +17,7 @@ export function changeLabel(change: StatChange, t: Translate): string {
     return change.after >= 0
       ? t('fittings.variations.stat.capacitorStable', { pct: change.after.toFixed(0) })
       : t('fittings.variations.stat.capacitorUnstable', {
-          seconds: (-change.after).toFixed(0),
+          time: formatSeconds(-change.after),
         });
   }
   const delta = formatDelta(change);

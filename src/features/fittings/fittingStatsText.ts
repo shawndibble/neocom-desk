@@ -3,6 +3,7 @@
  * into chat or a doc. Every label goes through i18next like the rest of the
  * stats column; the numbers are rounded as the column shows them.
  */
+import { formatSeconds } from '@/lib/duration';
 import { alignTimeSeconds, resistPct } from '@/engine/fittings/stats';
 import type { FittingStats, Resonances } from '@/engine/fittings/types';
 import { kmValue } from './rangeText';
@@ -43,7 +44,7 @@ export function fittingStatsText(stats: FittingStats, t: Translate): string {
   const capacitor = stats.capacitor.stable
     ? t('fittings.stats.capacitorStable', { pct: stats.capacitor.stablePercentage.toFixed(0) })
     : t('fittings.stats.capacitorDepletes', {
-        seconds: stats.capacitor.depletesInSeconds.toFixed(0),
+        time: formatSeconds(stats.capacitor.depletesInSeconds),
       });
 
   const lines = [

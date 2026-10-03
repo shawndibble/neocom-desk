@@ -1,4 +1,5 @@
 import type { CsvColumn } from '@/lib/csv';
+import { formatSeconds } from '@/lib/duration';
 import type { CompareRow, ModuleDiffEntry } from '@/engine/fittings/fittingCompare';
 
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -36,7 +37,7 @@ export function fittingCompareCsvColumns(
         if (row.key !== 'capacitor') return value;
         return value >= 0
           ? t('fittings.compare.stat.capacitorStable', { pct: value.toFixed(0) })
-          : t('fittings.compare.stat.capacitorUnstable', { seconds: (-value).toFixed(0) });
+          : t('fittings.compare.stat.capacitorUnstable', { time: formatSeconds(-value) });
       },
     })),
   ];

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCountdown, formatDuration, stepFinish } from './duration';
+import { formatCountdown, formatDuration, formatSeconds, stepFinish } from './duration';
 
 describe('formatDuration', () => {
   it('formats minutes only under an hour', () => {
@@ -53,5 +53,26 @@ describe('stepFinish', () => {
   it('finishes the first step at its own duration past the start date', () => {
     const startDate = new Date('2026-01-01T00:00:00Z');
     expect(stepFinish(500, startDate).getTime()).toBe(startDate.getTime() + 500_000);
+  });
+});
+
+describe('formatSeconds', () => {
+  it('keeps a sub-minute value in seconds', () => {
+    expect(formatSeconds(59)).toBe('59s');
+    expect(formatSeconds(0)).toBe('0s');
+  });
+
+  it('switches to minutes and seconds from a minute up', () => {
+    expect(formatSeconds(60)).toBe('1m 0s');
+    expect(formatSeconds(354)).toBe('5m 54s');
+  });
+
+  it('adds hours past an hour', () => {
+    expect(formatSeconds(3_725)).toBe('1h 2m 5s');
+  });
+
+  it('rounds to the nearest second before splitting, and floors negatives to 0s', () => {
+    expect(formatSeconds(59.6)).toBe('1m 0s');
+    expect(formatSeconds(-5)).toBe('0s');
   });
 });

@@ -132,11 +132,11 @@ describe('DefensePanel', () => {
     expect(screen.queryByText(/0m/)).not.toBeInTheDocument();
   });
 
-  it('keeps minutes for a depletion of a minute or more', () => {
+  it('reads a depletion of a minute or more as minutes and seconds', () => {
     render(
       <DefensePanel stats={statsWith({ capacitor: { stable: false, depletesInSeconds: 125 } })} />
     );
-    expect(screen.getByText('Empty in 2m')).toBeInTheDocument();
+    expect(screen.getByText('Empty in 2m 5s')).toBeInTheDocument();
   });
 });
 

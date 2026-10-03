@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Caret, RowMoreActions, Tooltip } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
+import { formatSeconds } from '@/lib/duration';
 import {
   alignTimeSeconds,
   resistPct,
@@ -875,7 +876,7 @@ export function FittingStatsSections({
                   pct: s.capacitor.stablePercentage.toFixed(0),
                 })
               : t('fittings.stats.capacitorDepletes', {
-                  seconds: s.capacitor.depletesInSeconds.toFixed(0),
+                  time: formatSeconds(s.capacitor.depletesInSeconds),
                 }),
           stats ? CAPACITOR_TONE_CLASS[capacitorTone(stats.capacitor)] : undefined
         ),

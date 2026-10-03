@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextArea } from '@/components/ui';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { formatDuration } from '@/lib/duration';
+import { formatSeconds } from '@/lib/duration';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { ResistTable, type ResistRow } from './FittingStatsSections';
 import { MissingSkillsChip } from './MissingSkillsChip';
@@ -186,16 +186,11 @@ export function DefensePanel({ stats }: { stats: FittingStats }) {
     resonances: layer,
     ehp: layer.ehp,
   }));
-  // formatDuration floors to whole minutes, so a sub-minute depletion needs seconds.
-  const depletes = (cap: { depletesInSeconds: number }): string => {
-    const seconds = Math.round(cap.depletesInSeconds);
-    return seconds < 60
-      ? t('fittings.start.preview.capDepletesSeconds', { seconds: Math.max(0, seconds) })
-      : t('fittings.start.preview.capDepletes', { time: formatDuration(seconds) });
-  };
   const capacitor = stats.capacitor.stable
     ? t('fittings.start.preview.capStable', { pct: Math.round(stats.capacitor.stablePercentage) })
-    : depletes(stats.capacitor);
+    : t('fittings.start.preview.capDepletes', {
+        time: formatSeconds(stats.capacitor.depletesInSeconds),
+      });
   return (
     <div className="space-y-3">
       <ResistTable rows={rows} />
