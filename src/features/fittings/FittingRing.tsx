@@ -636,13 +636,13 @@ function SlotTile({
       }}
       onDrop={handleDrop}
     >
-      {/* The charge pip, as the game draws it: a notch on the tile's rim side, lit once loaded. */}
+      {/* The charge pip: a notch on the tile's rim side for a module that takes one, lit once loaded. */}
       {chargePip && (
         <span
           aria-hidden="true"
           data-charge-pip={chargePip}
-          className={`absolute left-1/4 h-[7%] w-1/2 border ${chargePip === 'loaded' ? 'border-accent bg-accent' : 'border-line-bright bg-bg'}`}
-          style={{ top: '-11%' }}
+          className={`absolute left-1/4 h-[10%] w-1/2 ${chargePip === 'loaded' ? 'bg-accent' : 'bg-line-bright'}`}
+          style={{ top: '-12%' }}
         />
       )}
       {/* Counter-turned so the module reads upright wherever its tile sits, as in the game. */}
