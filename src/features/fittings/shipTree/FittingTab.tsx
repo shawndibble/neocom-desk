@@ -121,6 +121,8 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
         shipTypeId={ship.typeID}
         hullName={ship.name}
         busy={busy}
+        // Last thing in the slide-over: let it use the full height, not a box.
+        capped={false}
         onOpen={(loaded) => void openInEditor(loaded.fitting, 'popular')}
       />
     </div>
