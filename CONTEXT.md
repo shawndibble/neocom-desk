@@ -750,6 +750,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   there.
   **Load**s from its EFT. Comes from our own copy of Workbench's public list,
   synced by a Cloud Function, since Workbench can't list fits by hull.
+- **Out-of-date fit**: An **EVE Workbench fit** that no longer works in today's
+  game. It names an item or hull the app's current game data doesn't have, or
+  it has more modules in a rack than the hull now has slots. CPU, powergrid and
+  calibration never make a fit out of date. The tab lists it below the current
+  fits, only on request, with the reason.
 - **Price History**: The Market Browser item tab charting one item's daily
   history in a Region: **Daily Range**, average price and its moving average
   above, **Traded Volume** and **Order Count** below, on one shared date axis.

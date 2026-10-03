@@ -9,6 +9,18 @@ vi.mock('./workbenchSightings', () => ({ useWorkbenchSightings: useWorkbenchSigh
 vi.mock('./popularFits', () => ({ usePopularFits: () => ({ ok: true, fits: [] }) }));
 vi.mock('./loadFittingFromText', () => ({ loadFittingFromText: vi.fn() }));
 vi.mock('@/sde/loadSde', () => ({ typeName: (typeId: number) => Promise.resolve(`#${typeId}`) }));
+// Out-of-date fits (#2485) have their own tests: every fit here is current.
+vi.mock('./workbenchFitCurrency', () => ({
+  useWorkbenchFitList: (fits: readonly WorkbenchFit[] | null) => ({
+    checking: false,
+    listed: fits ?? [],
+    reasonsFor: () => undefined,
+    outOfDateCount: 0,
+    allOutOfDate: false,
+    showOutOfDate: false,
+    setShowOutOfDate: () => {},
+  }),
+}));
 
 const FITS: WorkbenchFit[] = ['a', 'b'].map((id) => ({
   id,

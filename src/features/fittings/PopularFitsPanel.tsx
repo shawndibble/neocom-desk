@@ -12,6 +12,8 @@ import { useNow } from '@/lib/useNow';
 import { loadFittingFromText } from './loadFittingFromText';
 import { usePopularFits } from './popularFits';
 import { useWorkbenchFits, workbenchFitUrl, type WorkbenchFit } from './workbenchFits';
+import { useWorkbenchFitList } from './workbenchFitCurrency';
+import { OutOfDateReasons, OutOfDateToggle } from './WorkbenchOutOfDate';
 import { useWorkbenchSightings } from './workbenchSightings';
 import { WorkbenchSightingBadge } from './WorkbenchSightingBadge';
 
@@ -188,6 +190,8 @@ function ZkillboardFits({
 function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: PopularFitsPanelProps) {
   const { t } = useTranslation();
   const result = useWorkbenchFits(shipTypeId);
+  // Out-of-date fits (issue #2485) sort below, shown only on request.
+  const list = useWorkbenchFitList(result?.ok ? result.fits : null);
   const sightings = useWorkbenchSightings(shipTypeId, result?.ok ? result.fits : null);
   const now = useNow();
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -231,7 +235,7 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
         <p className="text-xs text-text-dim">{t('fittings.popular.workbench.empty')}</p>
       ) : (
         <ul className={cx('space-y-1', capped && 'max-h-72 overflow-y-auto')}>
-          {result.fits.map((fit) => (
+          {list.listed.map((fit) => (
             <li
               key={fit.id}
               className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-line bg-panel px-2 py-1.5"
@@ -251,6 +255,7 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
                     age: formatAge(Math.max(0, now - fit.dateAdded), t),
                   })}
                 </p>
+                <OutOfDateReasons reasons={list.reasonsFor(fit.id)} />
                 <WorkbenchSightingBadge sighting={sightings.get(fit.id)} />
                 {failedId === fit.id && (
                   <p role="alert" className="text-xs text-danger">
@@ -269,6 +274,7 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
           ))}
         </ul>
       )}
+      {result?.ok && <OutOfDateToggle list={list} />}
     </>
   );
 }

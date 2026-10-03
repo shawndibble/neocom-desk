@@ -628,7 +628,25 @@
         "unknownAuthor": "unknown pilot",
         "byline": "by {{author}} · added {{age}}",
         "load": "Load",
-        "loadFailed": "Couldn't load this fit."
+        "loadFailed": "Couldn't load this fit.",
+        "outOfDate": {
+          "label": "Out of date: {{reasons}}",
+          "removedItem": "uses a removed item: {{name}}",
+          "removedHull": "this hull is no longer in the game: {{name}}",
+          "lostSlots": {
+            "high": "this ship has fewer high slots now",
+            "medium": "this ship has fewer mid slots now",
+            "low": "this ship has fewer low slots now",
+            "rig": "this ship has fewer rig slots now",
+            "subsystem": "this ship takes fewer subsystems now"
+          },
+          "show_one": "Show {{count}} out-of-date fit",
+          "show_other": "Show {{count}} out-of-date fits",
+          "hide": "Hide out-of-date fits",
+          "checking": "Checking fits against today's game…",
+          "allOutOfDate_one": "This hull's only EVE Workbench fit is out of date with today's game.",
+          "allOutOfDate_other": "All {{count}} of this hull's EVE Workbench fits are out of date with today's game."
+        }
       }
     },
     "start": {
