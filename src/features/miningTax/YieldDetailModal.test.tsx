@@ -117,8 +117,8 @@ describe('YieldDetailModal', () => {
 
   it('pairs the ore table’s four figures per stacked card, and leaves the refined list alone', () => {
     renderModal();
-    // The `.dt-stack-2col` grid itself lives in a `@media (width < 40rem)`
-    // block jsdom cannot evaluate, so this pins the prop reaching the table;
+    // The `.dt-stack-2col` grid itself lives in stylesheet rules (`.dt-stacked`)
+    // jsdom never loads, so this pins the prop reaching the table;
     // `e2e/miningTaxYieldDetailNarrow.spec.ts` measures the real layout.
     expect(screen.getByRole('table', { name: 'Ore mined' })).toHaveClass('dt-stack-2col');
     // Two non-primary columns is already a short card — pairing it buys

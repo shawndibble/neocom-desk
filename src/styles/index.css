@@ -144,7 +144,7 @@
  * every earlier layer whatever the specificity, so from `components` these
  * rules lose to the `px-3`/`text-right`/`whitespace-nowrap` utilities on the
  * very cells they need to re-lay-out. Inside `utilities` ordinary specificity
- * applies again and `.dt-stack td` (0,1,1) wins over a bare utility (0,1,0).
+ * applies again and `.dt-stacked td` (0,1,1) wins over a bare utility (0,1,0).
  */
 @layer utilities {
   /*
@@ -178,10 +178,18 @@
    * it, every other cell prints its column header into a left gutter via
    * `data-label`.
    *
-   * This is CSS-only on purpose. The markup is identical at every width — no
-   * `sm:hidden`/`hidden sm:flex` pair, nothing rendered twice — which is the
-   * same rule the Assets rework follows. `display: block` drops the implicit
-   * table roles in real browsers, so `DataTable` sets them explicitly.
+   * The markup is identical at every width — no `sm:hidden`/`hidden sm:flex`
+   * pair, nothing rendered twice — which is the same rule the Assets rework
+   * follows. `display: block` drops the implicit table roles in real
+   * browsers, so `DataTable` sets them explicitly.
+   *
+   * What switches the card on is a class, `dt-stacked`, not a media query
+   * (ADR 0017). `DataTable` sets it below `sm` (`useIsPhone`, the same 40rem
+   * this block used to query), so every table stacks exactly where it always
+   * did; a table can also ask to stack by its own width (`stacked`), which
+   * no media query can see — Hauling, whose panel is narrower than a phone's
+   * on a tablet with the rail open. `dt-stack` alone still marks a table that
+   * can stack.
    *
    * Two opt-in phone features are the deliberate exceptions to that rule,
    * and only for the tables that ask for them: `mobileSort` renders an
@@ -192,711 +200,709 @@
    * without also hiding them from desktop). The dense card below is pure
    * CSS again.
    */
-  @media (width < 40rem) {
-    .dt-stack,
-    .dt-stack tbody,
-    .dt-stack tr,
-    .dt-stack td {
-      display: block;
-    }
-
-    /* Redundant once every cell is labelled, but kept for header semantics. */
-    .dt-stack thead {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
-
-    /*
-     * A column flexbox, so the title cell can be hoisted to the top of the
-     * card without moving in the markup. The table keeps its own reading
-     * order at every width — a ledger still leads with its date column on
-     * desktop while the card is titled by what the row actually is.
-     */
-    .dt-stack tr {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      padding: 0.5rem 0.75rem;
-    }
-
-    .dt-stack td {
-      position: relative;
-      padding: 0.125rem 0 0.125rem 7rem;
-      /* The label below is out of flow, so an empty cell would be only its
-         own 4px of padding tall and its label would print over the next
-         cell's. Reserves the label's own box: top offset + its pinned
-         line-height + bottom padding. Inert on any cell with content, which
-         is always taller. */
-      min-height: 1.25rem;
-      /* Beats the `text-right`/`whitespace-nowrap` utilities on the cell:
-         nothing may force a card wider than the screen. */
-      text-align: left;
-      white-space: normal;
-      overflow-wrap: anywhere;
-    }
-
-    .dt-stack td::before {
-      content: attr(data-label);
-      position: absolute;
-      top: 0.125rem;
-      left: 0;
-      width: 6.5rem;
-      overflow: hidden;
-      font-size: 0.625rem;
-      /* Pinned rather than inherited, so the `min-height` above is arithmetic
-         and not a guess at each browser's `normal`. */
-      line-height: 1rem;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--color-text-dim);
-    }
-
-    /* The cell that names the row: first in the card, no label, no gutter. */
-    .dt-stack td.dt-primary {
-      order: -1;
-      padding-left: 0;
-      padding-bottom: 0.25rem;
-      font-weight: 600;
-    }
-
-    .dt-stack td.dt-primary::before {
-      content: none;
-    }
-
-    /*
-     * Two-value-per-row cards (`DataTable`'s `stackColumns={2}`).
-     *
-     * The default card is a single column with each label pinned into a 7rem
-     * left gutter, which reads well for four or five fields and wastes half
-     * the screen on a table of short figures — the Price History day list is
-     * four numbers, none wider than a price. Here the card becomes a
-     * two-track grid and each label moves *above* its value instead of
-     * beside it: a 6.5rem gutter inside a half-width column would leave a
-     * price barely 60px to render in.
-     *
-     * The primary cell still titles the card, now across both tracks. Grid
-     * places the rest in source order, so a table choosing this puts its
-     * widest field where a wrap costs least.
-     */
-    .dt-stack.dt-stack-2col tr {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.25rem 0.75rem;
-    }
-
-    .dt-stack.dt-stack-2col td {
-      padding-left: 0;
-      /* The label is in flow here, so the empty-cell reservation the pinned
-         version needs does not apply — the label itself gives the cell its
-         height. */
-      min-height: 0;
-    }
-
-    .dt-stack.dt-stack-2col td::before {
-      position: static;
-      display: block;
-      width: auto;
-      margin-bottom: 0.0625rem;
-    }
-
-    .dt-stack.dt-stack-2col td.dt-primary {
-      grid-column: 1 / -1;
-    }
-
-    /* A decorative corner cell (e.g. an edit-affordance icon): pinned out of
-       the card's label/value flow entirely, rather than rendering as its own
-       row with a blank label. */
-    .dt-stack td.dt-corner {
-      position: absolute;
-      top: 0.5rem;
-      right: 0.75rem;
-      padding: 0;
-    }
-
-    .dt-stack td.dt-corner::before {
-      content: none;
-    }
-
-    /* `cardCorner: 'start'` (e.g. a row-selection checkbox): the card's own
-       top-left corner instead of top-right — its own control, not a value
-       about the row, so it reads as the card's leading affordance rather
-       than crowding the actions/expand cluster on the right. */
-    .dt-stack td.dt-corner-start {
-      right: auto;
-      left: 0.75rem;
-    }
-
-    /* The title clears a start-pinned corner the same way it clears the
-       actions button below — first line reads to its right, not under it. */
-    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-corner-start) td.dt-primary {
-      padding-left: 1.75rem;
-    }
-
-    /* The More actions button (`rowMoreActions`): a control, not a field —
-       no label gutter. `width: auto` overrides the cell's own `w-0` (kept
-       for desktop's tight actions column, see the JSX): a zero-width flowed
-       cell left the button clipped past the card's right edge and scrolled
-       the whole page sideways (#1708). Where the cell actually sits is
-       layout-specific — the dense card (below) places it inline; every
-       other layout pins it to the card's own corner next. */
-    .dt-stack td.dt-actions {
-      padding: 0;
-      min-height: 0;
-      width: auto;
-    }
-
-    .dt-stack td.dt-actions::before {
-      content: none;
-    }
-
-    /* Labelled cards (`stackColumns={1}`/`{2}`): pinned to the card's own
-       top-right corner instead of flowing as a bottom row, which used to
-       leave a dead ~40px strip under a title-height's worth of nothing. The
-       button is sized to a 44px touch target here regardless of its own
-       (desktop-oriented) size prop. */
-    .dt-stack:not(.dt-stack-dense) td.dt-actions {
-      position: absolute;
-      top: 0.5rem;
-      right: 0.75rem;
-    }
-
-    .dt-stack:not(.dt-stack-dense) td.dt-actions button {
-      width: 2.75rem;
-      height: 2.75rem;
-    }
-
-    /* The expand/collapse disclosure chevron (`expandableRow`): pinned beside
-       the actions button rather than flowing as its own unlabelled line at
-       the card's bottom, where it used to sit. */
-    .dt-stack:not(.dt-stack-dense) td.dt-disclosure {
-      position: absolute;
-      top: 0.5rem;
-      right: 0.75rem;
-      padding: 0;
-      /* Overrides the cell's own `w-0` (kept for desktop's tight trailing
-         column, see the JSX) — left at `w-0` the icon rendered from this
-         corner anchor with no box to fill and overlapped the actions
-         button beside it, the same #1708 mistake `dt-actions` above notes. */
-      width: auto;
-    }
-
-    .dt-stack:not(.dt-stack-dense) td.dt-disclosure::before {
-      content: none;
-    }
-
-    /* A row with both a corner value and the actions button: one corner
-       control per position, not two overlapping. The button keeps the
-       card's actual top-right corner; the value shifts left to clear it.
-       Excludes `dt-corner-start`, which already sits in the opposite
-       corner and needs no shift. */
-    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-corner:not(.dt-corner-start) {
-      right: 3.75rem;
-    }
-
-    /* A row with both a disclosure chevron and the actions button: the
-       chevron sits immediately left of the button rather than under it. */
-    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-disclosure {
-      right: 3.75rem;
-    }
-
-    /* All three corner controls at once (a card with `cardCorner`,
-       `expandableRow` and `rowMoreActions` together, e.g. HaulingPanel):
-       the corner value shifts further left again to clear the chevron,
-       which otherwise shares its offset and sits on top of it. Excludes
-       `dt-corner-start`, which sits in the opposite corner (top-left) and
-       needs no shift — `right` and `left` set together on the same
-       absolutely-positioned, `width: auto` element would fight each other
-       for the box's width instead of just moving it. */
-    .dt-stack:not(.dt-stack-dense)
-      tr:has(> td.dt-actions):has(> td.dt-disclosure)
-      td.dt-corner:not(.dt-corner-start) {
-      right: 5.25rem;
-    }
-
-    /* The card title truncates before the pinned button rather than
-       running under it. Only when the row actually has one. */
-    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-primary {
-      padding-right: 3rem;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-    }
-
-    /* Both a disclosure chevron and the actions button pinned in the corner
-       need more clearance than the button alone. */
-    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions):has(> td.dt-disclosure) td.dt-primary {
-      padding-right: 5rem;
-    }
-
-    /*
-     * The dense card (`stackLayout="dense"`): two lines instead of one field
-     * per line, for a long list a reader scans rather than reads — a courier
-     * search returns hundreds of offers, and the labelled card fits four on
-     * a screen.
-     *
-     * Line one is the title (`dt-primary`) with the headline figure
-     * (`dt-corner`) in flow at its right; line two is every other cell
-     * inline, small and dim, `·`-separated, with no column labels —
-     * `stackAffix` (`data-stack-before`/`-after`) says what a bare number is.
-     *
-     * A wrapping row flexbox. `tr::before` is a flex item too: a zero-height,
-     * full-basis one ordered between the two lines forces the break, so the
-     * meta cells can never ride up beside the title however short they are.
-     */
-    .dt-stack.dt-stack-dense tr {
-      flex-direction: row;
-      flex-wrap: wrap;
-      align-items: baseline;
-      /* About one no-break space wide, so the gap before each `·` matches
-         the one the separator prints after it. */
-      column-gap: 0.1875rem;
-      row-gap: 0.125rem;
-      /* A thumb target even for a card whose two lines are short. */
-      min-height: 44px;
-      padding: 0.5rem 0.75rem;
-    }
-
-    .dt-stack.dt-stack-dense tr::before {
-      content: '';
-      order: 0;
-      flex-basis: 100%;
-      height: 0;
-    }
-
-    .dt-stack.dt-stack-dense td.dt-primary {
-      order: -2;
-      flex: 1 1 0;
-      min-width: 0;
-      padding: 0;
-      /* A size step above the meta line's 0.6875rem — this is the card's
-         title, not just another field. */
-      font-size: 0.8125rem;
-    }
-
-    /* Undoes the decorative corner's absolute pin: here it is content, and
-       an absolute cell would overlap a title long enough to reach it. */
-    .dt-stack.dt-stack-dense td.dt-corner {
-      position: static;
-      order: -1;
-      flex: none;
-      margin-left: auto;
-      padding: 0 0 0 0.5rem;
-      text-align: right;
-      white-space: nowrap;
-      font-weight: 700;
-      /* The card's headline figure — a size step above the title, two above
-         the meta line, so it reads as the number the whole card is for. */
-      font-size: 0.9375rem;
-    }
-
-    /* On line one, after the title and headline figure. */
-    .dt-stack.dt-stack-dense td.dt-actions {
-      order: -1;
-      flex: none;
-      align-self: center;
-    }
-
-    /* Opt-in (`dt-actions-pinned` on the table, Contacts): the actions button
-       pinned to the card's right edge and centred across both lines, the way
-       a `start` edge control is on the left. In flow on line one its 44px
-       touch target makes that line 44px tall and pushes the meta line a
-       button's height below the title; pinned, the card is two text lines.
-       The row pads its right side to clear it. Not the default because the
-       other dense tables with actions (Hauling, Contract Search, Mining Tax)
-       carry chevrons and `end` edge boxes this has not been checked against. */
-    .dt-stack.dt-stack-dense.dt-actions-pinned td.dt-actions {
-      position: absolute;
-      top: 50%;
-      right: 0.25rem;
-      transform: translateY(-50%);
-    }
-
-    .dt-stack.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions) {
-      padding-right: 3rem;
-    }
-
-    /* The headline figure (`cardCorner`) pinned beside it, centred across both
-       lines too, so the figure and the button read as one column instead of
-       the figure riding the title line's top edge. The row widens its right
-       padding to clear both. Sized for Contacts' standing icons — a short,
-       fixed-width figure; a long one (an ISK amount) would need more room. */
-    .dt-stack.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions) td.dt-corner {
-      position: absolute;
-      top: 50%;
-      right: 2.75rem;
-      transform: translateY(-50%);
-      margin: 0;
-      padding: 0;
-    }
-
-    .dt-stack.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions):has(> td.dt-corner) {
-      padding-right: 5.25rem;
-    }
-
-    /* The expand chevron (`expandableRow`) joins the actions on line one.
-       Left to the base card rules it flowed onto the meta line carrying the
-       labelled card's 7rem label gutter, pushing the first meta value a
-       third of the way across. A hidden icon (`hideIcon`) leaves the cell
-       empty: it takes no room at all then. */
-    .dt-stack.dt-stack-dense td.dt-disclosure {
-      order: -1;
-      flex: none;
-      align-self: center;
-      width: auto;
-      min-height: 0;
-      padding: 0;
-    }
-
-    .dt-stack.dt-stack-dense td.dt-disclosure::before {
-      content: none;
-    }
-
-    .dt-stack.dt-stack-dense td.dt-disclosure:empty {
-      display: none;
-    }
-
-    /* A control at the card's edge (`stackEdge`), kept off the 11px meta
-       line where it would be neither tappable nor readable. */
-    .dt-stack.dt-stack-dense td.dt-edge {
-      padding: 0;
-      min-height: 0;
-    }
-
-    .dt-stack.dt-stack-dense td.dt-edge::before {
-      content: none;
-    }
-
-    /* `start` (a tick box): pinned to the left edge, centred across both
-       lines; the row pads its left side to clear it. */
-    .dt-stack.dt-stack-dense td.dt-edge-start {
-      position: absolute;
-      top: 50%;
-      left: 0.75rem;
-      transform: translateY(-50%);
-    }
-
-    .dt-stack.dt-stack-dense tr:has(> td.dt-edge-start) {
-      padding-left: 2.5rem;
-    }
-
-    /* `end` (a quantity box): closes the meta line, pushed to its right end.
-       Not pinned across both lines like `start`: a box that wide would take
-       its width from the title line too, and the title needs it more.
-       `baseline` (the row's own alignment), not `center`: the box's text
-       lines up with the meta text, so the two read as one line rather than
-       the meta floating at the top of a box-tall line. */
-    .dt-stack.dt-stack-dense td.dt-edge-end {
-      order: 2;
-      flex: none;
-      align-self: baseline;
-      margin-left: auto;
-      padding-left: 0.5rem;
-    }
-
-    /* Opt-in (`dt-dense-tight` on the table, Hauling): a card whose tick box,
-       title, headline figure and More actions button all sit on line one,
-       centred on each other, with the `end` box closing line two. Without it
-       the button's 44px box made line one button-tall (the title riding its
-       top edge, the ⋮ below it), the tick box sat centred across both lines
-       rather than beside the name, and the box's height pushed the meta text
-       to its baseline, a gap's width under the title. */
-
-    /* The tick box joins line one ahead of the title, pulled back into the
-       left padding the row already keeps for a `start` edge. */
-    .dt-stack.dt-stack-dense.dt-dense-tight td.dt-edge-start {
-      position: static;
-      transform: none;
-      order: -3;
-      flex: none;
-      align-self: center;
-      width: 1.75rem;
-      margin-left: -1.75rem;
-    }
-
-    /* The button keeps its 44px touch target, but negative margins stop it
-       counting towards line one's height. */
-    .dt-stack.dt-stack-dense.dt-dense-tight td.dt-actions {
-      margin-block: -0.75rem;
-    }
-
-    /* Line two centres on the box rather than sitting on its baseline. The
-       box stacks above the button's overhanging touch target, so a tap on
-       its top edge reaches the box. */
-    .dt-stack.dt-stack-dense.dt-dense-tight td.dt-meta,
-    .dt-stack.dt-stack-dense.dt-dense-tight td.dt-edge-end {
-      align-self: center;
-    }
-
-    .dt-stack.dt-stack-dense.dt-dense-tight td.dt-edge-end {
-      position: relative;
-      z-index: 1;
-      /* A tighter gap than the base rule's, so a 360px phone still fits the
-         meta line and the box on one line. */
-      padding-left: 0.25rem;
-    }
-
-    .dt-stack.dt-stack-dense td.dt-meta {
-      order: 1;
-      display: inline;
-      padding: 0;
-      min-height: 0;
-      font-size: 0.6875rem;
-      line-height: 1rem;
-      color: var(--color-text-dim);
-    }
-
-    /* A meta cell's own content can be a control (`PriceSourceTag`'s
-       tooltip button) rather than bare text — its border/padding/background
-       read fine as a standalone pill in the labelled card or the desktop
-       table, but stacked inline with three or four `·`-separated fields it
-       is both too wide (crowds the line into wrapping) and visually heavier
-       than its neighbours despite matching their font size. Strip the
-       button chrome down to plain colored text here; the per-source color
-       class it already carries still says which source it is. */
-    .dt-stack.dt-stack-dense td.dt-meta button {
-      border: none;
-      padding: 0;
-      background: none;
-      border-radius: 0;
-    }
-
-    /* The separator and the affix share the one pseudo-element a cell has
-       before its value. The space after `·` is a no-break space: an ordinary
-       one at the start of the cell's line would be collapsed away. Every
-       gutter-label property of the base rule is reset, not just `content`. */
-    .dt-stack.dt-stack-dense td.dt-meta::before {
-      content: '\00b7\00a0' attr(data-stack-before);
-      position: static;
-      width: auto;
-      overflow: visible;
-      font-size: inherit;
-      line-height: inherit;
-      text-overflow: clip;
-      white-space: pre;
-      letter-spacing: normal;
-      text-transform: none;
-      /* Pinned, not inherited: a sorted cell bolds its value, and a bold
-         separator would read as part of it. */
-      font-weight: 400;
-      color: var(--color-text-dim);
-    }
-
-    .dt-stack.dt-stack-dense td.dt-meta.dt-meta-first::before {
-      content: attr(data-stack-before);
-    }
-
-    .dt-stack.dt-stack-dense td.dt-meta::after {
-      content: attr(data-stack-after);
-      white-space: pre;
-    }
-
-    /* A cell holding only a value the card can do without (`data-dense-omit`):
-       a "none" dash reads as "none" in a table column, but on the meta line it
-       would print one more "· —" between real values, so the card leaves it
-       out — likewise a word the card already says another way. */
-    .dt-stack.dt-stack-dense td.dt-meta:has(> [data-dense-omit]:only-child) {
-      display: none;
-    }
-
-    /* `dt-meta-first` is fixed at render, so when the leading meta cells are
-       omitted the first one left standing would open the line with a stray
-       "·". Hand it the first cell's no-separator content instead, past one or
-       two omitted cells (Contacts' Type, then an empty Corp / Alliance). */
-    .dt-stack.dt-stack-dense
-      td.dt-meta-first:has(> [data-dense-omit]:only-child)
-      + td.dt-meta:not(:has(> [data-dense-omit]:only-child))::before,
-    .dt-stack.dt-stack-dense
-      td.dt-meta-first:has(> [data-dense-omit]:only-child)
-      + td.dt-meta:has(> [data-dense-omit]:only-child)
-      + td.dt-meta::before {
-      content: attr(data-stack-before);
-    }
-
-    /* No header row to show the sort on, so the sorted value itself says it
-       — its trailing affix too, which inherits; the leading separator and
-       affix stay dim (pinned above). The corner never
-       changes: it is already the bold figure. */
-    .dt-stack.dt-stack-dense td.dt-meta.dt-sorted {
-      color: var(--color-text);
-      font-weight: 700;
-    }
-
-    /*
-     * Phone grouping (`groupBy`): a toggle row whose one full-width cell is
-     * the button, in either card. It is not a field, so it gets neither the
-     * labelled card's gutter and `data-label` slot nor the dense card's
-     * line-break pseudo — the button carries its own padding and 48px height.
-     */
-    .dt-stack tr.dt-group-header {
-      padding: 0;
-    }
-
-    /*
-     * A row's expand detail (`DataTable`'s `expandableRow`): the same
-     * full-width, no-gutter, no-label cell as the group-header toggle above —
-     * it is prose/sub-fields of its own, not one more labelled field of the
-     * row it hangs off.
-     */
-    .dt-stack tr.dt-row-detail {
-      padding: 0;
-    }
-
-    /*
-     * `.dt-stack.dt-stack-2col tr` (above) sets every `tr` under it —
-     * including this one — to a two-track `display: grid`, at equal
-     * specificity to the plain rule above. Left alone, the detail `<td>` then
-     * lands in a single grid track (half the card) instead of the full-width
-     * flex cell the rule below expects: `flex: 1 1 100%` is a no-op once its
-     * parent isn't a flex container (Market's order-row expand, #2138 — the
-     * required-skills section rendered at half width). Restoring `flex` here
-     * — at higher specificity than the 2-col rule, so order doesn't matter —
-     * makes `dt-stack tr.dt-row-detail > td`'s existing rule apply again
-     * regardless of `stackColumns`.
-     */
-    .dt-stack.dt-stack-2col tr.dt-row-detail {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .dt-stack tr.dt-row-detail > td {
-      flex: 1 1 100%;
-      padding: 0.75rem;
-      min-height: 0;
-    }
-
-    .dt-stack tr.dt-row-detail > td::before {
-      content: none;
-    }
-
-    /*
-     * A plain `<table>` nested inside a row's expand detail (Hauling's own
-     * "Sell orders" mini table, round: hauling mobile table detail) — the
-     * rules above key off bare `tbody`/`tr`/`td`/`thead` descendant
-     * selectors with no notion of "table nested in another table," so
-     * without this they flatten the inner table into a second, broken card
-     * layout too. It has no card fallback of its own to fall into, unlike
-     * `DataTable`'s own rows, so every leaky property is undone here,
-     * restated explicitly rather than `revert`ed. This block sits in the
-     * same `utilities` layer as the rules above (see this file's own note
-     * at the top of that layer) and beats the inner table's Tailwind
-     * classes (`py-1`, `text-right`) on ordinary specificity the same way
-     * those rules beat them — `revert` would not: it rolls a property back
-     * past every author style, Tailwind's utilities included, straight to
-     * the UA default, undoing `py-1`/`text-right` right along with the leak
-     * it's meant to fix. `text-align` for the two right-aligned columns is
-     * keyed off that same `text-right` class name instead, rather than
-     * relying on the utility itself to apply.
-     */
-    .dt-stack .dt-embedded-table,
-    .dt-stack .dt-embedded-table tbody,
-    .dt-stack .dt-embedded-table tr,
-    .dt-stack .dt-embedded-table td,
-    .dt-stack .dt-embedded-table th {
-      display: revert;
-    }
-
-    .dt-stack .dt-embedded-table thead {
-      position: revert;
-      width: revert;
-      height: revert;
-      overflow: revert;
-      clip-path: revert;
-      white-space: revert;
-    }
-
-    .dt-stack .dt-embedded-table tr {
-      position: static;
-      padding: 0;
-    }
-
-    /*
-     * `padding`/`text-align` here restate the Tailwind classes this table's
-     * `<td>`/`<th>` already carry (`py-1`, and `text-right` on the two
-     * right-aligned columns — see `HaulingRowDetail.tsx`) rather than
-     * relying on the utilities themselves to apply. Keep these two in sync
-     * with that component if its classes ever change.
-     */
-    .dt-stack .dt-embedded-table td,
-    .dt-stack .dt-embedded-table th {
-      position: static;
-      padding: 0.25rem 0;
-      min-height: 0;
-      text-align: left;
-      white-space: normal;
-      overflow-wrap: normal;
-    }
-
-    .dt-stack .dt-embedded-table td.text-right,
-    .dt-stack .dt-embedded-table th.text-right {
-      text-align: right;
-    }
-
-    .dt-stack .dt-embedded-table td::before {
-      content: none;
-    }
-
-    .dt-stack.dt-stack-dense tr.dt-group-header::before {
-      content: none;
-    }
-
-    .dt-stack tr.dt-group-header > td {
-      flex: 1 1 100%;
-      padding: 0;
-      min-height: 0;
-    }
-
-    .dt-stack tr.dt-group-header > td::before {
-      content: none;
-    }
-
-    /*
-     * `DataTable`'s `virtualize` spacers stand in for rows scrolled out of
-     * the window, so their inline height is the whole box: no card padding,
-     * thumb-target floor, line-break pseudo, or labelled cell.
-     */
-    .dt-stack tr.dt-spacer,
-    .dt-stack.dt-stack-dense tr.dt-spacer {
-      padding: 0;
-      min-height: 0;
-    }
-
-    .dt-stack.dt-stack-dense tr.dt-spacer::before {
-      content: none;
-    }
-
-    .dt-stack tr.dt-spacer > td {
-      display: none;
-    }
-
-    /* An expanded group's members: indented and on the panel fill, so where
-       the group ends is visible without a closing row. */
-    tr.dt-group-member {
-      background-color: var(--color-panel);
-    }
-
-    .dt-stack tr.dt-group-member {
-      padding-left: 2rem;
-    }
-
-    table:not(.dt-stack) tr.dt-group-member > td:first-child {
-      padding-left: 2rem;
-    }
-
-    /*
-     * A cell with no value keeps its label and shows blank, rather than
-     * disappearing. Hiding it (`td:empty { display: none }`) would drop a
-     * field on a phone that desktop still shows as an empty column — and
-     * `:empty` only matches when `render` returns exactly nullish, so which
-     * fields vanished would depend on how each column happened to be
-     * written. A labelled blank says the same thing at both widths.
-     */
+  .dt-stacked,
+  .dt-stacked tbody,
+  .dt-stacked tr,
+  .dt-stacked td {
+    display: block;
   }
+
+  /* Redundant once every cell is labelled, but kept for header semantics. */
+  .dt-stacked thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /*
+   * A column flexbox, so the title cell can be hoisted to the top of the
+   * card without moving in the markup. The table keeps its own reading
+   * order at every width — a ledger still leads with its date column on
+   * desktop while the card is titled by what the row actually is.
+   */
+  .dt-stacked tr {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .dt-stacked td {
+    position: relative;
+    padding: 0.125rem 0 0.125rem 7rem;
+    /* The label below is out of flow, so an empty cell would be only its
+       own 4px of padding tall and its label would print over the next
+       cell's. Reserves the label's own box: top offset + its pinned
+       line-height + bottom padding. Inert on any cell with content, which
+       is always taller. */
+    min-height: 1.25rem;
+    /* Beats the `text-right`/`whitespace-nowrap` utilities on the cell:
+       nothing may force a card wider than the screen. */
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .dt-stacked td::before {
+    content: attr(data-label);
+    position: absolute;
+    top: 0.125rem;
+    left: 0;
+    width: 6.5rem;
+    overflow: hidden;
+    font-size: 0.625rem;
+    /* Pinned rather than inherited, so the `min-height` above is arithmetic
+       and not a guess at each browser's `normal`. */
+    line-height: 1rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-text-dim);
+  }
+
+  /* The cell that names the row: first in the card, no label, no gutter. */
+  .dt-stacked td.dt-primary {
+    order: -1;
+    padding-left: 0;
+    padding-bottom: 0.25rem;
+    font-weight: 600;
+  }
+
+  .dt-stacked td.dt-primary::before {
+    content: none;
+  }
+
+  /*
+   * Two-value-per-row cards (`DataTable`'s `stackColumns={2}`).
+   *
+   * The default card is a single column with each label pinned into a 7rem
+   * left gutter, which reads well for four or five fields and wastes half
+   * the screen on a table of short figures — the Price History day list is
+   * four numbers, none wider than a price. Here the card becomes a
+   * two-track grid and each label moves *above* its value instead of
+   * beside it: a 6.5rem gutter inside a half-width column would leave a
+   * price barely 60px to render in.
+   *
+   * The primary cell still titles the card, now across both tracks. Grid
+   * places the rest in source order, so a table choosing this puts its
+   * widest field where a wrap costs least.
+   */
+  .dt-stacked.dt-stack-2col tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem 0.75rem;
+  }
+
+  .dt-stacked.dt-stack-2col td {
+    padding-left: 0;
+    /* The label is in flow here, so the empty-cell reservation the pinned
+       version needs does not apply — the label itself gives the cell its
+       height. */
+    min-height: 0;
+  }
+
+  .dt-stacked.dt-stack-2col td::before {
+    position: static;
+    display: block;
+    width: auto;
+    margin-bottom: 0.0625rem;
+  }
+
+  .dt-stacked.dt-stack-2col td.dt-primary {
+    grid-column: 1 / -1;
+  }
+
+  /* A decorative corner cell (e.g. an edit-affordance icon): pinned out of
+     the card's label/value flow entirely, rather than rendering as its own
+     row with a blank label. */
+  .dt-stacked td.dt-corner {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+    padding: 0;
+  }
+
+  .dt-stacked td.dt-corner::before {
+    content: none;
+  }
+
+  /* `cardCorner: 'start'` (e.g. a row-selection checkbox): the card's own
+     top-left corner instead of top-right — its own control, not a value
+     about the row, so it reads as the card's leading affordance rather
+     than crowding the actions/expand cluster on the right. */
+  .dt-stacked td.dt-corner-start {
+    right: auto;
+    left: 0.75rem;
+  }
+
+  /* The title clears a start-pinned corner the same way it clears the
+     actions button below — first line reads to its right, not under it. */
+  .dt-stacked:not(.dt-stack-dense) tr:has(> td.dt-corner-start) td.dt-primary {
+    padding-left: 1.75rem;
+  }
+
+  /* The More actions button (`rowMoreActions`): a control, not a field —
+     no label gutter. `width: auto` overrides the cell's own `w-0` (kept
+     for desktop's tight actions column, see the JSX): a zero-width flowed
+     cell left the button clipped past the card's right edge and scrolled
+     the whole page sideways (#1708). Where the cell actually sits is
+     layout-specific — the dense card (below) places it inline; every
+     other layout pins it to the card's own corner next. */
+  .dt-stacked td.dt-actions {
+    padding: 0;
+    min-height: 0;
+    width: auto;
+  }
+
+  .dt-stacked td.dt-actions::before {
+    content: none;
+  }
+
+  /* Labelled cards (`stackColumns={1}`/`{2}`): pinned to the card's own
+     top-right corner instead of flowing as a bottom row, which used to
+     leave a dead ~40px strip under a title-height's worth of nothing. The
+     button is sized to a 44px touch target here regardless of its own
+     (desktop-oriented) size prop. */
+  .dt-stacked:not(.dt-stack-dense) td.dt-actions {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+  }
+
+  .dt-stacked:not(.dt-stack-dense) td.dt-actions button {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  /* The expand/collapse disclosure chevron (`expandableRow`): pinned beside
+     the actions button rather than flowing as its own unlabelled line at
+     the card's bottom, where it used to sit. */
+  .dt-stacked:not(.dt-stack-dense) td.dt-disclosure {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+    padding: 0;
+    /* Overrides the cell's own `w-0` (kept for desktop's tight trailing
+       column, see the JSX) — left at `w-0` the icon rendered from this
+       corner anchor with no box to fill and overlapped the actions
+       button beside it, the same #1708 mistake `dt-actions` above notes. */
+    width: auto;
+  }
+
+  .dt-stacked:not(.dt-stack-dense) td.dt-disclosure::before {
+    content: none;
+  }
+
+  /* A row with both a corner value and the actions button: one corner
+     control per position, not two overlapping. The button keeps the
+     card's actual top-right corner; the value shifts left to clear it.
+     Excludes `dt-corner-start`, which already sits in the opposite
+     corner and needs no shift. */
+  .dt-stacked:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-corner:not(.dt-corner-start) {
+    right: 3.75rem;
+  }
+
+  /* A row with both a disclosure chevron and the actions button: the
+     chevron sits immediately left of the button rather than under it. */
+  .dt-stacked:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-disclosure {
+    right: 3.75rem;
+  }
+
+  /* All three corner controls at once (a card with `cardCorner`,
+     `expandableRow` and `rowMoreActions` together, e.g. HaulingPanel):
+     the corner value shifts further left again to clear the chevron,
+     which otherwise shares its offset and sits on top of it. Excludes
+     `dt-corner-start`, which sits in the opposite corner (top-left) and
+     needs no shift — `right` and `left` set together on the same
+     absolutely-positioned, `width: auto` element would fight each other
+     for the box's width instead of just moving it. */
+  .dt-stacked:not(.dt-stack-dense)
+    tr:has(> td.dt-actions):has(> td.dt-disclosure)
+    td.dt-corner:not(.dt-corner-start) {
+    right: 5.25rem;
+  }
+
+  /* The card title truncates before the pinned button rather than
+     running under it. Only when the row actually has one. */
+  .dt-stacked:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-primary {
+    padding-right: 3rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* Both a disclosure chevron and the actions button pinned in the corner
+     need more clearance than the button alone. */
+  .dt-stacked:not(.dt-stack-dense) tr:has(> td.dt-actions):has(> td.dt-disclosure) td.dt-primary {
+    padding-right: 5rem;
+  }
+
+  /*
+   * The dense card (`stackLayout="dense"`): two lines instead of one field
+   * per line, for a long list a reader scans rather than reads — a courier
+   * search returns hundreds of offers, and the labelled card fits four on
+   * a screen.
+   *
+   * Line one is the title (`dt-primary`) with the headline figure
+   * (`dt-corner`) in flow at its right; line two is every other cell
+   * inline, small and dim, `·`-separated, with no column labels —
+   * `stackAffix` (`data-stack-before`/`-after`) says what a bare number is.
+   *
+   * A wrapping row flexbox. `tr::before` is a flex item too: a zero-height,
+   * full-basis one ordered between the two lines forces the break, so the
+   * meta cells can never ride up beside the title however short they are.
+   */
+  .dt-stacked.dt-stack-dense tr {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    /* About one no-break space wide, so the gap before each `·` matches
+       the one the separator prints after it. */
+    column-gap: 0.1875rem;
+    row-gap: 0.125rem;
+    /* A thumb target even for a card whose two lines are short. */
+    min-height: 44px;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .dt-stacked.dt-stack-dense tr::before {
+    content: '';
+    order: 0;
+    flex-basis: 100%;
+    height: 0;
+  }
+
+  .dt-stacked.dt-stack-dense td.dt-primary {
+    order: -2;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0;
+    /* A size step above the meta line's 0.6875rem — this is the card's
+       title, not just another field. */
+    font-size: 0.8125rem;
+  }
+
+  /* Undoes the decorative corner's absolute pin: here it is content, and
+     an absolute cell would overlap a title long enough to reach it. */
+  .dt-stacked.dt-stack-dense td.dt-corner {
+    position: static;
+    order: -1;
+    flex: none;
+    margin-left: auto;
+    padding: 0 0 0 0.5rem;
+    text-align: right;
+    white-space: nowrap;
+    font-weight: 700;
+    /* The card's headline figure — a size step above the title, two above
+       the meta line, so it reads as the number the whole card is for. */
+    font-size: 0.9375rem;
+  }
+
+  /* On line one, after the title and headline figure. */
+  .dt-stacked.dt-stack-dense td.dt-actions {
+    order: -1;
+    flex: none;
+    align-self: center;
+  }
+
+  /* Opt-in (`dt-actions-pinned` on the table, Contacts): the actions button
+     pinned to the card's right edge and centred across both lines, the way
+     a `start` edge control is on the left. In flow on line one its 44px
+     touch target makes that line 44px tall and pushes the meta line a
+     button's height below the title; pinned, the card is two text lines.
+     The row pads its right side to clear it. Not the default because the
+     other dense tables with actions (Hauling, Contract Search, Mining Tax)
+     carry chevrons and `end` edge boxes this has not been checked against. */
+  .dt-stacked.dt-stack-dense.dt-actions-pinned td.dt-actions {
+    position: absolute;
+    top: 50%;
+    right: 0.25rem;
+    transform: translateY(-50%);
+  }
+
+  .dt-stacked.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions) {
+    padding-right: 3rem;
+  }
+
+  /* The headline figure (`cardCorner`) pinned beside it, centred across both
+     lines too, so the figure and the button read as one column instead of
+     the figure riding the title line's top edge. The row widens its right
+     padding to clear both. Sized for Contacts' standing icons — a short,
+     fixed-width figure; a long one (an ISK amount) would need more room. */
+  .dt-stacked.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions) td.dt-corner {
+    position: absolute;
+    top: 50%;
+    right: 2.75rem;
+    transform: translateY(-50%);
+    margin: 0;
+    padding: 0;
+  }
+
+  .dt-stacked.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions):has(> td.dt-corner) {
+    padding-right: 5.25rem;
+  }
+
+  /* The expand chevron (`expandableRow`) joins the actions on line one.
+     Left to the base card rules it flowed onto the meta line carrying the
+     labelled card's 7rem label gutter, pushing the first meta value a
+     third of the way across. A hidden icon (`hideIcon`) leaves the cell
+     empty: it takes no room at all then. */
+  .dt-stacked.dt-stack-dense td.dt-disclosure {
+    order: -1;
+    flex: none;
+    align-self: center;
+    width: auto;
+    min-height: 0;
+    padding: 0;
+  }
+
+  .dt-stacked.dt-stack-dense td.dt-disclosure::before {
+    content: none;
+  }
+
+  .dt-stacked.dt-stack-dense td.dt-disclosure:empty {
+    display: none;
+  }
+
+  /* A control at the card's edge (`stackEdge`), kept off the 11px meta
+     line where it would be neither tappable nor readable. */
+  .dt-stacked.dt-stack-dense td.dt-edge {
+    padding: 0;
+    min-height: 0;
+  }
+
+  .dt-stacked.dt-stack-dense td.dt-edge::before {
+    content: none;
+  }
+
+  /* `start` (a tick box): pinned to the left edge, centred across both
+     lines; the row pads its left side to clear it. */
+  .dt-stacked.dt-stack-dense td.dt-edge-start {
+    position: absolute;
+    top: 50%;
+    left: 0.75rem;
+    transform: translateY(-50%);
+  }
+
+  .dt-stacked.dt-stack-dense tr:has(> td.dt-edge-start) {
+    padding-left: 2.5rem;
+  }
+
+  /* `end` (a quantity box): closes the meta line, pushed to its right end.
+     Not pinned across both lines like `start`: a box that wide would take
+     its width from the title line too, and the title needs it more.
+     `baseline` (the row's own alignment), not `center`: the box's text
+     lines up with the meta text, so the two read as one line rather than
+     the meta floating at the top of a box-tall line. */
+  .dt-stacked.dt-stack-dense td.dt-edge-end {
+    order: 2;
+    flex: none;
+    align-self: baseline;
+    margin-left: auto;
+    padding-left: 0.5rem;
+  }
+
+  /* Opt-in (`dt-dense-tight` on the table, Hauling): a card whose tick box,
+     title, headline figure and More actions button all sit on line one,
+     centred on each other, with the `end` box closing line two. Without it
+     the button's 44px box made line one button-tall (the title riding its
+     top edge, the ⋮ below it), the tick box sat centred across both lines
+     rather than beside the name, and the box's height pushed the meta text
+     to its baseline, a gap's width under the title. */
+
+  /* The tick box joins line one ahead of the title, pulled back into the
+     left padding the row already keeps for a `start` edge. */
+  .dt-stacked.dt-stack-dense.dt-dense-tight td.dt-edge-start {
+    position: static;
+    transform: none;
+    order: -3;
+    flex: none;
+    align-self: center;
+    width: 1.75rem;
+    margin-left: -1.75rem;
+  }
+
+  /* The button keeps its 44px touch target, but negative margins stop it
+     counting towards line one's height. */
+  .dt-stacked.dt-stack-dense.dt-dense-tight td.dt-actions {
+    margin-block: -0.75rem;
+  }
+
+  /* Line two centres on the box rather than sitting on its baseline. The
+     box stacks above the button's overhanging touch target, so a tap on
+     its top edge reaches the box. */
+  .dt-stacked.dt-stack-dense.dt-dense-tight td.dt-meta,
+  .dt-stacked.dt-stack-dense.dt-dense-tight td.dt-edge-end {
+    align-self: center;
+  }
+
+  .dt-stacked.dt-stack-dense.dt-dense-tight td.dt-edge-end {
+    position: relative;
+    z-index: 1;
+    /* A tighter gap than the base rule's, so a 360px phone still fits the
+       meta line and the box on one line. */
+    padding-left: 0.25rem;
+  }
+
+  .dt-stacked.dt-stack-dense td.dt-meta {
+    order: 1;
+    display: inline;
+    padding: 0;
+    min-height: 0;
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    color: var(--color-text-dim);
+  }
+
+  /* A meta cell's own content can be a control (`PriceSourceTag`'s
+     tooltip button) rather than bare text — its border/padding/background
+     read fine as a standalone pill in the labelled card or the desktop
+     table, but stacked inline with three or four `·`-separated fields it
+     is both too wide (crowds the line into wrapping) and visually heavier
+     than its neighbours despite matching their font size. Strip the
+     button chrome down to plain colored text here; the per-source color
+     class it already carries still says which source it is. */
+  .dt-stacked.dt-stack-dense td.dt-meta button {
+    border: none;
+    padding: 0;
+    background: none;
+    border-radius: 0;
+  }
+
+  /* The separator and the affix share the one pseudo-element a cell has
+     before its value. The space after `·` is a no-break space: an ordinary
+     one at the start of the cell's line would be collapsed away. Every
+     gutter-label property of the base rule is reset, not just `content`. */
+  .dt-stacked.dt-stack-dense td.dt-meta::before {
+    content: '\00b7\00a0' attr(data-stack-before);
+    position: static;
+    width: auto;
+    overflow: visible;
+    font-size: inherit;
+    line-height: inherit;
+    text-overflow: clip;
+    white-space: pre;
+    letter-spacing: normal;
+    text-transform: none;
+    /* Pinned, not inherited: a sorted cell bolds its value, and a bold
+       separator would read as part of it. */
+    font-weight: 400;
+    color: var(--color-text-dim);
+  }
+
+  .dt-stacked.dt-stack-dense td.dt-meta.dt-meta-first::before {
+    content: attr(data-stack-before);
+  }
+
+  .dt-stacked.dt-stack-dense td.dt-meta::after {
+    content: attr(data-stack-after);
+    white-space: pre;
+  }
+
+  /* A cell holding only a value the card can do without (`data-dense-omit`):
+     a "none" dash reads as "none" in a table column, but on the meta line it
+     would print one more "· —" between real values, so the card leaves it
+     out — likewise a word the card already says another way. */
+  .dt-stacked.dt-stack-dense td.dt-meta:has(> [data-dense-omit]:only-child) {
+    display: none;
+  }
+
+  /* `dt-meta-first` is fixed at render, so when the leading meta cells are
+     omitted the first one left standing would open the line with a stray
+     "·". Hand it the first cell's no-separator content instead, past one or
+     two omitted cells (Contacts' Type, then an empty Corp / Alliance). */
+  .dt-stacked.dt-stack-dense
+    td.dt-meta-first:has(> [data-dense-omit]:only-child)
+    + td.dt-meta:not(:has(> [data-dense-omit]:only-child))::before,
+  .dt-stacked.dt-stack-dense
+    td.dt-meta-first:has(> [data-dense-omit]:only-child)
+    + td.dt-meta:has(> [data-dense-omit]:only-child)
+    + td.dt-meta::before {
+    content: attr(data-stack-before);
+  }
+
+  /* No header row to show the sort on, so the sorted value itself says it
+     — its trailing affix too, which inherits; the leading separator and
+     affix stay dim (pinned above). The corner never
+     changes: it is already the bold figure. */
+  .dt-stacked.dt-stack-dense td.dt-meta.dt-sorted {
+    color: var(--color-text);
+    font-weight: 700;
+  }
+
+  /*
+   * Phone grouping (`groupBy`): a toggle row whose one full-width cell is
+   * the button, in either card. It is not a field, so it gets neither the
+   * labelled card's gutter and `data-label` slot nor the dense card's
+   * line-break pseudo — the button carries its own padding and 48px height.
+   */
+  .dt-stacked tr.dt-group-header {
+    padding: 0;
+  }
+
+  /*
+   * A row's expand detail (`DataTable`'s `expandableRow`): the same
+   * full-width, no-gutter, no-label cell as the group-header toggle above —
+   * it is prose/sub-fields of its own, not one more labelled field of the
+   * row it hangs off.
+   */
+  .dt-stacked tr.dt-row-detail {
+    padding: 0;
+  }
+
+  /*
+   * `.dt-stacked.dt-stack-2col tr` (above) sets every `tr` under it —
+   * including this one — to a two-track `display: grid`, at equal
+   * specificity to the plain rule above. Left alone, the detail `<td>` then
+   * lands in a single grid track (half the card) instead of the full-width
+   * flex cell the rule below expects: `flex: 1 1 100%` is a no-op once its
+   * parent isn't a flex container (Market's order-row expand, #2138 — the
+   * required-skills section rendered at half width). Restoring `flex` here
+   * — at higher specificity than the 2-col rule, so order doesn't matter —
+   * makes `.dt-stacked tr.dt-row-detail > td`'s existing rule apply again
+   * regardless of `stackColumns`.
+   */
+  .dt-stacked.dt-stack-2col tr.dt-row-detail {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dt-stacked tr.dt-row-detail > td {
+    flex: 1 1 100%;
+    padding: 0.75rem;
+    min-height: 0;
+  }
+
+  .dt-stacked tr.dt-row-detail > td::before {
+    content: none;
+  }
+
+  /*
+   * A plain `<table>` nested inside a row's expand detail (Hauling's own
+   * "Sell orders" mini table, round: hauling mobile table detail) — the
+   * rules above key off bare `tbody`/`tr`/`td`/`thead` descendant
+   * selectors with no notion of "table nested in another table," so
+   * without this they flatten the inner table into a second, broken card
+   * layout too. It has no card fallback of its own to fall into, unlike
+   * `DataTable`'s own rows, so every leaky property is undone here,
+   * restated explicitly rather than `revert`ed. This block sits in the
+   * same `utilities` layer as the rules above (see this file's own note
+   * at the top of that layer) and beats the inner table's Tailwind
+   * classes (`py-1`, `text-right`) on ordinary specificity the same way
+   * those rules beat them — `revert` would not: it rolls a property back
+   * past every author style, Tailwind's utilities included, straight to
+   * the UA default, undoing `py-1`/`text-right` right along with the leak
+   * it's meant to fix. `text-align` for the two right-aligned columns is
+   * keyed off that same `text-right` class name instead, rather than
+   * relying on the utility itself to apply.
+   */
+  .dt-stacked .dt-embedded-table,
+  .dt-stacked .dt-embedded-table tbody,
+  .dt-stacked .dt-embedded-table tr,
+  .dt-stacked .dt-embedded-table td,
+  .dt-stacked .dt-embedded-table th {
+    display: revert;
+  }
+
+  .dt-stacked .dt-embedded-table thead {
+    position: revert;
+    width: revert;
+    height: revert;
+    overflow: revert;
+    clip-path: revert;
+    white-space: revert;
+  }
+
+  .dt-stacked .dt-embedded-table tr {
+    position: static;
+    padding: 0;
+  }
+
+  /*
+   * `padding`/`text-align` here restate the Tailwind classes this table's
+   * `<td>`/`<th>` already carry (`py-1`, and `text-right` on the two
+   * right-aligned columns — see `HaulingRowDetail.tsx`) rather than
+   * relying on the utilities themselves to apply. Keep these two in sync
+   * with that component if its classes ever change.
+   */
+  .dt-stacked .dt-embedded-table td,
+  .dt-stacked .dt-embedded-table th {
+    position: static;
+    padding: 0.25rem 0;
+    min-height: 0;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: normal;
+  }
+
+  .dt-stacked .dt-embedded-table td.text-right,
+  .dt-stacked .dt-embedded-table th.text-right {
+    text-align: right;
+  }
+
+  .dt-stacked .dt-embedded-table td::before {
+    content: none;
+  }
+
+  .dt-stacked.dt-stack-dense tr.dt-group-header::before {
+    content: none;
+  }
+
+  .dt-stacked tr.dt-group-header > td {
+    flex: 1 1 100%;
+    padding: 0;
+    min-height: 0;
+  }
+
+  .dt-stacked tr.dt-group-header > td::before {
+    content: none;
+  }
+
+  /*
+   * `DataTable`'s `virtualize` spacers stand in for rows scrolled out of
+   * the window, so their inline height is the whole box: no card padding,
+   * thumb-target floor, line-break pseudo, or labelled cell.
+   */
+  .dt-stacked tr.dt-spacer,
+  .dt-stacked.dt-stack-dense tr.dt-spacer {
+    padding: 0;
+    min-height: 0;
+  }
+
+  .dt-stacked.dt-stack-dense tr.dt-spacer::before {
+    content: none;
+  }
+
+  .dt-stacked tr.dt-spacer > td {
+    display: none;
+  }
+
+  /* An expanded group's members: indented and on the panel fill, so where
+     the group ends is visible without a closing row. */
+  tr.dt-group-member {
+    background-color: var(--color-panel);
+  }
+
+  .dt-stacked tr.dt-group-member {
+    padding-left: 2rem;
+  }
+
+  table:not(.dt-stacked) tr.dt-group-member > td:first-child {
+    padding-left: 2rem;
+  }
+
+  /*
+   * A cell with no value keeps its label and shows blank, rather than
+   * disappearing. Hiding it (`td:empty { display: none }`) would drop a
+   * field on a phone that desktop still shows as an empty column — and
+   * `:empty` only matches when `render` returns exactly nullish, so which
+   * fields vanished would depend on how each column happened to be
+   * written. A labelled blank says the same thing at both widths.
+   */
 
   /*
    * A `type="number"` field narrow enough that the platform spin buttons

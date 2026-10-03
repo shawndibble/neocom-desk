@@ -644,7 +644,7 @@ describe('DataTable', () => {
     });
   });
 
-  // The collapse itself is CSS (`.dt-stack`, src/styles/index.css) and jsdom
+  // The collapse itself is CSS (`.dt-stacked`, src/styles/index.css) and jsdom
   // loads no stylesheet, so these cover the markup that CSS depends on: where
   // the labels come from, the opt-out hook, and the roles `display: block`
   // would otherwise strip in a real browser.
@@ -663,6 +663,39 @@ describe('DataTable', () => {
       unmount();
       renderTable({ responsive: 'table' });
       expect(screen.getByRole('table')).not.toHaveClass('dt-stack');
+    });
+
+    it('shows cards (`dt-stacked`) below `sm`, or wherever the caller says', () => {
+      const real = window.matchMedia;
+      window.matchMedia = ((media: string) =>
+        ({
+          media,
+          matches: media === PHONE_QUERY,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList) as typeof window.matchMedia;
+      try {
+        const phone = renderTable();
+        expect(screen.getByRole('table')).toHaveClass('dt-stacked');
+        phone.unmount();
+        // A table that knows it has room keeps its columns even on a phone.
+        const wide = renderTable({ stacked: false });
+        expect(screen.getByRole('table')).not.toHaveClass('dt-stacked');
+        wide.unmount();
+      } finally {
+        window.matchMedia = real;
+      }
+
+      // jsdom's own `matchMedia` never matches: a desktop viewport.
+      const desktop = renderTable();
+      expect(screen.getByRole('table')).not.toHaveClass('dt-stacked');
+      desktop.unmount();
+      const forced = renderTable({ stacked: true });
+      expect(screen.getByRole('table')).toHaveClass('dt-stack', 'dt-stacked');
+      forced.unmount();
+      // Never cards without the stack layout to show them in.
+      renderTable({ stacked: true, responsive: 'table' });
+      expect(screen.getByRole('table')).not.toHaveClass('dt-stacked');
     });
 
     it('states its table roles explicitly, since the stacked layout drops the implicit ones', () => {

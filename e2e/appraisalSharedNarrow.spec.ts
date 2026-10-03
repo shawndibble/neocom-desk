@@ -9,8 +9,8 @@
  * on a phone.
  *
  * Playwright rather than jsdom for the same reason that spec gives: the
- * pairing lives in `.dt-stack-2col`'s `@media (width < 40rem)` grid
- * (`src/styles/index.css`), which jsdom cannot evaluate, so only a real
+ * pairing lives in `.dt-stack-2col`'s phone grid (`.dt-stacked`,
+ * `src/styles/index.css`), which jsdom cannot evaluate, so only a real
  * engine can tell a paired card from the six-line one that shipped. Hence
  * assertions on bounding boxes — which cells share a line, how wide each
  * is — rather than on the class token, which `src/routes/SharedLink.test.tsx`

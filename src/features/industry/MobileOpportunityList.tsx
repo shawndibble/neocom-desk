@@ -12,7 +12,7 @@
  * so a second card would only repeat the first.
  *
  * Sorting: `DataTable`'s own sortable column headers are accessibility-hidden
- * once it stacks below `sm` (`.dt-stack thead`, `src/styles/index.css`), so
+ * once it stacks below `sm` (`.dt-stacked thead`, `src/styles/index.css`), so
  * this list keeps its own sort toolbar, reusing `sortRows`/`nextDataTableSort`
  * so both this list and the desktop table sort and toggle direction by the
  * identical rule.

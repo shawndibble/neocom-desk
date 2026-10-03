@@ -713,7 +713,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         // The row's warning stripe. On a `<tr>` this would be a `box-shadow`,
         // which Chromium drops under the `border-collapse: collapse` every
         // table here inherits; a cell border paints. Held behind `sm:` — once
-        // `.dt-stack` blocks the cell there is no row edge to stripe, and the
+        // `.dt-stacked` blocks the cell there is no row edge to stripe, and the
         // card's tint already carries the state.
         cellClassName: (job) =>
           toneClass(jobTone(job), {
@@ -1127,7 +1127,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
             />
           ) : (
             // Six columns overflow the route's `lg:grid-cols-[20rem_1fr]`
-            // column at tablet widths; `.dt-stack` only rescues below `sm`.
+            // column at tablet widths; `.dt-stacked` only rescues below `sm`.
             <div className="overflow-x-auto">
               <DataTable
                 {...jobsExport.tableProps}

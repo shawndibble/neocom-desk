@@ -37,6 +37,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -96,6 +97,19 @@ import {
 import { useHaulingFees, useHaulingScan } from './useHaulingScan';
 import { HAUL_MODES, type HaulMode } from './haulingData';
 const DAY_CHOICES = [7, 14, 30, 0] as const;
+
+/**
+ * The table widths (rem) the layout changes at, measured in Chrome: below
+ * `compact` the figures go compact (`12.08M`; the full ones need about 54rem
+ * with "ISK each", which the CSS drops at the same 56rem), and below `cards`
+ * the rows become the phone's cards (the compact columns need about 46rem;
+ * a rem and more of headroom, so a longer figure never brings the scroll back).
+ * Any hub's Hub column needs about 5.3rem more of each.
+ */
+const TABLE_WIDTHS = {
+  oneHub: { compact: 56, cards: 47.5 },
+  anyHub: { compact: 60, cards: 53 },
+} as const;
 const MARGIN_CHOICES = [0, 3, 5, 10] as const;
 
 const HAULING_URL_FILTERS = {
@@ -238,10 +252,17 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   // its figures go compact (`3.41K`). Chosen in JS, not by a hidden/shown
   // pair of spans: one DOM at every width (DESIGN.md, DataTable).
   const isPhone = useIsPhone();
-  // A narrow desktop table goes compact too: below 56rem its full figures
+  // A narrow desktop table goes compact too: its full figures
   // (`12,080,000.00`) left the Item column no room and scrolled the page
-  // sideways. The same width drops the margin's "ISK each" (the CSS below).
-  const [tableRef, tableNarrow] = useElementNarrowerThan<HTMLDivElement>(56);
+  // sideways. Narrower than even the compact columns (a tablet with the rail
+  // open leaves the panel slimmer than a phone), the rows become the
+  // phone's cards (`TABLE_WIDTHS`).
+  const widths = TABLE_WIDTHS[anyEnd === null ? 'oneHub' : 'anyHub'];
+  const [tableRef, [tableNarrow = false, tableCards = false]] =
+    useElementNarrowerThan<HTMLDivElement>([widths.compact, widths.cards]);
+  // The table's `stacked`, and every cell class that would otherwise follow
+  // the viewport (`max-sm:`) picks by it instead (ADR 0017).
+  const cards = isPhone || tableCards;
   const isk = (value: number, digits: number) =>
     isPhone || tableNarrow ? formatIskCompact(value) : formatIsk(value, digits);
 
@@ -458,11 +479,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       // minimum and scrolling the page sideways (the card has its own rules).
       // Never below a short name's width, though: past that the table
       // scrolls in its own wrapper instead.
-      className: 'sm:w-full sm:max-w-0 sm:min-w-28',
+      className: cards ? undefined : 'w-full max-w-0 min-w-28',
       sortValue: (row) => row.name.toLowerCase(),
       render: (row) => (
         <span className="flex min-w-0 items-center gap-2">
-          <TypeIcon typeId={row.typeId} size={32} className="size-6 shrink-0 max-sm:hidden" />
+          {!cards && <TypeIcon typeId={row.typeId} size={32} className="size-6 shrink-0" />}
           <MarketItemLink
             typeId={row.typeId}
             className="min-w-0 truncate font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -546,7 +567,14 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       render: (row) => (
         <span className="font-semibold">
           {signed(row.marginPct, 1)}%
-          <span className="ml-1.5 hidden text-[0.6875rem] font-normal text-text-dim @min-[56rem]:inline">
+          <span
+            className={cx(
+              'ml-1.5 hidden text-[0.6875rem] font-normal text-text-dim',
+              // `TABLE_WIDTHS`' `compact`, per hub mode: the full figures and
+              // this suffix come and go together.
+              anyEnd === null ? '@min-[56rem]:inline' : '@min-[60rem]:inline'
+            )}
+          >
             {t('market.hauling.profitEach', {
               isk: `${row.profitPerUnit >= 0 ? '+' : ''}${formatIsk(row.profitPerUnit, 0)}`,
             })}
@@ -603,6 +631,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         if (!line) return null;
         return (
           <BringInput
+            card={cards}
             label={t('market.hauling.bringRow', { item: row.name })}
             title={limitTextOf(row)}
             value={overrides.get(row.typeId)?.selected === false ? '' : String(line.quantity)}
@@ -929,7 +958,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   actions that act on the whole plan — the ship, Copy
                   Multibuy, and a menu for the rest. One line on a wide
                   screen; on a phone the meter and actions take a second. */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-panel-2 px-3 py-2 text-sm tabular-nums">
+              <div className="@container flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-panel-2 px-3 py-2 text-sm tabular-nums">
                 <div className="flex items-center gap-x-4">
                   <label className="flex items-center gap-2 text-xs text-text-dim">
                     <Checkbox
@@ -956,7 +985,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                     <span className="text-text-dim">{t('market.hauling.plan.spendWord')}</span>
                   </span>
                 </div>
-                <div className="flex min-w-0 flex-1 basis-full items-center gap-3 sm:basis-auto">
+                <div className="flex min-w-0 flex-1 basis-full items-center gap-3 @min-[40rem]:basis-auto">
                   {cargo !== null && heldPct !== null ? (
                     <>
                       <div
@@ -965,28 +994,35 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                           used: Math.round(plan.totals.volumeM3).toLocaleString(),
                           total: Math.round(cargo.m3).toLocaleString(),
                         })}
-                        className="h-1 min-w-8 flex-1 bg-line sm:max-w-xs"
+                        className="h-1 min-w-8 flex-1 bg-line @max-[26rem]:hidden @min-[40rem]:max-w-xs"
                       >
                         <div className="h-full bg-accent" style={{ width: `${heldPct}%` }} />
                       </div>
-                      {/* What binds the load prints from `sm` up; a phone has
-                          no room for it here, and each row's detail says what
-                          capped that row. */}
+                      {/* The meter's bar goes first in a phone-narrow bar
+                          (the words beside it say the same), so the ship
+                          button keeps its name.
+                          What binds the load prints in a bar 40rem wide and up
+                          (the bar's own width, not the viewport's: a tablet
+                          with the rail open is as cramped as a phone); below
+                          that there is no room, and each row's detail says
+                          what capped that row. */}
                       <span className="min-w-0 shrink-0 text-[0.6875rem] text-text-dim">
                         {t('market.hauling.plan.holdUsed', {
                           used: Math.round(plan.totals.volumeM3).toLocaleString(),
                           total: Math.round(cargo.m3).toLocaleString(),
                         })}
-                        {bindingText && <span className="max-sm:hidden"> · {bindingText}</span>}
+                        {bindingText && (
+                          <span className="@max-[40rem]:hidden"> · {bindingText}</span>
+                        )}
                       </span>
                     </>
                   ) : (
                     // The ship button beside it says the same on a phone.
-                    <span className="min-w-0 flex-1 text-[0.6875rem] text-text-dim max-sm:hidden">
+                    <span className="min-w-0 flex-1 text-[0.6875rem] text-text-dim @max-[40rem]:hidden">
                       {t('market.hauling.cargo.tip')}
                     </span>
                   )}
-                  <div className="ml-auto flex items-center gap-2">
+                  <div className="ml-auto flex min-w-0 items-center gap-2">
                     <HaulingCargoControl
                       characterId={activeCharacterId}
                       cargo={cargo}
@@ -1001,7 +1037,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                       aria-label={t('market.hauling.copyMultibuy')}
                     >
                       <Icon.CopyToClipboard aria-hidden="true" size={Icon.ICON_SIZE.sm} />
-                      <span className="max-sm:hidden">{t('market.hauling.copyMultibuy')}</span>
+                      <span className="@max-[40rem]:hidden">
+                        {t('market.hauling.copyMultibuy')}
+                      </span>
                     </Button>
                     <TableActionsMenu name={t('market.hauling.title')} tableExport={tableExport}>
                       <MenuItem
@@ -1057,6 +1095,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   rowKey={(row) => row.typeId}
                   density="compact"
                   stackLayout="dense"
+                  stacked={cards}
                   className="dt-dense-tight"
                   rowContextMenu={rowContextMenu}
                   rowMoreActions
@@ -1175,11 +1214,14 @@ function ModeSelect({ value, onChange }: { value: HaulMode; onChange: (mode: Hau
  * row's detail says it too, for touch).
  */
 function BringInput({
+  card,
   label,
   title,
   value,
   onCommit,
 }: {
+  /** On the dense card rather than in a table row. */
+  card: boolean;
   label: string;
   title?: string;
   value: string;
@@ -1192,9 +1234,11 @@ function BringInput({
       inputMode="numeric"
       aria-label={label}
       title={title}
-      // Shorter and narrower on the phone card: its height sets the meta
-      // line's, and a 360px card still fits it beside that line.
-      className="w-16 text-right tabular-nums max-sm:h-7 sm:w-20"
+      // Shorter and narrower on the card: its height sets the meta line's,
+      // and a 360px card still fits it beside that line. 28px is under the
+      // touch tier's 36px on purpose (DESIGN.md §3); `max-md:` because the
+      // `sm` field is already 28px from `md` up.
+      className={cx('text-right tabular-nums', card ? 'w-16 max-md:h-7' : 'w-20')}
       value={draft ?? value}
       onChange={(event) => {
         const raw = event.target.value.replace(/[^\d]/g, '');
