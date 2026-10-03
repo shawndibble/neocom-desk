@@ -471,6 +471,51 @@ describe('extra connections and free systems', () => {
     }
   });
 
+  describe('a hub with stargates, as Turnur has', () => {
+    // GATED_HUB (0.39) sits on the only path START ─ GATED_HUB ─ FAR_END,
+    // and a hole joins SIDE (no stargates) to it.
+    const GATED_HUB = 31100001;
+    const FAR_END = 31100002;
+    const SIDE = 31100003;
+    const gatedGraph: JumpGraph = new Map([
+      [START, [GATED_HUB]],
+      [GATED_HUB, [START, FAR_END]],
+      [FAR_END, [GATED_HUB]],
+      [SIDE, []],
+    ]);
+    const gatedSecurity = new Map([
+      [START, 1.0],
+      [GATED_HUB, 0.39],
+      [FAR_END, 0.9],
+      [SIDE, 0.9],
+    ]);
+    const options = {
+      preference: 'prefer-highsec' as const,
+      securityOf: (systemId: number) => gatedSecurity.get(systemId),
+      extraConnections: [[SIDE, GATED_HUB]] as const,
+      freeSystems: new Set([GATED_HUB]),
+    };
+
+    it('charges the hub as lowsec when entered by stargate, holes or not', () => {
+      const sweep = routeSweepFrom(gatedGraph, START, options);
+      expect(sweep.routeTo(FAR_END)).toEqual([START, GATED_HUB, FAR_END]);
+      // Entered by gate from START: lowsec under Prefer safer, never the free 1.
+      expect(sweep.costs.get(GATED_HUB)).toBeCloseTo(penaltyCost);
+      expect(sweep.costs.get(FAR_END)).toBeCloseTo(penaltyCost + 0.9);
+      const gateOnly = routeSweepFrom(gatedGraph, START, {
+        ...options,
+        extraConnections: undefined,
+      });
+      expect(gateOnly.costs.get(GATED_HUB)).toBeCloseTo(penaltyCost);
+    });
+
+    it('still makes the hub free when entered through a hole', () => {
+      const sweep = routeSweepFrom(gatedGraph, SIDE, options);
+      expect(sweep.routeTo(GATED_HUB)).toEqual([SIDE, GATED_HUB]);
+      expect(sweep.costs.get(GATED_HUB)).toBe(1);
+    });
+  });
+
   it('ignores a connection to a system the graph does not hold', () => {
     const options = {
       ...holes,

@@ -261,6 +261,29 @@ describe('foldQuietStretches', () => {
   });
 });
 
+describe('J-space in the facts', () => {
+  it('leaves a wormhole system out of the band tallies and the lowest security', () => {
+    const rows = buildRouteSafetyRows([JITA, THERA, UEDAMA], inputs());
+    expect(summarizeRouteSafety(rows)).toMatchObject({
+      jumps: 2,
+      highsec: 2,
+      lowsec: 0,
+      nullsec: 0,
+      lowestSecurity: 0.5,
+    });
+  });
+
+  it("never makes a wormhole system the strip's lowest-security key system", () => {
+    const rows = [
+      row(1, { security: 0.9 }),
+      row(THERA, { security: -1 }),
+      row(3, { security: 0.6 }),
+      row(4, { security: 0.8 }),
+    ];
+    expect(routeStripKeySystems(rows)).toEqual([0, 2, 3]);
+  });
+});
+
 describe('routeStripKeySystems', () => {
   it('names the ends, the first lowest-security system and every chokepoint, in route order', () => {
     const rows = [

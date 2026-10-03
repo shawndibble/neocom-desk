@@ -119,8 +119,11 @@ export type HoleAt<T extends TheraConnection = TheraConnection> = (
 
 /**
  * One answer to "was this step a hole?" for everything that draws a route: a
- * hole joins the two systems and no stargate does. Turnur has gates, and a
- * gate to the same neighbour costs the same, so it is the jump shown.
+ * hole joins the two systems and no stargate does. Where both join them (an
+ * exit next door to Turnur) the gate is the jump shown, as Set waypoints
+ * reads it too: the pilot can always fly the gate. The search may have
+ * priced that step as the free hole, a difference of at most one system's
+ * security cost on a pairing EVE-Scout rarely lists.
  */
 export function holeStepFinder<T extends TheraConnection>(
   graph: JumpGraph,

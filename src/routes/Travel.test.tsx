@@ -673,6 +673,9 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
     expect(facts.getByText('2 jumps')).toBeInTheDocument();
     expect(facts.getByText('0 by gate')).toBeInTheDocument();
     expect(facts.getByText('2 through wormholes')).toBeInTheDocument();
+    // Thera is counted as wormhole jumps, never as a nullsec system or the lowest security.
+    expect(facts.getByText('2 highsec / 0 lowsec / 0 nullsec')).toBeInTheDocument();
+    expect(facts.getByText('lowest 0.5')).toBeInTheDocument();
     expect(screen.getAllByTestId('route-strip-cell')).toHaveLength(3);
   });
 

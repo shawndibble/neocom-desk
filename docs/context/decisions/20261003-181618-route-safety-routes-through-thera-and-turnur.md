@@ -11,11 +11,11 @@ _Recorded 2026-10-03 · issue #2476._
   caller passes the hole edges and the free systems
   (`engine/route/routeHoles.ts` → `FindJumpRouteOptions.extraConnections` /
   `freeSystems`). Only a hub with at least one usable hole is free, so with no
-  usable holes the gate route is exactly what it was. A free hub stays free
-  however it is entered, which means Turnur entered by gate also costs one
-  jump while the switch is on. That is the rule as given, and it is recorded
-  here so it isn't mistaken for a bug. An Avoided System is still avoided,
-  hub or not: only the security cost is waived.
+  usable holes the gate route is exactly what it was. The hub is free only
+  when it is reached through a hole: Turnur entered by stargate is charged
+  normally, as any 0.39 system would be, under the preference and the avoids.
+  An Avoided System is still avoided, hub or not: only the security cost is
+  waived.
 
 - **Route Safety only, never Travel Settings or `routeRules`.** The four
   settings (the switch, My ship fits, Skip holes with under N h left, Hubs)
@@ -37,6 +37,9 @@ _Recorded 2026-10-03 · issue #2476._
   left and the age of EVE-Scout's list. The row also has Copy, and the strip
   shows the jump as a hatched cell. The facts line adds "N by gate · M through
   wormholes". A J-space system's ESI figures stay unknown ("—", "ESI doesn't
-  report wormhole space"), and zKillboard still lists it. Both systems beside
-  a hole jump never fold into a quiet stretch. The age shown is when the list
+  report wormhole space"), and zKillboard still lists it. A J-space system is
+  left out of the facts line's highsec / lowsec / nullsec tallies and is never
+  the route's lowest security or the strip's lowest-security key system. The
+  "through wormholes" count already covers it. Both systems beside a hole
+  jump never fold into a quiet stretch. The age shown is when the list
   was read, because the feed parser keeps no per-hole update time.

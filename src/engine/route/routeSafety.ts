@@ -147,13 +147,25 @@ function totalOf(values: readonly (number | null)[]): number | null {
   return total;
 }
 
+/**
+ * The security figures a route's facts are read from. J-space is left out:
+ * Thera's -0.99 is not a nullsec system flown through, and a jump into it is
+ * counted as a wormhole jump instead.
+ */
+function kspaceSecurities(rows: readonly RouteSafetyRow[]): number[] {
+  return rows.flatMap((row) =>
+    row.security === null || isWormholeSystem(row.systemId) ? [] : [row.security]
+  );
+}
+
 export function summarizeRouteSafety(rows: readonly RouteSafetyRow[]): RouteSafetySummary {
-  const securities = rows.flatMap((row) => (row.security === null ? [] : [row.security]));
+  const securities = kspaceSecurities(rows);
+  const kspace = rows.filter((row) => !isWormholeSystem(row.systemId));
   return {
     jumps: Math.max(0, rows.length - 1),
-    highsec: rows.filter((row) => row.band === 'highsec').length,
-    lowsec: rows.filter((row) => row.band === 'lowsec').length,
-    nullsec: rows.filter((row) => row.band === 'nullsec').length,
+    highsec: kspace.filter((row) => row.band === 'highsec').length,
+    lowsec: kspace.filter((row) => row.band === 'lowsec').length,
+    nullsec: kspace.filter((row) => row.band === 'nullsec').length,
     lowestSecurity: securities.length === 0 ? null : Math.min(...securities),
     shipKills: totalOf(rows.map((row) => row.shipKills)),
     podKills: totalOf(rows.map((row) => row.podKills)),
@@ -275,10 +287,10 @@ export function routeStripKeySystems(
   const keys = new Set<number>(stopIndexes.filter((index) => index < rows.length));
   if (rows.length > 0) keys.add(0);
   if (rows.length > 1) keys.add(rows.length - 1);
-  const securities = rows.flatMap((row) => (row.security === null ? [] : [row.security]));
+  const securities = kspaceSecurities(rows);
   if (securities.length > 0) {
     const lowest = Math.min(...securities);
-    keys.add(rows.findIndex((row) => row.security === lowest));
+    keys.add(rows.findIndex((row) => row.security === lowest && !isWormholeSystem(row.systemId)));
   }
   rows.forEach((row, index) => {
     if (row.chokepoint) keys.add(index);
