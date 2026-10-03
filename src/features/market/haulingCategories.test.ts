@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ALL_HAULING_CATEGORIES,
+  EVERYTHING_CATEGORY_ID,
   isHaulingCategoryId,
   typeIdsInCategory,
   typeIdsInHaulingCategory,
@@ -39,14 +39,14 @@ describe('typeIdsInHaulingCategory', () => {
     expect(typeIdsInHaulingCategory(9, groups, types)).toEqual([20]);
   });
   it('scans every offered category for Everything, sorted, still without ships', () => {
-    expect(typeIdsInHaulingCategory(ALL_HAULING_CATEGORIES, groups, types)).toEqual([10, 20, 30]);
+    expect(typeIdsInHaulingCategory(EVERYTHING_CATEGORY_ID, groups, types)).toEqual([10, 20, 30]);
   });
 });
 
 describe('isHaulingCategoryId', () => {
   it('accepts the offered categories and Everything, and nothing else', () => {
     expect(isHaulingCategoryId(11)).toBe(true);
-    expect(isHaulingCategoryId(ALL_HAULING_CATEGORIES)).toBe(true);
+    expect(isHaulingCategoryId(EVERYTHING_CATEGORY_ID)).toBe(true);
     expect(isHaulingCategoryId(4)).toBe(false); // Ships
   });
 });

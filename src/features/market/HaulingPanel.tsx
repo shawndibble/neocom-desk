@@ -73,7 +73,7 @@ import {
 import { ItemContextMenu } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
 import {
-  ALL_HAULING_CATEGORIES,
+  EVERYTHING_CATEGORY_ID,
   DEFAULT_HAULING_CATEGORY_ID,
   HAULING_CATEGORY_OPTIONS,
   isHaulingCategoryId,
@@ -282,7 +282,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     };
   }, []);
   const categoryName = (id: number) =>
-    id === ALL_HAULING_CATEGORIES
+    id === EVERYTHING_CATEGORY_ID
       ? t('market.hauling.categoryAll')
       : (groups?.find((g) => g.id === id)?.name ?? t('market.hauling.categoryFallback', { id }));
 

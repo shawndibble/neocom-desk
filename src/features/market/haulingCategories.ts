@@ -14,10 +14,10 @@ import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 export const HAULING_CATEGORY_IDS = [11, 9, 157, 24, 19, 955, 1320] as const;
 
 /** Not a Market Group: _Everything_ scans every offered category at once — still no ships. */
-export const ALL_HAULING_CATEGORIES = 0;
+export const EVERYTHING_CATEGORY_ID = 0;
 
 /** What the Category select lists: Everything first, then each category. */
-export const HAULING_CATEGORY_OPTIONS = [ALL_HAULING_CATEGORIES, ...HAULING_CATEGORY_IDS] as const;
+export const HAULING_CATEGORY_OPTIONS = [EVERYTHING_CATEGORY_ID, ...HAULING_CATEGORY_IDS] as const;
 
 export const DEFAULT_HAULING_CATEGORY_ID = 11;
 
@@ -32,7 +32,7 @@ export function typeIdsInHaulingCategory(
   types: readonly MarketTypeEntry[]
 ): number[] {
   return typeIdsInCategories(
-    categoryId === ALL_HAULING_CATEGORIES ? HAULING_CATEGORY_IDS : [categoryId],
+    categoryId === EVERYTHING_CATEGORY_ID ? HAULING_CATEGORY_IDS : [categoryId],
     groups,
     types
   );
