@@ -1762,6 +1762,9 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole('heading', { name: 'Rifter', level: 2 });
+    // The linked hub is copied into the device setting only once that setting
+    // has hydrated; toggling before then would find the old Jita default.
+    await waitFor(() => expect(useMarketBrowserHub.getState().value).toBe('amarr'));
 
     await user.click(screen.getByRole('button', { name: 'Region' }));
     expect(window.location.search).toBe('?type=587&region=10000043'); // Domain, Amarr's region
