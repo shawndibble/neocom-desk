@@ -135,7 +135,7 @@ interface FittingRingProps {
   selectedSlot?: { rack: FittingSlotKind; index: number } | null;
   /** The turrets and launchers the high slots take; null (no pips filled) until known. */
   hardpointsUsed?: HardpointCounts | null;
-  /** The hardpoint each high-slot type takes, for its tile's badge; no badges without it. */
+  /** The hardpoint each high-slot type takes, named in its tile's tooltip; unnamed without it. */
   hardpointKindOf?: HardpointKindOf;
   /** The panel header's controls — the page's "+ Add module". */
   actions?: ReactNode;
@@ -669,20 +669,6 @@ function SlotTile({
         </span>
       </span>
       <span className="absolute inset-0" style={upright}>
-        {/* The hardpoint it takes, matching the icon heading that kind's pips on the rim. */}
-        {module && hardpoint && (
-          <span
-            data-hardpoint-badge={hardpoint}
-            className="absolute top-0 left-0 h-[34%] w-[34%] border border-line bg-bg/85"
-          >
-            <img
-              src={HARDPOINT_ICON[hardpoint]}
-              alt=""
-              aria-hidden="true"
-              className="h-full w-full object-contain"
-            />
-          </span>
-        )}
         {/* A corner flag, small enough to leave the module readable under it. */}
         {cantUse && (
           <span className="absolute top-0 right-0 flex h-[34%] w-[34%] bg-danger p-px text-bg">
