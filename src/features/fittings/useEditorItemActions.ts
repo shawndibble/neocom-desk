@@ -208,7 +208,7 @@ export function useEditorItemActions({
       if (payload.kind === 'drone' || payload.rack === 'drone') {
         const { typeId } = payload;
         edit((f) => {
-          // From the Add panel, one more goes straight into space — a full bay doesn't stop it.
+          // From the Add panel, one more is carried (if the bay has room) and launches.
           if (payload.kind === 'type') return launchNewDrone(f, typeId, droneBay, launchLimits);
           return launchLimits === null ? f : launchDrones(f, launchLimits, typeId);
         });

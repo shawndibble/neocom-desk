@@ -7,6 +7,7 @@ import {
   Panel,
   RowMoreActions,
   TextInput,
+  Tooltip,
   TypeIcon,
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -449,7 +450,9 @@ const LAUNCH_SQUARES = 5;
  * A drone type's launch squares: one lit per drone of it in space. Clicking
  * a square launches up to it; clicking the highest lit one recalls it. A
  * square past what the Fitting carries, or past what bandwidth and the
- * pilot's drone count allow, is disabled.
+ * pilot's drone count allow, is disabled — `aria-disabled` rather than the
+ * native attribute, so its tooltip saying why stays reachable by hover, focus
+ * and touch-and-hold.
  */
 function LaunchSquares({
   name,
@@ -470,21 +473,29 @@ function LaunchSquares({
         const count = index + 1;
         const lit = count <= inSpace;
         const blocked = !lit && count > max;
-        return (
+        const square = (
           <button
             key={count}
             type="button"
             aria-label={t('fittings.edit.launchCount', { count })}
             aria-pressed={lit}
-            disabled={blocked}
-            title={blocked ? t('fittings.edit.launchBlocked') : undefined}
-            onClick={() => onLaunch(count === inSpace ? count - 1 : count)}
-            className="group flex size-6 items-center justify-center disabled:cursor-not-allowed"
+            aria-disabled={blocked || undefined}
+            onClick={() => {
+              if (!blocked) onLaunch(count === inSpace ? count - 1 : count);
+            }}
+            className="group flex size-11 items-center justify-center aria-disabled:cursor-not-allowed md:size-6"
           >
             <span
-              className={`size-3.5 rounded-[2px] border ${lit ? 'border-accent bg-accent' : 'border-line-bright group-hover:group-enabled:border-accent group-disabled:opacity-40'}`}
+              className={`size-3.5 rounded-xs border ${lit ? 'border-accent bg-accent' : blocked ? 'border-line-bright opacity-40' : 'border-line-bright group-hover:border-accent'}`}
             />
           </button>
+        );
+        return blocked ? (
+          <Tooltip key={count} content={t('fittings.edit.launchBlocked')}>
+            {square}
+          </Tooltip>
+        ) : (
+          square
         );
       })}
     </div>
@@ -664,8 +675,9 @@ interface DroneSectionProps {
  * The Fitting's drones: each type with how many it carries (the bay count,
  * capped at what the bay holds — launched drones included) and launch
  * squares for how many of those are in space (these count toward DPS and
- * bandwidth, capped by it), and a way to add more. The List's Drones section, the Ring's drone panel, and the
- * phone Ring's Drones sheet. Nothing on a hull that takes no drones.
+ * bandwidth, capped by it), and a way to add more. The List's Drones
+ * section, the Ring's drone panel, and the phone Ring's Drones sheet.
+ * Nothing on a hull that takes no drones.
  */
 export function DroneSection({
   fitting,

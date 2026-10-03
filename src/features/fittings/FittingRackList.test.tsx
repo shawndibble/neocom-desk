@@ -283,8 +283,8 @@ describe('DroneSection', () => {
         onSelectTarget={() => {}}
       />
     );
-    expect(square(2)).toBeEnabled();
-    expect(square(3)).toBeDisabled();
+    expect(square(2)).not.toHaveAttribute('aria-disabled');
+    expect(square(3)).toHaveAttribute('aria-disabled', 'true');
     rerender(
       <DroneSection
         fitting={withDrones}
@@ -295,7 +295,7 @@ describe('DroneSection', () => {
         onSelectTarget={() => {}}
       />
     );
-    expect(square(5)).toBeEnabled();
+    expect(square(5)).not.toHaveAttribute('aria-disabled');
   });
 
   it('is nothing on a hull without a drone bay', () => {

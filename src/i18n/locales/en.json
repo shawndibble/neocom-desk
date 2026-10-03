@@ -388,7 +388,7 @@
       },
       "cargoTile": "{{name}} ×{{quantity}}",
       "rackHint": "Tap a rack to edit its slots",
-      "droneCount": "{{inSpace}} launched · {{carried}} in bay",
+      "droneCount": "{{inSpace}} of {{carried}} launched",
       "rackCount": "{{fitted}} / {{total}}",
       "rackCantUse_one": "{{count}} can’t use",
       "rackCantUse_other": "{{count}} can’t use"

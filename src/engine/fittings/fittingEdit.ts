@@ -723,6 +723,10 @@ export function addDronesWithinBay(
   return adding >= 1 ? addDrones(fitting, typeId, adding) : fitting;
 }
 
+function droneGroupOf(fitting: Fitting, typeId: number): DroneGroup | undefined {
+  return droneGroups(fitting).find((entry) => entry.typeId === typeId);
+}
+
 function carried(group: DroneGroup | undefined): number {
   return group ? group.inSpace + group.inBay : 0;
 }
@@ -732,7 +736,7 @@ function carried(group: DroneGroup | undefined): number {
  * the bay has room for.
  */
 export function droneCarriedMax(fitting: Fitting, typeId: number, bay: DroneBay | null): number {
-  const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
+  const group = droneGroupOf(fitting, typeId);
   return carried(group) + droneRoom(fitting, typeId, bay);
 }
 
@@ -747,7 +751,7 @@ export function setDronesCarried(
   count: number,
   bay: DroneBay | null
 ): Fitting {
-  const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
+  const group = droneGroupOf(fitting, typeId);
   const total = wholeCount(Math.min(count, droneCarriedMax(fitting, typeId, bay)));
   const inSpace = Math.min(group?.inSpace ?? 0, total);
   return setDroneCounts(fitting, typeId, { inSpace, inBay: total - inSpace });
@@ -763,7 +767,7 @@ export function droneLaunchedMax(
   typeId: number,
   launch: DroneLaunchLimits | null
 ): number {
-  const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
+  const group = droneGroupOf(fitting, typeId);
   return Math.min(carried(group), (group?.inSpace ?? 0) + droneLaunchRoom(fitting, typeId, launch));
 }
 
@@ -778,7 +782,7 @@ export function setDronesLaunched(
   count: number,
   launch: DroneLaunchLimits | null
 ): Fitting {
-  const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
+  const group = droneGroupOf(fitting, typeId);
   if (!group) return fitting;
   const inSpace = wholeCount(Math.min(count, droneLaunchedMax(fitting, typeId, launch)));
   return setDroneCounts(fitting, typeId, { inSpace, inBay: carried(group) - inSpace });
