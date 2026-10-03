@@ -553,14 +553,12 @@ export function launchDrones(
 }
 
 /**
- * A drone from the Add panel dropped on the Drones rack: any of its type in
- * the bay launch, then it goes straight into space too — it never passes
- * through the bay, so a full bay doesn't stop it. A type new to the Fitting
- * has no bandwidth from the engine yet, so it launches while any bandwidth
- * and a drone of the pilot's count are left; the bandwidth bar shows any
- * overage once it's calculated.
- * When it can't launch it goes in the bay instead, if it fits. The same
- * Fitting when neither can.
+ * A drone from the Add panel dropped on the Drones rack: one more is carried,
+ * if the bay has room, and the type launches as far as bandwidth and the
+ * pilot allow. A type new to the Fitting has no bandwidth from the engine
+ * yet, so it launches while any bandwidth and a drone of the pilot's count
+ * are left; the bandwidth bar shows any overage once it's calculated. The
+ * same Fitting when the bay is full.
  */
 export function launchNewDrone(
   fitting: Fitting,
@@ -568,43 +566,31 @@ export function launchNewDrone(
   bay: DroneBay | null,
   limits: DroneLaunchLimits | null
 ): Fitting {
-  if (limits === null) return addDronesWithinBay(fitting, typeId, 1, bay);
-  const launched = launchDrones(fitting, limits, typeId);
-  const headroom = launchHeadroom(droneGroups(launched), limits);
-  const each = limits.bandwidthOf(typeId);
+  const added = addDronesWithinBay(fitting, typeId, 1, bay);
+  if (added === fitting || limits === null) return added;
+  const launched = launchDrones(added, limits, typeId);
   const isNew = !fitting.drones.some((drone) => drone.typeId === typeId);
-  let room = launchable(each, headroom);
-  if (isNew && !Number.isFinite(each) && headroom.bandwidthLeft > 0) {
-    room = Math.max(0, headroom.countLeft);
+  const headroom = launchHeadroom(droneGroups(launched), limits);
+  if (
+    isNew &&
+    !Number.isFinite(limits.bandwidthOf(typeId)) &&
+    headroom.bandwidthLeft > 0 &&
+    headroom.countLeft >= 1
+  ) {
+    return setDroneCounts(launched, typeId, { inSpace: 1, inBay: 0 });
   }
-  if (room >= 1) {
-    const group = droneGroups(launched).find((entry) => entry.typeId === typeId);
-    return setDroneCounts(launched, typeId, {
-      inSpace: (group?.inSpace ?? 0) + 1,
-      inBay: group?.inBay ?? 0,
-    });
-  }
-  return addDronesWithinBay(launched, typeId, 1, bay);
-}
-
-/** How many of `typeId` in space the bay has room to take back. */
-export function droneRecallRoom(fitting: Fitting, typeId: number, bay: DroneBay | null): number {
-  const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
-  return group ? Math.min(group.inSpace, droneRoom(fitting, typeId, bay)) : 0;
+  return launched;
 }
 
 /**
- * Brings `typeId` back from space into the bay, as many as the bay has room
- * for — the rest stay out. The same Fitting when none is out or none fits.
+ * Brings every one of `typeId` back from space into the bay — they're
+ * carried already, so the bay always has room. The same Fitting when none is
+ * out.
  */
-export function recallDrones(fitting: Fitting, typeId: number, bay: DroneBay | null): Fitting {
+export function recallDrones(fitting: Fitting, typeId: number): Fitting {
   const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
-  const recalled = droneRecallRoom(fitting, typeId, bay);
-  if (!group || recalled === 0) return fitting;
-  return setDroneCounts(fitting, typeId, {
-    inSpace: group.inSpace - recalled,
-    inBay: group.inBay + recalled,
-  });
+  if (!group || group.inSpace === 0) return fitting;
+  return setDroneCounts(fitting, typeId, { inSpace: 0, inBay: group.inSpace + group.inBay });
 }
 
 const MODULE_STATES: readonly FittingItemState[] = ['offline', 'online', 'active', 'overload'];
@@ -693,16 +679,11 @@ export function cargoGroups(fitting: Fitting): FittingCargoItem[] {
 }
 
 /**
- * m3 of the drone bay the Fitting's drones take. Only those sitting in it: a
- * drone in space takes bandwidth, not bay room, so a full bay can still have
- * a flight out beside it.
+ * m3 of the drone bay the Fitting's drones take: every one it carries,
+ * launched or not — a launched drone came out of the bay and goes back in.
  */
 export function droneBayUsed(fitting: Fitting, volumeOf: (typeId: number) => number): number {
-  return fitting.drones.reduce(
-    (sum, drone) =>
-      drone.state === 'active' ? sum : sum + volumeOf(drone.typeId) * drone.quantity,
-    0
-  );
+  return fitting.drones.reduce((sum, drone) => sum + volumeOf(drone.typeId) * drone.quantity, 0);
 }
 
 /** A drone bay: its size, and how big each drone is. */
@@ -742,49 +723,74 @@ export function addDronesWithinBay(
   return adding >= 1 ? addDrones(fitting, typeId, adding) : fitting;
 }
 
+function carried(group: DroneGroup | undefined): number {
+  return group ? group.inSpace + group.inBay : 0;
+}
+
 /**
- * The highest one of a type's two counts may go: where it is now, plus the
- * room left — the bay's for the bay count, bandwidth and the pilot's drone
- * count for the space count.
+ * The most of `typeId` the Fitting may carry: what it carries now, plus what
+ * the bay has room for.
  */
-export function droneCountMax(
+export function droneCarriedMax(fitting: Fitting, typeId: number, bay: DroneBay | null): number {
+  const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
+  return carried(group) + droneRoom(fitting, typeId, bay);
+}
+
+/**
+ * Sets how many of `typeId` the Fitting carries — the List's bay count. More
+ * go in the bay, stopping at what it holds; fewer come out of the bay first,
+ * then out of space. Zero removes the type. A count may always come down.
+ */
+export function setDronesCarried(
   fitting: Fitting,
   typeId: number,
-  which: 'inSpace' | 'inBay',
-  bay: DroneBay | null,
+  count: number,
+  bay: DroneBay | null
+): Fitting {
+  const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
+  const total = wholeCount(Math.min(count, droneCarriedMax(fitting, typeId, bay)));
+  const inSpace = Math.min(group?.inSpace ?? 0, total);
+  return setDroneCounts(fitting, typeId, { inSpace, inBay: total - inSpace });
+}
+
+/**
+ * The most of `typeId` that may be launched: those out already plus what
+ * bandwidth and the pilot's drone count leave, and never more than the
+ * Fitting carries.
+ */
+export function droneLaunchedMax(
+  fitting: Fitting,
+  typeId: number,
   launch: DroneLaunchLimits | null
 ): number {
   const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
-  const room =
-    which === 'inBay' ? droneRoom(fitting, typeId, bay) : droneLaunchRoom(fitting, typeId, launch);
-  return (group?.[which] ?? 0) + room;
+  return Math.min(carried(group), (group?.inSpace ?? 0) + droneLaunchRoom(fitting, typeId, launch));
 }
 
 /**
- * Sets one of a type's two counts (the List's boxes), keeping the other. A
- * count may always come down; going up, the bay count stops at what the bay
- * holds and the space count at what bandwidth and the pilot allow.
+ * Launches or recalls `typeId` until `count` are in space — the drone row's
+ * launch squares. Only moves drones between the bay and space; how many are
+ * carried never changes.
  */
-export function setDroneCountWithinLimits(
+export function setDronesLaunched(
   fitting: Fitting,
   typeId: number,
-  counts: Partial<{ inSpace: number; inBay: number }>,
-  bay: DroneBay | null,
+  count: number,
   launch: DroneLaunchLimits | null
 ): Fitting {
   const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
-  const cap = (which: 'inSpace' | 'inBay') => {
-    const asked = counts[which];
-    if (asked === undefined) return group?.[which] ?? 0;
-    return Math.min(asked, droneCountMax(fitting, typeId, which, bay, launch));
-  };
-  return setDroneCounts(fitting, typeId, { inSpace: cap('inSpace'), inBay: cap('inBay') });
+  if (!group) return fitting;
+  const inSpace = wholeCount(Math.min(count, droneLaunchedMax(fitting, typeId, launch)));
+  return setDroneCounts(fitting, typeId, { inSpace, inBay: carried(group) - inSpace });
 }
 
-/** Drones launched and drones in the bay, every type together. */
-export function droneTotals(fitting: Fitting): { inSpace: number; inBay: number } {
+/** Drones launched and drones carried (launched or not), every type together. */
+export function droneTotals(fitting: Fitting): { inSpace: number; carried: number } {
   return droneGroups(fitting).reduce(
-    (sum, group) => ({ inSpace: sum.inSpace + group.inSpace, inBay: sum.inBay + group.inBay }),
-    { inSpace: 0, inBay: 0 }
+    (sum, group) => ({
+      inSpace: sum.inSpace + group.inSpace,
+      carried: sum.carried + carried(group),
+    }),
+    { inSpace: 0, carried: 0 }
   );
 }

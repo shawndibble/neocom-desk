@@ -288,13 +288,10 @@ export function useEditorItemActions({
             launchDrones: (typeId) => {
               if (launchLimits !== null) edit((f) => launchDrones(f, launchLimits, typeId));
             },
-            recallDrones: (typeId) => edit((f) => recallDrones(f, typeId, droneBay)),
+            recallDrones: (typeId) => edit((f) => recallDrones(f, typeId)),
             recallAllDrones: () =>
               edit((f) =>
-                droneGroups(f).reduce(
-                  (next, group) => recallDrones(next, group.typeId, droneBay),
-                  f
-                )
+                droneGroups(f).reduce((next, group) => recallDrones(next, group.typeId), f)
               ),
             removeDrones: (typeId) =>
               edit((f) => setDroneCounts(f, typeId, { inSpace: 0, inBay: 0 })),

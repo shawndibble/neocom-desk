@@ -216,7 +216,7 @@ describe('DroneSection', () => {
   };
   const stats = { ...statsWith(10), droneCapacity: 25, droneBandwidthTotal: 25 };
 
-  it('carries its own bandwidth and bay bars on the Ring, and the launched and bay counts', () => {
+  it('carries its own bandwidth and bay bars on the Ring, the launch squares and the bay count', () => {
     render(
       <DroneSection
         fitting={withDrones}
@@ -230,18 +230,49 @@ describe('DroneSection', () => {
     );
     expect(screen.getByRole('meter', { name: 'Drone bandwidth' })).toBeTruthy();
     expect(screen.getByRole('meter', { name: 'Drone bay (m³)' })).toBeTruthy();
-    expect(screen.getByLabelText('In space')).toHaveValue(2);
-    expect(screen.getByLabelText('In bay')).toHaveValue(3);
+    const pressed = ['1', '2', '3', '4', '5'].map((count) =>
+      screen.getByRole('button', { name: `${count} in space` }).getAttribute('aria-pressed')
+    );
+    expect(pressed).toEqual(['true', 'true', 'false', 'false', 'false']);
+    // The bay count is every drone carried, the two launched included.
+    expect(screen.getByLabelText('In bay')).toHaveValue(5);
     expect(screen.queryByText('Drones')).toBeNull();
   });
 
-  it('caps the in-space count by bandwidth and the pilot, not by the bay', () => {
+  it('launches up to a clicked square, and recalls the highest lit one', () => {
+    let next: Fitting | null = null;
+    render(
+      <DroneSection
+        fitting={withDrones}
+        catalogue={null}
+        stats={null}
+        edit={(change) => {
+          next = change(withDrones);
+        }}
+        target={null}
+        onSelectTarget={() => {}}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: '4 in space' }));
+    expect(next!.drones).toEqual([
+      { typeId: 2486, quantity: 4, state: 'active' },
+      { typeId: 2486, quantity: 1, state: 'online' },
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: '2 in space' }));
+    expect(next!.drones).toEqual([
+      { typeId: 2486, quantity: 1, state: 'active' },
+      { typeId: 2486, quantity: 4, state: 'online' },
+    ]);
+  });
+
+  it('disables a square past what bandwidth and the pilot allow, not the bay', () => {
     // 10 Mbit/s each: two out of 25 Mbit/s leave room for none more.
     const limited = {
       ...stats,
       maxActiveDrones: 5,
       droneBandwidthByType: { 2486: 10 },
     } as FittingStats;
+    const square = (count: number) => screen.getByRole('button', { name: `${count} in space` });
     const { rerender } = render(
       <DroneSection
         fitting={withDrones}
@@ -252,7 +283,8 @@ describe('DroneSection', () => {
         onSelectTarget={() => {}}
       />
     );
-    expect(screen.getByLabelText('In space')).toHaveAttribute('max', '2');
+    expect(square(2)).toBeEnabled();
+    expect(square(3)).toBeDisabled();
     rerender(
       <DroneSection
         fitting={withDrones}
@@ -263,7 +295,7 @@ describe('DroneSection', () => {
         onSelectTarget={() => {}}
       />
     );
-    expect(screen.getByLabelText('In space')).toHaveAttribute('max', '5');
+    expect(square(5)).toBeEnabled();
   });
 
   it('is nothing on a hull without a drone bay', () => {

@@ -12,9 +12,9 @@ import {
   launchLimitsFrom,
   launchNewDrone,
   droneBayUsed,
-  droneCountMax,
+  droneCarriedMax,
+  droneLaunchedMax,
   droneLaunchRoom,
-  droneRecallRoom,
   droneRoom,
   droneGroups,
   droneTotals,
@@ -30,7 +30,8 @@ import {
   removeAllOfType,
   removeModule,
   setCargoQuantity,
-  setDroneCountWithinLimits,
+  setDronesCarried,
+  setDronesLaunched,
   setDroneCounts,
   setModuleCharge,
   setModuleState,
@@ -362,14 +363,14 @@ describe('drone bay volume', () => {
     cargo: [],
   };
 
-  it('counts only the drones in the bay — one in space takes no room there', () => {
-    expect(droneBayUsed(fit, volumeOf)).toBe(25);
+  it('counts every drone the Fitting carries, launched ones too', () => {
+    expect(droneBayUsed(fit, volumeOf)).toBe(35);
   });
 
   it('says how many more of a type fit beside everything else', () => {
-    // 25 of 50 m3 used: five more Hobgoblins, two more Hammerheads.
-    expect(droneRoom(fit, 2454, bay(50))).toBe(5);
-    expect(droneRoom(fit, 2185, bay(50))).toBe(2);
+    // 35 of 50 m3 used: three more Hobgoblins, one more Hammerhead.
+    expect(droneRoom(fit, 2454, bay(50))).toBe(3);
+    expect(droneRoom(fit, 2185, bay(50))).toBe(1);
   });
 
   it('is zero, never negative, when nothing more fits — even over the cap already', () => {
@@ -401,10 +402,9 @@ describe('addDronesWithinBay', () => {
   });
 });
 
-describe('setDroneCountWithinLimits', () => {
+describe('setDronesCarried', () => {
   const volumeOf = (typeId: number) => ({ 2454: 5, 2185: 10 })[typeId] ?? 0;
-  // Hobgoblins draw 5 Mbit/s; a 25 Mbit/s hull, five drones at once.
-  const launch: DroneLaunchLimits = { bandwidthTotal: 25, maxActive: 5, bandwidthOf: () => 5 };
+  // Three Hobgoblins carried, two of them launched.
   const fit: Fitting = {
     name: 'D',
     shipTypeId: 1,
@@ -416,57 +416,97 @@ describe('setDroneCountWithinLimits', () => {
     cargo: [],
   };
 
-  it('sets one count, keeping the other', () => {
-    expect(
-      droneGroups(
-        setDroneCountWithinLimits(fit, 2454, { inBay: 3 }, { capacity: 50, volumeOf }, launch)
-      )
-    ).toEqual([{ typeId: 2454, inSpace: 2, inBay: 3 }]);
+  it('adds to the bay, leaving the launched ones out', () => {
+    expect(droneGroups(setDronesCarried(fit, 2454, 5, { capacity: 50, volumeOf }))).toEqual([
+      { typeId: 2454, inSpace: 2, inBay: 3 },
+    ]);
   });
 
-  it('raises the bay count no further than the bay holds — drones in space aside', () => {
-    // 25 m3: five Hobgoblins in the bay; the two in space take none of it.
-    expect(
-      droneGroups(
-        setDroneCountWithinLimits(fit, 2454, { inBay: 50 }, { capacity: 25, volumeOf }, launch)
-      )
-    ).toEqual([{ typeId: 2454, inSpace: 2, inBay: 5 }]);
+  it('carries no more than the bay holds — launched drones count against it', () => {
+    expect(droneGroups(setDronesCarried(fit, 2454, 50, { capacity: 25, volumeOf }))).toEqual([
+      { typeId: 2454, inSpace: 2, inBay: 3 },
+    ]);
+    expect(droneCarriedMax(fit, 2454, { capacity: 25, volumeOf })).toBe(5);
   });
 
-  it('raises the space count as far as bandwidth allows, however full the bay', () => {
-    const full = { capacity: 5, volumeOf };
-    expect(
-      droneGroups(setDroneCountWithinLimits(fit, 2454, { inSpace: 50 }, full, launch))
-    ).toEqual([{ typeId: 2454, inSpace: 5, inBay: 1 }]);
+  it('takes the bay first, then launched drones, when the count comes down', () => {
+    expect(droneGroups(setDronesCarried(fit, 2454, 2, null))).toEqual([
+      { typeId: 2454, inSpace: 2, inBay: 0 },
+    ]);
+    expect(droneGroups(setDronesCarried(fit, 2454, 1, null))).toEqual([
+      { typeId: 2454, inSpace: 1, inBay: 0 },
+    ]);
+    expect(setDronesCarried(fit, 2454, 0, null).drones).toEqual([]);
   });
 
-  it('always lets a count come down, even on a fit already over the cap', () => {
-    // A Hobgoblin in a 4 m3 bay, and a hull with no bandwidth left.
+  it('always lets the count come down, even on a fit already over the cap', () => {
     const small = { capacity: 4, volumeOf };
+    expect(droneCarriedMax(fit, 2454, small)).toBe(3);
+    expect(droneGroups(setDronesCarried(fit, 2454, 9, small))).toEqual([
+      { typeId: 2454, inSpace: 2, inBay: 1 },
+    ]);
+  });
+
+  it('does not cap before the bay is known', () => {
+    expect(droneGroups(setDronesCarried(fit, 2454, 40, null))).toEqual([
+      { typeId: 2454, inSpace: 2, inBay: 38 },
+    ]);
+  });
+});
+
+describe('setDronesLaunched', () => {
+  // Hobgoblins draw 5 Mbit/s; a 25 Mbit/s hull, five drones at once.
+  const launch: DroneLaunchLimits = { bandwidthTotal: 25, maxActive: 5, bandwidthOf: () => 5 };
+  const fit: Fitting = {
+    name: 'D',
+    shipTypeId: 1,
+    modules: [],
+    drones: [
+      { typeId: 2185, quantity: 2, state: 'active' },
+      { typeId: 2454, quantity: 6, state: 'online' },
+    ],
+    cargo: [],
+  };
+
+  it('moves drones between the bay and space, never changing how many are carried', () => {
+    const out = setDronesLaunched(fit, 2454, 2, launch);
+    expect(droneGroups(out)).toContainEqual({ typeId: 2454, inSpace: 2, inBay: 4 });
+    expect(droneGroups(setDronesLaunched(out, 2454, 0, launch))).toContainEqual({
+      typeId: 2454,
+      inSpace: 0,
+      inBay: 6,
+    });
+  });
+
+  it('launches no more than bandwidth, the pilot and the drones carried allow', () => {
+    // 10 of 25 Mbit/s out already: three more Hobgoblins.
+    expect(droneLaunchedMax(fit, 2454, launch)).toBe(3);
+    expect(droneGroups(setDronesLaunched(fit, 2454, 5, launch))).toContainEqual({
+      typeId: 2454,
+      inSpace: 3,
+      inBay: 3,
+    });
+    // Only two carried: two at most, whatever the bandwidth.
+    expect(droneLaunchedMax(fit, 2185, { ...launch, bandwidthTotal: 500 })).toBe(2);
+  });
+
+  it('caps only at the drones carried before the limits are known', () => {
+    expect(droneLaunchedMax(fit, 2454, null)).toBe(6);
+    expect(droneGroups(setDronesLaunched(fit, 2454, 9, null))).toContainEqual({
+      typeId: 2454,
+      inSpace: 6,
+      inBay: 0,
+    });
+  });
+
+  it('always lets the count come down, even over the limits already', () => {
     const none = { ...launch, bandwidthTotal: 0 };
-    expect(droneGroups(setDroneCountWithinLimits(fit, 2454, { inSpace: 1 }, small, none))).toEqual([
-      { typeId: 2454, inSpace: 1, inBay: 1 },
-    ]);
-    expect(droneGroups(setDroneCountWithinLimits(fit, 2454, { inBay: 4 }, small, none))).toEqual([
-      { typeId: 2454, inSpace: 2, inBay: 1 },
-    ]);
-    expect(droneGroups(setDroneCountWithinLimits(fit, 2454, { inSpace: 4 }, small, none))).toEqual([
-      { typeId: 2454, inSpace: 2, inBay: 1 },
-    ]);
-  });
-
-  it('does not cap before the bay or the bandwidth is known', () => {
-    expect(
-      droneGroups(setDroneCountWithinLimits(fit, 2454, { inBay: 40, inSpace: 30 }, null, null))
-    ).toEqual([{ typeId: 2454, inSpace: 30, inBay: 40 }]);
-  });
-
-  it('gives the highest each count box may go', () => {
-    expect(droneCountMax(fit, 2454, 'inBay', { capacity: 25, volumeOf }, launch)).toBe(5);
-    // 10 of 25 Mbit/s out already: three more.
-    expect(droneCountMax(fit, 2454, 'inSpace', { capacity: 5, volumeOf }, launch)).toBe(5);
-    // Over the cap already: the box may stay where it is, not climb.
-    expect(droneCountMax(fit, 2454, 'inBay', { capacity: 4, volumeOf }, launch)).toBe(1);
+    expect(droneLaunchedMax(fit, 2185, none)).toBe(2);
+    expect(droneGroups(setDronesLaunched(fit, 2185, 1, none))).toContainEqual({
+      typeId: 2185,
+      inSpace: 1,
+      inBay: 1,
+    });
   });
 });
 
@@ -526,22 +566,26 @@ describe('launchNewDrone', () => {
   const launch: DroneLaunchLimits = { bandwidthTotal: 25, maxActive: 5, bandwidthOf: () => 5 };
   const fit: Fitting = { ...base, drones: [{ typeId: 2185, quantity: 2, state: 'online' }] };
 
-  it('puts it straight into space, however full the bay', () => {
-    const full = { capacity: 20, volumeOf };
-    expect(droneGroups(launchNewDrone(fit, 2454, full, launch))).toEqual([
+  it('adds it to the Fitting and launches it', () => {
+    const room = { capacity: 50, volumeOf };
+    expect(droneGroups(launchNewDrone(fit, 2454, room, launch))).toEqual([
       { typeId: 2185, inSpace: 0, inBay: 2 },
       { typeId: 2454, inSpace: 1, inBay: 0 },
     ]);
   });
 
+  it('adds nothing when the bay is full — a launched drone is still carried', () => {
+    expect(launchNewDrone(fit, 2454, { capacity: 20, volumeOf }, launch)).toBe(fit);
+  });
+
   it('launches a type new to the Fitting — its bandwidth not known yet — while the pilot has drones to spare', () => {
-    const full = { capacity: 20, volumeOf };
+    const room = { capacity: 100, volumeOf };
     const fresh = launchLimitsFrom({
       droneBandwidthTotal: 25,
       maxActiveDrones: 5,
       droneBandwidthByType: { 2185: 10 },
     });
-    expect(droneGroups(launchNewDrone(fit, 2454, full, fresh))).toContainEqual({
+    expect(droneGroups(launchNewDrone(fit, 2454, room, fresh))).toContainEqual({
       typeId: 2454,
       inSpace: 1,
       inBay: 0,
@@ -553,10 +597,18 @@ describe('launchNewDrone', () => {
       maxActiveDrones: 5,
       droneBandwidthByType: { 2185: 10 },
     });
-    expect(launchNewDrone(spent, 2454, { capacity: 0, volumeOf }, tight)).toBe(spent);
-    // Five out already: it can't launch, and the full bay can't take it.
+    expect(droneGroups(launchNewDrone(spent, 2454, room, tight))).toContainEqual({
+      typeId: 2454,
+      inSpace: 0,
+      inBay: 1,
+    });
+    // Five out already: it can't launch, so it waits in the bay.
     const flight = setDroneCounts(fit, 2185, { inSpace: 5, inBay: 2 });
-    expect(launchNewDrone(flight, 2454, full, fresh)).toBe(flight);
+    expect(droneGroups(launchNewDrone(flight, 2454, room, fresh))).toContainEqual({
+      typeId: 2454,
+      inSpace: 0,
+      inBay: 1,
+    });
   });
 
   it('launches any of the type already in the bay along with it', () => {
@@ -576,7 +628,7 @@ describe('launchNewDrone', () => {
 });
 
 describe('droneTotals', () => {
-  it('adds up launched and bay drones across every type', () => {
+  it('adds up launched and carried drones across every type', () => {
     const fit: Fitting = {
       name: 'D',
       shipTypeId: 1,
@@ -588,7 +640,7 @@ describe('droneTotals', () => {
       ],
       cargo: [],
     };
-    expect(droneTotals(fit)).toEqual({ inSpace: 2, inBay: 4 });
+    expect(droneTotals(fit)).toEqual({ inSpace: 2, carried: 6 });
   });
 });
 
@@ -672,7 +724,7 @@ describe('launchDrones', () => {
       droneTotals(launchDrones(fit, { bandwidthTotal: 125, maxActive: 5, bandwidthOf }))
     ).toEqual({
       inSpace: 5,
-      inBay: 3,
+      carried: 8,
     });
     expect(launchDrones(fit, { bandwidthTotal: 125, maxActive: 0, bandwidthOf })).toBe(fit);
   });
@@ -1018,29 +1070,14 @@ describe('launching and recalling one drone type', () => {
     ]);
   });
 
-  it('recalls a type into the bay; the same Fitting when none is out', () => {
+  it('recalls every one of a type into the bay; the same Fitting when none is out', () => {
     const out = setDroneCounts(fit, 2454, { inSpace: 3, inBay: 2 });
-    expect(droneGroups(recallDrones(out, 2454, null))).toContainEqual({
+    expect(droneGroups(recallDrones(out, 2454))).toContainEqual({
       typeId: 2454,
       inSpace: 0,
       inBay: 5,
     });
-    expect(recallDrones(fit, 2454, null)).toBe(fit);
-  });
-
-  it('recalls only what the bay has room for; the same Fitting when none fits', () => {
-    // 2 Hammerheads (20 m3) and 2 Hobgoblins (10 m3) already in a 40 m3 bay.
-    const volumeOf = (typeId: number) => (typeId === 2185 ? 10 : 5);
-    const out = setDroneCounts(fit, 2454, { inSpace: 3, inBay: 2 });
-    expect(droneGroups(recallDrones(out, 2454, { capacity: 40, volumeOf }))).toContainEqual({
-      typeId: 2454,
-      inSpace: 1,
-      inBay: 4,
-    });
-    expect(recallDrones(out, 2454, { capacity: 30, volumeOf })).toBe(out);
-    expect(droneRecallRoom(out, 2454, { capacity: 40, volumeOf })).toBe(2);
-    expect(droneRecallRoom(out, 2454, null)).toBe(3);
-    expect(droneRecallRoom(fit, 2454, null)).toBe(0);
+    expect(recallDrones(fit, 2454)).toBe(fit);
   });
 });
 
