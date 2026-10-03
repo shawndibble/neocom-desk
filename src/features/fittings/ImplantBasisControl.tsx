@@ -24,7 +24,7 @@ import type { ImplantBasis } from '@/engine/fittings/implantBasis';
 import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
 import { ImplantSetPicker } from './ImplantSetPicker';
 import { StatField } from './StatFacts';
-import { STAT_FIELD_WIDTH } from './statKit';
+import { STAT_FIELD_WIDTH_NARROW } from './statKit';
 import { fieldBaseClassName, fieldSizeClassName } from '@/components/ui/controlStyles';
 
 interface ImplantBasisControlProps {
@@ -72,7 +72,7 @@ export function ImplantBasisControl({
           <button
             type="button"
             aria-label={`${label}: ${t(`fittings.implants.basis.${effective}`)}`}
-            className={`flex items-center justify-between gap-1 ${fieldBaseClassName} ${fieldSizeClassName.sm} ${STAT_FIELD_WIDTH}`}
+            className={`flex items-center justify-between gap-1 ${fieldBaseClassName} ${fieldSizeClassName.sm} ${STAT_FIELD_WIDTH_NARROW}`}
           >
             <span className="truncate">{t(`fittings.implants.basis.${effective}`)}</span>
             <Expanded aria-hidden className="shrink-0 text-text-dim" />
