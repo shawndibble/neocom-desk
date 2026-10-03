@@ -31,7 +31,9 @@ interface OwnedStockHintProps {
  * — "16 owned   USE 16" — which said the same number twice in a column already
  * dense with numbers, in a table long enough that every repeated word costs a
  * row. The total moved onto the offer's own hover tooltip, read when wanted
- * rather than always.
+ * rather than always. The offer itself now reads "Use assets" rather than
+ * "Use 2,316,600": the number wrapped the Have column onto a second line, and
+ * the Need column beside it already says how much the click covers.
  *
  * The tooltip is that total and nothing else. An earlier pass put the whole
  * per-Character, per-station placement list in there too, which turned a 14rem
@@ -80,7 +82,10 @@ export function OwnedStockHint({
         })}
         className={textActionClassName('justify-end')}
       >
-        {t('industry.useDetected', { quantity: suggestion.toLocaleString() })}
+        {/* Not the number: it made the Have column wrap, and Need beside the
+            field plus this tooltip already say how much. The accessible name
+            above still carries what a click will write. */}
+        {t('industry.useDetected')}
       </button>
     </Tooltip>
   );
