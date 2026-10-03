@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -14,9 +14,17 @@ import { clearHullFitMemory } from './hullFitService';
 
 const checkCandidates = vi.fn();
 const checkCharges = vi.fn();
+const compareCharges = vi.fn((): unknown[] => []);
+const chargesMissingSkills = vi.fn(() => new Set<number>());
 vi.mock('./dogmaFittingEngine', () => ({
   checkCandidates: (...args: unknown[]) => checkCandidates(...args),
   checkCharges: (...args: unknown[]) => checkCharges(...args),
+  compareCharges: () => compareCharges(),
+  chargesMissingSkills: () => chargesMissingSkills(),
+}));
+const getHubPrices = vi.fn(async () => new Map<number, { sellMin: number | null }>());
+vi.mock('@/market/prices', () => ({
+  getHubPrices: () => getHubPrices(),
 }));
 
 const fitting: Fitting = { name: 'Rifter', shipTypeId: 587, modules: [], drones: [], cargo: [] };
@@ -224,6 +232,164 @@ describe('FittingAddPanel', () => {
     expect(screen.getByText('2× Light Missile Launcher II')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Scourge Light Missile/ }));
     expect(onLoadCharge).toHaveBeenCalledWith(501);
+  });
+
+  describe('Charge Picker (a weapon group)', () => {
+    // Two railguns; Lead (long range), Antimatter and two navy versions, and a locked Spike.
+    const rails: Fitting = {
+      ...fitting,
+      modules: [0, 1].map((slotIndex) => ({
+        slot: 'high' as const,
+        slotIndex,
+        typeId: 3090,
+        state: 'active' as const,
+        chargeTypeId: slotIndex === 0 ? 230 : undefined,
+      })),
+      cargo: [{ typeId: 238, quantity: 1000 }],
+    };
+    const railCatalogue: FittingCatalogue = {
+      ...catalogue,
+      types: {
+        3090: { name: '425mm Railgun I' },
+        230: { name: 'Lead Charge L' },
+        238: { name: 'Antimatter Charge L' },
+        21740: { name: 'Caldari Navy Antimatter Charge L' },
+        22999: { name: 'Federation Navy Antimatter Charge L' },
+        12807: { name: 'Spike L' },
+      } as unknown as FittingCatalogue['types'],
+      typeIdsByGroup: new Map([[85, [230, 238, 21740, 22999, 12807]]]),
+      variations: {
+        types: {
+          230: { parentTypeId: null, metaGroupId: 1 },
+          238: { parentTypeId: null, metaGroupId: 1 },
+          21740: { parentTypeId: 238, metaGroupId: 4 },
+          22999: { parentTypeId: 238, metaGroupId: 4 },
+          12807: { parentTypeId: 237, metaGroupId: 2 },
+        },
+        metaGroups: { 1: 'Tech I', 2: 'Tech II', 4: 'Faction' },
+      },
+    };
+    const stat = (typeId: number, dps: number, optimal: number) => ({
+      typeId,
+      dps,
+      optimal,
+      falloff: 18_000,
+      damage: { em: 0, thermal: 0.44, kinetic: 0.56, explosive: 0 },
+      roundsPerMinute: 12,
+      techLevel: typeId === 12807 ? 2 : 1,
+    });
+
+    function renderRails(onLoadCharge = vi.fn()) {
+      checkCandidates.mockImplementation(() => new Map());
+      checkCharges.mockImplementation(() => new Set([230, 238, 21740, 22999, 12807]));
+      compareCharges.mockImplementation(() => [
+        stat(230, 253, 30_000),
+        stat(238, 380, 15_000),
+        stat(21740, 437, 15_000),
+        stat(22999, 437, 15_000),
+        stat(12807, 280, 54_000),
+      ]);
+      chargesMissingSkills.mockImplementation(() => new Set([12807]));
+      getHubPrices.mockImplementation(
+        async () =>
+          new Map([
+            [230, { sellMin: 44 }],
+            [238, { sellMin: 62 }],
+            [21740, { sellMin: 500 }],
+            [22999, { sellMin: 540 }],
+          ])
+      );
+      renderPanel({
+        fitting: rails,
+        target: null,
+        catalogue: railCatalogue,
+        moduleResults: rails.modules.map(() => ({
+          state: 'active' as const,
+          maxState: 'active' as const,
+          chargeGroupIds: [85],
+        })),
+        onLoadCharge,
+      });
+      return onLoadCharge;
+    }
+
+    it('lists one row per type, with the loaded charge and the quick picks', async () => {
+      const user = userEvent.setup();
+      renderRails();
+      await user.click(screen.getByRole('tab', { name: 'Charges' }));
+
+      const picks = screen.getByRole('group', { name: 'Quick picks' });
+      // Same damage, Caldari Navy is cheaper, so it wins; Spike is locked, so Lead reaches furthest.
+      // Within 10% of the top, it's also the cheapest per minute: best value too.
+      expect(await within(picks).findAllByText('Caldari Navy Antimatter')).toHaveLength(2);
+      expect(picks).toHaveTextContent(/Max range\s*Lead/);
+      expect(screen.getByRole('button', { name: /Antimatter Charge L/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Spike L/ })).toHaveTextContent('SKILL');
+    });
+
+    it("loads a faction version from its type's table, and names a strictly worse one", async () => {
+      const user = userEvent.setup();
+      const onLoadCharge = renderRails();
+      await user.click(screen.getByRole('tab', { name: 'Charges' }));
+      await within(screen.getByRole('group', { name: 'Quick picks' })).findAllByText(
+        'Caldari Navy Antimatter'
+      );
+
+      await user.click(screen.getByRole('button', { name: /Antimatter Charge L/ }));
+      expect(screen.getByText(/Thermal 44%/)).toBeInTheDocument();
+      expect(screen.getByText(/Same as Caldari Navy, costs more/)).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /^Caldari Navy\b/ }));
+      expect(onLoadCharge).toHaveBeenCalledWith(21740);
+    });
+
+    it('Usable filters out locked charges; the distance slider shows only with Fighting at on', async () => {
+      const user = userEvent.setup();
+      renderRails();
+      await user.click(screen.getByRole('tab', { name: 'Charges' }));
+
+      expect(screen.queryByLabelText('Target at')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Fighting at…' }));
+      expect(screen.getByLabelText('Target at')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Usable' }));
+      expect(screen.queryByRole('button', { name: /Spike L/ })).not.toBeInTheDocument();
+    });
+  });
+
+  it("keeps a plain list for a module whose charges don't shoot (a cap booster)", async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation(() => new Map());
+    checkCharges.mockImplementation(() => new Set([700]));
+    compareCharges.mockImplementation(() => [
+      {
+        typeId: 700,
+        dps: 0,
+        optimal: 0,
+        falloff: 0,
+        damage: null,
+        roundsPerMinute: null,
+        techLevel: 1,
+      },
+    ]);
+    renderPanel({
+      fitting: {
+        ...fitting,
+        modules: [{ slot: 'medium', slotIndex: 0, typeId: 600, state: 'active' }],
+      },
+      target: null,
+      catalogue: {
+        ...catalogue,
+        types: {
+          600: { name: 'Medium Capacitor Booster II' },
+          700: { name: 'Navy Cap Booster 400' },
+        } as unknown as FittingCatalogue['types'],
+        typeIdsByGroup: new Map([[9, [700]]]),
+      },
+      moduleResults: [{ state: 'active', maxState: 'active', chargeGroupIds: [9] }],
+    });
+    await user.click(screen.getByRole('tab', { name: 'Charges' }));
+    expect(screen.getByRole('button', { name: /Navy Cap Booster 400/ })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Quick picks' })).not.toBeInTheDocument();
   });
 
   it('adds any item to the cargo hold, in the quantity asked, from the Cargo tab', async () => {
