@@ -435,7 +435,11 @@ exactly the markup above.
   chevron and no `end` box can add `className="dt-actions-pinned"` to pin
   the More actions button to the right edge across both lines instead, so
   line one stays text-tall, with a short `cardCorner` figure (a standing
-  icon) centred beside it (Contacts). A cell holding only a `data-dense-omit` value (an empty cell's dash, a
+  icon) centred beside it (Contacts). A table with a tick box, a chevron
+  and an `end` box can add `className="dt-dense-tight"` instead: the tick
+  box, title, figure and button share line one, centred on each other (the
+  button's 44px target overhangs rather than heightening the line), and line
+  two centres on a `max-sm:h-7` `end` box (Hauling). A cell holding only a `data-dense-omit` value (an empty cell's dash, a
   word the card says another way) is left off the meta line. Still pure CSS
   (`.dt-stack-dense`); `stackColumns` is ignored.
 - **`mobileSort`** (+ optional `stackSummary`, e.g. "214 offers") renders an

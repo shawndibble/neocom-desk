@@ -599,6 +599,48 @@
       padding-left: 0.5rem;
     }
 
+    /* Opt-in (`dt-dense-tight` on the table, Hauling): a card whose tick box,
+       title, headline figure and More actions button all sit on line one,
+       centred on each other, with the `end` box closing line two. Without it
+       the button's 44px box made line one button-tall (the title riding its
+       top edge, the ⋮ below it), the tick box sat centred across both lines
+       rather than beside the name, and the box's height pushed the meta text
+       to its baseline, a gap's width under the title. */
+
+    /* The tick box joins line one ahead of the title, pulled back into the
+       left padding the row already keeps for a `start` edge. */
+    .dt-stack.dt-stack-dense.dt-dense-tight td.dt-edge-start {
+      position: static;
+      transform: none;
+      order: -3;
+      flex: none;
+      align-self: center;
+      width: 1.75rem;
+      margin-left: -1.75rem;
+    }
+
+    /* The button keeps its 44px touch target, but negative margins stop it
+       counting towards line one's height. */
+    .dt-stack.dt-stack-dense.dt-dense-tight td.dt-actions {
+      margin-block: -0.75rem;
+    }
+
+    /* Line two centres on the box rather than sitting on its baseline. The
+       box stacks above the button's overhanging touch target, so a tap on
+       its top edge reaches the box. */
+    .dt-stack.dt-stack-dense.dt-dense-tight td.dt-meta,
+    .dt-stack.dt-stack-dense.dt-dense-tight td.dt-edge-end {
+      align-self: center;
+    }
+
+    .dt-stack.dt-stack-dense.dt-dense-tight td.dt-edge-end {
+      position: relative;
+      z-index: 1;
+      /* A tighter gap than the base rule's, so a 360px phone still fits the
+         meta line and the box on one line. */
+      padding-left: 0.25rem;
+    }
+
     .dt-stack.dt-stack-dense td.dt-meta {
       order: 1;
       display: inline;
