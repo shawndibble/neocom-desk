@@ -26,28 +26,55 @@
  * live in the link as `stops`, in the order typed; a legacy `to` link still
  * opens as a single stop. One stop is the page exactly as it was.
  *
+ * Thera / Turnur (issue #2476): with "Route through Thera / Turnur" on, the
+ * open holes EVE-Scout lists join the route's graph (`useRouteHoles`), and a
+ * hole jump is its own row, a hatched strip cell, and a count on the facts
+ * line. The four settings are this page's synced defaults, each overridable
+ * in the link (`wh`, `whsize`, `whlife`, `whhub`). While the list loads the
+ * gate route shows and says so; if EVE-Scout cannot be reached the route is
+ * gates only, and says that too.
+ *
  * Set waypoints in game (issue #2479) closes the facts line (`SetWaypoints`).
  */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, PageHeader, Panel, Spinner } from '@/components/ui';
 import type { RouteSafetyRow, RouteSafetySummary } from '@/engine/route/routeSafety';
+import { WORMHOLE_SHIP_SIZES, type TheraConnection } from '@/engine/route/theraConnections';
 import { MAX_STOPS } from '@/engine/route/tripPlan';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { useCurrentSystem } from '@/features/route/currentSystem';
+import {
+  MAX_ROUTE_HOLE_MIN_LIFE,
+  MIN_ROUTE_HOLE_MIN_LIFE,
+  ROUTE_HOLE_HUBS,
+  useRouteHoleHubs,
+  useRouteHoleMinLife,
+  useRouteHoleQuery,
+  useRouteHolesEnabled,
+  useRouteHoleShipSize,
+} from '@/features/route/routeHoleSettings';
 import { ROUTE_PREFERENCES } from '@/features/route/routePreferences';
 import { useAvoidedSystemsEnabled, useRouteQuery } from '@/features/route/routeRules';
 import { useSolarSystemIndex, useSystemName } from '@/features/route/useSolarSystems';
-import { boolParam, optionalEnumParam, optionalIdParam, orderedIdListParam } from '@/lib/urlState';
+import {
+  boolParam,
+  optionalBoolParam,
+  optionalEnumParam,
+  optionalIdParam,
+  optionalIntParam,
+  orderedIdListParam,
+} from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { AvoidSystemDialog, type AvoidTarget } from './AvoidSystemDialog';
-import { RouteRulesPanel } from './RouteRulesPanel';
+import { RouteRulesPanel, type RouteHoleChange } from './RouteRulesPanel';
 import { RouteStrip } from './RouteStrip';
-import { RouteSystemsTable } from './RouteSystemsTable';
+import { RouteSystemsTable, type HoleRowProps } from './RouteSystemsTable';
 import { routeSystemName } from './routeSystemName';
 import { SetWaypoints } from './SetWaypoints';
 import { StopsPanel, type StopOrderSettings } from './StopsPanel';
 import { TripLegs } from './TripLegs';
+import { useRouteHoles, type RouteHolesState } from './useRouteHoles';
 import { useRouteKills, type RouteKillsCell } from './useRouteKills';
 import { useRouteSafety, type RouteSafetyLeg } from './useRouteSafety';
 
@@ -62,7 +89,39 @@ const ROUTE_PARAMS = {
   keep: boolParam(),
   // Absent means the pilot's Travel default (Settings → Travel).
   pref: optionalEnumParam(ROUTE_PREFERENCES),
+  // Route Safety's wormhole settings; absent means the page's saved default.
+  wh: optionalBoolParam(),
+  whsize: optionalEnumParam(WORMHOLE_SHIP_SIZES),
+  whlife: optionalIntParam({ min: MIN_ROUTE_HOLE_MIN_LIFE, max: MAX_ROUTE_HOLE_MIN_LIFE }),
+  whhub: optionalEnumParam(ROUTE_HOLE_HUBS),
 };
+
+/** The link parameter overriding each wormhole setting. */
+const HOLE_PARAM = {
+  enabled: 'wh',
+  shipSize: 'whsize',
+  minLifeHours: 'whlife',
+  hubs: 'whhub',
+} as const;
+
+/** Saves a wormhole setting as the page's default. */
+function saveHoleDefault(change: RouteHoleChange): void {
+  switch (change.field) {
+    case 'enabled':
+      void useRouteHolesEnabled.getState().setValue(change.value);
+      return;
+    case 'shipSize':
+      void useRouteHoleShipSize.getState().setValue(change.value);
+      return;
+    case 'minLifeHours':
+      void useRouteHoleMinLife.getState().setValue(change.value);
+      return;
+    case 'hubs':
+      void useRouteHoleHubs.getState().setValue(change.value);
+  }
+}
+
+const NO_HOLES: readonly TheraConnection[] = [];
 
 /** The stops a link names: `stops`, else a legacy `to`, each once, at most `MAX_STOPS`. */
 function stopsFromLink(stops: readonly number[], to: number | null): number[] {
@@ -77,11 +136,20 @@ interface AvoidLeg {
   jumps: number;
 }
 
-/** The route's facts on one line: jumps · bands · lowest · last hour's kills · chokepoints. */
-function RouteFacts({ summary }: { summary: RouteSafetySummary }) {
+/**
+ * The route's facts on one line: jumps (by gate · through wormholes, when a
+ * hole is flown) · bands · lowest · last hour's kills · chokepoints.
+ */
+function RouteFacts({ summary, holeJumps }: { summary: RouteSafetySummary; holeJumps: number }) {
   const { t } = useTranslation();
   const facts: string[] = [
     t('travel.summary.jumps', { count: summary.jumps }),
+    ...(holeJumps === 0
+      ? []
+      : [
+          t('travel.summary.byGate', { count: summary.jumps - holeJumps }),
+          t('travel.summary.throughHoles', { count: holeJumps }),
+        ]),
     t('travel.summary.bands', {
       highsec: summary.highsec,
       lowsec: summary.lowsec,
@@ -138,6 +206,14 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
   // The two options are the optimizer's own: with it off, the typed order is flown as typed.
   const optimizing = settings.optimize && stops.length > 1;
   const routeQuery = useRouteQuery(params.pref);
+  const holeQuery = useRouteHoleQuery({
+    enabled: params.wh,
+    shipSize: params.whsize,
+    minLifeHours: params.whlife,
+    hubs: params.whhub,
+  });
+  const holesState = useRouteHoles(holeQuery);
+  const holes = holesState.kind === 'ready' ? holesState.holes : NO_HOLES;
   const state = useRouteSafety(
     fromId,
     stops,
@@ -146,7 +222,8 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
       returnToStart: optimizing && settings.returnToStart,
       keepLastStopLast: optimizing && settings.keepLastStopLast,
     },
-    routeQuery
+    routeQuery,
+    holes
   );
   // Each system once, in flight order: a trip can cross one twice.
   const routeSystems = useMemo(() => {
@@ -228,6 +305,11 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
           <RouteRulesPanel
             preference={routeQuery.rules.preference}
             onPreferenceChange={(pref) => setParams({ pref })}
+            holeQuery={holeQuery}
+            onHoleChange={(change) => {
+              saveHoleDefault(change);
+              setParams({ [HOLE_PARAM[change.field]]: null });
+            }}
           />
         </div>
         <div className="min-w-0 space-y-4">
@@ -237,6 +319,7 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
             nameOf={nameOf}
             killsOf={killsOf}
             avoidAction={avoidAction}
+            holesState={holesState}
           />
         </div>
       </div>
@@ -247,6 +330,8 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
           toId={avoidLeg.to}
           rules={routeQuery.rules}
           currentJumps={avoidLeg.jumps}
+          extras={state.kind === 'route' ? state.network : undefined}
+          extrasKey={state.kind === 'route' ? state.networkKey : ''}
           onClose={() => setAvoidTarget(null)}
         />
       )}
@@ -260,12 +345,14 @@ function RouteBody({
   nameOf,
   killsOf,
   avoidAction,
+  holesState,
 }: {
   state: ReturnType<typeof useRouteSafety>;
   multiStop: boolean;
   nameOf: (systemId: number) => string;
   killsOf: (systemId: number) => RouteKillsCell;
   avoidAction: (leg: RouteSafetyLeg, row: RouteSafetyRow) => (() => void) | null;
+  holesState: RouteHolesState;
 }) {
   const { t } = useTranslation();
   switch (state.kind) {
@@ -286,12 +373,17 @@ function RouteBody({
     case 'route': {
       const { trip } = state;
       const onlyLeg = state.legs[0];
+      const holeRows: HoleRowProps = {
+        holeAt: state.holeAt,
+        holesFetchedAt: holesState.kind === 'ready' ? holesState.fetchedAt : null,
+        now: holesState.kind === 'ready' ? holesState.now : 0,
+      };
       return (
         <Panel>
           <div className="space-y-3">
             {trip && (
               <SetWaypoints legs={state.legs} nameOf={nameOf}>
-                <RouteFacts summary={trip.summary} />
+                <RouteFacts summary={trip.summary} holeJumps={trip.holeJumps} />
               </SetWaypoints>
             )}
             {trip && (
@@ -299,7 +391,18 @@ function RouteBody({
                 rows={trip.rows}
                 killsOf={killsOf}
                 stopIndexes={multiStop ? trip.stopIndexes : undefined}
+                holeAt={state.holeAt}
               />
+            )}
+            {holesState.kind === 'loading' && (
+              <p role="status" className="text-text-dim">
+                {t('travel.holes.loading')}
+              </p>
+            )}
+            {holesState.kind === 'unavailable' && (
+              <p role="status" className="text-text-dim">
+                {t('travel.holes.unavailable')}
+              </p>
             )}
             {state.activityLoading && (
               <p role="status" className="text-text-dim">
@@ -317,6 +420,7 @@ function RouteBody({
                 killsOf={killsOf}
                 avoidAction={(row) => avoidAction(onlyLeg, row)}
                 label={t('travel.tableLabel')}
+                {...holeRows}
               />
             ) : (
               <TripLegs
@@ -326,6 +430,7 @@ function RouteBody({
                 nameOf={nameOf}
                 killsOf={killsOf}
                 avoidAction={avoidAction}
+                holes={holeRows}
               />
             )}
           </div>

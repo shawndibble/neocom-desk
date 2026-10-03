@@ -12,7 +12,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret } from '@/components/ui';
 import type { RouteSafetyRow } from '@/engine/route/routeSafety';
-import { RouteSystemsTable } from './RouteSystemsTable';
+import { RouteSystemsTable, type HoleRowProps } from './RouteSystemsTable';
 import type { RouteKillsCell } from './useRouteKills';
 import type { RouteSafetyLeg } from './useRouteSafety';
 
@@ -21,11 +21,13 @@ export function TripLegs({
   nameOf,
   killsOf,
   avoidAction,
+  holes,
 }: {
   legs: readonly RouteSafetyLeg[];
   nameOf: (systemId: number) => string;
   killsOf: (systemId: number) => RouteKillsCell;
   avoidAction: (leg: RouteSafetyLeg, row: RouteSafetyRow) => (() => void) | null;
+  holes?: HoleRowProps;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set([0]));
@@ -92,6 +94,7 @@ export function TripLegs({
                     killsOf={killsOf}
                     avoidAction={(row) => avoidAction(leg, row)}
                     label={t('travel.legs.tableLabel', { number })}
+                    {...holes}
                   />
                 ) : (
                   <p className="text-text-dim">

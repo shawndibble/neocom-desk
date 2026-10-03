@@ -486,11 +486,17 @@ here — they go one per file in `docs/context/decisions/`.
   start (the **Current System** unless the link names another), kept in the
   link in the order typed. Optimize stop order may fly them in a cheaper
   order under the active route rules; the typed order stays as written.
-- **Leg**: one stargate route of a trip, from its start or a **Stop** to the
+- **Leg**: one route of a trip, by stargate (and, with **Hole jumps** on,
+  through Thera / Turnur holes), from its start or a **Stop** to the
   next stop (and, with Return to start, the last stop home). Route Safety
   lists a trip leg by leg, each with its own jumps, lowest security and
   **Gank Chokepoints**; the facts line and **Route strip** cover the whole
   trip.
+- **Hole jump**: one jump of a Route Safety route through an open Thera or
+  Turnur wormhole EVE-Scout lists, between the hole's exit system and its hub.
+  Shown as its own row between those two systems and as a hatched **Route
+  strip** cell. How it is costed and where it applies: decision
+  `20261003-181618`.
 - **Pilot Lookup**: Travel's view of one pilot, found by name — portrait,
   corporation, alliance and character age from public ESI, and the all-time
   kills, losses, ISK, solo kills, danger and gang ratios and most-used hulls

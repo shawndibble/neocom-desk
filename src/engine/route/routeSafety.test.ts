@@ -160,6 +160,25 @@ function shape(stretches: ReturnType<typeof foldQuietStretches>): string[] {
 }
 
 describe('foldQuietStretches', () => {
+  it('never folds a pinned system, such as either end of a wormhole jump', () => {
+    const rows = [row(1), row(2), row(3), row(4), row(5), row(6)];
+    expect(shape(foldQuietStretches(rows, noZkill, new Set([3, 4])))).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+    ]);
+    expect(shape(foldQuietStretches(rows, noZkill, new Set([4])))).toEqual([
+      '1',
+      'quiet[2,3]',
+      '4',
+      '5',
+      '6',
+    ]);
+  });
+
   it('folds a run of quiet middle systems, never either end', () => {
     const rows = [row(1), row(2), row(3), row(4), row(5)];
     expect(shape(foldQuietStretches(rows, noZkill))).toEqual(['1', 'quiet[2,3,4]', '5']);
@@ -239,6 +258,29 @@ describe('foldQuietStretches', () => {
   it('folds within whatever list it is given, so a leg folds between its own ends', () => {
     expect(shape(foldQuietStretches([row(1), row(2)], noZkill))).toEqual(['1', '2']);
     expect(shape(foldQuietStretches([], noZkill))).toEqual([]);
+  });
+});
+
+describe('J-space in the facts', () => {
+  it('leaves a wormhole system out of the band tallies and the lowest security', () => {
+    const rows = buildRouteSafetyRows([JITA, THERA, UEDAMA], inputs());
+    expect(summarizeRouteSafety(rows)).toMatchObject({
+      jumps: 2,
+      highsec: 2,
+      lowsec: 0,
+      nullsec: 0,
+      lowestSecurity: 0.5,
+    });
+  });
+
+  it("never makes a wormhole system the strip's lowest-security key system", () => {
+    const rows = [
+      row(1, { security: 0.9 }),
+      row(THERA, { security: -1 }),
+      row(3, { security: 0.6 }),
+      row(4, { security: 0.8 }),
+    ];
+    expect(routeStripKeySystems(rows)).toEqual([0, 2, 3]);
   });
 });
 

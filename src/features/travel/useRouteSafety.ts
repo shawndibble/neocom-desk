@@ -12,6 +12,12 @@
  * With several stops an unreachable stop is a fact about its legs, not the
  * whole trip: the other legs still draw, and that leg carries its own
  * no-route message.
+ *
+ * Holes (issue #2476): the caller passes the open Thera / Turnur holes the
+ * route may cross (`useRouteHoles`), and they join the graph as extra
+ * connections with the hubs free (`engine/route/routeHoles.ts`). The trip is
+ * planned again only when the network they make changes, never as their
+ * remaining life ticks down.
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -23,6 +29,15 @@ import {
   type RouteSafetySummary,
   type RouteSafetySystemEntry,
 } from '@/engine/route/routeSafety';
+import {
+  holeNetworkFromKey,
+  holeNetworkKey,
+  holeStepFinder,
+  holeStepIndexes,
+  type HoleAt,
+  type HoleNetwork,
+} from '@/engine/route/routeHoles';
+import type { TheraConnection } from '@/engine/route/theraConnections';
 import type { TripOptions, TripPlan } from '@/engine/route/tripPlan';
 import { planLocalTrip, type LocalTripResult } from '@/features/route/localRoute';
 import type { RouteQuery } from '@/features/route/routeRules';
@@ -43,7 +58,11 @@ export interface RouteSafetyTrip {
   /** Where along `rows` each leg ends. */
   stopIndexes: number[];
   summary: RouteSafetySummary;
+  /** How many of the trip's jumps go through a wormhole; the rest are by gate. */
+  holeJumps: number;
 }
+
+export type { HoleAt };
 
 export type RouteSafetyState =
   | { kind: 'incomplete' }
@@ -65,6 +84,10 @@ export type RouteSafetyState =
       activityLoading: boolean;
       /** A feed could not be read: its figures show as unknown, never zero. */
       activityUnavailable: boolean;
+      holeAt: HoleAt;
+      /** The holes the route was planned with, for an Avoid preview to plan the same way. */
+      network: HoleNetwork;
+      networkKey: string;
     };
 
 interface ResolvedTrip {
@@ -74,20 +97,25 @@ interface ResolvedTrip {
   regionNames: ReadonlyMap<number, string>;
 }
 
+const NO_HOLES: readonly TheraConnection[] = [];
+
 const NO_SYSTEMS: ReadonlyMap<number, RouteSafetySystemEntry> = new Map();
 
 export function useRouteSafety(
   fromId: number | null,
   stops: readonly number[],
   tripOptions: TripOptions,
-  route: RouteQuery
+  route: RouteQuery,
+  holes: readonly TheraConnection[] = NO_HOLES
 ): RouteSafetyState {
   const [activity, setActivity] = useState<SystemActivity | null>(null);
   const [resolved, setResolved] = useState<ResolvedTrip | null>(null);
   const { rules, key: routeKey, hydrated } = route;
   const { optimize = false, returnToStart = false, keepLastStopLast = false } = tripOptions;
   const stopsKey = stops.join(',');
-  const requestKey = `${fromId}:${stopsKey}:${optimize}:${returnToStart}:${keepLastStopLast}:${routeKey}`;
+  const networkKey = holeNetworkKey(holes);
+  const network = useMemo(() => holeNetworkFromKey(networkKey), [networkKey]);
+  const requestKey = `${fromId}:${stopsKey}:${optimize}:${returnToStart}:${keepLastStopLast}:${routeKey}:${networkKey}`;
   const wantsRoute =
     fromId !== null && stops.length > 0 && !(stops.length === 1 && stops[0] === fromId);
 
@@ -113,7 +141,13 @@ export function useRouteSafety(
     const stopIds = stopsKey.split(',').map(Number);
     void (async () => {
       const [result, systems] = await Promise.all([
-        planLocalTrip(fromId, stopIds, rules, { optimize, returnToStart, keepLastStopLast }),
+        planLocalTrip(
+          fromId,
+          stopIds,
+          rules,
+          { optimize, returnToStart, keepLastStopLast },
+          network
+        ),
         loadSolarSystemsById().catch(() => null),
       ]);
       const byId = systems ?? NO_SYSTEMS;
@@ -142,6 +176,7 @@ export function useRouteSafety(
     returnToStart,
     keepLastStopLast,
     rules,
+    network,
     requestKey,
   ]);
 
@@ -151,7 +186,8 @@ export function useRouteSafety(
     if (resolved?.requestKey !== requestKey) return { kind: 'loading' };
     const { result } = resolved;
     if (result.kind === 'unknown') return result;
-    const { plan } = result;
+    const { plan, graph } = result;
+    const holeAt: HoleAt = holeStepFinder(graph, holes);
     // One stop is the page as it always was: no route is the whole answer.
     if (stops.length === 1 && plan.legs[0]?.route.kind !== 'route') return { kind: 'no-route' };
     const inputs = {
@@ -174,7 +210,15 @@ export function useRouteSafety(
       legs,
       trip:
         legRows.length === legs.length
-          ? { rows: joined.rows, stopIndexes: joined.stopIndexes, summary: summarizeTrip(legRows) }
+          ? {
+              rows: joined.rows,
+              stopIndexes: joined.stopIndexes,
+              summary: summarizeTrip(legRows),
+              holeJumps: holeStepIndexes(
+                joined.rows.map((row) => row.systemId),
+                holeAt
+              ).length,
+            }
           : null,
       reordered: plan.reordered,
       unreachable: plan.unreachable,
@@ -182,6 +226,9 @@ export function useRouteSafety(
       activityLoading: activity === null,
       activityUnavailable:
         activity !== null && (activity.kills === null || activity.jumps === null),
+      holeAt,
+      network,
+      networkKey,
     };
-  }, [fromId, stops, resolved, requestKey, activity]);
+  }, [fromId, stops, resolved, requestKey, activity, holes, network, networkKey]);
 }

@@ -12,7 +12,7 @@ import {
   type AvoidPreviewOutcome,
 } from '@/engine/route/avoidPreview';
 import { buildRouteSafetyRows, summarizeRouteSafety } from '@/engine/route/routeSafety';
-import { findLocalRoute } from '@/features/route/localRoute';
+import { findLocalRoute, type RouteGraphExtras } from '@/features/route/localRoute';
 import type { RouteRules } from '@/features/route/routeRules';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 
@@ -31,6 +31,8 @@ export interface AvoidPreviewRequest {
   avoidList: readonly number[];
   /** The Avoided Systems switch; off previews it turned on along with the add. */
   avoidListEnabled: boolean;
+  /** The holes the page's route may cross, so the preview is the same kind of route. */
+  extras?: RouteGraphExtras;
 }
 
 export async function previewAvoid(request: AvoidPreviewRequest): Promise<AvoidPreviewResult> {
@@ -41,7 +43,7 @@ export async function previewAvoid(request: AvoidPreviewRequest): Promise<AvoidP
     avoidListEnabled: request.avoidListEnabled,
   });
   const [result, systems] = await Promise.all([
-    findLocalRoute(request.fromId, request.toId, { ...request.rules, avoid }),
+    findLocalRoute(request.fromId, request.toId, { ...request.rules, avoid }, request.extras),
     loadSolarSystemsById().catch(() => null),
   ]);
   if (result.kind !== 'route') return { kind: result.kind };
