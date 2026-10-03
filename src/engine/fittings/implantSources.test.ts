@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { priceFix, rankSources, type LpOfferInput, type SourceContext } from './implantSources';
+import {
+  alternativeSource,
+  priceFix,
+  rankSources,
+  usableSource,
+  type LpOfferInput,
+  type SourceContext,
+} from './implantSources';
 
 const TAG = 500;
 
@@ -131,5 +138,31 @@ describe('priceFix', () => {
 
   it('is no fix when an implant can’t be had at all', () => {
     expect(priceFix([1], () => [], context({ hubPrices: () => [] }))).toBeNull();
+  });
+});
+
+describe('alternativeSource', () => {
+  it('points to a cheaper offer the pilot can’t redeem yet', () => {
+    const sources = rankSources(1, [offer()], context({ lpBalance: () => 3_200 }));
+    const best = usableSource(sources)!;
+    expect(alternativeSource(sources, best)).toMatchObject({
+      source: { kind: 'lp', blocked: true },
+      cheaperIfYouCould: true,
+    });
+  });
+
+  it('otherwise offers the next way to get it, as a plain alternative', () => {
+    const sources = rankSources(1, [offer()], context());
+    const best = usableSource(sources)!;
+    expect(alternativeSource(sources, best)).toMatchObject({
+      source: { kind: 'market' },
+      cheaperIfYouCould: false,
+    });
+  });
+
+  it('when nothing is usable, the first source leads and nothing is "cheaper"', () => {
+    const sources = rankSources(1, [offer()], context({ lpBalance: () => 0, hubPrices: () => [] }));
+    expect(usableSource(sources)).toBeNull();
+    expect(alternativeSource(sources, sources[0]!)).toBeNull();
   });
 });

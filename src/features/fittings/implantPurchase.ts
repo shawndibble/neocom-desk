@@ -15,7 +15,8 @@ import type { HubPrice } from '@/engine/fittings/implantFinder';
 import type { LpRate } from '@/engine/loyalty/marketLpValue';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
 import { loadCharacterLoyaltyPoints, PARAGON_CORPORATION_ID } from '@/features/character/loyalty';
-import { loadLpRates } from '@/features/industry/blueprintPurchaseOffers';
+import { loadLpRates } from '@/features/loyalty/lpRates';
+import { loadTypeNames } from '@/features/character/typeNames';
 import { loadOwnedStockSnapshot } from '@/features/industry/ownedStockDetection';
 import { loadLoyaltyStoreOffers } from '@/features/loyalty/store';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -40,7 +41,11 @@ function offersOf(corporationId: number): Promise<LoyaltyStoreOffer[]> {
   return pending;
 }
 
-/** Every LP Store offer, from any store, that hands out one of `typeIds`. */
+/**
+ * Every LP Store offer, from any store, that hands out one of `typeIds`.
+ * Not `findLpOfferMatches`: that reads only the stores a Character holds LP
+ * with, and an offer the pilot can't redeem yet is still worth showing.
+ */
 export async function loadLpOffersFor(
   typeIds: readonly number[],
   onProgress?: (done: number, total: number) => void
@@ -85,6 +90,8 @@ export interface ImplantPurchase {
   offersFor: (typeId: number) => readonly LpOfferInput[];
   context: SourceContext;
   stores: LpStoreSummary[];
+  /** Names of the turn-ins the offers ask for (pirate tags and the like). */
+  itemName: (typeId: number) => string;
 }
 
 async function lpBalances(characterId: number | null): Promise<Map<number, number> | null> {
@@ -98,15 +105,13 @@ async function lpBalances(characterId: number | null): Promise<Map<number, numbe
   }
 }
 
-async function ownedItems(typeIds: readonly number[]): Promise<Map<number, number>> {
-  if (typeIds.length === 0) return new Map();
-  try {
-    const snapshot = await loadOwnedStockSnapshot();
-    const detected = detectOwnedStock(snapshot.sources, new Set(typeIds));
-    return new Map([...detected].map(([id, stock]) => [id, stock.quantity]));
-  } catch {
-    return new Map();
-  }
+function ownedItems(
+  snapshot: Awaited<ReturnType<typeof loadOwnedStockSnapshot>> | null,
+  typeIds: readonly number[]
+): Map<number, number> {
+  if (!snapshot || typeIds.length === 0) return new Map();
+  const detected = detectOwnedStock(snapshot.sources, new Set(typeIds));
+  return new Map([...detected].map(([id, stock]) => [id, stock.quantity]));
 }
 
 async function pricesAtEveryHub(typeIds: readonly number[]): Promise<Map<number, HubPrice[]>> {
@@ -132,20 +137,27 @@ export async function loadImplantPurchase(
   characterId: number | null,
   onProgress?: (done: number, total: number) => void
 ): Promise<ImplantPurchase> {
-  const [lpOffers, hubPrices, balances] = await Promise.all([
+  // The owned-stock snapshot doesn't depend on the offers, so it loads alongside them.
+  const [lpOffers, hubPrices, balances, snapshot] = await Promise.all([
     loadLpOffersFor(typeIds, onProgress),
     pricesAtEveryHub(typeIds),
     lpBalances(characterId),
+    loadOwnedStockSnapshot().catch(() => null),
   ]);
   const offers = [...lpOffers.values()].flat();
   const corporations = [...new Set(offers.map((o) => o.corporationId))];
   const turnInIds = [...new Set(offers.flatMap((o) => o.requiredItems.map((r) => r.typeId)))];
-  const [rateFor, owned, turnInPrices] = await Promise.all([
+  const [rateFor, turnInPrices, turnInNames] = await Promise.all([
     loadLpRates(corporations, hub),
-    ownedItems(turnInIds),
     turnInIds.length > 0 ? getHubPrices(hub, turnInIds) : Promise.resolve(new Map()),
+    turnInIds.length > 0
+      ? loadTypeNames(turnInIds).catch(() => new Map<number, string>())
+      : Promise.resolve(new Map<number, string>()),
   ]);
+  const owned = ownedItems(snapshot, turnInIds);
   const names = new Map(offers.map((o) => [o.corporationId, o.corpName]));
+  const balanceOf = (corporationId: number) =>
+    balances ? (balances.get(corporationId) ?? 0) : null;
   return {
     offersFor: (typeId) => lpOffers.get(typeId) ?? [],
     context: {
@@ -153,14 +165,15 @@ export async function loadImplantPurchase(
       hubPrices: (typeId) => hubPrices.get(typeId) ?? [],
       turnInPrice: (typeId) => turnInPrices.get(typeId)?.sellMin ?? null,
       lpRate: (corporationId) => rateFor(corporationId).rate,
-      lpBalance: (corporationId) => (balances ? (balances.get(corporationId) ?? 0) : null),
+      lpBalance: balanceOf,
       owned: (typeId) => owned.get(typeId) ?? 0,
     },
     stores: corporations.map((corporationId) => ({
       corporationId,
       corpName: names.get(corporationId)!,
-      balance: balances ? (balances.get(corporationId) ?? 0) : null,
+      balance: balanceOf(corporationId),
       rate: rateFor(corporationId),
     })),
+    itemName: (typeId) => turnInNames.get(typeId) ?? `#${typeId}`,
   };
 }

@@ -176,3 +176,23 @@ export function priceFix(
   }
   return { cost, sources };
 }
+
+/**
+ * What to show beside the source a row leads with: the cheapest offer the
+ * pilot can't redeem yet when it would have been cheaper ("Cheaper if you
+ * could"), else simply the next way to get it. Null when there is no other.
+ */
+export function alternativeSource(
+  sources: readonly Source[],
+  shown: Source
+): { source: Source; cheaperIfYouCould: boolean } | null {
+  const cheaper = sources
+    .filter((s) => s !== shown && s.kind === 'lp' && s.blocked && s.cost !== null)
+    .filter(
+      (s) => shown.cost !== null && !(shown.kind === 'lp' && shown.blocked) && s.cost! < shown.cost
+    )
+    .sort((a, b) => a.cost! - b.cost!)[0];
+  if (cheaper) return { source: cheaper, cheaperIfYouCould: true };
+  const next = sources.find((s) => s !== shown);
+  return next ? { source: next, cheaperIfYouCould: false } : null;
+}

@@ -13,8 +13,6 @@ import {
   parseImplantGrade,
   pickSource,
   placeInSet,
-  withImplant,
-  withImplants,
 } from './implantFinder';
 import type { FittingStats } from './types';
 
@@ -112,23 +110,6 @@ describe('implantEntriesFromMarket', () => {
     expect(implantEntriesFromMarket(types, groups)).toEqual([
       { typeId: 10, name: "Zainou 'Gypsy' CPU Management EE-605", slot: 6 },
     ]);
-  });
-});
-
-describe('withImplant', () => {
-  const slots = new Map([
-    [10, 6],
-    [20, 7],
-    [30, 6],
-  ]);
-  const slotOf = (typeId: number) => slots.get(typeId);
-
-  it('adds an implant to an empty slot', () => {
-    expect(withImplant([20], slotOf, 30)).toEqual([20, 30]);
-  });
-
-  it('replaces whatever already sits in that slot — one implant per slot', () => {
-    expect(withImplant([10, 20], slotOf, 30)).toEqual([20, 30]);
   });
 });
 
@@ -291,17 +272,6 @@ describe('displayValue', () => {
     });
     expect(displayValue(goalById('capacitorRecharge'), s)).toBe(312.5);
     expect(displayValue(goalById('lockRange'), s)).toBe(72);
-  });
-});
-
-describe('withImplants', () => {
-  it('adds several implants, each replacing its own slot', () => {
-    const slots = new Map([
-      [10, 6],
-      [30, 6],
-      [40, 10],
-    ]);
-    expect(withImplants([10], (id) => slots.get(id), [30, 40])).toEqual([30, 40]);
   });
 });
 

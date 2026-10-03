@@ -118,6 +118,8 @@ export interface GoalSummary {
   goal: ImplantGoal;
   /** Families that move this goal on this Fitting. */
   helpers: number;
+  /** The Fitting has something this goal measures (a budget always; missiles for "Missiles"). */
+  used: boolean;
 }
 
 export interface ImplantFinderState {
@@ -139,6 +141,8 @@ export interface ImplantFinderState {
   fixes: FixResult[];
   /** Where the shown items come from: LP Stores with the pilot's LP and the rate. */
   purchase: ImplantPurchase | null;
+  /** What goals are measured against (the selected Target Profile). */
+  context: GoalContext;
 }
 
 interface Input {
@@ -149,7 +153,7 @@ interface Input {
   hubId: TradeHub['id'];
   characterId: number | null;
   /** The Fitting page's selected Target Profile, for applied DPS. */
-  target: TargetProfile | null;
+  target: TargetProfile;
 }
 
 /** Runs one implant/booster set on the Fitting, remembering every answer for as long as the Fitting is the same. */
@@ -211,7 +215,7 @@ export function useImplantFinder({
     ? (damageProfiles.selected ?? undefined)
     : undefined;
   const conditions = useStatsConditions();
-  const context = useMemo<GoalContext>(() => (target ? { target } : {}), [target]);
+  const context = useMemo<GoalContext>(() => ({ target }), [target]);
 
   const [catalog, setCatalog] = useState<ImplantCatalog | null>(null);
   const [screening, setScreening] = useState<{
@@ -234,7 +238,11 @@ export function useImplantFinder({
     purchase: ImplantPurchase;
   } | null>(null);
   const [storeProgress, setStoreProgress] = useState<{ done: number; total: number } | null>(null);
-  const [fixRun, setFixRun] = useState<{ from: object; fixes: FixResult[] } | null>(null);
+  const [fixRun, setFixRun] = useState<{
+    from: object;
+    goalId: ImplantGoalId;
+    fixes: FixResult[];
+  } | null>(null);
 
   // One cache per Fitting and conditions: a goal switch or a hub change re-reads it, never the engine.
   const evaluate = useMemo<Evaluate | null>(() => {
@@ -304,11 +312,15 @@ export function useImplantFinder({
       });
   }, [screening, catalog, context]);
 
-  const goals = useMemo<GoalSummary[]>(
-    () =>
-      helpersOf ? IMPLANT_GOALS.map((goal) => ({ goal, helpers: helpersOf(goal).length })) : [],
-    [helpersOf]
-  );
+  const goals = useMemo<GoalSummary[]>(() => {
+    if (!helpersOf || !screening) return [];
+    const base = screening.baselines.stats;
+    return IMPLANT_GOALS.map((goal) => ({
+      goal,
+      helpers: helpersOf(goal).length,
+      used: goal.kind === 'budget' || goal.read(base, context) !== 0,
+    }));
+  }, [helpersOf, screening, context]);
 
   const goal = goalId ? goalById(goalId) : null;
   const helping = useMemo(() => (goal && helpersOf ? helpersOf(goal) : []), [goal, helpersOf]);
@@ -349,26 +361,28 @@ export function useImplantFinder({
     () => helping.flatMap((f) => f.grades.map((g) => g.typeId)).sort((a, b) => a - b),
     [helping]
   );
-  const purchaseKey = `${hubId}|${characterId ?? ''}|${helpingTypeIds.join(',')}`;
+  const typeIdsKey = helpingTypeIds.join(',');
+  const purchaseKey = `${hubId}|${characterId ?? ''}|${typeIdsKey}`;
   useEffect(() => {
-    if (!open || helpingTypeIds.length === 0) return;
+    if (!open || typeIdsKey === '') return;
     let cancelled = false;
     const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
-    void loadImplantPurchase(helpingTypeIds, hub, characterId, (done, total) => {
+    void loadImplantPurchase(typeIdsKey.split(',').map(Number), hub, characterId, (done, total) => {
       if (!cancelled) setStoreProgress({ done, total });
     })
       .then((purchase) => {
-        if (cancelled) return;
-        setPurchaseRun({ key: purchaseKey, purchase });
-        setStoreProgress(null);
+        if (!cancelled) setPurchaseRun({ key: purchaseKey, purchase });
       })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
+      // Where to buy is best-effort: a failed lookup leaves the rows unpriced, not the window broken.
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setStoreProgress(null);
       });
     return () => {
       cancelled = true;
+      setStoreProgress(null);
     };
-  }, [open, helpingTypeIds, hubId, characterId, purchaseKey]);
+  }, [open, typeIdsKey, hubId, characterId, purchaseKey]);
   const purchase = purchaseRun?.purchase ?? null;
 
   // Built from one run only, so a row's effect and its Add/Remove always describe the same set.
@@ -420,7 +434,7 @@ export function useImplantFinder({
         .map((g) => ({
           typeId: g.grade.typeId,
           // Implant and booster slots are numbered apart; keep them apart here too.
-          slot: r.family.kind === 'booster' ? 100 + r.family.slot : r.family.slot,
+          slot: slotKey(r.family.kind, r.family.slot),
           headroomGain: headroomGain(goal, before, g.stats),
           price: g.best?.cost ?? Number.NaN,
         }))
@@ -449,7 +463,11 @@ export function useImplantFinder({
         }
       }
       if (cancelled) return;
-      setFixRun({ from: shown, fixes: keepMoreHeadroom(confirmed).slice(0, FIX_LIMIT) });
+      setFixRun({
+        from: shown,
+        goalId: goal.id,
+        fixes: keepMoreHeadroom(confirmed).slice(0, FIX_LIMIT),
+      });
     })().catch(() => {
       if (!cancelled) setFailed(true);
     });
@@ -460,7 +478,7 @@ export function useImplantFinder({
 
   const over = goal?.kind === 'budget' && shown ? shortfall(goal.read(shown.baselines.stats)) : 0;
   // An older run's fix list stays up, marked updating, until the new one is confirmed.
-  const fixes = over > 0 && fixRun ? fixRun.fixes : [];
+  const fixes = over > 0 && fixRun?.goalId === goalId ? fixRun.fixes : [];
   const fixesCurrent = over <= 0 || fixRun?.from === shown;
   const resultsCurrent = goal === null || helping.length === 0 || shown?.fitting === fitting;
   const purchaseCurrent = helping.length === 0 || purchaseRun?.key === purchaseKey;
@@ -477,5 +495,6 @@ export function useImplantFinder({
     results,
     fixes,
     purchase,
+    context,
   };
 }

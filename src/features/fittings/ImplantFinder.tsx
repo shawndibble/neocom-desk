@@ -5,7 +5,14 @@
  * LP Store with the pilot's LP and tags checked. When the Fitting is over
  * CPU or powergrid, the cheapest ways back under budget come first.
  */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, IconButton, IskAmount, SearchInput, Spinner, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -22,7 +29,7 @@ import {
   type ImplantGoalId,
   type ImplantKind,
 } from '@/engine/fittings/implantFinder';
-import type { Source } from '@/engine/fittings/implantSources';
+import { alternativeSource, type Source } from '@/engine/fittings/implantSources';
 import { withBoosters } from '@/engine/fittings/boosterSideEffects';
 import type { ImplantBasis } from '@/engine/fittings/implantBasis';
 import type {
@@ -31,7 +38,6 @@ import type {
   FittingStats,
   PilotProfile,
 } from '@/engine/fittings/types';
-import { loadTypeNames } from '@/features/character/typeNames';
 import { useMarketHub } from '@/features/market/hub';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { getTradeHub } from '@/market/hubs';
@@ -50,7 +56,8 @@ import {
 
 const GROUPS: readonly GoalGroup[] = ['fitting', 'weapons', 'tank', 'navigation'];
 const IMPLANT_SLOTS = Array.from({ length: 10 }, (_, i) => i + 1);
-const BOOSTER_SLOTS = [1, 2, 3];
+/** Booster slots the strip shows at least; more when the set already fills a higher one. */
+const MIN_BOOSTER_SLOTS = 3;
 const EMPTY_SET: FittingImplantSet = { implants: [], boosters: [] };
 
 function fmt(value: number, decimals: number): string {
@@ -109,7 +116,6 @@ export function ImplantFinder({
     target,
   });
   const { baseline, catalog } = finder;
-  const context = useMemo<GoalContext>(() => ({ target }), [target]);
   const set = implantSet ?? EMPTY_SET;
 
   const label = (id: ImplantGoalId) => t(`fittings.implantFinder.goals.${id}`);
@@ -153,12 +159,10 @@ export function ImplantFinder({
   const overBy = (g: ImplantGoal) =>
     baseline && g.kind === 'budget' ? shortfall(g.read(baseline)) : 0;
   const problems = visible.filter(({ goal }) => overBy(goal) > 0);
-  const offered = visible.filter(
-    ({ goal, helpers }) => overBy(goal) === 0 && (goal.kind === 'budget' || helpers > 0)
-  );
-  const notOnFit = visible.filter(({ goal, helpers }) => goal.kind !== 'budget' && helpers === 0);
+  const offered = visible.filter(({ goal, used }) => overBy(goal) === 0 && used);
+  const notOnFit = visible.filter(({ used }) => !used);
   const goal = goalId ? goalById(goalId) : null;
-  const goalIsOff = finder.goals.some((g) => g.goal.id === goalId && g.helpers === 0);
+  const goalIsOff = finder.goals.some((g) => g.goal.id === goalId && !g.used);
 
   /** Slots an item that helps the selected goal could go in, for the set strip. */
   const helpfulSlots = useMemo(() => {
@@ -213,96 +217,103 @@ export function ImplantFinder({
   const budgetGoal = goal?.kind === 'budget' ? goal : null;
 
   return (
-    <div className="space-y-3">
-      <SetStrip
-        set={set}
-        slotOf={catalog.slotOf}
-        names={names}
-        helpfulSlots={helpfulSlots}
-        goalLabel={goal ? label(goal.id) : null}
-        onRemove={remove}
-        onInfo={setInfoTypeId}
-      />
-
-      <Toolbar
-        purchase={finder.purchase}
-        updating={finder.updating}
-        storeProgress={finder.storeProgress}
-        cloneBasis={basis === 'clone'}
-      />
-
-      <div className="flex flex-col gap-4 md:flex-row">
-        <nav
-          aria-label={t('fittings.implantFinder.goalsLabel')}
-          className={cx('space-y-3 md:block md:w-56 md:shrink-0', goal !== null && 'hidden')}
-        >
-          <SearchInput
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('fittings.implantFinder.searchPlaceholder')}
-            aria-label={t('fittings.implantFinder.searchLabel')}
-          />
-          {problems.length > 0 && (
-            <div className="space-y-1">
-              <SectionHeading warning>{t('fittings.implantFinder.fixHeading')}</SectionHeading>
-              <ul className="space-y-0.5">{problems.map((g) => goalButton(g, 'problem'))}</ul>
-            </div>
-          )}
-          {GROUPS.map((group) => {
-            const inGroup = offered.filter((g) => g.goal.group === group);
-            if (inGroup.length === 0) return null;
-            return (
-              <div key={group} className="space-y-1">
-                <SectionHeading>{t(`fittings.implantFinder.group.${group}`)}</SectionHeading>
-                <ul className="space-y-0.5">{inGroup.map((g) => goalButton(g))}</ul>
-              </div>
-            );
-          })}
-          {notOnFit.length > 0 && (
-            <div className="space-y-1 border-t border-line pt-2">
-              <SectionHeading>{t('fittings.implantFinder.notOnFit')}</SectionHeading>
-              <ul className="space-y-0.5">{notOnFit.map((g) => goalButton(g, 'off'))}</ul>
-            </div>
-          )}
-          {visible.length === 0 && (
-            <p className="text-sm text-text-dim">{t('fittings.implantFinder.noGoalMatch')}</p>
-          )}
-        </nav>
-
-        <section className={cx('min-w-0 flex-1 space-y-3', !goal && 'hidden md:block')}>
-          {!goal ? (
-            <p className="text-sm text-text-dim">{t('fittings.implantFinder.pickGoal')}</p>
-          ) : (
-            <GoalResults
-              goal={goal}
-              off={goalIsOff}
-              baseline={baseline}
-              context={context}
-              results={finder.results}
-              fixes={finder.fixes}
-              hubId={hubId}
-              nameOf={nameOf}
-              busy={finder.updating}
-              onBack={() => setGoalId(null)}
-              onAdd={addAll}
-              onRemove={remove}
-              onInfo={setInfoTypeId}
-            />
-          )}
-        </section>
-      </div>
-
-      {budgetGoal && !goalIsOff && <BudgetDock goal={budgetGoal} stats={baseline} />}
-
-      {infoTypeId !== null && (
-        <ItemDetailModal
-          typeId={infoTypeId}
-          itemName={nameOf(infoTypeId)}
-          onClose={() => setInfoTypeId(null)}
-          showOpenInMarket
+    <SourceNames.Provider
+      value={{
+        hubName: (id) => getTradeHub(id)?.systemName ?? id,
+        itemName: finder.purchase?.itemName ?? ((id) => `#${id}`),
+      }}
+    >
+      <div className="space-y-3">
+        <SetStrip
+          set={set}
+          slotOf={catalog.slotOf}
+          names={names}
+          helpfulSlots={helpfulSlots}
+          goalLabel={goal ? label(goal.id) : null}
+          onRemove={remove}
+          onInfo={setInfoTypeId}
         />
-      )}
-    </div>
+
+        <Toolbar
+          purchase={finder.purchase}
+          updating={finder.updating}
+          storeProgress={finder.storeProgress}
+          cloneBasis={basis === 'clone'}
+        />
+
+        <div className="flex flex-col gap-4 md:flex-row">
+          <nav
+            aria-label={t('fittings.implantFinder.goalsLabel')}
+            className={cx('space-y-3 md:block md:w-56 md:shrink-0', goal !== null && 'hidden')}
+          >
+            <SearchInput
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('fittings.implantFinder.searchPlaceholder')}
+              aria-label={t('fittings.implantFinder.searchLabel')}
+            />
+            {problems.length > 0 && (
+              <div className="space-y-1">
+                <SectionHeading warning>{t('fittings.implantFinder.fixHeading')}</SectionHeading>
+                <ul className="space-y-0.5">{problems.map((g) => goalButton(g, 'problem'))}</ul>
+              </div>
+            )}
+            {GROUPS.map((group) => {
+              const inGroup = offered.filter((g) => g.goal.group === group);
+              if (inGroup.length === 0) return null;
+              return (
+                <div key={group} className="space-y-1">
+                  <SectionHeading>{t(`fittings.implantFinder.group.${group}`)}</SectionHeading>
+                  <ul className="space-y-0.5">{inGroup.map((g) => goalButton(g))}</ul>
+                </div>
+              );
+            })}
+            {notOnFit.length > 0 && (
+              <div className="space-y-1 border-t border-line pt-2">
+                <SectionHeading>{t('fittings.implantFinder.notOnFit')}</SectionHeading>
+                <ul className="space-y-0.5">{notOnFit.map((g) => goalButton(g, 'off'))}</ul>
+              </div>
+            )}
+            {visible.length === 0 && (
+              <p className="text-sm text-text-dim">{t('fittings.implantFinder.noGoalMatch')}</p>
+            )}
+          </nav>
+
+          <section className={cx('min-w-0 flex-1 space-y-3', !goal && 'hidden md:block')}>
+            {!goal ? (
+              <p className="text-sm text-text-dim">{t('fittings.implantFinder.pickGoal')}</p>
+            ) : (
+              <GoalResults
+                goal={goal}
+                off={goalIsOff}
+                baseline={baseline}
+                context={finder.context}
+                results={finder.results}
+                fixes={finder.fixes}
+                hubId={hubId}
+                nameOf={nameOf}
+                busy={finder.updating}
+                onBack={() => setGoalId(null)}
+                onAdd={addAll}
+                onRemove={remove}
+                onInfo={setInfoTypeId}
+              />
+            )}
+          </section>
+        </div>
+
+        {budgetGoal && !goalIsOff && <BudgetDock goal={budgetGoal} stats={baseline} />}
+
+        {infoTypeId !== null && (
+          <ItemDetailModal
+            typeId={infoTypeId}
+            itemName={nameOf(infoTypeId)}
+            onClose={() => setInfoTypeId(null)}
+            showOpenInMarket
+          />
+        )}
+      </div>
+    </SourceNames.Provider>
   );
 }
 
@@ -326,6 +337,10 @@ function SetStrip({
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  const boosterSlots = Array.from(
+    { length: Math.max(MIN_BOOSTER_SLOTS, ...set.boosters.map((id) => slotOf(id)?.slot ?? 0)) },
+    (_, i) => i + 1
+  );
   const occupant = (kind: ImplantKind, slot: number) =>
     [...set.implants, ...set.boosters].find((id) => {
       const at = slotOf(id);
@@ -333,7 +348,7 @@ function SetStrip({
     });
   const cells = [
     ...IMPLANT_SLOTS.map((slot) => ({ kind: 'implant' as const, slot })),
-    ...BOOSTER_SLOTS.map((slot) => ({ kind: 'booster' as const, slot })),
+    ...boosterSlots.map((slot) => ({ kind: 'booster' as const, slot })),
   ];
   const filled = cells.filter((c) => occupant(c.kind, c.slot) !== undefined).length;
 
@@ -357,7 +372,7 @@ function SetStrip({
           {id !== undefined && (
             <IconButton
               variant="plain"
-              size="sm"
+              size="row"
               icon={<Icon.Close />}
               label={t('fittings.implantFinder.removeItem', { name: name?.full ?? id })}
               onClick={() => onRemove(id)}
@@ -413,7 +428,10 @@ function SetStrip({
             </span>
           )}
         </div>
-        <ul className="grid grid-cols-5 gap-1 md:grid-cols-[repeat(10,minmax(0,1fr))_0.5rem_repeat(3,minmax(0,1fr))]">
+        <ul
+          style={{ '--booster-slots': boosterSlots.length } as CSSProperties}
+          className="grid grid-cols-5 gap-1 md:grid-cols-[repeat(10,minmax(0,1fr))_0.5rem_repeat(var(--booster-slots),minmax(0,1fr))]"
+        >
           {cells.slice(0, 10).map(cell)}
           <li aria-hidden className="hidden md:block" />
           {cells.slice(10).map(cell)}
@@ -626,7 +644,6 @@ function GoalResults({
                     effect={rowEffect}
                     fixesIt={over > 0 && rowEffect.fits && !row.inSet}
                     replacesName={row.replaces === null ? null : nameOf(row.replaces)}
-                    hubName={hubName}
                     busy={busy}
                     onAdd={(id) => onAdd([id])}
                     onRemove={onRemove}
@@ -729,7 +746,7 @@ function GoalResults({
                     {fix.sources.map((source, k) => (
                       <li key={fix.typeIds[k]} className="text-xs text-text-dim">
                         <span className="text-text">{nameOf(fix.typeIds[k]!)}:</span>{' '}
-                        <SourceLine source={source} hubName={hubName} />
+                        <SourceLine source={source} />
                       </li>
                     ))}
                   </ul>
@@ -783,23 +800,16 @@ function GoalResults({
   );
 }
 
+/** How a source line names a Trade Hub and a turn-in — resolved once for the whole window. */
+const SourceNames = createContext<{
+  hubName: (hubId: string) => string;
+  itemName: (typeId: number) => string;
+}>({ hubName: (id) => id, itemName: (id) => `#${id}` });
+
 /** Where one item comes from, in a line: a hub's sell orders, or an LP Store offer and what it takes. */
-function SourceLine({ source, hubName }: { source: Source; hubName: (id: string) => string }) {
+function SourceLine({ source }: { source: Source }) {
   const { t } = useTranslation();
-  const [turnInNames, setTurnInNames] = useState<Map<number, string>>(new Map());
-  const turnInIds = source.kind === 'lp' ? source.turnIns.map((ti) => ti.typeId) : [];
-  const idsKey = turnInIds.join(',');
-  useEffect(() => {
-    if (idsKey === '') return;
-    let cancelled = false;
-    void loadTypeNames(idsKey.split(',').map(Number)).then((map) => {
-      if (!cancelled) setTurnInNames(map);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [idsKey]);
-  const itemName = (id: number) => turnInNames.get(id) ?? `#${id}`;
+  const { hubName, itemName } = useContext(SourceNames);
 
   if (source.kind === 'market') {
     return (
@@ -878,7 +888,6 @@ function GradeRow({
   effect,
   fixesIt,
   replacesName,
-  hubName,
   busy,
   onAdd,
   onRemove,
@@ -889,7 +898,6 @@ function GradeRow({
   effect: Effect;
   fixesIt: boolean;
   replacesName: string | null;
-  hubName: (id: string) => string;
   busy: boolean;
   onAdd: (typeId: number) => void;
   onRemove: (typeId: number) => void;
@@ -897,10 +905,9 @@ function GradeRow({
 }) {
   const { t } = useTranslation();
   const { best, sources } = row;
-  // The next way to get it: a cheaper LP offer the pilot can't redeem yet, or simply another option.
-  const alt = sources?.find((s) => s !== best) ?? null;
-  const altCheaper =
-    alt !== null && alt.cost !== null && (best === null || (best.cost ?? Infinity) > alt.cost);
+  // What the pilot can buy now; failing that, the best way there is, warnings and all.
+  const shown = best ?? sources?.[0] ?? null;
+  const alt = sources && shown ? alternativeSource(sources, shown) : null;
   const action = row.inSet
     ? t('fittings.implantFinder.remove')
     : row.replaces !== null
@@ -911,7 +918,7 @@ function GradeRow({
       <span className="flex w-28 items-center gap-1">
         <IconButton
           variant="plain"
-          size="sm"
+          size="row"
           icon={<Icon.Info />}
           label={t('fittings.implantFinder.info', { name })}
           onClick={() => onInfo(row.grade.typeId)}
@@ -930,22 +937,22 @@ function GradeRow({
       <span
         className={cx(
           'basis-full text-xs tabular-nums sm:basis-72',
-          best?.kind === 'market' && !best.atSelectedHub ? 'text-warning' : 'text-text'
+          shown?.kind === 'market' && !shown.atSelectedHub ? 'text-warning' : 'text-text'
         )}
       >
         {sources === null ? (
           <span className="text-text-dim">{t('fittings.implantFinder.findingSources')}</span>
-        ) : best ? (
-          <SourceLine source={best} hubName={hubName} />
+        ) : shown ? (
+          <SourceLine source={shown} />
         ) : (
           <span className="text-text-dim">{t('fittings.implantFinder.noSource')}</span>
         )}
         {alt && (
           <span className="mt-0.5 block text-[0.6875rem] text-text-dim">
-            {altCheaper && alt.kind === 'lp' && alt.blocked
+            {alt.cheaperIfYouCould
               ? t('fittings.implantFinder.cheaperIfYouCould')
               : t('fittings.implantFinder.or')}{' '}
-            <SourceLine source={alt} hubName={hubName} />
+            <SourceLine source={alt.source} />
           </span>
         )}
         {replacesName && !row.inSet && (

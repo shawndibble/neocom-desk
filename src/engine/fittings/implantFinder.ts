@@ -161,28 +161,6 @@ export function groupImplantFamilies(entries: readonly ImplantEntry[]): ImplantF
   return [...families.values()];
 }
 
-/**
- * `implants` with `typeId` added, replacing whatever already sits in its
- * slot — the game takes one implant per slot, and the engine doesn't check.
- */
-export function withImplant(
-  implants: readonly number[],
-  slotOf: (typeId: number) => number | undefined,
-  typeId: number
-): number[] {
-  const slot = slotOf(typeId);
-  return [...implants.filter((id) => slot === undefined || slotOf(id) !== slot), typeId];
-}
-
-/** `implants` with each of `typeIds` added in turn, one per slot. */
-export function withImplants(
-  implants: readonly number[],
-  slotOf: (typeId: number) => number | undefined,
-  typeIds: readonly number[]
-): number[] {
-  return typeIds.reduce<number[]>((set, id) => withImplant(set, slotOf, id), [...implants]);
-}
-
 /** Where an item goes: which kind of slot, and which one. */
 export type SlotOf = (typeId: number) => { kind: ImplantKind; slot: number } | undefined;
 
@@ -260,10 +238,20 @@ export type ImplantGoal = { id: ImplantGoalId; group: GoalGroup; display: GoalDi
 );
 
 /** Peak applied DPS against `target` at any range — so an implant or booster that only improves application or reach still counts. */
+const peakCache = new WeakMap<FittingStats, Map<TargetProfile, number>>();
+
 function peakAppliedDps(stats: FittingStats, target: TargetProfile | undefined): number {
   if (!target || stats.applied.weapons.length === 0) return 0;
-  const maxRange = graphMaxRange([stats.applied]);
-  return Math.max(0, ...appliedDpsVsRange(stats.applied, target, maxRange, 30).map((p) => p.dps));
+  // Screening reads the same baseline for every family it tries: work it out once.
+  let byTarget = peakCache.get(stats);
+  if (!byTarget) peakCache.set(stats, (byTarget = new Map()));
+  let peak = byTarget.get(target);
+  if (peak === undefined) {
+    const maxRange = graphMaxRange([stats.applied]);
+    peak = Math.max(0, ...appliedDpsVsRange(stats.applied, target, maxRange, 30).map((p) => p.dps));
+    byTarget.set(target, peak);
+  }
+  return peak;
 }
 
 /** Raw DPS of one kind of weapon the Fitting fires. */
@@ -311,13 +299,34 @@ export const IMPLANT_GOALS: readonly ImplantGoal[] = [
     display: { decimals: 1, divisor: 1000 },
     read: (s) => s.capacitorRechargeTime,
   },
-  ...(['turret', 'missile', 'drone', 'fighter'] as const).map((kind): ImplantGoal => ({
-    id: `${kind}Dps` as ImplantGoalId,
+  {
+    id: 'turretDps',
     group: 'weapons',
     kind: 'more',
     display: { decimals: 1 },
-    read: (s) => weaponDps(s, kind),
-  })),
+    read: (s) => weaponDps(s, 'turret'),
+  },
+  {
+    id: 'missileDps',
+    group: 'weapons',
+    kind: 'more',
+    display: { decimals: 1 },
+    read: (s) => weaponDps(s, 'missile'),
+  },
+  {
+    id: 'droneDps',
+    group: 'weapons',
+    kind: 'more',
+    display: { decimals: 1 },
+    read: (s) => weaponDps(s, 'drone'),
+  },
+  {
+    id: 'fighterDps',
+    group: 'weapons',
+    kind: 'more',
+    display: { decimals: 1 },
+    read: (s) => weaponDps(s, 'fighter'),
+  },
   { id: 'ehp', group: 'tank', kind: 'more', display: { decimals: 0 }, read: (s) => s.ehp },
   {
     id: 'repair',
@@ -467,7 +476,8 @@ export function pickSource(
 
 export interface FixCandidate {
   typeId: number;
-  slot: number;
+  /** Which slot it takes — one item per key in a fix. */
+  slot: number | string;
   /** Headroom this implant frees on its own, in the budget's unit. */
   headroomGain: number;
   /** NaN when it can't be bought anywhere. */
@@ -495,7 +505,7 @@ export function cheapestFixes(
   limit = 4
 ): FixOption[] {
   const usable = candidates.filter((c) => Number.isFinite(c.price) && c.headroomGain > 0);
-  const bySlot = new Map<number, FixCandidate[]>();
+  const bySlot = new Map<number | string, FixCandidate[]>();
   for (const c of usable) {
     const beaten = usable.some(
       (o) =>
@@ -510,7 +520,11 @@ export function cheapestFixes(
     list.push(c);
     bySlot.set(c.slot, list);
   }
-  const slots = [...bySlot.keys()].sort((a, b) => a - b);
+  const slots = [...bySlot.keys()].sort((a, b) =>
+    typeof a === 'number' && typeof b === 'number'
+      ? a - b
+      : String(a).localeCompare(String(b), undefined, { numeric: true })
+  );
   const found: FixOption[] = [];
   const walk = (i: number, picks: FixCandidate[], cost: number, gain: number) => {
     if (i === slots.length) {

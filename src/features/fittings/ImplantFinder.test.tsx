@@ -199,7 +199,7 @@ describe('ImplantFinder', () => {
 
     // EE-603 from Caldari Navy: 0.5M + 1,000 LP × 1,000 = 1.5M, under Jita's 9M.
     const ee603 = (await screen.findByRole('button', { name: /^Add .*EE-603$/ })).closest('li')!;
-    expect(ee603).toHaveTextContent('Caldari Navy LP store · 1,000 LP');
+    expect(ee603).toHaveTextContent('Caldari Navy LP Store · 1,000 LP');
     // EE-605's offer needs 4,000 LP; the pilot has 3,200: market first, the offer shown as cheaper.
     const ee605 = screen.getByRole('button', { name: /^Add .*EE-605$/ }).closest('li')!;
     expect(ee605).toHaveTextContent('Fits · 1.6 tf spare');
