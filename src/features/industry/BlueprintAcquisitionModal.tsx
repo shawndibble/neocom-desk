@@ -303,9 +303,11 @@ export function BlueprintAcquisitionModal({
         : loadMarketLpValues(lpCorpIds, hub),
     `${hub.id}:${lpValue > 0}:${lpCorpIds.join(',')}`
   );
+  // Rows wait for the rates, so none flashes as unpriced while they load.
+  const lpRatesLoading = lp.status === 'ready' && marketLpValues.status === 'loading';
   const lpRows = useMemo(
     () =>
-      lp.status === 'ready'
+      lp.status === 'ready' && marketLpValues.status !== 'loading'
         ? lpOfferRows(
             lp.data,
             (corp) =>
@@ -670,6 +672,7 @@ export function BlueprintAcquisitionModal({
         <section className={SECTION_CLASS}>
           <h3 className={HEADING_CLASS}>{t('industry.blueprintAcquisitionLpHeading')}</h3>
           {lp.status !== 'loading' &&
+          !lpRatesLoading &&
           lp.status !== 'unavailable' &&
           lpSection.total === 0 ? null : (
             <>
@@ -691,7 +694,7 @@ export function BlueprintAcquisitionModal({
               <p className="text-text-dim">{t('industry.bpAcqLpValueHint')}</p>
             </>
           )}
-          {lp.status === 'loading' ? (
+          {lp.status === 'loading' || lpRatesLoading ? (
             <p className="flex items-center gap-2 text-text-dim">
               <Spinner
                 size="sm"

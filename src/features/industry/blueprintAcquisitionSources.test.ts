@@ -376,6 +376,8 @@ describe('lpOfferRows', () => {
       price: 12_000_000,
       lpPriced: false,
       lpRate: null,
+      // Picking it would write its LP into the plan as free.
+      pickable: false,
     });
   });
 

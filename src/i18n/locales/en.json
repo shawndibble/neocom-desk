@@ -2110,6 +2110,7 @@
     "bpAcqLpValueLabel": "Your LP value (ISK per LP)",
     "bpAcqLpValueHint": "Leave at 0 to price each store’s LP at its market rate — what its offers sell for at this hub, after fees. Type your own rate to use it for every store instead. Kept for next time.",
     "bpAcqLpPriced": "{{isk}} ISK with LP at your {{rate}} ISK/LP",
+    "bpAcqLpPricedMarket": "{{isk}} ISK with LP at the store’s market {{rate}} ISK/LP",
     "bpAcqLpIskOnly": "ISK only — no market rate for this store’s LP",
     "bpAcqLpLoading": "Loading LP Store offers…",
     "bpAcqLpUnavailable": "Couldn't load LP Store offers.",
@@ -2657,8 +2658,7 @@
     "skillGateFilterChipCount_one": "{{count}} row hidden",
     "skillGateFilterChipCount_other": "{{count}} rows hidden",
     "assumesBaseStandingsHint": "Broker fees in these profit figures are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
-    "productionLogAssumesBaseStandingsHint": "Broker fees on watched sell orders are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
-    "bpAcqLpPricedMarket": "{{isk}} ISK with LP at the store’s market {{rate}} ISK/LP"
+    "productionLogAssumesBaseStandingsHint": "Broker fees on watched sell orders are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings."
   },
   "login": {
     "button": "Log in with EVE Online",

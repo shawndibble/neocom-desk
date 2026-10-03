@@ -16,11 +16,11 @@ import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 import { BlueprintAcquisitionModal, type AcquisitionOwnedCopy } from './BlueprintAcquisitionModal';
 
 vi.mock('@/features/market/appraisalLpAcquisition', () => ({ findLpOfferMatches: vi.fn() }));
-// Sisters of EVE LP sells for 1,000 ISK on the market; any other store has no rate.
+// Sisters of EVE LP sells for 1,000 ISK on the market, Other Corp's for 500; any other store has no rate.
 vi.mock('@/features/loyalty/marketLpValue', () => ({
   loadMarketLpValues: vi.fn(
     async (ids: Iterable<number>) =>
-      new Map([...ids].map((id) => [id, id === 1000125 ? 1000 : null]))
+      new Map([...ids].map((id) => [id, id === 1000125 ? 1000 : id === 1000126 ? 500 : null]))
   ),
 }));
 vi.mock('@/features/market/orderBook', () => ({ getOrderBook: vi.fn() }));
@@ -471,7 +471,7 @@ describe('BlueprintAcquisitionModal — LP Store', () => {
 
   it('says the LP is unpriced when the store has no market rate and the pilot set none', async () => {
     mockedFindLpOfferMatches.mockResolvedValue(
-      lpResult([lpMatch({ corporationId: 1000126, corpName: 'Other Corp' })])
+      lpResult([lpMatch({ corporationId: 1000127, corpName: 'Unpriced Corp' })])
     );
     renderModal();
     const lp = section('LP Store');

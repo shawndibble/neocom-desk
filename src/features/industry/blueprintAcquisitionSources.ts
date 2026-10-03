@@ -270,7 +270,8 @@ export interface LpOfferRow {
   lpRateSource: LpRate['source'];
   me: 0;
   te: 0;
-  pickable: true;
+  /** False when the offer costs LP and nothing prices it: picking it would write the LP in as free. */
+  pickable: boolean;
 }
 
 export function lpOfferRows(
@@ -300,7 +301,7 @@ export function lpOfferRows(
         lpRateSource: source,
         me: 0,
         te: 0,
-        pickable: true,
+        pickable: m.offer.lp_cost === 0 || usableRate(rate) > 0,
       };
     })
   );

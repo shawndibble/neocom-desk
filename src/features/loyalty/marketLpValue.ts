@@ -1,16 +1,18 @@
 /**
- * Loads one corporation's market **LP Value** at a Trade Hub — its store
- * priced exactly as the LP Store page prices it (`computeLoyaltyOfferRows`,
- * selling at the hub's sell price), then read by `marketLpValue`. Priced for
- * no particular pilot: untrained trade skills and no standing, so the fees
- * are the full ones and the rate errs low rather than flattering the LP.
+ * Loads corporations' market **LP Value** at a Trade Hub — each store priced
+ * exactly as the LP Store page prices it (`computeLoyaltyOfferRows`, selling
+ * at the hub's sell price), then read by `marketLpValue`. Priced for no
+ * particular pilot: untrained trade skills and no standing, so the fees are
+ * the full ones and the rate errs low rather than flattering the LP.
  *
- * Remembered per corporation and hub for a while; the offers and prices
- * underneath are cached on their own terms.
+ * Remembered per corporation and hub for a while; a failed load is not
+ * remembered, so the next ask tries again. The offers and prices underneath
+ * are cached on their own terms.
  */
 import { marketLpValue } from '@/engine/loyalty/marketLpValue';
-import { loadBlueprintCatalog } from '@/features/industry/blueprintCatalog';
-import { loadMarketSnapshot } from '@/features/industry/marketData';
+import type { LoyaltyStoreOffer } from '@/esi/endpoints';
+import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import { loadMarketSnapshots, type MarketSnapshot } from '@/features/industry/marketData';
 import type { TradeHub } from '@/market/hubs';
 import { computeLoyaltyOfferRows, offerPriceTypeIds } from './offerRows';
 import { loadLoyaltyStoreOffers } from './store';
@@ -19,14 +21,11 @@ const REMEMBER_MS = 15 * 60 * 1000;
 
 const remembered = new Map<string, { at: number; value: Promise<number | null> }>();
 
-async function compute(corporationId: number, hub: TradeHub): Promise<number | null> {
-  const [offersResult, catalog] = await Promise.all([
-    loadLoyaltyStoreOffers(corporationId),
-    loadBlueprintCatalog(),
-  ]);
-  const offers = offersResult?.data ?? [];
-  if (offers.length === 0) return null;
-  const snapshot = await loadMarketSnapshot(hub, offerPriceTypeIds(offers, catalog));
+function valueOf(
+  offers: LoyaltyStoreOffer[],
+  catalog: BlueprintCatalog,
+  snapshot: MarketSnapshot
+): number | null {
   const rows = computeLoyaltyOfferRows({
     offers,
     catalog,
@@ -40,37 +39,76 @@ async function compute(corporationId: number, hub: TradeHub): Promise<number | n
   });
   return marketLpValue(
     rows.map((row) => {
-      const sold = row.productTypeId ?? row.offer.type_id;
+      // A blueprint offer sells its product: one run's worth, as the row prices it.
+      const product = catalog.byBlueprintTypeID.get(row.offer.type_id)?.blueprint.products[0];
+      const sold = product ? product.typeID : row.offer.type_id;
       return {
         iskPerLp: row.profit.iskPerLp,
         sellVolume: snapshot.hubSellVolumes[sold] ?? 0,
-        // A blueprint offer's depth is counted in products, one run each.
-        quantity: row.productTypeId === null ? row.offer.quantity : 1,
+        quantity: product ? product.quantity : row.offer.quantity,
       };
     })
   );
 }
 
-/** ISK per LP the market pays for `corporationId`'s LP at `hub`; null when its store gives too little to go on. */
-export function loadMarketLpValue(
+/** Prices every store in one market fetch, so materials they share are fetched once. */
+async function computeMany(
+  corporationIds: number[],
+  hub: TradeHub
+): Promise<Map<number, number | null>> {
+  const [catalog, offersByCorp] = await Promise.all([
+    loadBlueprintCatalog(),
+    Promise.all(corporationIds.map(async (id) => (await loadLoyaltyStoreOffers(id))?.data ?? [])),
+  ]);
+  const priced = corporationIds
+    .map((id, i) => ({ id, offers: offersByCorp[i]! }))
+    .filter((store) => store.offers.length > 0);
+  const snapshots = loadMarketSnapshots(
+    priced.map((store) => ({ hub, typeIds: offerPriceTypeIds(store.offers, catalog) }))
+  );
+  const values = new Map<number, number | null>(corporationIds.map((id) => [id, null]));
+  await Promise.all(
+    priced.map(async (store, i) => {
+      values.set(store.id, valueOf(store.offers, catalog, await snapshots[i]!));
+    })
+  );
+  return values;
+}
+
+/** ISK per LP the market pays for each of `corporationIds`' LP at `hub`; null for a store that gives too little to go on. */
+export async function loadMarketLpValues(
+  corporationIds: Iterable<number>,
+  hub: TradeHub,
+  now: () => number = Date.now
+): Promise<Map<number, number | null>> {
+  const ids = [...new Set(corporationIds)];
+  const keyOf = (id: number) => `${id}|${hub.id}`;
+  const stale = ids.filter((id) => {
+    const hit = remembered.get(keyOf(id));
+    return !hit || now() - hit.at >= REMEMBER_MS;
+  });
+  if (stale.length > 0) {
+    const batch = computeMany(stale, hub);
+    for (const id of stale) {
+      const value = batch.then((values) => values.get(id) ?? null);
+      remembered.set(keyOf(id), { at: now(), value });
+      // A failure is answered null now and asked again next time.
+      batch.catch(() => {
+        if (remembered.get(keyOf(id))?.value === value) remembered.delete(keyOf(id));
+      });
+    }
+  }
+  const values = await Promise.all(
+    ids.map((id) => remembered.get(keyOf(id))!.value.catch(() => null))
+  );
+  return new Map(ids.map((id, i) => [id, values[i]!]));
+}
+
+/** One corporation's market LP Value at `hub` (`loadMarketLpValues`). */
+export async function loadMarketLpValue(
   corporationId: number,
   hub: TradeHub,
   now: () => number = Date.now
 ): Promise<number | null> {
-  const key = `${corporationId}|${hub.id}`;
-  const hit = remembered.get(key);
-  if (hit && now() - hit.at < REMEMBER_MS) return hit.value;
-  const value = compute(corporationId, hub).catch(() => null);
-  remembered.set(key, { at: now(), value });
-  return value;
-}
-
-/** Market LP Values for several corporations at once, keyed by corporation id. */
-export async function loadMarketLpValues(
-  corporationIds: Iterable<number>,
-  hub: TradeHub
-): Promise<Map<number, number | null>> {
-  const ids = [...new Set(corporationIds)];
-  const values = await Promise.all(ids.map((id) => loadMarketLpValue(id, hub)));
-  return new Map(ids.map((id, i) => [id, values[i]!]));
+  return (await loadMarketLpValues([corporationId], hub, now)).get(corporationId) ?? null;
 }
