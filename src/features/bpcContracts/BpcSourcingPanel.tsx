@@ -28,6 +28,7 @@ import {
   StatChip,
   StatChips,
   TextInput,
+  sortRows,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -244,6 +245,13 @@ const SUGGESTION_LIMIT = 8;
 
 /** Region cells shown in the cheapest-by-region strip, in cheapest-first order — six keeps the strip (plus the BPO cards beside it) from wrapping into rows that would outsize the table below it. */
 const REGION_CELL_LIMIT = 6;
+
+/**
+ * Rows the table shows, taken from the top of the current sort. A broad
+ * search can match six figures of synced contracts; past a couple of hundred
+ * the answer is to narrow the search, not to scroll.
+ */
+const RESULT_LIMIT = 200;
 
 /** Section header over each group in the sourcing strip: Cheapest by region, Market BPOs, Contract BPOs. */
 const SOURCING_GROUP_HEADER =
@@ -1065,12 +1073,6 @@ export function BpcSourcingPanel() {
     const contractBpoRows = sources.has('contractBpo') ? contractBpoSearchRows : [];
     return [...ownedRows, ...marketRows, ...contractBpoRows, ...contractRows];
   }, [sources, contractSearchRows, filteredOwnedRows, marketSearchRows, contractBpoSearchRows]);
-  // With several blueprints listed, one copy row per type carries the BPO
-  // badge; with one picked, the callout cards say it instead (issue #1241).
-  const badgedRows = useMemo(
-    () => (selectedTypeId === null ? bpoBadgeRows(displayRows) : new Set<BpcSearchRow>()),
-    [selectedTypeId, displayRows]
-  );
 
   // Both summarise `filteredRows`, not every row of the chosen blueprint, so
   // they describe what is actually on screen: narrowing to ME ≥ 10 should move
@@ -1356,13 +1358,44 @@ export function BpcSourcingPanel() {
     [t, regionNames, timeZone, bpcRowJumps]
   );
 
+  const itemSortValue = useCallback(
+    (row: BpcSearchRow) => blueprintNames.get(row.typeId) ?? `#${row.typeId}`,
+    [blueprintNames]
+  );
+  // Item plus the visible columns, the same ids `columns` below lists. Built
+  // here rather than from `columns`, because the cap below sorts before the
+  // badges — and so the columns that render them — exist.
+  const sortProps = useUrlSort(BPC_SOURCING_SORT_KEY, OFFERS_DEFAULT_SORT, [
+    'item',
+    ...BPC_SEARCH_COLUMN_IDS.filter((id) => visibleColumns.includes(id)),
+  ]);
+  // The top `RESULT_LIMIT` rows by the table's own sort (`sortRows` is the
+  // rule `DataTable` sorts with), so the cap keeps the cheapest copies under
+  // the default Price sort, the nearest under Jumps, and so on.
+  const shownRows = useMemo(() => {
+    const { columnId, direction } = sortProps.sort;
+    const column =
+      columnId === 'item'
+        ? { sortValue: itemSortValue }
+        : bpcColumnsById[columnId as BpcSearchColumnId];
+    const sorted = column ? sortRows(displayRows, column, direction) : displayRows;
+    return sorted.slice(0, RESULT_LIMIT);
+  }, [displayRows, sortProps.sort, itemSortValue, bpcColumnsById]);
+  // With several blueprints listed, one copy row per type carries the BPO
+  // badge; with one picked, the callout cards say it instead (issue #1241).
+  // Picked from the shown rows, so the cap never drops a type's only badge.
+  const badgedRows = useMemo(
+    () => (selectedTypeId === null ? bpoBadgeRows(shownRows) : new Set<BpcSearchRow>()),
+    [selectedTypeId, shownRows]
+  );
+
   const columns = useMemo<DataTableColumn<BpcSearchRow>[]>(() => {
     const cols: DataTableColumn<BpcSearchRow>[] = [
       {
         id: 'item',
         header: t('bpcContracts.itemColumn'),
         primary: true,
-        sortValue: (row) => blueprintNames.get(row.typeId) ?? `#${row.typeId}`,
+        sortValue: itemSortValue,
         render: (row) => {
           const name = blueprintNames.get(row.typeId) ?? `#${row.typeId}`;
           // A BPO row is the BPO itself; only a copy gets the "BPO too" badge,
@@ -1401,6 +1434,7 @@ export function BpcSourcingPanel() {
   }, [
     t,
     blueprintNames,
+    itemSortValue,
     visibleColumns,
     bpcColumnsById,
     bpoByType,
@@ -1408,11 +1442,6 @@ export function BpcSourcingPanel() {
     bpoLocationName,
     regionLabel,
   ]);
-  const sortProps = useUrlSort(
-    BPC_SOURCING_SORT_KEY,
-    OFFERS_DEFAULT_SORT,
-    columns.map((column) => column.id)
-  );
   // Item plus the visible columns, like the table itself.
   const csvColumns = useMemo(
     () =>
@@ -1747,11 +1776,19 @@ export function BpcSourcingPanel() {
             />
           ) : (
             <>
+              {displayRows.length > shownRows.length && (
+                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                  {t('bpcContracts.resultsCapped', {
+                    shown: shownRows.length.toLocaleString(),
+                    total: displayRows.length.toLocaleString(),
+                  })}
+                </p>
+              )}
               <DataTable
                 {...sourcingExport.tableProps}
                 label={t('bpcContracts.title')}
                 columns={columns}
-                rows={displayRows}
+                rows={shownRows}
                 // Index included deliberately: a contract lists the same
                 // blueprint once per copy, so contractId+typeId is not
                 // unique — 70% of rows in a live pull shared one, and the
@@ -1781,7 +1818,7 @@ export function BpcSourcingPanel() {
                     trigger={tr}
                   />
                 )}
-                // Six-figure snapshots: windowed, never capped.
+                // At most RESULT_LIMIT rows, but each can be a tall card on a phone.
                 virtualize
               />
             </>

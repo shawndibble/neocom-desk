@@ -736,6 +736,31 @@ describe('BpcSourcingPanel', () => {
   });
 });
 
+describe('BpcSourcingPanel result cap', () => {
+  const rowsOf = (count: number) =>
+    Array.from({ length: count }, (_, i) =>
+      row({ contractId: i + 1, typeId: 638, price: 1_000_000 + i })
+    );
+
+  it('shows at most 200 rows and says how many matched', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot(rowsOf(201)));
+    render(<App />);
+
+    await screen.findByRole('table', { name: 'BPC Sourcing' });
+    expect(
+      await screen.findByText('Showing 200 of 201 results. Narrow the search to see the rest.')
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing when every match fits', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot(rowsOf(200)));
+    render(<App />);
+
+    await screen.findByRole('table', { name: 'BPC Sourcing' });
+    expect(screen.queryByText(/Narrow the search to see the rest/)).not.toBeInTheDocument();
+  });
+});
+
 describe('BpcSourcingPanel search matching', () => {
   /**
    * Every blueprint in the catalogue is named "… Blueprint", so a substring
