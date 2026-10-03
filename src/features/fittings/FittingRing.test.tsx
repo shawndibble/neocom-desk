@@ -326,7 +326,7 @@ describe('FittingRing', () => {
     expect(glyph('launcher')).toBe('/images/fitting/hardpoint-launcher.png');
   });
 
-  it('badges a high-slot tile with the hardpoint its module takes, and names it on hover', async () => {
+  it('names the hardpoint a high-slot module takes on its tile, without an icon', async () => {
     const kinds: Record<number, HardpointKind | null> = {
       10: 'turret',
       12: 'launcher',
@@ -349,15 +349,14 @@ describe('FittingRing', () => {
         typeName={(typeId) => `Type ${typeId}`}
       />
     );
-    const badge = (slot: string) =>
-      container.querySelector(`[data-ring-slot="${slot}"] [data-hardpoint-badge]`);
-    expect(badge('high-0')?.getAttribute('data-hardpoint-badge')).toBe('turret');
-    expect(badge('high-1')?.getAttribute('data-hardpoint-badge')).toBe('launcher');
-    // A utility high (a neut, a cloak) takes no hardpoint, and a low slot never does.
-    expect(badge('high-2')).toBeNull();
-    expect(badge('low-0')).toBeNull();
-    // The badge is a picture; the tile's name carries it for a screen reader.
+    // The rim's icon heading each kind's pips says it; the tiles carry no icon of their own.
+    expect(
+      container.querySelector('[data-ring-slot] img[src*="/images/fitting/hardpoint-"]')
+    ).toBeNull();
+    expect(screen.getByLabelText('High slots 1, active, turret hardpoint')).toBeTruthy();
     expect(screen.getByLabelText('High slots 2, active, launcher hardpoint')).toBeTruthy();
+    // A utility high (a neut, a cloak) takes no hardpoint.
+    expect(screen.getByLabelText('High slots 3, active')).toBeTruthy();
 
     fireEvent.pointerMove(container.querySelector('[data-ring-slot="high-1"]')!, {
       pointerType: 'mouse',
