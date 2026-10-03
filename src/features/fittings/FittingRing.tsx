@@ -560,6 +560,8 @@ function SlotTile({
   const pressed = !compact && module === undefined ? selected : undefined;
   // A charge drag lights every module that takes it and dims the rest.
   const lights = chargeDragLights(drag, slot.rack, slot.index);
+  const chargePip =
+    module?.chargeTypeId !== undefined ? 'loaded' : module && takesCharges ? 'empty' : undefined;
 
   const border =
     over || pressed
@@ -634,6 +636,15 @@ function SlotTile({
       }}
       onDrop={handleDrop}
     >
+      {/* The charge pip: a notch on the tile's rim side for a module that takes one, lit once loaded. */}
+      {chargePip && (
+        <span
+          aria-hidden="true"
+          data-charge-pip={chargePip}
+          className={`absolute left-1/4 h-[10%] w-1/2 ${chargePip === 'loaded' ? 'bg-accent' : 'bg-line-bright'}`}
+          style={{ top: '-12%' }}
+        />
+      )}
       {/* Counter-turned so the module reads upright wherever its tile sits, as in the game. */}
       <span
         className="absolute inset-0 flex items-center justify-center"
@@ -649,8 +660,8 @@ function SlotTile({
           <AddRow aria-hidden className="text-text-dim" />
         )}
         {module?.chargeTypeId !== undefined && (
-          <span className="absolute right-0 bottom-0 h-[38%] w-[38%] border border-line bg-panel">
-            <TypeIcon typeId={module.chargeTypeId} size={32} className="h-full w-full" />
+          <span className="absolute right-0 bottom-0 h-1/2 w-1/2 border border-line bg-panel">
+            <TypeIcon typeId={module.chargeTypeId} size={64} className="h-full w-full" />
           </span>
         )}
         {/* The hardpoint it takes, matching the icon heading that kind's pips on the rim. */}

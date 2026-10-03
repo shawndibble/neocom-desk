@@ -207,6 +207,35 @@ describe('FittingRing', () => {
     expect(screen.getByLabelText('Low slots 1, online')).toBeTruthy();
   });
 
+  it('marks each module that takes a charge with a rim pip, filled once one is loaded', () => {
+    const { container } = render(
+      <FittingRing
+        fitting={{
+          ...fitting,
+          modules: [
+            ...fitting.modules,
+            { slot: 'high', slotIndex: 1, typeId: 12, state: 'active' },
+          ],
+        }}
+        stats={statsWith(10)}
+        moduleResults={[
+          { state: 'active', maxState: 'overload', chargeGroupIds: [83] },
+          { state: 'online', maxState: 'online', chargeGroupIds: [] },
+          { state: 'active', maxState: 'overload', chargeGroupIds: [83] },
+        ]}
+      />
+    );
+    const pipOf = (slot: string) =>
+      container
+        .querySelector(`[data-ring-slot="${slot}"] [data-charge-pip]`)
+        ?.getAttribute('data-charge-pip');
+    expect(pipOf('high-0')).toBe('loaded');
+    expect(pipOf('high-1')).toBe('empty');
+    // A module that takes no charge, and an empty slot, get no pip at all.
+    expect(pipOf('low-0')).toBeUndefined();
+    expect(pipOf('high-2')).toBeUndefined();
+  });
+
   it('colours each fitted tile border by the state it reached', () => {
     const { container } = render(
       <FittingRing
