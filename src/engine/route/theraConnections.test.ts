@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   buildTheraConnectionRows,
   filterTheraConnections,
+  groupTheraConnectionsByBand,
   jumpsSortValue,
+  type ConnectionDistances,
   type TheraConnection,
 } from './theraConnections';
 
@@ -138,6 +140,18 @@ describe('buildTheraConnectionRows', () => {
     });
     expect(row.jumps).toEqual({ kind: 'no-origin' });
   });
+
+  it('says no gate route for a J-space exit even with no origin or no stargate map', () => {
+    const jspace = connection({
+      exitSystemId: 31000629,
+      exitSystemName: 'J120704',
+      exitClass: 'c2',
+    });
+    for (const distances of [NO_ORIGIN, { kind: 'unknown' } as const]) {
+      const [row] = buildTheraConnectionRows([jspace], { now: NOW, systems: SYSTEMS, distances });
+      expect(row.jumps).toEqual({ kind: 'no-route' });
+    }
+  });
 });
 
 describe('filterTheraConnections', () => {
@@ -164,7 +178,7 @@ describe('filterTheraConnections', () => {
   );
   const ids = (filter: Parameters<typeof filterTheraConnections>[1]) =>
     filterTheraConnections(rows, filter).map((row) => row.id);
-  const ALL = { hub: 'all', space: 'all', shipSize: 'any' } as const;
+  const ALL = { hub: 'all', shipSize: 'any' } as const;
 
   it('passes everything with no filter set', () => {
     expect(ids(ALL)).toHaveLength(4);
@@ -172,11 +186,6 @@ describe('filterTheraConnections', () => {
 
   it('filters by hub', () => {
     expect(ids({ ...ALL, hub: 'turnur' })).toEqual(['turnur-ns-capital']);
-  });
-
-  it('filters by the exit security band', () => {
-    expect(ids({ ...ALL, space: 'highsec' })).toEqual(['thera-hs-medium', 'thera-hs-unsized']);
-    expect(ids({ ...ALL, space: 'wormhole' })).toEqual(['thera-c2-large']);
   });
 
   it('keeps connections that pass at least the chosen ship size, dropping unsized ones', () => {
@@ -203,5 +212,96 @@ describe('jumpsSortValue', () => {
     });
     expect(jumpsSortValue(known)).toBe(4);
     expect(jumpsSortValue(none)).toBeUndefined();
+  });
+});
+
+describe('groupTheraConnectionsByBand', () => {
+  const build = (connections: TheraConnection[], distances: ConnectionDistances) =>
+    groupTheraConnectionsByBand(
+      buildTheraConnectionRows(connections, { now: NOW, systems: SYSTEMS, distances })
+    );
+  const idsOf = (rows: readonly { id: string }[]) => rows.map((row) => row.id);
+
+  it('puts each exit in the column for the space it comes out in', () => {
+    const bands = build(
+      [
+        connection({ id: 'hs' }),
+        connection({ id: 'shown-hs', exitSystemId: 30003807, exitClass: 'ls' }),
+        connection({ id: 'ls', exitSystemId: 9, exitClass: 'ls' }),
+        connection({ id: 'ns', exitSystemId: 30004629, exitClass: 'ns' }),
+        connection({
+          id: 'c2',
+          exitSystemId: 31000629,
+          exitSystemName: 'J120704',
+          exitClass: 'c2',
+        }),
+      ],
+      NO_ORIGIN
+    );
+    expect({
+      highsec: idsOf(bands.highsec),
+      lowsec: idsOf(bands.lowsec),
+      nullsec: idsOf(bands.nullsec),
+      wormhole: idsOf(bands.wormhole),
+    }).toEqual({
+      highsec: ['hs', 'shown-hs'],
+      lowsec: ['ls'],
+      nullsec: ['ns'],
+      wormhole: ['c2'],
+    });
+  });
+
+  it('leaves out an exit whose space nothing can tell', () => {
+    const bands = build([connection({ id: 'none', exitSystemId: 3, exitClass: null })], NO_ORIGIN);
+    expect(Object.values(bands).flat()).toEqual([]);
+  });
+
+  it('sorts a k-space column nearest first, then longest life, with no known distance last', () => {
+    const bands = build(
+      [
+        connection({ id: 'island', exitSystemId: 11, exitClass: 'hs' }),
+        connection({ id: 'far', exitSystemId: 12, exitClass: 'hs' }),
+        connection({ id: 'near-short', exitSystemId: 13, exitClass: 'hs', expiresAt: NOW + HOUR }),
+        connection({
+          id: 'near-long',
+          exitSystemId: 14,
+          exitClass: 'hs',
+          expiresAt: NOW + 9 * HOUR,
+        }),
+      ],
+      {
+        kind: 'known',
+        jumps: new Map([
+          [12, 9],
+          [13, 2],
+          [14, 2],
+        ]),
+      }
+    );
+    expect(idsOf(bands.highsec)).toEqual(['near-long', 'near-short', 'far', 'island']);
+  });
+
+  it('sorts a k-space column by remaining life when no jumps are known', () => {
+    const bands = build(
+      [
+        connection({ id: 'short', expiresAt: NOW + HOUR }),
+        connection({ id: 'long', expiresAt: NOW + 9 * HOUR }),
+      ],
+      NO_ORIGIN
+    );
+    expect(idsOf(bands.highsec)).toEqual(['long', 'short']);
+  });
+
+  it('sorts the J-space column by remaining life, longest first', () => {
+    const jspace = (id: string, hours: number) =>
+      connection({
+        id,
+        exitSystemId: 31000629,
+        exitSystemName: 'J120704',
+        exitClass: 'c2',
+        expiresAt: NOW + hours * HOUR,
+      });
+    const bands = build([jspace('3h', 3), jspace('12h', 12), jspace('1h', 1)], NO_ORIGIN);
+    expect(idsOf(bands.wormhole)).toEqual(['12h', '3h', '1h']);
   });
 });
