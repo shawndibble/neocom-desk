@@ -8,6 +8,7 @@
  * BPC Sourcing can list contract originals and market BPOs off the same two
  * functions.
  */
+import type { LpRate } from '@/engine/loyalty/marketLpValue';
 import {
   effectivePrice,
   filterBpcContracts,
@@ -227,16 +228,16 @@ export function sectionRows<T>(
 
 /**
  * What one LP Store redemption costs in ISK: its ISK cost plus its LP cost at
- * the pilot's own **LP Value** (ISK per LP). A zero rate — the default —
- * prices the ISK side alone. A negative or non-finite rate is treated as zero
- * rather than discounting the offer.
+ * the **LP Value** it's priced at (`lpRate`: the pilot's own, else the
+ * store's market value). With no rate (`null`) the ISK side alone — the
+ * caller says so, since that undercounts the LP rather than freeing it.
  */
-export function lpPickPrice(iskCost: number, lpCost: number, iskPerLp: number): number {
+export function lpPickPrice(iskCost: number, lpCost: number, iskPerLp: number | null): number {
   return iskCost + lpCost * usableRate(iskPerLp);
 }
 
-function usableRate(iskPerLp: number): number {
-  return Number.isFinite(iskPerLp) && iskPerLp > 0 ? iskPerLp : 0;
+function usableRate(iskPerLp: number | null): number {
+  return iskPerLp !== null && Number.isFinite(iskPerLp) && iskPerLp > 0 ? iskPerLp : 0;
 }
 
 /**
@@ -259,23 +260,30 @@ export interface LpOfferRow {
    * (`loadLpTurnInPricer`); 0 with none to buy, `null` when unpriceable.
    */
   turnInCost: number | null;
-  /** `lpPickPrice` at the pilot's rate, plus `turnInCost` when it is known. */
+  /** `lpPickPrice` at `lpRate`, plus `turnInCost` when it is known. */
   price: number;
-  /** False when the rate is zero: `price` is the ISK cost only. */
+  /** False when nothing priced the LP: `price` is the ISK cost only. */
   lpPriced: boolean;
+  /** ISK per LP the LP was priced at; null when unpriced. */
+  lpRate: number | null;
+  /** Whose rate: the pilot's own LP Value or this store's market value. */
+  lpRateSource: LpRate['source'];
   me: 0;
   te: 0;
-  pickable: true;
+  /** False when the offer costs LP and nothing prices it: picking it would write the LP in as free. */
+  pickable: boolean;
 }
 
 export function lpOfferRows(
   matches: readonly LpOfferMatch[],
-  iskPerLp: number,
+  /** The rate each store's LP is priced at (`lpRate`). */
+  rateFor: (corporationId: number) => LpRate,
   /** Turn-in cost per offer (`loadLpTurnInPricer`); absent while it loads, which prices none. */
   turnInCostFor: (offer: LpOfferMatch['offer']) => number | null = () => 0
 ): LpOfferRow[] {
   return byCheapest(
     matches.map((m): LpOfferRow => {
+      const { rate, source } = rateFor(m.corporationId);
       const turnInCost = m.offer.required_items.length === 0 ? 0 : turnInCostFor(m.offer);
       return {
         kind: 'lp',
@@ -287,11 +295,13 @@ export function lpOfferRows(
         quantity: m.offer.quantity,
         requiredItemCount: m.offer.required_items.length,
         turnInCost,
-        price: lpPickPrice(m.offer.isk_cost, m.offer.lp_cost, iskPerLp) + (turnInCost ?? 0),
-        lpPriced: usableRate(iskPerLp) > 0 && m.offer.lp_cost > 0,
+        price: lpPickPrice(m.offer.isk_cost, m.offer.lp_cost, rate) + (turnInCost ?? 0),
+        lpPriced: usableRate(rate) > 0 && m.offer.lp_cost > 0,
+        lpRate: rate,
+        lpRateSource: source,
         me: 0,
         te: 0,
-        pickable: true,
+        pickable: m.offer.lp_cost === 0 || usableRate(rate) > 0,
       };
     })
   );

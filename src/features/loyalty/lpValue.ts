@@ -1,9 +1,7 @@
 /**
- * The pilot's **LP Value** (issue #1240): what they count one loyalty point
- * as worth, in ISK. Prices an LP Store pick in the Blueprint Acquisition
- * modal as ISK cost + LP cost × this rate. Default 0 — ISK cost alone —
- * because the app has no honest single number for what an LP is worth; the
- * pilot types their own and it is kept from then on.
+ * The pilot's own **LP Value** (issue #1240): what they count one loyalty
+ * point as worth, in ISK, for every store's LP. Default 0, which means "use
+ * each store's market rate" (`marketLpValue.ts`, resolved by `lpRate`).
  *
  * Synced (`sync.loyaltyLpValue`): the rate someone cashes out LP at is a fact
  * about how they play, not about one machine — same reasoning as

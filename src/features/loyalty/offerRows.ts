@@ -301,6 +301,29 @@ export function collectNameableTypeIds(offers: readonly LoyaltyStoreOffer[]): nu
   return [...ids];
 }
 
+/**
+ * Every typeId a store's offers need a hub price for: each offer's own item,
+ * its `required_items` turn-ins, and — for a catalog-known blueprint offer —
+ * its product and materials. Shared by the LP Store page and the market LP
+ * Value (`marketLpValue.ts`), so the two always price the same set.
+ */
+export function offerPriceTypeIds(
+  offers: readonly LoyaltyStoreOffer[],
+  catalog: BlueprintCatalog
+): number[] {
+  const ids = new Set<number>();
+  for (const offer of offers) {
+    ids.add(offer.type_id);
+    for (const req of offer.required_items) ids.add(req.type_id);
+    const entry = catalog.byBlueprintTypeID.get(offer.type_id);
+    if (entry) {
+      if (entry.productTypeID !== null) ids.add(entry.productTypeID);
+      for (const m of entry.blueprint.materials) ids.add(m.typeID);
+    }
+  }
+  return [...ids];
+}
+
 /** Ranked most- to least-profitable-per-LP; unpriceable offers sink to the end. */
 export function computeLoyaltyOfferRows(inputs: LoyaltyOfferComputeInputs): LoyaltyOfferRow[] {
   const rows = inputs.offers.map((offer) => {

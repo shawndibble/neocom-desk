@@ -493,7 +493,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     const params = new URLSearchParams({ product: String(row.productTypeId) });
     applyBlueprintPriceSeed(
       params,
-      await lpBlueprintPickPrice(row.offer, getTradeHub(hubId) ?? DEFAULT_TRADE_HUB)
+      await lpBlueprintPickPrice(row.offer, corporationId, getTradeHub(hubId) ?? DEFAULT_TRADE_HUB)
     );
     navigate(`${industryTabHref('plans')}?${params.toString()}`);
   }
