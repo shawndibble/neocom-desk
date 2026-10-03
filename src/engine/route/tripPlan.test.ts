@@ -273,3 +273,41 @@ describe('planTrip', () => {
     expect(planTrip(LINE, A, [ISLAND]).unreachable).toBe(true);
   });
 });
+
+describe('stop order through extra connections', () => {
+  // START ─ A ─ B ─ C ─ D ─ E by gate, and a hole pair START ⤳ HUB ⤳ E. By
+  // gate D comes before E; through the holes E is two jumps away, so E first.
+  const START = 32000001;
+  const A = 32000002;
+  const B = 32000003;
+  const C = 32000004;
+  const D = 32000005;
+  const E = 32000006;
+  const HUB = 32000007;
+  const graph: JumpGraph = new Map([
+    [START, [A]],
+    [A, [START, B]],
+    [B, [A, C]],
+    [C, [B, D]],
+    [D, [C, E]],
+    [E, [D]],
+    [HUB, []],
+  ]);
+  const extraConnections = [
+    [START, HUB],
+    [HUB, E],
+  ] as const;
+
+  it('orders stops by the costs the holes give', () => {
+    const points = [START, D, E];
+    const gatesOnly = pairwiseRouteCosts(graph, points);
+    expect(gatesOnly[0][2]?.jumps).toBe(5);
+    const withHoles = pairwiseRouteCosts(graph, points, {
+      extraConnections,
+      freeSystems: new Set([HUB]),
+    });
+    expect(withHoles[0][2]?.jumps).toBe(2);
+    expect(optimizeStopOrder(gatesOnly)).toEqual([1, 2]);
+    expect(optimizeStopOrder(withHoles)).toEqual([2, 1]);
+  });
+});

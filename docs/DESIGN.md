@@ -602,6 +602,9 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
     hard, and it reads as "not available", which no flat fill can say without
     being mistaken for "empty". Reach for this only where a surface must look
     unavailable rather than merely dim.
+    Its one sibling is `.route-strip-hole`, Route Safety's wormhole jump
+    on the route strip: a step with no security of its own to colour it,
+    hatched so it never reads as a system of some security band.
   - The Ship Tree's corner brackets, grid and render mask (`shipTree.css`)
     are hard-stop drawings under its own exception — §1 "Ship Tree (ISIS)".
 - Layering: `bg` → `panel` → `panel-2`. Depth via background steps + hairlines,

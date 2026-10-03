@@ -8,8 +8,10 @@ import {
   intParam,
   isoDateParam,
   nullableTextParam,
+  optionalBoolParam,
   optionalEnumParam,
   optionalIdParam,
+  optionalIntParam,
   optionalSortParam,
   orderedIdListParam,
   resolveSort,
@@ -112,6 +114,42 @@ describe('enumParam', () => {
   it('omits the default', () => {
     expect(codec.serialize('hub')).toBeNull();
     expect(codec.serialize('region')).toBe('region');
+  });
+});
+
+describe('optionalBoolParam', () => {
+  const codec = optionalBoolParam();
+
+  it('is null when absent or unreadable, so the saved default applies', () => {
+    expect(codec.parse(null)).toBeNull();
+    expect(codec.parse('yes')).toBeNull();
+    expect(codec.serialize(null)).toBeNull();
+  });
+
+  it('round-trips either side explicitly', () => {
+    expect(codec.parse('1')).toBe(true);
+    expect(codec.parse('0')).toBe(false);
+    expect(codec.serialize(true)).toBe('1');
+    expect(codec.serialize(false)).toBe('0');
+  });
+});
+
+describe('optionalIntParam', () => {
+  const codec = optionalIntParam({ min: 0, max: 24 });
+
+  it('is null when absent, unreadable or out of bounds', () => {
+    expect(codec.parse(null)).toBeNull();
+    expect(codec.parse('1.5')).toBeNull();
+    expect(codec.parse('25')).toBeNull();
+    expect(codec.parse('-1')).toBeNull();
+    expect(codec.serialize(null)).toBeNull();
+  });
+
+  it('round-trips any value in bounds, zero included', () => {
+    expect(codec.parse('0')).toBe(0);
+    expect(codec.parse('24')).toBe(24);
+    expect(codec.serialize(0)).toBe('0');
+    expect(codec.serialize(3)).toBe('3');
   });
 });
 

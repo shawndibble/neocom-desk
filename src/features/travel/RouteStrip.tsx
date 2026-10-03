@@ -8,9 +8,13 @@
  * Chokepoint — are written out under it. A chokepoint has a line over its
  * cell and a system with kills in the last hour a mark inside it.
  *
+ * A jump through a Thera / Turnur hole (issue #2476) is a hatched cell of
+ * its own between its two systems' cells: a step, with no security to colour.
+ *
  * One `role="img"`, not a tab stop per cell: a 40-jump route would otherwise
  * be 40 stops the table below already covers.
  */
+import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { Tooltip } from '@/components/ui';
@@ -18,6 +22,7 @@ import { routeStripKeySystems, type RouteSafetyRow } from '@/engine/route/routeS
 import { securityStatusColor } from '@/engine/securityStatus';
 import { routeSystemName } from './routeSystemName';
 import type { RouteKillsCell } from './useRouteKills';
+import type { HoleAt } from './useRouteSafety';
 
 function securityText(row: RouteSafetyRow): string {
   return row.security === null ? '—' : row.security.toFixed(1);
@@ -34,11 +39,14 @@ export function RouteStrip({
   rows,
   killsOf,
   stopIndexes,
+  holeAt,
 }: {
   rows: readonly RouteSafetyRow[];
   killsOf: (systemId: number) => RouteKillsCell;
   /** On a trip through several Stops, where each one falls: those are key systems too. */
   stopIndexes?: readonly number[];
+  /** The hole a step crosses, or `null` for a stargate jump. */
+  holeAt?: HoleAt;
 }) {
   const { t } = useTranslation();
   const first = rows[0];
@@ -57,6 +65,12 @@ export function RouteStrip({
         })
       : t('travel.strip.system', { name: routeSystemName(row), security: securityText(row) });
   const withKills = rows.filter((row) => hasKills(row, killsOf(row.systemId)));
+  // Whether the step into each row was through a hole.
+  const holeInto = rows.map((row, index) => {
+    const previous = rows[index - 1];
+    return previous !== undefined && holeAt?.(previous.systemId, row.systemId) != null;
+  });
+  const holeJumps = holeInto.filter(Boolean).length;
   const label = [
     t('travel.strip.label', {
       count: rows.length,
@@ -71,6 +85,7 @@ export function RouteStrip({
             names: [...new Set(withKills.map(routeSystemName))].join(', '),
           }),
         ]),
+    ...(holeJumps === 0 ? [] : [t('travel.holes.stripLabel', { count: holeJumps })]),
   ].join(' ');
 
   return (
@@ -79,28 +94,47 @@ export function RouteStrip({
         {rows.map((row, index) => {
           const kills = withKills.includes(row);
           const tip = [describe(row), ...(kills ? [t('travel.strip.kills')] : [])].join('\n');
+          const previous = rows[index - 1];
           return (
-            <Tooltip key={index} content={tip}>
-              <span
-                data-testid="route-strip-cell"
-                className={`relative min-w-0 flex-1 rounded-[1px] ${row.security === null ? 'bg-line' : ''}`}
-                style={
-                  row.security === null
-                    ? undefined
-                    : { backgroundColor: securityStatusColor(row.security) }
-                }
-              >
-                {row.chokepoint && (
-                  <span aria-hidden="true" className="absolute inset-x-0 -top-1 h-0.5 bg-warning" />
-                )}
-                {kills && (
+            <Fragment key={index}>
+              {holeInto[index] && previous && (
+                <Tooltip
+                  content={t('travel.holes.stripCell', {
+                    from: routeSystemName(previous),
+                    to: routeSystemName(row),
+                  })}
+                >
                   <span
-                    aria-hidden="true"
-                    className="absolute top-1/2 left-1/2 size-1 -translate-1/2 rounded-full bg-bg"
+                    data-testid="route-strip-hole"
+                    className="route-strip-hole min-w-0 flex-1 rounded-[1px] bg-panel-2"
                   />
-                )}
-              </span>
-            </Tooltip>
+                </Tooltip>
+              )}
+              <Tooltip content={tip}>
+                <span
+                  data-testid="route-strip-cell"
+                  className={`relative min-w-0 flex-1 rounded-[1px] ${row.security === null ? 'bg-line' : ''}`}
+                  style={
+                    row.security === null
+                      ? undefined
+                      : { backgroundColor: securityStatusColor(row.security) }
+                  }
+                >
+                  {row.chokepoint && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-x-0 -top-1 h-0.5 bg-warning"
+                    />
+                  )}
+                  {kills && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute top-1/2 left-1/2 size-1 -translate-1/2 rounded-full bg-bg"
+                    />
+                  )}
+                </span>
+              </Tooltip>
+            </Fragment>
           );
         })}
       </div>

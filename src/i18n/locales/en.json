@@ -6432,7 +6432,7 @@
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, and how the Assign form edits ore values.",
             "layout": "Layout: hidden and reordered Overview cards, and pages hidden from the navigation.",
-            "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold)."
+            "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs."
           }
         },
         "local": {
@@ -7438,11 +7438,41 @@
       "lowest": "lowest {{security}}",
       "kills": "{{ships}} ship · {{pods}} pod kills in the last hour",
       "chokepoints": "Gank Chokepoints: {{names}}",
-      "noChokepoints": "no Gank Chokepoints"
+      "noChokepoints": "no Gank Chokepoints",
+      "byGate": "{{count}} by gate",
+      "throughHoles_one": "{{count}} through a wormhole",
+      "throughHoles_other": "{{count}} through wormholes"
     },
     "activityLoading": "Loading the last hour of jumps and kills…",
     "activityUnavailable": "Some of ESI's last-hour figures couldn't be read, so they show as —, not as zero.",
     "dataAgeNote": "Jumps and kills cover the last hour; ESI refreshes them about hourly.",
+    "wormholeSpace": "ESI doesn't report wormhole space",
+    "holes": {
+      "group": "Route Safety only · your default on this page, can be overridden in the link",
+      "enabled": "Route through Thera / Turnur",
+      "shipSize": "My ship fits",
+      "minLifeBefore": "Skip holes with under",
+      "minLifeAfter": "h left",
+      "minLifeLabel": "Skip holes with under this many hours left",
+      "hubs": "Hubs",
+      "chip": "Holes",
+      "loading": "Checking Thera / Turnur connections…",
+      "unavailable": "EVE-Scout couldn't be reached, so this route uses gates only.",
+      "wormhole": "Wormhole",
+      "ends": "{{from}} → {{to}}",
+      "warpTo": "Warp to <sig>{{signature}}</sig> in {{system}}",
+      "fits": "fits {{size}}",
+      "source": "EVE-Scout, {{age}}",
+      "copy": "Copy {{signature}}",
+      "copyShort": "Copy",
+      "copied": "Copied",
+      "copyLabel": "Copy signature {{signature}} in {{system}}",
+      "copiedLabel": "Copied signature {{signature}} in {{system}}",
+      "unknownSignature": "the signature",
+      "stripCell": "Wormhole jump, {{from}} → {{to}}",
+      "stripLabel_one": "{{count}} jump through a wormhole.",
+      "stripLabel_other": "{{count}} jumps through wormholes."
+    },
     "thera": {
       "tab": "Thera / Turnur",
       "originLabel": "Jumps from",

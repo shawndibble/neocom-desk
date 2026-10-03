@@ -160,6 +160,25 @@ function shape(stretches: ReturnType<typeof foldQuietStretches>): string[] {
 }
 
 describe('foldQuietStretches', () => {
+  it('never folds a pinned system, such as either end of a wormhole jump', () => {
+    const rows = [row(1), row(2), row(3), row(4), row(5), row(6)];
+    expect(shape(foldQuietStretches(rows, noZkill, new Set([3, 4])))).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+    ]);
+    expect(shape(foldQuietStretches(rows, noZkill, new Set([4])))).toEqual([
+      '1',
+      'quiet[2,3]',
+      '4',
+      '5',
+      '6',
+    ]);
+  });
+
   it('folds a run of quiet middle systems, never either end', () => {
     const rows = [row(1), row(2), row(3), row(4), row(5)];
     expect(shape(foldQuietStretches(rows, noZkill))).toEqual(['1', 'quiet[2,3,4]', '5']);

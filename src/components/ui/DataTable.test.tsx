@@ -1097,6 +1097,32 @@ describe('DataTable opt-in phone features', () => {
   });
 });
 
+describe('DataTable fullWidthRow', () => {
+  it('renders a row as one cell across every column, with no column renders and no expand', async () => {
+    const user = userEvent.setup();
+    const render0 = vi.fn((row: Row) => row.item);
+    render(
+      <DataTable
+        columns={[{ ...columns[0], render: render0 }, columns[1]]}
+        rows={[rows[0], { id: 9, item: 'between', amount: 0, expired: false }, rows[1]]}
+        rowKey={(row) => row.id}
+        label="Items"
+        fullWidthRow={(row) => (row.id === 9 ? <span>Full width note</span> : null)}
+        rowClassName={(row) => (row.id === 9 ? 'note-row' : undefined)}
+        expandableRow={{ renderDetail: (row) => `detail ${row.item}` }}
+      />
+    );
+    const cell = screen.getByText('Full width note').closest('td');
+    expect(cell).toHaveAttribute('colspan', '3');
+    const tr = cell?.closest('tr');
+    expect(tr).toHaveClass('dt-full-row', 'note-row');
+    expect(render0).not.toHaveBeenCalledWith(expect.objectContaining({ id: 9 }));
+    await user.click(screen.getByText('Full width note'));
+    expect(screen.queryByText('detail between')).toBeNull();
+    expect(screen.getByText('Tritanium')).toBeInTheDocument();
+  });
+});
+
 describe('DataTable virtualize', () => {
   const many: Row[] = Array.from({ length: 1_000 }, (_, i) => ({
     id: i + 1,
