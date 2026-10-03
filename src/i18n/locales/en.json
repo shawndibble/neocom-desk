@@ -539,7 +539,12 @@
       "ladderHint": "Long range ↓ more damage",
       "priceyLabel": "over 10× the Tech I cost per minute",
       "navy": "Navy",
-      "pirate": "Pirate"
+      "pirate": "Pirate",
+      "sheetTitle": "Charge · {{name}}",
+      "scopeLabel": "Load into",
+      "scopeAll_one": "This gun",
+      "scopeAll_other": "All {{count}}",
+      "scopeOne": "This gun"
     },
     "popular": {
       "title": "Popular fits",

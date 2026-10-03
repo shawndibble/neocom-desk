@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -28,7 +28,6 @@ import {
   removeModule,
   setCargoQuantity,
   setDroneCounts,
-  setModuleCharge,
   setModuleState,
 } from '@/engine/fittings/fittingEdit';
 import {
@@ -45,7 +44,7 @@ import { moduleKey } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
 import { useOptionalItemActions } from '@/features/market/itemActions';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
-import { checkCharges } from './dogmaFittingEngine';
+import { ListChargePicker } from './ListChargePicker';
 import { endFittingDrag, startFittingDrag, type FittingDragPayload } from './fittingDrag';
 import {
   CargoMenuItems,
@@ -179,7 +178,6 @@ export function ModuleRow({
   });
   const name = catalogueTypeName(catalogue, module.typeId);
   const { slot, slotIndex, typeId } = module;
-  const shipTypeId = fitting.shipTypeId;
 
   // Offer only states the module can reach — every state until its own
   // calculation says otherwise — and show the one it reached: a pasted fit
@@ -189,20 +187,8 @@ export function ModuleRow({
   const states = reachableModuleStates(maxState, shownState);
 
   const chargeGroupIds = result?.chargeGroupIds;
-  const charges = useMemo(() => {
-    if (!chargeGroupIds || chargeGroupIds.length === 0 || catalogue === null) return [];
-    const candidates = chargeGroupIds.flatMap((id) => catalogue.typeIdsByGroup.get(id) ?? []);
-    const accepted =
-      engineReady && profile !== null
-        ? checkCharges(shipTypeId, { slot, typeId }, candidates, profile)
-        : new Set(candidates);
-    return candidates
-      .filter((id) => accepted.has(id))
-      .map((id) => ({ id, name: catalogueTypeName(catalogue, id) }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [chargeGroupIds, catalogue, engineReady, profile, shipTypeId, slot, typeId]);
+  const takesCharges = (chargeGroupIds?.length ?? 0) > 0;
   const loadedCharge = module.chargeTypeId;
-  const loadedListed = loadedCharge === undefined || charges.some((c) => c.id === loadedCharge);
 
   return (
     <SlotCard
@@ -260,33 +246,17 @@ export function ModuleRow({
           ))}
         </NativeSelect>
       )}
-      {(charges.length > 0 || loadedCharge !== undefined) && (
-        <NativeSelect
-          size="sm"
-          className={`min-w-0 flex-1 @min-[34rem]:w-56 @min-[34rem]:flex-none ${TOUCH_SELECT_CLASS}`}
-          aria-label={t('fittings.edit.chargeLabel', { name })}
-          value={loadedCharge ?? ''}
-          onChange={(event) =>
-            edit((f) =>
-              setModuleCharge(
-                f,
-                slot,
-                slotIndex,
-                event.target.value === '' ? null : Number(event.target.value)
-              )
-            )
-          }
-        >
-          <option value="">{t('fittings.edit.noCharge')}</option>
-          {!loadedListed && loadedCharge !== undefined && (
-            <option value={loadedCharge}>{catalogueTypeName(catalogue, loadedCharge)}</option>
-          )}
-          {charges.map((charge) => (
-            <option key={charge.id} value={charge.id}>
-              {charge.name}
-            </option>
-          ))}
-        </NativeSelect>
+      {(takesCharges || loadedCharge !== undefined) && (
+        <ListChargePicker
+          module={module}
+          result={result ?? undefined}
+          fitting={fitting}
+          catalogue={catalogue}
+          engineReady={engineReady}
+          profile={profile}
+          edit={edit}
+          className="flex-1 @min-[34rem]:w-56 @min-[34rem]:flex-none"
+        />
       )}
       {onOpenVariations && (
         <IconButton
