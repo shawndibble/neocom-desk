@@ -64,8 +64,14 @@ describe('MobileMarketWideList', () => {
   it('ranks each card and says how much of the scan is shown', () => {
     renderList();
     expect(screen.getByText('Top 2 of 812')).toBeInTheDocument();
+    expect(within(card('Widget Beta')).getByText('Rank 1')).toBeInTheDocument();
     expect(within(card('Widget Beta')).getByText('#1')).toBeInTheDocument();
     expect(within(card('Widget Gamma')).getByText('#2')).toBeInTheDocument();
+  });
+
+  it('just counts the cards when the whole scan fits on the page', () => {
+    renderList({ total: 2 });
+    expect(screen.getByText('2 products')).toBeInTheDocument();
   });
 
   it('leads with the sorted field and folds the rest into the quiet line', () => {

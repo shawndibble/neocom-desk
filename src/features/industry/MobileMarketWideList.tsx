@@ -125,7 +125,11 @@ export function MobileMarketWideList({
     <div className="-mx-3 flex flex-col">
       <MobileSortToolbar
         count={rows.length}
-        summary={t('industry.marketOpportunitiesTopOf', { shown: rows.length, total })}
+        summary={
+          rows.length < total
+            ? t('industry.marketOpportunitiesTopOf', { shown: rows.length, total })
+            : t('industry.marketOpportunitiesCount', { count: total })
+        }
         fields={SORT_FIELD_ORDER.map((id) => ({ id, label: fieldLabel[id] }))}
         sort={sort}
         onSortChange={onSortChange}
@@ -151,13 +155,19 @@ export function MobileMarketWideList({
                   height={40}
                   className="size-10 rounded-xs border border-line"
                 />
-                <span className="absolute -bottom-1 -left-1 rounded-xs border border-line bg-bg px-1 text-[0.625rem] leading-4 font-semibold text-text-dim tabular-nums">
-                  #{index + 1}
+                <span
+                  aria-hidden="true"
+                  className="absolute -bottom-1 -left-1 rounded-xs border border-line bg-bg px-1 text-[0.625rem] leading-4 font-semibold text-text-dim tabular-nums"
+                >
+                  {t('industry.marketOpportunitiesRankBadge', { rank: index + 1 })}
                 </span>
               </span>
 
               <div className="flex min-w-0 flex-col gap-1">
                 <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                  <span className="sr-only">
+                    {t('industry.marketOpportunitiesRank', { rank: index + 1 })}
+                  </span>
                   <span className="text-sm font-semibold break-words">
                     <MarketItemLink typeId={row.productTypeID}>{row.productName}</MarketItemLink>
                   </span>

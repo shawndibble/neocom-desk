@@ -603,8 +603,9 @@ export function MarketWideOpportunitiesPanel({
                   total: visibleRows.length,
                 })}
               </p>
+              {/* `sm` only beside the count with a pointer: alone on a phone it is a thumb target. */}
               <Button
-                size="sm"
+                size={isDesktop ? 'sm' : undefined}
                 onClick={() => setShownLimit((limit) => limit + MARKET_WIDE_PAGE_SIZE)}
               >
                 {remaining > MARKET_WIDE_PAGE_SIZE

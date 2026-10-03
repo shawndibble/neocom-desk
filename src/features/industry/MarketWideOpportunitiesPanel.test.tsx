@@ -280,7 +280,7 @@ describe('MarketWideOpportunitiesPanel on a phone', () => {
     try {
       renderPanel();
       expect(screen.queryByRole('table')).not.toBeInTheDocument();
-      expect(screen.getByText('Top 2 of 2')).toBeInTheDocument();
+      expect(screen.getByText('2 products')).toBeInTheDocument();
       const beta = screen.getByText('Widget Beta').closest('li')!;
       expect(within(beta).getByText('#1')).toBeInTheDocument();
       expect(
