@@ -1362,13 +1362,15 @@ export function BpcSourcingPanel() {
     (row: BpcSearchRow) => blueprintNames.get(row.typeId) ?? `#${row.typeId}`,
     [blueprintNames]
   );
-  // Item plus the visible columns, the same ids `columns` below lists. Built
-  // here rather than from `columns`, because the cap below sorts before the
-  // badges — and so the columns that render them — exist.
-  const sortProps = useUrlSort(BPC_SOURCING_SORT_KEY, OFFERS_DEFAULT_SORT, [
-    'item',
-    ...BPC_SEARCH_COLUMN_IDS.filter((id) => visibleColumns.includes(id)),
-  ]);
+  // In table order. Shared by `columns` below and the sort, which is resolved
+  // before `columns` exists: the cap sorts first, and the badges the Item
+  // column renders are picked from what it keeps.
+  const shownColumnIds = useMemo(
+    () => BPC_SEARCH_COLUMN_IDS.filter((id) => visibleColumns.includes(id)),
+    [visibleColumns]
+  );
+  const sortColumnIds = useMemo(() => ['item', ...shownColumnIds], [shownColumnIds]);
+  const sortProps = useUrlSort(BPC_SOURCING_SORT_KEY, OFFERS_DEFAULT_SORT, sortColumnIds);
   // The top `RESULT_LIMIT` rows by the table's own sort (`sortRows` is the
   // rule `DataTable` sorts with), so the cap keeps the cheapest copies under
   // the default Price sort, the nearest under Jumps, and so on.
@@ -1427,15 +1429,13 @@ export function BpcSourcingPanel() {
         },
       },
     ];
-    for (const id of BPC_SEARCH_COLUMN_IDS) {
-      if (visibleColumns.includes(id)) cols.push(bpcColumnsById[id]);
-    }
+    for (const id of shownColumnIds) cols.push(bpcColumnsById[id]);
     return cols;
   }, [
     t,
     blueprintNames,
     itemSortValue,
-    visibleColumns,
+    shownColumnIds,
     bpcColumnsById,
     bpoByType,
     badgedRows,
@@ -1461,7 +1461,9 @@ export function BpcSourcingPanel() {
   );
   const sourcingExport = useTableExport({
     surface: 'bpc-sourcing',
+    // Every match in the table's order, not just the `RESULT_LIMIT` it mounts.
     rows: displayRows,
+    source: 'sorted-rows',
     columns: csvColumns,
   });
 
