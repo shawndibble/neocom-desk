@@ -1442,7 +1442,8 @@
         "agility": "inertia",
         "lockRange": "km",
         "scanResolution": "mm"
-      }
+      },
+      "updating": "Updating for your change…"
     }
   },
   "skills": {

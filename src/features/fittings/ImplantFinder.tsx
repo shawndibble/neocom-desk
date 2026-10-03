@@ -167,6 +167,12 @@ export function ImplantFinder({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <PriceHubSelect size="sm" />
+        {finder.updating && (
+          <span className="flex items-center gap-1.5 text-xs text-text-dim" role="status">
+            <Spinner size="sm" />
+            {t('fittings.implantFinder.updating')}
+          </span>
+        )}
         {basis === 'clone' && (
           <p className="text-xs text-text-dim">{t('fittings.implantFinder.cloneBasisNote')}</p>
         )}
@@ -452,7 +458,7 @@ function GoalResults({
                       key={row.grade.typeId}
                       row={row}
                       name={names.get(row.grade.typeId) ?? result.family.name}
-                      code={row.grade.code ?? result.family.name}
+                      code={row.grade.code ?? ''}
                       effect={effect(row.stats)}
                       fixes={
                         budget !== null &&

@@ -95,6 +95,8 @@ export interface GoalSummary {
 
 export interface ImplantFinderState {
   status: 'loading' | 'ready' | 'error';
+  /** Showing the last results while the fit's new ones are worked out (after an Add). */
+  updating: boolean;
   /** How many families have been tried, for a progress line. */
   progress: { done: number; total: number };
   catalog: ImplantCatalog | null;
@@ -161,6 +163,7 @@ export function useImplantFinder({
   const [failed, setFailed] = useState(false);
   const [graded, setGraded] = useState<{
     key: string;
+    fitting: Fitting;
     stats: Map<number, FittingStats>;
     prices: Map<number, HubPrice[]>;
   } | null>(null);
@@ -209,7 +212,8 @@ export function useImplantFinder({
     };
   }, [open, evaluate, fitting, implants]);
 
-  const screenReady = screen !== null && screen.fitting === fitting;
+  // The last screen stays up while an edit's new one runs, rather than blanking the window.
+  const screenReady = screen !== null;
 
   const goals = useMemo<GoalSummary[]>(() => {
     if (!screenReady || !catalog) return [];
@@ -232,7 +236,7 @@ export function useImplantFinder({
 
   // 2. Every grade of the families that help the selected goal, and their prices at every hub.
   useEffect(() => {
-    if (!open || !evaluate || !catalog || !screenReady || helping.length === 0) return;
+    if (!open || !evaluate || !fitting || !catalog || !screenReady || helping.length === 0) return;
     let cancelled = false;
     void (async () => {
       const current = implants ?? [];
@@ -250,14 +254,14 @@ export function useImplantFinder({
         }
       }
       const prices = await pricesPending;
-      if (!cancelled) setGraded({ key: gradedKey, stats, prices });
+      if (!cancelled) setGraded({ key: gradedKey, fitting, stats, prices });
     })().catch(() => {
       if (!cancelled) setFailed(true);
     });
     return () => {
       cancelled = true;
     };
-  }, [open, evaluate, catalog, screenReady, helping, gradedKey, implants]);
+  }, [open, evaluate, fitting, catalog, screenReady, helping, gradedKey, implants]);
 
   const results = useMemo<FamilyResult[] | null>(() => {
     if (!goal || !screenReady || !catalog) return null;
@@ -331,6 +335,10 @@ export function useImplantFinder({
 
   return {
     status: failed ? 'error' : screenReady ? 'ready' : 'loading',
+    updating:
+      screen !== null &&
+      (screen.fitting !== fitting ||
+        (goal !== null && results !== null && graded?.fitting !== fitting && helping.length > 0)),
     progress,
     catalog,
     baseline: screenReady ? screen.baseline : null,
