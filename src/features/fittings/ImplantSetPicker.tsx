@@ -5,22 +5,38 @@
  * the EFT loader resolves names through — there is no per-slot SDE attribute
  * baked into this build's snapshot to drive a "browse implant slot 3" style
  * picker, so this trims to a name-search add/remove list instead.
+ *
+ * Given the open Fitting and pilot (`finder`), it opens on "Find by goal"
+ * (`ImplantFinder`) instead, with this list under "Your set".
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, IconButton, Modal, SearchInput, TypeIcon } from '@/components/ui';
+import {
+  Button,
+  Checkbox,
+  IconButton,
+  Modal,
+  SearchInput,
+  Tabs,
+  TypeIcon,
+  type TabItem,
+} from '@/components/ui';
 import { boosterSideEffects } from '@/engine/fittings/boosterSideEffects';
 import * as Icon from '@/components/ui/icons';
 import { MAX_BOOSTERS, MAX_IMPLANTS } from '@/engine/fitting/fittingShare';
-import type { FittingImplantSet } from '@/engine/fittings/types';
+import type { ImplantBasis } from '@/engine/fittings/implantBasis';
+import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { ImplantFinder } from './ImplantFinder';
 
 interface ImplantSetPickerProps {
   open: boolean;
   onClose: () => void;
   implantSet: FittingImplantSet | undefined;
   onChange: (implantSet: FittingImplantSet | undefined) => void;
+  /** The open Fitting and pilot: turns on "Find by goal". */
+  finder?: { fitting: Fitting; profile: PilotProfile; basis: ImplantBasis };
 }
 
 /** Stable identity: a fresh `{implants: [], boosters: []}` every render would
@@ -153,8 +169,15 @@ function SlotList({
   );
 }
 
-export function ImplantSetPicker({ open, onClose, implantSet, onChange }: ImplantSetPickerProps) {
+export function ImplantSetPicker({
+  open,
+  onClose,
+  implantSet,
+  onChange,
+  finder,
+}: ImplantSetPickerProps) {
   const { t } = useTranslation();
+  const [tab, setTab] = useState<'find' | 'set'>('find');
   const [nameMap, setNameMap] = useState<Map<string, { typeID: number }>>(new Map());
   const [names, setNames] = useState<Map<number, string>>(new Map());
   const [implantError, setImplantError] = useState<string | null>(null);
@@ -209,34 +232,68 @@ export function ImplantSetPicker({ open, onClose, implantSet, onChange }: Implan
     });
   }
 
+  const setEditor = (
+    <div className="space-y-4">
+      <SlotList
+        heading={t('fittings.implants.implantsHeading')}
+        typeIds={set.implants}
+        max={MAX_IMPLANTS}
+        names={names}
+        onAdd={(name) => addTo('implants', name)}
+        onRemove={(index) => removeFrom('implants', index)}
+        error={implantError}
+      />
+      <SlotList
+        heading={t('fittings.implants.boostersHeading')}
+        typeIds={set.boosters}
+        max={MAX_BOOSTERS}
+        names={names}
+        onAdd={(name) => addTo('boosters', name)}
+        onRemove={(index) => removeFrom('boosters', index)}
+        error={boosterError}
+        renderDetail={(typeId) => (
+          <SideEffectSwitches
+            boosterTypeId={typeId}
+            switchedOn={set.boosterSideEffects ?? []}
+            onToggle={toggleSideEffect}
+          />
+        )}
+      />
+    </div>
+  );
+
+  if (!finder) {
+    return (
+      <Modal open={open} onClose={onClose} title={t('fittings.implants.modalTitle')}>
+        <div className="p-3">{setEditor}</div>
+      </Modal>
+    );
+  }
+  const tabs: TabItem[] = [
+    { id: 'find', label: t('fittings.implantFinder.tabFind') },
+    { id: 'set', label: t('fittings.implantFinder.tabSet') },
+  ];
   return (
-    <Modal open={open} onClose={onClose} title={t('fittings.implants.modalTitle')}>
-      <div className="space-y-4 p-3">
-        <SlotList
-          heading={t('fittings.implants.implantsHeading')}
-          typeIds={set.implants}
-          max={MAX_IMPLANTS}
-          names={names}
-          onAdd={(name) => addTo('implants', name)}
-          onRemove={(index) => removeFrom('implants', index)}
-          error={implantError}
+    <Modal open={open} onClose={onClose} title={t('fittings.implants.modalTitle')} placement="wide">
+      <div className="space-y-3 p-3">
+        <Tabs
+          tabs={tabs}
+          value={tab}
+          onChange={(id) => setTab(id as 'find' | 'set')}
+          label={t('fittings.implants.modalTitle')}
         />
-        <SlotList
-          heading={t('fittings.implants.boostersHeading')}
-          typeIds={set.boosters}
-          max={MAX_BOOSTERS}
-          names={names}
-          onAdd={(name) => addTo('boosters', name)}
-          onRemove={(index) => removeFrom('boosters', index)}
-          error={boosterError}
-          renderDetail={(typeId) => (
-            <SideEffectSwitches
-              boosterTypeId={typeId}
-              switchedOn={set.boosterSideEffects ?? []}
-              onToggle={toggleSideEffect}
-            />
-          )}
-        />
+        {tab === 'find' ? (
+          <ImplantFinder
+            open={open}
+            fitting={finder.fitting}
+            profile={finder.profile}
+            basis={finder.basis}
+            implantSet={implantSet}
+            onChange={onChange}
+          />
+        ) : (
+          setEditor
+        )}
       </div>
     </Modal>
   );

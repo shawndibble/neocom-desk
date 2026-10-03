@@ -256,6 +256,31 @@ export function evaluateFitting(
   });
 }
 
+/**
+ * `fitting` with `implants` in place of its own carried implants (boosters
+ * kept), without overheat — the implant finder's "what would this implant
+ * do" run. Always on the Fitting's own set, since that is what the finder
+ * adds to, whichever basis the page shows.
+ */
+export function evaluateImplantSet(
+  fitting: Fitting,
+  profile: PilotProfile,
+  damageProfile: DamageProfile | undefined,
+  conditions: StatsConditions,
+  implants: readonly number[]
+): Promise<FittingStats> {
+  const pilot = applyImplantBasis(
+    profile,
+    { ...(fitting.implantSet ?? { boosters: [] }), implants: [...implants] },
+    'fitting'
+  );
+  return statsUnder(
+    fitting,
+    { pilot, conditions, ...(damageProfile === undefined ? {} : { damageProfile }) },
+    { overheated: false }
+  );
+}
+
 /** The open Fitting's stats, price and Variations evaluator. */
 export function useFittingEvaluation({
   fitting,
