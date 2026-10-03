@@ -1480,7 +1480,6 @@
       "maxLevelTitle": "Already at level 5"
     },
     "certificates": {
-      "intro": "CCP's combat certificates, graded against this character's trained skills. Each grade lists what the next one still needs.",
       "grade": {
         "0": "Not started",
         "1": "Basic",

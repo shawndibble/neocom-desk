@@ -285,7 +285,6 @@ export function SkillCertificates() {
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader title={t('nav.skills')} />
       <SkillsSubNav />
-      <p className="max-w-prose text-xs text-text-dim">{t('skills.certificates.intro')}</p>
       {body}
       {added && (
         <Toast
