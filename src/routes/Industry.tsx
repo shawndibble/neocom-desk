@@ -127,7 +127,7 @@ export function Industry() {
   useEffect(() => {
     void hydrateExpandedGroups();
   }, [hydrateExpandedGroups]);
-  // Opening a plan (a row, "Start a plan", a deep link) leaves for its own
+  // Opening a plan (a row, "Plan", a deep link) leaves for its own
   // page; fetch that page's chunk now so the click doesn't wait on it.
   useEffect(() => {
     preloadRouteChunk('/industry/plans/:planId');
@@ -166,7 +166,7 @@ export function Industry() {
   // Build Opportunities' blueprint data age, shown beside the page title.
   const [opportunitiesDataAge, setOpportunitiesDataAge] = useState<Date | null>(null);
 
-  // One plan per "Start a plan": set from the click until this page leaves
+  // One plan per "Plan" click: set from the click until this page leaves
   // for the new plan, so a second tap while the first is still saving (the
   // phone list's menu item has no busy state of its own) can't add a twin.
   const startingPlanRef = useRef(false);

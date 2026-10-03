@@ -26,9 +26,9 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
-  StatChip,
   type DataTableColumn,
   type StatChipTone,
+  STAT_CHIP_TONE_TEXT_CLASS,
 } from '@/components/ui';
 import { db } from '@/db';
 import { iskToneClass } from '@/features/character/format';
@@ -302,12 +302,15 @@ export function MarketWideOpportunitiesPanel({
       id: 'blueprintSource',
       header: t('industry.marketOpportunitiesBlueprintSource'),
       sortValue: SORT_VALUE.blueprintSource,
+      // The header already names the column, so the cell is just the toned value.
       render: (row) => (
-        <StatChip
-          label={t('industry.marketOpportunitiesBlueprintSource')}
-          value={t(`industry.marketOpportunitiesBlueprintSources.${row.blueprintSource}`)}
-          tone={row.blueprintSource === 'owned' ? 'success' : 'default'}
-        />
+        <span
+          className={
+            STAT_CHIP_TONE_TEXT_CLASS[row.blueprintSource === 'owned' ? 'success' : 'default']
+          }
+        >
+          {t(`industry.marketOpportunitiesBlueprintSources.${row.blueprintSource}`)}
+        </span>
       ),
     },
     {
@@ -364,11 +367,9 @@ export function MarketWideOpportunitiesPanel({
       header: t('industry.opportunitiesOrderDepthLabel'),
       sortValue: SORT_VALUE.orderDepth,
       render: (row) => (
-        <StatChip
-          label={t('industry.opportunitiesOrderDepthLabel')}
-          value={t(`industry.opportunitiesOrderDepth.${row.orderDepth}`)}
-          tone={ORDER_DEPTH_TONE[row.orderDepth]}
-        />
+        <span className={STAT_CHIP_TONE_TEXT_CLASS[ORDER_DEPTH_TONE[row.orderDepth]]}>
+          {t(`industry.opportunitiesOrderDepth.${row.orderDepth}`)}
+        </span>
       ),
     },
     {

@@ -2855,7 +2855,7 @@
     "marketOpportunitiesCheckingSales_one": "Checking daily sales across the trade-hub regions… {{count}} product left.",
     "marketOpportunitiesCheckingSales_other": "Checking daily sales across the trade-hub regions… {{count}} products left.",
     "marketOpportunitiesSourcesUnavailable": "Couldn't check {{sources}} — products whose blueprint only comes from there may be missing.",
-    "marketOpportunitiesStartPlan": "Start a plan",
+    "marketOpportunitiesStartPlan": "Plan",
     "marketOpportunitiesStartingPlan": "Starting…",
     "marketOpportunitiesSkillGateRule": "A locked row needs a skill no character on this account has trained. Every other row is one you can install today.",
     "buildCost": "Build cost",

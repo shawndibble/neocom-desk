@@ -10,7 +10,7 @@ describe('StartPlanButton', () => {
     const onStart = vi.fn(() => new Promise<boolean>((resolve) => (finish = resolve)));
     render(<StartPlanButton onStart={onStart} />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Start a plan' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Plan' }));
     const busy = screen.getByRole('button', { name: 'Starting…' });
     expect(busy).toBeDisabled();
     await userEvent.click(busy);
@@ -24,13 +24,13 @@ describe('StartPlanButton', () => {
 
   it('comes back when no plan was started', async () => {
     render(<StartPlanButton onStart={() => Promise.resolve(false)} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Start a plan' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Start a plan' })).toBeEnabled());
+    await userEvent.click(screen.getByRole('button', { name: 'Plan' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Plan' })).toBeEnabled());
   });
 
   it('comes back when creating the plan failed', async () => {
     render(<StartPlanButton onStart={() => Promise.reject(new Error('quota'))} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Start a plan' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Start a plan' })).toBeEnabled());
+    await userEvent.click(screen.getByRole('button', { name: 'Plan' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Plan' })).toBeEnabled());
   });
 });
