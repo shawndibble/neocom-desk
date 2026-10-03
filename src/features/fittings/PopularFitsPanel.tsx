@@ -17,6 +17,11 @@ interface PopularFitsPanelProps {
   onOpen: (loaded: LoadedFitting) => void;
   /** An open already under way: Open waits for it. */
   busy?: boolean;
+  /**
+   * Cap the list's height and scroll it in place — for a host with other
+   * content below it. Off, the list runs its full length and the host scrolls.
+   */
+  capped?: boolean;
 }
 
 /** A row's fitted modules by rack, in rack order; empty racks left out. */
@@ -59,6 +64,7 @@ export function PopularFitsPanel({
   hullName,
   onOpen,
   busy = false,
+  capped = true,
 }: PopularFitsPanelProps) {
   const { t } = useTranslation();
   const result = usePopularFits(shipTypeId);
@@ -79,7 +85,7 @@ export function PopularFitsPanel({
       ) : result.fits.length === 0 ? (
         <p className="text-xs text-text-dim">{t('fittings.popular.empty')}</p>
       ) : (
-        <ul className="max-h-72 space-y-1 overflow-y-auto">
+        <ul className={cx('space-y-1', capped && 'max-h-72 overflow-y-auto')}>
           {result.fits.map((fit, index) => (
             <li
               key={fit.key}
