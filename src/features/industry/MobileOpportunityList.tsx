@@ -2,9 +2,10 @@
  * Phone rendering of the Build Opportunities list (mobile UX pass): a
  * genuinely different information hierarchy from the desktop table, not a
  * CSS-only reflow of it — a glanceable list rather than a column-for-column
- * comparison. Each card leads with its selection checkbox, then the product,
- * a promoted "hero" metric (whichever field the pilot is sorting by), and
- * every other field folded into one quiet secondary line. Every row action
+ * comparison. Each card leads with its selection checkbox, then the product
+ * with a promoted "hero" metric (whichever field the pilot is sorting by)
+ * parked at the right of its row, and every other field folded into one
+ * quiet secondary line. Every row action
  * (Start a plan, price history, the market) lives in one borderless ⋯ menu.
  *
  * Identical copies — same owner, print, location, ME/TE and runs — fold into
@@ -226,33 +227,35 @@ export function MobileOpportunityList({
               </label>
 
               <div className="flex min-w-0 flex-col gap-1 py-3">
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                  <span className="text-sm font-semibold break-words">{productName}</span>
-                  {members.length > 1 && (
-                    <span className="text-[0.6875rem] font-semibold text-text-dim">
-                      {t('industry.opportunitiesCopies', { count: members.length })}
+                {/* The hero rides the name row's right edge like a price tag, matching the owned-blueprint cards. */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <span className="text-sm font-semibold break-words">{productName}</span>
+                    {members.length > 1 && (
+                      <span className="text-[0.6875rem] font-semibold text-text-dim">
+                        {t('industry.opportunitiesCopies', { count: members.length })}
+                      </span>
+                    )}
+                    {skillGateVerdict?.gated && (
+                      <SkillGateMarker
+                        verdict={skillGateVerdict}
+                        nameForSkill={nameForSkill}
+                        nameForCharacter={nameForCharacter}
+                      />
+                    )}
+                    {showCharacterColumn && (
+                      <span className="text-[0.6875rem] text-text-dim">
+                        {row.candidate.characterName}
+                      </span>
+                    )}
+                  </div>
+                  <span className="flex shrink-0 flex-col items-end text-right leading-tight tabular-nums">
+                    <span className={cx('text-sm font-semibold', hero.toneClassName)}>
+                      {hero.node}
                     </span>
-                  )}
-                  {skillGateVerdict?.gated && (
-                    <SkillGateMarker
-                      verdict={skillGateVerdict}
-                      nameForSkill={nameForSkill}
-                      nameForCharacter={nameForCharacter}
-                    />
-                  )}
-                  {showCharacterColumn && (
-                    <span className="text-[0.6875rem] text-text-dim">
-                      {row.candidate.characterName}
+                    <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">
+                      {fields[activeFieldId].label}
                     </span>
-                  )}
-                </div>
-
-                <div
-                  className={`flex items-baseline gap-1.5 text-xl leading-tight font-bold tabular-nums ${hero.toneClassName ?? ''}`}
-                >
-                  {hero.node}
-                  <span className="text-[0.6875rem] font-normal tracking-widest text-text-dim uppercase">
-                    {fields[activeFieldId].label}
                   </span>
                 </div>
 
