@@ -234,6 +234,71 @@ describe('FittingAddPanel', () => {
     expect(onLoadCharge).toHaveBeenCalledWith(501);
   });
 
+  it("collapses one module's charges, naming what it has loaded, and leaves the others open", async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation(() => new Map());
+    checkCharges.mockImplementation(() => new Set([501, 700]));
+    // Scourge shoots, so the launcher gets the Charge Picker; the cap booster's charge doesn't.
+    compareCharges.mockImplementation(() => [
+      {
+        typeId: 501,
+        dps: 100,
+        optimal: 20_000,
+        falloff: 0,
+        damage: null,
+        roundsPerMinute: 6,
+        techLevel: 1,
+      },
+    ]);
+    renderPanel({
+      fitting: {
+        ...fitting,
+        modules: [
+          { slot: 'high', slotIndex: 0, typeId: 400, state: 'active', chargeTypeId: 501 },
+          { slot: 'medium', slotIndex: 0, typeId: 600, state: 'active' },
+        ],
+      },
+      target: null,
+      catalogue: {
+        ...catalogue,
+        types: {
+          400: { name: 'Light Missile Launcher II', groupID: 1 },
+          501: { name: 'Scourge Light Missile', groupID: 2 },
+          600: { name: 'Medium Capacitor Booster II' },
+          700: { name: 'Navy Cap Booster 400', groupID: 9 },
+        } as unknown as FittingCatalogue['types'],
+        typeIdsByGroup: new Map([
+          [2, [501]],
+          [9, [700]],
+        ]),
+      },
+      moduleResults: [
+        { state: 'active', maxState: 'active', chargeGroupIds: [2] },
+        { state: 'active', maxState: 'active', chargeGroupIds: [9] },
+      ],
+    });
+
+    await user.click(screen.getByRole('tab', { name: 'Charges' }));
+    const launcher = screen.getByRole('button', { name: /1× Light Missile Launcher II/ });
+    expect(launcher).toHaveAttribute('aria-expanded', 'true');
+    expect(launcher).toHaveAccessibleName(
+      /Light Missile Launcher II, loaded: Scourge Light Missile/
+    );
+    expect(screen.getByRole('button', { name: 'Usable' })).toBeInTheDocument();
+
+    await user.click(launcher);
+    expect(launcher).toHaveAttribute('aria-expanded', 'false');
+    // Only the header is left, and it still says what the launchers fire.
+    expect(screen.getAllByRole('button', { name: /Scourge Light Missile/ })).toEqual([launcher]);
+    expect(launcher).toHaveTextContent('Scourge Light Missile');
+    // With no weapon section open, the picker's shared controls go too.
+    expect(screen.queryByRole('button', { name: 'Usable' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Navy Cap Booster 400/ })).toBeInTheDocument();
+
+    await user.click(launcher);
+    expect(launcher).toHaveAttribute('aria-expanded', 'true');
+  });
+
   describe('Charge Picker (a weapon group)', () => {
     // Two railguns; Lead (long range), Antimatter and two navy versions, and a locked Spike.
     const rails: Fitting = {

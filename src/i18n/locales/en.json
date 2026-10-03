@@ -453,6 +453,7 @@
       "loaded": "loaded",
       "dragHint": "Click an item to fit it, or drag it onto a slot on the Ring or a rack in the List.",
       "chargeTaker": "{{count}}× {{name}}",
+      "chargeTakerLoaded": ", loaded: {{names}}",
       "cargoSearchLabel": "Search items to put in the cargo hold",
       "cargoSearchPlaceholder": "Search any item — ammo, paste, filaments…",
       "cargoHint": "Search for anything to carry: ammo, nanite paste, cap boosters, filaments, a depot.",

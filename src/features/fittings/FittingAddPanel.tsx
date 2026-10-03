@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Caret,
@@ -552,7 +552,8 @@ interface ChargesTabProps {
  * Per fitted module type that takes charges: for a weapon, the Charge
  * Picker (grouped by type or faction, with this Fitting's damage, range and
  * the hub's price); for anything else (cap boosters, scripts, paste), the
- * plain list of what it takes.
+ * plain list of what it takes. Each module's section collapses under its
+ * header, which then names the charge loaded in it.
  */
 function ChargesTab({
   fitting,
@@ -566,6 +567,14 @@ function ChargesTab({
   const { t } = useTranslation();
   const actions = useFittingItemActions();
   const [settings, setSettings] = useState<ChargePickerSettings>(DEFAULT_PICKER_SETTINGS);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(() => new Set());
+  const sectionId = useId();
+  const toggleSection = (moduleTypeId: number) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(moduleTypeId)) next.add(moduleTypeId);
+      return next;
+    });
   const { groups, pricesLoading } = useChargeChoices({
     fitting,
     catalogue,
@@ -616,64 +625,97 @@ function ChargesTab({
     return <p className="text-xs text-text-dim">{t('fittings.add.noChargeTakers')}</p>;
   }
   const weaponChoices = groups.filter((g) => g.isWeapon).flatMap((g) => g.choices);
+  // The shared View/Sort/distance controls go with the weapon sections they drive.
+  const anyWeaponOpen = groups.some((g) => g.isWeapon && !collapsed.has(g.moduleTypeId));
   const maxKm = Math.ceil(
     (Math.max(0, ...weaponChoices.map((c) => c.optimal + c.falloff)) / 1000) * 1.2
   );
   return (
     <div className="space-y-3">
-      {weaponChoices.length > 0 && (
+      {weaponChoices.length > 0 && anyWeaponOpen && (
         <ChargePickerControls settings={settings} onChange={setSettings} maxKm={maxKm} />
       )}
-      {groups.map((group) => (
-        <section key={group.moduleTypeId} className="space-y-1">
-          <h3 className="flex items-center gap-2 text-xs font-semibold">
-            <TypeIcon typeId={group.moduleTypeId} size={32} width={20} height={20} />
-            <span className="min-w-0 flex-1 truncate">
-              {t('fittings.add.chargeTaker', {
-                count: group.count,
-                name: name(group.moduleTypeId),
-              })}
-            </span>
-          </h3>
-          {group.isWeapon ? (
-            <ChargePickerGroup
-              group={group}
-              settings={settings}
-              onLoad={onLoadCharge}
-              wrapRow={wrapRow}
-              pricesLoading={pricesLoading}
-            />
-          ) : (
-            <ul>
-              {group.choices.map((choice) => {
-                const loaded = group.loaded.has(choice.typeId);
-                return (
-                  <li key={choice.typeId}>
-                    {wrapRow(
-                      choice.typeId,
-                      <button
-                        type="button"
-                        aria-pressed={loaded}
-                        disabled={!onLoadCharge}
-                        onClick={() => onLoadCharge?.(choice.typeId)}
-                        className={`flex min-h-11 w-full items-center gap-2 border-l-2 px-2 text-left text-xs hover:bg-panel-2 md:min-h-9 ${loaded ? 'border-accent text-accent' : 'border-transparent'}`}
-                      >
-                        <TypeIcon typeId={choice.typeId} size={32} width={20} height={20} />
-                        <span className="min-w-0 flex-1 truncate">{choice.name}</span>
-                        {loaded && (
-                          <span className="shrink-0 text-[0.6875rem]">
-                            {t('fittings.add.loaded')}
-                          </span>
+      {groups.map((group) => {
+        const open = !collapsed.has(group.moduleTypeId);
+        const bodyId = `${sectionId}-${group.moduleTypeId}`;
+        const loadedNames = [...group.loaded].map(name).join(', ');
+        return (
+          <section key={group.moduleTypeId} className="space-y-1">
+            <h3 className="text-xs font-semibold">
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-controls={bodyId}
+                onClick={() => toggleSection(group.moduleTypeId)}
+                className="flex min-h-11 w-full items-center gap-2 px-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
+              >
+                <Caret expanded={open} />
+                <TypeIcon typeId={group.moduleTypeId} size={32} width={20} height={20} />
+                <span className="min-w-0 flex-1 truncate">
+                  {t('fittings.add.chargeTaker', {
+                    count: group.count,
+                    name: name(group.moduleTypeId),
+                  })}
+                </span>
+                {/* The name always carries what's loaded, so it reads the same open or shut. */}
+                {loadedNames !== '' && (
+                  <span className="sr-only">
+                    {t('fittings.add.chargeTakerLoaded', { names: loadedNames })}
+                  </span>
+                )}
+                {!open && loadedNames !== '' && (
+                  <span
+                    aria-hidden="true"
+                    className="max-w-40 shrink-0 truncate font-normal text-text-dim"
+                  >
+                    {loadedNames}
+                  </span>
+                )}
+              </button>
+            </h3>
+            {/* Hidden rather than unmounted, so a type opened inside stays open. */}
+            <div id={bodyId} hidden={!open}>
+              {group.isWeapon ? (
+                <ChargePickerGroup
+                  group={group}
+                  settings={settings}
+                  onLoad={onLoadCharge}
+                  wrapRow={wrapRow}
+                  pricesLoading={pricesLoading}
+                />
+              ) : (
+                <ul>
+                  {group.choices.map((choice) => {
+                    const loaded = group.loaded.has(choice.typeId);
+                    return (
+                      <li key={choice.typeId}>
+                        {wrapRow(
+                          choice.typeId,
+                          <button
+                            type="button"
+                            aria-pressed={loaded}
+                            disabled={!onLoadCharge}
+                            onClick={() => onLoadCharge?.(choice.typeId)}
+                            className={`flex min-h-11 w-full items-center gap-2 border-l-2 px-2 text-left text-xs hover:bg-panel-2 md:min-h-9 ${loaded ? 'border-accent text-accent' : 'border-transparent'}`}
+                          >
+                            <TypeIcon typeId={choice.typeId} size={32} width={20} height={20} />
+                            <span className="min-w-0 flex-1 truncate">{choice.name}</span>
+                            {loaded && (
+                              <span className="shrink-0 text-[0.6875rem]">
+                                {t('fittings.add.loaded')}
+                              </span>
+                            )}
+                          </button>
                         )}
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-      ))}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
