@@ -145,10 +145,16 @@ async function readKillmail(
   }
 }
 
+/** For EFT the pilot never saw: a warning names the item, not a line number. */
+function withoutLineNumbers(parts: LoadParts): LoadParts {
+  return { ...parts, unresolved: parts.unresolved.map(({ text, reason }) => ({ text, reason })) };
+}
+
 async function readEveWorkbench(
   fitId: string,
   sources: TextLoadSources
 ): Promise<{ eft: string } | LoadError> {
+  if (fitId === '') return 'eve-workbench-not-found';
   try {
     const answer = await sources.eveWorkbenchEft(fitId);
     if (answer.status === 'ok') return { eft: answer.eft };
@@ -183,9 +189,7 @@ export async function loadText(
   if (input.kind === 'eft') {
     parts = loadEftFitting(input.text, typeByName, slotByTypeId);
   } else if (input.kind === 'eveWorkbench') {
-    // The pilot never saw this EFT, so its warnings name items, not line numbers.
-    const read = loadEftFitting(workbenchEft, typeByName, slotByTypeId);
-    parts = { ...read, unresolved: read.unresolved.map(({ text, reason }) => ({ text, reason })) };
+    parts = withoutLineNumbers(loadEftFitting(workbenchEft, typeByName, slotByTypeId));
   } else if (input.kind === 'dna') {
     parts = loadDnaFitting(input.dna, slotByTypeId);
   } else {

@@ -45,7 +45,8 @@ const EFT_HEADER = /^\s*\[[^\]\n]+,[^\]\n]*\]/;
 const BARE_EFT_HEADER = /^\s*\[[^\]\n]+\]/;
 const ZKILL = /zkillboard\.com\/kill\/(\d+)/i;
 const ESI_KILL = /\/killmails\/(\d+)\/([0-9a-f]{40})/i;
-const WORKBENCH_FIT_PATH = /^\/fit\/([^/]+)/i;
+/** `/fit/<id>[/<slug>]`; the id may be empty, which still reads as a Workbench link. */
+const WORKBENCH_FIT_PATH = /^\/fit(?:\/([^/]*))?(?:\/|$)/i;
 
 function classifyPlain(text: string): LoadInput {
   // eveship.fit may tag the payload with its kind (`dna:587:…`).
@@ -76,7 +77,7 @@ export function classifyLoadInput(input: string): LoadInput {
       if (code && /\/fittings(\/edit)?\/?$/.test(url.pathname)) return { kind: 'share', code };
       const workbenchFit = WORKBENCH_FIT_PATH.exec(url.pathname);
       if (/(^|\.)eveworkbench\.com$/i.test(url.hostname) && workbenchFit) {
-        return { kind: 'eveWorkbench', fitId: workbenchFit[1].toLowerCase() };
+        return { kind: 'eveWorkbench', fitId: (workbenchFit[1] ?? '').toLowerCase() };
       }
       if (/(^|\.)eveship\.fit$/i.test(url.hostname)) {
         const fit = url.searchParams.get('fit') ?? decodeURIComponent(url.hash.replace(/^#/, ''));

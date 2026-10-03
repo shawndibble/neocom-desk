@@ -110,6 +110,18 @@ describe('classifyLoadInput', () => {
     }
   });
 
+  it.each([
+    'https://eveworkbench.com/fit',
+    'https://eveworkbench.com/fit/',
+    'https://eveworkbench.com/fit//x',
+  ])('keeps an EVE Workbench fit link with no id (%s) as a Workbench link', (link) => {
+    expect(classifyLoadInput(link)).toEqual({ kind: 'eveWorkbench', fitId: '' });
+  });
+
+  it('does not take another eveworkbench.com page for a fit link', () => {
+    expect(classifyLoadInput('https://eveworkbench.com/fitting/abc')).toEqual({ kind: 'unknown' });
+  });
+
   it('keeps an EVE Workbench fit link whose id is malformed, so Load can say Workbench has no such fit', () => {
     expect(classifyLoadInput('https://eveworkbench.com/fit/not-a-fit/slug')).toEqual({
       kind: 'eveWorkbench',

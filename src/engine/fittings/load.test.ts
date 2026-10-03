@@ -138,6 +138,30 @@ describe('loadText', () => {
     }
   );
 
+  it("carries a Workbench fit's too-many-slots warning over, by item", async () => {
+    const src = sources({
+      eveWorkbenchEft: vi.fn(async () => ({
+        status: 'ok' as const,
+        eft: ['[Rifter, Overfit]', ...Array(9).fill('125mm Gatling AutoCannon I')].join(
+          String.fromCharCode(10)
+        ),
+      })),
+    });
+    expect(await loadText(WORKBENCH_LINK, src)).toMatchObject({
+      kind: 'fitting',
+      unresolved: [{ text: '125mm Gatling AutoCannon I', reason: 'too many high slots' }],
+    });
+  });
+
+  it('reports a Workbench link with no fit id as not found, asking Workbench nothing', async () => {
+    const src = sources();
+    expect(await loadText('https://eveworkbench.com/fit/', src)).toMatchObject({
+      kind: 'failed',
+      error: 'eve-workbench-not-found',
+    });
+    expect(src.eveWorkbenchEft).not.toHaveBeenCalled();
+  });
+
   it('reports EVE Workbench as unreachable when its source throws', async () => {
     const src = sources({
       eveWorkbenchEft: vi.fn(async () => {
