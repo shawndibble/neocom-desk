@@ -18,8 +18,9 @@ const NOTICE_MS = 2500;
 /**
  * What Export does — copy a format, open Appraisal — and the brief notice
  * a copy leaves. Shared by the Export menu and the phone header's one menu.
+ * `cloneImplants` (the pilot's active clone) stay off the multibuy list.
  */
-export function useFittingExport(fitting: Fitting) {
+export function useFittingExport(fitting: Fitting, cloneImplants: readonly number[] = []) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -47,7 +48,7 @@ export function useFittingExport(fitting: Fitting) {
 
   async function copy(kind: FittingExportKind) {
     try {
-      const text = await exportFitting(kind, fitting);
+      const text = await exportFitting(kind, fitting, cloneImplants);
       if (text === null) {
         setNotice(t('fittings.export.tooLarge'));
         return;
@@ -114,7 +115,7 @@ export function useFittingExport(fitting: Fitting) {
   }
 
   async function openInAppraisal() {
-    const text = await exportFitting('multibuy', fitting);
+    const text = await exportFitting('multibuy', fitting, cloneImplants);
     if (text === null) return;
     navigate(tabPath(MARKET_TABS, 'appraisal'), {
       state: { appraiseText: text } satisfies MarketAppraiseState,

@@ -611,6 +611,7 @@ function FittingsPage() {
               navigate(fittingCompareHref(location.search));
             }}
             price={workspace.price}
+            cloneImplants={workspace.profile?.implantTypeIds}
             // The open slide-out takes 26rem off the page, too little for the one-row header.
             compact={addMode === 'sheet' || (addMode === 'slideOut' && addOpen)}
             context={
