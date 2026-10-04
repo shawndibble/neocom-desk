@@ -392,6 +392,15 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   const [expandedCombined, setExpandedCombined] = useState<ReadonlySet<string>>(new Set());
   const [toast, setToast] = useState<{ message: string; onUndo?: () => void } | null>(null);
   const [busy, setBusy] = useState(false);
+  // A row action that failed to save leaves its detail modal open to say so.
+  // Reset whenever the target changes, not keyed on it: after a failure nothing
+  // reloads, so reopening the same row hands back the very same object.
+  const [detailSaveError, setDetailSaveError] = useState<string | null>(null);
+  const [lastDetailTarget, setLastDetailTarget] = useState(detailTarget);
+  if (lastDetailTarget !== detailTarget) {
+    setLastDetailTarget(detailTarget);
+    setDetailSaveError(null);
+  }
 
   useEffect(() => {
     if (!toast) return;
@@ -928,12 +937,24 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   }
 
   /** Every row action ends the same way: busy while it writes, then close and reload. */
-  async function runAndClose(action: () => Promise<unknown>) {
+  /** Closing after a failed save reloads: a per-day action may have written some days. */
+  function closeDetail() {
+    if (detailSaveError) refresh();
+    setDetailTarget(null);
+  }
+
+  async function runAndClose(
+    action: () => Promise<unknown>,
+    failedMessage: string = t('miningTax.saveFailed')
+  ) {
     setBusy(true);
+    setDetailSaveError(null);
     try {
       await action();
       setDetailTarget(null);
       refresh();
+    } catch {
+      setDetailSaveError(failedMessage);
     } finally {
       setBusy(false);
     }
@@ -1058,9 +1079,10 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   function handleResolveGroup() {
     if (!detailTarget) return;
     const grown = allMembers(detailTarget).filter((m) => m.assignment.status === 'needs-review');
+    // One write per day: a failure partway leaves the earlier days written.
     void runAndClose(async () => {
       for (const m of grown) await resolveNeedsReview(m.assignment, m.row.entry, m.row.assignments);
-    });
+    }, t('miningTax.saveFailedPartway'));
   }
 
   function handleUnassignGroup() {
@@ -1068,7 +1090,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     const members = allMembers(detailTarget).map((m) => m.assignment);
     void runAndClose(async () => {
       for (const a of members) await deleteAssignment(a);
-    });
+    }, t('miningTax.saveFailedPartway'));
   }
 
   function handleUncombineAll() {
@@ -1905,13 +1927,14 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       {detailTarget && data && detailTarget.groupMembers && (
         <GroupSummaryModal
           open={detailTarget !== null}
-          onClose={() => setDetailTarget(null)}
+          onClose={closeDetail}
           members={allMembers(detailTarget)}
           systemName={systemName(detailTarget)}
           systemSecurity={systemSecurityOf(detailTarget)}
           typeNames={data.typeNames}
           payeeDisplayName={payeeDisplayName(detailTarget)}
           busy={busy}
+          saveError={detailSaveError}
           onEdit={() => {
             setEditTarget(detailTarget);
             setDetailTarget(null);
@@ -1965,7 +1988,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       {detailTarget && data && !detailTarget.groupMembers && (
         <RowDetailModal
           open={detailTarget !== null}
-          onClose={() => setDetailTarget(null)}
+          onClose={closeDetail}
           row={detailTarget.row}
           assignment={detailTarget.assignment}
           status={detailTarget.status}
@@ -1976,6 +1999,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           suggestion={detailTarget.assignment ? undefined : suggestionFor(detailTarget.row)}
           pricesFor={pricesFor}
           busy={busy}
+          saveError={detailSaveError}
           onAssigned={handleAssignedFromDetail}
           onDismiss={handleDismissFromDetail}
           onMarkPaid={handleMarkPaidFromDetail}
