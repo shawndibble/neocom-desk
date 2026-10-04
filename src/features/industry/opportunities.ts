@@ -21,11 +21,8 @@ import {
 import { buildPlanTypeIds } from './recipes';
 import type { MarketSnapshot, MarketSnapshotRequest } from './marketData';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
-import {
-  detectOwnedStock,
-  bulkOwnedStockSuggestions,
-  type DetectedOwnedStockMap,
-} from '@/engine/industry/ownedStock';
+import { detectOwnedStock, type DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
+import { takeEveryOffer } from '@/engine/industry/ownedStockOffer';
 import type { OwnedStockSource } from '@/engine/industry/ownedStock';
 import {
   FACILITY_PRESETS,
@@ -155,8 +152,12 @@ function ownedMaterialSourcing(
   stock: DetectedOwnedStockMap
 ): MaterialSourcingMap {
   const sourcing: MaterialSourcingMap = {};
-  for (const suggestion of bulkOwnedStockSuggestions(materials, undefined, stock)) {
-    sourcing[suggestion.typeID] = { ownedQuantity: suggestion.ownedQuantity };
+  for (const { typeID, to } of takeEveryOffer(
+    materials,
+    () => undefined,
+    (typeID) => stock.get(typeID)?.quantity ?? 0
+  )) {
+    sourcing[typeID] = { ownedQuantity: to };
   }
   return sourcing;
 }

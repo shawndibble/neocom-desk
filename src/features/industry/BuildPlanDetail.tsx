@@ -107,12 +107,12 @@ import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import {
-  bulkUseDetected,
-  bulkUseNone,
   materialTypeIdKey,
   ownedStockView,
+  planSourcingPatches,
   typeIdsFromKey,
 } from './planMaterialsView';
+import { useOwnedStockBulk } from './useOwnedStockBulk';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import type { CorpOwnedStockState } from './corpOwnedStock';
 import { pricingSourcesForHub, type BuildPlanPricingInputs } from './buildPlanPricingInputs';
@@ -358,13 +358,6 @@ export function BuildPlanDetail({
    * uses, in the one form a toolbar IconButton has: its own icon and label.
    */
   const [copyState, setCopyState] = useState<'copied' | 'failed' | null>(null);
-  // "Use all" / "Use none"'s confirmation — see `applyBulkOwned`.
-  const [bulkToast, setBulkToast] = useState<{ message: string; undo?: () => void } | null>(null);
-  useEffect(() => {
-    if (!bulkToast) return;
-    const timer = setTimeout(() => setBulkToast(null), 8000);
-    return () => clearTimeout(timer);
-  }, [bulkToast]);
   /** Blueprint Acquisition rows (issue #838) `shoppingListText` just left out of a successful copy. */
   const [blueprintsLeftOut, setBlueprintsLeftOut] = useState(0);
   // Verdict-first layout: the inputs fold behind a chip summary, the ledger
@@ -761,9 +754,9 @@ export function BuildPlanDetail({
     [entry, accountSkills]
   );
 
-  // `scopedStock` is narrowed to the plan's owned-stock scope (issue #454);
-  // `detectedStock` stays the galaxy-wide picture the breakdown popover shows.
-  const { detection, scopedStock } = useMemo(
+  // `detection.scopedQuantityFor` is narrowed to the plan's owned-stock scope
+  // (issue #454); `detectedStock` stays the galaxy-wide picture.
+  const { detection } = useMemo(
     () =>
       ownedStockView(
         {
@@ -798,27 +791,15 @@ export function BuildPlanDetail({
   // Over every row on the table, not the blueprint's own materials: the bulk
   // action has to reach exactly what the per-row offers reach, or "use all"
   // silently skips every mineral a sub-build introduced while the row beside
-  // it is still offering to apply one. The fill/clear rules themselves live
-  // in `planMaterialsView.ts`, shared with the Build Group's ledger. Blueprint
-  // Acquisition rows never offer "Use assets", though a packaged copy of a
-  // blueprint is detected stock, so they are left out (issue #2538). "Use
-  // none" below still reaches them, to clear a Have the old fill wrote there.
-  const bulkDetectedPatches = useMemo<SourcingPatchEntry[]>(
-    () =>
-      bulkUseDetected(
-        visibleMaterials.filter((material) => !material.acquisitionTier),
-        (typeID) => plan.materialSourcing?.[typeID]?.ownedQuantity,
-        scopedStock
-      ).map(({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })),
-    [visibleMaterials, plan.materialSourcing, scopedStock]
-  );
-  const bulkClearPatches = useMemo<SourcingPatchEntry[]>(
-    () =>
-      bulkUseNone(visibleMaterials, (typeID) => plan.materialSourcing?.[typeID]?.ownedQuantity).map(
-        ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
-      ),
-    [visibleMaterials, plan.materialSourcing]
-  );
+  // it is still offering to apply one. Which of those rows each action
+  // changes is the owned-stock offer's call (`ownedStockOffer.ts`), shared
+  // with the row's own "Use assets" and the Build Group's ledger. Written
+  // through the plan-sourcing adapter.
+  const ownedBulk = useOwnedStockBulk({
+    write: (changes) => changeSourcing(planSourcingPatches(changes)),
+    ownedFor: (typeID) => plan.materialSourcing?.[typeID]?.ownedQuantity,
+    scopedQuantityFor: detection.scopedQuantityFor,
+  });
 
   /**
    * The recipe behind whichever built row's "Build it" is open — the runs and
@@ -997,35 +978,6 @@ export function BuildPlanDetail({
 
   function changeSourcing(edits: readonly SourcingPatchEntry[]) {
     onChange({ kind: 'sourcing', edits });
-  }
-
-  /**
-   * "Use all" / "Use none", always answered: a toast saying how many rows
-   * changed, with Undo, or that there was nothing to do. Both buttons used to
-   * write silently, so a click that changed nothing — every row already
-   * holding what you own, or none of it detected — looked like a dead button.
-   */
-  function applyBulkOwned(patches: readonly SourcingPatchEntry[], kind: 'all' | 'none') {
-    if (patches.length === 0) {
-      setBulkToast({
-        message: t(kind === 'all' ? 'industry.useAllNothing' : 'industry.useNoneNothing'),
-      });
-      return;
-    }
-    const previous = patches.map(({ typeID }) => ({
-      typeID,
-      patch: { ownedQuantity: plan.materialSourcing?.[typeID]?.ownedQuantity },
-    }));
-    changeSourcing(patches);
-    setBulkToast({
-      message: t(kind === 'all' ? 'industry.useAllDone' : 'industry.useNoneDone', {
-        count: patches.length,
-      }),
-      undo: () => {
-        changeSourcing(previous);
-        setBulkToast(null);
-      },
-    });
   }
 
   function changeOneSourcing(typeID: number, patch: MaterialSourcing) {
@@ -1856,10 +1808,10 @@ export function BuildPlanDetail({
                   }
                   action={
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={() => applyBulkOwned(bulkDetectedPatches, 'all')}>
+                      <Button size="sm" onClick={() => ownedBulk.fillAll(visibleMaterials)}>
                         {t('industry.useAllOwned')}
                       </Button>
-                      <Button size="sm" onClick={() => applyBulkOwned(bulkClearPatches, 'none')}>
+                      <Button size="sm" onClick={() => ownedBulk.clearAll(visibleMaterials)}>
                         {t('industry.useNoneOwned')}
                       </Button>
                     </div>
@@ -2070,12 +2022,7 @@ export function BuildPlanDetail({
         standing={standing}
         logRequest={logRequest}
       />
-      {bulkToast && (
-        <Toast
-          message={bulkToast.message}
-          undo={bulkToast.undo && { label: t('industry.errands.undo'), onUndo: bulkToast.undo }}
-        />
-      )}
+      {ownedBulk.toast}
       {copyState === 'copied' && blueprintsLeftOut > 0 && (
         <Toast
           message={t('industry.copyShoppingListBlueprintsLeftOut', { count: blueprintsLeftOut })}

@@ -35,7 +35,7 @@ import { maskNumber, unmaskNumber } from '@/lib/numberMask';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatVolume } from './format';
 import { materialRowState } from './materialRow';
-import { suggestedOwnedQuantity } from '@/engine/industry/ownedStock';
+import { ownedStockOffer } from '@/engine/industry/ownedStockOffer';
 import { OwnedStockHint } from './OwnedStockHint';
 import type { OwnedStockDetection } from './ownedStockDetection';
 import { buildRecipe, type MaterialTableRow } from './subBuildPlan';
@@ -900,22 +900,24 @@ export function MaterialsTable({
    * instead of inside it, where it split Need − Have = To buy over two lines.
    */
   function renderOwnedHint(material: MaterialTableRow) {
-    if (material.acquisitionTier) return null;
-    const stock = detection?.stockFor(material.typeID);
-    if (!stock || !detection) return null;
-    const owned = sourcing?.[material.typeID]?.ownedQuantity;
-    // The offer respects the plan's owned-stock scope (issue #454), and is
-    // dropped once the row already holds the clamped suggestion.
-    const scopedQuantity = detection.scopedQuantityFor(material.typeID) ?? 0;
-    const suggestion = suggestedOwnedQuantity(scopedQuantity, material.quantity);
+    if (!detection) return null;
+    // Whether the row offers anything, and what, is the owned-stock offer's
+    // call (`ownedStockOffer.ts`) — the same rule "Use all" applies. It
+    // respects the plan's owned-stock scope (issue #454).
+    const scopedQuantity = detection.scopedQuantityFor(material.typeID);
+    const offer = ownedStockOffer(
+      material,
+      scopedQuantity,
+      sourcing?.[material.typeID]?.ownedQuantity
+    );
+    if (offer === null) return null;
     return (
       <OwnedStockHint
         scopedQuantity={scopedQuantity}
         detection={detection}
         materialName={nameFor(material.typeID)}
-        suggestion={suggestion}
-        canApply={owned !== suggestion && suggestion > 0}
-        onApply={() => commitOwned(material.typeID, suggestion)}
+        suggestion={offer}
+        onApply={() => commitOwned(material.typeID, offer)}
       />
     );
   }

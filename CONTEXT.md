@@ -733,6 +733,14 @@ here — they go one per file in `docs/context/decisions/`.
   this ceiling, so it is derived from trained skills
   (`src/engine/market/orderSlots.ts`) and shown as the denominator of the
   Overview's Open orders tile.
+- **Owned-Stock Offer**: A materials row's "Use assets" offer — the
+  owned quantity it would write (detected stock in the owned-stock scope,
+  capped at what the row needs), or none: a Blueprint Acquisition row, no
+  scoped stock, or the row already holding that number. "Use all" is every
+  row's offer at once; "Use none" clears every row's owned quantity, wider
+  than the offer on purpose. One rule for a Build Plan and a Build Group alike
+  (`src/engine/industry/ownedStockOffer.ts`), with plan sourcing and the
+  **Group Owned Overlay** as its two stores.
 - **Payee**: Who the Moon Mining Tax ledger owes — user-managed `{name,
 default tax %, optional moon/system tag, optional Trade Hub}`. The
   moon/system tag lets the UI
