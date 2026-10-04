@@ -13,6 +13,7 @@ vi.mock('@/sde/loadSde', () => ({ typeName: (typeId: number) => Promise.resolve(
 vi.mock('./workbenchFitCurrency', () => ({
   useWorkbenchFitList: (fits: readonly WorkbenchFit[] | null) => ({
     checking: false,
+    checks: null,
     listed: fits ?? [],
     reasonsFor: () => undefined,
     modulesFor: () => undefined,
@@ -21,6 +22,14 @@ vi.mock('./workbenchFitCurrency', () => ({
     allOutOfDate: false,
     showOutOfDate: false,
     setShowOutOfDate: () => {},
+  }),
+}));
+// Prices have their own tests in PopularFitsPanel.test.tsx.
+vi.mock('./workbenchFitPrices', () => ({
+  useWorkbenchFitPrices: () => ({
+    hub: { systemName: 'Jita' },
+    priceFor: () => undefined,
+    anyPriced: false,
   }),
 }));
 
