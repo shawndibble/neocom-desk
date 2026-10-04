@@ -2945,7 +2945,9 @@
         "buy": "Buy",
         "planetary": "PI",
         "reaction": "React"
-      }
+      },
+      "isk": "ISK",
+      "atPrice": "@ {{price}} ISK"
     }
   },
   "login": {

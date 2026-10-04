@@ -483,7 +483,15 @@ describe('MaterialsTable on a phone', () => {
     // Have is a real field filling its cell, and the cell itself is its label.
     const have = within(card).getByRole('textbox', { name: 'Have: Tritanium' });
     expect(have.closest('label')).toBeTruthy();
-    expect(within(card).getByRole('textbox', { name: 'Price for Tritanium' })).toBeTruthy();
+    // The price is text until tapped: "@ 5 ISK", then the field, with ISK after it.
+    const priceButton = within(card).getByRole('button', { name: /^Price for Tritanium/ });
+    expect(priceButton).toHaveTextContent('@ 5 ISK');
+    fireEvent.click(priceButton);
+    const price = within(card).getByRole('textbox', { name: 'Price for Tritanium' });
+    expect(price).toHaveFocus();
+    expect(price.parentElement).toHaveTextContent(/ISK/);
+    fireEvent.blur(price);
+    expect(within(card).queryByRole('textbox', { name: 'Price for Tritanium' })).toBeNull();
   });
 
   it('keeps the section headings and their subtotals', () => {
@@ -506,12 +514,11 @@ describe('MaterialsTable on a phone', () => {
     const card = screen.getByText('Tritanium').closest('li')!;
     const strip = card.querySelector('.grid')!;
     const offer = within(card).getByRole('button', { name: /^Use assets/ });
-    const price = within(card).getByRole('textbox', { name: 'Price for Tritanium' });
+    const price = within(card).getByRole('button', { name: /^Price for Tritanium/ });
     expect(strip).not.toContainElement(offer);
     expect(strip).not.toContainElement(price);
     const footer = offer.closest('li > div')!;
     expect(footer).toContainElement(price);
-    expect(price.closest('span')?.parentElement).toHaveTextContent(/^@/);
   });
 
   it('says Owned on a blueprint the pilot already has, with no strip and no price of 0', () => {
