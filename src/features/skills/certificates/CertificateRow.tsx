@@ -90,7 +90,7 @@ export function CertificateRow({
     action = <span className="text-text-dim">{t('skills.certificates.inPlan')}</span>;
   } else {
     action = (
-      <Button size="sm" variant="primary" onClick={onAdd ?? undefined} disabled={!onAdd}>
+      <Button size="sm" onClick={onAdd ?? undefined} disabled={!onAdd}>
         {t('skills.certificates.add', { grade: nextGrade })}
       </Button>
     );
