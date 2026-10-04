@@ -39,7 +39,7 @@ import { fittingItemCounts } from '@/engine/fittings/fittingExport';
 import type { ItemCount } from '@/engine/fittings/fitSellPrice';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import type { RackModule } from '@/engine/fittings/types';
-import { loadFittingSlots, loadShipTree, loadTypeNames } from '@/sde/loadSde';
+import { loadFittingSlots, loadShipTree, loadGameTypeNames } from '@/sde/loadSde';
 import type { WorkbenchFit } from './workbenchFits';
 
 /** What the check reads: the loader's catalog, each hull's slots and the game's type names. */
@@ -130,11 +130,14 @@ export function resetFitCurrencyCache(): void {
 
 let gameDataPromise: Promise<CurrencyGameData> | null = null;
 
-/** Never rejects: unreadable, every name counts as the game's, so nothing is called removed on a guess. */
+/** With the game's names unreadable, nothing is called removed on a guess. */
+const everyNameIsTheGames = (): boolean => true;
+
+/** Never rejects: an unreadable list falls back to `everyNameIsTheGames`. */
 function loadGameItemNames(): Promise<(name: string) => boolean> {
   return Promise.resolve()
-    .then(() => loadTypeNames())
-    .then(gameItemLookup, () => () => true);
+    .then(() => loadGameTypeNames())
+    .then(gameItemLookup, () => everyNameIsTheGames);
 }
 
 function loadGameData(): Promise<CurrencyGameData> {

@@ -48,7 +48,7 @@ vi.mock('@/sde/loadSde', () => ({
       ships: [{ typeID: 626, stats: { highSlots: 1, medSlots: 4, lowSlots: 5, rigSlots: 3 } }],
     }),
   // Every name the game has — more than the loader's catalogue below carries.
-  loadTypeNames: () =>
+  loadGameTypeNames: () =>
     Promise.resolve(['Vexor', 'Heavy Neutron Blaster II', 'Fierce Exotic Filament']),
 }));
 vi.mock('@/features/skills/typeCatalog', () => ({

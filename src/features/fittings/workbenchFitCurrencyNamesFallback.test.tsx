@@ -9,7 +9,7 @@ vi.mock('@/sde/loadSde', () => ({
     Promise.resolve({
       ships: [{ typeID: 626, stats: { highSlots: 4, medSlots: 4, lowSlots: 5, rigSlots: 3 } }],
     }),
-  loadTypeNames: () => Promise.reject(new Error('offline')),
+  loadGameTypeNames: () => Promise.reject(new Error('offline')),
 }));
 vi.mock('@/features/skills/typeCatalog', () => ({
   loadItemNameMap: () =>

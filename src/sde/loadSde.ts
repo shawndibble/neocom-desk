@@ -121,4 +121,4 @@ export const loadShipTree = cached<ShipTreeData>('shipTree.json');
  * — for telling an item CCP removed from one `types.json` just doesn't carry.
  * ~1.7 MB, so not precached: only the EVE Workbench's out-of-date check reads it.
  */
-export const loadTypeNames = cached<string[]>('typeNames.json');
+export const loadGameTypeNames = cached<string[]>('typeNames.json');

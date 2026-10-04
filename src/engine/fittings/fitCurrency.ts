@@ -52,12 +52,12 @@ export function gameItemLookup(names: Iterable<string>): (name: string) => boole
 /**
  * Classifies one fit from what the EFT loader made of it and its hull's slots
  * (`null`: unknown). `isGameItem` says whether a name the loader couldn't
- * read is still a type in the game; without it, every such name is removed.
+ * read is still a type in the game.
  */
 export function classifyFitCurrency(
   parts: LoadParts,
   hullSlots: HullSlotCounts | null,
-  isGameItem: (name: string) => boolean = () => false
+  isGameItem: (name: string) => boolean
 ): FitCurrency {
   const removed: OutOfDateReason[] = [];
   const removedNames = new Set<string>();
