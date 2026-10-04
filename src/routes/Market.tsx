@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { usePageTab } from '@/lib/usePageTab';
@@ -6,12 +6,8 @@ import { MARKET_TABS } from '@/app/pageTabs';
 import {
   Button,
   Caret,
-  ColumnPickerMenu,
-  DataTable,
   EmptyState,
-  FilterBar,
   FilterChip,
-  FilterField,
   IconButton,
   PageHeader,
   Panel,
@@ -24,25 +20,16 @@ import {
   SelectValue,
   Spinner,
   Tabs,
-  TextInput,
   Toast,
   TypeIcon,
   RowMoreActions,
 } from '@/components/ui';
-import type { DataTableColumn } from '@/components/ui';
-import type { MarketOrderColumnId } from '@/features/market/marketOrderColumns';
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
-import { SPACE_KINDS } from '@/engine/space';
-import type { CurrentSystemState } from '@/features/route/currentSystem';
-import {
-  JumpRangeSelect,
-  CurrentSystemPicker,
-  JumpRangeNote,
-} from '@/features/route/JumpRangeControls';
+import { JumpRangeNote } from '@/features/route/JumpRangeControls';
 import {
   MARKET_TREE_MATCH_LIMIT,
   MARKET_TREE_MIN_QUERY_LENGTH,
@@ -53,10 +40,6 @@ import { useFocusHeading } from '@/lib/useFocusHeading';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemPriceAlertBell } from '@/features/market/ItemPriceAlertBell';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
-import { RequiredSkillsSection } from '@/features/market/RequiredSkillsSection';
-import type { RequiredSkill } from '@/features/skills/dogma';
-import type { TargetPlan } from '@/features/skills/useTargetPlan';
-import type { TrainedSkill } from '@/engine/types';
 import { CompareDrawer } from '@/features/market/CompareDrawer';
 import { useCompareSet } from '@/features/market/compareSet';
 import { QuickbarList } from '@/features/market/QuickbarList';
@@ -69,16 +52,10 @@ import {
 } from '@/features/market/quickbar';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
-import {
-  resolveOrderLocation,
-  type NpcStationLookup,
-  type SolarSystemLookup,
-} from '@/engine/market/orderBook';
 import { ALL_REGIONS } from '@/engine/market/locationMode';
 import type { RegionOrder } from '@/esi/endpoints';
 import type { MarketAppraiseState } from '@/lib/shortcuts';
 import { buttonClassName } from '@/components/ui/buttonClassName';
-import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { orderBookCsvColumns } from '@/features/market/orderBookCsv';
 import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
@@ -96,11 +73,22 @@ import {
 import { useSharedAppraisalSeed } from '@/features/market/sharedAppraisalSeed';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { useMarketCatalogue } from '@/features/market/useMarketCatalogue';
-import { useMarketBrowser } from '@/features/market/useMarketBrowser';
+import { useMarketBrowser, type MarketItemTab } from '@/features/market/useMarketBrowser';
 import {
-  useOrderBookOrchestration,
-  type BrowserFilterValue,
-} from '@/features/market/useOrderBookOrchestration';
+  BrowserFilterBar,
+  OrderBookScopeBar,
+  type OrderBookScope,
+} from '@/features/market/OrderBookScopeBar';
+import {
+  BookSideToggle,
+  HubComparisonLine,
+  OrderBookSummaryStrip,
+  OrderSideCard,
+  type BookSide,
+} from '@/features/market/MarketOrderBook';
+import { OrderRowDetail } from '@/features/market/OrderRowDetail';
+import { ItemSkillsDisclosure } from '@/features/market/ItemSkillsDisclosure';
+import { useOrderBookOrchestration } from '@/features/market/useOrderBookOrchestration';
 import { useOrderRowSkills } from '@/features/market/useOrderRowSkills';
 import { useMarketOrderColumns } from '@/features/market/useMarketOrderColumns';
 import { SELL_ORDER_COLUMN_IDS, BUY_ORDER_COLUMN_IDS } from '@/features/market/marketOrderColumns';
@@ -143,209 +131,6 @@ function isHistoryView(tab: MarketTab): tab is 'history' | 'history/transactions
  */
 function usesHubPicker(tab: MarketTab): boolean {
   return tab === 'browser' || tab === 'appraisal';
-}
-
-/** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
-
-interface OrderDetailPanelProps {
-  order: RegionOrder;
-  npcStations: ReadonlyMap<number, NpcStationLookup>;
-  solarSystems: ReadonlyMap<number, SolarSystemLookup>;
-  /** This table's columns the pilot has hidden via the column picker — shown here instead. */
-  hiddenColumns: readonly MarketOrderColumnId[];
-  orderColumnsById: Record<MarketOrderColumnId, DataTableColumn<RegionOrder>>;
-  itemSkills: {
-    typeId: number;
-    requiredSkills: RequiredSkill[];
-    skillNames: Readonly<Record<number, string>>;
-  } | null;
-  trainedSkills: ReadonlyMap<number, TrainedSkill>;
-  targetPlan: TargetPlan;
-  activeCharacterId: number | null;
-  itemName: string;
-  t: Translate;
-}
-
-/**
- * An order row's expand (`DataTable`'s `expandableRow`): whatever this table
- * isn't already showing as a column, plus two facts no column carries at
- * all — a player structure's location isn't the game's own NPC-station
- * network, and this item's skill requirements are the character's, not the
- * order's, but a pilot scanning the book for a seller wants both in the same
- * place rather than a second trip through "Show Info".
- */
-function OrderDetailPanel({
-  order,
-  npcStations,
-  solarSystems,
-  hiddenColumns,
-  orderColumnsById,
-  itemSkills,
-  trainedSkills,
-  targetPlan,
-  activeCharacterId,
-  itemName,
-  t,
-}: OrderDetailPanelProps) {
-  const location = resolveOrderLocation(order, npcStations, solarSystems);
-  const isPlayerStructure = location.stationName === null;
-  const skillsLoaded = itemSkills !== null && itemSkills.typeId === order.type_id;
-  const hasSkills = skillsLoaded && itemSkills.requiredSkills.length > 0;
-  const hasFields = hiddenColumns.length > 0 || isPlayerStructure;
-
-  return (
-    <div className="space-y-3">
-      {hasFields && (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-3">
-          {isPlayerStructure && (
-            <div>
-              <div className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('market.orderDetail.structureType')}
-              </div>
-              <div className="text-text">{t('market.orderDetail.playerStructure')}</div>
-            </div>
-          )}
-          {hiddenColumns.map((id) => {
-            const column = orderColumnsById[id];
-            return (
-              <div key={id}>
-                <div className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {column.header}
-                </div>
-                <div className="text-text">{column.render(order)}</div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {skillsLoaded && hasSkills && (
-        <RequiredSkillsSection
-          requiredSkills={itemSkills.requiredSkills}
-          skillNames={itemSkills.skillNames}
-          trainedSkills={trainedSkills}
-          target={targetPlan}
-          hasCharacter={activeCharacterId !== null}
-          itemName={itemName}
-        />
-      )}
-
-      {!hasFields && skillsLoaded && !hasSkills && (
-        <p className="text-xs text-text-dim">{t('market.orderDetail.empty')}</p>
-      )}
-    </div>
-  );
-}
-
-/** A Min quantity box's text as a count; blank or junk is no minimum. */
-function parseMinQuantity(raw: string): number {
-  const n = Number.parseInt(raw, 10);
-  return Number.isSafeInteger(n) && n > 0 ? n : 0;
-}
-
-interface BrowserFilterBarProps {
-  value: BrowserFilterValue;
-  onChange: (next: BrowserFilterValue) => void;
-  activeCount: number;
-  /** Security and NPC stations only need a book of many stations: Region mode, or a set Jump Range. */
-  regionMode: boolean;
-  /** The header's hub or region: what the book reads while no Jump Range is set. */
-  scopeLabel: string;
-  currentSystem: CurrentSystemState;
-  /** The item search: the funnel sits at the end of its line rather than a row of its own. */
-  search: ReactNode;
-  className?: string;
-}
-
-/**
- * The order book's filters behind a funnel beside the item search, like the
- * other search pages (BPC Sourcing, Courier). They sit in the finder column
- * rather than over the book: the range is where to look, set before searching,
- * not a property of one item.
- */
-function BrowserFilterBar({
-  value,
-  onChange,
-  activeCount,
-  regionMode,
-  scopeLabel,
-  currentSystem,
-  search,
-  className,
-}: BrowserFilterBarProps) {
-  const { t } = useTranslation();
-  return (
-    <FilterBar
-      value={value}
-      onChange={onChange}
-      activeCount={activeCount}
-      search={search}
-      className={className}
-    >
-      {(draft, setDraft) => (
-        <>
-          {/* Keyed on the draft, so the picker and the many-station filters
-              appear as soon as a distance is picked, before it is applied. */}
-          <FilterField label={t('jumpRange.label')}>
-            <div className="flex flex-wrap items-center gap-2">
-              <JumpRangeSelect
-                value={draft.jumps}
-                onChange={(jumps) => setDraft({ ...draft, jumps })}
-                anyLabel={scopeLabel}
-              />
-              {draft.jumps !== DEFAULT_JUMP_RANGE && (
-                <CurrentSystemPicker current={currentSystem} />
-              )}
-            </div>
-          </FilterField>
-          <FilterField label={t('market.filterMinQuantity')}>
-            <TextInput
-              type="number"
-              inputMode="numeric"
-              min={0}
-              aria-label={t('market.filterMinQuantity')}
-              placeholder={t('market.filterMinQuantity')}
-              className="w-32"
-              value={draft.minQty === 0 ? '' : String(draft.minQty)}
-              onChange={(event) =>
-                setDraft({ ...draft, minQty: parseMinQuantity(event.target.value) })
-              }
-            />
-          </FilterField>
-          {(regionMode || draft.jumps !== DEFAULT_JUMP_RANGE) && (
-            <div
-              role="group"
-              aria-label={t('market.filterSecurity')}
-              className="flex flex-wrap items-center gap-2"
-            >
-              <span className="text-text-dim">{t('market.filterSecurity')}</span>
-              {SPACE_KINDS.map((kind) => (
-                <FilterChip
-                  key={kind}
-                  label={t(`common.spaceOption.${kind}`)}
-                  selected={draft.sec.has(kind)}
-                  onToggle={() => {
-                    const next = new Set(draft.sec);
-                    if (next.has(kind)) next.delete(kind);
-                    else next.add(kind);
-                    setDraft({ ...draft, sec: next });
-                  }}
-                />
-              ))}
-            </div>
-          )}
-          {(regionMode || draft.jumps !== DEFAULT_JUMP_RANGE) && (
-            <FilterChip
-              label={t('market.filterNpcOnly')}
-              selected={draft.npcOnly}
-              onToggle={() => setDraft({ ...draft, npcOnly: !draft.npcOnly })}
-            />
-          )}
-        </>
-      )}
-    </FilterBar>
-  );
 }
 
 interface MarketGroupTreeProps {
@@ -456,7 +241,9 @@ function MarketGroupTree({
     // Flat cap, not viewport-relative: `QuickbarList` renders below this
     // tree in the same column, so sizing the tree to all remaining viewport
     // height would push the quickbar off-screen.
-    <div className="max-h-[32rem] overflow-y-auto">
+    // On a desktop the finder column is sticky, so the tree takes what the
+    // viewport has left after the search and the Quickbar beneath it.
+    <div className="max-h-[32rem] overflow-y-auto lg:max-h-[calc(100dvh-18rem)]">
       {filterResult?.bestMatch && (
         <div className="mb-2 border-b border-line pb-2">
           <p className="pb-1 text-[0.6875rem] text-text-dim uppercase">{t('market.bestMatch')}</p>
@@ -719,6 +506,7 @@ export function Market() {
     loadedView,
     sortedSell,
     sortedBuy,
+    depthByOrder,
     sellShowAll,
     setSellShowAll,
     buyShowAll,
@@ -727,6 +515,7 @@ export function Market() {
     jumpNoteShown,
     variationsResult,
     variationPrices,
+    headerScopeSummary,
     refresh: refreshOrderBook,
   } = useOrderBookOrchestration({
     selectedTypeId,
@@ -814,7 +603,17 @@ export function Market() {
     buyColumns,
     sellHiddenColumns,
     buyHiddenColumns,
-  } = useMarketOrderColumns({ t, npcStationMap, solarSystemMap, myOrderIds, jumpRangeFilter });
+  } = useMarketOrderColumns({
+    t,
+    npcStationMap,
+    solarSystemMap,
+    myOrderIds,
+    jumpRangeFilter,
+    depthByOrder,
+    bestSell: loadedView?.summary.bestSell ?? null,
+  });
+  // A phone shows one side of the book at a time (`BookSideToggle`).
+  const [phoneSide, setPhoneSide] = useState<BookSide>('sell');
 
   function handleRefresh() {
     // On Appraisal the button re-prices the pasted list instead, dropping the
@@ -831,6 +630,10 @@ export function Market() {
       return;
     }
     refreshOrderBook();
+  }
+
+  function orderRowClassName(order: RegionOrder) {
+    return myOrderIds.has(order.order_id) ? 'row-mine' : undefined;
   }
 
   function orderRowContextMenu(order: RegionOrder, tr: ReactElement) {
@@ -879,21 +682,53 @@ export function Market() {
     currentSystem,
   };
 
+  // What the scope bar says the book is reading. Distances are known at every
+  // range, so the hub's own distance shows even with no range set.
+  const knownJumps = jumpRangeFilter.jumpsStatus === 'ready' ? jumpRangeFilter.jumps : null;
+  const bookStationCount = new Set([...sortedSell, ...sortedBuy].map((o) => o.location_id)).size;
+  const bookScope: OrderBookScope =
+    rangeAcross && browserFilterValue.jumps !== 'any'
+      ? { kind: 'range', jumps: browserFilterValue.jumps, stationCount: bookStationCount }
+      : effectiveLocation.mode === 'hub'
+        ? {
+            kind: 'station',
+            stationName: npcStationMap.get(effectiveHub.stationId)?.name ?? effectiveHub.systemName,
+            security: solarSystemMap.get(effectiveHub.systemId)?.security ?? null,
+            jumpsAway: knownJumps?.get(effectiveHub.systemId) ?? null,
+          }
+        : { kind: 'region', regionName: scopeLabel, stationCount: bookStationCount };
+  // What still reads the header's hub or region while the book reaches past it.
+  const scopeNote = allRegions
+    ? t('market.allRegionsSecondaryNote', { regionName: hubRegionName })
+    : rangeAcross
+      ? t('market.rangeSecondaryNote', { scope: scopeLabel })
+      : null;
+
   const itemTabs = (
     <Tabs
       tabs={[
         { id: 'orders', label: t('market.tabOrders') },
+        {
+          id: 'variations',
+          label:
+            variationsResult && variationsResult.rows.length > 0
+              ? t('market.tabVariationsCount', { count: variationsResult.rows.length })
+              : t('market.tabVariations'),
+        },
         { id: 'history', label: t('market.tabHistory') },
       ]}
       value={itemTab}
-      onChange={(id) => setItemTab(id as 'orders' | 'history')}
+      onChange={(id) => setItemTab(id as MarketItemTab)}
       label={t('market.itemTabsLabel')}
     />
   );
 
   return (
     <ItemActionsProvider page={itemActions} detailLocation={orderBookLocation}>
-      <div className="mx-auto max-w-6xl space-y-4">
+      {/* The Browser takes the width a wide screen has — a two-column finder
+          and order book wasted half a 1440px monitor at 6xl — while the
+          other tabs keep their reading width. */}
+      <div className={`mx-auto space-y-4 ${tab === 'browser' ? 'max-w-[96rem]' : 'max-w-6xl'}`}>
         <PageHeader
           title={t('market.title')}
           actions={
@@ -907,6 +742,13 @@ export function Market() {
 
                   Browser only: see `usesHubPicker`. Appraisal prices at a
                   station, so it has no Region mode to toggle into. */}
+                {/* A set range replaces the header's scope for the book (scope
+                    decision 20260929-204125); say so where the scope is picked. */}
+                {tab === 'browser' && rangeAcross && (
+                  <span className="text-[0.6875rem] text-text-dim max-sm:hidden">
+                    {t('market.rangeOverridesHeader')}
+                  </span>
+                )}
                 {tab === 'browser' && (
                   <div role="group" aria-label={t('market.locationMode')} className="flex gap-2">
                     <FilterChip
@@ -1039,7 +881,9 @@ export function Market() {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
             <Panel
               ref={finderPanelRef}
-              className={isDesktop || selectedTypeId === null ? '' : 'hidden'}
+              // Sticky beside a long order book, so the search stays in reach
+              // while the book scrolls.
+              className={isDesktop || selectedTypeId === null ? 'lg:sticky lg:top-4' : 'hidden'}
             >
               <BrowserFilterBar
                 {...browserFilterBarProps}
@@ -1150,20 +994,28 @@ export function Market() {
                   className="px-3 py-8"
                 />
               ) : (
-                <>
-                  <div className="px-3 pt-2">{itemTabs}</div>
-                  {/* Above both tabs: Price History is one of the readers it names. */}
-                  {allRegions ? (
-                    <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-                      {t('market.allRegionsSecondaryNote', { regionName: hubRegionName })}
-                    </p>
-                  ) : (
-                    rangeAcross && (
-                      <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-                        {t('market.rangeSecondaryNote', { scope: scopeLabel })}
-                      </p>
-                    )
-                  )}
+                <div className="space-y-3 px-3 pt-2 pb-3">
+                  <ItemSkillsDisclosure
+                    typeId={selectedTypeId}
+                    itemSkills={itemSkills}
+                    trainedSkills={trainedSkills}
+                    targetPlan={targetPlan}
+                    hasCharacter={activeCharacterId !== null}
+                    itemName={selectedItem?.name ?? ''}
+                  />
+                  {/* Above every tab: Variations and Price History are readers
+                      its note names. */}
+                  <OrderBookScopeBar
+                    scope={bookScope}
+                    filterValue={browserFilterValue}
+                    onFilterChange={handleBrowserFiltersChange}
+                    activeCount={activeFilterCount}
+                    regionMode={regionMode}
+                    scopeLabel={scopeLabel}
+                    currentSystem={currentSystem}
+                    note={scopeNote}
+                  />
+                  {itemTabs}
                   {itemTab === 'history' ? (
                     resolvedRegion && (
                       <PriceHistoryPanel
@@ -1171,6 +1023,20 @@ export function Market() {
                         typeId={selectedTypeId}
                         itemName={selectedItem?.name ?? ''}
                       />
+                    )
+                  ) : itemTab === 'variations' ? (
+                    variationsResult && variationsResult.rows.length > 0 ? (
+                      <VariationsTable
+                        rows={variationsResult.rows}
+                        prices={variationPrices}
+                        onSelect={handleSelectItem}
+                        onCompare={handleCompareVariations}
+                        selfName={selectedItem?.name ?? ''}
+                        selfSummary={headerScopeSummary}
+                        scopeName={scopeLabel}
+                      />
+                    ) : (
+                      <EmptyState title={t('market.variations.none')} className="py-8" />
                     )
                   ) : orderBookLoading &&
                     !regionsUnavailable &&
@@ -1194,239 +1060,181 @@ export function Market() {
                       }
                     />
                   ) : (
-                    <>
+                    <div className="space-y-3">
                       {resolvedRegion?.override && (
-                        <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                        <p className="m-0 text-[0.6875rem] text-text-dim">
                           {t('market.globalMarketNote', {
                             regionName: resolvedRegion.override.regionName,
                           })}
                         </p>
                       )}
-                      <div className="divide-y divide-line">
-                        {/* In the book, not the finder's funnel, so a collapsed bar can't hide why a range isn't applying. */}
-                        {(jumpNoteShown || failedRegionCount > 0) && (
-                          <div className="flex flex-col items-end gap-1 px-3 py-2 text-xs text-text-dim">
-                            {jumpNoteShown && <JumpRangeNote status={jumpRangeFilter.status} />}
-                            {failedRegionCount > 0 && (
-                              <p role="status" className="text-warning">
-                                {t('market.regionsFailed', { count: failedRegionCount })}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                        {stationFilter !== null && (
-                          <div className="flex items-center justify-between px-3 py-2 text-xs text-text-dim">
-                            <span>
-                              {t('market.stationFilterActive', {
-                                station: stationFilterLabel ?? t('market.unknownStructure'),
-                              })}
-                            </span>
-                            <Button size="sm" onClick={() => setStationFilter(null)}>
-                              {t('market.clearStationFilter')}
-                            </Button>
-                          </div>
-                        )}
-
-                        <div className="pb-3">
-                          {/*
-                        Each export sits with the table it exports. Both were
-                        in the panel header, where — once they became icons —
-                        they were two identical download glyphs telling a
-                        sighted user nothing apart; only their tooltips
-                        differed, and a touch user never sees those. Beside
-                        "Sell orders" the same glyph is unambiguous.
-                      */}
-                          <div className="flex items-center justify-between px-3 pt-3 pb-1">
-                            <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                              {t('market.sell')}
-                            </h2>
-                            <span className="flex items-center gap-1">
-                              <ColumnPickerMenu
-                                available={SELL_ORDER_COLUMN_IDS}
-                                visible={visibleOrderColumns}
-                                columnsById={orderColumnsById}
-                                onToggle={toggleOrderColumn}
-                                buttonLabel={t('market.columnsButton')}
-                                menuTitle={t('market.columnsMenuTitle')}
-                                size="sm"
-                              />
-                              <TableActionsMenu name={t('market.sell')} tableExport={sellExport} />
-                            </span>
-                          </div>
-                          {sortedSell.length === 0 ? (
-                            <EmptyState
-                              title={t('market.emptySellTitle')}
-                              hint={
-                                stationFilter !== null
-                                  ? t('market.emptyFilteredHint')
-                                  : filtersNarrowBook
-                                    ? t('market.emptyFiltersHint')
-                                    : selectedIsBlueprint
-                                      ? t('market.emptySellBlueprintHint')
-                                      : t('market.emptySellHint')
-                              }
-                              className="py-6"
-                              action={
-                                selectedIsBlueprint &&
-                                !filtersNarrowBook &&
-                                selectedTypeId !== null ? (
-                                  <Link
-                                    to={bpcSourcingHref(selectedTypeId)}
-                                    className={buttonClassName({ size: 'sm' })}
-                                  >
-                                    {t('market.searchBpcContracts')}
-                                  </Link>
-                                ) : undefined
-                              }
-                            />
-                          ) : (
-                            <>
-                              <div className="overflow-x-auto">
-                                <DataTable
-                                  {...sellExport.tableProps}
-                                  columns={baseColumns}
-                                  rows={sellRows}
-                                  virtualize="auto"
-                                  rowKey={(o) => o.order_id}
-                                  label={t('market.sell')}
-                                  defaultSort={{ columnId: 'price', direction: 'asc' }}
-                                  // Quantity/Security/Jumps/Expiry are short figures, and Location
-                                  // wraps within its half-width track — pairing two per line at
-                                  // phone widths beats one-per-line without overlap or clipping.
-                                  stackColumns={2}
-                                  rowContextMenu={orderRowContextMenu}
-                                  rowMoreActions
-                                  rowClassName={(o) =>
-                                    myOrderIds.has(o.order_id) ? 'row-mine' : undefined
-                                  }
-                                  expandableRow={{
-                                    renderDetail: (o) => (
-                                      <OrderDetailPanel
-                                        order={o}
-                                        npcStations={npcStationMap}
-                                        solarSystems={solarSystemMap}
-                                        hiddenColumns={sellHiddenColumns}
-                                        orderColumnsById={orderColumnsById}
-                                        itemSkills={itemSkills}
-                                        trainedSkills={trainedSkills}
-                                        targetPlan={targetPlan}
-                                        activeCharacterId={activeCharacterId}
-                                        itemName={selectedItem?.name ?? ''}
-                                        t={t}
-                                      />
-                                    ),
-                                  }}
-                                />
-                              </div>
-                              {!sellShowAll && sortedSell.length > ROW_CAP && (
-                                <div className="px-3 py-2">
-                                  <Button size="sm" onClick={() => setSellShowAll(true)}>
-                                    {t('market.showAll', { count: sortedSell.length })}
-                                  </Button>
-                                </div>
-                              )}
-                            </>
+                      {/* In the book, not the finder's funnel, so a collapsed bar can't hide why a range isn't applying. */}
+                      {(jumpNoteShown || failedRegionCount > 0) && (
+                        <div className="flex flex-col items-end gap-1 text-xs text-text-dim">
+                          {jumpNoteShown && <JumpRangeNote status={jumpRangeFilter.status} />}
+                          {failedRegionCount > 0 && (
+                            <p role="status" className="text-warning">
+                              {t('market.regionsFailed', { count: failedRegionCount })}
+                            </p>
                           )}
-                        </div>
-
-                        <div className="pb-3">
-                          <div className="flex items-center justify-between px-3 pt-3 pb-1">
-                            <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                              {t('market.buy')}
-                            </h2>
-                            <span className="flex items-center gap-1">
-                              <ColumnPickerMenu
-                                available={BUY_ORDER_COLUMN_IDS}
-                                visible={visibleOrderColumns}
-                                columnsById={orderColumnsById}
-                                onToggle={toggleOrderColumn}
-                                buttonLabel={t('market.columnsButton')}
-                                menuTitle={t('market.columnsMenuTitle')}
-                                size="sm"
-                              />
-                              <TableActionsMenu name={t('market.buy')} tableExport={buyExport} />
-                            </span>
-                          </div>
-                          {sortedBuy.length === 0 ? (
-                            <EmptyState
-                              title={t('market.emptyBuyTitle')}
-                              hint={
-                                stationFilter !== null
-                                  ? t('market.emptyFilteredHint')
-                                  : filtersNarrowBook
-                                    ? t('market.emptyFiltersHint')
-                                    : t('market.emptyBuyHint')
-                              }
-                              className="py-6"
-                            />
-                          ) : (
-                            <>
-                              <div className="overflow-x-auto">
-                                <DataTable
-                                  {...buyExport.tableProps}
-                                  columns={buyColumns}
-                                  rows={buyRows}
-                                  virtualize="auto"
-                                  rowKey={(o) => o.order_id}
-                                  label={t('market.buy')}
-                                  defaultSort={{ columnId: 'price', direction: 'desc' }}
-                                  // Same rationale as the sell table above, plus Range/Min. volume —
-                                  // still short figures, so pair two per line rather than stack.
-                                  stackColumns={2}
-                                  rowContextMenu={orderRowContextMenu}
-                                  rowMoreActions
-                                  rowClassName={(o) =>
-                                    myOrderIds.has(o.order_id) ? 'row-mine' : undefined
-                                  }
-                                  expandableRow={{
-                                    renderDetail: (o) => (
-                                      <OrderDetailPanel
-                                        order={o}
-                                        npcStations={npcStationMap}
-                                        solarSystems={solarSystemMap}
-                                        hiddenColumns={buyHiddenColumns}
-                                        orderColumnsById={orderColumnsById}
-                                        itemSkills={itemSkills}
-                                        trainedSkills={trainedSkills}
-                                        targetPlan={targetPlan}
-                                        activeCharacterId={activeCharacterId}
-                                        itemName={selectedItem?.name ?? ''}
-                                        t={t}
-                                      />
-                                    ),
-                                  }}
-                                />
-                              </div>
-                              {!buyShowAll && sortedBuy.length > ROW_CAP && (
-                                <div className="px-3 py-2">
-                                  <Button size="sm" onClick={() => setBuyShowAll(true)}>
-                                    {t('market.showAll', { count: sortedBuy.length })}
-                                  </Button>
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      {/*
-                      A gap, so the buy table stops butting straight into the
-                      Variations hairline — it reads as one more row block
-                      otherwise, not as a separate section.
-                    */}
-                      {variationsResult && (
-                        <div className="mt-3">
-                          <VariationsTable
-                            rows={variationsResult.rows}
-                            prices={variationPrices}
-                            onSelect={handleSelectItem}
-                            onCompare={handleCompareVariations}
-                          />
                         </div>
                       )}
-                    </>
+                      {stationFilter !== null && (
+                        <div className="flex items-center justify-between gap-2 text-xs text-text-dim">
+                          <span>
+                            {t('market.stationFilterActive', {
+                              station: stationFilterLabel ?? t('market.unknownStructure'),
+                            })}
+                          </span>
+                          <Button size="sm" onClick={() => setStationFilter(null)}>
+                            {t('market.clearStationFilter')}
+                          </Button>
+                        </div>
+                      )}
+                      {rangeAcross && stationFilter === null && (
+                        <HubComparisonLine
+                          placeName={scopeLabel}
+                          summary={headerScopeSummary}
+                          inRangeBestSell={loadedView?.summary.bestSell ?? null}
+                          inRangeBestBuy={loadedView?.summary.bestBuy ?? null}
+                          jumps={
+                            effectiveLocation.mode === 'hub'
+                              ? (knownJumps?.get(effectiveHub.systemId) ?? null)
+                              : null
+                          }
+                          stationId={
+                            effectiveLocation.mode === 'hub' ? effectiveHub.stationId : null
+                          }
+                          stationName={
+                            effectiveLocation.mode === 'hub'
+                              ? (npcStationMap.get(effectiveHub.stationId)?.name ?? null)
+                              : null
+                          }
+                          onView={() =>
+                            handleBrowserFiltersChange({
+                              ...browserFilterValue,
+                              jumps: DEFAULT_JUMP_RANGE,
+                            })
+                          }
+                        />
+                      )}
+                      <OrderBookSummaryStrip
+                        bestSell={loadedView?.summary.bestSell ?? null}
+                        bestBuy={loadedView?.summary.bestBuy ?? null}
+                      />
+                      <BookSideToggle
+                        side={phoneSide}
+                        onChange={setPhoneSide}
+                        sellCount={sortedSell.length}
+                        buyCount={sortedBuy.length}
+                        bestSell={loadedView?.summary.bestSell ?? null}
+                        bestBuy={loadedView?.summary.bestBuy ?? null}
+                      />
+                      <OrderSideCard
+                        side="sell"
+                        rows={sellRows}
+                        total={sortedSell.length}
+                        best={loadedView?.summary.bestSell ?? null}
+                        columns={baseColumns}
+                        availableColumns={SELL_ORDER_COLUMN_IDS}
+                        visibleColumns={visibleOrderColumns}
+                        columnsById={orderColumnsById}
+                        onToggleColumn={toggleOrderColumn}
+                        tableExport={sellExport}
+                        hiddenOnPhone={phoneSide !== 'sell'}
+                        onShowAll={
+                          !sellShowAll && sortedSell.length > ROW_CAP
+                            ? () => setSellShowAll(true)
+                            : null
+                        }
+                        rowContextMenu={orderRowContextMenu}
+                        rowClassName={orderRowClassName}
+                        renderDetail={(o) => (
+                          <OrderRowDetail
+                            order={o}
+                            best={loadedView?.summary.bestSell ?? null}
+                            depth={depthByOrder.get(o.order_id)}
+                            npcStations={npcStationMap}
+                            solarSystems={solarSystemMap}
+                            hiddenColumns={sellHiddenColumns}
+                            orderColumnsById={orderColumnsById}
+                            onFilterToStation={stationFilter === null ? setStationFilter : null}
+                          />
+                        )}
+                        empty={
+                          <EmptyState
+                            title={t('market.emptySellTitle')}
+                            hint={
+                              stationFilter !== null
+                                ? t('market.emptyFilteredHint')
+                                : filtersNarrowBook
+                                  ? t('market.emptyFiltersHint')
+                                  : selectedIsBlueprint
+                                    ? t('market.emptySellBlueprintHint')
+                                    : t('market.emptySellHint')
+                            }
+                            className="py-6"
+                            action={
+                              selectedIsBlueprint && !filtersNarrowBook ? (
+                                <Link
+                                  to={bpcSourcingHref(selectedTypeId)}
+                                  className={buttonClassName({ size: 'sm' })}
+                                >
+                                  {t('market.searchBpcContracts')}
+                                </Link>
+                              ) : undefined
+                            }
+                          />
+                        }
+                      />
+                      <OrderSideCard
+                        side="buy"
+                        rows={buyRows}
+                        total={sortedBuy.length}
+                        best={loadedView?.summary.bestBuy ?? null}
+                        columns={buyColumns}
+                        availableColumns={BUY_ORDER_COLUMN_IDS}
+                        visibleColumns={visibleOrderColumns}
+                        columnsById={orderColumnsById}
+                        onToggleColumn={toggleOrderColumn}
+                        tableExport={buyExport}
+                        hiddenOnPhone={phoneSide !== 'buy'}
+                        onShowAll={
+                          !buyShowAll && sortedBuy.length > ROW_CAP
+                            ? () => setBuyShowAll(true)
+                            : null
+                        }
+                        rowContextMenu={orderRowContextMenu}
+                        rowClassName={orderRowClassName}
+                        renderDetail={(o) => (
+                          <OrderRowDetail
+                            order={o}
+                            best={loadedView?.summary.bestBuy ?? null}
+                            depth={depthByOrder.get(o.order_id)}
+                            npcStations={npcStationMap}
+                            solarSystems={solarSystemMap}
+                            hiddenColumns={buyHiddenColumns}
+                            orderColumnsById={orderColumnsById}
+                            onFilterToStation={stationFilter === null ? setStationFilter : null}
+                          />
+                        )}
+                        empty={
+                          <EmptyState
+                            title={t('market.emptyBuyTitle')}
+                            hint={
+                              stationFilter !== null
+                                ? t('market.emptyFilteredHint')
+                                : filtersNarrowBook
+                                  ? t('market.emptyFiltersHint')
+                                  : t('market.emptyBuyHint')
+                            }
+                            className="py-6"
+                          />
+                        }
+                      />
+                    </div>
                   )}
-                </>
+                </div>
               )}
             </Panel>
           </div>

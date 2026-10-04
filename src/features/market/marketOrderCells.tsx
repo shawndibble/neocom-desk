@@ -60,3 +60,21 @@ export function SecurityCell({ order, npcStations, solarSystems, t }: LocationCe
     </span>
   );
 }
+
+/**
+ * A sell order priced ten times the best or more (`sellOutlierMultiple`):
+ * flagged beside its price rather than hidden, so the book stays complete but
+ * the row stops reading as a real offer. In words, not just a colour.
+ */
+export function BaitFlag({ multiple, t }: { multiple: number | null; t: TFunction }) {
+  if (multiple === null) return null;
+  const times = Math.round(multiple).toLocaleString();
+  return (
+    <span
+      className="ml-2 text-[0.6875rem] font-normal whitespace-nowrap text-warning"
+      title={t('market.baitHint', { times })}
+    >
+      {t('market.baitFlag', { times })}
+    </span>
+  );
+}
