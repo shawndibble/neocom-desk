@@ -271,6 +271,92 @@ export async function unlockPaidAssignment(
   return updated;
 }
 
+export interface CombinedMemberValues {
+  estimatedValue: number;
+  taxOwed: number;
+  /** Per-ore corrections for this day, replacing whatever it stored — see `UpdateAssignmentInput.oreLineValues`. */
+  oreLineValues?: Record<number, number>;
+}
+
+export interface UpdateCombinedInput {
+  payeeId: string;
+  taxPct: number;
+  /** Each member's own figures, keyed by Assignment id. A member missing here keeps its stored ones. */
+  members: Readonly<Record<string, CombinedMemberValues>>;
+}
+
+/**
+ * Saves the combined entry's single edit form in one write: one Payee and one
+ * tax % for every member, plus each day's own value and tax owed. Unlike
+ * `updateAssignment`, a Payee or rate change keeps the `groupId` — the whole
+ * entry moves together, which is exactly what keeps the "one obligation, one
+ * Payee, one rate" rule true. Status and payment are left alone, as there.
+ */
+export async function updateCombinedAssignments(
+  assignments: readonly MiningTaxAssignmentRecord[],
+  input: UpdateCombinedInput
+): Promise<MiningTaxAssignmentRecord[]> {
+  if (assignments.length === 0) return [];
+  const now = Date.now();
+  const updated = assignments.map((a): MiningTaxAssignmentRecord => {
+    const values = input.members[a.id];
+    const next: MiningTaxAssignmentRecord = {
+      ...a,
+      payeeId: input.payeeId,
+      taxPct: input.taxPct,
+      ...(values ? { estimatedValue: values.estimatedValue, taxOwed: values.taxOwed } : {}),
+      updatedAt: now,
+    };
+    if (values) {
+      if (values.oreLineValues !== undefined) next.oreLineValues = values.oreLineValues;
+      else delete next.oreLineValues;
+    }
+    return next;
+  });
+  await db.miningTaxAssignments.bulkPut(updated);
+  for (const characterId of new Set(updated.map((a) => a.characterId))) scheduleSync(characterId);
+  return updated;
+}
+
+/**
+ * "Take out of combined" / "Uncombine all": clears `groupId` and nothing
+ * else, so each day goes back to being its own row with its Payee, figures,
+ * status and payment intact. Taking one day out of a two-day entry leaves a
+ * lone `groupId`, which already renders as an ordinary row (`flatten`).
+ */
+export async function uncombineAssignments(
+  assignments: readonly MiningTaxAssignmentRecord[]
+): Promise<void> {
+  const now = Date.now();
+  const updated = assignments
+    .filter((a) => a.groupId !== undefined)
+    .map((a): MiningTaxAssignmentRecord => {
+      const next: MiningTaxAssignmentRecord = { ...a, updatedAt: now };
+      delete next.groupId;
+      return next;
+    });
+  if (updated.length === 0) return;
+  await db.miningTaxAssignments.bulkPut(updated);
+  for (const characterId of new Set(updated.map((a) => a.characterId))) scheduleSync(characterId);
+}
+
+/**
+ * Deleting a Payee that is still owed (scope decision 20261004): its
+ * Assignments move to another Payee rather than turning into "Unknown
+ * Payee". Only the Payee changes — the figures were the bill as it stood,
+ * and a combined entry moves whole, so its `groupId` stays.
+ */
+export async function moveAssignmentsToPayee(
+  assignments: readonly MiningTaxAssignmentRecord[],
+  payeeId: string
+): Promise<void> {
+  if (assignments.length === 0) return;
+  const now = Date.now();
+  const updated = assignments.map((a) => ({ ...a, payeeId, updatedAt: now }));
+  await db.miningTaxAssignments.bulkPut(updated);
+  for (const characterId of new Set(updated.map((a) => a.characterId))) scheduleSync(characterId);
+}
+
 export interface JoinMemberInput {
   characterId: number;
   date: string;

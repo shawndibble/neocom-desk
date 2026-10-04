@@ -662,9 +662,10 @@ export type MiningTaxAssignmentStatus = 'outstanding' | 'paid' | 'needs-review' 
  * a paid one).
  *
  * Re-diffed on every ledger refresh: if ESI reports *more* ore for the same
- * (characterId, date, solarSystemId) after assignment, `status` flips to
- * `needs-review` and `reviewDiff` records the before/after — never silently
- * absorbed into `oreLines`.
+ * (characterId, date, solarSystemId) after assignment, an `outstanding` one
+ * (combined or not) absorbs it straight into `oreLines`, re-priced; a `paid`
+ * or `dismissed` one flips to `needs-review` with `reviewDiff` recording the
+ * before/after (`reconcile.ts`).
  */
 export interface MiningTaxAssignmentRecord {
   id: string;

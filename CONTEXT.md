@@ -42,8 +42,8 @@ here — they go one per file in `docs/context/decisions/`.
   not just prefilled, and invoice semantics thereafter: neither a later Jita
   price move nor an edited Payee default retroactively changes what it shows
   as owed. Re-diffed on every ledger refresh: if ESI reports _more_ ore for
-  the same entry afterward, an Outstanding, ungrouped one absorbs the growth
-  at once (re-snapshotted, re-priced), while a Paid, dismissed or joined one
+  the same entry afterward, an Outstanding one — combined or not — absorbs
+  the growth at once (re-snapshotted, re-priced), while a Paid or dismissed one
   flips to `needs-review` with an explicit before/after diff — and can be
   split from there. A `dismissed`
   Assignment ("I don't pay tax on this entry") carries no Payee at all, but
@@ -208,6 +208,14 @@ here — they go one per file in `docs/context/decisions/`.
   it look empty for a reason that is not about the pilot's data. Map, ticker
   and rail all read the same board, so a day cannot show a dot for something
   the rail declines to list.
+- **Combined Entry**: Two or more Mining Ledger Entries the pilot billed as
+  one obligation — almost always a mining session that ran past midnight UTC,
+  which ESI's per-day ledger splits in two. Stored as ordinary Assignments
+  sharing a `groupId`, all on one Payee and one tax %; each day keeps its own
+  ore and value. The UI word is "Combine" (never "Join") for making one, "Take
+  out of combined" for removing a day without unassigning it, and "Continue
+  the <date> session" for the one-tap offer that combines a new day into the
+  previous day's owed entry (see `docs/context/decisions/20261004-135551-mining-tax-redesign-owed-first-combined-entries-edit.md`).
 - **Compare**: A resizable bottom drawer over the **Compare Set**, not a tab
   — it opens beside the order book rather than covering it, since comparing
   happens _while_ browsing. Two views: Prices (best sell, best buy, spread

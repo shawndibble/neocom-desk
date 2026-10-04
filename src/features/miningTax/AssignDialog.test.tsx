@@ -149,7 +149,7 @@ describe('AssignDialog — ore line checkbox and Market link', () => {
     renderDialog([payee()], null, undefined, undefined, twoLineRow);
 
     await userEvent.click(screen.getByRole('checkbox', { name: 'Include Veldspar' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Assign' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Assign( to |$)/ }));
 
     expect(mockedCreate).toHaveBeenCalledWith(
       expect.objectContaining({ oreLines: [{ typeId: ZEOLITES, quantity: 100 }] })
@@ -161,7 +161,7 @@ describe('AssignDialog — the money path', () => {
   it('snapshots the value computed at the selected Payee’s hub, not at Jita', async () => {
     renderDialog([payee()]);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Assign' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Assign( to |$)/ }));
 
     // 100 units at Hek's 400, not at Jita's 1000: the bill is the landlord's,
     // so it is priced at the book the landlord bills against.
@@ -173,7 +173,7 @@ describe('AssignDialog — the money path', () => {
   it('prices at Jita for a Payee that names no hub of its own', async () => {
     renderDialog([payee({ hubId: undefined })]);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Assign' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Assign( to |$)/ }));
 
     expect(mockedCreate).toHaveBeenCalledWith(
       expect.objectContaining({ estimatedValue: 100_000, taxOwed: 10_000 })

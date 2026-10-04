@@ -21,9 +21,9 @@ import { unmaskNumber } from '@/lib/numberMask';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { AlreadyAssignedError, createAssignment, updateAssignment } from './assignments';
 import { useMiningTaxOreValueMode } from './oreValueMode';
-import { updatePayee } from './payees';
 import { hubForPayee } from './pricing';
 import type { MoonMiningTaxRow } from './snapshot';
+import type { PayeeSuggestion } from './suggestPayee';
 
 interface AssignDialogProps {
   row: MoonMiningTaxRow;
@@ -58,6 +58,13 @@ interface AssignDialogProps {
    * Assignment once this resolves.
    */
   onUnlock?: () => void | Promise<void>;
+  /**
+   * Which Payee this entry most likely belongs to, from the pilot's own
+   * history in its system (`suggestPayeeForSystem`) — pre-selected when
+   * creating, and the order the Payee list is offered in. Absent when
+   * editing, where the stored Payee is the answer.
+   */
+  suggestion?: PayeeSuggestion;
 }
 
 /** Rounds to the cent — what the editable ISK fields below prefill and display, since a raw float in a number input reads as noise. */
@@ -233,6 +240,7 @@ export function AssignDialog({
   extraActions,
   onAddPayee,
   onUnlock,
+  suggestion,
 }: AssignDialogProps) {
   const { t } = useTranslation();
   const isEditing = assignment !== null;
@@ -240,14 +248,14 @@ export function AssignDialog({
   const oreValueMode = useMiningTaxOreValueMode((state) => state.value) && isEditing;
   const locked = isEditing && assignment.status === 'paid';
 
-  // Deliberately no `?? payees[0]` fallback when creating: the decision doc
-  // leaves the multiple-moons-one-system case "deliberately unmatched...
-  // that's the one case nothing can auto-resolve" — pre-selecting an
-  // arbitrary Payee here would let a pilot in a hurry create a real
-  // Assignment against a Payee they never actually chose.
+  // The Payee the pilot last used in this system (scope decision 20261004),
+  // falling back to one remembered for it. Still never `payees[0]`: with no
+  // history here at all, pre-selecting an arbitrary Payee would let a pilot
+  // in a hurry create a real Assignment against one they never chose.
   const autoMatch = isEditing
     ? undefined
-    : payees.find((p) => p.systemId === row.entry.solarSystemId);
+    : (suggestion?.suggested ?? payees.find((p) => p.systemId === row.entry.solarSystemId));
+  const orderedPayees = suggestion && !isEditing ? suggestion.ranked : payees;
   const [payeeId, setPayeeId] = useState<string | null>(
     assignment?.payeeId ?? autoMatch?.id ?? null
   );
@@ -258,7 +266,6 @@ export function AssignDialog({
     new Set(oreLines.map((line) => line.typeId))
   );
   const [markPaid, setMarkPaid] = useState(false);
-  const [rememberSystem, setRememberSystem] = useState(false);
   const [saving, setSaving] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
   // Empty means "track the computed default"; any other string is a pilot
@@ -382,9 +389,6 @@ export function AssignDialog({
     setOreValueOverrides((previous) => ({ ...previous, [typeId]: raw }));
   }
 
-  const offerRememberSystem =
-    selectedPayee !== null && selectedPayee.systemId !== row.entry.solarSystemId;
-
   async function handleUnlock() {
     if (!onUnlock) return;
     setUnlocking(true);
@@ -399,17 +403,6 @@ export function AssignDialog({
     if (!canAssign || !payeeId) return;
     setSaving(true);
     try {
-      if (rememberSystem && selectedPayee) {
-        await updatePayee(selectedPayee, {
-          name: selectedPayee.name,
-          defaultTaxPct: selectedPayee.defaultTaxPct,
-          systemId: row.entry.solarSystemId,
-          // Carried through, not omitted: `updatePayee` deletes any field its
-          // input leaves out, so remembering a system would otherwise quietly
-          // move this Payee's billing back to Jita.
-          hubId: selectedPayee.hubId,
-        });
-      }
       if (assignment) {
         await updateAssignment(assignment, {
           payeeId,
@@ -501,7 +494,7 @@ export function AssignDialog({
             <SelectValue placeholder={t('miningTax.payeePlaceholder')} />
           </SelectTrigger>
           <SelectContent>
-            {payees.map((payee) => (
+            {orderedPayees.map((payee) => (
               <SelectItem key={payee.id} value={payee.id}>
                 {payee.name}
               </SelectItem>
@@ -510,17 +503,10 @@ export function AssignDialog({
         </Select>
       </div>
 
-      {offerRememberSystem && (
-        <label className="flex items-center gap-2 text-xs text-text-dim">
-          <Checkbox
-            checked={rememberSystem}
-            onChange={(e) => setRememberSystem(e.target.checked)}
-          />
-          {t('miningTax.rememberSystemLabel', {
-            system: systemName,
-            payee: selectedPayee?.name,
-          })}
-        </label>
+      {!isEditing && suggestion?.fromHistory && autoMatch && payeeId === autoMatch.id && (
+        <p className="text-[0.6875rem] text-text-dim">
+          {t('miningTax.suggestedPayeeHint', { system: systemName })}
+        </p>
       )}
 
       {!isEditing && oreLines.length > 1 && (
@@ -693,7 +679,14 @@ export function AssignDialog({
           disabled={!canAssign || saving || busy}
           onClick={() => void handleAssign()}
         >
-          {isEditing ? t('common.save') : t('miningTax.assignAction')}
+          {isEditing
+            ? t('common.save')
+            : selectedPayee && Number.isFinite(taxOwed)
+              ? t('miningTax.assignToAction', {
+                  payee: selectedPayee.name,
+                  amount: maskIsk(Math.round(taxOwed)),
+                })
+              : t('miningTax.assignAction')}
         </Button>
         {extraActions}
         <Button size="sm" onClick={onCancel}>
