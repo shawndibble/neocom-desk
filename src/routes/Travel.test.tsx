@@ -11,6 +11,7 @@ import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 import { clearRouteKillCaches } from '@/features/travel/routeKillsData';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import { AVOIDED_SYSTEMS_KEY, useAvoidedSystems } from '@/features/route/avoidedSystems';
 import {
   AVOIDED_SYSTEMS_ENABLED_KEY,
@@ -170,10 +171,25 @@ const server = setupServer(
   )
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render of a Route Safety route, so no test pays for the
+  // first one. A worker's first `App` render — compiling the lazy route
+  // chunks, warming jsdom and React — cost 4-6s on top of a warm render, and
+  // it landed on whichever test ran first. Done here under the hook's own
+  // budget; `beforeEach` clears every cache it filled.
+  await routeChunks.loadTravel();
+  await resetState();
+  window.history.pushState({}, '', `/travel/route?from=${JITA}&to=${UEDAMA}`);
+  const { unmount } = render(<App />);
+  await screen.findByRole('table', { name: 'Systems on the route' }, { timeout: 25_000 });
+  unmount();
+}, 30_000);
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
-beforeEach(async () => {
+beforeEach(() => resetState());
+
+async function resetState() {
   clearJumpGraphIndex();
   clearSolarSystemIndex();
   clearEveScoutCache();
@@ -194,7 +210,7 @@ beforeEach(async () => {
     scopes: ['esi-location.read_location.v1'],
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
-});
+}
 
 /** One labelled figure from the route summary strip, e.g. `routeFact('Jumps')` → "4". */
 function routeFact(label: string) {
