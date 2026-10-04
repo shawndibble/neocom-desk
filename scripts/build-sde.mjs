@@ -14,6 +14,7 @@ import { npcCorporations, probeLpStores } from './lib/lpCorporations.mjs';
 import { marketTypeEntry } from './lib/marketTypeVolumes.mjs';
 import { bakeCertifiedPlans, factionNames, parseJsonl } from './lib/certifiedPlans.mjs';
 import { readCcpStaticDataFiles } from './lib/ccpStaticData.mjs';
+import { fitTypeIds } from './lib/fitTypeIds.mjs';
 import { bakeCertificates } from './lib/certificates.mjs';
 import { bakeTypeNames, namesMissingFrom } from './lib/typeNames.mjs';
 
@@ -1192,6 +1193,9 @@ async function main() {
     for (const p of bp.products) referenced.add(p.typeID);
     for (const sk of bp.skills) referenced.add(sk.typeID);
   }
+  // Every published type a Fitting can hold, blueprint or not: without them an
+  // EFT paste naming an LP booster or a filament read "unknown item".
+  for (const typeID of fitTypeIds(types, groups)) referenced.add(typeID);
   const typeMap = {};
   for (const typeID of [...referenced].sort((a, b) => a - b)) {
     const t = types.get(typeID);
