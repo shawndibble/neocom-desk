@@ -22,9 +22,13 @@ export interface HubSides {
 }
 
 /** `[typeId, quantity]` pairs, one per type. */
-export type ItemCounts = Iterable<readonly [number, number]>;
+export type ItemCounts = Iterable<ItemCount>;
 
-const FULL_PRICE_PERCENT = 100;
+/** One type and how many of it. */
+export type ItemCount = readonly [typeId: number, quantity: number];
+
+/** Every fit price is quoted at full market price, never a Price Percent. */
+export const FULL_PRICE_PERCENT = 100;
 
 /**
  * Each counted type as an `AppraisalItem` priced from `prices`; a type with no

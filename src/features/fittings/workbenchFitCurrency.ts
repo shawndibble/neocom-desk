@@ -29,6 +29,7 @@ import {
   type EftTypeLookup,
 } from '@/engine/fittings/eftLoader';
 import { fittingItemCounts } from '@/engine/fittings/fittingExport';
+import type { ItemCount } from '@/engine/fittings/fitSellPrice';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import type { RackModule } from '@/engine/fittings/types';
 import { loadFittingSlots, loadShipTree } from '@/sde/loadSde';
@@ -51,7 +52,7 @@ export interface WorkbenchFitCheck {
    * drones, fighters, cargo — tallied as the Price section tallies a Fitting.
    * Empty when the hull didn't load.
    */
-  items: readonly (readonly [number, number])[];
+  items: readonly ItemCount[];
 }
 
 const CHUNK_SIZE = 25;

@@ -352,7 +352,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     openWorkbench({ ok: true, fits: PRICED_FITS });
     expect(
       await screen.findByText(
-        'Prices: what each fit costs to buy today from sell orders at Jita, your default Trade Hub.'
+        'Prices: what each fit costs to buy today from sell orders at Jita, your default Trade Hub — not the loss value zKillboard reports.'
       )
     ).toBeTruthy();
     expect(within(rowOf('Fit a')).getByText('≈ 245M ISK')).toBeTruthy();

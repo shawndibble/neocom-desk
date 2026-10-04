@@ -629,7 +629,7 @@
         "byline": "by {{author}} · added {{age}}",
         "load": "Load",
         "loadFailed": "Couldn't load this fit.",
-        "priceNote": "Prices: what each fit costs to buy today from sell orders at {{hub}}, your default Trade Hub.",
+        "priceNote": "Prices: what each fit costs to buy today from sell orders at {{hub}}, your default Trade Hub — not the loss value zKillboard reports.",
         "price": "≈ {{value}} ISK",
         "pricePartial_one": "≥ {{value}} ISK · {{count}} item has no sell order at {{hub}}",
         "pricePartial_other": "≥ {{value}} ISK · {{count}} items have no sell order at {{hub}}",

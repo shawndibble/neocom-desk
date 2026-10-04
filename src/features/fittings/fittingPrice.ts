@@ -12,13 +12,11 @@
  * per-item row, only the fit-wide `totals.buy`/`totals.sell`.
  */
 import { buildAppraisal, type Appraisal } from '@/engine/market/appraisal';
-import { fitAppraisalItems } from '@/engine/fittings/fitSellPrice';
+import { FULL_PRICE_PERCENT, fitAppraisalItems } from '@/engine/fittings/fitSellPrice';
 import { getHubPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
 import { fittingItemCounts } from '@/engine/fittings/fittingExport';
 import type { Fitting } from '@/engine/fittings/types';
-
-const FULL_PRICE_PERCENT = 100;
 
 export async function loadFittingPrice(fitting: Fitting, hub: TradeHub): Promise<Appraisal> {
   const counts = fittingItemCounts(fitting);
