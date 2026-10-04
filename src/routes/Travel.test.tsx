@@ -437,6 +437,20 @@ describe('Travel › Route Safety › Stops', () => {
     expect(screen.getByRole('table', { name: 'Systems on leg 2' })).toBeInTheDocument();
   });
 
+  it('previews an Avoid as the whole trip, not the leg it was asked from', async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&stops=${SOBASEKI},${UEDAMA}`);
+
+    const table = await screen.findByRole('table', { name: 'Systems on leg 1' });
+    await user.click(await within(table).findByRole('button', { name: /^2 systems/ }));
+    await user.click(within(table).getByRole('button', { name: 'Avoid Niyabainen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Avoid Niyabainen?' });
+
+    expect(
+      await within(dialog).findByText(/^The route becomes 8 jumps \(\+0\)/)
+    ).toBeInTheDocument();
+  });
+
   it('adds a stop from the picker, writing the stops into the link', async () => {
     const user = userEvent.setup();
     visit(`?from=${JITA}&to=${UEDAMA}`);
@@ -850,6 +864,24 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
       );
       expect(pinInLink()).toBe('thera');
       await waitFor(() => expect(routeFact('Jumps')).toBe('2'));
+    });
+
+    it('previews an Avoid on a pinned leg as the leg is flown, pin and all', async () => {
+      const user = userEvent.setup();
+      visit(`?from=${JITA}&to=${UEDAMA}&wh=1&pin=gates`);
+
+      await waitFor(() => expect(routeFact('Jumps')).toBe('4'));
+      const table = await screen.findByRole('table', { name: 'Systems on the route' });
+      await user.click(await within(table).findByRole('button', { name: /^3 systems/ }));
+      await user.click(within(table).getByRole('button', { name: 'Avoid Muvolailen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Avoid Muvolailen?' });
+
+      // Gates only is pinned, and gates only has no way around Muvolailen: the
+      // trip stays 4 jumps, never the unpinned hole route's 2.
+      expect(
+        await within(dialog).findByText(/^The route becomes 4 jumps \(\+0\)/)
+      ).toBeInTheDocument();
+      expect(within(dialog).getByText(/no way around Muvolailen/)).toBeInTheDocument();
     });
 
     it('says when a pinned hole has closed, and flies the planner’s pick', async () => {

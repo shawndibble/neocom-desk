@@ -24,8 +24,14 @@
  * Holes (issue #2476) and Ansiblex (issue #2478) join the search as extra
  * connections; the stargate graph never holds them, so waypoints still cut at
  * a hole or a bridge.
+ *
+ * An Avoid preview (issue #2547) is this same trip request with one more
+ * system avoided: `planWithAvoid` runs it through the same planner and
+ * assembly — pins, holes, bridges and Optimize included — reading only the
+ * graph and systems already loaded, and saving nothing.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { candidateAvoid } from '@/engine/route/avoidRules';
 import type { RouteSafetySystemEntry } from '@/engine/route/routeSafety';
 import {
   assembleRouteSafety,
@@ -34,12 +40,12 @@ import {
   type LegAlternatives,
   type RouteSafetyAssembly,
 } from '@/engine/route/routeSafetyTrip';
-import type { HoleNetwork } from '@/engine/route/routeHoles';
+import type { HoleEnds, HoleNetwork } from '@/engine/route/routeHoles';
 import type { TheraConnection } from '@/engine/route/theraConnections';
 import type { AnsiblexGate } from '@/engine/route/ansiblex';
 import type { TripOptions } from '@/engine/route/tripPlan';
 import { planLocalTrip, type LocalTripResult } from '@/features/route/localRoute';
-import type { RouteQuery } from '@/features/route/routeRules';
+import type { RouteQuery, RouteRules } from '@/features/route/routeRules';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { loadRouteRegionNames, loadSystemActivity, type SystemActivity } from './routeSafetyData';
 import {
@@ -55,6 +61,12 @@ export type { BridgeAt } from '@/engine/route/ansiblex';
 export type { HoleAt } from '@/engine/route/routeHoles';
 export type { RouteSafetyLeg, RouteSafetyWay } from '@/engine/route/routeSafetyTrip';
 
+/** The trip as an Avoid preview would draw it: `unknown` when the stargate map cannot be read. */
+export type AvoidTripResult = RouteSafetyAssembly | { kind: 'unknown' };
+
+/** What an Avoid adds to the trip's avoid list (`candidateAvoid`, less the list it already has). */
+export type AvoidAddition = Omit<Parameters<typeof candidateAvoid>[0], 'effective'>;
+
 export type RouteSafetyState =
   | { kind: 'incomplete' }
   | { kind: 'same-system' }
@@ -62,9 +74,13 @@ export type RouteSafetyState =
   | { kind: 'no-route' }
   | { kind: 'unknown' }
   | (Extract<RouteSafetyAssembly, { kind: 'route' }> & {
-      /** The holes and bridges the route was planned with, for an Avoid preview to plan the same way. */
-      network: HoleNetwork;
-      networkKey: string;
+      /** Names the trip request: equal keys plan the same trip. */
+      requestKey: string;
+      /**
+       * This trip re-planned with the addition avoided — everything else as
+       * drawn. Saves nothing.
+       */
+      planWithAvoid: (addition: AvoidAddition) => Promise<AvoidTripResult>;
     });
 
 export interface RouteSafetyRequest {
@@ -93,6 +109,39 @@ interface ResolvedTrip {
 const NO_HOLES: readonly TheraConnection[] = [];
 const NO_PINS: readonly string[] = [];
 const NO_SYSTEMS: ReadonlyMap<number, RouteSafetySystemEntry> = new Map();
+const NO_REGION_NAMES: ReadonlyMap<number, string> = new Map();
+
+/** One planned trip with its legs' other ways: what the page and an Avoid preview both assemble. */
+async function planRouteSafetyTrip(request: {
+  fromId: number;
+  stops: readonly number[];
+  rules: RouteRules;
+  tripOptions: TripOptions;
+  network: HoleNetwork;
+  networkEnds: { holes: readonly HoleEnds[]; bridges: readonly AnsiblexGate[] };
+  pins: Parameters<typeof planLegAlternatives>[2];
+}): Promise<{
+  result: LocalTripResult;
+  alternatives: LegAlternatives[];
+  systemIds: number[];
+  systems: ReadonlyMap<number, RouteSafetySystemEntry>;
+}> {
+  const [result, systems] = await Promise.all([
+    planLocalTrip(
+      request.fromId,
+      request.stops,
+      request.rules,
+      request.tripOptions,
+      request.network
+    ),
+    loadSolarSystemsById().catch(() => null),
+  ]);
+  if (result.kind !== 'trip') {
+    return { result, alternatives: [], systemIds: [], systems: systems ?? NO_SYSTEMS };
+  }
+  const { legs, systemIds } = planLegAlternatives(result, request.networkEnds, request.pins);
+  return { result, alternatives: legs, systemIds, systems: systems ?? NO_SYSTEMS };
+}
 
 export function useRouteSafety({
   fromId,
@@ -147,30 +196,19 @@ export function useRouteSafety({
     let cancelled = false;
     const stopIds = stopsKey.split(',').map(Number);
     void (async () => {
-      const [result, systems] = await Promise.all([
-        planLocalTrip(
-          fromId,
-          stopIds,
-          rules,
-          { optimize, returnToStart, keepLastStopLast },
-          network
-        ),
-        loadSolarSystemsById().catch(() => null),
-      ]);
-      const byId = systems ?? NO_SYSTEMS;
-      let alternatives: LegAlternatives[] = [];
-      let systemIds: number[] = [];
-      if (result.kind === 'trip') {
-        ({ legs: alternatives, systemIds } = planLegAlternatives(
-          result,
-          networkEnds,
-          pinsFromKey(pinRequestKey)
-        ));
-      }
-      const regionIds = new Set(systemIds.flatMap((id) => byId.get(id)?.regionId ?? []));
+      const { result, alternatives, systemIds, systems } = await planRouteSafetyTrip({
+        fromId,
+        stops: stopIds,
+        rules,
+        tripOptions: { optimize, returnToStart, keepLastStopLast },
+        network,
+        networkEnds,
+        pins: pinsFromKey(pinRequestKey),
+      });
+      const regionIds = new Set(systemIds.flatMap((id) => systems.get(id)?.regionId ?? []));
       const regionNames = await loadRouteRegionNames([...regionIds]);
       if (!cancelled) {
-        setResolved({ requestKey, result, alternatives, systems: byId, regionNames });
+        setResolved({ requestKey, result, alternatives, systems, regionNames });
       }
     })();
     return () => {
@@ -191,6 +229,53 @@ export function useRouteSafety({
     requestKey,
   ]);
 
+  // The same request with the avoid list swapped. No region names or
+  // activity: a preview reads jumps and security only, and asks no network.
+  const planWithAvoid = useCallback(
+    async (addition: AvoidAddition): Promise<AvoidTripResult> => {
+      // Only offered on a drawn route, which always has a start.
+      if (fromId === null) return { kind: 'unknown' };
+      const stopIds = stopsKey.split(',').map(Number);
+      const planned = await planRouteSafetyTrip({
+        fromId,
+        stops: stopIds,
+        rules: { ...rules, avoid: candidateAvoid({ effective: rules.avoid, ...addition }) },
+        tripOptions: { optimize, returnToStart, keepLastStopLast },
+        network,
+        networkEnds,
+        pins: pinsFromKey(pinRequestKey),
+      });
+      if (planned.result.kind === 'unknown') return planned.result;
+      return assembleRouteSafety({
+        planned: planned.result,
+        alternatives: planned.alternatives,
+        singleStop: stopIds.length === 1,
+        pins,
+        holes,
+        listed,
+        bridges,
+        systems: planned.systems,
+        regionNames: NO_REGION_NAMES,
+        activity: null,
+      });
+    },
+    [
+      fromId,
+      stopsKey,
+      rules,
+      optimize,
+      returnToStart,
+      keepLastStopLast,
+      network,
+      networkEnds,
+      pinRequestKey,
+      pins,
+      holes,
+      listed,
+      bridges,
+    ]
+  );
+
   return useMemo((): RouteSafetyState => {
     if (fromId === null || stops.length === 0) return { kind: 'incomplete' };
     if (stops.length === 1 && stops[0] === fromId) return { kind: 'same-system' };
@@ -209,18 +294,6 @@ export function useRouteSafety({
       regionNames: resolved.regionNames,
       activity,
     });
-    return assembled.kind === 'route' ? { ...assembled, network, networkKey } : assembled;
-  }, [
-    bridges,
-    fromId,
-    stops,
-    resolved,
-    requestKey,
-    activity,
-    holes,
-    network,
-    networkKey,
-    pins,
-    listed,
-  ]);
+    return assembled.kind === 'route' ? { ...assembled, requestKey, planWithAvoid } : assembled;
+  }, [bridges, fromId, stops, resolved, requestKey, activity, holes, planWithAvoid, pins, listed]);
 }
