@@ -138,6 +138,22 @@ describe('findGatesWithCharacter', () => {
     ]);
   });
 
+  it('keeps a gate the search still lists when it cannot be read this time', async () => {
+    server.use(searchFinds(PILOT, [AB_ID]), structures);
+    await findGatesWithCharacter(PILOT, lookup);
+
+    await db.esiCache.clear();
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/structures/:id`, () =>
+        HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
+      )
+    );
+    await findGatesWithCharacter(PILOT, lookup);
+    expect((await gatesOf()).map(({ id, foundBy }) => [id, foundBy])).toEqual([
+      [`search:${AB_ID}`, [PILOT]],
+    ]);
+  });
+
   it('asks nothing of ESI for a character without the search permission', async () => {
     await grant(ALT, ['esi-universe.read_structures.v1']);
     server.use(searchFinds(ALT, [AB_ID]), structures);

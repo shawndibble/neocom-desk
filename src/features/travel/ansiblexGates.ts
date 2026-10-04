@@ -95,9 +95,12 @@ export async function findGatesWithCharacter(
   const now = Date.now();
   await db.transaction('rw', db.ansiblexGates, async () => {
     const earlier = await db.ansiblexGates.where('id').startsWith(SEARCH_PREFIX).toArray();
+    // Only a gate the search no longer lists loses this character: one it
+    // still lists but could not read this time keeps the earlier record.
+    const listed = new Set(ids);
     for (const record of earlier) {
       const structureId = Number(record.id.slice(SEARCH_PREFIX.length));
-      if (found.has(structureId) || !record.foundBy.includes(characterId)) continue;
+      if (listed.has(structureId) || !record.foundBy.includes(characterId)) continue;
       const foundBy = record.foundBy.filter((id) => id !== characterId);
       if (foundBy.length === 0) await db.ansiblexGates.delete(record.id);
       else await db.ansiblexGates.put({ ...record, foundBy });
