@@ -6,8 +6,8 @@
  * and the life it has left. The way in use has an accent edge and an In use
  * badge.
  *
- * On a phone the panel folds under the leg header to one line — "Gates only:
- * 33 j · compare" — and opens in place.
+ * On a phone the panel folds under the leg header to one line — "Gates only
+ * · 33 jumps", with Compare at its right end — and opens in place.
  *
  * Via Ansiblex (issue #2478) is one more way, with a line per bridge it
  * crosses. With Use jump bridges on and no gate known yet, its box offers
@@ -18,7 +18,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { textActionClassName } from '@/components/ui';
+import { Caret, textActionClassName } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -275,17 +275,17 @@ function PhoneLine({
       onClick={onToggle}
       className="flex min-h-11 w-full items-center gap-1.5 text-left text-sm text-text-dim"
     >
-      <span>
-        {t('travel.ways.phoneLine', {
-          way: label(way),
-          jumps: way.summary
-            ? t('travel.legs.jumps', { count: way.summary.jumps })
-            : t('travel.ways.noRoute', { to: nameOf(leg.to) }),
-        })}
-      </span>
+      <span className="font-semibold text-text">{label(way)}</span>
       <Dot />
-      <span className="font-semibold text-accent">
+      <span className="tabular-nums">
+        {way.summary
+          ? t('travel.ways.phoneJumps', { count: way.summary.jumps })
+          : t('travel.ways.noRoute', { to: nameOf(leg.to) })}
+      </span>
+      {/* The button is the whole line; this only looks like the page's other text actions. */}
+      <span className={textActionClassName('ml-auto min-h-0 gap-1')}>
         {open ? t('travel.ways.hide') : t('travel.ways.compare')}
+        <Caret expanded={open} />
       </span>
     </button>
   );

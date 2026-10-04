@@ -12,6 +12,11 @@
  * along the route. NPC kills and kills anywhere else in the system open in
  * the row's detail.
  *
+ * On a phone the row is a dense card: the system and its security on line
+ * one, and region · last hour · zKillboard below with Avoid closing it. A
+ * zero kill count is left off that line, so a quiet system reads
+ * "Khanid · 87 jumps" rather than a string of zeros.
+ *
  * A jump through a Thera / Turnur hole (issue #2476) is its own full-width
  * row between its two systems (`HoleStepRow`): where to warp, the signature
  * with Copy, size, life left and how old EVE-Scout's list is. Both systems
@@ -37,6 +42,7 @@ import {
 import { BridgeStepLine, type BridgeStep } from './BridgeStepLine';
 import { HoleStepLine, type HoleStep } from './HoleStepLine';
 import { RecentKillsCell, RecentKillsDetail } from './RecentKillsCell';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { routeSystemName } from './routeSystemName';
 import type { RouteKillsCell } from './useRouteKills';
 import type { BridgeAt, HoleAt } from './useRouteSafety';
@@ -92,6 +98,7 @@ function zkillCountOf(cell: RouteKillsCell): number | null {
 
 function LastHour({ row }: { row: RouteSafetyRow }) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
   if (isWormholeSystem(row.systemId)) {
     return (
       <span className="inline-flex items-center gap-1.5 text-text-dim">
@@ -104,7 +111,7 @@ function LastHour({ row }: { row: RouteSafetyRow }) {
     { key: 'ships', value: row.shipKills, unit: t('travel.lastHour.ships') },
     { key: 'pods', value: row.podKills, unit: t('travel.lastHour.pods') },
     { key: 'jumps', value: row.jumps, unit: t('travel.lastHour.jumps') },
-  ];
+  ].filter((figure) => !isPhone || figure.key === 'jumps' || figure.value !== 0);
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums">
       {figures.map((figure, index) => (
@@ -155,6 +162,8 @@ function useColumns(
       id: 'security',
       header: t('travel.col.security'),
       align: 'right',
+      // A phone card's headline figure, beside the system name.
+      cardCorner: true,
       render: (row) => (row.security === null ? DASH : <SecurityStatus security={row.security} />),
     },
     {
@@ -187,7 +196,7 @@ function useColumns(
       header: t('travel.col.avoid'),
       headerClassName: 'sr-only',
       align: 'right',
-      cardCorner: true,
+      stackEdge: 'end',
       render: (row) => {
         const onAvoid = avoidAction(row);
         const name = routeSystemName(row);

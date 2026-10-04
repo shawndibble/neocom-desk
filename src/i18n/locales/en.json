@@ -7445,9 +7445,10 @@
       "findBridges": "Find with a character",
       "or": "or",
       "pasteBridges": "paste a list",
-      "compare": "compare",
-      "hide": "hide",
-      "phoneLine": "{{way}}: {{jumps}}",
+      "compare": "Compare",
+      "hide": "Hide",
+      "phoneJumps_one": "{{count}} jump",
+      "phoneJumps_other": "{{count}} jumps",
       "phoneToggle": "Compare ways to fly leg {{number}}",
       "holesHint": "Turn on Route through Thera / Turnur to compare ways through a hole.",
       "pinNote": {

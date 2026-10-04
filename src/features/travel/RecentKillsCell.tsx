@@ -75,7 +75,11 @@ export function RecentKillsCell({ systemId, cell }: { systemId: number; cell: Ro
   }
   const { summary } = cell;
   return (
-    <span className="inline-flex flex-wrap items-center gap-x-3 text-left">
+    <span
+      className="inline-flex flex-wrap items-center gap-x-3 text-left"
+      // Nothing to say on a phone card's meta line; the table column keeps it.
+      data-dense-omit={summary.count === 0 ? '' : undefined}
+    >
       <a
         href={systemZkillUrl(systemId)}
         target="_blank"

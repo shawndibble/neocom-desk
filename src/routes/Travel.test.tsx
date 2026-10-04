@@ -478,6 +478,32 @@ describe('Travel › Route Safety › Stops', () => {
     ).toBeInTheDocument();
   });
 
+  it('leaves zero kill counts off a phone row, keeping its jumps', async () => {
+    const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation(
+      (media: string) =>
+        ({
+          media,
+          matches: media === PHONE_QUERY,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList
+    );
+    try {
+      visit(`?from=${JITA}&to=${UEDAMA}`);
+
+      const table = await screen.findByRole('table', { name: 'Systems on the route' });
+      const body = (await within(table).findAllByRole('row')).slice(1);
+      const lastHour = (row: HTMLElement) => within(row).getAllByRole('cell')[3];
+      await waitFor(() => expect(lastHour(body[2])).toHaveTextContent('12ship kills'));
+      expect(lastHour(body[2])).toHaveTextContent('4pod kills');
+      expect(lastHour(body[0])).toHaveTextContent('4,200jumps');
+      expect(lastHour(body[0])).not.toHaveTextContent('ship kills');
+      expect(lastHour(body[0])).not.toHaveTextContent('pod kills');
+    } finally {
+      matchMedia.mockRestore();
+    }
+  });
+
   it('folds the stops to one line on a phone, with Edit to open them', async () => {
     const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation(
       (media: string) =>
@@ -879,7 +905,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
         visit(`?from=${JITA}&to=${UEDAMA}&wh=1`);
 
         const toggle = await screen.findByRole('button', { name: 'Compare ways to fly leg 1' });
-        await waitFor(() => expect(toggle).toHaveTextContent('Gates only: 4 j·compare'));
+        await waitFor(() => expect(toggle).toHaveTextContent('Gates only·4 jumpsCompare'));
         expect(screen.queryByRole('region', { name: 'Ways to fly leg 1' })).toBeNull();
         await user.click(toggle);
         expect(await waysPanel()).toBeInTheDocument();
