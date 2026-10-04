@@ -20,6 +20,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { formatOrderLocationText } from './format';
 import { priceClipboardText } from './priceClipboardText';
 import { ShowInfoMenuItem } from './ItemContextMenu';
+import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
 
 export interface OrderRowContextMenuProps {
   order: RegionOrder;
@@ -66,6 +67,9 @@ export function OrderRowContextMenu({
           <MenuItem onSelect={() => onFilterToStation(order.location_id)}>
             {t('market.contextMenu.filterToStation')}
           </MenuItem>
+          {/* `location_id` is always the order's station or structure; the
+              Location column's text names it, even an unnamed structure. */}
+          <SetWaypointMenuItem locationId={order.location_id} placeName={locationText} />
         </>
       }
     >

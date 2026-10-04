@@ -29,7 +29,7 @@
  * caller opts in with `rowMoreActions` on the table rather than rendering a
  * second copy of the button here.
  */
-import { useEffect, useState, type ReactElement } from 'react';
+import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { industryTabHref } from './industryTabs';
@@ -63,6 +63,8 @@ export interface BuildPlanContextMenuProps {
    * menu entry: one action, one label, seeded or not.
    */
   seed?: BuildPlanSeed | null;
+  /** Caller-specific entries appended after the shared ones (BPC Sourcing's "Set waypoint in game"), as `ItemContextMenu`'s are. */
+  extraItems?: ReactNode;
 }
 
 /**
@@ -166,12 +168,22 @@ export function BuildPlanContextMenu({
   trigger,
   itemName,
   seed,
+  extraItems,
 }: BuildPlanContextMenuProps) {
   const { index, onOpenChange } = usePlannableIndexOnOpen();
   const items = useBuildPlanMenuNodes({ typeId, itemName, seed }, index);
 
   return (
-    <RowActionsMenu name={itemName ?? `#${typeId}`} items={items} onOpenChange={onOpenChange}>
+    <RowActionsMenu
+      name={itemName ?? `#${typeId}`}
+      items={
+        <>
+          {items}
+          {extraItems}
+        </>
+      }
+      onOpenChange={onOpenChange}
+    >
       {trigger}
     </RowActionsMenu>
   );
