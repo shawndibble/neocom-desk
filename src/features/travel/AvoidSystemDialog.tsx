@@ -102,9 +102,13 @@ export function AvoidSystemDialog({
     } = latest.current;
     if (previewKey === null || trip === null || id === null) return;
     let cancelled = false;
-    void trip.planWithAvoid({ systemId: id, avoidList, avoidListEnabled }).then((result) => {
-      if (!cancelled) setPlanned({ key: previewKey, result });
-    });
+    void trip
+      .planWithAvoid({ systemId: id, avoidList, avoidListEnabled })
+      // A failed plan says it can't be worked out, never spins for good.
+      .catch((): AvoidTripResult => ({ kind: 'unknown' }))
+      .then((result) => {
+        if (!cancelled) setPlanned({ key: previewKey, result });
+      });
     return () => {
       cancelled = true;
     };

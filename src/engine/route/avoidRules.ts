@@ -3,7 +3,11 @@
  * the in-game autopilot's avoidance options, gathered into one list every
  * jump count is given (`engine/route/jumpRoute.ts`, and ESI's `avoid`).
  *
- * Pure, per CLAUDE.md: the caller supplies the lists and the kill counts.
+ * Also what one more Avoid does to a trip: the list it is planned with
+ * (`candidateAvoid`) and the change it makes (`avoidPreviewOutcome`).
+ *
+ * Pure, per CLAUDE.md: the caller supplies the lists, the kill counts and
+ * the planned trips.
  */
 import { summarizeTrip, type RouteSafetyRow } from './routeSafety';
 export interface AvoidRules {
