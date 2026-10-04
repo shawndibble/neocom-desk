@@ -52,17 +52,24 @@ export function PlaceJumpsLink({
   const { t } = useTranslation();
   const { resolving, failed, view } = useViewRoute(locationId);
   return (
-    <button
-      type="button"
-      className={cx(linkClassName, 'text-left', className)}
-      disabled={resolving}
-      title={failed ? t('travel.waypoints.viewRouteUnavailable') : t('travel.waypoints.viewRoute')}
-      onClick={(event) => {
-        stop(event);
-        view();
-      }}
-    >
-      {children}
-    </button>
+    <>
+      <button
+        type="button"
+        className={cx(linkClassName, 'text-left', className)}
+        disabled={resolving}
+        title={t('travel.waypoints.viewRoute')}
+        onClick={(event) => {
+          stop(event);
+          view();
+        }}
+      >
+        {children}
+      </button>
+      {failed && (
+        <span role="alert" className="text-danger ml-1 text-xs">
+          {t('travel.waypoints.viewRouteUnavailable')}
+        </span>
+      )}
+    </>
   );
 }
