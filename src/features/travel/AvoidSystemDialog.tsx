@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Spinner } from '@/components/ui';
+import { listOnlyOutcome } from '@/engine/route/avoidPreview';
 import { avoidListKey } from '@/engine/route/avoidRules';
 import { addAvoidedSystem, useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { useAvoidedSystemsEnabled, type RouteRules } from '@/features/route/routeRules';
@@ -118,6 +119,8 @@ export function AvoidSystemDialog({
   if (target === null) return null;
   const current = preview?.key === requestKey ? preview.result : null;
 
+  const listOnly = listOnlyOutcome(currentJumps);
+
   const add = (switchOn: boolean) => {
     void setAvoided(addAvoidedSystem(avoided, target.systemId));
     if (switchOn) void setEnabled(true);
@@ -128,29 +131,58 @@ export function AvoidSystemDialog({
     <Modal open onClose={onClose} title={t('travel.avoid.title', { name: target.name })}>
       <div className="space-y-3 text-sm">
         {!enabled && <p>{t('travel.avoid.switchedOff')}</p>}
-        <div role="status" className="space-y-2">
-          {current === null ? (
-            <Spinner label={t('common.loading')} />
-          ) : (
-            <PreviewText preview={current} name={target.name} />
-          )}
-        </div>
-        <p className="text-text-dim">{t('travel.avoid.appWide', { name: target.name })}</p>
-        <div className="flex flex-wrap justify-end gap-2 pt-2">
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          {enabled ? (
-            <Button variant="primary" onClick={() => add(false)}>
-              {t('travel.avoid.confirm', { name: target.name })}
-            </Button>
-          ) : (
-            <>
-              <Button onClick={() => add(false)}>{t('travel.avoid.addOnly')}</Button>
-              <Button variant="primary" onClick={() => add(true)}>
-                {t('travel.avoid.confirmSwitchOn')}
+        {enabled ? (
+          <>
+            <div role="status" className="space-y-2">
+              {current === null ? (
+                <Spinner label={t('common.loading')} />
+              ) : (
+                <PreviewText preview={current} name={target.name} />
+              )}
+            </div>
+            <p className="text-text-dim">{t('travel.avoid.appWide', { name: target.name })}</p>
+            <div className="flex flex-wrap justify-end gap-2 pt-2">
+              <Button onClick={onClose}>{t('common.cancel')}</Button>
+              <Button variant="primary" onClick={() => add(false)}>
+                {t('travel.avoid.confirm', { name: target.name })}
               </Button>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-3">
+              <div
+                role="group"
+                aria-label={t('travel.avoid.confirmSwitchOn')}
+                className="space-y-2"
+              >
+                <div role="status" className="space-y-2">
+                  {current === null ? (
+                    <Spinner label={t('common.loading')} />
+                  ) : (
+                    <PreviewText preview={current} name={target.name} />
+                  )}
+                </div>
+                <Button variant="primary" onClick={() => add(true)}>
+                  {t('travel.avoid.confirmSwitchOn')}
+                </Button>
+              </div>
+              <div role="group" aria-label={t('travel.avoid.addOnly')} className="space-y-2">
+                <p className="font-semibold">
+                  {t('travel.avoid.listOnlyUnchanged', {
+                    count: listOnly.jumps,
+                    delta: formatJumpDelta(listOnly.jumpDelta),
+                  })}
+                </p>
+                <Button onClick={() => add(false)}>{t('travel.avoid.addOnly')}</Button>
+              </div>
+            </div>
+            <p className="text-text-dim">{t('travel.avoid.appWide', { name: target.name })}</p>
+            <div className="flex justify-end pt-2">
+              <Button onClick={onClose}>{t('common.cancel')}</Button>
+            </div>
+          </>
+        )}
       </div>
     </Modal>
   );

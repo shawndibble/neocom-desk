@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { avoidPreviewOutcome, candidateAvoid } from './avoidPreview';
+import { avoidPreviewOutcome, candidateAvoid, listOnlyOutcome } from './avoidPreview';
 
 describe('candidateAvoid', () => {
   it('adds the system to the avoid list the route already uses, sorted', () => {
@@ -54,5 +54,27 @@ describe('avoidPreviewOutcome', () => {
       avoidPreviewOutcome({ currentJumps: 2, route: [1, 7, 3], systemId: 2, lowestSecurity: null })
         .stillCrosses
     ).toBe(false);
+  });
+});
+
+describe('listOnlyOutcome', () => {
+  it('leaves the route as it is: the switch stays off, so the list changes nothing', () => {
+    expect(listOnlyOutcome(7)).toEqual({
+      jumps: 7,
+      jumpDelta: 0,
+      lowestSecurity: null,
+      stillCrosses: false,
+    });
+  });
+
+  it('differs from switching on when stored systems sit on the route', () => {
+    const avoidNow = avoidPreviewOutcome({
+      currentJumps: 2,
+      route: [1, 5, 6, 3],
+      systemId: 2,
+      lowestSecurity: 0.5,
+    });
+    expect(avoidNow.jumpDelta).toBe(1);
+    expect(listOnlyOutcome(2).jumpDelta).toBe(0);
   });
 });

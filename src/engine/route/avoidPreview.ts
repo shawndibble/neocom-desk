@@ -57,3 +57,12 @@ export function avoidPreviewOutcome(input: {
     stillCrosses: input.route.includes(input.systemId),
   };
 }
+
+/**
+ * The outcome of adding the system to the list with the Avoided Systems
+ * switch left off: the list does nothing to routes, so the route is the one
+ * the page already draws.
+ */
+export function listOnlyOutcome(currentJumps: number): AvoidPreviewOutcome {
+  return { jumps: currentJumps, jumpDelta: 0, lowestSecurity: null, stillCrosses: false };
+}
