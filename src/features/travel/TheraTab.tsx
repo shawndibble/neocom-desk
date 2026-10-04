@@ -121,7 +121,9 @@ export function TheraTab({ tabBar }: { tabBar: ReactNode }) {
         filter={filter}
         hasOrigin={originId !== null}
         originName={originName}
-        routeVia={originId === null ? undefined : (row) => routeViaHref(originId, row.id)}
+        routeVia={
+          originId === null ? undefined : (row) => routeViaHref(originId, row.id, params.pref)
+        }
         onResetFilters={
           (Object.keys(DEFAULT_FILTERS) as (keyof typeof DEFAULT_FILTERS)[]).some(
             (key) => params[key] !== DEFAULT_FILTERS[key]

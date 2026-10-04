@@ -12,6 +12,7 @@ import {
   usePodKillThreshold,
   useSecurityPenalty,
 } from '@/features/route/routeRules';
+import { useRouteHolesEnabled } from '@/features/route/routeHoleSettings';
 import { TravelSettingsPanel } from './TravelSettingsPanel';
 
 const loadPodKills = vi.fn<() => Promise<ReadonlyMap<number, number> | null>>();
@@ -36,6 +37,18 @@ beforeEach(async () => {
 });
 
 describe('TravelSettingsPanel', () => {
+  it("offers Route Safety's wormhole rules, saved as the default every jump count follows", async () => {
+    const user = userEvent.setup();
+    render(<TravelSettingsPanel />);
+
+    const holes = await screen.findByRole('checkbox', { name: /Route through Thera/ });
+    expect(holes).not.toBeChecked();
+    await user.click(holes);
+
+    expect(useRouteHolesEnabled.getState().value).toBe(true);
+    expect(screen.getByRole('checkbox', { name: /jump bridges/i })).toBeInTheDocument();
+  });
+
   it('opens on the stored default and changes it', async () => {
     const user = userEvent.setup();
     render(<TravelSettingsPanel />);

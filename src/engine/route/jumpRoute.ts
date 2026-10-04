@@ -3,8 +3,8 @@
  * request-free answer to "how far apart are these two systems, and what does
  * the trip cross".
  *
- * Distance used to cost one ESI request per pair (`features/character/
- * routeDistance.ts`, which asks `/route/`), and that is why every feature
+ * Distance used to cost one ESI request per pair (an ESI `/route/` call),
+ * and that is why every feature
  * wanting a distance over *many* rows has so far had to settle for showing it
  * one opened row at a time: fifty rows meant fifty requests before a table
  * could sort. The graph is static map data, so shipping it locally turns a
@@ -26,7 +26,7 @@ export type JumpGraph = ReadonlyMap<number, readonly number[]>;
 /**
  * Which trip the caller is asking about — the game's Prefer Shorter, Prefer
  * Safer and Prefer Less Secure, and ESI's `Shorter`/`Safer`/`LessSecure`
- * (`features/route/esiRoute.ts` maps them), named for what they do since
+ * (the app's names for them), named for what they do since
  * nothing here talks to ESI.
  *
  * Both biased preferences are *preferences*, not filters: they make the
@@ -321,8 +321,8 @@ export function findJumpRoute(
  * A table ranking hauls by distance asks the same origin about many
  * destinations, and one sweep to exhaustion costs about what two single-pair
  * lookups do while answering all of them — so a per-row call is the shape to
- * avoid, not a cost to absorb. The ESI resolver this replaces caches each
- * pair (`features/character/routeDistance.ts`); reaching for a pair at a time
+ * avoid, not a cost to absorb. The ESI resolver this replaced cached each
+ * pair; reaching for a pair at a time
  * here would make the local path the slower of the two, which is the opposite
  * of the point.
  *

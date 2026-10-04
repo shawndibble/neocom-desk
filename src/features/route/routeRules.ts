@@ -1,14 +1,14 @@
 /**
  * The pilot's **Travel Settings** — the in-game autopilot's route options,
  * for planning: which trip to prefer, and which systems to keep out of. Every
- * jump count in the app reads them through `useRouteRules`, so no page
- * carries its own copy of the rules.
+ * jump count in the app reads them through `useJumpBasis`
+ * (`features/route/jumpBasis.ts`), which adds Route Safety's saved wormhole
+ * and bridge settings, so no page carries its own copy of the rules and every
+ * number is the one Route Safety draws.
  *
- * Only what ESI's `/route/` can also honour is offered — a preference, the
- * game's security penalty, and an avoid list: Assets and market order jumps
- * still ask ESI, and a setting only some pages obeyed would quote two
- * distances for one trip. The local graph weighs routes with CCP's own
- * published costs (`engine/route/jumpRoute.ts`), so both agree.
+ * Every count runs on the local graph, which weighs routes with CCP's own
+ * published costs (`engine/route/jumpRoute.ts`) and treats an Avoided System
+ * as a cost, never a wall.
  *
  * Each setting is its own synced key, so changing one on a laptop cannot roll
  * back another changed on a phone (`sync/syncedSettings.ts`).

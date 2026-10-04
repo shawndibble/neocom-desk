@@ -18,6 +18,7 @@ import {
   SecurityPenaltyInput,
   SecurityPenaltyNote,
 } from '@/features/route/TravelRuleFields';
+import { SavedRouteNetworkFields } from '@/features/travel/SavedRouteNetworkFields';
 import { AvoidedSystemsPanel } from './AvoidedSystemsPanel';
 
 /**
@@ -25,7 +26,8 @@ import { AvoidedSystemsPanel } from './AvoidedSystemsPanel';
  * Every jump count in the app follows them (`features/route/routeRules.ts`);
  * a page with its own route picker starts from the preference here. Route
  * Safety edits the same settings in place, through the same controls
- * (`features/route/TravelRuleFields.tsx`).
+ * (`features/route/TravelRuleFields.tsx`, and for wormholes and bridges
+ * `features/travel/RouteRulesPanel.tsx`'s `RouteHoleFields`).
  */
 export function TravelSettingsPanel() {
   const { t } = useTranslation();
@@ -83,6 +85,12 @@ export function TravelSettingsPanel() {
         ) : (
           <Spinner />
         )}
+      </Panel>
+      <Panel title={t('settings.travel.networkTitle')}>
+        <div className="space-y-4">
+          <p className="max-w-2xl text-xs text-text-dim">{t('settings.travel.networkHint')}</p>
+          <SavedRouteNetworkFields />
+        </div>
       </Panel>
       <AvoidedSystemsPanel />
     </div>
