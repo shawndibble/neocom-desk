@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
   HULL_PART_BYTE_BUDGET,
+  hullPartCount,
   hullPartDocId,
   mergeHullFits,
   parseEftResponse,
   parsePublicFitsPage,
   parseRetryAfterMs,
   parseWorkbenchDate,
+  planHullWrite,
   planPage,
   runWorkbenchSync,
   splitHullParts,
   type FetchJsonResult,
+  type HullPartDoc,
+  type HullWriteOp,
   type StoredWorkbenchFit,
   type WorkbenchFitSummary,
   type WorkbenchFitsStore,
@@ -226,6 +230,104 @@ describe('splitHullParts', () => {
   it('names parts by hull and index', () => {
     expect(hullPartDocId(626, 0)).toBe('626_0');
   });
+});
+
+describe('hullPartCount', () => {
+  it('is 0 for no part 0, its parts count when it has one, else 1', () => {
+    expect(hullPartCount(undefined)).toBe(0);
+    expect(hullPartCount(null)).toBe(0);
+    expect(hullPartCount({ shipTypeId: 626, part: 0, parts: 3, fits: [] })).toBe(3);
+    // Written before part 0 carried a count: read as the one part it is.
+    expect(hullPartCount({ shipTypeId: 626, part: 0, fits: [] })).toBe(1);
+    expect(hullPartCount({ parts: 0 })).toBe(1);
+    expect(hullPartCount({ parts: 2.5 })).toBe(1);
+    expect(hullPartCount({ parts: '3' })).toBe(1);
+  });
+});
+
+type MemoryDocs = Map<string, HullPartDoc>;
+
+function applyBatch(docs: MemoryDocs, batch: HullWriteOp[]): void {
+  for (const op of batch) {
+    if (op.kind === 'set') docs.set(op.docId, op.doc);
+    else docs.delete(op.docId);
+  }
+}
+
+/** A hull already stored with `count` parts, as `planHullWrite` leaves it. */
+function storedHull(count: number): MemoryDocs {
+  const docs: MemoryDocs = new Map();
+  const parts = Array.from({ length: count }, (_, i) => [stored(`old${i}`, 100 - i)]);
+  for (const batch of planHullWrite(626, parts, 0)) applyBatch(docs, batch);
+  return docs;
+}
+
+/** What a by-id reader would ask for: part 0, then the parts part 0 claims. */
+function claimedPartsExist(docs: MemoryDocs): boolean {
+  const count = hullPartCount(docs.get(hullPartDocId(626, 0)));
+  for (let part = 0; part < count; part += 1) {
+    if (!docs.has(hullPartDocId(626, part))) return false;
+  }
+  return true;
+}
+
+describe('planHullWrite', () => {
+  const newParts = (n: number) => Array.from({ length: n }, (_, i) => [stored(`new${i}`, 50 - i)]);
+
+  it('stamps the part count on part 0 only', () => {
+    const ops = planHullWrite(626, newParts(3), 0).flat();
+    const sets = ops.filter((op) => op.kind === 'set');
+    expect(sets.find((op) => op.docId === '626_0')?.doc).toMatchObject({ part: 0, parts: 3 });
+    expect(sets.find((op) => op.docId === '626_1')?.doc).not.toHaveProperty('parts');
+  });
+
+  it('writes the last part first, part 0 after every other part, deletes last', () => {
+    const ids = planHullWrite(626, newParts(3), 5)
+      .flat()
+      .map((op) => `${op.kind}:${op.docId}`);
+    expect(ids).toEqual(['set:626_2', 'set:626_1', 'set:626_0', 'delete:626_3', 'delete:626_4']);
+  });
+
+  it('batches at most five docs per commit', () => {
+    const batches = planHullWrite(626, newParts(7), 0);
+    expect(batches.map((batch) => batch.length)).toEqual([5, 2]);
+  });
+
+  it('deletes part 0 first when every fit was dropped', () => {
+    const ids = planHullWrite(626, [], 3)
+      .flat()
+      .map((op) => `${op.kind}:${op.docId}`);
+    expect(ids).toEqual(['delete:626_0', 'delete:626_1', 'delete:626_2']);
+  });
+
+  const cases: [string, () => MemoryDocs, number, number][] = [
+    ['an empty hull', () => new Map(), 0, 3],
+    [
+      'a legacy part 0 with no count',
+      () => new Map([['626_0', { shipTypeId: 626, part: 0, fits: [] }]]),
+      1,
+      7,
+    ],
+    ['a hull growing across a batch boundary', () => storedHull(2), 2, 7],
+    ['a hull shrinking', () => storedHull(7), 7, 2],
+    ['a hull shrinking to nothing', () => storedHull(7), 7, 0],
+  ];
+
+  it.each(cases)(
+    'never leaves part 0 claiming a missing part, after any batch, for %s',
+    (_label, before, previousPartCount, nextPartCount) => {
+      const docs = before();
+      expect(claimedPartsExist(docs)).toBe(true);
+      for (const batch of planHullWrite(626, newParts(nextPartCount), previousPartCount)) {
+        applyBatch(docs, batch);
+        expect(claimedPartsExist(docs)).toBe(true);
+      }
+      expect(hullPartCount(docs.get('626_0'))).toBe(nextPartCount);
+      expect([...docs.keys()].sort()).toEqual(
+        Array.from({ length: nextPartCount }, (_, i) => hullPartDocId(626, i)).sort()
+      );
+    }
+  );
 });
 
 class MemoryStore implements WorkbenchFitsStore {
