@@ -79,7 +79,6 @@ import {
   resolveNeedsReview,
   uncombineAssignments,
   unlinkPaymentTransaction,
-  unlockPaidAssignment,
 } from '@/features/miningTax/assignments';
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { TypeOverridesDialog } from '@/features/miningTax/TypeOverridesDialog';
@@ -117,7 +116,7 @@ import { useMediaQuery } from '@/lib/useMediaQuery';
 import { AttentionStrip, type AttentionItem } from '@/features/miningTax/AttentionStrip';
 import { OwedBalances } from '@/features/miningTax/OwedBalances';
 import { ContinueSessionCard } from '@/features/miningTax/ContinueSessionCard';
-import { CombinedEditDialog } from '@/features/miningTax/CombinedEditDialog';
+import { EntryEditDialog } from '@/features/miningTax/EntryEditDialog';
 import { LinkWalletPaymentDialog } from '@/features/miningTax/LinkWalletPaymentDialog';
 import {
   useAutoContinueSessions,
@@ -370,8 +369,8 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   // they stay offers rather than being continued the moment the box is ticked.
   const [autoSkip, setAutoSkip] = useState<ReadonlySet<string>>(new Set());
   const [detailTarget, setDetailTarget] = useState<DisplayRow | null>(null);
-  // The combined entry whose single edit form is open (mockup F1).
-  const [combinedEditTarget, setCombinedEditTarget] = useState<DisplayRow | null>(null);
+  // The entry whose edit form is open — single or combined, owed or paid (mockup F1).
+  const [editTarget, setEditTarget] = useState<DisplayRow | null>(null);
   // Which row's "Link transaction" picker is open — kept separate from
   // `detailTarget` so the manual picker can sit on top of the row detail
   // rather than replacing it (issue #540 follow-up: linking a transaction to
@@ -944,7 +943,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     void runAndClose(() => markAssignmentsPaid(outstanding));
   }
 
-  /** The Assign form's create-or-edit submit, from inside RowDetailModal — same refresh-and-close every other row action takes. */
+  /** The Assign form's submit, from inside RowDetailModal — same refresh-and-close every other row action takes. */
   function handleAssignedFromDetail() {
     setDetailTarget(null);
     refresh();
@@ -1043,24 +1042,6 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     const assignment = detailTarget?.assignment;
     if (!assignment) return;
     void runAndClose(() => deleteAssignment(assignment));
-  }
-
-  /**
-   * "Unlock to edit" (AssignDialog's paid-lock banner). Deliberately does not
-   * close the modal or call `refresh()` the way every other row action does
-   * — the whole point is to reopen the *same* record for editing right away,
-   * so it swaps `detailTarget`'s assignment in place rather than round-
-   * tripping through the full snapshot reload.
-   */
-  async function handleUnlockFromDetail() {
-    if (!detailTarget?.assignment) return;
-    setBusy(true);
-    try {
-      const unlocked = await unlockPaidAssignment(detailTarget.assignment);
-      setDetailTarget({ ...detailTarget, assignment: unlocked, status: unlocked.status });
-    } finally {
-      setBusy(false);
-    }
   }
 
   /** Taking one day out of a combined entry keeps its Assignment; only the combination goes. */
@@ -1809,6 +1790,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                           key: (dr) => (dateRangeOf(dr).at(-1) ?? dr.row.entry.date).slice(0, 7),
                           allWidths: true,
                           minSize: 1,
+                          // The newest month opens; older ones stay folded.
+                          defaultExpanded: (rows) =>
+                            (dateRangeOf(rows[0]).at(-1) ?? '').slice(0, 7) === history[0]?.month,
                           renderHeader: (rows) => (
                             <HistoryMonthHeader
                               month={(dateRangeOf(rows[0]).at(-1) ?? '').slice(0, 7)}
@@ -1905,7 +1889,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           payeeDisplayName={payeeDisplayName(detailTarget)}
           busy={busy}
           onEdit={() => {
-            setCombinedEditTarget(detailTarget);
+            setEditTarget(detailTarget);
             setDetailTarget(null);
           }}
           onSettleUp={
@@ -1937,18 +1921,18 @@ export function TaxTab({ tabBar }: TaxTabProps) {
         />
       )}
 
-      {combinedEditTarget && data && (
-        <CombinedEditDialog
+      {editTarget && data && (
+        <EntryEditDialog
           open
-          onClose={() => setCombinedEditTarget(null)}
-          members={allMembers(combinedEditTarget)}
-          systemName={systemName(combinedEditTarget)}
-          systemSecurity={systemSecurityOf(combinedEditTarget)}
+          onClose={() => setEditTarget(null)}
+          members={allMembers(editTarget)}
+          systemName={systemName(editTarget)}
+          systemSecurity={systemSecurityOf(editTarget)}
           payees={allPayees}
           typeNames={data.typeNames}
           pricesFor={pricesFor}
           onSaved={() => {
-            setCombinedEditTarget(null);
+            setEditTarget(null);
             refresh();
           }}
         />
@@ -1973,7 +1957,10 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           onMarkPaid={handleMarkPaidFromDetail}
           onResolve={handleResolveFromDetail}
           onUndo={handleUndoFromDetail}
-          onUnlock={handleUnlockFromDetail}
+          onEdit={() => {
+            setEditTarget(detailTarget);
+            setDetailTarget(null);
+          }}
           onSettleUp={
             detailTarget.status === 'outstanding' ? () => settleUpPayeeOf(detailTarget) : undefined
           }

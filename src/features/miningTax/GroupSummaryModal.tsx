@@ -39,7 +39,7 @@ interface GroupSummaryModalProps {
   typeNames: ReadonlyMap<number, string>;
   payeeDisplayName: string;
   busy: boolean;
-  /** Opens the one edit form for the whole combined entry (`CombinedEditDialog`). */
+  /** Opens the one edit form for the whole combined entry (`EntryEditDialog`). */
   onEdit: () => void;
   /** Settles this Payee's whole balance — offered while any day is still owed. */
   onSettleUp?: () => void;
