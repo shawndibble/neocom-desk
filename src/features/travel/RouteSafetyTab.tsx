@@ -285,7 +285,7 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
           rail and route sit side by side only from `xl` (#2591). Below it the rail
           dissolves (`contents`) so Stops, the route, then Route rules stack in order. */}
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
-        <div className="contents space-y-4 xl:block">
+        <div className="contents xl:block xl:space-y-4">
           <div className="order-1 xl:order-none">
             <StopsPanel
               fromId={fromId}
