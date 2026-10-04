@@ -36,7 +36,9 @@ export type LoadWarningKind =
   | { kind: 'unknown-item' }
   | { kind: 'too-many-slots'; rack: FittingSlotKind }
   | { kind: 'malformed-item' }
+  /** An In-game Fitting item in an ESI flag the app doesn't fit (a service slot, say). */
   | { kind: 'unsupported-slot' }
+  /** A fittings-file entry whose slot string isn't a rack, bay or cargo. */
   | { kind: 'unknown-slot' }
   /** A line the EFT parser couldn't read at all: the author's typo, not the game's. */
   | { kind: 'parse-error' };
