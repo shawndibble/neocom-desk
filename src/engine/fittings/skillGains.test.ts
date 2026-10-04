@@ -15,7 +15,7 @@ import {
   type SkillGain,
 } from './skillGains';
 import type { FittingStats } from './types';
-import { neutralExtendedStats } from './__fixtures__/fittingStats';
+import { NO_HOLDS, neutralExtendedStats } from './__fixtures__/fittingStats';
 
 function layer(hp: number) {
   return {
@@ -199,7 +199,7 @@ describe('gainMetrics — non-combat roles', () => {
     offense: { ...baseStats.offense, dps: 0 },
     droneDps: 0,
     mining: { rows: [], perSecond: 2, perHour: 7200, wastePerSecond: 0, wastePct: 0 },
-    holds: { cargo: 500, fleetHangar: 0, miningHold: 10000 },
+    holds: { ...NO_HOLDS, cargo: 500, fleetHangar: 0, miningHold: 10000 },
   });
 
   it('scores mining yield as a relative gain in m³ an hour', () => {
@@ -215,11 +215,15 @@ describe('gainMetrics — non-combat roles', () => {
   it('scores total hold space on an unarmed hull, and ignores it on an armed one', () => {
     const roomier = withStats({
       ...miner,
-      holds: { cargo: 600, fleetHangar: 0, miningHold: 10000 },
+      holds: { ...NO_HOLDS, cargo: 600, fleetHangar: 0, miningHold: 10000 },
     });
     expect(gainMetrics(miner, roomier).hold).toBeCloseTo(100 / 10500);
-    const armedBefore = withStats({ holds: { cargo: 500, fleetHangar: 0, miningHold: 0 } });
-    const armedAfter = withStats({ holds: { cargo: 600, fleetHangar: 0, miningHold: 0 } });
+    const armedBefore = withStats({
+      holds: { ...NO_HOLDS, cargo: 500, fleetHangar: 0, miningHold: 0 },
+    });
+    const armedAfter = withStats({
+      holds: { ...NO_HOLDS, cargo: 600, fleetHangar: 0, miningHold: 0 },
+    });
     expect(gainMetrics(armedBefore, armedAfter).hold).toBe(0);
   });
 

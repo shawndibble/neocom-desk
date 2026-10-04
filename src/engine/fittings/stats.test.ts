@@ -18,6 +18,7 @@ import {
 } from './stats';
 import { DOGMA_ATTRIBUTE, ITEM_DOGMA_ATTRIBUTE, type FittingItemState } from './types';
 import { APPLIED_DPS_ATTRIBUTE } from './appliedWeapons';
+import { NO_HOLDS } from './__fixtures__/fittingStats';
 
 function attrs(
   values: Partial<Record<keyof typeof DOGMA_ATTRIBUTE, number>>
@@ -1194,7 +1195,40 @@ describe('extractFittingStats resources', () => {
       attrs({ cargoCapacity: 4600, fleetHangarCapacity: 5000, miningHoldCapacity: 28000 }),
       []
     );
-    expect(stats.holds).toEqual({ cargo: 4600, fleetHangar: 5000, miningHold: 28000 });
+    expect(stats.holds).toEqual({
+      ...NO_HOLDS,
+      cargo: 4600,
+      fleetHangar: 5000,
+      miningHold: 28000,
+    });
+  });
+
+  it('reads each specialised hold from its own attribute', () => {
+    const stats = extractFittingStats(
+      [],
+      attrs({
+        specialAmmoHoldCapacity: 41_000,
+        specialPlanetaryCommoditiesHoldCapacity: 22_000,
+        specialCommandCenterHoldCapacity: 1_000,
+        specialMineralHoldCapacity: 45_000,
+        specialGasHoldCapacity: 5_000,
+        specialIceHoldCapacity: 40_000,
+        specialFuelBayCapacity: 3_000,
+        specialColonyResourcesHoldCapacity: 60_000,
+      }),
+      []
+    );
+    expect(stats.holds).toEqual({
+      ...NO_HOLDS,
+      ammoHold: 41_000,
+      planetaryHold: 22_000,
+      commandCenterHold: 1_000,
+      mineralHold: 45_000,
+      gasHold: 5_000,
+      iceHold: 40_000,
+      fuelBay: 3_000,
+      infrastructureHold: 60_000,
+    });
   });
 
   it('reads a jump drive only on a hull that has one', () => {
