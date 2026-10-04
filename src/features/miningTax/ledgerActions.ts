@@ -4,8 +4,8 @@
  * take out of combined, settle, split, dismiss, edit an entry, delete a Payee
  * (moving its entries to another), link or unlink a transaction.
  *
- * Every action is one Dexie transaction over the Assignments and the
- * tombstones their deletes leave, so a multi-record change — every day of a
+ * Every action is one Dexie transaction over the Assignments, the Payees
+ * (for deleting one) and the tombstones their deletes leave, so a multi-record change — every day of a
  * Combined Entry, or an undo that both deletes and un-combines — lands whole
  * or not at all. That is what keeps the Combined Entry rule (one obligation,
  * one Payee, one rate) true on write; `coalesce.ts` repairing it on load is
