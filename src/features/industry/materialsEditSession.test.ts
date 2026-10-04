@@ -4,6 +4,7 @@ import {
   INITIAL_EDIT_SESSION,
   editSessionGroups,
   reduceEditSession,
+  shownSections,
   type EditSessionEvent,
   type MaterialsEditSession,
   type SessionToast,
@@ -63,7 +64,7 @@ function play(world: World, steps: readonly Step[]): MaterialsEditSession {
 function observe(session: MaterialsEditSession, world: World): MaterialsEditSession {
   return reduceEditSession(session, {
     type: 'rendered',
-    materials: rowsOf(world),
+    shown: shownSections(editSessionGroups(session.held, rowsOf(world))),
     ownedFor: (typeID) => world.owned[typeID],
   });
 }
@@ -318,7 +319,7 @@ describe('reduceEditSession: toasts and their undo', () => {
 
 describe('reduceEditSession: holding rows in place', () => {
   function sectionOf(session: MaterialsEditSession, world: World, typeID: number) {
-    const groups = editSessionGroups(session, rowsOf(world));
+    const groups = editSessionGroups(session.held, rowsOf(world));
     return (Object.keys(groups) as MaterialErrand[]).find((errand) =>
       groups[errand].some((row) => row.typeID === typeID)
     );

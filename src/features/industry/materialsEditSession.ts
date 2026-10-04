@@ -99,10 +99,10 @@ export type EditSessionEvent =
   | { type: 'toastExpired' }
   /** The swap control asked for by `focusAfterToggle` took focus, or never will. */
   | { type: 'focusSettled' }
-  /** The table rendered `materials`, with the plan storing `ownedFor` for each. */
+  /** The table rendered each row in `shown`'s section, with the plan storing `ownedFor` for it. */
   | {
       type: 'rendered';
-      materials: readonly MaterialTableRow[];
+      shown: ReadonlyMap<number, MaterialErrand>;
       ownedFor: (typeID: number) => number | undefined;
     };
 
@@ -115,12 +115,21 @@ export const INITIAL_EDIT_SESSION: MaterialsEditSession = {
   toast: null,
 };
 
-/** The sections as the session shows them: the grouping rule, with held rows kept where they were. */
+/** The sections as the session shows them: the grouping rule, with `held` rows kept where they were. */
 export function editSessionGroups(
-  session: MaterialsEditSession,
+  held: MaterialsEditSession['held'],
   materials: readonly MaterialTableRow[]
 ): MaterialErrandGroups {
-  return groupMaterialsByErrand(materials, session.held ?? undefined);
+  return groupMaterialsByErrand(materials, held ?? undefined);
+}
+
+/** Each row's section in `groups` — what a `rendered` event reports. */
+export function shownSections(groups: MaterialErrandGroups): Map<number, MaterialErrand> {
+  const shown = new Map<number, MaterialErrand>();
+  for (const errand of MATERIAL_ERRANDS) {
+    for (const row of groups[errand]) shown.set(row.typeID, errand);
+  }
+  return shown;
 }
 
 export function reduceEditSession(
@@ -215,28 +224,25 @@ export function reduceEditSession(
       return session.focusAfterToggle ? { ...session, focusAfterToggle: null } : session;
 
     case 'rendered':
-      return observeRender(session, event.materials, event.ownedFor);
+      return observeRender(session, event.shown, event.ownedFor);
   }
 }
 
 /** Confirms the moves the player's edits caused, once they are actually shown, and settles those edits. */
 function observeRender(
   session: MaterialsEditSession,
-  materials: readonly MaterialTableRow[],
+  shown: ReadonlyMap<number, MaterialErrand>,
   ownedFor: (typeID: number) => number | undefined
 ): MaterialsEditSession {
-  const groups = editSessionGroups(session, materials);
-  const shown = new Map<number, MaterialErrand>();
-  for (const errand of MATERIAL_ERRANDS) {
-    for (const row of groups[errand]) shown.set(row.typeID, errand);
-  }
-
   const previous = session.shown;
+  // The common render: nothing moved and no edit is waiting to settle.
+  if (previous === shown && session.pending.size === 0) return session;
+
   // Both only ever lose entries here, so an unchanged size is an unchanged set.
   const toggled = new Set(session.toggled);
   let toast = session.toast;
   const moved: { typeID: number; to: MaterialErrand }[] = [];
-  if (previous) {
+  if (previous && previous !== shown) {
     for (const [typeID, errand] of shown) {
       const was = previous.get(typeID);
       if (was === undefined || was === errand) continue;

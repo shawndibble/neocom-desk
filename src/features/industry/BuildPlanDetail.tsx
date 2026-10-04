@@ -787,13 +787,9 @@ export function BuildPlanDetail({
     ]
   );
 
-  // "Use all" / "Use none" run inside the Materials table, over every row on
-  // it rather than the blueprint's own materials: the bulk action has to
-  // reach exactly what the per-row offers reach, or "use all" silently skips
-  // every mineral a sub-build introduced while the row beside it is still
-  // offering to apply one. The table answers them with the same toast and
-  // Undo as a row edit (`materialsEditSession.ts`), and writes them through
-  // the plan-sourcing adapter.
+  // "Use all" / "Use none" run inside the Materials table over every row on
+  // it (the rows the per-row offers reach, sub-build inputs included) and
+  // share a row edit's toast and Undo (`materialsEditSession.ts`).
   const materialsTable = useRef<MaterialsTableHandle>(null);
 
   /**

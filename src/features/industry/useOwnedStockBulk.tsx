@@ -20,7 +20,7 @@ interface BulkToast {
 }
 
 interface OwnedStockBulkInput {
-  /** The store's adapter — the Group Owned Overlay. A Build Plan's Materials table answers its own bulk actions (`materialsEditSession.ts`). */
+  /** The Group Owned Overlay's adapter. */
   write: (changes: readonly OwnedStockChange[]) => void;
   ownedFor: OwnedQuantityFor;
   scopedQuantityFor: ScopedQuantityFor;

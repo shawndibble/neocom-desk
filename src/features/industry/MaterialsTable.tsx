@@ -53,6 +53,7 @@ import { MATERIAL_ERRANDS, errandSubtotal, type MaterialErrand } from './materia
 import {
   INITIAL_EDIT_SESSION,
   editSessionGroups,
+  shownSections,
   reduceEditSession,
   type SessionToastMessage,
 } from './materialsEditSession';
@@ -669,7 +670,9 @@ export function MaterialsTable({
   const [editingHave, setEditingHave] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const groups = useMemo(() => editSessionGroups(session, materials), [session, materials]);
+  const { held } = session;
+  const groups = useMemo(() => editSessionGroups(held, materials), [held, materials]);
+  const shown = useMemo(() => shownSections(groups), [groups]);
   const ownedFor = useCallback((typeID: number) => sourcing?.[typeID]?.ownedQuantity, [sourcing]);
 
   // Owned-quantity writes the session makes (bulk, and every Undo) go out as
@@ -682,8 +685,8 @@ export function MaterialsTable({
   // The session confirms the moves an edit caused once they are actually
   // shown, so it watches every render that could have moved a row.
   useEffect(() => {
-    dispatch({ type: 'rendered', materials, ownedFor });
-  }, [materials, ownedFor, session.held]);
+    dispatch({ type: 'rendered', shown, ownedFor });
+  }, [shown, ownedFor]);
 
   const toast = session.toast;
   useEffect(() => {
@@ -703,45 +706,46 @@ export function MaterialsTable({
     if (el) {
       dispatch({ type: 'focusSettled' });
       el.focus();
-    } else if (session.shown?.get(target.typeID) !== target.from) {
+    } else if (shown.get(target.typeID) !== target.from) {
       // It moved somewhere its control isn't mounted — the folded Already
       // have section. Give up rather than steal focus whenever that opens.
       dispatch({ type: 'focusSettled' });
     }
   });
 
+  function applyBulk(kind: 'all' | 'none', changes: readonly OwnedStockChange[]) {
+    if (changes.length > 0) writeOwned(changes);
+    dispatch({ type: 'bulkApplied', kind, changes });
+  }
+
   useImperativeHandle(ref, () => ({
-    fillAll() {
-      const changes = takeEveryOffer(
-        materials,
-        ownedFor,
-        detection?.scopedQuantityFor ?? (() => 0)
-      );
-      if (changes.length > 0) writeOwned(changes);
-      dispatch({ type: 'bulkApplied', kind: 'all', changes });
-    },
-    clearAll() {
-      const changes = clearEveryOwned(materials, ownedFor);
-      if (changes.length > 0) writeOwned(changes);
-      dispatch({ type: 'bulkApplied', kind: 'none', changes });
-    },
+    fillAll: () =>
+      applyBulk(
+        'all',
+        takeEveryOffer(materials, ownedFor, detection?.scopedQuantityFor ?? (() => 0))
+      ),
+    clearAll: () => applyBulk('none', clearEveryOwned(materials, ownedFor)),
   }));
 
   // Built per render, so Undo writes through the latest props: a write made
   // while the toast was up isn't dropped by a stale callback.
   function undo() {
     const patch = session.toast?.undo;
-    if (patch?.kind === 'owned') writeOwned(undoOwnedStockChanges(patch.changes));
-    else if (patch?.kind === 'toggle') onToggleBuildHere?.(patch.typeID);
+    if (patch) {
+      if (patch.kind === 'owned') writeOwned(undoOwnedStockChanges(patch.changes));
+      else onToggleBuildHere?.(patch.typeID);
+    }
     dispatch({ type: 'undone' });
   }
+
+  const sectionLabel = useCallback((errand: MaterialErrand) => t(ERRAND_LABEL_KEY[errand]), [t]);
 
   function toastText(message: SessionToastMessage): string {
     switch (message.kind) {
       case 'moved':
         return t('industry.errands.moved', {
           material: nameFor(message.typeID),
-          section: t(ERRAND_LABEL_KEY[message.to]),
+          section: sectionLabel(message.to),
         });
       case 'movedMany':
         return t('industry.errands.movedMany', { count: message.count });
@@ -753,8 +757,6 @@ export function MaterialsTable({
         return t(`industry.${message.kind}`);
     }
   }
-
-  const sectionLabel = useCallback((errand: MaterialErrand) => t(ERRAND_LABEL_KEY[errand]), [t]);
 
   const commitOwned = useCallback(
     (typeID: number, ownedQuantity: number | undefined) => {
