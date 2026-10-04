@@ -5682,7 +5682,27 @@
     "orderDetail": {
       "structureType": "Structure",
       "playerStructure": "Player-owned",
-      "empty": "Nothing else to show for this order."
+      "empty": "Nothing else to show for this order.",
+      "remaining": "{{remain}} of {{total}} left",
+      "remainingLabel": "Units left on this order",
+      "filled_one": "{{units}} unit filled",
+      "filled_other": "{{units}} units filled",
+      "issued": "issued {{age}}",
+      "orderValue": "Order value",
+      "versusBest": "vs best",
+      "isBest": "Best price",
+      "daysLeft_one": "{{count}} day left",
+      "daysLeft_other": "{{count}} days left",
+      "buyDownTo": "Buying down to here:",
+      "sellDownTo": "Selling down to here:",
+      "depthUnits": "{{units}} units for {{isk}}",
+      "depthAverage": "avg {{price}}",
+      "setDestination": "Set destination",
+      "setDestinationTo": "Set destination to {{placeName}}",
+      "destinationSet": "Destination set to {{placeName}}",
+      "onlyThisStation": "Only this station",
+      "copyPriceOf": "Copy price {{price}}",
+      "copied": "Copied"
     },
     "columnsButton": "Columns",
     "columnsMenuTitle": "Columns",
@@ -6087,7 +6107,16 @@
       "sell": "Sell",
       "buy": "Buy",
       "noOrders": "No orders",
-      "compare": "Compare"
+      "compare": "Compare",
+      "none": "No variations for this item",
+      "versus": "vs {{name}}",
+      "versusHint": "Each variation's best sell minus {{name}}'s, at the same location.",
+      "pricedAt": "Priced at {{scope}}",
+      "thisItem": "This item",
+      "groupCount_one": "{{count}} item",
+      "groupCount_other": "{{count}} items",
+      "groupNoneSold_one": "{{count}} item · none sold at {{scope}}",
+      "groupNoneSold_other": "{{count}} items · none sold at {{scope}}"
     },
     "itemDetail": {
       "openInMarket": "Open in Market",
@@ -6351,7 +6380,63 @@
       "assumesBaseStandingsHint": "Floor prices on this character's sell orders are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings."
     },
     "emptySellBlueprintHint": "Copies of this blueprint are traded on contract, not on the market.",
-    "searchBpcContracts": "Search BPC contracts"
+    "searchBpcContracts": "Search BPC contracts",
+    "depthColumn": "Cum. qty",
+    "depthHint": "Units at this price or better: what buying (or selling into) the book down to this row would take.",
+    "jumpsWord_one": "jump",
+    "jumpsWord_other": "jumps",
+    "rangeAffix": "range ",
+    "minVolumeAffix": "min ",
+    "baitFlag": "{{times}}× best",
+    "baitHint": "Asks {{times}} times the best sell — likely bait, not a real price.",
+    "tabVariations": "Variations",
+    "tabVariationsCount": "Variations ({{count}})",
+    "scope": {
+      "label": "Where the order book is looking",
+      "within": "{{distance}} of {{system}}",
+      "inSystem": "In {{system}}",
+      "stations_one": "{{count}} station",
+      "stations_other": "{{count}} stations",
+      "jumpsAway_zero": "in {{system}}, your system",
+      "jumpsAway_one": "{{count}} jump from {{system}}",
+      "jumpsAway_other": "{{count}} jumps from {{system}}",
+      "sheetTitle": "Where to look",
+      "clearRange": "Clear range"
+    },
+    "summary": {
+      "bestSell": "Best sell",
+      "bestBuy": "Best buy",
+      "spread": "Spread",
+      "spreadHint": "Best sell minus best buy, and that gap as a share of the best buy."
+    },
+    "hubCompare": {
+      "label": "{{place}} compared with the best in range",
+      "sells": "{{place}} sells for {{price}}",
+      "buys": "buys for {{price}}",
+      "jumps_zero": "in your system",
+      "jumps_one": "{{count}} jump away",
+      "jumps_other": "{{count}} jumps away",
+      "view": "View {{place}}"
+    },
+    "sideToggle": {
+      "label": "Order book side",
+      "sell": "Sell · {{count}}",
+      "buy": "Buy · {{count}}"
+    },
+    "sideSummary": {
+      "none": "{{count}} orders",
+      "sell_one": "{{count}} order · lowest {{price}}",
+      "sell_other": "{{count}} orders · lowest {{price}}",
+      "buy_one": "{{count}} order · highest {{price}}",
+      "buy_other": "{{count}} orders · highest {{price}}"
+    },
+    "itemSkills": {
+      "trained": "{{trained}} of {{count}} trained",
+      "count_one": "{{count}} skill",
+      "count_other": "{{count}} skills"
+    },
+    "rangeOverridesHeader": "Distance filter overrides this for the order book",
+    "quantityAffix": "×"
   },
   "error": {
     "title": "Something went wrong",

@@ -1128,9 +1128,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   stack at the hub's sell price: sales tax plus broker fee, 100 ISK minimum per
   stack). Independent of a plan's material price basis, which is about buying.
 - **Variations**: The selected item's Tech I/II/Faction/Storyline/Officer
-  variation group, shown as a sortable table (Name, Tier, Sell, Buy) beside
-  it for price comparison; falls back to its Market Group siblings when it
-  has no variation data.
+  variation group, shown on its own item tab (beside Order Book and Price
+  History) as a sortable table grouped by tier — Name, Tier, Sell, Buy and a
+  signed "vs <item>" sell delta, the item's own prices above it — for price
+  comparison; falls back to its Market Group siblings when it has no
+  variation data.
 - **What We Store**: The section of Settings' FAQ tab that tells a pilot, in
   their own words, what leaves their device. Not documentation — a
   **commitment**: the **Synced Collection** registry's `REMOTE_COLLECTIONS` is
