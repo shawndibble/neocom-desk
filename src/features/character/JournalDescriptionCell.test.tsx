@@ -47,9 +47,8 @@ describe('JournalDescriptionCell', () => {
         />
       </MemoryRouter>
     );
-    expect(container).toHaveTextContent('Complete 3 Jumps');
-    expect(container).not.toHaveTextContent('1004953');
-    expect(container).not.toHaveTextContent('-');
+    // The goal's name replaces both ESI's `-` description and the bare id.
+    expect(container.textContent).toBe('Complete 3 Jumps');
   });
 
   it('falls back to a plain label for a daily goal it has no name for', () => {

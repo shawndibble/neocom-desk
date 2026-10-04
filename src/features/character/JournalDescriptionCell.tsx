@@ -22,7 +22,7 @@ import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { formatIsk } from '@/lib/isk';
 import { BountyFactionSummary } from './BountyFactionSummary';
 import { bountyKillsOf } from './bountyKills';
-import { dailyGoalMessageIdOf } from './dailyGoal';
+import { dailyGoalMessageIdOf, dailyGoalName } from './dailyGoal';
 import { transactionTotal } from './walletTransactionsCsv';
 
 interface JournalDescriptionCellProps {
@@ -42,7 +42,7 @@ export function JournalDescriptionCell({
   const kills = useMemo(() => bountyKillsOf(entry), [entry]);
   const goalId = dailyGoalMessageIdOf(entry);
   if (goalId !== null) {
-    const name = t(`wallet.dailyGoalNames.${goalId}`, { defaultValue: '' });
+    const name = dailyGoalName(goalId, t);
     if (name) return <>{name}</>;
     // An unnamed goal keeps its id on hover, so it can be added to the map.
     return (
