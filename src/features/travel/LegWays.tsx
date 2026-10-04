@@ -315,7 +315,7 @@ export function LegBody({ children, ...props }: LegWaysProps & { children: React
   return (
     <div className="space-y-2">
       {note && (
-        <p role="status" className="text-text-dim">
+        <p role="status" className="text-sm text-text-dim">
           {note}
         </p>
       )}
