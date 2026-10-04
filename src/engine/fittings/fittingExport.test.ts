@@ -66,6 +66,17 @@ describe('fittingItemCounts', () => {
       7: 100,
     });
   });
+
+  it("counts the Fitting's own implants and boosters, one of each", () => {
+    const counts = fittingItemCounts({
+      ...FITTING,
+      implantSet: { implants: [8, 9], boosters: [10], boosterSideEffects: [2737] },
+    });
+    expect(counts.get(8)).toBe(1);
+    expect(counts.get(9)).toBe(1);
+    expect(counts.get(10)).toBe(1);
+    expect(counts.has(2737)).toBe(false);
+  });
 });
 
 describe('fittingToEft', () => {
@@ -153,6 +164,20 @@ describe('fittingToMultibuy', () => {
     expect(lines).toContain('Hobgoblin II\t5');
     expect(lines).toContain('Nanite Repair Paste\t100');
     expect(lines).toHaveLength(8);
+  });
+
+  it("includes the Fitting's own implants and boosters", () => {
+    const names: Record<number, string> = {
+      8: "Zor's Custom Navigation Hyper-Link",
+      9: 'Snake Alpha',
+      10: 'Synth Blue Pill Booster',
+    };
+    const withSet: Fitting = { ...FITTING, implantSet: { implants: [8, 9], boosters: [10] } };
+    const lines = fittingToMultibuy(withSet, (id) => names[id] ?? nameFor(id)).split('\n');
+    expect(lines).toContain("Zor's Custom Navigation Hyper-Link\t1");
+    expect(lines).toContain('Snake Alpha\t1');
+    expect(lines).toContain('Synth Blue Pill Booster\t1');
+    expect(lines).toHaveLength(11);
   });
 
   it('reads back through the Appraisal paste parser', () => {

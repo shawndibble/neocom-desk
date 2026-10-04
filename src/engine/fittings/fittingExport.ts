@@ -12,7 +12,11 @@ import { FITTING_SLOT_KINDS, type Fitting, type FittingSlotKind } from './types'
 
 export type ItemNameFor = (typeId: number) => string;
 
-/** Hull, every module, loaded charge, drone stack and cargo stack, summed per type. */
+/**
+ * Hull, every module, loaded charge, drone stack, cargo stack and the
+ * Fitting's own implants and boosters, summed per type. A Fitting on the
+ * clone's implants carries no set, so nothing extra is counted for it.
+ */
 export function fittingItemCounts(fitting: Fitting): Map<number, number> {
   const counts = new Map<number, number>();
   const add = (typeId: number, quantity: number) => {
@@ -27,6 +31,8 @@ export function fittingItemCounts(fitting: Fitting): Map<number, number> {
   for (const drone of fitting.drones) add(drone.typeId, drone.quantity);
   for (const fighter of fitting.fighters ?? []) add(fighter.typeId, fighter.quantity);
   for (const item of fitting.cargo) add(item.typeId, item.quantity);
+  for (const typeId of fitting.implantSet?.implants ?? []) add(typeId, 1);
+  for (const typeId of fitting.implantSet?.boosters ?? []) add(typeId, 1);
 
   return counts;
 }
