@@ -293,8 +293,9 @@ function PhoneLine({
 
 /**
  * One leg's body: the pin note when a pin could not be flown, the ways panel
- * beside the rows on a wide screen (above them below `xl`), and folded to a
- * line under the leg header on a phone.
+ * beside the rows when the leg itself is at least `@5xl` wide (above them,
+ * two or three across, when it is narrower), and folded to a line under the
+ * leg header on a phone.
  */
 export function LegBody({ children, ...props }: LegWaysProps & { children: ReactNode }) {
   const { t } = useTranslation();
