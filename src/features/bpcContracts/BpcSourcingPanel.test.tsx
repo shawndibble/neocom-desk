@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -258,7 +258,7 @@ function cachedSnapshot(
   };
 }
 
-beforeEach(async () => {
+async function resetSession() {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -298,7 +298,24 @@ beforeEach(async () => {
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   window.history.pushState({}, '', '/industry/sourcing');
-});
+}
+
+beforeAll(async () => {
+  // One throwaway render of the panel, so no test pays for the first one. A
+  // worker's first `App` render — compiling the lazy route chunks, warming
+  // jsdom and React — took ~4.5s even on a quiet machine, against the 5s
+  // `findBy*` budget, and failed whichever test ran first on a loaded CI
+  // shard. Done here under the hook's own budget.
+  await resetSession();
+  loadPublicBpcContracts.mockResolvedValue(
+    cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
+  );
+  const { unmount } = render(<App />);
+  await screen.findByRole('table', { name: 'BPC Sourcing' }, { timeout: 25_000 });
+  unmount();
+}, 30_000);
+
+beforeEach(resetSession);
 
 /** Every `FilterBar` keeps its controls behind the funnel, so open it first. */
 async function openFilters(user: ReturnType<typeof userEvent.setup>) {
