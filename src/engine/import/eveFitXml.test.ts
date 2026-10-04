@@ -88,7 +88,9 @@ describe('loadEveFitXmlEntry', () => {
   it('reports an unknown ship and resolves nothing else', () => {
     const result = loadEveFitXmlEntry(entry({ shipTypeName: 'Not A Ship' }), typeByName);
     expect(result.hullTypeId).toBeNull();
-    expect(result.unresolved).toEqual([{ text: 'Not A Ship', reason: 'unknown ship' }]);
+    expect(result.unresolved).toEqual([
+      { text: 'Not A Ship', reason: 'unknown ship', kind: 'unknown-ship' },
+    ]);
   });
 
   it('reports an unknown item without failing the rest of the fitting', () => {
@@ -103,7 +105,9 @@ describe('loadEveFitXmlEntry', () => {
     );
     if (result.hullTypeId === null) throw new Error('expected a hull');
     expect(result.modules).toEqual([{ slot: 'low', slotIndex: 0, typeId: 2046, state: 'active' }]);
-    expect(result.unresolved).toEqual([{ text: 'Not A Real Module', reason: 'unknown item' }]);
+    expect(result.unresolved).toEqual([
+      { text: 'Not A Real Module', reason: 'unknown item', kind: 'unknown-item' },
+    ]);
   });
 
   it('reports a slot index past the rack size without failing the rest of the fitting', () => {
@@ -119,7 +123,12 @@ describe('loadEveFitXmlEntry', () => {
     if (result.hullTypeId === null) throw new Error('expected a hull');
     expect(result.modules).toEqual([{ slot: 'low', slotIndex: 0, typeId: 2046, state: 'active' }]);
     expect(result.unresolved).toEqual([
-      { text: '125mm Gatling AutoCannon II', reason: 'too many high slots' },
+      {
+        text: '125mm Gatling AutoCannon II',
+        reason: 'too many high slots',
+        kind: 'too-many-slots',
+        rack: 'high',
+      },
     ]);
   });
 
@@ -136,7 +145,7 @@ describe('loadEveFitXmlEntry', () => {
     if (result.hullTypeId === null) throw new Error('expected a hull');
     expect(result.modules).toEqual([{ slot: 'low', slotIndex: 0, typeId: 2046, state: 'active' }]);
     expect(result.unresolved).toEqual([
-      { text: 'Damage Control I', reason: 'unknown slot: implant' },
+      { text: 'Damage Control I', reason: 'unknown slot: implant', kind: 'unknown-slot' },
     ]);
   });
 });

@@ -72,8 +72,8 @@ describe('esiFittingToFitting', () => {
     );
     expect(fitting.modules).toEqual([]);
     expect(unresolved).toEqual([
-      { text: 'ServiceSlot0', reason: 'unsupported slot' },
-      { text: 'Invalid', reason: 'unsupported slot' },
+      { text: 'ServiceSlot0', reason: 'unsupported slot', kind: 'unsupported-slot' },
+      { text: 'Invalid', reason: 'unsupported slot', kind: 'unsupported-slot' },
     ]);
   });
 });

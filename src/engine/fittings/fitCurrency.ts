@@ -24,12 +24,6 @@ export type OutOfDateReason =
 
 export type FitCurrency = { current: true } | { current: false; reasons: OutOfDateReason[] };
 
-const TOO_MANY_SLOTS = /^too many (\w+) slots$/;
-
-function isSlotKind(value: string): value is FittingSlotKind {
-  return (FITTING_SLOT_KINDS as readonly string[]).includes(value);
-}
-
 /**
  * A Tech 3 cruiser's high, mid and low slots come from its subsystems, which
  * the bare hull's counts (all zero) don't include — so they can't be counted.
@@ -53,17 +47,16 @@ export function classifyFitCurrency(
   const racks = new Set<FittingSlotKind>();
 
   for (const warning of parts.unresolved) {
-    if (warning.reason === 'unknown ship') {
+    if (warning.kind === 'unknown-ship') {
       // An empty name is a missing header — a typo, not a removed hull.
       if (warning.text.trim() !== '') removed.push({ kind: 'unknown-hull', name: warning.text });
-    } else if (warning.reason === 'unknown item') {
+    } else if (warning.kind === 'unknown-item') {
       if (!removedNames.has(warning.text)) {
         removedNames.add(warning.text);
         removed.push({ kind: 'removed-item', name: warning.text });
       }
-    } else {
-      const rack = TOO_MANY_SLOTS.exec(warning.reason)?.[1];
-      if (rack !== undefined && isSlotKind(rack)) racks.add(rack);
+    } else if (warning.kind === 'too-many-slots') {
+      racks.add(warning.rack);
     }
   }
 

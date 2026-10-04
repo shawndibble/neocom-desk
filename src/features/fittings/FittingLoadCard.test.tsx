@@ -41,7 +41,7 @@ const UNRESOLVED: FittingXmlListItem = {
     kind: 'failed',
     source: 'file',
     error: null,
-    unresolved: [{ text: 'Not A Ship', reason: 'unknown ship' }],
+    unresolved: [{ text: 'Not A Ship', reason: 'unknown ship', kind: 'unknown-ship' }],
   },
 };
 
@@ -112,7 +112,7 @@ describe('LoadWarnings', () => {
       kind: 'failed',
       source: 'text',
       error: null,
-      unresolved: [{ line: 1, text: 'Not A Ship', reason: 'unknown ship' }],
+      unresolved: [{ line: 1, text: 'Not A Ship', reason: 'unknown ship', kind: 'unknown-ship' }],
     };
     const { rerender } = render(<LoadWarnings load={text} />);
     expect(screen.getByText("1 line wasn't recognized")).toBeInTheDocument();
@@ -122,7 +122,7 @@ describe('LoadWarnings', () => {
       kind: 'fitting',
       source: 'in-game',
       fitting: { name: 'Carrier', shipTypeId: 23757, modules: [], drones: [], cargo: [] },
-      unresolved: [{ text: 'FighterBay', reason: 'unsupported slot' }],
+      unresolved: [{ text: 'FighterBay', reason: 'unsupported slot', kind: 'unsupported-slot' }],
     };
     rerender(<LoadWarnings load={inGame} />);
     expect(
