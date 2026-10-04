@@ -119,8 +119,26 @@ describe('reconcileAssignments', () => {
     expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('needs-review');
   });
 
-  it('never auto-absorbs a member of a joined group', async () => {
-    await db.miningTaxAssignments.put(assignment({ groupId: 'g1' }));
+  it('auto-absorbs growth on an unpaid member of a combined entry too', async () => {
+    // A session that crossed midnight UTC is combined while still mining —
+    // the second day keeps growing, and an unpaid bill has nothing to protect.
+    const member = assignment({ groupId: 'g1' });
+    await db.miningTaxAssignments.put(member);
+    const entry: MiningLedgerEntry = {
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      oreLines: [{ typeId: TYPE_A, quantity: 150 }],
+    };
+
+    await reconcileAssignments(CHAR_A, [entry]);
+
+    expect(assignmentsMock.resolveNeedsReview).toHaveBeenCalledWith(member, entry, [member]);
+    expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('outstanding');
+  });
+
+  it('still flags growth on a paid member of a combined entry', async () => {
+    await db.miningTaxAssignments.put(assignment({ groupId: 'g1', status: 'paid', paidAt: 1 }));
 
     await reconcileAssignments(CHAR_A, [
       {
