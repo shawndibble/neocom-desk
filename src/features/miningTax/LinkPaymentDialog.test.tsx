@@ -142,10 +142,14 @@ describe('LinkPaymentDialog — a failed save', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Payment linked, but couldn’t remember who Mining Corp is paid.'
     );
-    expect(onLinked).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
     // Already recorded: a second click must not mark it paid twice.
     expect(screen.getByRole('button', { name: 'Mark 1 paid' })).toBeDisabled();
     expect(markAssignmentsPaid).toHaveBeenCalledTimes(1);
+    // The reload waits for the close, so it can't unmount the message unread.
+    expect(onLinked).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onLinked).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

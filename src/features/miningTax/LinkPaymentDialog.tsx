@@ -139,7 +139,8 @@ export function LinkPaymentDialog({
     } catch {
       // The payment is recorded; only learning who the Payee is paid failed.
       // Say so and keep the dialog open, rather than closing as if all went.
-      onLinked();
+      // `onLinked` waits for the close: the reload it triggers drops this
+      // payment from the suggestions, which would unmount the dialog unread.
       setSaveError(t('miningTax.linkWallet.rememberFailed', { payee: balance.payee.name }));
       setSaving(false);
       return;
@@ -149,11 +150,16 @@ export function LinkPaymentDialog({
     onClose();
   }
 
+  function close() {
+    if (recorded) onLinked();
+    onClose();
+  }
+
   const confidenceLabel = (suggestion: LinkSuggestion, payee: PayeeRecord) =>
     t(`miningTax.linkConfidence.${suggestion.confidence}`, { payee: payee.name });
 
   return (
-    <Modal open={open} onClose={onClose} title={t('miningTax.linkPaymentTitle')}>
+    <Modal open={open} onClose={close} title={t('miningTax.linkPaymentTitle')}>
       <div className="space-y-3 text-sm">
         <p className="text-xs text-text-dim">{t('miningTax.linkPaymentHint')}</p>
 
@@ -300,7 +306,7 @@ export function LinkPaymentDialog({
           >
             {t('miningTax.linkPaymentConfirmAction', { count: included.length })}
           </Button>
-          <Button size="sm" onClick={onClose}>
+          <Button size="sm" onClick={close}>
             {t('filters.cancel')}
           </Button>
         </div>
