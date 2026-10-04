@@ -70,6 +70,7 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import {
   acceptNewTotal,
+  assignmentsMovedWithPayee,
   assignmentsSharingPayment,
   continueSession as continueSessionAction,
   dismiss,
@@ -104,7 +105,7 @@ import { LinkPaymentDialog } from '@/features/miningTax/LinkPaymentDialog';
 import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
 import { SettleUpDialog, type SettleUpRow } from '@/features/miningTax/SettleUpDialog';
 import { JoinAssignDialog } from '@/features/miningTax/JoinAssignDialog';
-import { PayeeManagerDialog } from '@/features/miningTax/PayeeManagerDialog';
+import { PayeeManagerDialog, type PayeeOwed } from '@/features/miningTax/PayeeManagerDialog';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
 import { type LinkedTransaction } from '@/features/miningTax/PaymentLinksCard';
 import { LinkTransactionDialog } from '@/features/miningTax/LinkTransactionDialog';
@@ -594,15 +595,18 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     [everyAssignment, allPayees]
   );
   const owedByPayee = useMemo(() => {
-    const out = new Map<string, { amount: number; assignments: MiningTaxAssignmentRecord[] }>();
+    const out = new Map<string, PayeeOwed>();
     for (const a of everyAssignment) {
       // Owed means Outstanding, as on the balance cards: a needs-review entry
       // was already paid (or dismissed) before it grew.
       if (!a.payeeId || a.status !== 'outstanding') continue;
-      const entry = out.get(a.payeeId) ?? { amount: 0, assignments: [] };
+      const entry = out.get(a.payeeId) ?? { amount: 0, count: 0, moving: 0 };
       entry.amount += a.taxOwed;
-      entry.assignments.push(a);
+      entry.count += 1;
       out.set(a.payeeId, entry);
+    }
+    for (const [payeeId, entry] of out) {
+      entry.moving = assignmentsMovedWithPayee(everyAssignment, payeeId).length;
     }
     return out;
   }, [everyAssignment]);

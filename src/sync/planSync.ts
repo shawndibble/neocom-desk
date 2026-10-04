@@ -83,7 +83,6 @@ import {
   EDITABLE_COLLECTIONS,
   FITTINGS,
   NOTIFICATION_FEED,
-  PAYEES,
   PLANET_RICHNESS,
   PRODUCTION_ORDER_WATCHES,
   PRODUCTION_RUNS,
@@ -224,13 +223,6 @@ export async function markBuildPlanDeleted(characterId: number, planId: string):
 export async function markBuildPlansDeleted(characterId: number, planIds: string[]): Promise<void> {
   await recordBulkDeletion(characterId, planIds, tombstoneKey(BUILD_PLANS, characterId), (ids) =>
     db.buildPlans.bulkDelete(ids)
-  );
-}
-
-/** Payee analogue of markPlanDeleted — same tombstone semantics (issue #523). */
-export async function markPayeeDeleted(characterId: number, payeeId: string): Promise<void> {
-  await recordDeletion(characterId, payeeId, tombstoneKey(PAYEES, characterId), () =>
-    db.payees.delete(payeeId)
   );
 }
 

@@ -1,8 +1,8 @@
 /**
  * The Mining Tax ledger's write actions, in the terms the pilot uses: assign,
  * combine, continue a session (and undo it), unassign, accept a new total,
- * take out of combined, settle, split, dismiss, edit an entry, move to another
- * Payee, link or unlink a transaction.
+ * take out of combined, settle, split, dismiss, edit an entry, delete a Payee
+ * (moving its entries to another), link or unlink a transaction.
  *
  * Every action is one Dexie transaction over the Assignments and the
  * tombstones their deletes leave, so a multi-record change — every day of a
@@ -17,7 +17,12 @@
  * primitives in `assignments.ts` are this module's to call; the UI imports
  * actions from here (an ESLint rule holds that line).
  */
-import { db, type MiningTaxAssignmentRecord, type MiningTaxPaymentLinkSource } from '@/db';
+import {
+  db,
+  type MiningTaxAssignmentRecord,
+  type MiningTaxPaymentLinkSource,
+  type PayeeRecord,
+} from '@/db';
 import { scheduleSync } from '@/sync';
 import {
   AlreadyAssignedError,
@@ -45,6 +50,7 @@ import {
   type UpdateCombinedInput,
 } from './assignments';
 import type { GroupMember } from './groupRows';
+import { removePayeeRecord } from './payees';
 import type { SessionContinuation } from './sessionContinuation';
 
 export type {
@@ -87,20 +93,22 @@ function failure(cause: unknown): LedgerActionFailure {
 
 /**
  * Runs `write` as one transaction, then schedules a sync for each character
- * it touched. `write` may only await Dexie — anything else (a price fetch)
+ * it touched — given up front, or worked out from what `write` returned when
+ * only the transaction knows. `write` may only await Dexie — anything else (a price fetch)
  * belongs before this call, or Dexie commits early (PrematureCommitError).
  */
 async function commit<T>(
-  characterIds: Iterable<number>,
+  characterIds: Iterable<number> | ((value: T) => Iterable<number>),
   write: () => Promise<T>
 ): Promise<LedgerActionResult<T>> {
   let value: T;
   try {
-    value = await db.transaction('rw', db.miningTaxAssignments, db.settings, write);
+    value = await db.transaction('rw', db.miningTaxAssignments, db.payees, db.settings, write);
   } catch (cause) {
     return failure(cause);
   }
-  for (const characterId of new Set(characterIds)) scheduleSync(characterId);
+  const touched = typeof characterIds === 'function' ? characterIds(value) : characterIds;
+  for (const characterId of new Set(touched)) scheduleSync(characterId);
   return { ok: true, value };
 }
 
@@ -261,12 +269,50 @@ export function split(
   return commit([original.characterId], () => splitAssignment(original, input, prices));
 }
 
-/** Moves a deleted Payee's Assignments to another Payee. */
-export function moveToPayee(
+/**
+ * What deleting `payeeId` with a move takes to the new Payee: its owed days,
+ * plus every other day of a Combined Entry one of them is in — paid,
+ * dismissed and needs-review days included, because a Combined Entry is one
+ * obligation under one Payee and moving only its owed days would split it
+ * (and coalesce would then dissolve it on load). Standalone paid days, and
+ * Combined Entries with nothing owed, stay with the deleted Payee's history.
+ */
+export function assignmentsMovedWithPayee(
   assignments: readonly MiningTaxAssignmentRecord[],
   payeeId: string
+): MiningTaxAssignmentRecord[] {
+  const own = assignments.filter((a) => a.payeeId === payeeId);
+  const owedGroups = new Set(
+    own.filter((a) => a.status === 'outstanding' && a.groupId !== undefined).map((a) => a.groupId)
+  );
+  return own.filter(
+    (a) => a.status === 'outstanding' || (a.groupId !== undefined && owedGroups.has(a.groupId))
+  );
+}
+
+/**
+ * Deletes a Payee, first moving what `assignmentsMovedWithPayee` picks to
+ * `moveToPayeeId` when given — one transaction, so a failure leaves both the
+ * Payee and every one of its entries as they were. The entries are re-read
+ * inside it, so a day another tab assigned since the dialog opened moves too.
+ */
+export function deletePayee(
+  payee: PayeeRecord,
+  moveToPayeeId?: string
 ): Promise<LedgerActionResult> {
-  return commit(charactersOf(assignments), () => moveAssignmentsToPayee(assignments, payeeId));
+  return commit(
+    (moved: MiningTaxAssignmentRecord[]) => [payee.characterId, ...charactersOf(moved)],
+    async () => {
+      let moved: MiningTaxAssignmentRecord[] = [];
+      if (moveToPayeeId !== undefined) {
+        const own = await db.miningTaxAssignments.filter((a) => a.payeeId === payee.id).toArray();
+        moved = assignmentsMovedWithPayee(own, payee.id);
+        await moveAssignmentsToPayee(moved, moveToPayeeId);
+      }
+      await removePayeeRecord(payee);
+      return moved;
+    }
+  ).then((result) => (result.ok ? { ok: true, value: undefined } : result));
 }
 
 /** The manual "Link transaction" — see `linkPaymentTransaction`. */

@@ -1,12 +1,14 @@
 /**
  * Payee CRUD for the Moon Mining Tax ledger (issue #523). Per-character
  * Editable Data, synced like a Build Plan (`sync/planSync.ts`'s `payeeSpec`) —
- * writes go straight to Dexie plus a debounced `scheduleSync`, and deletes go
- * through `markPayeeDeleted` so the removal propagates instead of
- * resurrecting from a remote copy.
+ * writes go straight to Dexie plus a debounced `scheduleSync`. Deleting is a
+ * ledger action (`ledgerActions.deletePayee`), since it moves the Payee's
+ * entries in the same transaction.
  */
 import { db, type PayeeRecord } from '@/db';
-import { markPayeeDeleted, scheduleSync } from '@/sync';
+import { scheduleSync } from '@/sync';
+import { appendTombstones, tombstoneKey } from '@/sync/localBookkeeping';
+import { PAYEES } from '@/sync/syncedCollections';
 
 export function loadPayees(characterId: number): Promise<PayeeRecord[]> {
   return db.payees.where('characterId').equals(characterId).toArray();
@@ -83,6 +85,15 @@ export async function rememberPayeeEntity(
   return updated;
 }
 
-export async function deletePayee(payee: PayeeRecord): Promise<void> {
-  await markPayeeDeleted(payee.characterId, payee.id);
+/**
+ * Deletes a Payee and tombstones it, so the deletion syncs instead of the next
+ * pull resurrecting it. Dexie-only: no transaction of its own and no sync —
+ * `ledgerActions.deletePayee` runs it inside its transaction and schedules
+ * the sync after the commit.
+ */
+export async function removePayeeRecord(
+  payee: Pick<PayeeRecord, 'id' | 'characterId'>
+): Promise<void> {
+  await db.payees.delete(payee.id);
+  await appendTombstones(tombstoneKey(PAYEES, payee.characterId), [payee.id]);
 }

@@ -3,18 +3,20 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import '@/i18n';
-import { db, type MiningTaxAssignmentRecord, type PayeeRecord } from '@/db';
+import { db, type PayeeRecord } from '@/db';
 import { PayeeManagerDialog } from './PayeeManagerDialog';
 import { loadPayees } from './payees';
 
 const syncMock = vi.hoisted(() => ({
-  markPayeeDeleted: vi.fn(async () => {}),
   scheduleSync: vi.fn(),
 }));
 vi.mock('@/sync', () => syncMock);
 
 const actionsMock = vi.hoisted(() => ({
-  moveToPayee: vi.fn(async () => ({ ok: true, value: undefined })),
+  deletePayee: vi.fn(async (): Promise<{ ok: boolean; value?: undefined }> => ({
+    ok: true,
+    value: undefined,
+  })),
 }));
 vi.mock('./ledgerActions', () => actionsMock);
 
@@ -201,7 +203,7 @@ describe('PayeeManagerDialog delete confirmation (#862: no silent delete)', () =
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
-      expect(syncMock.markPayeeDeleted).toHaveBeenCalledWith(CHAR, 'p1');
+      expect(actionsMock.deletePayee).toHaveBeenCalledWith(stored, undefined);
     });
     expect(
       screen.queryByText('Delete "Hek landlord"? This can\'t be undone.')
@@ -228,7 +230,7 @@ describe('PayeeManagerDialog — list rows', () => {
 
   it('shows what each Payee is owed, and Settled when nothing is', () => {
     renderDialog([bureau, police], {
-      owedByPayee: new Map([['p1', { amount: 4_309_281, assignments: [] }]]),
+      owedByPayee: new Map([['p1', { amount: 4_309_281, count: 1, moving: 1 }]]),
     });
     expect(screen.getByText('4,309,281 ISK')).toHaveClass('text-isk-neg');
     expect(screen.getByText('Settled')).toBeInTheDocument();
@@ -295,11 +297,8 @@ describe('PayeeManagerDialog — deleting a Payee that is still owed', () => {
     defaultTaxPct: 8,
     updatedAt: 1,
   };
-  const owedAssignments = [
-    { id: 'a1', payeeId: 'p1' },
-    { id: 'a2', payeeId: 'p1' },
-  ] as unknown as MiningTaxAssignmentRecord[];
-  const owedByPayee = new Map([['p1', { amount: 4_309_281, assignments: owedAssignments }]]);
+  // Two owed days, one of them in a Combined Entry with a paid day.
+  const owedByPayee = new Map([['p1', { amount: 4_309_281, count: 2, moving: 3 }]]);
 
   beforeEach(async () => {
     await db.payees.bulkPut([bureau, police]);
@@ -312,6 +311,11 @@ describe('PayeeManagerDialog — deleting a Payee that is still owed', () => {
     expect(
       screen.getByText('Bureau of Unified Harvesting still has 2 owed entries (4,309,281 ISK).')
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Moving takes 3 entries, counting the other days of the Combined Entries they're in."
+      )
+    ).toBeInTheDocument();
 
     const moveButton = screen.getByRole('button', { name: 'Move and delete' });
     expect(moveButton).toBeDisabled();
@@ -320,9 +324,8 @@ describe('PayeeManagerDialog — deleting a Payee that is still owed', () => {
     await userEvent.click(moveButton);
 
     await waitFor(() => {
-      expect(syncMock.markPayeeDeleted).toHaveBeenCalledWith(CHAR, 'p1');
+      expect(actionsMock.deletePayee).toHaveBeenCalledWith(bureau, 'p2');
     });
-    expect(actionsMock.moveToPayee).toHaveBeenCalledWith(owedAssignments, 'p2');
   });
 
   it('can still delete anyway, leaving the entries where they are', async () => {
@@ -332,8 +335,21 @@ describe('PayeeManagerDialog — deleting a Payee that is still owed', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Delete anyway' }));
 
     await waitFor(() => {
-      expect(syncMock.markPayeeDeleted).toHaveBeenCalledWith(CHAR, 'p1');
+      expect(actionsMock.deletePayee).toHaveBeenCalledWith(bureau, undefined);
     });
-    expect(actionsMock.moveToPayee).not.toHaveBeenCalled();
+  });
+
+  it('says nothing changed when the delete fails', async () => {
+    actionsMock.deletePayee.mockResolvedValueOnce({ ok: false });
+    renderDialog([bureau, police], { owedByPayee });
+
+    await openDeleteFor('Bureau of Unified Harvesting');
+    await userEvent.click(screen.getByRole('button', { name: 'Delete anyway' }));
+
+    expect(
+      await screen.findByText(
+        'Couldn’t delete Bureau of Unified Harvesting — nothing was changed. Try again.'
+      )
+    ).toBeInTheDocument();
   });
 });

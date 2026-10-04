@@ -86,12 +86,6 @@ export async function markFittingDeleted(characterId: number, fittingId: string)
   return markFittingDeleted(characterId, fittingId);
 }
 
-/** Payee analogue of markPlanDeleted — same tombstone semantics (issue #523). */
-export async function markPayeeDeleted(characterId: number, payeeId: string): Promise<void> {
-  const { markPayeeDeleted } = await import('./planSync');
-  return markPayeeDeleted(characterId, payeeId);
-}
-
 /** Pin a station for one Character only (issue #84's per-character pin state). */
 export async function setCharacterStationPin(
   characterId: number,

@@ -1,9 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
-import { createPayee, deletePayee, loadPayees, rememberPayeeEntity, updatePayee } from './payees';
+import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
+import { PAYEES } from '@/sync/syncedCollections';
+import {
+  createPayee,
+  loadPayees,
+  rememberPayeeEntity,
+  removePayeeRecord,
+  updatePayee,
+} from './payees';
 
 const syncMock = vi.hoisted(() => ({
-  markPayeeDeleted: vi.fn(async () => {}),
   scheduleSync: vi.fn(),
 }));
 vi.mock('@/sync', () => syncMock);
@@ -97,10 +104,17 @@ describe('updatePayee', () => {
   });
 });
 
-describe('deletePayee', () => {
-  it('tombstones the deletion via markPayeeDeleted', async () => {
+describe('removePayeeRecord', () => {
+  it('deletes and tombstones the Payee, leaving the sync to the ledger action', async () => {
     const payee = await createPayee(CHAR_A, { name: 'A', defaultTaxPct: 10 });
-    await deletePayee(payee);
-    expect(syncMock.markPayeeDeleted).toHaveBeenCalledWith(CHAR_A, payee.id);
+    syncMock.scheduleSync.mockClear();
+
+    await removePayeeRecord(payee);
+
+    expect(await db.payees.get(payee.id)).toBeUndefined();
+    expect((await readTombstones(tombstoneKey(PAYEES, CHAR_A))).map((t) => t.id)).toEqual([
+      payee.id,
+    ]);
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 });

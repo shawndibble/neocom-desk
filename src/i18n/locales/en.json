@@ -4025,6 +4025,8 @@
       "taxPctLabel": "Default tax %",
       "deleteOwed_one": "{{name}} still has {{count}} owed entry ({{amount}} ISK).",
       "deleteOwed_other": "{{name}} still has {{count}} owed entries ({{amount}} ISK).",
+      "moveTakesCombined_one": "Moving takes {{count}} entry, counting the other days of the Combined Entries they're in.",
+      "moveTakesCombined_other": "Moving takes {{count}} entries, counting the other days of the Combined Entries they're in.",
       "moveToLabel": "Move them to…",
       "moveAndDelete": "Move and delete",
       "deleteAnyway": "Delete anyway",
