@@ -139,8 +139,10 @@ export function LinkPaymentDialog({
     } catch {
       // The payment is recorded; only learning who the Payee is paid failed.
       // Say so and keep the dialog open, rather than closing as if all went.
-      // `onLinked` waits for the close: the reload it triggers drops this
-      // payment from the suggestions, which would unmount the dialog unread.
+      // `onLinked` waits for the close: TaxTab mounts this dialog only while
+      // `linkSuggestions` is non-empty, and the reload drops this payment from
+      // them, which would unmount the message unread. (LinkWalletPaymentDialog
+      // is mounted per Payee, so it can reload straight away.)
       setSaveError(t('miningTax.linkWallet.rememberFailed', { payee: balance.payee.name }));
       setSaving(false);
       return;
