@@ -10,6 +10,8 @@
  *
  * A jump through a Thera / Turnur hole (issue #2476) is a hatched cell of
  * its own between its two systems' cells: a step, with no security to colour.
+ * A jump over an Ansiblex (issue #2546) is a cell of its own too, edged in
+ * the bridge row's dashed line. Both read the rows' own tags.
  *
  * One `role="img"`, not a tab stop per cell: a 40-jump route would otherwise
  * be 40 stops the table below already covers.
@@ -18,12 +20,30 @@ import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { Tooltip } from '@/components/ui';
-import { holeStepIndexes } from '@/engine/route/routeHoles';
 import { routeStripKeySystems, type RouteSafetyRow } from '@/engine/route/routeSafety';
+import { stepJumps } from '@/engine/route/routeSafetyTrip';
 import { securityStatusColor } from '@/engine/securityStatus';
 import { routeSystemName } from './routeSystemName';
 import type { RouteKillsCell } from './useRouteKills';
-import type { HoleAt } from './useRouteSafety';
+import type { RouteSafetyTripRow } from './useRouteSafety';
+
+/**
+ * The cell a hole or bridge jump draws between its two systems. A bridge
+ * takes the bridge row's dashed line, top and bottom only: a full box would
+ * read as a control.
+ */
+const STEP_CELL = {
+  hole: {
+    tip: 'travel.holes.stripCell',
+    testId: 'route-strip-hole',
+    className: 'route-strip-hole',
+  },
+  bridge: {
+    tip: 'travel.bridges.stripCell',
+    testId: 'route-strip-bridge',
+    className: 'border-y border-dashed border-line-bright',
+  },
+} as const;
 
 function securityText(row: RouteSafetyRow): string {
   return row.security === null ? '—' : row.security.toFixed(1);
@@ -40,14 +60,12 @@ export function RouteStrip({
   rows,
   killsOf,
   stopIndexes,
-  holeAt,
 }: {
-  rows: readonly RouteSafetyRow[];
+  /** The trip's systems in flying order, each tagged with how it was entered. */
+  rows: readonly RouteSafetyTripRow[];
   killsOf: (systemId: number) => RouteKillsCell;
   /** On a trip through several Stops, where each one falls: those are key systems too. */
   stopIndexes?: readonly number[];
-  /** The hole a step crosses, or `null` for a stargate jump. */
-  holeAt?: HoleAt;
 }) {
   const { t } = useTranslation();
   const first = rows[0];
@@ -66,16 +84,7 @@ export function RouteStrip({
         })
       : t('travel.strip.system', { name: routeSystemName(row), security: securityText(row) });
   const withKills = rows.filter((row) => hasKills(row, killsOf(row.systemId)));
-  // Whether the step into each row was through a hole.
-  const holeInto = new Set(
-    holeAt
-      ? holeStepIndexes(
-          rows.map((row) => row.systemId),
-          holeAt
-        )
-      : []
-  );
-  const holeJumps = holeInto.size;
+  const { holeJumps, bridgeJumps } = stepJumps(rows);
   const label = [
     t('travel.strip.label', {
       count: rows.length,
@@ -91,6 +100,7 @@ export function RouteStrip({
           }),
         ]),
     ...(holeJumps === 0 ? [] : [t('travel.holes.stripLabel', { count: holeJumps })]),
+    ...(bridgeJumps === 0 ? [] : [t('travel.bridges.stripLabel', { count: bridgeJumps })]),
   ].join(' ');
 
   return (
@@ -100,18 +110,19 @@ export function RouteStrip({
           const kills = withKills.includes(row);
           const tip = [describe(row), ...(kills ? [t('travel.strip.kills')] : [])].join('\n');
           const previous = rows[index - 1];
+          const step = row.entry && row.entry.kind !== 'gate' ? STEP_CELL[row.entry.kind] : null;
           return (
             <Fragment key={index}>
-              {holeInto.has(index) && previous && (
+              {step && previous && (
                 <Tooltip
-                  content={t('travel.holes.stripCell', {
+                  content={t(step.tip, {
                     from: routeSystemName(previous),
                     to: routeSystemName(row),
                   })}
                 >
                   <span
-                    data-testid="route-strip-hole"
-                    className="route-strip-hole min-w-0 flex-1 rounded-[1px] bg-panel-2"
+                    data-testid={step.testId}
+                    className={`min-w-0 flex-1 rounded-[1px] bg-panel-2 ${step.className}`}
                   />
                 </Tooltip>
               )}

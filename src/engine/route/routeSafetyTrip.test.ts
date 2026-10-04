@@ -4,6 +4,7 @@ import type { AnsiblexGate } from './ansiblex';
 import type { PinnableHole } from './legWays';
 import { HUB_SYSTEM_IDS, type TheraConnection } from './theraConnections';
 import { planTrip, type TripPlan } from './tripPlan';
+import { waypointSequence } from './waypoints';
 import type { RouteSafetySystemEntry } from './routeSafety';
 import {
   assembleRouteSafety,
@@ -12,6 +13,7 @@ import {
   type LegAlternatives,
   type RouteSafetyActivity,
   type RouteSafetyAssembly,
+  type RouteSafetyTripRow,
   type RouteSafetyTripInput,
 } from './routeSafetyTrip';
 
@@ -189,6 +191,16 @@ function route(state: RouteSafetyAssembly) {
 const systemsOf = (rows: readonly { systemId: number }[] | null) =>
   rows?.map((row) => row.systemId) ?? null;
 
+/** How the route entered `to` from `from`: the row's tag, or `undefined` for no such step. */
+function entryOf(rows: readonly RouteSafetyTripRow[] | null, from: number, to: number) {
+  const at = rows?.findIndex(
+    (row, index) => index > 0 && rows[index - 1].systemId === from && row.systemId === to
+  );
+  return at === undefined || at < 0 ? undefined : rows?.[at].entry;
+}
+
+const GATE = { kind: 'gate' } as const;
+
 describe('routeSafetyNetwork', () => {
   it('joins holes and bridges as connections; only the holes make a system free', () => {
     expect(routeSafetyNetwork([VIA_ENTRY], [BRIDGE, { ...BRIDGE, name: 'twin' }])).toEqual({
@@ -317,7 +329,7 @@ describe('assembleRouteSafety', () => {
     expect(systemsOf(leg.rows)).toEqual(THROUGH_FAR);
     expect(leg.ways[0]).toMatchObject({ kind: 'hole', pin: '3', inUse: true });
     expect(leg.ways[0].holes.map(({ hole }) => hole)).toEqual([VIA_FAR, VIA_EXIT]);
-    expect(state.holeAt(FAR, THERA)).toBe(VIA_FAR);
+    expect(entryOf(leg.rows, FAR, THERA)).toEqual({ kind: 'hole', hole: VIA_FAR });
     expect(state.trip?.holeJumps).toBe(2);
   });
 
@@ -326,7 +338,7 @@ describe('assembleRouteSafety', () => {
     const state = route(
       plan({ holes: THERA_HOLES, listed: [relisted, VIA_EXIT], pins: ['1'] }).state
     );
-    expect(state.holeAt(ENTRY, THERA)).toBe(VIA_ENTRY);
+    expect(entryOf(state.legs[0].rows, ENTRY, THERA)).toEqual({ kind: 'hole', hole: VIA_ENTRY });
   });
 
   it.each([
@@ -346,8 +358,8 @@ describe('assembleRouteSafety', () => {
   it('shows a gate where a gate and a hole join the same two systems', () => {
     const state = route(plan({ holes: [VIA_W2, VIA_TURNUR], pins: ['turnur'] }).state);
     expect(systemsOf(state.legs[0].rows)).toEqual(THROUGH_TURNUR);
-    expect(state.holeAt(W2, TURNUR)).toBeNull();
-    expect(state.holeAt(TURNUR, TEXIT)).toBe(VIA_TURNUR);
+    expect(entryOf(state.legs[0].rows, W2, TURNUR)).toEqual(GATE);
+    expect(entryOf(state.legs[0].rows, TURNUR, TEXIT)).toEqual({ kind: 'hole', hole: VIA_TURNUR });
     expect(state.trip?.holeJumps).toBe(1);
   });
 
@@ -357,9 +369,70 @@ describe('assembleRouteSafety', () => {
     expect(systemsOf(leg.rows)).toEqual([START, W1, W4, END]);
     expect(leg.ways[0]).toMatchObject({ kind: 'ansiblex', inUse: true });
     expect(leg.ways[0].bridges).toEqual([{ from: W1, to: W4, gate: BRIDGE }]);
-    expect(state.bridgeAt(W4, W1)).toBe(BRIDGE);
-    expect(state.bridgeAt(W1, W2)).toBeNull();
+    expect(entryOf(leg.rows, W1, W4)).toEqual({ kind: 'bridge', gate: BRIDGE });
     expect(state.trip).toMatchObject({ holeJumps: 0, bridgeJumps: 1 });
+  });
+
+  it('tags each row with how it was entered, the start with nothing', () => {
+    const state = route(plan({ holes: THERA_HOLES }).state);
+    expect(state.legs[0].rows?.map((row) => row.entry)).toEqual([
+      null,
+      GATE,
+      { kind: 'hole', hole: VIA_ENTRY },
+      { kind: 'hole', hole: VIA_EXIT },
+      GATE,
+    ]);
+  });
+
+  it('reads a bridge flown back the other way as that bridge', () => {
+    const state = route(plan({ bridges: [BRIDGE], returnToStart: true }).state);
+    expect(systemsOf(state.legs[1].rows)).toEqual([END, W4, W1, START]);
+    expect(entryOf(state.legs[1].rows, W4, W1)).toEqual({ kind: 'bridge', gate: BRIDGE });
+    expect(state.trip?.bridgeJumps).toBe(2);
+  });
+
+  it('prefers the Ansiblex standing in the system the step leaves', () => {
+    const back: AnsiblexGate = { fromId: W4, toId: W1, name: 'W4 » W1 - Back' };
+    const state = route(plan({ bridges: [back, BRIDGE] }).state);
+    expect(entryOf(state.legs[0].rows, W1, W4)).toEqual({ kind: 'bridge', gate: BRIDGE });
+  });
+
+  it('shows a gate where a gate and a bridge join the same two systems', () => {
+    const twin: AnsiblexGate = { fromId: W1, toId: W2, name: 'W1 » W2 - Twin' };
+    const state = route(plan({ bridges: [twin], pins: ['gates'] }).state);
+    expect(entryOf(state.legs[0].rows, W1, W2)).toEqual(GATE);
+    expect(state.legs[0].ways[0].bridges).toEqual([]);
+    expect(state.trip).toMatchObject({ holeJumps: 0, bridgeJumps: 0 });
+  });
+
+  it('keeps the gate rows of each later leg, never its repeated start', () => {
+    const state = route(plan({ holes: THERA_HOLES, returnToStart: true }).state);
+    const entries = state.trip?.rows.map((row) => row.entry) ?? [];
+    expect(entries[0]).toBeNull();
+    expect(entries.slice(1).every((entry) => entry !== null)).toBe(true);
+  });
+
+  it('cuts the waypoints at a hole’s entrance, off the row tags', () => {
+    const state = route(plan({ holes: THERA_HOLES }).state);
+    expect(waypointSequence(state.legs)).toEqual({
+      waypoints: [ENTRY],
+      cutOff: { entrance: ENTRY, exit: THERA, kind: 'hole' },
+    });
+  });
+
+  it('cuts the waypoints at a bridge’s entrance, as a bridge', () => {
+    const state = route(plan({ bridges: [BRIDGE] }).state);
+    expect(waypointSequence(state.legs).cutOff).toEqual({ entrance: W1, exit: W4, kind: 'bridge' });
+  });
+
+  it('reads a step nothing known joins as a gate', () => {
+    // Planned through Thera, then read against no holes at all.
+    const { tripPlan, alternatives } = plan({ holes: THERA_HOLES });
+    const state = route(
+      assembleRouteSafety(input({ planned: { plan: tripPlan, graph: GRAPH }, alternatives }))
+    );
+    expect(state.legs[0].rows?.slice(1).map((row) => row.entry)).toEqual([GATE, GATE, GATE, GATE]);
+    expect(state.trip).toMatchObject({ holeJumps: 0, bridgeJumps: 0 });
   });
 
   it('sums the whole trip across its legs', () => {

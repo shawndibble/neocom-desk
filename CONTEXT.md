@@ -508,7 +508,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **Ansiblex**: an alliance-built jump gate between two nullsec systems,
   named "SYS1 » SYS2 - …" in game. Route Safety may route over the ones in
   this device's list — found by a character's structure search or pasted —
-  each as one jump, shown as its own row. Decision `20261003-204009`.
+  each as one jump, shown as its own row and as a dashed-edged **Route
+  strip** cell. Decision `20261003-204009`.
 - **Way to fly**: one way a **Leg** can be flown, listed beside its rows:
   Gates only (always), Via Thera / Via Turnur (when that hub has a
   qualifying hole), Via Ansiblex (with Use jump bridges on, when a known

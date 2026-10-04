@@ -3,9 +3,8 @@ import { findJumpRoute, routeCost, type JumpGraph } from './jumpRoute';
 import {
   ANSIBLEX_SEARCH,
   ANSIBLEX_TYPE_ID,
+  bridgeBetween,
   bridgeConnections,
-  bridgeStepFinder,
-  bridgeStepIndexes,
   foundGate,
   parseAnsiblexName,
   parseGateList,
@@ -209,19 +208,16 @@ describe('routing over a bridge', () => {
   });
 });
 
-describe('bridgeStepFinder', () => {
-  it('finds the gate a step crosses, in the direction it is flown', () => {
-    const at = bridgeStepFinder(GRAPH, [AD]);
-    expect(at(A, D)).toBe(AD);
-    expect(at(D, A)).toBe(AD);
-    expect(at(A, B)).toBeNull();
+describe('bridgeBetween', () => {
+  it('finds the gate a step crosses, either way it is flown', () => {
+    expect(bridgeBetween([AD], A, D)).toBe(AD);
+    expect(bridgeBetween([AD], D, A)).toBe(AD);
+    expect(bridgeBetween([AD], A, B)).toBeNull();
   });
 
-  it('is null for a step a stargate joins, even when a gate joins it too', () => {
-    expect(bridgeStepFinder(GRAPH, [{ fromId: A, toId: B, name: 'x' }])(A, B)).toBeNull();
-  });
-
-  it('marks where along a route a bridge is crossed', () => {
-    expect(bridgeStepIndexes([A, D, E], bridgeStepFinder(GRAPH, [AD]))).toEqual([1]);
+  it('prefers the gate standing in the system the step leaves', () => {
+    const DA: AnsiblexGate = { fromId: D, toId: A, name: 'D » A' };
+    expect(bridgeBetween([DA, AD], A, D)).toBe(AD);
+    expect(bridgeBetween([AD, DA], D, A)).toBe(DA);
   });
 });
