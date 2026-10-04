@@ -14,7 +14,7 @@
  * Planner layout (issue #2472): a left column with the Route rules panel —
  * the Route Preference for this route, and the pilot's Travel Settings edited
  * in place — and the route on the right. Every middle row can Avoid its
- * system, previewing the new route before it saves.
+ * system, previewing the whole trip with it avoided before it saves.
  *
  * Itinerary (issue #2474): one panel holds the route's facts as a chip strip,
  * the route strip (`RouteStrip`), and one-line rows with quiet stretches
@@ -125,13 +125,6 @@ const NO_HOLES: readonly TheraConnection[] = [];
 function stopsFromLink(stops: readonly number[], to: number | null): number[] {
   const named = stops.length > 0 ? stops : to === null ? [] : [to];
   return [...new Set(named)].slice(0, MAX_STOPS);
-}
-
-/** The leg an Avoid was asked from: its preview re-plans that leg alone. */
-interface AvoidLeg {
-  from: number;
-  to: number;
-  jumps: number;
 }
 
 /**
@@ -267,20 +260,15 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
   const avoided = useAvoidedSystems((s) => s.value);
   const avoidedEnabled = useAvoidedSystemsEnabled((s) => s.value);
   const [avoidTarget, setAvoidTarget] = useState<AvoidTarget | null>(null);
-  // The leg the last Avoid was asked from, kept after the dialog closes so it
-  // stays mounted rather than blinking out and back while the route reloads.
-  const [avoidLeg, setAvoidLeg] = useState<AvoidLeg | null>(null);
   // The trip's own start and stops cannot be avoided; a system already on an
-  // active list has nothing to add.
-  const avoidAction = (leg: RouteSafetyLeg, row: RouteSafetyRow) =>
+  // active list has nothing to add. The preview covers the whole trip, so the
+  // leg it was asked from does not matter.
+  const avoidAction = (_leg: RouteSafetyLeg, row: RouteSafetyRow) =>
     row.systemId === fromId ||
     stops.includes(row.systemId) ||
     (avoidedEnabled && avoided.includes(row.systemId))
       ? null
-      : () => {
-          setAvoidLeg({ from: leg.from, to: leg.to, jumps: leg.summary?.jumps ?? 0 });
-          setAvoidTarget({ systemId: row.systemId, name: routeSystemName(row) });
-        };
+      : () => setAvoidTarget({ systemId: row.systemId, name: routeSystemName(row) });
 
   const fromTrigger =
     fromId === null
@@ -376,18 +364,12 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
           />
         </div>
       </div>
-      {avoidLeg !== null && (
-        <AvoidSystemDialog
-          target={avoidTarget}
-          fromId={avoidLeg.from}
-          toId={avoidLeg.to}
-          rules={routeQuery.rules}
-          currentJumps={avoidLeg.jumps}
-          extras={state.kind === 'route' ? state.network : undefined}
-          extrasKey={state.kind === 'route' ? state.networkKey : ''}
-          onClose={() => setAvoidTarget(null)}
-        />
-      )}
+      <AvoidSystemDialog
+        target={avoidTarget}
+        route={state.kind === 'route' ? state : null}
+        effectiveAvoid={routeQuery.rules.avoid}
+        onClose={() => setAvoidTarget(null)}
+      />
       {bridgeDialog !== null && (
         <AnsiblexGatesDialog
           mode={bridgeDialog}

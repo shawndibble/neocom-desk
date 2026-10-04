@@ -51,3 +51,25 @@ export function avoidListKey(ids: readonly number[]): string {
   }
   return `a${ids.length}:${hash.toString(36)}`;
 }
+
+/**
+ * The avoid list an Avoid preview plans with (issue #2472): the list the
+ * route is drawn with now, plus the system — and, with the Avoided Systems
+ * switch off, the whole stored list too, since confirming switches it on.
+ * Sorted and deduped, like `effectiveAvoid`.
+ */
+export function candidateAvoid(input: {
+  /** The avoid list the route is drawn with now (`effectiveAvoid`). */
+  effective: readonly number[];
+  /** The system the pilot is about to avoid. */
+  systemId: number;
+  /** The stored Avoided Systems. */
+  avoidList: readonly number[];
+  /** The Avoided Systems switch. */
+  avoidListEnabled: boolean;
+}): number[] {
+  const avoid = new Set(input.effective);
+  avoid.add(input.systemId);
+  if (!input.avoidListEnabled) for (const id of input.avoidList) avoid.add(id);
+  return [...avoid].sort((a, b) => a - b);
+}
