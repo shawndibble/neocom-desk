@@ -26,6 +26,7 @@
  * held.
  */
 
+import { ownedStockBulkConfirmation } from '@/engine/industry/ownedStockBulkConfirmation';
 import type { OwnedStockChange } from '@/engine/industry/ownedStockOffer';
 import {
   MATERIAL_ERRANDS,
@@ -188,15 +189,8 @@ export function reduceEditSession(
 
     case 'bulkApplied': {
       const { kind, changes } = event;
-      if (changes.length === 0) {
-        return {
-          ...session,
-          toast: {
-            message: { kind: kind === 'all' ? 'useAllNothing' : 'useNoneNothing' },
-            undo: null,
-          },
-        };
-      }
+      const confirmation = ownedStockBulkConfirmation(kind, changes);
+      if (changes.length === 0) return { ...session, toast: confirmation };
       // The latest edit owns the toast: a row edit still waiting to move (its
       // write or its section's release yet to land) moves silently now, as
       // the bulk action's own rows do, rather than replacing this toast and
@@ -210,10 +204,7 @@ export function reduceEditSession(
       return {
         ...session,
         pending,
-        toast: {
-          message: { kind: kind === 'all' ? 'useAllDone' : 'useNoneDone', count: changes.length },
-          undo: { kind: 'owned', changes: [...changes] },
-        },
+        toast: confirmation,
       };
     }
 

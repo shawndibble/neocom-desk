@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, DataTable, Modal, type DataTableColumn } from '@/components/ui';
 import type { Appraisal, AppraisalRow } from '@/engine/market/appraisal';
@@ -7,8 +7,7 @@ import { useMarketHub } from '@/features/market/hub';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk } from '@/lib/isk';
 import { TRADE_HUBS } from '@/market/hubs';
-
-const NOTICE_MS = 2500;
+import { useTimedToast, NOTICE_MS } from '@/components/ui/useTimedToast';
 
 interface Props {
   open: boolean;
@@ -27,11 +26,7 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
   const hub = TRADE_HUBS.find((tradeHub) => tradeHub.id === hubId);
   const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (notice === null) return;
-    const timer = setTimeout(() => setNotice(null), NOTICE_MS);
-    return () => clearTimeout(timer);
-  }, [notice]);
+  useTimedToast(notice, () => setNotice(null), NOTICE_MS);
 
   const isk = (value: number | null) =>
     value === null ? '—' : t('fittings.stats.unit.isk', { value: formatIsk(value) });

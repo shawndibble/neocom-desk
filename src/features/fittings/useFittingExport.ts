@@ -12,8 +12,7 @@ import { createShareLink, existingShareLink } from '@/features/share/shareStore'
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { exportFitting, fittingShareCode, type FittingExportKind } from './fittingExportText';
-
-const NOTICE_MS = 2500;
+import { useTimedToast, NOTICE_MS } from '@/components/ui/useTimedToast';
 
 /**
  * What Export does — copy a format, open Appraisal — and the brief notice
@@ -40,11 +39,7 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
     };
   }, [fitting]);
 
-  useEffect(() => {
-    if (notice === null) return;
-    const timer = setTimeout(() => setNotice(null), NOTICE_MS);
-    return () => clearTimeout(timer);
-  }, [notice]);
+  useTimedToast(notice, () => setNotice(null), NOTICE_MS);
 
   async function copy(kind: FittingExportKind) {
     try {

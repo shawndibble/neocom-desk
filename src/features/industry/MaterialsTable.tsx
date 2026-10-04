@@ -59,6 +59,8 @@ import {
 } from './materialsEditSession';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useMediaQuery } from '@/lib/useMediaQuery';
+import { useTimedToast } from '@/components/ui/useTimedToast';
+import { ownedStockBulkText } from './ownedStockBulkText';
 
 interface MaterialsTableProps {
   /** Engine cost lines — already resolved against the plan's sourcing overrides and hub prices. */
@@ -484,9 +486,6 @@ function isBuilt(material: MaterialTableRow): boolean {
 /** A number in the phone ledger, right-aligned under its section's column header. */
 const LEDGER_VALUE = 'flex min-w-0 justify-end text-sm tabular-nums';
 
-/** How long the "moved to …" confirmation stays up — the same beat every other Undo toast in the app keeps. */
-const TOAST_MS = 8000;
-
 /**
  * Each section's colour, carried by its heading. Never the only cue
  * (docs/DESIGN.md §7): every heading also names its section in words and,
@@ -689,11 +688,7 @@ export function MaterialsTable({
   }, [shown, ownedFor]);
 
   const toast = session.toast;
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => dispatch({ type: 'toastExpired' }), TOAST_MS);
-    return () => clearTimeout(timer);
-  }, [toast]);
+  useTimedToast(toast, () => dispatch({ type: 'toastExpired' }));
 
   // Runs after every render: the toggled row only reaches its new section
   // once the plan write lands, which can be several renders later.
@@ -749,14 +744,8 @@ export function MaterialsTable({
         });
       case 'movedMany':
         return t('industry.errands.movedMany', { count: message.count });
-      case 'useAllDone':
-        return t('industry.useAllDone', { count: message.count });
-      case 'useNoneDone':
-        return t('industry.useNoneDone', { count: message.count });
-      case 'useAllNothing':
-        return t('industry.useAllNothing');
-      case 'useNoneNothing':
-        return t('industry.useNoneNothing');
+      default:
+        return ownedStockBulkText(t, message);
     }
   }
 

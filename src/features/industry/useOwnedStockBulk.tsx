@@ -10,9 +10,12 @@ import {
   type OwnedStockOfferRow,
   type ScopedQuantityFor,
 } from '@/engine/industry/ownedStockOffer';
-
-/** How long the "Use all" / "Use none" confirmation stays up. */
-const TOAST_MS = 8000;
+import {
+  ownedStockBulkConfirmation,
+  type OwnedStockBulkKind,
+} from '@/engine/industry/ownedStockBulkConfirmation';
+import { useTimedToast } from '@/components/ui/useTimedToast';
+import { ownedStockBulkText } from './ownedStockBulkText';
 
 interface BulkToast {
   message: string;
@@ -49,28 +52,19 @@ export function useOwnedStockBulk({ write, ownedFor, scopedQuantityFor }: OwnedS
   useEffect(() => {
     latestWrite.current = write;
   });
-  useEffect(() => {
-    if (!bulkToast) return;
-    const timer = setTimeout(() => setBulkToast(null), TOAST_MS);
-    return () => clearTimeout(timer);
-  }, [bulkToast]);
+  useTimedToast(bulkToast, () => setBulkToast(null));
 
-  function apply(changes: readonly OwnedStockChange[], kind: 'all' | 'none') {
-    if (changes.length === 0) {
-      setBulkToast({
-        message: t(kind === 'all' ? 'industry.useAllNothing' : 'industry.useNoneNothing'),
-      });
-      return;
-    }
-    write(changes);
+  function apply(changes: readonly OwnedStockChange[], kind: OwnedStockBulkKind) {
+    const { message, undo } = ownedStockBulkConfirmation(kind, changes);
+    if (undo) write(changes);
     setBulkToast({
-      message: t(kind === 'all' ? 'industry.useAllDone' : 'industry.useNoneDone', {
-        count: changes.length,
-      }),
-      undo: () => {
-        latestWrite.current(undoOwnedStockChanges(changes));
-        setBulkToast(null);
-      },
+      message: ownedStockBulkText(t, message),
+      undo: undo
+        ? () => {
+            latestWrite.current(undoOwnedStockChanges(undo.changes));
+            setBulkToast(null);
+          }
+        : undefined,
     });
   }
 

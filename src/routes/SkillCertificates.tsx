@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import {
@@ -35,9 +35,9 @@ import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { GrantNote } from '@/app/GrantNote';
+import { useTimedToast } from '@/components/ui/useTimedToast';
 
 const SORTS: readonly CertificateSort[] = ['grade', 'name', 'time'];
-const TOAST_MS = 8000;
 /** The group select's "every group" value — Radix Select reserves the empty string. */
 const ALL_GROUPS = '__all__';
 
@@ -67,11 +67,7 @@ export function SkillCertificates() {
   const [sort, setSort] = useState<CertificateSort>('grade');
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [added, setAdded] = useState<Added | null>(null);
-  useEffect(() => {
-    if (!added) return;
-    const timer = setTimeout(() => setAdded(null), TOAST_MS);
-    return () => clearTimeout(timer);
-  }, [added]);
+  useTimedToast(added, () => setAdded(null));
 
   const { catalog, trainedSkills, attributes, implants, cloneState, skillsKnown } = data;
   const certificates = data.load.status === 'ready' ? data.load.certificates : null;

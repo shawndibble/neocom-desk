@@ -11,6 +11,7 @@ export { DataAgeBadge } from './DataAgeBadge';
 export { CachedEmptyState } from './CachedEmptyState';
 export { EmptyState } from './EmptyState';
 export { Toast } from './Toast';
+export { useTimedToast } from './useTimedToast';
 export { Tabs } from './Tabs';
 export type { TabItem } from './Tabs';
 export { Spinner } from './Spinner';
