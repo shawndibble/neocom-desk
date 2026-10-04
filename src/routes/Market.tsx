@@ -623,7 +623,6 @@ export function Market() {
     solarSystemMap,
     myOrderIds,
     jumpRangeFilter,
-    depthByOrder,
     bestSell: loadedView?.summary.bestSell ?? null,
     cards: orderCards,
   });
@@ -761,13 +760,6 @@ export function Market() {
 
                   Browser only: see `usesHubPicker`. Appraisal prices at a
                   station, so it has no Region mode to toggle into. */}
-                {/* A set range replaces the header's scope for the book (scope
-                    decision 20260929-204125); say so where the scope is picked. */}
-                {tab === 'browser' && rangeAcross && (
-                  <span className="text-[0.6875rem] text-text-dim max-sm:hidden">
-                    {t('market.rangeOverridesHeader')}
-                  </span>
-                )}
                 {tab === 'browser' && (
                   <div role="group" aria-label={t('market.locationMode')} className="flex gap-2">
                     <FilterChip

@@ -22,7 +22,7 @@ import { priceComparison, type DepthAt } from '@/engine/market/orderBookDepth';
 import type { RegionOrder } from '@/esi/endpoints';
 import { formatAge } from '@/lib/age';
 import { writeToClipboard } from '@/lib/clipboard';
-import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { formatIskCompact, formatMarketIsk, marketIskDecimals } from '@/lib/isk';
 import { formatVolume } from './format';
 import type { MarketOrderColumnId } from './marketOrderColumns';
 import { priceClipboardText } from './priceClipboardText';
@@ -126,7 +126,7 @@ export function OrderRowDetail({
         <Fact label={t('market.orderDetail.versusBest')}>
           {versusBest === null || versusBest.delta === 0
             ? t('market.orderDetail.isBest')
-            : `${signedIsk(versusBest.delta, 2)} (${versusBest.ratio > 0 ? '+' : '−'}${Math.abs(
+            : `${signedIsk(versusBest.delta, marketIskDecimals(versusBest.delta))} (${versusBest.ratio > 0 ? '+' : '−'}${Math.abs(
                 versusBest.ratio * 100
               ).toFixed(2)}%)`}
         </Fact>
@@ -165,7 +165,9 @@ export function OrderRowDetail({
           </span>{' '}
           <span className="text-text-dim tabular-nums">
             ·{' '}
-            {t('market.orderDetail.depthAverage', { price: formatIsk(depth.isk / depth.units, 2) })}
+            {t('market.orderDetail.depthAverage', {
+              price: formatMarketIsk(depth.isk / depth.units),
+            })}
           </span>
         </p>
       )}
@@ -179,7 +181,7 @@ export function OrderRowDetail({
         )}
         <Button
           size="sm"
-          aria-label={t('market.orderDetail.copyPriceOf', { price: formatIsk(order.price, 2) })}
+          aria-label={t('market.orderDetail.copyPriceOf', { price: formatMarketIsk(order.price) })}
           onClick={() => {
             void writeToClipboard(priceClipboardText(order.price)).then(() => setCopied(true));
           }}

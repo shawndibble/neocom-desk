@@ -12,7 +12,7 @@
  */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FilterBar, FilterChip, FilterField, TextInput } from '@/components/ui';
+import { FilterBar, FilterChip, FilterField, InfoTooltip, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
@@ -38,6 +38,12 @@ interface BrowserFilterFieldsProps {
   /** The header's hub or region: what the book reads while no Jump Range is set. */
   scopeLabel: string;
   currentSystem: CurrentSystemState;
+  /**
+   * Extra classes for the distance field. The scope bar passes `sm:hidden`:
+   * from `sm` up its distance and origin sit inline beside the funnel, so
+   * the popover would only repeat them; a phone's sheet still holds them.
+   */
+  rangeFieldClassName?: string;
 }
 
 /**
@@ -50,6 +56,7 @@ function BrowserFilterFields({
   regionMode,
   scopeLabel,
   currentSystem,
+  rangeFieldClassName,
 }: BrowserFilterFieldsProps) {
   const { t } = useTranslation();
   const spansStations = regionMode || draft.jumps !== DEFAULT_JUMP_RANGE;
@@ -57,7 +64,7 @@ function BrowserFilterFields({
     <>
       {/* Keyed on the draft, so the picker and the many-station filters
           appear as soon as a distance is picked, before it is applied. */}
-      <FilterField label={t('jumpRange.label')}>
+      <FilterField label={t('jumpRange.label')} className={rangeFieldClassName}>
         <div className="flex flex-wrap items-center gap-2">
           <JumpRangeSelect
             value={draft.jumps}
@@ -179,7 +186,7 @@ export interface OrderBookScopeBarProps {
   regionMode: boolean;
   scopeLabel: string;
   currentSystem: CurrentSystemState;
-  /** What still reads the header's hub or region while the book reaches further. */
+  /** What still reads the header's hub or region while the book reaches further, behind an info tip. */
   note?: string | null;
 }
 
@@ -202,7 +209,10 @@ export function OrderBookScopeBar({
       case 'range':
         return (
           <>
-            <span className="font-semibold text-accent">
+            {/* From `sm` up the distance and origin controls beside it
+                already say this; a phone, whose controls live in the sheet,
+                still needs it in words. */}
+            <span className="font-semibold text-accent sm:hidden">
               {scope.jumps === 'system'
                 ? t('market.scope.inSystem', { system: originName ?? '…' })
                 : t('market.scope.within', {
@@ -269,9 +279,17 @@ export function OrderBookScopeBar({
       )}
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <p className="m-0 flex min-w-0 flex-1 items-center gap-2 sm:min-w-[18rem]">
+        <p
+          className={cx(
+            'm-0 flex min-w-0 flex-1 items-center gap-2',
+            // A station name needs the room; a range's count and Clear link
+            // do not, and share the line with the controls.
+            !ranged && 'sm:min-w-[18rem]'
+          )}
+        >
           <Icon.Location aria-hidden className={cx('shrink-0', ranged && 'text-accent')} />
           <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">{summary}</span>
+          {note && <InfoTooltip label={t('market.scope.noteLabel')} content={note} />}
         </p>
         {/* The one control a pilot changes most, in reach without a click —
             not on a phone, whose sheet holds it with the rest. */}
@@ -300,11 +318,11 @@ export function OrderBookScopeBar({
               regionMode={regionMode}
               scopeLabel={scopeLabel}
               currentSystem={currentSystem}
+              rangeFieldClassName="sm:hidden"
             />
           )}
         </FilterBar>
       </div>
-      {note && <p className="m-0 text-[0.6875rem] text-text-dim">{note}</p>}
     </section>
   );
 }

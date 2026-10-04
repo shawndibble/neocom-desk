@@ -195,7 +195,7 @@ describe('Market Browser: All regions', () => {
     await user.click(await screen.findByRole('option', { name: 'All regions' }));
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(await within(sellTable).findByText('1,100,000.00')).toBeInTheDocument();
+    expect(await within(sellTable).findByText('1,100,000')).toBeInTheDocument();
     expect(window.location.search).toContain('region=all');
     expect(screen.getByRole('combobox', { name: 'Region' })).toHaveTextContent('All regions');
   });
@@ -207,10 +207,12 @@ describe('Market Browser: All regions', () => {
     render(<App />);
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(await within(sellTable).findByText('1,000,000.00')).toBeInTheDocument();
-    expect(within(sellTable).getByText('1,100,000.00')).toBeInTheDocument();
-    expect(within(sellTable).getByText('1,200,000.00')).toBeInTheDocument();
-    expect(screen.getByText(/use The Forge/)).toBeInTheDocument();
+    expect(await within(sellTable).findByText('1,000,000')).toBeInTheDocument();
+    expect(within(sellTable).getByText('1,100,000')).toBeInTheDocument();
+    expect(within(sellTable).getByText('1,200,000')).toBeInTheDocument();
+    // The note sits behind the scope bar's info tip.
+    await userEvent.setup().hover(screen.getByRole('button', { name: 'What else this covers' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/use The Forge/);
     expect(hits.get(THE_FORGE)).toBe(1);
     expect(hits.get(DOMAIN)).toBe(1);
     expect(hits.get(HEIMATAR)).toBe(1);
@@ -223,8 +225,8 @@ describe('Market Browser: All regions', () => {
     render(<App />);
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(await within(sellTable).findByText('1,000,000.00')).toBeInTheDocument();
-    expect(within(sellTable).queryByText('1,100,000.00')).not.toBeInTheDocument();
+    expect(await within(sellTable).findByText('1,000,000')).toBeInTheDocument();
+    expect(within(sellTable).queryByText('1,100,000')).not.toBeInTheDocument();
     expect(
       screen.getByText("1 region didn't load, so its orders are missing. Refresh to retry.")
     ).toBeInTheDocument();
@@ -255,8 +257,8 @@ describe('Market Browser: All regions', () => {
     render(<App />);
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(await within(sellTable).findByText('1,100,000.00')).toBeInTheDocument();
-    expect(within(sellTable).getByText('1,000,000.00')).toBeInTheDocument();
+    expect(await within(sellTable).findByText('1,100,000')).toBeInTheDocument();
+    expect(within(sellTable).getByText('1,000,000')).toBeInTheDocument();
     // Each row's own distance from Jita, not only the "within 5" filter that
     // let both of these through — default sort is price ascending.
     const sellRows = within(sellTable).getAllByRole('row');
@@ -290,14 +292,18 @@ describe('Market Browser: All regions', () => {
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     // Amarr's order isn't at the hub station: only a range that drops the
     // hub's one-station filter shows it.
-    expect(await within(sellTable).findByText('1,100,000.00')).toBeInTheDocument();
-    expect(within(sellTable).getByText('1,000,000.00')).toBeInTheDocument();
-    expect(within(sellTable).queryByText('1,200,000.00')).not.toBeInTheDocument();
+    expect(await within(sellTable).findByText('1,100,000')).toBeInTheDocument();
+    expect(within(sellTable).getByText('1,000,000')).toBeInTheDocument();
+    expect(within(sellTable).queryByText('1,200,000')).not.toBeInTheDocument();
     expect(within(sellTable).getByText(/Emperor Family Academy/)).toBeInTheDocument();
     expect(hits.get(HEIMATAR)).toBeUndefined();
     expect(hits.get(THE_FORGE)).toBe(1);
     expect(hits.get(DOMAIN)).toBe(1);
-    expect(screen.getByText(/use Jita — only the order book reaches/)).toBeInTheDocument();
+    // The note sits behind the scope bar's info tip.
+    await userEvent.setup().hover(screen.getByRole('button', { name: 'What else this covers' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      /use Jita — only the order book reaches/
+    );
   });
 
   it('offers the Distance filter before any item is picked, named after the header scope', async () => {
@@ -357,8 +363,8 @@ describe('Market Browser: All regions', () => {
     render(<App />);
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(await within(sellTable).findByText('1,100,000.00')).toBeInTheDocument();
-    expect(within(sellTable).getByText('1,000,000.00')).toBeInTheDocument();
+    expect(await within(sellTable).findByText('1,100,000')).toBeInTheDocument();
+    expect(within(sellTable).getByText('1,000,000')).toBeInTheDocument();
     // Never fired for the out-of-range region, not even once before narrowing.
     expect(hits.get(HEIMATAR)).toBeUndefined();
     expect(hits.get(THE_FORGE)).toBe(1);

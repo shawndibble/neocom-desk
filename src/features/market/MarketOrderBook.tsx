@@ -24,7 +24,7 @@ import type { OrderBookSummary } from '@/engine/market/orderBook';
 import type { RegionOrder } from '@/esi/endpoints';
 import { cx } from '@/lib/cx';
 import { toggleChipStateClassName } from '@/components/ui/controlStyles';
-import { formatIsk } from '@/lib/isk';
+import { formatMarketIsk } from '@/lib/isk';
 import type { MarketOrderColumnId } from './marketOrderColumns';
 import { SetDestinationButton } from './SetDestinationButton';
 
@@ -57,11 +57,11 @@ export function OrderBookSummaryStrip({
     <StatChips className="max-sm:hidden">
       <StatChip
         label={t('market.summary.bestSell')}
-        value={bestSell === null ? '—' : formatIsk(bestSell, 2)}
+        value={bestSell === null ? '—' : formatMarketIsk(bestSell)}
       />
       <StatChip
         label={t('market.summary.bestBuy')}
-        value={bestBuy === null ? '—' : formatIsk(bestBuy, 2)}
+        value={bestBuy === null ? '—' : formatMarketIsk(bestBuy)}
       />
       <StatChip
         label={t('market.summary.spread')}
@@ -69,7 +69,7 @@ export function OrderBookSummaryStrip({
         value={
           spread === null
             ? '—'
-            : `${formatIsk(spread.delta, 2)} (${(spread.ratio * 100).toFixed(1)}%)`
+            : `${formatMarketIsk(spread.delta)} (${(spread.ratio * 100).toFixed(1)}%)`
         }
       />
     </StatChips>
@@ -124,7 +124,7 @@ export function HubComparisonLine({
             <span className="font-semibold">
               {t('market.hubCompare.sells', {
                 place: placeName,
-                price: formatIsk(summary.bestSell, 2),
+                price: formatMarketIsk(summary.bestSell),
               })}
             </span>
             {sell && sell.delta !== 0 && (
@@ -138,7 +138,7 @@ export function HubComparisonLine({
         {summary.bestBuy !== null && (
           <span className="whitespace-nowrap">
             <span className="font-semibold">
-              {t('market.hubCompare.buys', { price: formatIsk(summary.bestBuy, 2) })}
+              {t('market.hubCompare.buys', { price: formatMarketIsk(summary.bestBuy) })}
             </span>
             {buy && buy.delta !== 0 && (
               // A higher buy at the hub is the good news for a seller.
@@ -211,7 +211,7 @@ export function BookSideToggle({
               {t(`market.sideToggle.${segment.id}`, { count: segment.count })}
             </span>
             <span className={cx('text-sm tabular-nums', pressed ? 'font-semibold' : 'font-normal')}>
-              {segment.best === null ? '—' : formatIsk(segment.best, 2)}
+              {segment.best === null ? '—' : formatMarketIsk(segment.best)}
             </span>
           </button>
         );
@@ -285,7 +285,7 @@ export function OrderSideCard({
               ? t('market.sideSummary.none', { count: total })
               : t(side === 'sell' ? 'market.sideSummary.sell' : 'market.sideSummary.buy', {
                   count: total,
-                  price: formatIsk(best, 2),
+                  price: formatMarketIsk(best),
                 })}
           </span>
         </div>
