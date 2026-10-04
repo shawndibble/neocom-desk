@@ -36,7 +36,6 @@ import {
   partitionByCurrency,
   type FitCurrency,
   type HullSlotCounts,
-  type OutOfDateReason,
 } from '@/engine/fittings/fitCurrency';
 import type { EftSlotLookup, EftTypeLookup } from '@/engine/fittings/eftLoader';
 import { fitSellPrice, type FitSellPrice, type HubSides } from '@/engine/fittings/fitSellPrice';
@@ -242,8 +241,6 @@ export interface WorkbenchRow {
   fit: WorkbenchFit;
   /** The modules its EFT loaded, rack and type only. */
   modules: readonly RackModule[];
-  /** Why it is out of date; `undefined` for a current fit. */
-  reasons: OutOfDateReason[] | undefined;
   /** Its price at `hub`; `undefined` while pricing, or when nothing in it has a sell order. */
   price: FitSellPrice | undefined;
   /** Seen on zKillboard; `undefined` when not (yet) seen. */
@@ -256,17 +253,15 @@ export interface WorkbenchRow {
 export interface WorkbenchHullRows {
   /** The stored list: still loading, unreachable, empty, or read. */
   status: 'loading' | 'failed' | 'empty' | 'ready';
-  /** Still checking: nothing is listed yet, so an out-of-date fit never shows unasked. */
+  /** Still checking: nothing is listed yet, so an out-of-date fit never flashes up. */
   checking: boolean;
-  /** Current fits, then out-of-date ones only on request. */
+  /** Current fits only: an out-of-date fit is never listed. */
   rows: WorkbenchRow[];
   /** Every module type across the checked fits, for looking their names up once; `null` while checking. */
   moduleTypeIds: readonly number[] | null;
   outOfDateCount: number;
   /** Every fit is out of date — the list would otherwise look empty. */
   allOutOfDate: boolean;
-  showOutOfDate: boolean;
-  setShowOutOfDate: (show: boolean) => void;
   /** The Default Trade Hub the prices are from. */
   hub: TradeHub;
   /** This hub's prices are on their way; false while there is nothing to price. */
@@ -336,9 +331,6 @@ export function useWorkbenchHullRows(
       ),
     [fits, checks]
   );
-  // Held against the fits it was asked for, so another hull starts hidden again.
-  const [shownFor, setShownFor] = useState<readonly WorkbenchFit[] | null>(null);
-  const showOutOfDate = fits !== null && shownFor === fits;
   const checking = fits !== null && checks === null;
 
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -346,18 +338,14 @@ export function useWorkbenchHullRows(
 
   const rows = useMemo(() => {
     if (checking) return [];
-    const row = (fit: WorkbenchFit, reasons?: OutOfDateReason[]): WorkbenchRow => ({
+    return current.map((fit): WorkbenchRow => ({
       fit,
       modules: checks?.get(fit.id)?.modules ?? [],
-      reasons,
       price: priceById.get(fit.id),
       sighting: sightings.get(fit.id),
       loadFailed: failedId === fit.id,
-    });
-    const listed = current.map((fit) => row(fit));
-    if (showOutOfDate) listed.push(...outOfDate.map(({ fit, reasons }) => row(fit, reasons)));
-    return listed;
-  }, [checking, checks, current, outOfDate, showOutOfDate, priceById, sightings, failedId]);
+    }));
+  }, [checking, checks, current, priceById, sightings, failedId]);
 
   async function load(fit: WorkbenchFit, onOpen: (loaded: LoadedFitting) => void) {
     setLoadingId(fit.id);
@@ -388,8 +376,6 @@ export function useWorkbenchHullRows(
     moduleTypeIds,
     outOfDateCount: outOfDate.length,
     allOutOfDate: outOfDate.length > 0 && current.length === 0,
-    showOutOfDate,
-    setShowOutOfDate: (show) => setShownFor(show ? fits : null),
     hub,
     pricing: priceKey !== null && prices === null,
     anyPriced: priceById.size > 0,

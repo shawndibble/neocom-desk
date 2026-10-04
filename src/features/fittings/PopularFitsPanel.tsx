@@ -20,7 +20,7 @@ import {
   type WorkbenchHullSources,
   type WorkbenchRow,
 } from './workbenchHullRows';
-import { OutOfDateReasons, OutOfDateToggle } from './WorkbenchOutOfDate';
+import { OutOfDateNote } from './WorkbenchOutOfDate';
 import { WorkbenchSightingBadge } from './WorkbenchSightingBadge';
 
 /** What both tabs read from outside: the Workbench rows' sources, and module names. */
@@ -64,9 +64,6 @@ export function PopularFitsPanel(props: PopularFitsPanelProps) {
 
   return (
     <section aria-label={t('fittings.popular.title')} className="space-y-2">
-      <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {t('fittings.popular.title')}
-      </h3>
       <Tabs
         label={t('fittings.popular.sourceLabel')}
         tabs={[
@@ -178,8 +175,9 @@ function WorkbenchFits({
 
   return (
     <>
+      {/* One line for the whole tab, not one per row: a hull can list hundreds. */}
       <p className="text-xs text-text-dim">
-        {t('fittings.popular.workbench.attribution')}{' '}
+        {t('fittings.popular.workbench.source')}{' '}
         <a
           href="https://eveworkbench.com"
           target="_blank"
@@ -188,18 +186,20 @@ function WorkbenchFits({
         >
           eveworkbench.com
         </a>
+        {listed && tab.pricing ? (
+          <>
+            {' · '}
+            <span role="status">
+              {t('fittings.popular.workbench.pricing', { hub: tab.hub.systemName })}
+            </span>
+          </>
+        ) : listed && tab.anyPriced ? (
+          <>
+            {' · '}
+            <span>{t('fittings.popular.workbench.priceNote', { hub: tab.hub.systemName })}</span>
+          </>
+        ) : null}
       </p>
-      {listed && tab.pricing && (
-        // One line for the whole tab, not one per row: a hull can list hundreds.
-        <p role="status" className="text-xs text-text-dim">
-          {t('fittings.popular.workbench.pricing', { hub: tab.hub.systemName })}
-        </p>
-      )}
-      {listed && tab.anyPriced && (
-        <p className="text-xs text-text-dim">
-          {t('fittings.popular.workbench.priceNote', { hub: tab.hub.systemName })}
-        </p>
-      )}
       {tab.status === 'loading' ? (
         <Spinner size="sm" delayMs={200} label={t('fittings.popular.workbench.loading')} />
       ) : tab.status === 'failed' ? (
@@ -215,25 +215,31 @@ function WorkbenchFits({
           estimateSize={WORKBENCH_ROW_ESTIMATE}
           label={t('fittings.popular.tabWorkbench')}
           capped={capped}
-          renderItem={({ fit, modules, reasons, price, sighting, loadFailed }) => (
+          renderItem={({ fit, modules, price, sighting, loadFailed }) => (
             <>
               <div className="min-w-0 flex-1">
-                <a
-                  href={workbenchFitUrl(fit.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block truncate text-sm hover:underline"
-                >
-                  {fit.name || t('fittings.popular.workbench.unnamed')}
-                </a>
+                <p className="flex min-w-0 items-baseline gap-1 text-sm">
+                  <a
+                    href={workbenchFitUrl(fit.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="truncate hover:underline"
+                  >
+                    {fit.name || t('fittings.popular.workbench.unnamed')}
+                  </a>
+                  <WorkbenchFitPrice price={price} />
+                </p>
                 <p className="text-xs text-text-dim">
-                  {t('fittings.popular.workbench.added', {
+                  {t('fittings.popular.workbench.created', {
                     age: formatAge(Math.max(0, now - fit.dateAdded), t),
                   })}
+                  {price?.partial &&
+                    ` · ${t('fittings.popular.workbench.unpriced', {
+                      count: price.unpricedTypes,
+                      hub: tab.hub.systemName,
+                    })}`}
                 </p>
-                <WorkbenchFitPrice price={price} hubName={tab.hub.systemName} />
                 <RackIconStrip modules={modules} names={names} />
-                <OutOfDateReasons reasons={reasons} />
                 <WorkbenchSightingBadge sighting={sighting} />
                 {loadFailed && (
                   <p role="alert" className="text-xs text-danger">
@@ -252,31 +258,30 @@ function WorkbenchFits({
           )}
         />
       )}
-      {listed && <OutOfDateToggle list={tab} />}
+      {listed && <OutOfDateNote list={tab} />}
     </>
   );
 }
 
-/** A Workbench row's price at the Default Trade Hub; nothing while loading or with nothing priced. */
-function WorkbenchFitPrice({
-  price,
-  hubName,
-}: {
-  price: FitSellPrice | undefined;
-  hubName: string;
-}) {
+/**
+ * A Workbench row's price at the Default Trade Hub, after its name; nothing
+ * while loading or with nothing priced. A partial total's missing items are
+ * on the line below.
+ */
+function WorkbenchFitPrice({ price }: { price: FitSellPrice | undefined }) {
   const { t } = useTranslation();
   if (price === undefined) return null;
   const value = formatIskCompact(price.sell);
   return (
-    <p className="text-xs tabular-nums">
-      {price.partial
-        ? t('fittings.popular.workbench.pricePartial', {
-            value,
-            count: price.unpricedTypes,
-            hub: hubName,
-          })
-        : t('fittings.popular.workbench.price', { value })}
-    </p>
+    <>
+      <span aria-hidden className="shrink-0 text-text-dim">
+        ·
+      </span>
+      <span className="shrink-0 tabular-nums">
+        {price.partial
+          ? t('fittings.popular.workbench.pricePartial', { value })
+          : t('fittings.popular.workbench.price', { value })}
+      </span>
+    </>
   );
 }

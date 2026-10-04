@@ -226,11 +226,11 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     expect(workbenchFitsMock).not.toHaveBeenCalled();
   });
 
-  it('lists fits with name and date added, no author, linking each to Workbench', async () => {
+  it('lists fits with name and date created, no author, linking each to Workbench', async () => {
     openWorkbench({ ok: true, fits: [wbFit('a'), wbFit('b', { name: '', authorName: '' })] });
     const link = await screen.findByRole('link', { name: 'Fit a' });
     expect(link.getAttribute('href')).toBe('https://eveworkbench.com/fit/a');
-    expect(screen.getAllByText('added 2d ago')).toHaveLength(2);
+    expect(screen.getAllByText('Created: 2d ago')).toHaveLength(2);
     expect(screen.queryByText(/Saryna Dach/)).toBeNull();
     expect(screen.getByRole('link', { name: 'Unnamed fit' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'eveworkbench.com' })).toBeTruthy();
@@ -273,7 +273,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     );
   });
 
-  it('lists current fits first and out-of-date ones, with why, only on request', async () => {
+  it('lists only current fits, never an out-of-date one', async () => {
     openWorkbench({
       ok: true,
       fits: [
@@ -286,20 +286,10 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     });
     // Nothing is listed until the check lands, so an out-of-date fit never flashes up.
     expect(screen.queryByRole('link', { name: 'Fit a' })).toBeNull();
-    const show = await screen.findByRole('button', { name: 'Show 2 out-of-date fits' });
+    expect(await screen.findByRole('link', { name: 'Fit c' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Fit a' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Fit b' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Fit c' })).toBeTruthy();
-
-    fireEvent.click(show);
-    const names = screen
-      .getAllByRole('link')
-      .map((link) => link.textContent)
-      .filter((name) => name?.startsWith('Fit '));
-    expect(names).toEqual(['Fit c', 'Fit a', 'Fit b']);
-    expect(screen.getByText('Out of date: uses a removed item: Old Gun I')).toBeTruthy();
-    expect(screen.getByText('Out of date: this ship has fewer high slots now')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Hide out-of-date fits' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /out-of-date/ })).toBeNull();
   });
 
   it('never calls an item the game still has removed, though the loader cannot read it', async () => {
@@ -312,7 +302,6 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
       ],
     });
     expect(await screen.findByRole('link', { name: 'Fit a' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /out-of-date fit/ })).toBeNull();
   });
 
   it("shows a fit's modules by rack, from the out-of-date check's own load", async () => {
@@ -333,21 +322,6 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     expect(within(bare).queryByRole('group')).toBeNull();
   });
 
-  it('shows the modules that did load on an out-of-date fit, without the unread line', async () => {
-    openWorkbench({
-      ok: true,
-      fits: [wbFit('a', { eft: '[Vexor, Fit a]\nOld Gun I\nHeavy Neutron Blaster II' })],
-    });
-    fireEvent.click(await screen.findByRole('button', { name: 'Show 1 out-of-date fit' }));
-    const row = screen.getByRole('link', { name: 'Fit a' }).closest('li');
-    if (row === null) throw new Error('no row');
-    const highs = within(row).getByRole('group', { name: 'High slots' });
-    expect(
-      await within(highs).findAllByRole('img', { name: 'Heavy Neutron Blaster II' })
-    ).toHaveLength(1);
-    expect(within(row).queryByRole('img', { name: /Old Gun/ })).toBeNull();
-  });
-
   it('says so when every fit for the hull is out of date, rather than looking empty', async () => {
     openWorkbench({ ok: true, fits: [wbFit('a', { eft: '[Vexor, Fit a]\nOld Gun I' })] });
     expect(
@@ -356,8 +330,6 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
       )
     ).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Fit a' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Show 1 out-of-date fit' }));
-    expect(screen.getByRole('link', { name: 'Fit a' })).toBeTruthy();
   });
 
   /** Sell-side prices by type, as `getHubPrices` answers. */
@@ -384,11 +356,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
   it("prices each fit at the Default Trade Hub, with one price lookup for the hull's fits", async () => {
     getHubPricesMock.mockResolvedValue(sellPrices({ 626: 200_000_000, 3001: 45_000_000 }));
     openWorkbench({ ok: true, fits: PRICED_FITS });
-    expect(
-      await screen.findByText(
-        'Prices: what each fit costs to buy today from sell orders at Jita, your default Trade Hub — not the loss value zKillboard reports.'
-      )
-    ).toBeTruthy();
+    expect(await screen.findByText('Prices: Jita, your default Trade Hub')).toBeTruthy();
     expect(within(rowOf('Fit a')).getByText('≈ 245M ISK')).toBeTruthy();
     expect(within(rowOf('Fit b')).getByText('≈ 200M ISK')).toBeTruthy();
     expect(getHubPricesMock).toHaveBeenCalledTimes(1);
@@ -401,11 +369,12 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
   it('marks a total partial when an item has no sell order, rather than pricing it at 0', async () => {
     getHubPricesMock.mockResolvedValue(sellPrices({ 626: 200_000_000, 3001: null }));
     openWorkbench({ ok: true, fits: PRICED_FITS });
+    const row = await waitFor(() => rowOf('Fit a'));
+    expect(await within(row).findByText('≥ 200M ISK')).toBeTruthy();
     expect(
-      await within(await waitFor(() => rowOf('Fit a'))).findByText(
-        '≥ 200M ISK · 1 item has no sell order at Jita'
-      )
+      within(row).getByText('Created: 2d ago · 1 item has no sell order at Jita')
     ).toBeTruthy();
+    expect(within(rowOf('Fit b')).getByText('Created: 2d ago')).toBeTruthy();
     expect(within(rowOf('Fit b')).getByText('≈ 200M ISK')).toBeTruthy();
   });
 
@@ -425,16 +394,6 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     await screen.findByRole('link', { name: 'Fit a' });
     await waitFor(() => expect(getHubPricesMock).toHaveBeenCalled());
     expect(screen.queryByText(/ISK/)).toBeNull();
-  });
-
-  it('prices an out-of-date fit for whatever loaded', async () => {
-    getHubPricesMock.mockResolvedValue(sellPrices({ 626: 200_000_000, 3001: 45_000_000 }));
-    openWorkbench({
-      ok: true,
-      fits: [wbFit('a', { eft: '[Vexor, Fit a]\nOld Gun I\nHeavy Neutron Blaster II' })],
-    });
-    fireEvent.click(await screen.findByRole('button', { name: 'Show 1 out-of-date fit' }));
-    expect(await within(rowOf('Fit a')).findByText('≈ 245M ISK')).toBeTruthy();
   });
 
   it('says prices are on their way until they land', async () => {
@@ -459,7 +418,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
 
   it('never says prices are on their way when no fit loaded anything to price', async () => {
     openWorkbench({ ok: true, fits: [wbFit('a', { eft: '[Gone Hull, Fit a]' })] });
-    await screen.findByText(/out of date/);
+    await screen.findByText(/out of date with today's game/);
     expect(screen.queryByText(/Pricing fits/)).toBeNull();
     expect(getHubPricesMock).not.toHaveBeenCalled();
   });
@@ -476,7 +435,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     expect(await screen.findByText('≈ 245M ISK')).toBeTruthy();
     act(() => useMarketHub.setState({ value: 'amarr' }));
     expect(await within(rowOf('Fit a')).findByText('≈ 300M ISK')).toBeTruthy();
-    expect(screen.getByText(/sell orders at Amarr, your default Trade Hub/)).toBeTruthy();
+    expect(screen.getByText(/Prices: Amarr, your default Trade Hub/)).toBeTruthy();
     expect(getHubPricesMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ id: 'amarr' }),
       [626, 3001]
