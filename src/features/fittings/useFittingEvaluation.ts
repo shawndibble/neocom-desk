@@ -402,17 +402,20 @@ export function useFittingEvaluation({
     void hydrateHub();
   }, [hydrateHub]);
 
+  // The clone's implants are already bought: priced like the multibuy list, without them.
+  const cloneImplants = profile?.implantTypeIds;
   useEffect(() => {
     let cancelled = false;
     if (fitting === null || !hubHydrated) return;
     void (async () => {
-      const result = await loadFittingPrice(fitting, getTradeHub(hubId) ?? DEFAULT_TRADE_HUB);
+      const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+      const result = await loadFittingPrice(fitting, hub, cloneImplants);
       if (!cancelled) setPrice(result);
     })();
     return () => {
       cancelled = true;
     };
-  }, [fitting, hubId, hubHydrated]);
+  }, [fitting, hubId, hubHydrated, cloneImplants]);
 
   // One baseline for Variations and "What to train" alike.
   const evaluators = useMemo(() => {

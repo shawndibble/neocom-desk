@@ -100,6 +100,22 @@ describe('FittingExportMenu', () => {
     expect(decoded.ok && decoded.value.hullTypeId).toBe(587);
   });
 
+  it('keeps the whole implant set in the link, leaving the clone’s implants off the multibuy list', async () => {
+    // A set seeded from a clone holding 8 and 9, with implant 11 and booster 10 added.
+    const seeded: Fitting = { ...FITTING, implantSet: { implants: [8, 9, 11], boosters: [10] } };
+    const clone = [8, 9];
+
+    const url = new URL((await exportFitting('permanentLink', seeded, clone)) ?? '');
+    const decoded = await decodeFittingShare(url.searchParams.get('f') ?? '');
+    expect(decoded.ok && decoded.value.implantSet).toEqual({
+      implants: [8, 9, 11],
+      boosters: [10],
+    });
+
+    const lines = ((await exportFitting('multibuy', seeded, clone)) ?? '').split('\n');
+    expect(lines).toEqual(['Rifter\t1', '200mm AutoCannon II\t1', 'Type 11\t1', 'Type 10\t1']);
+  });
+
   it('copies a short Share Link storing the Fitting Share Code', async () => {
     useActiveCharacter.setState({ activeCharacterId: 7 });
     const copied = setup();

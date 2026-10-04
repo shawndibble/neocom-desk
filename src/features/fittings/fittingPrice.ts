@@ -18,8 +18,13 @@ import type { TradeHub } from '@/market/hubs';
 import { fittingItemCounts } from '@/engine/fittings/fittingExport';
 import type { Fitting } from '@/engine/fittings/types';
 
-export async function loadFittingPrice(fitting: Fitting, hub: TradeHub): Promise<Appraisal> {
-  const counts = fittingItemCounts(fitting);
+/** `cloneImplants`: the pilot's active clone, whose implants are already bought (`fittingItemCounts`). */
+export async function loadFittingPrice(
+  fitting: Fitting,
+  hub: TradeHub,
+  cloneImplants: readonly number[] = []
+): Promise<Appraisal> {
+  const counts = fittingItemCounts(fitting, cloneImplants);
   const prices = await getHubPrices(hub, [...counts.keys()]);
   // The same items an EVE Workbench row is priced from (`fitSellPrice.ts`).
   return buildAppraisal(fitAppraisalItems(counts, prices), FULL_PRICE_PERCENT);
