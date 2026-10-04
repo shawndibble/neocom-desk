@@ -79,7 +79,7 @@ export function TripLegs({
               aria-expanded={expanded}
               aria-label={parts.join(' · ')}
               onClick={() => toggle(index)}
-              className="flex min-h-11 w-full items-center gap-1.5 py-1.5 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
+              className="flex min-h-11 w-full items-center gap-1.5 py-1.5 text-left text-sm hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
             >
               <Caret expanded={expanded} />
               <span className="flex flex-wrap gap-x-2">

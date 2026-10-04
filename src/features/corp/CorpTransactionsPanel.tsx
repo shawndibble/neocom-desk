@@ -358,6 +358,7 @@ export function CorpTransactionsPanel({
               virtualize="auto"
               sort={sort}
               onSortChange={onSortChange}
+              mobileSort
               rowContextMenu={rowContextMenu}
               rowMoreActions
             />

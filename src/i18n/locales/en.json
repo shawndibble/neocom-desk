@@ -7842,10 +7842,6 @@
         "zkillboard": "zKillboard ↗",
         "zkillboardLabel": "{{system}} on zKillboard (opens in a new tab)"
       },
-      "copy": "Copy",
-      "copied": "Copied",
-      "copySignature": "Copy {{hub}} signature for {{system}}",
-      "copiedSignature": "Copied {{hub}} signature for {{system}}",
       "noGateRoute": "No gate route",
       "noOrigin": "Pick a system to count jumps from, or set your current system.",
       "originUngated": "{{system}} has no stargates, so no exit can be reached by gate from it.",
