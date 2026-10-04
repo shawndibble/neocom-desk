@@ -27,7 +27,6 @@ import {
 } from '@/engine/market/variations';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
-import { checkCandidates } from './dogmaFittingEngine';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
 import { yieldToEventLoop } from './yieldToEventLoop';
@@ -101,7 +100,7 @@ export function useModuleVariations({
     let cancelled = false;
     void (async () => {
       const typeIds = members.map((member) => member.typeId);
-      const candidateChecks = checkCandidates(
+      const candidateChecks = variants.engine.checkCandidates(
         variants.fitting.shipTypeId,
         slot,
         typeIds,

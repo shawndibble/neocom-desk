@@ -48,6 +48,7 @@ import {
   useVisibleOrderHistoryColumns,
   type OrderHistoryColumnId,
 } from './orderHistoryColumns';
+import { marketIskDecimals } from '@/lib/isk';
 
 const HISTORY_SORT = { columnId: 'issued', direction: 'desc' } as const;
 
@@ -214,7 +215,13 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
         align: 'right',
         className: 'tabular-nums',
         sortValue: (order) => order.price,
-        render: (order) => <IskAmount value={order.price} revealOn="longPress" />,
+        render: (order) => (
+          <IskAmount
+            value={order.price}
+            revealOn="longPress"
+            decimals={marketIskDecimals(order.price)}
+          />
+        ),
       },
       {
         id: 'remaining',

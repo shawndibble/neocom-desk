@@ -182,9 +182,14 @@ export async function localJumpCountsForRoutes(
   };
 }
 
-/** `graph` is the stargate map the trip was planned on, for telling a gate step from a hole. */
+/**
+ * `graph` is the stargate map the trip was planned on, for telling a gate step
+ * from a hole; `options` the search it was planned under, holes and all, for
+ * weighing a leg's other ways the same way (`engine/route/legWays.ts`).
+ */
 export type LocalTripResult =
-  { kind: 'trip'; plan: TripPlan; graph: JumpGraph } | { kind: 'unknown' };
+  | { kind: 'trip'; plan: TripPlan; graph: JumpGraph; options: FindJumpRouteOptions }
+  | { kind: 'unknown' };
 
 /**
  * A trip from `start` through several Stops (issue #2475): every leg, and the
@@ -203,9 +208,11 @@ export async function planLocalTrip(
     securityLookupFor(rules.preference ?? 'shortest'),
   ]);
   if (!graph) return { kind: 'unknown' };
+  const options = engineOptions(rules, securityOf, extras);
   return {
     kind: 'trip',
-    plan: planTrip(graph, start, stops, engineOptions(rules, securityOf, extras), tripOptions),
+    plan: planTrip(graph, start, stops, options, tripOptions),
     graph,
+    options,
   };
 }

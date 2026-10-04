@@ -1261,10 +1261,11 @@ export function Settings() {
             The four short action panels sit two-up from `xl`: one column of
             them left most of each card empty. Export beside Import, since
             they are one round trip; the device's log-out row stays full width.
+            Data Age goes last: its list grows with every endpoint and
+            Character, and it is the least-used block on the page.
           */}
           {section === 'dataAge' && (
             <>
-              <DataAgePanel />
               <div className="grid items-start gap-4 xl:grid-cols-2">
                 <DataPanel />
                 <UpdatePanel />
@@ -1272,6 +1273,7 @@ export function Settings() {
                 <ImportPanel />
               </div>
               <DevicePanel />
+              <DataAgePanel />
             </>
           )}
           {section === 'activity' && <ActivityLogPanel />}

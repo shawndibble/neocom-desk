@@ -378,3 +378,30 @@ export function routeSweepFrom(
       graph.has(systemId) && costs.has(systemId) ? reconstruct(cameFrom, systemId) : null,
   };
 }
+
+/**
+ * What a given route costs under these options, step by step, as the search
+ * would have priced it: each system entered by stargate, or over an extra
+ * connection where no stargate joins the two (or the extra one is cheaper).
+ * A step nothing joins makes the route unflyable: infinite.
+ *
+ * For comparing routes built outside one search — a leg forced through a
+ * chosen hole is pieced together from several sweeps (`legWays.ts`).
+ */
+export function routeCost(
+  graph: JumpGraph,
+  systems: readonly number[],
+  options: FindJumpRouteOptions = {}
+): number {
+  const stepCost = stepCostFor(options);
+  const neighbours = neighboursFor(graph, options);
+  let total = 0;
+  for (let index = 1; index < systems.length; index += 1) {
+    const from = systems[index - 1];
+    const to = systems[index];
+    const byGate = neighbours.gates(from).includes(to) ? stepCost(to, false) : Infinity;
+    const byExtra = neighbours.extra(from).includes(to) ? stepCost(to, true) : Infinity;
+    total += Math.min(byGate, byExtra);
+  }
+  return total;
+}

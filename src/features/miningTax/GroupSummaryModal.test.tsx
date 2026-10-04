@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { MiningTaxAssignmentRecord } from '@/db';
@@ -53,8 +54,12 @@ function renderGroup(overrides: Partial<Parameters<typeof GroupSummaryModal>[0]>
         typeNames={new Map()}
         payeeDisplayName="Corp One"
         busy={false}
-        onEditMember={noop}
+        onEdit={noop}
         onMarkAllPaid={noop}
+        onTakeOut={noop}
+        onUncombine={noop}
+        onResolve={noop}
+        onUnassignAll={noop}
         {...overrides}
       />
     </MemoryRouter>
@@ -70,11 +75,24 @@ describe('GroupSummaryModal payment', () => {
     expect(screen.queryByText('Payment')).not.toBeInTheDocument();
   });
 
-  it('offers Link a transaction once every member is paid', () => {
+  it('offers Link a transaction once every member is paid', async () => {
     const onLink = vi.fn();
     renderGroup({ onLinkTransaction: onLink });
-    fireEvent.click(screen.getByRole('button', { name: 'Link a transaction' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Payment actions' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Link a transaction' }));
     expect(onLink).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads the recorded payment as one line', () => {
+    renderGroup({
+      members: [
+        member('2026-09-08', {
+          payment: { paymentId: 'p', paidOn: '2026-09-10', method: 'donation', amount: 200 },
+        }),
+        member('2026-09-09'),
+      ],
+    });
+    expect(screen.getByText('Paid 200 ISK · 2026-09-10')).toBeInTheDocument();
   });
 
   it('links a transaction to the Wallet Journal, highlighting it', () => {
@@ -98,10 +116,10 @@ describe('GroupSummaryModal payment', () => {
         { kind: 'journal', refId: 42, source: 'auto', label: '100 ISK · 2026-09-10 — donation' },
       ],
     });
-    expect(screen.getByText(/linked automatically/)).toBeInTheDocument();
+    expect(screen.getByText(/auto-linked/)).toBeInTheDocument();
   });
 
-  it('calls onUnlinkTransaction with the clicked transaction', () => {
+  it('calls onUnlinkTransaction with the clicked transaction', async () => {
     const onUnlink = vi.fn();
     const transaction = {
       kind: 'journal' as const,
@@ -110,7 +128,67 @@ describe('GroupSummaryModal payment', () => {
       label: '100 ISK · 2026-09-10 — Player donation',
     };
     renderGroup({ linkedTransactions: [transaction], onUnlinkTransaction: onUnlink });
-    fireEvent.click(screen.getByRole('button', { name: 'Unlink this transaction' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Payment actions' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Unlink this transaction' }));
     expect(onUnlink).toHaveBeenCalledWith(transaction);
+  });
+});
+
+describe('GroupSummaryModal as one entry', () => {
+  it('shows every day with its own figures but offers one Edit for the whole entry', () => {
+    const onEdit = vi.fn();
+    renderGroup({ onEdit });
+    expect(screen.getByText('2026-09-08')).toBeInTheDocument();
+    expect(screen.getByText('2026-09-09')).toBeInTheDocument();
+    const edits = screen.getAllByRole('button', { name: 'Edit' });
+    expect(edits).toHaveLength(1);
+    fireEvent.click(edits[0]);
+    expect(onEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('takes one day out, or uncombines all, from the More menu', async () => {
+    const onTakeOut = vi.fn();
+    const onUncombine = vi.fn();
+    renderGroup({ onTakeOut, onUncombine });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'More actions for this combined entry' })
+    );
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Take 2026-09-09 out of combined' })
+    );
+    expect(onTakeOut).toHaveBeenCalledWith(
+      expect.objectContaining({ assignment: expect.objectContaining({ date: '2026-09-09' }) })
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'More actions for this combined entry' })
+    );
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Uncombine all' }));
+    expect(onUncombine).toHaveBeenCalledTimes(1);
+  });
+
+  it('settles up while a day is still owed, and closes with Close', () => {
+    const onSettleUp = vi.fn();
+    const onClose = vi.fn();
+    renderGroup({
+      members: [member('2026-09-08', { status: 'outstanding' }), member('2026-09-09')],
+      onSettleUp,
+      onClose,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Settle up' }));
+    expect(onSettleUp).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close' }).at(-1)!);
+    expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe('GroupSummaryModal — a failed action', () => {
+  it('shows the save error it is handed', () => {
+    renderGroup({ saveError: 'Couldn’t save — nothing was changed. Try again.' });
+    expect(screen.getByRole('alert')).toHaveTextContent(/Couldn’t save/);
+  });
+
+  it('shows no alert while nothing has failed', () => {
+    renderGroup();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

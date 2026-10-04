@@ -19,12 +19,13 @@ import {
   type NpcStationLookup,
   type SolarSystemLookup,
 } from '@/engine/market/orderBook';
-import { LocationCell, SecurityCell } from '@/features/market/marketOrderCells';
+import { BaitFlag, LocationCell, SecurityCell } from '@/features/market/marketOrderCells';
 import { renderJumpsCell } from '@/features/route/jumpsCell';
 import type { JumpRangeFilter, JumpsCellValue } from '@/features/route/currentSystem';
 import type { RegionOrder } from '@/esi/endpoints';
-import { formatIsk } from '@/lib/isk';
+import { formatMarketIsk } from '@/lib/isk';
 import { rangeLabel } from '@/features/market/orderBookCsv';
+import { sellOutlierMultiple } from '@/engine/market/orderBookDepth';
 
 /**
  * Ordinal rank for an order's `range`: station, then solarsystem, then a
@@ -46,6 +47,14 @@ export interface UseMarketOrderColumnsArgs {
   solarSystemMap: ReadonlyMap<number, SolarSystemLookup>;
   myOrderIds: ReadonlySet<number>;
   jumpRangeFilter: JumpRangeFilter;
+  /** The book's best sell, which a bait-priced sell order is measured against. */
+  bestSell: number | null;
+  /**
+   * Whether the tables show as two-line cards — on a phone, or wherever the
+   * order book's column is too narrow for its columns. Chosen in JS from the
+   * book's own width, so card-only touches can't follow the viewport (ADR 0017).
+   */
+  cards: boolean;
 }
 
 export interface MarketOrderColumns {
@@ -64,6 +73,8 @@ export function useMarketOrderColumns({
   solarSystemMap,
   myOrderIds,
   jumpRangeFilter,
+  bestSell,
+  cards,
 }: UseMarketOrderColumnsArgs): MarketOrderColumns {
   const visibleOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
   const setVisibleOrderColumns = useVisibleMarketOrderColumns((state) => state.setValue);
@@ -101,9 +112,15 @@ export function useMarketOrderColumns({
         header: t('market.price'),
         align: 'right',
         className: 'tabular-nums',
+        // The phone card's headline figure: a book is scanned by price.
+        cardCorner: true,
         render: (o) => (
           <>
-            {formatIsk(o.price, 2)}
+            {/* Left of the figure, so the prices stay right-aligned in one column. */}
+            {!o.is_buy_order && (
+              <BaitFlag multiple={sellOutlierMultiple(o.price, bestSell)} t={t} />
+            )}
+            {formatMarketIsk(o.price)}
             {/*
               The tinted row (`row-mine`, styles/index.css) is the visible
               marker for "this one is mine" — no badge, no gap figure,
@@ -122,6 +139,7 @@ export function useMarketOrderColumns({
         header: t('market.quantity'),
         align: 'right',
         className: 'tabular-nums',
+        stackAffix: { before: t('market.quantityAffix') },
         render: (o) => formatVolume(o.volume_remain),
         sortValue: (o) => o.volume_remain,
       },
@@ -132,11 +150,24 @@ export function useMarketOrderColumns({
         // and wrapping rows across several lines. The stacked-card media
         // query overrides `white-space`/width below `sm`, so phone keeps
         // the full, untruncated name.
-        className: 'sm:max-w-[10rem] truncate',
+        // Truncated (the full name is in the row's tooltip and its expanded
+        // row), and only as wide as the screen can spare, so the book never
+        // scrolls sideways beside the finder column.
+        // Chosen with `cards` (ADR 0017): a card forced on a desktop is
+        // titled by the station, uncapped; a table row caps it.
+        className: cards ? '' : 'max-w-[16rem] truncate',
+        // The phone card's title: the station a pilot would fly to.
+        primary: true,
         sortValue: (o) =>
           resolveOrderLocation(o, npcStationMap, solarSystemMap).stationName ?? undefined,
         render: (o) => (
-          <LocationCell order={o} npcStations={npcStationMap} solarSystems={solarSystemMap} t={t} />
+          <LocationCell
+            order={o}
+            npcStations={npcStationMap}
+            solarSystems={solarSystemMap}
+            t={t}
+            card={cards}
+          />
         ),
       },
       security: {
@@ -158,13 +189,26 @@ export function useMarketOrderColumns({
           const cell = orderJumps(o.system_id);
           return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;
         },
-        render: (o) => renderJumpsCell(orderJumps(o.system_id), t, 'market.jumpsUnavailableHint'),
+        render: (o) => {
+          const cell = orderJumps(o.system_id);
+          return (
+            <>
+              {renderJumpsCell(cell, t, 'market.jumpsUnavailableHint')}
+              {/* The phone card has no Jumps header to say what the bare number is. */}
+              {cards && cell.kind === 'value' && cell.count !== null && (
+                <> {t('market.jumpsWord', { count: cell.count })}</>
+              )}
+            </>
+          );
+        },
       },
       expiry: {
         id: 'expiry',
         header: t('market.expiry'),
-        className: 'whitespace-nowrap text-text-dim',
-        render: (o) => orderExpiry(o).toLocaleDateString(),
+        // Same room rule as Cum. qty; the expanded row states it in full.
+        className: 'whitespace-nowrap text-text-dim max-[105rem]:hidden',
+        headerCellClassName: 'max-[105rem]:hidden',
+        render: (o) => <span data-dense-omit="">{orderExpiry(o).toLocaleDateString()}</span>,
         sortValue: (o) => orderExpiry(o).getTime(),
       },
       range: {
@@ -173,6 +217,7 @@ export function useMarketOrderColumns({
         className: 'text-text-dim',
         // Station < solarsystem < N jumps < region, in that order — not
         // alphabetical, which would put "region" ahead of "station".
+        stackAffix: { before: t('market.rangeAffix') },
         sortValue: (o) => rangeRank(o.range),
         render: (o) => rangeLabel(o.range, t),
       },
@@ -180,12 +225,15 @@ export function useMarketOrderColumns({
         id: 'minVolume',
         header: t('market.minVolume'),
         align: 'right',
-        className: 'tabular-nums',
-        render: (o) => formatVolume(o.min_volume),
+        // Almost always 1: a column only a very wide screen spends on it,
+        // never a card. The expanded row states it for every buy order.
+        className: 'tabular-nums max-[120rem]:hidden',
+        headerCellClassName: 'max-[120rem]:hidden',
+        render: (o) => <span data-dense-omit="">{formatVolume(o.min_volume)}</span>,
         sortValue: (o) => o.min_volume,
       },
     }),
-    [t, npcStationMap, solarSystemMap, myOrderIds, orderJumps]
+    [t, npcStationMap, solarSystemMap, myOrderIds, orderJumps, bestSell, cards]
   );
 
   const baseColumns = useMemo<DataTableColumn<RegionOrder>[]>(

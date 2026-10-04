@@ -688,12 +688,10 @@ export interface MaterialCostLine extends EffectiveMaterial {
   unpriced: boolean;
   /**
    * Present only on a synthetic Blueprint Acquisition row (issue #838) — the
-   * ME/TE tier it resolved to. Optional and rarely carried through a merge
-   * (`mergeCostLines` doesn't spread it, so two occurrences merging into one
-   * line drops it), but declared here rather than read off an untyped cast
-   * so a caller that does have it (e.g. `groupRollup.ts`'s
-   * `acquisitionTypeIds`) can check it without reaching past this module's
-   * own type.
+   * ME/TE tier it resolved to. `mergeCostLines` carries it through a merge;
+   * a shopping-list cost line strips it. It marks the row as having no
+   * owned-stock offer (`ownedStockOffer.ts`) and no place in the multibuy
+   * text.
    */
   acquisitionTier?: { me: number; te: number };
 }

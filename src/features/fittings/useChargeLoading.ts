@@ -18,13 +18,8 @@ import {
   type ModuleAt,
 } from '@/engine/fittings/fittingEdit';
 import { moduleKey } from '@/engine/fittings/skillGaps';
-import type {
-  Fitting,
-  FittingModule,
-  FittingModuleResult,
-  PilotProfile,
-} from '@/engine/fittings/types';
-import { checkCharges, moduleChargeCapacity } from './dogmaFittingEngine';
+import type { Fitting, FittingModule, FittingModuleResult } from '@/engine/fittings/types';
+import type { FittingContext } from './fittingContext';
 import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
 
@@ -35,8 +30,8 @@ interface ChargeLoadingParams {
   catalogue: FittingCatalogue | null;
   /** Index-parallel to `fitting.modules`; null while it calculates — then nothing is offered. */
   moduleResults: FittingModuleResult[] | null;
-  engineReady: boolean;
-  profile: PilotProfile | null;
+  /** Null while the engine, pilot or catalogue loads — then nothing is offered either. */
+  context: FittingContext | null;
   edit: (change: FittingChange, coalesceKey?: string) => void;
 }
 
@@ -63,8 +58,7 @@ export function useChargeLoading({
   fitting,
   catalogue,
   moduleResults,
-  engineReady,
-  profile,
+  context,
   edit,
 }: ChargeLoadingParams): ChargeLoading {
   const { t } = useTranslation();
@@ -81,7 +75,7 @@ export function useChargeLoading({
   const caches = useMemo(
     () => ({ fits: new Map<string, boolean>(), capacity: new Map<string, number>() }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the caches are keyed on exactly these
-    [shipTypeId, profile, engineReady]
+    [shipTypeId, context]
   );
 
   const resultByKey = useMemo(() => {
@@ -96,37 +90,37 @@ export function useChargeLoading({
 
   const accepts = useCallback(
     (module: FittingModule, chargeTypeId: number): boolean => {
-      if (shipTypeId === null || catalogue === null || !engineReady || profile === null) {
-        return false;
-      }
+      if (shipTypeId === null || context === null) return false;
       const entry = resultByKey.get(moduleKey(module));
       // A module the calculation hasn't reached (or a swap it's still behind on) takes nothing yet.
       if (entry === undefined || entry.typeId !== module.typeId) return false;
-      const groupId = catalogue.types[String(chargeTypeId)]?.groupID;
+      const groupId = context.catalogue.types[String(chargeTypeId)]?.groupID;
       if (groupId === undefined || !entry.result.chargeGroupIds.includes(groupId)) return false;
       const key = `${module.slot}:${module.typeId}:${chargeTypeId}`;
       let fits = caches.fits.get(key);
       if (fits === undefined) {
-        fits = checkCharges(shipTypeId, module, [chargeTypeId], profile).has(chargeTypeId);
+        fits = context.engine
+          .checkCharges(shipTypeId, module, [chargeTypeId], context.profile)
+          .has(chargeTypeId);
         caches.fits.set(key, fits);
       }
       return fits;
     },
-    [shipTypeId, catalogue, engineReady, profile, resultByKey, caches]
+    [shipTypeId, context, resultByKey, caches]
   );
 
   const chargesPerLoad = useCallback(
     (module: FittingModule, chargeTypeId: number): number => {
-      if (shipTypeId === null || !engineReady) return 1;
+      if (shipTypeId === null || context === null) return 1;
       const key = `${module.slot}:${module.typeId}`;
       let capacity = caches.capacity.get(key);
       if (capacity === undefined) {
-        capacity = moduleChargeCapacity(shipTypeId, module);
+        capacity = context.engine.moduleChargeCapacity(shipTypeId, module);
         caches.capacity.set(key, capacity);
       }
-      return chargesInCapacity(capacity, catalogueVolume(catalogue, chargeTypeId));
+      return chargesInCapacity(capacity, catalogueVolume(context.catalogue, chargeTypeId));
     },
-    [shipTypeId, engineReady, catalogue, caches]
+    [shipTypeId, context, caches]
   );
 
   const targetsFor = useCallback(

@@ -24,7 +24,7 @@ import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
 import { Toast } from '@/components/ui/Toast';
 import { writeToClipboard } from '@/lib/clipboard';
-import { formatIsk } from '@/lib/isk';
+import { formatMarketIsk } from '@/lib/isk';
 import { priceClipboardText } from './priceClipboardText';
 
 /** How long the "copied" toast stays up — matches `CopyableTotal`'s own feedback window. */
@@ -51,7 +51,7 @@ export function CopyablePrice({
     resetTimer.current = setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS);
   }
 
-  const formatted = formatIsk(price, 2);
+  const formatted = formatMarketIsk(price);
 
   return (
     <>

@@ -11,6 +11,7 @@ import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 import { clearRouteKillCaches } from '@/features/travel/routeKillsData';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import { AVOIDED_SYSTEMS_KEY, useAvoidedSystems } from '@/features/route/avoidedSystems';
 import {
   AVOIDED_SYSTEMS_ENABLED_KEY,
@@ -21,7 +22,6 @@ import {
   useDefaultRoutePreference,
 } from '@/features/route/routeRules';
 import { clearEveScoutCache, EVE_SCOUT_SIGNATURES_URL } from '@/lib/eveScout';
-import { configureClipboard } from '@/lib/clipboard';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -171,10 +171,25 @@ const server = setupServer(
   )
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render of a Route Safety route, so no test pays for the
+  // first one. A worker's first `App` render — compiling the lazy route
+  // chunks, warming jsdom and React — cost 4-6s on top of a warm render, and
+  // it landed on whichever test ran first. Done here under the hook's own
+  // budget; `beforeEach` clears every cache it filled.
+  await routeChunks.loadTravel();
+  await resetState();
+  window.history.pushState({}, '', `/travel/route?from=${JITA}&to=${UEDAMA}`);
+  const { unmount } = render(<App />);
+  await screen.findByRole('table', { name: 'Systems on the route' }, { timeout: 25_000 });
+  unmount();
+}, 30_000);
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
-beforeEach(async () => {
+beforeEach(() => resetState());
+
+async function resetState() {
   clearJumpGraphIndex();
   clearSolarSystemIndex();
   clearEveScoutCache();
@@ -195,7 +210,14 @@ beforeEach(async () => {
     scopes: ['esi-location.read_location.v1'],
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
-});
+}
+
+/** One labelled figure from the route summary strip, e.g. `routeFact('Jumps')` → "4". */
+function routeFact(label: string) {
+  const summary = within(screen.getByRole('group', { name: 'Route summary' }));
+  return summary.getByText(label, { selector: 'span' }).parentElement?.lastElementChild
+    ?.textContent;
+}
 
 function visit(search: string) {
   window.history.pushState({}, '', `/travel/route${search}`);
@@ -222,12 +244,13 @@ describe('Travel › Route Safety', () => {
     expect(await uedama.findByText('The Citadel')).toBeInTheDocument();
     expect(within(body[0]).getByText('The Forge')).toBeInTheDocument();
 
-    const facts = within(screen.getByRole('list', { name: 'Route summary' }));
-    expect(facts.getByText('Gank Chokepoints: Uedama')).toBeInTheDocument();
-    expect(facts.getByText('2 jumps')).toBeInTheDocument();
-    expect(facts.getByText('3 highsec / 0 lowsec / 0 nullsec')).toBeInTheDocument();
-    expect(facts.getByText('lowest 0.5')).toBeInTheDocument();
-    expect(facts.getByText('12 ship · 4 pod kills in the last hour')).toBeInTheDocument();
+    expect(routeFact('Chokepoints')).toBe('Uedama');
+    expect(routeFact('Jumps')).toBe('2');
+    expect(routeFact('High')).toBe('3');
+    expect(routeFact('Low')).toBe('0');
+    expect(routeFact('Null')).toBe('0');
+    expect(routeFact('Lowest')).toBe('0.5');
+    expect(routeFact('Kills 1h')).toBe('12 ship · 4 pod');
   });
 
   it('draws the route strip with a spoken description and its key systems', async () => {
@@ -407,12 +430,25 @@ describe('Travel › Route Safety › Stops', () => {
     expect(second).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('table', { name: 'Systems on leg 2' })).not.toBeInTheDocument();
 
-    const facts = within(screen.getByRole('list', { name: 'Route summary' }));
-    expect(facts.getByText('8 jumps')).toBeInTheDocument();
+    expect(routeFact('Jumps')).toBe('8');
     expect(screen.getAllByTestId('route-strip-cell')).toHaveLength(9);
 
     await user.click(second);
     expect(screen.getByRole('table', { name: 'Systems on leg 2' })).toBeInTheDocument();
+  });
+
+  it('previews an Avoid as the whole trip, not the leg it was asked from', async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&stops=${SOBASEKI},${UEDAMA}`);
+
+    const table = await screen.findByRole('table', { name: 'Systems on leg 1' });
+    await user.click(await within(table).findByRole('button', { name: /^2 systems/ }));
+    await user.click(within(table).getByRole('button', { name: 'Avoid Niyabainen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Avoid Niyabainen?' });
+
+    expect(
+      await within(dialog).findByText(/^The route becomes 8 jumps \(\+0\)/)
+    ).toBeInTheDocument();
   });
 
   it('adds a stop from the picker, writing the stops into the link', async () => {
@@ -469,6 +505,32 @@ describe('Travel › Route Safety › Stops', () => {
         'Order changed: Uedama → Sobaseki → Niyabainen · 11 jumps in typed order → 9 jumps'
       )
     ).toBeInTheDocument();
+  });
+
+  it('leaves zero kill counts off a phone row, keeping its jumps', async () => {
+    const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation(
+      (media: string) =>
+        ({
+          media,
+          matches: media === PHONE_QUERY,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList
+    );
+    try {
+      visit(`?from=${JITA}&to=${UEDAMA}`);
+
+      const table = await screen.findByRole('table', { name: 'Systems on the route' });
+      const body = (await within(table).findAllByRole('row')).slice(1);
+      const lastHour = (row: HTMLElement) => within(row).getAllByRole('cell')[3];
+      await waitFor(() => expect(lastHour(body[2])).toHaveTextContent('12ship kills'));
+      expect(lastHour(body[2])).toHaveTextContent('4pod kills');
+      expect(lastHour(body[0])).toHaveTextContent('4,200jumps');
+      expect(lastHour(body[0])).not.toHaveTextContent('ship kills');
+      expect(lastHour(body[0])).not.toHaveTextContent('pod kills');
+    } finally {
+      matchMedia.mockRestore();
+    }
   });
 
   it('folds the stops to one line on a phone, with Edit to open them', async () => {
@@ -677,13 +739,13 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
       within(body[1]).getByRole('button', { name: 'Copy signature JIT-001 in Jita' })
     ).toBeInTheDocument();
 
-    const facts = within(screen.getByRole('list', { name: 'Route summary' }));
-    expect(facts.getByText('2 jumps')).toBeInTheDocument();
-    expect(facts.getByText('0 by gate')).toBeInTheDocument();
-    expect(facts.getByText('2 through wormholes')).toBeInTheDocument();
+    expect(routeFact('Jumps')).toBe('2');
+    expect(routeFact('By gate')).toBe('0');
+    expect(routeFact('Wormhole')).toBe('2');
     // Thera is counted as wormhole jumps, never as a nullsec system or the lowest security.
-    expect(facts.getByText('2 highsec / 0 lowsec / 0 nullsec')).toBeInTheDocument();
-    expect(facts.getByText('lowest 0.5')).toBeInTheDocument();
+    expect(routeFact('High')).toBe('2');
+    expect(routeFact('Null')).toBe('0');
+    expect(routeFact('Lowest')).toBe('0.5');
     expect(screen.getAllByTestId('route-strip-cell')).toHaveLength(3);
   });
 
@@ -731,9 +793,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
       expect(within(table).getAllByRole('row').slice(1)[0]).toHaveTextContent('Jita')
     );
     expect(screen.queryByTestId('route-strip-hole')).toBeNull();
-    expect(
-      within(screen.getByRole('list', { name: 'Route summary' })).getByText('4 jumps')
-    ).toBeInTheDocument();
+    expect(routeFact('Jumps')).toBe('4');
   });
 
   it('never asks EVE-Scout with the switch off', async () => {
@@ -742,9 +802,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
     visit(`?from=${JITA}&to=${UEDAMA}`);
 
     await screen.findByRole('table', { name: 'Systems on the route' });
-    expect(
-      within(screen.getByRole('list', { name: 'Route summary' })).getByText('4 jumps')
-    ).toBeInTheDocument();
+    expect(routeFact('Jumps')).toBe('4');
     expect(asked).not.toHaveBeenCalled();
   });
 
@@ -763,15 +821,157 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
     expect(
       await screen.findByText("EVE-Scout couldn't be reached, so this route uses gates only.")
     ).toBeInTheDocument();
-    expect(
-      within(screen.getByRole('list', { name: 'Route summary' })).getByText('4 jumps')
-    ).toBeInTheDocument();
+    expect(routeFact('Jumps')).toBe('4');
+  });
+
+  describe('ways to fly a leg', () => {
+    const pinInLink = () => new URLSearchParams(window.location.search).get('pin');
+    const waysPanel = () => screen.findByRole('region', { name: 'Ways to fly leg 1' });
+
+    beforeEach(() => {
+      server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json(HOLES)));
+    });
+
+    it('lists each way with its facts, the one in use first', async () => {
+      visit(`?from=${JITA}&to=${UEDAMA}&wh=1`);
+
+      const panel = await waysPanel();
+      await within(panel).findByText('Via Thera');
+      const [inUse, gates] = within(panel).getAllByRole('listitem');
+      expect(inUse).toHaveTextContent(/^Via TheraIn use2 j/);
+      expect(inUse).toHaveTextContent('Jita → Thera');
+      expect(inUse).toHaveTextContent('Thera → Uedama');
+      expect(inUse).toHaveTextContent('fits Medium');
+      expect(gates).toHaveTextContent(/^Gates only4 j/);
+      expect(gates).toHaveTextContent('lowest 0.5·0 lowsec·0 nullsec');
+      expect(gates).toHaveTextContent('passes Uedama');
+      expect(
+        within(inUse).queryByRole('button', { name: /^Use .* for leg 1$/ })
+      ).not.toBeInTheDocument();
+    });
+
+    it('pins a way into the link, and the leg flies it', async () => {
+      const user = userEvent.setup();
+      visit(`?from=${JITA}&to=${UEDAMA}&wh=1`);
+
+      const panel = await waysPanel();
+      await user.click(
+        await within(panel).findByRole('button', { name: 'Use Gates only for leg 1' })
+      );
+      expect(pinInLink()).toBe('gates');
+      await waitFor(() => expect(routeFact('Jumps')).toBe('4'));
+      // The leg re-plans, so the panel is drawn afresh.
+      await waitFor(async () =>
+        expect(within(await waysPanel()).getAllByRole('listitem')[0]).toHaveTextContent(
+          /^Gates onlyIn use/
+        )
+      );
+
+      await user.click(
+        within(await waysPanel()).getByRole('button', { name: 'Use Via Thera for leg 1' })
+      );
+      expect(pinInLink()).toBe('thera');
+      await waitFor(() => expect(routeFact('Jumps')).toBe('2'));
+    });
+
+    it('previews an Avoid on a pinned leg as the leg is flown, pin and all', async () => {
+      const user = userEvent.setup();
+      visit(`?from=${JITA}&to=${UEDAMA}&wh=1&pin=gates`);
+
+      await waitFor(() => expect(routeFact('Jumps')).toBe('4'));
+      const table = await screen.findByRole('table', { name: 'Systems on the route' });
+      await user.click(await within(table).findByRole('button', { name: /^3 systems/ }));
+      await user.click(within(table).getByRole('button', { name: 'Avoid Muvolailen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Avoid Muvolailen?' });
+
+      // Gates only is pinned, and gates only has no way around Muvolailen: the
+      // trip stays 4 jumps, never the unpinned hole route's 2.
+      expect(
+        await within(dialog).findByText(/^The route becomes 4 jumps \(\+0\)/)
+      ).toBeInTheDocument();
+      expect(within(dialog).getByText(/no way around Muvolailen/)).toBeInTheDocument();
+    });
+
+    it('says when a pinned hole has closed, and flies the planner’s pick', async () => {
+      visit(`?from=${JITA}&to=${UEDAMA}&wh=1&pin=gone`);
+
+      expect(
+        await screen.findByText(
+          "The pinned wormhole has closed or is no longer on EVE-Scout's list, so this leg flies the planner's pick."
+        )
+      ).toBeInTheDocument();
+      expect(routeFact('Jumps')).toBe('2');
+    });
+
+    it('says when a pinned hub has no qualifying hole', async () => {
+      visit(`?from=${JITA}&to=${UEDAMA}&wh=1&whhub=turnur&pin=thera`);
+
+      expect(
+        await screen.findByText(
+          "No open Thera hole fits the hole settings, so this leg flies the planner's pick."
+        )
+      ).toBeInTheDocument();
+      expect(routeFact('Jumps')).toBe('4');
+    });
+
+    it('says EVE-Scout could not be reached for a pinned hole, never that the switch is off', async () => {
+      server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => new HttpResponse(null, { status: 503 })));
+      visit(`?from=${JITA}&to=${UEDAMA}&wh=1&pin=uedama`);
+
+      expect(
+        await screen.findByText(
+          "EVE-Scout couldn't be reached, so the pinned way can't be checked. This leg flies the planner's pick."
+        )
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/Route through Thera \/ Turnur is off/)).toBeNull();
+    });
+
+    it('opens a Route via link asking for a stop, then flies the pinned hole', async () => {
+      const user = userEvent.setup();
+      visit(`?from=${JITA}&wh=1&pin=uedama`);
+
+      expect(
+        await screen.findByText('Add a stop to fly there through the pinned wormhole.')
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Add a stop' }));
+      await user.type(await screen.findByRole('combobox'), 'Ueda');
+      await user.click(await screen.findByRole('option', { name: /Uedama/ }));
+
+      expect(pinInLink()).toBe('uedama');
+      await waitFor(async () =>
+        expect(within(await waysPanel()).getAllByRole('listitem')[0]).toHaveTextContent(
+          /^Pinned hole via TheraIn use2 j/
+        )
+      );
+    });
+
+    it('folds the ways under the leg on a phone', async () => {
+      const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation(
+        (media: string) =>
+          ({
+            media,
+            matches: media === PHONE_QUERY,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+          }) as unknown as MediaQueryList
+      );
+      try {
+        const user = userEvent.setup();
+        visit(`?from=${JITA}&to=${UEDAMA}&wh=1`);
+
+        const toggle = await screen.findByRole('button', { name: 'Compare ways to fly leg 1' });
+        await waitFor(() => expect(toggle).toHaveTextContent('Gates only·4 jumpsCompare'));
+        expect(screen.queryByRole('region', { name: 'Ways to fly leg 1' })).toBeNull();
+        await user.click(toggle);
+        expect(await waysPanel()).toBeInTheDocument();
+      } finally {
+        matchMedia.mockRestore();
+      }
+    });
   });
 });
 
 describe('Travel › Thera / Turnur', () => {
-  afterEach(() => configureClipboard(null));
-
   const MAIN_TABLE = 'Open holes out of Thera and Turnur';
   const JSPACE_TABLE = 'Open holes into J-space';
   const JSPACE_GROUP = /exits? into J-space · no gate route from you/;
@@ -792,6 +992,18 @@ describe('Travel › Thera / Turnur', () => {
   function holeRow(id: string) {
     return document.querySelector<HTMLElement>(`tr[data-row-key="${id}"]`)!;
   }
+
+  it('links each K-space row a gate route reaches to Route Safety through its hole', async () => {
+    visitThera('');
+
+    const links = await screen.findAllByRole('link', {
+      name: 'Plan a route through the Thera hole at Uedama',
+    });
+    expect(links[0]).toHaveAttribute('href', `/travel/route?from=${JITA}&wh=1&pin=uedama`);
+    expect(
+      screen.queryByRole('link', { name: /Plan a route through the Thera hole at J120704/ })
+    ).not.toBeInTheDocument();
+  });
 
   function stubPhone() {
     return vi.spyOn(window, 'matchMedia').mockImplementation(
@@ -936,29 +1148,14 @@ describe('Travel › Thera / Turnur', () => {
     expect(await screen.findByText(/Connections can.t be loaded right now/)).toBeInTheDocument();
   });
 
-  it('copies the hub-side signature without opening the row', async () => {
-    const write = vi.fn(async () => {});
-    configureClipboard(write);
+  it('lets the hub-side signature be selected without opening the row', async () => {
     visitThera('');
 
     await screen.findByRole('table', { name: MAIN_TABLE });
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Thera signature for Uedama' }));
-    expect(
-      await screen.findByRole('button', { name: 'Copied Thera signature for Uedama' })
-    ).toBeInTheDocument();
-    expect(write).toHaveBeenCalledWith('AAA-111');
+    const signature = within(holeRow('uedama')).getByText('AAA-111');
+    expect(signature).toHaveClass('select-all');
+    fireEvent.click(signature);
     expect(holeRow('uedama')).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('selects the signature to copy by hand when the clipboard refuses', async () => {
-    configureClipboard(async () => {
-      throw new Error('denied');
-    });
-    visitThera('');
-
-    await screen.findByRole('table', { name: MAIN_TABLE });
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Turnur signature for Perimeter' }));
-    await waitFor(() => expect(window.getSelection()?.toString()).toBe('AAA-111'));
   });
 
   it('shows dense cards and filter chips on a phone', async () => {

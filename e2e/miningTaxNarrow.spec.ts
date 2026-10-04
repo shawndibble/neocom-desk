@@ -238,9 +238,10 @@ test.describe('Balances strip Payee filter button — touch target', () => {
     expect(buttonHeight).toBeGreaterThanOrEqual(44);
     // Proves the extra height comes from the button's own box/negative-margin
     // trick, not from the row (and thus the card) genuinely growing to fit
-    // it: pinned near text-sm's own 20px line-height, not just "under 44".
-    expect(rowHeight).toBeGreaterThan(15);
-    expect(rowHeight).toBeLessThan(25);
+    // it: pinned near the owed figure's own 28px (text-lg) line-height, the
+    // tallest thing the row holds besides the button, not just "under 44".
+    expect(rowHeight).toBeGreaterThan(20);
+    expect(rowHeight).toBeLessThan(32);
   });
 
   test('stays small above md — desktop is unchanged', async ({ page }) => {
@@ -299,6 +300,9 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
     await page.getByRole('button', { name: 'Settle up', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: `Settle up — ${PAYEE_NAME}` });
     await expect(dialog).toBeVisible();
+    // A single entry starts folded into its summary line; the itemized row
+    // under test is one tap away.
+    await dialog.getByRole('button', { name: /^1 entry ·/ }).click();
     return dialog;
   }
 
@@ -394,8 +398,8 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
  * Ledger table phone sort picker (issue #2148): `DataTable` defaults to
  * `responsive="stack"` below `sm`, which hides the `<thead>` and its sort
  * buttons entirely — the same bug class already fixed for Industry (#1627),
- * Market (#1628) and Contacts (#1978). The fix is a bare `mobileSort` prop on
- * the Tax tab's `DataTable` call (every column already carries `sortValue`),
+ * Market (#1628) and Contacts (#1978). The Tax tab renders `DataTableSortPicker`
+ * in its filter row on a phone (every column already carries `sortValue`),
  * so this only needs to prove the picker renders on phone, is absent on
  * desktop, and actually reorders the stacked cards.
  */
@@ -502,7 +506,8 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
  * long enough to fill the column was pushing Status and the row's edit
  * affordance off-screen at 1024px, the narrowest width the table's `md:`
  * layout (not the phone stacked-card) has to support. The fix truncates the
- * `payee` column at `sm:max-w-[8rem]` with an ellipsis, same shape as
+ * `payee` column (the one flexible column of a fixed-layout table, so it
+ * takes what the others leave and truncates past that) with an ellipsis, same shape as
  * Market's `location` column/`LocationCell`, so the full name stays
  * discoverable via the app's `Tooltip` rather than being lost outright.
  */
