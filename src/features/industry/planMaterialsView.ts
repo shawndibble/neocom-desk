@@ -125,7 +125,7 @@ function asSourcing(
  * that number is left out, a typed or zeroed one is not. Callers pass every
  * row the per-row action can reach, or "Use all" silently skips rows the row
  * beside it still offers to fill — and no row whose offer their surface hides
- * (the plan's Blueprint Acquisition row), or it fills what no row offers.
+ * (a plan's Blueprint Acquisition rows), or it fills what no row offers.
  */
 export function bulkUseDetected(
   rows: readonly { typeID: number; quantity: number }[],
