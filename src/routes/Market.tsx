@@ -707,6 +707,7 @@ export function Market() {
         ? {
             kind: 'station',
             stationName: npcStationMap.get(effectiveHub.stationId)?.name ?? effectiveHub.systemName,
+            systemId: effectiveHub.systemId,
             security: solarSystemMap.get(effectiveHub.systemId)?.security ?? null,
             jumpsAway: knownJumps?.get(effectiveHub.systemId) ?? null,
           }

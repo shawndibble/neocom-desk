@@ -6,12 +6,16 @@
  * whole trip; this is the one-stop case, through the same ESI call. The row
  * menus' "Set waypoint in game" sends the same way (`useSetDestination`).
  *
+ * "View route" sits beside it (`ViewRouteButton`): the same place, opened in
+ * Route Safety from the Character's current system.
+ *
  * A Character without the waypoint scope, or no Character at all, sees the
  * button disabled with the reason beside it rather than a click that fails.
  */
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { useSetDestination } from '@/features/travel/useSetDestination';
+import { ViewRouteButton } from '@/features/travel/ViewRouteButton';
 
 export function SetDestinationButton({
   locationId,
@@ -35,6 +39,7 @@ export function SetDestinationButton({
       >
         {t('market.orderDetail.setDestination')}
       </Button>
+      <ViewRouteButton locationId={locationId} placeName={placeName} />
       {blockedReason !== null && (
         <span className="text-[0.6875rem] text-text-dim">{blockedReason}</span>
       )}

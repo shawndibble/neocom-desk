@@ -10,6 +10,7 @@
  * column is hidden then). Both bars read and write one `BrowserFilterValue`,
  * so they can never disagree.
  */
+import { JumpsLink } from '@/features/travel/JumpsLink';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FilterBar, FilterChip, FilterField, InfoTooltip, TextInput } from '@/components/ui';
@@ -174,7 +175,14 @@ export type OrderBookScope =
   /** A measurable Jump Range: every station in reach of the Current System. */
   | { kind: 'range'; jumps: Exclude<BrowserFilterValue['jumps'], 'any'>; stationCount: number }
   /** Trade Hub mode with no range: the hub's one station. */
-  | { kind: 'station'; stationName: string; security: number | null; jumpsAway: number | null }
+  | {
+      kind: 'station';
+      stationName: string;
+      /** The station's solar system: the jump count links to the route there. */
+      systemId: number;
+      security: number | null;
+      jumpsAway: number | null;
+    }
   /** Region mode with no range: every station in the picked region, or in every region. */
   | { kind: 'region'; regionName: string; stationCount: number };
 
@@ -253,7 +261,9 @@ export function OrderBookScopeBar({
             )}
             {scope.jumpsAway !== null && originName !== null && (
               <span className="whitespace-nowrap text-text-dim">
-                {t('market.scope.jumpsAway', { count: scope.jumpsAway, system: originName })}
+                <JumpsLink systemId={scope.systemId}>
+                  {t('market.scope.jumpsAway', { count: scope.jumpsAway, system: originName })}
+                </JumpsLink>
               </span>
             )}
           </>

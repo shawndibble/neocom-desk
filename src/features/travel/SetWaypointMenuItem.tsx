@@ -18,6 +18,7 @@
 import { useTranslation } from 'react-i18next';
 import { DisabledMenuItem, MenuItem } from '@/components/ui';
 import { useSetDestination } from './useSetDestination';
+import { ViewRouteMenuItem } from './ViewRouteMenuItem';
 
 export function SetWaypointMenuItem({
   locationId,
@@ -32,28 +33,36 @@ export function SetWaypointMenuItem({
   const label = t('travel.waypoints.menuItem');
 
   if (blockedReason !== null) {
-    return <DisabledMenuItem reason={blockedReason}>{label}</DisabledMenuItem>;
+    return (
+      <>
+        <DisabledMenuItem reason={blockedReason}>{label}</DisabledMenuItem>
+        <ViewRouteMenuItem locationId={locationId} />
+      </>
+    );
   }
   return (
-    <MenuItem
-      disabled={sending}
-      onSelect={(event) => {
-        event.preventDefault();
-        send();
-      }}
-    >
-      {sending ? (
-        t('travel.waypoints.menuSending')
-      ) : outcome ? (
-        <span
-          role={outcome.tone}
-          className={outcome.tone === 'alert' ? 'text-danger' : 'text-success'}
-        >
-          {outcome.text}
-        </span>
-      ) : (
-        label
-      )}
-    </MenuItem>
+    <>
+      <MenuItem
+        disabled={sending}
+        onSelect={(event) => {
+          event.preventDefault();
+          send();
+        }}
+      >
+        {sending ? (
+          t('travel.waypoints.menuSending')
+        ) : outcome ? (
+          <span
+            role={outcome.tone}
+            className={outcome.tone === 'alert' ? 'text-danger' : 'text-success'}
+          >
+            {outcome.text}
+          </span>
+        ) : (
+          label
+        )}
+      </MenuItem>
+      <ViewRouteMenuItem locationId={locationId} />
+    </>
   );
 }

@@ -8,6 +8,7 @@
  * panel owns the snapshot, the mode and the region names; this owns
  * everything that is only true of a haul.
  */
+import { JumpsLink } from '@/features/travel/JumpsLink';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -1205,7 +1206,13 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
               </span>
             );
           }
-          return String(count);
+          return row.destination.systemId == null ? (
+            String(count)
+          ) : (
+            <JumpsLink systemId={row.destination.systemId} fromId={row.origin.systemId}>
+              {count}
+            </JumpsLink>
+          );
         },
       },
       iskPerJump: {

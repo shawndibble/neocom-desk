@@ -27,6 +27,7 @@ import { toggleChipStateClassName } from '@/components/ui/controlStyles';
 import { formatMarketIsk } from '@/lib/isk';
 import type { MarketOrderColumnId } from './marketOrderColumns';
 import { SetDestinationButton } from './SetDestinationButton';
+import { PlaceJumpsLink } from '@/features/travel/JumpsLink';
 
 export type BookSide = 'sell' | 'buy';
 
@@ -149,7 +150,15 @@ export function HubComparisonLine({
           </span>
         )}
         {jumps !== null && (
-          <span className="text-text-dim">{t('market.hubCompare.jumps', { count: jumps })}</span>
+          <span className="text-text-dim">
+            {stationId === null ? (
+              t('market.hubCompare.jumps', { count: jumps })
+            ) : (
+              <PlaceJumpsLink locationId={stationId}>
+                {t('market.hubCompare.jumps', { count: jumps })}
+              </PlaceJumpsLink>
+            )}
+          </span>
         )}
       </p>
       <span className="flex flex-wrap items-center gap-2">

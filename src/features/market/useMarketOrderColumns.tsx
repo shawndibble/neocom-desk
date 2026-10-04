@@ -193,7 +193,7 @@ export function useMarketOrderColumns({
           const cell = orderJumps(o.system_id);
           return (
             <>
-              {renderJumpsCell(cell, t, 'market.jumpsUnavailableHint')}
+              {renderJumpsCell(cell, t, 'market.jumpsUnavailableHint', o.system_id)}
               {/* The phone card has no Jumps header to say what the bare number is. */}
               {cards && cell.kind === 'value' && cell.count !== null && (
                 <> {t('market.jumpsWord', { count: cell.count })}</>

@@ -1826,6 +1826,7 @@ export function Assets() {
                               `${resolved.station.locationId}:${jumpsFor}`
                             )}
                             t={t}
+                            locationId={resolved.station.locationId}
                           />
                         </span>
                       )}
