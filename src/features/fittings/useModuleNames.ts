@@ -1,15 +1,14 @@
 /** Module names for a Popular fits panel row's rack icon strip (`RackIconStrip.tsx`). */
 import { useEffect, useState } from 'react';
-import { typeName } from '@/sde/loadSde';
 
 /**
- * Names for the given module types, from the SDE; empty until they land.
- * Pass a stable (memoized) list — a new one each render re-reads the names —
- * and a stable `lookUp`, which is for tests.
+ * Names for the given module types, through `lookUp` (the SDE's `typeName`, or
+ * a test's stand-in); empty until they land. Pass a stable (memoized) list — a
+ * new one each render re-reads the names — and a stable `lookUp`.
  */
 export function useModuleNames(
   typeIds: readonly number[] | null,
-  lookUp: (typeId: number) => Promise<string> = typeName
+  lookUp: (typeId: number) => Promise<string>
 ): ReadonlyMap<number, string> {
   const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
   useEffect(() => {

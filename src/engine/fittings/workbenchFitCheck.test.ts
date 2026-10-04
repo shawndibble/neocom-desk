@@ -95,6 +95,16 @@ describe('checkWorkbenchFit', () => {
     expect(check.sightingKey).toBe('3001');
   });
 
+  it('an unread fitted module stays current but is never matched, though the game has it', () => {
+    // A mutated module reads as a fitted line: dropped, the rest could equal a smaller group.
+    const check = checkWorkbenchFit(
+      '[Vexor, A]\nHeavy Neutron Blaster II\nLarge Abyssal Shield Extender',
+      data
+    );
+    expect(check.verdict).toEqual({ current: true });
+    expect(check.sightingKey).toBeNull();
+  });
+
   it('with the game’s names unreadable, an unread item is neither removed nor matched on', () => {
     const check = checkWorkbenchFit('[Vexor, A]\nHeavy Neutron Blaster II\n\nMystery Thing x1', {
       ...data,

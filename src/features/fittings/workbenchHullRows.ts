@@ -59,6 +59,7 @@ import { getHubPrices } from '@/market/prices';
 import { loadFittingSlots, loadGameTypeNames, loadShipTree } from '@/sde/loadSde';
 import { loadFittingFromText } from './loadFittingFromText';
 import { loadPopularFits, type PopularFitsResult } from './popularFits';
+import { yieldToEventLoop } from './yieldToEventLoop';
 import { loadWorkbenchFits, type WorkbenchFit, type WorkbenchFitsResult } from './workbenchFits';
 
 /** What the Workbench rows read from outside. */
@@ -145,8 +146,6 @@ export const workbenchHullSources: WorkbenchHullSources = {
 
 const CHUNK_SIZE = 25;
 
-const nextTask = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
-
 /** Checks by fit id, each held with the EFT it was made from. */
 const checkCache = new Map<string, { eft: string; check: WorkbenchFitCheck }>();
 
@@ -168,7 +167,7 @@ export async function checkWorkbenchFits(
   fits: readonly Pick<WorkbenchFit, 'id' | 'eft'>[],
   data: WorkbenchGameData,
   cancelled: () => boolean = () => false,
-  yieldToUi: () => Promise<void> = nextTask
+  yieldToUi: () => Promise<void> = yieldToEventLoop
 ): Promise<Map<string, WorkbenchFitCheck> | null> {
   const checks = new Map<string, WorkbenchFitCheck>();
   for (let start = 0; start < fits.length; start += CHUNK_SIZE) {
@@ -224,18 +223,8 @@ const askChecks: Ask<readonly WorkbenchFit[], ReadonlyMap<string, WorkbenchFitCh
     // `null` only when cancelled, and a cancelled answer is dropped.
     .then((checks) => checks ?? NO_CHECKS);
 
-const askSightings: Ask<
-  { shipTypeId: number; checks: ReadonlyMap<string, WorkbenchFitCheck> },
-  ReadonlyMap<string, WorkbenchSighting>
-> = (sources, { shipTypeId, checks }) =>
-  checks.size === 0
-    ? Promise.resolve(NO_SIGHTINGS)
-    : sources
-        .popularFits(shipTypeId)
-        .then((popular) =>
-          popular.ok ? matchWorkbenchSightings(checks, popular.fits, shipTypeId) : NO_SIGHTINGS
-        )
-        .catch(() => NO_SIGHTINGS);
+const askPopular: Ask<number, PopularFitsResult> = (sources, shipTypeId) =>
+  sources.popularFits(shipTypeId).catch((): PopularFitsResult => ({ ok: false }));
 
 const askPrices: Ask<
   { hub: TradeHub; typeIds: readonly number[] },
@@ -292,11 +281,15 @@ export function useWorkbenchHullRows(
   const stored = useAnswer(sources, shipTypeId, askFits);
   const fits = stored?.ok ? stored.fits : null;
   const checks = useAnswer(sources, fits, askChecks);
-  const sightingKey = useMemo(
-    () => (checks === null ? null : { shipTypeId, checks }),
-    [shipTypeId, checks]
+  // Asked beside the check, not after it; a hull with no fits asks zKillboard nothing.
+  const popular = useAnswer(sources, fits?.length ? shipTypeId : null, askPopular);
+  const sightings = useMemo(
+    () =>
+      checks !== null && popular?.ok
+        ? matchWorkbenchSightings(checks, popular.fits, shipTypeId)
+        : NO_SIGHTINGS,
+    [checks, popular, shipTypeId]
   );
-  const sightings = useAnswer(sources, sightingKey, askSightings) ?? NO_SIGHTINGS;
 
   const hubId = useMarketHub((state) => state.value);
   const hydrate = useMarketHub((state) => state.hydrate);
@@ -321,21 +314,21 @@ export function useWorkbenchHullRows(
     return priced;
   }, [checks, prices]);
 
-  const verdicts = useMemo(
-    () =>
-      checks === null
-        ? null
-        : new Map([...checks].map(([id, check]): [string, FitCurrency] => [id, check.verdict])),
-    [checks]
-  );
-  const moduleTypeIds = useMemo(
-    () =>
-      checks === null ? null : [...checks.values()].flatMap((c) => c.modules.map((m) => m.typeId)),
-    [checks]
-  );
+  const moduleTypeIds = useMemo(() => {
+    if (checks === null) return null;
+    const ids = new Set<number>();
+    for (const check of checks.values()) for (const { typeId } of check.modules) ids.add(typeId);
+    return [...ids];
+  }, [checks]);
   const { current, outOfDate } = useMemo(
-    () => partitionByCurrency(fits ?? [], verdicts ?? new Map()),
-    [fits, verdicts]
+    () =>
+      partitionByCurrency(
+        fits ?? [],
+        new Map(
+          [...(checks ?? [])].map(([id, check]): [string, FitCurrency] => [id, check.verdict])
+        )
+      ),
+    [fits, checks]
   );
   // Held against the fits it was asked for, so another hull starts hidden again.
   const [shownFor, setShownFor] = useState<readonly WorkbenchFit[] | null>(null);

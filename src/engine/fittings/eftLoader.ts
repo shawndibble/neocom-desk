@@ -51,7 +51,7 @@ export type EftSlotLookup = Readonly<Record<string, FittingSlotAssignment>>;
  * tells a fitted module (never gets one) apart from a single spare sitting
  * in cargo (EVE's own export always writes one, even for `x1`).
  */
-const HAS_QUANTITY_SUFFIX = /^.*\S\s+x\d+$/i;
+export const HAS_QUANTITY_SUFFIX = /^.*\S\s+x\d+$/i;
 
 export function resolveTypeId(name: string, typeByName: EftTypeLookup): number | null {
   return typeByName.get(name.toLowerCase())?.typeID ?? null;

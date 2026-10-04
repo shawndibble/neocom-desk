@@ -30,6 +30,7 @@ export interface PopularFitsSources extends WorkbenchHullSources {
 
 const POPULAR_FITS_SOURCES: PopularFitsSources = {
   ...workbenchHullSources,
+  // Read when called, not now: a test mocking `@/sde/loadSde` may leave it out.
   typeName: (typeId) => typeName(typeId),
 };
 

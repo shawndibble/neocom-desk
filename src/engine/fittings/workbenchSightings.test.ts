@@ -82,6 +82,7 @@ const GAME_ITEMS = gameItemLookup([
   'Thorax',
   'Heavy Neutron Blaster II',
   'Fierce Exotic Filament',
+  'Gravid Warp Scrambler',
 ]);
 
 function checks(fits: { id: string; eft: string }[], isGameItem: GameItemLookup = GAME_ITEMS) {
@@ -156,6 +157,12 @@ Medium Auxiliary Nano Pump I`;
     expect(match([{ id: 'j', eft: gone }]).size).toBe(0);
     const filament = `${EFT}\nFierce Exotic Filament x3`;
     expect(match([{ id: 'k', eft: filament }], HULL, null).size).toBe(0);
+  });
+
+  it('leaves out a fit with an unread fitted module, even one the game still has', () => {
+    // A mutated module reads as a fitted line: dropped, the rest would equal the group.
+    const mutated = EFT.replace('Warp Scrambler II', 'Warp Scrambler II\nGravid Warp Scrambler');
+    expect(match([{ id: 'l', eft: mutated }]).size).toBe(0);
   });
 
   it('matches nothing when there are no Popular fits', () => {

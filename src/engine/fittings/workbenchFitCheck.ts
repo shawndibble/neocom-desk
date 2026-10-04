@@ -4,14 +4,16 @@
  * modules its rack icons draw, the item counts its price sums, and the key
  * "Seen on zKillboard" matches it by (`workbenchSightings.ts`).
  *
- * An item the loader couldn't read is read by one rule, `unreadItemStatus`:
- * one the game still has neither makes the fit out of date nor stops it
- * matching (#2513, #2536) — the loader's catalogue leaves out Abyssal
- * filaments, LP boosters and mutated modules, which Workbench fits carry all
- * the time. One the game no longer has, or one nobody can tell (the game's
- * names unreadable), keeps the fit from matching: a dropped line could make
- * it equal a smaller group it isn't, and a missed badge is harmless where a
- * false one is not.
+ * An item the loader couldn't read is judged by one rule, `unreadItemStatus`
+ * (#2513): one the game still has never makes the fit out of date — the
+ * loader's catalogue leaves out Abyssal filaments, LP boosters and mutated
+ * modules, which Workbench fits carry all the time. For matching (#2536) such
+ * a line is overlooked only when it is written with a count (`x1`): that can
+ * never load as a fitted module, so it can't change the key. An unread line
+ * without a count may be a fitted module (a mutated one, say) and still rules
+ * the fit out, as does an item the game no longer has or one nobody can tell
+ * (the game's names unreadable): matching on what's left could equal a
+ * smaller group, and a missed badge is harmless where a false one is not.
  *
  * What it keeps is small on purpose — rack and type per module, counts per
  * type — since a caller caches one per fit across every hull it has shown.
@@ -23,7 +25,12 @@ import {
   type GameItemLookup,
   type HullSlotCounts,
 } from './fitCurrency';
-import { loadEftFitting, type EftSlotLookup, type EftTypeLookup } from './eftLoader';
+import {
+  HAS_QUANTITY_SUFFIX,
+  loadEftFitting,
+  type EftSlotLookup,
+  type EftTypeLookup,
+} from './eftLoader';
 import { fittingItemCounts } from './fittingExport';
 import type { ItemCount } from './fitSellPrice';
 import type { LoadParts } from './load';
@@ -57,11 +64,19 @@ export interface WorkbenchFitCheck {
   sightingKey: string | null;
 }
 
-/** Every line loaded, or the only ones that didn't are items the game still has. */
-function loadedAsTheGameHasIt(parts: LoadParts, isGameItem: GameItemLookup): boolean {
+/**
+ * Its modules are all there: every line loaded, or the only ones that didn't
+ * are counted (never fitted) items the game still has.
+ */
+function modulesAreWhole(eft: string, parts: LoadParts, isGameItem: GameItemLookup): boolean {
+  if (parts.unresolved.length === 0) return true;
+  const lines = eft.split(/\r\n|\r|\n/);
   return parts.unresolved.every(
     (warning) =>
-      warning.kind === 'unknown-item' && unreadItemStatus(warning.text, isGameItem) === 'in-game'
+      warning.kind === 'unknown-item' &&
+      warning.line !== undefined &&
+      HAS_QUANTITY_SUFFIX.test((lines[warning.line - 1] ?? '').trim()) &&
+      unreadItemStatus(warning.text, isGameItem) === 'in-game'
   );
 }
 
@@ -91,6 +106,6 @@ export function checkWorkbenchFit(eft: string, data: WorkbenchGameData): Workben
         fighters: parts.fighters,
       }),
     ],
-    sightingKey: loadedAsTheGameHasIt(parts, data.isGameItem) ? popularFitKey(parts.modules) : null,
+    sightingKey: modulesAreWhole(eft, parts, data.isGameItem) ? popularFitKey(parts.modules) : null,
   };
 }
