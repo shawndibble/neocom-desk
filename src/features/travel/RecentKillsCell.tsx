@@ -49,7 +49,7 @@ function LocationLine({ location }: { location: RecentKillLocation }) {
           minutes: location.minutesSinceLast,
         });
   return (
-    <span className="inline-flex items-center gap-1.5 sm:whitespace-nowrap">
+    <span className="inline-flex flex-wrap items-center gap-1.5">
       <span className={location.onPath ? 'font-semibold text-accent' : 'text-text-dim'}>
         {text}
       </span>
@@ -64,7 +64,8 @@ function LocationLine({ location }: { location: RecentKillLocation }) {
 /**
  * The row's own line (issue #2474): the count, then only the kills on a gate
  * along the route. Kills anywhere else wait in the row's detail
- * (`RecentKillsDetail`), so every row stays one line high.
+ * (`RecentKillsDetail`), so a row stays short. The on-route line wraps in a
+ * narrow column rather than widening the table past its panel.
  */
 export function RecentKillsCell({ systemId, cell }: { systemId: number; cell: RouteKillsCell }) {
   const { t } = useTranslation();
@@ -74,7 +75,7 @@ export function RecentKillsCell({ systemId, cell }: { systemId: number; cell: Ro
   }
   const { summary } = cell;
   return (
-    <span className="inline-flex flex-wrap items-center gap-x-3 text-left sm:flex-nowrap sm:whitespace-nowrap">
+    <span className="inline-flex flex-wrap items-center gap-x-3 text-left">
       <a
         href={systemZkillUrl(systemId)}
         target="_blank"
