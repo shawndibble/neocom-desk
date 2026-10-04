@@ -143,12 +143,6 @@ interface SourcingInputProps {
   describedBy?: string;
   /** The player's own number (a typed price, a claimed owned count): shown in the accent, the app's "you set this" cue. */
   mine?: boolean;
-  /**
-   * Drawn as plain text — no box, no fill — for a field that sits in a cell
-   * which is itself the visible, tappable control (the phone card's Have
-   * cell). The focus ring stays.
-   */
-  bare?: boolean;
   /** Takes focus on mount — a field the player has just asked to edit. */
   autoFocus?: boolean;
   parse: (raw: string) => number | undefined;
@@ -183,7 +177,6 @@ export function SourcingInput({
   invalid,
   describedBy,
   mine = false,
-  bare = false,
   autoFocus,
   parse,
   onCommit,
@@ -228,12 +221,7 @@ export function SourcingInput({
       // label that names them.
       // `!`: the field's base class sets `text-text`, and two colour utilities
       // on one element resolve by stylesheet order, not by class order.
-      className={cx(
-        widthClassName,
-        'text-left tabular-nums sm:text-right',
-        mine && 'text-accent!',
-        bare && 'h-7! border-transparent! bg-transparent! px-0!'
-      )}
+      className={cx(widthClassName, 'text-left tabular-nums sm:text-right', mine && 'text-accent!')}
       autoFocus={autoFocus}
       // Three states, and the order matters. A typed draft wins, verbatim — a
       // half-finished "6622." has to survive a keystroke a formatter would
@@ -466,12 +454,8 @@ function isBuilt(material: MaterialTableRow): boolean {
   return material.subBuilds.length > 0;
 }
 
-/** The phone card's Need | Have | Buy strip: a caption over a 44px value row, so a field and a figure sit level. */
-const STRIP_CELL = 'flex min-w-0 flex-col gap-0.5 px-2 pt-1.5 pb-1';
-const STRIP_LABEL = 'text-[0.5625rem] font-semibold tracking-widest text-text-dim uppercase';
-// No 44px value row: the cell as a whole is over 44px tall, and the Have
-// cell — the one that is tapped — is the field's label.
-const STRIP_VALUE = 'flex min-h-7 items-center';
+/** A number in the phone ledger, right-aligned under its section's column header. */
+const LEDGER_VALUE = 'flex min-w-0 justify-end text-sm tabular-nums';
 
 /** How long the "moved to …" confirmation stays up — the same beat every other Undo toast in the app keeps. */
 const TOAST_MS = 8000;
@@ -649,6 +633,8 @@ export function MaterialsTable({
   // The phone card whose price field is open; every other card shows its
   // price as text.
   const [editingPrice, setEditingPrice] = useState<number | null>(null);
+  // Same for the ledger's Have number.
+  const [editingHave, setEditingHave] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; undo: () => void } | null>(null);
 
   // Have edits not yet seen to land: what the field held before, and what the
@@ -934,7 +920,12 @@ export function MaterialsTable({
     );
   }
 
-  function renderHave(material: MaterialTableRow, withHint = true, fill = false) {
+  function renderHave(
+    material: MaterialTableRow,
+    withHint = true,
+    fill = false,
+    autoFocus = false
+  ) {
     // Blueprint Acquisition (issue #838): ownership comes entirely from the
     // Character's real BPO/BPC, never from a typed quantity — an editable
     // field here would silently do nothing.
@@ -955,7 +946,7 @@ export function MaterialsTable({
           label={t('industry.errands.haveFor', { material: nameFor(material.typeID) })}
           inputMode="numeric"
           widthClassName={fill ? 'w-full' : 'w-20'}
-          bare={fill}
+          autoFocus={autoFocus}
           placeholder="0"
           mine={owned !== undefined && owned > 0}
           parse={parseCount}
@@ -1263,12 +1254,13 @@ export function MaterialsTable({
   }
 
   /**
-   * One phone card: name and total, then a Need | Have | Buy strip — the same
-   * three cells in the same place on every card, Have a real field filling
-   * its cell — then the row's action on the left and its price, or what a
-   * build saves, on the right. A Building card says Build instead of Buy and
-   * is edged green; a Blueprint card skips the strip, is edged pink, and an
-   * owned one says Owned instead of a total and a price of 0.
+   * One phone ledger row, under its section's NEED | HAVE | BUY header: the
+   * name and total; the three numbers in the header's columns, Have a dashed
+   * number you tap to edit; then the row's action on the left and its price
+   * (or what a build saves) on the right. No card and no box — rows are told
+   * apart by a zebra tint, so the Materials panel is the only frame. A
+   * Blueprint row has no numbers line, and an owned one says Owned instead of
+   * a total and a price of 0.
    */
   function renderPhoneRow(material: MaterialTableRow) {
     const building = isBuilt(material);
@@ -1279,16 +1271,13 @@ export function MaterialsTable({
       <li
         key={material.typeID}
         className={cx(
-          // A fill, not a border: the Materials panel is already the frame,
-          // and a bordered card in it with a bordered strip in that read as
-          // boxes in boxes in boxes. The section heading carries the colour.
-          'flex flex-col gap-2 rounded-md bg-panel-2 p-3',
+          'grid grid-cols-3 gap-x-1.5 gap-y-1 px-3 py-2 even:bg-white/[0.025]',
           ownedBlueprint && 'opacity-80'
         )}
       >
-        <div className="flex items-center justify-between gap-2">
+        <div className="col-span-3 flex items-center justify-between gap-2">
           <span className="min-w-0 text-sm font-semibold">{renderName(material, false, true)}</span>
-          <span className="flex shrink-0 items-center gap-1 text-sm font-bold tabular-nums">
+          <span className="flex shrink-0 items-center gap-1 text-sm font-semibold tabular-nums">
             {ownedBlueprint ? (
               <span className="rounded-xs border border-blueprint-copy/50 px-1.5 text-[0.625rem] leading-5 font-bold tracking-widest text-blueprint-copy uppercase">
                 {t('industry.blueprintAcquisitionOwned')}
@@ -1300,36 +1289,18 @@ export function MaterialsTable({
           </span>
         </div>
         {!tier && (
-          <div className="grid grid-cols-3 text-sm tabular-nums">
-            <div className={STRIP_CELL}>
-              <span className={STRIP_LABEL}>{t('industry.errands.need')}</span>
-              <span className={STRIP_VALUE}>{material.quantity.toLocaleString()}</span>
-            </div>
-            {/* A label, so a tap anywhere in the cell lands in the field. */}
-            <label className={cx(STRIP_CELL, 'rounded-sm bg-bg/70')}>
-              <span
-                className={cx(STRIP_LABEL, 'inline-flex items-center gap-1')}
-                aria-hidden="true"
-              >
-                {t('industry.errands.haveColumn')}
-                <Icon.Rename size={10} />
-              </span>
-              {renderHave(material, false, true)}
-            </label>
-            <div className={cx(STRIP_CELL, 'border-l border-line')}>
-              <span className={STRIP_LABEL}>
-                {t(building ? 'industry.errands.buildColumn' : 'industry.errands.buyColumn')}
-              </span>
-              <span className={cx(STRIP_VALUE, 'font-semibold')}>
-                {material.remainingQuantity.toLocaleString()}
-              </span>
-            </div>
-          </div>
+          <>
+            <span className={LEDGER_VALUE}>{material.quantity.toLocaleString()}</span>
+            <span className={LEDGER_VALUE}>{renderPhoneHave(material)}</span>
+            <span className={cx(LEDGER_VALUE, 'font-semibold')}>
+              {material.remainingQuantity.toLocaleString()}
+            </span>
+          </>
         )}
         {/* What to do about the row on the left — use what's in the hangar,
             switch build/buy, change the blueprint tier — and on the right its
             price as "@ price", or what building it saves. */}
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <div className="col-span-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <span className="flex min-w-0 flex-wrap items-center gap-x-3">
             {renderOwnedHint(material)}
             {renderAction(material, false)}
@@ -1357,6 +1328,46 @@ export function MaterialsTable({
       <Fragment key={material.typeID}>{rowContextMenu(material, item)}</Fragment>
     ) : (
       item
+    );
+  }
+
+  /**
+   * The ledger's Have: the number with a dashed underline — the price's own
+   * "tap to edit" cue — rather than a field stretched across its column. Blue
+   * when the player set it, faint at 0. A tap swaps in the field, focused;
+   * leaving it swaps the number back. The 44px tap area is an invisible
+   * `::after`, so the row stays one line tall.
+   */
+  function renderPhoneHave(material: MaterialTableRow) {
+    if (editingHave === material.typeID) {
+      return (
+        <span
+          className="w-full"
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              setEditingHave(null);
+            }
+          }}
+        >
+          {renderHave(material, false, true, true)}
+        </span>
+      );
+    }
+    const owned = sourcing?.[material.typeID]?.ownedQuantity ?? 0;
+    return (
+      <button
+        type="button"
+        onClick={() => setEditingHave(material.typeID)}
+        className={cx(
+          'relative tabular-nums underline decoration-dashed underline-offset-4 after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[""] focus-visible:outline-2 focus-visible:outline-accent',
+          owned > 0 ? 'text-accent decoration-accent-dim' : 'text-text-faint decoration-line-bright'
+        )}
+      >
+        <span className="sr-only">
+          {t('industry.errands.haveFor', { material: nameFor(material.typeID) })},{' '}
+        </span>
+        {owned.toLocaleString()}
+      </button>
     );
   }
 
@@ -1471,9 +1482,31 @@ export function MaterialsTable({
             )}
             {open &&
               (isPhone ? (
-                <ul className="flex flex-col gap-2 py-2">
-                  {sortForPhone(rows).map((material) => renderPhoneRow(material))}
-                </ul>
+                <>
+                  {/* The ledger's column header, printed once per section
+                      rather than as a label on every row. A Blueprint section
+                      has no numbers to head. */}
+                  {errand !== 'blueprint' && (
+                    <div
+                      className="grid grid-cols-3 gap-x-1.5 border-b border-line px-3 pt-2 pb-1 text-[0.5625rem] font-semibold tracking-widest text-text-dim uppercase"
+                      aria-hidden="true"
+                    >
+                      <span className="text-right">{t('industry.errands.need')}</span>
+                      <span className="inline-flex items-center justify-end gap-1">
+                        {t('industry.errands.haveColumn')}
+                        <Icon.Rename size={10} />
+                      </span>
+                      <span className="text-right">
+                        {t(
+                          errand === 'building'
+                            ? 'industry.errands.buildColumn'
+                            : 'industry.errands.buyColumn'
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  <ul>{sortForPhone(rows).map((material) => renderPhoneRow(material))}</ul>
+                </>
               ) : (
                 <div className="overflow-x-auto">
                   <DataTable
