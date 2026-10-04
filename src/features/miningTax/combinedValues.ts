@@ -1,7 +1,7 @@
 import type { MiningTaxAssignmentRecord } from '@/db';
 
 /**
- * What each ore line of one day starts at in the combined entry's edit form
+ * What each ore line of one day starts at in an entry's edit form
  * (`EntryEditDialog`): the day's own per-ore corrections when it has
  * them, otherwise its billed `estimatedValue` shared out by each line's
  * market worth on the mined date — or by units when nothing is priced. A
@@ -35,7 +35,7 @@ export interface CombinedDayValues {
 }
 
 /**
- * One day's figures as the combined edit form would save them. A day with no
+ * One day's figures as the edit form would save them, per-ore mode. A day with no
  * edited line keeps the value it was billed at, and its tax owed too unless
  * the rate changed; an edited day is re-totalled from its lines — the edited
  * ones as typed, the rest at their `lineDefaults` share — and stores them as

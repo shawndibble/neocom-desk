@@ -70,8 +70,8 @@ function candidateKey(candidate: JoinCandidate): string {
  * two dates are joined each keeps its own independently hub-priced value —
  * a blended, hand-typed total across two different ledger entries has no
  * single obvious meaning. A correction after the fact goes through the
- * ordinary single-Assignment editor for that one member
- * (`GroupSummaryModal`'s per-member Edit), not this dialog.
+ * combined entry's Edit (`EntryEditDialog`), which keeps each day's own
+ * value, not this dialog.
  *
  * Payee/tax % are only pickable when *neither* side is assigned yet; the
  * moment either side already has an Assignment, joining means adopting that

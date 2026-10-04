@@ -943,7 +943,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     void runAndClose(() => markAssignmentsPaid(outstanding));
   }
 
-  /** The Assign form's create-or-edit submit, from inside RowDetailModal — same refresh-and-close every other row action takes. */
+  /** The Assign form's submit, from inside RowDetailModal — same refresh-and-close every other row action takes. */
   function handleAssignedFromDetail() {
     setDetailTarget(null);
     refresh();

@@ -88,9 +88,9 @@ interface RowDetailModalProps {
  * last used in its system pre-selected. An assigned one opens as a summary —
  * who it's owed to, how much, what was mined — with one main action for its
  * status (Settle up when owed, Accept new total when grown) and Edit, which
- * opens the same `EntryEditDialog` a combined entry uses. Everything rarer (split, combine, link a payment, unassign)
- * lives in the More menu beside the title, and Unassign asks first: it
- * deletes the Assignment.
+ * opens the same `EntryEditDialog` a combined entry uses. Everything rarer
+ * (split, combine, link a payment, unassign) lives in the More menu beside
+ * the title, and Unassign asks first: it deletes the Assignment.
  */
 export function RowDetailModal({
   open,
