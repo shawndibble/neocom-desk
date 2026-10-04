@@ -8,7 +8,7 @@ import { createLocalSetting } from '@/lib/useLocalSetting';
 
 /**
  * In table column order. Sell only ever renders the `baseColumns` prefix
- * (`price` through `expiry`; `depth` is the running Cum. qty); Buy adds `range` and `minVolume` after `expiry`.
+ * (`price` through `expiry`); Buy adds `range` and `minVolume` after `expiry`.
  * Neither table can lose its columns entirely — there is no identity column
  * here to hold back, but every id defaults visible below, so a picker fresh
  * off this release changes nothing until a pilot actually opens it.
@@ -16,7 +16,6 @@ import { createLocalSetting } from '@/lib/useLocalSetting';
 export const MARKET_ORDER_COLUMN_IDS = [
   'price',
   'quantity',
-  'depth',
   'jumps',
   'location',
   'security',
@@ -31,7 +30,6 @@ export type MarketOrderColumnId = (typeof MARKET_ORDER_COLUMN_IDS)[number];
 export const SELL_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = [
   'price',
   'quantity',
-  'depth',
   'jumps',
   'location',
   'security',
@@ -52,8 +50,11 @@ export const VISIBLE_MARKET_ORDER_COLUMNS_KEY = 'marketOrderVisibleColumns';
 export const useVisibleMarketOrderColumns = createLocalSetting<readonly MarketOrderColumnId[]>({
   key: VISIBLE_MARKET_ORDER_COLUMNS_KEY,
   defaultValue: DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS,
-  parse: (raw) =>
-    Array.isArray(raw) && raw.length > 0 && raw.every(isMarketOrderColumnId)
-      ? (raw as MarketOrderColumnId[])
-      : null,
+  // Unknown ids are dropped rather than voiding the whole preference: a
+  // retired column (Cum. qty's `depth`) shouldn't reset a pilot's picks.
+  parse: (raw) => {
+    if (!Array.isArray(raw)) return null;
+    const known = raw.filter(isMarketOrderColumnId);
+    return known.length > 0 ? known : null;
+  },
 });

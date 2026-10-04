@@ -23,9 +23,9 @@ import { BaitFlag, LocationCell, SecurityCell } from '@/features/market/marketOr
 import { renderJumpsCell } from '@/features/route/jumpsCell';
 import type { JumpRangeFilter, JumpsCellValue } from '@/features/route/currentSystem';
 import type { RegionOrder } from '@/esi/endpoints';
-import { formatIsk } from '@/lib/isk';
+import { formatMarketIsk } from '@/lib/isk';
 import { rangeLabel } from '@/features/market/orderBookCsv';
-import { sellOutlierMultiple, type DepthAt } from '@/engine/market/orderBookDepth';
+import { sellOutlierMultiple } from '@/engine/market/orderBookDepth';
 
 /**
  * Ordinal rank for an order's `range`: station, then solarsystem, then a
@@ -47,8 +47,6 @@ export interface UseMarketOrderColumnsArgs {
   solarSystemMap: ReadonlyMap<number, SolarSystemLookup>;
   myOrderIds: ReadonlySet<number>;
   jumpRangeFilter: JumpRangeFilter;
-  /** Running units/ISK per order id, each side walked best-first (`bookDepth`). */
-  depthByOrder: ReadonlyMap<number, DepthAt>;
   /** The book's best sell, which a bait-priced sell order is measured against. */
   bestSell: number | null;
   /**
@@ -75,7 +73,6 @@ export function useMarketOrderColumns({
   solarSystemMap,
   myOrderIds,
   jumpRangeFilter,
-  depthByOrder,
   bestSell,
   cards,
 }: UseMarketOrderColumnsArgs): MarketOrderColumns {
@@ -123,7 +120,7 @@ export function useMarketOrderColumns({
             {!o.is_buy_order && (
               <BaitFlag multiple={sellOutlierMultiple(o.price, bestSell)} t={t} />
             )}
-            {formatIsk(o.price, 2)}
+            {formatMarketIsk(o.price)}
             {/*
               The tinted row (`row-mine`, styles/index.css) is the visible
               marker for "this one is mine" — no badge, no gap figure,
@@ -145,25 +142,6 @@ export function useMarketOrderColumns({
         stackAffix: { before: t('market.quantityAffix') },
         render: (o) => formatVolume(o.volume_remain),
         sortValue: (o) => o.volume_remain,
-      },
-      depth: {
-        id: 'depth',
-        header: t('market.depthColumn'),
-        headerTooltip: t('market.depthHint'),
-        align: 'right',
-        // Only where the table has the room: below ~1680px the Location
-        // column needs it, and the expanded row's "buying down to here"
-        // carries the same figure.
-        className: 'tabular-nums text-text-dim max-[105rem]:hidden',
-        headerCellClassName: 'max-[105rem]:hidden',
-        // Walked best-first whatever the table is sorted by: "units at this
-        // price or better" is a fact of the book, not of the current sort.
-        sortValue: (o) => depthByOrder.get(o.order_id)?.units,
-        render: (o) => {
-          const depth = depthByOrder.get(o.order_id);
-          // Omitted from the phone card, which the expanded row covers.
-          return <span data-dense-omit="">{depth ? formatVolume(depth.units) : '—'}</span>;
-        },
       },
       location: {
         id: 'location',
@@ -255,7 +233,7 @@ export function useMarketOrderColumns({
         sortValue: (o) => o.min_volume,
       },
     }),
-    [t, npcStationMap, solarSystemMap, myOrderIds, orderJumps, depthByOrder, bestSell, cards]
+    [t, npcStationMap, solarSystemMap, myOrderIds, orderJumps, bestSell, cards]
   );
 
   const baseColumns = useMemo<DataTableColumn<RegionOrder>[]>(

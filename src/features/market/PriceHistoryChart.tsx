@@ -28,7 +28,7 @@ import {
   GROUPED_NUMBER_Y_AXIS_WIDTH,
 } from '@/lib/chartAxis';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { formatIsk, formatIskCompact, formatMarketIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatPriceRange, formatVolume } from './format';
 import { priceHistoryCsvColumns } from './priceHistoryCsv';
@@ -121,7 +121,7 @@ function HistoryTooltip({
     <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs tabular-nums text-text shadow-lg shadow-black/50">
       <p className="font-semibold">{label}</p>
       <p>
-        {t('market.priceHistory.average')}: {formatIsk(point.average, 2)}
+        {t('market.priceHistory.average')}: {formatMarketIsk(point.average)}
       </p>
       <p>
         {t('market.priceHistory.priceRange')}: {formatPriceRange(point.lowest, point.highest)}
@@ -254,7 +254,7 @@ export default function PriceHistoryChart({
       {
         id: 'average',
         header: t('market.priceHistory.average'),
-        render: (p) => formatIsk(p.average, 2),
+        render: (p) => formatMarketIsk(p.average),
         sortValue: (p) => p.average,
       },
       {

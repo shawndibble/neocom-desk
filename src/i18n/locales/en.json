@@ -6398,8 +6398,6 @@
     },
     "emptySellBlueprintHint": "Copies of this blueprint are traded on contract, not on the market.",
     "searchBpcContracts": "Search BPC contracts",
-    "depthColumn": "Cum. qty",
-    "depthHint": "Units at this price or better: what buying (or selling into) the book down to this row would take.",
     "jumpsWord_one": "jump",
     "jumpsWord_other": "jumps",
     "rangeAffix": "range ",
@@ -6418,7 +6416,8 @@
       "jumpsAway_one": "{{count}} jump from {{system}}",
       "jumpsAway_other": "{{count}} jumps from {{system}}",
       "sheetTitle": "Where to look",
-      "clearRange": "Clear range"
+      "clearRange": "Clear range",
+      "noteLabel": "What else this covers"
     },
     "summary": {
       "bestSell": "Best sell",
@@ -6452,7 +6451,6 @@
       "count_one": "{{count}} skill",
       "count_other": "{{count}} skills"
     },
-    "rangeOverridesHeader": "Distance filter overrides this for the order book",
     "quantityAffix": "×"
   },
   "error": {

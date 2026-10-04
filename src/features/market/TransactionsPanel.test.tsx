@@ -274,8 +274,8 @@ describe('TransactionsPanel — margin', () => {
     load([taxFor(2, -49_766.4), taxFor(3, -100)]);
     renderPanel();
     const row = await screen.findByRole('row', { name: /Damage Control II.*Sell/ });
-    // 3 × 460,800 − 3 × 400,000 − 49,766.40
-    expect(marginCell(row)).toHaveTextContent('132,633.60');
+    // 3 × 460,800 − 3 × 400,000 − 49,766
+    expect(marginCell(row)).toHaveTextContent('132,634');
   });
 
   it('shows a dash, never a zero-cost margin, for a sale no wallet buy covers', async () => {
@@ -345,9 +345,9 @@ describe('TransactionsPanel — phone', () => {
     expect(within(summary).getByText('-100,000')).toBeInTheDocument();
     expect(within(summary).getByText('+1,282,400')).toBeInTheDocument();
     // Day net and a row total both carry their sign, not colour alone.
-    expect(screen.getByText('+1,282,400.00')).toBeInTheDocument();
-    expect(screen.getByText('+1,382,400.00')).toBeInTheDocument();
-    expect(screen.getByText('-100,000.00')).toBeInTheDocument();
+    expect(screen.getByText('+1,282,400')).toBeInTheDocument();
+    expect(screen.getByText('+1,382,400')).toBeInTheDocument();
+    expect(screen.getByText('-100,000')).toBeInTheDocument();
   });
 
   it('says when the fetch stopped at the page cap', async () => {

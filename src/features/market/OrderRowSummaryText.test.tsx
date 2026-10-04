@@ -43,7 +43,7 @@ describe('OrderRowSummaryText relist price', () => {
       written.push(text);
     });
     render(<OrderRowSummaryText row={BASE_ROW} copyRelistPrice />);
-    const price = screen.getByRole('button', { name: '→ 439,900.00' });
+    const price = screen.getByRole('button', { name: '→ 439,900' });
     expect(price.querySelector('svg')).toBeNull();
     await userEvent.setup().click(price);
     expect(written).toEqual(['439900']);

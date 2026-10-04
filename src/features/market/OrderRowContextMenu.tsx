@@ -15,7 +15,7 @@ import {
   type SolarSystemLookup,
 } from '@/engine/market/orderBook';
 import type { RegionOrder } from '@/esi/endpoints';
-import { formatIsk } from '@/lib/isk';
+import { formatMarketIsk } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatOrderLocationText } from './format';
 import { priceClipboardText } from './priceClipboardText';
@@ -43,7 +43,7 @@ export function OrderRowContextMenu({
   const { t } = useTranslation();
   const location = resolveOrderLocation(order, npcStations, solarSystems);
   const locationText = formatOrderLocationText(location, t('market.unknownStructure'));
-  const priceText = `${formatIsk(order.price, 2)} ISK`;
+  const priceText = `${formatMarketIsk(order.price)} ISK`;
 
   return (
     <RowActionsMenu
