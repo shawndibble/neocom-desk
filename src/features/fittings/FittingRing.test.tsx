@@ -439,6 +439,14 @@ describe('FittingRing with the editor’s item actions', () => {
     expect(actions.remove).toHaveBeenCalledWith('high', 0);
   });
 
+  it('asks how many of a module’s charge to put in the cargo, from its menu', async () => {
+    const actions = fakeItemActions({ names });
+    renderRing(actions);
+    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Put EMP S in cargo…' }));
+    expect(actions.changeCargoQuantity).toHaveBeenCalledWith(20);
+  });
+
   it('loads a module’s charge into every compatible module from its menu', async () => {
     const actions = fakeItemActions({ names });
     renderRing(actions);
