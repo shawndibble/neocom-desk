@@ -13,6 +13,8 @@ import { IskAmount, TypeIcon } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
+import { priceComparison } from '@/engine/market/orderBookDepth';
+import { formatIskCompact } from '@/lib/isk';
 import { ItemContextMenu } from './ItemContextMenu';
 import type { VariationRow } from './variations';
 import { variationsCsvColumns } from './variationsCsv';
@@ -37,6 +39,18 @@ export interface VariationsTableProps {
   onSelect: (typeId: number) => void;
   /** Adds every row currently shown here to the Compare Set and opens the Compare drawer on Attributes — both the header button and each row's "Compare Variations" menu action. */
   onCompare: () => void;
+  /** The item the rows vary, which each row's price is measured against. */
+  selfName: string;
+  /** Its own book at the same location the rows are priced at; `undefined` while loading. */
+  selfSummary: OrderBookSummary | undefined;
+  /** Where the rows are priced: the header's hub or region. */
+  scopeName: string;
+}
+
+/** "+1.44M" / "−350.1K": compact, and signed so the colour never carries it alone. */
+function signedCompactIsk(value: number): string {
+  const text = formatIskCompact(Math.abs(value));
+  return value > 0 ? `+${text}` : value < 0 ? `−${text}` : text;
 }
 
 /**
@@ -58,7 +72,15 @@ function priceCell(
   return t('market.variations.noOrders');
 }
 
-export function VariationsTable({ rows, prices, onSelect, onCompare }: VariationsTableProps) {
+export function VariationsTable({
+  rows,
+  prices,
+  onSelect,
+  onCompare,
+  selfName,
+  selfSummary,
+  scopeName,
+}: VariationsTableProps) {
   const { t } = useTranslation();
   const csvColumns = useMemo(() => variationsCsvColumns(t, prices), [t, prices]);
   const tableExport = useTableExport({ surface: 'market-variations', rows, columns: csvColumns });
@@ -72,6 +94,10 @@ export function VariationsTable({ rows, prices, onSelect, onCompare }: Variation
       </ItemContextMenu>
     );
   }
+
+  /** A row's best sell against the item it varies. */
+  const versusSelf = (row: VariationRow) =>
+    priceComparison(selfSummary?.bestSell ?? null, prices.get(row.typeId)?.bestSell ?? null);
 
   // Sibling-fallback rows carry no meta-group classification, so the column would be all dashes.
   const hasTier = rows.some((row) => row.tier !== null);
@@ -118,14 +144,49 @@ export function VariationsTable({ rows, prices, onSelect, onCompare }: Variation
       sortValue: (row) => prices.get(row.typeId)?.bestBuy ?? undefined,
       render: (row) => priceCell(prices.get(row.typeId), 'buy', t),
     },
+    {
+      id: 'delta',
+      header: t('market.variations.versus', { name: selfName }),
+      headerTooltip: t('market.variations.versusHint', { name: selfName }),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (row) => versusSelf(row)?.delta,
+      render: (row) => {
+        const delta = versusSelf(row);
+        if (delta === null) return <span className="text-text-dim">—</span>;
+        return (
+          // Cheaper than the item you opened reads as good news.
+          <span
+            className={delta.delta < 0 ? 'text-isk-pos' : delta.delta > 0 ? 'text-isk-neg' : ''}
+          >
+            {signedCompactIsk(delta.delta)}
+          </span>
+        );
+      },
+    },
   ];
 
+  // Tiers group, so a twenty-row variation list reads as Tech I, Faction,
+  // Officer…; a tier nobody sells here folds shut on its own (Officer
+  // modules, mostly), still one click away. A sibling-fallback list has no
+  // tiers and stays flat.
+  const hasSellOrders = (group: readonly VariationRow[]) =>
+    group.some((row) => {
+      const summary = prices.get(row.typeId);
+      return summary === undefined || summary.bestSell !== null;
+    });
+
   return (
-    <div className="border-t border-line px-3 py-2">
-      <div className="flex items-center justify-between gap-2 pb-1">
-        <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('market.variations.title')}
-        </h2>
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
+          <h2 className="m-0 text-xs font-semibold tracking-widest uppercase">
+            {t('market.variations.title')}
+          </h2>
+          <span className="text-xs text-text-dim">
+            {t('market.variations.pricedAt', { scope: scopeName })}
+          </span>
+        </div>
         <span className="flex items-center gap-2">
           <TableActionsMenu name={t('market.variations.title')} tableExport={tableExport} />
           <Button size="sm" onClick={onCompare}>
@@ -133,6 +194,18 @@ export function VariationsTable({ rows, prices, onSelect, onCompare }: Variation
           </Button>
         </span>
       </div>
+      <p className="m-0 flex flex-wrap items-baseline gap-x-3 border border-accent-dim bg-panel-2 px-3 py-1.5 text-xs">
+        <span className="font-semibold">{selfName}</span>
+        <span className="text-[0.6875rem] text-accent uppercase">
+          {t('market.variations.thisItem')}
+        </span>
+        <span className="tabular-nums">
+          {t('market.variations.sell')} {priceCell(selfSummary, 'sell', t)}
+        </span>
+        <span className="text-text-dim tabular-nums">
+          {t('market.variations.buy')} {priceCell(selfSummary, 'buy', t)}
+        </span>
+      </p>
       <div className="overflow-x-auto">
         <DataTable
           {...tableExport.tableProps}
@@ -146,6 +219,30 @@ export function VariationsTable({ rows, prices, onSelect, onCompare }: Variation
           rowContextMenu={rowContextMenu}
           rowMoreActions
           mobileSort
+          groupBy={
+            hasTier
+              ? {
+                  key: (row) => row.tier,
+                  allWidths: true,
+                  defaultExpanded: hasSellOrders,
+                  renderHeader: (group) => (
+                    <span className="flex flex-wrap items-baseline gap-x-2">
+                      <span className="text-[0.6875rem] font-semibold tracking-widest uppercase">
+                        {group[0]?.tier}
+                      </span>
+                      <span className="text-xs text-text-dim">
+                        {hasSellOrders(group)
+                          ? t('market.variations.groupCount', { count: group.length })
+                          : t('market.variations.groupNoneSold', {
+                              count: group.length,
+                              scope: scopeName,
+                            })}
+                      </span>
+                    </span>
+                  ),
+                }
+              : undefined
+          }
         />
       </div>
     </div>
