@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Spinner, Tabs } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { FitSellPrice } from '@/engine/fittings/fitSellPrice';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { popularFitLoad } from '@/engine/fittings/popularFits';
@@ -182,7 +183,7 @@ function WorkbenchFits({
           href="https://eveworkbench.com"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-accent hover:underline"
+          className={inlineLinkClassName}
         >
           eveworkbench.com
         </a>
