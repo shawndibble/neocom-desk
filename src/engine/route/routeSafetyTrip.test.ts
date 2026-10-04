@@ -152,7 +152,7 @@ function plan({
   );
   const state = assembleRouteSafety(
     input({
-      trip,
+      planned: trip,
       alternatives,
       singleStop: stops.length === 1,
       pins,
@@ -166,7 +166,7 @@ function plan({
 }
 
 function input(
-  overrides: Partial<RouteSafetyTripInput> & Pick<RouteSafetyTripInput, 'trip' | 'alternatives'>
+  overrides: Partial<RouteSafetyTripInput> & Pick<RouteSafetyTripInput, 'planned' | 'alternatives'>
 ): RouteSafetyTripInput {
   return {
     singleStop: true,
@@ -280,7 +280,9 @@ describe('assembleRouteSafety', () => {
     const alternatives: LegAlternatives[] = [
       { ways: [{ way: 'gates', route: { kind: 'route', systems: BY_GATE } }], pinned: null },
     ];
-    const state = route(assembleRouteSafety(input({ trip, alternatives, holes: THERA_HOLES })));
+    const state = route(
+      assembleRouteSafety(input({ planned: trip, alternatives, holes: THERA_HOLES }))
+    );
     expect(state.legs[0].ways.map((way) => [way.kind, way.pin, way.inUse])).toEqual([
       ['planner', null, true],
       ['gates', 'gates', false],
@@ -388,7 +390,7 @@ describe('assembleRouteSafety', () => {
       { ways: [], pinned: { kind: 'route', systems: BY_GATE, hole: null } },
     ];
     const state = route(
-      assembleRouteSafety(input({ trip: { plan: tripPlan, graph: GRAPH }, alternatives }))
+      assembleRouteSafety(input({ planned: { plan: tripPlan, graph: GRAPH }, alternatives }))
     );
     expect(systemsOf(state.legs[0].rows)).toEqual(BY_GATE);
   });

@@ -10,7 +10,7 @@
  */
 import type { AnsiblexGate } from '@/engine/route/ansiblex';
 import { bridgePairKey } from '@/engine/route/ansiblex';
-import { parseLegPin, type PinnableHole } from '@/engine/route/legWays';
+import { parseLegPin, pinWaitsOnHoleList, type PinnableHole } from '@/engine/route/legWays';
 import type { HoleEnds } from '@/engine/route/routeHoles';
 import type { TheraConnection } from '@/engine/route/theraConnections';
 
@@ -55,8 +55,7 @@ export function pinsKey(
     .map((token) => {
       const pin = parseLegPin(token);
       if (pin === null) return '';
-      // Gates and the bridge list never wait on EVE-Scout's list.
-      if (pin.kind === 'gates' || pin.kind === 'ansiblex') return token;
+      if (!pinWaitsOnHoleList(pin)) return token;
       if (listed === null) return `${token}@wait`;
       if (pin.kind === 'hub') return token;
       const hole = listed.get(pin.id);

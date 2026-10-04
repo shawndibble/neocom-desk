@@ -24,6 +24,7 @@ import type { FindJumpRouteOptions, JumpGraph } from './jumpRoute';
 import {
   legWays,
   parseLegPin,
+  pinWaitsOnHoleList,
   pinnedLegRoute,
   type LegWay,
   type PinnableHole,
@@ -142,9 +143,10 @@ export function routeSafetyNetwork(
  * the planner's pick) crosses — what the region names are looked up for.
  *
  * `network` is what the trip was planned with: the qualifying holes and the
- * known bridges, their ends are enough. `pins.listed` is every open hole
- * EVE-Scout lists (at least the pinned ones), or `null` while there is no
- * list: a hole or hub pin then waits, unflown.
+ * known bridges, their ends are enough. `pins.listed` holds the open holes
+ * a hole pin may name — EVE-Scout's list, or just the pinned holes it still
+ * holds — or is `null` while there is no list: a hole or hub pin then waits,
+ * unflown.
  */
 export function planLegAlternatives(
   trip: PlannedTrip,
@@ -160,7 +162,7 @@ export function planLegAlternatives(
     const ways = legWays(graph, leg.from, leg.to, options, network.holes, network.bridges);
     for (const way of ways) if (way.route.kind === 'route') cross(way.route.systems);
     const pin = parseLegPin(pins.tokens[index] ?? '');
-    const waiting = pins.listed === null && (pin?.kind === 'hub' || pin?.kind === 'hole');
+    const waiting = pins.listed === null && pin !== null && pinWaitsOnHoleList(pin);
     const pinned =
       pin === null || waiting
         ? null
@@ -183,8 +185,9 @@ export interface RouteSafetyActivity {
   fetchedAt: Date | null;
 }
 
+/** What `assembleRouteSafety` reads: the planned trip, and the live lists and data around it. */
 export interface RouteSafetyTripInput {
-  trip: Pick<PlannedTrip, 'plan' | 'graph'>;
+  planned: Pick<PlannedTrip, 'plan' | 'graph'>;
   /** From `planLegAlternatives`, one per leg. */
   alternatives: readonly LegAlternatives[];
   /** One Stop was asked for: no route is then the whole answer. */
@@ -233,8 +236,8 @@ function sameRoute(a: readonly number[] | null, b: readonly number[] | null): bo
 
 /** The Route Safety trip: each leg's rows and ways, and the whole trip's facts. */
 export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAssembly {
-  const { trip, alternatives, pins, holes, listed, bridges, activity } = input;
-  const { plan, graph } = trip;
+  const { planned, alternatives, pins, holes, listed, bridges, activity } = input;
+  const { plan, graph } = planned;
   // A pinned hole the filters skip is still a hole jump on the leg it is flown on.
   const listedById = new Map(listed?.map((hole) => [hole.id, hole]));
   const qualifyingIds = new Set(holes.map((hole) => hole.id));
@@ -279,7 +282,7 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
     const token = pins[index] ?? '';
     const pin = parseLegPin(token);
     let pinNote: LegPinNote | null = null;
-    if (pin !== null && pinned === null && pin.kind !== 'gates' && listed === null) {
+    if (pin !== null && pinned === null && pinWaitsOnHoleList(pin) && listed === null) {
       pinNote = 'no-list';
     } else if (pinned !== null && pinned.kind !== 'route') {
       pinNote = pinned.kind;

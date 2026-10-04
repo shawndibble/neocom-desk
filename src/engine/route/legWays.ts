@@ -204,6 +204,14 @@ export function parseLegPin(token: string): LegPin | null {
   return /^[\w-]{1,40}$/.test(token) ? { kind: 'hole', id: token } : null;
 }
 
+/**
+ * A hub or hole pin is answered from EVE-Scout's hole list, and waits while
+ * there is none; gates and the bridge list never do.
+ */
+export function pinWaitsOnHoleList(pin: LegPin): pin is Extract<LegPin, { kind: 'hub' | 'hole' }> {
+  return pin.kind === 'hub' || pin.kind === 'hole';
+}
+
 /** The link token a pin is written as. */
 export function legPinToken(pin: LegPin): string {
   switch (pin.kind) {

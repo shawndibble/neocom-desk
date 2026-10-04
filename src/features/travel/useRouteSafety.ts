@@ -121,8 +121,8 @@ export function useRouteSafety({
     () => (listed === null ? null : new Map(listed.map((hole) => [hole.id, hole]))),
     [listed]
   );
-  const pinKey = pinsKey(pins, listedById);
-  const requestKey = `${fromId}:${stopsKey}:${optimize}:${returnToStart}:${keepLastStopLast}:${routeKey}:${networkKey}:${pinKey}`;
+  const pinRequestKey = pinsKey(pins, listedById);
+  const requestKey = `${fromId}:${stopsKey}:${optimize}:${returnToStart}:${keepLastStopLast}:${routeKey}:${networkKey}:${pinRequestKey}`;
   const wantsRoute =
     fromId !== null && stops.length > 0 && !(stops.length === 1 && stops[0] === fromId);
 
@@ -164,7 +164,7 @@ export function useRouteSafety({
         ({ legs: alternatives, systemIds } = planLegAlternatives(
           result,
           networkEnds,
-          pinsFromKey(pinKey)
+          pinsFromKey(pinRequestKey)
         ));
       }
       const regionIds = new Set(systemIds.flatMap((id) => byId.get(id)?.regionId ?? []));
@@ -187,7 +187,7 @@ export function useRouteSafety({
     rules,
     network,
     networkEnds,
-    pinKey,
+    pinRequestKey,
     requestKey,
   ]);
 
@@ -198,7 +198,7 @@ export function useRouteSafety({
     const { result } = resolved;
     if (result.kind === 'unknown') return result;
     const assembled = assembleRouteSafety({
-      trip: result,
+      planned: result,
       alternatives: resolved.alternatives,
       singleStop: stops.length === 1,
       pins,
