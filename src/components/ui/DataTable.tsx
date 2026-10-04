@@ -242,6 +242,13 @@ export interface DataTableGroupBy<T> {
    * stretches of a route).
    */
   allWidths?: boolean;
+  /**
+   * Fewest rows a key needs before it folds; default 2, since one courier
+   * offer behind a toggle saves nothing. 1 for a fold that names a section
+   * rather than collapsing duplicates (the Mining Tax history's months),
+   * where a month with one entry still reads as that month.
+   */
+  minSize?: number;
 }
 
 interface DataTableProps<T> {
@@ -1348,7 +1355,7 @@ export function DataTable<T>({
         {groups
           ? groups.map((group) => {
               const first = group.rows[0];
-              if (group.key === null || group.rows.length < 2 || !first) {
+              if (group.key === null || group.rows.length < (groupBy?.minSize ?? 2) || !first) {
                 return group.rows.map((entry) => renderRow(entry.row, entry.index));
               }
               const key = group.key;

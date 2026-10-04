@@ -271,30 +271,6 @@ export async function unlockPaidAssignment(
   return updated;
 }
 
-/**
- * Reopens every Paid member of a combined entry at once — the combined
- * entry's single Edit (scope decision 20261004, "one Edit per combined
- * entry"), so the pilot unlocks once rather than once per EVE day. Same rules
- * as `unlockPaidAssignment` per member: the recorded payment stays. Members
- * that aren't Paid come back unchanged.
- */
-export async function unlockPaidAssignments(
-  assignments: readonly MiningTaxAssignmentRecord[]
-): Promise<MiningTaxAssignmentRecord[]> {
-  const now = Date.now();
-  const out = assignments.map((a): MiningTaxAssignmentRecord => {
-    if (a.status !== 'paid') return a;
-    const updated: MiningTaxAssignmentRecord = { ...a, status: 'outstanding', updatedAt: now };
-    delete updated.paidAt;
-    return updated;
-  });
-  const changed = out.filter((a, i) => a !== assignments[i]);
-  if (changed.length === 0) return out;
-  await db.miningTaxAssignments.bulkPut(changed);
-  for (const characterId of new Set(changed.map((a) => a.characterId))) scheduleSync(characterId);
-  return out;
-}
-
 export interface CombinedMemberValues {
   estimatedValue: number;
   taxOwed: number;

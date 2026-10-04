@@ -1,5 +1,20 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, InfoTooltip, Modal, StatChip, StatChips, TypeIcon } from '@/components/ui';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  IconButton,
+  InfoTooltip,
+  Modal,
+  StatChip,
+  StatChips,
+  TypeIcon,
+} from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
@@ -7,10 +22,13 @@ import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { cx } from '@/lib/cx';
 import { AssignDialog } from './AssignDialog';
 import { PaymentLinksCard, type LinkedTransaction } from './PaymentLinksCard';
 import { STATUS_TONE } from './statusTone';
 import type { MoonMiningTaxRow } from './snapshot';
+import type { PayeeSuggestion } from './suggestPayee';
 
 interface RowDetailModalProps {
   open: boolean;
@@ -57,15 +75,23 @@ interface RowDetailModalProps {
   onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
   /** Reopens a Paid Assignment for editing ("unlock to edit") — offered only when `assignment.status === 'paid'`. */
   onUnlock?: () => void | Promise<void>;
+  /** The Payee to pre-select for an unassigned entry — see `AssignDialog.suggestion`. */
+  suggestion?: PayeeSuggestion;
+  /** Settles this entry's whole Payee balance — the usual next step for an owed entry. */
+  onSettleUp?: () => void;
+  /** Opens "Link a wallet payment" for this entry's Payee, for ISK already sent. */
+  onLinkWalletPayment?: () => void;
 }
 
 /**
- * Row detail (issue #523): clicking any row opens this instead of hunting
- * for an icon in a dense table. Every status but Dismissed gets the full
- * Assign/edit form (`AssignDialog`) inline — pre-filled from the existing
- * Assignment when there is one — so "view what this row is" and "change it"
- * are the same click, not a read-only stop followed by a second dialog.
- * Dismissed stays read-only (no Payee to edit): its only move is Undo.
+ * Row detail (issue #523, reworked by scope decision 20261004 — mockup F4).
+ * An unassigned entry opens straight into the Assign form, with the Payee
+ * last used in its system pre-selected. An assigned one opens as a summary —
+ * who it's owed to, how much, what was mined — with one main action for its
+ * status (Settle up when owed, Accept new total when grown) and Edit to
+ * correct it. Everything rarer (split, combine, link a payment, unassign)
+ * lives in the More menu beside the title, and Unassign asks first: it
+ * deletes the Assignment.
  */
 export function RowDetailModal({
   open,
@@ -91,22 +117,76 @@ export function RowDetailModal({
   onLinkTransaction,
   onUnlinkTransaction,
   onUnlock,
+  suggestion,
+  onSettleUp,
+  onLinkWalletPayment,
 }: RowDetailModalProps) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
+  const [editing, setEditing] = useState(false);
+  const [confirmUnassign, setConfirmUnassign] = useState(false);
   const oreLines = assignment ? assignment.oreLines : row.unassignedOreLines;
   const estimatedValue = assignment
     ? assignment.estimatedValue
     : computeAssignmentValue(oreLines, pricesFor(undefined, row.entry.date), 0).estimatedValue;
-  // The Assign form already shows ore lines interactively (with split
-  // checkboxes) whenever it's creating a new Assignment across more than one
-  // line — showing the same lines again as a plain list just above it would
-  // be pure duplication.
-  const showOreCard = status !== 'unassigned' || oreLines.length <= 1;
+  const payee = payees.find((p) => p.id === assignment?.payeeId);
+  const payeeName = payee?.name ?? t('miningTax.unknownPayee');
+  const assigned = assignment !== null && status !== 'dismissed';
+  const showForm = status === 'unassigned' || (assigned && editing);
+  // The Assign form already lists the ore (with split checkboxes) when it is
+  // creating across more than one line — showing it again above would be
+  // pure duplication.
+  const showOreCard = !(status === 'unassigned' && oreLines.length > 1);
+
+  const moreItems = [
+    onLinkWalletPayment && status === 'outstanding' && (
+      <DropdownMenuItem key="wallet" onSelect={onLinkWalletPayment}>
+        {t('miningTax.detail.linkWalletPayment')}
+      </DropdownMenuItem>
+    ),
+    onLinkTransaction && (
+      <DropdownMenuItem key="transaction" onSelect={onLinkTransaction}>
+        {t('miningTax.linkTransactionAction')}
+      </DropdownMenuItem>
+    ),
+    onJoin && status === 'outstanding' && (
+      <DropdownMenuItem key="join" onSelect={onJoin}>
+        {t('miningTax.joinAction')}
+      </DropdownMenuItem>
+    ),
+    onSplit && (status === 'outstanding' || status === 'paid' || status === 'needs-review') && (
+      <DropdownMenuItem key="split" onSelect={onSplit}>
+        {t('miningTax.detail.splitAction')}
+      </DropdownMenuItem>
+    ),
+  ].filter(Boolean);
+
+  const moreMenu = assigned && (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <IconButton
+          variant="plain"
+          icon={<Icon.More />}
+          label={t('miningTax.detail.moreLabel')}
+          disabled={busy}
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {moreItems}
+        {moreItems.length > 0 && <DropdownMenuSeparator />}
+        <DropdownMenuItem onSelect={() => setConfirmUnassign(true)} className="text-danger">
+          {t('miningTax.detail.unassignAction')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
     <Modal
       open={open}
       onClose={onClose}
+      placement={isPhone ? 'sheet' : 'center'}
+      titleActions={moreMenu || undefined}
       title={
         <span className="flex items-center gap-1.5">
           {t('miningTax.detailTitle', { date: row.entry.date, system: systemName })}
@@ -136,7 +216,31 @@ export function RowDetailModal({
           </StatChips>
         </div>
 
-        {status === 'paid' && (onLinkTransaction || assignment?.payment) && (
+        {assigned && !editing && assignment && (
+          <div className="flex items-end justify-between gap-3 rounded-xs border border-line bg-panel-2 p-2">
+            <div className="min-w-0">
+              <p className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {payeeName} · {assignment.taxPct}%
+              </p>
+              <p
+                className={cx(
+                  'text-lg font-semibold tabular-nums',
+                  status === 'outstanding' && 'text-isk-neg'
+                )}
+              >
+                {formatIsk(assignment.taxOwed)} <span className="text-xs text-text-dim">ISK</span>
+              </p>
+              <p className="text-[0.6875rem] text-text-dim">
+                {t('miningTax.detail.valueLine', { value: formatIsk(estimatedValue) })}
+              </p>
+            </div>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={() => setEditing(true)}>
+              {t('miningTax.detail.editAction')}
+            </Button>
+          </div>
+        )}
+
+        {status === 'paid' && !editing && (onLinkTransaction || assignment?.payment) && (
           <PaymentLinksCard
             linkedTransactions={linkedTransactions}
             onLinkTransaction={onLinkTransaction}
@@ -144,9 +248,12 @@ export function RowDetailModal({
             busy={busy}
             summary={
               assignment?.payment && (
-                <span className="tabular-nums text-xs text-text-dim">
-                  {formatIsk(assignment.payment.amount)} ISK · {assignment.payment.paidOn}
-                </span>
+                <p className="text-xs tabular-nums">
+                  {t('miningTax.payment.paidLine', {
+                    amount: formatIsk(assignment.payment.amount, 0),
+                    date: assignment.payment.paidOn,
+                  })}
+                </p>
               )
             }
           />
@@ -161,7 +268,7 @@ export function RowDetailModal({
           </div>
         )}
 
-        {showOreCard && (
+        {showOreCard && !editing && (
           <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
             <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('miningTax.oreColumn')}
@@ -173,7 +280,7 @@ export function RowDetailModal({
                   className="flex items-center gap-1.5 py-1 first:pt-0 last:pb-0"
                 >
                   <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
-                  <span className="w-40 shrink-0 truncate">
+                  <span className="min-w-0 flex-1 truncate">
                     <MarketItemLink typeId={line.typeId}>
                       {typeNames.get(line.typeId) ?? `#${line.typeId}`}
                     </MarketItemLink>
@@ -217,16 +324,33 @@ export function RowDetailModal({
           </div>
         )}
 
+        {confirmUnassign && (
+          <div
+            role="alert"
+            className="space-y-2 rounded-xs border border-danger/60 bg-danger/10 p-2 text-xs"
+          >
+            <p>{t('miningTax.detail.unassignConfirm', { payee: payeeName })}</p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="danger" disabled={busy} onClick={onUndo}>
+                {t('miningTax.unassignAction')}
+              </Button>
+              <Button size="sm" onClick={() => setConfirmUnassign(false)}>
+                {t('filters.cancel')}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {status === 'dismissed' ? (
           <div className="flex flex-wrap gap-2 pt-1">
             <Button size="sm" disabled={busy} onClick={onUndo}>
               {t('miningTax.undismissAction')}
             </Button>
             <Button size="sm" onClick={onClose}>
-              {t('filters.cancel')}
+              {t('common.close')}
             </Button>
           </div>
-        ) : (
+        ) : showForm ? (
           <AssignDialog
             row={row}
             assignment={assignment}
@@ -236,45 +360,46 @@ export function RowDetailModal({
             pricesFor={pricesFor}
             busy={busy}
             onAssigned={onAssigned}
-            onCancel={onClose}
+            onCancel={assigned ? () => setEditing(false) : onClose}
             onAddPayee={onAddPayee}
             onUnlock={onUnlock}
+            suggestion={suggestion}
             extraActions={
-              <>
-                {status === 'unassigned' && (
+              status === 'unassigned' && (
+                <>
                   <Button size="sm" disabled={busy} onClick={onDismiss}>
                     {t('miningTax.dismissAction')}
                   </Button>
-                )}
-                {status === 'outstanding' && (
-                  <Button size="sm" disabled={busy} onClick={onMarkPaid}>
-                    {t('miningTax.markPaidAction')}
-                  </Button>
-                )}
-                {status === 'needs-review' && (
-                  <Button size="sm" disabled={busy} onClick={onResolve}>
-                    {t('miningTax.resolveConfirm')}
-                  </Button>
-                )}
-                {onJoin && (status === 'unassigned' || status === 'outstanding') && (
-                  <Button size="sm" disabled={busy} onClick={onJoin}>
-                    {t('miningTax.joinAction')}
-                  </Button>
-                )}
-                {onSplit &&
-                  (status === 'outstanding' || status === 'paid' || status === 'needs-review') && (
-                    <Button size="sm" disabled={busy} onClick={onSplit}>
-                      {t('miningTax.splitAction')}
+                  {onJoin && (
+                    <Button size="sm" disabled={busy} onClick={onJoin}>
+                      {t('miningTax.joinAction')}
                     </Button>
                   )}
-                {assignment && (
-                  <Button size="sm" variant="danger" disabled={busy} onClick={onUndo}>
-                    {t('miningTax.unassignAction')}
-                  </Button>
-                )}
-              </>
+                </>
+              )
             }
           />
+        ) : (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {status === 'outstanding' && onSettleUp && (
+              <Button variant="primary" size="sm" disabled={busy} onClick={onSettleUp}>
+                {t('miningTax.detail.settleUpPayee', { payee: payeeName })}
+              </Button>
+            )}
+            {status === 'outstanding' && (
+              <Button size="sm" disabled={busy} onClick={onMarkPaid}>
+                {t('miningTax.markPaidAction')}
+              </Button>
+            )}
+            {status === 'needs-review' && (
+              <Button variant="primary" size="sm" disabled={busy} onClick={onResolve}>
+                {t('miningTax.resolveConfirm')}
+              </Button>
+            )}
+            <Button size="sm" className="ml-auto" onClick={onClose}>
+              {t('common.close')}
+            </Button>
+          </div>
         )}
       </div>
     </Modal>

@@ -17,7 +17,6 @@ import {
   uncombineAssignments,
   unlinkPaymentTransaction,
   unlockPaidAssignment,
-  unlockPaidAssignments,
   updateAssignment,
   updateCombinedAssignments,
 } from './assignments';
@@ -1492,28 +1491,6 @@ describe('uncombineAssignments', () => {
     const stored = await db.miningTaxAssignments.get('d3');
     expect(stored?.groupId).toBeUndefined();
     expect(stored).toMatchObject({ payeeId: 'star-tail', status: 'outstanding', taxOwed: 50 });
-  });
-});
-
-describe('unlockPaidAssignments', () => {
-  it('reopens every paid member at once and keeps the recorded payment', async () => {
-    const payment = {
-      paymentId: 'p1',
-      paidOn: '2026-10-04',
-      method: 'donation' as const,
-      amount: 100,
-    };
-    const d3 = member('d3', '2026-10-03', { status: 'paid', paidAt: 5, payment });
-    const d4 = member('d4', '2026-10-04', { status: 'paid', paidAt: 5, payment });
-    const owed = member('d5', '2026-10-05');
-    await db.miningTaxAssignments.bulkPut([d3, d4, owed]);
-
-    const unlocked = await unlockPaidAssignments([d3, d4, owed]);
-
-    expect(unlocked.map((a) => a.status)).toEqual(['outstanding', 'outstanding', 'outstanding']);
-    const stored = await db.miningTaxAssignments.get('d4');
-    expect(stored?.paidAt).toBeUndefined();
-    expect(stored?.payment?.paymentId).toBe('p1');
   });
 });
 
