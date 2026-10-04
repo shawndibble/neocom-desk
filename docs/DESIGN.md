@@ -574,7 +574,7 @@ Rules:
   the active one, sized `ICON_SIZE.sm`, with the direction in the accessible
   name ("Profit, sorted descending"). A "↑" / "↓" text arrow appears only where
   a native `<option>` can't render an icon (`DataTable`'s stacked-mode sort
-  select); lint rejects it everywhere else.
+  select); lint rejects it in every other `src` `.tsx` file.
 
 **Exception — the Fitting Add panel's filter and slot icons.** The module
 browser's Hull/Resources/Skills toggles and its "Fits this slot" toggle
