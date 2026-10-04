@@ -1430,7 +1430,8 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
       const badge = await within(table).findByRole('button', { name: /BPO on contract: 4M/ });
-      expect(badge).toHaveTextContent('BPO may be cheaper');
+      // Short visible text; price and location live in the tooltip.
+      expect(badge).toHaveTextContent(/^BPO may be cheaper$/);
     });
 
     it('badges one copy per blueprint, not every offer row, when several are listed', async () => {
