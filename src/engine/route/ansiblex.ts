@@ -13,7 +13,6 @@
  * go into the search's `extraConnections` and never its `freeSystems`.
  */
 import { securityBand } from '../securityStatus';
-import type { JumpGraph } from './jumpRoute';
 import { isWormholeSystem } from './routeSafety';
 
 /** The Ansiblex Jump Bridge's type id. */
@@ -172,31 +171,20 @@ export function bridgeConnections(gates: readonly AnsiblexGate[]): [number, numb
   return pairs;
 }
 
-/** The gate a step from one system to the next crosses, or `null`. */
-export type BridgeAt = (from: number, to: number) => AnsiblexGate | null;
-
 /**
- * Finds the gate each step crosses — the one standing in the system the step
- * leaves, when both ends have one. A step a stargate joins is a gate jump,
- * never a bridge.
+ * The gate a step between two systems crosses, or `null` for a step no known
+ * gate joins: the one standing in the system the step leaves, when both ends
+ * have one. Whether a stargate joins them first is the trip's call
+ * (`routeSafetyTrip.ts`).
  */
-export function bridgeStepFinder(graph: JumpGraph, gates: readonly AnsiblexGate[]): BridgeAt {
-  if (gates.length === 0) return () => null;
-  return (from, to) => {
-    if (graph.get(from)?.includes(to)) return null;
-    return (
-      gates.find((gate) => gate.fromId === from && gate.toId === to) ??
-      gates.find((gate) => gate.fromId === to && gate.toId === from) ??
-      null
-    );
-  };
-}
-
-/** The positions along a route entered over a bridge: index `i` is the step from `i - 1`. */
-export function bridgeStepIndexes(systemIds: readonly number[], bridgeAt: BridgeAt): number[] {
-  const indexes: number[] = [];
-  for (let index = 1; index < systemIds.length; index += 1) {
-    if (bridgeAt(systemIds[index - 1], systemIds[index])) indexes.push(index);
-  }
-  return indexes;
+export function bridgeBetween(
+  gates: readonly AnsiblexGate[],
+  from: number,
+  to: number
+): AnsiblexGate | null {
+  return (
+    gates.find((gate) => gate.fromId === from && gate.toId === to) ??
+    gates.find((gate) => gate.fromId === to && gate.toId === from) ??
+    null
+  );
 }

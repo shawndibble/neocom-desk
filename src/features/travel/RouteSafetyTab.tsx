@@ -446,8 +446,6 @@ function RouteBody({
       const { trip } = state;
       const onlyLeg = state.legs[0];
       const holeRows: HoleRowProps = {
-        holeAt: state.holeAt,
-        bridgeAt: state.bridgeAt,
         holesFetchedAt: holesState.kind === 'ready' ? holesState.fetchedAt : null,
         now: holesState.kind === 'ready' ? holesState.now : 0,
       };
@@ -461,7 +459,7 @@ function RouteBody({
         <Panel>
           <div className="space-y-3">
             {trip && (
-              <SetWaypoints legs={state.legs} nameOf={nameOf} bridgeAt={state.bridgeAt}>
+              <SetWaypoints legs={state.legs} nameOf={nameOf}>
                 <RouteFacts
                   summary={trip.summary}
                   holeJumps={trip.holeJumps}
@@ -474,7 +472,6 @@ function RouteBody({
                 rows={trip.rows}
                 killsOf={killsOf}
                 stopIndexes={multiStop ? trip.stopIndexes : undefined}
-                holeAt={state.holeAt}
               />
             )}
             {holesState.kind === 'loading' && (

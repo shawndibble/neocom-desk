@@ -6,7 +6,8 @@
  * The client routes between waypoints by stargate with its own autopilot
  * settings, and cannot fly a wormhole or a bridge, so the waypoints stop at
  * the first such hop's entrance and the result says where to pick up
- * (`engine/route/waypoints.ts`). A Character whose grant predates the scope
+ * (`engine/route/waypoints.ts`). How each hop was flown is the trip's own
+ * row tag (issue #2546): this never loads the stargate graph. A Character whose grant predates the scope
  * sees the button disabled, the reason, and a Grant for that Character.
  */
 import { useState, type ReactNode } from 'react';
@@ -24,51 +25,22 @@ import {
 } from '@/components/ui';
 import { db } from '@/db';
 import type { EsiEndpointId } from '@/esi/registry';
-import type { TripLeg } from '@/engine/route/tripPlan';
-import { bridgeHopKind, waypointSequence, type WaypointSequence } from '@/engine/route/waypoints';
-import { loadJumpGraph } from '@/sde/jumpGraph';
+import { waypointSequence } from '@/engine/route/waypoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { setWaypointsInGame } from './sendWaypoints';
-import type { BridgeAt, RouteSafetyLeg } from './useRouteSafety';
+import type { RouteSafetyLeg } from './useRouteSafety';
 
 const ENDPOINTS: readonly EsiEndpointId[] = ['postAutopilotWaypoint'];
 
 type Outcome = { tone: 'status' | 'alert'; text: string } | null;
 
-/** A leg's rows are its systems, one each, in flying order. */
-function tripLegsOf(legs: readonly RouteSafetyLeg[]): TripLeg[] {
-  return legs.map((leg) => ({
-    from: leg.from,
-    to: leg.to,
-    route: leg.rows
-      ? { kind: 'route', systems: leg.rows.map((row) => row.systemId) }
-      : { kind: 'no-route' },
-  }));
-}
-
-/**
- * The waypoints to send, read off the plain stargate graph and the route's
- * known bridges (issue #2478); `null` when the graph can't be read.
- */
-async function sequenceOf(
-  legs: readonly RouteSafetyLeg[],
-  bridgeAt: BridgeAt
-): Promise<WaypointSequence | null> {
-  const gates = await loadJumpGraph().catch(() => undefined);
-  return gates ? waypointSequence(tripLegsOf(legs), bridgeHopKind(gates, bridgeAt)) : null;
-}
-
-const NO_BRIDGES: BridgeAt = () => null;
-
 export function SetWaypoints({
   legs,
   nameOf,
-  bridgeAt = NO_BRIDGES,
   children,
 }: {
+  /** The trip's legs: a hole or bridge hop in their rows cuts the waypoints, named as such. */
   legs: readonly RouteSafetyLeg[];
-  /** The Ansiblex a step crosses: a bridge hop cuts the waypoints, named as a bridge. */
-  bridgeAt?: BridgeAt;
   nameOf: (systemId: number) => string;
   /** The facts line the button closes. */
   children: ReactNode;
@@ -95,12 +67,7 @@ export function SetWaypoints({
     setSending(true);
     setOutcome(null);
     try {
-      const sequence = await sequenceOf(legs, bridgeAt);
-      if (sequence === null) {
-        setOutcome({ tone: 'alert', text: t('travel.waypoints.noMap') });
-        return;
-      }
-      const { waypoints, cutOff } = sequence;
+      const { waypoints, cutOff } = waypointSequence(legs);
       /** The cut-off's copy under `group`, naming where it is taken and where to pick up. */
       const cutOffText = (group: 'nothing' | 'cutOff') =>
         cutOff &&

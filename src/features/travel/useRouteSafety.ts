@@ -51,9 +51,11 @@ import {
   pinsKey,
 } from './routeSafetyKeys';
 
-export type { BridgeAt } from '@/engine/route/ansiblex';
-export type { HoleAt } from '@/engine/route/routeHoles';
-export type { RouteSafetyLeg, RouteSafetyWay } from '@/engine/route/routeSafetyTrip';
+export type {
+  RouteSafetyLeg,
+  RouteSafetyTripRow,
+  RouteSafetyWay,
+} from '@/engine/route/routeSafetyTrip';
 
 export type RouteSafetyState =
   | { kind: 'incomplete' }

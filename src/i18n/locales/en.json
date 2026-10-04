@@ -7793,6 +7793,9 @@
       "manage_other": "{{count}} Ansiblex known · Manage",
       "ansiblex": "Ansiblex",
       "ends": "{{from}} → {{to}}",
+      "stripCell": "Ansiblex jump, {{from}} → {{to}}",
+      "stripLabel_one": "{{count}} jump over an Ansiblex.",
+      "stripLabel_other": "{{count}} jumps over Ansiblex.",
       "title": "Ansiblex jump gates",
       "localOnly": "Kept on this device only. Never synced and never sent anywhere: structure access is private to your alliance.",
       "searchTitle": "Find with a character",
@@ -7841,15 +7844,14 @@
       "grantAction": "Log in again",
       "done": "Waypoints set. Your client plans the path between them with its own settings.",
       "cutOff": {
-        "wormhole": "Waypoints set to {{entrance}}. Take the wormhole there, then set the rest from {{exit}}. Your client plans the path to {{entrance}} with its own settings.",
+        "hole": "Waypoints set to {{entrance}}. Take the wormhole there, then set the rest from {{exit}}. Your client plans the path to {{entrance}} with its own settings.",
         "bridge": "Waypoints set to {{entrance}}. Take the bridge there, then set the rest from {{exit}}. Your client plans the path to {{entrance}} with its own settings."
       },
       "nothing": {
-        "wormhole": "No waypoints set: the trip leaves {{entrance}} by wormhole. Take it, then set the rest from {{exit}}.",
+        "hole": "No waypoints set: the trip leaves {{entrance}} by wormhole. Take it, then set the rest from {{exit}}.",
         "bridge": "No waypoints set: the trip leaves {{entrance}} by bridge. Take it, then set the rest from {{exit}}."
       },
       "nothingToSet": "No waypoints to set: the trip has no jumps.",
-      "noMap": "The stargate map couldn't be read, so no waypoints were set.",
       "failed": "Waypoints not set: {{message}}",
       "failedPartway": "{{set}} of {{total}} waypoints set, then ESI refused the rest: {{message}}",
       "permissionReason": "this character hasn't granted the Autopilot waypoints permission",

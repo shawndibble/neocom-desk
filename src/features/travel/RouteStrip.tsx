@@ -10,6 +10,8 @@
  *
  * A jump through a Thera / Turnur hole (issue #2476) is a hatched cell of
  * its own between its two systems' cells: a step, with no security to colour.
+ * A jump over an Ansiblex (issue #2546) is a cell of its own too, edged in
+ * the bridge row's dashed line. Both read the rows' own tags.
  *
  * One `role="img"`, not a tab stop per cell: a 40-jump route would otherwise
  * be 40 stops the table below already covers.
@@ -18,12 +20,11 @@ import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { Tooltip } from '@/components/ui';
-import { holeStepIndexes } from '@/engine/route/routeHoles';
 import { routeStripKeySystems, type RouteSafetyRow } from '@/engine/route/routeSafety';
 import { securityStatusColor } from '@/engine/securityStatus';
 import { routeSystemName } from './routeSystemName';
 import type { RouteKillsCell } from './useRouteKills';
-import type { HoleAt } from './useRouteSafety';
+import type { RouteSafetyTripRow } from './useRouteSafety';
 
 function securityText(row: RouteSafetyRow): string {
   return row.security === null ? '—' : row.security.toFixed(1);
@@ -40,14 +41,12 @@ export function RouteStrip({
   rows,
   killsOf,
   stopIndexes,
-  holeAt,
 }: {
-  rows: readonly RouteSafetyRow[];
+  /** The trip's systems in flying order, each tagged with how it was entered. */
+  rows: readonly RouteSafetyTripRow[];
   killsOf: (systemId: number) => RouteKillsCell;
   /** On a trip through several Stops, where each one falls: those are key systems too. */
   stopIndexes?: readonly number[];
-  /** The hole a step crosses, or `null` for a stargate jump. */
-  holeAt?: HoleAt;
 }) {
   const { t } = useTranslation();
   const first = rows[0];
@@ -66,16 +65,10 @@ export function RouteStrip({
         })
       : t('travel.strip.system', { name: routeSystemName(row), security: securityText(row) });
   const withKills = rows.filter((row) => hasKills(row, killsOf(row.systemId)));
-  // Whether the step into each row was through a hole.
-  const holeInto = new Set(
-    holeAt
-      ? holeStepIndexes(
-          rows.map((row) => row.systemId),
-          holeAt
-        )
-      : []
-  );
-  const holeJumps = holeInto.size;
+  const jumpsBy = (kind: 'hole' | 'bridge') =>
+    rows.filter((row) => row.entry?.kind === kind).length;
+  const holeJumps = jumpsBy('hole');
+  const bridgeJumps = jumpsBy('bridge');
   const label = [
     t('travel.strip.label', {
       count: rows.length,
@@ -91,6 +84,7 @@ export function RouteStrip({
           }),
         ]),
     ...(holeJumps === 0 ? [] : [t('travel.holes.stripLabel', { count: holeJumps })]),
+    ...(bridgeJumps === 0 ? [] : [t('travel.bridges.stripLabel', { count: bridgeJumps })]),
   ].join(' ');
 
   return (
@@ -102,7 +96,7 @@ export function RouteStrip({
           const previous = rows[index - 1];
           return (
             <Fragment key={index}>
-              {holeInto.has(index) && previous && (
+              {row.entry?.kind === 'hole' && previous && (
                 <Tooltip
                   content={t('travel.holes.stripCell', {
                     from: routeSystemName(previous),
@@ -112,6 +106,20 @@ export function RouteStrip({
                   <span
                     data-testid="route-strip-hole"
                     className="route-strip-hole min-w-0 flex-1 rounded-[1px] bg-panel-2"
+                  />
+                </Tooltip>
+              )}
+              {row.entry?.kind === 'bridge' && previous && (
+                <Tooltip
+                  content={t('travel.bridges.stripCell', {
+                    from: routeSystemName(previous),
+                    to: routeSystemName(row),
+                  })}
+                >
+                  {/* The bridge row's dashed line, top and bottom only: a full box would read as a control. */}
+                  <span
+                    data-testid="route-strip-bridge"
+                    className="min-w-0 flex-1 rounded-[1px] border-y border-dashed border-line-bright bg-panel-2"
                   />
                 </Tooltip>
               )}
