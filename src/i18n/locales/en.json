@@ -2915,8 +2915,6 @@
       "haveColumn": "Have",
       "toBuyColumn": "To buy",
       "total": "Total",
-      "needValue": "Need {{quantity}}",
-      "toBuyValue": "{{quantity}} to buy",
       "unpricedCount_one": "+{{count}} unpriced",
       "unpricedCount_other": "+{{count}} unpriced",
       "buildInstead": "Build instead",
@@ -2929,8 +2927,6 @@
       "movedMany_one": "{{count}} material changed section",
       "movedMany_other": "{{count}} materials changed section",
       "undo": "Undo",
-      "minus": "−",
-      "equals": "=",
       "changeTierFor": "Change tier: {{material}}",
       "haveFor": "Have: {{material}}",
       "savesVsBuying": "saves {{amount}} ISK vs buying",
@@ -2941,7 +2937,15 @@
         "toBuy": "To buy, most first",
         "name": "Name, A to Z"
       },
-      "at": "@"
+      "at": "@",
+      "buyColumn": "Buy",
+      "buildColumn": "Build",
+      "badge": {
+        "build": "Build",
+        "buy": "Buy",
+        "planetary": "PI",
+        "reaction": "React"
+      }
     }
   },
   "login": {

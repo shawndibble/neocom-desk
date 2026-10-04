@@ -8,6 +8,7 @@ import {
   useState,
   type FocusEvent,
   type ReactElement,
+  type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -384,7 +385,19 @@ function MakeOrBuyTooltip({
  * which never fires without a `tabIndex` to focus onto. So wrapping the span
  * costs nothing of the "no tab stop" rule above — there's a test pinning it.
  */
-function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: number }) {
+function MakeOrBuyMarker({
+  advice,
+  remaining,
+  badge = false,
+}: {
+  advice: MakeOrBuy;
+  remaining: number;
+  /**
+   * A short word in a pill ("PI", "Buy") instead of the glyph — the phone
+   * card's form, where there is no hover to explain a bare planet or cart.
+   */
+  badge?: boolean;
+}) {
   const { t } = useTranslation();
   const building = advice.verdict === 'build';
   const label = makeOrBuyLabel(advice, remaining, t);
@@ -400,6 +413,7 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
   // the shape-carries-meaning half of docs/DESIGN.md §7, not the colour half.
   const planetary = building && advice.method === 'planetary';
   const Glyph = building ? BUILD_GLYPH[advice.method] : Icon.Buy;
+  const tone = planetary ? 'text-accent' : building ? 'text-isk-pos' : 'text-text-dim';
   return (
     <Tooltip content={<MakeOrBuyTooltip advice={advice} remaining={remaining} />} openOnTap>
       <span
@@ -407,10 +421,18 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
         aria-label={label}
         className={cx(
           'shrink-0',
-          planetary ? 'text-accent' : building ? 'text-isk-pos' : 'text-text-dim'
+          tone,
+          badge &&
+            'rounded-xs border border-current px-1 text-[0.5625rem] leading-4 font-bold tracking-widest uppercase'
         )}
       >
-        <Glyph size={Icon.ICON_SIZE.sm} />
+        {badge ? (
+          t(
+            `industry.errands.badge.${building ? (advice.method === 'manufacturing' ? 'build' : advice.method) : 'buy'}`
+          )
+        ) : (
+          <Glyph size={Icon.ICON_SIZE.sm} />
+        )}
       </span>
     </Tooltip>
   );
@@ -427,6 +449,11 @@ const PHONE_SORTS: readonly PhoneSort[] = ['plan', 'total', 'toBuy', 'name'];
 function isBuilt(material: MaterialTableRow): boolean {
   return material.subBuilds.length > 0;
 }
+
+/** The phone card's Need | Have | Buy strip: a caption over a 44px value row, so a field and a figure sit level. */
+const STRIP_CELL = 'flex min-w-0 flex-col gap-0.5 px-2 pt-1.5 pb-1';
+const STRIP_LABEL = 'text-[0.5625rem] font-semibold tracking-widest text-text-dim uppercase';
+const STRIP_VALUE = 'flex min-h-11 items-center';
 
 /** How long the "moved to …" confirmation stays up — the same beat every other Undo toast in the app keeps. */
 const TOAST_MS = 8000;
@@ -772,7 +799,7 @@ export function MaterialsTable({
   }
 
   /** The name, any advice/skill marker, and — unless the caller places it itself — the row's text action. */
-  function renderName(material: MaterialTableRow, withAction: boolean) {
+  function renderName(material: MaterialTableRow, withAction: boolean, badge = false) {
     const name = nameFor(material.typeID);
     const { advice, toggleable } = buildChoice(material);
     const skillGate = isBuilt(material) ? skillGates?.get(material.typeID) : undefined;
@@ -784,7 +811,7 @@ export function MaterialsTable({
               else produces. Inline after the name, not in a reserved slot
               before it, so every name starts at the same edge. */}
           {!toggleable && !material.acquisitionTier && advice && (
-            <MakeOrBuyMarker advice={advice} remaining={material.remainingQuantity} />
+            <MakeOrBuyMarker advice={advice} remaining={material.remainingQuantity} badge={badge} />
           )}
           {skillGate?.gated && characterNameFor && (
             <SkillGateMarker
@@ -800,7 +827,7 @@ export function MaterialsTable({
   }
 
   /** Recipe · Buy instead, Build instead, or Change tier — whichever this row's errand offers. */
-  function renderAction(material: MaterialTableRow) {
+  function renderAction(material: MaterialTableRow, withSavings = true) {
     const name = nameFor(material.typeID);
     if (material.acquisitionTier) {
       return onOpenAcquisitionPicker ? (
@@ -816,7 +843,7 @@ export function MaterialsTable({
     }
     const { advice, toggleable } = buildChoice(material);
     if (isBuilt(material)) {
-      const savings = buildSavings(material);
+      const savings = withSavings ? buildSavings(material) : null;
       if (!onShowRecipe && !toggleable && savings === null) return null;
       return (
         <span className="inline-flex flex-wrap items-center gap-x-2">
@@ -886,7 +913,7 @@ export function MaterialsTable({
     );
   }
 
-  function renderHave(material: MaterialTableRow, withHint = true) {
+  function renderHave(material: MaterialTableRow, withHint = true, fill = false) {
     // Blueprint Acquisition (issue #838): ownership comes entirely from the
     // Character's real BPO/BPC, never from a typed quantity — an editable
     // field here would silently do nothing.
@@ -901,12 +928,12 @@ export function MaterialsTable({
     }
     const owned = sourcing?.[material.typeID]?.ownedQuantity;
     return (
-      <span className="flex flex-col items-start gap-0.5 sm:items-end">
+      <span className={cx('flex flex-col items-start gap-0.5 sm:items-end', fill && 'w-full')}>
         <SourcingInput
           value={owned}
           label={t('industry.errands.haveFor', { material: nameFor(material.typeID) })}
           inputMode="numeric"
-          widthClassName="w-20"
+          widthClassName={fill ? 'w-full' : 'w-20'}
           placeholder="0"
           mine={owned !== undefined && owned > 0}
           parse={parseCount}
@@ -1135,7 +1162,11 @@ export function MaterialsTable({
     setHeld(null);
   }
 
-  function renderHeading(errand: MaterialErrand, rows: readonly MaterialTableRow[]) {
+  function renderHeading(
+    errand: MaterialErrand,
+    rows: readonly MaterialTableRow[],
+    extra?: ReactNode
+  ) {
     const Glyph = ERRAND_GLYPH[errand];
     const headingId = `${idPrefix}-${errand}`;
     const subtotal =
@@ -1151,7 +1182,7 @@ export function MaterialsTable({
       </span>
     );
     return (
-      <div className="flex items-baseline justify-between gap-3 border-b border-line bg-panel-2 px-2 py-1.5">
+      <div className="flex items-center justify-between gap-3 border-b border-line bg-panel-2 px-2 py-1.5">
         <h3
           id={headingId}
           className={cx(
@@ -1174,6 +1205,7 @@ export function MaterialsTable({
             title
           )}
         </h3>
+        {extra}
         {saved > 0 && (
           <span className="text-[0.6875rem] font-semibold text-success tabular-nums">
             {t('industry.errands.saves', { amount: formatIsk(saved) })}
@@ -1199,56 +1231,90 @@ export function MaterialsTable({
     );
   }
 
-  /** One phone row: name and total, then Need − Have = To buy on one line, then the row's action and price. */
+  /**
+   * One phone card: name and total, then a Need | Have | Buy strip — the same
+   * three cells in the same place on every card, Have a real field filling
+   * its cell — then the row's action on the left and its price, or what a
+   * build saves, on the right. A Building card says Build instead of Buy and
+   * is edged green; a Blueprint card skips the strip, is edged pink, and an
+   * owned one says Owned instead of a total and a price of 0.
+   */
   function renderPhoneRow(material: MaterialTableRow) {
     const building = isBuilt(material);
+    const tier = material.acquisitionTier;
+    const ownedBlueprint = tier !== undefined && material.remainingQuantity === 0;
+    const savings = building ? buildSavings(material) : null;
     const item = (
-      <li key={material.typeID} className="flex flex-col gap-1 py-2">
-        {/* Centred, not top-aligned: the row menu button is taller than a
-            line of text, and top alignment dropped the total below the name. */}
+      <li
+        key={material.typeID}
+        className={cx(
+          'flex flex-col gap-2 rounded-md border bg-panel p-3',
+          building ? 'border-success/35' : tier ? 'border-blueprint-copy/35' : 'border-line',
+          ownedBlueprint && 'opacity-80'
+        )}
+      >
         <div className="flex items-center justify-between gap-2">
-          <span className="min-w-0 text-sm font-semibold">{renderName(material, false)}</span>
-          <span className="flex shrink-0 items-center gap-1 text-sm font-semibold tabular-nums">
-            {renderTotal(material)}
+          <span className="min-w-0 text-sm font-semibold">{renderName(material, false, true)}</span>
+          <span className="flex shrink-0 items-center gap-1 text-sm font-bold tabular-nums">
+            {ownedBlueprint ? (
+              <span className="rounded-xs border border-blueprint-copy/50 px-1.5 text-[0.625rem] leading-5 font-bold tracking-widest text-blueprint-copy uppercase">
+                {t('industry.blueprintAcquisitionOwned')}
+              </span>
+            ) : (
+              renderTotal(material)
+            )}
             {rowActions?.(material)}
           </span>
         </div>
-        {!material.acquisitionTier && (
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-text-dim tabular-nums">
-            <span>
-              {t('industry.errands.needValue', { quantity: material.quantity.toLocaleString() })}
-            </span>
-            <span aria-hidden="true">{t('industry.errands.minus')}</span>
-            {/* The field's own accessible name starts with this word. */}
-            <span aria-hidden="true">{t('industry.errands.haveColumn')}</span>
-            {renderHave(material, false)}
-            {!building && (
-              <>
-                <span aria-hidden="true">{t('industry.errands.equals')}</span>
-                <span className="font-semibold text-text">
-                  {t('industry.errands.toBuyValue', {
-                    quantity: material.remainingQuantity.toLocaleString(),
-                  })}
-                </span>
-              </>
-            )}
+        {!tier && (
+          <div className="grid grid-cols-3 overflow-hidden rounded-sm border border-line text-sm tabular-nums">
+            <div className={STRIP_CELL}>
+              <span className={STRIP_LABEL}>{t('industry.errands.need')}</span>
+              <span className={STRIP_VALUE}>{material.quantity.toLocaleString()}</span>
+            </div>
+            {/* A label, so a tap anywhere in the cell lands in the field. */}
+            <label className={cx(STRIP_CELL, 'border-l border-line bg-panel-2')}>
+              <span className={STRIP_LABEL} aria-hidden="true">
+                {t('industry.errands.haveColumn')}
+              </span>
+              {renderHave(material, false, true)}
+            </label>
+            <div className={cx(STRIP_CELL, 'border-l border-line')}>
+              <span className={STRIP_LABEL}>
+                {t(building ? 'industry.errands.buildColumn' : 'industry.errands.buyColumn')}
+              </span>
+              <span className={cx(STRIP_VALUE, 'font-semibold')}>
+                {material.remainingQuantity.toLocaleString()}
+              </span>
+            </div>
           </div>
         )}
         {/* What to do about the row on the left — use what's in the hangar,
-            switch build/buy, change the blueprint tier — and its price on the
-            right, as "@ price": one line, not a labelled box of its own. */}
+            switch build/buy, change the blueprint tier — and on the right its
+            price as "@ price", or what building it saves. */}
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <span className="flex min-w-0 flex-wrap items-center gap-x-3">
             {renderOwnedHint(material)}
-            {renderAction(material)}
-            {material.acquisitionTier && (
+            {renderAction(material, false)}
+            {tier && (
               <span className="text-[0.6875rem] text-text-dim">
-                {t('industry.blueprintAcquisitionTier', material.acquisitionTier)}
+                {t('industry.blueprintAcquisitionTier', tier)}
               </span>
             )}
           </span>
-          {!building && <span className="ml-auto text-xs">{renderPrice(material, true)}</span>}
-          {building && material.unpriced && renderPrice(material)}
+          {building ? (
+            savings !== null ? (
+              <span className="ml-auto text-xs text-success tabular-nums">
+                {t('industry.errands.saves', { amount: formatIsk(savings) })}
+              </span>
+            ) : (
+              material.unpriced && renderPrice(material)
+            )
+          ) : (
+            !ownedBlueprint && (
+              <span className="ml-auto text-xs">{renderPrice(material, true)}</span>
+            )
+          )}
         </div>
       </li>
     );
@@ -1286,23 +1352,24 @@ export function MaterialsTable({
 
   const visible = MATERIAL_ERRANDS.filter((errand) => groups[errand].length > 0);
 
+  const sortPicker = (
+    <NativeSelect
+      size="sm"
+      className="ml-auto w-32 shrink-0 [&>select]:min-h-11 [&>select]:normal-case"
+      aria-label={t('industry.errands.sortLabel')}
+      value={phoneSort}
+      onChange={(event) => setPhoneSort(event.target.value as PhoneSort)}
+    >
+      {PHONE_SORTS.map((key) => (
+        <option key={key} value={key}>
+          {t(`industry.errands.sort.${key}`)}
+        </option>
+      ))}
+    </NativeSelect>
+  );
+
   return (
     <div ref={containerRef} className="flex flex-col gap-3">
-      {isPhone && (
-        <NativeSelect
-          size="sm"
-          className="ml-auto w-44 [&>select]:min-h-11"
-          aria-label={t('industry.errands.sortLabel')}
-          value={phoneSort}
-          onChange={(event) => setPhoneSort(event.target.value as PhoneSort)}
-        >
-          {PHONE_SORTS.map((key) => (
-            <option key={key} value={key}>
-              {t(`industry.errands.sort.${key}`)}
-            </option>
-          ))}
-        </NativeSelect>
-      )}
       {visible.map((errand) => {
         const rows = groups[errand];
         const open = errand !== 'have' || haveOpen;
@@ -1313,10 +1380,16 @@ export function MaterialsTable({
             onFocus={() => holdSection(errand)}
             onBlur={releaseSection}
           >
-            {renderHeading(errand, rows)}
+            {renderHeading(
+              errand,
+              rows,
+              // The phone's sort picker rides in the first heading rather
+              // than taking a row of its own above the list.
+              isPhone && errand === visible[0] ? sortPicker : undefined
+            )}
             {open &&
               (isPhone ? (
-                <ul className="divide-y divide-line px-2">
+                <ul className="flex flex-col gap-2 p-2">
                   {sortForPhone(rows).map((material) => renderPhoneRow(material))}
                 </ul>
               ) : (
