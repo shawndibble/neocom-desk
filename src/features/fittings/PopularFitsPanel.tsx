@@ -8,17 +8,30 @@ import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
 import { useNow } from '@/lib/useNow';
-import { loadFittingFromText } from './loadFittingFromText';
+import { typeName } from '@/sde/loadSde';
 import { usePopularFits } from './popularFits';
 import { RackIconStrip } from './RackIconStrip';
 import { useModuleNames } from './useModuleNames';
 import { FIT_ROW_CLASS, VirtualFitList } from './VirtualFitList';
-import { useWorkbenchFits, workbenchFitUrl, type WorkbenchFit } from './workbenchFits';
-import { useWorkbenchFitList } from './workbenchFitCurrency';
-import { useWorkbenchFitPrices } from './workbenchFitPrices';
+import { workbenchFitUrl } from './workbenchFits';
+import {
+  useWorkbenchHullRows,
+  workbenchHullSources,
+  type WorkbenchHullSources,
+  type WorkbenchRow,
+} from './workbenchHullRows';
 import { OutOfDateReasons, OutOfDateToggle } from './WorkbenchOutOfDate';
-import { useWorkbenchSightings } from './workbenchSightings';
 import { WorkbenchSightingBadge } from './WorkbenchSightingBadge';
+
+/** What both tabs read from outside: the Workbench rows' sources, and module names. */
+export interface PopularFitsSources extends WorkbenchHullSources {
+  typeName: (typeId: number) => Promise<string>;
+}
+
+const POPULAR_FITS_SOURCES: PopularFitsSources = {
+  ...workbenchHullSources,
+  typeName: (typeId) => typeName(typeId),
+};
 
 interface PopularFitsPanelProps {
   shipTypeId: number;
@@ -31,6 +44,8 @@ interface PopularFitsPanelProps {
    * content below it. Off, the list runs its full length and the host scrolls.
    */
   capped?: boolean;
+  /** For tests: stand-ins for Firestore, the SDE, prices, zKillboard and Load. Pass it stable. */
+  sources?: PopularFitsSources;
 }
 
 type PopularFitsSource = 'zkillboard' | 'workbench';
@@ -72,16 +87,17 @@ function ZkillboardFits({
   onOpen,
   busy = false,
   capped = true,
+  sources = POPULAR_FITS_SOURCES,
 }: PopularFitsPanelProps) {
   const { t } = useTranslation();
-  const result = usePopularFits(shipTypeId);
+  const result = usePopularFits(shipTypeId, sources.popularFits);
   const now = useNow();
   const fits = result?.ok ? result.fits : null;
   const typeIds = useMemo(
     () => fits?.flatMap((fit) => fit.parts.modules.map((m) => m.typeId)) ?? null,
     [fits]
   );
-  const names = useModuleNames(typeIds);
+  const names = useModuleNames(typeIds, sources.typeName);
 
   return (
     <>
@@ -139,41 +155,25 @@ function ZkillboardFits({
  */
 const WORKBENCH_ROW_ESTIMATE = 96;
 
-const workbenchFitKey = (fit: WorkbenchFit) => fit.id;
+const workbenchRowKey = (row: WorkbenchRow) => row.fit.id;
 
 /**
  * The EVE Workbench tab (issue #2484): the hull's published fits, newest
- * first, each Loaded from its stored EFT through the ordinary text Load.
+ * first, as rows `useWorkbenchHullRows` checks, prices, badges and Loads.
  * Windowed (`VirtualFitList`): a popular hull lists 500+ fits.
  */
-function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: PopularFitsPanelProps) {
+function WorkbenchFits({
+  shipTypeId,
+  onOpen,
+  busy = false,
+  capped = true,
+  sources = POPULAR_FITS_SOURCES,
+}: PopularFitsPanelProps) {
   const { t } = useTranslation();
-  const result = useWorkbenchFits(shipTypeId);
-  // Out-of-date fits (issue #2485) sort below, shown only on request.
-  const list = useWorkbenchFitList(result?.ok ? result.fits : null);
-  // Each fit's modules come from that same check (issue #2493): no second parse.
-  const names = useModuleNames(list.moduleTypeIds);
-  const sightings = useWorkbenchSightings(shipTypeId, result?.ok ? result.fits : null);
-  // Priced from that same check too, at the Default Trade Hub.
-  const prices = useWorkbenchFitPrices(list.checks);
+  const tab = useWorkbenchHullRows(shipTypeId, sources);
+  const names = useModuleNames(tab.moduleTypeIds, sources.typeName);
   const now = useNow();
-  const [loadingId, setLoadingId] = useState<string | null>(null);
-  const [failedId, setFailedId] = useState<string | null>(null);
-
-  async function load(fit: WorkbenchFit) {
-    setLoadingId(fit.id);
-    setFailedId(null);
-    try {
-      // The fit's own EFT header names it.
-      const outcome = await loadFittingFromText(fit.eft);
-      if (outcome.kind === 'fitting') onOpen(outcome);
-      else setFailedId(fit.id);
-    } catch {
-      setFailedId(fit.id);
-    } finally {
-      setLoadingId(null);
-    }
-  }
+  const listed = tab.status === 'ready';
 
   return (
     <>
@@ -188,33 +188,33 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
           eveworkbench.com
         </a>
       </p>
-      {result?.ok && prices.loading && (
+      {listed && tab.pricing && (
         // One line for the whole tab, not one per row: a hull can list hundreds.
         <p role="status" className="text-xs text-text-dim">
-          {t('fittings.popular.workbench.pricing', { hub: prices.hub.systemName })}
+          {t('fittings.popular.workbench.pricing', { hub: tab.hub.systemName })}
         </p>
       )}
-      {result?.ok && prices.anyPriced && (
+      {listed && tab.anyPriced && (
         <p className="text-xs text-text-dim">
-          {t('fittings.popular.workbench.priceNote', { hub: prices.hub.systemName })}
+          {t('fittings.popular.workbench.priceNote', { hub: tab.hub.systemName })}
         </p>
       )}
-      {result === null ? (
+      {tab.status === 'loading' ? (
         <Spinner size="sm" delayMs={200} label={t('fittings.popular.workbench.loading')} />
-      ) : !result.ok ? (
+      ) : tab.status === 'failed' ? (
         <p role="status" className="text-xs text-warning">
           {t('fittings.popular.workbench.failed')}
         </p>
-      ) : result.fits.length === 0 ? (
+      ) : tab.status === 'empty' ? (
         <p className="text-xs text-text-dim">{t('fittings.popular.workbench.empty')}</p>
       ) : (
         <VirtualFitList
-          items={list.listed}
-          itemKey={workbenchFitKey}
+          items={tab.rows}
+          itemKey={workbenchRowKey}
           estimateSize={WORKBENCH_ROW_ESTIMATE}
           label={t('fittings.popular.tabWorkbench')}
           capped={capped}
-          renderItem={(fit) => (
+          renderItem={({ fit, modules, reasons, price, sighting, loadFailed }) => (
             <>
               <div className="min-w-0 flex-1">
                 <a
@@ -230,14 +230,11 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
                     age: formatAge(Math.max(0, now - fit.dateAdded), t),
                   })}
                 </p>
-                <WorkbenchFitPrice
-                  price={prices.priceFor(fit.id)}
-                  hubName={prices.hub.systemName}
-                />
-                <RackIconStrip modules={list.modulesFor(fit.id) ?? []} names={names} />
-                <OutOfDateReasons reasons={list.reasonsFor(fit.id)} />
-                <WorkbenchSightingBadge sighting={sightings.get(fit.id)} />
-                {failedId === fit.id && (
+                <WorkbenchFitPrice price={price} hubName={tab.hub.systemName} />
+                <RackIconStrip modules={modules} names={names} />
+                <OutOfDateReasons reasons={reasons} />
+                <WorkbenchSightingBadge sighting={sighting} />
+                {loadFailed && (
                   <p role="alert" className="text-xs text-danger">
                     {t('fittings.popular.workbench.loadFailed')}
                   </p>
@@ -245,8 +242,8 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
               </div>
               <Button
                 size="sm"
-                disabled={busy || loadingId !== null}
-                onClick={() => void load(fit)}
+                disabled={busy || tab.loading}
+                onClick={() => void tab.load(fit, onOpen)}
               >
                 {t('fittings.popular.workbench.load')}
               </Button>
@@ -254,7 +251,7 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
           )}
         />
       )}
-      {result?.ok && <OutOfDateToggle list={list} />}
+      {listed && <OutOfDateToggle list={tab} />}
     </>
   );
 }

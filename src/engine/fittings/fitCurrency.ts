@@ -14,7 +14,9 @@
  * The loader resolves names against a catalogue that leaves out much of the
  * game — Abyssal filaments, LP boosters and mutated (Abyssal) modules among
  * them — so an item it can't read is only removed when the game's full list
- * of type names (`isGameItem`) doesn't have it either.
+ * of type names (`isGameItem`) doesn't have it either — `unreadItemStatus`,
+ * the one rule every Workbench answer reads an unread item by. With that list
+ * unreadable, an unread item is neither: never called removed on a guess.
  */
 import type { LoadParts } from './load';
 import { FITTING_SLOT_KINDS, type FittingSlotKind } from './types';
@@ -42,6 +44,9 @@ function subsystemSetsRacks(parts: LoadParts & { hullTypeId: number }, slots: Hu
   );
 }
 
+/** Whether a name is a type in today's game; `null` when the game's list of names couldn't be read. */
+export type GameItemLookup = ((name: string) => boolean) | null;
+
 /** `isGameItem` over a list of the game's type names, matched ignoring case as the EFT loader matches. */
 export function gameItemLookup(names: Iterable<string>): (name: string) => boolean {
   const known = new Set<string>();
@@ -50,14 +55,27 @@ export function gameItemLookup(names: Iterable<string>): (name: string) => boole
 }
 
 /**
+ * What became of an item the EFT loader couldn't read: still `in-game` (the
+ * loader's catalogue just leaves it out), `removed` from the game, or
+ * `unknown` when the game's names couldn't be read.
+ */
+export function unreadItemStatus(
+  name: string,
+  isGameItem: GameItemLookup
+): 'in-game' | 'removed' | 'unknown' {
+  if (isGameItem === null) return 'unknown';
+  return isGameItem(name) ? 'in-game' : 'removed';
+}
+
+/**
  * Classifies one fit from what the EFT loader made of it and its hull's slots
  * (`null`: unknown). `isGameItem` says whether a name the loader couldn't
- * read is still a type in the game.
+ * read is still a type in the game (`null`: unknown, so nothing is removed).
  */
 export function classifyFitCurrency(
   parts: LoadParts,
   hullSlots: HullSlotCounts | null,
-  isGameItem: (name: string) => boolean
+  isGameItem: GameItemLookup
 ): FitCurrency {
   const removed: OutOfDateReason[] = [];
   const removedNames = new Set<string>();
@@ -68,7 +86,10 @@ export function classifyFitCurrency(
       // An empty name is a missing header — a typo, not a removed hull.
       if (warning.text.trim() !== '') removed.push({ kind: 'unknown-hull', name: warning.text });
     } else if (warning.kind === 'unknown-item') {
-      if (!removedNames.has(warning.text) && !isGameItem(warning.text)) {
+      if (
+        !removedNames.has(warning.text) &&
+        unreadItemStatus(warning.text, isGameItem) === 'removed'
+      ) {
         removedNames.add(warning.text);
         removed.push({ kind: 'removed-item', name: warning.text });
       }

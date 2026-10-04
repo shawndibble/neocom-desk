@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { EftSlotLookup, EftTypeLookup } from './eftLoader';
+import { gameItemLookup, type GameItemLookup } from './fitCurrency';
 import type { KillmailVictim } from './linkLoader';
 import { groupPopularFits, type HullLoss } from './popularFits';
+import { checkWorkbenchFit } from './workbenchFitCheck';
 import { matchWorkbenchSightings } from './workbenchSightings';
 
 const HULL = 626;
@@ -74,8 +76,34 @@ Medium Auxiliary Nano Pump I
 Hammerhead II x3
 Void M x500`;
 
-function match(fits: { id: string; eft: string }[], hullTypeId = HULL) {
-  return matchWorkbenchSightings(fits, POPULAR, hullTypeId, TYPES, SLOTS);
+/** The game's names: everything the loader reads, plus a filament its catalogue leaves out. */
+const GAME_ITEMS = gameItemLookup([
+  'Vexor',
+  'Thorax',
+  'Heavy Neutron Blaster II',
+  'Fierce Exotic Filament',
+]);
+
+function checks(fits: { id: string; eft: string }[], isGameItem: GameItemLookup = GAME_ITEMS) {
+  return new Map(
+    fits.map(({ id, eft }) => [
+      id,
+      checkWorkbenchFit(eft, {
+        typeByName: TYPES,
+        slotByTypeId: SLOTS,
+        hullSlots: () => null,
+        isGameItem,
+      }),
+    ])
+  );
+}
+
+function match(
+  fits: { id: string; eft: string }[],
+  hullTypeId = HULL,
+  isGameItem: GameItemLookup = GAME_ITEMS
+) {
+  return matchWorkbenchSightings(checks(fits, isGameItem), POPULAR, hullTypeId);
 }
 
 describe('matchWorkbenchSightings', () => {
@@ -118,7 +146,19 @@ Medium Auxiliary Nano Pump I`;
     expect(match([{ id: 'h', eft: 'not a fit' }]).size).toBe(0);
   });
 
+  it('still matches a fit carrying an item the game has but the loader cannot read (#2536)', () => {
+    const filament = `${EFT}\nFierce Exotic Filament x3`;
+    expect(match([{ id: 'i', eft: filament }]).get('i')?.count).toBe(3);
+  });
+
+  it('leaves it out when that item is gone from the game, or nobody can tell', () => {
+    const gone = `${EFT}\nRetired Booster x1`;
+    expect(match([{ id: 'j', eft: gone }]).size).toBe(0);
+    const filament = `${EFT}\nFierce Exotic Filament x3`;
+    expect(match([{ id: 'k', eft: filament }], HULL, null).size).toBe(0);
+  });
+
   it('matches nothing when there are no Popular fits', () => {
-    expect(matchWorkbenchSightings([{ id: 'a', eft: EFT }], [], HULL, TYPES, SLOTS).size).toBe(0);
+    expect(matchWorkbenchSightings(checks([{ id: 'a', eft: EFT }]), [], HULL).size).toBe(0);
   });
 });

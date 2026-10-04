@@ -4,9 +4,13 @@ import { typeName } from '@/sde/loadSde';
 
 /**
  * Names for the given module types, from the SDE; empty until they land.
- * Pass a stable (memoized) list — a new one each render re-reads the names.
+ * Pass a stable (memoized) list — a new one each render re-reads the names —
+ * and a stable `lookUp`, which is for tests.
  */
-export function useModuleNames(typeIds: readonly number[] | null): ReadonlyMap<number, string> {
+export function useModuleNames(
+  typeIds: readonly number[] | null,
+  lookUp: (typeId: number) => Promise<string> = typeName
+): ReadonlyMap<number, string> {
   const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
   useEffect(() => {
     if (typeIds === null) return;
@@ -14,7 +18,7 @@ export function useModuleNames(typeIds: readonly number[] | null): ReadonlyMap<n
     void Promise.all(
       [...new Set(typeIds)].map(async (typeId): Promise<[number, string]> => [
         typeId,
-        await typeName(typeId),
+        await lookUp(typeId),
       ])
     )
       .then((resolved) => {
@@ -25,6 +29,6 @@ export function useModuleNames(typeIds: readonly number[] | null): ReadonlyMap<n
     return () => {
       cancelled = true;
     };
-  }, [typeIds]);
+  }, [typeIds, lookUp]);
   return names;
 }

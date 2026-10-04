@@ -86,17 +86,23 @@ async function fetchPopularFits(shipTypeId: number, now: number): Promise<Popula
   }
 }
 
-/** The hull's Popular fits; `null` while loading. A switch of hull drops the old hull's answer. */
-export function usePopularFits(shipTypeId: number): PopularFitsResult | null {
+/**
+ * The hull's Popular fits; `null` while loading. A switch of hull drops the old
+ * hull's answer. `load` is for tests: pass it stable.
+ */
+export function usePopularFits(
+  shipTypeId: number,
+  load: (shipTypeId: number) => Promise<PopularFitsResult> = loadPopularFits
+): PopularFitsResult | null {
   const [state, setState] = useState<{ typeId: number; result: PopularFitsResult } | null>(null);
   useEffect(() => {
     let cancelled = false;
-    void loadPopularFits(shipTypeId).then((result) => {
+    void load(shipTypeId).then((result) => {
       if (!cancelled) setState({ typeId: shipTypeId, result });
     });
     return () => {
       cancelled = true;
     };
-  }, [shipTypeId]);
+  }, [shipTypeId, load]);
   return state?.typeId === shipTypeId ? state.result : null;
 }

@@ -1,68 +1,57 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@/i18n';
+import { gameItemLookup } from '@/engine/fittings/fitCurrency';
+import { loadText } from '@/engine/fittings/load';
 import type { PopularFit } from '@/engine/fittings/popularFits';
-import type { PopularFitsResult } from './popularFits';
-import type { WorkbenchFit, WorkbenchFitsResult } from './workbenchFits';
-
-const { usePopularFitsMock, useWorkbenchFitsMock, loadFittingFromTextMock, getHubPricesMock } =
-  vi.hoisted(() => ({
-    usePopularFitsMock: vi.fn(),
-    useWorkbenchFitsMock: vi.fn(),
-    loadFittingFromTextMock: vi.fn(),
-    getHubPricesMock: vi.fn(),
-  }));
-vi.mock('@/market/prices', () => ({ getHubPrices: getHubPricesMock }));
-// The synced Default Trade Hub, as a plain store a test can switch.
-vi.mock('@/features/market/hub', async () => {
-  const { create } = await import('zustand');
-  return {
-    useMarketHub: create<{ value: string; hydrate: () => Promise<void> }>(() => ({
-      value: 'jita',
-      hydrate: () => Promise.resolve(),
-    })),
-  };
-});
-vi.mock('./popularFits', () => ({ usePopularFits: usePopularFitsMock }));
-vi.mock('./workbenchFits', () => ({
-  useWorkbenchFits: useWorkbenchFitsMock,
-  workbenchFitUrl: (id: string) => `https://eveworkbench.com/fit/${id}`,
-}));
-vi.mock('./loadFittingFromText', () => ({ loadFittingFromText: loadFittingFromTextMock }));
-// Sightings (#2486) have their own tests: WorkbenchSightingBadge.test.tsx.
-vi.mock('./workbenchSightings', () => ({ useWorkbenchSightings: () => new Map() }));
-vi.mock('@/sde/loadSde', () => ({
-  typeName: (typeId: number) =>
-    Promise.resolve(
-      {
-        100: 'Heavy Neutron Blaster II',
-        200: 'Warp Scrambler II',
-        300: 'Damage Control II',
-        3001: 'Heavy Neutron Blaster II',
-      }[typeId] ?? `Type ${typeId}`
-    ),
-  // The out-of-date check's game data (issue #2485): a Vexor with one high slot.
-  loadFittingSlots: () => Promise.resolve({ 3001: 'high' }),
-  loadShipTree: () =>
-    Promise.resolve({
-      ships: [{ typeID: 626, stats: { highSlots: 1, medSlots: 4, lowSlots: 5, rigSlots: 3 } }],
-    }),
-  // Every name the game has — more than the loader's catalogue below carries.
-  loadGameTypeNames: () =>
-    Promise.resolve(['Vexor', 'Heavy Neutron Blaster II', 'Fierce Exotic Filament']),
-}));
-vi.mock('@/features/skills/typeCatalog', () => ({
-  loadItemNameMap: () =>
-    Promise.resolve(
-      new Map([
-        ['vexor', { typeID: 626 }],
-        ['heavy neutron blaster ii', { typeID: 3001 }],
-      ])
-    ),
-}));
-
 import { useMarketHub } from '@/features/market/hub';
-import { PopularFitsPanel } from './PopularFitsPanel';
+import type { PopularFitsResult } from './popularFits';
+import { PopularFitsPanel, type PopularFitsSources } from './PopularFitsPanel';
+import type { WorkbenchFit, WorkbenchFitsResult } from './workbenchFits';
+import { resetWorkbenchCheckCache } from './workbenchHullRows';
+
+/** The loader's catalogue: a Vexor and one gun — less than the game has. */
+const TYPE_BY_NAME = new Map([
+  ['vexor', { typeID: 626 }],
+  ['heavy neutron blaster ii', { typeID: 3001 }],
+]);
+const SLOT_BY_TYPE_ID = { 3001: 'high' } as const;
+
+const NAMES: Record<number, string> = {
+  100: 'Heavy Neutron Blaster II',
+  200: 'Warp Scrambler II',
+  300: 'Damage Control II',
+  3001: 'Heavy Neutron Blaster II',
+};
+
+const never = <T,>() => new Promise<T>(() => {});
+
+/** Fake sources: one Vexor with a single high slot, and real EFT through the real text Load. */
+function sources(overrides: Partial<PopularFitsSources> = {}): PopularFitsSources {
+  return {
+    workbenchFits: () => Promise.resolve({ ok: true, fits: [] }),
+    gameData: () =>
+      Promise.resolve({
+        typeByName: TYPE_BY_NAME,
+        slotByTypeId: SLOT_BY_TYPE_ID,
+        hullSlots: (typeId) => (typeId === 626 ? { high: 1, medium: 4, low: 5, rig: 3 } : null),
+        // Every name the game has — more than the loader's catalogue carries.
+        isGameItem: gameItemLookup(['Vexor', 'Heavy Neutron Blaster II', 'Fierce Exotic Filament']),
+      }),
+    hubPrices: () => Promise.resolve(new Map()),
+    popularFits: () => Promise.resolve({ ok: true, fits: [] }),
+    loadText: (eft) =>
+      loadText(eft, {
+        catalog: () => Promise.resolve({ typeByName: TYPE_BY_NAME, slotByTypeId: SLOT_BY_TYPE_ID }),
+        hullName: () => Promise.resolve('Vexor'),
+        killmailHash: never,
+        killmailVictim: never,
+        eveWorkbenchEft: never,
+      }),
+    typeName: (typeId) => Promise.resolve(NAMES[typeId] ?? `Type ${typeId}`),
+    ...overrides,
+  };
+}
 
 function fit(key: string, count: number, extra: Partial<PopularFit> = {}): PopularFit {
   return {
@@ -83,21 +72,27 @@ function fit(key: string, count: number, extra: Partial<PopularFit> = {}): Popul
 }
 
 function renderPanel(result: PopularFitsResult | null, onOpen = vi.fn()) {
-  usePopularFitsMock.mockReturnValue(result);
-  render(<PopularFitsPanel shipTypeId={626} hullName="Vexor" onOpen={onOpen} />);
+  const popularFits = () =>
+    result === null ? never<PopularFitsResult>() : Promise.resolve(result);
+  render(
+    <PopularFitsPanel
+      shipTypeId={626}
+      hullName="Vexor"
+      onOpen={onOpen}
+      sources={sources({ popularFits })}
+    />
+  );
   return onOpen;
 }
 
 describe('PopularFitsPanel', () => {
-  beforeEach(() => usePopularFitsMock.mockReset());
-
-  it('lists each fit with its count, last seen and value, and opens one', () => {
+  it('lists each fit with its count, last seen and value, and opens one', async () => {
     const lastSeen = new Date(Date.now() - 3 * 86_400_000).toISOString();
     const onOpen = renderPanel({
       ok: true,
       fits: [fit('a', 5, { lastSeen, value: 12_300_000 }), fit('b', 1)],
     });
-    expect(screen.getByText('5 losses')).toBeTruthy();
+    expect(await screen.findByText('5 losses')).toBeTruthy();
     expect(screen.getByText(/last seen 3d ago/)).toBeTruthy();
     expect(screen.getByText(/~12\.3M ISK/)).toBeTruthy();
     expect(screen.getByText('1 loss')).toBeTruthy();
@@ -132,7 +127,7 @@ describe('PopularFitsPanel', () => {
         }),
       ],
     });
-    const highs = screen.getByRole('group', { name: 'High slots' });
+    const highs = await screen.findByRole('group', { name: 'High slots' });
     expect(
       await within(highs).findAllByRole('img', { name: 'Heavy Neutron Blaster II' })
     ).toHaveLength(2);
@@ -149,9 +144,9 @@ describe('PopularFitsPanel', () => {
     expect(screen.queryByRole('group', { name: 'Rigs' })).toBeNull();
   });
 
-  it('says so, without blocking anything, when zKillboard fails', () => {
+  it('says so, without blocking anything, when zKillboard fails', async () => {
     renderPanel({ ok: false });
-    expect(screen.getByRole('status').textContent).toMatch(/Couldn't load popular fits/);
+    expect((await screen.findByRole('status')).textContent).toMatch(/Couldn't load popular fits/);
   });
 
   it('shows a spinner while loading', async () => {
@@ -161,17 +156,19 @@ describe('PopularFitsPanel', () => {
     ).toBeTruthy();
   });
 
-  it('notes when there is nothing to show', () => {
+  it('notes when there is nothing to show', async () => {
     renderPanel({ ok: true, fits: [] });
-    expect(screen.getByText('No recent losses of this hull with a full fit.')).toBeTruthy();
+    expect(await screen.findByText('No recent losses of this hull with a full fit.')).toBeTruthy();
   });
 });
 
 describe('PopularFitsPanel EVE Workbench tab', () => {
+  const getHubPricesMock = vi.fn<PopularFitsSources['hubPrices']>();
+  const workbenchFitsMock = vi.fn<PopularFitsSources['workbenchFits']>();
+
   beforeEach(() => {
-    usePopularFitsMock.mockReset().mockReturnValue({ ok: true, fits: [] });
-    useWorkbenchFitsMock.mockReset();
-    loadFittingFromTextMock.mockReset();
+    resetWorkbenchCheckCache();
+    workbenchFitsMock.mockReset();
     getHubPricesMock.mockReset().mockResolvedValue(new Map());
     useMarketHub.setState({ value: 'jita' });
   });
@@ -188,17 +185,45 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     };
   }
 
-  function openWorkbench(result: WorkbenchFitsResult | null, onOpen = vi.fn()) {
-    useWorkbenchFitsMock.mockReturnValue(result);
-    render(<PopularFitsPanel shipTypeId={626} hullName="Vexor" onOpen={onOpen} />);
+  /** The Workbench tab's sources, its stored list answering `result` (`null`: never). */
+  function workbenchSources(
+    result: WorkbenchFitsResult | null,
+    overrides: Partial<PopularFitsSources> = {}
+  ) {
+    workbenchFitsMock.mockImplementation(() =>
+      result === null ? never<WorkbenchFitsResult>() : Promise.resolve(result)
+    );
+    return sources({ workbenchFits: workbenchFitsMock, hubPrices: getHubPricesMock, ...overrides });
+  }
+
+  function openWorkbench(
+    result: WorkbenchFitsResult | null,
+    onOpen = vi.fn(),
+    overrides: Partial<PopularFitsSources> = {}
+  ) {
+    render(
+      <PopularFitsPanel
+        shipTypeId={626}
+        hullName="Vexor"
+        onOpen={onOpen}
+        sources={workbenchSources(result, overrides)}
+      />
+    );
     fireEvent.click(screen.getByRole('tab', { name: 'EVE Workbench' }));
     return onOpen;
   }
 
   it('starts on zKillboard and only reads Workbench once its tab is picked', () => {
-    render(<PopularFitsPanel shipTypeId={626} hullName="Vexor" onOpen={vi.fn()} />);
+    render(
+      <PopularFitsPanel
+        shipTypeId={626}
+        hullName="Vexor"
+        onOpen={vi.fn()}
+        sources={workbenchSources({ ok: true, fits: [] })}
+      />
+    );
     expect(screen.getByRole('tab', { name: 'zKillboard', selected: true })).toBeTruthy();
-    expect(useWorkbenchFitsMock).not.toHaveBeenCalled();
+    expect(workbenchFitsMock).not.toHaveBeenCalled();
   });
 
   it('lists fits with name and date added, no author, linking each to Workbench', async () => {
@@ -212,27 +237,20 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
   });
 
   it('Loads the picked fit from its stored EFT', async () => {
-    const loaded = {
-      kind: 'fitting',
-      source: 'text',
-      fitting: { name: 'Fit b', shipTypeId: 626, modules: [], drones: [], cargo: [] },
-      unresolved: [],
-    };
-    loadFittingFromTextMock.mockResolvedValue(loaded);
-    const onOpen = openWorkbench({ ok: true, fits: [wbFit('a'), wbFit('b')] });
+    const onOpen = openWorkbench({
+      ok: true,
+      fits: [wbFit('a'), wbFit('b', { eft: '[Vexor, Fit b]\nHeavy Neutron Blaster II' })],
+    });
     fireEvent.click((await screen.findAllByRole('button', { name: 'Load' }))[1]);
-    await waitFor(() => expect(onOpen).toHaveBeenCalledWith(loaded));
-    expect(loadFittingFromTextMock).toHaveBeenCalledWith('[Vexor, Fit b]');
+    await waitFor(() => expect(onOpen).toHaveBeenCalledTimes(1));
+    expect(onOpen.mock.calls[0][0]).toMatchObject({
+      kind: 'fitting',
+      fitting: { name: 'Fit b', shipTypeId: 626, modules: [{ slot: 'high', typeId: 3001 }] },
+    });
   });
 
   it('says so when a fit will not Load', async () => {
-    loadFittingFromTextMock.mockResolvedValue({
-      kind: 'failed',
-      source: 'text',
-      error: 'unrecognised',
-      unresolved: [],
-    });
-    const onOpen = openWorkbench({ ok: true, fits: [wbFit('a')] });
+    const onOpen = openWorkbench({ ok: true, fits: [wbFit('a', { eft: 'not a fit' })] });
     fireEvent.click(await screen.findByRole('button', { name: 'Load' }));
     expect((await screen.findByRole('alert')).textContent).toBe("Couldn't load this fit.");
     expect(onOpen).not.toHaveBeenCalled();
@@ -246,11 +264,11 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     cleanup();
     openWorkbench({ ok: true, fits: [] });
     expect(
-      screen.getByText('Nobody has published a fit for this hull on EVE Workbench yet.')
+      await screen.findByText('Nobody has published a fit for this hull on EVE Workbench yet.')
     ).toBeTruthy();
     cleanup();
     openWorkbench({ ok: false });
-    expect(screen.getByRole('status').textContent).toMatch(
+    expect((await screen.findByRole('status')).textContent).toMatch(
       /Couldn't reach the EVE Workbench fit list/
     );
   });
@@ -465,6 +483,75 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     );
   });
 
+  describe('Seen on zKillboard', () => {
+    /** The hull's one Popular fit: a single Heavy Neutron Blaster II, lost 4 times. */
+    const SEEN: PopularFitsResult = {
+      ok: true,
+      fits: [
+        fit('3001', 4, {
+          parts: {
+            hullTypeId: 626,
+            modules: [{ slot: 'high', slotIndex: 0, typeId: 3001, state: 'active' }],
+            drones: [],
+            cargo: [],
+            unresolved: [],
+          },
+        }),
+      ],
+    };
+    const popularFits = () => Promise.resolve(SEEN);
+
+    it('badges only the Workbench fits seen on zKillboard', async () => {
+      openWorkbench(
+        {
+          ok: true,
+          fits: [wbFit('a'), wbFit('b', { eft: '[Vexor, Fit b]\nHeavy Neutron Blaster II' })],
+        },
+        vi.fn(),
+        { popularFits }
+      );
+      expect(
+        await within(await waitFor(() => rowOf('Fit b'))).findByText(
+          'Seen on zKillboard: 4 recent losses'
+        )
+      ).toBeTruthy();
+      expect(rowOf('Fit a').textContent).not.toMatch(/Seen on zKillboard/);
+    });
+
+    it('still badges a fit carrying an item the game has but the loader cannot read (#2536)', async () => {
+      openWorkbench(
+        {
+          ok: true,
+          fits: [
+            wbFit('a', {
+              eft: '[Vexor, Fit a]\nHeavy Neutron Blaster II\n\n\nFierce Exotic Filament x3',
+            }),
+          ],
+        },
+        vi.fn(),
+        { popularFits }
+      );
+      expect(
+        await within(await waitFor(() => rowOf('Fit a'))).findByText(
+          'Seen on zKillboard: 4 recent losses'
+        )
+      ).toBeTruthy();
+    });
+
+    it('badges nothing, and warns of nothing, when zKillboard is unreachable', async () => {
+      const unreachable = vi.fn(() => Promise.resolve<PopularFitsResult>({ ok: false }));
+      openWorkbench(
+        { ok: true, fits: [wbFit('a', { eft: '[Vexor, Fit a]\nHeavy Neutron Blaster II' })] },
+        vi.fn(),
+        { popularFits: unreachable }
+      );
+      await screen.findByRole('link', { name: 'Fit a' });
+      await waitFor(() => expect(unreachable).toHaveBeenCalledWith(626));
+      expect(screen.queryByText(/Seen on zKillboard/)).toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+  });
+
   describe('a long list', () => {
     // jsdom does no layout: `data-virtual-scroll-root` gets a 600px viewport
     // (vitest.setup.dom.ts) and every row its ~96px estimate.
@@ -497,10 +584,15 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     });
 
     it('uncapped, windows against the host that scrolls it', async () => {
-      useWorkbenchFitsMock.mockReturnValue({ ok: true, fits: MANY });
       render(
         <div data-virtual-scroll-root style={{ overflowY: 'auto' }}>
-          <PopularFitsPanel shipTypeId={626} hullName="Vexor" onOpen={vi.fn()} capped={false} />
+          <PopularFitsPanel
+            shipTypeId={626}
+            hullName="Vexor"
+            onOpen={vi.fn()}
+            capped={false}
+            sources={workbenchSources({ ok: true, fits: MANY })}
+          />
         </div>
       );
       fireEvent.click(screen.getByRole('tab', { name: 'EVE Workbench' }));
@@ -517,9 +609,14 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     });
 
     it('uncapped with nothing but the page to scroll, lists every fit', async () => {
-      useWorkbenchFitsMock.mockReturnValue({ ok: true, fits: MANY });
       render(
-        <PopularFitsPanel shipTypeId={626} hullName="Vexor" onOpen={vi.fn()} capped={false} />
+        <PopularFitsPanel
+          shipTypeId={626}
+          hullName="Vexor"
+          onOpen={vi.fn()}
+          capped={false}
+          sources={workbenchSources({ ok: true, fits: MANY })}
+        />
       );
       fireEvent.click(screen.getByRole('tab', { name: 'EVE Workbench' }));
       await screen.findByRole('link', { name: 'Fit 80' });
