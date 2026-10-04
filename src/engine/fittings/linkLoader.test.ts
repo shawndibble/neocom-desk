@@ -152,7 +152,32 @@ describe('loadDnaFitting', () => {
 
   it('reports rack overflow as unresolved', () => {
     const result = loadDnaFitting('587:100;9::', SLOTS);
-    expect(result.unresolved).toHaveLength(1);
+    expect(result.unresolved).toEqual([
+      {
+        line: 1,
+        text: '100',
+        reason: 'too many high slots',
+        kind: 'too-many-slots',
+        rack: 'high',
+      },
+    ]);
+  });
+
+  it('reports a malformed entry as a malformed item', () => {
+    const result = loadDnaFitting('587:abc;1::', SLOTS);
+    expect(result.unresolved).toEqual([
+      { line: 1, text: 'abc;1', reason: 'malformed item', kind: 'malformed-item' },
+    ]);
+  });
+
+  it('reports a non-numeric hull as an unknown ship', () => {
+    const result = loadDnaFitting('Rifter:100;1::', SLOTS);
+    expect(result).toEqual({
+      hullTypeId: null,
+      unresolved: [
+        { line: 1, text: 'Rifter:100;1::', reason: 'unknown ship', kind: 'unknown-ship' },
+      ],
+    });
   });
 });
 

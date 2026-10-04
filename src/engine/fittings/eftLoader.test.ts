@@ -121,7 +121,7 @@ describe('loadEftFitting', () => {
       { slot: 'medium', slotIndex: 0, typeId: 439, state: 'active' },
     ]);
     expect(result.unresolved).toEqual([
-      { line: 2, text: 'Some Unknown Module I', reason: 'unknown item' },
+      { line: 2, text: 'Some Unknown Module I', reason: 'unknown item', kind: 'unknown-item' },
     ]);
   });
 
@@ -130,8 +130,19 @@ describe('loadEftFitting', () => {
 
     expect(result.hullTypeId).toBeNull();
     expect(result.unresolved).toEqual([
-      { line: 1, text: 'Not A Real Ship', reason: 'unknown ship' },
+      { line: 1, text: 'Not A Real Ship', reason: 'unknown ship', kind: 'unknown-ship' },
     ]);
+  });
+
+  it("passes the parser's own errors on as parse errors, keeping their wording", () => {
+    const result = load('125mm Gatling AutoCannon I');
+
+    expect(result.unresolved[0]).toMatchObject({
+      line: 1,
+      text: '125mm Gatling AutoCannon I',
+      kind: 'parse-error',
+    });
+    expect(result.unresolved[0].reason).toMatch(/^invalid or missing fit header/);
   });
 
   it('rejects a slot past the per-category maximum rather than silently dropping it', () => {
@@ -142,7 +153,13 @@ describe('loadEftFitting', () => {
     if (result.hullTypeId === null) return;
     expect(result.modules).toHaveLength(8);
     expect(result.unresolved).toEqual([
-      { line: 10, text: '125mm Gatling AutoCannon I', reason: 'too many high slots' },
+      {
+        line: 10,
+        text: '125mm Gatling AutoCannon I',
+        reason: 'too many high slots',
+        kind: 'too-many-slots',
+        rack: 'high',
+      },
     ]);
   });
 });

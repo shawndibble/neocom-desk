@@ -76,7 +76,7 @@ export function esiFittingToFitting(esiFitting: EsiCharacterFitting): LoadedFitt
       cargo.push({ typeId: item.type_id, quantity: item.quantity });
       continue;
     }
-    unresolved.push({ text: item.flag, reason: 'unsupported slot' });
+    unresolved.push({ text: item.flag, reason: 'unsupported slot', kind: 'unsupported-slot' });
   }
 
   return {
