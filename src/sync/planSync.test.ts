@@ -332,6 +332,11 @@ async function readLocalSettingsTombstones(): Promise<SyncedSettingTombstone[]> 
 }
 
 beforeEach(async () => {
+  // Helpers like markPlanDeleted schedule a debounced sync that outlives
+  // their test; left alone it fires mid-way through a later test and queues
+  // a pass right behind that test's own, so "the last status" turns flaky.
+  await haltSync();
+  resetSyncHalt();
   remoteStore.clear();
   vi.clearAllMocks();
   vi.mocked(getDocs).mockImplementation(fake.getDocsImpl as never);
