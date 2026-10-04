@@ -167,12 +167,22 @@ export async function warmDogmaEngineAssets(): Promise<void> {
   }
 }
 
-let enginePromise: Promise<void> | null = null;
-let engineReady = false;
+let enginePromise: Promise<DogmaEngine> | null = null;
+/** Set once `loadDogmaEngine` has resolved; the only way to the synchronous fit checks. */
+let readyEngine: DogmaEngine | null = null;
+const readyListeners = new Set<() => void>();
 
-/** True once `loadDogmaEngine` has resolved — the fit checks below are synchronous and need it. */
-export function isDogmaEngineReady(): boolean {
-  return engineReady;
+/** The ready engine, or null until `loadDogmaEngine` has resolved. Never starts a load. */
+export function readyDogmaEngine(): DogmaEngine | null {
+  return readyEngine;
+}
+
+/** Calls `listener` once the engine becomes ready (`useDogmaEngine`'s subscription). */
+export function subscribeDogmaEngine(listener: () => void): () => void {
+  readyListeners.add(listener);
+  return () => {
+    readyListeners.delete(listener);
+  };
 }
 
 /**
@@ -187,7 +197,7 @@ export function isDogmaEngineReady(): boolean {
  */
 export function loadDogmaEngine(
   onProgress?: (progress: DogmaAssetProgress) => void
-): Promise<void> {
+): Promise<DogmaEngine> {
   if (!enginePromise) {
     void deleteStaleAssetCaches();
     enginePromise = (async () => {
@@ -215,7 +225,9 @@ export function loadDogmaEngine(
 
       await wasmInit({ module_or_path: wasmBytes });
       load_sde(new Uint8Array(sdeBytes));
-      engineReady = true;
+      readyEngine = dogmaEngine;
+      for (const listener of readyListeners) listener();
+      return dogmaEngine;
     })().catch((error: unknown) => {
       // A failed load (offline on first visit, a bad response, …) must not
       // wedge every later attempt behind the same rejected promise.
@@ -560,10 +572,6 @@ export interface CandidateCheck {
   fitsResources: boolean;
 }
 
-function assertReady(): void {
-  if (!engineReady) throw new Error('Dogma engine not loaded; await loadDogmaEngine() first');
-}
-
 function rulesNaming(violations: readonly Violation[] | undefined, target: 'item' | 'charge') {
   return (violations ?? []).filter(
     (violation) => violation.target.type === target && violation.target.index === 0
@@ -586,13 +594,12 @@ const candidateCache = new WeakMap<PilotProfile, Map<string, CandidateCheck>>();
  * itself once added. Cheap (~0.3 ms a candidate), but only ever asked about
  * the results that survived the static filters in `candidates.ts`.
  */
-export function checkCandidates(
+function checkCandidates(
   shipTypeId: number,
   rack: CandidateRack,
   typeIds: readonly number[],
   profile: PilotProfile
 ): Map<number, CandidateCheck> {
-  assertReady();
   let cache = candidateCache.get(profile);
   if (!cache) {
     cache = new Map();
@@ -639,7 +646,7 @@ function candidateRuleTypes(violations: readonly Violation[]): string[] {
 }
 
 /** One candidate alone on the bare hull, uncached — the work `checkCandidates` memoizes. */
-export function checkOneCandidate(
+function checkOneCandidate(
   shipTypeId: number,
   rack: CandidateRack,
   typeId: number,
@@ -666,7 +673,7 @@ const NO_SKILLS: Map<number, number> = new Map();
  * (`FittingAddPanel`) is the only consumer that ever sees it, and a
  * structure module's exact CPU headroom is not worth a full run to report.
  */
-export function checkHullCandidate(
+function checkHullCandidate(
   shipTypeId: number,
   rack: CandidateRack,
   typeId: number,
@@ -689,12 +696,11 @@ export function checkHullCandidate(
  * from the pinned SDE, so no ESI round trip per module. Its direct
  * requirements only: a Skill Plan's schedule adds their prerequisites.
  */
-export function moduleSkillRequirements(
+function moduleSkillRequirements(
   shipTypeId: number,
   rack: CandidateRack,
   typeId: number
 ): PlanEntry[] {
-  assertReady();
   return rulesNaming(validateCandidate(shipTypeId, rack, typeId, NO_SKILLS), 'item').flatMap(
     (violation) =>
       violation.rule.type === 'skill'
@@ -704,7 +710,7 @@ export function moduleSkillRequirements(
 }
 
 /** How many slots the bare hull has in each rack — a Tech 3's are 0 until subsystems are fitted. */
-export function hullSlotCounts(
+function hullSlotCounts(
   shipTypeId: number,
   skillLevels: Map<number, number>
 ): Record<FittingSlotKind, number> {
@@ -729,10 +735,7 @@ export function hullSlotCounts(
  * so the whole-catalogue check (`useHullFit`) answers it without the engine
  * and leaves it out — the browser shows nothing the check doesn't list.
  */
-export function hullRacks(
-  shipTypeId: number,
-  skillLevels: Map<number, number>
-): Set<CandidateRack> {
+function hullRacks(shipTypeId: number, skillLevels: Map<number, number>): Set<CandidateRack> {
   return racksWithSlots(hullSlotCounts(shipTypeId, skillLevels));
 }
 
@@ -741,13 +744,12 @@ export function hullRacks(
  * hull, a charge of the wrong group or size, or too big for the module's
  * capacity, breaks a rule. A missing skill doesn't — the charge still loads.
  */
-export function checkCharges(
+function checkCharges(
   shipTypeId: number,
   module: { slot: FittingSlotKind; typeId: number },
   chargeTypeIds: readonly number[],
   profile: PilotProfile
 ): Set<number> {
-  assertReady();
   const fits = new Set<number>();
   for (const chargeTypeId of chargeTypeIds) {
     const fit: Fit = {
@@ -779,12 +781,7 @@ export function checkCharges(
  * `addModule`'s default-charge candidates need this before the module has a
  * calculated result of its own to read `chargeGroupIds` off.
  */
-export function chargeGroupIdsFor(
-  shipTypeId: number,
-  slot: FittingSlotKind,
-  typeId: number
-): number[] {
-  assertReady();
+function chargeGroupIdsFor(shipTypeId: number, slot: FittingSlotKind, typeId: number): number[] {
   const fit: Fit = {
     ship: { type_id: shipTypeId },
     items: [{ type_id: typeId, slot: { type: slot, index: 0 }, state: 'online' }],
@@ -794,11 +791,10 @@ export function chargeGroupIdsFor(
 }
 
 /** m3 of charge a module holds — over a charge's volume, how many one load is. 0 when it holds none. */
-export function moduleChargeCapacity(
+function moduleChargeCapacity(
   shipTypeId: number,
   module: { slot: FittingSlotKind; typeId: number }
 ): number {
-  assertReady();
   const { items } = calculate({
     ship: { type_id: shipTypeId },
     items: [{ type_id: module.typeId, slot: { type: module.slot, index: 0 }, state: 'online' }],
@@ -808,13 +804,12 @@ export function moduleChargeCapacity(
 }
 
 /** Which of `chargeTypeIds` need a skill the pilot lacks — checked the way `checkCharges` is, keeping what it drops. */
-export function chargesMissingSkills(
+function chargesMissingSkills(
   shipTypeId: number,
   module: { slot: FittingSlotKind; typeId: number },
   chargeTypeIds: readonly number[],
   profile: PilotProfile
 ): Set<number> {
-  assertReady();
   const missing = new Set<number>();
   for (const chargeTypeId of chargeTypeIds) {
     const { violations } = calculate(
@@ -857,13 +852,12 @@ export interface ChargeEngineStats extends Pick<
  * same calculation. One `calculate` per charge (no overheated pass): the Charges tab
  * pays this only while it is open, memoized by its caller.
  */
-export function compareCharges(
+function compareCharges(
   fitting: Fitting,
   profile: PilotProfile,
   moduleTypeId: number,
   chargeTypeIds: readonly number[]
 ): ChargeEngineStats[] {
-  assertReady();
   const indices = fitting.modules.flatMap((module, index) =>
     module.typeId === moduleTypeId ? [index] : []
   );
@@ -921,3 +915,37 @@ export function compareCharges(
     };
   });
 }
+
+/**
+ * The synchronous fit checks, reachable only once the engine is loaded:
+ * `loadDogmaEngine()` resolves to this, and `readyDogmaEngine()` (React:
+ * `useDogmaEngine`) hands it out after that. Holding one is the proof the
+ * WASM engine and its SDE are in, so no caller has to know the call order.
+ */
+export interface DogmaEngine {
+  checkCandidates: typeof checkCandidates;
+  checkOneCandidate: typeof checkOneCandidate;
+  checkHullCandidate: typeof checkHullCandidate;
+  moduleSkillRequirements: typeof moduleSkillRequirements;
+  hullSlotCounts: typeof hullSlotCounts;
+  hullRacks: typeof hullRacks;
+  checkCharges: typeof checkCharges;
+  chargeGroupIdsFor: typeof chargeGroupIdsFor;
+  moduleChargeCapacity: typeof moduleChargeCapacity;
+  chargesMissingSkills: typeof chargesMissingSkills;
+  compareCharges: typeof compareCharges;
+}
+
+const dogmaEngine: DogmaEngine = {
+  checkCandidates,
+  checkOneCandidate,
+  checkHullCandidate,
+  moduleSkillRequirements,
+  hullSlotCounts,
+  hullRacks,
+  checkCharges,
+  chargeGroupIdsFor,
+  moduleChargeCapacity,
+  chargesMissingSkills,
+  compareCharges,
+};

@@ -5,13 +5,7 @@ import type { Fitting, FittingModuleResult, PilotProfile } from '@/engine/fittin
 import { useChargeLoading } from './useChargeLoading';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
-
-// The engine's size check says no to the one oversized charge; each launcher holds 1.2 m3.
-vi.mock('./dogmaFittingEngine', () => ({
-  checkCharges: (_ship: number, _module: unknown, ids: number[]) =>
-    new Set(ids.filter((id) => id !== 999)),
-  moduleChargeCapacity: () => 1.2,
-}));
+import { fakeDogmaEngine, fakeFittingContext } from './__fixtures__/fakeDogmaEngine';
 
 const MISSILES = 385;
 const HEAVY = 209;
@@ -27,6 +21,13 @@ const catalogue = {
 } as unknown as FittingCatalogue;
 
 const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] };
+
+// The engine's size check says no to the one oversized charge; each launcher holds 1.2 m3.
+const engine = fakeDogmaEngine({
+  checkCharges: (_ship, _module, ids) => new Set(ids.filter((id) => id !== OVERSIZED)),
+  moduleChargeCapacity: () => 1.2,
+});
+const context = fakeFittingContext(catalogue, { engine, profile });
 
 const fitting: Fitting = {
   name: 'Drake',
@@ -57,8 +58,7 @@ function setup() {
       fitting,
       catalogue,
       moduleResults: [launcher, launcher, passive],
-      engineReady: true,
-      profile,
+      context,
       edit,
     })
   );
@@ -93,8 +93,7 @@ describe('useChargeLoading', () => {
         fitting: holding,
         catalogue,
         moduleResults: [launcher, launcher, passive],
-        engineReady: true,
-        profile,
+        context,
         edit: (change) => void change(holding),
       })
     );
@@ -121,8 +120,7 @@ describe('useChargeLoading', () => {
         fitting: three,
         catalogue,
         moduleResults: [launcher, launcher, launcher, launcher],
-        engineReady: true,
-        profile,
+        context,
         edit: (change) => void change(three),
       })
     );
@@ -142,8 +140,7 @@ describe('useChargeLoading', () => {
         fitting: holding,
         catalogue,
         moduleResults: [launcher, launcher, passive],
-        engineReady: true,
-        profile,
+        context,
         edit: (change) => void change(holding),
       })
     );

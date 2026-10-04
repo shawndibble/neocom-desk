@@ -79,6 +79,7 @@ import { useFittingHardpoints } from '@/features/fittings/useFittingHardpoints';
 import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
 import { useHullFit } from '@/features/fittings/useHullFit';
 import { catalogueTypeName, useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
+import { useFittingContext } from '@/features/fittings/fittingContext';
 import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
 import { useModuleVariations } from '@/features/fittings/useModuleVariations';
 import { useOverlayFitting } from '@/features/fittings/useOverlayFitting';
@@ -118,6 +119,7 @@ function FittingsPage() {
   const location = useLocation();
   const workspace = useFittingWorkspace();
   const catalogue = useFittingCatalogue();
+  const context = useFittingContext(workspace.profile, catalogue);
   const isDesktop = useIsDesktop();
   const isPhone = useIsPhone();
   const threeColumns = useMediaQuery(THREE_COLUMN_QUERY);
@@ -212,13 +214,7 @@ function FittingsPage() {
   // Warm the module browser's hull check in the background once the ship data,
   // pilot and catalogue are in, so opening Add (or changing hull) needn't wait.
   // The panel's own call finds the memoized results.
-  useHullFit(
-    catalogue,
-    fitting?.shipTypeId ?? null,
-    workspace.profile,
-    workspace.engineReady,
-    true
-  );
+  useHullFit(context, fitting?.shipTypeId ?? null, true);
   if (library !== null && fitting !== libraryOver) {
     setLibrary(null);
     closeAdd();
@@ -238,7 +234,7 @@ function FittingsPage() {
   // away, so a browser still aimed at it lets go.
   if (target?.kind === 'drone' && !dronesShown) setTarget(null);
   // Module results only line up with the Fitting they were calculated for.
-  const moduleResults = stats !== null && workspace.statsFitting === fitting ? stats.modules : null;
+  const moduleResults = workspace.currentStats?.modules ?? null;
   // The catalogue carries no tactical modes (an Affected-by source can be one).
   const typeName = (typeId: number) => {
     const name = catalogue?.types[String(typeId)]?.name;
@@ -251,8 +247,7 @@ function FittingsPage() {
     fitting,
     catalogue,
     moduleResults,
-    engineReady: workspace.engineReady,
-    profile: workspace.profile,
+    context,
     edit,
   });
   // The cargo item whose quantity dialog is open.
@@ -265,8 +260,7 @@ function FittingsPage() {
     fitting,
     stats,
     edit,
-    engineReady: workspace.engineReady,
-    profile: workspace.profile,
+    context,
     catalogue,
     charges,
     target,
@@ -348,8 +342,7 @@ function FittingsPage() {
       fitting={fitting}
       catalogue={catalogue}
       target={target}
-      engineReady={workspace.engineReady}
-      profile={workspace.profile}
+      context={context}
       onAdd={handleAdd}
       onClearTarget={() => setTarget(null)}
       moduleResults={moduleResults}
@@ -478,8 +471,7 @@ function FittingsPage() {
         stats={stats}
         moduleResults={moduleResults}
         catalogue={catalogue}
-        engineReady={workspace.engineReady}
-        profile={workspace.profile}
+        context={context}
         edit={edit}
         target={target}
         onSelectTarget={selectTarget}
@@ -854,8 +846,7 @@ function FittingsPage() {
                   cantUse={gaps?.unusableModuleKeys.has(moduleKey(openModule)) ?? false}
                   fitting={fitting}
                   catalogue={catalogue}
-                  engineReady={workspace.engineReady}
-                  profile={workspace.profile}
+                  context={context}
                   edit={edit}
                 />
                 <Disclosure
@@ -916,8 +907,7 @@ function FittingsPage() {
                   hideLabel
                   fitting={fitting}
                   catalogue={catalogue}
-                  engineReady={workspace.engineReady}
-                  profile={workspace.profile}
+                  context={context}
                   edit={edit}
                   stats={stats}
                   moduleResults={moduleResults}

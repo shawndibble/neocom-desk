@@ -11,11 +11,8 @@ import {
   type SkillGain,
 } from '@/engine/fittings/skillGains';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
-import {
-  computeFittingStats,
-  fittingSkillSources,
-  moduleSkillRequirements,
-} from './dogmaFittingEngine';
+import { computeFittingStats, fittingSkillSources } from './dogmaFittingEngine';
+import { loadRealDogmaEngine, stubEngineAssets } from './__fixtures__/realDogmaEngine';
 import {
   evaluateModuleUpgrades,
   moduleUpgradeCandidates,
@@ -69,32 +66,6 @@ const PLAYER_LEVELS: [number, number][] = [
   [MOTION_PREDICTION, 4],
   [TRAJECTORY_ANALYSIS, 4],
 ];
-
-/** Serves the pinned engine and SDE from node_modules to `loadDogmaEngine`'s fetch. */
-async function stubEngineAssets() {
-  const wasmPath = require.resolve('@eveshipfit/dogma-engine/esf_dogma_engine_bg.wasm');
-  const sdePath = require.resolve('@eveshipfit/sde/dist/sde.dat');
-  const [wasm, sde] = await Promise.all([readFile(wasmPath), readFile(sdePath)]);
-  const respond = (bytes: Buffer, type: string) =>
-    new Response(new Uint8Array(bytes), {
-      headers: { 'content-type': type, 'content-length': String(bytes.byteLength) },
-    });
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes('.wasm')) return respond(wasm, 'application/wasm');
-      if (url.includes('sde.dat')) return respond(sde, 'application/octet-stream');
-      throw new Error(`unexpected fetch: ${url}`);
-    })
-  );
-  const cache = { match: async () => undefined, put: async () => {} };
-  vi.stubGlobal('caches', {
-    open: async () => cache,
-    keys: async () => [],
-    delete: async () => false,
-  });
-}
 
 async function readJson<T>(path: string): Promise<T> {
   return JSON.parse(await readFile(require.resolve(`../../../public/data/${path}`), 'utf8')) as T;
@@ -179,7 +150,7 @@ describe('Tech II upgrades on that Rokh (real WASM + real pinned SDE)', () => {
   let rows: ModuleUpgradeGain<LevelGain>[];
 
   beforeAll(async () => {
-    await stubEngineAssets();
+    const engine = await loadRealDogmaEngine();
     const decoded = await decodeFittingShare(ROKH_SHARE);
     if (!decoded.ok) throw new Error('share code did not decode');
     const fitting = shareToFitting(decoded.value, 'Boom');
@@ -202,7 +173,8 @@ describe('Tech II upgrades on that Rokh (real WASM + real pinned SDE)', () => {
       {
         fitting,
         levels: pilot.skillLevels,
-        requirements: (typeId, rack) => moduleSkillRequirements(fitting.shipTypeId, rack, typeId),
+        requirements: (typeId, rack) =>
+          engine.moduleSkillRequirements(fitting.shipTypeId, rack, typeId),
         // The engine's requirements already reach down the prerequisite
         // chain; a real schedule only adds training times.
         schedule: (entries) =>

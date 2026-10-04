@@ -1,17 +1,14 @@
-import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
-import { beforeAll, describe, expect, it } from 'vitest';
-import wasmInit, { calculate } from '@eveshipfit/dogma-engine';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { calculate } from '@eveshipfit/dogma-engine';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import {
-  checkHullCandidate,
-  hullRacks,
-  checkOneCandidate,
-  hullSlotCounts,
   toProjectedEffects,
   withIncoming,
   withWeather,
+  type DogmaEngine,
 } from './dogmaFittingEngine';
+import { loadRealDogmaEngine } from './__fixtures__/realDogmaEngine';
 import {
   extractCapacitorBudget,
   extractCapBoosterFigures,
@@ -55,8 +52,6 @@ import type { CandidateRack } from '@/engine/fittings/candidates';
  * `invTypes.csv`/`dgmTypeAttributes.csv` on 2026-09-24 (the same source
  * `scripts/build-sde.mjs` bakes from), not recalled from memory.
  */
-
-const require = createRequire(import.meta.url);
 
 const VEXOR_NAVY_ISSUE = 17843;
 const NEUTRON_BLASTER_CANNON_II = 3186;
@@ -196,13 +191,9 @@ function vexorNavyIssueFit(): Fitting {
 
 describe('dogma engine integration (real WASM + real pinned SDE)', () => {
   beforeAll(async () => {
-    const wasmPath = require.resolve('@eveshipfit/dogma-engine/esf_dogma_engine_bg.wasm');
-    const sdePath = require.resolve('@eveshipfit/sde/dist/sde.dat');
-    const [wasmBytes, sdeBytes] = await Promise.all([readFile(wasmPath), readFile(sdePath)]);
-    await wasmInit({ module_or_path: wasmBytes });
-    const { load_sde } = await import('@eveshipfit/dogma-engine');
-    load_sde(new Uint8Array(sdeBytes));
+    await loadRealDogmaEngine();
   });
+  afterAll(() => vi.unstubAllGlobals());
 
   it('computes stats for an All-V pilot matching the pinned engine within a tight tolerance', () => {
     const fitting = vexorNavyIssueFit();
@@ -1562,6 +1553,11 @@ const MINING_SKILL_IDS = [...SUPPORT_SKILL_IDS, 17940, 22551];
 
 // Runs on the engine and SDE the describe above loaded (the SDE loads once per process).
 describe('hull fit pre-filter (real WASM + real pinned SDE)', () => {
+  let engine: DogmaEngine;
+  beforeAll(async () => {
+    engine = await loadRealDogmaEngine();
+  });
+  afterAll(() => vi.unstubAllGlobals());
   // A Rifter (frigate), a Loki (Tech 3: no hi/med/low slots until subsystems
   // are fitted) and a Bestower (an industrial).
   const HULLS = [587, 29990, 1944];
@@ -1577,9 +1573,10 @@ describe('hull fit pre-filter (real WASM + real pinned SDE)', () => {
 
   it.each(HULLS)('leaves out only items the full check refuses, on hull %i', (hull) => {
     const skills = new Map<number, number>();
-    const racks = hullRacks(hull, skills);
+    const racks = engine.hullRacks(hull, skills);
     for (const [rack, id] of ITEMS) {
-      if (!racks.has(rack)) expect(checkOneCandidate(hull, rack, id, skills).fitsHull).toBe(false);
+      if (!racks.has(rack))
+        expect(engine.checkOneCandidate(hull, rack, id, skills).fitsHull).toBe(false);
     }
   });
 
@@ -1606,8 +1603,8 @@ describe('hull fit pre-filter (real WASM + real pinned SDE)', () => {
     )('hull %i, %s', { timeout: 120_000 }, (hull, _name, skills) => {
       for (const [id, rack] of sample) {
         const typeId = Number(id);
-        const full = checkOneCandidate(hull, rack, typeId, skills);
-        const fast = checkHullCandidate(hull, rack, typeId, skills);
+        const full = engine.checkOneCandidate(hull, rack, typeId, skills);
+        const fast = engine.checkHullCandidate(hull, rack, typeId, skills);
         // An item the hull refuses outright only needs to agree on that —
         // `fast` answers it from the no-skill bare check (the Hull icon
         // filter's only consumer), not the full skills-aware run `full` is.
@@ -1618,7 +1615,7 @@ describe('hull fit pre-filter (real WASM + real pinned SDE)', () => {
   });
 
   it('reports a Tech 3 hull as having no hi, med or low slots until subsystems are fitted', () => {
-    const counts = hullSlotCounts(29990, new Map());
+    const counts = engine.hullSlotCounts(29990, new Map());
     expect(counts.high + counts.medium + counts.low).toBe(0);
     expect(counts.subsystem).toBeGreaterThan(0);
   });
