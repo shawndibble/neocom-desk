@@ -62,7 +62,7 @@ import { MARKED_RISKS } from '@/features/contractSearch/courierRiskLabels';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { ROUTE_PREFERENCE_LABEL_KEYS, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
-import { useRouteQuery, type RouteQuery } from '@/features/route/routeRules';
+import { useJumpBasis, type JumpBasis } from '@/features/route/jumpBasis';
 import {
   CourierContractDetailModal,
   type CourierJumps,
@@ -705,7 +705,7 @@ const PENDING: JumpsState = { kind: 'pending' };
 /** The modal's own pending value, stable for the same reason `PENDING` is. */
 const PENDING_JUMPS: CourierJumps = { kind: 'pending' };
 
-function useJumpCounts(rows: readonly CourierRouteRow[], route: RouteQuery): JumpsState {
+function useJumpCounts(rows: readonly CourierRouteRow[], route: JumpBasis): JumpsState {
   // The answer carries the inputs it was computed for, so "pending" is
   // *derived* during render rather than written by the effect: an answer whose
   // inputs are no longer the current ones is stale by definition, and the
@@ -715,7 +715,7 @@ function useJumpCounts(rows: readonly CourierRouteRow[], route: RouteQuery): Jum
     routeKey: string;
     state: JumpsState;
   } | null>(null);
-  const { rules, key: routeKey, hydrated } = route;
+  const { rules, network, key: routeKey, hydrated } = route;
 
   useEffect(() => {
     // Held until the Travel Settings are in, so the board does not rank once without them.
@@ -726,14 +726,15 @@ function useJumpCounts(rows: readonly CourierRouteRow[], route: RouteQuery): Jum
         originSystemId: row.origin.systemId,
         destinationSystemId: row.destination.systemId,
       })),
-      rules
+      rules,
+      network
     ).then((state) => {
       if (!cancelled) setAnswer({ rows, routeKey, state });
     });
     return () => {
       cancelled = true;
     };
-  }, [rows, rules, routeKey, hydrated]);
+  }, [rows, rules, network, routeKey, hydrated]);
 
   return answer && answer.rows === rows && answer.routeKey === routeKey ? answer.state : PENDING;
 }
@@ -897,7 +898,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
     }),
     [params]
   );
-  const routeQuery = useRouteQuery(params['courier.pref']);
+  const routeQuery = useJumpBasis(params['courier.pref']);
   const preference = routeQuery.rules.preference;
   const [selectedRow, setSelectedRow] = useState<CourierRouteRow | null>(null);
 

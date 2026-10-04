@@ -58,10 +58,9 @@ import { loadStructureName, loadStructureSystemId } from '@/features/character/s
 import { loadSystemSecurity, loadSystemName } from '@/features/character/systemSecurity';
 import { loadTypeNames, loadTypeVolumes } from '@/features/character/typeNames';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
-import { loadJumpsAway } from '@/features/character/routeDistance';
+import { jumpsBetween, useJumpBasis } from '@/features/route/jumpBasis';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { ROUTE_PREFERENCE_LABEL_KEYS, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
-import { useRouteQuery } from '@/features/route/routeRules';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useFocusHeading } from '@/lib/useFocusHeading';
 import type { CharacterAsset } from '@/esi/endpoints';
@@ -936,7 +935,7 @@ export function Assets() {
 
   // Opens on the pilot's Travel default; the picker here changes this view only.
   const [routeOverride, setRouteOverride] = useState<RoutePreferenceKind | null>(null);
-  const assetsRoute = useRouteQuery(routeOverride);
+  const assetsRoute = useJumpBasis(routeOverride);
   const routePreference = assetsRoute.rules.preference;
   // What a jumps-away answer was worked out under: every Travel rule changes
   // the route, so the whole query is in its key.
@@ -1418,7 +1417,7 @@ export function Assets() {
         result =
           systemId === null
             ? { kind: 'unknown', reason: 'noRoute' }
-            : await loadJumpsAway(characterSystemId, systemId, assetsRoute.rules);
+            : await jumpsBetween(characterSystemId, systemId, assetsRoute);
       }
       if (activeCharacterIdRef.current === requestedForCharacterId) {
         setJumpsAwayByKey((prev) => new Map(prev).set(key, result));
@@ -1431,7 +1430,7 @@ export function Assets() {
     stableScopedStations,
     jumpsAwayByKey,
     stationSystemIds,
-    assetsRoute.rules,
+    assetsRoute,
     avoidedHydrated,
     jumpsFor,
   ]);

@@ -35,7 +35,7 @@ import {
   MIN_ROUTE_HOLE_MIN_LIFE,
   parseRouteHoleMinLife,
   ROUTE_HOLE_HUBS,
-  type RouteHoleOverrides,
+  type RouteHoleChange,
   type RouteHoleQuery,
 } from '@/features/route/routeHoleSettings';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
@@ -70,11 +70,6 @@ function GroupLabel({ children }: { children: string }) {
   );
 }
 
-/** A change to one wormhole setting: the field and its new value. */
-export type RouteHoleChange = {
-  [K in keyof RouteHoleOverrides]: { field: K; value: NonNullable<RouteHoleOverrides[K]> };
-}[keyof RouteHoleOverrides];
-
 /** What the Route Safety group needs for Use jump bridges and the Ansiblex list. */
 export interface RouteBridgeFieldsProps {
   /** Whether this route may cross bridges: the link's say, else the page's default. */
@@ -87,7 +82,7 @@ export interface RouteBridgeFieldsProps {
   onManageBridges: () => void;
 }
 
-function RouteBridgeFields({
+export function RouteBridgeFields({
   bridgeQuery,
   onBridgesChange,
   bridgeCount,
@@ -110,22 +105,28 @@ function RouteBridgeFields({
   );
 }
 
-/** Route Safety's own group: whether, and through which holes and bridges, routes may go. */
-function RouteHoleFields({
+/**
+ * Route Safety's own group: whether, and through which holes and bridges,
+ * routes may go. Shared with Settings → Travel (`bare`: the panel there
+ * supplies the heading and rule), so the two pages edit one set of controls.
+ */
+export function RouteHoleFields({
   query,
   onChange,
   bridges,
+  bare = false,
 }: {
   query: RouteHoleQuery;
   onChange: (change: RouteHoleChange) => void;
   bridges: RouteBridgeFieldsProps;
+  bare?: boolean;
 }) {
   const { t } = useTranslation();
   const lifeId = useId();
   const { enabled, settings } = query;
   return (
-    <section className="space-y-3 border-t border-line pt-4">
-      <GroupLabel>{t('travel.holes.group')}</GroupLabel>
+    <section className={bare ? 'space-y-3 text-xs' : 'space-y-3 border-t border-line pt-4'}>
+      {!bare && <GroupLabel>{t('travel.holes.group')}</GroupLabel>}
       <label className="flex items-center gap-2 font-semibold">
         <Checkbox
           checked={enabled}

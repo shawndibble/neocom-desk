@@ -6622,6 +6622,8 @@
     },
     "travel": {
       "routeTitle": "Route planning",
+      "networkTitle": "Wormholes and jump bridges",
+      "networkHint": "Whether routes may fly through Thera / Turnur wormholes and Ansiblex jump bridges. Like the rules above, every jump count in the app follows them, so a number always matches the route Route Safety draws.",
       "hint": "The in-game autopilot's route settings, for planning. Every jump count and route in the app follows them; a page with its own route picker starts from the preference here. Kept across your devices.",
       "preferenceLabel": "Default route preference",
       "preferenceHint": "Which trip to plan, as the game's autopilot offers it.",

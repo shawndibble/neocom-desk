@@ -8,7 +8,7 @@ const JITA = 30000142;
 const AMARR = 30002187;
 const SAFER: RouteRules = { preference: 'prefer-highsec', securityPenalty: 50, avoid: [] };
 
-/** The key `routeDistance.ts` stores a route under. */
+/** The key a route's ESI answer was cached under. */
 const routeKey = (rules: RouteRules) =>
   `route:${JITA}:${AMARR}:${rulesCacheKey(JITA, AMARR, rules)}`;
 

@@ -6,8 +6,8 @@
  */
 import { createContext } from 'react';
 import { loadReprocessing } from '@/sde/loadSde';
+import { jumpsBetween } from '@/features/route/jumpBasis';
 import {
-  loadJumpsBetween,
   loadRegionCompetition,
   loadStationBestPrices,
   loadStructureCompetition,
@@ -19,7 +19,8 @@ export interface OrderDetailLoaders {
   regionCompetition: typeof loadRegionCompetition;
   /** One player structure's market book; resolves null when it can't be read (403, no scope, network). */
   structureCompetition: typeof loadStructureCompetition;
-  jumpsBetween: typeof loadJumpsBetween;
+  /** Jumps between two systems under the pilot's jump basis (`features/route/jumpBasis.ts`). */
+  jumpsBetween: typeof jumpsBetween;
   priceHistory: typeof loadPriceHistory;
   /** The SDE's baked reprocessing yields, every item. */
   reprocessing: typeof loadReprocessing;
@@ -36,7 +37,7 @@ export const esiOrderDetailLoaders: OrderDetailLoaders = {
   regionCompetition: (regionId, typeId) => loadRegionCompetition(regionId, typeId),
   structureCompetition: (characterId, structureId) =>
     loadStructureCompetition(characterId, structureId),
-  jumpsBetween: (origin, destination, rules) => loadJumpsBetween(origin, destination, rules),
+  jumpsBetween: (origin, destination, basis) => jumpsBetween(origin, destination, basis),
   priceHistory: (regionId, typeId) => loadPriceHistory(regionId, typeId),
   reprocessing: () => loadReprocessing(),
   stationBestPrices: (requests) => loadStationBestPrices(requests),

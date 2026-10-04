@@ -67,13 +67,7 @@ import type { TheraConnection } from '@/engine/route/theraConnections';
 import { MAX_STOPS } from '@/engine/route/tripPlan';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { useCurrentSystem } from '@/features/route/currentSystem';
-import {
-  useRouteHoleHubs,
-  useRouteHoleMinLife,
-  useRouteHoleQuery,
-  useRouteHolesEnabled,
-  useRouteHoleShipSize,
-} from '@/features/route/routeHoleSettings';
+import { saveRouteHoleDefault, useRouteHoleQuery } from '@/features/route/routeHoleSettings';
 import { useAvoidedSystemsEnabled, useRouteQuery } from '@/features/route/routeRules';
 import { useRouteBridgeQuery, useRouteBridgesEnabled } from '@/features/route/routeBridgeSettings';
 import { useSolarSystemIndex, useSystemName } from '@/features/route/useSolarSystems';
@@ -82,7 +76,7 @@ import { AnsiblexGatesDialog, type AnsiblexDialogMode } from './AnsiblexGatesDia
 import { useAnsiblexGates } from './ansiblexGates';
 import { AvoidSystemDialog, type AvoidTarget } from './AvoidSystemDialog';
 import { LegBody, type LegWaysProps } from './LegWays';
-import { RouteRulesPanel, type RouteHoleChange } from './RouteRulesPanel';
+import { RouteRulesPanel } from './RouteRulesPanel';
 import { RouteStrip } from './RouteStrip';
 import { RouteSystemsTable, type HoleRowProps } from './RouteSystemsTable';
 import { ROUTE_PARAMS } from './routeSafetyLink';
@@ -101,23 +95,6 @@ const HOLE_PARAM = {
   minLifeHours: 'whlife',
   hubs: 'whhub',
 } as const;
-
-/** Saves a wormhole setting as the page's default. */
-function saveHoleDefault(change: RouteHoleChange): void {
-  switch (change.field) {
-    case 'enabled':
-      void useRouteHolesEnabled.getState().setValue(change.value);
-      return;
-    case 'shipSize':
-      void useRouteHoleShipSize.getState().setValue(change.value);
-      return;
-    case 'minLifeHours':
-      void useRouteHoleMinLife.getState().setValue(change.value);
-      return;
-    case 'hubs':
-      void useRouteHoleHubs.getState().setValue(change.value);
-  }
-}
 
 const NO_HOLES: readonly TheraConnection[] = [];
 
@@ -335,7 +312,7 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
             onPreferenceChange={(pref) => setParams({ pref })}
             holeQuery={holeQuery}
             onHoleChange={(change) => {
-              saveHoleDefault(change);
+              saveRouteHoleDefault(change);
               setParams({ [HOLE_PARAM[change.field]]: null });
             }}
             bridges={{
