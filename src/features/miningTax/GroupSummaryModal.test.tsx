@@ -180,3 +180,15 @@ describe('GroupSummaryModal as one entry', () => {
     expect(onClose).toHaveBeenCalled();
   });
 });
+
+describe('GroupSummaryModal — a failed action', () => {
+  it('shows the save error it is handed', () => {
+    renderGroup({ saveError: 'Couldn’t save — nothing was changed. Try again.' });
+    expect(screen.getByRole('alert')).toHaveTextContent(/Couldn’t save/);
+  });
+
+  it('shows no alert while nothing has failed', () => {
+    renderGroup();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
