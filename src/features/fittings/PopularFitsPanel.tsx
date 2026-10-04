@@ -211,8 +211,7 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
                   {fit.name || t('fittings.popular.workbench.unnamed')}
                 </a>
                 <p className="text-xs text-text-dim">
-                  {t('fittings.popular.workbench.byline', {
-                    author: fit.authorName || t('fittings.popular.workbench.unknownAuthor'),
+                  {t('fittings.popular.workbench.added', {
                     age: formatAge(Math.max(0, now - fit.dateAdded), t),
                   })}
                 </p>
