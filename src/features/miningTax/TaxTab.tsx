@@ -390,13 +390,12 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   // A row action that failed to save leaves its detail modal open to say so.
   // Reset whenever the target changes, not keyed on it: after a failure nothing
   // reloads, so reopening the same row hands back the very same object.
-  const [actionFailed, setActionFailed] = useState(false);
-  const [actionFailedFor, setActionFailedFor] = useState(detailTarget);
-  if (actionFailedFor !== detailTarget) {
-    setActionFailedFor(detailTarget);
-    setActionFailed(false);
+  const [detailSaveError, setDetailSaveError] = useState<string | null>(null);
+  const [lastDetailTarget, setLastDetailTarget] = useState(detailTarget);
+  if (lastDetailTarget !== detailTarget) {
+    setLastDetailTarget(detailTarget);
+    setDetailSaveError(null);
   }
-  const detailSaveError = actionFailed ? t('miningTax.saveFailed') : null;
 
   useEffect(() => {
     if (!toast) return;
@@ -933,15 +932,24 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   }
 
   /** Every row action ends the same way: busy while it writes, then close and reload. */
-  async function runAndClose(action: () => Promise<unknown>) {
+  /** Closing after a failed save reloads: a per-day action may have written some days. */
+  function closeDetail() {
+    if (detailSaveError) refresh();
+    setDetailTarget(null);
+  }
+
+  async function runAndClose(
+    action: () => Promise<unknown>,
+    failedMessage: string = t('miningTax.saveFailed')
+  ) {
     setBusy(true);
-    setActionFailed(false);
+    setDetailSaveError(null);
     try {
       await action();
       setDetailTarget(null);
       refresh();
     } catch {
-      setActionFailed(true);
+      setDetailSaveError(failedMessage);
     } finally {
       setBusy(false);
     }
@@ -1066,9 +1074,10 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   function handleResolveGroup() {
     if (!detailTarget) return;
     const grown = allMembers(detailTarget).filter((m) => m.assignment.status === 'needs-review');
+    // One write per day: a failure partway leaves the earlier days written.
     void runAndClose(async () => {
       for (const m of grown) await resolveNeedsReview(m.assignment, m.row.entry, m.row.assignments);
-    });
+    }, t('miningTax.saveFailedPartway'));
   }
 
   function handleUnassignGroup() {
@@ -1076,7 +1085,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     const members = allMembers(detailTarget).map((m) => m.assignment);
     void runAndClose(async () => {
       for (const a of members) await deleteAssignment(a);
-    });
+    }, t('miningTax.saveFailedPartway'));
   }
 
   function handleUncombineAll() {
@@ -1894,7 +1903,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       {detailTarget && data && detailTarget.groupMembers && (
         <GroupSummaryModal
           open={detailTarget !== null}
-          onClose={() => setDetailTarget(null)}
+          onClose={closeDetail}
           members={allMembers(detailTarget)}
           systemName={systemName(detailTarget)}
           systemSecurity={systemSecurityOf(detailTarget)}
@@ -1955,7 +1964,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       {detailTarget && data && !detailTarget.groupMembers && (
         <RowDetailModal
           open={detailTarget !== null}
-          onClose={() => setDetailTarget(null)}
+          onClose={closeDetail}
           row={detailTarget.row}
           assignment={detailTarget.assignment}
           status={detailTarget.status}
