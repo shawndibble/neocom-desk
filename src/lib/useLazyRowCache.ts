@@ -7,7 +7,7 @@
  * or already in flight, and leave a failure uncached so the next demand
  * retries it.
  */
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface LazyRowCacheLoadOptions {
   /**
@@ -71,6 +71,18 @@ export function useLazyRowCache<K, V>(): LazyRowCache<K, V> {
   // state above.
   const attemptedRef = useRef<Set<K>>(new Set());
 
+  // A fetch can settle after the owner unmounts (a test tearing down its
+  // jsdom window, a page navigated away from): setting state then is a no-op
+  // in React, and during teardown it throws "window is not defined" as an
+  // unhandled rejection. Settled-late results are simply dropped.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const load = useCallback(
     (key: K, fetchValue: () => Promise<V>, options?: LazyRowCacheLoadOptions): Promise<void> => {
       const sticky = options?.sticky ?? false;
@@ -85,14 +97,16 @@ export function useLazyRowCache<K, V>(): LazyRowCache<K, V> {
       });
       return fetchValue()
         .then((value) => {
+          if (!mountedRef.current) return;
           setByKey((prev) => new Map(prev).set(key, value));
         })
         .catch(() => {
           // Left uncached so a non-sticky key's next `load` call retries.
-          setFailedKeys((prev) => new Set(prev).add(key));
           if (!sticky) attemptedRef.current.delete(key);
+          if (mountedRef.current) setFailedKeys((prev) => new Set(prev).add(key));
         })
         .finally(() => {
+          if (!mountedRef.current) return;
           setLoadingKeys((prev) => {
             const next = new Set(prev);
             next.delete(key);

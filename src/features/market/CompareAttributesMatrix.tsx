@@ -41,6 +41,7 @@ import type { CompareRow } from './useCompareRows';
 import { formatAttributeValue } from './format';
 import { useCompareAttributeGroups } from './useCompareAttributesExport';
 import { RemovableTypeIcon } from './RemovableTypeIcon';
+import { marketIskDecimals } from '@/lib/isk';
 
 export interface CompareAttributesMatrixProps {
   /** The drawer's own price rows — one per Compare Set item, loading state and best-sell summary included. */
@@ -58,7 +59,8 @@ export interface CompareAttributesMatrixProps {
 
 /** A price is shorthand — the whole table is a side-by-side scan — with the exact figure one gesture away; an attribute keeps its own unit and precision. */
 function formatCell(kind: 'price' | 'attribute', cell: CompareCell): ReactNode {
-  if (kind === 'price') return <IskAmount value={cell.value} revealOn="tap" />;
+  if (kind === 'price')
+    return <IskAmount value={cell.value} revealOn="tap" decimals={marketIskDecimals(cell.value)} />;
   return (
     cell.displayValue ??
     `${formatAttributeValue(cell.value, cell.unit)}${cell.unit ? ` ${cell.unit}` : ''}`

@@ -13,56 +13,61 @@
  * whole trip: the other legs still draw, and that leg carries its own
  * no-route message.
  *
- * Holes (issue #2476): the caller passes the open Thera / Turnur holes the
- * route may cross (`useRouteHoles`), and they join the graph as extra
- * connections with the hubs free (`engine/route/routeHoles.ts`). The trip is
- * planned again only when the network they make changes, never as their
- * remaining life ticks down.
+ * This hook is the adapter (issue #2539): it loads the stargate graph,
+ * systems, region names and activity, drops answers a newer request made
+ * stale, and names its inputs (`routeSafetyKeys.ts`) so the trip is planned
+ * again only when the network or a pin's answer changes — never as the holes'
+ * remaining life ticks down. What the trip is made of — each leg's Ways to
+ * fly, its pin, the hole and bridge jumps, the trip's facts — is
+ * `engine/route/routeSafetyTrip.ts`.
+ *
+ * Holes (issue #2476) and Ansiblex (issue #2478) join the search as extra
+ * connections; the stargate graph never holds them, so waypoints still cut at
+ * a hole or a bridge.
+ *
+ * An Avoid preview (issue #2547) is this same trip request with one more
+ * system avoided: `planWithAvoid` runs it through the same planner and
+ * assembly — pins, holes, bridges and Optimize included — reading only the
+ * graph and systems already loaded, and saving nothing.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { candidateAvoid } from '@/engine/route/avoidRules';
+import type { RouteSafetySystemEntry } from '@/engine/route/routeSafety';
 import {
-  buildRouteSafetyRows,
-  joinLegs,
-  summarizeRouteSafety,
-  summarizeTrip,
-  type RouteSafetyRow,
-  type RouteSafetySummary,
-  type RouteSafetySystemEntry,
-} from '@/engine/route/routeSafety';
-import {
-  holeNetworkFromKey,
-  holeNetworkKey,
-  holeStepFinder,
-  holeStepIndexes,
-  type HoleAt,
-  type HoleNetwork,
-} from '@/engine/route/routeHoles';
+  assembleRouteSafety,
+  planLegAlternatives,
+  routeSafetyNetwork,
+  type LegAlternatives,
+  type RouteSafetyAssembly,
+} from '@/engine/route/routeSafetyTrip';
+import type { HoleEnds, HoleNetwork } from '@/engine/route/routeHoles';
 import type { TheraConnection } from '@/engine/route/theraConnections';
-import type { TripOptions, TripPlan } from '@/engine/route/tripPlan';
+import type { AnsiblexGate } from '@/engine/route/ansiblex';
+import type { TripOptions } from '@/engine/route/tripPlan';
 import { planLocalTrip, type LocalTripResult } from '@/features/route/localRoute';
-import type { RouteQuery } from '@/features/route/routeRules';
+import type { RouteQuery, RouteRules } from '@/features/route/routeRules';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { loadRouteRegionNames, loadSystemActivity, type SystemActivity } from './routeSafetyData';
+import {
+  bridgeEndsFromKey,
+  bridgeKey,
+  holeEndsFromKey,
+  holeNetworkKey,
+  pinsFromKey,
+  pinsKey,
+} from './routeSafetyKeys';
 
-/** One Leg of the trip: its rows and facts, or `null` for both when no stargate route flies it. */
-export interface RouteSafetyLeg {
-  from: number;
-  to: number;
-  rows: RouteSafetyRow[] | null;
-  summary: RouteSafetySummary | null;
-}
+export type {
+  RouteSafetyLeg,
+  RouteSafetyTripRow,
+  RouteSafetyWay,
+} from '@/engine/route/routeSafetyTrip';
 
-/** The whole trip as one route: what the facts line and strip cover. */
-export interface RouteSafetyTrip {
-  rows: RouteSafetyRow[];
-  /** Where along `rows` each leg ends. */
-  stopIndexes: number[];
-  summary: RouteSafetySummary;
-  /** How many of the trip's jumps go through a wormhole; the rest are by gate. */
-  holeJumps: number;
-}
+/** The trip as an Avoid preview would draw it: `unknown` when the stargate map cannot be read. */
+export type AvoidTripResult = RouteSafetyAssembly | { kind: 'unknown' };
 
-export type { HoleAt };
+/** What an Avoid adds to the trip's avoid list (`candidateAvoid`, less the list it already has). */
+export type AvoidAddition = Omit<Parameters<typeof candidateAvoid>[0], 'effective'>;
 
 export type RouteSafetyState =
   | { kind: 'incomplete' }
@@ -70,52 +75,105 @@ export type RouteSafetyState =
   | { kind: 'loading' }
   | { kind: 'no-route' }
   | { kind: 'unknown' }
-  | {
-      kind: 'route';
-      legs: RouteSafetyLeg[];
-      /** `null` when a leg has no route: there is no whole trip to sum. */
-      trip: RouteSafetyTrip | null;
-      /** Set when optimizing changed the stop order. */
-      reordered: TripPlan['reordered'];
-      /** A stop no stargate route reaches: optimizing is off until it is removed. */
-      unreachable: boolean;
-      /** `null` while the activity feeds load, and when neither could be read. */
-      fetchedAt: Date | null;
-      activityLoading: boolean;
-      /** A feed could not be read: its figures show as unknown, never zero. */
-      activityUnavailable: boolean;
-      holeAt: HoleAt;
-      /** The holes the route was planned with, for an Avoid preview to plan the same way. */
-      network: HoleNetwork;
-      networkKey: string;
-    };
+  | (Extract<RouteSafetyAssembly, { kind: 'route' }> & {
+      /** Names the trip request: equal keys plan the same trip. */
+      requestKey: string;
+      /**
+       * This trip re-planned with the addition avoided — everything else as
+       * drawn. Saves nothing.
+       */
+      planWithAvoid: (addition: AvoidAddition) => Promise<AvoidTripResult>;
+    });
+
+export interface RouteSafetyRequest {
+  fromId: number | null;
+  stops: readonly number[];
+  tripOptions: TripOptions;
+  route: RouteQuery;
+  /** The open Thera / Turnur holes the filters allow (`useRouteHoles`). */
+  holes?: readonly TheraConnection[];
+  /** Each leg's pin token (`routeSafetyLink.ts`), `''` for a leg flown as planned. */
+  pins?: readonly string[];
+  /** Every open hole EVE-Scout lists, or `null` while there is no list (Hole jumps off, loading, unreachable). */
+  listed?: readonly TheraConnection[] | null;
+  /** The known Ansiblex the route may cross, or `null` while Use jump bridges is off. */
+  bridges?: readonly AnsiblexGate[] | null;
+}
 
 interface ResolvedTrip {
   requestKey: string;
   result: LocalTripResult;
+  alternatives: LegAlternatives[];
   systems: ReadonlyMap<number, RouteSafetySystemEntry>;
   regionNames: ReadonlyMap<number, string>;
 }
 
 const NO_HOLES: readonly TheraConnection[] = [];
-
+const NO_PINS: readonly string[] = [];
 const NO_SYSTEMS: ReadonlyMap<number, RouteSafetySystemEntry> = new Map();
+const NO_REGION_NAMES: ReadonlyMap<number, string> = new Map();
 
-export function useRouteSafety(
-  fromId: number | null,
-  stops: readonly number[],
-  tripOptions: TripOptions,
-  route: RouteQuery,
-  holes: readonly TheraConnection[] = NO_HOLES
-): RouteSafetyState {
+/** One planned trip with its legs' other ways: what the page and an Avoid preview both assemble. */
+async function planRouteSafetyTrip(request: {
+  fromId: number;
+  stops: readonly number[];
+  rules: RouteRules;
+  tripOptions: TripOptions;
+  network: HoleNetwork;
+  networkEnds: { holes: readonly HoleEnds[]; bridges: readonly AnsiblexGate[] };
+  pins: Parameters<typeof planLegAlternatives>[2];
+}): Promise<{
+  result: LocalTripResult;
+  alternatives: LegAlternatives[];
+  systemIds: number[];
+  systems: ReadonlyMap<number, RouteSafetySystemEntry>;
+}> {
+  const [result, systems] = await Promise.all([
+    planLocalTrip(
+      request.fromId,
+      request.stops,
+      request.rules,
+      request.tripOptions,
+      request.network
+    ),
+    loadSolarSystemsById().catch(() => null),
+  ]);
+  if (result.kind !== 'trip') {
+    return { result, alternatives: [], systemIds: [], systems: systems ?? NO_SYSTEMS };
+  }
+  const { legs, systemIds } = planLegAlternatives(result, request.networkEnds, request.pins);
+  return { result, alternatives: legs, systemIds, systems: systems ?? NO_SYSTEMS };
+}
+
+export function useRouteSafety({
+  fromId,
+  stops,
+  tripOptions,
+  route,
+  holes = NO_HOLES,
+  pins = NO_PINS,
+  listed = null,
+  bridges = null,
+}: RouteSafetyRequest): RouteSafetyState {
   const [activity, setActivity] = useState<SystemActivity | null>(null);
   const [resolved, setResolved] = useState<ResolvedTrip | null>(null);
   const { rules, key: routeKey, hydrated } = route;
   const { optimize = false, returnToStart = false, keepLastStopLast = false } = tripOptions;
   const stopsKey = stops.join(',');
-  const networkKey = holeNetworkKey(holes);
-  const network = useMemo(() => holeNetworkFromKey(networkKey), [networkKey]);
-  const requestKey = `${fromId}:${stopsKey}:${optimize}:${returnToStart}:${keepLastStopLast}:${routeKey}:${networkKey}`;
+  const holesKey = holeNetworkKey(holes);
+  const bridgesKey = bridges === null ? '' : bridgeKey(bridges);
+  const networkKey = bridgesKey === '' ? holesKey : `${holesKey}|${bridgesKey}`;
+  // Just the ends: the holes' life and the bridges' names never re-plan the trip.
+  const { networkEnds, network } = useMemo(() => {
+    const ends = { holes: holeEndsFromKey(holesKey), bridges: bridgeEndsFromKey(bridgesKey) };
+    return { networkEnds: ends, network: routeSafetyNetwork(ends.holes, ends.bridges) };
+  }, [holesKey, bridgesKey]);
+  const listedById = useMemo(
+    () => (listed === null ? null : new Map(listed.map((hole) => [hole.id, hole]))),
+    [listed]
+  );
+  const pinRequestKey = pinsKey(pins, listedById);
+  const requestKey = `${fromId}:${stopsKey}:${optimize}:${returnToStart}:${keepLastStopLast}:${routeKey}:${networkKey}:${pinRequestKey}`;
   const wantsRoute =
     fromId !== null && stops.length > 0 && !(stops.length === 1 && stops[0] === fromId);
 
@@ -140,29 +198,20 @@ export function useRouteSafety(
     let cancelled = false;
     const stopIds = stopsKey.split(',').map(Number);
     void (async () => {
-      const [result, systems] = await Promise.all([
-        planLocalTrip(
-          fromId,
-          stopIds,
-          rules,
-          { optimize, returnToStart, keepLastStopLast },
-          network
-        ),
-        loadSolarSystemsById().catch(() => null),
-      ]);
-      const byId = systems ?? NO_SYSTEMS;
-      const regionIds = new Set<number>();
-      if (result.kind === 'trip') {
-        for (const leg of result.plan.legs) {
-          if (leg.route.kind !== 'route') continue;
-          for (const id of leg.route.systems) {
-            const regionId = byId.get(id)?.regionId;
-            if (regionId !== undefined) regionIds.add(regionId);
-          }
-        }
-      }
+      const { result, alternatives, systemIds, systems } = await planRouteSafetyTrip({
+        fromId,
+        stops: stopIds,
+        rules,
+        tripOptions: { optimize, returnToStart, keepLastStopLast },
+        network,
+        networkEnds,
+        pins: pinsFromKey(pinRequestKey),
+      });
+      const regionIds = new Set(systemIds.flatMap((id) => systems.get(id)?.regionId ?? []));
       const regionNames = await loadRouteRegionNames([...regionIds]);
-      if (!cancelled) setResolved({ requestKey, result, systems: byId, regionNames });
+      if (!cancelled) {
+        setResolved({ requestKey, result, alternatives, systems, regionNames });
+      }
     })();
     return () => {
       cancelled = true;
@@ -177,8 +226,57 @@ export function useRouteSafety(
     keepLastStopLast,
     rules,
     network,
+    networkEnds,
+    pinRequestKey,
     requestKey,
   ]);
+
+  // The same request with the avoid list swapped. No region names or
+  // activity: a preview reads jumps and security only, and asks no network.
+  const planWithAvoid = useCallback(
+    async (addition: AvoidAddition): Promise<AvoidTripResult> => {
+      // Only offered on a drawn route, which always has a start.
+      if (fromId === null) return { kind: 'unknown' };
+      const stopIds = stopsKey.split(',').map(Number);
+      const planned = await planRouteSafetyTrip({
+        fromId,
+        stops: stopIds,
+        rules: { ...rules, avoid: candidateAvoid({ effective: rules.avoid, ...addition }) },
+        tripOptions: { optimize, returnToStart, keepLastStopLast },
+        network,
+        networkEnds,
+        pins: pinsFromKey(pinRequestKey),
+      });
+      if (planned.result.kind === 'unknown') return planned.result;
+      return assembleRouteSafety({
+        planned: planned.result,
+        alternatives: planned.alternatives,
+        singleStop: stopIds.length === 1,
+        pins,
+        holes,
+        listed,
+        bridges,
+        systems: planned.systems,
+        regionNames: NO_REGION_NAMES,
+        activity: null,
+      });
+    },
+    [
+      fromId,
+      stopsKey,
+      rules,
+      optimize,
+      returnToStart,
+      keepLastStopLast,
+      network,
+      networkEnds,
+      pinRequestKey,
+      pins,
+      holes,
+      listed,
+      bridges,
+    ]
+  );
 
   return useMemo((): RouteSafetyState => {
     if (fromId === null || stops.length === 0) return { kind: 'incomplete' };
@@ -186,49 +284,18 @@ export function useRouteSafety(
     if (resolved?.requestKey !== requestKey) return { kind: 'loading' };
     const { result } = resolved;
     if (result.kind === 'unknown') return result;
-    const { plan, graph } = result;
-    const holeAt: HoleAt = holeStepFinder(graph, holes);
-    // One stop is the page as it always was: no route is the whole answer.
-    if (stops.length === 1 && plan.legs[0]?.route.kind !== 'route') return { kind: 'no-route' };
-    const inputs = {
+    const assembled = assembleRouteSafety({
+      planned: result,
+      alternatives: resolved.alternatives,
+      singleStop: stops.length === 1,
+      pins,
+      holes,
+      listed,
+      bridges,
       systems: resolved.systems,
       regionNames: resolved.regionNames,
-      kills: activity?.kills ?? null,
-      jumps: activity?.jumps ?? null,
-    };
-    const legs = plan.legs.map((leg): RouteSafetyLeg => {
-      if (leg.route.kind !== 'route') {
-        return { from: leg.from, to: leg.to, rows: null, summary: null };
-      }
-      const rows = buildRouteSafetyRows(leg.route.systems, inputs);
-      return { from: leg.from, to: leg.to, rows, summary: summarizeRouteSafety(rows) };
+      activity,
     });
-    const legRows = legs.flatMap((leg) => (leg.rows ? [leg.rows] : []));
-    const joined = joinLegs(legRows);
-    return {
-      kind: 'route',
-      legs,
-      trip:
-        legRows.length === legs.length
-          ? {
-              rows: joined.rows,
-              stopIndexes: joined.stopIndexes,
-              summary: summarizeTrip(legRows),
-              holeJumps: holeStepIndexes(
-                joined.rows.map((row) => row.systemId),
-                holeAt
-              ).length,
-            }
-          : null,
-      reordered: plan.reordered,
-      unreachable: plan.unreachable,
-      fetchedAt: activity?.fetchedAt ?? null,
-      activityLoading: activity === null,
-      activityUnavailable:
-        activity !== null && (activity.kills === null || activity.jumps === null),
-      holeAt,
-      network,
-      networkKey,
-    };
-  }, [fromId, stops, resolved, requestKey, activity, holes, network, networkKey]);
+    return assembled.kind === 'route' ? { ...assembled, requestKey, planWithAvoid } : assembled;
+  }, [bridges, fromId, stops, resolved, requestKey, activity, holes, planWithAvoid, pins, listed]);
 }

@@ -20,8 +20,7 @@ function FittingRackList(
     <EditableRackList
       moduleResults={null}
       catalogue={null}
-      engineReady={false}
-      profile={null}
+      context={null}
       edit={() => {}}
       target={null}
       onSelectTarget={() => {}}

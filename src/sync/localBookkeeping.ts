@@ -96,6 +96,24 @@ export async function readTombstones(key: string): Promise<LocalTombstone[]> {
 }
 
 /**
+ * Records `ids` as deleted now under one tombstone key, replacing any older
+ * tombstone for the same id. Dexie-only and Firebase-free, so a feature can
+ * call it inside its own `db.transaction` (covering `db.settings`) and have
+ * the row deletes and their tombstones commit or fail together. Scheduling
+ * the sync that pushes them is the caller's job, after that commit.
+ */
+export async function appendTombstones(key: string, ids: readonly string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const now = Date.now();
+  const replaced = new Set(ids);
+  const remaining = (await readTombstones(key)).filter((t) => !replaced.has(t.id));
+  await db.settings.put({
+    key,
+    value: [...remaining, ...ids.map((id) => ({ id, deletedAt: now }))],
+  });
+}
+
+/**
  * Drop every device-local sync bookkeeping key for one Character (owner-hash
  * bookmark + every collection's tombstone list). Called when a Character is
  * removed — its skillPlans/buildPlans/quickbars/etc. rows are already gone by

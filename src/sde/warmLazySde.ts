@@ -19,6 +19,7 @@ export const LAZY_SDE_FILES = [
   'marketWideTrees.json',
   'pi-planet-radius.json',
   'shipTree.json',
+  'typeNames.json',
   'market/groups.json',
   'market/types.json',
   'market/systems.json',

@@ -20,7 +20,7 @@
  */
 
 import { isShipBayFlag, type EngineAsset } from '../assetTree';
-import type { MaterialSourcingMap, OwnedStockLocation, OwnedStockScope } from './types';
+import type { OwnedStockLocation, OwnedStockScope } from './types';
 
 // Re-exported from here too: every existing caller of this module already
 // imports its owned-stock types from `./ownedStock`, and the canonical
@@ -278,59 +278,4 @@ export function detectOwnedStock(
  */
 export function suggestedOwnedQuantity(detectedQuantity: number, requiredQuantity: number): number {
   return Math.min(detectedQuantity, requiredQuantity);
-}
-
-export interface OwnedStockSuggestion {
-  typeID: number;
-  ownedQuantity: number;
-}
-
-/**
- * The rows a bulk "use all detected" fills: those with detected stock and no
- * owned quantity stored at all.
- *
- * Bulk never clobbers. A hand-typed value — including a deliberate 0, which is
- * a real statement about a material the player means to buy — is left alone,
- * because a single click covering the whole table can't have meant any one of
- * them specifically. The per-row action is the one that overwrites; clicking it
- * on that row means it.
- */
-/**
- * The rows a bulk "use none" clears: those currently carrying a non-zero
- * owned quantity, wherever it came from (hand-typed or an earlier "use all").
- *
- * Unlike `bulkOwnedStockSuggestions`, this *does* overwrite an existing
- * value — clicking "use none" means exactly that for every row, not just the
- * untouched ones. A row already at 0, or with no owned quantity stored at
- * all, is left out of the patch since there is nothing to change.
- */
-export function clearOwnedStockSuggestions(
-  materials: readonly { typeID: number }[],
-  sourcing: MaterialSourcingMap | undefined
-): OwnedStockSuggestion[] {
-  const suggestions: OwnedStockSuggestion[] = [];
-  for (const material of materials) {
-    const owned = sourcing?.[material.typeID]?.ownedQuantity;
-    if (owned === undefined || owned === 0) continue;
-    suggestions.push({ typeID: material.typeID, ownedQuantity: 0 });
-  }
-  return suggestions;
-}
-
-export function bulkOwnedStockSuggestions(
-  materials: readonly { typeID: number; quantity: number }[],
-  sourcing: MaterialSourcingMap | undefined,
-  stock: DetectedOwnedStockMap
-): OwnedStockSuggestion[] {
-  const suggestions: OwnedStockSuggestion[] = [];
-  for (const material of materials) {
-    if (sourcing?.[material.typeID]?.ownedQuantity !== undefined) continue;
-    const detected = stock.get(material.typeID);
-    if (!detected) continue;
-    suggestions.push({
-      typeID: material.typeID,
-      ownedQuantity: suggestedOwnedQuantity(detected.quantity, material.quantity),
-    });
-  }
-  return suggestions;
 }

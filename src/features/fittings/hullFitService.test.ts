@@ -2,13 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import type { PilotProfile } from '@/engine/fittings/types';
 import type { FittingCatalogue } from './useFittingCatalogue';
+import { fakeDogmaEngine, fakeFittingContext } from './__fixtures__/fakeDogmaEngine';
+import { clearHullFitMemory, getHullFit } from './hullFitService';
 
 const checkCandidates = vi.fn();
-vi.mock('./dogmaFittingEngine', () => ({
-  checkCandidates: (...args: unknown[]) => checkCandidates(...args),
-}));
-
-import { clearHullFitMemory, getHullFit } from './hullFitService';
+const engine = fakeDogmaEngine({ checkCandidates });
 
 const profile = (level: number): PilotProfile => ({
   skillLevels: new Map([[3300, level]]),
@@ -24,6 +22,9 @@ const catalogue = {
   ],
 } as unknown as FittingCatalogue;
 
+const hullFit = (shipTypeId: number, pilot: PilotProfile) =>
+  getHullFit(fakeFittingContext(catalogue, { engine, profile: pilot }), shipTypeId);
+
 beforeEach(async () => {
   checkCandidates.mockReset();
   checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
@@ -37,10 +38,7 @@ beforeEach(async () => {
 
 describe('getHullFit', () => {
   it('runs one check for concurrent callers of the same hull and skills', async () => {
-    const [a, b] = await Promise.all([
-      getHullFit(catalogue, 587, profile(5)),
-      getHullFit(catalogue, 587, profile(5)),
-    ]);
+    const [a, b] = await Promise.all([hullFit(587, profile(5)), hullFit(587, profile(5))]);
     expect(a).toBe(b);
     expect(checkCandidates).toHaveBeenCalledTimes(1);
     expect(a.get(1)?.fitsHull).toBe(true);
@@ -49,19 +47,19 @@ describe('getHullFit', () => {
   });
 
   it('answers a repeat from memory', async () => {
-    await getHullFit(catalogue, 587, profile(5));
+    await hullFit(587, profile(5));
     checkCandidates.mockClear();
-    await getHullFit(catalogue, 587, profile(5));
+    await hullFit(587, profile(5));
     expect(checkCandidates).not.toHaveBeenCalled();
   });
 
   it('answers from the saved row after memory is lost, as after a reload', async () => {
-    await getHullFit(catalogue, 587, profile(5));
+    await hullFit(587, profile(5));
     await vi.waitFor(async () => expect(await db.hullFitCache.count()).toBe(1));
     clearHullFitMemory();
     checkCandidates.mockClear();
 
-    const checks = await getHullFit(catalogue, 587, profile(5));
+    const checks = await hullFit(587, profile(5));
 
     expect(checkCandidates).not.toHaveBeenCalled();
     expect(checks.get(1)).toEqual({ fitsHull: true, canFly: true, fitsResources: true });
@@ -69,10 +67,10 @@ describe('getHullFit', () => {
   });
 
   it('checks again for other skills, or another hull', async () => {
-    await getHullFit(catalogue, 587, profile(5));
+    await hullFit(587, profile(5));
     checkCandidates.mockClear();
-    await getHullFit(catalogue, 587, profile(4));
-    await getHullFit(catalogue, 588, profile(5));
+    await hullFit(587, profile(4));
+    await hullFit(588, profile(5));
     expect(checkCandidates).toHaveBeenCalledTimes(2);
   });
 });

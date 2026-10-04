@@ -6,7 +6,7 @@
  * `dismissedAt` has to reach the other device, or the same alert is dismissed
  * twice — once per device. Every sibling collection does that by calling
  * `scheduleSync` at the mutation site (`miningTax/payees.ts`,
- * `miningTax/assignments.ts`, `market/useQuickbar.ts`); the feed did not, so
+ * `miningTax/ledgerActions.ts`, `market/useQuickbar.ts`); the feed did not, so
  * a dismissal only left the device on whatever sync some *unrelated* edit
  * happened to trigger next.
  *

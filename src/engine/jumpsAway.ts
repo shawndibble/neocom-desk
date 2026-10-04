@@ -1,12 +1,10 @@
 /**
  * Jumps-away display state for a station/structure row on the Assets page
- * (issue #87): a pure mapping from a resolved ESI route to a jump count — it
- * only interprets the waypoint list `/route/` already returns (origin and
- * destination both included as stops).
+ * (issue #87): a pure mapping from a route's waypoint list to a jump count
+ * (origin and destination both included as stops).
  *
- * Round 14's "no local pathfinding graph" holds for one station at a time and
- * is not a standing prohibition: a table wanting a distance on every row uses
- * the local graph instead (`engine/route/jumpRoute.ts`). This page asks ESI.
+ * The count comes from the local stargate graph under the pilot's jump basis
+ * (`features/route/jumpBasis.ts`), the same as every other jump count in the app.
  *
  * The "no location"/"no route" distinction the Assets page shows in its
  * tooltip is assembled by the caller, not here: this module only knows how to

@@ -240,7 +240,9 @@ function KillmailRow({
         <span className="text-text-dim">
           {detail?.systemId == null ? dash : (names.get(detail.systemId) ?? `#${detail.systemId}`)}
         </span>
-        <span className="min-w-0 flex-1 truncate">
+        {/* `flex-1` from zero width never forces a wrap, so a phone truncated a normal
+            name to ~9 characters (#2520): below `sm` it takes the last line of its own. */}
+        <span className="min-w-0 flex-1 truncate max-sm:order-last max-sm:basis-full">
           <span className="text-text-dim">
             {t(
               entry.side === 'kill' ? 'travel.pilot.recent.victim' : 'travel.pilot.recent.finalBlow'

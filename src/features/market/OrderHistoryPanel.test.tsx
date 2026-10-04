@@ -226,7 +226,7 @@ describe('OrderHistoryPanel — phone', () => {
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('1 / 3')).toBeInTheDocument();
-    expect(screen.getByText('460,800.00')).toBeInTheDocument();
+    expect(screen.getByText('460,800')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View in Market' })).toHaveAttribute(
       'href',
       expect.stringContaining('2048')

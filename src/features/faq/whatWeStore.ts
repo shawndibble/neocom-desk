@@ -123,6 +123,7 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
         noteKey: 'settings.faq.store.local.loginNote',
       },
       { id: 'preferences', labelKey: 'settings.faq.store.local.preferences' },
+      { id: 'ansiblex', labelKey: 'settings.faq.store.local.ansiblex' },
     ],
   },
 ];

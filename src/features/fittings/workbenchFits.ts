@@ -13,7 +13,6 @@
  * nobody logged in. A good result is held per hull for ten minutes, like the
  * zKillboard tab's.
  */
-import { useEffect, useState } from 'react';
 import { doc, getDoc } from 'firebase/firestore/lite';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { getSyncFirestore } from '@/sync/firebaseApp';
@@ -121,19 +120,4 @@ export async function loadWorkbenchFits(
   } catch {
     return { ok: false };
   }
-}
-
-/** The hull's Workbench fits; `null` while loading. A switch of hull drops the old hull's answer. */
-export function useWorkbenchFits(shipTypeId: number): WorkbenchFitsResult | null {
-  const [state, setState] = useState<{ typeId: number; result: WorkbenchFitsResult } | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void loadWorkbenchFits(shipTypeId).then((result) => {
-      if (!cancelled) setState({ typeId: shipTypeId, result });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [shipTypeId]);
-  return state?.typeId === shipTypeId ? state.result : null;
 }

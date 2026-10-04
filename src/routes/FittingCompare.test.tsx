@@ -10,7 +10,8 @@ import { FittingCompare } from './FittingCompare';
 vi.mock('@/sde/loadSde', () => ({ loadTypes: async () => ({}), loadSkills: async () => [] }));
 vi.mock('@/features/fittings/fittingPrice', () => ({ loadFittingPrice: async () => null }));
 vi.mock('@/features/fittings/dogmaFittingEngine', () => ({
-  isDogmaEngineReady: () => false,
+  readyDogmaEngine: () => null,
+  subscribeDogmaEngine: () => () => {},
   computeFittingStats: () => Promise.reject(new Error('no dogma engine in tests')),
 }));
 

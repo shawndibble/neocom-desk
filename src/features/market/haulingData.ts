@@ -95,6 +95,9 @@ interface HaulingScanRowBase {
   toHub: TradeHub;
   /** m³ of one unit as hauled. */
   unitVolumeM3: number;
+  /** The item's SDE group and category, which decide the Specialised Holds it may ride in; null where unknown. */
+  groupId: number | null;
+  categoryId: number | null;
   /** The origin hub's sell ladder — what buying costs. */
   buyLadder: LadderLevel[];
   /** The destination hub's sell ladder — the competition. */
@@ -132,6 +135,8 @@ export interface HaulingScanRequest {
   /** How the cargo is sold; defaults to `list`. */
   mode?: HaulMode;
   types: TypeMap;
+  /** SDE groupID -> categoryID (`groupCategories.json`); without it every row's category is unknown. */
+  groupCategories?: Readonly<Record<string, number>>;
   /** ISO date the demand window ends on. */
   today?: string;
   onProgress?: (progress: HaulingProgress) => void;
@@ -290,9 +295,12 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
         stationLadders(candidate.lane.to, candidate.typeId),
       ]);
       const buyLadder = origin.sell;
+      const groupId = types[String(candidate.typeId)]?.groupID ?? null;
       const base = {
         typeId: candidate.typeId,
         name: types[String(candidate.typeId)]?.name ?? `#${candidate.typeId}`,
+        groupId,
+        categoryId: groupId === null ? null : (request.groupCategories?.[String(groupId)] ?? null),
         fromHub: candidate.lane.from,
         toHub: candidate.lane.to,
         buyLadder,
