@@ -785,15 +785,15 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   seen and roughly what it cost, and **Load**s the group's most recent loss.
 - **EVE Workbench fit**: A fit a pilot published on EVE Workbench, listed for its
   hull in the Popular fits panel's EVE Workbench tab (beside the zKillboard tab
-  of **Popular fit**s) with its name and date added, linked to its page
+  of **Popular fit**s) with its name, price and date created, linked to its page
   there.
   **Load**s from its EFT. Comes from our own copy of Workbench's public list,
   synced by a Cloud Function, since Workbench can't list fits by hull.
 - **Out-of-date fit**: An **EVE Workbench fit** that no longer works in today's
   game. It names a hull the app's current game data doesn't have, or an item
   the game's full list of type names doesn't have, or it has more modules in a rack than the hull now has slots. CPU, powergrid and
-  calibration never make a fit out of date. The tab lists it below the current
-  fits, only on request, with the reason.
+  calibration never make a fit out of date. The tab never lists it; when
+  every fit for the hull is out of date, it says so instead.
 - **Seen on zKillboard**: A sighting badge on an **EVE Workbench fit** whose
   fitted modules exactly match one of its hull's **Popular fit**s (the same
   grouping, so charges, drones and cargo don't count). Shows how many of the

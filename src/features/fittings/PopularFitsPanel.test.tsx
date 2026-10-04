@@ -416,6 +416,17 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     await waitFor(() => expect(screen.queryByText('Pricing fits at Jita…')).toBeNull());
   });
 
+  it('never prices an out-of-date fit, since it is never listed', async () => {
+    getHubPricesMock.mockResolvedValue(sellPrices({ 3001: 45_000_000 }));
+    openWorkbench({
+      ok: true,
+      fits: [wbFit('a', { eft: '[Vexor, Fit a]\nOld Gun I\nHeavy Neutron Blaster II' })],
+    });
+    await screen.findByText(/out of date with today's game/);
+    expect(screen.queryByText(/Pricing fits|Prices:/)).toBeNull();
+    expect(getHubPricesMock).not.toHaveBeenCalled();
+  });
+
   it('never says prices are on their way when no fit loaded anything to price', async () => {
     openWorkbench({ ok: true, fits: [wbFit('a', { eft: '[Gone Hull, Fit a]' })] });
     await screen.findByText(/out of date with today's game/);
