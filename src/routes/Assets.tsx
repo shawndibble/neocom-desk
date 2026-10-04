@@ -1826,6 +1826,7 @@ export function Assets() {
                             )}
                             t={t}
                             locationId={resolved.station.locationId}
+                            preference={routeOverride}
                           />
                         </span>
                       )}

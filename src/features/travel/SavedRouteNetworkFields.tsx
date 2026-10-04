@@ -8,15 +8,17 @@ import { useState } from 'react';
 import { Spinner } from '@/components/ui';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import { useRouteBridgeQuery, useRouteBridgesEnabled } from '@/features/route/routeBridgeSettings';
-import { saveRouteHoleDefault, useRouteHoleQuery } from '@/features/route/routeHoleSettings';
+import {
+  NO_HOLE_OVERRIDES,
+  saveRouteHoleDefault,
+  useRouteHoleQuery,
+} from '@/features/route/routeHoleSettings';
 import { AnsiblexGatesDialog, type AnsiblexDialogMode } from './AnsiblexGatesDialog';
 import { useAnsiblexGates } from './ansiblexGates';
 import { RouteHoleFields } from './RouteRulesPanel';
 
-const NO_OVERRIDES = { enabled: null, shipSize: null, minLifeHours: null, hubs: null } as const;
-
 export function SavedRouteNetworkFields() {
-  const holeQuery = useRouteHoleQuery(NO_OVERRIDES);
+  const holeQuery = useRouteHoleQuery(NO_HOLE_OVERRIDES);
   const bridgeQuery = useRouteBridgeQuery(null);
   const gateRecords = useAnsiblexGates();
   const systems = useSolarSystemIndex();

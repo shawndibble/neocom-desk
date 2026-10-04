@@ -26,7 +26,7 @@ export type JumpGraph = ReadonlyMap<number, readonly number[]>;
 /**
  * Which trip the caller is asking about — the game's Prefer Shorter, Prefer
  * Safer and Prefer Less Secure, and ESI's `Shorter`/`Safer`/`LessSecure`
- * (`features/route/esiRoute.ts` maps them), named for what they do since
+ * (the app's names for them), named for what they do since
  * nothing here talks to ESI.
  *
  * Both biased preferences are *preferences*, not filters: they make the

@@ -11,6 +11,7 @@
 import { TRAVEL_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import { parseLegPin } from '@/engine/route/legWays';
+import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { WORMHOLE_SHIP_SIZES } from '@/engine/route/theraConnections';
 import {
   MAX_ROUTE_HOLE_MIN_LIFE,
@@ -77,14 +78,20 @@ export const ROUTE_PARAMS = {
  * Route Safety from `originId` with one hole pinned for the first leg: what
  * Route via on a Thera / Turnur row opens. Hole jumps are switched on in the
  * link alone (never saved), since a hole is only known while they are on. No
- * stop is set: the page asks for one.
+ * stop is set: the page asks for one. A page's own `preference` rides along,
+ * so the route is drawn as the page counted it.
  */
-export function routeViaHref(originId: number, holeId: string): string {
+export function routeViaHref(
+  originId: number,
+  holeId: string,
+  preference?: RoutePreferenceKind | null
+): string {
   const params = new URLSearchParams();
   const values = {
     from: ROUTE_PARAMS.from.serialize(originId),
     wh: ROUTE_PARAMS.wh.serialize(true),
     pin: ROUTE_PARAMS.pin.serialize([holeId]),
+    pref: preference == null ? null : ROUTE_PARAMS.pref.serialize(preference),
   };
   for (const [key, value] of Object.entries(values)) if (value !== null) params.set(key, value);
   return `${tabPath(TRAVEL_TABS, 'route')}?${params.toString()}`;
@@ -93,11 +100,18 @@ export function routeViaHref(originId: number, holeId: string): string {
 /**
  * Route Safety to one system: what "View route" opens. With no `fromId` the
  * page starts from the Character's current system on its own; a courier
- * contract passes its pickup system, since that is where its jumps begin.
+ * contract passes its pickup system, since that is where its jumps begin. A
+ * page with its own route picker (Assets, Courier) passes the `preference` it
+ * counted under, so the route opens the way the number was worked out.
  */
-export function routeToHref(systemId: number, fromId?: number | null): string {
+export function routeToHref(
+  systemId: number,
+  fromId?: number | null,
+  preference?: RoutePreferenceKind | null
+): string {
   const params = new URLSearchParams();
   if (fromId != null) params.set('from', String(fromId));
+  if (preference != null) params.set('pref', ROUTE_PARAMS.pref.serialize(preference) ?? '');
   params.set('stops', ROUTE_PARAMS.stops.serialize([systemId]) ?? '');
   return `${tabPath(TRAVEL_TABS, 'route')}?${params.toString()}`;
 }

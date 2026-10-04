@@ -12,7 +12,10 @@
  *
  * Every count, one pair or a whole table, is then `localRoute.ts` over the
  * stargate graph under a basis (`jumpsBetween`, `localJumpDistances`,
- * `localJumpCountsForRoutes`). Nothing counts jumps any other way: ESI's
+ * `localJumpCountsForRoutes`). The one deliberate exception is the Thera
+ * table's distance column: it measures the gate distance to a hole's exit
+ * *before* taking that hole, so letting holes into it would put every exit one
+ * jump away. Nothing else counts jumps any other way: ESI's
  * `/route/` treats Avoided Systems as a wall where the graph weighs them as a
  * cost, so asking it gave Assets a different number than the route it links to.
  */
@@ -31,7 +34,7 @@ import {
 import { useRouteHoles } from '@/features/travel/useRouteHoles';
 import { findLocalJumps, type RouteGraphExtras } from './localRoute';
 import { useRouteBridgeQuery } from './routeBridgeSettings';
-import { useRouteHoleQuery } from './routeHoleSettings';
+import { NO_HOLE_OVERRIDES, useRouteHoleQuery } from './routeHoleSettings';
 import { useRouteQuery, type RouteRules } from './routeRules';
 
 export interface JumpBasis {
@@ -46,7 +49,6 @@ export interface JumpBasis {
 }
 
 const NO_HOLES: readonly TheraConnection[] = [];
-const NO_OVERRIDES = { enabled: null, shipSize: null, minLifeHours: null, hubs: null } as const;
 
 /**
  * The jump basis for this device's saved settings. `preferenceOverride` is a
@@ -55,7 +57,7 @@ const NO_OVERRIDES = { enabled: null, shipSize: null, minLifeHours: null, hubs: 
  */
 export function useJumpBasis(preferenceOverride?: RoutePreferenceKind | null): JumpBasis {
   const route = useRouteQuery(preferenceOverride);
-  const holeQuery = useRouteHoleQuery(NO_OVERRIDES);
+  const holeQuery = useRouteHoleQuery(NO_HOLE_OVERRIDES);
   const holesState = useRouteHoles(holeQuery);
   const bridgeQuery = useRouteBridgeQuery(null);
   const gateRecords = useAnsiblexGates();

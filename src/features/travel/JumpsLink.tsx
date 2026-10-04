@@ -7,6 +7,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { cx } from '@/lib/cx';
 import { routeToHref } from './routeSafetyLink';
 import { useViewRoute } from './useViewRoute';
@@ -20,17 +21,20 @@ const stop = (event: { stopPropagation: () => void }) => event.stopPropagation()
 export function JumpsLink({
   systemId,
   fromId,
+  preference,
   children,
 }: {
   systemId: number;
   /** Where the count starts, when that isn't the Character's current system. */
   fromId?: number | null;
+  /** The page's own route picker, when the count was worked out under it. */
+  preference?: RoutePreferenceKind | null;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
   return (
     <Link
-      to={routeToHref(systemId, fromId)}
+      to={routeToHref(systemId, fromId, preference)}
       className={linkClassName}
       title={t('travel.waypoints.viewRoute')}
       onClick={stop}
@@ -42,15 +46,17 @@ export function JumpsLink({
 
 export function PlaceJumpsLink({
   locationId,
+  preference,
   children,
   className,
 }: {
   locationId: number;
+  preference?: RoutePreferenceKind | null;
   children: ReactNode;
   className?: string;
 }) {
   const { t } = useTranslation();
-  const { resolving, failed, view } = useViewRoute(locationId);
+  const { resolving, failed, view } = useViewRoute(locationId, preference);
   return (
     <>
       <button

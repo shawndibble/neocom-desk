@@ -75,6 +75,14 @@ const ROUTE_HOLE_STORES = [
   useRouteHoleHubs,
 ] as const;
 
+/** "No link override": the saved defaults, for a caller with no link to read. */
+export const NO_HOLE_OVERRIDES = {
+  enabled: null,
+  shipSize: null,
+  minLifeHours: null,
+  hubs: null,
+} as const;
+
 /** What a link may override; `null` is "the saved default". */
 export interface RouteHoleOverrides {
   enabled: boolean | null;

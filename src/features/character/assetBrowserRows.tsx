@@ -24,6 +24,7 @@ import { formatBadge } from './assetBrowserFormat';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import type { PinState } from '@/features/character/stationPins';
 import type { SelectionState } from '@/features/character/assetSelection';
+import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { PlaceJumpsLink } from '@/features/travel/JumpsLink';
 import { SelectionCheckbox } from './SelectionCheckbox';
 import type { BlueprintKind } from '@/engine/blueprintKind';
@@ -62,17 +63,19 @@ interface JumpsAwayTextProps {
   t: Translate;
   /** The place counted to; when given, a known count opens the route to it. Leave out inside a link — a button can't nest in one. */
   locationId?: number;
+  /** The page's own route picker, carried into the route the count opens. */
+  preference?: RoutePreferenceKind | null;
 }
 
 /** Renders nothing until its route call settles — a progressive enhancement, never load-blocking. */
-export function JumpsAwayText({ result, t, locationId }: JumpsAwayTextProps) {
+export function JumpsAwayText({ result, t, locationId, preference }: JumpsAwayTextProps) {
   if (!result) return null;
   if (result.kind === 'known') {
     const text = t('assets.jumpsAway.value', { count: result.jumps });
     return locationId === undefined ? (
       <span className="tabular-nums">{text}</span>
     ) : (
-      <PlaceJumpsLink locationId={locationId} className="tabular-nums">
+      <PlaceJumpsLink locationId={locationId} preference={preference} className="tabular-nums">
         {text}
       </PlaceJumpsLink>
     );

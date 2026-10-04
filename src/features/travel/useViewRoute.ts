@@ -6,6 +6,7 @@
  */
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { resolvePlaceSystemId } from './placeSystem';
 import { routeToHref } from './routeSafetyLink';
@@ -17,7 +18,10 @@ interface ViewRoute {
   view: () => void;
 }
 
-export function useViewRoute(locationId: number): ViewRoute {
+export function useViewRoute(
+  locationId: number,
+  preference?: RoutePreferenceKind | null
+): ViewRoute {
   const navigate = useNavigate();
   const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
   const [resolving, setResolving] = useState(false);
@@ -33,7 +37,7 @@ export function useViewRoute(locationId: number): ViewRoute {
       .catch(() => null)
       .then((systemId) => {
         if (systemId === null) setFailed(true);
-        else navigate(routeToHref(systemId));
+        else navigate(routeToHref(systemId, null, preference));
       })
       .finally(() => {
         inFlight.current = false;

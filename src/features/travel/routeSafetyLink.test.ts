@@ -30,6 +30,13 @@ describe('routeToHref', () => {
     expect(routeToHref(30000142)).toBe('/travel/route?stops=30000142');
   });
 
+  it("carries the page's own route preference, so the route opens the way the count was worked out", () => {
+    expect(routeToHref(30000142, null, 'shortest')).toBe(
+      '/travel/route?pref=shortest&stops=30000142'
+    );
+    expect(routeViaHref(30000142, 'abc12', 'prefer-highsec')).toContain('pref=prefer-highsec');
+  });
+
   it('names the start when the count is measured from somewhere else', () => {
     expect(routeToHref(30000142, 30002187)).toBe('/travel/route?from=30002187&stops=30000142');
   });

@@ -898,7 +898,9 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
     }),
     [params]
   );
-  const routeQuery = useJumpBasis(params['courier.pref']);
+  // The board's own picker, if one is set: carried into the route a count opens.
+  const preferenceOverride = params['courier.pref'];
+  const routeQuery = useJumpBasis(preferenceOverride);
   const preference = routeQuery.rules.preference;
   const [selectedRow, setSelectedRow] = useState<CourierRouteRow | null>(null);
 
@@ -1210,7 +1212,11 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           return row.destination.systemId == null ? (
             String(count)
           ) : (
-            <JumpsLink systemId={row.destination.systemId} fromId={row.origin.systemId}>
+            <JumpsLink
+              systemId={row.destination.systemId}
+              fromId={row.origin.systemId}
+              preference={preferenceOverride}
+            >
               {count}
             </JumpsLink>
           );
@@ -1314,7 +1320,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         render: (row) => formatTimestamp(new Date(row.dateExpired), timeZone),
       },
     }),
-    [t, timeZone, jumps.kind, jumpsByContract, multipleFor]
+    [t, timeZone, jumps.kind, jumpsByContract, multipleFor, preferenceOverride]
   );
 
   const columns = useMemo<DataTableColumn<CourierRouteRow>[]>(() => {
