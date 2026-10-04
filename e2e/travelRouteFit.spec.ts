@@ -27,11 +27,17 @@ for (const width of [1024, 1280, 1440]) {
     const avoid = page.getByRole('button', { name: /^Avoid/ });
     await expect(avoid.first()).toBeVisible({ timeout: 15000 });
     await expectNoPageOverflow(page);
-    for (const button of await avoid.all()) {
-      const box = await button.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box!.x + box!.width).toBeLessThanOrEqual(width);
-    }
+    // One in-page pass: the rows keep re-rendering as kills/jumps land, so a
+    // snapshot of locators goes stale.
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          [...document.querySelectorAll('button')]
+            .filter((b) => /^Avoid/.test(b.getAttribute('aria-label') ?? b.textContent ?? ''))
+            .every((b) => b.getBoundingClientRect().right <= window.innerWidth)
+        )
+      )
+      .toBe(true);
 
     const main = page.getByRole('main');
     const rail = main.getByText('Stops', { exact: true }).first();
