@@ -37,6 +37,35 @@ describe('JournalDescriptionCell', () => {
     expect(container.querySelector('div')).toBeNull();
   });
 
+  it("names a daily goal payout's goal instead of printing its message id", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <JournalDescriptionCell
+          entry={entry({ ref_type: 'daily_goal_payouts', description: '-', reason: '1004953' })}
+          transaction={undefined}
+          itemName=""
+        />
+      </MemoryRouter>
+    );
+    expect(container).toHaveTextContent('Complete 3 Jumps');
+    expect(container).not.toHaveTextContent('1004953');
+    expect(container).not.toHaveTextContent('-');
+  });
+
+  it('falls back to a plain label for a daily goal it has no name for', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <JournalDescriptionCell
+          entry={entry({ ref_type: 'daily_goal_payouts', description: '-', reason: '697658' })}
+          transaction={undefined}
+          itemName=""
+        />
+      </MemoryRouter>
+    );
+    expect(container).toHaveTextContent('Daily goal');
+    expect(container).not.toHaveTextContent('697658');
+  });
+
   it('shows a non-empty reason as a second line', () => {
     render(
       <MemoryRouter>

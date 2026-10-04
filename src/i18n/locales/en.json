@@ -3614,6 +3614,11 @@
     "journalItemBought": "Bought {{quantity}} × {{unitPrice}} = {{total}}",
     "journalItemSold": "Sold {{quantity}} × {{unitPrice}} = {{total}}",
     "journalContractLink": "Contract →",
+    "dailyGoal": "Daily goal",
+    "dailyGoalNames": {
+      "712791": "Salvage 15 Wrecks",
+      "1004953": "Complete 3 Jumps"
+    },
     "journalBountyFaction": "{{faction}} ×{{count}}",
     "journalBountyOther": "Other",
     "journalBountyKills_one": "{{count}} NPC killed",
