@@ -18,6 +18,8 @@ import {
   Tabs,
   type StatChipTone,
 } from '@/components/ui';
+import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
+import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { db } from '@/db';
@@ -1244,6 +1246,9 @@ export function PlanetaryIndustry() {
         meta={planetsResult && <DataAgeBadge date={planetsResult.fetchedAt} />}
         actions={
           <>
+            <PageSettingsButton pageName={t('pi.title')} section="industry">
+              <PiSettingsForm />
+            </PageSettingsButton>
             <IconButton
               icon={<Icon.Refresh />}
               label={t('pi.refresh')}

@@ -33,6 +33,8 @@ import { characterFilterParam } from '@/features/character/characterFilterUrlPar
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
+import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
+import { MiningTaxSettingsForm } from '@/features/settings/MiningTaxSettingsForm';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { beginGrant } from '@/app/grantAction';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -360,6 +362,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   // already taken the banner away, stranding the pilot exactly as before. The
   // dialog says so itself when there is nothing to show.
   const [oreTagsOpen, setOreTagsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   // Row keys checked in the Open table's select column. Feeds all three bulk
   // actions (settle up / combine / dismiss), never just bulk-pay.
   const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
@@ -1602,12 +1605,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                 <DropdownMenuItem onSelect={() => setOreTagsOpen(true)}>
                   {t('miningTax.oreTagsAction')}
                 </DropdownMenuItem>
-                <DropdownMenuCheckboxItem
-                  checked={autoContinue}
-                  onCheckedChange={(next) => setAutoContinueFromCard(next === true)}
-                >
-                  {t('miningTax.continue.autoMenuLabel')}
-                </DropdownMenuCheckboxItem>
+                <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
+                  {t('pageSettings.menuItem')}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <IconButton
@@ -1878,6 +1878,15 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           onChanged={refresh}
         />
       )}
+
+      <PageSettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        pageName={t('miningTax.title')}
+        section="miningTax"
+      >
+        <MiningTaxSettingsForm onAutoContinueChange={setAutoContinueFromCard} />
+      </PageSettingsModal>
 
       {payeeManagerCharacterId !== null && (
         <PayeeManagerDialog
