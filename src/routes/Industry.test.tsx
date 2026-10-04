@@ -9,6 +9,7 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useAuthFailure } from '@/stores/authFailure';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import { useBuildGroups } from '@/features/industry/buildGroups';
@@ -150,7 +151,6 @@ function seedPlan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
   };
 }
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 
 afterEach(() => {
@@ -158,7 +158,7 @@ afterEach(() => {
   clearMarketPriceCache();
   clearCostIndexCache();
 });
-beforeEach(async () => {
+async function resetSession() {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -190,7 +190,25 @@ beforeEach(async () => {
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
 
   window.history.pushState({}, '', '/industry');
-});
+}
+
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render, so no test pays for the first one: a worker's first
+  // `App` render (lazy route chunks, jsdom and React warm-up) took over the
+  // 5s `findBy*` budget on its own and failed whichever test ran first.
+  // Same fix as `IndustryPlanPage.test.tsx`, paid under this hook's budget.
+  await routeChunks.loadIndustry();
+  await resetSession();
+  const { unmount } = render(<App />);
+  await screen.findByRole('searchbox', { name: 'Add build plan' }, { timeout: 25_000 });
+  unmount();
+  server.resetHandlers();
+  clearMarketPriceCache();
+  clearCostIndexCache();
+}, 30_000);
+
+beforeEach(resetSession);
 
 describe('Industry: tabs are paths (issue #1300)', () => {
   it('sends bare /industry to the Build Plans tab, and a tab click pushes its own path', async () => {
@@ -213,6 +231,24 @@ describe('Industry: tabs are paths (issue #1300)', () => {
     const row = (await screen.findByText('Rifter run')).closest('li');
     expect(row).not.toBeNull();
     expect(within(row as HTMLElement).getByText('7')).toBeInTheDocument();
+  });
+
+  it('gives each tab the gear for its own settings, and none to a tab that has none', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole('searchbox', { name: 'Add build plan' });
+    await user.click(screen.getByRole('button', { name: 'Industry settings' }));
+    expect(
+      within(screen.getByRole('dialog', { name: 'Industry settings' })).getByRole('spinbutton', {
+        name: /Assumed ME/,
+      })
+    ).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    await user.click(screen.getByRole('tab', { name: 'Records' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/industry/records'));
+    expect(screen.queryByRole('button', { name: /settings$/ })).not.toBeInTheDocument();
   });
 
   it('opens the tab its path names', async () => {

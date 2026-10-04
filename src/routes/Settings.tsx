@@ -16,6 +16,7 @@ import { UpdatePanel } from '@/features/settings/UpdatePanel';
 import { TravelSettingsPanel } from '@/features/settings/TravelSettingsPanel';
 import { IndustrySettingsForm } from '@/features/settings/IndustrySettingsForm';
 import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
+import { BpcSourcingSettingsForm } from '@/features/settings/BpcSourcingSettingsForm';
 import { MiningTaxSettingsForm } from '@/features/settings/MiningTaxSettingsForm';
 import { ChipRow, DefaultsSyncHint } from '@/features/settings/settingsFields';
 import { useHydratedStore } from '@/features/settings/useHydratedStore';
@@ -76,10 +77,6 @@ import {
   COLLATERAL_RATIO_OPTIONS,
   useCourierCollateralRatio,
 } from '@/features/contractSearch/collateralThreshold';
-import {
-  useBpcHideAuctionsDefault,
-  useBpcHidePlexDefault,
-} from '@/features/bpcContracts/sourcingDefaults';
 import { useDarkThreshold, DARK_AFTER_DAY_OPTIONS } from '@/features/corp/darkThreshold';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import {
@@ -654,6 +651,16 @@ function IndustryDefaultsPanel() {
   );
 }
 
+/** BPC Sourcing is an Industry tab, so its starting filters live beside the Industry defaults. */
+function BpcSourcingDefaultsPanel() {
+  const { t } = useTranslation();
+  return (
+    <Panel title={t('settings.bpcSourcingDefaultsTitle')}>
+      <BpcSourcingSettingsForm />
+    </Panel>
+  );
+}
+
 /** Beside the Industry defaults because Planetary Industry is an industry page; its own panel because its one control has nothing to do with a build. */
 function PiDefaultsPanel() {
   const { t } = useTranslation();
@@ -672,13 +679,7 @@ function MarketDefaultsPanel() {
   const collateralRatio = useCourierCollateralRatio((state) => state.value);
   const setCollateralRatio = useCourierCollateralRatio((state) => state.setValue);
   const collateralHydrated = useHydratedStore(useCourierCollateralRatio);
-  const hideAuctions = useBpcHideAuctionsDefault((state) => state.value);
-  const setHideAuctions = useBpcHideAuctionsDefault((state) => state.setValue);
-  const hideAuctionsHydrated = useHydratedStore(useBpcHideAuctionsDefault);
-  const hidePlex = useBpcHidePlexDefault((state) => state.value);
-  const setHidePlex = useBpcHidePlexDefault((state) => state.setValue);
-  const hidePlexHydrated = useHydratedStore(useBpcHidePlexDefault);
-  const hydrated = hubHydrated && collateralHydrated && hideAuctionsHydrated && hidePlexHydrated;
+  const hydrated = hubHydrated && collateralHydrated;
 
   return (
     <Panel title={t('settings.marketDefaultsTitle')}>
@@ -713,30 +714,6 @@ function MarketDefaultsPanel() {
               onSelect={(ratio) => void setCollateralRatio(ratio)}
               labelFor={(ratio) => t('settings.courierCollateralOption', { count: ratio })}
             />
-
-            <Field
-              label={t('settings.bpcHideAuctionsLabel')}
-              htmlFor="settings-bpc-hide-auctions"
-              inline
-            >
-              <Checkbox
-                id="settings-bpc-hide-auctions"
-                checked={hideAuctions}
-                onChange={() => void setHideAuctions(!hideAuctions)}
-              />
-            </Field>
-            <Field
-              label={t('settings.bpcHidePlexLabel')}
-              htmlFor="settings-bpc-hide-plex"
-              inline
-              note={t('settings.bpcHideHint')}
-            >
-              <Checkbox
-                id="settings-bpc-hide-plex"
-                checked={hidePlex}
-                onChange={() => void setHidePlex(!hidePlex)}
-              />
-            </Field>
           </Fields>
         </div>
       ) : (
@@ -1061,6 +1038,7 @@ export function Settings() {
           {section === 'industry' && (
             <>
               <IndustryDefaultsPanel />
+              <BpcSourcingDefaultsPanel />
               <PiDefaultsPanel />
             </>
           )}
