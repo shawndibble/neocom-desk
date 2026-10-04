@@ -204,9 +204,7 @@ export function StopsPanel({
       labels={{ show: t('travel.stops.edit'), hide: t('travel.stops.done') }}
       collapsedSummary={
         <p className="text-xs">
-          {stops.length === 0
-            ? fromName
-            : t('travel.stops.summary', { from: fromName, count: stops.length })}
+          {t('travel.stops.summary', { from: fromName, count: stops.length })}
         </p>
       }
     >

@@ -46,17 +46,17 @@ import { routeViaHref } from './routeSafetyLink';
 import { TheraTable } from './TheraTable';
 import { useTheraConnections, type TheraConnectionsState } from './useTheraConnections';
 
+/** What Reset filters goes back to: origin and Route Preference filter nothing, so they stay. */
+const DEFAULT_FILTERS = { hub: 'all', space: 'kspace', size: 'any' } as const;
+
 const THERA_PARAMS = {
   origin: optionalIdParam(),
   // Absent means the pilot's Travel default (Settings → Travel).
   pref: optionalEnumParam(ROUTE_PREFERENCES),
-  hub: enumParam(HUB_OPTIONS, 'all'),
-  space: enumParam(THERA_EXITS, 'kspace'),
-  size: enumParam(SIZE_OPTIONS, 'any'),
+  hub: enumParam(HUB_OPTIONS, DEFAULT_FILTERS.hub),
+  space: enumParam(THERA_EXITS, DEFAULT_FILTERS.space),
+  size: enumParam(SIZE_OPTIONS, DEFAULT_FILTERS.size),
 };
-
-/** What Reset filters goes back to: origin and Route Preference filter nothing, so they stay. */
-const DEFAULT_FILTERS = { hub: 'all', space: 'kspace', size: 'any' } as const;
 
 export function TheraTab({ tabBar }: { tabBar: ReactNode }) {
   const { t } = useTranslation();
@@ -123,9 +123,9 @@ export function TheraTab({ tabBar }: { tabBar: ReactNode }) {
         originName={originName}
         routeVia={originId === null ? undefined : (row) => routeViaHref(originId, row.id)}
         onResetFilters={
-          params.hub !== DEFAULT_FILTERS.hub ||
-          params.space !== DEFAULT_FILTERS.space ||
-          params.size !== DEFAULT_FILTERS.size
+          (Object.keys(DEFAULT_FILTERS) as (keyof typeof DEFAULT_FILTERS)[]).some(
+            (key) => params[key] !== DEFAULT_FILTERS[key]
+          )
             ? () => setParams(DEFAULT_FILTERS)
             : undefined
         }

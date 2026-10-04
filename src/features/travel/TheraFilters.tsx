@@ -79,7 +79,7 @@ export function TheraFilters({
         <div className="flex items-center gap-2">
           <span
             aria-hidden="true"
-            className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+            className="shrink-0 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap text-text-dim uppercase"
           >
             {t('travel.thera.originLabel')}
           </span>
