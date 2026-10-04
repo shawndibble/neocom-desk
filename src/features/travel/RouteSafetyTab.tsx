@@ -367,7 +367,6 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
       <AvoidSystemDialog
         target={avoidTarget}
         route={state.kind === 'route' ? state : null}
-        effectiveAvoid={routeQuery.rules.avoid}
         onClose={() => setAvoidTarget(null)}
       />
       {bridgeDialog !== null && (

@@ -14,65 +14,27 @@
  * the preview counts it switched on and the dialog offers to switch it on
  * along with the add.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Spinner } from '@/components/ui';
-import { avoidListKey, candidateAvoid } from '@/engine/route/avoidRules';
-import type { RouteSafetyAssembly } from '@/engine/route/routeSafetyTrip';
+import {
+  avoidListKey,
+  avoidPreviewOutcome,
+  type AvoidPreviewOutcome,
+} from '@/engine/route/avoidRules';
 import { addAvoidedSystem, useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { useAvoidedSystemsEnabled } from '@/features/route/routeRules';
-import type { AvoidTripResult, RouteSafetyState } from './useRouteSafety';
+import type { AvoidTripResult, RouteSafetyLeg, RouteSafetyState } from './useRouteSafety';
 
 export interface AvoidTarget {
   systemId: number;
   name: string;
 }
 
-type RoutedTrip = Extract<RouteSafetyAssembly, { kind: 'route' }>;
-
-/** The figures a preview compares: the whole trip's, or its routed legs' while a leg has none. */
-function tripFigures(trip: RoutedTrip): { jumps: number; lowestSecurity: number | null } {
-  if (trip.trip) return trip.trip.summary;
-  let jumps = 0;
-  let lowestSecurity: number | null = null;
-  for (const { summary } of trip.legs) {
-    if (!summary) continue;
-    jumps += summary.jumps;
-    if (summary.lowestSecurity !== null) {
-      lowestSecurity = Math.min(lowestSecurity ?? Infinity, summary.lowestSecurity);
-    }
-  }
-  return { jumps, lowestSecurity };
-}
-
 type AvoidPreview =
-  | {
-      kind: 'preview';
-      jumps: number;
-      /** New jumps less current: 0 either way, or negative with other rules changing. */
-      jumpDelta: number;
-      lowestSecurity: number | null;
-      /**
-       * The new trip still passes through the system. Avoidance is a cost,
-       * never a wall, so a trip only possible through it keeps it — told
-       * apart from an equal-length detour, which is +0 too.
-       */
-      stillCrosses: boolean;
-    }
-  | { kind: 'no-route' }
-  | { kind: 'unknown' };
+  ({ kind: 'preview' } & AvoidPreviewOutcome) | { kind: 'no-route' } | { kind: 'unknown' };
 
-function avoidPreview(current: RoutedTrip, next: AvoidTripResult, systemId: number): AvoidPreview {
-  if (next.kind !== 'route') return next;
-  const { jumps, lowestSecurity } = tripFigures(next);
-  return {
-    kind: 'preview',
-    jumps,
-    jumpDelta: jumps - tripFigures(current).jumps,
-    lowestSecurity,
-    stillCrosses: next.legs.some((leg) => leg.rows?.some((row) => row.systemId === systemId)),
-  };
-}
+const legRows = (trip: { legs: readonly RouteSafetyLeg[] }) => trip.legs.map((leg) => leg.rows);
 
 /** "+3", "−2", "+0": the change always carries a sign, so +0 reads as no change. */
 function formatJumpDelta(delta: number): string {
@@ -104,15 +66,12 @@ function PreviewText({ preview, name }: { preview: AvoidPreview; name: string })
 export function AvoidSystemDialog({
   target,
   route,
-  effectiveAvoid,
   onClose,
 }: {
   /** `null` keeps the dialog closed. */
   target: AvoidTarget | null;
   /** The page's trip now, or `null` while it loads. */
   route: Extract<RouteSafetyState, { kind: 'route' }> | null;
-  /** The avoid list the page's trip is drawn with now. */
-  effectiveAvoid: readonly number[];
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -120,49 +79,52 @@ export function AvoidSystemDialog({
   const setAvoided = useAvoidedSystems((state) => state.setValue);
   const enabled = useAvoidedSystemsEnabled((state) => state.value);
   const setEnabled = useAvoidedSystemsEnabled((state) => state.setValue);
-  const [planned, setPlanned] = useState<{
-    plan: Extract<RouteSafetyState, { kind: 'route' }>['planWithAvoid'];
-    avoidKey: string;
-    result: AvoidTripResult;
-  } | null>(null);
+  const [planned, setPlanned] = useState<{ key: string; result: AvoidTripResult } | null>(null);
 
   const systemId = target?.systemId ?? null;
-  const plan = route?.planWithAvoid ?? null;
-  // What the preview was planned with, so a stale answer is never shown.
-  const avoidKey =
-    systemId === null
-      ? ''
-      : avoidListKey(
-          candidateAvoid({
-            effective: effectiveAvoid,
-            systemId,
-            avoidList: avoided,
-            avoidListEnabled: enabled,
-          })
-        );
+  // Keyed by what it plans, not by the planner's identity: a hole list
+  // refreshed with the same holes is the same trip, and re-plans nothing.
+  const previewKey =
+    route === null || systemId === null
+      ? null
+      : `${route.requestKey}|${systemId}|${enabled}|${avoidListKey(avoided)}`;
+  const latest = useRef({ route, systemId, avoided, enabled });
+  useEffect(() => {
+    latest.current = { route, systemId, avoided, enabled };
+  });
 
   useEffect(() => {
-    if (plan === null || systemId === null) return;
+    const {
+      route: trip,
+      systemId: id,
+      avoided: avoidList,
+      enabled: avoidListEnabled,
+    } = latest.current;
+    if (previewKey === null || trip === null || id === null) return;
     let cancelled = false;
-    const avoid = candidateAvoid({
-      effective: effectiveAvoid,
-      systemId,
-      avoidList: avoided,
-      avoidListEnabled: enabled,
-    });
-    void plan(avoid).then((result) => {
-      if (!cancelled) setPlanned({ plan, avoidKey: avoidListKey(avoid), result });
+    void trip.planWithAvoid({ systemId: id, avoidList, avoidListEnabled }).then((result) => {
+      if (!cancelled) setPlanned({ key: previewKey, result });
     });
     return () => {
       cancelled = true;
     };
-  }, [plan, systemId, effectiveAvoid, avoided, enabled]);
+  }, [previewKey]);
 
   if (target === null) return null;
-  const current =
-    route !== null && planned?.plan === plan && planned.avoidKey === avoidKey
-      ? avoidPreview(route, planned.result, target.systemId)
-      : null;
+  const next = route !== null && planned?.key === previewKey ? planned.result : null;
+  const current: AvoidPreview | null =
+    route === null || next === null
+      ? null
+      : next.kind === 'route'
+        ? {
+            kind: 'preview',
+            ...avoidPreviewOutcome({
+              current: legRows(route),
+              next: legRows(next),
+              systemId: target.systemId,
+            }),
+          }
+        : next;
 
   const add = (switchOn: boolean) => {
     void setAvoided(addAvoidedSystem(avoided, target.systemId));

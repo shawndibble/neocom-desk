@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { avoidListKey, candidateAvoid, effectiveAvoid, type AvoidRules } from './avoidRules';
+import {
+  avoidListKey,
+  avoidPreviewOutcome,
+  candidateAvoid,
+  effectiveAvoid,
+  type AvoidRules,
+} from './avoidRules';
+import { buildRouteSafetyRows } from './routeSafety';
 
 const UEDAMA = 30045328;
 const TAMA = 30002813;
@@ -106,5 +113,48 @@ describe('candidateAvoid', () => {
         avoidListEnabled: false,
       })
     ).toEqual([5, 10, 20, 40]);
+  });
+});
+
+describe('avoidPreviewOutcome', () => {
+  const SYSTEMS = new Map([
+    [1, { id: 1, name: 'One', security: 0.9, regionId: 10 }],
+    [2, { id: 2, name: 'Two', security: 0.9, regionId: 10 }],
+    [3, { id: 3, name: 'Three', security: 0.9, regionId: 10 }],
+    [4, { id: 4, name: 'Four', security: 0.46, regionId: 10 }],
+    [5, { id: 5, name: 'Five', security: 0.7, regionId: 10 }],
+  ]);
+  const rows = (route: number[]) =>
+    buildRouteSafetyRows(route, {
+      systems: SYSTEMS,
+      regionNames: new Map(),
+      kills: null,
+      jumps: null,
+    });
+
+  it('counts the whole trip, every leg, new less current', () => {
+    expect(
+      avoidPreviewOutcome({
+        current: [rows([1, 2, 3]), rows([3, 2])],
+        next: [rows([1, 4, 5, 3]), rows([3, 2])],
+        systemId: 2,
+      })
+    ).toEqual({ jumps: 4, jumpDelta: 1, lowestSecurity: 0.5, stillCrosses: true });
+  });
+
+  it('tells a trip that goes round the system from one that still crosses it', () => {
+    expect(
+      avoidPreviewOutcome({ current: [rows([1, 2, 3])], next: [rows([1, 4, 3])], systemId: 2 })
+    ).toMatchObject({ jumpDelta: 0, stillCrosses: false });
+  });
+
+  it('counts only the legs a route flies, on both sides alike', () => {
+    expect(
+      avoidPreviewOutcome({
+        current: [rows([1, 2, 3]), null],
+        next: [rows([1, 4, 5, 3]), null],
+        systemId: 2,
+      })
+    ).toMatchObject({ jumps: 3, jumpDelta: 1 });
   });
 });

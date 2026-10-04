@@ -5,6 +5,7 @@
  *
  * Pure, per CLAUDE.md: the caller supplies the lists and the kill counts.
  */
+import { summarizeTrip, type RouteSafetyRow } from './routeSafety';
 export interface AvoidRules {
   /** The pilot's own Avoided Systems. */
   avoidList: readonly number[];
@@ -72,4 +73,45 @@ export function candidateAvoid(input: {
   avoid.add(input.systemId);
   if (!input.avoidListEnabled) for (const id of input.avoidList) avoid.add(id);
   return [...avoid].sort((a, b) => a - b);
+}
+
+export interface AvoidPreviewOutcome {
+  jumps: number;
+  /** New jumps less current: 0 either way, or negative with other rules changing. */
+  jumpDelta: number;
+  lowestSecurity: number | null;
+  /**
+   * The new trip still passes through the system. Avoidance is a cost, never
+   * a wall, so a trip only possible through it keeps it — told apart from an
+   * equal-length detour, which is +0 too.
+   */
+  stillCrosses: boolean;
+}
+
+/** Each leg's rows in flying order, `null` for a leg no route flies. */
+type TripLegRows = readonly (readonly RouteSafetyRow[] | null)[];
+
+/** The routed legs, summed the way the trip's facts line is. */
+function tripSummary(legs: TripLegRows) {
+  return summarizeTrip(legs.filter((rows): rows is readonly RouteSafetyRow[] => rows !== null));
+}
+
+/**
+ * An Avoid preview (issue #2547): the trip re-planned with one more system
+ * avoided, against the trip as drawn. Both are whole trips — a stop order
+ * that moves elsewhere counts — and a leg with no route is left out of both
+ * alike: avoiding only adds cost, so it cannot open or close a leg.
+ */
+export function avoidPreviewOutcome(input: {
+  current: TripLegRows;
+  next: TripLegRows;
+  systemId: number;
+}): AvoidPreviewOutcome {
+  const { jumps, lowestSecurity } = tripSummary(input.next);
+  return {
+    jumps,
+    jumpDelta: jumps - tripSummary(input.current).jumps,
+    lowestSecurity,
+    stillCrosses: input.next.some((rows) => rows?.some((row) => row.systemId === input.systemId)),
+  };
 }

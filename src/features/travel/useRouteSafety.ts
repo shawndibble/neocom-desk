@@ -31,6 +31,7 @@
  * graph and systems already loaded, and saving nothing.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { candidateAvoid } from '@/engine/route/avoidRules';
 import type { RouteSafetySystemEntry } from '@/engine/route/routeSafety';
 import {
   assembleRouteSafety,
@@ -63,6 +64,9 @@ export type { RouteSafetyLeg, RouteSafetyWay } from '@/engine/route/routeSafetyT
 /** The trip as an Avoid preview would draw it: `unknown` when the stargate map cannot be read. */
 export type AvoidTripResult = RouteSafetyAssembly | { kind: 'unknown' };
 
+/** What an Avoid adds to the trip's avoid list (`candidateAvoid`, less the list it already has). */
+export type AvoidAddition = Omit<Parameters<typeof candidateAvoid>[0], 'effective'>;
+
 export type RouteSafetyState =
   | { kind: 'incomplete' }
   | { kind: 'same-system' }
@@ -70,12 +74,13 @@ export type RouteSafetyState =
   | { kind: 'no-route' }
   | { kind: 'unknown' }
   | (Extract<RouteSafetyAssembly, { kind: 'route' }> & {
+      /** Names the trip request: equal keys plan the same trip. */
+      requestKey: string;
       /**
-       * This trip, re-planned with `avoid` in place of the rules' own avoid
-       * list — everything else as drawn. Saves nothing; a new function
-       * whenever the trip request changes.
+       * This trip re-planned with the addition avoided — everything else as
+       * drawn. Saves nothing.
        */
-      planWithAvoid: (avoid: readonly number[]) => Promise<AvoidTripResult>;
+      planWithAvoid: (addition: AvoidAddition) => Promise<AvoidTripResult>;
     });
 
 export interface RouteSafetyRequest {
@@ -227,13 +232,14 @@ export function useRouteSafety({
   // The same request with the avoid list swapped. No region names or
   // activity: a preview reads jumps and security only, and asks no network.
   const planWithAvoid = useCallback(
-    async (avoid: readonly number[]): Promise<AvoidTripResult> => {
+    async (addition: AvoidAddition): Promise<AvoidTripResult> => {
+      // Only offered on a drawn route, which always has a start.
       if (fromId === null) return { kind: 'unknown' };
       const stopIds = stopsKey.split(',').map(Number);
       const planned = await planRouteSafetyTrip({
         fromId,
         stops: stopIds,
-        rules: { ...rules, avoid: [...avoid] },
+        rules: { ...rules, avoid: candidateAvoid({ effective: rules.avoid, ...addition }) },
         tripOptions: { optimize, returnToStart, keepLastStopLast },
         network,
         networkEnds,
@@ -288,6 +294,6 @@ export function useRouteSafety({
       regionNames: resolved.regionNames,
       activity,
     });
-    return assembled.kind === 'route' ? { ...assembled, planWithAvoid } : assembled;
+    return assembled.kind === 'route' ? { ...assembled, requestKey, planWithAvoid } : assembled;
   }, [bridges, fromId, stops, resolved, requestKey, activity, holes, planWithAvoid, pins, listed]);
 }
