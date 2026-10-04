@@ -800,9 +800,8 @@ export function BuildPlanDetail({
   // silently skips every mineral a sub-build introduced while the row beside
   // it is still offering to apply one. The fill/clear rules themselves live
   // in `planMaterialsView.ts`, shared with the Build Group's ledger. The
-  // Blueprint Acquisition row is left out: it never shows "Use assets"
-  // (`MaterialsTable`'s `renderOwnedHint`), yet a packaged copy of the
-  // blueprint in a hangar is detected stock like any other (issue #2538).
+  // Blueprint Acquisition row never offers "Use assets", though a packaged
+  // copy of its blueprint is detected stock, so it is left out (issue #2538).
   const bulkDetectedPatches = useMemo<SourcingPatchEntry[]>(
     () =>
       bulkUseDetected(

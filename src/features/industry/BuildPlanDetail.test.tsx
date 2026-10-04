@@ -1522,32 +1522,14 @@ describe('BuildPlanDetail Use all / Use none', () => {
     expect(onSourcing).toHaveBeenLastCalledWith([{ typeID: 34, patch: { ownedQuantity: 0 } }]);
   });
 
-  // The Blueprint Acquisition row never offers "Use assets" (its ownership is
-  // the Character's real BPO/BPC), so "Use all" must not fill it either — even
-  // when a packaged copy of that blueprint sits in a hangar (issue #2538).
   it('leaves the Blueprint Acquisition row alone even with a packaged blueprint in a hangar', async () => {
     const user = userEvent.setup();
     const onSourcing = vi.fn();
-    const source = TRITANIUM_IN_JITA.sources[0]!;
+    const [source] = TRITANIUM_IN_JITA.sources;
+    const packagedBlueprint = { ...source!.assets[0]!, item_id: 2, type_id: 638, quantity: 1 };
     const withPackagedBlueprint: OwnedStockSnapshot = {
       ...TRITANIUM_IN_JITA,
-      sources: [
-        {
-          ...source,
-          assets: [
-            ...source.assets,
-            {
-              item_id: 2,
-              type_id: 638,
-              location_id: 60003760,
-              location_flag: 'Hangar',
-              location_type: 'station',
-              quantity: 1,
-              is_singleton: false,
-            },
-          ],
-        },
-      ],
+      sources: [{ ...source!, assets: [...source!.assets, packagedBlueprint] }],
     };
     render(
       <Harness
