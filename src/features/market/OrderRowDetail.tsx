@@ -91,7 +91,8 @@ export function OrderRowDetail({
               remain: formatVolume(order.volume_remain),
               total: formatVolume(order.volume_total),
             })}
-            {filled > 0 && ` · ${t('market.orderDetail.filled', { count: filled })}`}
+            {filled > 0 &&
+              ` · ${t('market.orderDetail.filled', { count: filled, units: formatVolume(filled) })}`}
           </span>
           <span>
             {t('market.orderDetail.issued', {
@@ -111,6 +112,13 @@ export function OrderRowDetail({
         </div>
       </div>
 
+      <p className="text-text">
+        <span className="font-semibold">{placeName}</span>
+        {location.systemName !== '' && (
+          <span className="text-text-dim"> · {location.systemName}</span>
+        )}
+      </p>
+
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
         <Fact label={t('market.orderDetail.orderValue')}>
           {formatIskCompact(order.price * order.volume_remain)}
@@ -128,6 +136,7 @@ export function OrderRowDetail({
             · {t('market.orderDetail.daysLeft', { count: daysLeft })}
           </span>
         </Fact>
+        {buy && <Fact label={t('market.minVolume')}>{formatVolume(order.min_volume)}</Fact>}
         {location.stationName === null && (
           <Fact label={t('market.orderDetail.structureType')}>
             {t('market.orderDetail.playerStructure')}
@@ -144,7 +153,7 @@ export function OrderRowDetail({
       </div>
 
       {depth && (
-        <p className="m-0 border border-line bg-bg px-2 py-1.5">
+        <p className="border border-line bg-bg px-2 py-1.5">
           <span className="text-text-dim">
             {t(buy ? 'market.orderDetail.sellDownTo' : 'market.orderDetail.buyDownTo')}
           </span>{' '}

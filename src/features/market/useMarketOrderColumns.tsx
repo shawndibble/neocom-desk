@@ -51,6 +51,12 @@ export interface UseMarketOrderColumnsArgs {
   depthByOrder: ReadonlyMap<number, DepthAt>;
   /** The book's best sell, which a bait-priced sell order is measured against. */
   bestSell: number | null;
+  /**
+   * Whether the tables show as two-line cards — on a phone, or wherever the
+   * order book's column is too narrow for its columns. Chosen in JS from the
+   * book's own width, so card-only touches can't follow the viewport (ADR 0017).
+   */
+  cards: boolean;
 }
 
 export interface MarketOrderColumns {
@@ -71,6 +77,7 @@ export function useMarketOrderColumns({
   jumpRangeFilter,
   depthByOrder,
   bestSell,
+  cards,
 }: UseMarketOrderColumnsArgs): MarketOrderColumns {
   const visibleOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
   const setVisibleOrderColumns = useVisibleMarketOrderColumns((state) => state.setValue);
@@ -112,10 +119,11 @@ export function useMarketOrderColumns({
         cardCorner: true,
         render: (o) => (
           <>
-            {formatIsk(o.price, 2)}
+            {/* Left of the figure, so the prices stay right-aligned in one column. */}
             {!o.is_buy_order && (
               <BaitFlag multiple={sellOutlierMultiple(o.price, bestSell)} t={t} />
             )}
+            {formatIsk(o.price, 2)}
             {/*
               The tinted row (`row-mine`, styles/index.css) is the visible
               marker for "this one is mine" — no badge, no gap figure,
@@ -143,7 +151,11 @@ export function useMarketOrderColumns({
         header: t('market.depthColumn'),
         headerTooltip: t('market.depthHint'),
         align: 'right',
-        className: 'tabular-nums text-text-dim',
+        // Only where the table has the room: below ~1680px the Location
+        // column needs it, and the expanded row's "buying down to here"
+        // carries the same figure.
+        className: 'tabular-nums text-text-dim max-[105rem]:hidden',
+        headerCellClassName: 'max-[105rem]:hidden',
         // Walked best-first whatever the table is sorted by: "units at this
         // price or better" is a fact of the book, not of the current sort.
         sortValue: (o) => depthByOrder.get(o.order_id)?.units,
@@ -160,13 +172,22 @@ export function useMarketOrderColumns({
         // and wrapping rows across several lines. The stacked-card media
         // query overrides `white-space`/width below `sm`, so phone keeps
         // the full, untruncated name.
-        className: 'sm:max-w-[28rem] truncate',
+        // Truncated (the full name is in the row's tooltip and its expanded
+        // row), and only as wide as the screen can spare, so the book never
+        // scrolls sideways beside the finder column.
+        className: 'truncate sm:max-w-[16rem]',
         // The phone card's title: the station a pilot would fly to.
         primary: true,
         sortValue: (o) =>
           resolveOrderLocation(o, npcStationMap, solarSystemMap).stationName ?? undefined,
         render: (o) => (
-          <LocationCell order={o} npcStations={npcStationMap} solarSystems={solarSystemMap} t={t} />
+          <LocationCell
+            order={o}
+            npcStations={npcStationMap}
+            solarSystems={solarSystemMap}
+            t={t}
+            card={cards}
+          />
         ),
       },
       security: {
@@ -194,8 +215,8 @@ export function useMarketOrderColumns({
             <>
               {renderJumpsCell(cell, t, 'market.jumpsUnavailableHint')}
               {/* The phone card has no Jumps header to say what the bare number is. */}
-              {cell.kind === 'value' && cell.count !== null && (
-                <span className="sm:hidden"> {t('market.jumpsWord', { count: cell.count })}</span>
+              {cards && cell.kind === 'value' && cell.count !== null && (
+                <> {t('market.jumpsWord', { count: cell.count })}</>
               )}
             </>
           );
@@ -204,7 +225,9 @@ export function useMarketOrderColumns({
       expiry: {
         id: 'expiry',
         header: t('market.expiry'),
-        className: 'whitespace-nowrap text-text-dim',
+        // Same room rule as Cum. qty; the expanded row states it in full.
+        className: 'whitespace-nowrap text-text-dim max-[105rem]:hidden',
+        headerCellClassName: 'max-[105rem]:hidden',
         render: (o) => <span data-dense-omit="">{orderExpiry(o).toLocaleDateString()}</span>,
         sortValue: (o) => orderExpiry(o).getTime(),
       },
@@ -222,13 +245,15 @@ export function useMarketOrderColumns({
         id: 'minVolume',
         header: t('market.minVolume'),
         align: 'right',
-        className: 'tabular-nums',
-        stackAffix: { before: t('market.minVolumeAffix') },
-        render: (o) => formatVolume(o.min_volume),
+        // Almost always 1: a column only a very wide screen spends on it,
+        // never a card. The expanded row states it for every buy order.
+        className: 'tabular-nums max-[120rem]:hidden',
+        headerCellClassName: 'max-[120rem]:hidden',
+        render: (o) => <span data-dense-omit="">{formatVolume(o.min_volume)}</span>,
         sortValue: (o) => o.min_volume,
       },
     }),
-    [t, npcStationMap, solarSystemMap, myOrderIds, orderJumps, depthByOrder, bestSell]
+    [t, npcStationMap, solarSystemMap, myOrderIds, orderJumps, depthByOrder, bestSell, cards]
   );
 
   const baseColumns = useMemo<DataTableColumn<RegionOrder>[]>(

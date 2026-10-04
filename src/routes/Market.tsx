@@ -36,6 +36,8 @@ import {
   type MarketTreeFilterResult,
 } from '@/features/market/marketTree';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useFocusHeading } from '@/lib/useFocusHeading';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemPriceAlertBell } from '@/features/market/ItemPriceAlertBell';
@@ -95,6 +97,9 @@ import { SELL_ORDER_COLUMN_IDS, BUY_ORDER_COLUMN_IDS } from '@/features/market/m
 
 /** Rows shown per side before "show all" (CONTEXT.md). */
 const ROW_CAP = 15;
+
+/** Below this order-book width the Buy table's columns stop fitting: cards instead. */
+const ORDER_BOOK_CARDS_REM = 48;
 
 /**
  * The page's own top-level tabs: Market Browser plus a character's Open
@@ -590,6 +595,15 @@ export function Market() {
     source: 'sorted-rows',
   });
 
+  // The order book's own width picks columns or two-line cards: a phone,
+  // and a desktop whose finder column leaves the book too narrow for its
+  // columns (a 1024–1280px window), both get the card.
+  const isPhone = useIsPhone();
+  const [orderBookRef, [orderBookNarrow]] = useElementNarrowerThan<HTMLDivElement>([
+    ORDER_BOOK_CARDS_REM,
+  ]);
+  const orderCards = isPhone || orderBookNarrow;
+
   const { itemSkills, trainedSkills, targetPlan } = useOrderRowSkills(
     selectedTypeId,
     activeCharacterId
@@ -611,6 +625,7 @@ export function Market() {
     jumpRangeFilter,
     depthByOrder,
     bestSell: loadedView?.summary.bestSell ?? null,
+    cards: orderCards,
   });
   // A phone shows one side of the book at a time (`BookSideToggle`).
   const [phoneSide, setPhoneSide] = useState<BookSide>('sell');
@@ -1060,7 +1075,7 @@ export function Market() {
                       }
                     />
                   ) : (
-                    <div className="space-y-3">
+                    <div ref={orderBookRef} className="space-y-3">
                       {resolvedRegion?.override && (
                         <p className="m-0 text-[0.6875rem] text-text-dim">
                           {t('market.globalMarketNote', {
@@ -1142,6 +1157,7 @@ export function Market() {
                         onToggleColumn={toggleOrderColumn}
                         tableExport={sellExport}
                         hiddenOnPhone={phoneSide !== 'sell'}
+                        cards={orderCards}
                         onShowAll={
                           !sellShowAll && sortedSell.length > ROW_CAP
                             ? () => setSellShowAll(true)
@@ -1199,6 +1215,7 @@ export function Market() {
                         onToggleColumn={toggleOrderColumn}
                         tableExport={buyExport}
                         hiddenOnPhone={phoneSide !== 'buy'}
+                        cards={orderCards}
                         onShowAll={
                           !buyShowAll && sortedBuy.length > ROW_CAP
                             ? () => setBuyShowAll(true)

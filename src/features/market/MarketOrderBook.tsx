@@ -36,7 +36,8 @@ export type BookSide = 'sell' | 'buy';
  */
 function signedPercent(ratio: number): string {
   if (ratio >= 9) return `${Math.round(1 + ratio).toLocaleString()}×`;
-  const digits = Math.abs(ratio) >= 0.1 ? 0 : 1;
+  const share = Math.abs(ratio);
+  const digits = share >= 0.1 ? 0 : share >= 0.01 ? 1 : 2;
   const text = `${Math.abs(ratio * 100).toFixed(digits)}%`;
   return ratio > 0 ? `+${text}` : ratio < 0 ? `−${text}` : text;
 }
@@ -114,11 +115,11 @@ export function HubComparisonLine({
   return (
     <section
       aria-label={t('market.hubCompare.label', { place: placeName })}
-      className="flex flex-wrap items-center gap-x-3 gap-y-2 border border-line bg-panel px-3 py-2 text-xs"
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 border border-line bg-panel px-3 py-2 text-xs max-sm:flex-col max-sm:items-start"
     >
       <p className="m-0 flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
         {summary.bestSell !== null && (
-          <span>
+          <span className="whitespace-nowrap">
             <span className="font-semibold">
               {t('market.hubCompare.sells', {
                 place: placeName,
@@ -134,7 +135,7 @@ export function HubComparisonLine({
           </span>
         )}
         {summary.bestBuy !== null && (
-          <span>
+          <span className="whitespace-nowrap">
             <span className="font-semibold">
               {t('market.hubCompare.buys', { price: formatIsk(summary.bestBuy, 2) })}
             </span>
@@ -240,6 +241,8 @@ export interface OrderSideCardProps {
   rowClassName: (order: RegionOrder) => string | undefined;
   /** The phone toggle hides the side it isn't showing. */
   hiddenOnPhone: boolean;
+  /** Two-line cards instead of columns: a phone, or a column too narrow for them. */
+  cards: boolean;
 }
 
 export function OrderSideCard({
@@ -259,6 +262,7 @@ export function OrderSideCard({
   rowContextMenu,
   rowClassName,
   hiddenOnPhone,
+  cards,
 }: OrderSideCardProps) {
   const { t } = useTranslation();
   const name = t(side === 'sell' ? 'market.sell' : 'market.buy');
@@ -275,7 +279,7 @@ export function OrderSideCard({
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 pt-2 pb-1">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
           <h2 className="m-0 text-xs font-bold tracking-widest uppercase">{name}</h2>
-          <span className="text-xs text-text-dim tabular-nums">
+          <span className="text-xs text-text-dim tabular-nums max-sm:hidden">
             {best === null
               ? t('market.sideSummary.none', { count: total })
               : t(side === 'sell' ? 'market.sideSummary.sell' : 'market.sideSummary.buy', {
@@ -285,15 +289,18 @@ export function OrderSideCard({
           </span>
         </div>
         <span className="flex items-center gap-1">
-          <ColumnPickerMenu
-            available={availableColumns}
-            visible={visibleColumns}
-            columnsById={columnsById}
-            onToggle={onToggleColumn}
-            buttonLabel={t('market.columnsButton')}
-            menuTitle={t('market.columnsMenuTitle')}
-            size="sm"
-          />
+          {/* A two-line card has no columns to pick. */}
+          {!cards && (
+            <ColumnPickerMenu
+              available={availableColumns}
+              visible={visibleColumns}
+              columnsById={columnsById}
+              onToggle={onToggleColumn}
+              buttonLabel={t('market.columnsButton')}
+              menuTitle={t('market.columnsMenuTitle')}
+              size="sm"
+            />
+          )}
           <TableActionsMenu name={name} tableExport={tableExport} />
         </span>
       </div>
@@ -314,6 +321,7 @@ export function OrderSideCard({
               // quantity, distance and security — a long book is scanned,
               // not read.
               stackLayout="dense"
+              stacked={cards}
               rowContextMenu={rowContextMenu}
               rowClassName={rowClassName}
               expandableRow={{ renderDetail }}

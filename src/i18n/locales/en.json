@@ -5577,8 +5577,8 @@
       "empty": "Nothing else to show for this order.",
       "remaining": "{{remain}} of {{total}} left",
       "remainingLabel": "Units left on this order",
-      "filled_one": "{{count}} unit filled",
-      "filled_other": "{{count}} units filled",
+      "filled_one": "{{units}} unit filled",
+      "filled_other": "{{units}} units filled",
       "issued": "issued {{age}}",
       "orderValue": "Order value",
       "versusBest": "vs best",
@@ -6292,7 +6292,8 @@
       "jumpsAway_zero": "in {{system}}, your system",
       "jumpsAway_one": "{{count}} jump from {{system}}",
       "jumpsAway_other": "{{count}} jumps from {{system}}",
-      "sheetTitle": "Where to look"
+      "sheetTitle": "Where to look",
+      "clearRange": "Clear range"
     },
     "summary": {
       "bestSell": "Best sell",

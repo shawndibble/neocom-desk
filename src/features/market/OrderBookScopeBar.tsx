@@ -62,6 +62,7 @@ function BrowserFilterFields({
             value={draft.jumps}
             onChange={(jumps) => setDraft({ ...draft, jumps })}
             anyLabel={scopeLabel}
+            className="w-40 max-md:w-full"
           />
           {draft.jumps !== DEFAULT_JUMP_RANGE && <CurrentSystemPicker current={currentSystem} />}
         </div>
@@ -211,6 +212,15 @@ export function OrderBookScopeBar({
             <span className="text-text-dim">
               {t('market.scope.stations', { count: scope.stationCount })}
             </span>
+            {/* The range is the one filter here that changes what the book
+                is; taking it off is one click, not a trip into the funnel. */}
+            <button
+              type="button"
+              onClick={() => onFilterChange({ ...filterValue, jumps: DEFAULT_JUMP_RANGE })}
+              className="text-accent underline underline-offset-2 hover:text-text max-sm:inline-flex max-sm:min-h-11 max-sm:items-center"
+            >
+              {t('market.scope.clearRange')}
+            </button>
           </>
         );
       case 'station':
@@ -255,7 +265,7 @@ export function OrderBookScopeBar({
       )}
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <p className="m-0 flex min-w-0 flex-1 items-center gap-2">
+        <p className="m-0 flex min-w-0 flex-1 items-center gap-2 sm:min-w-[18rem]">
           <Icon.Location aria-hidden className={cx('shrink-0', ranged && 'text-accent')} />
           <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">{summary}</span>
         </p>
