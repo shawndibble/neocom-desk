@@ -763,7 +763,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   seen and roughly what it cost, and **Load**s the group's most recent loss.
 - **EVE Workbench fit**: A fit a pilot published on EVE Workbench, listed for its
   hull in the Popular fits panel's EVE Workbench tab (beside the zKillboard tab
-  of **Popular fit**s) with its name, author and date added, linked to its page
+  of **Popular fit**s) with its name and date added, linked to its page
   there.
   **Load**s from its EFT. Comes from our own copy of Workbench's public list,
   synced by a Cloud Function, since Workbench can't list fits by hull.

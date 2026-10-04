@@ -198,13 +198,13 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     expect(useWorkbenchFitsMock).not.toHaveBeenCalled();
   });
 
-  it('lists fits with name, author and date added, linking each to Workbench', async () => {
+  it('lists fits with name and date added, no author, linking each to Workbench', async () => {
     openWorkbench({ ok: true, fits: [wbFit('a'), wbFit('b', { name: '', authorName: '' })] });
     const link = await screen.findByRole('link', { name: 'Fit a' });
     expect(link.getAttribute('href')).toBe('https://eveworkbench.com/fit/a');
-    expect(screen.getByText('by Saryna Dach · added 2d ago')).toBeTruthy();
+    expect(screen.getAllByText('added 2d ago')).toHaveLength(2);
+    expect(screen.queryByText(/Saryna Dach/)).toBeNull();
     expect(screen.getByRole('link', { name: 'Unnamed fit' })).toBeTruthy();
-    expect(screen.getByText('by unknown pilot · added 2d ago')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'eveworkbench.com' })).toBeTruthy();
   });
 
