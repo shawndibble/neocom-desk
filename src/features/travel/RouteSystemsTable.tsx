@@ -7,7 +7,7 @@
  * leg. Conditions, never verdicts (decision `20260912-172628`): a fold says
  * "no kills reported in the last hour", never that the stretch is anything.
  *
- * Every row is one line: System, Sec., Region, the last hour's ship kills ·
+ * Each row is short: System, Sec., Region, the last hour's ship kills ·
  * pod kills · jumps, and zKillboard's count with only the kills on a gate
  * along the route. NPC kills and kills anywhere else in the system open in
  * the row's detail.

@@ -230,7 +230,7 @@ function LegWaysPanel({
       <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {multiStop ? t('travel.ways.title', ends) : t('travel.ways.titleRoute', ends)}
       </h3>
-      <ul className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-1">
+      <ul className="grid gap-1.5 @xl:grid-cols-2 @3xl:grid-cols-3 @5xl:grid-cols-1">
         {leg.ways.map((way) => (
           <WayBox
             key={`${way.kind}-${way.pin ?? ''}`}
@@ -293,8 +293,9 @@ function PhoneLine({
 
 /**
  * One leg's body: the pin note when a pin could not be flown, the ways panel
- * beside the rows on a wide screen (above them below `xl`), and folded to a
- * line under the leg header on a phone.
+ * beside the rows when the leg itself is at least `@5xl` wide (above them,
+ * two or three across, when it is narrower), and folded to a line under the
+ * leg header on a phone.
  */
 export function LegBody({ children, ...props }: LegWaysProps & { children: ReactNode }) {
   const { t } = useTranslation();
@@ -318,24 +319,27 @@ export function LegBody({ children, ...props }: LegWaysProps & { children: React
           {note}
         </p>
       )}
-      <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_17rem]">
-        <div className="xl:order-last">
-          {isPhone ? (
-            <>
-              <PhoneLine
-                leg={leg}
-                number={props.number}
-                nameOf={nameOf}
-                open={open}
-                onToggle={() => setOpen((was) => !was)}
-              />
-              {open && <LegWaysPanel {...props} />}
-            </>
-          ) : (
-            <LegWaysPanel {...props} />
-          )}
+      {/* Beside the rows only when this panel, not the screen, has room: the rules column and the nav rail both eat into it. */}
+      <div className="@container">
+        <div className="grid items-start gap-3 @5xl:grid-cols-[minmax(0,1fr)_17rem]">
+          <div className="@5xl:order-last">
+            {isPhone ? (
+              <>
+                <PhoneLine
+                  leg={leg}
+                  number={props.number}
+                  nameOf={nameOf}
+                  open={open}
+                  onToggle={() => setOpen((was) => !was)}
+                />
+                {open && <LegWaysPanel {...props} />}
+              </>
+            ) : (
+              <LegWaysPanel {...props} />
+            )}
+          </div>
+          <div className="min-w-0">{children}</div>
         </div>
-        <div className="min-w-0">{children}</div>
       </div>
     </div>
   );
