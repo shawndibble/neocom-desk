@@ -615,7 +615,9 @@
     padding-top: 0.25rem;
   }
 
-  /* Opt-in (`dt-dense-tight` on the table, Hauling): a card whose tick box,
+  /* Opt-in (`dt-dense-tight` on the table, Hauling; BPC Sourcing too, with
+     no tick or `end` box, its ISK figure too wide for `dt-actions-pinned`'s
+     corner): a card whose tick box,
      title, headline figure and More actions button all sit on line one,
      centred on each other, with the `end` box closing line two. Without it
      the button's 44px box made line one button-tall (the title riding its

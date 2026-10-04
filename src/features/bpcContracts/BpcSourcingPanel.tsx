@@ -1823,7 +1823,15 @@ export function BpcSourcingPanel() {
                   </p>
                   {/* Cheapest first, so the ordering carries the answer and the
                     accent on the leading cell is only reinforcement (DESIGN.md §7). */}
-                  <ul className="flex gap-2 max-sm:-mx-3 max-sm:overflow-x-auto max-sm:px-3 sm:flex-wrap">
+                  {/* `relative` makes the row the containing block of each
+                    price's absolutely positioned screen-reader text
+                    (`IskAmount`'s `sr-only`). Without it that text escaped
+                    the row's scroll clip and the whole page scrolled
+                    sideways on a phone, not just this row. */}
+                  <ul
+                    aria-label={t('bpcContracts.cheapestByRegion')}
+                    className="relative flex gap-2 max-sm:-mx-3 max-sm:overflow-x-auto max-sm:px-3 sm:flex-wrap"
+                  >
                     {regionPrices.slice(0, REGION_CELL_LIMIT).map((region, index) => (
                       <li
                         key={region.regionId}
@@ -1948,8 +1956,9 @@ export function BpcSourcingPanel() {
                 // and a sort picker, since the header row it would sort from
                 // is gone. The cap above follows that same sort.
                 stackLayout="dense"
-                // Line one's title and price centre on the ⋮ button instead
-                // of riding the top of its 44px touch target.
+                // Name, price and the More actions button centred on one
+                // line, the button's 44px touch target no longer making that
+                // line button-tall (Hauling's opt-in, `index.css`).
                 className="dt-dense-tight"
                 mobileSort
                 stackSummary={

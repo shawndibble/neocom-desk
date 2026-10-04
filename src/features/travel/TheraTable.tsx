@@ -1,39 +1,35 @@
 /**
  * Thera / Turnur's slim table of open holes (issue #2499): exit, security,
- * region, fits, life left and jumps, with the hub-side signature's Copy button
- * in a narrow action column. Clicking a row opens a line with the wormhole
+ * region, fits, life left and jumps, with the hub-side signature (select-all,
+ * so one tap selects it to copy) in a narrow column. Clicking a row opens a line with the wormhole
  * type, both signatures and the exit's zKillboard page.
  *
  * Below `sm` each hole is one dense card (`DataTable`'s dense stack): exit and
  * hub badge with jumps on the right, then security, region, fits and life
- * left, then the signature pair and Copy on a line of their own.
+ * left, then the signature pair with Route via at its right end.
  *
  * Route via (issue #2477): a K-space row with a gate route from the page's
  * origin links to Route Safety from that origin with the hole pinned for the
- * first leg — after Copy in the action cell (and so on the phone card's
- * signature line), and on the expanded row.
+ * first leg — after the signature (and so on the phone card's signature
+ * line), and on the expanded row.
  *
  * Conditions, never verdicts (decision `20260912-172628`).
  */
-import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { SecurityStatus } from '@/components/SecurityStatus';
-import { Button, DataTable, textActionClassName, type DataTableColumn } from '@/components/ui';
+import { DataTable, textActionClassName, type DataTableColumn } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import * as Icon from '@/components/ui/icons';
 import {
   jumpsSortValue,
   shipSizeRank,
   type TheraConnectionRow,
 } from '@/engine/route/theraConnections';
-import { writeToClipboard } from '@/lib/clipboard';
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
 import { systemZkillUrl } from '@/lib/zkillboard';
 
 const DASH = '—';
-const COPIED_MS = 1500;
 const DEFAULT_SORT = { columnId: 'jumps', direction: 'asc' } as const;
 
 const hubBadgeClassName =
@@ -47,7 +43,15 @@ function routeViaTarget(row: TheraConnectionRow, href?: RouteViaHref): string | 
   return row.exitSpace !== 'wormhole' && row.jumps.kind === 'known' ? (href?.(row) ?? null) : null;
 }
 
-function RouteVia({ row, href }: { row: TheraConnectionRow; href?: RouteViaHref }) {
+function RouteVia({
+  row,
+  href,
+  className,
+}: {
+  row: TheraConnectionRow;
+  href?: RouteViaHref;
+  className?: string;
+}) {
   const { t } = useTranslation();
   const to = routeViaTarget(row, href);
   if (to === null) return null;
@@ -55,7 +59,7 @@ function RouteVia({ row, href }: { row: TheraConnectionRow; href?: RouteViaHref 
     <Link
       to={to}
       data-row-control
-      className={textActionClassName('whitespace-nowrap')}
+      className={textActionClassName(cx('whitespace-nowrap', className))}
       aria-label={t('travel.thera.routeViaLabel', {
         hub: t(`travel.thera.hub.${row.hub}`),
         system: row.exitSystemName ?? DASH,
@@ -143,14 +147,16 @@ function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow
       render: (row) => <JumpsCell row={row} />,
     },
     {
-      id: 'copy',
+      id: 'signature',
       header: t('travel.thera.col.signature'),
       className: 'w-0 whitespace-nowrap',
       stackEdge: 'below',
       render: (row) => (
-        <span className="inline-flex items-center gap-3 max-sm:flex max-sm:w-full max-sm:flex-wrap">
-          <SignatureCopy row={row} />
-          <RouteVia row={row} href={routeVia} />
+        <span className="inline-flex items-center gap-3 max-sm:flex max-sm:w-full">
+          <Signature row={row} />
+          {/* Its 44px tap target overhangs the phone card's line rather than
+              heightening it, which left a gap over the signature. */}
+          <RouteVia row={row} href={routeVia} className="max-sm:-my-2.5" />
         </span>
       ),
     },
@@ -180,71 +186,19 @@ function JumpsCell({ row }: { row: TheraConnectionRow }) {
 }
 
 /**
- * The hub-side signature and its Copy button; a refused clipboard selects the
- * signature instead. On a phone card the exit-side signature follows it, so
- * the line reads as the pair.
+ * The hub-side signature, selected whole by one tap or click so it can be
+ * copied by hand. On a phone card the exit-side signature follows it, so the
+ * line reads as the pair.
  */
-function SignatureCopy({ row }: { row: TheraConnectionRow }) {
-  const { t } = useTranslation();
-  const signatureRef = useRef<HTMLSpanElement>(null);
-  const [copied, setCopied] = useState(false);
-  const signature = row.hubSignature;
-  const names = {
-    hub: t(`travel.thera.hub.${row.hub}`),
-    system: row.exitSystemName ?? DASH,
-  };
-
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), COPIED_MS);
-    return () => clearTimeout(timer);
-  }, [copied]);
-
-  const copyLabel = copied
-    ? t('travel.thera.copiedSignature', names)
-    : t('travel.thera.copySignature', names);
-
-  async function copy() {
-    if (signature === null) return;
-    try {
-      await writeToClipboard(signature);
-      setCopied(true);
-    } catch {
-      // No clipboard (permission, insecure context): select the signature so
-      // the pilot can copy it by hand.
-      const node = signatureRef.current;
-      if (node) window.getSelection()?.selectAllChildren(node);
-    }
-  }
-
+function Signature({ row }: { row: TheraConnectionRow }) {
   return (
-    <span className="inline-flex items-center gap-1.5 max-sm:flex max-sm:w-full">
-      <Button
-        size="sm"
-        className="max-sm:order-last max-sm:ml-auto"
-        disabled={signature === null}
-        onClick={() => void copy()}
-        aria-label={copyLabel}
-        // Above `sm` the button is the icon alone; the tooltip names it.
-        title={copyLabel}
-      >
-        {copied ? (
-          <Icon.Done size={Icon.ICON_SIZE.sm} />
-        ) : (
-          <Icon.CopyToClipboard size={Icon.ICON_SIZE.sm} />
-        )}
-        <span className="sm:hidden">
-          {copied ? t('travel.thera.copied') : t('travel.thera.copy')}
-        </span>
-      </Button>
-      {/* A control of its own, so selecting the signature by hand never
-          opens the row. */}
-      <span data-row-control className="font-mono text-sm tabular-nums">
-        <span ref={signatureRef} className="select-all">
-          {signature ?? DASH}
-        </span>
-        <span className="text-text-dim sm:hidden"> → {row.exitSignature ?? DASH}</span>
-      </span>
+    // A control of its own, so selecting the signature never opens the row.
+    <span
+      data-row-control
+      className="font-mono text-sm whitespace-nowrap tabular-nums max-sm:mr-auto"
+    >
+      <span className="select-all">{row.hubSignature ?? DASH}</span>
+      <span className="text-text-dim sm:hidden"> → {row.exitSignature ?? DASH}</span>
     </span>
   );
 }
