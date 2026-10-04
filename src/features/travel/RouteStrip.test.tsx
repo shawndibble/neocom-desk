@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@/i18n';
-import type { RouteStep } from '@/engine/route/routeSafetyTrip';
+import type { RouteSafetyTripRow, RouteStep } from '@/engine/route/routeSafetyTrip';
 import { RouteStrip } from './RouteStrip';
-import type { RouteSafetyTripRow } from './useRouteSafety';
 
 const GATE: RouteStep = { kind: 'gate' };
 const HOLE: RouteStep = {

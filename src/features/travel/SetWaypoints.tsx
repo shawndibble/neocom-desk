@@ -7,8 +7,9 @@
  * settings, and cannot fly a wormhole or a bridge, so the waypoints stop at
  * the first such hop's entrance and the result says where to pick up
  * (`engine/route/waypoints.ts`). How each hop was flown is the trip's own
- * row tag (issue #2546): this never loads the stargate graph. A Character whose grant predates the scope
- * sees the button disabled, the reason, and a Grant for that Character.
+ * row tag (issue #2546): this never loads the stargate graph. A Character
+ * whose grant predates the scope sees the button disabled, the reason, and a
+ * Grant for that Character.
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
