@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EftSlotLookup, EftTypeLookup } from './eftLoader';
 import type { KillmailVictim } from './linkLoader';
+import { gameItemLookup } from './fitCurrency';
 import { groupPopularFits, type HullLoss } from './popularFits';
 import { matchWorkbenchSightings } from './workbenchSightings';
 
@@ -75,12 +76,12 @@ Hammerhead II x3
 Void M x500`;
 
 /** The game's full list of names: everything the catalog has, plus what it leaves out. */
-const GAME_NAMES = new Set([
+const isGameItem = gameItemLookup([
   ...Object.keys(NAMES),
-  'calm exotic filament',
-  'gravid warp scrambler',
+  'Calm Exotic Filament',
+  'Gravid Warp Scrambler',
 ]);
-const isGameItem = (name: string) => GAME_NAMES.has(name.toLowerCase());
+const WITH_FILAMENT = `${EFT}\n\nCalm Exotic Filament x1`;
 
 function match(
   fits: { id: string; eft: string }[],
@@ -131,13 +132,11 @@ Medium Auxiliary Nano Pump I`;
   });
 
   it('still matches a fit carrying a game item the catalog leaves out, like a filament in cargo', () => {
-    const withFilament = `${EFT}\n\nCalm Exotic Filament x1`;
-    expect(match([{ id: 'i', eft: withFilament }]).get('i')?.count).toBe(3);
+    expect(match([{ id: 'i', eft: WITH_FILAMENT }]).get('i')?.count).toBe(3);
   });
 
   it('leaves out a fit carrying an item the game no longer has', () => {
-    const withRemoved = `${EFT}\n\nCalm Exotic Filament x1`;
-    expect(match([{ id: 'j', eft: withRemoved }], HULL, () => false).size).toBe(0);
+    expect(match([{ id: 'j', eft: WITH_FILAMENT }], HULL, () => false).size).toBe(0);
   });
 
   it('leaves out a fit with an unread fitted module, even one the game still has', () => {

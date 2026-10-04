@@ -12,19 +12,14 @@
  *
  * One exception (issue #2536): the catalog leaves out Abyssal filaments, LP
  * boosters and the like, which Workbench fits carry in cargo all the time. An
- * unread line written with a count (`x1`) can never be a fitted module, so it
- * can't change the key; if the game still has the item (`isGameItem`, the
- * same rule the Out-of-date check applies) the fit is matched anyway. An
- * unread line without a count may be a fitted module, so it still rules the
- * fit out, even when the game has it — a mutated module, say.
+ * unread line written with a count (`x1`, `countWritten`) was never a fitted
+ * module, so it can't change the key. Such a fit is still matched, so long as
+ * the game still has the item (`isGameItem`, the rule the Out-of-date check
+ * applies): a fit carrying a removed item is out of date, and gets no badge.
+ * An unread line without a count may be a fitted module, so it still rules
+ * the fit out, even when the game has it — a mutated module, say.
  */
-import {
-  HAS_QUANTITY_SUFFIX,
-  loadEftFitting,
-  type EftSlotLookup,
-  type EftTypeLookup,
-} from './eftLoader';
-import type { LoadWarning } from './load';
+import { loadEftFitting, type EftSlotLookup, type EftTypeLookup } from './eftLoader';
 import { popularFitKey, type PopularFit } from './popularFits';
 
 /** How often a Workbench fit's modules turned up among the hull's recent losses. */
@@ -54,13 +49,11 @@ export function matchWorkbenchSightings(
   for (const fit of fits) {
     const parts = loadEftFitting(fit.eft, typeByName, slotByTypeId);
     if (parts.hullTypeId !== hullTypeId) continue;
-    const lines = fit.eft.split(/\r\n|\r|\n/);
-    const keyIsWhole = (warning: LoadWarning) =>
-      warning.kind === 'unknown-item' &&
-      isGameItem(warning.text) &&
-      warning.line !== undefined &&
-      HAS_QUANTITY_SUFFIX.test((lines[warning.line - 1] ?? '').trim());
-    if (!parts.unresolved.every(keyIsWhole)) continue;
+    const onlyUnreadCargo = parts.unresolved.every(
+      (warning) =>
+        warning.kind === 'unknown-item' && warning.countWritten === true && isGameItem(warning.text)
+    );
+    if (!onlyUnreadCargo) continue;
     const group = byKey.get(popularFitKey(parts.modules));
     if (group) sightings.set(fit.id, { count: group.count, lastSeen: group.lastSeen });
   }
