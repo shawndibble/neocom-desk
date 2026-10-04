@@ -11,10 +11,14 @@ _Recorded 2026-10-03 · issue #2478._
   bare "»": ESI's spec sets a three-character minimum on `search`, and the
   search is a substring match, so the spaced form still finds every
   "SYS1 » SYS2 - name". A structure whose `type_id` is present and not the
-  Ansiblex (35841), or whose name does not read as a gate, is skipped; a 403
-  is a structure that character cannot use. The search finds only what that
-  character can see, so each character runs its own and the list says who
-  found each gate; a character's new search replaces only its own finds. The
+  Ansiblex (35841), whose name does not read as a gate, or whose name places
+  it in a system other than ESI's `solar_system_id`, is skipped. A structure
+  no character can read is left out (the existing structure reader may fall
+  back to another character for the name). The search finds only what that
+  character can see, so each character runs its own (or Find with every
+  character runs them in turn) and the list says who found each gate, by the
+  search that listed it; a character's new search replaces only its own
+  finds. A character whose grant lacks the search is never asked. The
   pasted list (one "SYS1 » SYS2" or full in-game name per line) is the
   fallback for gates no character can search for; unknown systems, lines that
   are not a gate, and systems outside known-space nullsec are listed back.

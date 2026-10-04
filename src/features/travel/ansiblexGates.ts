@@ -16,20 +16,27 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type AnsiblexGateRecord } from '@/db';
 import {
   ANSIBLEX_SEARCH,
+  bridgePairKey,
   foundGate,
   type AnsiblexGate,
   type SystemLookup,
 } from '@/engine/route/ansiblex';
 import { getCharacterSearch } from '@/esi/endpoints';
+import { requiredScopesForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import { loadStructureInfo } from '@/features/character/structures';
 
 export type { AnsiblexGateRecord };
 
 const SEARCH_PREFIX = 'search:';
 
+/** What a structure search for Ansiblex calls. */
+export const ANSIBLEX_SEARCH_ENDPOINTS: readonly EsiEndpointId[] = [
+  'getCharacterSearch',
+  'getUniverseStructure',
+];
+
 function pastedId(gate: AnsiblexGate): string {
-  const [low, high] = gate.fromId < gate.toId ? [gate.fromId, gate.toId] : [gate.toId, gate.fromId];
-  return `paste:${low}:${high}`;
+  return `paste:${bridgePairKey(gate.fromId, gate.toId)}`;
 }
 
 /** Every known gate, by id. */
@@ -43,12 +50,13 @@ export function useAnsiblexGates(): AnsiblexGateRecord[] | undefined {
 }
 
 /**
- * What one character's search came to: how many gates it found, and the far
- * systems of any it could not place; or `failed` when the search itself could
- * not be run, which leaves the list as it was.
+ * What one character's search came to: how many gates it found, and the
+ * systems of any it could not place; `no-scope` for a character whose grant
+ * lacks the search, which is never asked; or `failed` when the search itself
+ * could not be run. Neither of the last two changes the list.
  */
 export type FindGatesOutcome =
-  { kind: 'found'; count: number; unknown: string[] } | { kind: 'failed' };
+  { kind: 'no-scope' } | { kind: 'found'; count: number; unknown: string[] } | { kind: 'failed' };
 
 /**
  * Runs one character's structure search and saves what it finds. The
@@ -57,14 +65,15 @@ export type FindGatesOutcome =
  */
 export async function findGatesWithCharacter(
   characterId: number,
-  lookup: SystemLookup,
-  signal?: AbortSignal
+  lookup: SystemLookup
 ): Promise<FindGatesOutcome> {
+  const held = new Set((await db.tokens.get(characterId))?.scopes ?? []);
+  if (requiredScopesForEndpoints(ANSIBLEX_SEARCH_ENDPOINTS).some((scope) => !held.has(scope))) {
+    return { kind: 'no-scope' };
+  }
   let ids: number[];
   try {
-    const result = await getCharacterSearch(characterId, ['structure'], ANSIBLEX_SEARCH, {
-      signal,
-    });
+    const result = await getCharacterSearch(characterId, ['structure'], ANSIBLEX_SEARCH);
     ids = result.data?.structure ?? [];
   } catch {
     return { kind: 'failed' };
@@ -73,8 +82,9 @@ export async function findGatesWithCharacter(
   const found = new Map<number, AnsiblexGate>();
   const unknown = new Set<string>();
   for (const structureId of ids) {
-    if (signal?.aborted) return { kind: 'failed' };
-    // A structure this character cannot read (a 403) is simply not a gate it can use.
+    // A structure no character can read (a 403 for each) is left out; the
+    // roster fallback in `loadStructureInfo` only reads the name, while who
+    // found the gate stays this character, whose search listed it.
     const structure = await loadStructureInfo(characterId, structureId).catch(() => null);
     if (!structure) continue;
     const read = foundGate(structure, lookup);

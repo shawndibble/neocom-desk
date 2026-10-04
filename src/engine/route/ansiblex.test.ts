@@ -155,6 +155,17 @@ describe('foundGate', () => {
     expect(foundGate({ ...structure, name: 'A-1 - Keepstar' }, lookup)).toEqual({ kind: 'skip' });
   });
 
+  it('skips a gate whose name places it somewhere other than the system ESI says', () => {
+    expect(foundGate({ ...structure, solar_system_id: B }, lookup)).toEqual({ kind: 'skip' });
+  });
+
+  it('names the near system too when it is not one this app knows', () => {
+    expect(foundGate({ ...structure, name: 'Elsewhere » 1DQ1-A' }, lookup)).toEqual({
+      kind: 'unknown',
+      names: ['Elsewhere'],
+    });
+  });
+
   it('names the far system when it is not one this app knows', () => {
     expect(foundGate({ ...structure, name: 'A-1 » Nowhere - Gate' }, lookup)).toEqual({
       kind: 'unknown',

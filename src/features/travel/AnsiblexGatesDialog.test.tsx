@@ -25,11 +25,11 @@ describe('AnsiblexGatesDialog', () => {
   it('adds pasted gates on this device, and lists back the lines it could not read', async () => {
     render(<AnsiblexGatesDialog mode="paste" systems={SYSTEMS} onClose={() => {}} />);
 
-    await userEvent.click(screen.getByRole('textbox', { name: 'Ansiblex gates, one per line' }));
+    await userEvent.click(screen.getByRole('textbox', { name: 'Ansiblex, one per line' }));
     await userEvent.paste('1DQ1-A » J5A-IX - Delve Highway\nJ5A-IX » Nowhere\nJita » 1DQ1-A');
-    await userEvent.click(screen.getByRole('button', { name: 'Add gates' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add Ansiblex' }));
 
-    expect(await screen.findByText('Added 1 gate.')).toBeInTheDocument();
+    expect(await screen.findByText('Added 1 Ansiblex.')).toBeInTheDocument();
     expect(screen.getByText('Line 2: no system named Nowhere.')).toBeInTheDocument();
     expect(
       screen.getByText("Line 3: Jita isn't in nullsec, where Ansiblex stand.")
@@ -42,7 +42,7 @@ describe('AnsiblexGatesDialog', () => {
         source: 'paste',
       }),
     ]);
-    expect(await screen.findByText('1 gate known')).toBeInTheDocument();
+    expect(await screen.findByText('1 Ansiblex known')).toBeInTheDocument();
   });
 
   it('removes a gate from the list', async () => {
@@ -55,11 +55,11 @@ describe('AnsiblexGatesDialog', () => {
       foundBy: [],
       savedAt: 1,
     });
-    render(<AnsiblexGatesDialog mode="list" systems={SYSTEMS} onClose={() => {}} />);
+    render(<AnsiblexGatesDialog mode="search" systems={SYSTEMS} onClose={() => {}} />);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Remove 1DQ1-A » J5A-IX' }));
 
     await waitFor(async () => expect(await db.ansiblexGates.count()).toBe(0));
-    expect(await screen.findByText('No gates known yet.')).toBeInTheDocument();
+    expect(await screen.findByText('No Ansiblex known yet.')).toBeInTheDocument();
   });
 });

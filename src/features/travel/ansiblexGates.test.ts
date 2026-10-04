@@ -71,10 +71,25 @@ afterAll(() => {
   server.close();
   configureEsi({ getToken: null });
 });
+const SEARCH_SCOPES = ['esi-search.search_structures.v1', 'esi-universe.read_structures.v1'];
+
+async function grant(characterId: number, scopes: string[]) {
+  await db.tokens.put({
+    characterId,
+    accessToken: 'a',
+    refreshToken: 'r',
+    expiresAt: Date.now() + 3_600_000,
+    scopes,
+  });
+}
+
 beforeEach(async () => {
   searched = [];
   await db.esiCache.clear();
   await db.ansiblexGates.clear();
+  await db.tokens.clear();
+  await grant(PILOT, SEARCH_SCOPES);
+  await grant(ALT, SEARCH_SCOPES);
 });
 
 describe('findGatesWithCharacter', () => {
@@ -121,6 +136,13 @@ describe('findGatesWithCharacter', () => {
     expect((await gatesOf()).map(({ id, foundBy }) => [id, foundBy])).toEqual([
       [`search:${AB_ID}`, [PILOT, ALT]],
     ]);
+  });
+
+  it('asks nothing of ESI for a character without the search permission', async () => {
+    await grant(ALT, ['esi-universe.read_structures.v1']);
+    server.use(searchFinds(ALT, [AB_ID]), structures);
+    expect(await findGatesWithCharacter(ALT, lookup)).toEqual({ kind: 'no-scope' });
+    expect(searched).toEqual([]);
   });
 
   it('reports a failed search and leaves the list as it was', async () => {

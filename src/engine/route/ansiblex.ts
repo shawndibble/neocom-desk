@@ -14,6 +14,7 @@
  */
 import { securityBand } from '../securityStatus';
 import type { JumpGraph } from './jumpRoute';
+import { isWormholeSystem } from './routeSafety';
 
 /** The Ansiblex Jump Bridge's type id. */
 export const ANSIBLEX_TYPE_ID = 35841;
@@ -61,7 +62,7 @@ export type SystemLookup = (name: string) => { id: number; security: number } | 
 
 /** Ansiblex are sovereignty structures: only known-space nullsec holds one. */
 function canHoldAnsiblex(system: { id: number; security: number }): boolean {
-  return system.id < 31_000_000 && securityBand(system.security) === 'nullsec';
+  return !isWormholeSystem(system.id) && securityBand(system.security) === 'nullsec';
 }
 
 /** A pasted line that is not a gate, and why. */
@@ -74,19 +75,15 @@ export interface GateListError {
   names: string[];
 }
 
-function pairKey(a: number, b: number): string {
+/** One pair of systems, the same whichever way round: what a bridge's two ends are keyed by. */
+export function bridgePairKey(a: number, b: number): string {
   return a < b ? `${a}:${b}` : `${b}:${a}`;
 }
 
 type ReadGate = { kind: 'gate'; gate: AnsiblexGate } | Omit<GateListError, 'line' | 'text'>;
 
-function readGate(
-  name: AnsiblexName,
-  fullName: string,
-  lookup: SystemLookup,
-  fromSystem?: { id: number; security: number }
-): ReadGate {
-  const from = fromSystem ?? lookup(name.from);
+function readGate(name: AnsiblexName, fullName: string, lookup: SystemLookup): ReadGate {
+  const from = lookup(name.from);
   const to = lookup(name.to);
   const unknown = [...(from ? [] : [name.from]), ...(to ? [] : [name.to])];
   if (!from || !to) return { reason: 'unknown', names: unknown };
@@ -123,7 +120,7 @@ export function parseGateList(
       errors.push({ line: index + 1, text: line, ...read });
       return;
     }
-    const key = pairKey(read.gate.fromId, read.gate.toId);
+    const key = bridgePairKey(read.gate.fromId, read.gate.toId);
     if (seen.has(key)) return;
     seen.add(key);
     gates.push(read.gate);
@@ -141,8 +138,9 @@ export interface FoundStructure {
 
 /**
  * A structure the search found, as a gate: `skip` for any other structure
- * (the search matches every name with a "»" in it), `unknown` for a gate to
- * a system this app has no name for. The gate stands in the system ESI says.
+ * (the search matches every name with a "»" in it, and a name placing the
+ * gate anywhere but the system ESI says is not trusted), `unknown` for a gate
+ * naming a system this app has no name for.
  */
 export function foundGate(
   structure: FoundStructure,
@@ -153,10 +151,10 @@ export function foundGate(
   }
   const name = parseAnsiblexName(structure.name);
   if (name === null) return { kind: 'skip' };
-  const read = readGate(name, structure.name, lookup, {
-    id: structure.solar_system_id,
-    security: lookup(name.from)?.security ?? -1,
-  });
+  // The name must place the gate where ESI says it stands, or it is not read as one.
+  const near = lookup(name.from);
+  if (near && near.id !== structure.solar_system_id) return { kind: 'skip' };
+  const read = readGate(name, structure.name, lookup);
   if ('kind' in read) return read;
   return read.reason === 'unknown' ? { kind: 'unknown', names: read.names } : { kind: 'skip' };
 }
@@ -166,7 +164,7 @@ export function bridgeConnections(gates: readonly AnsiblexGate[]): [number, numb
   const seen = new Set<string>();
   const pairs: [number, number][] = [];
   for (const gate of gates) {
-    const key = pairKey(gate.fromId, gate.toId);
+    const key = bridgePairKey(gate.fromId, gate.toId);
     if (seen.has(key)) continue;
     seen.add(key);
     pairs.push([gate.fromId, gate.toId]);
@@ -176,7 +174,7 @@ export function bridgeConnections(gates: readonly AnsiblexGate[]): [number, numb
 
 /** The connections the gates make, as a string: the trip re-plans only when it changes. */
 export function bridgeKey(gates: readonly AnsiblexGate[]): string {
-  return [...new Set(gates.map((gate) => pairKey(gate.fromId, gate.toId)))].sort().join(',');
+  return [...new Set(gates.map((gate) => bridgePairKey(gate.fromId, gate.toId)))].sort().join(',');
 }
 
 /** The pairs a {@link bridgeKey} was made from, as gates with no name: enough to route on. */

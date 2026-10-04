@@ -16,9 +16,9 @@ import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { Button, Modal, TextArea, textActionClassName } from '@/components/ui';
 import { db, type CharacterRecord } from '@/db';
 import { parseGateList, type GateListError, type SystemLookup } from '@/engine/route/ansiblex';
-import type { EsiEndpointId } from '@/esi/registry';
 import type { SolarSystemEntry } from '@/sde/marketTypes';
 import {
+  ANSIBLEX_SEARCH_ENDPOINTS,
   findGatesWithCharacter,
   removeAnsiblexGate,
   savePastedGates,
@@ -26,10 +26,8 @@ import {
   type FindGatesOutcome,
 } from './ansiblexGates';
 
-const SEARCH_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterSearch', 'getUniverseStructure'];
-
 /** Which way in the dialog was opened for: the paste box takes focus for `paste`. */
-export type AnsiblexDialogMode = 'search' | 'paste' | 'list';
+export type AnsiblexDialogMode = 'search' | 'paste';
 
 /** Names to systems, case-insensitively, off the systems snapshot. */
 function useSystemLookup(
@@ -46,36 +44,30 @@ function useSystemLookup(
   }, [systems]);
 }
 
+/** One character's search: not run yet, running, or what it came to. */
+type SearchStatus = 'running' | FindGatesOutcome | undefined;
+
 function CharacterSearchRow({
   character,
-  lookup,
+  status,
+  disabled,
+  onFind,
 }: {
   character: CharacterRecord;
-  lookup: SystemLookup | null;
+  status: SearchStatus;
+  disabled: boolean;
+  onFind: () => void;
 }) {
   const { t } = useTranslation();
-  const lacksScope = useCharacterLacksEndpoints(character.characterId, SEARCH_ENDPOINTS);
-  const [running, setRunning] = useState(false);
-  const [outcome, setOutcome] = useState<FindGatesOutcome | null>(null);
+  const lacksScope = useCharacterLacksEndpoints(character.characterId, ANSIBLEX_SEARCH_ENDPOINTS);
 
-  async function find() {
-    if (lookup === null) return;
-    setRunning(true);
-    setOutcome(null);
-    try {
-      setOutcome(await findGatesWithCharacter(character.characterId, lookup));
-    } finally {
-      setRunning(false);
-    }
-  }
-
-  let status: string | null = null;
-  if (running) status = t('travel.bridges.searching');
-  else if (outcome?.kind === 'failed') status = t('travel.bridges.searchFailed');
-  else if (outcome?.kind === 'found') {
-    status = t('travel.bridges.found', { count: outcome.count });
-    if (outcome.unknown.length > 0) {
-      status += ` ${t('travel.bridges.foundUnknown', { names: outcome.unknown.join(', ') })}`;
+  const lines: string[] = [];
+  if (status === 'running') lines.push(t('travel.bridges.searching'));
+  else if (status?.kind === 'failed') lines.push(t('travel.bridges.searchFailed'));
+  else if (status?.kind === 'found') {
+    lines.push(t('travel.bridges.found', { count: status.count }));
+    if (status.unknown.length > 0) {
+      lines.push(t('travel.bridges.foundUnknown', { names: status.unknown.join(', ') }));
     }
   }
 
@@ -88,7 +80,7 @@ function CharacterSearchRow({
           <button
             type="button"
             className={textActionClassName()}
-            onClick={() => void beginGrant(character.characterId, SEARCH_ENDPOINTS)}
+            onClick={() => void beginGrant(character.characterId, ANSIBLEX_SEARCH_ENDPOINTS)}
           >
             {t('travel.bridges.grant')}
           </button>
@@ -96,16 +88,18 @@ function CharacterSearchRow({
       ) : (
         <Button
           size="sm"
-          disabled={running || lookup === null}
+          disabled={disabled || status === 'running'}
           aria-label={t('travel.bridges.findLabel', { character: character.name })}
-          onClick={() => void find()}
+          onClick={onFind}
         >
           {t('travel.bridges.find')}
         </Button>
       )}
-      {status && (
-        <span role="status" className="text-text-dim">
-          {status}
+      {lines.length > 0 && (
+        <span role="status" className="flex flex-wrap gap-x-1 text-text-dim">
+          {lines.map((line) => (
+            <span key={line}>{line}</span>
+          ))}
         </span>
       )}
     </li>
@@ -118,6 +112,7 @@ function pasteErrorText(error: GateListError, t: ReturnType<typeof useTranslatio
     line: error.line,
     text: error.text,
     names,
+    count: error.names.length,
   });
 }
 
@@ -139,6 +134,26 @@ export function AnsiblexGatesDialog({
     added: number;
     errors: GateListError[];
   } | null>(null);
+  const [searches, setSearches] = useState<ReadonlyMap<number, SearchStatus>>(new Map());
+  const searching = [...searches.values()].includes('running');
+
+  async function findWith(characterId: number) {
+    if (lookup === null) return;
+    const set = (status: SearchStatus) =>
+      setSearches((was) => new Map(was).set(characterId, status));
+    set('running');
+    try {
+      set(await findGatesWithCharacter(characterId, lookup));
+    } catch {
+      set({ kind: 'failed' });
+    }
+  }
+
+  /** One character after another: their finds merge, each keeping who found it. */
+  async function findWithEvery() {
+    for (const character of characters) await findWith(character.characterId);
+  }
+
   const nameOfCharacter = (id: number) =>
     characters.find((character) => character.characterId === id)?.name ??
     t('travel.bridges.unknownCharacter', { id });
@@ -163,15 +178,28 @@ export function AnsiblexGatesDialog({
           {characters.length === 0 ? (
             <p className="text-text-dim">{t('travel.bridges.noCharacters')}</p>
           ) : (
-            <ul className="space-y-1.5">
-              {characters.map((character) => (
-                <CharacterSearchRow
-                  key={character.characterId}
-                  character={character}
-                  lookup={lookup}
-                />
-              ))}
-            </ul>
+            <>
+              <ul className="space-y-1.5">
+                {characters.map((character) => (
+                  <CharacterSearchRow
+                    key={character.characterId}
+                    character={character}
+                    status={searches.get(character.characterId)}
+                    disabled={lookup === null || searching}
+                    onFind={() => void findWith(character.characterId)}
+                  />
+                ))}
+              </ul>
+              {characters.length > 1 && (
+                <Button
+                  size="sm"
+                  disabled={lookup === null || searching}
+                  onClick={() => void findWithEvery()}
+                >
+                  {t('travel.bridges.findAll')}
+                </Button>
+              )}
+            </>
           )}
         </section>
 

@@ -228,7 +228,11 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
       returnToStart: optimizing && settings.returnToStart,
       keepLastStopLast: optimizing && settings.keepLastStopLast,
     },
-    routeQuery,
+    // Held until Use jump bridges and the list are read, so the route is not drawn once without them.
+    {
+      ...routeQuery,
+      hydrated: routeQuery.hydrated && bridgeQuery.hydrated && gateRecords !== undefined,
+    },
     holes,
     params.pin,
     listed,
@@ -341,7 +345,7 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
                 setParams({ jb: null });
               },
               bridgeCount: gateRecords?.length ?? 0,
-              onManageBridges: () => setBridgeDialog('list'),
+              onManageBridges: () => setBridgeDialog('search'),
             }}
           />
         </div>
