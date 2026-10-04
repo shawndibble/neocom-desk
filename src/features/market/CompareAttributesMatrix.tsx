@@ -23,6 +23,7 @@
  * the same explicit column widths (the `--compare-*-width` variables below)
  * so the columns line up under the one header.
  */
+import { marketIskDecimals } from '@/lib/isk';
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, DataTable, TypeIcon } from '@/components/ui';
@@ -58,7 +59,8 @@ export interface CompareAttributesMatrixProps {
 
 /** A price is shorthand — the whole table is a side-by-side scan — with the exact figure one gesture away; an attribute keeps its own unit and precision. */
 function formatCell(kind: 'price' | 'attribute', cell: CompareCell): ReactNode {
-  if (kind === 'price') return <IskAmount value={cell.value} revealOn="tap" />;
+  if (kind === 'price')
+    return <IskAmount value={cell.value} revealOn="tap" decimals={marketIskDecimals(cell.value)} />;
   return (
     cell.displayValue ??
     `${formatAttributeValue(cell.value, cell.unit)}${cell.unit ? ` ${cell.unit}` : ''}`

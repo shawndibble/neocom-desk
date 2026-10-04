@@ -210,7 +210,9 @@ describe('Market Browser: All regions', () => {
     expect(await within(sellTable).findByText('1,000,000')).toBeInTheDocument();
     expect(within(sellTable).getByText('1,100,000')).toBeInTheDocument();
     expect(within(sellTable).getByText('1,200,000')).toBeInTheDocument();
-    expect(screen.getByText(/use The Forge/)).toBeInTheDocument();
+    // The note sits behind the scope bar's info tip.
+    await userEvent.setup().hover(screen.getByRole('button', { name: 'What else this covers' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/use The Forge/);
     expect(hits.get(THE_FORGE)).toBe(1);
     expect(hits.get(DOMAIN)).toBe(1);
     expect(hits.get(HEIMATAR)).toBe(1);
@@ -297,7 +299,11 @@ describe('Market Browser: All regions', () => {
     expect(hits.get(HEIMATAR)).toBeUndefined();
     expect(hits.get(THE_FORGE)).toBe(1);
     expect(hits.get(DOMAIN)).toBe(1);
-    expect(screen.getByText(/use Jita — only the order book reaches/)).toBeInTheDocument();
+    // The note sits behind the scope bar's info tip.
+    await userEvent.setup().hover(screen.getByRole('button', { name: 'What else this covers' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      /use Jita — only the order book reaches/
+    );
   });
 
   it('offers the Distance filter before any item is picked, named after the header scope', async () => {

@@ -17,6 +17,7 @@
  * reaction consumes gets "Used in" (`UsedInSection`), off the blueprint
  * catalog — the same SDE files Build Plan reads, not ESI.
  */
+import { marketIskDecimals } from '@/lib/isk';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
@@ -372,7 +373,11 @@ function OpenInMarketLink({ typeId, onNavigate }: { typeId: number; onNavigate: 
  * The line is inert, so a tap is free to be the reveal.
  */
 function priceCell(price: number | null): ReactNode {
-  return price != null ? <IskAmount value={price} revealOn="tap" /> : '—';
+  return price != null ? (
+    <IskAmount value={price} revealOn="tap" decimals={marketIskDecimals(price)} />
+  ) : (
+    '—'
+  );
 }
 
 /**

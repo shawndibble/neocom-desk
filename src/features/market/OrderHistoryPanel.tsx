@@ -1,3 +1,4 @@
+import { marketIskDecimals } from '@/lib/isk';
 import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -214,7 +215,13 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
         align: 'right',
         className: 'tabular-nums',
         sortValue: (order) => order.price,
-        render: (order) => <IskAmount value={order.price} revealOn="longPress" />,
+        render: (order) => (
+          <IskAmount
+            value={order.price}
+            revealOn="longPress"
+            decimals={marketIskDecimals(order.price)}
+          />
+        ),
       },
       {
         id: 'remaining',

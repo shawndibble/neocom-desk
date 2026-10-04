@@ -12,6 +12,7 @@
  * drawer open on Attributes (`useCompareSet`'s `openIn`) instead of opening
  * a separate modal that covered the order book.
  */
+import { marketIskDecimals } from '@/lib/isk';
 import {
   useCallback,
   useEffect,
@@ -287,7 +288,11 @@ export function CompareDrawer({
           row.loading ? (
             '…'
           ) : row.summary?.bestSell != null ? (
-            <IskAmount value={row.summary.bestSell} revealOn="tap" />
+            <IskAmount
+              value={row.summary.bestSell}
+              revealOn="tap"
+              decimals={marketIskDecimals(row.summary.bestSell)}
+            />
           ) : (
             '—'
           ),
@@ -303,7 +308,11 @@ export function CompareDrawer({
           row.loading ? (
             '…'
           ) : row.summary?.bestBuy != null ? (
-            <IskAmount value={row.summary.bestBuy} revealOn="tap" />
+            <IskAmount
+              value={row.summary.bestBuy}
+              revealOn="tap"
+              decimals={marketIskDecimals(row.summary.bestBuy)}
+            />
           ) : (
             '—'
           ),
@@ -319,7 +328,11 @@ export function CompareDrawer({
           row.loading ? (
             '…'
           ) : row.summary?.spread != null ? (
-            <IskAmount value={row.summary.spread} revealOn="tap" />
+            <IskAmount
+              value={row.summary.spread}
+              revealOn="tap"
+              decimals={marketIskDecimals(row.summary.spread)}
+            />
           ) : (
             '—'
           ),
@@ -347,7 +360,11 @@ export function CompareDrawer({
         render: (row) => {
           if (row.loading) return '…';
           const { afterFees } = marginFor(row);
-          return afterFees != null ? <IskAmount value={afterFees} revealOn="tap" /> : '—';
+          return afterFees != null ? (
+            <IskAmount value={afterFees} revealOn="tap" decimals={marketIskDecimals(afterFees)} />
+          ) : (
+            '—'
+          );
         },
         sortValue: (row) => marginFor(row).afterFees ?? undefined,
       },
