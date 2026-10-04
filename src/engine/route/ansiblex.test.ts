@@ -4,8 +4,6 @@ import {
   ANSIBLEX_SEARCH,
   ANSIBLEX_TYPE_ID,
   bridgeConnections,
-  bridgeEndsFromKey,
-  bridgeKey,
   bridgeStepFinder,
   bridgeStepIndexes,
   foundGate,
@@ -186,19 +184,6 @@ describe('bridgeConnections', () => {
       [A, D],
       [B, E],
     ]);
-  });
-});
-
-describe('bridgeKey', () => {
-  it('is the same for the same pairs in any order, and empty for none', () => {
-    const other: AnsiblexGate = { fromId: E, toId: B, name: 'x' };
-    expect(bridgeKey([AD, other])).toBe(bridgeKey([other, { ...AD, name: 'renamed' }]));
-    expect(bridgeKey([])).toBe('');
-  });
-
-  it('gives back the pairs it was made from, unnamed', () => {
-    expect(bridgeEndsFromKey(bridgeKey([AD]))).toEqual([{ fromId: A, toId: D, name: '' }]);
-    expect(bridgeEndsFromKey('')).toEqual([]);
   });
 });
 

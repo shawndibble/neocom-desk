@@ -307,3 +307,17 @@ describe('RowDetailModal owed entry', () => {
     expect(onLinkWalletPayment).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('RowDetailModal — a failed action', () => {
+  it('shows the save error it is handed', () => {
+    renderModal('unassigned', null, undefined, vi.fn(), {
+      saveError: 'Couldn’t save — nothing was changed. Try again.',
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(/Couldn’t save/);
+  });
+
+  it('shows no alert while nothing has failed', () => {
+    renderModal('unassigned', null);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});

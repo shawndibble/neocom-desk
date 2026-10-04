@@ -73,29 +73,6 @@ export function holeNetwork(holes: readonly HoleEnds[]): HoleNetwork {
 export type HoleEnds = Pick<TheraConnection, 'exitSystemId' | 'hub'>;
 
 /**
- * A stable name for the network a hole list makes — sorted, each exit/hub
- * pair once. The list itself is rebuilt as life ticks down; a route only
- * needs planning again when this changes.
- */
-export function holeNetworkKey(holes: readonly HoleEnds[]): string {
-  return [...new Set(holes.map((hole) => `${hole.exitSystemId}:${hole.hub}`))].sort().join(',');
-}
-
-/** The holes `holeNetworkKey` named, each exit/hub pair once, rebuilt from the name alone. */
-export function holeEndsFromKey(key: string): HoleEnds[] {
-  if (key === '') return [];
-  return key.split(',').flatMap((pair): HoleEnds[] => {
-    const [exit, hub] = pair.split(':');
-    return hub === 'thera' || hub === 'turnur' ? [{ exitSystemId: Number(exit), hub }] : [];
-  });
-}
-
-/** The network `holeNetworkKey` named, rebuilt from the name alone. */
-export function holeNetworkFromKey(key: string): HoleNetwork {
-  return holeNetwork(holeEndsFromKey(key));
-}
-
-/**
  * The hole a step between two systems crosses, either way round, or `null`
  * for a step no hole joins. Several holes can join the same exit to the same
  * hub; the longest-lived one is the one worth flying.

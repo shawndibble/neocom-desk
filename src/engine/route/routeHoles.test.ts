@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   holeBetween,
   holeNetwork,
-  holeNetworkFromKey,
-  holeNetworkKey,
   holeStepFinder,
   holeStepIndexes,
   routeHoles,
@@ -82,25 +80,6 @@ describe('holeNetwork', () => {
 
   it('is empty with no holes, so the gate route is untouched', () => {
     expect(holeNetwork([])).toEqual({ extraConnections: [], freeSystems: new Set() });
-  });
-});
-
-describe('holeNetworkKey', () => {
-  it('names the network, not the list: order, duplicates and life do not change it', () => {
-    const a = [hole({ exitSystemId: 2 }), hole({ exitSystemId: 1, hub: 'turnur' })];
-    const b = [
-      hole({ exitSystemId: 1, hub: 'turnur', expiresAt: NOW + HOUR }),
-      hole({ exitSystemId: 2 }),
-      hole({ id: 'twin', exitSystemId: 2 }),
-    ];
-    expect(holeNetworkKey(a)).toBe(holeNetworkKey(b));
-    expect(holeNetworkKey([])).toBe('');
-  });
-
-  it('round-trips to the same network', () => {
-    const holes = [hole({ exitSystemId: 2 }), hole({ exitSystemId: 1, hub: 'turnur' })];
-    expect(holeNetworkFromKey(holeNetworkKey(holes))).toEqual(holeNetwork([holes[1], holes[0]]));
-    expect(holeNetworkFromKey('')).toEqual(holeNetwork([]));
   });
 });
 
