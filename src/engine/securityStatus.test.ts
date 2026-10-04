@@ -59,10 +59,6 @@ describe('securityStatusColor', () => {
     expect(securityStatusColor(0.8)).toBe('#5cd0a9');
   });
 
-  it('reads pure danger red at the bottom of the scale (-1.0)', () => {
-    expect(securityStatusColor(-1.0)).toBe('#ff7369');
-  });
-
   /**
    * The game paints every nullsec system red; a gradient that ran amber from
    * 0.4 all the way down to -1.0 left a 0.0 system the same orange as a 0.1
@@ -73,22 +69,19 @@ describe('securityStatusColor', () => {
     expect(securityStatusColor(0.0499)).toBe('#ff7369'); // shown as 0.0
     expect(securityStatusColor(-0.25)).toBe('#ff7369');
     expect(securityStatusColor(-1.0)).toBe('#ff7369');
+    expect(securityStatusColor(-2.0)).toBe('#ff7369');
   });
 
   it('paints lowsec orange, deepening toward 0.1 but stopping short of red', () => {
-    expect(securityStatusColor(0.4)).toBe('#fa965a');
-    expect(securityStatusColor(0.4499)).toBe('#fa965a'); // shown as 0.4
-    expect(securityStatusColor(0.25)).toBe('#fb8f5d');
-    expect(securityStatusColor(0.1)).toBe('#fc8860');
-    expect(securityStatusColor(0.05)).toBe('#fc8860'); // shown as 0.1
+    expect(securityStatusColor(0.4)).toBe('#f99d56');
+    expect(securityStatusColor(0.4499)).toBe('#f99d56'); // shown as 0.4
+    expect(securityStatusColor(0.25)).toBe('#fa965a');
+    expect(securityStatusColor(0.1)).toBe('#fb8f5d');
+    expect(securityStatusColor(0.05)).toBe('#fb8f5d'); // shown as 0.1
   });
 
   it('clamps above 1.0 to the same color as 1.0', () => {
     expect(securityStatusColor(1.5)).toBe(securityStatusColor(1.0));
-  });
-
-  it('clamps below -1.0 to the same color as -1.0', () => {
-    expect(securityStatusColor(-2.0)).toBe(securityStatusColor(-1.0));
   });
 
   /**
@@ -96,7 +89,7 @@ describe('securityStatusColor', () => {
    * so a raw 0.4730616 reads "0.5" in orange — a highsec system wearing the
    * lowsec color. Ainsan and Balle really are highsec in game; the boundary
    * belongs to `securityBand`, which rounds the way the game does. Only the
-   * branch moves: the gradient inside each band still interpolates the raw
+   * branch moves: the gradients inside highsec and lowsec still interpolate the raw
    * value, so neighbouring systems stay visually distinct.
    */
   it('colors on the rounded boundary, matching the number rendered beside it', () => {

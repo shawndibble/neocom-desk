@@ -34,17 +34,17 @@ const SUCCESS = { r: 0x5f, g: 0xd5, b: 0x84 }; // --success
 const ACCENT = { r: 0x57, g: 0xc7, b: 0xf4 }; // --accent
 const WARNING = { r: 0xf5, g: 0xb9, b: 0x4a }; // --warning
 const DANGER = { r: 0xff, g: 0x73, b: 0x69 }; // --danger
-const DANGER_HEX = '#ff7369';
 
 const HIGHSEC_FLOOR = 0.5;
 const HIGHSEC_GREEN = 0.7;
 const HIGHSEC_CEIL = 1.0;
 const LOWSEC_CEIL = 0.4;
 const LOWSEC_FLOOR = 0.1;
-// Lowsec's orange, as a point on the warning→danger blend: it starts halfway
-// at 0.4 and deepens to 70% by 0.1, so it never reaches nullsec's full red.
-const LOWSEC_BLEND_TOP = 0.5;
-const LOWSEC_BLEND_BOTTOM = 0.7;
+// Lowsec's orange, as a point on the warning→danger blend: 40% of the way at
+// 0.4, deepening to 60% by 0.1 — far enough short of nullsec's full red that a
+// 0.1 and a 0.0 cell side by side on the route strip still read apart.
+const LOWSEC_BLEND_TOP = 0.4;
+const LOWSEC_BLEND_BOTTOM = 0.6;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -62,6 +62,8 @@ function lerpColor(a: { r: number; g: number; b: number }, b: typeof a, t: numbe
   return `#${toHex(lerpChannel(a.r, b.r, t))}${toHex(lerpChannel(a.g, b.g, t))}${toHex(lerpChannel(a.b, b.b, t))}`;
 }
 
+const DANGER_HEX = lerpColor(DANGER, DANGER, 0);
+
 /**
  * Colors a solar system's security status on the game client's own scale:
  * across highsec, warning yellow at 0.5 blending to success green at 0.7 and
@@ -75,7 +77,8 @@ function lerpColor(a: { r: number; g: number; b: number }, b: typeof a, t: numbe
  * the raw float here instead painted Ainsan (0.4730616, a highsec system shown
  * as 0.5) in the lowsec color. Only the branch rounds: the gradients within
  * highsec and lowsec still interpolate the raw value, so neighbours stay
- * distinguishable.
+ * distinguishable. The gradients run between the shown stops (0.5, 0.4, 0.1),
+ * so the half-step of raw values that rounds onto a stop shares its color.
  */
 export function securityStatusColor(security: number): string {
   const band = securityBand(security);
