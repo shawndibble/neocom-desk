@@ -2,7 +2,7 @@ import type { MiningTaxAssignmentRecord } from '@/db';
 
 /**
  * What each ore line of one day starts at in the combined entry's edit form
- * (`CombinedEditDialog`): the day's own per-ore corrections when it has
+ * (`EntryEditDialog`): the day's own per-ore corrections when it has
  * them, otherwise its billed `estimatedValue` shared out by each line's
  * market worth on the mined date — or by units when nothing is priced. A
  * share of the stored figure, never a fresh re-price, so the boxes add up to
@@ -63,4 +63,13 @@ export function combinedDayValues(
   }
   const estimatedValue = Object.values(oreLineValues).reduce((sum, v) => sum + v, 0);
   return { estimatedValue, taxOwed: (estimatedValue * taxPct) / 100, oreLineValues };
+}
+
+/**
+ * One day's figures when the pilot types the whole day's value rather than
+ * each ore's ("edit ore values individually" off). No per-ore corrections
+ * are kept: the ones the day stored would no longer add up to the new total.
+ */
+export function dayTotalValues(estimatedValue: number, taxPct: number): CombinedDayValues {
+  return { estimatedValue, taxOwed: (estimatedValue * taxPct) / 100 };
 }

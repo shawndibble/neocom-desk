@@ -36,7 +36,7 @@ function renderModal(
   status: 'unassigned' | 'needs-review' | 'paid' | 'outstanding',
   assignment: MiningTaxAssignmentRecord | null,
   onSplit?: () => void,
-  onUnlock?: () => void,
+  onEdit: () => void = vi.fn(),
   extra: Partial<Parameters<typeof RowDetailModal>[0]> = {}
 ) {
   const noop = vi.fn();
@@ -60,7 +60,7 @@ function renderModal(
         onResolve={noop}
         onUndo={noop}
         onSplit={onSplit}
-        onUnlock={onUnlock}
+        onEdit={onEdit}
         {...extra}
       />
     </MemoryRouter>
@@ -161,6 +161,7 @@ describe('RowDetailModal payment', () => {
           pricesFor={() => new Map()}
           busy={false}
           onAssigned={noop}
+          onEdit={noop}
           onDismiss={noop}
           onMarkPaid={noop}
           onResolve={noop}
@@ -236,9 +237,9 @@ describe('RowDetailModal payment', () => {
   });
 });
 
-describe('RowDetailModal paid lock', () => {
-  it('passes onUnlock through to the Assign form, which fires it from its unlock button', () => {
-    const onUnlock = vi.fn();
+describe('RowDetailModal edit', () => {
+  it('hands a paid entry straight to the edit form, with no unlock step here', () => {
+    const onEdit = vi.fn();
     renderModal(
       'paid',
       {
@@ -256,12 +257,12 @@ describe('RowDetailModal paid lock', () => {
         updatedAt: 1,
       } as MiningTaxAssignmentRecord,
       undefined,
-      onUnlock
+      onEdit
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Unlock to edit' }));
-    expect(onUnlock).toHaveBeenCalledTimes(1);
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: /unlock/i })).not.toBeInTheDocument();
   });
 });
 
@@ -284,7 +285,7 @@ describe('RowDetailModal owed entry', () => {
     const onSettleUp = vi.fn();
     renderModal('outstanding', owed, undefined, undefined, { onSettleUp });
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Settle up Corp One' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Settle up' }));
     expect(onSettleUp).toHaveBeenCalledTimes(1);
   });
 

@@ -1,9 +1,7 @@
 /**
  * "Edit ore values individually" (grilling session, 2026-09-27): whether the
- * Moon Mining Tax Assign/edit form shows one editable total-value box per ore
- * type instead of a single whole-row total. Off by default — the existing
- * whole-row Estimated Value/Tax Owed fields (`AssignDialog.tsx`) are
- * unchanged either way.
+ * Moon Mining Tax edit form (`EntryEditDialog.tsx`) shows one editable
+ * total-value box per ore type instead of one value per day. Off by default.
  *
  * Synced, not device-local: a pilot reconciling this app's numbers against a
  * corp's own moon-tax tool wants that per-ore workflow available wherever

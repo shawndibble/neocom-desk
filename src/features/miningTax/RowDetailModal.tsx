@@ -49,8 +49,10 @@ interface RowDetailModalProps {
    */
   pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   busy: boolean;
-  /** A create or an edit through the Assign form both land here — refresh and close, same as every other action below. */
+  /** A new Assignment from the Assign form lands here — refresh and close, same as every other action below. */
   onAssigned: () => void;
+  /** Opens `EntryEditDialog` for this entry — the same edit form a combined entry uses, owed or paid. */
+  onEdit: () => void;
   onDismiss: () => void;
   onMarkPaid: () => void;
   onResolve: () => void;
@@ -72,8 +74,6 @@ interface RowDetailModalProps {
   /** Opens the manual "Link transaction" picker (issue #540 follow-up) — offered whenever there is a payment to link against, paid or not. */
   onLinkTransaction?: () => void;
   onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
-  /** Reopens a Paid Assignment for editing ("unlock to edit") — offered only when `assignment.status === 'paid'`. */
-  onUnlock?: () => void | Promise<void>;
   /** The Payee to pre-select for an unassigned entry — see `AssignDialog.suggestion`. */
   suggestion?: PayeeSuggestion;
   /** Settles this entry's whole Payee balance — the usual next step for an owed entry. */
@@ -87,8 +87,8 @@ interface RowDetailModalProps {
  * An unassigned entry opens straight into the Assign form, with the Payee
  * last used in its system pre-selected. An assigned one opens as a summary —
  * who it's owed to, how much, what was mined — with one main action for its
- * status (Settle up when owed, Accept new total when grown) and Edit to
- * correct it. Everything rarer (split, combine, link a payment, unassign)
+ * status (Settle up when owed, Accept new total when grown) and Edit, which
+ * opens the same `EntryEditDialog` a combined entry uses. Everything rarer (split, combine, link a payment, unassign)
  * lives in the More menu beside the title, and Unassign asks first: it
  * deletes the Assignment.
  */
@@ -105,6 +105,7 @@ export function RowDetailModal({
   pricesFor,
   busy,
   onAssigned,
+  onEdit,
   onDismiss,
   onMarkPaid,
   onResolve,
@@ -115,14 +116,12 @@ export function RowDetailModal({
   linkedTransactions,
   onLinkTransaction,
   onUnlinkTransaction,
-  onUnlock,
   suggestion,
   onSettleUp,
   onLinkWalletPayment,
 }: RowDetailModalProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
-  const [editing, setEditing] = useState(false);
   const [confirmUnassign, setConfirmUnassign] = useState(false);
   const oreLines = assignment ? assignment.oreLines : row.unassignedOreLines;
   const estimatedValue = assignment
@@ -131,7 +130,6 @@ export function RowDetailModal({
   const payee = payees.find((p) => p.id === assignment?.payeeId);
   const payeeName = payee?.name ?? t('miningTax.unknownPayee');
   const assigned = assignment !== null && status !== 'dismissed';
-  const showForm = status === 'unassigned' || (assigned && editing);
   // The Assign form already lists the ore (with split checkboxes) when it is
   // creating across more than one line — showing it again above would be
   // pure duplication.
@@ -200,7 +198,7 @@ export function RowDetailModal({
       <div className="space-y-3 text-sm">
         {/* Who it's owed to and how much lead, the same way the combined
             view does; the pilot and the paperwork sit on the line below. */}
-        {assigned && assignment && !editing && (
+        {assigned && assignment && (
           <div className="flex items-baseline justify-between gap-3">
             <span className="min-w-0 text-base font-semibold">{payeeName}</span>
             <span
@@ -216,7 +214,7 @@ export function RowDetailModal({
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-text-dim">
           <span>
             {row.characterName}
-            {assigned && assignment && !editing && (
+            {assigned && assignment && (
               <>
                 {' · '}
                 {assignment.taxPct}%{' · '}
@@ -229,7 +227,7 @@ export function RowDetailModal({
           <StatusPill status={status} label={t(`miningTax.status.${STATUS_LABEL_KEY[status]}`)} />
         </div>
 
-        {status === 'paid' && !editing && (onLinkTransaction || assignment?.payment) && (
+        {status === 'paid' && (onLinkTransaction || assignment?.payment) && (
           <PaymentLinksCard
             linkedTransactions={linkedTransactions}
             onLinkTransaction={onLinkTransaction}
@@ -248,7 +246,7 @@ export function RowDetailModal({
           </div>
         )}
 
-        {showOreCard && !editing && (
+        {showOreCard && (
           <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
             <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('miningTax.oreColumn')}
@@ -330,40 +328,36 @@ export function RowDetailModal({
               {t('common.close')}
             </Button>
           </div>
-        ) : showForm ? (
+        ) : status === 'unassigned' ? (
           <AssignDialog
             row={row}
-            assignment={assignment}
             payees={payees}
             systemName={systemName}
             typeNames={typeNames}
             pricesFor={pricesFor}
             busy={busy}
             onAssigned={onAssigned}
-            onCancel={assigned ? () => setEditing(false) : onClose}
+            onCancel={onClose}
             onAddPayee={onAddPayee}
-            onUnlock={onUnlock}
             suggestion={suggestion}
             extraActions={
-              status === 'unassigned' && (
-                <>
-                  <Button size="sm" disabled={busy} onClick={onDismiss}>
-                    {t('miningTax.dismissAction')}
+              <>
+                <Button size="sm" disabled={busy} onClick={onDismiss}>
+                  {t('miningTax.dismissAction')}
+                </Button>
+                {onJoin && (
+                  <Button size="sm" disabled={busy} onClick={onJoin}>
+                    {t('miningTax.joinAction')}
                   </Button>
-                  {onJoin && (
-                    <Button size="sm" disabled={busy} onClick={onJoin}>
-                      {t('miningTax.joinAction')}
-                    </Button>
-                  )}
-                </>
-              )
+                )}
+              </>
             }
           />
         ) : (
           <div className="flex flex-wrap gap-2 pt-1">
             {status === 'outstanding' && onSettleUp && (
               <Button variant="primary" disabled={busy} onClick={onSettleUp}>
-                {t('miningTax.detail.settleUpPayee', { payee: payeeName })}
+                {t('miningTax.settleUpAction')}
               </Button>
             )}
             {status === 'needs-review' && (
@@ -376,7 +370,7 @@ export function RowDetailModal({
                 {t('miningTax.markPaidAction')}
               </Button>
             )}
-            <Button disabled={busy} onClick={() => setEditing(true)}>
+            <Button disabled={busy} onClick={onEdit}>
               {t('miningTax.detail.editAction')}
             </Button>
             <Button className="ml-auto" onClick={onClose}>

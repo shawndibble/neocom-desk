@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord } from '@/db';
-import { combinedDayValues, combinedLineDefaults } from './combinedValues';
+import { combinedDayValues, combinedLineDefaults, dayTotalValues } from './combinedValues';
 
 const Z = 45490;
 const B = 45492;
@@ -73,6 +73,15 @@ describe('combinedDayValues', () => {
       estimatedValue: 1600,
       taxOwed: 80,
       oreLineValues: { [Z]: 1000, [B]: 600 },
+    });
+  });
+});
+
+describe('dayTotalValues', () => {
+  it('bills a typed whole-day value at the rate, with no per-ore corrections', () => {
+    expect(dayTotalValues(2000, 5)).toEqual({
+      estimatedValue: 2000,
+      taxOwed: 100,
     });
   });
 });

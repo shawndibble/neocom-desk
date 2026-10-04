@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import { CombinedEditDialog } from './CombinedEditDialog';
+import { db, type MiningTaxAssignmentRecord, type PayeeRecord } from '@/db';
+import { EntryEditDialog } from './EntryEditDialog';
+import { MINING_TAX_ORE_VALUE_MODE_KEY, useMiningTaxOreValueMode } from './oreValueMode';
 import type { GroupMember } from './groupRows';
 import type { MoonMiningTaxRow } from './snapshot';
 
@@ -63,7 +64,7 @@ function renderDialog(members: GroupMember[]) {
   const onSaved = vi.fn();
   render(
     <MemoryRouter>
-      <CombinedEditDialog
+      <EntryEditDialog
         open
         onClose={vi.fn()}
         members={members}
@@ -92,9 +93,10 @@ function renderDialog(members: GroupMember[]) {
 beforeEach(() => {
   vi.clearAllMocks();
   assignmentsMock.updateCombinedAssignments.mockResolvedValue([]);
+  useMiningTaxOreValueMode.setState({ value: true, hydrated: true });
 });
 
-describe('CombinedEditDialog', () => {
+describe('EntryEditDialog', () => {
   it('edits every day in one form and saves them together', async () => {
     const d3 = member('d3', '2026-10-03');
     const d4 = member('d4', '2026-10-04');
@@ -121,15 +123,59 @@ describe('CombinedEditDialog', () => {
     });
   });
 
-  it('opens a paid entry locked, and unlocking only opens the fields', () => {
+  it('opens a paid entry ready to edit, with no second unlock step', () => {
     renderDialog([
       member('d3', '2026-10-03', { status: 'paid', paidAt: 1 }),
       member('d4', '2026-10-04', { status: 'paid', paidAt: 1 }),
     ]);
-    expect(screen.getByRole('button', { name: 'Save all 2 days' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Unlock to edit' }));
+    expect(screen.queryByRole('button', { name: /unlock/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/stays paid/)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Zeolites value on 2026-10-03' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Save all 2 days' })).toBeEnabled();
-    expect(assignmentsMock.updateCombinedAssignments).not.toHaveBeenCalled();
+  });
+
+  it('edits a single entry in the same form, saved as one day', async () => {
+    const { onSaved } = renderDialog([member('d3', '2026-10-03', { groupId: undefined })]);
+    expect(screen.getByRole('heading', { name: /Edit 2026-10-03 — Ainsan/ })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Bitumens value on 2026-10-03' }), {
+      target: { value: '2000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const [records, input] = assignmentsMock.updateCombinedAssignments.mock.calls[0];
+    expect(records.map((a: MiningTaxAssignmentRecord) => a.id)).toEqual(['d3']);
+    expect(input.members.d3).toEqual({
+      estimatedValue: 3_000,
+      taxOwed: 150,
+      oreLineValues: { [ZEOLITES]: 1_000, [BITUMENS]: 2_000 },
+    });
+  });
+
+  it('edits each day’s whole value when ore values aren’t edited individually', async () => {
+    useMiningTaxOreValueMode.setState({ value: false, hydrated: true });
+    const { onSaved } = renderDialog([
+      member('d3', '2026-10-03', { oreLineValues: { [ZEOLITES]: 1_500, [BITUMENS]: 500 } }),
+    ]);
+    expect(screen.queryByRole('textbox', { name: /Zeolites value/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Estimated value on 2026-10-03' }), {
+      target: { value: '4000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const [, input] = assignmentsMock.updateCombinedAssignments.mock.calls[0];
+    expect(input.members.d3).toEqual({ estimatedValue: 4_000, taxOwed: 200 });
+  });
+
+  it('reads the stored ore-values setting itself, even when Settings was never opened', async () => {
+    useMiningTaxOreValueMode.setState({ value: false, hydrated: false });
+    await db.settings.put({ key: MINING_TAX_ORE_VALUE_MODE_KEY, value: true });
+    renderDialog([member('d3', '2026-10-03')]);
+    expect(
+      await screen.findByRole('textbox', { name: 'Zeolites value on 2026-10-03' })
+    ).toBeInTheDocument();
+    await db.settings.delete(MINING_TAX_ORE_VALUE_MODE_KEY);
   });
 
   it('says so when the save fails, and stays open', async () => {
