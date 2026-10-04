@@ -44,8 +44,10 @@ export function MiningTaxSettingsForm({ onAutoContinueChange }: MiningTaxSetting
             onChange={() => void setOreValueMode(!oreValueMode)}
           />
         </Field>
-        {/* Device-local (`continueSessionPref.ts`), so its note says so: the
-            sync hint above covers the rest of this form, not this one. */}
+      </Fields>
+      {/* Device-local (`continueSessionPref.ts`): outside the block the sync
+          hint heads, and its note says so. */}
+      <Fields variant="form">
         <Field
           label={t('settings.miningTaxAutoContinueLabel')}
           htmlFor="settings-mining-tax-auto-continue"
