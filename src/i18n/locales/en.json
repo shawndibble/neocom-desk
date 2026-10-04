@@ -2940,7 +2940,8 @@
         "total": "Total, highest first",
         "toBuy": "To buy, most first",
         "name": "Name, A to Z"
-      }
+      },
+      "at": "@"
     }
   },
   "login": {
