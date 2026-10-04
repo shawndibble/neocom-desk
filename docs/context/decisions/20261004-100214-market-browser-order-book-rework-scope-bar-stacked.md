@@ -42,8 +42,9 @@ _Recorded 2026-10-04._
   tab stays when an item has no variations, as an empty state, so the tabs
   never move between items. Rules out Variations under the order book.
 - **The Browser tab widens to 96rem** (other Market tabs keep 6xl) and its
-  finder column is sticky. Cum. qty and Expires drop out of the table below
-  ~1680px (105rem) and Min. volume below 1920px, where Location needs the
-  room; all three remain in the expanded row. Below a 48rem order-book width
+  finder column is sticky. Expires drops out of the table below ~1680px
+  (105rem) and Min. volume below 1920px, where Location needs the room; both
+  remain in the expanded row. The Cum. qty column was dropped after use (the
+  expanded row's depth line still gives units and ISK to that row). Below a 48rem order-book width
   (a 1024–1366px window beside the finder) the rows become the phone's
   two-line card, picked from the book's own width (ADR 0017).

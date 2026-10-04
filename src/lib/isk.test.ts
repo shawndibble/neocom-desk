@@ -4,6 +4,8 @@ import {
   formatIsk,
   formatIskAuto,
   formatIskCompact,
+  formatMarketIsk,
+  marketIskDecimals,
   parseIskAmount,
 } from './isk';
 
@@ -64,6 +66,32 @@ describe('formatIskAuto', () => {
     expect(formatIskAuto(5_000_000_000, CONTRACT_ISK_CENTS_BELOW)).toBe('5,000,000,000');
     expect(formatIskAuto(1_000, CONTRACT_ISK_CENTS_BELOW)).toBe('1,000.00');
     expect(formatIskAuto(4.99, CONTRACT_ISK_CENTS_BELOW)).toBe('4.99');
+  });
+});
+
+describe('formatMarketIsk', () => {
+  it('keeps cents below 10,000 ISK', () => {
+    expect(formatMarketIsk(9_999.99)).toBe('9,999.99');
+    expect(formatMarketIsk(4.5)).toBe('4.50');
+  });
+
+  it('drops decimals from 10,000 ISK up', () => {
+    expect(formatMarketIsk(10_000)).toBe('10,000');
+    expect(formatMarketIsk(1_234_567.89)).toBe('1,234,568');
+  });
+
+  it('drops them for an amount that would round up to 10,000.00', () => {
+    expect(formatMarketIsk(9_999.996)).toBe('10,000');
+  });
+
+  it('judges a negative amount by its size', () => {
+    expect(formatMarketIsk(-12_345.67)).toBe('-12,346');
+    expect(formatMarketIsk(-9_999.99)).toBe('-9,999.99');
+  });
+
+  it('names the precision for a caller that formats the text itself', () => {
+    expect(marketIskDecimals(9_999.99)).toBe(2);
+    expect(marketIskDecimals(-10_000)).toBe(0);
   });
 });
 

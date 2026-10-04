@@ -45,9 +45,9 @@ import { RecentKillsCell, RecentKillsDetail } from './RecentKillsCell';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { routeSystemName } from './routeSystemName';
 import type { RouteKillsCell } from './useRouteKills';
-import type { BridgeAt, HoleAt } from './useRouteSafety';
+import type { RouteSafetyTripRow } from './useRouteSafety';
 
-type TableRow = RouteSafetyRow | HoleStep | BridgeStep;
+type TableRow = RouteSafetyTripRow | HoleStep | BridgeStep;
 
 /** A hole or bridge jump: its own full-width row, not a system. */
 function isHoleStep(row: TableRow): row is HoleStep | BridgeStep {
@@ -66,19 +66,15 @@ function systemColumn(column: DataTableColumn<RouteSafetyRow>): DataTableColumn<
 }
 
 /** The route's systems in order, with each hole or bridge jump as its own row between its two. */
-function withHoleSteps(
-  rows: readonly RouteSafetyRow[],
-  holeAt: HoleAt,
-  bridgeAt: BridgeAt
-): TableRow[] {
+function withHoleSteps(rows: readonly RouteSafetyTripRow[]): TableRow[] {
   const out: TableRow[] = [];
   rows.forEach((row, index) => {
     const previous = rows[index - 1];
     if (previous) {
-      const hole = holeAt(previous.systemId, row.systemId);
-      const bridge = hole ? null : bridgeAt(previous.systemId, row.systemId);
-      if (hole) out.push({ from: previous, to: row, hole });
-      else if (bridge) out.push({ from: previous, to: row, bridge });
+      if (row.entry?.kind === 'hole') out.push({ from: previous, to: row, hole: row.entry.hole });
+      else if (row.entry?.kind === 'bridge') {
+        out.push({ from: previous, to: row, bridge: row.entry.gate });
+      }
     }
     out.push(row);
   });
@@ -221,15 +217,11 @@ function RowDetail({ row, cell }: { row: RouteSafetyRow; cell: RouteKillsCell })
   );
 }
 
-const GATES_ONLY: HoleAt = () => null;
-const NO_BRIDGES: BridgeAt = () => null;
-
-/** What a table needs to draw hole (issue #2476) and bridge (issue #2478) rows; a gate-only route passes none. */
+/**
+ * What a table needs to draw hole (issue #2476) rows beyond the rows' own
+ * tags (issue #2546); a gate-only route passes none.
+ */
 export interface HoleRowProps {
-  /** The hole a step crosses, or `null` for a stargate jump. */
-  holeAt?: HoleAt;
-  /** The Ansiblex a step crosses, or `null`. */
-  bridgeAt?: BridgeAt;
   /** When EVE-Scout's list was read, for each hole row's age. */
   holesFetchedAt?: Date | null;
   /** The clock a hole's remaining life is read against. */
@@ -241,13 +233,11 @@ export function RouteSystemsTable({
   killsOf,
   avoidAction,
   label,
-  holeAt = GATES_ONLY,
-  bridgeAt = NO_BRIDGES,
   holesFetchedAt = null,
   now = 0,
 }: {
-  /** One list of route systems in flight order; folds never take its first or last. */
-  rows: readonly RouteSafetyRow[];
+  /** One list of route systems in flight order, each tagged with how it was entered; folds never take its first or last. */
+  rows: readonly RouteSafetyTripRow[];
   killsOf: (systemId: number) => RouteKillsCell;
   /** `null` for a row with nothing to offer: either end, or a system already avoided. */
   avoidAction: (row: RouteSafetyRow) => (() => void) | null;
@@ -255,7 +245,7 @@ export function RouteSystemsTable({
 } & HoleRowProps) {
   const { t } = useTranslation();
   const columns = useColumns(killsOf, avoidAction);
-  const tableRows = withHoleSteps(rows, holeAt, bridgeAt);
+  const tableRows = withHoleSteps(rows);
   // Both ends of a hole or bridge jump stay in view beside it.
   const pinned = new Set(
     tableRows.flatMap((row) => (isHoleStep(row) ? [row.from.systemId, row.to.systemId] : []))
@@ -276,7 +266,7 @@ export function RouteSystemsTable({
     allWidths: true,
     key: (row) => (isHoleStep(row) ? null : (foldKey.get(row.systemId) ?? null)),
     renderHeader: (tableMembers) => {
-      const members = tableMembers.filter((row): row is RouteSafetyRow => !isHoleStep(row));
+      const members = tableMembers.filter((row): row is RouteSafetyTripRow => !isHoleStep(row));
       const first = members[0];
       const last = members[members.length - 1];
       const lowest = first ? lowestOf.get(foldKey.get(first.systemId) ?? '') : undefined;

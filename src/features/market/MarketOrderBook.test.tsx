@@ -25,9 +25,9 @@ describe('HubComparisonLine', () => {
         onView={vi.fn()}
       />
     );
-    expect(screen.getByText('Amarr sells for 358,000.00')).toBeInTheDocument();
+    expect(screen.getByText('Amarr sells for 358,000')).toBeInTheDocument();
     expect(screen.getByText('−35%')).toBeInTheDocument();
-    expect(screen.getByText('buys for 325,800.00')).toBeInTheDocument();
+    expect(screen.getByText('buys for 325,800')).toBeInTheDocument();
     expect(screen.getByText('125×')).toBeInTheDocument();
     expect(screen.getByText('13 jumps away')).toBeInTheDocument();
   });

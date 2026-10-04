@@ -14,7 +14,7 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import { priceComparison } from '@/engine/market/orderBookDepth';
-import { formatIskCompact } from '@/lib/isk';
+import { formatIskCompact, marketIskDecimals } from '@/lib/isk';
 import { ItemContextMenu } from './ItemContextMenu';
 import type { VariationRow } from './variations';
 import { variationsCsvColumns } from './variationsCsv';
@@ -66,7 +66,8 @@ function priceCell(
 ): ReactNode {
   if (summary === undefined) return t('common.loading');
   const own = side === 'sell' ? summary.bestSell : summary.bestBuy;
-  if (own !== null) return <IskAmount value={own} revealOn="longPress" />;
+  if (own !== null)
+    return <IskAmount value={own} revealOn="longPress" decimals={marketIskDecimals(own)} />;
   const other = side === 'sell' ? summary.bestBuy : summary.bestSell;
   if (other !== null) return t(side === 'sell' ? 'market.emptySellTitle' : 'market.emptyBuyTitle');
   return t('market.variations.noOrders');

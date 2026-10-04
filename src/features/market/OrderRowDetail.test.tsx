@@ -66,7 +66,7 @@ describe('OrderRowDetail', () => {
     renderDetail();
     expect(screen.getByText('Buying down to here:')).toBeInTheDocument();
     expect(screen.getByText('546 units for 195.5M')).toBeInTheDocument();
-    expect(screen.getByText(/avg 358,087\.36/)).toBeInTheDocument();
+    expect(screen.getByText(/avg 358,087/)).toBeInTheDocument();
   });
 
   it('calls the best order the best price rather than a zero gap', () => {
@@ -107,7 +107,7 @@ describe('OrderRowDetail', () => {
     configureClipboard(writeText);
     const user = userEvent.setup();
     renderDetail();
-    await user.click(screen.getByRole('button', { name: 'Copy price 358,100.00' }));
+    await user.click(screen.getByRole('button', { name: 'Copy price 358,100' }));
     expect(writeText).toHaveBeenCalledWith('358100');
     expect(await screen.findByText('Copied')).toBeInTheDocument();
   });

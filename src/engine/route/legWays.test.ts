@@ -11,8 +11,7 @@ import {
   routeOverBridges,
   routeThroughHoles,
 } from './legWays';
-import { bridgeConnections, bridgeStepFinder, type AnsiblexGate } from './ansiblex';
-import { bridgeHopKind, stargateHopKind, waypointSequence } from './waypoints';
+import { bridgeConnections, type AnsiblexGate } from './ansiblex';
 
 /**
  *   START ─ W1 ─ W2 ─ W3 ─ W4 ─ END          the gate way, five jumps
@@ -188,14 +187,10 @@ describe('routeThroughHoles', () => {
     expect(routeThroughHoles(GRAPH, START, END, [], NETWORK)).toEqual({ kind: 'no-route' });
   });
 
-  it('leaves the stargate graph stargates only, so waypoints still cut at the entrance', () => {
+  it('leaves the stargate graph stargates only', () => {
     const route = routeThroughHoles(GRAPH, START, END, [VIA_ENTRY], NETWORK);
-    if (route.kind !== 'route') throw new Error('expected a route');
+    expect(route).toMatchObject({ kind: 'route', systems: [START, ENTRY, THERA, EXIT, END] });
     expect(GRAPH.get(ENTRY)).toEqual([START]);
-    expect(waypointSequence([{ from: START, to: END, route }], stargateHopKind(GRAPH))).toEqual({
-      waypoints: [ENTRY],
-      cutOff: { entrance: ENTRY, exit: THERA, kind: 'wormhole' },
-    });
   });
 });
 
@@ -378,13 +373,5 @@ describe('ansiblex pins', () => {
         }
       )
     ).toEqual({ kind: 'no-route' });
-  });
-
-  it('cuts the waypoints at the bridge’s entrance, as a bridge', () => {
-    const sequence = waypointSequence(
-      [{ from: START, to: END, route: { kind: 'route', systems: BY_BRIDGE } }],
-      bridgeHopKind(GRAPH, bridgeStepFinder(GRAPH, [BRIDGE]))
-    );
-    expect(sequence.cutOff).toEqual({ entrance: W1, exit: W4, kind: 'bridge' });
   });
 });

@@ -43,7 +43,7 @@ import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { multibuyText, planTrip, type TripOverride } from '@/engine/market/haulingPlan';
 import type { DemandKind, HaulingFlag } from '@/engine/market/haulingMarket';
-import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { formatIsk, formatIskCompact, formatMarketIsk } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
 import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
 import { createLocalSetting } from '@/lib/useLocalSetting';
@@ -267,6 +267,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const cards = isPhone || tableCards;
   const isk = (value: number, digits: number) =>
     isPhone || tableNarrow ? formatIskCompact(value) : formatIsk(value, digits);
+  /** A per-unit price: the Market page's cents-below-10,000 rule. */
+  const price = (value: number) =>
+    isPhone || tableNarrow ? formatIskCompact(value) : formatMarketIsk(value);
 
   const [groups, setGroups] = useState<MarketGroupNode[] | null>(null);
   useEffect(() => {
@@ -545,7 +548,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       className: 'tabular-nums whitespace-nowrap',
       stackAffix: { before: `${t('market.hauling.columns.buy')} ` },
       sortValue: (row) => row.buyLadder[0]?.price,
-      render: (row) => isk(row.buyLadder[0]?.price ?? 0, 2),
+      render: (row) => price(row.buyLadder[0]?.price ?? 0),
     },
     {
       id: 'expected',
@@ -560,7 +563,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         before: `${t(instant ? 'market.hauling.columns.buyOrder' : 'market.hauling.columns.expected')} `,
       },
       sortValue: (row) => row.price,
-      render: (row) => isk(row.price, 2),
+      render: (row) => price(row.price),
     },
     {
       id: 'margin',
