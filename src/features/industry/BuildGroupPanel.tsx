@@ -31,7 +31,12 @@ import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import { rowVolume, totalVolume } from '@/engine/industry/materialVolume';
-import { suggestedOwnedQuantity, type OwnedStockScope } from '@/engine/industry/ownedStock';
+import type { OwnedStockScope } from '@/engine/industry/ownedStock';
+import {
+  clearEveryOwned,
+  ownedStockOffer,
+  takeEveryOffer,
+} from '@/engine/industry/ownedStockOffer';
 import type { MaterialCostLine } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { iskToneClass } from '@/features/character/format';
@@ -54,12 +59,12 @@ import { OwnedStockHint } from './OwnedStockHint';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import {
-  bulkUseDetected,
-  bulkUseNone,
+  applyToGroupOwnedStock,
   groupMaterialTypeIdKey,
   ownedStockView,
   typeIdsFromKey,
 } from './planMaterialsView';
+import { useOwnedStockBulk } from './useOwnedStockBulk';
 import { GroupSlotLine } from './PlanSlotLine';
 import { countJobsByCategory } from './planJobSlots';
 import { hasShoppingList, shoppingListText } from './shoppingList';
@@ -374,38 +379,25 @@ export function BuildGroupPanel({
 
   const setOwnedQuantity = useCallback(
     (typeID: number, quantity: number | undefined) => {
-      updateOwnedStock((next) => {
-        if (quantity === undefined || quantity <= 0) delete next[typeID];
-        else next[typeID] = quantity;
-      });
+      updateOwnedStock((next) => applyToGroupOwnedStock(next, [{ typeID, to: quantity }]));
     },
     [updateOwnedStock]
   );
 
-  // Same rule as the plan-level bulk fill (`planMaterialsView.ts`): every row
-  // whose own "Use assets" offer is showing. Scoped to `buyRows`, not every merged
-  // material — a fully-crafted row (see above) is never bought, so it has no
-  // owned quantity for "Use all" to fill.
-  const bulkDetectedEntries = useMemo(
-    () =>
-      bulkUseDetected(buyRows, (typeID) => ownedStockMap.get(typeID), scopedStock).map(
-        ({ typeID, ownedQuantity }) => [typeID, ownedQuantity] as const
-      ),
-    [buyRows, ownedStockMap, scopedStock]
+  // "Use all" / "Use none", written through the Group Owned Overlay adapter.
+  // Which rows each changes is the owned-stock offer's call
+  // (`ownedStockOffer.ts`), the same one each row's "Use assets" renders.
+  // "Use all" goes over `buyRows`, not every merged material: a fully-crafted
+  // row (see above) is never bought, so it has no offer. "Use none" goes over
+  // every merged material: a material can carry a ledger entry from before it
+  // became fully crafted (see `craftedTypeIds` above), still live in
+  // `ownedStockMap` and still read by `computeGroupRollup` above, though the
+  // Crafted section renders no input for it — "Use none" has to reach it, or
+  // a stray entry becomes permanently stuck.
+  const ownedBulk = useOwnedStockBulk((changes) =>
+    updateOwnedStock((next) => applyToGroupOwnedStock(next, changes))
   );
-  // Unlike `bulkDetectedEntries`, this scans every merged material, not just
-  // `buyRows`: a material can carry an owned-stock ledger entry from before
-  // it became fully crafted (see `craftedTypeIds` above), and that entry is
-  // still live in `ownedStockMap` — still read by `computeGroupRollup` above —
-  // even though the Crafted section renders no input for it. "Use none" has
-  // to be able to reach it, or a stray entry becomes permanently stuck.
-  const bulkClearTypeIds = useMemo(
-    () =>
-      bulkUseNone(rollup.tableMaterials, (typeID) => ownedStockMap.get(typeID)).map(
-        ({ typeID }) => typeID
-      ),
-    [rollup.tableMaterials, ownedStockMap]
-  );
+  const ownedQuantityFor = (typeID: number) => ownedStockMap.get(typeID);
 
   const buyMaterialColumns = useMemo<DataTableColumn<BuyMaterialRow>[]>(
     () => [
@@ -443,10 +435,9 @@ export function BuildGroupPanel({
         header: t('industry.ownedQuantity'),
         align: 'right',
         render: (material) => {
-          const stock = detection.stockFor(material.typeID);
           const owned = ownedStockMap.get(material.typeID);
           const scopedQuantity = detection.scopedQuantityFor(material.typeID);
-          const suggestion = stock ? suggestedOwnedQuantity(scopedQuantity, material.quantity) : 0;
+          const offer = ownedStockOffer(material, scopedQuantity, owned);
           return (
             <span className="flex flex-col items-start gap-0.5 sm:items-end">
               <SourcingInput
@@ -460,14 +451,13 @@ export function BuildGroupPanel({
                 parse={parseOwnedCount}
                 onCommit={(quantity) => setOwnedQuantity(material.typeID, quantity)}
               />
-              {stock && (
+              {offer !== null && (
                 <OwnedStockHint
                   scopedQuantity={scopedQuantity}
                   detection={detection}
                   materialName={nameForType(catalog, material.typeID)}
-                  suggestion={suggestion}
-                  canApply={owned !== suggestion && suggestion > 0}
-                  onApply={() => setOwnedQuantity(material.typeID, suggestion)}
+                  suggestion={offer}
+                  onApply={() => setOwnedQuantity(material.typeID, offer)}
                 />
               )}
             </span>
@@ -848,10 +838,7 @@ export function BuildGroupPanel({
                   <Button
                     size="sm"
                     onClick={() =>
-                      updateOwnedStock((next) => {
-                        for (const [typeID, quantity] of bulkDetectedEntries)
-                          next[typeID] = quantity;
-                      })
+                      ownedBulk.apply(takeEveryOffer(buyRows, ownedQuantityFor, scopedStock), 'all')
                     }
                   >
                     {t('industry.useAllOwned')}
@@ -859,9 +846,10 @@ export function BuildGroupPanel({
                   <Button
                     size="sm"
                     onClick={() =>
-                      updateOwnedStock((next) => {
-                        for (const typeID of bulkClearTypeIds) delete next[typeID];
-                      })
+                      ownedBulk.apply(
+                        clearEveryOwned(rollup.tableMaterials, ownedQuantityFor),
+                        'none'
+                      )
                     }
                   >
                     {t('industry.useNoneOwned')}
@@ -909,6 +897,7 @@ export function BuildGroupPanel({
           onClose={() => setRetargeting(false)}
         />
       )}
+      {ownedBulk.toast}
     </div>
   );
 }

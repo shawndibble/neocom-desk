@@ -11,11 +11,21 @@ import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog
 import { flattenBuildResult } from './resultFlattenCache';
 import { resolveBuildPlan } from './resolveBuildPlan';
 import {
-  bulkUseDetected,
-  bulkUseNone,
+  clearEveryOwned,
+  ownedStockOffer,
+  takeEveryOffer,
+  undoOwnedStockChanges,
+  type OwnedStockChange,
+} from '@/engine/industry/ownedStockOffer';
+import { normalizeMaterialSourcingMap } from '@/engine/industry/sourcing';
+import type { MaterialSourcingMap } from '@/engine/industry/types';
+import { applySourcingPatch } from './sourcingEdits';
+import {
+  applyToGroupOwnedStock,
   groupMaterialTypeIdKey,
   materialTypeIdKey,
   ownedStockView,
+  planSourcingPatches,
   typeIdsFromKey,
 } from './planMaterialsView';
 
@@ -237,51 +247,109 @@ describe('ownedStockView', () => {
   });
 });
 
-describe('bulk owned-stock patches', () => {
-  const rows = [
-    { typeID: 34, quantity: 500 },
-    { typeID: 35, quantity: 10 },
-    { typeID: 36, quantity: 10 },
-    { typeID: 37, quantity: 10 },
-  ];
+// The owned-stock offer (`ownedStockOffer.ts`) through each of its two stores:
+// a plan's sourcing map, written through the same `applySourcingPatch` the
+// plan store folds a `sourcing` change with, and a Build Group's Group Owned
+// Overlay ledger, written the way `BuildGroupPanel` commits it.
+interface StoreUnderTest<S> {
+  name: string;
+  from: (owned: Record<number, number>) => S;
+  ownedFor: (store: S) => (typeID: number) => number | undefined;
+  apply: (store: S, changes: readonly OwnedStockChange[]) => S;
+}
 
-  it.each([
-    {
-      name: 'fills untouched rows, capped at what the row needs',
-      owned: {} as Record<number, number>,
-      expected: [
-        { typeID: 34, ownedQuantity: 200 },
-        { typeID: 35, ownedQuantity: 10 },
-      ],
-    },
-    {
-      // The rows each row's own "Use assets" would fill — a 0 from "Use none"
-      // and a stale typed count included; a row already there is left out.
-      name: 'refreshes a zeroed or stale row, the same rows the per-row offer fills',
-      owned: { 34: 0, 35: 3 } as Record<number, number>,
-      expected: [
-        { typeID: 34, ownedQuantity: 200 },
-        { typeID: 35, ownedQuantity: 10 },
-      ],
-    },
-    {
-      name: 'leaves a row that already holds what it would write',
-      owned: { 34: 200, 35: 10 } as Record<number, number>,
-      expected: [],
-    },
-  ])('use all: $name', ({ owned, expected }) => {
-    const stock = stockOf([
-      [34, 200],
-      [35, 99],
-    ]);
-    expect(bulkUseDetected(rows, (id) => owned[id], stock)).toEqual(expected);
+const planStore: StoreUnderTest<MaterialSourcingMap | undefined> = {
+  name: 'plan sourcing',
+  from: (owned) =>
+    normalizeMaterialSourcingMap(
+      Object.fromEntries(
+        Object.entries(owned).map(([typeID, ownedQuantity]) => [typeID, { ownedQuantity }])
+      )
+    ),
+  ownedFor: (sourcing) => (typeID) => sourcing?.[typeID]?.ownedQuantity,
+  apply: (sourcing, changes) =>
+    planSourcingPatches(changes).reduce(
+      (next, { typeID, patch }) => applySourcingPatch(next, typeID, patch),
+      sourcing
+    ),
+};
+
+const groupStore: StoreUnderTest<Record<number, number>> = {
+  name: 'Group Owned Overlay',
+  // The overlay never holds a 0 (an empty count removes the entry), so a
+  // zeroed row is simply absent there.
+  from: (owned) => Object.fromEntries(Object.entries(owned).filter(([, quantity]) => quantity > 0)),
+  ownedFor: (ledger) => (typeID) => ledger[typeID],
+  apply: (ledger, changes) => {
+    const next = { ...ledger };
+    applyToGroupOwnedStock(next, changes);
+    return next;
+  },
+};
+
+const STORES = [planStore, groupStore] as StoreUnderTest<unknown>[];
+
+describe.each(STORES)('owned-stock offer through $name', (store) => {
+  const BLUEPRINT = 999;
+  const rows = [
+    { typeID: 34, quantity: 500 }, // untouched, stock short of the need
+    { typeID: 35, quantity: 10 }, // zeroed by an earlier "Use none"
+    { typeID: 36, quantity: 10 }, // a stale typed count
+    { typeID: 37, quantity: 10 }, // already at its offer
+    { typeID: 38, quantity: 10 }, // stock well beyond the need
+    { typeID: 39, quantity: 10 }, // no stock detected, a typed count
+    { typeID: BLUEPRINT, quantity: 1, acquisitionTier: { me: 0, te: 0 } },
+  ];
+  const owned = { 35: 0, 36: 3, 37: 10, 39: 7 };
+  const scoped = stockOf([
+    [34, 200],
+    [35, 99],
+    [36, 99],
+    [37, 10],
+    [38, 5000],
+    [BLUEPRINT, 1],
+  ]);
+  const offerFor = (row: (typeof rows)[number], ownedFor: (typeID: number) => number | undefined) =>
+    ownedStockOffer(row, scoped.get(row.typeID)?.quantity ?? 0, ownedFor(row.typeID));
+
+  it(`"Use all" is every row's offer at once: each row takes its own, and none is left offering`, () => {
+    const before = store.from(owned);
+    const after = store.apply(before, takeEveryOffer(rows, store.ownedFor(before), scoped));
+    for (const row of rows) {
+      const offer = offerFor(row, store.ownedFor(before));
+      expect(store.ownedFor(after)(row.typeID)).toBe(offer ?? store.ownedFor(before)(row.typeID));
+      expect(offerFor(row, store.ownedFor(after))).toBeNull();
+    }
   });
 
-  it('use none zeroes every non-zero row, typed or bulk-filled, and nothing else', () => {
-    const owned: Record<number, number> = { 34: 5, 35: 0, 36: 12 };
-    expect(bulkUseNone(rows, (id) => owned[id])).toEqual([
-      { typeID: 34, ownedQuantity: 0 },
-      { typeID: 36, ownedQuantity: 0 },
-    ]);
+  it('Undo puts "Use all" back exactly, an empty row included', () => {
+    const before = store.from(owned);
+    const changes = takeEveryOffer(rows, store.ownedFor(before), scoped);
+    const undone = store.apply(store.apply(before, changes), undoOwnedStockChanges(changes));
+    expect(undone).toEqual(before);
+  });
+
+  it('"Use none" leaves nothing owned, and Undo puts it back exactly', () => {
+    const before = store.from(owned);
+    const changes = clearEveryOwned(rows, store.ownedFor(before));
+    const cleared = store.apply(before, changes);
+    for (const row of rows) expect(store.ownedFor(cleared)(row.typeID) ?? 0).toBe(0);
+    expect(store.apply(cleared, undoOwnedStockChanges(changes))).toEqual(before);
+  });
+});
+
+// Each store keeps its own rule for an empty count, unchanged by sharing the
+// offer: a plan stores the 0 "Use none" writes, the overlay drops the entry.
+describe('"Use none" in each store', () => {
+  const changes = [{ typeID: 34, from: 5, to: 0 }];
+
+  it('writes a 0 into plan sourcing', () => {
+    expect(planSourcingPatches(changes)).toEqual([{ typeID: 34, patch: { ownedQuantity: 0 } }]);
+  });
+
+  it('removes the Group Owned Overlay entry', () => {
+    const ledger: Record<number, number> = { 34: 5, 35: 2 };
+    applyToGroupOwnedStock(ledger, changes);
+    expect(ledger).toEqual({ 35: 2 });
   });
 });

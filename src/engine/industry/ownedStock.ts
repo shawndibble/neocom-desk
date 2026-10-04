@@ -20,7 +20,7 @@
  */
 
 import { isShipBayFlag, type EngineAsset } from '../assetTree';
-import type { MaterialSourcingMap, OwnedStockLocation, OwnedStockScope } from './types';
+import type { OwnedStockLocation, OwnedStockScope } from './types';
 
 // Re-exported from here too: every existing caller of this module already
 // imports its owned-stock types from `./ownedStock`, and the canonical
@@ -278,66 +278,4 @@ export function detectOwnedStock(
  */
 export function suggestedOwnedQuantity(detectedQuantity: number, requiredQuantity: number): number {
   return Math.min(detectedQuantity, requiredQuantity);
-}
-
-export interface OwnedStockSuggestion {
-  typeID: number;
-  ownedQuantity: number;
-}
-
-/**
- * The rows a bulk "use none" clears: those currently carrying a non-zero
- * owned quantity, wherever it came from (hand-typed or an earlier "use all").
- *
- * Unlike `bulkOwnedStockSuggestions`, this *does* overwrite an existing
- * value — clicking "use none" means exactly that for every row, not just the
- * untouched ones. A row already at 0, or with no owned quantity stored at
- * all, is left out of the patch since there is nothing to change.
- */
-export function clearOwnedStockSuggestions(
-  materials: readonly { typeID: number }[],
-  sourcing: MaterialSourcingMap | undefined
-): OwnedStockSuggestion[] {
-  const suggestions: OwnedStockSuggestion[] = [];
-  for (const material of materials) {
-    const owned = sourcing?.[material.typeID]?.ownedQuantity;
-    if (owned === undefined || owned === 0) continue;
-    suggestions.push({ typeID: material.typeID, ownedQuantity: 0 });
-  }
-  return suggestions;
-}
-
-/**
- * The rows a bulk "Use all" fills: exactly the rows whose own "Use assets"
- * offer is showing — detected stock to write (capped at what the row needs),
- * and the row not already holding that number. So "Use all" is every row's
- * offer at once, and the two can never disagree.
- *
- * That includes a row with a number in it. Bulk used to leave any typed value
- * alone, a 0 included, which made "Use none" (it writes 0s) a one-way door:
- * "Use all" afterwards did nothing while each row still offered its stock.
- * The caller confirms the fill with an Undo toast instead.
- */
-export function bulkOwnedStockSuggestions(
-  materials: readonly { typeID: number; quantity: number }[],
-  sourcing: MaterialSourcingMap | undefined,
-  stock: DetectedOwnedStockMap
-): OwnedStockSuggestion[] {
-  const suggestions: OwnedStockSuggestion[] = [];
-  for (const material of materials) {
-    const detected = stock.get(material.typeID);
-    if (!detected) continue;
-    const ownedQuantity = suggestedOwnedQuantity(detected.quantity, material.quantity);
-    // The per-row offer's own rule (OwnedStockHint's `canApply`): something to
-    // write, and not what the row already holds. A typed count — a 0 from
-    // "Use none" included — is refreshed like any other row the offer covers.
-    if (ownedQuantity <= 0 || sourcing?.[material.typeID]?.ownedQuantity === ownedQuantity) {
-      continue;
-    }
-    suggestions.push({
-      typeID: material.typeID,
-      ownedQuantity,
-    });
-  }
-  return suggestions;
 }
