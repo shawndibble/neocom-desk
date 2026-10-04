@@ -216,6 +216,15 @@ export interface HoldStats {
   cargo: number;
   fleetHangar: number;
   miningHold: number;
+  /** The Specialised Holds a hauler may have (see `engine/market/cargoHolds.ts`). */
+  ammoHold: number;
+  planetaryHold: number;
+  commandCenterHold: number;
+  mineralHold: number;
+  gasHold: number;
+  iceHold: number;
+  fuelBay: number;
+  infrastructureHold: number;
 }
 
 export interface JumpDriveStats {
@@ -565,6 +574,16 @@ export const DOGMA_ATTRIBUTE = {
   cargoCapacity: 38,
   fleetHangarCapacity: 912,
   miningHoldCapacity: 1556,
+  // Specialised holds (plain SDE; ids checked by name in the market
+  // attribute dictionary, 2026-10-04).
+  specialAmmoHoldCapacity: 1573,
+  specialPlanetaryCommoditiesHoldCapacity: 1653,
+  specialCommandCenterHoldCapacity: 1646,
+  specialMineralHoldCapacity: 1558,
+  specialGasHoldCapacity: 1557,
+  specialIceHoldCapacity: 3136,
+  specialFuelBayCapacity: 1549,
+  specialColonyResourcesHoldCapacity: 5646,
   jumpDriveRange: 867,
   jumpDriveConsumptionAmount: 868,
   jumpDriveConsumptionType: 866,

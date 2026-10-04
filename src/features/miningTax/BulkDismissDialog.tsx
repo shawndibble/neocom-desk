@@ -39,6 +39,7 @@ export function BulkDismissDialog({
   const { t } = useTranslation();
   const [excluded, setExcluded] = useState<ReadonlySet<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const included = useMemo(() => rows.filter((dr) => !excluded.has(dr.key)), [rows, excluded]);
   const total = included.reduce((sum, dr) => sum + estimatedValueOf(dr), 0);
@@ -58,6 +59,7 @@ export function BulkDismissDialog({
   async function commit() {
     if (included.length === 0) return;
     setSaving(true);
+    setSaveError(null);
     try {
       await dismissEntries(
         included.map((dr) => ({
@@ -70,6 +72,8 @@ export function BulkDismissDialog({
       );
       onDismissed();
       onClose();
+    } catch {
+      setSaveError(t('miningTax.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -119,6 +123,11 @@ export function BulkDismissDialog({
           <span className="text-sm font-semibold tabular-nums">{formatIsk(total)} ISK</span>
         </div>
 
+        {saveError && (
+          <p role="alert" className="text-xs text-danger">
+            {saveError}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"

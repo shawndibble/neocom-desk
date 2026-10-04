@@ -26,7 +26,7 @@ export { standingTier, type StandingTier } from './standingTier';
 export { Modal } from './Modal';
 export { SlideOver } from './SlideOver';
 export type { ModalPlacement } from './Modal';
-export { DataTable, DataTableDenseCell } from './DataTable';
+export { DataTable, DataTableDenseCell, DataTableSortPicker } from './DataTable';
 export type {
   DataTableColumn,
   DataTableExpandableRow,

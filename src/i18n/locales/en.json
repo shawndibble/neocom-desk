@@ -4150,7 +4150,8 @@
     },
     "linkPaymentSelectedAction": "Link payment",
     "linkPaymentOnePayeeHint": "One wallet payment pays one Payee — tick entries for a single Payee to link a payment.",
-    "saveFailed": "Couldn’t save — nothing was changed. Try again."
+    "saveFailed": "Couldn’t save — nothing was changed. Try again.",
+    "saveFailedPartway": "Couldn’t save every day — some may already have changed. Close and check the entry before trying again."
   },
   "assets": {
     "title": "Assets",
@@ -5854,7 +5855,10 @@
         "holdUsed": "{{used}} of {{total}} m³",
         "limitedBudget": "limited by your budget",
         "limitedSpace": "hold full",
-        "limitedSales": "limited by what sells in about a week"
+        "limitedSales": "limited by what sells in about a week",
+        "holdNamed": "{{name}} {{used}} of {{total}} m³",
+        "holdNamedAria": "{{name}}: {{used}} of {{total}} cubic metres used",
+        "inHolds": "in {{holds}}"
       },
       "limit": {
         "sales": "about a week of sales",
@@ -5880,7 +5884,7 @@
         "tabCustom": "Enter m³",
         "searchShips": "Search ships",
         "searchShipsPlaceholder": "Search all ships…",
-        "shipHint": "The cargo hold and fleet hangar this ship has with your skills and nothing fitted. A saved fitting includes cargo expanders.",
+        "shipHint": "The cargo hold, fleet hangar and any specialised hold (ammo, planetary commodities, ore and more) this ship has with your skills and nothing fitted. A saved fitting includes cargo expanders.",
         "noFittings": "No saved fittings for this character yet.",
         "custom": "Custom",
         "customLabel": "Cargo space (m³)",
@@ -5890,7 +5894,9 @@
         "budgetLabel": "Budget (optional)",
         "budgetPlaceholder": "No limit",
         "budgetHint": "The most ISK to spend on one load. Leave it empty for no limit.",
-        "clear": "Clear ship and budget"
+        "clear": "Clear ship and budget",
+        "holdKindLabel": "Takes",
+        "anyItem": "Any item"
       },
       "detail": {
         "about": "About {{section}}",
@@ -5933,6 +5939,18 @@
         "buyOrdersTitle": "Buy orders in {{hub}}",
         "buyOrdersNote": "Dearest first. Shaded rows are the ones the suggested load sells into.",
         "noneProfitable": "No buy order here pays enough to cover the purchase and sales tax."
+      },
+      "holds": {
+        "general": "Cargo hold",
+        "ammo": "Ammo hold",
+        "planetary": "Planetary commodities hold",
+        "commandCenter": "Command center hold",
+        "mineral": "Mineral hold",
+        "gas": "Gas hold",
+        "mining": "Mining hold",
+        "ice": "Ice hold",
+        "fuel": "Fuel bay",
+        "infrastructure": "Infrastructure hold"
       }
     },
     "appraisal": {
