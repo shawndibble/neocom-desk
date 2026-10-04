@@ -118,6 +118,9 @@ export function loadEftFitting(
     const chargeTypeId = nextIsCharge ? resolveCharge(items[i + 1]) : undefined;
     if (nextIsCharge) i++; // its charge, already handled either way
 
+    const rawLine = (lines[item.line - 1] ?? '').trim().replace(/\s*\/offline\s*$/i, '');
+    const hasExplicitQuantity = HAS_QUANTITY_SUFFIX.test(rawLine);
+
     const typeId = resolveTypeId(item.name, typeByName);
     if (typeId === null) {
       unresolved.push({
@@ -125,13 +128,12 @@ export function loadEftFitting(
         text: item.name,
         reason: 'unknown item',
         kind: 'unknown-item',
+        ...(hasExplicitQuantity ? { countWritten: true } : {}),
       });
       continue;
     }
 
     const rack = slotByTypeId[typeId];
-    const rawLine = (lines[item.line - 1] ?? '').trim().replace(/\s*\/offline\s*$/i, '');
-    const hasExplicitQuantity = HAS_QUANTITY_SUFFIX.test(rawLine);
 
     if (rack === 'drone') {
       drones.push({ typeId, quantity: item.quantity, state: 'online' });

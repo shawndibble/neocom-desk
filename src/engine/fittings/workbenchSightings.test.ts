@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EftSlotLookup, EftTypeLookup } from './eftLoader';
 import type { KillmailVictim } from './linkLoader';
+import { gameItemLookup } from './fitCurrency';
 import { groupPopularFits, type HullLoss } from './popularFits';
 import { matchWorkbenchSightings } from './workbenchSightings';
 
@@ -74,8 +75,20 @@ Medium Auxiliary Nano Pump I
 Hammerhead II x3
 Void M x500`;
 
-function match(fits: { id: string; eft: string }[], hullTypeId = HULL) {
-  return matchWorkbenchSightings(fits, POPULAR, hullTypeId, TYPES, SLOTS);
+/** The game's full list of names: everything the catalog has, plus what it leaves out. */
+const isGameItem = gameItemLookup([
+  ...Object.keys(NAMES),
+  'Calm Exotic Filament',
+  'Gravid Warp Scrambler',
+]);
+const WITH_FILAMENT = `${EFT}\n\nCalm Exotic Filament x1`;
+
+function match(
+  fits: { id: string; eft: string }[],
+  hullTypeId = HULL,
+  gameItem: (name: string) => boolean = isGameItem
+) {
+  return matchWorkbenchSightings(fits, POPULAR, hullTypeId, TYPES, SLOTS, gameItem);
 }
 
 describe('matchWorkbenchSightings', () => {
@@ -118,7 +131,23 @@ Medium Auxiliary Nano Pump I`;
     expect(match([{ id: 'h', eft: 'not a fit' }]).size).toBe(0);
   });
 
+  it('still matches a fit carrying a game item the catalog leaves out, like a filament in cargo', () => {
+    expect(match([{ id: 'i', eft: WITH_FILAMENT }]).get('i')?.count).toBe(3);
+  });
+
+  it('leaves out a fit carrying an item the game no longer has', () => {
+    expect(match([{ id: 'j', eft: WITH_FILAMENT }], HULL, () => false).size).toBe(0);
+  });
+
+  it('leaves out a fit with an unread fitted module, even one the game still has', () => {
+    // A mutated module reads as a fitted line: dropped, the rest would equal the group.
+    const mutated = EFT.replace('Warp Scrambler II', 'Warp Scrambler II\nGravid Warp Scrambler');
+    expect(match([{ id: 'k', eft: mutated }]).size).toBe(0);
+  });
+
   it('matches nothing when there are no Popular fits', () => {
-    expect(matchWorkbenchSightings([{ id: 'a', eft: EFT }], [], HULL, TYPES, SLOTS).size).toBe(0);
+    expect(
+      matchWorkbenchSightings([{ id: 'a', eft: EFT }], [], HULL, TYPES, SLOTS, isGameItem).size
+    ).toBe(0);
   });
 });

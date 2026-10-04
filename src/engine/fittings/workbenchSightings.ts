@@ -9,6 +9,15 @@
  * with any line the catalog can't resolve is left out rather than matched on
  * what's left — a dropped module could otherwise make it equal a smaller
  * group it isn't. A missed badge is harmless; a false one is not.
+ *
+ * One exception (issue #2536): the catalog leaves out Abyssal filaments, LP
+ * boosters and the like, which Workbench fits carry in cargo all the time. An
+ * unread line written with a count (`x1`, `countWritten`) was never a fitted
+ * module, so it can't change the key. Such a fit is still matched, so long as
+ * the game still has the item (`isGameItem`, the rule the Out-of-date check
+ * applies): a fit carrying a removed item is out of date, and gets no badge.
+ * An unread line without a count may be a fitted module, so it still rules
+ * the fit out, even when the game has it — a mutated module, say.
  */
 import { loadEftFitting, type EftSlotLookup, type EftTypeLookup } from './eftLoader';
 import { popularFitKey, type PopularFit } from './popularFits';
@@ -26,7 +35,8 @@ export function matchWorkbenchSightings(
   popular: readonly PopularFit[],
   hullTypeId: number,
   typeByName: EftTypeLookup,
-  slotByTypeId: EftSlotLookup
+  slotByTypeId: EftSlotLookup,
+  isGameItem: (name: string) => boolean
 ): Map<string, WorkbenchSighting> {
   const sightings = new Map<string, WorkbenchSighting>();
   const byKey = new Map(
@@ -38,7 +48,12 @@ export function matchWorkbenchSightings(
 
   for (const fit of fits) {
     const parts = loadEftFitting(fit.eft, typeByName, slotByTypeId);
-    if (parts.hullTypeId !== hullTypeId || parts.unresolved.length > 0) continue;
+    if (parts.hullTypeId !== hullTypeId) continue;
+    const onlyUnreadCargo = parts.unresolved.every(
+      (warning) =>
+        warning.kind === 'unknown-item' && warning.countWritten === true && isGameItem(warning.text)
+    );
+    if (!onlyUnreadCargo) continue;
     const group = byKey.get(popularFitKey(parts.modules));
     if (group) sightings.set(fit.id, { count: group.count, lastSeen: group.lastSeen });
   }

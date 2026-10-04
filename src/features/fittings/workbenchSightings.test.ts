@@ -20,6 +20,8 @@ vi.mock('@/features/skills/typeCatalog', () => ({
 }));
 vi.mock('@/sde/loadSde', () => ({
   loadFittingSlots: () => Promise.resolve({ 100: 'high', 200: 'medium', 300: 'low' }),
+  // The game's full list of names, which has the filaments the catalog leaves out (#2536).
+  loadGameTypeNames: () => Promise.resolve(['Vexor', 'Calm Exotic Filament']),
 }));
 
 import { loadWorkbenchSightings } from './workbenchSightings';
@@ -63,6 +65,12 @@ describe('loadWorkbenchSightings', () => {
     const sightings = await loadWorkbenchSightings(626, [MATCHING, OTHER]);
     expect(loadPopularFitsMock).toHaveBeenCalledWith(626);
     expect(sightings).toEqual(new Map([['a', { count: 4, lastSeen: '2026-09-20T00:00:00Z' }]]));
+  });
+
+  it("badges a fit carrying a filament the catalog can't read, by the game's names", async () => {
+    loadPopularFitsMock.mockResolvedValue({ ok: true, fits: [POPULAR] });
+    const withFilament = wbFit('c', `${MATCHING.eft}\n\nCalm Exotic Filament x1`);
+    expect((await loadWorkbenchSightings(626, [withFilament])).get('c')?.count).toBe(4);
   });
 
   it('badges nothing when zKillboard is unreachable', async () => {

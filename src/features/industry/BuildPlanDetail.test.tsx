@@ -1522,6 +1522,50 @@ describe('BuildPlanDetail Use all / Use none', () => {
     expect(onSourcing).toHaveBeenLastCalledWith([{ typeID: 34, patch: { ownedQuantity: 0 } }]);
   });
 
+  it('leaves a Blueprint Acquisition row alone even with a packaged blueprint in a hangar', async () => {
+    const user = userEvent.setup();
+    const onSourcing = vi.fn();
+    const [source] = TRITANIUM_IN_JITA.sources;
+    const packagedBlueprint = {
+      ...source!.assets[0]!,
+      item_id: 2,
+      type_id: ENTRY.blueprintTypeID,
+      quantity: 1,
+    };
+    const withPackagedBlueprint: OwnedStockSnapshot = {
+      ...TRITANIUM_IN_JITA,
+      sources: [{ ...source!, assets: [...source!.assets, packagedBlueprint] }],
+    };
+    render(
+      <Harness
+        plan={{ runs: 1 }}
+        ownedStockSnapshot={withPackagedBlueprint}
+        onSourcing={onSourcing}
+      />
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Use all' }));
+
+    expect(onSourcing).toHaveBeenLastCalledWith([{ typeID: 34, patch: { ownedQuantity: 100 } }]);
+  });
+
+  it('Use none still clears a Have a Blueprint Acquisition row was given', async () => {
+    const user = userEvent.setup();
+    const onSourcing = vi.fn();
+    render(
+      <Harness
+        plan={{ runs: 1, materialSourcing: { [ENTRY.blueprintTypeID]: { ownedQuantity: 1 } } }}
+        onSourcing={onSourcing}
+      />
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Use none' }));
+
+    expect(onSourcing).toHaveBeenLastCalledWith([
+      { typeID: ENTRY.blueprintTypeID, patch: { ownedQuantity: 0 } },
+    ]);
+  });
+
   it('says there is nothing to fill instead of doing nothing silently', async () => {
     const user = userEvent.setup();
     const onSourcing = vi.fn();
