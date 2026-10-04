@@ -145,10 +145,30 @@ export function buildTheraConnectionRows(
   return rows;
 }
 
+/**
+ * Where a hole comes out, as the page filters it (issue #2499): K-space is
+ * every exit outside J-space, then one band each.
+ */
+export type TheraExit = 'kspace' | SpaceKind;
+export const THERA_EXITS: readonly TheraExit[] = ['kspace', ...SPACE_KINDS];
+
 export interface TheraConnectionFilter {
   hub: TheraHub | 'all';
   /** Keep connections passing at least this size; `any` keeps every one. */
   shipSize: WormholeShipSize | 'any';
+  /** Absent keeps every exit. */
+  exit?: TheraExit;
+}
+
+/**
+ * K-space keeps an exit whose band nothing could tell (no security on record,
+ * no feed class): its name is not a J-space one, so it is a gated system; it
+ * just can't sit under one band.
+ */
+function exitMatches(row: TheraConnectionRow, exit: TheraExit | undefined): boolean {
+  if (exit === undefined) return true;
+  if (exit === 'kspace') return row.exitSpace !== 'wormhole';
+  return row.exitSpace === exit;
 }
 
 export function filterTheraConnections(
@@ -158,6 +178,7 @@ export function filterTheraConnections(
   const minSize = filter.shipSize === 'any' ? -1 : shipSizeRank(filter.shipSize);
   return rows.filter((row) => {
     if (filter.hub !== 'all' && row.hub !== filter.hub) return false;
+    if (!exitMatches(row, filter.exit)) return false;
     if (minSize >= 0) {
       if (row.maxShipSize === null) return false;
       if (shipSizeRank(row.maxShipSize) < minSize) return false;
@@ -166,43 +187,36 @@ export function filterTheraConnections(
   });
 }
 
+/**
+ * How many holes each Hub option would show under the rest of the filter —
+ * the counts on the Hub control, so they ignore the hub picked.
+ */
+export function countTheraConnectionsByHub(
+  rows: readonly TheraConnectionRow[],
+  filter: TheraConnectionFilter
+): Record<TheraHub | 'all', number> {
+  const counts: Record<TheraHub | 'all', number> = { all: 0, thera: 0, turnur: 0 };
+  for (const row of filterTheraConnections(rows, { ...filter, hub: 'all' })) {
+    counts.all += 1;
+    counts[row.hub] += 1;
+  }
+  return counts;
+}
+
 /** The jumps column's sort value: a known distance, else nothing (sorted last). */
 export function jumpsSortValue(row: TheraConnectionRow): number | undefined {
   return row.jumps.kind === 'known' ? row.jumps.jumps : undefined;
 }
 
-/** The page's four columns, one per space a hole comes out in (issue #2473). */
-export type TheraBands = Readonly<Record<SpaceKind, readonly TheraConnectionRow[]>>;
-
-const byLongestLife = (a: TheraConnectionRow, b: TheraConnectionRow) =>
-  b.remainingMs - a.remainingMs || (a.exitSystemName ?? '').localeCompare(b.exitSystemName ?? '');
-
-/** Nearest first; a row with no known distance goes after every one with one. */
-function byNearest(a: TheraConnectionRow, b: TheraConnectionRow): number {
-  const ja = jumpsSortValue(a) ?? Infinity;
-  const jb = jumpsSortValue(b) ?? Infinity;
-  return ja === jb ? byLongestLife(a, b) : ja - jb;
-}
-
 /**
- * Groups rows into Highsec, Lowsec, Nullsec and J-space by the band
- * `buildTheraConnectionRows` gave each exit — the same banding Route Safety's
- * summary uses. A k-space column reads nearest first; J-space has no gate
- * distance, so it reads longest-lived first. A row whose band nothing could
- * tell (no security on record and no feed class) has no column and is left out.
+ * Longest remaining life first, then by exit name. The page hands rows to its
+ * table in this order: the table's jumps sort is stable, so rows with the same
+ * distance, or none (every J-space exit), keep it.
  */
-export function groupTheraConnectionsByBand(rows: readonly TheraConnectionRow[]): TheraBands {
-  const bands: Record<SpaceKind, TheraConnectionRow[]> = {
-    highsec: [],
-    lowsec: [],
-    nullsec: [],
-    wormhole: [],
-  };
-  for (const row of rows) {
-    if (row.exitSpace !== null) bands[row.exitSpace].push(row);
-  }
-  for (const band of SPACE_KINDS) {
-    bands[band].sort(band === 'wormhole' ? byLongestLife : byNearest);
-  }
-  return bands;
+export function longestLifeFirst(rows: readonly TheraConnectionRow[]): TheraConnectionRow[] {
+  return [...rows].sort(
+    (a, b) =>
+      b.remainingMs - a.remainingMs ||
+      (a.exitSystemName ?? '').localeCompare(b.exitSystemName ?? '')
+  );
 }

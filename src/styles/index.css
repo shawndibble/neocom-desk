@@ -606,6 +606,15 @@
     padding-left: 0.5rem;
   }
 
+  /* `below` (Thera's signature pair and Copy): a third line of its own,
+     after the meta line and anything closing it. Full basis, so it can
+     never share a line with the meta values however short they are. */
+  .dt-stacked.dt-stack-dense td.dt-edge-below {
+    order: 3;
+    flex: 1 1 100%;
+    padding-top: 0.25rem;
+  }
+
   /* Opt-in (`dt-dense-tight` on the table, Hauling): a card whose tick box,
      title, headline figure and More actions button all sit on line one,
      centred on each other, with the `end` box closing line two. Without it
