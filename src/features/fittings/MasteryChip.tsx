@@ -111,6 +111,9 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
   const untrained = visible.filter((row) => row.status !== 'trained');
   const totalSeconds = untrained.reduce((sum, row) => sum + row.seconds, 0);
   const planEntries = targetPlanEntries(target);
+  const unplanned = untrained.filter(
+    (row) => !isEntryCovered(planEntries, row.skillTypeID, row.targetLevel)
+  );
 
   async function add(entries: readonly PlanEntry[]) {
     const result = await target.addEntries(entries, hullName);
@@ -191,6 +194,15 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
               </div>
             )}
             <p className="text-xs text-text-dim">{t('fittings.mastery.suggestedNote')}</p>
+            {untrained.length > 0 && unplanned.length < untrained.length && (
+              <p className="text-xs text-text-dim">
+                {unplanned.length === 0
+                  ? t('skills.fitCheck.allPlanned')
+                  : t('skills.fitCheck.alreadyPlanned', {
+                      count: untrained.length - unplanned.length,
+                    })}
+              </p>
+            )}
             {target.plans !== undefined && (
               <div className="flex flex-wrap items-center justify-end gap-2">
                 {untrained.length > 0 && (
@@ -199,13 +211,14 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
                   </span>
                 )}
                 <TargetPlanPicker target={target} />
-                {untrained.length > 0 && (
+                {unplanned.length > 0 && (
                   <Button
                     size="sm"
                     variant="primary"
+                    className="transition-transform active:scale-95"
                     onClick={() =>
                       void add(
-                        untrained.map((row) => ({
+                        unplanned.map((row) => ({
                           skillTypeID: row.skillTypeID,
                           targetLevel: row.targetLevel,
                         }))

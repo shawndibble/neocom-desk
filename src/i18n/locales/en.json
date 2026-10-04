@@ -1712,7 +1712,10 @@
       "inPlan": "Planned",
       "addedToast_one": "Added {{count}} skill to {{plan}}",
       "addedToast_other": "Added {{count}} skills to {{plan}}",
-      "addedToastUndo": "Undo"
+      "addedToastUndo": "Undo",
+      "alreadyPlanned_one": "{{count}} skill is already in the Skill Plan",
+      "alreadyPlanned_other": "{{count}} skills are already in the Skill Plan",
+      "allPlanned": "All of these skills are already in the Skill Plan"
     },
     "requiredSkills": {
       "title": "Required Skills",
