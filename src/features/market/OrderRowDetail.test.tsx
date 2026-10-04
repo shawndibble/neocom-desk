@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { configureClipboard } from '@/lib/clipboard';
 import type { RegionOrder } from '@/esi/endpoints';
@@ -45,7 +46,8 @@ function renderDetail(overrides: Partial<Parameters<typeof OrderRowDetail>[0]> =
       onFilterToStation={vi.fn()}
       now={NOW}
       {...overrides}
-    />
+    />,
+    { wrapper: MemoryRouter }
   );
 }
 

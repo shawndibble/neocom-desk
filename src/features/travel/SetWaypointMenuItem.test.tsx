@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { RowActionsMenu } from '@/components/ui';
 import { db } from '@/db';
@@ -27,14 +28,22 @@ async function seed(scopes: string[]) {
   });
 }
 
-function openMenu() {
+function Where() {
+  const location = useLocation();
+  return <p data-testid="where">{location.pathname + location.search}</p>;
+}
+
+function openMenu(locationId = JITA_4_4) {
   render(
-    <RowActionsMenu
-      name="row"
-      items={<SetWaypointMenuItem locationId={JITA_4_4} placeName={PLACE} />}
-    >
-      <div>row</div>
-    </RowActionsMenu>
+    <MemoryRouter>
+      <RowActionsMenu
+        name="row"
+        items={<SetWaypointMenuItem locationId={locationId} placeName={PLACE} />}
+      >
+        <div>row</div>
+      </RowActionsMenu>
+      <Where />
+    </MemoryRouter>
   );
   fireEvent.contextMenu(screen.getByText('row'));
 }
@@ -91,5 +100,16 @@ describe('SetWaypointMenuItem', () => {
     await userEvent.click(screen.getByRole('menuitem', { name: 'Set waypoint in game' }));
 
     expect(postAutopilotWaypointMock).not.toHaveBeenCalled();
+  });
+
+  it('offers View route to the place, opening Route Safety with its system as the stop', async () => {
+    const user = userEvent.setup();
+    openMenu(30000142);
+
+    await user.click(await screen.findByRole('menuitem', { name: 'View route' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('where')).toHaveTextContent('/travel/route?stops=30000142')
+    );
   });
 });

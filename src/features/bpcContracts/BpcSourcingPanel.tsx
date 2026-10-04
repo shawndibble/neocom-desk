@@ -1267,7 +1267,8 @@ export function BpcSourcingPanel() {
         // The dense phone card has no header row, and a bare "7" beside a
         // system name says nothing about what it counts.
         stackAffix: { before: t('bpcContracts.mobile.jumpsAffix') },
-        render: (row) => renderJumpsCell(bpcRowJumps(row), t, 'bpcContracts.jumpsUnavailableHint'),
+        render: (row) =>
+          renderJumpsCell(bpcRowJumps(row), t, 'bpcContracts.jumpsUnavailableHint', row.systemId),
       },
       me: {
         id: 'me',

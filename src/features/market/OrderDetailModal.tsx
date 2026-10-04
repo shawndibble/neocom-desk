@@ -333,7 +333,11 @@ function ScopeRow({
   // `stationScopeState` fills those fields with 0, so they are only ever read
   // when the deep book actually supplied them.
   const countsKnown = rival.ordersBeatingMe > 0;
-  const distanceText = jumps ? <JumpsAwayText result={jumps} t={t} /> : (distance ?? '');
+  const distanceText = jumps ? (
+    <JumpsAwayText result={jumps} t={t} locationId={rival.locationId} />
+  ) : (
+    (distance ?? '')
+  );
   const whoText = countsKnown
     ? [
         t('market.orders.rowSummary.sellersUnderMe', { count: rival.ordersBeatingMe }),

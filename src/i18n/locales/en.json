@@ -7832,6 +7832,10 @@
     "waypoints": {
       "action": "Set waypoints in game",
       "menuItem": "Set waypoint in game",
+      "viewRoute": "View route",
+      "viewRouteTo": "View route to {{placeName}}",
+      "viewRouteResolving": "Finding route…",
+      "viewRouteUnavailable": "Route unavailable — couldn't tell which system that is.",
       "menuSending": "Setting waypoint…",
       "sending": "Setting waypoints…",
       "character": "Character to set waypoints for",

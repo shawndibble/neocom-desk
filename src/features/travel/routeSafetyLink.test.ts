@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { legPinsParam, routeViaHref } from './routeSafetyLink';
+import { legPinsParam, routeToHref, routeViaHref } from './routeSafetyLink';
 
 describe('legPinsParam', () => {
   const codec = legPinsParam();
@@ -22,5 +22,15 @@ describe('legPinsParam', () => {
 describe('routeViaHref', () => {
   it('opens Route Safety from the origin, holes on, the hole pinned for the first leg', () => {
     expect(routeViaHref(30000142, 'abc12')).toBe('/travel/route?from=30000142&wh=1&pin=abc12');
+  });
+});
+
+describe('routeToHref', () => {
+  it('opens Route Safety to the system, leaving the start to the page (the current system)', () => {
+    expect(routeToHref(30000142)).toBe('/travel/route?stops=30000142');
+  });
+
+  it('names the start when the count is measured from somewhere else', () => {
+    expect(routeToHref(30000142, 30002187)).toBe('/travel/route?from=30002187&stops=30000142');
   });
 });

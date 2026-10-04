@@ -89,3 +89,15 @@ export function routeViaHref(originId: number, holeId: string): string {
   for (const [key, value] of Object.entries(values)) if (value !== null) params.set(key, value);
   return `${tabPath(TRAVEL_TABS, 'route')}?${params.toString()}`;
 }
+
+/**
+ * Route Safety to one system: what "View route" opens. With no `fromId` the
+ * page starts from the Character's current system on its own; a courier
+ * contract passes its pickup system, since that is where its jumps begin.
+ */
+export function routeToHref(systemId: number, fromId?: number | null): string {
+  const params = new URLSearchParams();
+  if (fromId != null) params.set('from', String(fromId));
+  params.set('stops', ROUTE_PARAMS.stops.serialize([systemId]) ?? '');
+  return `${tabPath(TRAVEL_TABS, 'route')}?${params.toString()}`;
+}
