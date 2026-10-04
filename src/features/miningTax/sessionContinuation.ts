@@ -37,15 +37,17 @@ export interface SessionContinuation {
  * mode themselves.
  */
 export function findSessionContinuations(rows: readonly DisplayRow[]): SessionContinuation[] {
-  const assignedByDay = new Map<string, { member: MiningTaxAssignmentRecord; dr: DisplayRow }[]>();
+  // Keyed by the day *after* each Assignment's own, so an unassigned entry
+  // finds the session it may continue with one lookup.
+  const byFollowingDay = new Map<string, { member: MiningTaxAssignmentRecord; dr: DisplayRow }[]>();
   for (const dr of rows) {
     for (const { assignment } of allMembers(dr)) {
       // A dismissed slice is "not taxed", not another Payee's claim on the day.
       if (assignment.status === 'dismissed') continue;
-      const key = `${assignment.characterId}:${assignment.solarSystemId}:${assignment.date}`;
-      const list = assignedByDay.get(key) ?? [];
+      const key = `${assignment.characterId}:${assignment.solarSystemId}:${nextEveDate(assignment.date)}`;
+      const list = byFollowingDay.get(key) ?? [];
       list.push({ member: assignment, dr });
-      assignedByDay.set(key, list);
+      byFollowingDay.set(key, list);
     }
   }
 
@@ -54,12 +56,7 @@ export function findSessionContinuations(rows: readonly DisplayRow[]): SessionCo
     if (dr.assignment || dr.row.assignments.length > 0) continue;
     const { characterId } = dr.row;
     const { solarSystemId, date } = dr.row.entry;
-    const candidates = [...assignedByDay.entries()]
-      .filter(([key]) => {
-        const [c, s, d] = key.split(':');
-        return Number(c) === characterId && Number(s) === solarSystemId && nextEveDate(d) === date;
-      })
-      .flatMap(([, list]) => list);
+    const candidates = byFollowingDay.get(`${characterId}:${solarSystemId}:${date}`) ?? [];
     if (candidates.length !== 1) continue;
     const [{ member, dr: previousRow }] = candidates;
     if (member.status !== 'outstanding' || member.payeeId === undefined) continue;

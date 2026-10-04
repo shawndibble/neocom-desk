@@ -4029,7 +4029,8 @@
       "moveToLabel": "Move them to…",
       "moveAndDelete": "Move and delete",
       "deleteAnyway": "Delete anyway",
-      "deleteAnywayHint": "Deleting anyway keeps those entries, but they will show as \"Unknown Payee\" until you assign them again."
+      "deleteAnywayHint": "Deleting anyway keeps those entries, but they will show as \"Unknown Payee\" until you assign them again.",
+      "deleteFailed": "Couldn’t delete {{name}} — nothing was changed. Try again."
     },
     "settleUp": {
       "entriesSummary_one": "{{count}} entry · {{range}}",
@@ -4067,7 +4068,8 @@
       "remember": "Remember {{name}} as who {{payee}} is paid",
       "confirm_one": "Mark {{count}} paid with this payment",
       "confirm_other": "Mark {{count}} paid with this payment",
-      "empty": "No unlinked wallet payments found. Payments appear here once ESI shows them in your wallet journal."
+      "empty": "No unlinked wallet payments found. Payments appear here once ESI shows them in your wallet journal.",
+      "rememberFailed": "Payment linked, but couldn’t remember who {{payee}} is paid. You can close this."
     },
     "attention": {
       "title_one": "{{count}} thing needs attention",
@@ -4149,7 +4151,8 @@
       "settleUpPayee": "Settle up {{payee}}"
     },
     "linkPaymentSelectedAction": "Link payment",
-    "linkPaymentOnePayeeHint": "One wallet payment pays one Payee — tick entries for a single Payee to link a payment."
+    "linkPaymentOnePayeeHint": "One wallet payment pays one Payee — tick entries for a single Payee to link a payment.",
+    "saveFailed": "Couldn’t save — nothing was changed. Try again."
   },
   "assets": {
     "title": "Assets",

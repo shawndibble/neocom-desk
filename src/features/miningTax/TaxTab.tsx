@@ -611,10 +611,11 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     return pricesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, hubId, date);
   }
 
-  async function continueSession(continuation: SessionContinuation): Promise<void> {
+  /** Continues one session; `false` when there was nothing to write (its Payee is gone). */
+  async function continueSession(continuation: SessionContinuation): Promise<boolean> {
     const { next, previous } = continuation;
     const payee = allPayees.find((p) => p.id === continuation.payeeId);
-    if (!payee) return;
+    if (!payee) return false;
     const wasCombined = previous.groupId !== undefined;
     const records = await joinAssignments(
       [
@@ -653,6 +654,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
         : undefined,
     });
     refresh();
+    return true;
   }
 
   async function handleContinue(continuation: SessionContinuation) {
@@ -681,13 +683,17 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     for (const c of fresh) autoContinuedRef.current.add(c.next.key);
     void (async () => {
       for (const c of fresh) {
+        let continued = false;
         try {
-          await continueSession(c);
+          continued = await continueSession(c);
         } catch {
           // Claimed meanwhile, or the write failed: the refresh shows what
-          // actually exists, and the offer stays for the pilot to retry.
+          // actually exists.
           refresh();
         }
+        // Not continued: bring the offer back as a card so the pilot can retry
+        // or choose, rather than it vanishing until the next page load.
+        if (!continued) setAutoSkip((previous) => new Set(previous).add(c.next.key));
       }
     })();
     // `continueSession` closes over `allPayees`/`pricesFor`/`t`/`refresh`,
@@ -1743,37 +1749,41 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                 )}
               </div>
 
-              <section aria-labelledby="mining-tax-open" className="space-y-2">
-                <h2
-                  id="mining-tax-open"
-                  className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-                >
-                  {t('miningTax.sections.open', { count: openRows.length })}
-                </h2>
-                {openRows.length === 0 ? (
-                  <p className="rounded-xs border border-dashed border-line px-3 py-3 text-xs text-text-dim">
-                    {t('miningTax.sections.openEmpty')}
-                  </p>
-                ) : (
-                  <Panel padded={false}>
-                    <div className="overflow-x-auto">
-                      <DataTable
-                        {...taxExport.tableProps}
-                        columns={openColumns}
-                        rows={openRows}
-                        className="sm:table-fixed"
-                        rowKey={(dr) => dr.key}
-                        label={t('miningTax.sections.openLabel')}
-                        {...taxSort}
-                        mobileSort={openRows.length > 1}
-                        stackLayout="dense"
-                        rowClassName={rowClassName}
-                        onRowClick={(dr) => setDetailTarget(dr)}
-                      />
-                    </div>
-                  </Panel>
-                )}
-              </section>
+              {/* An empty ledger is EmptyState's to explain below; "nothing
+                  open — every entry is paid" would contradict it. */}
+              {visibleRows.length > 0 && (
+                <section aria-labelledby="mining-tax-open" className="space-y-2">
+                  <h2
+                    id="mining-tax-open"
+                    className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                  >
+                    {t('miningTax.sections.open', { count: openRows.length })}
+                  </h2>
+                  {openRows.length === 0 ? (
+                    <p className="rounded-xs border border-dashed border-line px-3 py-3 text-xs text-text-dim">
+                      {t('miningTax.sections.openEmpty')}
+                    </p>
+                  ) : (
+                    <Panel padded={false}>
+                      <div className="overflow-x-auto">
+                        <DataTable
+                          {...taxExport.tableProps}
+                          columns={openColumns}
+                          rows={openRows}
+                          className="sm:table-fixed"
+                          rowKey={(dr) => dr.key}
+                          label={t('miningTax.sections.openLabel')}
+                          {...taxSort}
+                          mobileSort={openRows.length > 1}
+                          stackLayout="dense"
+                          rowClassName={rowClassName}
+                          onRowClick={(dr) => setDetailTarget(dr)}
+                        />
+                      </div>
+                    </Panel>
+                  )}
+                </section>
+              )}
 
               {historyRows.length > 0 && (
                 <section aria-labelledby="mining-tax-history" className="space-y-2">

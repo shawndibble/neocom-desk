@@ -120,6 +120,8 @@ export function PayeeManagerDialog({
   // the dialog is for. An empty list shows it regardless (see `showForm`).
   const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Shown above the list: the add/edit form (and its own error line) may be closed.
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletingPayee, setDeletingPayee] = useState<PayeeRecord | null>(null);
   const [moveTargetId, setMoveTargetId] = useState<string>('');
   // Set by the row menu's Delete item, acted on once the menu has closed: the
@@ -211,8 +213,14 @@ export function PayeeManagerDialog({
 
   async function handleDelete(payee: PayeeRecord, moveTo?: PayeeOwed & { targetId: string }) {
     // Move first: a failed move must leave the Payee (and its entries' label) intact.
-    if (moveTo) await moveAssignmentsToPayee(moveTo.assignments, moveTo.targetId);
-    await deletePayee(payee);
+    setDeleteError(null);
+    try {
+      if (moveTo) await moveAssignmentsToPayee(moveTo.assignments, moveTo.targetId);
+      await deletePayee(payee);
+    } catch {
+      setDeleteError(t('miningTax.payees.deleteFailed', { name: payee.name }));
+      return;
+    }
     if (draft.id === payee.id) closeForm();
     await refresh();
     onChanged();
@@ -259,6 +267,11 @@ export function PayeeManagerDialog({
           </div>
         )}
 
+        {deleteError && (
+          <p role="alert" className="text-xs text-danger">
+            {deleteError}
+          </p>
+        )}
         {payees.length === 0 ? (
           <p className="text-xs text-text-dim">{t('miningTax.payeesEmpty')}</p>
         ) : (

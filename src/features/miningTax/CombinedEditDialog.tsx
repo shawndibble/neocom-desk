@@ -77,6 +77,7 @@ export function CombinedEditDialog({
   // reports it (plain digits). Absent or blank means "untouched".
   const [overrides, setOverrides] = useState<Record<string, Record<number, string>>>({});
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   // Unlocking only opens the fields: nothing is written until Save, and Save
   // corrects the figures without un-paying anything — cancelling leaves the
   // entry exactly as it was.
@@ -119,12 +120,15 @@ export function CombinedEditDialog({
   async function handleSave() {
     if (!payeeId || !pctValid || locked) return;
     setSaving(true);
+    setSaveError(null);
     try {
       await updateCombinedAssignments(
         current.map((m) => m.assignment),
         { payeeId, taxPct: pct, members: Object.fromEntries(values) }
       );
       onSaved();
+    } catch {
+      setSaveError(t('miningTax.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -270,6 +274,11 @@ export function CombinedEditDialog({
           </div>
         </div>
 
+        {saveError && (
+          <p role="alert" className="text-xs text-danger">
+            {saveError}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"

@@ -75,6 +75,9 @@ export function LinkWalletPaymentDialog({
   const [valueText, setValueText] = useState('');
   const [valueParses, setValueParses] = useState(true);
   const [remember, setRemember] = useState(true);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // Set once the entries are marked paid, so a retry after a later failure can't record it twice.
+  const [recorded, setRecorded] = useState(false);
   const [saving, setSaving] = useState(false);
 
   function ticksFor(payment: MadePayment | null): ReadonlySet<string> {
@@ -144,6 +147,7 @@ export function LinkWalletPaymentDialog({
   async function commit() {
     if (!selected || included.length === 0 || !amountValid || paymentAmount === null) return;
     setSaving(true);
+    setSaveError(null);
     try {
       const link = [{ refId: selected.refId, source: 'manual' as const }];
       await markAssignmentsPaid(
@@ -155,14 +159,27 @@ export function LinkWalletPaymentDialog({
           ...(selected.kind === 'journal' ? { journalLinks: link } : { contractLinks: link }),
         }
       );
+    } catch {
+      setSaveError(t('miningTax.saveFailed'));
+      setSaving(false);
+      return;
+    }
+    setRecorded(true);
+    try {
       if (remember && selected.counterpartyId !== undefined) {
         await rememberPayeeEntity(payee, selected.counterpartyId);
       }
+    } catch {
+      // The payment is recorded; only learning who the Payee is paid failed.
+      // Say so and keep the dialog open, rather than closing as if all went.
       onLinked();
-      onClose();
-    } finally {
+      setSaveError(t('miningTax.linkWallet.rememberFailed', { payee: payee.name }));
       setSaving(false);
+      return;
     }
+    setSaving(false);
+    onLinked();
+    onClose();
   }
 
   return (
@@ -330,10 +347,15 @@ export function LinkWalletPaymentDialog({
           </label>
         )}
 
+        {saveError && (
+          <p role="alert" className="text-xs text-danger">
+            {saveError}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"
-            disabled={!selected || included.length === 0 || !amountValid || saving}
+            disabled={!selected || included.length === 0 || !amountValid || saving || recorded}
             onClick={() => void commit()}
           >
             {t('miningTax.linkWallet.confirm', { count: included.length })}

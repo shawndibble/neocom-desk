@@ -83,6 +83,7 @@ export function SettleUpDialog({
   const [method, setMethod] = useState<MiningTaxPaymentMethod>('donation');
   const [contractId, setContractId] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   // "Sent a different amount?": the ids ticked when it opened, which each new
   // figure re-allocates over (and closing it restores). `null` while closed.
@@ -192,6 +193,7 @@ export function SettleUpDialog({
   async function commit(withPayment: boolean) {
     if (included.length === 0) return;
     setSaving(true);
+    setSaveError(null);
     try {
       await markAssignmentsPaid(
         included.map((r) => r.assignment),
@@ -199,6 +201,8 @@ export function SettleUpDialog({
       );
       onPaid();
       onClose();
+    } catch {
+      setSaveError(t('miningTax.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -417,6 +421,11 @@ export function SettleUpDialog({
           )}
         </p>
 
+        {saveError && (
+          <p role="alert" className="text-xs text-danger">
+            {saveError}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"

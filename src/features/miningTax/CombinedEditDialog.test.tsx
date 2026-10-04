@@ -131,4 +131,12 @@ describe('CombinedEditDialog', () => {
     expect(screen.getByRole('button', { name: 'Save all 2 days' })).toBeEnabled();
     expect(assignmentsMock.updateCombinedAssignments).not.toHaveBeenCalled();
   });
+
+  it('says so when the save fails, and stays open', async () => {
+    assignmentsMock.updateCombinedAssignments.mockRejectedValue(new Error('quota'));
+    const { onSaved } = renderDialog([member('d3', '2026-10-03'), member('d4', '2026-10-04')]);
+    fireEvent.click(screen.getByRole('button', { name: 'Save all 2 days' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn’t save/);
+    expect(onSaved).not.toHaveBeenCalled();
+  });
 });
