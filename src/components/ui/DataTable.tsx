@@ -142,10 +142,13 @@ export interface DataTableColumn<T> {
    * 11px meta line, where a control is neither tappable nor readable. A
    * `start` cell (a row-selection checkbox) is centred across both lines; an
    * `end` cell (Hauling's Bring box) closes the second line at its right end,
-   * leaving the title line its full width. At most one column per edge;
-   * elsewhere (the labelled stack, the table) it is an ordinary cell.
+   * leaving the title line its full width. A `below` cell takes a third line
+   * of its own under the meta line, for a value and its control that would
+   * crowd line two (Thera's signature pair and Copy button). At most one
+   * column per edge; elsewhere (the labelled stack, the table) it is an
+   * ordinary cell.
    */
-  stackEdge?: 'start' | 'end';
+  stackEdge?: 'start' | 'end' | 'below';
 }
 
 /**
@@ -384,6 +387,15 @@ interface DataTableProps<T> {
    * unless the group sets `allWidths`.
    */
   groupBy?: DataTableGroupBy<T>;
+  /**
+   * A row that is not a record but a note between records — Route Safety's
+   * wormhole jump between two systems (issue #2476). Return its content to
+   * draw the row as one cell across every column (and one unlabelled line on
+   * a phone card); `null` draws the row as usual. Such a row never expands,
+   * never activates `onRowClick`, and never goes through a column's `render`.
+   * Not for a virtualized table: the row is not measured.
+   */
+  fullWidthRow?: (row: T) => ReactNode | null;
   /**
    * Mounts only the rows near the viewport (TanStack Virtual, windowed
    * against the page the way `NotificationsPanel` is), so a list of tens of
@@ -728,6 +740,7 @@ export function DataTable<T>({
   stackSummary,
   stackActions,
   groupBy,
+  fullWidthRow,
   virtualize = false,
   exportRef,
   exportable,
@@ -1059,6 +1072,21 @@ export function DataTable<T>({
 
   function renderRow(row: T, index: number, member = false, windowIndex?: number) {
     const key = rowKey(row, index);
+    const full = fullWidthRow?.(row);
+    if (full !== undefined && full !== null) {
+      return (
+        <tr
+          key={key}
+          role="row"
+          data-row-key={key}
+          className={cx('dt-full-row', member && 'dt-group-member', rowClassName?.(row))}
+        >
+          <td role="cell" colSpan={columns.length + trailingColumns} className={cellPadding}>
+            {full}
+          </td>
+        </tr>
+      );
+    }
     const expanded = expandable && expandedRowKey === key;
     return (
       <DataTableRow

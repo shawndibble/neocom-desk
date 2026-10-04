@@ -68,11 +68,17 @@ export function loadEftFitting(
     line: e.line,
     text: e.text,
     reason: e.reason,
+    kind: 'parse-error',
   }));
 
   const hullTypeId = resolveTypeId(fit.shipName, typeByName);
   if (hullTypeId === null) {
-    unresolved.push({ line: fit.headerLine, text: fit.shipName, reason: 'unknown ship' });
+    unresolved.push({
+      line: fit.headerLine,
+      text: fit.shipName,
+      reason: 'unknown ship',
+      kind: 'unknown-ship',
+    });
     return { hullTypeId: null, unresolved };
   }
 
@@ -92,7 +98,12 @@ export function loadEftFitting(
     if (item === undefined || !item.isCharge) return undefined;
     const chargeTypeId = resolveTypeId(item.name, typeByName);
     if (chargeTypeId === null) {
-      unresolved.push({ line: item.line, text: item.name, reason: 'unknown item' });
+      unresolved.push({
+        line: item.line,
+        text: item.name,
+        reason: 'unknown item',
+        kind: 'unknown-item',
+      });
       return undefined;
     }
     return chargeTypeId;
@@ -109,7 +120,12 @@ export function loadEftFitting(
 
     const typeId = resolveTypeId(item.name, typeByName);
     if (typeId === null) {
-      unresolved.push({ line: item.line, text: item.name, reason: 'unknown item' });
+      unresolved.push({
+        line: item.line,
+        text: item.name,
+        reason: 'unknown item',
+        kind: 'unknown-item',
+      });
       continue;
     }
 
@@ -125,7 +141,13 @@ export function loadEftFitting(
     } else if (rack !== undefined && !hasExplicitQuantity) {
       const slotIndex = slotIndexByRack[rack];
       if (slotIndex >= MAX_SLOTS_PER_CATEGORY) {
-        unresolved.push({ line: item.line, text: item.name, reason: `too many ${rack} slots` });
+        unresolved.push({
+          line: item.line,
+          text: item.name,
+          reason: `too many ${rack} slots`,
+          kind: 'too-many-slots',
+          rack,
+        });
         continue;
       }
       slotIndexByRack[rack] = slotIndex + 1;

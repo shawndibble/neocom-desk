@@ -32,7 +32,7 @@ export type ScopeRequirement = EsiScopeName | PublicAccess;
 
 /**
  * Every named Scope Group (user-facing: **Permission**) a scope outside the
- * **Core Grant** can belong to. Eleven are default-on — granted at sign-in
+ * **Core Grant** can belong to. Thirteen are default-on — granted at sign-in
  * along with the Core Grant, together forming the **Base Grant** — and two
  * (`corp`, `structureMarkets`) are opt-in: a Character is asked for them only
  * when they ask for the feature, never at sign-in with everyone else.
@@ -63,6 +63,7 @@ export const SCOPE_GROUPS = [
   'notifications',
   'characterDetails',
   'fittings',
+  'autopilot',
   'corp',
   'structureMarkets',
 ] as const;
@@ -144,6 +145,11 @@ export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
     captionKey: 'permissions.fittings.caption',
     defaultOn: true,
   },
+  autopilot: {
+    labelKey: 'permissions.autopilot.label',
+    captionKey: 'permissions.autopilot.caption',
+    defaultOn: true,
+  },
   corp: {
     labelKey: 'permissions.corp.label',
     captionKey: 'permissions.corp.caption',
@@ -167,7 +173,7 @@ export interface EsiEndpointSpec {
    * structure lookup and search) — so leaving it off is the rare case,
    * reserved for those.
    *
-   * Every other endpoint declares one of the 13 `SCOPE_GROUPS`: the eleven
+   * Every other endpoint declares one of the 15 `SCOPE_GROUPS`: the thirteen
    * default-on ones together with the Core Grant make up the **Base Grant**
    * (`SCOPES` in `scopes.ts`), and `corp`/`structureMarkets` stay opt-in.
    *
@@ -459,6 +465,17 @@ export const ESI_REGISTRY = {
   postRoute: {
     route: '/route/{origin_system_id}/{destination_system_id}',
     scope: PUBLIC,
+  },
+  /**
+   * Base grant (issue #2479, scope decision `20261003-175151`): Route
+   * Safety's Set waypoints in game — the fifth write exception, used only when
+   * the pilot presses it. A Permission of its own, so a Character that signed
+   * in before it reads as lacking only this, not Character details.
+   */
+  postAutopilotWaypoint: {
+    route: '/ui/autopilot/waypoint',
+    scope: 'esi-ui.write_waypoint.v1',
+    group: 'autopilot',
   },
   getAlliancePublicInfo: {
     route: '/alliances/{alliance_id}',

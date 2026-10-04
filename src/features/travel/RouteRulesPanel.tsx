@@ -2,20 +2,44 @@
  * Route Safety's Route rules panel (issue #2472): what this route avoids,
  * changeable while planning instead of a trip to Settings → Travel and back.
  *
- * Two groups, labelled so it is clear what each setting touches (decision
+ * Three groups, labelled so it is clear what each setting touches (decision
  * `20261003-161302`):
  * - the Route Preference, this route only and kept in the link;
  * - the pilot's Travel Settings — the same synced stores and the same
  *   controls Settings → Travel shows (`features/route/TravelRuleFields.tsx`),
- *   never a copy.
+ *   never a copy;
+ * - Route Safety only (issue #2476): routing through the Thera / Turnur
+ *   holes. Saved as this page's default and overridable in the link, and
+ *   deliberately not in Settings → Travel — no other page's jumps use holes.
+ *   And Use jump bridges (issue #2478), with the Ansiblex list behind it:
+ *   a device-local default, since the list itself never leaves the device.
  *
  * On a phone the panel folds above the route, with chips naming the rules on.
  */
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CollapsiblePanel, SegmentedControl, Spinner, StatChip, StatChips } from '@/components/ui';
+import {
+  Checkbox,
+  CollapsiblePanel,
+  SegmentedControl,
+  Spinner,
+  StatChip,
+  StatChips,
+  TextInput,
+  textActionClassName,
+} from '@/components/ui';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
+import { WORMHOLE_SHIP_SIZES } from '@/engine/route/theraConnections';
+import {
+  MAX_ROUTE_HOLE_MIN_LIFE,
+  MIN_ROUTE_HOLE_MIN_LIFE,
+  parseRouteHoleMinLife,
+  ROUTE_HOLE_HUBS,
+  type RouteHoleOverrides,
+  type RouteHoleQuery,
+} from '@/features/route/routeHoleSettings';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
+import type { RouteBridgeQuery } from '@/features/route/routeBridgeSettings';
 import {
   ROUTE_PREFERENCE_LABEL_KEYS,
   ROUTE_PREFERENCE_SHORT_LABEL_KEYS,
@@ -46,8 +70,133 @@ function GroupLabel({ children }: { children: string }) {
   );
 }
 
+/** A change to one wormhole setting: the field and its new value. */
+export type RouteHoleChange = {
+  [K in keyof RouteHoleOverrides]: { field: K; value: NonNullable<RouteHoleOverrides[K]> };
+}[keyof RouteHoleOverrides];
+
+/** What the Route Safety group needs for Use jump bridges and the Ansiblex list. */
+export interface RouteBridgeFieldsProps {
+  /** Whether this route may cross bridges: the link's say, else the page's default. */
+  bridgeQuery: RouteBridgeQuery;
+  /** Saves the page's default, and drops the link's override of it. */
+  onBridgesChange: (enabled: boolean) => void;
+  /** How many Ansiblex are known on this device. */
+  bridgeCount: number;
+  /** Opens the Ansiblex list. */
+  onManageBridges: () => void;
+}
+
+function RouteBridgeFields({
+  bridgeQuery,
+  onBridgesChange,
+  bridgeCount,
+  onManageBridges,
+}: RouteBridgeFieldsProps) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-1.5">
+      <label className="flex items-center gap-2 font-semibold">
+        <Checkbox
+          checked={bridgeQuery.enabled}
+          onChange={() => onBridgesChange(!bridgeQuery.enabled)}
+        />
+        {t('travel.bridges.enabled')}
+      </label>
+      <button type="button" className={textActionClassName()} onClick={onManageBridges}>
+        {t('travel.bridges.manage', { count: bridgeCount })}
+      </button>
+    </div>
+  );
+}
+
+/** Route Safety's own group: whether, and through which holes and bridges, routes may go. */
+function RouteHoleFields({
+  query,
+  onChange,
+  bridges,
+}: {
+  query: RouteHoleQuery;
+  onChange: (change: RouteHoleChange) => void;
+  bridges: RouteBridgeFieldsProps;
+}) {
+  const { t } = useTranslation();
+  const lifeId = useId();
+  const { enabled, settings } = query;
+  return (
+    <section className="space-y-3 border-t border-line pt-4">
+      <GroupLabel>{t('travel.holes.group')}</GroupLabel>
+      <label className="flex items-center gap-2 font-semibold">
+        <Checkbox
+          checked={enabled}
+          onChange={() => onChange({ field: 'enabled', value: !enabled })}
+        />
+        {t('travel.holes.enabled')}
+      </label>
+      <div className="space-y-1.5">
+        <p className="font-semibold">{t('travel.holes.shipSize')}</p>
+        <SegmentedControl
+          label={t('travel.holes.shipSize')}
+          options={WORMHOLE_SHIP_SIZES.map((value) => ({
+            value,
+            label: t(`travel.thera.fits.${value}`),
+          }))}
+          value={settings.shipSize}
+          onChange={(value) => onChange({ field: 'shipSize', value })}
+          size="sm"
+          fill
+          uppercase={false}
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor={lifeId}>{t('travel.holes.minLifeBefore')}</label>
+        <TextInput
+          id={lifeId}
+          type="number"
+          className="w-16"
+          min={MIN_ROUTE_HOLE_MIN_LIFE}
+          max={MAX_ROUTE_HOLE_MIN_LIFE}
+          step={1}
+          value={settings.minLifeHours}
+          aria-label={t('travel.holes.minLifeLabel')}
+          onChange={(event) => {
+            const next =
+              event.target.value === '' ? null : parseRouteHoleMinLife(Number(event.target.value));
+            if (next !== null) onChange({ field: 'minLifeHours', value: next });
+          }}
+        />
+        <span>{t('travel.holes.minLifeAfter')}</span>
+      </div>
+      <div className="space-y-1.5">
+        <p className="font-semibold">{t('travel.holes.hubs')}</p>
+        <SegmentedControl
+          label={t('travel.holes.hubs')}
+          options={ROUTE_HOLE_HUBS.map((value) => ({
+            value,
+            label: t(`travel.thera.hub.${value}`),
+          }))}
+          value={settings.hubs}
+          onChange={(value) => onChange({ field: 'hubs', value })}
+          size="sm"
+          fill
+          uppercase={false}
+        />
+      </div>
+      <RouteBridgeFields {...bridges} />
+    </section>
+  );
+}
+
 /** The rules on, as readouts: the folded panel's stand-in on a phone. */
-function ActiveRuleChips({ preference }: { preference: RoutePreferenceKind }) {
+function ActiveRuleChips({
+  preference,
+  holeQuery,
+  bridges,
+}: {
+  preference: RoutePreferenceKind;
+  holeQuery: RouteHoleQuery;
+  bridges: RouteBridgeFieldsProps;
+}) {
   const { t } = useTranslation();
   const penalty = useSecurityPenalty((state) => state.value);
   const avoidEdencom = useAvoidEdencom((state) => state.value);
@@ -84,6 +233,18 @@ function ActiveRuleChips({ preference }: { preference: RoutePreferenceKind }) {
         {avoidedEnabled && avoided.length > 0 && (
           <StatChip label={t('travel.rules.chip.avoided')} value={avoided.length} />
         )}
+        {holeQuery.enabled && (
+          <StatChip
+            label={t('travel.holes.chip')}
+            value={t(`travel.thera.hub.${holeQuery.settings.hubs}`)}
+          />
+        )}
+        {bridges.bridgeQuery.enabled && (
+          <StatChip
+            label={t('travel.bridges.chip')}
+            value={t('travel.bridges.chipValue', { count: bridges.bridgeCount })}
+          />
+        )}
       </StatChips>
     </div>
   );
@@ -92,11 +253,19 @@ function ActiveRuleChips({ preference }: { preference: RoutePreferenceKind }) {
 export function RouteRulesPanel({
   preference,
   onPreferenceChange,
+  holeQuery,
+  onHoleChange,
+  bridges,
 }: {
   /** The preference this route is drawn with: the link's, else the pilot's default. */
   preference: RoutePreferenceKind;
   /** Writes the link only — never the saved default. */
   onPreferenceChange: (next: RoutePreferenceKind) => void;
+  /** The wormhole settings this route is drawn with: the link's, else the page's defaults. */
+  holeQuery: RouteHoleQuery;
+  /** Saves the page's default, and drops the link's override of it. */
+  onHoleChange: (change: RouteHoleChange) => void;
+  bridges: RouteBridgeFieldsProps;
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -113,9 +282,15 @@ export function RouteRulesPanel({
       onToggle={() => setExpanded((open) => !open)}
       collapsible={isPhone}
       labels={{ show: t('travel.rules.show'), hide: t('travel.rules.hide') }}
-      collapsedSummary={settingsHydrated && <ActiveRuleChips preference={preference} />}
+      collapsedSummary={
+        settingsHydrated &&
+        holeQuery.hydrated &&
+        bridges.bridgeQuery.hydrated && (
+          <ActiveRuleChips preference={preference} holeQuery={holeQuery} bridges={bridges} />
+        )
+      }
     >
-      {settingsHydrated ? (
+      {settingsHydrated && holeQuery.hydrated && bridges.bridgeQuery.hydrated ? (
         <div className="space-y-5 text-xs">
           <section className="space-y-2">
             <GroupLabel>{t('travel.rules.thisRoute')}</GroupLabel>
@@ -153,6 +328,8 @@ export function RouteRulesPanel({
               switchLabel={t('travel.rules.avoidedSystems', { count: avoidedCount })}
             />
           </section>
+
+          <RouteHoleFields query={holeQuery} onChange={onHoleChange} bridges={bridges} />
         </div>
       ) : (
         <Spinner />

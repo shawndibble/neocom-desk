@@ -25,41 +25,92 @@
  * rows (`TripLegs`); the facts line and strip cover the whole trip. The stops
  * live in the link as `stops`, in the order typed; a legacy `to` link still
  * opens as a single stop. One stop is the page exactly as it was.
+ *
+ * Thera / Turnur (issue #2476): with "Route through Thera / Turnur" on, the
+ * open holes EVE-Scout lists join the route's graph (`useRouteHoles`), and a
+ * hole jump is its own row, a hatched strip cell, and a count on the facts
+ * line. The four settings are this page's synced defaults, each overridable
+ * in the link (`wh`, `whsize`, `whlife`, `whhub`). While the list loads the
+ * gate route shows and says so; if EVE-Scout cannot be reached the route is
+ * gates only, and says that too.
+ *
+ * Set waypoints in game (issue #2479) closes the facts line (`SetWaypoints`).
+ *
+ * Ansiblex (issue #2478): with Use jump bridges on (a device-local default,
+ * overridable in the link as `jb`), the gates in this device's Ansiblex list
+ * join the route as one-jump connections, each crossing its own row, and
+ * each leg may list Via Ansiblex. The list is found with a character's
+ * structure search or pasted (`AnsiblexGatesDialog`).
+ *
+ * Ways to fly each leg (issue #2477): beside each leg's rows, gates only and
+ * the way through each hub with a qualifying hole, with facts side by side
+ * (`LegWays`). Use for this leg pins one in the link (`pin`), and a Thera /
+ * Turnur row's Route via opens this page with its hole pinned for the first
+ * leg (`routeSafetyLink.ts`). Editing the stops or their order drops the
+ * pins, which belong to legs by position — except the first stop added to a
+ * Route via link, which is the leg its pin was made for.
  */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, PageHeader, Panel, Spinner } from '@/components/ui';
 import type { RouteSafetyRow, RouteSafetySummary } from '@/engine/route/routeSafety';
+import type { TheraConnection } from '@/engine/route/theraConnections';
 import { MAX_STOPS } from '@/engine/route/tripPlan';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { useCurrentSystem } from '@/features/route/currentSystem';
-import { ROUTE_PREFERENCES } from '@/features/route/routePreferences';
+import {
+  useRouteHoleHubs,
+  useRouteHoleMinLife,
+  useRouteHoleQuery,
+  useRouteHolesEnabled,
+  useRouteHoleShipSize,
+} from '@/features/route/routeHoleSettings';
 import { useAvoidedSystemsEnabled, useRouteQuery } from '@/features/route/routeRules';
+import { useRouteBridgeQuery, useRouteBridgesEnabled } from '@/features/route/routeBridgeSettings';
 import { useSolarSystemIndex, useSystemName } from '@/features/route/useSolarSystems';
-import { boolParam, optionalEnumParam, optionalIdParam, orderedIdListParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
+import { AnsiblexGatesDialog, type AnsiblexDialogMode } from './AnsiblexGatesDialog';
+import { useAnsiblexGates } from './ansiblexGates';
 import { AvoidSystemDialog, type AvoidTarget } from './AvoidSystemDialog';
-import { RouteRulesPanel } from './RouteRulesPanel';
+import { LegBody, type LegWaysProps } from './LegWays';
+import { RouteRulesPanel, type RouteHoleChange } from './RouteRulesPanel';
 import { RouteStrip } from './RouteStrip';
-import { RouteSystemsTable } from './RouteSystemsTable';
+import { RouteSystemsTable, type HoleRowProps } from './RouteSystemsTable';
+import { ROUTE_PARAMS } from './routeSafetyLink';
 import { routeSystemName } from './routeSystemName';
+import { SetWaypoints } from './SetWaypoints';
 import { StopsPanel, type StopOrderSettings } from './StopsPanel';
 import { TripLegs } from './TripLegs';
+import { useRouteHoles, type RouteHolesState } from './useRouteHoles';
 import { useRouteKills, type RouteKillsCell } from './useRouteKills';
 import { useRouteSafety, type RouteSafetyLeg } from './useRouteSafety';
 
-const ROUTE_PARAMS = {
-  from: optionalIdParam(),
-  // The stops in the order typed. `to` is the single-stop link from before
-  // stops, still read so an old link opens; nothing writes it any more.
-  stops: orderedIdListParam(),
-  to: optionalIdParam(),
-  opt: boolParam(),
-  ret: boolParam(),
-  keep: boolParam(),
-  // Absent means the pilot's Travel default (Settings → Travel).
-  pref: optionalEnumParam(ROUTE_PREFERENCES),
-};
+/** The link parameter overriding each wormhole setting. */
+const HOLE_PARAM = {
+  enabled: 'wh',
+  shipSize: 'whsize',
+  minLifeHours: 'whlife',
+  hubs: 'whhub',
+} as const;
+
+/** Saves a wormhole setting as the page's default. */
+function saveHoleDefault(change: RouteHoleChange): void {
+  switch (change.field) {
+    case 'enabled':
+      void useRouteHolesEnabled.getState().setValue(change.value);
+      return;
+    case 'shipSize':
+      void useRouteHoleShipSize.getState().setValue(change.value);
+      return;
+    case 'minLifeHours':
+      void useRouteHoleMinLife.getState().setValue(change.value);
+      return;
+    case 'hubs':
+      void useRouteHoleHubs.getState().setValue(change.value);
+  }
+}
+
+const NO_HOLES: readonly TheraConnection[] = [];
 
 /** The stops a link names: `stops`, else a legacy `to`, each once, at most `MAX_STOPS`. */
 function stopsFromLink(stops: readonly number[], to: number | null): number[] {
@@ -74,11 +125,30 @@ interface AvoidLeg {
   jumps: number;
 }
 
-/** The route's facts on one line: jumps · bands · lowest · last hour's kills · chokepoints. */
-function RouteFacts({ summary }: { summary: RouteSafetySummary }) {
+/**
+ * The route's facts on one line: jumps (by gate · through wormholes · over
+ * Ansiblex, when a hole or bridge is flown) · bands · lowest · last hour's
+ * kills · chokepoints.
+ */
+function RouteFacts({
+  summary,
+  holeJumps,
+  bridgeJumps,
+}: {
+  summary: RouteSafetySummary;
+  holeJumps: number;
+  bridgeJumps: number;
+}) {
   const { t } = useTranslation();
   const facts: string[] = [
     t('travel.summary.jumps', { count: summary.jumps }),
+    ...(holeJumps === 0 && bridgeJumps === 0
+      ? []
+      : [
+          t('travel.summary.byGate', { count: summary.jumps - holeJumps - bridgeJumps }),
+          ...(holeJumps === 0 ? [] : [t('travel.summary.throughHoles', { count: holeJumps })]),
+          ...(bridgeJumps === 0 ? [] : [t('travel.summary.overBridges', { count: bridgeJumps })]),
+        ]),
     t('travel.summary.bands', {
       highsec: summary.highsec,
       lowsec: summary.lowsec,
@@ -135,6 +205,21 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
   // The two options are the optimizer's own: with it off, the typed order is flown as typed.
   const optimizing = settings.optimize && stops.length > 1;
   const routeQuery = useRouteQuery(params.pref);
+  const holeQuery = useRouteHoleQuery({
+    enabled: params.wh,
+    shipSize: params.whsize,
+    minLifeHours: params.whlife,
+    hubs: params.whhub,
+  });
+  const holesState = useRouteHoles(holeQuery);
+  const holes = holesState.kind === 'ready' ? holesState.holes : NO_HOLES;
+  const listed = holesState.kind === 'ready' ? holesState.listed : null;
+  const bridgeQuery = useRouteBridgeQuery(params.jb);
+  const gateRecords = useAnsiblexGates();
+  // `null` while the switch is off; held off too until the switch and the list are read.
+  const bridges =
+    bridgeQuery.enabled && bridgeQuery.hydrated && gateRecords !== undefined ? gateRecords : null;
+  const [bridgeDialog, setBridgeDialog] = useState<AnsiblexDialogMode | null>(null);
   const state = useRouteSafety(
     fromId,
     stops,
@@ -143,8 +228,22 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
       returnToStart: optimizing && settings.returnToStart,
       keepLastStopLast: optimizing && settings.keepLastStopLast,
     },
-    routeQuery
+    // Held until Use jump bridges and the list are read, so the route is not drawn once without them.
+    {
+      ...routeQuery,
+      hydrated: routeQuery.hydrated && bridgeQuery.hydrated && gateRecords !== undefined,
+    },
+    holes,
+    params.pin,
+    listed,
+    bridges
   );
+  const pinLeg = (index: number, pin: string | null) => {
+    const next = [...params.pin];
+    while (next.length <= index) next.push('');
+    next[index] = pin ?? '';
+    setParams({ pin: next }, { push: true });
+  };
   // Each system once, in flight order: a trip can cross one twice.
   const routeSystems = useMemo(() => {
     if (state.kind !== 'route') return null;
@@ -207,12 +306,21 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
             fromId={fromId}
             fromName={fromId === null ? fromTrigger : nameOf(fromId)}
             fromTrigger={fromTrigger}
-            onFromChange={(systemId) => setParams({ from: systemId }, { push: true })}
+            // A new start is a new first leg: its pin no longer applies.
+            onFromChange={(systemId) => setParams({ from: systemId, pin: [] }, { push: true })}
             stops={stops}
-            onStopsChange={(next) => setParams({ stops: next, to: null }, { push: true })}
+            onStopsChange={(next) =>
+              setParams(
+                // Pins belong to legs by position: a new stop list drops them,
+                // but the first stop keeps the pin a Route via link made for it.
+                { stops: next, to: null, ...(stops.length > 0 ? { pin: [] } : {}) },
+                { push: true }
+              )
+            }
             settings={settings}
             onSettingsChange={(patch) =>
               setParams({
+                pin: [],
                 ...(patch.optimize === undefined ? {} : { opt: patch.optimize }),
                 ...(patch.returnToStart === undefined ? {} : { ret: patch.returnToStart }),
                 ...(patch.keepLastStopLast === undefined ? {} : { keep: patch.keepLastStopLast }),
@@ -225,6 +333,20 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
           <RouteRulesPanel
             preference={routeQuery.rules.preference}
             onPreferenceChange={(pref) => setParams({ pref })}
+            holeQuery={holeQuery}
+            onHoleChange={(change) => {
+              saveHoleDefault(change);
+              setParams({ [HOLE_PARAM[change.field]]: null });
+            }}
+            bridges={{
+              bridgeQuery,
+              onBridgesChange: (enabled) => {
+                void useRouteBridgesEnabled.getState().setValue(enabled);
+                setParams({ jb: null });
+              },
+              bridgeCount: gateRecords?.length ?? 0,
+              onManageBridges: () => setBridgeDialog('search'),
+            }}
           />
         </div>
         <div className="min-w-0 space-y-4">
@@ -234,6 +356,11 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
             nameOf={nameOf}
             killsOf={killsOf}
             avoidAction={avoidAction}
+            holesState={holesState}
+            pinned={params.pin.some((token) => token !== '')}
+            onUse={pinLeg}
+            bridges={bridges === null ? 'off' : bridges.length === 0 ? 'none' : 'known'}
+            onSetUpBridges={setBridgeDialog}
           />
         </div>
       </div>
@@ -244,7 +371,16 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
           toId={avoidLeg.to}
           rules={routeQuery.rules}
           currentJumps={avoidLeg.jumps}
+          extras={state.kind === 'route' ? state.network : undefined}
+          extrasKey={state.kind === 'route' ? state.networkKey : ''}
           onClose={() => setAvoidTarget(null)}
+        />
+      )}
+      {bridgeDialog !== null && (
+        <AnsiblexGatesDialog
+          mode={bridgeDialog}
+          systems={systems}
+          onClose={() => setBridgeDialog(null)}
         />
       )}
     </div>
@@ -257,17 +393,31 @@ function RouteBody({
   nameOf,
   killsOf,
   avoidAction,
+  holesState,
+  pinned,
+  onUse,
+  bridges,
+  onSetUpBridges,
 }: {
   state: ReturnType<typeof useRouteSafety>;
   multiStop: boolean;
   nameOf: (systemId: number) => string;
   killsOf: (systemId: number) => RouteKillsCell;
   avoidAction: (leg: RouteSafetyLeg, row: RouteSafetyRow) => (() => void) | null;
-}) {
+  holesState: RouteHolesState;
+  /** A leg is pinned: an incomplete route asks for the stop a Route via link left open. */
+  pinned: boolean;
+  onUse: (index: number, pin: string | null) => void;
+} & Pick<LegWaysProps, 'bridges' | 'onSetUpBridges'>) {
   const { t } = useTranslation();
   switch (state.kind) {
     case 'incomplete':
-      return <EmptyState title={t('travel.pickTitle')} hint={t('travel.pickHint')} />;
+      return (
+        <EmptyState
+          title={t('travel.pickTitle')}
+          hint={pinned ? t('travel.ways.pickDestination') : t('travel.pickHint')}
+        />
+      );
     case 'same-system':
       return <EmptyState title={t('travel.sameSystemTitle')} hint={t('travel.sameSystemHint')} />;
     case 'no-route':
@@ -283,16 +433,47 @@ function RouteBody({
     case 'route': {
       const { trip } = state;
       const onlyLeg = state.legs[0];
+      const holeRows: HoleRowProps = {
+        holeAt: state.holeAt,
+        bridgeAt: state.bridgeAt,
+        holesFetchedAt: holesState.kind === 'ready' ? holesState.fetchedAt : null,
+        now: holesState.kind === 'ready' ? holesState.now : 0,
+      };
+      const ways = {
+        now: holesState.kind === 'ready' ? holesState.now : 0,
+        holes: holesState.kind,
+        bridges,
+        onSetUpBridges,
+      };
       return (
         <Panel>
           <div className="space-y-3">
-            {trip && <RouteFacts summary={trip.summary} />}
+            {trip && (
+              <SetWaypoints legs={state.legs} nameOf={nameOf} bridgeAt={state.bridgeAt}>
+                <RouteFacts
+                  summary={trip.summary}
+                  holeJumps={trip.holeJumps}
+                  bridgeJumps={trip.bridgeJumps}
+                />
+              </SetWaypoints>
+            )}
             {trip && (
               <RouteStrip
                 rows={trip.rows}
                 killsOf={killsOf}
                 stopIndexes={multiStop ? trip.stopIndexes : undefined}
+                holeAt={state.holeAt}
               />
+            )}
+            {holesState.kind === 'loading' && (
+              <p role="status" className="text-text-dim">
+                {t('travel.holes.loading')}
+              </p>
+            )}
+            {holesState.kind === 'unavailable' && (
+              <p role="status" className="text-text-dim">
+                {t('travel.holes.unavailable')}
+              </p>
             )}
             {state.activityLoading && (
               <p role="status" className="text-text-dim">
@@ -305,12 +486,22 @@ function RouteBody({
               </p>
             )}
             {!multiStop && onlyLeg?.rows ? (
-              <RouteSystemsTable
-                rows={onlyLeg.rows}
-                killsOf={killsOf}
-                avoidAction={(row) => avoidAction(onlyLeg, row)}
-                label={t('travel.tableLabel')}
-              />
+              <LegBody
+                leg={onlyLeg}
+                number={1}
+                multiStop={false}
+                nameOf={nameOf}
+                onUse={(pin) => onUse(0, pin)}
+                {...ways}
+              >
+                <RouteSystemsTable
+                  rows={onlyLeg.rows}
+                  killsOf={killsOf}
+                  avoidAction={(row) => avoidAction(onlyLeg, row)}
+                  label={t('travel.tableLabel')}
+                  {...holeRows}
+                />
+              </LegBody>
             ) : (
               <TripLegs
                 // A new order is a new itinerary: it opens on its own first leg.
@@ -319,6 +510,9 @@ function RouteBody({
                 nameOf={nameOf}
                 killsOf={killsOf}
                 avoidAction={avoidAction}
+                holes={holeRows}
+                ways={ways}
+                onUse={onUse}
               />
             )}
           </div>

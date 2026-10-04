@@ -218,6 +218,11 @@
 // sync.podKillThreshold (keep out of systems with that many pod kills in the
 // last hour). All "set to another value, never unset", so the tombstone-expiry
 // edge does not bite them either.
+//
+// Route Safety's own wormhole defaults (features/route/routeHoleSettings.ts),
+// beside but deliberately not part of the Travel Settings: sync.routeHoles
+// (route through the open Thera / Turnur holes), sync.routeHoleShipSize,
+// sync.routeHoleMinLife and sync.routeHoleHubs. Also set, never unset.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.avoidEdencom',
   'sync.avoidPodKills',
@@ -252,6 +257,10 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
   'sync.podKillThreshold',
+  'sync.routeHoleHubs',
+  'sync.routeHoleMinLife',
+  'sync.routeHoleShipSize',
+  'sync.routeHoles',
   'sync.routePreference',
   'sync.routeSecurityPenalty',
   'sync.skillCloneStates',

@@ -391,7 +391,11 @@ describe('bulkOwnedStockSuggestions', () => {
     ]);
   });
 
-  it('leaves a hand-typed value untouched, including a deliberate zero', () => {
+  // "Use all" is every row's own "Use assets" at once: the rows the per-row
+  // offer would fill, and no others. It used to skip any row with a number
+  // in it, a 0 included — so after "Use none" (which writes 0s) the button
+  // did nothing at all while every row beside it still offered its stock.
+  it('fills a zeroed row and refreshes a stale count, the same rows the per-row offer would', () => {
     const sourcing = { [TRITANIUM]: { ownedQuantity: 0 }, [PYERITE]: { ownedQuantity: 12 } };
     expect(
       bulkOwnedStockSuggestions(
@@ -399,7 +403,23 @@ describe('bulkOwnedStockSuggestions', () => {
         sourcing,
         stockOf({ [TRITANIUM]: 9000, [PYERITE]: 30, [ISOGEN]: 4 })
       )
-    ).toEqual([{ typeID: ISOGEN, ownedQuantity: 4 }]);
+    ).toEqual([
+      { typeID: TRITANIUM, ownedQuantity: 1000 },
+      { typeID: PYERITE, ownedQuantity: 30 },
+      { typeID: ISOGEN, ownedQuantity: 4 },
+    ]);
+  });
+
+  it('skips a row that already holds what it would write', () => {
+    const sourcing = { [TRITANIUM]: { ownedQuantity: 1000 }, [PYERITE]: { ownedQuantity: 30 } };
+    expect(
+      bulkOwnedStockSuggestions(MATERIALS, sourcing, stockOf({ [TRITANIUM]: 9000, [PYERITE]: 30 }))
+    ).toEqual([]);
+  });
+
+  it('never writes a 0 over a typed count when the scoped stock is empty', () => {
+    const sourcing = { [TRITANIUM]: { ownedQuantity: 500 } };
+    expect(bulkOwnedStockSuggestions(MATERIALS, sourcing, stockOf({ [TRITANIUM]: 0 }))).toEqual([]);
   });
 
   it('ignores an entry that only carries an override price', () => {

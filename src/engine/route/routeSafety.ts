@@ -94,7 +94,8 @@ export interface RouteSafetySummary {
 const WORMHOLE_SYSTEM_MIN = 31_000_000;
 const WORMHOLE_SYSTEM_MAX = 31_999_999;
 
-function isWormholeSystem(systemId: number): boolean {
+/** J-space by id: outside both ESI activity feeds, and never part of a quiet stretch. */
+export function isWormholeSystem(systemId: number): boolean {
   return systemId >= WORMHOLE_SYSTEM_MIN && systemId <= WORMHOLE_SYSTEM_MAX;
 }
 
@@ -146,13 +147,25 @@ function totalOf(values: readonly (number | null)[]): number | null {
   return total;
 }
 
+/**
+ * The security figures a route's facts are read from. J-space is left out:
+ * Thera's -0.99 is not a nullsec system flown through, and a jump into it is
+ * counted as a wormhole jump instead.
+ */
+function kspaceSecurities(rows: readonly RouteSafetyRow[]): number[] {
+  return rows.flatMap((row) =>
+    row.security === null || isWormholeSystem(row.systemId) ? [] : [row.security]
+  );
+}
+
 export function summarizeRouteSafety(rows: readonly RouteSafetyRow[]): RouteSafetySummary {
-  const securities = rows.flatMap((row) => (row.security === null ? [] : [row.security]));
+  const securities = kspaceSecurities(rows);
+  const kspace = rows.filter((row) => !isWormholeSystem(row.systemId));
   return {
     jumps: Math.max(0, rows.length - 1),
-    highsec: rows.filter((row) => row.band === 'highsec').length,
-    lowsec: rows.filter((row) => row.band === 'lowsec').length,
-    nullsec: rows.filter((row) => row.band === 'nullsec').length,
+    highsec: kspace.filter((row) => row.band === 'highsec').length,
+    lowsec: kspace.filter((row) => row.band === 'lowsec').length,
+    nullsec: kspace.filter((row) => row.band === 'nullsec').length,
     lowestSecurity: securities.length === 0 ? null : Math.min(...securities),
     shipKills: totalOf(rows.map((row) => row.shipKills)),
     podKills: totalOf(rows.map((row) => row.podKills)),
@@ -230,11 +243,13 @@ function isQuiet(row: RouteSafetyRow, zkillCount: (systemId: number) => number |
  * only when ESI reported zero ship and pod kills, zKillboard reported zero
  * kills, it is not a Gank Chokepoint, its security is known and it is not in
  * J-space. NPC kills do not count. The list's first and last systems never
- * fold.
+ * fold, and neither does a `pinned` one — either end of a wormhole jump
+ * (issue #2476), so the hole's own row always has both its systems beside it.
  */
 export function foldQuietStretches(
   rows: readonly RouteSafetyRow[],
-  zkillCount: (systemId: number) => number | null
+  zkillCount: (systemId: number) => number | null,
+  pinned: ReadonlySet<number> = new Set()
 ): RouteStretch[] {
   const stretches: RouteStretch[] = [];
   let run: RouteSafetyRow[] = [];
@@ -249,7 +264,7 @@ export function foldQuietStretches(
   };
   rows.forEach((row, index) => {
     const middle = index > 0 && index < rows.length - 1;
-    if (middle && isQuiet(row, zkillCount)) {
+    if (middle && !pinned.has(row.systemId) && isQuiet(row, zkillCount)) {
       run.push(row);
       return;
     }
@@ -272,10 +287,10 @@ export function routeStripKeySystems(
   const keys = new Set<number>(stopIndexes.filter((index) => index < rows.length));
   if (rows.length > 0) keys.add(0);
   if (rows.length > 1) keys.add(rows.length - 1);
-  const securities = rows.flatMap((row) => (row.security === null ? [] : [row.security]));
+  const securities = kspaceSecurities(rows);
   if (securities.length > 0) {
     const lowest = Math.min(...securities);
-    keys.add(rows.findIndex((row) => row.security === lowest));
+    keys.add(rows.findIndex((row) => row.security === lowest && !isWormholeSystem(row.systemId)));
   }
   rows.forEach((row, index) => {
     if (row.chokepoint) keys.add(index);

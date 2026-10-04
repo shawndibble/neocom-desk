@@ -625,10 +625,32 @@
         "failed": "Couldn't reach the EVE Workbench fit list right now. Everything else still works.",
         "empty": "Nobody has published a fit for this hull on EVE Workbench yet.",
         "unnamed": "Unnamed fit",
-        "unknownAuthor": "unknown pilot",
-        "byline": "by {{author}} · added {{age}}",
+        "added": "added {{age}}",
         "load": "Load",
-        "loadFailed": "Couldn't load this fit."
+        "loadFailed": "Couldn't load this fit.",
+        "priceNote": "Prices: what each fit costs to buy today from sell orders at {{hub}}, your default Trade Hub — not the loss value zKillboard reports.",
+        "price": "≈ {{value}} ISK",
+        "pricePartial_one": "≥ {{value}} ISK · {{count}} item has no sell order at {{hub}}",
+        "pricePartial_other": "≥ {{value}} ISK · {{count}} items have no sell order at {{hub}}",
+        "pricing": "Pricing fits at {{hub}}…",
+        "outOfDate": {
+          "label": "Out of date: {{reasons}}",
+          "removedItem": "uses a removed item: {{name}}",
+          "removedHull": "this hull is no longer in the game: {{name}}",
+          "lostSlots": {
+            "high": "this ship has fewer high slots now",
+            "medium": "this ship has fewer mid slots now",
+            "low": "this ship has fewer low slots now",
+            "rig": "this ship has fewer rig slots now",
+            "subsystem": "this ship takes fewer subsystems now"
+          },
+          "show_one": "Show {{count}} out-of-date fit",
+          "show_other": "Show {{count}} out-of-date fits",
+          "hide": "Hide out-of-date fits",
+          "checking": "Checking fits against today's game…",
+          "allOutOfDate_one": "This hull's only EVE Workbench fit is out of date with today's game.",
+          "allOutOfDate_other": "All {{count}} of this hull's EVE Workbench fits are out of date with today's game."
+        }
       }
     },
     "start": {
@@ -2897,8 +2919,6 @@
       "haveColumn": "Have",
       "toBuyColumn": "To buy",
       "total": "Total",
-      "needValue": "Need {{quantity}}",
-      "toBuyValue": "{{quantity}} to buy",
       "unpricedCount_one": "+{{count}} unpriced",
       "unpricedCount_other": "+{{count}} unpriced",
       "buildInstead": "Build instead",
@@ -2911,8 +2931,6 @@
       "movedMany_one": "{{count}} material changed section",
       "movedMany_other": "{{count}} materials changed section",
       "undo": "Undo",
-      "minus": "−",
-      "equals": "=",
       "changeTierFor": "Change tier: {{material}}",
       "haveFor": "Have: {{material}}",
       "savesVsBuying": "saves {{amount}} ISK vs buying",
@@ -2922,13 +2940,30 @@
         "total": "Total, highest first",
         "toBuy": "To buy, most first",
         "name": "Name, A to Z"
-      }
-    }
+      },
+      "at": "@",
+      "buyColumn": "Buy",
+      "buildColumn": "Build",
+      "badge": {
+        "build": "Build",
+        "buy": "Buy",
+        "planetary": "PI",
+        "reaction": "React"
+      },
+      "isk": "ISK",
+      "atPrice": "@ {{price}} ISK"
+    },
+    "useAllDone_one": "Filled Have on {{count}} material from your assets",
+    "useAllDone_other": "Filled Have on {{count}} materials from your assets",
+    "useAllNothing": "Nothing to fill: every material already has what you own, or you own none of it in the selected locations",
+    "useNoneDone_one": "Cleared Have on {{count}} material",
+    "useNoneDone_other": "Cleared Have on {{count}} materials",
+    "useNoneNothing": "Nothing to clear: no material has a Have amount"
   },
   "login": {
     "button": "Log in with EVE Online",
     "permissionsHint": "Logging in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, your in-game fittings, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions. Want to share less from the start? Use Log in with custom permissions, next to the Log in button, to choose exactly what you grant.",
-    "writeExceptions": "It also asks for four permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client; and saving a Fitting to EVE creates or replaces your in-game fitting there, the same as fitting it in the client. Nothing else in the app writes to EVE.",
+    "writeExceptions": "It also asks for five permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client; saving a Fitting to EVE creates or replaces your in-game fitting there, the same as fitting it in the client; and setting a route's waypoints in game replaces your autopilot waypoints in the EVE client. Nothing else in the app writes to EVE.",
     "eyebrow": "Free · Open source · Runs on your device",
     "heading": "Answers, not API dumps.",
     "previewLabel": "Example — logged-in view",
@@ -3095,8 +3130,8 @@
     "trustHeading": "It reads. It writes only when you act.",
     "trust": {
       "readOnly": {
-        "name": "Four writes, and nothing else",
-        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, a reply or forward you write goes out through your account, and saving a Fitting to EVE recreates it on the game's side. Nothing else in the app writes to EVE."
+        "name": "Five writes, and nothing else",
+        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, a reply or forward you write goes out through your account, saving a Fitting to EVE recreates it on the game's side, and setting a route's waypoints replaces your autopilot waypoints in the client. Nothing else in the app writes to EVE."
       },
       "token": {
         "name": "Your refresh token stays on this device",
@@ -3596,6 +3631,45 @@
     "journalItemBought": "Bought {{quantity}} × {{unitPrice}} = {{total}}",
     "journalItemSold": "Sold {{quantity}} × {{unitPrice}} = {{total}}",
     "journalContractLink": "Contract →",
+    "dailyGoal": "Daily goal",
+    "dailyGoalIdTitle": "Goal id {{id}}",
+    "dailyGoalNames": {
+      "697658": "Scan 5 Signatures",
+      "697659": "Scan 2 Wormholes",
+      "697660": "Scan 2 Combat Sites",
+      "697661": "Scan 2 Data Sites",
+      "697662": "Scan 2 Relic Sites",
+      "697664": "Destroy 10 Angels or Rogue Drones",
+      "697665": "Destroy 10 Guristas or Rogue Drones",
+      "697666": "Destroy 10 Serpentis or Rogue Drones",
+      "697667": "Destroy 25 non-capsuleers",
+      "697668": "Mine 100 units of Scordite, Dark Ochre, or Bistot",
+      "697669": "Mine 100 units of Veldspar, Jaspet, or Arkonor",
+      "697670": "Mine 2000 units of Ore",
+      "697671": "Manufacture an Item",
+      "697674": "Damage other Capsuleers",
+      "697675": "Shield Boost other Capsuleers",
+      "697676": "Armor Repair other Capsuleers",
+      "697677": "Destroy 10 Sansha or Rogue Drones",
+      "697678": "Destroy 10 Sleepers or Rogue Drones",
+      "697679": "Destroy 10 Blood Raiders or Rogue Drones",
+      "697680": "Capture Contested FW Complex",
+      "697681": "Defend Contested FW Complex",
+      "699211": "Daily Completion Bonus",
+      "712791": "Salvage 5 Wrecks",
+      "712805": "Earn 50 LP for any corporation",
+      "712806": "Complete 3 Daily Bonus Goals - Alpha",
+      "712831": "Complete 6 Daily Bonus Goals - Alpha",
+      "712833": "Complete 9 Daily Bonus Goals - Alpha",
+      "712834": "Complete 12 Daily Bonus Goals - Alpha",
+      "722237": "Sequencer",
+      "722238": "SKINR",
+      "722337": "Complete 3 Daily Bonus Goals - Omega",
+      "722338": "Complete 6 Daily Bonus Goals - Omega",
+      "722339": "Complete 9 Daily Bonus Goals - Omega",
+      "722340": "Complete 12 Daily Bonus Goals - Omega",
+      "1004953": "Complete 3 Jumps"
+    },
     "journalBountyFaction": "{{faction}} ×{{count}}",
     "journalBountyOther": "Other",
     "journalBountyKills_one": "{{count}} NPC killed",
@@ -6258,6 +6332,10 @@
       "label": "Character details",
       "caption": "Implants, clones, location, contacts, standings and loyalty."
     },
+    "autopilot": {
+      "label": "Autopilot waypoints",
+      "caption": "Set a route's waypoints in your EVE client from Route Safety."
+    },
     "fittings": {
       "label": "Fittings",
       "caption": "Your in-game Fittings, and saving Fittings to EVE."
@@ -6436,7 +6514,7 @@
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, and how the Assign form edits ore values.",
             "layout": "Layout: hidden and reordered Overview cards, and pages hidden from the navigation.",
-            "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold)."
+            "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs."
           }
         },
         "local": {
@@ -6448,13 +6526,14 @@
           "miningHistory": "90 days of mining ledger, longer than the 30 EVE returns.",
           "login": "Your EVE login token.",
           "loginNote": "It never leaves this device.",
-          "preferences": "Display settings (text size, time format) and the sorts, filters and sections each page remembers."
+          "preferences": "Display settings (text size, time format) and the sorts, filters and sections each page remembers.",
+          "ansiblex": "Route Safety's Ansiblex jump gate list, and whether Route Safety uses it. Structure access is private alliance information, so it never leaves this device."
         },
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
           "crashes": "Crash reports: the error and the page it happened on. No IP addresses; request and response bodies are never captured; EVE tokens are stripped first.",
           "removal": "Removing a character clears it from this device only; adding it back restores its synced copy. That copy is deleted after 90 days with no device syncing it, or right away from Settings › Data & storage › Delete all data.",
-          "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account, and saving a Fitting to EVE creates or replaces it there. Nothing else is ever written.",
+          "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account, saving a Fitting to EVE creates or replaces it there, and Route Safety's Set waypoints in game replaces your autopilot waypoints. Nothing else is ever written.",
           "export": "Backups (Settings › Data & storage) are password-encrypted files, login tokens included. One is written only when you press the button, and saved only where you put it. We never see it."
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."
@@ -7341,6 +7420,46 @@
       "noRouteHint": "No stargate route connects {{from}} and {{to}}. Remove the stop, or pick another.",
       "tableLabel": "Systems on leg {{number}}"
     },
+    "ways": {
+      "title": "Ways to fly leg {{number}} · {{from}} → {{to}}",
+      "titleRoute": "Ways to fly {{from}} → {{to}}",
+      "label": "Ways to fly leg {{number}}",
+      "kind": {
+        "planner": "Planner's pick",
+        "gates": "Gates only",
+        "thera": "Via Thera",
+        "turnur": "Via Turnur",
+        "hole": "Pinned hole via {{hub}}",
+        "ansiblex": "Via Ansiblex"
+      },
+      "inUse": "In use",
+      "use": "Use for this leg",
+      "useLabel": "Use {{way}} for leg {{number}}",
+      "noRoute": "doesn't reach {{to}}",
+      "lowsec": "{{count}} lowsec",
+      "nullsec": "{{count}} nullsec",
+      "passes": "passes {{names}}",
+      "hole": "{{from}} → {{to}}",
+      "bridge": "Ansiblex · {{from}} → {{to}}",
+      "noBridges": "no Ansiblex known",
+      "findBridges": "Find with a character",
+      "or": "or",
+      "pasteBridges": "paste a list",
+      "compare": "compare",
+      "hide": "hide",
+      "phoneLine": "{{way}}: {{jumps}}",
+      "phoneToggle": "Compare ways to fly leg {{number}}",
+      "holesHint": "Turn on Route through Thera / Turnur to compare ways through a hole.",
+      "pinNote": {
+        "closed": "The pinned wormhole has closed or is no longer on EVE-Scout's list, so this leg flies the planner's pick.",
+        "no-hole": "No open {{hub}} hole fits the hole settings, so this leg flies the planner's pick.",
+        "no-route": "The pinned way doesn't reach {{to}}, so this leg flies the planner's pick.",
+        "no-list-off": "Route through Thera / Turnur is off, so the pinned way can't be checked. This leg flies the planner's pick.",
+        "no-list-unavailable": "EVE-Scout couldn't be reached, so the pinned way can't be checked. This leg flies the planner's pick.",
+        "no-bridge": "Use jump bridges is off or no Ansiblex is known, so this leg flies the planner's pick."
+      },
+      "pickDestination": "Add a stop to fly there through the pinned wormhole."
+    },
     "pickTitle": "Pick where the route starts and ends",
     "pickHint": "Every system on the route is listed with its security, region, and the last hour of jumps and kills ESI reports.",
     "sameSystemTitle": "Start and destination are the same system",
@@ -7442,21 +7561,133 @@
       "lowest": "lowest {{security}}",
       "kills": "{{ships}} ship · {{pods}} pod kills in the last hour",
       "chokepoints": "Gank Chokepoints: {{names}}",
-      "noChokepoints": "no Gank Chokepoints"
+      "noChokepoints": "no Gank Chokepoints",
+      "byGate": "{{count}} by gate",
+      "throughHoles_one": "{{count}} through a wormhole",
+      "throughHoles_other": "{{count}} through wormholes",
+      "overBridges_one": "{{count}} over an Ansiblex",
+      "overBridges_other": "{{count}} over Ansiblex"
+    },
+    "bridges": {
+      "enabled": "Use jump bridges",
+      "chip": "Ansiblex",
+      "chipValue_one": "{{count}} known",
+      "chipValue_other": "{{count}} known",
+      "manage_one": "{{count}} Ansiblex known · Manage",
+      "manage_other": "{{count}} Ansiblex known · Manage",
+      "ansiblex": "Ansiblex",
+      "ends": "{{from}} → {{to}}",
+      "title": "Ansiblex jump gates",
+      "localOnly": "Kept on this device only. Never synced and never sent anywhere: structure access is private to your alliance.",
+      "searchTitle": "Find with a character",
+      "searchHint": "Each character's structure search finds only the Ansiblex that character can use, so search with each one.",
+      "findAll": "Find with every character",
+      "noCharacters": "Add a character to search for Ansiblex.",
+      "find": "Find Ansiblex",
+      "findLabel": "Find Ansiblex with {{character}}",
+      "searching": "Searching…",
+      "searchFailed": "The search couldn't be run. Try again later, or paste a list.",
+      "found_one": "Found {{count}} Ansiblex.",
+      "found_other": "Found {{count}} Ansiblex.",
+      "foundUnknown": "Skipped Ansiblex naming systems this app doesn't know: {{names}}.",
+      "needsGrant": "needs the structure search permission",
+      "grant": "Grant",
+      "pasteTitle": "Paste a list",
+      "pasteLabel": "Ansiblex, one per line",
+      "pastePlaceholder": "One Ansiblex per line: SYS1 » SYS2, or the full in-game name",
+      "pasteAdd": "Add Ansiblex",
+      "pasteAdded_one": "Added {{count}} Ansiblex.",
+      "pasteAdded_other": "Added {{count}} Ansiblex.",
+      "pasteError": {
+        "format": "Line {{line}}: “{{text}}” doesn't read as SYS1 » SYS2.",
+        "unknown_one": "Line {{line}}: no system named {{names}}.",
+        "unknown_other": "Line {{line}}: no systems named {{names}}.",
+        "same-system": "Line {{line}}: “{{text}}” joins a system to itself.",
+        "not-nullsec": "Line {{line}}: {{names}} isn't in nullsec, where Ansiblex stand."
+      },
+      "known_one": "{{count}} Ansiblex known",
+      "known_other": "{{count}} Ansiblex known",
+      "none": "No Ansiblex known yet.",
+      "pasted": "pasted",
+      "foundBy": "found by {{names}}",
+      "unknownCharacter": "character {{id}}",
+      "remove": "Remove",
+      "removeLabel": "Remove {{name}}"
+    },
+    "waypoints": {
+      "action": "Set waypoints in game",
+      "sending": "Setting waypoints…",
+      "character": "Character to set waypoints for",
+      "needCharacter": "Log in a character to set waypoints in its EVE client.",
+      "needPermission": "This character hasn't granted the Autopilot waypoints permission.",
+      "grantTitle": "Setting waypoints needs a permission this character hasn't granted",
+      "grantHint": "Characters that logged in before this button existed must log in again to let Neocom Desk set autopilot waypoints in the EVE client.",
+      "grantAction": "Log in again",
+      "done": "Waypoints set. Your client plans the path between them with its own settings.",
+      "cutOff": {
+        "wormhole": "Waypoints set to {{entrance}}. Take the wormhole there, then set the rest from {{exit}}. Your client plans the path to {{entrance}} with its own settings.",
+        "bridge": "Waypoints set to {{entrance}}. Take the bridge there, then set the rest from {{exit}}. Your client plans the path to {{entrance}} with its own settings."
+      },
+      "nothing": {
+        "wormhole": "No waypoints set: the trip leaves {{entrance}} by wormhole. Take it, then set the rest from {{exit}}.",
+        "bridge": "No waypoints set: the trip leaves {{entrance}} by bridge. Take it, then set the rest from {{exit}}."
+      },
+      "nothingToSet": "No waypoints to set: the trip has no jumps.",
+      "noMap": "The stargate map couldn't be read, so no waypoints were set.",
+      "failed": "Waypoints not set: {{message}}",
+      "failedPartway": "{{set}} of {{total}} waypoints set, then ESI refused the rest: {{message}}",
+      "permissionReason": "this character hasn't granted the Autopilot waypoints permission",
+      "unknownError": "ESI gave no reason. Is the character logged in to the game?"
     },
     "activityLoading": "Loading the last hour of jumps and kills…",
     "activityUnavailable": "Some of ESI's last-hour figures couldn't be read, so they show as —, not as zero.",
     "dataAgeNote": "Jumps and kills cover the last hour; ESI refreshes them about hourly.",
+    "wormholeSpace": "ESI doesn't report wormhole space",
+    "holes": {
+      "group": "Route Safety only · your default on this page, can be overridden in the link",
+      "enabled": "Route through Thera / Turnur",
+      "shipSize": "My ship fits",
+      "minLifeBefore": "Skip holes with under",
+      "minLifeAfter": "h left",
+      "minLifeLabel": "Skip holes with under this many hours left",
+      "hubs": "Hubs",
+      "chip": "Holes",
+      "loading": "Checking Thera / Turnur connections…",
+      "unavailable": "EVE-Scout couldn't be reached, so this route uses gates only.",
+      "wormhole": "Wormhole",
+      "ends": "{{from}} → {{to}}",
+      "warpTo": "Warp to <sig>{{signature}}</sig> in {{system}}",
+      "fits": "fits {{size}}",
+      "source": "EVE-Scout, {{age}}",
+      "copy": "Copy {{signature}}",
+      "copyShort": "Copy",
+      "copied": "Copied",
+      "copyLabel": "Copy signature {{signature}} in {{system}}",
+      "copiedLabel": "Copied signature {{signature}} in {{system}}",
+      "unknownSignature": "the signature",
+      "stripCell": "Wormhole jump, {{from}} → {{to}}",
+      "stripLabel_one": "{{count}} jump through a wormhole.",
+      "stripLabel_other": "{{count}} jumps through wormholes."
+    },
     "thera": {
       "tab": "Thera / Turnur",
       "originLabel": "Jumps from",
       "changeOrigin": "Change the system jumps are counted from — {{current}}",
       "hubLabel": "Hub",
       "fitsLabel": "Fits",
+      "exitLabel": "Exit",
+      "hubOption": "{{hub}} {{count}}",
       "hub": {
         "all": "Both",
         "thera": "Thera",
         "turnur": "Turnur"
+      },
+      "exit": {
+        "kspace": "K-space",
+        "highsec": "Highsec",
+        "lowsec": "Lowsec",
+        "nullsec": "Nullsec",
+        "wormhole": "J-space"
       },
       "fits": {
         "any": "Any",
@@ -7473,32 +7704,32 @@
         "xlarge": "Very large",
         "capital": "Capital"
       },
-      "band": {
-        "highsec": "Highsec",
-        "lowsec": "Lowsec",
-        "nullsec": "Nullsec",
-        "wormhole": "J-space"
+      "col": {
+        "exit": "Exit system",
+        "security": "Sec",
+        "region": "Region",
+        "fits": "Fits",
+        "life": "Life left",
+        "jumps": "Jumps",
+        "signature": "Signature"
       },
-      "bandTabsLabel": "Where the holes come out",
-      "bandTab": {
-        "highsec": "High {{count}}",
-        "lowsec": "Low {{count}}",
-        "nullsec": "Null {{count}}",
-        "wormhole": "J {{count}}"
-      },
-      "emptyBand": {
-        "highsec": "No open holes into highsec right now",
-        "lowsec": "No open holes into lowsec right now",
-        "nullsec": "No open holes into nullsec right now",
-        "wormhole": "No open holes into J-space right now"
-      },
-      "maxSize": "Up to {{size}}",
+      "tableLabel": "Open holes out of Thera and Turnur",
+      "jspaceTableLabel": "Open holes into J-space",
+      "jspaceGroup_one": "{{count}} exit into J-space · no gate route from you",
+      "jspaceGroup_other": "{{count}} exits into J-space · no gate route from you",
+      "fitsAffix": "Fits ",
+      "lifeAffix": " left",
       "lifeLeft": "{{time}} left",
-      "jumps_one": "{{count}} jump",
-      "jumps_other": "{{count}} jumps",
-      "jumpsBlank": "— jumps",
-      "wormholeType": "Wormhole type {{type}}",
-      "hubSignature": "{{hub}} sig",
+      "routeVia": "Route via",
+      "routeViaLabel": "Plan a route through the {{hub}} hole at {{system}}",
+      "jumpsUnit_one": "jump",
+      "jumpsUnit_other": "jumps",
+      "detail": {
+        "type": "Type {{type}}",
+        "signatures": "enter at {{hubSignature}} in {{hub}}, leave at {{exitSignature}}",
+        "zkillboard": "zKillboard ↗",
+        "zkillboardLabel": "{{system}} on zKillboard (opens in a new tab)"
+      },
       "copy": "Copy",
       "copied": "Copied",
       "copySignature": "Copy {{hub}} signature for {{system}}",
@@ -7511,7 +7742,8 @@
       "emptyTitle": "EVE-Scout lists no open connections right now",
       "emptyHint": "Scouts add connections as they find them. Check back later.",
       "noMatchTitle": "No connections match these filters",
-      "noMatchHint": "Widen the hub or ship size filter.",
+      "noMatchHint": "Widen the hub, exit or ship size filter.",
+      "noKspaceMatchTitle": "No holes into K-space match these filters",
       "unavailableTitle": "Connections can't be loaded right now",
       "unavailableHint": "EVE-Scout couldn't be reached. Check your connection and try again.",
       "dataAgeNote": "Connections come from EVE-Scout's volunteer scouts and are refreshed every 5 minutes."

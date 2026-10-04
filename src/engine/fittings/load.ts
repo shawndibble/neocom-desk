@@ -24,14 +24,32 @@ import type {
   FittingDrone,
   FittingModule,
   FittingFighter,
+  FittingSlotKind,
 } from './types';
 
+/**
+ * What kind of thing a Load couldn't place — what code reads, where `reason`
+ * is only the wording shown to the pilot.
+ */
+export type LoadWarningKind =
+  | { kind: 'unknown-ship' }
+  | { kind: 'unknown-item' }
+  | { kind: 'too-many-slots'; rack: FittingSlotKind }
+  | { kind: 'malformed-item' }
+  /** An In-game Fitting item in an ESI flag the app doesn't fit (a service slot, say). */
+  | { kind: 'unsupported-slot' }
+  /** A fittings-file entry whose slot string isn't a rack, bay or cargo. */
+  | { kind: 'unknown-slot' }
+  /** A line the EFT parser couldn't read at all: the author's typo, not the game's. */
+  | { kind: 'parse-error' };
+
 /** One thing a Load couldn't place. `line` is the pasted text's line, for a text Load. */
-export interface LoadWarning {
+export type LoadWarning = {
   line?: number;
   text: string;
+  /** Displayed wording only; branch on `kind`, never on this. */
   reason: string;
-}
+} & LoadWarningKind;
 
 /** Where a Load came from — which the warnings' wording depends on. */
 export type LoadSource = 'text' | 'file' | 'in-game';
@@ -147,7 +165,14 @@ async function readKillmail(
 
 /** For EFT the pilot never saw: a warning names the item, not a line number. */
 function withoutLineNumbers(parts: LoadParts): LoadParts {
-  return { ...parts, unresolved: parts.unresolved.map(({ text, reason }) => ({ text, reason })) };
+  return {
+    ...parts,
+    unresolved: parts.unresolved.map((warning) => {
+      const unlined = { ...warning };
+      delete unlined.line;
+      return unlined;
+    }),
+  };
 }
 
 async function readEveWorkbench(

@@ -24,6 +24,9 @@ export const FITTING_SLOT_KINDS: readonly FittingSlotKind[] = [
 
 export type FittingItemState = 'offline' | 'online' | 'active' | 'overload';
 
+/** A fitted module as a fit row's rack icon strip draws it: just its rack and type. */
+export type RackModule = Pick<FittingModule, 'slot' | 'typeId'>;
+
 export interface FittingModule {
   slot: FittingSlotKind;
   /** Position within the slot's own rack, starting at 0. */

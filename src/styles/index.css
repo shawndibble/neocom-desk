@@ -606,6 +606,15 @@
     padding-left: 0.5rem;
   }
 
+  /* `below` (Thera's signature pair and Copy): a third line of its own,
+     after the meta line and anything closing it. Full basis, so it can
+     never share a line with the meta values however short they are. */
+  .dt-stacked.dt-stack-dense td.dt-edge-below {
+    order: 3;
+    flex: 1 1 100%;
+    padding-top: 0.25rem;
+  }
+
   /* Opt-in (`dt-dense-tight` on the table, Hauling; BPC Sourcing too, with
      no tick or `end` box, its ISK figure too wide for `dt-actions-pinned`'s
      corner): a card whose tick box,
@@ -744,6 +753,21 @@
    */
   .dt-stacked tr.dt-group-header {
     padding: 0;
+  }
+
+  /*
+   * A full-width note row (`fullWidthRow`): one unlabelled cell, so it keeps
+   * the card's own padding but drops the field gutter and label slot.
+   */
+  .dt-stacked tr.dt-full-row > td {
+    flex: 1 1 100%;
+    padding: 0;
+    min-height: 0;
+  }
+
+  .dt-stacked tr.dt-full-row > td::before,
+  .dt-stacked.dt-stack-dense tr.dt-full-row::before {
+    content: none;
   }
 
   /*
@@ -963,6 +987,19 @@
       135deg,
       transparent 0 6px,
       color-mix(in srgb, var(--color-line) 55%, transparent) 6px 7px
+    );
+  }
+
+  /*
+   * Route Safety's strip: a jump through a wormhole (issue #2476) is a step,
+   * not a system, and has no security to colour it by — the same hard-stop
+   * hatch, finer to fit a cell a few pixels wide (DESIGN.md "No gradients").
+   */
+  .route-strip-hole {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent 0 2px,
+      var(--color-line-bright) 2px 3px
     );
   }
 

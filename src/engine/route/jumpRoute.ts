@@ -61,6 +61,23 @@ export interface FindJumpRouteOptions {
    * between the same two ends pays for it alike.
    */
   avoid?: ReadonlySet<number>;
+  /**
+   * Two-way connections the stargate graph does not hold — Route Safety's
+   * open Thera / Turnur holes (issue #2476). Each crossing is one jump, and
+   * like a stargate it charges the system it lands in. A connection to a
+   * system the graph has no entry for is ignored. Nothing here knows which
+   * systems are hubs: the caller builds these from whatever list it trusts.
+   */
+  extraConnections?: readonly (readonly [number, number])[];
+  /**
+   * Systems entered for one jump's cost whatever their security, when — and
+   * only when — entered over an extra connection: the hub a hole leads to, so
+   * a -0.99 Thera does not price every hole out of a Prefer safer route.
+   * Entered by stargate (Turnur has gates) such a system is charged as any
+   * other. Only the security cost is waived: an Avoided System here is still
+   * avoided.
+   */
+  freeSystems?: ReadonlySet<number>;
 }
 
 /** The game's default security penalty. */
@@ -112,15 +129,48 @@ function securityStepCost(
   };
 }
 
-function stepCostFor(options: FindJumpRouteOptions): (systemId: number) => number {
+/** What entering a system costs, by stargate (`viaExtra` false) or over an extra connection. */
+type StepCost = (systemId: number, viaExtra: boolean) => number;
+
+function stepCostFor(options: FindJumpRouteOptions): StepCost {
   const base = securityStepCost(
     options.preference ?? 'shortest',
     options.securityOf,
     options.securityPenalty ?? DEFAULT_SECURITY_PENALTY
   );
-  const avoid = options.avoid;
-  if (!avoid?.size) return base;
-  return (systemId) => base(systemId) + (avoid.has(systemId) ? AVOIDED_PENALTY : 0);
+  const free = options.freeSystems ?? new Set<number>();
+  const avoid = options.avoid ?? new Set<number>();
+  return (systemId, viaExtra) =>
+    (viaExtra && free.has(systemId) ? 1 : base(systemId)) +
+    (avoid.has(systemId) ? AVOIDED_PENALTY : 0);
+}
+
+/**
+ * Where the search can go from one system: its stargates, then any extra
+ * connections to systems the graph knows. The stargate graph itself is
+ * shared and never touched.
+ */
+interface Neighbours {
+  gates: (systemId: number) => readonly number[];
+  extra: (systemId: number) => readonly number[];
+}
+
+const NONE: readonly number[] = [];
+
+function neighboursFor(graph: JumpGraph, options: FindJumpRouteOptions): Neighbours {
+  const gates = (systemId: number) => graph.get(systemId) ?? NONE;
+  const added = new Map<number, number[]>();
+  const link = (from: number, to: number) => {
+    const list = added.get(from) ?? [];
+    if (!list.includes(to)) list.push(to);
+    added.set(from, list);
+  };
+  for (const [a, b] of options.extraConnections ?? []) {
+    if (a === b || !graph.has(a) || !graph.has(b)) continue;
+    link(a, b);
+    link(b, a);
+  }
+  return { gates, extra: (systemId) => added.get(systemId) ?? NONE };
 }
 
 /**
@@ -197,9 +247,9 @@ interface SearchResult {
  * lowsec, and it is the jump count a reader is shown.
  */
 function search(
-  graph: JumpGraph,
+  neighbours: Neighbours,
   originSystemId: number,
-  stepCost: (systemId: number) => number,
+  stepCost: StepCost,
   stopAt?: number
 ): SearchResult {
   const best = new Map<number, number>([[originSystemId, 0]]);
@@ -216,15 +266,18 @@ function search(
     if (settled.has(systemId)) continue;
     settled.add(systemId);
     if (systemId === stopAt) return { cameFrom, jumps, costs: best, reachedStopAt: true };
-    for (const neighbour of graph.get(systemId) ?? []) {
-      const neighbourCost = cost + stepCost(neighbour);
-      // Also rejects an already-settled neighbour: its recorded cost is final,
-      // and every weight is positive, so no later path can undercut it.
-      if (neighbourCost >= (best.get(neighbour) ?? Number.POSITIVE_INFINITY)) continue;
-      best.set(neighbour, neighbourCost);
-      jumps.set(neighbour, (jumps.get(systemId) ?? 0) + 1);
-      cameFrom.set(neighbour, systemId);
-      queue.push(neighbour, neighbourCost);
+    // Stargates first, so on a tie the gate is the jump taken.
+    for (const viaExtra of [false, true]) {
+      for (const neighbour of viaExtra ? neighbours.extra(systemId) : neighbours.gates(systemId)) {
+        const neighbourCost = cost + stepCost(neighbour, viaExtra);
+        // Also rejects an already-settled neighbour: its recorded cost is final,
+        // and every weight is positive, so no later path can undercut it.
+        if (neighbourCost >= (best.get(neighbour) ?? Number.POSITIVE_INFINITY)) continue;
+        best.set(neighbour, neighbourCost);
+        jumps.set(neighbour, (jumps.get(systemId) ?? 0) + 1);
+        cameFrom.set(neighbour, systemId);
+        queue.push(neighbour, neighbourCost);
+      }
     }
   }
 
@@ -252,7 +305,12 @@ export function findJumpRoute(
   }
 
   const stepCost = stepCostFor(options);
-  const { cameFrom, reachedStopAt } = search(graph, originSystemId, stepCost, destinationSystemId);
+  const { cameFrom, reachedStopAt } = search(
+    neighboursFor(graph, options),
+    originSystemId,
+    stepCost,
+    destinationSystemId
+  );
   if (!reachedStopAt) return { kind: 'no-route' };
   return { kind: 'route', systems: reconstruct(cameFrom, destinationSystemId) };
 }
@@ -279,7 +337,7 @@ export function jumpDistancesFrom(
 ): ReadonlyMap<number, number> {
   if (!graph.has(originSystemId)) return new Map();
   const stepCost = stepCostFor(options);
-  return search(graph, originSystemId, stepCost).jumps;
+  return search(neighboursFor(graph, options), originSystemId, stepCost).jumps;
 }
 
 /** Every route from one origin, from a single sweep. */
@@ -308,11 +366,42 @@ export function routeSweepFrom(
   if (!graph.has(originSystemId)) {
     return { costs: new Map(), jumps: new Map(), routeTo: () => null };
   }
-  const { cameFrom, jumps, costs } = search(graph, originSystemId, stepCostFor(options));
+  const { cameFrom, jumps, costs } = search(
+    neighboursFor(graph, options),
+    originSystemId,
+    stepCostFor(options)
+  );
   return {
     costs,
     jumps,
     routeTo: (systemId) =>
       graph.has(systemId) && costs.has(systemId) ? reconstruct(cameFrom, systemId) : null,
   };
+}
+
+/**
+ * What a given route costs under these options, step by step, as the search
+ * would have priced it: each system entered by stargate, or over an extra
+ * connection where no stargate joins the two (or the extra one is cheaper).
+ * A step nothing joins makes the route unflyable: infinite.
+ *
+ * For comparing routes built outside one search — a leg forced through a
+ * chosen hole is pieced together from several sweeps (`legWays.ts`).
+ */
+export function routeCost(
+  graph: JumpGraph,
+  systems: readonly number[],
+  options: FindJumpRouteOptions = {}
+): number {
+  const stepCost = stepCostFor(options);
+  const neighbours = neighboursFor(graph, options);
+  let total = 0;
+  for (let index = 1; index < systems.length; index += 1) {
+    const from = systems[index - 1];
+    const to = systems[index];
+    const byGate = neighbours.gates(from).includes(to) ? stepCost(to, false) : Infinity;
+    const byExtra = neighbours.extra(from).includes(to) ? stepCost(to, true) : Infinity;
+    total += Math.min(byGate, byExtra);
+  }
+  return total;
 }

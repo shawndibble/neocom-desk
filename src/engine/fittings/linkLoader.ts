@@ -14,7 +14,7 @@
  */
 import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
 import type { EftSlotLookup } from './eftLoader';
-import type { LoadParts, LoadWarning } from './load';
+import type { LoadParts, LoadWarning, LoadWarningKind } from './load';
 import {
   FITTING_SLOT_KINDS,
   type FittingCargoItem,
@@ -91,8 +91,8 @@ export function classifyLoadInput(input: string): LoadInput {
   return classifyPlain(text);
 }
 
-function unresolved(text: string, reason: string): LoadWarning {
-  return { line: 1, text, reason };
+function unresolved(text: string, warning: { reason: string } & LoadWarningKind): LoadWarning {
+  return { line: 1, text, ...warning };
 }
 
 function sortModules(modules: FittingModule[]): void {
@@ -108,7 +108,10 @@ export function loadDnaFitting(dna: string, slotByTypeId: EftSlotLookup): LoadPa
   const [hull, ...entries] = dna.split(':').filter((part) => part !== '');
   const hullTypeId = Number(hull);
   if (!Number.isInteger(hullTypeId)) {
-    return { hullTypeId: null, unresolved: [unresolved(dna, 'unknown ship')] };
+    return {
+      hullTypeId: null,
+      unresolved: [unresolved(dna, { reason: 'unknown ship', kind: 'unknown-ship' })],
+    };
   }
 
   const problems: LoadWarning[] = [];
@@ -129,7 +132,7 @@ export function loadDnaFitting(dna: string, slotByTypeId: EftSlotLookup): LoadPa
     const typeId = Number(idPart.replace(/_$/, ''));
     const quantity = Number(qtyPart);
     if (!Number.isInteger(typeId) || !Number.isInteger(quantity) || quantity < 1) {
-      problems.push(unresolved(entry, 'malformed item'));
+      problems.push(unresolved(entry, { reason: 'malformed item', kind: 'malformed-item' }));
       continue;
     }
     const rack = slotByTypeId[typeId];
@@ -144,7 +147,13 @@ export function loadDnaFitting(dna: string, slotByTypeId: EftSlotLookup): LoadPa
       for (let i = 0; i < quantity; i++) {
         const slotIndex = next[rack];
         if (slotIndex >= MAX_SLOTS_PER_CATEGORY) {
-          problems.push(unresolved(String(typeId), `too many ${rack} slots`));
+          problems.push(
+            unresolved(String(typeId), {
+              reason: `too many ${rack} slots`,
+              kind: 'too-many-slots',
+              rack,
+            })
+          );
           break;
         }
         next[rack] = slotIndex + 1;

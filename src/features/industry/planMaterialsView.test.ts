@@ -255,8 +255,18 @@ describe('bulk owned-stock patches', () => {
       ],
     },
     {
-      name: 'never overwrites a typed value, including a deliberate 0',
+      // The rows each row's own "Use assets" would fill — a 0 from "Use none"
+      // and a stale typed count included; a row already there is left out.
+      name: 'refreshes a zeroed or stale row, the same rows the per-row offer fills',
       owned: { 34: 0, 35: 3 } as Record<number, number>,
+      expected: [
+        { typeID: 34, ownedQuantity: 200 },
+        { typeID: 35, ownedQuantity: 10 },
+      ],
+    },
+    {
+      name: 'leaves a row that already holds what it would write',
+      owned: { 34: 200, 35: 10 } as Record<number, number>,
       expected: [],
     },
   ])('use all: $name', ({ owned, expected }) => {

@@ -1,10 +1,12 @@
 /**
  * ESI OAuth scopes for Neocom Desk v1. Reads by design (see CONTEXT.md), with
- * four narrow, user-triggered writes: `esi-mail.organize_mail.v1` marks a
+ * five narrow, user-triggered writes: `esi-mail.organize_mail.v1` marks a
  * mail read on ESI when it's opened here, `esi-calendar.respond_calendar_events.v1`
  * sends an RSVP, `esi-mail.send_mail.v1` sends a reply or forward, and
  * `esi-fittings.write_fittings.v1` (issue #1539) saves a Fitting to EVE — the
- * write itself is Save to EVE's job (#1540), not this ticket's. Every other
+ * write itself is Save to EVE's job (#1540), not this ticket's — and
+ * `esi-ui.write_waypoint.v1` (issue #2479) sets a trip's autopilot waypoints
+ * from Route Safety. Every other
  * scope below is a read — `esi-planets.manage_planets.v1` included, whatever
  * its name says.
  * `esi-markets.structure_markets.v1` (issue #538) is opt-in only — behind the

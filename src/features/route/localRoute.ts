@@ -19,6 +19,8 @@
 import {
   findJumpRoute,
   jumpDistancesFrom,
+  type FindJumpRouteOptions,
+  type JumpGraph,
   type JumpRouteResult,
   type RoutePreferenceKind,
 } from '@/engine/route/jumpRoute';
@@ -36,15 +38,26 @@ import { loadSolarSystemsById } from '@/sde/solarSystems';
  */
 export type LocalRouteRules = Partial<RouteRules>;
 
+/**
+ * Connections beyond the stargates, and the systems they make free — Route
+ * Safety's open Thera / Turnur holes (issue #2476), built by the caller from
+ * `engine/route/routeHoles.ts`. Only Route Safety passes these: no other
+ * page's jump count may change with a hole that closes within hours.
+ */
+export type RouteGraphExtras = Pick<FindJumpRouteOptions, 'extraConnections' | 'freeSystems'>;
+
 function engineOptions(
   rules: LocalRouteRules,
-  securityOf: ((systemId: number) => number | undefined) | undefined
-) {
+  securityOf: ((systemId: number) => number | undefined) | undefined,
+  extras: RouteGraphExtras = {}
+): FindJumpRouteOptions {
   return {
     preference: rules.preference ?? 'shortest',
     securityPenalty: rules.securityPenalty,
     securityOf,
     avoid: new Set(rules.avoid ?? []),
+    extraConnections: extras.extraConnections,
+    freeSystems: extras.freeSystems,
   };
 }
 
@@ -79,7 +92,8 @@ async function securityLookupFor(
 export async function findLocalRoute(
   originSystemId: number,
   destinationSystemId: number,
-  rules: LocalRouteRules = {}
+  rules: LocalRouteRules = {},
+  extras: RouteGraphExtras = {}
 ): Promise<LocalRouteResult> {
   const [graph, securityOf] = await Promise.all([
     loadJumpGraph(),
@@ -90,7 +104,7 @@ export async function findLocalRoute(
     graph,
     originSystemId,
     destinationSystemId,
-    engineOptions(rules, securityOf)
+    engineOptions(rules, securityOf, extras)
   );
 }
 
@@ -168,7 +182,14 @@ export async function localJumpCountsForRoutes(
   };
 }
 
-export type LocalTripResult = { kind: 'trip'; plan: TripPlan } | { kind: 'unknown' };
+/**
+ * `graph` is the stargate map the trip was planned on, for telling a gate step
+ * from a hole; `options` the search it was planned under, holes and all, for
+ * weighing a leg's other ways the same way (`engine/route/legWays.ts`).
+ */
+export type LocalTripResult =
+  | { kind: 'trip'; plan: TripPlan; graph: JumpGraph; options: FindJumpRouteOptions }
+  | { kind: 'unknown' };
 
 /**
  * A trip from `start` through several Stops (issue #2475): every leg, and the
@@ -179,15 +200,19 @@ export async function planLocalTrip(
   start: number,
   stops: readonly number[],
   rules: LocalRouteRules = {},
-  tripOptions: TripOptions = {}
+  tripOptions: TripOptions = {},
+  extras: RouteGraphExtras = {}
 ): Promise<LocalTripResult> {
   const [graph, securityOf] = await Promise.all([
     loadJumpGraph(),
     securityLookupFor(rules.preference ?? 'shortest'),
   ]);
   if (!graph) return { kind: 'unknown' };
+  const options = engineOptions(rules, securityOf, extras);
   return {
     kind: 'trip',
-    plan: planTrip(graph, start, stops, engineOptions(rules, securityOf), tripOptions),
+    plan: planTrip(graph, start, stops, options, tripOptions),
+    graph,
+    options,
   };
 }

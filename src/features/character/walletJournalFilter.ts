@@ -1,6 +1,7 @@
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import { defineUrlFilter, nullableTextParam, textParam } from '@/lib/urlState';
 import { bountyKillsOf } from './bountyKills';
+import { dailyGoalMessageIdOf } from './dailyGoal';
 
 /**
  * The journal filter bar's state (issue #413): a raw ESI `ref_type`, an
@@ -46,7 +47,9 @@ export const {
  */
 export function filterWalletJournal(
   entries: readonly WalletJournalEntry[],
-  filter: WalletJournalFilter
+  filter: WalletJournalFilter,
+  /** The description the journal shows for a line, which free text matches against. */
+  describe: (entry: WalletJournalEntry) => string = (entry) => entry.description
 ): WalletJournalEntry[] {
   const text = filter.text.trim().toLowerCase();
   return entries.filter((entry) => {
@@ -56,9 +59,12 @@ export function filterWalletJournal(
     if (filter.endDate !== null && day > filter.endDate) return false;
     if (
       text !== '' &&
-      !entry.description.toLowerCase().includes(text) &&
-      // A bounty line's reason is a raw kill list the journal shows as factions.
-      !(bountyKillsOf(entry) ? '' : (entry.reason ?? '')).toLowerCase().includes(text)
+      !describe(entry).toLowerCase().includes(text) &&
+      // A bounty line's reason is a raw kill list the journal shows as factions,
+      // and a daily goal line's is a message id it shows as the goal's name.
+      !(bountyKillsOf(entry) || dailyGoalMessageIdOf(entry) !== null ? '' : (entry.reason ?? ''))
+        .toLowerCase()
+        .includes(text)
     )
       return false;
     return true;

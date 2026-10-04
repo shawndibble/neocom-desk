@@ -13,7 +13,9 @@ import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog
 import type { CorpOwnedStockState } from './corpOwnedStock';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { PRICING_INPUTS_FIXTURE } from './pricingInputsFixtures';
-import { EMPTY_OWNED_STOCK_SNAPSHOT } from './ownedStockDetection';
+import { EMPTY_OWNED_STOCK_SNAPSHOT, type OwnedStockSnapshot } from './ownedStockDetection';
+import { applySourcingPatch } from './sourcingEdits';
+import type { SourcingPatchEntry } from './buildPlanStore';
 import { BuildPlanDetail, type PlanPatch } from './BuildPlanDetail';
 import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 import { DEFAULT_FACILITY_DEFAULTS, useFacilityDefaults } from './facilityDefaults';
@@ -210,6 +212,10 @@ interface HarnessProps {
   corpOwnedBlueprints?: Partial<CorpOwnedBlueprintsState>;
   /** Fields layered over the held plan on every render — stands in for a change arriving from elsewhere (another device's sync). */
   externalPlan?: Partial<BuildPlanRecord>;
+  /** Detected owned stock; empty by default. */
+  ownedStockSnapshot?: OwnedStockSnapshot;
+  /** Sourcing edits (owned quantity, price) — applied to the held plan as well as reported. */
+  onSourcing?: (edits: readonly SourcingPatchEntry[]) => void;
 }
 
 const CORP_OWNED_STOCK_UNAVAILABLE: CorpOwnedStockState = {
@@ -233,6 +239,8 @@ function Harness({
   corpOwnedStock,
   corpOwnedBlueprints,
   externalPlan,
+  ownedStockSnapshot = EMPTY_OWNED_STOCK_SNAPSHOT,
+  onSourcing,
 }: HarnessProps) {
   const [heldPlan, setPlan] = useState<BuildPlanRecord>(makePlan(planOverrides));
   const plan = externalPlan ? { ...heldPlan, ...externalPlan } : heldPlan;
@@ -245,7 +253,7 @@ function Harness({
           pi={null}
           ownedBlueprints={[]}
           modifiers={NO_CHARACTER_MODIFIERS}
-          ownedStockSnapshot={EMPTY_OWNED_STOCK_SNAPSHOT}
+          ownedStockSnapshot={ownedStockSnapshot}
           corpOwnedStock={{ ...CORP_OWNED_STOCK_UNAVAILABLE, ...corpOwnedStock }}
           pricingInputs={
             corpOwnedBlueprints
@@ -259,7 +267,17 @@ function Harness({
               : PRICING_INPUTS_FIXTURE
           }
           onChange={(change) => {
-            if (change.kind === 'sourcing') return;
+            if (change.kind === 'sourcing') {
+              onSourcing?.(change.edits);
+              setPlan((p) => {
+                let materialSourcing = p.materialSourcing;
+                for (const { typeID, patch } of change.edits) {
+                  materialSourcing = applySourcingPatch(materialSourcing, typeID, patch);
+                }
+                return { ...p, materialSourcing };
+              });
+              return;
+            }
             (change.kind === 'edit' ? onUpdate : onDerivedFix)?.(change.patch);
             setPlan((p) => ({ ...p, ...change.patch }));
           }}
@@ -1452,5 +1470,66 @@ describe('BuildPlanDetail Character details implant note (issue #1588)', () => {
 
     await screen.findByRole('button', { name: 'Edit setup' });
     expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * "Use all" is every row's own "Use assets" at once. It used to skip any row
+ * with a number in it — a 0 from "Use none" included — and said nothing, so
+ * after "Use none" it looked like a dead button while rows still offered stock.
+ */
+describe('BuildPlanDetail Use all / Use none', () => {
+  const TRITANIUM_IN_JITA: OwnedStockSnapshot = {
+    sources: [
+      {
+        characterId: 1,
+        assets: [
+          {
+            item_id: 1,
+            type_id: 34,
+            location_id: 60003760,
+            location_flag: 'Hangar',
+            location_type: 'station',
+            quantity: 5000,
+            is_singleton: false,
+          },
+        ],
+      },
+    ],
+    characterNames: new Map([[1, 'Pilot']]),
+    incompleteCharacters: [],
+  };
+
+  it('fills a row Use none zeroed, says so, and Undo puts the 0 back', async () => {
+    const user = userEvent.setup();
+    const onSourcing = vi.fn();
+    render(
+      <Harness
+        plan={{ runs: 1, materialSourcing: { 34: { ownedQuantity: 0 } } }}
+        ownedStockSnapshot={TRITANIUM_IN_JITA}
+        onSourcing={onSourcing}
+      />
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Use all' }));
+
+    expect(onSourcing).toHaveBeenLastCalledWith([{ typeID: 34, patch: { ownedQuantity: 100 } }]);
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Filled Have on 1 material from your assets'
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(onSourcing).toHaveBeenLastCalledWith([{ typeID: 34, patch: { ownedQuantity: 0 } }]);
+  });
+
+  it('says there is nothing to fill instead of doing nothing silently', async () => {
+    const user = userEvent.setup();
+    const onSourcing = vi.fn();
+    render(<Harness plan={{ runs: 1 }} onSourcing={onSourcing} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Use all' }));
+
+    expect(onSourcing).not.toHaveBeenCalled();
+    expect(screen.getByRole('status')).toHaveTextContent(/^Nothing to fill/);
   });
 });

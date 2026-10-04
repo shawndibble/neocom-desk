@@ -97,6 +97,33 @@ export function optionalEnumParam<V extends string>(values: readonly V[]): UrlPa
 }
 
 /**
+ * `'1'` / `'0'`, or `null` when absent — "use the saved default", as
+ * `optionalEnumParam` is. Unlike `boolParam`, both sides are written, since
+ * either can override a default the link cannot see.
+ */
+export function optionalBoolParam(): UrlParamCodec<boolean | null> {
+  return {
+    parse: (raw) => (raw === '1' ? true : raw === '0' ? false : null),
+    serialize: (value) => (value === null ? null : value ? '1' : '0'),
+  };
+}
+
+/** A whole number in `[min, max]`, or `null` when absent or unreadable — "use the saved default". */
+export function optionalIntParam(
+  bounds: { min?: number; max?: number } = {}
+): UrlParamCodec<number | null> {
+  const { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER } = bounds;
+  return {
+    parse: (raw) => {
+      if (raw === null || !/^-?\d+$/.test(raw)) return null;
+      const n = Number(raw);
+      return Number.isSafeInteger(n) && n >= min && n <= max ? n : null;
+    },
+    serialize: (value) => (value === null ? null : String(value)),
+  };
+}
+
+/**
  * A comma-separated list of positive ids (character, type, location…),
  * sorted and de-duplicated so the same selection always writes the same URL.
  * One unreadable entry discards the whole list: a partial selection the

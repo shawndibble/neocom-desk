@@ -62,7 +62,7 @@ export function loadEveFitXmlEntry(entry: FittingXmlEntry, typeByName: EftTypeLo
   const unresolved: LoadWarning[] = [];
   const hullTypeId = resolveTypeId(entry.shipTypeName, typeByName);
   if (hullTypeId === null) {
-    unresolved.push({ text: entry.shipTypeName, reason: 'unknown ship' });
+    unresolved.push({ text: entry.shipTypeName, reason: 'unknown ship', kind: 'unknown-ship' });
     return { hullTypeId: null, unresolved };
   }
 
@@ -78,7 +78,7 @@ export function loadEveFitXmlEntry(entry: FittingXmlEntry, typeByName: EftTypeLo
     if (slotKey === 'drone bay') {
       const typeId = resolveTypeId(item.type, typeByName);
       if (typeId === null) {
-        unresolved.push({ text: item.type, reason: 'unknown item' });
+        unresolved.push({ text: item.type, reason: 'unknown item', kind: 'unknown-item' });
         continue;
       }
       // Carried, not deployed — matches eftLoader's drone-bay stacks.
@@ -89,7 +89,7 @@ export function loadEveFitXmlEntry(entry: FittingXmlEntry, typeByName: EftTypeLo
     if (slotKey === 'fighter bay') {
       const typeId = resolveTypeId(item.type, typeByName);
       if (typeId === null) {
-        unresolved.push({ text: item.type, reason: 'unknown item' });
+        unresolved.push({ text: item.type, reason: 'unknown item', kind: 'unknown-item' });
         continue;
       }
       // Squadrons in the bay, as the EFT loader brings them in.
@@ -101,7 +101,7 @@ export function loadEveFitXmlEntry(entry: FittingXmlEntry, typeByName: EftTypeLo
     if (slotKey === 'cargo' || slotKey === 'cargo hold') {
       const typeId = resolveTypeId(item.type, typeByName);
       if (typeId === null) {
-        unresolved.push({ text: item.type, reason: 'unknown item' });
+        unresolved.push({ text: item.type, reason: 'unknown item', kind: 'unknown-item' });
         continue;
       }
       cargo.push({ typeId, quantity: item.qty ?? 1 });
@@ -110,13 +110,17 @@ export function loadEveFitXmlEntry(entry: FittingXmlEntry, typeByName: EftTypeLo
 
     const rackMatch = RACK_SLOT.exec(slotKey);
     if (!rackMatch) {
-      unresolved.push({ text: item.type, reason: `unknown slot: ${item.slot}` });
+      unresolved.push({
+        text: item.type,
+        reason: `unknown slot: ${item.slot}`,
+        kind: 'unknown-slot',
+      });
       continue;
     }
 
     const typeId = resolveTypeId(item.type, typeByName);
     if (typeId === null) {
-      unresolved.push({ text: item.type, reason: 'unknown item' });
+      unresolved.push({ text: item.type, reason: 'unknown item', kind: 'unknown-item' });
       continue;
     }
 
@@ -130,7 +134,12 @@ export function loadEveFitXmlEntry(entry: FittingXmlEntry, typeByName: EftTypeLo
     const slot = RACK_NAME[rackMatch[1].toLowerCase()];
     const slotIndex = Number(rackMatch[2]);
     if (slotIndex >= MAX_SLOTS_PER_CATEGORY) {
-      unresolved.push({ text: item.type, reason: `too many ${slot} slots` });
+      unresolved.push({
+        text: item.type,
+        reason: `too many ${slot} slots`,
+        kind: 'too-many-slots',
+        rack: slot,
+      });
       continue;
     }
     const module: FittingModule = { slot, slotIndex, typeId, state: 'active' };

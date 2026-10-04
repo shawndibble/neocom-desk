@@ -5,14 +5,16 @@
  * hull — Workbench's own list can't be filtered by hull, and its API sends no
  * CORS headers anyway.
  *
- * A hull may be split across several part docs, so this queries them all by
- * `shipTypeId` rather than reading one doc by id, and sorts the union itself
- * (an `orderBy` would need a composite index). No Firebase session: the rule
- * is a public read, since the fitter works with nobody logged in. A good
- * result is held per hull for ten minutes, like the zKillboard tab's.
+ * A hull may be split across several `{shipTypeId}_{part}` docs. The rules
+ * allow `get` by id only — never `list`, so nobody can page through the whole
+ * collection on our read bill — so this reads part 0, whose `parts` says how
+ * many there are, then the rest in parallel, and sorts the union itself. No
+ * Firebase session: the rule is a public get, since the fitter works with
+ * nobody logged in. A good result is held per hull for ten minutes, like the
+ * zKillboard tab's.
  */
 import { useEffect, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore/lite';
+import { doc, getDoc } from 'firebase/firestore/lite';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 
@@ -20,6 +22,12 @@ import { getSyncFirestore } from '@/sync/firebaseApp';
 export const WORKBENCH_FITS_COLLECTION = 'workbenchFits';
 
 const CACHE_TTL_MS = 10 * 60_000;
+
+/**
+ * Most parts one hull is read as, against a corrupt count. A part holds
+ * ~900KB of fits; the biggest hull needs a handful.
+ */
+const MAX_PARTS = 50;
 
 /** One stored Workbench fit — mirrors `StoredWorkbenchFit` on the Functions side. */
 export interface WorkbenchFit {
@@ -55,6 +63,26 @@ export function mergeWorkbenchParts(parts: readonly { fits?: unknown }[]): Workb
   );
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * How many parts a hull has, from its part 0 doc's data (`undefined`: no such
+ * doc, no fits). A part 0 with no usable `parts` predates the count — read it
+ * as one part. Mirrors `hullPartCount` in `functions/src/workbenchFits.ts`.
+ */
+export function workbenchPartCount(part0: unknown): number {
+  if (!isRecord(part0)) return 0;
+  const { parts } = part0;
+  return typeof parts === 'number' && Number.isInteger(parts) && parts >= 1 ? parts : 1;
+}
+
+/** Mirrors `hullPartDocId` on the Functions side. */
+function partDocId(shipTypeId: number, part: number): string {
+  return `${shipTypeId}_${part}`;
+}
+
 const cache = new Map<number, { at: number; result: WorkbenchFitsResult }>();
 
 /** For tests: forget every cached hull. */
@@ -71,16 +99,23 @@ export async function loadWorkbenchFits(
   if (hit && now - hit.at < CACHE_TTL_MS) return hit.result;
   if (!isSyncConfigured()) return { ok: false };
   try {
-    const snapshot = await getDocs(
-      query(
-        collection(getSyncFirestore(), WORKBENCH_FITS_COLLECTION),
-        where('shipTypeId', '==', shipTypeId)
-      )
-    );
-    const result: WorkbenchFitsResult = {
-      ok: true,
-      fits: mergeWorkbenchParts(snapshot.docs.map((doc) => doc.data())),
+    const db = getSyncFirestore();
+    const read = async (part: number) => {
+      const snapshot = await getDoc(
+        doc(db, WORKBENCH_FITS_COLLECTION, partDocId(shipTypeId, part))
+      );
+      return snapshot.exists() ? snapshot.data() : undefined;
     };
+    const part0 = await read(0);
+    const count = Math.min(workbenchPartCount(part0), MAX_PARTS);
+    const rest = await Promise.all(
+      Array.from({ length: Math.max(0, count - 1) }, (_, i) => read(i + 1))
+    );
+    // A claimed part can be missing: the sync deletes surplus parts right
+    // after it lowers part 0's count, so a reader holding the old count can
+    // race the delete. Skip it rather than fail the whole hull.
+    const parts = [part0, ...rest].filter(isRecord);
+    const result: WorkbenchFitsResult = { ok: true, fits: mergeWorkbenchParts(parts) };
     cache.set(shipTypeId, { at: now, result });
     return result;
   } catch {

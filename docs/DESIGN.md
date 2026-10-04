@@ -436,7 +436,9 @@ exactly the markup above.
   there is no header row to show the sort on. A control column sets
   `stackEdge` to stay off that 11px line: `'start'` (a tick box) is pinned
   left and centred across both lines, `'end'` (a quantity box) closes line
-  two at its right end (Hauling). An `expandableRow`'s chevron cell joins
+  two at its right end (Hauling), and `'below'` takes a full-width third
+  line of its own for a value and its control (Thera's signature pair and
+  Copy). An `expandableRow`'s chevron cell joins
   the actions on line one (none at all with `hideIcon`). A table with no
   chevron and no `end` box can add `className="dt-actions-pinned"` to pin
   the More actions button to the right edge across both lines instead, so
@@ -596,7 +598,7 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
 - **Dark only.** No light theme. `color-scheme: dark` is set globally.
 - **No gradients, anywhere.** Flat fills only (`bg-accent/10`, `bg-panel-2`,
   …). Depth comes from the layering step below, not a fade.
-  - One exception, and it is not a fade: `.calendar-map-past`
+  - One exception (and its one sibling below), and it is not a fade: `.calendar-map-past`
     (`styles/index.css`) draws a 45° hairline hatch with a
     `repeating-linear-gradient`, because CSS has no other one-declaration way
     to make a texture. The rule exists to keep depth coming from layering
@@ -604,6 +606,9 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
     hard, and it reads as "not available", which no flat fill can say without
     being mistaken for "empty". Reach for this only where a surface must look
     unavailable rather than merely dim.
+    Its one sibling is `.route-strip-hole`, Route Safety's wormhole jump
+    on the route strip: a step with no security of its own to colour it,
+    hatched so it never reads as a system of some security band.
   - The Ship Tree's corner brackets, grid and render mask (`shipTree.css`)
     are hard-stop drawings under its own exception — §1 "Ship Tree (ISIS)".
 - Layering: `bg` → `panel` → `panel-2`. Depth via background steps + hairlines,

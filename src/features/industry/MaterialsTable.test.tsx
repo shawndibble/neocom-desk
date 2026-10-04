@@ -469,20 +469,93 @@ describe('MaterialsTable on a phone', () => {
     window.matchMedia = realMatchMedia;
   });
 
-  it('renders each section as a list with the subtraction on one line', () => {
+  it('renders a ledger: the column header once per section, plain numbers on each row', () => {
     render(<Harness initial={{ 34: { ownedQuantity: 400 } }} />);
 
     expect(screen.queryByRole('table')).toBeNull();
-    const item = screen.getByText('Tritanium').closest('li')!;
-    expect(within(item).getByText('Need 1,000')).toBeTruthy();
-    expect(within(item).getByRole('textbox', { name: 'Have: Tritanium' })).toBeTruthy();
-    expect(within(item).getByText('600 to buy')).toBeTruthy();
-    expect(within(item).getByRole('textbox', { name: 'Price for Tritanium' })).toBeTruthy();
+    const section = screen.getByRole('heading', { name: /^To buy/ }).closest('section')!;
+    // NEED | HAVE | BUY printed once, not as a label on every row.
+    expect(within(section).getAllByText('Need')).toHaveLength(1);
+    expect(within(section).getAllByText('Buy')).toHaveLength(1);
+
+    const row = screen.getByText('Tritanium').closest('li')!;
+    expect(row).toHaveTextContent('1,000');
+    expect(row).toHaveTextContent('600');
+    // Have is a dashed number, not a field stretched across its column.
+    expect(within(row).queryByRole('textbox', { name: 'Have: Tritanium' })).toBeNull();
+    const have = within(row).getByRole('button', { name: /^Have: Tritanium/ });
+    expect(have).toHaveTextContent('400');
+    expect(have).toHaveClass('text-accent', 'decoration-dashed');
+
+    // A tap opens the field, focused; leaving it puts the number back.
+    fireEvent.click(have);
+    const field = within(row).getByRole('textbox', { name: 'Have: Tritanium' });
+    expect(field).toHaveFocus();
+    fireEvent.blur(field);
+    expect(within(row).getByRole('button', { name: /^Have: Tritanium/ })).toBeTruthy();
   });
 
   it('keeps the section headings and their subtotals', () => {
     render(<Harness />);
     expect(screen.getByRole('heading', { name: /^To buy · 2/ })).toBeTruthy();
+  });
+
+  it('puts Use assets and the price on the line under the numbers', () => {
+    const detection: OwnedStockDetection = {
+      stockFor: (typeID) => (typeID === 34 ? { quantity: 9000, placements: [] } : undefined),
+      scopedQuantityFor: (typeID) => (typeID === 34 ? 9000 : 0),
+      lowerBound: false,
+      incompleteCharacters: [],
+      characterNameFor: () => 'Main Pilot',
+      corporationNameFor: () => 'Unknown Corp',
+      locationLabelFor: () => 'Jita IV - Moon 4',
+    };
+    render(<Harness detection={detection} />);
+
+    const row = screen.getByText('Tritanium').closest('li')!;
+    const offer = within(row).getByRole('button', { name: /^Use assets/ });
+    const price = within(row).getByRole('button', { name: /^Price for Tritanium/ });
+    const have = within(row).getByRole('button', { name: /^Have: Tritanium/ });
+    const footer = offer.closest('li > div:last-child')!;
+    expect(footer).toContainElement(price);
+    expect(footer).not.toContainElement(have);
+  });
+
+  it('says Owned on a blueprint the pilot already has, with no strip and no price of 0', () => {
+    render(
+      <MemoryRouter>
+        <MaterialsTable
+          materials={[
+            {
+              typeID: 9841,
+              baseQuantity: 1,
+              quantity: 1,
+              ownedQuantity: 1,
+              remainingQuantity: 0,
+              unitPrice: 0,
+              lineCost: 0,
+              unpriced: false,
+              acquisitionTier: { me: 10, te: 20 },
+              subBuilds: [],
+            },
+          ]}
+          nameFor={nameFor}
+          volumeFor={volumeFor}
+          sourcing={undefined}
+          pricesReady
+          onSourcingChange={vi.fn()}
+          onOpenAcquisitionPicker={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+    const card = screen.getByText('Widget Blueprint').closest('li')!;
+    expect(within(card).getByText('Owned')).toBeInTheDocument();
+    expect(card.querySelector('.grid')).toBeNull();
+    expect(within(card).queryByRole('textbox')).toBeNull();
+    expect(
+      within(card).getByRole('button', { name: 'Change tier: Widget Blueprint' })
+    ).toBeTruthy();
+    expect(within(card).getByText('ME 10% / TE 20%')).toBeTruthy();
   });
 
   it('sorts within each section from its own picker, since a phone has no table header', () => {

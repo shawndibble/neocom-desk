@@ -486,11 +486,33 @@ here — they go one per file in `docs/context/decisions/`.
   start (the **Current System** unless the link names another), kept in the
   link in the order typed. Optimize stop order may fly them in a cheaper
   order under the active route rules; the typed order stays as written.
-- **Leg**: one stargate route of a trip, from its start or a **Stop** to the
+- **Leg**: one route of a trip, by stargate (and, with **Hole jumps** on,
+  through Thera / Turnur holes; with Use jump bridges on, over **Ansiblex**), from its start or a **Stop** to the
   next stop (and, with Return to start, the last stop home). Route Safety
   lists a trip leg by leg, each with its own jumps, lowest security and
   **Gank Chokepoints**; the facts line and **Route strip** cover the whole
   trip.
+- **Hole jump**: one jump of a Route Safety route through an open Thera or
+  Turnur wormhole EVE-Scout lists, between the hole's exit system and its hub.
+  Shown as its own row between those two systems and as a hatched **Route
+  strip** cell. How it is costed and where it applies: decision
+  `20261003-181618`.
+- **Ansiblex**: an alliance-built jump gate between two nullsec systems,
+  named "SYS1 » SYS2 - …" in game. Route Safety may route over the ones in
+  this device's list — found by a character's structure search or pasted —
+  each as one jump, shown as its own row. Decision `20261003-204009`.
+- **Way to fly**: one way a **Leg** can be flown, listed beside its rows:
+  Gates only (always), Via Thera / Via Turnur (when that hub has a
+  qualifying hole), Via Ansiblex (with Use jump bridges on, when a known
+  gate is on the way), the planner's pick when it differs, and a **Pinned way**.
+  Each states jumps, lowest security, lowsec / nullsec counts and the
+  **Gank Chokepoints** it passes — facts side by side, never ranked.
+- **Pinned way**: the **Way to fly** a pilot chose for one **Leg** with
+  "Use for this leg", kept in the link (`pin`, by leg position): `gates`,
+  `thera`, `turnur`, `ansiblex` or an EVE-Scout hole id. A pin that cannot be flown (its
+  hole closed, its hub has no qualifying hole) is reported on the leg, and
+  the planner's pick flies it. Route via on a Thera / Turnur row opens Route
+  Safety with that hole pinned for the first leg.
 - **Pilot Lookup**: Travel's view of one pilot, found by name — portrait,
   corporation, alliance and character age from public ESI, and the all-time
   kills, losses, ISK, solo kills, danger and gang ratios and most-used hulls
@@ -746,10 +768,21 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   seen and roughly what it cost, and **Load**s the group's most recent loss.
 - **EVE Workbench fit**: A fit a pilot published on EVE Workbench, listed for its
   hull in the Popular fits panel's EVE Workbench tab (beside the zKillboard tab
-  of **Popular fit**s) with its name, author and date added, linked to its page
+  of **Popular fit**s) with its name and date added, linked to its page
   there.
   **Load**s from its EFT. Comes from our own copy of Workbench's public list,
   synced by a Cloud Function, since Workbench can't list fits by hull.
+- **Out-of-date fit**: An **EVE Workbench fit** that no longer works in today's
+  game. It names a hull the app's current game data doesn't have, or an item
+  the game's full list of type names doesn't have, or it has more modules in a rack than the hull now has slots. CPU, powergrid and
+  calibration never make a fit out of date. The tab lists it below the current
+  fits, only on request, with the reason.
+- **Seen on zKillboard**: A sighting badge on an **EVE Workbench fit** whose
+  fitted modules exactly match one of its hull's **Popular fit**s (the same
+  grouping, so charges, drones and cargo don't count). Shows how many of the
+  hull's recent losses flew that group and when it was last seen. A fit that
+  matches nothing, has any line that doesn't load cleanly, or whose hull's losses
+  can't be fetched shows nothing — never a warning.
 - **Price History**: The Market Browser item tab charting one item's daily
   history in a Region: **Daily Range**, average price and its moving average
   above, **Traded Volume** and **Order Count** below, on one shared date axis.
