@@ -230,24 +230,24 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
   const bridges =
     bridgeQuery.enabled && bridgeQuery.hydrated && gateRecords !== undefined ? gateRecords : null;
   const [bridgeDialog, setBridgeDialog] = useState<AnsiblexDialogMode | null>(null);
-  const state = useRouteSafety(
+  const state = useRouteSafety({
     fromId,
     stops,
-    {
+    tripOptions: {
       optimize: optimizing,
       returnToStart: optimizing && settings.returnToStart,
       keepLastStopLast: optimizing && settings.keepLastStopLast,
     },
     // Held until Use jump bridges and the list are read, so the route is not drawn once without them.
-    {
+    route: {
       ...routeQuery,
       hydrated: routeQuery.hydrated && bridgeQuery.hydrated && gateRecords !== undefined,
     },
     holes,
-    params.pin,
+    pins: params.pin,
     listed,
-    bridges
-  );
+    bridges,
+  });
   const pinLeg = (index: number, pin: string | null) => {
     const next = [...params.pin];
     while (next.length <= index) next.push('');
