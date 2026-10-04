@@ -13,8 +13,12 @@
  * a long name override `/location` (a later `page.route` wins). It doesn't
  * answer `/universe/system_jumps` or `/universe/system_kills`, which Route
  * Safety reads once it has a route, so both are answered empty here.
+ *
+ * Issue #2522: the itinerary's leg headers and Travel's status notes set no
+ * size, so they fell through to the browser's 16px; they now sit on the 14px
+ * body size (`text-sm`).
  */
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
@@ -29,11 +33,15 @@ const JITA = 30000142;
 const TASH_MURKON_PRIME = 30001671;
 const KOR_AZOR_PRIME = 30005038;
 const AMARR = 30002187;
+const DODIXIE = 30002659;
 const THERA = 31000005;
 
-async function mockUniverseStats(page: Page) {
+/** Empty by default; `unavailable` answers 503 so Route Safety reports the figures as unread. */
+async function mockUniverseStats(page: Page, unavailable = false) {
   await page.route(/esi\.evetech\.net\/(.*\/)?universe\/system_(jumps|kills)/, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    unavailable
+      ? route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"down"}' })
+      : route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   );
 }
 
@@ -72,6 +80,10 @@ async function mockOneTheraHole(page: Page) {
       ]),
     })
   );
+}
+
+async function expectFontSize(locator: Locator, px: number) {
+  await expect(locator).toHaveCSS('font-size', `${px}px`);
 }
 
 async function expectPickerFits(page: Page, name: RegExp) {
@@ -134,6 +146,36 @@ test.describe('Travel at 390px', () => {
       page.getByRole('button', { name: /^Change the system jumps are counted from — Amarr$/ })
     ).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`origin=${AMARR}`));
+  });
+
+  test('a two-stop trip sets its leg headers at 14px, without widening the page', async ({
+    page,
+  }) => {
+    await signInAndGoto(page, `./travel/route?stops=${AMARR},${DODIXIE}`);
+    const legs = page.getByRole('button', { name: /^Leg \d/ });
+    await expect(legs).toHaveCount(2, COLD_LOAD);
+    await expectFontSize(legs.nth(0), 14);
+    await expectFontSize(legs.nth(1), 14);
+    await expectNoPageOverflow(page);
+  });
+
+  test("Route Safety's unread last-hour figures note is 14px", async ({ page }) => {
+    await mockUniverseStats(page, true);
+    await signInAndGoto(page, `./travel/route?stops=${AMARR}`);
+    const note = page.getByRole('status').filter({ hasText: "last-hour figures couldn't be read" });
+    await expect(note).toBeVisible(COLD_LOAD);
+    await expectFontSize(note, 14);
+  });
+
+  test('Thera with no origin sets its distance note at 14px', async ({ page }) => {
+    // No Current System to fall back on: ESI has no location for the character.
+    await page.route(`https://esi.evetech.net/**/characters/${CHARACTER_ID}/location*`, (route) =>
+      route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"none"}' })
+    );
+    await signInAndGoto(page, './travel/thera');
+    const note = page.getByRole('status').filter({ hasText: 'Pick a system to count jumps from' });
+    await expect(note).toBeVisible(COLD_LOAD);
+    await expectFontSize(note, 14);
   });
 });
 
