@@ -332,7 +332,9 @@ describe('FittingStartScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Open fitting' }));
     expect(workspace.openLoaded).toHaveBeenCalledWith(
       expect.objectContaining({
-        unresolved: [{ text: 'ServiceSlot0', reason: 'unsupported slot' }],
+        unresolved: [
+          { text: 'ServiceSlot0', reason: 'unsupported slot', kind: 'unsupported-slot' },
+        ],
       })
     );
   });
