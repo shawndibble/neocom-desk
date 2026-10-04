@@ -211,11 +211,16 @@ service cloud.firestore {
     // collections above: the data is EVE Workbench's own public fit list, and
     // the fitter works with nobody logged in, so a sign-in gate would hide
     // public fits from exactly the pilot browsing hulls before adding a
-    // Character. `list` is needed too: the client queries a hull's parts by
-    // shipTypeId. The sync's checkpoint lives in workbenchFitsSync, which has
-    // no rule and so stays denied by the implicit deny below.
+    // Character. `get` only, never `list`: with no sign-in at all, a public
+    // list would let anyone page through all ~38k fits (EFT included) and run
+    // up our read bill. The client reads a hull by id instead — part
+    // `{shipTypeId}_0`, whose `parts` field says how many `_1.._{n-1}` docs to
+    // fetch (features/fittings/workbenchFits.ts). The sync's checkpoint lives
+    // in workbenchFitsSync, which has no rule and so stays denied by the
+    // implicit deny below.
     match /workbenchFits/{docId} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if false;
       allow write: if false;
     }
     // Stored Share Links (src/features/share/shareStore.ts): a short

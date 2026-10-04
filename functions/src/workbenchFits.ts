@@ -6,7 +6,7 @@
  * 100 a page, and has no hull filter — so the app can't ask it for "this
  * hull's fits". This keeps our own copy instead: every public fit's summary
  * and EFT, grouped by hull into `workbenchFits` docs the client reads by
- * `shipTypeId`. See the decision doc this ships with.
+ * id (`{shipTypeId}_{part}`). See the decision doc this ships with.
  *
  * Everything here is fetch- and Firestore-free: `runWorkbenchSync` takes the
  * HTTP call, the clock and the store as arguments, so paging, stop-at-known,
@@ -41,7 +41,7 @@ export const WORKBENCH_API_BASE = 'https://api.eveworkbench.com/v1';
  * for the doc's other fields and field names.
  */
 export const HULL_PART_BYTE_BUDGET = 900_000;
-/** Fixed allowance per part for `shipTypeId`, `part` and the `fits` field name. */
+/** Fixed allowance per part for `shipTypeId`, `part`, `parts` and the `fits` field name. */
 const PART_OVERHEAD_BYTES = 64;
 
 /** Attempts per request before a run gives up on it (and stops, checkpointed). */
@@ -76,8 +76,25 @@ export interface StoredWorkbenchFit {
 export interface HullPartDoc {
   shipTypeId: number;
   part: number;
+  /**
+   * Part 0 only: how many parts the hull has. Clients can only `get` these
+   * docs by id (listing is denied), so this is how they learn which other
+   * parts to fetch.
+   */
+  parts?: number;
   fits: StoredWorkbenchFit[];
 }
+
+/** One write in `planHullWrite`'s plan. */
+export type HullWriteOp =
+  { kind: 'set'; docId: string; doc: HullPartDoc } | { kind: 'delete'; docId: string };
+
+/**
+ * Part docs per `WriteBatch`. A part can be ~900KB, and `commit()` encodes
+ * the whole batch at once — the same reason the public-contract snapshot
+ * writes 5 chunk docs per batch, and well under Firestore's request size cap.
+ */
+export const PART_DOCS_PER_BATCH = 5;
 
 /** The newest fits a pass saw at its start: what the next pass stops at. */
 export interface PassHead {
@@ -102,6 +119,62 @@ export interface PublicFitsPage {
 /** `hullPartDocId(626, 0)` → `626_0`. */
 export function hullPartDocId(shipTypeId: number, part: number): string {
   return `${shipTypeId}_${part}`;
+}
+
+/**
+ * How many parts a hull has, from its part 0 doc (`undefined` when there is
+ * none: no fits). A part 0 without a usable `parts` count was written before
+ * the count existed, when the client still found parts by query — read it as
+ * the one part it can vouch for. Mirrored by the client's reader.
+ */
+export function hullPartCount(part0: unknown): number {
+  if (!isRecord(part0)) return 0;
+  const { parts } = part0;
+  return typeof parts === 'number' && Number.isInteger(parts) && parts >= 1 ? parts : 1;
+}
+
+/**
+ * The writes that replace a hull's `previousPartCount` parts with `parts`, as
+ * batches to commit in order. A reader fetches part 0, then the parts its
+ * `parts` count claims — so the order guarantees part 0 never claims a part
+ * that doesn't exist, after any batch:
+ *
+ * - Parts are set last first, and part 0 (carrying the new count) after
+ *   every other part, so the parts a new count claims all exist before the
+ *   count does. Until then the old part 0's old count stands, and the old
+ *   parts it claims are still there: nothing is deleted yet. Parts are
+ *   newest first, so new fits push older ones into later parts; writing the
+ *   later parts first leaves a fit in two parts mid-write (the client dedupes
+ *   by id) rather than overwritten out of both. A reader still holding the
+ *   old count can miss a fit pushed past it until it reads again — the count
+ *   bounds what is fetched, it doesn't make the read a snapshot. Accepted.
+ * - Deletes (parts past the new count) go after part 0, by which point no
+ *   count claims them. With no parts left at all, part 0 is the first delete,
+ *   so the hull reads as empty before its other parts go.
+ *
+ * A run that dies mid-way leaves pages un-checkpointed, so the next run
+ * re-merges the same fits and rewrites the hull — and its `readHull` finds
+ * parts by query, past any count, so nothing is stranded.
+ */
+export function planHullWrite(
+  shipTypeId: number,
+  parts: readonly StoredWorkbenchFit[][],
+  previousPartCount: number
+): HullWriteOp[][] {
+  const ops: HullWriteOp[] = [];
+  for (let part = parts.length - 1; part >= 0; part -= 1) {
+    const doc: HullPartDoc = { shipTypeId, part, fits: parts[part] };
+    if (part === 0) doc.parts = parts.length;
+    ops.push({ kind: 'set', docId: hullPartDocId(shipTypeId, part), doc });
+  }
+  for (let part = parts.length; part < previousPartCount; part += 1) {
+    ops.push({ kind: 'delete', docId: hullPartDocId(shipTypeId, part) });
+  }
+  const batches: HullWriteOp[][] = [];
+  for (let i = 0; i < ops.length; i += PART_DOCS_PER_BATCH) {
+    batches.push(ops.slice(i, i + PART_DOCS_PER_BATCH));
+  }
+  return batches;
 }
 
 export function publicFitsPageUrl(page: number): string {
@@ -288,9 +361,13 @@ export interface FetchJsonResult {
 export interface WorkbenchFitsStore {
   readState(): Promise<WorkbenchSyncState>;
   saveState(state: WorkbenchSyncState): Promise<void>;
-  /** Every stored fit for the hull, and how many part docs hold them now. */
+  /**
+   * Every stored fit for the hull, and how many part docs hold them now —
+   * every part doc that exists, not just the ones part 0's count claims, so a
+   * crashed run's leftovers are re-merged and then deleted.
+   */
   readHull(shipTypeId: number): Promise<{ fits: StoredWorkbenchFit[]; partCount: number }>;
-  /** Replaces the hull's parts with these; parts past `parts.length` (up to `previousPartCount`) are deleted. */
+  /** Replaces the hull's parts with these, in `planHullWrite`'s order; parts past `parts.length` (up to `previousPartCount`) are deleted. */
   writeHull(
     shipTypeId: number,
     parts: StoredWorkbenchFit[][],

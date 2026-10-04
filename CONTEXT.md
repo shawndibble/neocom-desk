@@ -772,6 +772,12 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   it has more modules in a rack than the hull now has slots. CPU, powergrid and
   calibration never make a fit out of date. The tab lists it below the current
   fits, only on request, with the reason.
+- **Seen on zKillboard**: A sighting badge on an **EVE Workbench fit** whose
+  fitted modules exactly match one of its hull's **Popular fit**s (the same
+  grouping, so charges, drones and cargo don't count). Shows how many of the
+  hull's recent losses flew that group and when it was last seen. A fit that
+  matches nothing, has any line that doesn't load cleanly, or whose hull's losses
+  can't be fetched shows nothing — never a warning.
 - **Price History**: The Market Browser item tab charting one item's daily
   history in a Region: **Daily Range**, average price and its moving average
   above, **Traded Volume** and **Order Count** below, on one shared date axis.

@@ -31,8 +31,8 @@ describe('classifyFitCurrency', () => {
 
   it('a fit naming an item the game data no longer has is out of date, naming it', () => {
     const fit = parts(modules('high', 2), [
-      { text: 'Old Gun I', reason: 'unknown item' },
-      { text: 'Old Ammo', reason: 'unknown item' },
+      { text: 'Old Gun I', reason: 'unknown item', kind: 'unknown-item' },
+      { text: 'Old Ammo', reason: 'unknown item', kind: 'unknown-item' },
     ]);
     expect(classifyFitCurrency(fit, VEXOR)).toEqual({
       current: false,
@@ -47,8 +47,8 @@ describe('classifyFitCurrency', () => {
     const fit = parts(
       [],
       [
-        { text: 'Old Gun I', reason: 'unknown item' },
-        { text: 'Old Gun I', reason: 'unknown item' },
+        { text: 'Old Gun I', reason: 'unknown item', kind: 'unknown-item' },
+        { text: 'Old Gun I', reason: 'unknown item', kind: 'unknown-item' },
       ]
     );
     expect(classifyFitCurrency(fit, VEXOR)).toEqual({
@@ -60,7 +60,7 @@ describe('classifyFitCurrency', () => {
   it('a hull the game data no longer has is out of date', () => {
     const fit: LoadParts = {
       hullTypeId: null,
-      unresolved: [{ text: 'Old Hull', reason: 'unknown ship' }],
+      unresolved: [{ text: 'Old Hull', reason: 'unknown ship', kind: 'unknown-ship' }],
     };
     expect(classifyFitCurrency(fit, null)).toEqual({
       current: false,
@@ -81,8 +81,18 @@ describe('classifyFitCurrency', () => {
 
   it("the loader's own too-many-slots warning is a lost-slots reason too, once per rack", () => {
     const fit = parts(modules('medium', 4), [
-      { text: 'Warp Scrambler II', reason: 'too many medium slots' },
-      { text: 'Warp Disruptor II', reason: 'too many medium slots' },
+      {
+        text: 'Warp Scrambler II',
+        reason: 'too many medium slots',
+        kind: 'too-many-slots',
+        rack: 'medium',
+      },
+      {
+        text: 'Warp Disruptor II',
+        reason: 'too many medium slots',
+        kind: 'too-many-slots',
+        rack: 'medium',
+      },
     ]);
     expect(classifyFitCurrency(fit, VEXOR)).toEqual({
       current: false,
@@ -90,8 +100,33 @@ describe('classifyFitCurrency', () => {
     });
   });
 
+  it("reads each warning's kind, never its displayed wording", () => {
+    const fit = parts(modules('medium', 4), [
+      { text: 'Old Gun I', reason: 'reworded', kind: 'unknown-item' },
+      { text: 'Warp Disruptor II', reason: 'reworded', kind: 'too-many-slots', rack: 'medium' },
+    ]);
+    expect(classifyFitCurrency(fit, VEXOR)).toEqual({
+      current: false,
+      reasons: [
+        { kind: 'removed-item', name: 'Old Gun I' },
+        { kind: 'lost-slots', rack: 'medium' },
+      ],
+    });
+
+    const hull: LoadParts = {
+      hullTypeId: null,
+      unresolved: [{ text: 'Old Hull', reason: 'reworded', kind: 'unknown-ship' }],
+    };
+    expect(classifyFitCurrency(hull, null)).toEqual({
+      current: false,
+      reasons: [{ kind: 'unknown-hull', name: 'Old Hull' }],
+    });
+  });
+
   it('lists every reason: removed items first, then racks', () => {
-    const fit = parts(modules('high', 6), [{ text: 'Old Gun I', reason: 'unknown item' }]);
+    const fit = parts(modules('high', 6), [
+      { text: 'Old Gun I', reason: 'unknown item', kind: 'unknown-item' },
+    ]);
     expect(classifyFitCurrency(fit, VEXOR)).toEqual({
       current: false,
       reasons: [
@@ -110,7 +145,7 @@ describe('classifyFitCurrency', () => {
 
   it('badly written text is not out of date: the game did not change', () => {
     const fit = parts(modules('high', 1), [
-      { line: 3, text: '%%%', reason: 'unparseable item line' },
+      { line: 3, text: '%%%', reason: 'unparseable item line', kind: 'parse-error' },
     ]);
     expect(classifyFitCurrency(fit, VEXOR)).toEqual({ current: true });
 
@@ -118,8 +153,8 @@ describe('classifyFitCurrency', () => {
     const headerless: LoadParts = {
       hullTypeId: null,
       unresolved: [
-        { text: 'Gun', reason: 'invalid or missing fit header' },
-        { text: '', reason: 'unknown ship' },
+        { text: 'Gun', reason: 'invalid or missing fit header', kind: 'parse-error' },
+        { text: '', reason: 'unknown ship', kind: 'unknown-ship' },
       ],
     };
     expect(classifyFitCurrency(headerless, null)).toEqual({ current: true });

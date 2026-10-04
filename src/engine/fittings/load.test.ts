@@ -35,26 +35,26 @@ describe('toLoadOutcome', () => {
       modules: [],
       drones: [],
       cargo: [],
-      unresolved: [{ text: 'Nope', reason: 'unknown item' }],
+      unresolved: [{ text: 'Nope', reason: 'unknown item', kind: 'unknown-item' }],
     };
     expect(toLoadOutcome(parts, 'My Rifter', 'file')).toEqual({
       kind: 'fitting',
       source: 'file',
       fitting: { name: 'My Rifter', shipTypeId: 587, modules: [], drones: [], cargo: [] },
-      unresolved: [{ text: 'Nope', reason: 'unknown item' }],
+      unresolved: [{ text: 'Nope', reason: 'unknown item', kind: 'unknown-item' }],
     });
   });
 
   it('fails a Load whose hull did not resolve, with the reason in its warnings', () => {
     const parts: LoadParts = {
       hullTypeId: null,
-      unresolved: [{ text: 'Not A Ship', reason: 'unknown ship' }],
+      unresolved: [{ text: 'Not A Ship', reason: 'unknown ship', kind: 'unknown-ship' }],
     };
     expect(toLoadOutcome(parts, '', 'file')).toEqual({
       kind: 'failed',
       source: 'file',
       error: null,
-      unresolved: [{ text: 'Not A Ship', reason: 'unknown ship' }],
+      unresolved: [{ text: 'Not A Ship', reason: 'unknown ship', kind: 'unknown-ship' }],
     });
   });
 });
@@ -117,7 +117,7 @@ describe('loadText', () => {
         cargo: [],
       },
       // The pilot never saw the EFT's lines, so a warning names the item, not a line number.
-      unresolved: [{ text: 'Not A Real Module', reason: 'unknown item' }],
+      unresolved: [{ text: 'Not A Real Module', reason: 'unknown item', kind: 'unknown-item' }],
     });
   });
 
@@ -147,10 +147,18 @@ describe('loadText', () => {
         ),
       })),
     });
-    expect(await loadText(WORKBENCH_LINK, src)).toMatchObject({
-      kind: 'fitting',
-      unresolved: [{ text: '125mm Gatling AutoCannon I', reason: 'too many high slots' }],
-    });
+    const outcome = await loadText(WORKBENCH_LINK, src);
+    expect(outcome).toMatchObject({ kind: 'fitting' });
+    if (outcome.kind !== 'fitting') return;
+    // No line number (the pilot never saw this EFT), but the kind survives.
+    expect(outcome.unresolved).toEqual([
+      {
+        text: '125mm Gatling AutoCannon I',
+        reason: 'too many high slots',
+        kind: 'too-many-slots',
+        rack: 'high',
+      },
+    ]);
   });
 
   it('reports a Workbench link with no fit id as not found, asking Workbench nothing', async () => {
@@ -183,7 +191,9 @@ describe('loadText', () => {
       kind: 'fitting',
       source: 'text',
       fitting: { name: 'My Fit', shipTypeId: 587, modules: RIFTER_MODULES, drones: [], cargo: [] },
-      unresolved: [{ line: 3, text: 'Not A Real Module', reason: 'unknown item' }],
+      unresolved: [
+        { line: 3, text: 'Not A Real Module', reason: 'unknown item', kind: 'unknown-item' },
+      ],
     });
   });
 
@@ -193,7 +203,7 @@ describe('loadText', () => {
     expect(outcome).toMatchObject({
       kind: 'failed',
       error: null,
-      unresolved: [{ text: 'Not A Ship', reason: 'unknown ship' }],
+      unresolved: [{ text: 'Not A Ship', reason: 'unknown ship', kind: 'unknown-ship' }],
     });
     expect(src.hullName).not.toHaveBeenCalled();
   });

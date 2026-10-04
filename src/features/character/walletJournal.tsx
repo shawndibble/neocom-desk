@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import type { DataTableColumn } from '@/components/ui';
 import type { WalletJournalEntry, WalletTransactionCommon } from '@/esi/endpoints';
 import { humanizeRefType, iskToneClass } from '@/features/character/format';
+import { journalDescriptionText } from '@/features/character/dailyGoal';
 import { JournalDescriptionCell } from '@/features/character/JournalDescriptionCell';
 import {
   filterWalletJournal,
@@ -33,7 +34,11 @@ export function useJournalFilterResult(
   journal: readonly WalletJournalEntry[],
   filter: WalletJournalFilter
 ): { filteredJournal: WalletJournalEntry[]; refTypeOptions: string[] } {
-  const filteredJournal = useMemo(() => filterWalletJournal(journal, filter), [journal, filter]);
+  const { t } = useTranslation();
+  const filteredJournal = useMemo(
+    () => filterWalletJournal(journal, filter, (entry) => journalDescriptionText(entry, t)),
+    [journal, filter, t]
+  );
   const refTypeOptions = useMemo(() => journalRefTypes(journal), [journal]);
   return { filteredJournal, refTypeOptions };
 }
@@ -83,7 +88,7 @@ export function useJournalColumnsBuilder(): (
             />
           );
         },
-        sortValue: (entry) => entry.description,
+        sortValue: (entry) => journalDescriptionText(entry, t),
       },
       {
         id: 'amount',
