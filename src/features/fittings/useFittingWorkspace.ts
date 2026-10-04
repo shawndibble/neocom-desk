@@ -10,11 +10,12 @@
  * control inside `COALESCE_MS` (a drone stepper clicked five times) replace
  * rather than push, so Back skips the in-between counts.
  *
- * The implant/booster basis toggle ("My clone" vs "Fitting's") rides on the
- * same `edit()` path — an implant-set edit is just another Fitting change —
- * and is resolved here, per Fitting; the evaluation applies it. `profile`
- * itself (exposed to fit checks/candidates) always stays the active
- * Character's own.
+ * The implant/booster basis ("My clone" vs the Fitting's own set) follows
+ * the Fitting: one that carries a set is stated on it, and an implant-set
+ * edit is just another Fitting change on the same `edit()` path, so adding
+ * or dropping the set is what switches it. The evaluation applies it.
+ * `profile` itself (exposed to fit checks/candidates) always stays the
+ * active Character's own.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -120,11 +121,10 @@ export interface FittingWorkspace extends FittingEvaluation {
    * replaces the history entry instead of adding one.
    */
   edit: (change: FittingChange, coalesceKey?: string) => void;
-  /** "My clone" vs "Fitting's" — the basis the open Fitting's stats read implants/boosters from. */
+  /** "My clone" vs the Fitting's own set — the basis the open Fitting's stats read implants/boosters from. */
   implantBasis: ImplantBasis;
   /** `false` with no active Character: there is no clone to label "My clone", so the basis is always "fitting". */
   canUseCloneBasis: boolean;
-  setImplantBasis: (basis: ImplantBasis) => void;
   /** Edits the set the open Fitting carries via `edit()`. `undefined` removes it. */
   setImplantSet: (implantSet: FittingImplantSet | undefined) => void;
   /** The active Character's own skills and clone, for fit checks; null while loading. */
@@ -193,10 +193,6 @@ export function useFittingWorkspace(): FittingWorkspace {
   const [tooLargeToShare, setTooLargeToShare] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
 
-  // User's explicit toggle pick, layered over `defaultImplantBasis`'s
-  // per-Fitting default; `null` means "no override yet, use the default".
-  const [basisOverride, setBasisOverride] = useState<ImplantBasis | null>(null);
-
   // Set right before this hook's own `setShareCode` writes, so the decode
   // effect below can tell "the URL changed because we just wrote it" (keep
   // the `lastLoad` that write's own Load just reported) apart from every
@@ -257,11 +253,6 @@ export function useFittingWorkspace(): FittingWorkspace {
       // Back/Forward or a pasted link ends any coalescing run: the next edit
       // pushes rather than overwriting the entry just navigated to.
       lastWriteRef.current = null;
-    }
-    // An edit keeps the toggle's override; everything else (a paste,
-    // Back/Forward) is a genuinely different Fitting.
-    if (adopted === null) {
-      setBasisOverride(null);
     }
     if (shareCode === null) {
       latestFittingRef.current = null;
@@ -514,11 +505,7 @@ export function useFittingWorkspace(): FittingWorkspace {
   // always "fitting" (the scope decision's "Share links open ... at All V").
   const canUseCloneBasis = activeCharacterId !== null;
   const implantBasis: ImplantBasis =
-    fitting === null
-      ? 'clone'
-      : !canUseCloneBasis
-        ? 'fitting'
-        : (basisOverride ?? defaultImplantBasis(fitting));
+    fitting === null ? 'clone' : !canUseCloneBasis ? 'fitting' : defaultImplantBasis(fitting);
 
   const setImplantSet = useCallback(
     (implantSet: FittingImplantSet | undefined) => {
@@ -567,7 +554,6 @@ export function useFittingWorkspace(): FittingWorkspace {
     edit,
     implantBasis,
     canUseCloneBasis,
-    setImplantBasis: setBasisOverride,
     setImplantSet,
     ...evaluation,
     statsError: evaluation.statsError || profileFailed,

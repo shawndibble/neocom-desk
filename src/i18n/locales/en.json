@@ -1269,16 +1269,18 @@
     },
     "implants": {
       "basis": {
-        "label": "Implants from",
-        "clone": "My clone",
-        "fitting": "Fitting's"
+        "clone": "My clone"
       },
-      "setImplants": "Set implants…",
       "label": "Implants",
-      "popoverTitle": "Implants in these stats",
-      "cloneExplain": "The implants in {{name}}'s current clone.",
-      "cloneExplainNoName": "The implants in your current clone.",
-      "fittingExplain": "The implant set saved with this Fitting.",
+      "cloneExplain": "Stats use the implants in your current clone. A change here starts this Fitting’s own set.",
+      "fittingExplain": "Stats use the implants and boosters saved with this Fitting.",
+      "useClone": "Use my clone",
+      "none": "None",
+      "custom": "Custom · {{implants}}, {{boosters}}",
+      "implantCount_one": "{{count}} implant",
+      "implantCount_other": "{{count}} implants",
+      "boosterCount_one": "{{count}} booster",
+      "boosterCount_other": "{{count}} boosters",
       "modalTitle": "Implants & boosters",
       "implantsHeading": "Implants",
       "boostersHeading": "Boosters",

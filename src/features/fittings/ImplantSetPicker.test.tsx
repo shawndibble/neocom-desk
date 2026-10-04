@@ -93,49 +93,49 @@ describe('ImplantSetPicker — planning from the clone', () => {
     boosterTypeIds: [],
   };
 
-  it('starts from the clone’s implants, and the first change saves them with it and switches the page to the plan', async () => {
+  it('starts from the clone’s implants, and the first change saves them as the Fitting’s set', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    const onBasisChange = vi.fn();
     render(
       <ImplantSetPicker
         open
         onClose={vi.fn()}
         implantSet={undefined}
         onChange={onChange}
-        finder={{ fitting, profile, basis: 'clone', onBasisChange }}
+        finder={{ fitting, profile, basis: 'clone' }}
+        onUseClone={vi.fn()}
       />
     );
     expect(screen.getByText('Plan: 10228,13283')).toBeInTheDocument();
     expect(screen.getByText('Measured on: 10228,13283')).toBeInTheDocument();
-    // Opening it alone saves nothing.
+    // Opening it alone saves nothing, and on the clone there is nothing to go back from.
     expect(onChange).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Use my clone' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Plan one more' }));
     expect(onChange).toHaveBeenLastCalledWith({ implants: [10228, 13283, 999], boosters: [] });
-    expect(onBasisChange).toHaveBeenLastCalledWith('fitting');
   });
 
-  it('keeps a Fitting’s own set, and leaves the basis alone on "Fitting’s"', async () => {
+  it('keeps a Fitting’s own set, and drops it to go back to the clone', async () => {
     const user = userEvent.setup();
-    const onBasisChange = vi.fn();
+    const onChange = vi.fn();
+    const onUseClone = vi.fn();
     const own = { implants: [5], boosters: [] };
     render(
       <ImplantSetPicker
         open
         onClose={vi.fn()}
         implantSet={own}
-        onChange={vi.fn()}
-        finder={{
-          fitting: { ...fitting, implantSet: own },
-          profile,
-          basis: 'fitting',
-          onBasisChange,
-        }}
+        onChange={onChange}
+        finder={{ fitting: { ...fitting, implantSet: own }, profile, basis: 'fitting' }}
+        onUseClone={onUseClone}
       />
     );
     expect(screen.getByText('Plan: 5')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Plan one more' }));
-    expect(onBasisChange).not.toHaveBeenCalled();
+    expect(onChange).toHaveBeenLastCalledWith({ implants: [5, 999], boosters: [] });
+
+    await user.click(screen.getByRole('button', { name: 'Use my clone' }));
+    expect(onUseClone).toHaveBeenCalledTimes(1);
   });
 });

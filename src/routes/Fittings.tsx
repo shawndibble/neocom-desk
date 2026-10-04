@@ -63,7 +63,7 @@ import { FittingFightersPanel } from '@/features/fittings/FittingFightersPanel';
 import { StatsHeadingLabel } from '@/features/fittings/StatsHeadingLabel';
 import { TacticalModePicker } from '@/features/fittings/TacticalModePicker';
 import { tacticalModeKind } from '@/engine/fittings/tacticalModes';
-import { ImplantBasisControl } from '@/features/fittings/ImplantBasisControl';
+import { ImplantSetControl } from '@/features/fittings/ImplantSetControl';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import {
   resolveFittingView,
@@ -522,10 +522,8 @@ function FittingsPage() {
       }
       implants={
         <>
-          <ImplantBasisControl
-            basis={workspace.implantBasis}
-            canUseCloneBasis={workspace.canUseCloneBasis}
-            onBasisChange={workspace.setImplantBasis}
+          <ImplantSetControl
+            canUseClone={workspace.canUseCloneBasis}
             implantSet={fitting.implantSet}
             onImplantSetChange={workspace.setImplantSet}
             fitting={fitting}
