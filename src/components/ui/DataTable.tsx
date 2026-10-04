@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { fieldBaseClassName } from './controlStyles';
+import { controlHeightClassName, fieldBaseClassName, type ControlSize } from './controlStyles';
 import { groupSortedRows } from './dataTableGroup';
 import * as Icon from './icons';
 import { InfoTooltip } from './Tooltip';
@@ -711,6 +711,90 @@ function parseSortOptionValue(value: string): DataTableSort | null {
   return { columnId: value.slice(0, at), direction };
 }
 
+interface DataTableSortPickerProps<T> {
+  /** The columns offered; only those with a `sortValue` are listed. */
+  columns: readonly DataTableColumn<T>[];
+  /** The sort in force, or `undefined` before any. */
+  sort: DataTableSort | undefined;
+  onSortChange: (sort: DataTableSort) => void;
+  /**
+   * `md` (the default) is the 44px touch target of the bar above a table;
+   * `sm` matches the `size="sm"` buttons of a filter row it sits in.
+   */
+  size?: ControlSize;
+  className?: string;
+}
+
+/**
+ * The phone sort picker `mobileSort` puts above a stacked table, on its own
+ * for a page that wants it elsewhere (Mining Tax keeps it in its filter row,
+ * so the Open list starts with its first row).
+ *
+ * A real `<select>` laid invisibly over its own label rather than
+ * `Select`/`NativeSelect`: a phone should get the OS picker, and the closed
+ * control reads "Sort: Price ↑" while each option is just "Price ↑" — a
+ * native select can only show its option's text.
+ */
+export function DataTableSortPicker<T>({
+  columns,
+  sort,
+  onSortChange,
+  size = 'md',
+  className,
+}: DataTableSortPickerProps<T>) {
+  const { t } = useTranslation();
+  const sortable = columns.filter((column) => column.sortValue !== undefined);
+  const sortColumn = sort ? sortable.find((column) => column.id === sort.columnId) : undefined;
+  return (
+    <label
+      className={cx(
+        fieldBaseClassName,
+        controlHeightClassName[size],
+        size === 'sm' ? 'px-2' : 'px-3',
+        'relative inline-flex shrink-0 items-center gap-1.5 text-xs focus-within:outline-2 focus-within:outline-accent',
+        className
+      )}
+    >
+      <Icon.Sort aria-hidden="true" size={Icon.ICON_SIZE.sm} className="text-text-dim" />
+      <span aria-hidden="true">
+        {sortColumn && sort
+          ? t('common.dataTable.sortLabel', {
+              column: sortColumn.header,
+              arrow: SORT_ARROW[sort.direction],
+            })
+          : t('common.dataTable.sortNone')}
+      </span>
+      <select
+        aria-label={t('common.dataTable.sortBy')}
+        className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
+        value={sortColumn && sort ? sortOptionValue(sort) : ''}
+        onChange={(event) => {
+          const next = parseSortOptionValue(event.target.value);
+          if (next) onSortChange(next);
+        }}
+      >
+        {/* Matches `value=""` before any sort; never re-selectable. */}
+        <option value="" disabled>
+          {t('common.dataTable.sortNone')}
+        </option>
+        {sortable.flatMap((column) =>
+          (['asc', 'desc'] as const).map((direction) => (
+            <option
+              key={`${column.id}:${direction}`}
+              value={sortOptionValue({ columnId: column.id, direction })}
+            >
+              {t('common.dataTable.sortOption', {
+                column: column.header,
+                arrow: SORT_ARROW[direction],
+              })}
+            </option>
+          ))
+        )}
+      </select>
+    </label>
+  );
+}
+
 /**
  * Dense table. Headers and cell content arrive already translated — no i18n
  * here. No empty branch — callers show `EmptyState` instead (docs/DESIGN.md
@@ -1174,53 +1258,12 @@ export function DataTable<T>({
       {stackSummary !== undefined && (
         <span className="min-w-0 text-[0.6875rem] text-text-dim">{stackSummary}</span>
       )}
-      {/* A real `<select>` laid invisibly over its own label rather than
-          `Select`/`NativeSelect`: a phone should get the OS picker, and the
-          closed control reads "Sort: Price ↑" while each option is just
-          "Price ↑" — a native select can only show its option's text. */}
-      <label
-        className={cx(
-          fieldBaseClassName,
-          'relative ml-auto inline-flex h-11 shrink-0 items-center gap-1.5 px-3 text-xs focus-within:outline-2 focus-within:outline-accent'
-        )}
-      >
-        <Icon.Sort aria-hidden="true" size={Icon.ICON_SIZE.sm} className="text-text-dim" />
-        <span aria-hidden="true">
-          {sortColumn?.sortValue && sort
-            ? t('common.dataTable.sortLabel', {
-                column: sortColumn.header,
-                arrow: SORT_ARROW[sort.direction],
-              })
-            : t('common.dataTable.sortNone')}
-        </span>
-        <select
-          aria-label={t('common.dataTable.sortBy')}
-          className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
-          value={sort && activeSortId ? sortOptionValue(sort) : ''}
-          onChange={(event) => {
-            const next = parseSortOptionValue(event.target.value);
-            if (next) setSort(next);
-          }}
-        >
-          {/* Matches `value=""` before any sort; never re-selectable. */}
-          <option value="" disabled>
-            {t('common.dataTable.sortNone')}
-          </option>
-          {sortableColumns.flatMap((column) =>
-            (['asc', 'desc'] as const).map((direction) => (
-              <option
-                key={`${column.id}:${direction}`}
-                value={sortOptionValue({ columnId: column.id, direction })}
-              >
-                {t('common.dataTable.sortOption', {
-                  column: column.header,
-                  arrow: SORT_ARROW[direction],
-                })}
-              </option>
-            ))
-          )}
-        </select>
-      </label>
+      <DataTableSortPicker
+        columns={sortableColumns}
+        sort={sort && activeSortId ? sort : undefined}
+        onSortChange={setSort}
+        className="ml-auto"
+      />
       {stackActions}
     </div>
   );
