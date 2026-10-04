@@ -275,58 +275,63 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
         }
       />
       {tabBar}
-      {/* `grid-cols-1` below lg, not the implicit `auto` column: that one
-          grows to a truncating picker's full label and widens the page. */}
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <div className="space-y-4">
-          <StopsPanel
-            fromId={fromId}
-            fromName={fromId === null ? fromTrigger : nameOf(fromId)}
-            fromTrigger={fromTrigger}
-            // A new start is a new first leg: its pin no longer applies.
-            onFromChange={(systemId) => setParams({ from: systemId, pin: [] }, { push: true })}
-            stops={stops}
-            onStopsChange={(next) =>
-              setParams(
-                // Pins belong to legs by position: a new stop list drops them,
-                // but the first stop keeps the pin a Route via link made for it.
-                { stops: next, to: null, ...(stops.length > 0 ? { pin: [] } : {}) },
-                { push: true }
-              )
-            }
-            settings={settings}
-            onSettingsChange={(patch) =>
-              setParams({
-                pin: [],
-                ...(patch.optimize === undefined ? {} : { opt: patch.optimize }),
-                ...(patch.returnToStart === undefined ? {} : { ret: patch.returnToStart }),
-                ...(patch.keepLastStopLast === undefined ? {} : { keep: patch.keepLastStopLast }),
-              })
-            }
-            optimizeBlocked={state.kind === 'route' && state.unreachable}
-            orderNote={orderNote}
-            nameOf={nameOf}
-          />
-          <RouteRulesPanel
-            preference={routeQuery.rules.preference}
-            onPreferenceChange={(pref) => setParams({ pref })}
-            holeQuery={holeQuery}
-            onHoleChange={(change) => {
-              saveRouteHoleDefault(change);
-              setParams({ [HOLE_PARAM[change.field]]: null });
-            }}
-            bridges={{
-              bridgeQuery,
-              onBridgesChange: (enabled) => {
-                void useRouteBridgesEnabled.getState().setValue(enabled);
-                setParams({ jb: null });
-              },
-              bridgeCount: gateRecords?.length ?? 0,
-              onManageBridges: () => setBridgeDialog('search'),
-            }}
-          />
+      {/* The route table needs ~612px but only gets ~427px beside the rail at 1024, so the
+          rail and route sit side by side only from `xl` (#2591). Below it the rail
+          dissolves (`contents`) so Stops, the route, then Route rules stack in order. */}
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="contents xl:block xl:space-y-4">
+          <div className="order-1 xl:order-none">
+            <StopsPanel
+              fromId={fromId}
+              fromName={fromId === null ? fromTrigger : nameOf(fromId)}
+              fromTrigger={fromTrigger}
+              // A new start is a new first leg: its pin no longer applies.
+              onFromChange={(systemId) => setParams({ from: systemId, pin: [] }, { push: true })}
+              stops={stops}
+              onStopsChange={(next) =>
+                setParams(
+                  // Pins belong to legs by position: a new stop list drops them,
+                  // but the first stop keeps the pin a Route via link made for it.
+                  { stops: next, to: null, ...(stops.length > 0 ? { pin: [] } : {}) },
+                  { push: true }
+                )
+              }
+              settings={settings}
+              onSettingsChange={(patch) =>
+                setParams({
+                  pin: [],
+                  ...(patch.optimize === undefined ? {} : { opt: patch.optimize }),
+                  ...(patch.returnToStart === undefined ? {} : { ret: patch.returnToStart }),
+                  ...(patch.keepLastStopLast === undefined ? {} : { keep: patch.keepLastStopLast }),
+                })
+              }
+              optimizeBlocked={state.kind === 'route' && state.unreachable}
+              orderNote={orderNote}
+              nameOf={nameOf}
+            />
+          </div>
+          <div className="order-3 xl:order-none">
+            <RouteRulesPanel
+              preference={routeQuery.rules.preference}
+              onPreferenceChange={(pref) => setParams({ pref })}
+              holeQuery={holeQuery}
+              onHoleChange={(change) => {
+                saveRouteHoleDefault(change);
+                setParams({ [HOLE_PARAM[change.field]]: null });
+              }}
+              bridges={{
+                bridgeQuery,
+                onBridgesChange: (enabled) => {
+                  void useRouteBridgesEnabled.getState().setValue(enabled);
+                  setParams({ jb: null });
+                },
+                bridgeCount: gateRecords?.length ?? 0,
+                onManageBridges: () => setBridgeDialog('search'),
+              }}
+            />
+          </div>
         </div>
-        <div className="min-w-0 space-y-4">
+        <div className="order-2 min-w-0 space-y-4 xl:order-none">
           <RouteBody
             state={state}
             multiStop={stops.length > 1}
