@@ -478,22 +478,22 @@ function RouteBody({
               />
             )}
             {holesState.kind === 'loading' && (
-              <p role="status" className="text-text-dim">
+              <p role="status" className="text-sm text-text-dim">
                 {t('travel.holes.loading')}
               </p>
             )}
             {holesState.kind === 'unavailable' && (
-              <p role="status" className="text-text-dim">
+              <p role="status" className="text-sm text-text-dim">
                 {t('travel.holes.unavailable')}
               </p>
             )}
             {state.activityLoading && (
-              <p role="status" className="text-text-dim">
+              <p role="status" className="text-sm text-text-dim">
                 {t('travel.activityLoading')}
               </p>
             )}
             {state.activityUnavailable && (
-              <p role="status" className="text-text-dim">
+              <p role="status" className="text-sm text-text-dim">
                 {t('travel.activityUnavailable')}
               </p>
             )}

@@ -12,9 +12,12 @@
  * — only `status`/`reviewDiff` move; `resolveNeedsReview` (assignments.ts) is
  * the one place `oreLines` itself re-snapshots.
  *
- * Unpaid, ungrouped growth skips the flag: it is absorbed straight into the
- * Assignment (`resolveNeedsReview`), since an unsettled obligation has no paid
- * history to protect. Paid, dismissed and joined-group growth still flags.
+ * Unpaid growth skips the flag: it is absorbed straight into the Assignment
+ * (`resolveNeedsReview`), since an unsettled obligation has no paid history to
+ * protect. That includes a member of a combined entry — a session that crossed
+ * midnight UTC is usually combined while the second day is still growing
+ * (scope decision 20261004, "combined entries absorb unpaid growth"). Paid and
+ * dismissed growth still flags.
  *
  * Run once per character after loading its fresh ledger (see
  * `snapshot.ts`), not on every render — `sameDiffs` skips the write (and the
@@ -78,10 +81,11 @@ export async function reconcileAssignments(
     const diffs = diffAssignedOreLines(assignment.oreLines, relevantFresh);
     if (diffs.length === 0) continue;
     if (assignment.status === 'needs-review' && sameDiffs(assignment.reviewDiff, diffs)) continue;
-    // Unpaid, ungrouped growth has no settled history to protect, so it folds
-    // straight in — the pilot then splits it from the ordinary row if the
-    // new ore belongs to another Payee.
-    if (assignment.status === 'outstanding' && !assignment.groupId) {
+    // Unpaid growth has no settled history to protect, so it folds straight
+    // in — the pilot then splits it from the ordinary row if the new ore
+    // belongs to another Payee. Combined or not: a combined member is billed
+    // with its siblings, but its own ore is still only its own day's.
+    if (assignment.status === 'outstanding') {
       absorbs.push({ assignment, key });
       continue;
     }

@@ -11,11 +11,12 @@ import {
   linkPaymentTransaction,
   linkRecordedPayment,
   markAssignmentsPaid,
+  moveAssignmentsToPayee,
   resolveNeedsReview,
   splitAssignment,
+  uncombineAssignments,
   unlinkPaymentTransaction,
-  unlockPaidAssignment,
-  updateAssignment,
+  updateCombinedAssignments,
 } from './assignments';
 
 const syncMock = vi.hoisted(() => ({
@@ -107,192 +108,6 @@ describe('createAssignment', () => {
 
     expect(assignment.status).toBe('paid');
     expect(assignment.paidAt).toBeDefined();
-  });
-});
-
-describe('updateAssignment', () => {
-  async function grouped() {
-    const assignment = await createAssignment({
-      characterId: CHAR_A,
-      date: '2026-09-04',
-      solarSystemId: 30000142,
-      payeeId: 'payee-1',
-      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
-      taxPct: 10,
-      estimatedValue: 1000,
-      taxOwed: 100,
-      markPaid: false,
-    });
-    const joined = { ...assignment, groupId: 'g1' };
-    await db.miningTaxAssignments.put(joined);
-    vi.clearAllMocks();
-    return joined;
-  }
-
-  it('ejects a joined member from its group when its Payee changes', async () => {
-    const joined = await grouped();
-
-    const updated = await updateAssignment(joined, {
-      payeeId: 'payee-2',
-      taxPct: 10,
-      estimatedValue: 1000,
-      taxOwed: 100,
-    });
-
-    expect(updated.groupId).toBeUndefined();
-    expect((await db.miningTaxAssignments.get(joined.id))?.groupId).toBeUndefined();
-  });
-
-  it('ejects a joined member when only its tax rate changes', async () => {
-    const joined = await grouped();
-
-    const updated = await updateAssignment(joined, {
-      payeeId: 'payee-1',
-      taxPct: 15,
-      estimatedValue: 1000,
-      taxOwed: 150,
-    });
-
-    expect(updated.groupId).toBeUndefined();
-  });
-
-  it('keeps a joined member in its group when only the ISK figures are corrected', async () => {
-    const joined = await grouped();
-
-    const updated = await updateAssignment(joined, {
-      payeeId: 'payee-1',
-      taxPct: 10,
-      estimatedValue: 1250,
-      taxOwed: 125,
-    });
-
-    expect(updated.groupId).toBe('g1');
-  });
-
-  it('overwrites payeeId/taxPct/estimatedValue/taxOwed, leaving oreLines, status and paidAt untouched', async () => {
-    const assignment = await createAssignment({
-      characterId: CHAR_A,
-      date: '2026-09-04',
-      solarSystemId: 30000142,
-      payeeId: 'payee-1',
-      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
-      taxPct: 10,
-      estimatedValue: 1000,
-      taxOwed: 100,
-      markPaid: true,
-    });
-    vi.clearAllMocks();
-
-    const updated = await updateAssignment(assignment, {
-      payeeId: 'payee-2',
-      taxPct: 15,
-      estimatedValue: 1200,
-      taxOwed: 180,
-    });
-
-    expect(updated.payeeId).toBe('payee-2');
-    expect(updated.taxPct).toBe(15);
-    expect(updated.estimatedValue).toBe(1200);
-    expect(updated.taxOwed).toBe(180);
-    expect(updated.oreLines).toEqual(assignment.oreLines);
-    expect(updated.status).toBe('paid');
-    expect(updated.paidAt).toBe(assignment.paidAt);
-    expect(await db.miningTaxAssignments.get(assignment.id)).toEqual(updated);
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
-  });
-
-  it('persists per-ore-type value overrides when given', async () => {
-    const assignment = await createAssignment({
-      characterId: CHAR_A,
-      date: '2026-09-04',
-      solarSystemId: 30000142,
-      payeeId: 'payee-1',
-      oreLines: [
-        { typeId: TYPE_A, quantity: 100 },
-        { typeId: TYPE_B, quantity: 50 },
-      ],
-      taxPct: 10,
-      estimatedValue: 1200,
-      taxOwed: 120,
-      markPaid: false,
-    });
-
-    const updated = await updateAssignment(assignment, {
-      payeeId: 'payee-1',
-      taxPct: 10,
-      estimatedValue: 1100,
-      taxOwed: 110,
-      oreLineValues: { [TYPE_A]: 900 },
-    });
-
-    expect(updated.oreLineValues).toEqual({ [TYPE_A]: 900 });
-    expect((await db.miningTaxAssignments.get(assignment.id))?.oreLineValues).toEqual({
-      [TYPE_A]: 900,
-    });
-  });
-
-  it('clears any stored per-ore-type overrides when the input omits them', async () => {
-    const assignment = await createAssignment({
-      characterId: CHAR_A,
-      date: '2026-09-04',
-      solarSystemId: 30000142,
-      payeeId: 'payee-1',
-      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
-      taxPct: 10,
-      estimatedValue: 1000,
-      taxOwed: 100,
-      markPaid: false,
-    });
-    await updateAssignment(assignment, {
-      payeeId: 'payee-1',
-      taxPct: 10,
-      estimatedValue: 900,
-      taxOwed: 90,
-      oreLineValues: { [TYPE_A]: 900 },
-    });
-
-    // Back to the "edit ore values individually" setting being off: the
-    // Assign form's whole-row edit doesn't send oreLineValues at all.
-    const reverted = await updateAssignment(assignment, {
-      payeeId: 'payee-1',
-      taxPct: 10,
-      estimatedValue: 1100,
-      taxOwed: 110,
-    });
-
-    expect(reverted.oreLineValues).toBeUndefined();
-    expect((await db.miningTaxAssignments.get(assignment.id))?.oreLineValues).toBeUndefined();
-  });
-});
-
-describe('unlockPaidAssignment', () => {
-  it('reverts status to outstanding and clears paidAt, but keeps the recorded payment', async () => {
-    const assignment = await createAssignment({
-      characterId: CHAR_A,
-      date: '2026-09-04',
-      solarSystemId: 30000142,
-      payeeId: 'payee-1',
-      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
-      taxPct: 10,
-      estimatedValue: 1000,
-      taxOwed: 100,
-      markPaid: false,
-    });
-    await markAssignmentsPaid([assignment], {
-      method: 'donation',
-      amount: 1000,
-      paidOn: '2026-09-05',
-    });
-    const paid = await db.miningTaxAssignments.get(assignment.id);
-    vi.clearAllMocks();
-
-    const unlocked = await unlockPaidAssignment(paid!);
-
-    expect(unlocked.status).toBe('outstanding');
-    expect(unlocked.paidAt).toBeUndefined();
-    expect(unlocked.payment).toEqual(paid!.payment);
-    expect(await db.miningTaxAssignments.get(assignment.id)).toEqual(unlocked);
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
   });
 });
 
@@ -1407,5 +1222,98 @@ describe('double-assignment guard', () => {
       entryOreLines: [{ typeId: TYPE_A, quantity: 130 }],
     });
     expect(await db.miningTaxAssignments.count()).toBe(3);
+  });
+});
+
+function member(
+  id: string,
+  date: string,
+  overrides: Partial<MiningTaxAssignmentRecord> = {}
+): MiningTaxAssignmentRecord {
+  return {
+    id,
+    characterId: CHAR_A,
+    date,
+    solarSystemId: 30001,
+    payeeId: 'star-tail',
+    oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+    taxPct: 5,
+    estimatedValue: 1000,
+    taxOwed: 50,
+    status: 'outstanding',
+    groupId: 'g1',
+    updatedAt: 1,
+    ...overrides,
+  };
+}
+
+describe('updateCombinedAssignments', () => {
+  it('moves every member onto one Payee and rate and keeps them combined', async () => {
+    const d3 = member('d3', '2026-10-03');
+    const d4 = member('d4', '2026-10-04');
+    await db.miningTaxAssignments.bulkPut([d3, d4]);
+
+    await updateCombinedAssignments([d3, d4], {
+      payeeId: 'bureau',
+      taxPct: 6,
+      members: {
+        d3: { estimatedValue: 2000, taxOwed: 120, oreLineValues: { [TYPE_A]: 2000 } },
+        d4: { estimatedValue: 3000, taxOwed: 180 },
+      },
+    });
+
+    const [s3, s4] = await Promise.all([
+      db.miningTaxAssignments.get('d3'),
+      db.miningTaxAssignments.get('d4'),
+    ]);
+    expect(s3).toMatchObject({ payeeId: 'bureau', taxPct: 6, taxOwed: 120, groupId: 'g1' });
+    expect(s3?.oreLineValues).toEqual({ [TYPE_A]: 2000 });
+    expect(s4).toMatchObject({ payeeId: 'bureau', taxPct: 6, estimatedValue: 3000, groupId: 'g1' });
+    expect(s4?.oreLineValues).toBeUndefined();
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+  });
+
+  it('leaves status and payment alone', async () => {
+    const paid = member('d3', '2026-10-03', {
+      status: 'paid',
+      paidAt: 5,
+      payment: { paymentId: 'p1', paidOn: '2026-10-04', method: 'donation', amount: 50 },
+    });
+    await db.miningTaxAssignments.put(paid);
+
+    await updateCombinedAssignments([paid], {
+      payeeId: 'star-tail',
+      taxPct: 5,
+      members: { d3: { estimatedValue: 1100, taxOwed: 55 } },
+    });
+
+    const stored = await db.miningTaxAssignments.get('d3');
+    expect(stored?.status).toBe('paid');
+    expect(stored?.payment?.paymentId).toBe('p1');
+  });
+});
+
+describe('uncombineAssignments', () => {
+  it('takes members out of their combined entry without unassigning them', async () => {
+    const d3 = member('d3', '2026-10-03');
+    await db.miningTaxAssignments.put(d3);
+
+    await uncombineAssignments([d3]);
+
+    const stored = await db.miningTaxAssignments.get('d3');
+    expect(stored?.groupId).toBeUndefined();
+    expect(stored).toMatchObject({ payeeId: 'star-tail', status: 'outstanding', taxOwed: 50 });
+  });
+});
+
+describe('moveAssignmentsToPayee', () => {
+  it('re-points Assignments at another Payee and keeps every figure and combination', async () => {
+    const d3 = member('d3', '2026-10-03');
+    await db.miningTaxAssignments.put(d3);
+
+    await moveAssignmentsToPayee([d3], 'bureau');
+
+    const stored = await db.miningTaxAssignments.get('d3');
+    expect(stored).toMatchObject({ payeeId: 'bureau', taxPct: 5, taxOwed: 50, groupId: 'g1' });
   });
 });

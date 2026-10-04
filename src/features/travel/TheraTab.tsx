@@ -190,7 +190,7 @@ function TheraBody({
   return (
     <Panel>
       <div className="space-y-3">
-        <p role="status" className={cx('text-text-dim', jumpsNote === '' && 'sr-only')}>
+        <p role="status" className={cx('text-sm text-text-dim', jumpsNote === '' && 'sr-only')}>
           {jumpsNote}
         </p>
         {rows.length > 0 ? (

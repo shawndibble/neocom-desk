@@ -5,6 +5,51 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 
+// Shared by every non-primitive file. Flat config replaces a rule's options
+// rather than merging them, so a later block that adds selectors for a
+// narrower glob must re-list these.
+const restrictedSyntax = [
+  {
+    selector:
+      "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='search']",
+    message: 'Use SearchInput from src/components/ui instead of a raw <input type="search">.',
+  },
+  {
+    selector:
+      "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='checkbox']",
+    message: 'Use Checkbox from src/components/ui instead of a raw <input type="checkbox">.',
+  },
+  {
+    selector:
+      "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='radio']",
+    message: 'Use Radio from src/components/ui instead of a raw <input type="radio">.',
+  },
+  {
+    selector: "JSXOpeningElement[name.name='textarea']",
+    message: 'Use TextArea from src/components/ui instead of a raw <textarea>.',
+  },
+  {
+    // A typed character is not an icon (DESIGN.md §5). Only-child, so a
+    // sign before an amount (`+<IskAmount …/>`) stays legal. Pinned by
+    // scripts/lib/typedGlyphLint.test.mjs.
+    selector: 'JSXText[value=/^\\s*(−|\\+|Aa)\\s*$/]:first-child:last-child',
+    message:
+      'A typed "−", "+" or "Aa" is not an icon — use IconButton with an Icon.* glyph (e.g. Icon.Decrease / Icon.Increase).',
+  },
+];
+
+// Sort direction is always Icon.Sort / Icon.Ascending / Icon.Descending
+// (DESIGN.md §5). A text arrow is only legal inside DataTable's stacked-mode
+// native <option>, which can only show text. Pinned by
+// scripts/lib/sortArrowLint.test.mjs.
+const sortArrowMessage =
+  'Draw sort direction with Icon.Sort / Icon.Ascending / Icon.Descending, not a "↑" / "↓" character (DESIGN.md §5).';
+const sortArrowSyntax = [
+  { selector: 'Literal[value=/[↑↓]/]', message: sortArrowMessage },
+  { selector: 'TemplateElement[value.raw=/[↑↓]/]', message: sortArrowMessage },
+  { selector: 'JSXText[value=/[↑↓]/]', message: sortArrowMessage },
+];
+
 export default tseslint.config(
   {
     ignores: [
@@ -36,36 +81,7 @@ export default tseslint.config(
     files: ['**/*.{ts,tsx}'],
     ignores: ['src/components/ui/**'],
     rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector:
-            "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='search']",
-          message: 'Use SearchInput from src/components/ui instead of a raw <input type="search">.',
-        },
-        {
-          selector:
-            "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='checkbox']",
-          message: 'Use Checkbox from src/components/ui instead of a raw <input type="checkbox">.',
-        },
-        {
-          selector:
-            "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='radio']",
-          message: 'Use Radio from src/components/ui instead of a raw <input type="radio">.',
-        },
-        {
-          selector: "JSXOpeningElement[name.name='textarea']",
-          message: 'Use TextArea from src/components/ui instead of a raw <textarea>.',
-        },
-        {
-          // A typed character is not an icon (DESIGN.md §5). Only-child, so a
-          // sign before an amount (`+<IskAmount …/>`) stays legal. Pinned by
-          // scripts/lib/typedGlyphLint.test.mjs.
-          selector: 'JSXText[value=/^\\s*(−|\\+|Aa)\\s*$/]:first-child:last-child',
-          message:
-            'A typed "−", "+" or "Aa" is not an icon — use IconButton with an Icon.* glyph (e.g. Icon.Decrease / Icon.Increase).',
-        },
-      ],
+      'no-restricted-syntax': ['error', ...restrictedSyntax],
       'no-restricted-imports': [
         'error',
         {
@@ -86,6 +102,20 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+  {
+    files: ['src/**/*.tsx'],
+    ignores: ['src/components/ui/**'],
+    rules: {
+      'no-restricted-syntax': ['error', ...restrictedSyntax, ...sortArrowSyntax],
+    },
+  },
+  {
+    files: ['src/components/ui/**/*.tsx'],
+    ignores: ['src/components/ui/DataTable.tsx', 'src/components/ui/DataTable.test.tsx'],
+    rules: {
+      'no-restricted-syntax': ['error', ...sortArrowSyntax],
     },
   },
   {
