@@ -10,7 +10,10 @@ const settle = vi.fn<(...args: unknown[]) => Promise<LedgerActionResult>>();
 vi.mock('./ledgerActions', () => ({
   settle: (...args: unknown[]) => settle(...args),
 }));
-vi.mock('./payees', () => ({ rememberPayeeEntity: vi.fn(() => Promise.resolve()) }));
+const rememberPayeeEntity = vi.fn<(...args: unknown[]) => Promise<void>>(() => Promise.resolve());
+vi.mock('./payees', () => ({
+  rememberPayeeEntity: (...args: unknown[]) => rememberPayeeEntity(...args),
+}));
 
 /** A payment in kind: its cargo is unpriced, so the pilot types what it was worth. */
 const IN_KIND = {
@@ -34,15 +37,18 @@ const IN_KIND = {
   confidence: 'identity',
 } as unknown as LinkSuggestion;
 
-function renderDialog(onClose = () => {}) {
+function renderDialog(
+  suggestion: LinkSuggestion = IN_KIND,
+  { onLinked = () => {}, onClose = () => {} }: { onLinked?: () => void; onClose?: () => void } = {}
+) {
   render(
     <LinkPaymentDialog
       open
       onClose={onClose}
-      suggestions={[IN_KIND]}
+      suggestions={[suggestion]}
       systemNames={new Map()}
       showCharacter={false}
-      onLinked={() => {}}
+      onLinked={onLinked}
     />
   );
 }
@@ -98,17 +104,53 @@ describe('LinkPaymentDialog — value handed over', () => {
   });
 });
 
-describe('LinkPaymentDialog — saving', () => {
-  it('shows the failure and stays open when the save fails', async () => {
+describe('LinkPaymentDialog — a failed save', () => {
+  beforeEach(() => {
     settle.mockReset();
-    settle.mockResolvedValue({ ok: false, reason: 'save-failed', cause: null });
+    settle.mockResolvedValue({ ok: true, value: undefined });
+    rememberPayeeEntity.mockReset();
+    rememberPayeeEntity.mockResolvedValue();
+  });
+
+  it('says so and stays open when marking paid fails', async () => {
+    settle.mockResolvedValueOnce({ ok: false, reason: 'save-failed', cause: new Error('quota') });
+    const onLinked = vi.fn();
     const onClose = vi.fn();
     const user = userEvent.setup();
-    renderDialog(onClose);
+    renderDialog(IN_KIND, { onLinked, onClose });
 
     await user.click(screen.getByRole('button', { name: 'Mark 1 paid' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t save');
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn’t save/);
+    expect(onLinked).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Mark 1 paid' })).toBeEnabled();
+  });
+
+  it('keeps the recorded payment, and says only remembering the recipient failed', async () => {
+    rememberPayeeEntity.mockRejectedValueOnce(new Error('quota'));
+    const onLinked = vi.fn();
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    const fromKnownSender = {
+      ...IN_KIND,
+      payment: { ...IN_KIND.payment, counterpartyId: 99 },
+    } as LinkSuggestion;
+    renderDialog(fromKnownSender, { onLinked, onClose });
+
+    await user.click(screen.getByRole('button', { name: 'Mark 1 paid' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Payment linked, but couldn’t remember who Mining Corp is paid.'
+    );
+    expect(onClose).not.toHaveBeenCalled();
+    // Already recorded: a second click must not mark it paid twice.
+    expect(screen.getByRole('button', { name: 'Mark 1 paid' })).toBeDisabled();
+    expect(settle).toHaveBeenCalledTimes(1);
+    // The reload waits for the close, so it can't unmount the message unread.
+    expect(onLinked).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onLinked).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

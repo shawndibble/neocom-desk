@@ -63,7 +63,9 @@ export function LinkPaymentDialog({
   // False while the field shows text `amountInKind` doesn't reflect ("1bx"):
   // saving then would record a figure the pilot can't see.
   const [amountInKindParses, setAmountInKindParses] = useState(true);
-  const { pending: saving, error: saveError, run } = useLedgerAction();
+  const { pending: saving, error: saveError, setError: setSaveError, run } = useLedgerAction();
+  // Set once the entries are marked paid, so a retry after a later failure can't record it twice.
+  const [recorded, setRecorded] = useState(false);
 
   const selected = suggestions.find((s) => s.payment.key === selectedKey) ?? null;
 
@@ -109,40 +111,51 @@ export function LinkPaymentDialog({
   async function commit() {
     if (!selected || included.length === 0 || !amountValid) return;
     const { payment, balance } = selected;
-    await run(
-      async () => {
-        const result = await settle(
-          included.map((m) => m.assignment),
-          {
-            paidOn: paidOnFor(payment.date),
-            method: payment.method,
-            amount: Math.round(recordedAmount),
-            ...(payment.kind === 'journal'
-              ? { journalLinks: [{ refId: payment.refId, source: 'manual' as const }] }
-              : { contractLinks: [{ refId: payment.refId, source: 'manual' as const }] }),
-          }
-        );
-        // Learned only on confirmation — the pilot agreeing this payment settled
-        // this Payee is what makes the recipient identification trustworthy.
-        // Best effort: the payment is recorded either way, and failing to
-        // learn who was paid is no reason to hold the dialog open.
-        if (result.ok && payment.counterpartyId !== undefined) {
-          await rememberPayeeEntity(balance.payee, payment.counterpartyId).catch(() => {});
+    const result = await run(() =>
+      settle(
+        included.map((m) => m.assignment),
+        {
+          paidOn: paidOnFor(payment.date),
+          method: payment.method,
+          amount: Math.round(recordedAmount),
+          ...(payment.kind === 'journal'
+            ? { journalLinks: [{ refId: payment.refId, source: 'manual' as const }] }
+            : { contractLinks: [{ refId: payment.refId, source: 'manual' as const }] }),
         }
-        return result;
-      },
-      () => {
-        onLinked();
-        onClose();
-      }
+      )
     );
+    if (!result.ok) return;
+    setRecorded(true);
+    try {
+      // Learned only on confirmation — the pilot agreeing this payment settled
+      // this Payee is what makes the recipient identification trustworthy.
+      if (payment.counterpartyId !== undefined) {
+        await rememberPayeeEntity(balance.payee, payment.counterpartyId);
+      }
+    } catch {
+      // The payment is recorded; only learning who the Payee is paid failed.
+      // Say so and keep the dialog open, rather than closing as if all went.
+      // `onLinked` waits for the close: TaxTab mounts this dialog only while
+      // `linkSuggestions` is non-empty, and the reload drops this payment from
+      // them, which would unmount the message unread. (LinkWalletPaymentDialog
+      // is mounted per Payee, so it can reload straight away.)
+      setSaveError(t('miningTax.linkWallet.rememberFailed', { payee: balance.payee.name }));
+      return;
+    }
+    onLinked();
+    onClose();
+  }
+
+  function close() {
+    if (recorded) onLinked();
+    onClose();
   }
 
   const confidenceLabel = (suggestion: LinkSuggestion, payee: PayeeRecord) =>
     t(`miningTax.linkConfidence.${suggestion.confidence}`, { payee: payee.name });
 
   return (
-    <Modal open={open} onClose={onClose} title={t('miningTax.linkPaymentTitle')}>
+    <Modal open={open} onClose={close} title={t('miningTax.linkPaymentTitle')}>
       <div className="space-y-3 text-sm">
         <p className="text-xs text-text-dim">{t('miningTax.linkPaymentHint')}</p>
 
@@ -280,12 +293,12 @@ export function LinkPaymentDialog({
           <Button
             variant="primary"
             size="sm"
-            disabled={!selected || included.length === 0 || !amountValid || saving}
+            disabled={!selected || included.length === 0 || !amountValid || saving || recorded}
             onClick={() => void commit()}
           >
             {t('miningTax.linkPaymentConfirmAction', { count: included.length })}
           </Button>
-          <Button size="sm" onClick={onClose}>
+          <Button size="sm" onClick={close}>
             {t('filters.cancel')}
           </Button>
         </div>

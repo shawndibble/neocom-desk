@@ -13,10 +13,12 @@
  * to seed a second Payee and an Assignment for no extra coverage.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
+import { split } from './ledgerActions';
 import { SplitDialog } from './SplitDialog';
 import type { MoonMiningTaxRow } from './snapshot';
 
@@ -111,5 +113,43 @@ describe('SplitDialog — the split preview', () => {
     const { container } = renderDialog();
 
     expect(container.querySelectorAll('.text-isk-neg, .text-isk-pos')).toHaveLength(0);
+  });
+});
+
+describe('SplitDialog — a failed save', () => {
+  it('says so and stays open', async () => {
+    vi.mocked(split).mockResolvedValueOnce({
+      ok: false,
+      reason: 'save-failed',
+      cause: new Error('quota'),
+    });
+    const onSplit = vi.fn();
+    render(
+      <MemoryRouter>
+        <SplitDialog
+          open
+          onClose={vi.fn()}
+          assignment={assignment}
+          row={row}
+          systemName="Jita"
+          payees={payees}
+          typeNames={new Map([[ZEOLITES, 'Zeolites']])}
+          pricesFor={pricesFor}
+          busy={false}
+          onSplit={onSplit}
+        />
+      </MemoryRouter>
+    );
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Move part of this day to' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Hek landlord' }));
+    fireEvent.change(screen.getByRole('slider', { name: 'Units of Zeolites to move' }), {
+      target: { value: '40' },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Split · move 40 units' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn’t save/);
+    expect(onSplit).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Split · move 40 units' })).toBeEnabled();
   });
 });

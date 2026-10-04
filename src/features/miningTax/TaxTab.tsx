@@ -390,11 +390,25 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   const [toast, setToast] = useState<{ message: string; onUndo?: () => void } | null>(null);
   const [continuing, setContinuing] = useState(false);
   // Every row action and the Link-transaction confirm run through this, so a
-  // failure reads the same as in every dialog. The error belongs to the row
-  // (or link target) it failed on — opening another one doesn't inherit it.
-  const { pending: acting, error: actionError, run: runRowAction } = useLedgerAction();
-  const [failedOn, setFailedOn] = useState<DisplayRow | null>(null);
+  // failure reads the same as in every dialog: the modal stays open saying
+  // nothing was changed (each action is one transaction, so that is true).
+  const {
+    pending: acting,
+    error: actionError,
+    setError: setActionError,
+    run: runRowAction,
+  } = useLedgerAction();
   const busy = continuing || acting;
+  // Reset whenever the target changes, not keyed on it: after a failure
+  // nothing reloads, so reopening the same row hands back the very same object.
+  const [errorTargets, setErrorTargets] = useState({ detailTarget, linkTransactionTarget });
+  if (
+    errorTargets.detailTarget !== detailTarget ||
+    errorTargets.linkTransactionTarget !== linkTransactionTarget
+  ) {
+    setErrorTargets({ detailTarget, linkTransactionTarget });
+    setActionError(null);
+  }
 
   useEffect(() => {
     if (!toast) return;
@@ -907,17 +921,10 @@ export function TaxTab({ tabBar }: TaxTabProps) {
    * reload — or, when it wrote nothing, stay open and say so.
    */
   async function runAndClose(action: () => Promise<LedgerActionResult<unknown>>) {
-    const target = detailTarget;
-    const result = await runRowAction(action, () => {
+    await runRowAction(action, () => {
       setDetailTarget(null);
       refresh();
     });
-    setFailedOn(result.ok ? null : target);
-  }
-
-  /** `actionError`, but only for the row it failed on. */
-  function errorFor(target: DisplayRow): string | null {
-    return failedOn === target ? actionError : null;
   }
 
   function handleMarkGroupPaidFromDetail() {
@@ -987,8 +994,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     if (!linkTransactionTarget) return;
     const targets = assignmentsForLinkTarget(linkTransactionTarget, everyAssignment);
     if (targets.length === 0) return;
-    const target = linkTransactionTarget;
-    const result = await runRowAction(
+    await runRowAction(
       () =>
         linkTransaction(
           targets,
@@ -1008,7 +1014,6 @@ export function TaxTab({ tabBar }: TaxTabProps) {
         refresh();
       }
     );
-    setFailedOn(result.ok ? null : target);
   }
 
   function handleMarkPaidFromDetail() {
@@ -1870,7 +1875,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           typeNames={data.typeNames}
           payeeDisplayName={payeeDisplayName(detailTarget)}
           busy={busy}
-          saveError={errorFor(detailTarget)}
+          saveError={actionError}
           onEdit={() => {
             setEditTarget(detailTarget);
             setDetailTarget(null);
@@ -1935,7 +1940,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           suggestion={detailTarget.assignment ? undefined : suggestionFor(detailTarget.row)}
           pricesFor={pricesFor}
           busy={busy}
-          saveError={errorFor(detailTarget)}
+          saveError={actionError}
           onAssigned={handleAssignedFromDetail}
           onDismiss={handleDismissFromDetail}
           onMarkPaid={handleMarkPaidFromDetail}
@@ -1992,7 +1997,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             candidates={linkTransactionCandidates}
             targetAmount={linkTransactionTargetAmount}
             busy={busy}
-            saveError={errorFor(linkTransactionTarget)}
+            saveError={actionError}
             onConfirm={(payment, source) => void handleConfirmLinkTransaction(payment, source)}
           />
         )}
