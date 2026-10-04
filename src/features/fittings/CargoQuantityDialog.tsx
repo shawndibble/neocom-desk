@@ -3,7 +3,7 @@
  * taking it out. Mounted per item opened, so the field starts at that
  * item's own count.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput } from '@/components/ui';
 
@@ -23,8 +23,14 @@ export function CargoQuantityDialog({
 }: CargoQuantityDialogProps) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState(String(quantity));
+  const fieldRef = useRef<HTMLInputElement>(null);
   return (
-    <Modal open onClose={onClose} title={t('fittings.item.quantityTitle', { name })}>
+    <Modal
+      open
+      onClose={onClose}
+      title={t('fittings.item.quantityTitle', { name })}
+      initialFocusRef={fieldRef}
+    >
       <form
         className="space-y-3"
         onSubmit={(e) => {
@@ -38,12 +44,15 @@ export function CargoQuantityDialog({
           {t('fittings.edit.quantity')}
         </label>
         <TextInput
+          ref={fieldRef}
           id="fitting-cargo-quantity"
           type="number"
           min={0}
           className="w-full"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          // Selected on focus, so typing replaces the count rather than appending to it.
+          onFocus={(e) => e.currentTarget.select()}
         />
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>{t('fittings.myFittings.cancel')}</Button>

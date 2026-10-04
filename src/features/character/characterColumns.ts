@@ -60,7 +60,7 @@ export const useVisibleCharacterColumns = createLocalSetting<readonly CharacterC
   key: VISIBLE_CHARACTER_COLUMNS_KEY,
   defaultValue: DEFAULT_VISIBLE_CHARACTER_COLUMNS,
   // An empty stored array is rejected rather than honoured (miningTax's
-  // statusFilterPref.ts precedent) — it would render a table with only the
+  // since-retired statusFilterPref.ts precedent) — it would render a table with only the
   // row header, no columns and no explanation.
   parse: (raw) =>
     Array.isArray(raw) && raw.length > 0 && raw.every(isCharacterColumnId)

@@ -15,7 +15,15 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, Disclosure, EmptyState, PageHeader, Panel, Spinner } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  Disclosure,
+  EmptyState,
+  PageHeader,
+  Panel,
+  Spinner,
+} from '@/components/ui';
 import {
   countTheraConnectionsByHub,
   filterTheraConnections,
@@ -34,16 +42,20 @@ import { enumParam, optionalEnumParam, optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { TheraFilters } from './TheraFilters';
 import { HUB_OPTIONS, SIZE_OPTIONS } from './theraOptions';
+import { routeViaHref } from './routeSafetyLink';
 import { TheraTable } from './TheraTable';
 import { useTheraConnections, type TheraConnectionsState } from './useTheraConnections';
+
+/** What Reset filters goes back to: origin and Route Preference filter nothing, so they stay. */
+const DEFAULT_FILTERS = { hub: 'all', space: 'kspace', size: 'any' } as const;
 
 const THERA_PARAMS = {
   origin: optionalIdParam(),
   // Absent means the pilot's Travel default (Settings → Travel).
   pref: optionalEnumParam(ROUTE_PREFERENCES),
-  hub: enumParam(HUB_OPTIONS, 'all'),
-  space: enumParam(THERA_EXITS, 'kspace'),
-  size: enumParam(SIZE_OPTIONS, 'any'),
+  hub: enumParam(HUB_OPTIONS, DEFAULT_FILTERS.hub),
+  space: enumParam(THERA_EXITS, DEFAULT_FILTERS.space),
+  size: enumParam(SIZE_OPTIONS, DEFAULT_FILTERS.size),
 };
 
 export function TheraTab({ tabBar }: { tabBar: ReactNode }) {
@@ -109,6 +121,14 @@ export function TheraTab({ tabBar }: { tabBar: ReactNode }) {
         filter={filter}
         hasOrigin={originId !== null}
         originName={originName}
+        routeVia={originId === null ? undefined : (row) => routeViaHref(originId, row.id)}
+        onResetFilters={
+          (Object.keys(DEFAULT_FILTERS) as (keyof typeof DEFAULT_FILTERS)[]).some(
+            (key) => params[key] !== DEFAULT_FILTERS[key]
+          )
+            ? () => setParams(DEFAULT_FILTERS)
+            : undefined
+        }
       />
     </div>
   );
@@ -119,11 +139,16 @@ function TheraBody({
   filter,
   hasOrigin,
   originName,
+  routeVia,
+  onResetFilters,
 }: {
   state: TheraConnectionsState;
   filter: TheraConnectionFilter;
   hasOrigin: boolean;
   originName: string | null;
+  routeVia?: (row: TheraConnectionRow) => string;
+  /** Set while any filter is off its default. */
+  onResetFilters?: () => void;
 }) {
   const { t } = useTranslation();
   if (state.kind === 'loading') {
@@ -165,12 +190,13 @@ function TheraBody({
   return (
     <Panel>
       <div className="space-y-3">
-        <p role="status" className={cx('text-text-dim', jumpsNote === '' && 'sr-only')}>
+        <p role="status" className={cx('text-sm text-text-dim', jumpsNote === '' && 'sr-only')}>
           {jumpsNote}
         </p>
         {rows.length > 0 ? (
           <TheraTable
             rows={rows}
+            routeVia={routeVia}
             label={
               filter.exit === 'wormhole'
                 ? t('travel.thera.jspaceTableLabel')
@@ -187,6 +213,15 @@ function TheraBody({
                   : t('travel.thera.noMatchTitle')
             }
             hint={listed ? t('travel.thera.noMatchHint') : t('travel.thera.emptyHint')}
+            action={
+              // Only a zero the filters made: when EVE-Scout lists nothing,
+              // there is nothing to reset.
+              listed && onResetFilters ? (
+                <Button size="sm" onClick={onResetFilters}>
+                  {t('common.resetFilters')}
+                </Button>
+              ) : undefined
+            }
           />
         )}
         {jspace.length > 0 && <JspaceGroup rows={jspace} />}

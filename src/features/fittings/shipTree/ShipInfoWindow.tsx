@@ -4,7 +4,7 @@
  * Mastery, Blueprint. On a desktop a right slide-over, non-modal so the
  * tree behind keeps steering it; on a phone a bottom sheet.
  */
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, SlideOver, Tabs, Toast } from '@/components/ui';
 import { useTargetPlan } from '@/features/skills/useTargetPlan';
@@ -22,11 +22,10 @@ import { SkillsMasteryTab, type AddedToPlan } from './SkillsMasteryTab';
 import { flyLabel } from './flyLabel';
 import { factionNameOf } from './shipTreeModel';
 import type { ShipTreeSource } from './useShipTreeData';
+import { useTimedToast } from '@/components/ui/useTimedToast';
 
 type InfoTab = 'description' | 'fitting' | 'skills' | 'blueprint';
 const TABS: readonly InfoTab[] = ['description', 'fitting', 'skills', 'blueprint'];
-const TOAST_MS = 8000;
-
 export function ShipInfoWindow({
   ship,
   source,
@@ -42,11 +41,7 @@ export function ShipInfoWindow({
   // Here rather than in the tab, so Undo survives a tab switch or a new hull.
   const [added, setAdded] = useState<AddedToPlan | null>(null);
   const target = useTargetPlan(source.characterId);
-  useEffect(() => {
-    if (!added) return;
-    const timer = setTimeout(() => setAdded(null), TOAST_MS);
-    return () => clearTimeout(timer);
-  }, [added]);
+  useTimedToast(added, () => setAdded(null));
 
   const body = ship && (
     <div className="space-y-3">

@@ -5,11 +5,10 @@ import type { FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
 import { useModuleVariations } from './useModuleVariations';
 import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
+import { fakeDogmaEngine } from './__fixtures__/fakeDogmaEngine';
 
 const checkCandidates = vi.fn();
-vi.mock('./dogmaFittingEngine', () => ({
-  checkCandidates: (...args: unknown[]) => checkCandidates(...args),
-}));
+const engine = fakeDogmaEngine({ checkCandidates });
 
 const getHubPrices = vi.fn();
 vi.mock('@/market/prices', () => ({
@@ -93,6 +92,7 @@ function evaluator(afterFor: (typeId: number | undefined) => FittingStats): Vari
   return {
     fitting,
     profile,
+    engine,
     compare: vi.fn(async (variant: Fitting) => ({
       before: baseStats,
       after: afterFor(variant.modules[0]?.typeId),

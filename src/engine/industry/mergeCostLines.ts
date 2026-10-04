@@ -19,6 +19,9 @@
  * - **`unpriced` is sticky.** One occurrence with no price makes the merged
  *   line's cost an understatement, so the flag survives being merged with
  *   occurrences that priced fine.
+ * - **The Blueprint Acquisition marker survives.** `acquisitionTier` is what
+ *   keeps a blueprint row out of the multibuy text and off the owned-stock
+ *   offer, so a merged blueprint row must still carry it.
  */
 
 import type { MaterialCostLine } from './types';
@@ -41,5 +44,8 @@ export function mergeCostLines(
     unitPrice: existing.unitPrice ?? line.unitPrice,
     lineCost: existing.lineCost + line.lineCost,
     unpriced: existing.unpriced || line.unpriced,
+    ...((existing.acquisitionTier ?? line.acquisitionTier)
+      ? { acquisitionTier: existing.acquisitionTier ?? line.acquisitionTier }
+      : {}),
   };
 }

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
+import * as routeChunks from '@/app/routeChunks';
 import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
@@ -108,7 +109,12 @@ const server = setupServer(
   })
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // Compile the lazy Market chunk here, under the hook's own budget: its first
+  // import cost whichever test ran first more than `findBy`'s default wait.
+  await routeChunks.loadMarket();
+}, 30_000);
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
 beforeEach(async () => {

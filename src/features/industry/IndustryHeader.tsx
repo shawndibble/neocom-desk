@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader, Panel, Tabs } from '@/components/ui';
 import { GrantBanner } from '@/app/GrantNote';
+import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
+import { IndustrySettingsForm } from '@/features/settings/IndustrySettingsForm';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
 import { industryTabs, type IndustryTab } from './industryTabs';
 
@@ -22,7 +24,8 @@ export interface IndustryHeaderProps {
 }
 
 /**
- * The chrome every Industry page shares above its own content: title,
+ * The chrome every Industry page shares above its own content: title (and
+ * the page settings gear beside it),
  * Active Jobs, the reauth banner, and the 4-tab strip — identical whether
  * this is the index or a plan/group's own full-width page, so moving
  * between them reads as "only the content under the tabs changed," not a
@@ -41,7 +44,15 @@ export function IndustryHeader({
   const { t } = useTranslation();
   return (
     <>
-      <PageHeader title={t('nav.industry')} meta={meta} />
+      <PageHeader
+        title={t('nav.industry')}
+        meta={meta}
+        actions={
+          <PageSettingsButton pageName={t('nav.industry')} section="industry">
+            <IndustrySettingsForm />
+          </PageSettingsButton>
+        }
+      />
       <ActiveJobsPanel characterId={activeCharacterId} />
 
       {blueprintsNeedsReauth && (

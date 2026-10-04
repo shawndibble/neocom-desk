@@ -9,8 +9,9 @@ import { FittingItemMenu, ModuleMenuItems } from './FittingItemMenu';
 import { FittingItemActionsProvider, type ChargePickerInput } from './fittingItemActions';
 import { fakeItemActions } from './__fixtures__/itemActions';
 import type { FittingCatalogue } from './useFittingCatalogue';
+import { fakeDogmaEngine, fakeFittingContext } from './__fixtures__/fakeDogmaEngine';
 
-vi.mock('./dogmaFittingEngine', () => ({
+const engine = fakeDogmaEngine({
   checkCharges: () => new Set([230, 238, 21740]),
   chargesMissingSkills: () => new Set<number>(),
   compareCharges: () => [
@@ -42,7 +43,7 @@ vi.mock('./dogmaFittingEngine', () => ({
       techLevel: 1,
     },
   ],
-}));
+});
 vi.mock('@/market/prices', () => ({
   getHubPrices: async () => new Map(),
 }));
@@ -82,9 +83,7 @@ const catalogue = {
 function renderMenu() {
   const input: ChargePickerInput = {
     fitting,
-    catalogue,
-    engineReady: true,
-    profile: { skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] },
+    context: fakeFittingContext(catalogue, { engine }),
     moduleResults: fitting.modules.map(() => ({
       state: 'active',
       maxState: 'overload',

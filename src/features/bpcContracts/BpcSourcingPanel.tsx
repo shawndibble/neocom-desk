@@ -35,7 +35,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { useRememberedUrlParams, useUrlSort } from '@/lib/useUrlState';
 import {
   bpcSourcingParams,
   BPC_SOURCING_SORT_KEY,
@@ -82,6 +82,7 @@ import {
   type BpcSearchColumnId,
 } from '@/features/bpcContracts/bpcSearchColumns';
 import { useSpaceFilter } from '@/features/bpcContracts/bpcSpaceFilterPref';
+import { useBpcSources } from '@/features/bpcContracts/bpcSourcesPref';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
 import { bpcSourcingCsvColumns } from '@/features/bpcContracts/bpcSourcingCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -123,6 +124,7 @@ import {
 } from '@/features/route/JumpRangeControls';
 import { renderJumpsCell } from '@/features/route/jumpsCell';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
+import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { loadBlueprints } from '@/sde/loadSde';
 import { isSyncConfigured } from '@/app/syncStatus';
@@ -314,6 +316,24 @@ function marketLookupRegion(
 ): number | null {
   if (regionId !== null) return regionId;
   return hubHydrated ? hubRegionId : null;
+}
+
+/**
+ * "Set waypoint in game" for a row whose Location names its station or
+ * structure; nothing for one that names none (an unresolved location, or an
+ * owned blueprint inside a container or ship).
+ */
+function waypointItemFor(row: BpcSearchRow, ownedPlaceIds: ReadonlyMap<number, number>): ReactNode {
+  if (row.locationName === null) return null;
+  const placeId =
+    row.source === 'contract'
+      ? row.contract.locationId
+      : row.source === 'market'
+        ? row.locationId
+        : ownedPlaceIds.get(row.itemId);
+  return placeId === undefined ? null : (
+    <SetWaypointMenuItem locationId={placeId} placeName={row.locationName} />
+  );
 }
 
 /** The Trade Hub station in `regionId`, or 0 when the region holds none — nothing gets marked. */
@@ -608,7 +628,28 @@ export function BpcSourcingPanel() {
     () => bpcSourcingParams({ hideAuctions: hideAuctionsDefault, hidePlex: hidePlexDefault }),
     [hideAuctionsDefault, hidePlexDefault]
   );
-  const [params, setParams] = useUrlParams(sourcingParams);
+  // Source is a remembered default behind its URL key (`bpcSourcesPref.ts`):
+  // a bare visit reopens the pilot's last picks, a link's `sourcing.src` still
+  // wins, and only an edit is stored. Same group, so it writes in the same
+  // navigation as the rest.
+  const rememberedSources = useBpcSources((state) => state.value);
+  const hydrateRememberedSources = useBpcSources((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateRememberedSources();
+  }, [hydrateRememberedSources]);
+  const rememberedParams = useMemo(
+    () => ({
+      values: { 'sourcing.src': new Set(rememberedSources) },
+      remember: (patch: { 'sourcing.src'?: ReadonlySet<SourceToggle> }) => {
+        const next = patch['sourcing.src'];
+        if (next !== undefined) {
+          void useBpcSources.getState().setValue(SOURCE_TOGGLES.filter((s) => next.has(s)));
+        }
+      },
+    }),
+    [rememberedSources]
+  );
+  const [params, setParams] = useRememberedUrlParams(sourcingParams, rememberedParams);
   const uiFilter: UiFilter = useMemo(
     () => ({
       typeQuery: params['sourcing.q'],
@@ -1038,6 +1079,18 @@ export function BpcSourcingPanel() {
       }),
     [ownedBlueprints, ownedLocations]
   );
+  // An owned blueprint's `location_id` can be a container or ship; it only
+  // resolved to a name because it is a station or structure, so only then is
+  // it somewhere a waypoint can go.
+  const ownedPlaceIds = useMemo(
+    () =>
+      new Map(
+        ownedBlueprints.flatMap((bp): [number, number][] =>
+          ownedLocations.get(bp.location_id)?.name != null ? [[bp.item_id, bp.location_id]] : []
+        )
+      ),
+    [ownedBlueprints, ownedLocations]
+  );
   const filteredOwnedRows = useMemo(
     () => filterBpcSearchRows(ownedSearchRows, engineFilter),
     [ownedSearchRows, engineFilter]
@@ -1236,7 +1289,8 @@ export function BpcSourcingPanel() {
         // The dense phone card has no header row, and a bare "7" beside a
         // system name says nothing about what it counts.
         stackAffix: { before: t('bpcContracts.mobile.jumpsAffix') },
-        render: (row) => renderJumpsCell(bpcRowJumps(row), t, 'bpcContracts.jumpsUnavailableHint'),
+        render: (row) =>
+          renderJumpsCell(bpcRowJumps(row), t, 'bpcContracts.jumpsUnavailableHint', row.systemId),
       },
       me: {
         id: 'me',
@@ -1823,7 +1877,15 @@ export function BpcSourcingPanel() {
                   </p>
                   {/* Cheapest first, so the ordering carries the answer and the
                     accent on the leading cell is only reinforcement (DESIGN.md §7). */}
-                  <ul className="flex gap-2 max-sm:-mx-3 max-sm:overflow-x-auto max-sm:px-3 sm:flex-wrap">
+                  {/* `relative` makes the row the containing block of each
+                    price's absolutely positioned screen-reader text
+                    (`IskAmount`'s `sr-only`). Without it that text escaped
+                    the row's scroll clip and the whole page scrolled
+                    sideways on a phone, not just this row. */}
+                  <ul
+                    aria-label={t('bpcContracts.cheapestByRegion')}
+                    className="relative flex gap-2 max-sm:-mx-3 max-sm:overflow-x-auto max-sm:px-3 sm:flex-wrap"
+                  >
                     {regionPrices.slice(0, REGION_CELL_LIMIT).map((region, index) => (
                       <li
                         key={region.regionId}
@@ -1948,6 +2010,10 @@ export function BpcSourcingPanel() {
                 // and a sort picker, since the header row it would sort from
                 // is gone. The cap above follows that same sort.
                 stackLayout="dense"
+                // Name, price and the More actions button centred on one
+                // line, the button's 44px touch target no longer making that
+                // line button-tall (Hauling's opt-in, `index.css`).
+                className="dt-dense-tight"
                 mobileSort
                 stackSummary={
                   displayRows.length > shownRows.length
@@ -1970,6 +2036,7 @@ export function BpcSourcingPanel() {
                     itemName={blueprintNames.get(row.typeId)}
                     seed={row.runs === -1 ? null : { me: row.me, te: row.te, runs: row.runs }}
                     trigger={tr}
+                    extraItems={waypointItemFor(row, ownedPlaceIds)}
                   />
                 )}
                 // At most RESULT_LIMIT rows, but a phone still mounts only a screenful.

@@ -7,16 +7,21 @@
  * leg. Conditions, never verdicts (decision `20260912-172628`): a fold says
  * "no kills reported in the last hour", never that the stretch is anything.
  *
- * Every row is one line: System, Sec., Region, the last hour's ship kills ·
+ * Each row is short: System, Sec., Region, the last hour's ship kills ·
  * pod kills · jumps, and zKillboard's count with only the kills on a gate
  * along the route. NPC kills and kills anywhere else in the system open in
  * the row's detail.
  *
+ * On a phone the row is a dense card: the system and its security on line
+ * one, and region · last hour · zKillboard below with Avoid closing it. A
+ * zero kill count is left off that line, so a quiet system reads
+ * "Khanid · 87 jumps" rather than a string of zeros.
+ *
  * A jump through a Thera / Turnur hole (issue #2476) is its own full-width
  * row between its two systems (`HoleStepRow`): where to warp, the signature
  * with Copy, size, life left and how old EVE-Scout's list is. Both systems
- * beside it never fold. A J-space system reads "—" for ESI's figures with
- * the reason, since ESI does not report wormhole space; zKillboard still
+ * beside it never fold. A J-space system reads "N/A" for ESI's figures with
+ * an info tip giving the reason, since ESI does not report wormhole space; zKillboard still
  * lists it.
  */
 import { useTranslation } from 'react-i18next';
@@ -25,6 +30,7 @@ import {
   Button,
   DataTable,
   DataTableDenseCell,
+  InfoTooltip,
   Tooltip,
   type DataTableColumn,
   type DataTableGroupBy,
@@ -34,16 +40,19 @@ import {
   isWormholeSystem,
   type RouteSafetyRow,
 } from '@/engine/route/routeSafety';
+import { BridgeStepLine, type BridgeStep } from './BridgeStepLine';
 import { HoleStepLine, type HoleStep } from './HoleStepLine';
 import { RecentKillsCell, RecentKillsDetail } from './RecentKillsCell';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { routeSystemName } from './routeSystemName';
 import type { RouteKillsCell } from './useRouteKills';
-import type { HoleAt } from './useRouteSafety';
+import type { RouteSafetyTripRow } from './useRouteSafety';
 
-type TableRow = RouteSafetyRow | HoleStep;
+type TableRow = RouteSafetyTripRow | HoleStep | BridgeStep;
 
-function isHoleStep(row: TableRow): row is HoleStep {
-  return 'hole' in row;
+/** A hole or bridge jump: its own full-width row, not a system. */
+function isHoleStep(row: TableRow): row is HoleStep | BridgeStep {
+  return 'hole' in row || 'bridge' in row;
 }
 
 /** A system column, drawn only for system rows — a hole row is one full-width cell. */
@@ -57,13 +66,17 @@ function systemColumn(column: DataTableColumn<RouteSafetyRow>): DataTableColumn<
   };
 }
 
-/** The route's systems in order, with each hole jump as its own row between its two. */
-function withHoleSteps(rows: readonly RouteSafetyRow[], holeAt: HoleAt): TableRow[] {
+/** The route's systems in order, with each hole or bridge jump as its own row between its two. */
+function withHoleSteps(rows: readonly RouteSafetyTripRow[]): TableRow[] {
   const out: TableRow[] = [];
   rows.forEach((row, index) => {
     const previous = rows[index - 1];
-    const hole = previous ? holeAt(previous.systemId, row.systemId) : null;
-    if (previous && hole) out.push({ from: previous, to: row, hole });
+    if (previous) {
+      if (row.entry?.kind === 'hole') out.push({ from: previous, to: row, hole: row.entry.hole });
+      else if (row.entry?.kind === 'bridge') {
+        out.push({ from: previous, to: row, bridge: row.entry.gate });
+      }
+    }
     out.push(row);
   });
   return out;
@@ -82,11 +95,16 @@ function zkillCountOf(cell: RouteKillsCell): number | null {
 
 function LastHour({ row }: { row: RouteSafetyRow }) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
   if (isWormholeSystem(row.systemId)) {
     return (
       <span className="inline-flex items-center gap-1.5 text-text-dim">
-        <span aria-hidden="true">{DASH}</span>
-        <span>{t('travel.wormholeSpace')}</span>
+        <span>{t('travel.notApplicable')}</span>
+        <InfoTooltip
+          glyph="info"
+          label={t('travel.wormholeSpace')}
+          content={t('travel.wormholeSpace')}
+        />
       </span>
     );
   }
@@ -94,7 +112,7 @@ function LastHour({ row }: { row: RouteSafetyRow }) {
     { key: 'ships', value: row.shipKills, unit: t('travel.lastHour.ships') },
     { key: 'pods', value: row.podKills, unit: t('travel.lastHour.pods') },
     { key: 'jumps', value: row.jumps, unit: t('travel.lastHour.jumps') },
-  ];
+  ].filter((figure) => !isPhone || figure.key === 'jumps' || figure.value !== 0);
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums">
       {figures.map((figure, index) => (
@@ -145,6 +163,8 @@ function useColumns(
       id: 'security',
       header: t('travel.col.security'),
       align: 'right',
+      // A phone card's headline figure, beside the system name.
+      cardCorner: true,
       render: (row) => (row.security === null ? DASH : <SecurityStatus security={row.security} />),
     },
     {
@@ -177,7 +197,7 @@ function useColumns(
       header: t('travel.col.avoid'),
       headerClassName: 'sr-only',
       align: 'right',
-      cardCorner: true,
+      stackEdge: 'end',
       render: (row) => {
         const onAvoid = avoidAction(row);
         const name = routeSystemName(row);
@@ -202,12 +222,11 @@ function RowDetail({ row, cell }: { row: RouteSafetyRow; cell: RouteKillsCell })
   );
 }
 
-const GATES_ONLY: HoleAt = () => null;
-
-/** What a table needs to draw hole rows (issue #2476); a gate-only route passes none. */
+/**
+ * What a table needs to draw hole (issue #2476) rows beyond the rows' own
+ * tags (issue #2546); a gate-only route passes none.
+ */
 export interface HoleRowProps {
-  /** The hole a step crosses, or `null` for a stargate jump. */
-  holeAt?: HoleAt;
   /** When EVE-Scout's list was read, for each hole row's age. */
   holesFetchedAt?: Date | null;
   /** The clock a hole's remaining life is read against. */
@@ -219,12 +238,11 @@ export function RouteSystemsTable({
   killsOf,
   avoidAction,
   label,
-  holeAt = GATES_ONLY,
   holesFetchedAt = null,
   now = 0,
 }: {
-  /** One list of route systems in flight order; folds never take its first or last. */
-  rows: readonly RouteSafetyRow[];
+  /** One list of route systems in flight order, each tagged with how it was entered; folds never take its first or last. */
+  rows: readonly RouteSafetyTripRow[];
   killsOf: (systemId: number) => RouteKillsCell;
   /** `null` for a row with nothing to offer: either end, or a system already avoided. */
   avoidAction: (row: RouteSafetyRow) => (() => void) | null;
@@ -232,8 +250,8 @@ export function RouteSystemsTable({
 } & HoleRowProps) {
   const { t } = useTranslation();
   const columns = useColumns(killsOf, avoidAction);
-  const tableRows = withHoleSteps(rows, holeAt);
-  // Both ends of a hole jump stay in view beside it.
+  const tableRows = withHoleSteps(rows);
+  // Both ends of a hole or bridge jump stay in view beside it.
   const pinned = new Set(
     tableRows.flatMap((row) => (isHoleStep(row) ? [row.from.systemId, row.to.systemId] : []))
   );
@@ -253,7 +271,7 @@ export function RouteSystemsTable({
     allWidths: true,
     key: (row) => (isHoleStep(row) ? null : (foldKey.get(row.systemId) ?? null)),
     renderHeader: (tableMembers) => {
-      const members = tableMembers.filter((row): row is RouteSafetyRow => !isHoleStep(row));
+      const members = tableMembers.filter((row): row is RouteSafetyTripRow => !isHoleStep(row));
       const first = members[0];
       const last = members[members.length - 1];
       const lowest = first ? lowestOf.get(foldKey.get(first.systemId) ?? '') : undefined;
@@ -275,13 +293,19 @@ export function RouteSystemsTable({
       columns={columns}
       rows={tableRows}
       rowKey={(row) =>
-        isHoleStep(row) ? `hole:${row.from.systemId}-${row.to.systemId}` : String(row.systemId)
+        isHoleStep(row)
+          ? `${'hole' in row ? 'hole' : 'bridge'}:${row.from.systemId}-${row.to.systemId}`
+          : String(row.systemId)
       }
       label={label}
       stackLayout="dense"
       groupBy={groupBy}
       fullWidthRow={(row) =>
-        isHoleStep(row) ? <HoleStepLine step={row} fetchedAt={holesFetchedAt} now={now} /> : null
+        !isHoleStep(row) ? null : 'hole' in row ? (
+          <HoleStepLine step={row} fetchedAt={holesFetchedAt} now={now} />
+        ) : (
+          <BridgeStepLine step={row} />
+        )
       }
       rowClassName={(row) => (isHoleStep(row) ? 'bg-panel-2' : undefined)}
       expandableRow={{

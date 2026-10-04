@@ -1,21 +1,38 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Spinner, Tabs } from '@/components/ui';
+import type { FitSellPrice } from '@/engine/fittings/fitSellPrice';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { popularFitLoad } from '@/engine/fittings/popularFits';
 import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
 import { useNow } from '@/lib/useNow';
-import { loadFittingFromText } from './loadFittingFromText';
+import { typeName } from '@/sde/loadSde';
 import { usePopularFits } from './popularFits';
 import { RackIconStrip } from './RackIconStrip';
 import { useModuleNames } from './useModuleNames';
-import { useWorkbenchFits, workbenchFitUrl, type WorkbenchFit } from './workbenchFits';
-import { useWorkbenchFitList } from './workbenchFitCurrency';
-import { OutOfDateReasons, OutOfDateToggle } from './WorkbenchOutOfDate';
-import { useWorkbenchSightings } from './workbenchSightings';
+import { FIT_ROW_CLASS, VirtualFitList } from './VirtualFitList';
+import { workbenchFitUrl } from './workbenchFits';
+import {
+  useWorkbenchHullRows,
+  workbenchHullSources,
+  type WorkbenchHullSources,
+  type WorkbenchRow,
+} from './workbenchHullRows';
+import { OutOfDateNote } from './WorkbenchOutOfDate';
 import { WorkbenchSightingBadge } from './WorkbenchSightingBadge';
+
+/** What both tabs read from outside: the Workbench rows' sources, and module names. */
+export interface PopularFitsSources extends WorkbenchHullSources {
+  typeName: (typeId: number) => Promise<string>;
+}
+
+const POPULAR_FITS_SOURCES: PopularFitsSources = {
+  ...workbenchHullSources,
+  // Read when called, not now: a test mocking `@/sde/loadSde` may leave it out.
+  typeName: (typeId) => typeName(typeId),
+};
 
 interface PopularFitsPanelProps {
   shipTypeId: number;
@@ -28,6 +45,8 @@ interface PopularFitsPanelProps {
    * content below it. Off, the list runs its full length and the host scrolls.
    */
   capped?: boolean;
+  /** For tests: stand-ins for Firestore, the SDE, prices, zKillboard and Load. Pass it stable. */
+  sources?: PopularFitsSources;
 }
 
 type PopularFitsSource = 'zkillboard' | 'workbench';
@@ -45,9 +64,6 @@ export function PopularFitsPanel(props: PopularFitsPanelProps) {
 
   return (
     <section aria-label={t('fittings.popular.title')} className="space-y-2">
-      <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {t('fittings.popular.title')}
-      </h3>
       <Tabs
         label={t('fittings.popular.sourceLabel')}
         tabs={[
@@ -69,16 +85,17 @@ function ZkillboardFits({
   onOpen,
   busy = false,
   capped = true,
+  sources = POPULAR_FITS_SOURCES,
 }: PopularFitsPanelProps) {
   const { t } = useTranslation();
-  const result = usePopularFits(shipTypeId);
+  const result = usePopularFits(shipTypeId, sources.popularFits);
   const now = useNow();
   const fits = result?.ok ? result.fits : null;
   const typeIds = useMemo(
     () => fits?.flatMap((fit) => fit.parts.modules.map((m) => m.typeId)) ?? null,
     [fits]
   );
-  const names = useModuleNames(typeIds);
+  const names = useModuleNames(typeIds, sources.typeName);
 
   return (
     <>
@@ -93,10 +110,7 @@ function ZkillboardFits({
       ) : (
         <ul className={cx('space-y-1', capped && 'max-h-72 overflow-y-auto')}>
           {result.fits.map((fit, index) => (
-            <li
-              key={fit.key}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-line bg-panel px-2 py-1.5"
-            >
+            <li key={fit.key} className={FIT_ROW_CLASS}>
               <div className="min-w-0 flex-1">
                 <p className="text-sm">
                   {t('fittings.popular.losses', { count: fit.count })}
@@ -134,40 +148,36 @@ function ZkillboardFits({
 }
 
 /**
- * The EVE Workbench tab (issue #2484): the hull's published fits, newest
- * first, each Loaded from its stored EFT through the ordinary text Load.
+ * A Workbench row's height before it is measured: name and price, date
+ * created, and one line of module icons, plus the gap below it.
  */
-function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: PopularFitsPanelProps) {
-  const { t } = useTranslation();
-  const result = useWorkbenchFits(shipTypeId);
-  // Out-of-date fits (issue #2485) sort below, shown only on request.
-  const list = useWorkbenchFitList(result?.ok ? result.fits : null);
-  // Each fit's modules come from that same check (issue #2493): no second parse.
-  const names = useModuleNames(list.moduleTypeIds);
-  const sightings = useWorkbenchSightings(shipTypeId, result?.ok ? result.fits : null);
-  const now = useNow();
-  const [loadingId, setLoadingId] = useState<string | null>(null);
-  const [failedId, setFailedId] = useState<string | null>(null);
+const WORKBENCH_ROW_ESTIMATE = 80;
 
-  async function load(fit: WorkbenchFit) {
-    setLoadingId(fit.id);
-    setFailedId(null);
-    try {
-      // The fit's own EFT header names it.
-      const outcome = await loadFittingFromText(fit.eft);
-      if (outcome.kind === 'fitting') onOpen(outcome);
-      else setFailedId(fit.id);
-    } catch {
-      setFailedId(fit.id);
-    } finally {
-      setLoadingId(null);
-    }
-  }
+const workbenchRowKey = (row: WorkbenchRow) => row.fit.id;
+
+/**
+ * The EVE Workbench tab (issue #2484): the hull's published fits, newest
+ * first, as rows `useWorkbenchHullRows` checks, prices, badges and Loads.
+ * Windowed (`VirtualFitList`): a popular hull lists 500+ fits.
+ */
+function WorkbenchFits({
+  shipTypeId,
+  onOpen,
+  busy = false,
+  capped = true,
+  sources = POPULAR_FITS_SOURCES,
+}: PopularFitsPanelProps) {
+  const { t } = useTranslation();
+  const tab = useWorkbenchHullRows(shipTypeId, sources);
+  const names = useModuleNames(tab.moduleTypeIds, sources.typeName);
+  const now = useNow();
+  const listed = tab.status === 'ready';
 
   return (
     <>
+      {/* One line for the whole tab, not one per row: a hull can list hundreds. */}
       <p className="text-xs text-text-dim">
-        {t('fittings.popular.workbench.attribution')}{' '}
+        {t('fittings.popular.workbench.source')}{' '}
         <a
           href="https://eveworkbench.com"
           target="_blank"
@@ -176,41 +186,62 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
         >
           eveworkbench.com
         </a>
+        {listed && tab.pricing ? (
+          <>
+            {' · '}
+            <span role="status">
+              {t('fittings.popular.workbench.pricing', { hub: tab.hub.systemName })}
+            </span>
+          </>
+        ) : listed && tab.anyPriced ? (
+          <>
+            {' · '}
+            <span>{t('fittings.popular.workbench.priceNote', { hub: tab.hub.systemName })}</span>
+          </>
+        ) : null}
       </p>
-      {result === null ? (
+      {tab.status === 'loading' ? (
         <Spinner size="sm" delayMs={200} label={t('fittings.popular.workbench.loading')} />
-      ) : !result.ok ? (
+      ) : tab.status === 'failed' ? (
         <p role="status" className="text-xs text-warning">
           {t('fittings.popular.workbench.failed')}
         </p>
-      ) : result.fits.length === 0 ? (
+      ) : tab.status === 'empty' ? (
         <p className="text-xs text-text-dim">{t('fittings.popular.workbench.empty')}</p>
       ) : (
-        <ul className={cx('space-y-1', capped && 'max-h-72 overflow-y-auto')}>
-          {list.listed.map((fit) => (
-            <li
-              key={fit.id}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-line bg-panel px-2 py-1.5"
-            >
+        <VirtualFitList
+          items={tab.rows}
+          itemKey={workbenchRowKey}
+          estimateSize={WORKBENCH_ROW_ESTIMATE}
+          label={t('fittings.popular.tabWorkbench')}
+          capped={capped}
+          renderItem={({ fit, modules, price, sighting, loadFailed }) => (
+            <>
               <div className="min-w-0 flex-1">
-                <a
-                  href={workbenchFitUrl(fit.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block truncate text-sm hover:underline"
-                >
-                  {fit.name || t('fittings.popular.workbench.unnamed')}
-                </a>
+                <p className="flex min-w-0 items-baseline gap-1 text-sm">
+                  <a
+                    href={workbenchFitUrl(fit.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="truncate hover:underline"
+                  >
+                    {fit.name || t('fittings.popular.workbench.unnamed')}
+                  </a>
+                  <WorkbenchFitPrice price={price} />
+                </p>
                 <p className="text-xs text-text-dim">
-                  {t('fittings.popular.workbench.byline', {
-                    author: fit.authorName || t('fittings.popular.workbench.unknownAuthor'),
+                  {t('fittings.popular.workbench.created', {
                     age: formatAge(Math.max(0, now - fit.dateAdded), t),
                   })}
+                  {price?.partial &&
+                    ` · ${t('fittings.popular.workbench.unpriced', {
+                      count: price.unpricedTypes,
+                      hub: tab.hub.systemName,
+                    })}`}
                 </p>
-                <RackIconStrip modules={list.modulesFor(fit.id) ?? []} names={names} />
-                <OutOfDateReasons reasons={list.reasonsFor(fit.id)} />
-                <WorkbenchSightingBadge sighting={sightings.get(fit.id)} />
-                {failedId === fit.id && (
+                <RackIconStrip modules={modules} names={names} />
+                <WorkbenchSightingBadge sighting={sighting} />
+                {loadFailed && (
                   <p role="alert" className="text-xs text-danger">
                     {t('fittings.popular.workbench.loadFailed')}
                   </p>
@@ -218,16 +249,39 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
               </div>
               <Button
                 size="sm"
-                disabled={busy || loadingId !== null}
-                onClick={() => void load(fit)}
+                disabled={busy || tab.loading}
+                onClick={() => void tab.load(fit, onOpen)}
               >
                 {t('fittings.popular.workbench.load')}
               </Button>
-            </li>
-          ))}
-        </ul>
+            </>
+          )}
+        />
       )}
-      {result?.ok && <OutOfDateToggle list={list} />}
+      {listed && <OutOfDateNote list={tab} />}
+    </>
+  );
+}
+
+/**
+ * A Workbench row's price at the Default Trade Hub, after its name; nothing
+ * while loading or with nothing priced. A partial total's missing items are
+ * on the line below.
+ */
+function WorkbenchFitPrice({ price }: { price: FitSellPrice | undefined }) {
+  const { t } = useTranslation();
+  if (price === undefined) return null;
+  const value = formatIskCompact(price.sell);
+  return (
+    <>
+      <span aria-hidden className="shrink-0 text-text-dim">
+        ·
+      </span>
+      <span className="shrink-0 tabular-nums">
+        {price.partial
+          ? t('fittings.popular.workbench.pricePartial', { value })
+          : t('fittings.popular.workbench.price', { value })}
+      </span>
     </>
   );
 }
