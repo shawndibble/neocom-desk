@@ -26,7 +26,7 @@ import {
   dismissEntries,
   joinAssignments,
   linkPaymentTransaction,
-  linkRecordedPayment as linkRecordedPaymentRecords,
+  linkRecordedPayment as linkRecordedPaymentPrimitive,
   markAssignmentsPaid,
   moveAssignmentsToPayee,
   planNeedsReviewResolution,
@@ -294,5 +294,5 @@ export function linkRecordedPayment(
   assignments: readonly MiningTaxAssignmentRecord[],
   ref: PaymentTransactionRef
 ): Promise<LedgerActionResult> {
-  return commit(charactersOf(assignments), () => linkRecordedPaymentRecords(assignments, ref));
+  return commit(charactersOf(assignments), () => linkRecordedPaymentPrimitive(assignments, ref));
 }

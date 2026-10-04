@@ -241,7 +241,6 @@ export async function markFittingDeleted(characterId: number, fittingId: string)
   );
 }
 
-/** Mining Tax Assignment analogue of markPlanDeleted — same tombstone semantics (issue #523). */
 function stationPinId(characterId: number, locationId: number): string {
   return `${characterId}:${locationId}`;
 }

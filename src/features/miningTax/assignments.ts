@@ -126,7 +126,8 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
     ...(input.markPaid ? { paidAt: now } : {}),
     updatedAt: now,
   };
-  // Check and write in one transaction so two tabs cannot both pass the check.
+  // Check and write in one transaction so two tabs cannot both pass the check
+  // (under a ledger action this joins the action's own transaction).
   await db.transaction('rw', db.miningTaxAssignments, async () => {
     await assertUnclaimed(
       input.characterId,
