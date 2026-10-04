@@ -125,17 +125,30 @@ function SortHeader({
 }) {
   const { t } = useTranslation();
   const active = sort?.key === sortKey;
+  // The app's sort glyph trio (DataTable headers, Order History): the neutral
+  // glyph marks a sortable column that isn't sorting — here, manual order.
+  const Glyph = !active ? Icon.Sort : sort.dir === 'asc' ? Icon.Ascending : Icon.Descending;
   return (
     <span className={className}>
       <button
         type="button"
         onClick={() => onSort(sortKey)}
-        aria-label={t('industry.sortBy', { column: label })}
+        aria-label={
+          active
+            ? t(sort.dir === 'asc' ? 'industry.sortedAsc' : 'industry.sortedDesc', {
+                column: label,
+              })
+            : t('industry.sortBy', { column: label })
+        }
         aria-pressed={active}
-        className="inline-flex items-center gap-0.5 uppercase tracking-widest hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+        className={`inline-flex items-center gap-px uppercase tracking-widest hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${active ? 'text-text' : ''}`}
       >
         {label}
-        {active && <span aria-hidden="true">{sort.dir === 'asc' ? '↑' : '↓'}</span>}
+        <Glyph
+          aria-hidden="true"
+          size={Icon.ICON_SIZE.sm}
+          className={`shrink-0 ${active ? 'text-accent' : 'text-text-faint'}`}
+        />
       </button>
     </span>
   );

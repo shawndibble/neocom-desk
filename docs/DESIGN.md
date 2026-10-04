@@ -569,6 +569,12 @@ Rules:
 - A typed character ("+", "−", "Aa", "✓") is not an icon; icon-only controls
   take an `Icon.*` glyph (`Icon.Decrease` / `Icon.Increase` for a stepper). Lint
   rejects JSX text that is only "−", "+" or "Aa".
+- Sort direction is always the glyph trio: `Icon.Sort` (faint) on a sortable
+  column that isn't sorting, `Icon.Ascending` / `Icon.Descending` (accent) on
+  the active one, sized `ICON_SIZE.sm`, with the direction in the accessible
+  name ("Profit, sorted descending"). A "↑" / "↓" text arrow appears only where
+  a native `<option>` can't render an icon (`DataTable`'s stacked-mode sort
+  select); lint rejects it everywhere else.
 
 **Exception — the Fitting Add panel's filter and slot icons.** The module
 browser's Hull/Resources/Skills toggles and its "Fits this slot" toggle
