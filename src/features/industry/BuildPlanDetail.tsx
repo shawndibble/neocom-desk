@@ -358,6 +358,13 @@ export function BuildPlanDetail({
    * uses, in the one form a toolbar IconButton has: its own icon and label.
    */
   const [copyState, setCopyState] = useState<'copied' | 'failed' | null>(null);
+  // "Use all" / "Use none"'s confirmation — see `applyBulkOwned`.
+  const [bulkToast, setBulkToast] = useState<{ message: string; undo?: () => void } | null>(null);
+  useEffect(() => {
+    if (!bulkToast) return;
+    const timer = setTimeout(() => setBulkToast(null), 8000);
+    return () => clearTimeout(timer);
+  }, [bulkToast]);
   /** Blueprint Acquisition rows (issue #838) `shoppingListText` just left out of a successful copy. */
   const [blueprintsLeftOut, setBlueprintsLeftOut] = useState(0);
   // Verdict-first layout: the inputs fold behind a chip summary, the ledger
@@ -987,6 +994,35 @@ export function BuildPlanDetail({
 
   function changeSourcing(edits: readonly SourcingPatchEntry[]) {
     onChange({ kind: 'sourcing', edits });
+  }
+
+  /**
+   * "Use all" / "Use none", always answered: a toast saying how many rows
+   * changed, with Undo, or that there was nothing to do. Both buttons used to
+   * write silently, so a click that changed nothing — every row already
+   * holding what you own, or none of it detected — looked like a dead button.
+   */
+  function applyBulkOwned(patches: readonly SourcingPatchEntry[], kind: 'all' | 'none') {
+    if (patches.length === 0) {
+      setBulkToast({
+        message: t(kind === 'all' ? 'industry.useAllNothing' : 'industry.useNoneNothing'),
+      });
+      return;
+    }
+    const previous = patches.map(({ typeID }) => ({
+      typeID,
+      patch: { ownedQuantity: plan.materialSourcing?.[typeID]?.ownedQuantity },
+    }));
+    changeSourcing(patches);
+    setBulkToast({
+      message: t(kind === 'all' ? 'industry.useAllDone' : 'industry.useNoneDone', {
+        count: patches.length,
+      }),
+      undo: () => {
+        changeSourcing(previous);
+        setBulkToast(null);
+      },
+    });
   }
 
   function changeOneSourcing(typeID: number, patch: MaterialSourcing) {
@@ -1817,10 +1853,10 @@ export function BuildPlanDetail({
                   }
                   action={
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={() => changeSourcing(bulkDetectedPatches)}>
+                      <Button size="sm" onClick={() => applyBulkOwned(bulkDetectedPatches, 'all')}>
                         {t('industry.useAllOwned')}
                       </Button>
-                      <Button size="sm" onClick={() => changeSourcing(bulkClearPatches)}>
+                      <Button size="sm" onClick={() => applyBulkOwned(bulkClearPatches, 'none')}>
                         {t('industry.useNoneOwned')}
                       </Button>
                     </div>
@@ -2031,6 +2067,12 @@ export function BuildPlanDetail({
         standing={standing}
         logRequest={logRequest}
       />
+      {bulkToast && (
+        <Toast
+          message={bulkToast.message}
+          undo={bulkToast.undo && { label: t('industry.errands.undo'), onUndo: bulkToast.undo }}
+        />
+      )}
       {copyState === 'copied' && blueprintsLeftOut > 0 && (
         <Toast
           message={t('industry.copyShoppingListBlueprintsLeftOut', { count: blueprintsLeftOut })}

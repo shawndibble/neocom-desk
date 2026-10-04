@@ -120,11 +120,11 @@ function asSourcing(
 }
 
 /**
- * "Use all detected": only rows with nothing typed in them — a hand-entered
- * value, including a deliberate 0, is never clobbered by a bulk action — each
- * filled with its scoped detected stock, capped at what the row needs.
- * Callers pass every row the per-row action can reach, or "use all" silently
- * skips rows the row beside it still offers to fill.
+ * "Use all": every row whose own "Use assets" offer is showing, filled with
+ * its scoped detected stock capped at what the row needs — a row already at
+ * that number is left out, a typed or zeroed one is not. Callers pass every
+ * row the per-row action can reach, or "Use all" silently skips rows the row
+ * beside it still offers to fill.
  */
 export function bulkUseDetected(
   rows: readonly { typeID: number; quantity: number }[],

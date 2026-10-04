@@ -286,16 +286,6 @@ export interface OwnedStockSuggestion {
 }
 
 /**
- * The rows a bulk "use all detected" fills: those with detected stock and no
- * owned quantity stored at all.
- *
- * Bulk never clobbers. A hand-typed value — including a deliberate 0, which is
- * a real statement about a material the player means to buy — is left alone,
- * because a single click covering the whole table can't have meant any one of
- * them specifically. The per-row action is the one that overwrites; clicking it
- * on that row means it.
- */
-/**
  * The rows a bulk "use none" clears: those currently carrying a non-zero
  * owned quantity, wherever it came from (hand-typed or an earlier "use all").
  *
@@ -317,6 +307,17 @@ export function clearOwnedStockSuggestions(
   return suggestions;
 }
 
+/**
+ * The rows a bulk "Use all" fills: exactly the rows whose own "Use assets"
+ * offer is showing — detected stock to write (capped at what the row needs),
+ * and the row not already holding that number. So "Use all" is every row's
+ * offer at once, and the two can never disagree.
+ *
+ * That includes a row with a number in it. Bulk used to leave any typed value
+ * alone, a 0 included, which made "Use none" (it writes 0s) a one-way door:
+ * "Use all" afterwards did nothing while each row still offered its stock.
+ * The caller confirms the fill with an Undo toast instead.
+ */
 export function bulkOwnedStockSuggestions(
   materials: readonly { typeID: number; quantity: number }[],
   sourcing: MaterialSourcingMap | undefined,
@@ -324,12 +325,18 @@ export function bulkOwnedStockSuggestions(
 ): OwnedStockSuggestion[] {
   const suggestions: OwnedStockSuggestion[] = [];
   for (const material of materials) {
-    if (sourcing?.[material.typeID]?.ownedQuantity !== undefined) continue;
     const detected = stock.get(material.typeID);
     if (!detected) continue;
+    const ownedQuantity = suggestedOwnedQuantity(detected.quantity, material.quantity);
+    // The per-row offer's own rule (OwnedStockHint's `canApply`): something to
+    // write, and not what the row already holds. A typed count — a 0 from
+    // "Use none" included — is refreshed like any other row the offer covers.
+    if (ownedQuantity <= 0 || sourcing?.[material.typeID]?.ownedQuantity === ownedQuantity) {
+      continue;
+    }
     suggestions.push({
       typeID: material.typeID,
-      ownedQuantity: suggestedOwnedQuantity(detected.quantity, material.quantity),
+      ownedQuantity,
     });
   }
   return suggestions;

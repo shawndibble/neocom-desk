@@ -382,8 +382,8 @@ export function BuildGroupPanel({
     [updateOwnedStock]
   );
 
-  // Same "never clobber a hand-typed value" rule the plan-level bulk fill
-  // keeps (`planMaterialsView.ts`). Scoped to `buyRows`, not every merged
+  // Same rule as the plan-level bulk fill (`planMaterialsView.ts`): every row
+  // whose own "Use assets" offer is showing. Scoped to `buyRows`, not every merged
   // material — a fully-crafted row (see above) is never bought, so it has no
   // owned quantity for "Use all" to fill.
   const bulkDetectedEntries = useMemo(

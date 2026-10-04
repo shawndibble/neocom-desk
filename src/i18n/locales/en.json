@@ -2951,7 +2951,13 @@
       },
       "isk": "ISK",
       "atPrice": "@ {{price}} ISK"
-    }
+    },
+    "useAllDone_one": "Filled Have on {{count}} material from your assets",
+    "useAllDone_other": "Filled Have on {{count}} materials from your assets",
+    "useAllNothing": "Nothing to fill: every material already has what you own, or you own none of it in the selected locations",
+    "useNoneDone_one": "Cleared Have on {{count}} material",
+    "useNoneDone_other": "Cleared Have on {{count}} materials",
+    "useNoneNothing": "Nothing to clear: no material has a Have amount"
   },
   "login": {
     "button": "Log in with EVE Online",
