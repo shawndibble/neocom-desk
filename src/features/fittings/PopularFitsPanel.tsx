@@ -12,6 +12,7 @@ import { loadFittingFromText } from './loadFittingFromText';
 import { usePopularFits } from './popularFits';
 import { RackIconStrip } from './RackIconStrip';
 import { useModuleNames } from './useModuleNames';
+import { VirtualFitList } from './VirtualFitList';
 import { useWorkbenchFits, workbenchFitUrl, type WorkbenchFit } from './workbenchFits';
 import { useWorkbenchFitList } from './workbenchFitCurrency';
 import { useWorkbenchFitPrices } from './workbenchFitPrices';
@@ -136,8 +137,17 @@ function ZkillboardFits({
 }
 
 /**
+ * A Workbench row's height before it is measured: name, date added, price and
+ * one line of module icons, plus the gap below it.
+ */
+const WORKBENCH_ROW_ESTIMATE = 96;
+
+const workbenchFitKey = (fit: WorkbenchFit) => fit.id;
+
+/**
  * The EVE Workbench tab (issue #2484): the hull's published fits, newest
  * first, each Loaded from its stored EFT through the ordinary text Load.
+ * Windowed (`VirtualFitList`): a popular hull lists 500+ fits.
  */
 function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: PopularFitsPanelProps) {
   const { t } = useTranslation();
@@ -201,12 +211,13 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
       ) : result.fits.length === 0 ? (
         <p className="text-xs text-text-dim">{t('fittings.popular.workbench.empty')}</p>
       ) : (
-        <ul className={cx('space-y-1', capped && 'max-h-72 overflow-y-auto')}>
-          {list.listed.map((fit) => (
-            <li
-              key={fit.id}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-line bg-panel px-2 py-1.5"
-            >
+        <VirtualFitList
+          items={list.listed}
+          itemKey={workbenchFitKey}
+          estimateSize={WORKBENCH_ROW_ESTIMATE}
+          capped={capped}
+          renderItem={(fit) => (
+            <>
               <div className="min-w-0 flex-1">
                 <a
                   href={workbenchFitUrl(fit.id)}
@@ -241,9 +252,9 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
               >
                 {t('fittings.popular.workbench.load')}
               </Button>
-            </li>
-          ))}
-        </ul>
+            </>
+          )}
+        />
       )}
       {result?.ok && <OutOfDateToggle list={list} />}
     </>
