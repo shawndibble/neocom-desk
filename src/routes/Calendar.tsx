@@ -196,6 +196,14 @@ export function Calendar() {
   } | null>(null);
   const activeOverrides =
     data && responseOverrides?.asOfMs === data.loadedAtMs ? responseOverrides.values : undefined;
+  // The snapshot showing *when the RSVP lands*, not when it was clicked: a
+  // reload can commit while the PUT is in flight (the event detail fetch
+  // writes the cache, which reloads the board from it), and an override
+  // stamped with the older snapshot would never show.
+  const loadedAtMsRef = useRef(data?.loadedAtMs ?? 0);
+  useEffect(() => {
+    loadedAtMsRef.current = data?.loadedAtMs ?? 0;
+  });
 
   /**
    * The instant the snapshot was assembled, threaded into everything below.
@@ -474,7 +482,7 @@ export function Calendar() {
           onClose={() => setSelectedEventId(null)}
           onResponded={(eventId, response) =>
             setResponseOverrides((prev) => {
-              const asOfMs = data?.loadedAtMs ?? 0;
+              const asOfMs = loadedAtMsRef.current;
               const values = prev?.asOfMs === asOfMs ? new Map(prev.values) : new Map();
               values.set(eventId, response);
               return { asOfMs, values };
