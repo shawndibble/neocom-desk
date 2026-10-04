@@ -1,12 +1,12 @@
 /**
  * The Workbench tab's **Out-of-date fit** pieces (issue #2485): a row's
  * reasons, and the toggle that shows or hides out-of-date fits below the
- * current ones. The check itself is `workbenchFitCurrency.ts`.
+ * current ones. The check itself is `workbenchHullRows.ts`.
  */
 import { useTranslation } from 'react-i18next';
 import { Button, Spinner } from '@/components/ui';
 import type { OutOfDateReason } from '@/engine/fittings/fitCurrency';
-import type { WorkbenchFitList } from './workbenchFitCurrency';
+import type { WorkbenchHullRows } from './workbenchHullRows';
 
 /** Why a fit is out of date, one line; nothing for a current fit. */
 export function OutOfDateReasons({ reasons }: { reasons: OutOfDateReason[] | undefined }) {
@@ -39,7 +39,7 @@ export function OutOfDateToggle({
   list,
 }: {
   list: Pick<
-    WorkbenchFitList,
+    WorkbenchHullRows,
     'checking' | 'outOfDateCount' | 'allOutOfDate' | 'showOutOfDate' | 'setShowOutOfDate'
   >;
 }) {

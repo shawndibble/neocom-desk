@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { EftSlotLookup, EftTypeLookup } from './eftLoader';
-import type { KillmailVictim } from './linkLoader';
 import { gameItemLookup } from './fitCurrency';
+import type { KillmailVictim } from './linkLoader';
 import { groupPopularFits, type HullLoss } from './popularFits';
+import { checkWorkbenchFit } from './workbenchFitCheck';
 import { matchWorkbenchSightings } from './workbenchSightings';
 
 const HULL = 626;
@@ -75,20 +76,38 @@ Medium Auxiliary Nano Pump I
 Hammerhead II x3
 Void M x500`;
 
-/** The game's full list of names: everything the catalog has, plus what it leaves out. */
-const isGameItem = gameItemLookup([
-  ...Object.keys(NAMES),
-  'Calm Exotic Filament',
+/** The game's names: everything the loader reads, plus a filament its catalogue leaves out. */
+const GAME_ITEMS = gameItemLookup([
+  'Vexor',
+  'Thorax',
+  'Heavy Neutron Blaster II',
+  'Fierce Exotic Filament',
   'Gravid Warp Scrambler',
 ]);
-const WITH_FILAMENT = `${EFT}\n\nCalm Exotic Filament x1`;
+
+function checks(
+  fits: { id: string; eft: string }[],
+  isGameItem: (name: string) => boolean = GAME_ITEMS
+) {
+  return new Map(
+    fits.map(({ id, eft }) => [
+      id,
+      checkWorkbenchFit(eft, {
+        typeByName: TYPES,
+        slotByTypeId: SLOTS,
+        hullSlots: () => null,
+        isGameItem,
+      }),
+    ])
+  );
+}
 
 function match(
   fits: { id: string; eft: string }[],
   hullTypeId = HULL,
-  gameItem: (name: string) => boolean = isGameItem
+  isGameItem: (name: string) => boolean = GAME_ITEMS
 ) {
-  return matchWorkbenchSightings(fits, POPULAR, hullTypeId, TYPES, SLOTS, gameItem);
+  return matchWorkbenchSightings(checks(fits, isGameItem), POPULAR, hullTypeId);
 }
 
 describe('matchWorkbenchSightings', () => {
@@ -131,6 +150,8 @@ Medium Auxiliary Nano Pump I`;
     expect(match([{ id: 'h', eft: 'not a fit' }]).size).toBe(0);
   });
 
+  const WITH_FILAMENT = `${EFT}\n\nFierce Exotic Filament x1`;
+
   it('still matches a fit carrying a game item the catalog leaves out, like a filament in cargo', () => {
     expect(match([{ id: 'i', eft: WITH_FILAMENT }]).get('i')?.count).toBe(3);
   });
@@ -142,12 +163,10 @@ Medium Auxiliary Nano Pump I`;
   it('leaves out a fit with an unread fitted module, even one the game still has', () => {
     // A mutated module reads as a fitted line: dropped, the rest would equal the group.
     const mutated = EFT.replace('Warp Scrambler II', 'Warp Scrambler II\nGravid Warp Scrambler');
-    expect(match([{ id: 'k', eft: mutated }]).size).toBe(0);
+    expect(match([{ id: 'l', eft: mutated }]).size).toBe(0);
   });
 
   it('matches nothing when there are no Popular fits', () => {
-    expect(
-      matchWorkbenchSightings([{ id: 'a', eft: EFT }], [], HULL, TYPES, SLOTS, isGameItem).size
-    ).toBe(0);
+    expect(matchWorkbenchSightings(checks([{ id: 'a', eft: EFT }]), [], HULL).size).toBe(0);
   });
 });

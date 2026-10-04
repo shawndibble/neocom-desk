@@ -4,7 +4,7 @@
  * Built for the EVE Workbench tab, where a popular hull lists 500+ fits and
  * rendering every row at once — each with its module icons and their
  * tooltips — blocked the main thread for seconds, and the Trade Hub prices
- * landed only after that render finished (see `workbenchFitPrices.ts`).
+ * landed only after that render finished (see `workbenchHullRows.ts`).
  *
  * Two shapes, after `PopularFitsPanel`'s `capped` prop:
  *
