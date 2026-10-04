@@ -6938,6 +6938,8 @@
     "wallet": {
       "title": "Corp wallet",
       "divisionsTitle": "Divisions",
+      "divisionsShow": "Show all divisions",
+      "divisionsHide": "Hide divisions",
       "viewLabel": "Wallet view",
       "transactionsView": "Transactions",
       "noAccessTitle": "Corp wallet needs Accountant",
