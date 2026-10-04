@@ -13,7 +13,7 @@ function owedForDays(balance: PayeeBalance, today: Date = new Date()): number {
 }
 
 interface OwedBalancesProps {
-  /** Every Payee balance; the owed ones are drawn as cards, the settled ones as one line of names. */
+  /** Every Payee balance; only the owed ones are drawn, as cards. */
   balances: readonly PayeeBalance[];
   unassigned: UnassignedSummary;
   /** Wallet payments nothing here accounts for yet (paying backwards, #540). */
@@ -34,8 +34,7 @@ interface OwedBalancesProps {
  * than three Payees, so each gets a compact card — the name on a line of its
  * own, because Payee names run long ("Bureau of Unified Harvesting") and
  * must never share a line with the figure that matters. Settled Payees
- * collapse to one line of names, each still a shortcut to that Payee's
- * entries.
+ * aren't listed: the Payee filter below already reaches their entries.
  */
 export function OwedBalances({
   balances,
@@ -51,7 +50,6 @@ export function OwedBalances({
 }: OwedBalancesProps) {
   const { t } = useTranslation();
   const owed = balances.filter((b) => b.owed > 0);
-  const settled = balances.filter((b) => b.owed <= 0);
   const owedTotal = owed.reduce((sum, b) => sum + b.owed, 0);
 
   // One owed Payee and nothing else to show: a single full-width row (name,
@@ -196,28 +194,6 @@ export function OwedBalances({
               </div>
             </Panel>
           )}
-        </div>
-      )}
-
-      {/* Not on a phone: there the row of 44px chips pushes Open down a
-          screen, and the Payee filter just below already lists these. */}
-      {settled.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 max-sm:hidden">
-          <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('miningTax.owed.settledLabel')}
-          </span>
-          {settled.map((balance) => (
-            <button
-              key={balance.payee.id}
-              type="button"
-              onClick={() => onFilterPayee(balance.payee.id)}
-              aria-pressed={isSoleFilter(balance.payee.id)}
-              aria-label={t('miningTax.filterToPayee', { payee: balance.payee.name })}
-              className="inline-flex min-h-7 items-center rounded-xs border border-line px-2 text-xs text-text-dim hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-accent aria-pressed:text-accent"
-            >
-              {balance.payee.name}
-            </button>
-          ))}
         </div>
       )}
     </section>

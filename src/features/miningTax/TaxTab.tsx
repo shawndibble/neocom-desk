@@ -1809,6 +1809,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                           key: (dr) => (dateRangeOf(dr).at(-1) ?? dr.row.entry.date).slice(0, 7),
                           allWidths: true,
                           minSize: 1,
+                          // The newest month opens; older ones stay folded.
+                          defaultExpanded: (rows) =>
+                            (dateRangeOf(rows[0]).at(-1) ?? '').slice(0, 7) === history[0]?.month,
                           renderHeader: (rows) => (
                             <HistoryMonthHeader
                               month={(dateRangeOf(rows[0]).at(-1) ?? '').slice(0, 7)}

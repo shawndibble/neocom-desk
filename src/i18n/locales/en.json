@@ -4087,7 +4087,6 @@
       "linkPayment": "Link payment",
       "unassignedHint_one": "{{count}} entry has no Payee yet",
       "unassignedHint_other": "{{count}} entries have no Payee yet",
-      "settledLabel": "Settled",
       "acrossPayees_one": "across {{count}} payee",
       "acrossPayees_other": "across {{count}} payees"
     },
