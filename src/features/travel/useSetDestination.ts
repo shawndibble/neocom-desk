@@ -10,7 +10,7 @@
  * `location_id` can be a container, ship or hangar item id, which ESI
  * refuses; those callers resolve it to its station first.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import type { EsiEndpointId } from '@/esi/registry';
@@ -19,9 +19,9 @@ import { setWaypointsInGame } from './sendWaypoints';
 
 const ENDPOINTS: readonly EsiEndpointId[] = ['postAutopilotWaypoint'];
 
-export type SetDestinationOutcome = { tone: 'status' | 'alert'; text: string } | null;
+type SetDestinationOutcome = { tone: 'status' | 'alert'; text: string } | null;
 
-export interface SetDestination {
+interface SetDestination {
   /** Why sending can't work yet — no Character, or no waypoint scope — or null when it can. */
   blockedReason: string | null;
   sending: boolean;
@@ -36,6 +36,8 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
   const lacksScope = useCharacterLacksEndpoints(characterId, ENDPOINTS);
   const [sending, setSending] = useState(false);
   const [outcome, setOutcome] = useState<SetDestinationOutcome>(null);
+  /** `sending` lags a render behind; two quick selects must not both send. */
+  const inFlight = useRef(false);
 
   const blockedReason =
     characterId === null
@@ -45,6 +47,7 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
         : null;
 
   async function sendFor(id: number) {
+    inFlight.current = true;
     setSending(true);
     setOutcome(null);
     try {
@@ -58,6 +61,7 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
         setOutcome({ tone: 'alert', text: t('travel.waypoints.failed', { message }) });
       }
     } finally {
+      inFlight.current = false;
       setSending(false);
     }
   }
@@ -67,7 +71,9 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
     sending,
     outcome,
     send: () => {
-      if (characterId !== null && blockedReason === null && !sending) void sendFor(characterId);
+      if (characterId !== null && blockedReason === null && !inFlight.current) {
+        void sendFor(characterId);
+      }
     },
   };
 }
