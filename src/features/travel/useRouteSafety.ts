@@ -53,14 +53,7 @@ import {
 
 export type { BridgeAt } from '@/engine/route/ansiblex';
 export type { HoleAt } from '@/engine/route/routeHoles';
-export type {
-  LegPinNote,
-  RouteSafetyLeg,
-  RouteSafetyTrip,
-  RouteSafetyWay,
-  RouteSafetyWayBridge,
-  RouteSafetyWayHole,
-} from '@/engine/route/routeSafetyTrip';
+export type { RouteSafetyLeg, RouteSafetyWay } from '@/engine/route/routeSafetyTrip';
 
 export type RouteSafetyState =
   | { kind: 'incomplete' }
@@ -119,10 +112,11 @@ export function useRouteSafety({
   const holesKey = holeNetworkKey(holes);
   const bridgesKey = bridges === null ? '' : bridgeKey(bridges);
   const networkKey = bridgesKey === '' ? holesKey : `${holesKey}|${bridgesKey}`;
-  const network = useMemo(
-    () => routeSafetyNetwork(holeEndsFromKey(holesKey), bridgeEndsFromKey(bridgesKey)),
-    [holesKey, bridgesKey]
-  );
+  // Just the ends: the holes' life and the bridges' names never re-plan the trip.
+  const { networkEnds, network } = useMemo(() => {
+    const ends = { holes: holeEndsFromKey(holesKey), bridges: bridgeEndsFromKey(bridgesKey) };
+    return { networkEnds: ends, network: routeSafetyNetwork(ends.holes, ends.bridges) };
+  }, [holesKey, bridgesKey]);
   const listedById = useMemo(
     () => (listed === null ? null : new Map(listed.map((hole) => [hole.id, hole]))),
     [listed]
@@ -169,7 +163,7 @@ export function useRouteSafety({
       if (result.kind === 'trip') {
         ({ legs: alternatives, systemIds } = planLegAlternatives(
           result,
-          { holes: holeEndsFromKey(holesKey), bridges: bridgeEndsFromKey(bridgesKey) },
+          networkEnds,
           pinsFromKey(pinKey)
         ));
       }
@@ -192,8 +186,7 @@ export function useRouteSafety({
     keepLastStopLast,
     rules,
     network,
-    holesKey,
-    bridgesKey,
+    networkEnds,
     pinKey,
     requestKey,
   ]);
@@ -207,7 +200,7 @@ export function useRouteSafety({
     const assembled = assembleRouteSafety({
       trip: result,
       alternatives: resolved.alternatives,
-      stops,
+      singleStop: stops.length === 1,
       pins,
       holes,
       listed,

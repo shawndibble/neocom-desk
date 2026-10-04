@@ -151,7 +151,16 @@ function plan({
     { tokens: pins, listed: listed === null ? null : listed.map(ends) }
   );
   const state = assembleRouteSafety(
-    input({ trip, alternatives, stops, pins, holes, listed, bridges, activity })
+    input({
+      trip,
+      alternatives,
+      singleStop: stops.length === 1,
+      pins,
+      holes,
+      listed,
+      bridges,
+      activity,
+    })
   );
   return { state, alternatives, systemIds, tripPlan };
 }
@@ -160,7 +169,7 @@ function input(
   overrides: Partial<RouteSafetyTripInput> & Pick<RouteSafetyTripInput, 'trip' | 'alternatives'>
 ): RouteSafetyTripInput {
   return {
-    stops: [END],
+    singleStop: true,
     pins: [],
     holes: [],
     listed: [],

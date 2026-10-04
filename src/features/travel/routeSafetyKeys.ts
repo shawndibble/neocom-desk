@@ -60,7 +60,7 @@ export function pinsKey(
       if (listed === null) return `${token}@wait`;
       if (pin.kind === 'hub') return token;
       const hole = listed.get(pin.id);
-      return hole ? `${token}@${hole.exitSystemId}:${hole.hub}` : `${token}@closed`;
+      return hole ? `${token}@${holeNetworkKey([hole])}` : `${token}@closed`;
     })
     .join(',');
 }

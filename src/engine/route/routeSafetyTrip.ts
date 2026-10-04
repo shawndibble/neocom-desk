@@ -187,8 +187,8 @@ export interface RouteSafetyTripInput {
   trip: Pick<PlannedTrip, 'plan' | 'graph'>;
   /** From `planLegAlternatives`, one per leg. */
   alternatives: readonly LegAlternatives[];
-  /** The Stops as asked: with one, no route is the whole answer. */
-  stops: readonly number[];
+  /** One Stop was asked for: no route is then the whole answer. */
+  singleStop: boolean;
   /** Each leg's pin token, `''` for a leg flown as planned. */
   pins: readonly string[];
   /** The holes the filters allow. */
@@ -236,17 +236,18 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
   const { trip, alternatives, pins, holes, listed, bridges, activity } = input;
   const { plan, graph } = trip;
   // A pinned hole the filters skip is still a hole jump on the leg it is flown on.
+  const listedById = new Map(listed?.map((hole) => [hole.id, hole]));
+  const qualifyingIds = new Set(holes.map((hole) => hole.id));
   const pinnedHoles = alternatives.flatMap(({ pinned }) => {
-    const pinnedId = pinned?.kind === 'route' ? pinned.hole?.id : undefined;
     const hole =
-      pinnedId === undefined ? undefined : listed?.find((candidate) => candidate.id === pinnedId);
-    return hole && !holes.some((qualifying) => qualifying.id === hole.id) ? [hole] : [];
+      pinned?.kind === 'route' && pinned.hole ? listedById.get(pinned.hole.id) : undefined;
+    return hole && !qualifyingIds.has(hole.id) ? [hole] : [];
   });
   const holeAt: HoleAt = holeStepFinder(graph, [...holes, ...pinnedHoles]);
   const bridgeAt: BridgeAt = bridges ? bridgeStepFinder(graph, bridges) : NO_BRIDGE_AT;
   // One stop is the page as it always was: no route is the whole answer.
   if (
-    input.stops.length === 1 &&
+    input.singleStop &&
     plan.legs[0]?.route.kind !== 'route' &&
     alternatives[0]?.pinned?.kind !== 'route'
   ) {
