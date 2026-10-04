@@ -536,18 +536,18 @@ export function useFittingWorkspace(): FittingWorkspace {
   } = usePilotProfile(activeCharacterId);
   const evaluation = useFittingEvaluation({ fitting, profile, implantBasis });
 
-  const { stats: evaluatedStats, statsFitting } = evaluation;
+  const { currentStats } = evaluation;
   useEffect(() => {
     const pending = launchPendingRef.current;
-    if (pending === null || fitting === null || evaluatedStats === null) return;
+    if (pending === null || fitting === null || currentStats === null) return;
     // Until the decode lands, the code is written but the old Fitting is still on screen.
-    if (!('fitting' in pending) || pending.fitting !== fitting || statsFitting !== fitting) return;
+    if (!('fitting' in pending) || pending.fitting !== fitting) return;
     launchPendingRef.current = null;
-    const launched = launchDrones(fitting, launchLimitsFrom(evaluatedStats));
+    const launched = launchDrones(fitting, launchLimitsFrom(currentStats));
     if (launched !== fitting) {
       applyEdit(() => launched, { history: pending.writeUrl ? 'replace' : 'none' });
     }
-  }, [evaluatedStats, statsFitting, fitting, applyEdit, launchRequest]);
+  }, [currentStats, fitting, applyEdit, launchRequest]);
   const retryEvaluation = evaluation.retry;
   // One retry for whichever failed: the skills load, or the engine and its calculation.
   const retry = useCallback(() => {

@@ -20,12 +20,7 @@ import {
   type CandidateRack,
 } from '@/engine/fittings/candidates';
 import type { AddTarget } from './addTarget';
-import type {
-  Fitting,
-  FittingModuleResult,
-  FittingSlotKind,
-  PilotProfile,
-} from '@/engine/fittings/types';
+import type { Fitting, FittingModuleResult, FittingSlotKind } from '@/engine/fittings/types';
 import type { CandidateCheck } from './dogmaFittingEngine';
 import { CapBoosterGuide } from './CapBoosterGuide';
 import { MiningCrystalGuide } from './MiningCrystalGuide';
@@ -35,6 +30,7 @@ import { useChargeChoices } from './useChargeChoices';
 import { endFittingDrag, startFittingDrag } from './fittingDrag';
 import { AddCargoMenuItems, AddItemMenuItems, FittingItemMenu } from './FittingItemMenu';
 import { useFittingItemActions } from './fittingItemActions';
+import type { FittingContext } from './fittingContext';
 import { useHullFit } from './useHullFit';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
@@ -44,9 +40,8 @@ interface FittingAddPanelProps {
   fitting: Fitting;
   catalogue: FittingCatalogue | null;
   target: AddTarget | null;
-  /** Ship data (dogma engine) loaded — slot and fit checks can run. */
-  engineReady: boolean;
-  profile: PilotProfile | null;
+  /** The engine, pilot and catalogue for fit checks; null while any of them loads. */
+  context: FittingContext | null;
   onAdd: (typeId: number, rack: CandidateRack) => void;
   /** Drops the chosen slot, so the browser shows every rack again. */
   onClearTarget?: () => void;
@@ -227,8 +222,7 @@ export function FittingAddPanel({
   fitting,
   catalogue,
   target,
-  engineReady,
-  profile,
+  context,
   onAdd,
   onClearTarget,
   moduleResults,
@@ -266,7 +260,7 @@ export function FittingAddPanel({
     if (target !== null) setPickedTab(targetTab);
   }
 
-  const hullFit = useHullFit(catalogue, fitting.shipTypeId, profile, engineReady);
+  const hullFit = useHullFit(context, fitting.shipTypeId);
   const slotRack = target?.kind === 'slot' && fitsSlot ? target.slot : null;
   const slotIcon = target?.kind === 'slot' ? SLOT_ICONS[target.slot] : undefined;
   const toggleFitsSlot = () => setFitsSlot((on) => !on);
@@ -275,13 +269,13 @@ export function FittingAddPanel({
   const results = useMemo(() => {
     // Once the ship data is in, a search waits for the hull check as browsing
     // does, rather than briefly offering structure modules and the like.
-    if (catalogue === null || trimmed === '' || (engineReady && hullFit === null)) return [];
+    if (catalogue === null || trimmed === '' || (context !== null && hullFit === null)) return [];
     const include = browseFilter(catalogue, { tab, slotRack, metaGroupId, hullFit, fitFilters });
     return catalogue.marketTypes
       .filter((entry) => include(entry) && entry.name.toLowerCase().includes(trimmed))
       .sort((a, b) => a.name.localeCompare(b.name))
       .slice(0, CANDIDATE_LIMIT);
-  }, [catalogue, trimmed, engineReady, tab, slotRack, metaGroupId, hullFit, fitFilters]);
+  }, [catalogue, trimmed, context, tab, slotRack, metaGroupId, hullFit, fitFilters]);
   // Browsing needs the hull check: without it the tree would be every
   // fittable item in the game, structure modules and all.
   const tree = useMemo(() => {
@@ -386,8 +380,8 @@ export function FittingAddPanel({
         check={check}
         // Not gated on a free slot: a full rack's item still drags into the cargo
         // (or onto a slot, replacing it); a click with no room adds nothing.
-        placeable={fitsHull && engineReady}
-        draggable={fitsHull && dragToRing && engineReady}
+        placeable={fitsHull && context !== null}
+        draggable={fitsHull && dragToRing && context !== null}
         onAdd={onAdd}
       />
     );
@@ -430,8 +424,7 @@ export function FittingAddPanel({
         <ChargesTab
           fitting={fitting}
           catalogue={catalogue}
-          engineReady={engineReady}
-          profile={profile}
+          context={context}
           moduleResults={moduleResults ?? null}
           onLoadCharge={onLoadCharge}
           dragToFit={dragToRing}
@@ -497,10 +490,10 @@ export function FittingAddPanel({
             </NativeSelect>
           </div>
 
-          {!engineReady && (
+          {context === null && (
             <p className="text-xs text-warning">{t('fittings.add.waitingForShipData')}</p>
           )}
-          {engineReady && hullFit === null && (
+          {context !== null && hullFit === null && (
             <p className="text-xs text-text-dim">{t('fittings.add.checkingHull')}</p>
           )}
           {dragToRing && tab === 'modules' && hullFit !== null && (
@@ -541,8 +534,7 @@ export function FittingAddPanel({
 interface ChargesTabProps {
   fitting: Fitting;
   catalogue: FittingCatalogue | null;
-  engineReady: boolean;
-  profile: PilotProfile | null;
+  context: FittingContext | null;
   moduleResults: FittingModuleResult[] | null;
   onLoadCharge?: (chargeTypeId: number) => void;
   /** A charge drags onto the modules that take it. */
@@ -562,8 +554,7 @@ interface ChargesTabProps {
 function ChargesTab({
   fitting,
   catalogue,
-  engineReady,
-  profile,
+  context,
   moduleResults,
   onLoadCharge,
   dragToFit,
@@ -579,13 +570,7 @@ function ChargesTab({
       if (!next.delete(moduleTypeId)) next.add(moduleTypeId);
       return next;
     });
-  const { groups, pricesLoading } = useChargeChoices({
-    fitting,
-    catalogue,
-    engineReady,
-    profile,
-    moduleResults,
-  });
+  const { groups, pricesLoading } = useChargeChoices({ fitting, context, moduleResults });
 
   const name = (typeId: number) => catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
 
@@ -622,7 +607,7 @@ function ChargesTab({
     );
   };
 
-  if (moduleResults === null || !engineReady || groups === null) {
+  if (groups === null) {
     return <p className="text-xs text-warning">{t('fittings.add.waitingForShipData')}</p>;
   }
   if (groups.length === 0) {

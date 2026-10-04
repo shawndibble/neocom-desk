@@ -29,7 +29,8 @@ const computeFittingStats = vi.fn(async (): Promise<FittingStats> => {
   throw new Error('no dogma engine in tests');
 });
 vi.mock('@/features/fittings/dogmaFittingEngine', () => ({
-  isDogmaEngineReady: () => false,
+  readyDogmaEngine: () => null,
+  subscribeDogmaEngine: () => () => {},
   computeFittingStats: () => computeFittingStats(),
 }));
 

@@ -6,8 +6,9 @@ import type { Fitting, FittingModule } from '@/engine/fittings/types';
 import { ListChargePicker } from './ListChargePicker';
 import type { FittingChange } from './useFittingWorkspace';
 import type { FittingCatalogue } from './useFittingCatalogue';
+import { fakeDogmaEngine, fakeFittingContext } from './__fixtures__/fakeDogmaEngine';
 
-vi.mock('./dogmaFittingEngine', () => ({
+const engine = fakeDogmaEngine({
   checkCharges: () => new Set([230, 238]),
   chargesMissingSkills: () => new Set<number>(),
   compareCharges: () => [
@@ -30,7 +31,7 @@ vi.mock('./dogmaFittingEngine', () => ({
       techLevel: 1,
     },
   ],
-}));
+});
 vi.mock('@/market/prices', () => ({
   getHubPrices: async () => new Map(),
 }));
@@ -76,8 +77,7 @@ function renderPicker() {
       result={{ state: 'active', maxState: 'overload', chargeGroupIds: [85] }}
       fitting={fitting}
       catalogue={catalogue}
-      engineReady
-      profile={{ skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] }}
+      context={fakeFittingContext(catalogue, { engine })}
       edit={edit}
     />
   );
@@ -125,8 +125,7 @@ describe('ListChargePicker', () => {
         result={{ state: 'active', maxState: 'overload', chargeGroupIds: [85] }}
         fitting={fitting}
         catalogue={catalogue}
-        engineReady={false}
-        profile={null}
+        context={null}
         edit={vi.fn()}
       />
     );

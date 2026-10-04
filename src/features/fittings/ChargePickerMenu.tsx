@@ -42,9 +42,7 @@ export function ChargePickerMenuItems({
   const input = actions.chargePickerInput?.() ?? null;
   const { groups } = useChargeChoices({
     fitting: input?.fitting ?? null,
-    catalogue: input?.catalogue ?? null,
-    engineReady: input?.engineReady ?? false,
-    profile: input?.profile ?? null,
+    context: input?.context ?? null,
     moduleResults: input?.moduleResults ?? null,
     moduleTypeId: module.typeId,
   });
