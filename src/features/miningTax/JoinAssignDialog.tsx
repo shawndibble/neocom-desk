@@ -18,6 +18,7 @@ import { combine, type JoinMemberInput } from './ledgerActions';
 import { agreedTerms } from './selection';
 import type { MoonMiningTaxRow } from './snapshot';
 import { useLedgerAction } from './useLedgerAction';
+import { LedgerActionError } from './LedgerActionError';
 
 export interface JoinCandidate {
   row: MoonMiningTaxRow;
@@ -305,11 +306,7 @@ export function JoinAssignDialog({
           )
         )}
 
-        {saveError && (
-          <p role="alert" className="text-xs text-danger">
-            {saveError}
-          </p>
-        )}
+        <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"

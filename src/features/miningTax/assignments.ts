@@ -617,11 +617,14 @@ export async function deleteAssignments(
 ): Promise<void> {
   if (assignments.length === 0) return;
   await db.miningTaxAssignments.bulkDelete(assignments.map((a) => a.id));
-  for (const characterId of new Set(assignments.map((a) => a.characterId))) {
-    await appendTombstones(
-      tombstoneKey(MINING_TAX_ASSIGNMENTS, characterId),
-      assignments.filter((a) => a.characterId === characterId).map((a) => a.id)
-    );
+  const idsByCharacter = new Map<number, string[]>();
+  for (const a of assignments) {
+    const ids = idsByCharacter.get(a.characterId);
+    if (ids) ids.push(a.id);
+    else idsByCharacter.set(a.characterId, [a.id]);
+  }
+  for (const [characterId, ids] of idsByCharacter) {
+    await appendTombstones(tombstoneKey(MINING_TAX_ASSIGNMENTS, characterId), ids);
   }
 }
 

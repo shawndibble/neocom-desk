@@ -5,6 +5,7 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { exactAmountMatches, type MadePayment } from './paymentLinks';
+import { LedgerActionError } from './LedgerActionError';
 
 interface LinkTransactionDialogProps {
   open: boolean;
@@ -127,11 +128,7 @@ export function LinkTransactionDialog({
           </ul>
         )}
 
-        {saveError && (
-          <p role="alert" className="text-xs text-danger">
-            {saveError}
-          </p>
-        )}
+        <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
           <Button variant="primary" size="sm" disabled={!selected || busy} onClick={confirm}>
             {t('miningTax.linkTransactionConfirmAction')}

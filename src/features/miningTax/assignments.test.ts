@@ -691,7 +691,7 @@ describe('joinAssignments', () => {
 
 describe('planNeedsReviewResolution', () => {
   /** Plans and writes, the way an action does — these tests read the stored result. */
-  async function resolveNeedsReview(
+  async function planAndWrite(
     ...args: Parameters<typeof planNeedsReviewResolution>
   ): Promise<void> {
     await db.miningTaxAssignments.put(await planNeedsReviewResolution(...args));
@@ -724,7 +724,7 @@ describe('planNeedsReviewResolution', () => {
     };
     await db.miningTaxAssignments.put(assignment);
 
-    await resolveNeedsReview(assignment, freshEntry, [assignment]);
+    await planAndWrite(assignment, freshEntry, [assignment]);
 
     const updated = await db.miningTaxAssignments.get('a1');
     expect(updated?.oreLines).toEqual([
@@ -754,7 +754,7 @@ describe('planNeedsReviewResolution', () => {
     };
     await db.miningTaxAssignments.put(assignment);
 
-    await resolveNeedsReview(assignment, freshEntry, [assignment]);
+    await planAndWrite(assignment, freshEntry, [assignment]);
 
     const updated = await db.miningTaxAssignments.get('a1');
     expect(updated?.oreLineValues).toBeUndefined();
@@ -783,7 +783,7 @@ describe('planNeedsReviewResolution', () => {
       oreLines: [{ typeId: TYPE_B, quantity: 999 }],
       status: 'outstanding',
     };
-    await resolveNeedsReview(assignment, freshEntry, [assignment, sibling]);
+    await planAndWrite(assignment, freshEntry, [assignment, sibling]);
 
     const updated = await db.miningTaxAssignments.get('a1');
     expect(updated?.oreLines).toEqual([{ typeId: TYPE_A, quantity: 150 }]);
@@ -816,7 +816,7 @@ describe('planNeedsReviewResolution', () => {
     };
     await db.miningTaxAssignments.put(assignment);
 
-    await resolveNeedsReview(assignment, freshEntry, [assignment]);
+    await planAndWrite(assignment, freshEntry, [assignment]);
 
     // Accepting growth is a fresh invoice moment, and the invoice is still
     // billed at the hub this Payee bills at — re-pricing at Jita would quietly
@@ -844,7 +844,7 @@ describe('planNeedsReviewResolution', () => {
     };
     await db.miningTaxAssignments.put(dismissed);
 
-    await resolveNeedsReview(dismissed, freshEntry, [dismissed]);
+    await planAndWrite(dismissed, freshEntry, [dismissed]);
     expect(pricingMock.loadUnitPricesOnDate).toHaveBeenCalledWith(
       CHAR_A,
       expect.anything(),
@@ -855,7 +855,7 @@ describe('planNeedsReviewResolution', () => {
     // A dangling payeeId (the Payee was deleted after the Assignment) resolves
     // the same way rather than throwing partway through a re-snapshot.
     pricingMock.loadUnitPricesOnDate.mockClear();
-    await resolveNeedsReview({ ...dismissed, payeeId: 'gone' }, freshEntry, [dismissed]);
+    await planAndWrite({ ...dismissed, payeeId: 'gone' }, freshEntry, [dismissed]);
     expect(pricingMock.loadUnitPricesOnDate).toHaveBeenCalledWith(
       CHAR_A,
       expect.anything(),
@@ -882,7 +882,7 @@ describe('planNeedsReviewResolution', () => {
     };
     await db.miningTaxAssignments.put(assignment);
 
-    await resolveNeedsReview(assignment, freshEntry, [assignment]);
+    await planAndWrite(assignment, freshEntry, [assignment]);
 
     const updated = await db.miningTaxAssignments.get('a2');
     expect(updated?.status).toBe('outstanding');

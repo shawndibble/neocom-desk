@@ -7,6 +7,7 @@ import { formatIsk } from '@/lib/isk';
 import type { DisplayRow } from './groupRows';
 import { dismiss } from './ledgerActions';
 import { useLedgerAction } from './useLedgerAction';
+import { LedgerActionError } from './LedgerActionError';
 
 interface BulkDismissDialogProps {
   open: boolean;
@@ -120,11 +121,7 @@ export function BulkDismissDialog({
           <span className="text-sm font-semibold tabular-nums">{formatIsk(total)} ISK</span>
         </div>
 
-        {saveError && (
-          <p role="alert" className="text-xs text-danger">
-            {saveError}
-          </p>
-        )}
+        <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"

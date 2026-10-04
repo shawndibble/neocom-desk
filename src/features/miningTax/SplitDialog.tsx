@@ -22,6 +22,7 @@ import { unmaskNumber } from '@/lib/numberMask';
 import { split } from './ledgerActions';
 import type { MoonMiningTaxRow } from './snapshot';
 import { useLedgerAction } from './useLedgerAction';
+import { LedgerActionError } from './LedgerActionError';
 
 interface SplitDialogProps {
   open: boolean;
@@ -303,11 +304,7 @@ export function SplitDialog({
         </div>
         <p className="text-[0.6875rem] text-text-dim">{t('miningTax.splitRepriceHint')}</p>
 
-        {saveError && (
-          <p role="alert" className="text-xs text-danger">
-            {saveError}
-          </p>
-        )}
+        <LedgerActionError error={saveError} />
 
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <Button

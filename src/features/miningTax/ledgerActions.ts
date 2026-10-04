@@ -17,9 +17,8 @@
  * primitives in `assignments.ts` are this module's to call; the UI imports
  * actions from here (an ESLint rule holds that line).
  */
-import { db, type MiningTaxAssignmentRecord } from '@/db';
+import { db, type MiningTaxAssignmentRecord, type MiningTaxPaymentLinkSource } from '@/db';
 import { scheduleSync } from '@/sync';
-import type { MiningTaxPaymentLinkSource } from '@/db';
 import {
   AlreadyAssignedError,
   createAssignment,

@@ -23,6 +23,7 @@ import { hubForPayee } from './pricing';
 import type { MoonMiningTaxRow } from './snapshot';
 import type { PayeeSuggestion } from './suggestPayee';
 import { useLedgerAction } from './useLedgerAction';
+import { LedgerActionError } from './LedgerActionError';
 
 interface AssignDialogProps {
   row: MoonMiningTaxRow;
@@ -421,11 +422,7 @@ export function AssignDialog({
         {t('miningTax.markPaidLabel')}
       </label>
 
-      {saveError && (
-        <p role="alert" className="text-xs text-danger">
-          {saveError}
-        </p>
-      )}
+      <LedgerActionError error={saveError} />
       <div className="flex flex-wrap gap-2 pt-1">
         <Button
           variant="primary"

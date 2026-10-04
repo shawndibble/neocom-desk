@@ -12,6 +12,7 @@ import { rememberPayeeEntity } from './payees';
 import { exactAmountMatches, type MadePayment } from './paymentLinks';
 import { allocateOldestFirst } from './settleAllocation';
 import { useLedgerAction } from './useLedgerAction';
+import { LedgerActionError } from './LedgerActionError';
 
 interface LinkWalletPaymentDialogProps {
   open: boolean;
@@ -146,11 +147,9 @@ export function LinkWalletPaymentDialog({
 
   async function commit() {
     if (!selected || included.length === 0 || !amountValid || paymentAmount === null) return;
-    const counterpartyId = remember ? selected.counterpartyId : undefined;
-    let rememberFailed = false;
     const link = [{ refId: selected.refId, source: 'manual' as const }];
-    const result = await run(async () => {
-      const saved = await settle(
+    const result = await run(() =>
+      settle(
         included.map((m) => m.assignment),
         {
           paidOn: paidOnFor(selected.date),
@@ -158,21 +157,18 @@ export function LinkWalletPaymentDialog({
           amount: Math.round(paymentAmount),
           ...(selected.kind === 'journal' ? { journalLinks: link } : { contractLinks: link }),
         }
-      );
-      if (saved.ok) {
-        setRecorded(true);
-        if (counterpartyId !== undefined) {
-          rememberFailed = await rememberPayeeEntity(payee, counterpartyId).then(
-            () => false,
-            () => true
-          );
-        }
-      }
-      return saved;
-    });
+      )
+    );
     if (!result.ok) return;
+    // `recorded` keeps the button disabled from here on, so the remember step
+    // below can't be raced into recording the payment twice.
+    setRecorded(true);
     onLinked();
-    if (rememberFailed) {
+    try {
+      if (remember && selected.counterpartyId !== undefined) {
+        await rememberPayeeEntity(payee, selected.counterpartyId);
+      }
+    } catch {
       // The payment is recorded; only learning who the Payee is paid failed.
       // Say so and keep the dialog open, rather than closing as if all went.
       setSaveError(t('miningTax.linkWallet.rememberFailed', { payee: payee.name }));
@@ -346,11 +342,7 @@ export function LinkWalletPaymentDialog({
           </label>
         )}
 
-        {saveError && (
-          <p role="alert" className="text-xs text-danger">
-            {saveError}
-          </p>
-        )}
+        <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"

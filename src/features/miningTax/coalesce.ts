@@ -24,13 +24,14 @@
  * idempotent, so a healthy ledger writes nothing and triggers no sync.
  */
 import { db, type MiningTaxAssignmentRecord } from '@/db';
-import { markMiningTaxAssignmentDeleted, scheduleSync } from '@/sync';
+import { scheduleSync } from '@/sync';
 import { entryKey, type MiningLedgerEntry } from '@/engine/miningTax/types';
 import {
   planEntryMerges,
   planGroupEjections,
   type CoalescableAssignment,
 } from '@/engine/miningTax/coalesce';
+import { deleteAssignments } from './assignments';
 
 function coalescable(a: MiningTaxAssignmentRecord): CoalescableAssignment {
   return {
@@ -105,10 +106,13 @@ export async function coalesceAssignments(
 
   if (rewritten.size === 0 && absorbedIds.length === 0) return;
 
-  await db.miningTaxAssignments.bulkPut([...rewritten].map((id) => working.get(id)!));
-  // Tombstoned rather than plainly dropped: the absorbed halves may already
-  // have synced, and a bare local delete would let the next pull resurrect
-  // them beside the record that now holds their ore.
-  for (const id of absorbedIds) await markMiningTaxAssignmentDeleted(characterId, id);
+  // One transaction, so a repair never lands half-done. Tombstoned rather than
+  // plainly dropped: the absorbed halves may already have synced, and a bare
+  // local delete would let the next pull resurrect them beside the record
+  // that now holds their ore.
+  await db.transaction('rw', db.miningTaxAssignments, db.settings, async () => {
+    await db.miningTaxAssignments.bulkPut([...rewritten].map((id) => working.get(id)!));
+    await deleteAssignments(absorbedIds.map((id) => ({ id, characterId })));
+  });
   scheduleSync(characterId);
 }

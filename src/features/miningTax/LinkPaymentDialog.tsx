@@ -11,6 +11,7 @@ import { settle } from './ledgerActions';
 import { rememberPayeeEntity } from './payees';
 import type { LinkSuggestion } from './paymentLinks';
 import { useLedgerAction } from './useLedgerAction';
+import { LedgerActionError } from './LedgerActionError';
 
 interface LinkPaymentDialogProps {
   open: boolean;
@@ -274,11 +275,7 @@ export function LinkPaymentDialog({
           </>
         )}
 
-        {saveError && (
-          <p role="alert" className="text-xs text-danger">
-            {saveError}
-          </p>
-        )}
+        <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"

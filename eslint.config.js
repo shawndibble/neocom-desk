@@ -104,12 +104,13 @@ export default tseslint.config(
   {
     // Mining Tax writes go through ledgerActions.ts, which makes each one a
     // single transaction that schedules its sync after commit. Only it and
-    // the load-time repairs (reconcile, snapshot) touch the record
+    // the load path (coalesce, reconcile, snapshot) touch the record
     // primitives directly.
     files: ['src/**/*.{ts,tsx}'],
     ignores: [
       'src/components/ui/**',
       'src/features/miningTax/ledgerActions.ts',
+      'src/features/miningTax/coalesce.ts',
       'src/features/miningTax/reconcile.ts',
       'src/features/miningTax/snapshot.ts',
       'src/features/miningTax/assignments.test.ts',
@@ -122,7 +123,7 @@ export default tseslint.config(
           paths: restrictedImportPaths,
           patterns: [
             {
-              group: ['./assignments', '@/features/miningTax/assignments'],
+              group: ['./assignments', '**/miningTax/assignments'],
               message: 'Write Mining Tax Assignments through ./ledgerActions, not the primitives.',
             },
           ],

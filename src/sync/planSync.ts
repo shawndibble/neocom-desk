@@ -52,6 +52,7 @@ import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { getSyncFirestore } from './firebaseApp';
 import {
   INTERNAL_PREFIX,
+  appendTombstones,
   heartbeatKey,
   ownerHashKey,
   readTombstones,
@@ -81,7 +82,6 @@ import {
   BUILD_PLANS,
   EDITABLE_COLLECTIONS,
   FITTINGS,
-  MINING_TAX_ASSIGNMENTS,
   NOTIFICATION_FEED,
   PAYEES,
   PLANET_RICHNESS,
@@ -163,9 +163,7 @@ async function recordDeletion(
   deleteRow: () => Promise<void>
 ): Promise<void> {
   await deleteRow();
-  const tombstones = (await readTombstones(tombstoneKey)).filter((t) => t.id !== id);
-  tombstones.push({ id, deletedAt: Date.now() });
-  await writeTombstones(tombstoneKey, tombstones);
+  await appendTombstones(tombstoneKey, [id]);
   scheduleSync(characterId);
 }
 
@@ -185,9 +183,7 @@ async function recordBulkDeletion(
 ): Promise<void> {
   if (ids.length === 0) return;
   await deleteRows(ids);
-  const now = Date.now();
-  const remaining = (await readTombstones(tombstoneKey)).filter((t) => !ids.includes(t.id));
-  await writeTombstones(tombstoneKey, [...remaining, ...ids.map((id) => ({ id, deletedAt: now }))]);
+  await appendTombstones(tombstoneKey, ids);
   scheduleSync(characterId);
 }
 
@@ -246,18 +242,6 @@ export async function markFittingDeleted(characterId: number, fittingId: string)
 }
 
 /** Mining Tax Assignment analogue of markPlanDeleted — same tombstone semantics (issue #523). */
-export async function markMiningTaxAssignmentDeleted(
-  characterId: number,
-  assignmentId: string
-): Promise<void> {
-  await recordDeletion(
-    characterId,
-    assignmentId,
-    tombstoneKey(MINING_TAX_ASSIGNMENTS, characterId),
-    () => db.miningTaxAssignments.delete(assignmentId)
-  );
-}
-
 function stationPinId(characterId: number, locationId: number): string {
   return `${characterId}:${locationId}`;
 }

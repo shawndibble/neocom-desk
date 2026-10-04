@@ -28,6 +28,7 @@ import { PaymentLinksCard, type LinkedTransaction } from './PaymentLinksCard';
 import { StatusPill } from './StatusPill';
 import type { MoonMiningTaxRow } from './snapshot';
 import type { PayeeSuggestion } from './suggestPayee';
+import { LedgerActionError } from './LedgerActionError';
 
 interface RowDetailModalProps {
   open: boolean;
@@ -322,11 +323,7 @@ export function RowDetailModal({
           </div>
         )}
 
-        {saveError && (
-          <p role="alert" className="text-xs text-danger">
-            {saveError}
-          </p>
-        )}
+        <LedgerActionError error={saveError} />
         {status === 'dismissed' ? (
           <div className="flex flex-wrap gap-2 pt-1">
             <Button size="sm" disabled={busy} onClick={onUndo}>

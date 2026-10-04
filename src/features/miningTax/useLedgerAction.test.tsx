@@ -18,17 +18,12 @@ describe('useLedgerAction', () => {
     expect(result.current.pending).toBe(false);
   });
 
-  it('treats a stale view like done (the reload shows what exists), unless told otherwise', async () => {
+  it('treats a stale view like done — the reload shows what exists', async () => {
     const { result } = renderHook(() => useLedgerAction());
     const onDone = vi.fn();
     await act(() => result.current.run(async () => stale, onDone));
     expect(onDone).toHaveBeenCalledTimes(1);
     expect(result.current.error).toBeNull();
-
-    const onStale = vi.fn();
-    await act(() => result.current.run(async () => stale, onDone, onStale));
-    expect(onStale).toHaveBeenCalledTimes(1);
-    expect(onDone).toHaveBeenCalledTimes(1);
   });
 
   it('shows the save-failed message and stays put on any other failure, clearing it on the next try', async () => {

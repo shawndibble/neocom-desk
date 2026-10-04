@@ -23,6 +23,7 @@ import { formatDateRange } from './groupRows';
 import { PaymentLinksCard, type LinkedTransaction } from './PaymentLinksCard';
 import { STATUS_TONE } from './statusTone';
 import type { MoonMiningTaxRow } from './snapshot';
+import { LedgerActionError } from './LedgerActionError';
 
 export interface GroupMember {
   row: MoonMiningTaxRow;
@@ -246,11 +247,7 @@ export function GroupSummaryModal({
           </div>
         )}
 
-        {saveError && (
-          <p role="alert" className="text-xs text-danger">
-            {saveError}
-          </p>
-        )}
+        <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
           {anyGrown ? (
             <Button variant="primary" disabled={busy} onClick={onResolve}>

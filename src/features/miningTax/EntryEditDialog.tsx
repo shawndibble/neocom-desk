@@ -22,6 +22,7 @@ import { useLedgerAction } from './useLedgerAction';
 import { formatDateRange, type GroupMember } from './groupRows';
 import { combinedDayValues, combinedLineDefaults, dayTotalValues } from './combinedValues';
 import { useMiningTaxOreValueMode } from './oreValueMode';
+import { LedgerActionError } from './LedgerActionError';
 
 interface EntryEditDialogProps {
   open: boolean;
@@ -296,11 +297,7 @@ export function EntryEditDialog({
           </div>
         </div>
 
-        {saveError && (
-          <p role="alert" className="text-xs text-danger">
-            {saveError}
-          </p>
-        )}
+        <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"

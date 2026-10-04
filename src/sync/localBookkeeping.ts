@@ -105,7 +105,8 @@ export async function readTombstones(key: string): Promise<LocalTombstone[]> {
 export async function appendTombstones(key: string, ids: readonly string[]): Promise<void> {
   if (ids.length === 0) return;
   const now = Date.now();
-  const remaining = (await readTombstones(key)).filter((t) => !ids.includes(t.id));
+  const replaced = new Set(ids);
+  const remaining = (await readTombstones(key)).filter((t) => !replaced.has(t.id));
   await db.settings.put({
     key,
     value: [...remaining, ...ids.map((id) => ({ id, deletedAt: now }))],

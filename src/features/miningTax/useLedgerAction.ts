@@ -5,8 +5,8 @@ import type { LedgerActionResult } from './ledgerActions';
 /**
  * How every Mining Tax dialog runs a ledger action, so a failure reads the
  * same everywhere: `pending` while it writes; on success, `onDone`; when the
- * pilot's view was stale (`already-assigned`), `onStale` — by default the same
- * as done, since closing and reloading shows what exists; on any other
+ * pilot's view was stale (`already-assigned`), also `onDone`, since closing
+ * and reloading shows what exists; on any other
  * failure, `error` holds the "nothing was changed" message and the dialog
  * stays open to retry. `run` also hands the result back for a caller with a
  * further step, and `setError` lets one say what that step failed at.
@@ -19,15 +19,13 @@ export function useLedgerAction() {
   const run = useCallback(
     async <T>(
       action: () => Promise<LedgerActionResult<T>>,
-      onDone?: () => void,
-      onStale?: () => void
+      onDone?: () => void
     ): Promise<LedgerActionResult<T>> => {
       setPending(true);
       setError(null);
       try {
         const result = await action();
-        if (result.ok) onDone?.();
-        else if (result.reason === 'already-assigned') (onStale ?? onDone)?.();
+        if (result.ok || result.reason === 'already-assigned') onDone?.();
         else setError(t('miningTax.saveFailed'));
         return result;
       } finally {

@@ -22,6 +22,7 @@ import { buildSettleUpReason, formatDateRange } from './groupRows';
 import { settle, type PaymentInput } from './ledgerActions';
 import { allocateOldestFirst } from './settleAllocation';
 import { useLedgerAction } from './useLedgerAction';
+import { LedgerActionError } from './LedgerActionError';
 
 export interface SettleUpRow {
   assignment: MiningTaxAssignmentRecord;
@@ -418,11 +419,7 @@ export function SettleUpDialog({
           )}
         </p>
 
-        {saveError && (
-          <p role="alert" className="text-xs text-danger">
-            {saveError}
-          </p>
-        )}
+        <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"
