@@ -57,7 +57,7 @@ describe('HaulingCargoControl, a typed Cargo Space', () => {
     await user.type(screen.getByRole('textbox', { name: 'Cargo space (m³)' }), '41000');
     await user.click(screen.getByRole('button', { name: 'Use' }));
     expect(onCargoChange).toHaveBeenCalledWith({
-      label: 'Custom',
+      label: 'Ammo hold',
       holds: [{ kind: 'ammo', capacityM3: 41_000 }],
     });
   });

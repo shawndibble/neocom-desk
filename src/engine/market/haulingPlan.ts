@@ -29,7 +29,13 @@
  */
 import { brokerFeePct, salesTaxPct } from '@/engine/industry/fees';
 import type { AppraisalNetFees } from './appraisal';
-import { holdAccepts, SPECIALISED_HOLD_KINDS, type CargoHold, type HoldKind } from './cargoHolds';
+import {
+  HOLD_KINDS,
+  holdAccepts,
+  SPECIALISED_HOLD_KINDS,
+  type CargoHold,
+  type HoldKind,
+} from './cargoHolds';
 import { lotEconomics, walkInstant, walkLadder, type LadderLevel } from './haulingMarket';
 
 export interface TripCandidate {
@@ -177,9 +183,11 @@ function holdUses(holds: readonly CargoHold[] | null): HoldUse[] {
   for (const { kind, capacityM3 } of holds ?? []) {
     if (capacityM3 > 0) byKind.set(kind, (byKind.get(kind) ?? 0) + capacityM3);
   }
-  return (['general', ...SPECIALISED_HOLD_KINDS] as const)
-    .filter((kind) => byKind.has(kind))
-    .map((kind) => ({ kind, capacityM3: byKind.get(kind)!, usedM3: 0 }));
+  return HOLD_KINDS.filter((kind) => byKind.has(kind)).map((kind) => ({
+    kind,
+    capacityM3: byKind.get(kind)!,
+    usedM3: 0,
+  }));
 }
 
 /** The holds `candidate` may go in, in the order it fills them: Specialised Holds narrowest first, then the general hold. */

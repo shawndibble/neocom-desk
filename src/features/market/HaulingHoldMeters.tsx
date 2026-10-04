@@ -1,9 +1,9 @@
 /**
  * The Trip Plan summary's hold meters: one fill bar per hold of the Cargo
  * Space, so a hauler sees which hold is full and which still has room. A
- * single hold keeps the plain "used of total m³" meter; several each carry
- * their name. A hold no candidate fits stays empty rather than reading as
- * spare room for the load.
+ * lone general hold keeps the plain "used of total m³" meter; otherwise each
+ * bar carries its hold's name. A hold no candidate fits stays empty rather
+ * than reading as spare room for the load.
  */
 import { useTranslation } from 'react-i18next';
 import type { HoldUse } from '@/engine/market/haulingPlan';
@@ -21,7 +21,7 @@ export function HaulingHoldMeters({
   const { t } = useTranslation();
   const binding = bindingText && <span className="@max-[40rem]:hidden"> · {bindingText}</span>;
 
-  if (holds.length === 1) {
+  if (holds.length === 1 && holds[0]!.kind === 'general') {
     const hold = holds[0]!;
     const counts = { used: fmt(hold.usedM3), total: fmt(hold.capacityM3) };
     return (

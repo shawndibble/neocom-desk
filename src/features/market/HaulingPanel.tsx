@@ -408,9 +408,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     const line = lineOf.get(row.typeId);
     if (!line) return undefined;
     const unit = line.volumeM3 > 0 ? `${Math.round(line.volumeM3).toLocaleString()} m³ · ` : '';
-    // With more than one hold, say which the line rides in ("in Ammo hold, Cargo hold").
+    // Unless the Cargo Space is one plain hold, say which the line rides in ("in Ammo hold, Cargo hold").
+    const plainHold = plan.holds.length === 1 && plan.holds[0]!.kind === 'general';
     const holds =
-      plan.holds.length > 1 && line.placements.length > 0
+      !plainHold && line.placements.length > 0
         ? `${t('market.hauling.plan.inHolds', {
             holds: line.placements.map((p) => t(`market.hauling.holds.${p.kind}`)).join(', '),
           })} · `

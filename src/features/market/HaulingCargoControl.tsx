@@ -181,7 +181,16 @@ function CargoPickerBody({
       )}
       {tab === 'custom' && (
         <CustomTab
-          onChoose={(hold) => onPick({ label: t('market.hauling.cargo.custom'), holds: [hold] })}
+          onChoose={(hold) =>
+            onPick({
+              // A typed hold of a kind says which, so the control shows it after picking.
+              label:
+                hold.kind === 'general'
+                  ? t('market.hauling.cargo.custom')
+                  : t(`market.hauling.holds.${hold.kind}`),
+              holds: [hold],
+            })
+          }
         />
       )}
 

@@ -50,7 +50,8 @@ export function useHaulingScan(
           loadMarketGroups(),
           loadMarketTypes(),
           loadTypes(),
-          loadGroupCategories(),
+          // Without it every category reads as unknown: items still plan, in the general hold only.
+          loadGroupCategories().catch(() => ({})),
         ]);
         const typeIds = typeIdsInHaulingCategory(categoryId, groups, marketTypes);
         const scan = await runHaulingScan({
