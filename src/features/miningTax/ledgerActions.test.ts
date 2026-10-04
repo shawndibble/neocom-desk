@@ -1,16 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { db, type MiningTaxAssignmentRecord } from '@/db';
+import { db, type MiningTaxAssignmentRecord, type PayeeRecord } from '@/db';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
-import { MINING_TAX_ASSIGNMENTS } from '@/sync/syncedCollections';
+import { MINING_TAX_ASSIGNMENTS, PAYEES } from '@/sync/syncedCollections';
+import { coalesceAssignments } from './coalesce';
 import type { GroupMember, DisplayRow } from './groupRows';
 import type { SessionContinuation } from './sessionContinuation';
 import type { MoonMiningTaxRow } from './snapshot';
 import {
   acceptNewTotal,
   assign,
+  assignmentsMovedWithPayee,
   combine,
   continueSession,
+  deletePayee,
   dismiss,
   settle,
   unassign,
@@ -353,5 +356,103 @@ describe('every action', () => {
     );
     expect(failed).toMatchObject({ ok: false, reason: 'save-failed' });
     expect(failed.ok === false && failed.cause).toBeInstanceOf(Error);
+  });
+});
+
+describe('deletePayee', () => {
+  const payeeA: PayeeRecord = {
+    id: 'p1',
+    characterId: CHAR,
+    name: 'A',
+    defaultTaxPct: 10,
+    updatedAt: 1,
+  };
+  const payeeB: PayeeRecord = {
+    id: 'p2',
+    characterId: CHAR,
+    name: 'B',
+    defaultTaxPct: 10,
+    updatedAt: 1,
+  };
+  const payment: MiningTaxAssignmentRecord['payment'] = {
+    paymentId: 'pay1',
+    paidOn: '2026-09-06',
+    method: 'donation',
+    amount: 100,
+  };
+
+  /** One Combined Entry under A: a day settled oldest-first, and a day still owed. */
+  const paidDay = assignment({ id: 'g1', groupId: 'g', status: 'paid', payment });
+  const owedDay = assignment({ id: 'g2', groupId: 'g', date: '2026-09-05' });
+
+  beforeEach(async () => {
+    await db.payees.bulkPut([payeeA, payeeB]);
+  });
+
+  it('moves every day of a Combined Entry with an owed day, keeping each status, and coalesce leaves it whole', async () => {
+    await db.miningTaxAssignments.bulkPut([paidDay, owedDay]);
+
+    expect(await deletePayee(payeeA, 'p2')).toEqual({ ok: true, value: undefined });
+
+    const after = await stored();
+    expect(after.map((a) => [a.id, a.payeeId, a.status, a.groupId])).toEqual(
+      expect.arrayContaining([
+        ['g1', 'p2', 'paid', 'g'],
+        ['g2', 'p2', 'outstanding', 'g'],
+      ])
+    );
+    expect(after.find((a) => a.id === 'g1')!.payment).toEqual(payment);
+    expect(await db.payees.get('p1')).toBeUndefined();
+    expect((await readTombstones(tombstoneKey(PAYEES, CHAR))).map((t) => t.id)).toEqual(['p1']);
+    expect(syncMock.scheduleSync).toHaveBeenCalledTimes(1);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR);
+
+    await coalesceAssignments(CHAR);
+    expect((await stored()).every((a) => a.groupId === 'g')).toBe(true);
+  });
+
+  it('leaves standalone paid days, and Combined Entries with nothing owed, where they are', async () => {
+    const standalonePaid = assignment({ id: 's1', date: '2026-09-01', status: 'paid', payment });
+    const settledGroup = [
+      assignment({ id: 'h1', groupId: 'h', date: '2026-08-01', status: 'paid', payment }),
+      assignment({ id: 'h2', groupId: 'h', date: '2026-08-02', status: 'paid', payment }),
+    ];
+    await db.miningTaxAssignments.bulkPut([standalonePaid, ...settledGroup, owedDay]);
+
+    expect((await deletePayee(payeeA, 'p2')).ok).toBe(true);
+
+    const payeeOf = new Map((await stored()).map((a) => [a.id, a.payeeId]));
+    expect(Object.fromEntries(payeeOf)).toEqual({ s1: 'p1', h1: 'p1', h2: 'p1', g2: 'p2' });
+  });
+
+  it('changes nothing and syncs nothing when the Payee delete fails after the move', async () => {
+    await db.miningTaxAssignments.bulkPut([paidDay, owedDay]);
+    vi.spyOn(db.payees, 'delete').mockRejectedValueOnce(new Error('disk full'));
+
+    expect(await deletePayee(payeeA, 'p2')).toMatchObject({ ok: false, reason: 'save-failed' });
+
+    expect((await stored()).every((a) => a.payeeId === 'p1')).toBe(true);
+    expect(await db.payees.get('p1')).toEqual(payeeA);
+    expect(await readTombstones(tombstoneKey(PAYEES, CHAR))).toEqual([]);
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
+  it('deletes only the Payee when there is nowhere to move its entries', async () => {
+    await db.miningTaxAssignments.bulkPut([owedDay]);
+
+    expect((await deletePayee(payeeA)).ok).toBe(true);
+
+    expect((await stored())[0].payeeId).toBe('p1');
+    expect(await db.payees.get('p1')).toBeUndefined();
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR);
+  });
+
+  it('counts what a move takes: owed days plus the rest of their Combined Entries', () => {
+    const elsewhere = assignment({ id: 'x1', payeeId: 'p2', groupId: 'g' });
+    expect(
+      assignmentsMovedWithPayee([paidDay, owedDay, elsewhere], 'p1')
+        .map((a) => a.id)
+        .sort()
+    ).toEqual(['g1', 'g2']);
   });
 });

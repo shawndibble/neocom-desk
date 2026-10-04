@@ -18,11 +18,11 @@ import {
   TextInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
+import type { PayeeRecord } from '@/db';
 import { formatIsk } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { moveToPayee } from './ledgerActions';
-import { createPayee, deletePayee, loadPayees, updatePayee } from './payees';
+import { deletePayee } from './ledgerActions';
+import { createPayee, loadPayees, updatePayee } from './payees';
 import { payeeSystemNames } from './payeeSystemNames';
 import { hubForPayee } from './pricing';
 import type { TrackedCharacter } from './snapshot';
@@ -42,8 +42,8 @@ interface PayeeManagerDialogProps {
   initialCharacterId: number;
   onChanged: () => void;
   /**
-   * What each Payee is still owed — outstanding and needs-review Assignments
-   * only — keyed by Payee id. Drives the row's balance and the delete
+   * What each Payee is still owed — outstanding Assignments only — keyed by
+   * Payee id. Drives the row's balance and the delete
    * confirmation's "move them first" offer; absent reads as nothing owed.
    */
   owedByPayee?: ReadonlyMap<string, PayeeOwed>;
@@ -55,7 +55,13 @@ interface PayeeManagerDialogProps {
 
 export interface PayeeOwed {
   amount: number;
-  assignments: readonly MiningTaxAssignmentRecord[];
+  /** How many owed entries make up `amount`. */
+  count: number;
+  /**
+   * How many entries "Move and delete" takes — `count` plus the other days of
+   * any Combined Entry those are in (`assignmentsMovedWithPayee`).
+   */
+  moving: number;
 }
 
 interface DraftPayee {
@@ -211,17 +217,10 @@ export function PayeeManagerDialog({
     onChanged();
   }
 
-  async function handleDelete(payee: PayeeRecord, moveTo?: PayeeOwed & { targetId: string }) {
-    // Move first: a failed move must leave the Payee (and its entries' label) intact.
+  async function handleDelete(payee: PayeeRecord, moveToPayeeId?: string) {
+    // One transaction: a failure leaves the Payee and every entry's label intact.
     setDeleteError(null);
-    const moved = moveTo ? (await moveToPayee(moveTo.assignments, moveTo.targetId)).ok : true;
-    const deleted =
-      moved &&
-      (await deletePayee(payee).then(
-        () => true,
-        () => false
-      ));
-    if (!deleted) {
+    if (!(await deletePayee(payee, moveToPayeeId)).ok) {
       setDeleteError(t('miningTax.payees.deleteFailed', { name: payee.name }));
       return;
     }
@@ -240,14 +239,11 @@ export function PayeeManagerDialog({
     setDeletingPayee(null);
     if (!payee) return;
     const owed = owedByPayee?.get(payee.id);
-    void handleDelete(
-      payee,
-      moveAndDelete && owed && moveTargetId ? { ...owed, targetId: moveTargetId } : undefined
-    );
+    void handleDelete(payee, moveAndDelete && owed && moveTargetId ? moveTargetId : undefined);
   }
 
   const deletingOwed =
-    deletingPayee && (owedByPayee?.get(deletingPayee.id)?.assignments.length ?? 0) > 0
+    deletingPayee && (owedByPayee?.get(deletingPayee.id)?.count ?? 0) > 0
       ? owedByPayee?.get(deletingPayee.id)
       : undefined;
   const moveTargets = deletingPayee ? payees.filter((p) => p.id !== deletingPayee.id) : [];
@@ -428,10 +424,15 @@ export function PayeeManagerDialog({
             <p className="text-xs">
               {t('miningTax.payees.deleteOwed', {
                 name: deletingPayee?.name ?? '',
-                count: deletingOwed.assignments.length,
+                count: deletingOwed.count,
                 amount: formatIsk(deletingOwed.amount, 0),
               })}
             </p>
+            {moveTargets.length > 0 && deletingOwed.moving > deletingOwed.count && (
+              <p className="text-xs">
+                {t('miningTax.payees.moveTakesCombined', { count: deletingOwed.moving })}
+              </p>
+            )}
             {moveTargets.length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
                 <Select value={moveTargetId} onValueChange={setMoveTargetId}>
