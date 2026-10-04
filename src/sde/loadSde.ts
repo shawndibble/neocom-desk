@@ -49,6 +49,8 @@ export async function typeName(typeId: number): Promise<string> {
   const types = await loadTypes();
   return types[String(typeId)]?.name ?? `Type ${typeId}`;
 }
+/** SDE groupID -> categoryID, for every group: `types.json` carries only a type's group. */
+export const loadGroupCategories = cached<Record<string, number>>('groupCategories.json');
 export const loadPi = cached<PiData>('pi.json');
 /**
  * What each market-listed type reprocesses into (issue #537), for the
