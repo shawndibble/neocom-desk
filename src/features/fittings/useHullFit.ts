@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { PilotProfile } from '@/engine/fittings/types';
 import type { CandidateCheck } from './dogmaFittingEngine';
+import type { FittingContext } from './fittingContext';
 import { getHullFit } from './hullFitService';
-import type { FittingCatalogue } from './useFittingCatalogue';
 
 /**
  * Which fittable items go on this hull at all, and which the pilot can fly —
@@ -12,31 +11,28 @@ import type { FittingCatalogue } from './useFittingCatalogue';
  * caller — so the Fittings route also calls this as a background warm-up
  * (`whenIdle`) as soon as the ship data, profile and catalogue are in,
  * before the pilot opens the module browser. Null until done, or while the
- * ship data isn't loaded.
+ * fitting context is (the ship data, pilot or catalogue still loading).
  */
 export function useHullFit(
-  catalogue: FittingCatalogue | null,
+  context: FittingContext | null,
   shipTypeId: number | null,
-  profile: PilotProfile | null,
-  engineReady: boolean,
   /** Start when the browser is idle (a background warm-up) rather than at once. */
   whenIdle = false
 ): ReadonlyMap<number, CandidateCheck> | null {
   const [result, setResult] = useState<{
-    catalogue: FittingCatalogue;
+    context: FittingContext;
     shipTypeId: number;
-    profile: PilotProfile;
     checks: ReadonlyMap<number, CandidateCheck>;
   } | null>(null);
 
   useEffect(() => {
-    if (catalogue === null || profile === null || shipTypeId === null || !engineReady) return;
+    if (context === null || shipTypeId === null) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const start = (attempt = 0) => {
-      getHullFit(catalogue, shipTypeId, profile)
+      getHullFit(context, shipTypeId)
         .then((checks) => {
-          if (!cancelled) setResult({ catalogue, shipTypeId, profile, checks });
+          if (!cancelled) setResult({ context, shipTypeId, checks });
         })
         .catch((error: unknown) => {
           // A newer hull took the worker while this one was still on screen
@@ -63,12 +59,9 @@ export function useHullFit(
       clearTimeout(timer);
       if (idle !== undefined) cancelIdleCallback(idle);
     };
-  }, [catalogue, shipTypeId, profile, engineReady, whenIdle]);
+  }, [context, shipTypeId, whenIdle]);
 
-  return result !== null &&
-    result.catalogue === catalogue &&
-    result.shipTypeId === shipTypeId &&
-    result.profile === profile
+  return result !== null && result.context === context && result.shipTypeId === shipTypeId
     ? result.checks
     : null;
 }

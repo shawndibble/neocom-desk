@@ -502,7 +502,6 @@ describe('MaterialsTable on a phone', () => {
 
   it('puts Use assets and the price on the line under the numbers', () => {
     const detection: OwnedStockDetection = {
-      stockFor: (typeID) => (typeID === 34 ? { quantity: 9000, placements: [] } : undefined),
       scopedQuantityFor: (typeID) => (typeID === 34 ? 9000 : 0),
       lowerBound: false,
       incompleteCharacters: [],
@@ -940,12 +939,8 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     overrides: Partial<OwnedStockDetection> = {}
   ): OwnedStockDetection {
     return {
-      stockFor: (typeID) => {
-        const entry = stock[typeID];
-        return entry ? { quantity: entry.quantity, placements: entry.placements ?? [] } : undefined;
-      },
-      // Defaults to the same total as `stockFor` — the "everywhere" scope,
-      // and today's only behavior before per-location scoping (#454) existed.
+      // Defaults to the whole detected total — the "everywhere" scope, and
+      // today's only behavior before per-location scoping (#454) existed.
       scopedQuantityFor: (typeID) => stock[typeID]?.quantity ?? 0,
       lowerBound: false,
       incompleteCharacters: [],

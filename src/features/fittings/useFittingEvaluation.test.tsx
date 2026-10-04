@@ -17,8 +17,10 @@ const engine = vi.hoisted(() => ({
   computeFittingStats: vi.fn(),
   loadFittingPrice: vi.fn(),
 }));
+const readyEngine = vi.hoisted(() => ({ value: null as unknown }));
 vi.mock('./dogmaFittingEngine', () => ({
-  isDogmaEngineReady: () => false,
+  readyDogmaEngine: () => readyEngine.value,
+  subscribeDogmaEngine: () => () => {},
   computeFittingStats: (...args: EngineCall) => engine.computeFittingStats(...args),
 }));
 vi.mock('./fittingPrice', () => ({
@@ -32,6 +34,8 @@ vi.mock('./damageProfiles', () => ({
 }));
 
 const { useFittingEvaluation, evaluateFitting } = await import('./useFittingEvaluation');
+const { fakeDogmaEngine } = await import('./__fixtures__/fakeDogmaEngine');
+readyEngine.value = fakeDogmaEngine();
 const { useAbyssalWeather } = await import('./abyssalWeatherSelection');
 const { useOverheatAll, useSkillOverrides } = await import('./statsConditions');
 
@@ -137,7 +141,7 @@ describe('useFittingEvaluation', () => {
   it('works everything out inside the picked Abyssal weather, and in normal space without one', async () => {
     useAbyssalWeather.setState({ weatherTypeId: 47390 });
     const { result } = render({ fitting: RIFTER });
-    await waitFor(() => expect(result.current.variants).not.toBeNull());
+    await waitFor(() => expect(result.current.stats).not.toBeNull());
     await result.current.variants!.compare(addModule(RIFTER, 'medium', 0, 438));
     await evaluateFitting(SLASHER, CLONE, GURISTAS, { weatherTypeId: 47390, overheatAll: false });
     // Main stats, the variant's baseline, the variant, and another Fitting.
@@ -202,16 +206,18 @@ describe('useFittingEvaluation', () => {
     );
     const edited = addModule(RIFTER, 'medium', 0, 438);
     rerender({ fitting: edited, implantBasis: 'fitting' });
-    expect(result.current.stats).not.toBeNull();
-    expect(result.current.statsFitting).toBe(RIFTER);
+    // The bars keep the old numbers; what belongs to this exact Fitting waits.
+    expect(result.current.stats).toEqual(statsFor(RIFTER));
+    expect(result.current.currentStats).toBeNull();
     expect(result.current.price).not.toBeNull();
     act(() => release());
-    await waitFor(() => expect(result.current.statsFitting).toBe(edited));
+    await waitFor(() => expect(result.current.currentStats).toEqual(statsFor(edited)));
 
     rerender({ fitting: SLASHER, implantBasis: 'fitting' });
     expect(result.current.stats).toBeNull();
+    expect(result.current.currentStats).toBeNull();
     expect(result.current.price).toBeNull();
-    await waitFor(() => expect(result.current.statsFitting).toBe(SLASHER));
+    await waitFor(() => expect(result.current.currentStats).toEqual(statsFor(SLASHER)));
   });
 });
 

@@ -23,12 +23,8 @@ import type {
 import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
-import {
-  checkCharges,
-  chargesMissingSkills,
-  compareCharges,
-  type ChargeEngineStats,
-} from './dogmaFittingEngine';
+import type { ChargeEngineStats } from './dogmaFittingEngine';
+import type { FittingContext } from './fittingContext';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
 /** The SDE meta groups (public/data/market/variations.json) a charge's tier reads off. */
@@ -163,8 +159,7 @@ const ENGINE_CACHE_LIMIT = 24;
 
 function engineFigures(
   fitting: Fitting,
-  profile: PilotProfile,
-  catalogue: FittingCatalogue,
+  { engine, profile, catalogue }: FittingContext,
   group: WeaponGroupBase
 ): EngineResult {
   const key = `${group.moduleTypeId}|${engineKey(fitting, group.moduleTypeId)}`;
@@ -175,14 +170,16 @@ function engineFigures(
 
   const module = { slot: group.slot, typeId: group.moduleTypeId };
   const ids = group.chargeGroupIds.flatMap((id) => catalogue.typeIdsByGroup.get(id) ?? []);
-  const fits = checkCharges(fitting.shipTypeId, module, ids, profile);
+  const fits = engine.checkCharges(fitting.shipTypeId, module, ids, profile);
   const candidates = ids.filter((id) => fits.has(id) && catalogue.types[String(id)] !== undefined);
   const result: EngineResult = {
     candidates,
     stats: new Map(
-      compareCharges(fitting, profile, group.moduleTypeId, candidates).map((s) => [s.typeId, s])
+      engine
+        .compareCharges(fitting, profile, group.moduleTypeId, candidates)
+        .map((s) => [s.typeId, s])
     ),
-    skillMissing: chargesMissingSkills(fitting.shipTypeId, module, candidates, profile),
+    skillMissing: engine.chargesMissingSkills(fitting.shipTypeId, module, candidates, profile),
   };
   if (cache.size >= ENGINE_CACHE_LIMIT) cache.delete(cache.keys().next().value!);
   cache.set(key, result);
@@ -191,9 +188,8 @@ function engineFigures(
 
 interface UseChargeChoicesParams {
   fitting: Fitting | null;
-  catalogue: FittingCatalogue | null;
-  engineReady: boolean;
-  profile: PilotProfile | null;
+  /** Null while the engine, pilot or catalogue loads. */
+  context: FittingContext | null;
   moduleResults: readonly FittingModuleResult[] | null;
   /** Only this module type's group; every group when absent. */
   moduleTypeId?: number;
@@ -208,9 +204,7 @@ export interface ChargeChoicesResult {
 
 export function useChargeChoices({
   fitting,
-  catalogue,
-  engineReady,
-  profile,
+  context,
   moduleResults,
   moduleTypeId,
 }: UseChargeChoicesParams): ChargeChoicesResult {
@@ -220,16 +214,19 @@ export function useChargeChoices({
     void hydrateHub();
   }, [hydrateHub]);
 
-  const engine = useMemo(() => {
-    if (!fitting || !catalogue || !engineReady || !profile || !moduleResults) return null;
+  const figuresByGroup = useMemo(() => {
+    if (!fitting || !context || !moduleResults) return null;
     return weaponGroupsOf(fitting, moduleResults)
       .filter((g) => moduleTypeId === undefined || g.moduleTypeId === moduleTypeId)
-      .map((group) => ({ group, figures: engineFigures(fitting, profile, catalogue, group) }));
-  }, [fitting, catalogue, engineReady, profile, moduleResults, moduleTypeId]);
+      .map((group) => ({ group, figures: engineFigures(fitting, context, group) }));
+  }, [fitting, context, moduleResults, moduleTypeId]);
 
   const priceIds = useMemo(
-    () => [...new Set((engine ?? []).flatMap((e) => e.figures.candidates))].sort((a, b) => a - b),
-    [engine]
+    () =>
+      [...new Set((figuresByGroup ?? []).flatMap((e) => e.figures.candidates))].sort(
+        (a, b) => a - b
+      ),
+    [figuresByGroup]
   );
   const priceKey = `${hubId}|${priceIds.join(',')}`;
   const [prices, setPrices] = useState<{ key: string; map: Map<number, number | null> } | null>(
@@ -259,18 +256,18 @@ export function useChargeChoices({
   const priceMap = prices?.key === priceKey ? prices.map : null;
 
   const groups = useMemo(() => {
-    if (!engine || !catalogue || !fitting) return null;
+    if (!figuresByGroup || !context || !fitting) return null;
     const cargo = new Map<number, number>();
     for (const item of fitting.cargo)
       cargo.set(item.typeId, (cargo.get(item.typeId) ?? 0) + item.quantity);
-    return engine.map(({ group, figures }): WeaponChargeGroup => {
+    return figuresByGroup.map(({ group, figures }): WeaponChargeGroup => {
       const choices = buildChargeChoices({
         typeIds: figures.candidates,
         stats: figures.stats,
         skillMissing: figures.skillMissing,
         prices: priceMap ?? new Map(),
         cargo,
-        catalogue,
+        catalogue: context.catalogue,
       });
       return {
         moduleTypeId: group.moduleTypeId,
@@ -283,7 +280,7 @@ export function useChargeChoices({
         choices,
       };
     });
-  }, [engine, catalogue, fitting, priceMap]);
+  }, [figuresByGroup, context, fitting, priceMap]);
 
   return { groups, pricesLoading: priceIds.length > 0 && priceMap === null };
 }

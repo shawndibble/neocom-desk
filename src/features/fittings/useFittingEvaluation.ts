@@ -43,8 +43,8 @@ import {
   computeFittingStats,
   explainModule,
   fittingSkillSources,
-  isDogmaEngineReady,
   type DogmaAssetProgress,
+  type DogmaEngine,
   type StatsOptions,
 } from './dogmaFittingEngine';
 import type { AffectedAttribute } from '@/engine/fittings/affectedBy';
@@ -54,6 +54,7 @@ import { allVSkillLevels } from '@/engine/fittings/pilotProfile';
 import { raisedSkillLevels } from '@/engine/fittings/moduleUpgrades';
 import type { PlanEntry } from '@/engine/types';
 import { loadSkills } from '@/sde/loadSde';
+import { useDogmaEngine } from './fittingContext';
 
 /**
  * Changes to the open Fitting (Variations' swap candidates), worked out
@@ -66,6 +67,8 @@ export interface VariantEvaluator {
   fitting: Fitting;
   /** The pilot the stats run under — skills for fit checks on the candidates. */
   profile: PilotProfile;
+  /** The ready engine, for the candidates' synchronous fit checks. */
+  engine: DogmaEngine;
   /** A variant's stats beside the open Fitting's own, both without overheat. */
   compare: (variant: Fitting) => Promise<{ before: FittingStats; after: FittingStats }>;
 }
@@ -78,6 +81,8 @@ export interface VariantEvaluator {
 export interface SkillGainEvaluator {
   /** The pilot the stats run under; its skill levels are the ones a +1 builds on. */
   profile: PilotProfile;
+  /** The ready engine, for a module upgrade's skill requirements. */
+  engine: DogmaEngine;
   /** Every skill that modifies anything on the Fitting, found with every skill at V. */
   skillSources: () => Promise<number[]>;
   /** The Fitting's stats with `skillTypeId` at `level`, beside its own, both without overheat. */
@@ -109,19 +114,21 @@ export interface FittingEvaluation {
   /**
    * The latest stats. After an edit to the same hull these are the previous
    * fit's until the new calculation lands, so the bars don't blank on every
-   * click — `statsFitting` says which Fitting they belong to. A different
-   * hull drops them at once.
+   * click. A different hull drops them at once.
    */
   stats: FittingStats | null;
-  statsFitting: Fitting | null;
+  /**
+   * The stats of exactly the Fitting given, or null while its calculation is
+   * pending — what anything read per module (module results, a Load's drone
+   * launch) must use, since `stats` can be the previous edit's.
+   */
+  currentStats: FittingStats | null;
   /** The Abyssal weather `stats` were worked out in (null: normal space) — which lags a new pick until it lands. */
   statsWeatherTypeId: number | null;
   statsProgress: DogmaAssetProgress | null;
   statsError: boolean;
   /** Calculates again after `statsError` — the engine refetches its assets if those failed. */
   retry: () => void;
-  /** The ship data (dogma engine) is loaded, so slot and fit checks can run. */
-  engineReady: boolean;
   /** The Damage Profile every evaluation's EHP is measured against, and the pilot's custom ones. */
   damageProfiles: DamageProfiles;
   /** The open Fitting at the default Trade Hub; independent of the engine, so usually first. */
@@ -198,11 +205,13 @@ function sharedBaseline(fitting: Fitting, basis: EvaluationBasis): () => Promise
 function variantEvaluator(
   fitting: Fitting,
   basis: EvaluationBasis,
+  engine: DogmaEngine,
   baseline: () => Promise<FittingStats>
 ): VariantEvaluator {
   return {
     fitting,
     profile: basis.pilot,
+    engine,
     async compare(variant) {
       const [before, after] = await Promise.all([
         baseline(),
@@ -216,10 +225,12 @@ function variantEvaluator(
 function skillGainEvaluator(
   fitting: Fitting,
   basis: EvaluationBasis,
+  engine: DogmaEngine,
   baseline: () => Promise<FittingStats>
 ): SkillGainEvaluator {
   return {
     profile: basis.pilot,
+    engine,
     async skillSources() {
       // At V, so an untrained skill — which the engine gives no modifiers —
       // is still found when it would change something.
@@ -340,7 +351,7 @@ export function useFittingEvaluation({
   const [statsError, setStatsError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
-  const [engineReady, setEngineReady] = useState(isDogmaEngineReady);
+  const engine = useDogmaEngine();
   const [price, setPrice] = useState<Appraisal | null>(null);
 
   // A different hull (or none) is a different Fitting: drop the old numbers at
@@ -373,7 +384,6 @@ export function useFittingEvaluation({
           }
         );
         if (cancelled) return;
-        setEngineReady(true);
         setStats({ fitting, stats: result, weatherTypeId: conditions.weatherTypeId });
       } catch {
         if (!cancelled) setStatsError(true);
@@ -406,34 +416,34 @@ export function useFittingEvaluation({
 
   // One baseline for Variations and "What to train" alike.
   const evaluators = useMemo(() => {
-    if (fitting === null || pilot === null || damageProfile === null || !engineReady) return null;
+    if (fitting === null || pilot === null || damageProfile === null || engine === null)
+      return null;
     const basis = { pilot, damageProfile, conditions };
     const baseline = sharedBaseline(fitting, basis);
     return {
-      variants: variantEvaluator(fitting, basis, baseline),
-      skillGains: skillGainEvaluator(fitting, basis, baseline),
+      variants: variantEvaluator(fitting, basis, engine, baseline),
+      skillGains: skillGainEvaluator(fitting, basis, engine, baseline),
     };
-  }, [fitting, pilot, damageProfile, conditions, engineReady]);
+  }, [fitting, pilot, damageProfile, conditions, engine]);
 
   const explain = useMemo(
     () =>
-      fitting === null || pilot === null || damageProfile === null || !engineReady
+      fitting === null || pilot === null || damageProfile === null || engine === null
         ? null
         : (moduleIndex: number) =>
             underBasis({ pilot, damageProfile, conditions }, (under, options) =>
               explainModule(fitting, under, moduleIndex, damageProfile, options)
             ),
-    [fitting, pilot, damageProfile, conditions, engineReady]
+    [fitting, pilot, damageProfile, conditions, engine]
   );
 
   return {
     stats: stats?.stats ?? null,
-    statsFitting: stats?.fitting ?? null,
+    currentStats: stats !== null && stats.fitting === fitting ? stats.stats : null,
     statsWeatherTypeId: stats?.weatherTypeId ?? null,
     statsProgress,
     statsError,
     retry,
-    engineReady,
     damageProfiles,
     price,
     variants: evaluators?.variants ?? null,

@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  bulkOwnedStockSuggestions,
-  clearOwnedStockSuggestions,
   collectStockLocations,
   detectOwnedStock,
   filterStockByScope,
@@ -363,105 +361,6 @@ describe('suggestedOwnedQuantity', () => {
 
   it('keeps the detected total when it falls short of the requirement', () => {
     expect(suggestedOwnedQuantity(400, 1000)).toBe(400);
-  });
-});
-
-describe('bulkOwnedStockSuggestions', () => {
-  const MATERIALS = [
-    { typeID: TRITANIUM, quantity: 1000 },
-    { typeID: PYERITE, quantity: 200 },
-    { typeID: ISOGEN, quantity: 50 },
-  ];
-
-  function stockOf(entries: Record<number, number>): DetectedOwnedStockMap {
-    return new Map(
-      Object.entries(entries).map(([typeID, quantity]) => [
-        Number(typeID),
-        { quantity, placements: [] },
-      ])
-    );
-  }
-
-  it('fills every row with detected stock and nothing typed in it', () => {
-    expect(
-      bulkOwnedStockSuggestions(MATERIALS, undefined, stockOf({ [TRITANIUM]: 9000, [PYERITE]: 30 }))
-    ).toEqual([
-      { typeID: TRITANIUM, ownedQuantity: 1000 },
-      { typeID: PYERITE, ownedQuantity: 30 },
-    ]);
-  });
-
-  // "Use all" is every row's own "Use assets" at once: the rows the per-row
-  // offer would fill, and no others. It used to skip any row with a number
-  // in it, a 0 included — so after "Use none" (which writes 0s) the button
-  // did nothing at all while every row beside it still offered its stock.
-  it('fills a zeroed row and refreshes a stale count, the same rows the per-row offer would', () => {
-    const sourcing = { [TRITANIUM]: { ownedQuantity: 0 }, [PYERITE]: { ownedQuantity: 12 } };
-    expect(
-      bulkOwnedStockSuggestions(
-        MATERIALS,
-        sourcing,
-        stockOf({ [TRITANIUM]: 9000, [PYERITE]: 30, [ISOGEN]: 4 })
-      )
-    ).toEqual([
-      { typeID: TRITANIUM, ownedQuantity: 1000 },
-      { typeID: PYERITE, ownedQuantity: 30 },
-      { typeID: ISOGEN, ownedQuantity: 4 },
-    ]);
-  });
-
-  it('skips a row that already holds what it would write', () => {
-    const sourcing = { [TRITANIUM]: { ownedQuantity: 1000 }, [PYERITE]: { ownedQuantity: 30 } };
-    expect(
-      bulkOwnedStockSuggestions(MATERIALS, sourcing, stockOf({ [TRITANIUM]: 9000, [PYERITE]: 30 }))
-    ).toEqual([]);
-  });
-
-  it('never writes a 0 over a typed count when the scoped stock is empty', () => {
-    const sourcing = { [TRITANIUM]: { ownedQuantity: 500 } };
-    expect(bulkOwnedStockSuggestions(MATERIALS, sourcing, stockOf({ [TRITANIUM]: 0 }))).toEqual([]);
-  });
-
-  it('ignores an entry that only carries an override price', () => {
-    const sourcing = { [TRITANIUM]: { overridePrice: 6 } };
-    expect(bulkOwnedStockSuggestions(MATERIALS, sourcing, stockOf({ [TRITANIUM]: 250 }))).toEqual([
-      { typeID: TRITANIUM, ownedQuantity: 250 },
-    ]);
-  });
-
-  it('suggests nothing for a material with no detected stock', () => {
-    expect(bulkOwnedStockSuggestions(MATERIALS, undefined, stockOf({}))).toEqual([]);
-  });
-});
-
-describe('clearOwnedStockSuggestions', () => {
-  const MATERIALS = [{ typeID: TRITANIUM }, { typeID: PYERITE }, { typeID: ISOGEN }];
-
-  it('zeroes every row that currently carries a non-zero owned quantity', () => {
-    const sourcing = {
-      [TRITANIUM]: { ownedQuantity: 500 },
-      [PYERITE]: { ownedQuantity: 12 },
-    };
-    expect(clearOwnedStockSuggestions(MATERIALS, sourcing)).toEqual([
-      { typeID: TRITANIUM, ownedQuantity: 0 },
-      { typeID: PYERITE, ownedQuantity: 0 },
-    ]);
-  });
-
-  it('leaves a row already at 0 out of the patch, unlike a bare clobber', () => {
-    const sourcing = { [TRITANIUM]: { ownedQuantity: 0 }, [PYERITE]: { ownedQuantity: 40 } };
-    expect(clearOwnedStockSuggestions(MATERIALS, sourcing)).toEqual([
-      { typeID: PYERITE, ownedQuantity: 0 },
-    ]);
-  });
-
-  it('leaves an untouched row (no sourcing entry at all) out of the patch', () => {
-    expect(clearOwnedStockSuggestions(MATERIALS, undefined)).toEqual([]);
-  });
-
-  it('does not clear a row that only carries an override price', () => {
-    const sourcing = { [TRITANIUM]: { overridePrice: 6 } };
-    expect(clearOwnedStockSuggestions(MATERIALS, sourcing)).toEqual([]);
   });
 });
 

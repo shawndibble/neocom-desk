@@ -1,11 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
-
-vi.mock('./dogmaFittingEngine', () => ({
-  checkCharges: vi.fn(),
-  chargesMissingSkills: vi.fn(),
-  compareCharges: vi.fn(),
-}));
-
+import { describe, expect, it } from 'vitest';
 import { buildChargeChoices } from './useChargeChoices';
 
 const catalogue = {
