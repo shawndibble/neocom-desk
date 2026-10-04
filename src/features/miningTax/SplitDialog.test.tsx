@@ -18,11 +18,11 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import { splitAssignment } from './assignments';
+import { split } from './ledgerActions';
 import { SplitDialog } from './SplitDialog';
 import type { MoonMiningTaxRow } from './snapshot';
 
-vi.mock('./assignments', () => ({ splitAssignment: vi.fn(async () => ({})) }));
+vi.mock('./ledgerActions', () => ({ split: vi.fn(async () => ({ ok: true, value: {} })) }));
 
 const CHAR = 1;
 const SYSTEM = 30000142;
@@ -118,7 +118,11 @@ describe('SplitDialog — the split preview', () => {
 
 describe('SplitDialog — a failed save', () => {
   it('says so and stays open', async () => {
-    vi.mocked(splitAssignment).mockRejectedValueOnce(new Error('quota'));
+    vi.mocked(split).mockResolvedValueOnce({
+      ok: false,
+      reason: 'save-failed',
+      cause: new Error('quota'),
+    });
     const onSplit = vi.fn();
     render(
       <MemoryRouter>

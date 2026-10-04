@@ -4150,8 +4150,7 @@
     },
     "linkPaymentSelectedAction": "Link payment",
     "linkPaymentOnePayeeHint": "One wallet payment pays one Payee — tick entries for a single Payee to link a payment.",
-    "saveFailed": "Couldn’t save — nothing was changed. Try again.",
-    "saveFailedPartway": "Couldn’t save every day — some may already have changed. Close and check the entry before trying again."
+    "saveFailed": "Couldn’t save — nothing was changed. Try again."
   },
   "assets": {
     "title": "Assets",

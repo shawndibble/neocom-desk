@@ -3,11 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { MiningTaxAssignmentRecord } from '@/db';
+import type { LedgerActionResult } from './ledgerActions';
 import { SettleUpDialog, type SettleUpRow } from './SettleUpDialog';
 
-const markAssignmentsPaid = vi.fn<(...args: unknown[]) => Promise<void>>();
-vi.mock('./assignments', () => ({
-  markAssignmentsPaid: (...args: unknown[]) => markAssignmentsPaid(...args),
+const settle = vi.fn<(...args: unknown[]) => Promise<LedgerActionResult>>();
+vi.mock('./ledgerActions', () => ({
+  settle: (...args: unknown[]) => settle(...args),
 }));
 
 function assignment(
@@ -61,20 +62,20 @@ function renderDialog(
 }
 
 function paidIds(): string[] {
-  const [assignments] = markAssignmentsPaid.mock.calls[0] as [MiningTaxAssignmentRecord[]];
+  const [assignments] = settle.mock.calls[0] as [MiningTaxAssignmentRecord[]];
   return assignments.map((a) => a.id).sort();
 }
 
 function recordedPayment(): Record<string, unknown> | undefined {
-  return markAssignmentsPaid.mock.calls[0][1] as Record<string, unknown> | undefined;
+  return settle.mock.calls[0][1] as Record<string, unknown> | undefined;
 }
 
 const RECORD = 'I sent it · record payment';
 
 describe('SettleUpDialog', () => {
   beforeEach(() => {
-    markAssignmentsPaid.mockReset();
-    markAssignmentsPaid.mockResolvedValue();
+    settle.mockReset();
+    settle.mockResolvedValue({ ok: true, value: undefined });
   });
 
   it('is one screen: amount, payee and reason are copyable without a Next step', () => {
@@ -129,7 +130,7 @@ describe('SettleUpDialog', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Just mark paid' }));
 
-    await waitFor(() => expect(markAssignmentsPaid).toHaveBeenCalled());
+    await waitFor(() => expect(settle).toHaveBeenCalled());
     expect(recordedPayment()).toBeUndefined();
   });
 
@@ -146,7 +147,7 @@ describe('SettleUpDialog', () => {
 
     await userEvent.click(screen.getByRole('button', { name: RECORD }));
 
-    await waitFor(() => expect(markAssignmentsPaid).toHaveBeenCalled());
+    await waitFor(() => expect(settle).toHaveBeenCalled());
     expect(paidIds()).toEqual(['a-1', 'a-2']);
     expect(recordedPayment()).toMatchObject({ amount: 350_000 });
   });
@@ -179,7 +180,7 @@ describe('SettleUpDialog', () => {
     await userEvent.type(screen.getByRole('textbox', { name: 'Contract id' }), '123456');
     await userEvent.click(screen.getByRole('button', { name: RECORD }));
 
-    await waitFor(() => expect(markAssignmentsPaid).toHaveBeenCalled());
+    await waitFor(() => expect(settle).toHaveBeenCalled());
     const payment = recordedPayment();
     expect(payment).toMatchObject({
       method: 'contract',

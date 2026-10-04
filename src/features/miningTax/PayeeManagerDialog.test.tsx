@@ -13,10 +13,10 @@ const syncMock = vi.hoisted(() => ({
 }));
 vi.mock('@/sync', () => syncMock);
 
-const assignmentsMock = vi.hoisted(() => ({
-  moveAssignmentsToPayee: vi.fn(async () => {}),
+const actionsMock = vi.hoisted(() => ({
+  moveToPayee: vi.fn(async () => ({ ok: true, value: undefined })),
 }));
-vi.mock('./assignments', () => assignmentsMock);
+vi.mock('./ledgerActions', () => actionsMock);
 
 const CHAR = 1;
 const SYSTEM = 30000142;
@@ -322,7 +322,7 @@ describe('PayeeManagerDialog — deleting a Payee that is still owed', () => {
     await waitFor(() => {
       expect(syncMock.markPayeeDeleted).toHaveBeenCalledWith(CHAR, 'p1');
     });
-    expect(assignmentsMock.moveAssignmentsToPayee).toHaveBeenCalledWith(owedAssignments, 'p2');
+    expect(actionsMock.moveToPayee).toHaveBeenCalledWith(owedAssignments, 'p2');
   });
 
   it('can still delete anyway, leaving the entries where they are', async () => {
@@ -334,6 +334,6 @@ describe('PayeeManagerDialog — deleting a Payee that is still owed', () => {
     await waitFor(() => {
       expect(syncMock.markPayeeDeleted).toHaveBeenCalledWith(CHAR, 'p1');
     });
-    expect(assignmentsMock.moveAssignmentsToPayee).not.toHaveBeenCalled();
+    expect(actionsMock.moveToPayee).not.toHaveBeenCalled();
   });
 });

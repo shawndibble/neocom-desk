@@ -28,6 +28,7 @@ import { PaymentLinksCard, type LinkedTransaction } from './PaymentLinksCard';
 import { StatusPill } from './StatusPill';
 import type { MoonMiningTaxRow } from './snapshot';
 import type { PayeeSuggestion } from './suggestPayee';
+import { LedgerActionError } from './LedgerActionError';
 
 interface RowDetailModalProps {
   open: boolean;
@@ -49,7 +50,7 @@ interface RowDetailModalProps {
    */
   pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   busy: boolean;
-  /** Set when the last action taken from here failed to save; the modal stays open to show it. */
+  /** Why the last row action wrote nothing, shown until the next one — `useLedgerAction`'s message. */
   saveError?: string | null;
   /** A new Assignment from the Assign form lands here — refresh and close, same as every other action below. */
   onAssigned: () => void;
@@ -322,12 +323,7 @@ export function RowDetailModal({
           </div>
         )}
 
-        {saveError && (
-          <p role="alert" className="text-xs text-danger">
-            {saveError}
-          </p>
-        )}
-
+        <LedgerActionError error={saveError} />
         {status === 'dismissed' ? (
           <div className="flex flex-wrap gap-2 pt-1">
             <Button size="sm" disabled={busy} onClick={onUndo}>

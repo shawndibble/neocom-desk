@@ -6,10 +6,12 @@ import type { PayeeRecord } from '@/db';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
-import { markAssignmentsPaid } from './assignments';
 import { formatDateRange } from './groupRows';
+import { settle } from './ledgerActions';
 import { rememberPayeeEntity } from './payees';
 import type { LinkSuggestion } from './paymentLinks';
+import { useLedgerAction } from './useLedgerAction';
+import { LedgerActionError } from './LedgerActionError';
 
 interface LinkPaymentDialogProps {
   open: boolean;
@@ -61,8 +63,7 @@ export function LinkPaymentDialog({
   // False while the field shows text `amountInKind` doesn't reflect ("1bx"):
   // saving then would record a figure the pilot can't see.
   const [amountInKindParses, setAmountInKindParses] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const { pending: saving, error: saveError, setError: setSaveError, run } = useLedgerAction();
   // Set once the entries are marked paid, so a retry after a later failure can't record it twice.
   const [recorded, setRecorded] = useState(false);
 
@@ -109,11 +110,9 @@ export function LinkPaymentDialog({
 
   async function commit() {
     if (!selected || included.length === 0 || !amountValid) return;
-    setSaving(true);
-    setSaveError(null);
     const { payment, balance } = selected;
-    try {
-      await markAssignmentsPaid(
+    const result = await run(() =>
+      settle(
         included.map((m) => m.assignment),
         {
           paidOn: paidOnFor(payment.date),
@@ -123,12 +122,9 @@ export function LinkPaymentDialog({
             ? { journalLinks: [{ refId: payment.refId, source: 'manual' as const }] }
             : { contractLinks: [{ refId: payment.refId, source: 'manual' as const }] }),
         }
-      );
-    } catch {
-      setSaveError(t('miningTax.saveFailed'));
-      setSaving(false);
-      return;
-    }
+      )
+    );
+    if (!result.ok) return;
     setRecorded(true);
     try {
       // Learned only on confirmation — the pilot agreeing this payment settled
@@ -144,10 +140,8 @@ export function LinkPaymentDialog({
       // them, which would unmount the message unread. (LinkWalletPaymentDialog
       // is mounted per Payee, so it can reload straight away.)
       setSaveError(t('miningTax.linkWallet.rememberFailed', { payee: balance.payee.name }));
-      setSaving(false);
       return;
     }
-    setSaving(false);
     onLinked();
     onClose();
   }
@@ -294,11 +288,7 @@ export function LinkPaymentDialog({
           </>
         )}
 
-        {saveError && (
-          <p role="alert" className="text-xs text-danger">
-            {saveError}
-          </p>
-        )}
+        <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"
