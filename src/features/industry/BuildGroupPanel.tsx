@@ -32,11 +32,7 @@ import type { BuildPlanRecord } from '@/db';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import { rowVolume, totalVolume } from '@/engine/industry/materialVolume';
 import type { OwnedStockScope } from '@/engine/industry/ownedStock';
-import {
-  clearEveryOwned,
-  ownedStockOffer,
-  takeEveryOffer,
-} from '@/engine/industry/ownedStockOffer';
+import { ownedStockOffer } from '@/engine/industry/ownedStockOffer';
 import type { MaterialCostLine } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { iskToneClass } from '@/features/character/format';
@@ -250,7 +246,7 @@ export function BuildGroupPanel({
   // Corp Assets (issue #798) is a per-plan toggle, not a group-level one —
   // the group rollup never merges a corp source in, so no corp name or corp
   // incompleteness is passed.
-  const { detection, scopedStock } = useMemo(
+  const { detection } = useMemo(
     () => ownedStockView({ ...detected, scope: group.ownedStockScope }, t),
     [detected, group.ownedStockScope, t]
   );
@@ -385,19 +381,11 @@ export function BuildGroupPanel({
   );
 
   // "Use all" / "Use none", written through the Group Owned Overlay adapter.
-  // Which rows each changes is the owned-stock offer's call
-  // (`ownedStockOffer.ts`), the same one each row's "Use assets" renders.
-  // "Use all" goes over `buyRows`, not every merged material: a fully-crafted
-  // row (see above) is never bought, so it has no offer. "Use none" goes over
-  // every merged material: a material can carry a ledger entry from before it
-  // became fully crafted (see `craftedTypeIds` above), still live in
-  // `ownedStockMap` and still read by `computeGroupRollup` above, though the
-  // Crafted section renders no input for it — "Use none" has to reach it, or
-  // a stray entry becomes permanently stuck.
-  const ownedBulk = useOwnedStockBulk((changes) =>
-    updateOwnedStock((next) => applyToGroupOwnedStock(next, changes))
-  );
-  const ownedQuantityFor = (typeID: number) => ownedStockMap.get(typeID);
+  const ownedBulk = useOwnedStockBulk({
+    write: (changes) => updateOwnedStock((next) => applyToGroupOwnedStock(next, changes)),
+    ownedFor: (typeID) => ownedStockMap.get(typeID),
+    scopedQuantityFor: detection.scopedQuantityFor,
+  });
 
   const buyMaterialColumns = useMemo<DataTableColumn<BuyMaterialRow>[]>(
     () => [
@@ -837,20 +825,19 @@ export function BuildGroupPanel({
                 <div className="flex gap-2">
                   <Button
                     size="sm"
-                    onClick={() =>
-                      ownedBulk.apply(takeEveryOffer(buyRows, ownedQuantityFor, scopedStock), 'all')
-                    }
+                    // The buy table's rows: a fully-crafted row (see above) is
+                    // never bought, so it has no Have and no offer.
+                    onClick={() => ownedBulk.fillAll(buyRows)}
                   >
                     {t('industry.useAllOwned')}
                   </Button>
                   <Button
                     size="sm"
-                    onClick={() =>
-                      ownedBulk.apply(
-                        clearEveryOwned(rollup.tableMaterials, ownedQuantityFor),
-                        'none'
-                      )
-                    }
+                    // Every merged material: a ledger entry from before its
+                    // material became fully crafted (see `craftedTypeIds`) is
+                    // still read by the rollup though the Crafted section
+                    // shows no input for it, so "Use none" must reach it.
+                    onClick={() => ownedBulk.clearAll(rollup.tableMaterials)}
                   >
                     {t('industry.useNoneOwned')}
                   </Button>

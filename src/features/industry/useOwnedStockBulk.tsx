@@ -1,7 +1,15 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Toast } from '@/components/ui';
-import { undoOwnedStockChanges, type OwnedStockChange } from '@/engine/industry/ownedStockOffer';
+import {
+  clearEveryOwned,
+  takeEveryOffer,
+  undoOwnedStockChanges,
+  type OwnedQuantityFor,
+  type OwnedStockChange,
+  type OwnedStockOfferRow,
+  type ScopedQuantityFor,
+} from '@/engine/industry/ownedStockOffer';
 
 /** How long the "Use all" / "Use none" confirmation stays up. */
 const TOAST_MS = 8000;
@@ -11,19 +19,25 @@ interface BulkToast {
   undo?: () => void;
 }
 
+interface OwnedStockBulkInput {
+  /** The store's adapter: plan sourcing or the Group Owned Overlay. */
+  write: (changes: readonly OwnedStockChange[]) => void;
+  ownedFor: OwnedQuantityFor;
+  scopedQuantityFor: ScopedQuantityFor;
+}
+
 /**
- * "Use all" / "Use none", always answered: a toast saying how many rows
- * changed, with Undo, or that there was nothing to do. A click that changed
- * nothing — every row already holding what you own, or none of it detected —
- * would otherwise look like a dead button, and "Use all" overwrites typed
- * counts, so it needs a way back.
+ * "Use all" / "Use none" on a materials table, always answered: a toast
+ * saying how many rows changed, with Undo, or that there was nothing to do.
+ * A click that changed nothing would otherwise look like a dead button, and
+ * "Use all" overwrites typed counts, so it needs a way back.
  *
- * `write` is the store's adapter (plan sourcing or the Group Owned Overlay);
- * Undo writes the same changes reversed through it. Returns the action and
- * the toast to render.
+ * Which rows change is the owned-stock offer's rule (`ownedStockOffer.ts`);
+ * Undo writes the same changes reversed through `write`.
  */
-export function useOwnedStockBulk(write: (changes: readonly OwnedStockChange[]) => void): {
-  apply: (changes: readonly OwnedStockChange[], kind: 'all' | 'none') => void;
+export function useOwnedStockBulk({ write, ownedFor, scopedQuantityFor }: OwnedStockBulkInput): {
+  fillAll: (rows: readonly OwnedStockOfferRow[]) => void;
+  clearAll: (rows: readonly { typeID: number }[]) => void;
   toast: ReactNode;
 } {
   const { t } = useTranslation();
@@ -34,33 +48,33 @@ export function useOwnedStockBulk(write: (changes: readonly OwnedStockChange[]) 
     return () => clearTimeout(timer);
   }, [bulkToast]);
 
-  const apply = useCallback(
-    (changes: readonly OwnedStockChange[], kind: 'all' | 'none') => {
-      if (changes.length === 0) {
-        setBulkToast({
-          message: t(kind === 'all' ? 'industry.useAllNothing' : 'industry.useNoneNothing'),
-        });
-        return;
-      }
-      write(changes);
+  function apply(changes: readonly OwnedStockChange[], kind: 'all' | 'none') {
+    if (changes.length === 0) {
       setBulkToast({
-        message: t(kind === 'all' ? 'industry.useAllDone' : 'industry.useNoneDone', {
-          count: changes.length,
-        }),
-        undo: () => {
-          write(undoOwnedStockChanges(changes));
-          setBulkToast(null);
-        },
+        message: t(kind === 'all' ? 'industry.useAllNothing' : 'industry.useNoneNothing'),
       });
-    },
-    [write, t]
-  );
+      return;
+    }
+    write(changes);
+    setBulkToast({
+      message: t(kind === 'all' ? 'industry.useAllDone' : 'industry.useNoneDone', {
+        count: changes.length,
+      }),
+      undo: () => {
+        write(undoOwnedStockChanges(changes));
+        setBulkToast(null);
+      },
+    });
+  }
 
-  const toast = bulkToast && (
-    <Toast
-      message={bulkToast.message}
-      undo={bulkToast.undo && { label: t('industry.errands.undo'), onUndo: bulkToast.undo }}
-    />
-  );
-  return { apply, toast };
+  return {
+    fillAll: (rows) => apply(takeEveryOffer(rows, ownedFor, scopedQuantityFor), 'all'),
+    clearAll: (rows) => apply(clearEveryOwned(rows, ownedFor), 'none'),
+    toast: bulkToast && (
+      <Toast
+        message={bulkToast.message}
+        undo={bulkToast.undo && { label: t('industry.errands.undo'), onUndo: bulkToast.undo }}
+      />
+    ),
+  };
 }

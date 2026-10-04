@@ -2,11 +2,9 @@
  * The owned-stock offer: whether a materials row shows "Use assets", what it
  * writes, and "Use all" / "Use none" / Undo defined over every row at once.
  *
- * One rule, not three. The per-row offer's `canApply` used to be written out
- * in `MaterialsTable`, again in `BuildGroupPanel`, and a third time in the
- * bulk fill (which copied it by comment) — and #2509 was those copies
- * disagreeing, while #2538 was the callers disagreeing about which rows bulk
- * may reach. Both tables now only render what this module answers.
+ * One rule for both tables and both bulk actions, so a row's offer and
+ * "Use all" can't disagree again (#2509, #2538). Both tables only render
+ * what this module answers.
  *
  * Store-agnostic: a row's current value is read through `ownedFor`, and every
  * bulk action returns `OwnedStockChange`s (`from` → `to`) rather than writing
@@ -16,7 +14,7 @@
  * rule for an empty count, unchanged — and Undo is the same changes reversed.
  */
 
-import { suggestedOwnedQuantity, type DetectedOwnedStockMap } from './ownedStock';
+import { suggestedOwnedQuantity } from './ownedStock';
 
 /**
  * A materials row as the offer sees it. `acquisitionTier` marks a Blueprint
@@ -31,6 +29,13 @@ export interface OwnedStockOfferRow {
 
 /** A row's stored owned quantity; `undefined` when nothing is stored. */
 export type OwnedQuantityFor = (typeID: number) => number | undefined;
+
+/**
+ * A material's detected stock narrowed to the owned-stock scope — the one
+ * input both the per-row offer and "Use all" read (`OwnedStockDetection`'s
+ * `scopedQuantityFor` on both tables).
+ */
+export type ScopedQuantityFor = (typeID: number) => number;
 
 /** One row's owned quantity going from `from` to `to`; `undefined` is "nothing stored". */
 export interface OwnedStockChange {
@@ -69,12 +74,12 @@ export function ownedStockOffer(
 export function takeEveryOffer(
   rows: readonly OwnedStockOfferRow[],
   ownedFor: OwnedQuantityFor,
-  scopedStock: DetectedOwnedStockMap
+  scopedQuantityFor: ScopedQuantityFor
 ): OwnedStockWrite[] {
   const changes: OwnedStockWrite[] = [];
   for (const row of rows) {
     const from = ownedFor(row.typeID);
-    const to = ownedStockOffer(row, scopedStock.get(row.typeID)?.quantity ?? 0, from);
+    const to = ownedStockOffer(row, scopedQuantityFor(row.typeID), from);
     if (to !== null) changes.push({ typeID: row.typeID, from, to });
   }
   return changes;

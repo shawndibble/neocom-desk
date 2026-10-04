@@ -106,7 +106,6 @@ import {
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
-import { clearEveryOwned, takeEveryOffer } from '@/engine/industry/ownedStockOffer';
 import {
   materialTypeIdKey,
   ownedStockView,
@@ -359,8 +358,6 @@ export function BuildPlanDetail({
    * uses, in the one form a toolbar IconButton has: its own icon and label.
    */
   const [copyState, setCopyState] = useState<'copied' | 'failed' | null>(null);
-  // "Use all" / "Use none", written through the plan-sourcing adapter.
-  const ownedBulk = useOwnedStockBulk((changes) => changeSourcing(planSourcingPatches(changes)));
   /** Blueprint Acquisition rows (issue #838) `shoppingListText` just left out of a successful copy. */
   const [blueprintsLeftOut, setBlueprintsLeftOut] = useState(0);
   // Verdict-first layout: the inputs fold behind a chip summary, the ledger
@@ -757,9 +754,9 @@ export function BuildPlanDetail({
     [entry, accountSkills]
   );
 
-  // `scopedStock` is narrowed to the plan's owned-stock scope (issue #454);
-  // `detectedStock` stays the galaxy-wide picture the breakdown popover shows.
-  const { detection, scopedStock } = useMemo(
+  // `detection.scopedQuantityFor` is narrowed to the plan's owned-stock scope
+  // (issue #454); `detectedStock` stays the galaxy-wide picture.
+  const { detection } = useMemo(
     () =>
       ownedStockView(
         {
@@ -796,8 +793,13 @@ export function BuildPlanDetail({
   // silently skips every mineral a sub-build introduced while the row beside
   // it is still offering to apply one. Which of those rows each action
   // changes is the owned-stock offer's call (`ownedStockOffer.ts`), shared
-  // with the row's own "Use assets" and the Build Group's ledger.
-  const ownedQuantityFor = (typeID: number) => plan.materialSourcing?.[typeID]?.ownedQuantity;
+  // with the row's own "Use assets" and the Build Group's ledger. Written
+  // through the plan-sourcing adapter.
+  const ownedBulk = useOwnedStockBulk({
+    write: (changes) => changeSourcing(planSourcingPatches(changes)),
+    ownedFor: (typeID) => plan.materialSourcing?.[typeID]?.ownedQuantity,
+    scopedQuantityFor: detection.scopedQuantityFor,
+  });
 
   /**
    * The recipe behind whichever built row's "Build it" is open — the runs and
@@ -1806,26 +1808,10 @@ export function BuildPlanDetail({
                   }
                   action={
                     <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          ownedBulk.apply(
-                            takeEveryOffer(visibleMaterials, ownedQuantityFor, scopedStock),
-                            'all'
-                          )
-                        }
-                      >
+                      <Button size="sm" onClick={() => ownedBulk.fillAll(visibleMaterials)}>
                         {t('industry.useAllOwned')}
                       </Button>
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          ownedBulk.apply(
-                            clearEveryOwned(visibleMaterials, ownedQuantityFor),
-                            'none'
-                          )
-                        }
-                      >
+                      <Button size="sm" onClick={() => ownedBulk.clearAll(visibleMaterials)}>
                         {t('industry.useNoneOwned')}
                       </Button>
                     </div>

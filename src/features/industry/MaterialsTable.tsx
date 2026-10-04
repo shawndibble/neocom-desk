@@ -904,7 +904,7 @@ export function MaterialsTable({
     // Whether the row offers anything, and what, is the owned-stock offer's
     // call (`ownedStockOffer.ts`) — the same rule "Use all" applies. It
     // respects the plan's owned-stock scope (issue #454).
-    const scopedQuantity = detection.scopedQuantityFor(material.typeID) ?? 0;
+    const scopedQuantity = detection.scopedQuantityFor(material.typeID);
     const offer = ownedStockOffer(
       material,
       scopedQuantity,

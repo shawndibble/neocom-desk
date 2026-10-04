@@ -152,7 +152,11 @@ function ownedMaterialSourcing(
   stock: DetectedOwnedStockMap
 ): MaterialSourcingMap {
   const sourcing: MaterialSourcingMap = {};
-  for (const { typeID, to } of takeEveryOffer(materials, () => undefined, stock)) {
+  for (const { typeID, to } of takeEveryOffer(
+    materials,
+    () => undefined,
+    (typeID) => stock.get(typeID)?.quantity ?? 0
+  )) {
     sourcing[typeID] = { ownedQuantity: to };
   }
   return sourcing;

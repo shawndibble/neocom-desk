@@ -197,9 +197,9 @@ describe('groupMaterialTypeIdKey', () => {
 describe('ownedStockView', () => {
   const t = ((key: string) => key) as Parameters<typeof ownedStockView>[1];
 
-  it('narrows to the owned-stock scope for "use detected", keeping galaxy-wide stock for the breakdown', () => {
+  it('narrows to the owned-stock scope for "use detected"', () => {
     const elsewhere: OwnedStockPlacement = { ...placement(60), locationId: 60008494 };
-    const { detection, scopedStock } = ownedStockView(
+    const { detection } = ownedStockView(
       {
         stock: new Map([[34, { quantity: 100, placements: [placement(40), elsewhere] }]]),
         scope: {
@@ -212,9 +212,7 @@ describe('ownedStockView', () => {
       },
       t
     );
-    expect(detection.stockFor(34)?.quantity).toBe(100);
     expect(detection.scopedQuantityFor(34)).toBe(40);
-    expect(scopedStock.get(34)?.quantity).toBe(40);
     expect(detection.scopedQuantityFor(35)).toBe(0);
     expect(detection.characterNameFor(7)).toBe('Pilot');
     expect(detection.characterNameFor(8)).toBe('common.unknown');
@@ -309,12 +307,16 @@ describe.each(STORES)('owned-stock offer through $name', (store) => {
     [38, 5000],
     [BLUEPRINT, 1],
   ]);
+  const scopedQuantityFor = (typeID: number) => scoped.get(typeID)?.quantity ?? 0;
   const offerFor = (row: (typeof rows)[number], ownedFor: (typeID: number) => number | undefined) =>
-    ownedStockOffer(row, scoped.get(row.typeID)?.quantity ?? 0, ownedFor(row.typeID));
+    ownedStockOffer(row, scopedQuantityFor(row.typeID), ownedFor(row.typeID));
 
   it(`"Use all" is every row's offer at once: each row takes its own, and none is left offering`, () => {
     const before = store.from(owned);
-    const after = store.apply(before, takeEveryOffer(rows, store.ownedFor(before), scoped));
+    const after = store.apply(
+      before,
+      takeEveryOffer(rows, store.ownedFor(before), scopedQuantityFor)
+    );
     for (const row of rows) {
       const offer = offerFor(row, store.ownedFor(before));
       expect(store.ownedFor(after)(row.typeID)).toBe(offer ?? store.ownedFor(before)(row.typeID));
@@ -324,7 +326,7 @@ describe.each(STORES)('owned-stock offer through $name', (store) => {
 
   it('Undo puts "Use all" back exactly, an empty row included', () => {
     const before = store.from(owned);
-    const changes = takeEveryOffer(rows, store.ownedFor(before), scoped);
+    const changes = takeEveryOffer(rows, store.ownedFor(before), scopedQuantityFor);
     const undone = store.apply(store.apply(before, changes), undoOwnedStockChanges(changes));
     expect(undone).toEqual(before);
   });

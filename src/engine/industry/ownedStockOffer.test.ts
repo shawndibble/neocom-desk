@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { DetectedOwnedStockMap } from './ownedStock';
 import {
   ownedStockOffer,
   undoOwnedStockChanges,
@@ -12,13 +11,9 @@ const PYERITE = 35;
 const ISOGEN = 37;
 const BLUEPRINT = 999;
 
-function stockOf(entries: Record<number, number>): DetectedOwnedStockMap {
-  return new Map(
-    Object.entries(entries).map(([typeID, quantity]) => [
-      Number(typeID),
-      { quantity, placements: [] },
-    ])
-  );
+/** Scoped stock as both tables read it: a quantity per material, 0 when none. */
+function stockOf(entries: Record<number, number>) {
+  return (typeID: number): number => entries[typeID] ?? 0;
 }
 
 function ownedFrom(owned: Record<number, number>) {

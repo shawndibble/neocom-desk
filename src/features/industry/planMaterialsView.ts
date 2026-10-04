@@ -83,8 +83,6 @@ export interface OwnedStockViewInput {
 
 export interface OwnedStockView {
   detection: OwnedStockDetection;
-  /** `stock` narrowed to the scope — what the bulk "use all" fills from. */
-  scopedStock: DetectedOwnedStockMap;
 }
 
 export function ownedStockView(input: OwnedStockViewInput, t: Translate): OwnedStockView {
@@ -93,7 +91,6 @@ export function ownedStockView(input: OwnedStockViewInput, t: Translate): OwnedS
     ? [...input.incompleteCharacters, input.incompleteCorporation]
     : input.incompleteCharacters;
   const detection: OwnedStockDetection = {
-    stockFor: (typeID) => input.stock.get(typeID),
     scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
     lowerBound: incompleteCharacters.length > 0,
     incompleteCharacters,
@@ -101,7 +98,7 @@ export function ownedStockView(input: OwnedStockViewInput, t: Translate): OwnedS
     corporationNameFor: () => input.corporationName ?? t('common.unknown'),
     locationLabelFor: (placement) => stockLocationLabel(placement, input.locationNames, t),
   };
-  return { detection, scopedStock };
+  return { detection };
 }
 
 /**
