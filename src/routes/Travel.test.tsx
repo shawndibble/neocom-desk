@@ -759,6 +759,135 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
       within(screen.getByRole('list', { name: 'Route summary' })).getByText('4 jumps')
     ).toBeInTheDocument();
   });
+
+  describe('ways to fly a leg', () => {
+    const pinInLink = () => new URLSearchParams(window.location.search).get('pin');
+    const waysPanel = () => screen.findByRole('region', { name: 'Ways to fly leg 1' });
+    const summary = () => within(screen.getByRole('list', { name: 'Route summary' }));
+
+    beforeEach(() => {
+      server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json(HOLES)));
+    });
+
+    it('lists each way with its facts, the one in use first', async () => {
+      visit(`?from=${JITA}&to=${UEDAMA}&wh=1`);
+
+      const panel = await waysPanel();
+      await within(panel).findByText('Via Thera');
+      const [inUse, gates] = within(panel).getAllByRole('listitem');
+      expect(inUse).toHaveTextContent(/^Via TheraIn use2 j/);
+      expect(inUse).toHaveTextContent('Jita → Thera');
+      expect(inUse).toHaveTextContent('Thera → Uedama');
+      expect(inUse).toHaveTextContent('fits Medium');
+      expect(gates).toHaveTextContent(/^Gates only4 j/);
+      expect(gates).toHaveTextContent('lowest 0.5·0 lowsec·0 nullsec');
+      expect(gates).toHaveTextContent('passes Uedama');
+      expect(
+        within(inUse).queryByRole('button', { name: /^Use .* for leg 1$/ })
+      ).not.toBeInTheDocument();
+    });
+
+    it('pins a way into the link, and the leg flies it', async () => {
+      const user = userEvent.setup();
+      visit(`?from=${JITA}&to=${UEDAMA}&wh=1`);
+
+      const panel = await waysPanel();
+      await user.click(
+        await within(panel).findByRole('button', { name: 'Use Gates only for leg 1' })
+      );
+      expect(pinInLink()).toBe('gates');
+      await waitFor(() => expect(summary().getByText('4 jumps')).toBeInTheDocument());
+      // The leg re-plans, so the panel is drawn afresh.
+      await waitFor(async () =>
+        expect(within(await waysPanel()).getAllByRole('listitem')[0]).toHaveTextContent(
+          /^Gates onlyIn use/
+        )
+      );
+
+      await user.click(
+        within(await waysPanel()).getByRole('button', { name: 'Use Via Thera for leg 1' })
+      );
+      expect(pinInLink()).toBe('thera');
+      await waitFor(() => expect(summary().getByText('2 jumps')).toBeInTheDocument());
+    });
+
+    it('says when a pinned hole has closed, and flies the planner’s pick', async () => {
+      visit(`?from=${JITA}&to=${UEDAMA}&wh=1&pin=gone`);
+
+      expect(
+        await screen.findByText(
+          "The pinned wormhole has closed or is no longer on EVE-Scout's list, so this leg flies the planner's pick."
+        )
+      ).toBeInTheDocument();
+      expect(summary().getByText('2 jumps')).toBeInTheDocument();
+    });
+
+    it('says when a pinned hub has no qualifying hole', async () => {
+      visit(`?from=${JITA}&to=${UEDAMA}&wh=1&whhub=turnur&pin=thera`);
+
+      expect(
+        await screen.findByText(
+          "No open Thera hole fits the hole settings, so this leg flies the planner's pick."
+        )
+      ).toBeInTheDocument();
+      expect(summary().getByText('4 jumps')).toBeInTheDocument();
+    });
+
+    it('says EVE-Scout could not be reached for a pinned hole, never that the switch is off', async () => {
+      server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => new HttpResponse(null, { status: 503 })));
+      visit(`?from=${JITA}&to=${UEDAMA}&wh=1&pin=uedama`);
+
+      expect(
+        await screen.findByText(
+          "EVE-Scout couldn't be reached, so the pinned way can't be checked. This leg flies the planner's pick."
+        )
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/Route through Thera \/ Turnur is off/)).toBeNull();
+    });
+
+    it('opens a Route via link asking for a stop, then flies the pinned hole', async () => {
+      const user = userEvent.setup();
+      visit(`?from=${JITA}&wh=1&pin=uedama`);
+
+      expect(
+        await screen.findByText('Add a stop to fly there through the pinned wormhole.')
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Add a stop' }));
+      await user.type(await screen.findByRole('combobox'), 'Ueda');
+      await user.click(await screen.findByRole('option', { name: /Uedama/ }));
+
+      expect(pinInLink()).toBe('uedama');
+      await waitFor(async () =>
+        expect(within(await waysPanel()).getAllByRole('listitem')[0]).toHaveTextContent(
+          /^Pinned hole via TheraIn use2 j/
+        )
+      );
+    });
+
+    it('folds the ways under the leg on a phone', async () => {
+      const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation(
+        (media: string) =>
+          ({
+            media,
+            matches: media === PHONE_QUERY,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+          }) as unknown as MediaQueryList
+      );
+      try {
+        const user = userEvent.setup();
+        visit(`?from=${JITA}&to=${UEDAMA}&wh=1`);
+
+        const toggle = await screen.findByRole('button', { name: 'Compare ways to fly leg 1' });
+        await waitFor(() => expect(toggle).toHaveTextContent('Gates only: 4 j·compare'));
+        expect(screen.queryByRole('region', { name: 'Ways to fly leg 1' })).toBeNull();
+        await user.click(toggle);
+        expect(await waysPanel()).toBeInTheDocument();
+      } finally {
+        matchMedia.mockRestore();
+      }
+    });
+  });
 });
 
 describe('Travel › Thera / Turnur', () => {
@@ -784,6 +913,18 @@ describe('Travel › Thera / Turnur', () => {
   function holeRow(id: string) {
     return document.querySelector<HTMLElement>(`tr[data-row-key="${id}"]`)!;
   }
+
+  it('links each K-space row a gate route reaches to Route Safety through its hole', async () => {
+    visitThera('');
+
+    const links = await screen.findAllByRole('link', {
+      name: 'Plan a route through the Thera hole at Uedama',
+    });
+    expect(links[0]).toHaveAttribute('href', `/travel/route?from=${JITA}&wh=1&pin=uedama`);
+    expect(
+      screen.queryByRole('link', { name: /Plan a route through the Thera hole at J120704/ })
+    ).not.toBeInTheDocument();
+  });
 
   function stubPhone() {
     return vi.spyOn(window, 'matchMedia').mockImplementation(

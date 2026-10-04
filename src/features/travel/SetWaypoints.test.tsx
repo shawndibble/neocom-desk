@@ -42,6 +42,9 @@ function leg(...systems: number[]): RouteSafetyLeg {
     // Only `systemId` matters here: the rows are read for their systems.
     rows: systems.map((systemId) => ({ systemId })) as NonNullable<RouteSafetyLeg['rows']>,
     summary: null,
+    ways: [],
+    pin: '',
+    pinNote: null,
   };
 }
 

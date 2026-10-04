@@ -34,6 +34,7 @@ import { enumParam, optionalEnumParam, optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { TheraFilters } from './TheraFilters';
 import { HUB_OPTIONS, SIZE_OPTIONS } from './theraOptions';
+import { routeViaHref } from './routeSafetyLink';
 import { TheraTable } from './TheraTable';
 import { useTheraConnections, type TheraConnectionsState } from './useTheraConnections';
 
@@ -109,6 +110,7 @@ export function TheraTab({ tabBar }: { tabBar: ReactNode }) {
         filter={filter}
         hasOrigin={originId !== null}
         originName={originName}
+        routeVia={originId === null ? undefined : (row) => routeViaHref(originId, row.id)}
       />
     </div>
   );
@@ -119,11 +121,13 @@ function TheraBody({
   filter,
   hasOrigin,
   originName,
+  routeVia,
 }: {
   state: TheraConnectionsState;
   filter: TheraConnectionFilter;
   hasOrigin: boolean;
   originName: string | null;
+  routeVia?: (row: TheraConnectionRow) => string;
 }) {
   const { t } = useTranslation();
   if (state.kind === 'loading') {
@@ -171,6 +175,7 @@ function TheraBody({
         {rows.length > 0 ? (
           <TheraTable
             rows={rows}
+            routeVia={routeVia}
             label={
               filter.exit === 'wormhole'
                 ? t('travel.thera.jspaceTableLabel')

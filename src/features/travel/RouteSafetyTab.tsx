@@ -35,41 +35,39 @@
  * gates only, and says that too.
  *
  * Set waypoints in game (issue #2479) closes the facts line (`SetWaypoints`).
+ *
+ * Ways to fly each leg (issue #2477): beside each leg's rows, gates only and
+ * the way through each hub with a qualifying hole, with facts side by side
+ * (`LegWays`). Use for this leg pins one in the link (`pin`), and a Thera /
+ * Turnur row's Route via opens this page with its hole pinned for the first
+ * leg (`routeSafetyLink.ts`). Editing the stops or their order drops the
+ * pins, which belong to legs by position — except the first stop added to a
+ * Route via link, which is the leg its pin was made for.
  */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, PageHeader, Panel, Spinner } from '@/components/ui';
 import type { RouteSafetyRow, RouteSafetySummary } from '@/engine/route/routeSafety';
-import { WORMHOLE_SHIP_SIZES, type TheraConnection } from '@/engine/route/theraConnections';
+import type { TheraConnection } from '@/engine/route/theraConnections';
 import { MAX_STOPS } from '@/engine/route/tripPlan';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { useCurrentSystem } from '@/features/route/currentSystem';
 import {
-  MAX_ROUTE_HOLE_MIN_LIFE,
-  MIN_ROUTE_HOLE_MIN_LIFE,
-  ROUTE_HOLE_HUBS,
   useRouteHoleHubs,
   useRouteHoleMinLife,
   useRouteHoleQuery,
   useRouteHolesEnabled,
   useRouteHoleShipSize,
 } from '@/features/route/routeHoleSettings';
-import { ROUTE_PREFERENCES } from '@/features/route/routePreferences';
 import { useAvoidedSystemsEnabled, useRouteQuery } from '@/features/route/routeRules';
 import { useSolarSystemIndex, useSystemName } from '@/features/route/useSolarSystems';
-import {
-  boolParam,
-  optionalBoolParam,
-  optionalEnumParam,
-  optionalIdParam,
-  optionalIntParam,
-  orderedIdListParam,
-} from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { AvoidSystemDialog, type AvoidTarget } from './AvoidSystemDialog';
+import { LegBody } from './LegWays';
 import { RouteRulesPanel, type RouteHoleChange } from './RouteRulesPanel';
 import { RouteStrip } from './RouteStrip';
 import { RouteSystemsTable, type HoleRowProps } from './RouteSystemsTable';
+import { ROUTE_PARAMS } from './routeSafetyLink';
 import { routeSystemName } from './routeSystemName';
 import { SetWaypoints } from './SetWaypoints';
 import { StopsPanel, type StopOrderSettings } from './StopsPanel';
@@ -77,24 +75,6 @@ import { TripLegs } from './TripLegs';
 import { useRouteHoles, type RouteHolesState } from './useRouteHoles';
 import { useRouteKills, type RouteKillsCell } from './useRouteKills';
 import { useRouteSafety, type RouteSafetyLeg } from './useRouteSafety';
-
-const ROUTE_PARAMS = {
-  from: optionalIdParam(),
-  // The stops in the order typed. `to` is the single-stop link from before
-  // stops, still read so an old link opens; nothing writes it any more.
-  stops: orderedIdListParam(),
-  to: optionalIdParam(),
-  opt: boolParam(),
-  ret: boolParam(),
-  keep: boolParam(),
-  // Absent means the pilot's Travel default (Settings → Travel).
-  pref: optionalEnumParam(ROUTE_PREFERENCES),
-  // Route Safety's wormhole settings; absent means the page's saved default.
-  wh: optionalBoolParam(),
-  whsize: optionalEnumParam(WORMHOLE_SHIP_SIZES),
-  whlife: optionalIntParam({ min: MIN_ROUTE_HOLE_MIN_LIFE, max: MAX_ROUTE_HOLE_MIN_LIFE }),
-  whhub: optionalEnumParam(ROUTE_HOLE_HUBS),
-};
 
 /** The link parameter overriding each wormhole setting. */
 const HOLE_PARAM = {
@@ -214,6 +194,7 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
   });
   const holesState = useRouteHoles(holeQuery);
   const holes = holesState.kind === 'ready' ? holesState.holes : NO_HOLES;
+  const listed = holesState.kind === 'ready' ? holesState.listed : null;
   const state = useRouteSafety(
     fromId,
     stops,
@@ -223,8 +204,16 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
       keepLastStopLast: optimizing && settings.keepLastStopLast,
     },
     routeQuery,
-    holes
+    holes,
+    params.pin,
+    listed
   );
+  const pinLeg = (index: number, pin: string | null) => {
+    const next = [...params.pin];
+    while (next.length <= index) next.push('');
+    next[index] = pin ?? '';
+    setParams({ pin: next }, { push: true });
+  };
   // Each system once, in flight order: a trip can cross one twice.
   const routeSystems = useMemo(() => {
     if (state.kind !== 'route') return null;
@@ -287,12 +276,21 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
             fromId={fromId}
             fromName={fromId === null ? fromTrigger : nameOf(fromId)}
             fromTrigger={fromTrigger}
-            onFromChange={(systemId) => setParams({ from: systemId }, { push: true })}
+            // A new start is a new first leg: its pin no longer applies.
+            onFromChange={(systemId) => setParams({ from: systemId, pin: [] }, { push: true })}
             stops={stops}
-            onStopsChange={(next) => setParams({ stops: next, to: null }, { push: true })}
+            onStopsChange={(next) =>
+              setParams(
+                // Pins belong to legs by position: a new stop list drops them,
+                // but the first stop keeps the pin a Route via link made for it.
+                { stops: next, to: null, ...(stops.length > 0 ? { pin: [] } : {}) },
+                { push: true }
+              )
+            }
             settings={settings}
             onSettingsChange={(patch) =>
               setParams({
+                pin: [],
                 ...(patch.optimize === undefined ? {} : { opt: patch.optimize }),
                 ...(patch.returnToStart === undefined ? {} : { ret: patch.returnToStart }),
                 ...(patch.keepLastStopLast === undefined ? {} : { keep: patch.keepLastStopLast }),
@@ -320,6 +318,8 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
             killsOf={killsOf}
             avoidAction={avoidAction}
             holesState={holesState}
+            pinned={params.pin.some((token) => token !== '')}
+            onUse={pinLeg}
           />
         </div>
       </div>
@@ -346,6 +346,8 @@ function RouteBody({
   killsOf,
   avoidAction,
   holesState,
+  pinned,
+  onUse,
 }: {
   state: ReturnType<typeof useRouteSafety>;
   multiStop: boolean;
@@ -353,11 +355,19 @@ function RouteBody({
   killsOf: (systemId: number) => RouteKillsCell;
   avoidAction: (leg: RouteSafetyLeg, row: RouteSafetyRow) => (() => void) | null;
   holesState: RouteHolesState;
+  /** A leg is pinned: an incomplete route asks for the stop a Route via link left open. */
+  pinned: boolean;
+  onUse: (index: number, pin: string | null) => void;
 }) {
   const { t } = useTranslation();
   switch (state.kind) {
     case 'incomplete':
-      return <EmptyState title={t('travel.pickTitle')} hint={t('travel.pickHint')} />;
+      return (
+        <EmptyState
+          title={t('travel.pickTitle')}
+          hint={pinned ? t('travel.ways.pickDestination') : t('travel.pickHint')}
+        />
+      );
     case 'same-system':
       return <EmptyState title={t('travel.sameSystemTitle')} hint={t('travel.sameSystemHint')} />;
     case 'no-route':
@@ -377,6 +387,10 @@ function RouteBody({
         holeAt: state.holeAt,
         holesFetchedAt: holesState.kind === 'ready' ? holesState.fetchedAt : null,
         now: holesState.kind === 'ready' ? holesState.now : 0,
+      };
+      const ways = {
+        now: holesState.kind === 'ready' ? holesState.now : 0,
+        holes: holesState.kind,
       };
       return (
         <Panel>
@@ -415,13 +429,22 @@ function RouteBody({
               </p>
             )}
             {!multiStop && onlyLeg?.rows ? (
-              <RouteSystemsTable
-                rows={onlyLeg.rows}
-                killsOf={killsOf}
-                avoidAction={(row) => avoidAction(onlyLeg, row)}
-                label={t('travel.tableLabel')}
-                {...holeRows}
-              />
+              <LegBody
+                leg={onlyLeg}
+                number={1}
+                multiStop={false}
+                nameOf={nameOf}
+                onUse={(pin) => onUse(0, pin)}
+                {...ways}
+              >
+                <RouteSystemsTable
+                  rows={onlyLeg.rows}
+                  killsOf={killsOf}
+                  avoidAction={(row) => avoidAction(onlyLeg, row)}
+                  label={t('travel.tableLabel')}
+                  {...holeRows}
+                />
+              </LegBody>
             ) : (
               <TripLegs
                 // A new order is a new itinerary: it opens on its own first leg.
@@ -431,6 +454,8 @@ function RouteBody({
                 killsOf={killsOf}
                 avoidAction={avoidAction}
                 holes={holeRows}
+                ways={ways}
+                onUse={onUse}
               />
             )}
           </div>

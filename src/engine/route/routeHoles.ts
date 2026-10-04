@@ -81,14 +81,18 @@ export function holeNetworkKey(holes: readonly HoleEnds[]): string {
   return [...new Set(holes.map((hole) => `${hole.exitSystemId}:${hole.hub}`))].sort().join(',');
 }
 
-/** The network `holeNetworkKey` named, rebuilt from the name alone. */
-export function holeNetworkFromKey(key: string): HoleNetwork {
-  if (key === '') return holeNetwork([]);
-  const ends = key.split(',').flatMap((pair): HoleEnds[] => {
+/** The holes `holeNetworkKey` named, each exit/hub pair once, rebuilt from the name alone. */
+export function holeEndsFromKey(key: string): HoleEnds[] {
+  if (key === '') return [];
+  return key.split(',').flatMap((pair): HoleEnds[] => {
     const [exit, hub] = pair.split(':');
     return hub === 'thera' || hub === 'turnur' ? [{ exitSystemId: Number(exit), hub }] : [];
   });
-  return holeNetwork(ends);
+}
+
+/** The network `holeNetworkKey` named, rebuilt from the name alone. */
+export function holeNetworkFromKey(key: string): HoleNetwork {
+  return holeNetwork(holeEndsFromKey(key));
 }
 
 /**
