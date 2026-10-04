@@ -621,59 +621,119 @@ describe('Travel › Route Safety › Route rules', () => {
 describe('Travel › Thera / Turnur', () => {
   afterEach(() => configureClipboard(null));
 
+  const MAIN_TABLE = 'Open holes out of Thera and Turnur';
+  const JSPACE_TABLE = 'Open holes into J-space';
+  const JSPACE_GROUP = /exits? into J-space · no gate route from you/;
+
   function visitThera(search: string) {
     window.history.pushState({}, '', '/travel/thera' + search);
     render(<App />);
   }
 
-  function band(name: RegExp) {
-    return screen.findByRole('region', { name });
+  /** The connection ids a table lists, top to bottom. */
+  function holesIn(table: HTMLElement) {
+    return within(table)
+      .getAllByRole('row')
+      .map((row) => row.getAttribute('data-row-key'))
+      .filter((key) => key !== null);
   }
 
-  async function exitsIn(name: RegExp) {
-    return within(await band(name))
-      .queryAllByRole('heading', { level: 4 })
-      .map((heading) => heading.textContent);
+  function holeRow(id: string) {
+    return document.querySelector<HTMLElement>(`tr[data-row-key="${id}"]`)!;
   }
 
-  function card(exit: string) {
-    return screen.getByRole('heading', { level: 4, name: exit }).closest('li')!;
+  function stubPhone() {
+    return vi.spyOn(window, 'matchMedia').mockImplementation(
+      (media: string) =>
+        ({
+          media,
+          matches: media === PHONE_QUERY,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList
+    );
   }
 
-  it('groups live holes by where they come out, nearest first, hiding expired ones', async () => {
+  it('lists live K-space holes nearest first, folding J-space exits into a group under them', async () => {
     visitThera('');
 
     expect(await screen.findByText('Jita (current system)')).toBeInTheDocument();
-    await screen.findByText('1 jump');
-    expect(within(await band(/^Highsec/)).getByRole('heading', { level: 3 })).toHaveTextContent(
-      'Highsec2'
-    );
-    expect(await exitsIn(/^Highsec/)).toEqual(['Perimeter', 'Uedama']);
-    expect(await exitsIn(/^J-space/)).toEqual(['J120704']);
-    expect(within(card('J120704')).getByText('No gate route')).toBeInTheDocument();
-    expect(within(await band(/^Nullsec/)).getByText('No open holes into nullsec right now'));
-    expect(screen.queryByRole('heading', { level: 4, name: 'Jita' })).not.toBeInTheDocument();
-
-    const perimeter = within(card('Perimeter'));
+    const table = await screen.findByRole('table', { name: MAIN_TABLE });
+    // Perimeter is one jump from Jita, Uedama two; the expired Jita hole is gone.
+    await waitFor(() => expect(holesIn(table)).toEqual(['perimeter', 'uedama']));
+    const perimeter = within(holeRow('perimeter'));
+    expect(perimeter.getByText('Perimeter')).toHaveClass('font-semibold');
     expect(perimeter.getByText('Turnur')).toBeInTheDocument();
-    expect(perimeter.getByText('Up to Capital')).toBeInTheDocument();
-    expect(perimeter.getByText('AAA-111')).toHaveClass('font-mono');
-    expect(card('Perimeter')).toHaveAttribute('title', 'Wormhole type Q063');
+    expect(perimeter.getByText('Capital')).toBeInTheDocument();
+    expect(perimeter.getByText('AAA-111')).toBeInTheDocument();
+    // The type code waits for the expanded row.
+    expect(perimeter.queryByText(/Q063/)).not.toBeInTheDocument();
+
+    const group = screen.getByRole('button', {
+      name: '1 exit into J-space · no gate route from you',
+    });
+    expect(group).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('table', { name: JSPACE_TABLE })).not.toBeInTheDocument();
+    fireEvent.click(group);
+    const jspace = await screen.findByRole('table', { name: JSPACE_TABLE });
+    expect(holesIn(jspace)).toEqual(['jspace']);
+    expect(within(holeRow('jspace')).getByText('No gate route')).toBeInTheDocument();
+    expect(within(holeRow('jspace')).getByText('C2')).toBeInTheDocument();
   });
 
   it('shows a connection with two hours or less left in the warning color', async () => {
     visitThera('');
 
-    await band(/^Highsec/);
-    expect(within(card('Perimeter')).getByText(/left$/)).toHaveClass('text-warning');
-    expect(within(card('Uedama')).getByText(/left$/)).not.toHaveClass('text-warning');
+    await screen.findByRole('table', { name: MAIN_TABLE });
+    const life = (id: string) => within(holeRow(id)).getAllByRole('cell')[4]!.firstElementChild;
+    expect(life('perimeter')).toHaveClass('text-warning');
+    expect(life('uedama')).not.toHaveClass('text-warning');
   });
 
-  it('filters by hub from the URL, ignoring a legacy exit-space param', async () => {
-    visitThera('?hub=thera&space=wormhole');
-    expect(await exitsIn(/^Highsec/)).toEqual(['Uedama']);
-    expect(await exitsIn(/^J-space/)).toEqual(['J120704']);
-    expect(screen.getByRole('button', { name: 'Thera' })).toHaveAttribute('aria-pressed', 'true');
+  it('opens a row onto its type, both signatures and the exit on zKillboard', async () => {
+    visitThera('');
+
+    await screen.findByRole('table', { name: MAIN_TABLE });
+    fireEvent.click(holeRow('uedama'));
+    expect(await screen.findByText('Type Q063')).toBeInTheDocument();
+    expect(screen.getByText('enter at AAA-111 in Thera, leave at UED-001')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Uedama on zKillboard (opens in a new tab)' })
+    ).toHaveAttribute('href', `https://zkillboard.com/system/${UEDAMA}/`);
+  });
+
+  it('filters by hub from the URL, counting each hub under the other filters', async () => {
+    visitThera('?hub=thera');
+
+    const table = await screen.findByRole('table', { name: MAIN_TABLE });
+    expect(holesIn(table)).toEqual(['uedama']);
+    expect(screen.getByRole('button', { name: 'Thera 1' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Both 2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Turnur 1' })).toBeInTheDocument();
+  });
+
+  it.each(['all', 'bogus'])('reads an unknown exit param (space=%s) as K-space', async (space) => {
+    visitThera(`?space=${space}`);
+
+    const table = await screen.findByRole('table', { name: MAIN_TABLE });
+    await waitFor(() => expect(holesIn(table)).toEqual(['perimeter', 'uedama']));
+    expect(screen.getByRole('button', { name: 'K-space' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: JSPACE_GROUP })).toBeInTheDocument();
+  });
+
+  it('shows only the J-space exits under the J-space filter, with no group', async () => {
+    visitThera('?space=wormhole');
+
+    const table = await screen.findByRole('table', { name: JSPACE_TABLE });
+    expect(holesIn(table)).toEqual(['jspace']);
+    expect(screen.queryByRole('table', { name: MAIN_TABLE })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: JSPACE_GROUP })).not.toBeInTheDocument();
+  });
+
+  it('narrows to one band from the URL', async () => {
+    visitThera('?space=lowsec');
+    expect(await screen.findByText('No connections match these filters')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: JSPACE_GROUP })).not.toBeInTheDocument();
   });
 
   it('says an origin with no stargates reaches no exit by gate', async () => {
@@ -685,28 +745,58 @@ describe('Travel › Thera / Turnur', () => {
 
   it('keeps only connections that pass at least the chosen ship size', async () => {
     visitThera('?size=capital');
-    expect(await exitsIn(/^Highsec/)).toEqual(['Perimeter']);
-    expect(within(await band(/^J-space/)).getByText('No open holes into J-space right now'));
+    const table = await screen.findByRole('table', { name: MAIN_TABLE });
+    expect(holesIn(table)).toEqual(['perimeter']);
+    // The J-space hole stops at medium hulls.
+    expect(screen.queryByRole('button', { name: JSPACE_GROUP })).not.toBeInTheDocument();
   });
 
-  it('says so when the filters leave no hole in any column', async () => {
+  it('says so when the filters leave no hole', async () => {
     // Thera's two holes both stop at medium hulls.
     visitThera('?hub=thera&size=capital');
     expect(await screen.findByText('No connections match these filters')).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: /^Highsec/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: MAIN_TABLE })).not.toBeInTheDocument();
   });
 
-  it('copies the hub-side signature', async () => {
+  it('says no K-space hole matches when only J-space exits are open', async () => {
+    server.use(
+      http.get(EVE_SCOUT_SIGNATURES_URL, () =>
+        HttpResponse.json(SIGNATURES.filter((entry) => entry.id === 'jspace'))
+      )
+    );
+    visitThera('');
+    expect(
+      await screen.findByText('No holes into K-space match these filters')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: JSPACE_GROUP })).toBeInTheDocument();
+  });
+
+  it('says so when EVE-Scout lists nothing', async () => {
+    server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json([])));
+    visitThera('');
+    expect(
+      await screen.findByText('EVE-Scout lists no open connections right now')
+    ).toBeInTheDocument();
+  });
+
+  it('says so when EVE-Scout cannot be reached', async () => {
+    server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => new HttpResponse(null, { status: 500 })));
+    visitThera('');
+    expect(await screen.findByText(/Connections can.t be loaded right now/)).toBeInTheDocument();
+  });
+
+  it('copies the hub-side signature without opening the row', async () => {
     const write = vi.fn(async () => {});
     configureClipboard(write);
     visitThera('');
 
-    await band(/^Highsec/);
+    await screen.findByRole('table', { name: MAIN_TABLE });
     fireEvent.click(screen.getByRole('button', { name: 'Copy Thera signature for Uedama' }));
     expect(
       await screen.findByRole('button', { name: 'Copied Thera signature for Uedama' })
     ).toBeInTheDocument();
     expect(write).toHaveBeenCalledWith('AAA-111');
+    expect(holeRow('uedama')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('selects the signature to copy by hand when the clipboard refuses', async () => {
@@ -715,64 +805,27 @@ describe('Travel › Thera / Turnur', () => {
     });
     visitThera('');
 
-    await band(/^Highsec/);
+    await screen.findByRole('table', { name: MAIN_TABLE });
     fireEvent.click(screen.getByRole('button', { name: 'Copy Turnur signature for Perimeter' }));
     await waitFor(() => expect(window.getSelection()?.toString()).toBe('AAA-111'));
   });
 
-  it('shows one band at a time under count tabs on a phone', async () => {
-    const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation(
-      (media: string) =>
-        ({
-          media,
-          matches: media === PHONE_QUERY,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        }) as unknown as MediaQueryList
-    );
+  it('shows dense cards and filter chips on a phone', async () => {
+    const matchMedia = stubPhone();
     try {
+      const user = userEvent.setup();
       visitThera('');
 
-      const tabs = await screen.findByRole('tablist', { name: 'Where the holes come out' });
-      expect(
-        within(tabs)
-          .getAllByRole('tab')
-          .map((tab) => tab.textContent)
-      ).toEqual(['High 2', 'Low 0', 'Null 0', 'J 1']);
-      await screen.findByText('1 jump');
-      expect(await exitsIn(/^Highsec/)).toEqual(['Perimeter', 'Uedama']);
-      expect(screen.queryByRole('region', { name: /^J-space/ })).not.toBeInTheDocument();
+      const table = await screen.findByRole('table', { name: MAIN_TABLE });
+      expect(table).toHaveClass('dt-stacked', 'dt-stack-dense');
+      expect(within(holeRow('perimeter')).getByText(/→ PER-002/)).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Exit' })).not.toBeInTheDocument();
 
-      fireEvent.click(within(tabs).getByRole('tab', { name: 'J 1' }));
-      expect(await exitsIn(/^J-space/)).toEqual(['J120704']);
-    } finally {
-      matchMedia.mockRestore();
-    }
-  });
-
-  it('opens the phone tabs on the first band that has holes', async () => {
-    const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation(
-      (media: string) =>
-        ({
-          media,
-          matches: media === PHONE_QUERY,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        }) as unknown as MediaQueryList
-    );
-    try {
-      server.use(
-        http.get(EVE_SCOUT_SIGNATURES_URL, () =>
-          HttpResponse.json(SIGNATURES.filter((entry) => entry.id === 'jspace'))
-        )
-      );
-      visitThera('');
-      const tabs = await screen.findByRole('tablist', { name: 'Where the holes come out' });
-      expect(within(tabs).getByRole('tab', { name: 'J 1' })).toHaveAttribute(
-        'aria-selected',
-        'true'
-      );
-      expect(await exitsIn(/^J-space/)).toEqual(['J120704']);
+      await user.click(screen.getByRole('button', { name: 'Exit K-space' }));
+      await user.click(await screen.findByRole('menuitemradio', { name: 'J-space' }));
+      const jspace = await screen.findByRole('table', { name: JSPACE_TABLE });
+      expect(holesIn(jspace)).toEqual(['jspace']);
+      expect(window.location.search).toContain('space=wormhole');
     } finally {
       matchMedia.mockRestore();
     }
