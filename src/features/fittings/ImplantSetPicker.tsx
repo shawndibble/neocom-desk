@@ -3,8 +3,8 @@
  *
  * Adds by exact (case-insensitive) item name via the same `loadItemNameMap`
  * the EFT loader resolves names through, from one box: the implant catalog
- * (`loadImplantCatalog`) says whether the item is an implant or a booster,
- * and so which list it joins.
+ * (`loadImplantCatalog`) says which slot the item takes, and it goes there
+ * (`placeInSet`), replacing whatever held that slot, as Find by goal does.
  *
  * Given the open Fitting and pilot (`finder`), it opens on "Find by goal"
  * (`ImplantFinder`) instead, with this list under "Your set".
@@ -14,7 +14,7 @@
  * Fitting — which is what puts the page on it — while opening it alone
  * changes nothing. "Use my clone" drops the set again.
  */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -29,8 +29,8 @@ import {
 import { boosterSideEffects, withBoosters } from '@/engine/fittings/boosterSideEffects';
 import * as Icon from '@/components/ui/icons';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
-import { MAX_BOOSTERS, MAX_IMPLANTS } from '@/engine/fitting/fittingShare';
 import type { ImplantBasis } from '@/engine/fittings/implantBasis';
+import { placeInSet } from '@/engine/fittings/implantFinder';
 import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -109,15 +109,7 @@ function SideEffectSwitches({
 }
 
 /** One box for both lists: the item itself decides where it goes. */
-function AddItemForm({
-  disabled,
-  onAdd,
-  error,
-}: {
-  disabled: boolean;
-  onAdd: (name: string) => void;
-  error: string | null;
-}) {
+function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: string | null }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   return (
@@ -135,14 +127,12 @@ function AddItemForm({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t('fittings.implants.addPlaceholder')}
-          disabled={disabled}
           aria-label={t('fittings.implants.addLabel')}
         />
-        <Button type="submit" size="sm" disabled={disabled || query.trim() === ''}>
+        <Button type="submit" size="sm" disabled={query.trim() === ''}>
           {t('fittings.implants.add')}
         </Button>
       </form>
-      {disabled && <p className="text-xs text-warning">{t('fittings.implants.full')}</p>}
       {error && <p className="text-xs text-danger">{error}</p>}
     </div>
   );
@@ -227,6 +217,10 @@ export function ImplantSetPicker({
     [fitting, seed]
   );
   const set = implantSet ?? seed ?? EMPTY_SET;
+  const latestSet = useRef(set);
+  useEffect(() => {
+    latestSet.current = set;
+  }, [set]);
 
   useEffect(() => {
     if (!open) return;
@@ -245,23 +239,20 @@ export function ImplantSetPicker({
       setAddError(t('fittings.implants.notFound'));
       return;
     }
-    const place = await loadImplantCatalog().then(
-      (catalog) => catalog.slotOf(entry.typeID),
-      () => undefined
-    );
-    if (!place) {
+    const catalog = await loadImplantCatalog().catch(() => null);
+    if (!catalog) {
+      setAddError(t('fittings.implants.catalogFailed'));
+      return;
+    }
+    if (!catalog.slotOf(entry.typeID)) {
       setAddError(t('fittings.implants.notImplantOrBooster', { name: rawName }));
       return;
     }
-    const kind = place.kind === 'booster' ? 'boosters' : 'implants';
-    if (set[kind].length >= (kind === 'boosters' ? MAX_BOOSTERS : MAX_IMPLANTS)) {
-      setAddError(
-        t(kind === 'boosters' ? 'fittings.implants.boostersFull' : 'fittings.implants.implantsFull')
-      );
-      return;
-    }
     setAddError(null);
-    onChange({ ...set, [kind]: [...set[kind], entry.typeID] });
+    // The set as of now, not as of the submit: another add may have landed meanwhile.
+    const next = placeInSet(latestSet.current, catalog.slotOf, entry.typeID);
+    latestSet.current = next;
+    onChange(next);
   }
 
   function removeFrom(kind: 'implants' | 'boosters', index: number) {
@@ -284,11 +275,7 @@ export function ImplantSetPicker({
 
   const setEditor = (
     <div className="space-y-4">
-      <AddItemForm
-        disabled={set.implants.length >= MAX_IMPLANTS && set.boosters.length >= MAX_BOOSTERS}
-        onAdd={(name) => void add(name)}
-        error={addError}
-      />
+      <AddItemForm onAdd={(name) => void add(name)} error={addError} />
       <SlotList
         heading={t('fittings.implants.implantsHeading')}
         typeIds={set.implants}

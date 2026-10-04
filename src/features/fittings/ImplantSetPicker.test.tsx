@@ -8,21 +8,19 @@ vi.mock('@/features/skills/typeCatalog', () => ({
   loadItemNameMap: async () =>
     new Map([
       ['standard blue pill booster', { typeID: 9950 }],
-      ["inherent implants 'squire' power grid management eg-602", { typeID: 13283 }],
+      ['squire eg-602', { typeID: 13283 }],
+      ['squire eg-603', { typeID: 13284 }],
       ['damage control ii', { typeID: 2048 }],
     ]),
 }));
-// Which kind of slot each item goes in; anything else is neither.
+// Which slot each item takes; anything else is neither an implant nor a booster.
+const SLOTS = new Map([
+  [9950, { kind: 'booster', slot: 1 }],
+  [13283, { kind: 'implant', slot: 6 }],
+  [13284, { kind: 'implant', slot: 6 }],
+]);
 vi.mock('./useImplantFinder', () => ({
-  loadImplantCatalog: async () => ({
-    families: [],
-    slotOf: (id: number) =>
-      id === 9950
-        ? { kind: 'booster', slot: 1 }
-        : id === 13283
-          ? { kind: 'implant', slot: 6 }
-          : undefined,
-  }),
+  loadImplantCatalog: async () => ({ families: [], slotOf: (id: number) => SLOTS.get(id) }),
 }));
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: async () => new Map([[9950, 'Standard Blue Pill Booster']]),
@@ -186,16 +184,9 @@ describe('ImplantSetPicker — item info', () => {
 });
 
 describe('ImplantSetPicker — one add box', () => {
-  function renderEmpty() {
+  function renderEmpty(implantSet: FittingImplantSet = { implants: [], boosters: [] }) {
     const onChange = vi.fn();
-    render(
-      <ImplantSetPicker
-        open
-        onClose={vi.fn()}
-        implantSet={{ implants: [], boosters: [] }}
-        onChange={onChange}
-      />
-    );
+    render(<ImplantSetPicker open onClose={vi.fn()} implantSet={implantSet} onChange={onChange} />);
     return onChange;
   }
 
@@ -216,10 +207,7 @@ describe('ImplantSetPicker — one add box', () => {
   it('adds an implant to the implants', async () => {
     const user = userEvent.setup();
     const onChange = renderEmpty();
-    await user.type(
-      screen.getByRole('searchbox'),
-      "Inherent Implants 'Squire' Power Grid Management EG-602{Enter}"
-    );
+    await user.type(screen.getByRole('searchbox'), 'Squire EG-602{Enter}');
     await waitFor(() =>
       expect(onChange).toHaveBeenLastCalledWith({ implants: [13283], boosters: [] })
     );
@@ -231,5 +219,25 @@ describe('ImplantSetPicker — one add box', () => {
     await user.type(screen.getByRole('searchbox'), 'Damage Control II{Enter}');
     expect(await screen.findByText('Damage Control II isn’t an implant or booster.')).toBeVisible();
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('replaces what already holds that slot', async () => {
+    const user = userEvent.setup();
+    const onChange = renderEmpty({ implants: [13283], boosters: [] });
+    await user.type(screen.getByRole('searchbox'), 'Squire EG-603{Enter}');
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith({ implants: [13284], boosters: [] })
+    );
+  });
+
+  it('keeps both of two quick adds', async () => {
+    const user = userEvent.setup();
+    const onChange = renderEmpty();
+    const box = screen.getByRole('searchbox');
+    await user.type(box, 'Standard Blue Pill Booster{Enter}');
+    await user.type(box, 'Squire EG-602{Enter}');
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith({ implants: [13283], boosters: [9950] })
+    );
   });
 });
