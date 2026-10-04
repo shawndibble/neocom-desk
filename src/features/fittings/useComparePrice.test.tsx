@@ -4,7 +4,8 @@ import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { useComparePrice } from './useComparePrice';
 
-const loadFittingPrice = vi.fn(async (..._args: unknown[]) => ({
+const loadFittingPrice = vi.fn(async (...args: unknown[]) => ({
+  args,
   totals: { sell: 10, buy: 5 },
 }));
 vi.mock('./fittingPrice', () => ({
