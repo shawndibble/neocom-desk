@@ -143,6 +143,14 @@ interface SourcingInputProps {
   describedBy?: string;
   /** The player's own number (a typed price, a claimed owned count): shown in the accent, the app's "you set this" cue. */
   mine?: boolean;
+  /**
+   * Drawn as plain text — no box, no fill — for a field that sits in a cell
+   * which is itself the visible, tappable control (the phone card's Have
+   * cell). The focus ring stays.
+   */
+  bare?: boolean;
+  /** Takes focus on mount — a field the player has just asked to edit. */
+  autoFocus?: boolean;
   parse: (raw: string) => number | undefined;
   onCommit: (value: number | undefined) => void;
 }
@@ -175,6 +183,8 @@ export function SourcingInput({
   invalid,
   describedBy,
   mine = false,
+  bare = false,
+  autoFocus,
   parse,
   onCommit,
 }: SourcingInputProps) {
@@ -218,7 +228,13 @@ export function SourcingInput({
       // label that names them.
       // `!`: the field's base class sets `text-text`, and two colour utilities
       // on one element resolve by stylesheet order, not by class order.
-      className={cx(widthClassName, 'text-left tabular-nums sm:text-right', mine && 'text-accent!')}
+      className={cx(
+        widthClassName,
+        'text-left tabular-nums sm:text-right',
+        mine && 'text-accent!',
+        bare && 'h-7! border-transparent! bg-transparent! px-0!'
+      )}
+      autoFocus={autoFocus}
       // Three states, and the order matters. A typed draft wins, verbatim — a
       // half-finished "6622." has to survive a keystroke a formatter would
       // eat. Otherwise the prop is shown: plain while focused, masked at rest.
@@ -453,7 +469,9 @@ function isBuilt(material: MaterialTableRow): boolean {
 /** The phone card's Need | Have | Buy strip: a caption over a 44px value row, so a field and a figure sit level. */
 const STRIP_CELL = 'flex min-w-0 flex-col gap-0.5 px-2 pt-1.5 pb-1';
 const STRIP_LABEL = 'text-[0.5625rem] font-semibold tracking-widest text-text-dim uppercase';
-const STRIP_VALUE = 'flex min-h-11 items-center';
+// No 44px value row: the cell as a whole is over 44px tall, and the Have
+// cell — the one that is tapped — is the field's label.
+const STRIP_VALUE = 'flex min-h-7 items-center';
 
 /** How long the "moved to …" confirmation stays up — the same beat every other Undo toast in the app keeps. */
 const TOAST_MS = 8000;
@@ -628,6 +646,9 @@ export function MaterialsTable({
   const [held, setHeld] = useState<ReadonlyMap<number, MaterialErrand> | null>(null);
   const [haveOpen, setHaveOpen] = useState(false);
   const [phoneSort, setPhoneSort] = useState<PhoneSort>('plan');
+  // The phone card whose price field is open; every other card shows its
+  // price as text.
+  const [editingPrice, setEditingPrice] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; undo: () => void } | null>(null);
 
   // Have edits not yet seen to land: what the field held before, and what the
@@ -934,6 +955,7 @@ export function MaterialsTable({
           label={t('industry.errands.haveFor', { material: nameFor(material.typeID) })}
           inputMode="numeric"
           widthClassName={fill ? 'w-full' : 'w-20'}
+          bare={fill}
           placeholder="0"
           mine={owned !== undefined && owned > 0}
           parse={parseCount}
@@ -950,7 +972,7 @@ export function MaterialsTable({
    * one line with its tag beside it rather than stacked under it, and no tier
    * caption, which the phone row prints beside Change tier instead.
    */
-  function renderPrice(material: MaterialTableRow, inline = false) {
+  function renderPrice(material: MaterialTableRow, inline = false, autoFocus = false) {
     const name = nameFor(material.typeID);
     if (material.subBuilds.length > 0) {
       // "Something under this has no price" is a warning about the plan's
@@ -997,9 +1019,11 @@ export function MaterialsTable({
           inputMode="decimal"
           widthClassName="w-24"
           mine={overridden}
+          autoFocus={autoFocus}
           parse={parsePrice}
           onCommit={(overridePrice) => onSourcingChange(material.typeID, { overridePrice })}
         />
+        {inline && <span className="text-text-dim">{t('industry.errands.isk')}</span>}
         {(tag || overridden) && (
           <span className="inline-flex items-center gap-1">
             {onFindBlueprint ? (
@@ -1182,7 +1206,14 @@ export function MaterialsTable({
       </span>
     );
     return (
-      <div className="flex items-center justify-between gap-3 border-b border-line bg-panel-2 px-2 py-1.5">
+      <div
+        className={cx(
+          'flex items-center justify-between gap-3 border-b border-line px-2 py-1.5',
+          // On a phone the heading is a rule over its cards, not a filled bar
+          // — one more box around boxes there.
+          !isPhone && 'bg-panel-2'
+        )}
+      >
         <h3
           id={headingId}
           className={cx(
@@ -1248,8 +1279,10 @@ export function MaterialsTable({
       <li
         key={material.typeID}
         className={cx(
-          'flex flex-col gap-2 rounded-md border bg-panel p-3',
-          building ? 'border-success/35' : tier ? 'border-blueprint-copy/35' : 'border-line',
+          // A fill, not a border: the Materials panel is already the frame,
+          // and a bordered card in it with a bordered strip in that read as
+          // boxes in boxes in boxes. The section heading carries the colour.
+          'flex flex-col gap-2 rounded-md bg-panel-2 p-3',
           ownedBlueprint && 'opacity-80'
         )}
       >
@@ -1267,15 +1300,19 @@ export function MaterialsTable({
           </span>
         </div>
         {!tier && (
-          <div className="grid grid-cols-3 overflow-hidden rounded-sm border border-line text-sm tabular-nums">
+          <div className="grid grid-cols-3 text-sm tabular-nums">
             <div className={STRIP_CELL}>
               <span className={STRIP_LABEL}>{t('industry.errands.need')}</span>
               <span className={STRIP_VALUE}>{material.quantity.toLocaleString()}</span>
             </div>
             {/* A label, so a tap anywhere in the cell lands in the field. */}
-            <label className={cx(STRIP_CELL, 'border-l border-line bg-panel-2')}>
-              <span className={STRIP_LABEL} aria-hidden="true">
+            <label className={cx(STRIP_CELL, 'rounded-sm bg-bg/70')}>
+              <span
+                className={cx(STRIP_LABEL, 'inline-flex items-center gap-1')}
+                aria-hidden="true"
+              >
                 {t('industry.errands.haveColumn')}
+                <Icon.Rename size={10} />
               </span>
               {renderHave(material, false, true)}
             </label>
@@ -1311,9 +1348,7 @@ export function MaterialsTable({
               material.unpriced && renderPrice(material)
             )
           ) : (
-            !ownedBlueprint && (
-              <span className="ml-auto text-xs">{renderPrice(material, true)}</span>
-            )
+            !ownedBlueprint && <span className="ml-auto text-xs">{renderPhonePrice(material)}</span>
           )}
         </div>
       </li>
@@ -1322,6 +1357,53 @@ export function MaterialsTable({
       <Fragment key={material.typeID}>{rowContextMenu(material, item)}</Fragment>
     ) : (
       item
+    );
+  }
+
+  /**
+   * The phone card's price: "@ 3,320,000 ISK" as light text, the way the
+   * mockup drew it, which becomes the field when tapped and goes back to text
+   * once focus leaves it. A box on every card made the cards heavy, and gave
+   * a card with nothing else on its last line a 44px line just for that box.
+   * The tap area is still 44px tall — an invisible `::after` around the text —
+   * so it costs no layout height. A row with no price yet stays the field,
+   * since there is no number to show.
+   */
+  function renderPhonePrice(material: MaterialTableRow) {
+    const state = materialRowState(material, sourcing, pricesReady);
+    if (editingPrice === material.typeID || state.unitPrice === null) {
+      return (
+        <span
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              setEditingPrice(null);
+            }
+          }}
+        >
+          {renderPrice(material, true, editingPrice === material.typeID)}
+        </span>
+      );
+    }
+    const overridden = state.priceSource === 'override';
+    return (
+      <button
+        type="button"
+        onClick={() => setEditingPrice(material.typeID)}
+        className={cx(
+          'relative text-xs tabular-nums underline decoration-dashed underline-offset-4 after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[""] focus-visible:outline-2 focus-visible:outline-accent',
+          overridden ? 'text-accent decoration-accent-dim' : 'text-text decoration-line-bright'
+        )}
+      >
+        <span className="sr-only">
+          {t('industry.priceFor', { material: nameFor(material.typeID) })}:{' '}
+        </span>
+        {t('industry.errands.atPrice', { price: maskNumber(state.unitPrice) })}
+        {overridden && (
+          <span className="ml-1.5 text-[0.6875rem] no-underline">
+            {t('industry.priceSourceOverride')}
+          </span>
+        )}
+      </button>
     );
   }
 
@@ -1389,7 +1471,7 @@ export function MaterialsTable({
             )}
             {open &&
               (isPhone ? (
-                <ul className="flex flex-col gap-2 p-2">
+                <ul className="flex flex-col gap-2 py-2">
                   {sortForPhone(rows).map((material) => renderPhoneRow(material))}
                 </ul>
               ) : (
