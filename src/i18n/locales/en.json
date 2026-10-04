@@ -2183,6 +2183,8 @@
     "iskPerHourColumn": "ISK/h",
     "marginColumn": "Margin",
     "sortBy": "Sort by {{column}}",
+    "sortedAsc": "{{column}}, sorted ascending",
+    "sortedDesc": "{{column}}, sorted descending",
     "blueprintOwned": "Owned",
     "verdictColumn": "Verdict",
     "runsColumn": "Runs",
