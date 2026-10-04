@@ -5,6 +5,8 @@ import '@/i18n';
 import { db } from '@/db';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { DEFAULT_SPACE_FILTER, useSpaceFilter } from '@/features/bpcContracts/bpcSpaceFilterPref';
+import { DEFAULT_SOURCE_TOGGLES } from '@/features/bpcContracts/bpcSourcingUrl';
+import { BPC_SOURCES_SETTING_KEY, useBpcSources } from '@/features/bpcContracts/bpcSourcesPref';
 import {
   DEFAULT_VISIBLE_BPC_SEARCH_COLUMNS,
   useVisibleBpcSearchColumns,
@@ -272,6 +274,7 @@ async function resetSession() {
   // the Space chips or a column) would otherwise leak into every later test
   // in this file despite `db.settings.clear()` above.
   useSpaceFilter.setState({ value: DEFAULT_SPACE_FILTER, hydrated: false });
+  useBpcSources.setState({ value: DEFAULT_SOURCE_TOGGLES, hydrated: false });
   useVisibleBpcSearchColumns.setState({
     value: DEFAULT_VISIBLE_BPC_SEARCH_COLUMNS,
     hydrated: false,
@@ -1177,6 +1180,73 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
 
     expect(await filterOptionChecked(user, 'Auctions')).toBe('false');
     expect(await filterOptionChecked(user, 'PLEX contracts')).toBe('false');
+  });
+});
+
+describe('BpcSourcingPanel remembered Source', () => {
+  /** A fresh visit to the bare tab path — what the Industry tab strip and the rail link do. */
+  function revisit(unmount: () => void) {
+    unmount();
+    window.history.pushState({}, '', '/industry/sourcing');
+    render(<App />);
+    return screen.findByRole('table', { name: 'BPC Sourcing' });
+  }
+
+  it('keeps the Source picks on a bare revisit, without writing them into the URL', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+    await openFilters(user);
+    await toggleFilterOption(user, 'Contract BPOs');
+    await toggleFilterOption(user, 'Market BPOs');
+
+    await revisit(unmount);
+    expect(window.location.search).toBe('');
+    await openFilters(user);
+    for (const option of ['Contracts', 'Owned', 'Contract BPOs', 'Market BPOs']) {
+      expect(await filterOptionChecked(user, option)).toBe('true');
+    }
+  });
+
+  it('lets a linked Source override the remembered one without storing it', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    await db.settings.put({ key: BPC_SOURCES_SETTING_KEY, value: ['contract', 'market', 'owned'] });
+    window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract');
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+    await openFilters(user);
+    expect(await filterOptionChecked(user, 'Market BPOs')).toBe('false');
+    expect(await filterOptionChecked(user, 'Owned')).toBe('false');
+    expect(await filterOptionChecked(user, 'Contracts')).toBe('true');
+    expect((await db.settings.get(BPC_SOURCES_SETTING_KEY))?.value).toEqual([
+      'contract',
+      'market',
+      'owned',
+    ]);
+  });
+
+  it('forgets the remembered Source when Reset filters puts the defaults back', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+    await openFilters(user);
+    await toggleFilterOption(user, 'Market BPOs');
+    await toggleFilterOption(user, 'Contracts');
+    await toggleFilterOption(user, 'Owned');
+    // Only Market BPOs is left, and the row is a contract, so nothing matches.
+    await user.click(await screen.findByRole('button', { name: 'Reset filters' }));
+
+    await revisit(unmount);
+    await openFilters(user);
+    expect(await filterOptionChecked(user, 'Market BPOs')).toBe('false');
+    expect(await filterOptionChecked(user, 'Contracts')).toBe('true');
+    expect(await filterOptionChecked(user, 'Owned')).toBe('true');
   });
 });
 
