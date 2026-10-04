@@ -36,7 +36,8 @@ async function assertNoAccentFilledAddButtons(page: Page) {
     return { accent, backgrounds: buttons.map((b) => getComputedStyle(b).backgroundColor) };
   });
 
-  expect(accent).not.toBe('');
+  // An unresolved var computes to transparent, not ''.
+  expect(accent).not.toBe('rgba(0, 0, 0, 0)');
   expect(backgrounds.length).toBeGreaterThan(0);
   for (const background of backgrounds) expect(background).not.toBe(accent);
 }
