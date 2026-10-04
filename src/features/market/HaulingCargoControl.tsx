@@ -1,8 +1,9 @@
 /**
  * "Cargo space" on the Hauling Opportunities page: one control that opens a
  * small popover with three ways to say how much the hauler can carry — a ship
- * (its base hold), a saved Fitting (the exact hold, skills and expanders
- * included) or a typed number of m³ — plus an optional ISK budget.
+ * (its base holds), a saved Fitting (the exact holds, skills and expanders
+ * included) or a typed number of m³ in one hold of a chosen kind — plus an
+ * optional ISK budget.
  *
  * The popover body mounts only when opened, so the catalogue and saved
  * Fittings it reads cost nothing to a visit that never picks a ship.
@@ -16,16 +17,22 @@ import {
   PopoverTrigger,
   SearchInput,
   SegmentedControl,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   TextInput,
 } from '@/components/ui';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { buildHullCatalogue, searchHulls } from '@/engine/fittings/hullCatalogue';
+import { HOLD_KINDS, type CargoHold, type HoldKind } from '@/engine/market/cargoHolds';
 import { useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
 import { savedRows, useSavedFittings } from '@/features/fittings/useLibraryFittings';
 import { parseIskAmount } from '@/lib/isk';
-import { fittingCargoM3, hullCargoM3, type HaulingCargo } from './haulingCargo';
+import { fittingCargoHolds, hullCargoHolds, totalCargoM3, type HaulingCargo } from './haulingCargo';
 
 type CargoTab = 'ship' | 'fitting' | 'custom';
 
@@ -77,7 +84,7 @@ export function HaulingCargoControl({
             <>
               {cargo.label}
               <span className="@max-[30rem]:hidden">
-                {t('market.hauling.cargo.chosenM3', { m3: formatM3(cargo.m3) })}
+                {t('market.hauling.cargo.chosenM3', { m3: formatM3(totalCargoM3(cargo)) })}
               </span>
             </>
           )}
@@ -129,13 +136,13 @@ function CargoPickerBody({
   const [failed, setFailed] = useState(false);
   const { profile } = usePilotProfile(characterId);
 
-  async function choose(label: string, compute: () => Promise<number | null>) {
+  async function choose(label: string, compute: () => Promise<CargoHold[] | null>) {
     setWorking(true);
     setFailed(false);
     try {
-      const m3 = await compute();
-      if (m3 === null || !(m3 > 0)) setFailed(true);
-      else onPick({ label, m3 });
+      const holds = await compute();
+      if (holds === null || holds.length === 0) setFailed(true);
+      else onPick({ label, holds });
     } catch {
       setFailed(true);
     } finally {
@@ -162,18 +169,20 @@ function CargoPickerBody({
       {tab === 'ship' && (
         <ShipTab
           disabled={working || profile === null}
-          onChoose={(typeId, name) => void choose(name, () => hullCargoM3(typeId, profile!))}
+          onChoose={(typeId, name) => void choose(name, () => hullCargoHolds(typeId, profile!))}
         />
       )}
       {tab === 'fitting' && (
         <FittingTab
           characterId={characterId}
           disabled={working || profile === null}
-          onChoose={(record) => void choose(record.name, () => fittingCargoM3(record, profile!))}
+          onChoose={(record) => void choose(record.name, () => fittingCargoHolds(record, profile!))}
         />
       )}
       {tab === 'custom' && (
-        <CustomTab onChoose={(m3) => onPick({ label: t('market.hauling.cargo.custom'), m3 })} />
+        <CustomTab
+          onChoose={(hold) => onPick({ label: t('market.hauling.cargo.custom'), holds: [hold] })}
+        />
       )}
 
       {working && <Spinner label={t('market.hauling.cargo.working')} size="sm" />}
@@ -285,16 +294,19 @@ function FittingTab({
   );
 }
 
-function CustomTab({ onChoose }: { onChoose: (m3: number) => void }) {
+/** A typed Cargo Space: one hold of m³, "Any item" unless a Specialised Hold kind is picked. */
+function CustomTab({ onChoose }: { onChoose: (hold: CargoHold) => void }) {
   const { t } = useTranslation();
   const [text, setText] = useState('');
+  const [kind, setKind] = useState<HoldKind>('general');
   const parsed = parseIskAmount(text);
+  const kindLabel = t('market.hauling.cargo.holdKindLabel');
   return (
     <form
       className="flex items-end gap-2"
       onSubmit={(event) => {
         event.preventDefault();
-        if (parsed !== null && parsed > 0) onChoose(parsed);
+        if (parsed !== null && parsed > 0) onChoose({ kind, capacityM3: parsed });
       }}
     >
       <label className="flex flex-1 flex-col gap-1 text-[0.6875rem] uppercase tracking-wider text-text-dim">
@@ -306,6 +318,23 @@ function CustomTab({ onChoose }: { onChoose: (m3: number) => void }) {
           value={text}
           onChange={(event) => setText(event.target.value)}
         />
+      </label>
+      <label className="flex flex-1 flex-col gap-1 text-[0.6875rem] uppercase tracking-wider text-text-dim">
+        {kindLabel}
+        <Select value={kind} onValueChange={(next) => setKind(next as HoldKind)}>
+          <SelectTrigger size="sm" aria-label={kindLabel}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {HOLD_KINDS.map((option) => (
+              <SelectItem key={option} value={option}>
+                {option === 'general'
+                  ? t('market.hauling.cargo.anyItem')
+                  : t(`market.hauling.holds.${option}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </label>
       <Button type="submit" size="sm" disabled={parsed === null || parsed <= 0}>
         {t('market.hauling.cargo.use')}

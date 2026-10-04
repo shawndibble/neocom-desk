@@ -11,7 +11,7 @@ import { ZERO_STANDINGS } from '@/engine/market/standings';
 import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import type { TradeHub } from '@/market/hubs';
 import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
-import { loadTypes } from '@/sde/loadSde';
+import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 import { typeIdsInHaulingCategory } from './haulingCategories';
 import {
   clearHaulingScanCache,
@@ -46,10 +46,11 @@ export function useHaulingScan(
     setState({ status: 'loading', progress: null });
     void (async () => {
       try {
-        const [groups, marketTypes, types] = await Promise.all([
+        const [groups, marketTypes, types, groupCategories] = await Promise.all([
           loadMarketGroups(),
           loadMarketTypes(),
           loadTypes(),
+          loadGroupCategories(),
         ]);
         const typeIds = typeIdsInHaulingCategory(categoryId, groups, marketTypes);
         const scan = await runHaulingScan({
@@ -59,6 +60,7 @@ export function useHaulingScan(
           scope: categoryId,
           mode,
           types,
+          groupCategories,
           signal: controller.signal,
           onProgress: (progress) => {
             if (!controller.signal.aborted) setState({ status: 'loading', progress });
