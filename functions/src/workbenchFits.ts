@@ -145,7 +145,9 @@ export function hullPartCount(part0: unknown): number {
  *   parts it claims are still there: nothing is deleted yet. Parts are
  *   newest first, so new fits push older ones into later parts; writing the
  *   later parts first leaves a fit in two parts mid-write (the client dedupes
- *   by id) rather than overwritten out of both.
+ *   by id) rather than overwritten out of both. A reader still holding the
+ *   old count can miss a fit pushed past it until it reads again — the count
+ *   bounds what is fetched, it doesn't make the read a snapshot. Accepted.
  * - Deletes (parts past the new count) go after part 0, by which point no
  *   count claims them. With no parts left at all, part 0 is the first delete,
  *   so the hull reads as empty before its other parts go.
@@ -157,8 +159,7 @@ export function hullPartCount(part0: unknown): number {
 export function planHullWrite(
   shipTypeId: number,
   parts: readonly StoredWorkbenchFit[][],
-  previousPartCount: number,
-  perBatch: number = PART_DOCS_PER_BATCH
+  previousPartCount: number
 ): HullWriteOp[][] {
   const ops: HullWriteOp[] = [];
   for (let part = parts.length - 1; part >= 0; part -= 1) {
@@ -170,7 +171,9 @@ export function planHullWrite(
     ops.push({ kind: 'delete', docId: hullPartDocId(shipTypeId, part) });
   }
   const batches: HullWriteOp[][] = [];
-  for (let i = 0; i < ops.length; i += perBatch) batches.push(ops.slice(i, i + perBatch));
+  for (let i = 0; i < ops.length; i += PART_DOCS_PER_BATCH) {
+    batches.push(ops.slice(i, i + PART_DOCS_PER_BATCH));
+  }
   return batches;
 }
 

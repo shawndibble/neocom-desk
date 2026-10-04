@@ -12,11 +12,16 @@ Supersedes the "client reads them all with one `shipTypeId` query" half of
 - **The client reads a hull by id: `{shipTypeId}_0`, then the parts it
   claims.** Part 0 carries `parts`, the hull's part count; the client fetches
   `_1.._{parts-1}` in parallel. No `_0` means no fits for the hull, not an
-  error. A claimed part that turns out missing (raced a delete) is skipped.
+  error. A claimed part that turns out missing (raced a delete) is skipped, and
+  a count over 50 is read as 50 (a corrupt doc, not a real hull).
 - **The sync writes part 0 after every other part, and deletes last.** So a
   reader never sees part 0 claiming a part that doesn't exist yet, after any
   committed batch, growing or shrinking; with nothing left, part 0 is deleted
-  first. `planHullWrite` is the pure plan, tested batch by batch.
+  first. `planHullWrite` is the pure plan, tested batch by batch. The read is not a
+  snapshot, though: a reader holding part 0's old count while a hull grows can
+  miss the oldest fits, pushed into a part past that count, until its
+  ten-minute cache lapses. Accepted — a transaction-free read can't avoid it,
+  and it heals on the next read.
 - **The sync still reads a hull by query.** It is admin, so the rules don't
   bind it, and the query finds parts a crashed run left past part 0's count,
   so they are re-merged and then deleted.
