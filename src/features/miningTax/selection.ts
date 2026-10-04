@@ -109,7 +109,7 @@ export function settleUpMembers(selected: readonly DisplayRow[]): GroupMember[] 
 
 /**
  * The rows a bulk dismiss would dismiss — the still-unassigned ones only.
- * `dismissEntry` is defined over `row.unassignedOreLines`, so an assigned row
+ * `dismiss` is defined over `row.unassignedOreLines`, so an assigned row
  * has nothing for it to act on; those stay in the selection and are simply not
  * counted by the Dismiss button.
  */

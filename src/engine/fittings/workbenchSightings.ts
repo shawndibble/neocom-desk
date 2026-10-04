@@ -2,16 +2,14 @@
  * "Seen on zKillboard" (issue #2486): which EVE Workbench fits for a hull
  * match one of its Popular fits — the same fitted modules, by the very key
  * `groupPopularFits` groups losses on (`popularFitKey`), so charges, drones
- * and cargo don't count. Pure: the caller loads the Workbench fits, the
- * Popular fits and the type/slot lookups.
+ * and cargo don't count. Pure: matched off each fit's own check
+ * (`workbenchFitCheck.ts`), which has already parsed its EFT and decided
+ * whether it can be matched at all.
  *
- * Only a positive signal. A fit that matches nothing gets no entry, and a fit
- * with any line the catalog can't resolve is left out rather than matched on
- * what's left — a dropped module could otherwise make it equal a smaller
- * group it isn't. A missed badge is harmless; a false one is not.
+ * Only a positive signal. A fit that matches nothing gets no entry.
  */
-import { loadEftFitting, type EftSlotLookup, type EftTypeLookup } from './eftLoader';
-import { popularFitKey, type PopularFit } from './popularFits';
+import type { PopularFit } from './popularFits';
+import type { WorkbenchFitCheck } from './workbenchFitCheck';
 
 /** How often a Workbench fit's modules turned up among the hull's recent losses. */
 export interface WorkbenchSighting {
@@ -22,11 +20,9 @@ export interface WorkbenchSighting {
 
 /** Each matching Workbench fit's sighting, keyed by its id; fits that match nothing are absent. */
 export function matchWorkbenchSightings(
-  fits: readonly { id: string; eft: string }[],
+  checks: ReadonlyMap<string, Pick<WorkbenchFitCheck, 'hullTypeId' | 'sightingKey'>>,
   popular: readonly PopularFit[],
-  hullTypeId: number,
-  typeByName: EftTypeLookup,
-  slotByTypeId: EftSlotLookup
+  hullTypeId: number
 ): Map<string, WorkbenchSighting> {
   const sightings = new Map<string, WorkbenchSighting>();
   const byKey = new Map(
@@ -36,11 +32,10 @@ export function matchWorkbenchSightings(
   );
   if (byKey.size === 0) return sightings;
 
-  for (const fit of fits) {
-    const parts = loadEftFitting(fit.eft, typeByName, slotByTypeId);
-    if (parts.hullTypeId !== hullTypeId || parts.unresolved.length > 0) continue;
-    const group = byKey.get(popularFitKey(parts.modules));
-    if (group) sightings.set(fit.id, { count: group.count, lastSeen: group.lastSeen });
+  for (const [id, check] of checks) {
+    if (check.hullTypeId !== hullTypeId || check.sightingKey === null) continue;
+    const group = byKey.get(check.sightingKey);
+    if (group) sightings.set(id, { count: group.count, lastSeen: group.lastSeen });
   }
   return sightings;
 }

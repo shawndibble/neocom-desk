@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { parsePodKillThreshold, parseRoutePreference, parseSecurityPenalty } from './routeRules';
-import { esiRoutePreference } from './esiRoute';
 
 describe('parseRoutePreference', () => {
   it('keeps each preference the app routes by', () => {
@@ -48,13 +47,5 @@ describe('parseSecurityPenalty', () => {
     expect(parseSecurityPenalty(-1)).toBeNull();
     expect(parseSecurityPenalty(101)).toBeNull();
     expect(parseSecurityPenalty(12.5)).toBeNull();
-  });
-});
-
-describe('esiRoutePreference', () => {
-  it("names each preference in ESI's own words", () => {
-    expect(esiRoutePreference('shortest')).toBe('Shorter');
-    expect(esiRoutePreference('prefer-highsec')).toBe('Safer');
-    expect(esiRoutePreference('avoid-highsec')).toBe('LessSecure');
   });
 });

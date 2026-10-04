@@ -89,7 +89,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { writeToClipboard } from '@/lib/clipboard';
 import { unmaskNumber } from '@/lib/numberMask';
-import { MaterialsTable, SourcingInput } from './MaterialsTable';
+import { MaterialsTable, SourcingInput, type MaterialsTableHandle } from './MaterialsTable';
 import { BuildRecipeModal } from './BuildRecipeModal';
 import { BlueprintAcquisitionModal } from './BlueprintAcquisitionModal';
 import { buyPricedLine } from './materialRow';
@@ -107,10 +107,9 @@ import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import {
-  bulkUseDetected,
-  bulkUseNone,
   materialTypeIdKey,
   ownedStockView,
+  planSourcingPatches,
   typeIdsFromKey,
 } from './planMaterialsView';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
@@ -754,9 +753,9 @@ export function BuildPlanDetail({
     [entry, accountSkills]
   );
 
-  // `scopedStock` is narrowed to the plan's owned-stock scope (issue #454);
-  // `detectedStock` stays the galaxy-wide picture the breakdown popover shows.
-  const { detection, scopedStock } = useMemo(
+  // `detection.scopedQuantityFor` is narrowed to the plan's owned-stock scope
+  // (issue #454); `detectedStock` stays the galaxy-wide picture.
+  const { detection } = useMemo(
     () =>
       ownedStockView(
         {
@@ -788,27 +787,10 @@ export function BuildPlanDetail({
     ]
   );
 
-  // Over every row on the table, not the blueprint's own materials: the bulk
-  // action has to reach exactly what the per-row offers reach, or "use all"
-  // silently skips every mineral a sub-build introduced while the row beside
-  // it is still offering to apply one. The fill/clear rules themselves live
-  // in `planMaterialsView.ts`, shared with the Build Group's ledger.
-  const bulkDetectedPatches = useMemo<SourcingPatchEntry[]>(
-    () =>
-      bulkUseDetected(
-        visibleMaterials,
-        (typeID) => plan.materialSourcing?.[typeID]?.ownedQuantity,
-        scopedStock
-      ).map(({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })),
-    [visibleMaterials, plan.materialSourcing, scopedStock]
-  );
-  const bulkClearPatches = useMemo<SourcingPatchEntry[]>(
-    () =>
-      bulkUseNone(visibleMaterials, (typeID) => plan.materialSourcing?.[typeID]?.ownedQuantity).map(
-        ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
-      ),
-    [visibleMaterials, plan.materialSourcing]
-  );
+  // "Use all" / "Use none" run inside the Materials table over every row on
+  // it (the rows the per-row offers reach, sub-build inputs included) and
+  // share a row edit's toast and Undo (`materialsEditSession.ts`).
+  const materialsTable = useRef<MaterialsTableHandle>(null);
 
   /**
    * The recipe behind whichever built row's "Build it" is open — the runs and
@@ -1817,10 +1799,10 @@ export function BuildPlanDetail({
                   }
                   action={
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={() => changeSourcing(bulkDetectedPatches)}>
+                      <Button size="sm" onClick={() => materialsTable.current?.fillAll()}>
                         {t('industry.useAllOwned')}
                       </Button>
-                      <Button size="sm" onClick={() => changeSourcing(bulkClearPatches)}>
+                      <Button size="sm" onClick={() => materialsTable.current?.clearAll()}>
                         {t('industry.useNoneOwned')}
                       </Button>
                     </div>
@@ -1835,6 +1817,8 @@ export function BuildPlanDetail({
                 sourcing={plan.materialSourcing}
                 pricesReady={pricesReady}
                 onSourcingChange={changeOneSourcing}
+                onOwnedStockChange={(changes) => changeSourcing(planSourcingPatches(changes))}
+                ref={materialsTable}
                 detection={detection}
                 rowContextMenu={materialContextMenu}
                 rowActions={materialActionsFor}

@@ -339,6 +339,23 @@ export function extractFittingStats(
       cargo: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.cargoCapacity),
       fleetHangar: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.fleetHangarCapacity),
       miningHold: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.miningHoldCapacity),
+      ammoHold: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.specialAmmoHoldCapacity),
+      planetaryHold: readAttribute(
+        shipAttributes,
+        DOGMA_ATTRIBUTE.specialPlanetaryCommoditiesHoldCapacity
+      ),
+      commandCenterHold: readAttribute(
+        shipAttributes,
+        DOGMA_ATTRIBUTE.specialCommandCenterHoldCapacity
+      ),
+      mineralHold: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.specialMineralHoldCapacity),
+      gasHold: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.specialGasHoldCapacity),
+      iceHold: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.specialIceHoldCapacity),
+      fuelBay: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.specialFuelBayCapacity),
+      infrastructureHold: readAttribute(
+        shipAttributes,
+        DOGMA_ATTRIBUTE.specialColonyResourcesHoldCapacity
+      ),
     },
     jumpDrive: jumpDriveStats(shipAttributes),
     slotCounts: {

@@ -1,10 +1,27 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
 
-vi.mock('@/features/skills/typeCatalog', () => ({ loadItemNameMap: async () => new Map() }));
+vi.mock('@/features/skills/typeCatalog', () => ({
+  loadItemNameMap: async () =>
+    new Map([
+      ['standard blue pill booster', { typeID: 9950 }],
+      ['squire eg-602', { typeID: 13283 }],
+      ['squire eg-603', { typeID: 13284 }],
+      ['damage control ii', { typeID: 2048 }],
+    ]),
+}));
+// Which slot each item takes; anything else is neither an implant nor a booster.
+const SLOTS = new Map([
+  [9950, { kind: 'booster', slot: 1 }],
+  [13283, { kind: 'implant', slot: 6 }],
+  [13284, { kind: 'implant', slot: 6 }],
+]);
+vi.mock('./useImplantFinder', () => ({
+  loadImplantCatalog: async () => ({ families: [], slotOf: (id: number) => SLOTS.get(id) }),
+}));
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: async () => new Map([[9950, 'Standard Blue Pill Booster']]),
 }));
@@ -29,6 +46,15 @@ vi.mock('./ImplantFinder', () => ({
         Plan one more
       </button>
     </>
+  ),
+}));
+
+// The item's details, as the dialog that opens on them.
+vi.mock('@/features/market/ItemDetailModal', () => ({
+  ItemDetailModal: ({ typeId, itemName }: { typeId: number; itemName: string }) => (
+    <p>
+      Info: {itemName} ({typeId})
+    </p>
   ),
 }));
 
@@ -93,49 +119,125 @@ describe('ImplantSetPicker — planning from the clone', () => {
     boosterTypeIds: [],
   };
 
-  it('starts from the clone’s implants, and the first change saves them with it and switches the page to the plan', async () => {
+  it('starts from the clone’s implants, and the first change saves them as the Fitting’s set', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    const onBasisChange = vi.fn();
     render(
       <ImplantSetPicker
         open
         onClose={vi.fn()}
         implantSet={undefined}
         onChange={onChange}
-        finder={{ fitting, profile, basis: 'clone', onBasisChange }}
+        finder={{ fitting, profile, basis: 'clone' }}
+        onUseClone={vi.fn()}
       />
     );
     expect(screen.getByText('Plan: 10228,13283')).toBeInTheDocument();
     expect(screen.getByText('Measured on: 10228,13283')).toBeInTheDocument();
-    // Opening it alone saves nothing.
+    // Opening it alone saves nothing, and on the clone there is nothing to go back from.
     expect(onChange).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Use my clone' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Plan one more' }));
     expect(onChange).toHaveBeenLastCalledWith({ implants: [10228, 13283, 999], boosters: [] });
-    expect(onBasisChange).toHaveBeenLastCalledWith('fitting');
   });
 
-  it('keeps a Fitting’s own set, and leaves the basis alone on "Fitting’s"', async () => {
+  it('keeps a Fitting’s own set, and drops it to go back to the clone', async () => {
     const user = userEvent.setup();
-    const onBasisChange = vi.fn();
+    const onChange = vi.fn();
+    const onUseClone = vi.fn();
     const own = { implants: [5], boosters: [] };
     render(
       <ImplantSetPicker
         open
         onClose={vi.fn()}
         implantSet={own}
-        onChange={vi.fn()}
-        finder={{
-          fitting: { ...fitting, implantSet: own },
-          profile,
-          basis: 'fitting',
-          onBasisChange,
-        }}
+        onChange={onChange}
+        finder={{ fitting: { ...fitting, implantSet: own }, profile, basis: 'fitting' }}
+        onUseClone={onUseClone}
       />
     );
     expect(screen.getByText('Plan: 5')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Plan one more' }));
-    expect(onBasisChange).not.toHaveBeenCalled();
+    expect(onChange).toHaveBeenLastCalledWith({ implants: [5, 999], boosters: [] });
+
+    await user.click(screen.getByRole('button', { name: 'Use my clone' }));
+    expect(onUseClone).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ImplantSetPicker — item info', () => {
+  it('opens an item’s details from its name', async () => {
+    const user = userEvent.setup();
+    render(
+      <ImplantSetPicker
+        open
+        onClose={vi.fn()}
+        implantSet={{ implants: [], boosters: [9950] }}
+        onChange={vi.fn()}
+      />
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Standard Blue Pill Booster' }));
+    expect(screen.getByText('Info: Standard Blue Pill Booster (9950)')).toBeInTheDocument();
+  });
+});
+
+describe('ImplantSetPicker — one add box', () => {
+  function renderEmpty(implantSet: FittingImplantSet = { implants: [], boosters: [] }) {
+    const onChange = vi.fn();
+    render(<ImplantSetPicker open onClose={vi.fn()} implantSet={implantSet} onChange={onChange} />);
+    return onChange;
+  }
+
+  it('has a single search box for implants and boosters', () => {
+    renderEmpty();
+    expect(screen.getAllByRole('searchbox')).toHaveLength(1);
+  });
+
+  it('adds a booster to the boosters', async () => {
+    const user = userEvent.setup();
+    const onChange = renderEmpty();
+    await user.type(screen.getByRole('searchbox'), 'Standard Blue Pill Booster{Enter}');
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith({ implants: [], boosters: [9950] })
+    );
+  });
+
+  it('adds an implant to the implants', async () => {
+    const user = userEvent.setup();
+    const onChange = renderEmpty();
+    await user.type(screen.getByRole('searchbox'), 'Squire EG-602{Enter}');
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith({ implants: [13283], boosters: [] })
+    );
+  });
+
+  it('refuses an item that is neither', async () => {
+    const user = userEvent.setup();
+    const onChange = renderEmpty();
+    await user.type(screen.getByRole('searchbox'), 'Damage Control II{Enter}');
+    expect(await screen.findByText('Damage Control II isn’t an implant or booster.')).toBeVisible();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('replaces what already holds that slot', async () => {
+    const user = userEvent.setup();
+    const onChange = renderEmpty({ implants: [13283], boosters: [] });
+    await user.type(screen.getByRole('searchbox'), 'Squire EG-603{Enter}');
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith({ implants: [13284], boosters: [] })
+    );
+  });
+
+  it('keeps both of two quick adds', async () => {
+    const user = userEvent.setup();
+    const onChange = renderEmpty();
+    const box = screen.getByRole('searchbox');
+    await user.type(box, 'Standard Blue Pill Booster{Enter}');
+    await user.type(box, 'Squire EG-602{Enter}');
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith({ implants: [13283], boosters: [9950] })
+    );
   });
 });

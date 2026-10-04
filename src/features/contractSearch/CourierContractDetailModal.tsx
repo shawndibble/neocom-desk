@@ -47,7 +47,7 @@ import {
   paysFarAboveGoingRate,
 } from '@/engine/contracts/courierGoingRate';
 import { routeExposure, type RouteExposure } from '@/features/contractSearch/routeExposure';
-import { useRouteQuery } from '@/features/route/routeRules';
+import { useJumpBasis } from '@/features/route/jumpBasis';
 import { formatMagnitude } from '@/lib/magnitude';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { endpointName, endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
@@ -116,12 +116,12 @@ function useRouteExposure(
   const [measured, setMeasured] = useState<{ key: string; exposure: RouteExposure } | null>(null);
   const originSystemId = row.origin.systemId;
   const destinationSystemId = row.destination.systemId;
-  const { rules, key: routeKey, hydrated } = useRouteQuery(preference);
+  const { rules, network, key: routeKey, hydrated } = useJumpBasis(preference);
 
   useEffect(() => {
     if (!hydrated) return;
     let cancelled = false;
-    void routeExposure(originSystemId, destinationSystemId, rules)
+    void routeExposure(originSystemId, destinationSystemId, rules, network)
       .catch((): RouteExposure => ({ kind: 'unknown' }))
       .then((result) => {
         if (!cancelled) setMeasured({ key: routeKey, exposure: result });
@@ -129,7 +129,7 @@ function useRouteExposure(
     return () => {
       cancelled = true;
     };
-  }, [originSystemId, destinationSystemId, rules, routeKey, hydrated]);
+  }, [originSystemId, destinationSystemId, rules, network, routeKey, hydrated]);
 
   return measured?.key === routeKey ? measured.exposure : null;
 }

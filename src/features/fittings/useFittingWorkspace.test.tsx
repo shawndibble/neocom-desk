@@ -32,7 +32,8 @@ vi.mock('./fittingPrice', () => ({ loadFittingPrice: async () => null }));
 // Stats land once this resolves; a test holds it to act before they do.
 const statsGate = vi.hoisted(() => ({ wait: Promise.resolve() as Promise<void> }));
 vi.mock('./dogmaFittingEngine', () => ({
-  isDogmaEngineReady: () => false,
+  readyDogmaEngine: () => null,
+  subscribeDogmaEngine: () => () => {},
   computeFittingStats: async (fitting: Fitting) => {
     await statsGate.wait;
     return {

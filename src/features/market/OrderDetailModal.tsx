@@ -28,7 +28,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { cx } from '@/lib/cx';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { Link } from 'react-router-dom';
-import { formatIsk } from '@/lib/isk';
+import { formatIsk, formatMarketIsk } from '@/lib/isk';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { JumpsAwayText } from '@/features/character/assetBrowserRows';
 import type { UndercutRival, UndercutScope } from '@/engine/market/undercut';
@@ -114,7 +114,7 @@ function tightestRivalScope(
 
 /** An ISK figure that can go either way, with its own sign — `+30.00`, `-30.10`. */
 function signedIsk(amount: number): string {
-  return `${amount >= 0 ? '+' : ''}${formatIsk(amount, 2)}`;
+  return `${amount >= 0 ? '+' : ''}${formatMarketIsk(amount)}`;
 }
 
 /** Short label for an exit's kind in the "Is there a better exit?" disclosure's trailing read — distinct from the exit's own full sentence, which states the price rather than the net. */
@@ -333,7 +333,11 @@ function ScopeRow({
   // `stationScopeState` fills those fields with 0, so they are only ever read
   // when the deep book actually supplied them.
   const countsKnown = rival.ordersBeatingMe > 0;
-  const distanceText = jumps ? <JumpsAwayText result={jumps} t={t} /> : (distance ?? '');
+  const distanceText = jumps ? (
+    <JumpsAwayText result={jumps} t={t} locationId={rival.locationId} />
+  ) : (
+    (distance ?? '')
+  );
   const whoText = countsKnown
     ? [
         t('market.orders.rowSummary.sellersUnderMe', { count: rival.ordersBeatingMe }),
@@ -354,8 +358,8 @@ function ScopeRow({
           phone is the read-only surface for this page.
         */}
         <span className="text-[0.6875rem] text-text-dim md:hidden">
-          {t('market.orders.scopeOverBy')}: {formatIsk(rival.gapIsk, 2)} · {rival.gapPct.toFixed(1)}
-          %
+          {t('market.orders.scopeOverBy')}: {formatMarketIsk(rival.gapIsk)} ·{' '}
+          {rival.gapPct.toFixed(1)}%
         </span>
         {distanceText !== '' && (
           <span className="text-[0.6875rem] text-text-dim md:hidden">
@@ -364,10 +368,10 @@ function ScopeRow({
         )}
       </span>
       <span role="cell" className={cx(CELL, 'pr-3 text-right tabular-nums md:pr-2')}>
-        {formatIsk(rival.price, 2)}
+        {formatMarketIsk(rival.price)}
       </span>
       <span role="cell" className={cx(CELL, 'hidden text-right text-danger tabular-nums md:block')}>
-        {formatIsk(rival.gapIsk, 2)} · {rival.gapPct.toFixed(1)}%
+        {formatMarketIsk(rival.gapIsk)} · {rival.gapPct.toFixed(1)}%
       </span>
       <span
         role="cell"
@@ -514,12 +518,12 @@ export function OrderDetailContent({
   const nextActionText = (() => {
     switch (nextAction.kind) {
       case 'cheapestRival':
-        return t('market.orders.nextCheapestRival', { price: formatIsk(nextAction.price, 2) });
+        return t('market.orders.nextCheapestRival', { price: formatMarketIsk(nextAction.price) });
       case 'keepAt':
-        return t('market.orders.nextKeepAt', { price: formatIsk(nextAction.price, 2) });
+        return t('market.orders.nextKeepAt', { price: formatMarketIsk(nextAction.price) });
       case 'raisePrice':
       case 'matchThem':
-        return t('market.orders.nextSetPrice', { price: formatIsk(nextAction.price, 2) });
+        return t('market.orders.nextSetPrice', { price: formatMarketIsk(nextAction.price) });
       case 'badgeAdvice':
         return null;
     }
@@ -542,11 +546,11 @@ export function OrderDetailContent({
     const scopeLabel = t(
       `market.orders.badge.undercut${tightest.scope[0].toUpperCase()}${tightest.scope.slice(1)}`
     );
-    return `${scopeLabel} · ${formatIsk(tightest.price, 2)}`;
+    return `${scopeLabel} · ${formatMarketIsk(tightest.price)}`;
   })();
 
   const costBasisTrailing = row.costBasis
-    ? t('market.orders.trailingCostPerUnit', { amount: formatIsk(row.costBasis.unitCost, 2) })
+    ? t('market.orders.trailingCostPerUnit', { amount: formatMarketIsk(row.costBasis.unitCost) })
     : null;
 
   const bestExit = exits.length
@@ -555,7 +559,7 @@ export function OrderDetailContent({
   const exitsTrailing = bestExit
     ? `${t(`market.orders.${EXIT_SHORT_KEY[bestExit.kind]}`)} · ${signedIsk(bestExit.netPerUnit)}`
     : haulGaps.length
-      ? `${haulGaps[0].systemName} · +${formatIsk(haulGaps[0].overLocal, 2)}`
+      ? `${haulGaps[0].systemName} · +${formatMarketIsk(haulGaps[0].overLocal)}`
       : t('market.orders.trailingNoExit');
 
   // Buy orders fill rather than sell out, and are beaten by a higher bid
@@ -601,7 +605,7 @@ export function OrderDetailContent({
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
         <StatCard
           label={t('market.orders.statMyPrice')}
-          value={formatIsk(row.price, 2)}
+          value={formatMarketIsk(row.price)}
           caption={
             rank ? t('market.orders.statRank', { rank: rank.rank, total: rank.total }) : null
           }
@@ -694,13 +698,13 @@ export function OrderDetailContent({
                 */}
                 <p className={cx('mt-1.5 text-xl font-semibold', VERDICT_TONE[verdict.kind])}>
                   {t(`market.orders.verdict.${verdict.kind}`, {
-                    price: verdict.price === null ? '' : formatIsk(verdict.price, 2),
+                    price: verdict.price === null ? '' : formatMarketIsk(verdict.price),
                   })}
                 </p>
                 <p className="mt-1 text-sm text-text-dim">
                   {t(`market.orders.verdict.${verdict.kind}Detail`, {
-                    amount: verdict.amount === null ? '' : formatIsk(verdict.amount, 2),
-                    price: verdict.price === null ? '' : formatIsk(verdict.price, 2),
+                    amount: verdict.amount === null ? '' : formatMarketIsk(verdict.amount),
+                    price: verdict.price === null ? '' : formatMarketIsk(verdict.price),
                   })}
                 </p>
               </>
@@ -759,7 +763,7 @@ export function OrderDetailContent({
                       row.price < row.floor.relist ? 'text-danger' : 'text-text'
                     )}
                   >
-                    {formatIsk(roundPriceUp(row.floor.relist) ?? row.floor.relist, 2)}
+                    {formatMarketIsk(roundPriceUp(row.floor.relist) ?? row.floor.relist)}
                   </span>
                 </p>
                 <p className="text-[0.6875rem] text-text-dim">
@@ -794,7 +798,7 @@ export function OrderDetailContent({
             {outbidSuggestedPrice !== null && (
               <p className="mt-1.5 flex items-center gap-1.5 text-sm">
                 <CopyablePrice price={outbidSuggestedPrice}>
-                  {t('market.orders.outbidAt', { price: formatIsk(outbidSuggestedPrice, 2) })}
+                  {t('market.orders.outbidAt', { price: formatMarketIsk(outbidSuggestedPrice) })}
                 </CopyablePrice>
               </p>
             )}
@@ -917,7 +921,7 @@ export function OrderDetailContent({
                   role="cell"
                   className={cx(CELL, 'bg-panel-2 pr-3 text-right tabular-nums md:pr-2')}
                 >
-                  {formatIsk(row.price, 2)}
+                  {formatMarketIsk(row.price)}
                 </span>
                 <span role="cell" className={cx(CELL, 'hidden bg-panel-2 md:block')} />
                 <span role="cell" className={cx(CELL, 'hidden bg-panel-2 md:block')} />
@@ -1041,7 +1045,7 @@ export function OrderDetailContent({
                     */}
                       <LedgerRow
                         label={t('market.orders.costPerUnit')}
-                        value={`${formatIsk(row.costBasis.unitCost, 2)} ISK`}
+                        value={`${formatMarketIsk(row.costBasis.unitCost)} ISK`}
                       />
                       {row.costBasis.source === 'wallet' && (
                         <div className="col-span-2 space-y-0.5 text-text-dim">
@@ -1050,7 +1054,7 @@ export function OrderDetailContent({
                               <li key={i}>
                                 {t('market.orders.walletBasisBuyLine', {
                                   quantity: buy.quantity.toLocaleString(),
-                                  price: formatIsk(buy.unitPrice, 2),
+                                  price: formatMarketIsk(buy.unitPrice),
                                   date: new Date(buy.date).toLocaleDateString(),
                                 })}
                               </li>
@@ -1068,11 +1072,11 @@ export function OrderDetailContent({
                         <>
                           <LedgerRow
                             label={t('industry.salesTax')}
-                            value={`${formatIsk(relistFees.salesTax, 2)} ISK`}
+                            value={`${formatMarketIsk(relistFees.salesTax)} ISK`}
                           />
                           <LedgerRow
                             label={t('market.orders.relistBrokerFee')}
-                            value={`${formatIsk(relistFees.brokerFee, 2)} ISK`}
+                            value={`${formatMarketIsk(relistFees.brokerFee)} ISK`}
                           />
                         </>
                       )}
@@ -1109,14 +1113,14 @@ export function OrderDetailContent({
                           </p>
                           <p className="mt-1 text-xs text-text">
                             {t('market.orders.floorWhyBrokerBody', {
-                              relist: formatIsk(row.floor.relist, 2),
+                              relist: formatMarketIsk(row.floor.relist),
                             })}
                           </p>
                           <p className="mt-1 text-xs text-text-dim">
                             {t('market.orders.floorWhyBrokerFill', {
-                              price: formatIsk(row.price, 2),
-                              fill: formatIsk(row.floor.fill, 2),
-                              difference: formatIsk(row.floor.relist - row.floor.fill, 2),
+                              price: formatMarketIsk(row.price),
+                              fill: formatMarketIsk(row.floor.fill),
+                              difference: formatMarketIsk(row.floor.relist - row.floor.fill),
                             })}
                           </p>
                         </div>
@@ -1148,13 +1152,13 @@ export function OrderDetailContent({
                       const exitLabel =
                         exit.kind === 'hold' && sell.kind === 'known'
                           ? t('market.orders.exitHoldSellsIn', {
-                              price: formatIsk(exit.price, 2),
+                              price: formatMarketIsk(exit.price),
                               days: sell.daysToClear,
                             })
                           : t(
                               `market.orders.exit${exit.kind[0].toUpperCase()}${exit.kind.slice(1)}`,
                               {
-                                price: formatIsk(exit.price, 2),
+                                price: formatMarketIsk(exit.price),
                               }
                             );
                       return (
@@ -1218,14 +1222,14 @@ export function OrderDetailContent({
                               <span className="text-text-dim">
                                 {t('market.orders.exitHaulHub', {
                                   hub: gap.systemName,
-                                  price: formatIsk(gap.price, 2),
+                                  price: formatMarketIsk(gap.price),
                                 })}{' '}
                                 <JumpsAwayText result={gap.jumps} t={t} />
                               </span>
                               <span className="shrink-0 tabular-nums text-success">
                                 {t('market.orders.exitHaulGap', {
-                                  amount: formatIsk(gap.overLocal, 2),
-                                  total: formatIsk(gap.totalIsk, 2),
+                                  amount: formatMarketIsk(gap.overLocal),
+                                  total: formatMarketIsk(gap.totalIsk),
                                 })}
                               </span>
                             </p>

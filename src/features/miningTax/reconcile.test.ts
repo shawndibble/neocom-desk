@@ -6,7 +6,7 @@ import { reconcileAssignments } from './reconcile';
 const syncMock = vi.hoisted(() => ({ scheduleSync: vi.fn() }));
 vi.mock('@/sync', () => syncMock);
 
-const assignmentsMock = vi.hoisted(() => ({ resolveNeedsReview: vi.fn() }));
+const assignmentsMock = vi.hoisted(() => ({ planNeedsReviewResolution: vi.fn() }));
 vi.mock('./assignments', () => assignmentsMock);
 
 const CHAR_A = 1;
@@ -32,7 +32,11 @@ function assignment(overrides: Partial<MiningTaxAssignmentRecord> = {}): MiningT
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  assignmentsMock.resolveNeedsReview.mockResolvedValue(undefined);
+  // A stand-in re-snapshot: what matters here is that reconcile writes
+  // whatever the plan returns, in its own one write.
+  assignmentsMock.planNeedsReviewResolution.mockImplementation(
+    async (a: MiningTaxAssignmentRecord) => ({ ...a, estimatedValue: 1500, updatedAt: 2 })
+  );
   await db.miningTaxAssignments.clear();
 });
 
@@ -80,7 +84,7 @@ describe('reconcileAssignments', () => {
     // The stored snapshot itself is untouched — only status/reviewDiff moved.
     expect(updated?.oreLines).toEqual([{ typeId: TYPE_A, quantity: 100 }]);
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
-    expect(assignmentsMock.resolveNeedsReview).not.toHaveBeenCalled();
+    expect(assignmentsMock.planNeedsReviewResolution).not.toHaveBeenCalled();
   });
 
   it('auto-absorbs growth on an unpaid (outstanding) assignment instead of flagging it', async () => {
@@ -95,16 +99,19 @@ describe('reconcileAssignments', () => {
 
     await reconcileAssignments(CHAR_A, [entry]);
 
-    expect(assignmentsMock.resolveNeedsReview).toHaveBeenCalledTimes(1);
-    expect(assignmentsMock.resolveNeedsReview).toHaveBeenCalledWith(outstanding, entry, [
+    expect(assignmentsMock.planNeedsReviewResolution).toHaveBeenCalledTimes(1);
+    expect(assignmentsMock.planNeedsReviewResolution).toHaveBeenCalledWith(outstanding, entry, [
       outstanding,
     ]);
-    // Absorbing is resolveNeedsReview's job — reconcile itself never flags it.
-    expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('outstanding');
+    // The planned re-snapshot is what lands — reconcile itself never flags it.
+    const stored = await db.miningTaxAssignments.get('a1');
+    expect(stored?.status).toBe('outstanding');
+    expect(stored?.estimatedValue).toBe(1500);
+    expect(syncMock.scheduleSync).toHaveBeenCalledTimes(1);
   });
 
   it('flags instead when the absorb itself fails (e.g. prices unavailable)', async () => {
-    assignmentsMock.resolveNeedsReview.mockRejectedValue(new Error('offline'));
+    assignmentsMock.planNeedsReviewResolution.mockRejectedValue(new Error('offline'));
     await db.miningTaxAssignments.put(assignment());
 
     await reconcileAssignments(CHAR_A, [
@@ -119,8 +126,26 @@ describe('reconcileAssignments', () => {
     expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('needs-review');
   });
 
-  it('never auto-absorbs a member of a joined group', async () => {
-    await db.miningTaxAssignments.put(assignment({ groupId: 'g1' }));
+  it('auto-absorbs growth on an unpaid member of a combined entry too', async () => {
+    // A session that crossed midnight UTC is combined while still mining —
+    // the second day keeps growing, and an unpaid bill has nothing to protect.
+    const member = assignment({ groupId: 'g1' });
+    await db.miningTaxAssignments.put(member);
+    const entry: MiningLedgerEntry = {
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      oreLines: [{ typeId: TYPE_A, quantity: 150 }],
+    };
+
+    await reconcileAssignments(CHAR_A, [entry]);
+
+    expect(assignmentsMock.planNeedsReviewResolution).toHaveBeenCalledWith(member, entry, [member]);
+    expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('outstanding');
+  });
+
+  it('still flags growth on a paid member of a combined entry', async () => {
+    await db.miningTaxAssignments.put(assignment({ groupId: 'g1', status: 'paid', paidAt: 1 }));
 
     await reconcileAssignments(CHAR_A, [
       {
@@ -131,7 +156,7 @@ describe('reconcileAssignments', () => {
       },
     ]);
 
-    expect(assignmentsMock.resolveNeedsReview).not.toHaveBeenCalled();
+    expect(assignmentsMock.planNeedsReviewResolution).not.toHaveBeenCalled();
     expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('needs-review');
   });
 

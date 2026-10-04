@@ -31,6 +31,8 @@ interface FittingHeaderProps {
   onRename: (name: string) => void;
   /** The Fitting's Jita price, for Export; null while it loads. */
   price: Appraisal | null;
+  /** The pilot's active clone, left off Export's multibuy list. */
+  cloneImplants?: readonly number[];
   /** Icon badges about the fit itself — Alpha/Omega, Mastery. What its numbers assume (implants, missing skills) lives in the stats panel. */
   context?: ReactNode;
   save: ReactNode;
@@ -50,6 +52,7 @@ interface FittingHeaderProps {
 function CompactFittingHeader({
   fitting,
   price,
+  cloneImplants,
   identity,
   libraryItems,
   save,
@@ -57,13 +60,14 @@ function CompactFittingHeader({
 }: {
   fitting: Fitting;
   price: Appraisal | null;
+  cloneImplants: readonly number[] | undefined;
   identity: ReactNode;
   libraryItems: ReactNode;
   save: ReactNode;
   context?: ReactNode;
 }) {
   const { t } = useTranslation();
-  const exportActions = useFittingExport(fitting);
+  const exportActions = useFittingExport(fitting, cloneImplants);
   return (
     <div className="space-y-2 rounded-xs border border-line bg-panel/85 p-2 backdrop-blur-sm">
       {identity}
@@ -105,6 +109,7 @@ export function FittingHeader({
   onCompare,
   onRename,
   price,
+  cloneImplants,
   context,
   save,
   compact = false,
@@ -177,6 +182,7 @@ export function FittingHeader({
         <CompactFittingHeader
           fitting={fitting}
           price={price}
+          cloneImplants={cloneImplants}
           identity={identity}
           libraryItems={
             <>
@@ -211,7 +217,7 @@ export function FittingHeader({
             </DropdownMenuContent>
           </DropdownMenu>
           <Button onClick={onCompare}>{t('fittings.compare.entryButton')}</Button>
-          <FittingExportMenu fitting={fitting} price={price} />
+          <FittingExportMenu fitting={fitting} price={price} cloneImplants={cloneImplants} />
           {save}
         </div>
       </div>

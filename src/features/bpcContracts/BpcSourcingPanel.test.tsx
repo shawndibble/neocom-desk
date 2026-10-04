@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { DEFAULT_SPACE_FILTER, useSpaceFilter } from '@/features/bpcContracts/bpcSpaceFilterPref';
+import { DEFAULT_SOURCE_TOGGLES } from '@/features/bpcContracts/bpcSourcingUrl';
+import { BPC_SOURCES_SETTING_KEY, useBpcSources } from '@/features/bpcContracts/bpcSourcesPref';
 import {
   DEFAULT_VISIBLE_BPC_SEARCH_COLUMNS,
   useVisibleBpcSearchColumns,
@@ -258,7 +260,7 @@ function cachedSnapshot(
   };
 }
 
-beforeEach(async () => {
+async function resetSession() {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -272,6 +274,7 @@ beforeEach(async () => {
   // the Space chips or a column) would otherwise leak into every later test
   // in this file despite `db.settings.clear()` above.
   useSpaceFilter.setState({ value: DEFAULT_SPACE_FILTER, hydrated: false });
+  useBpcSources.setState({ value: DEFAULT_SOURCE_TOGGLES, hydrated: false });
   useVisibleBpcSearchColumns.setState({
     value: DEFAULT_VISIBLE_BPC_SEARCH_COLUMNS,
     hydrated: false,
@@ -298,7 +301,24 @@ beforeEach(async () => {
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   window.history.pushState({}, '', '/industry/sourcing');
-});
+}
+
+beforeAll(async () => {
+  // One throwaway render of the panel, so no test pays for the first one. A
+  // worker's first `App` render — compiling the lazy route chunks, warming
+  // jsdom and React — took ~4.5s even on a quiet machine, against the 5s
+  // `findBy*` budget, and failed whichever test ran first on a loaded CI
+  // shard. Done here under the hook's own budget.
+  await resetSession();
+  loadPublicBpcContracts.mockResolvedValue(
+    cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
+  );
+  const { unmount } = render(<App />);
+  await screen.findByRole('table', { name: 'BPC Sourcing' }, { timeout: 25_000 });
+  unmount();
+}, 30_000);
+
+beforeEach(resetSession);
 
 /** Every `FilterBar` keeps its controls behind the funnel, so open it first. */
 async function openFilters(user: ReturnType<typeof userEvent.setup>) {
@@ -1163,6 +1183,73 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
   });
 });
 
+describe('BpcSourcingPanel remembered Source', () => {
+  /** A fresh visit to the bare tab path — what the Industry tab strip and the rail link do. */
+  function revisit(unmount: () => void) {
+    unmount();
+    window.history.pushState({}, '', '/industry/sourcing');
+    render(<App />);
+    return screen.findByRole('table', { name: 'BPC Sourcing' });
+  }
+
+  it('keeps the Source picks on a bare revisit, without writing them into the URL', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+    await openFilters(user);
+    await toggleFilterOption(user, 'Contract BPOs');
+    await toggleFilterOption(user, 'Market BPOs');
+
+    await revisit(unmount);
+    expect(window.location.search).toBe('');
+    await openFilters(user);
+    for (const option of ['Contracts', 'Owned', 'Contract BPOs', 'Market BPOs']) {
+      expect(await filterOptionChecked(user, option)).toBe('true');
+    }
+  });
+
+  it('lets a linked Source override the remembered one without storing it', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    await db.settings.put({ key: BPC_SOURCES_SETTING_KEY, value: ['contract', 'market', 'owned'] });
+    window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract');
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+    await openFilters(user);
+    expect(await filterOptionChecked(user, 'Market BPOs')).toBe('false');
+    expect(await filterOptionChecked(user, 'Owned')).toBe('false');
+    expect(await filterOptionChecked(user, 'Contracts')).toBe('true');
+    expect((await db.settings.get(BPC_SOURCES_SETTING_KEY))?.value).toEqual([
+      'contract',
+      'market',
+      'owned',
+    ]);
+  });
+
+  it('forgets the remembered Source when Reset filters puts the defaults back', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+    await openFilters(user);
+    await toggleFilterOption(user, 'Market BPOs');
+    await toggleFilterOption(user, 'Contracts');
+    await toggleFilterOption(user, 'Owned');
+    // Only Market BPOs is left, and the row is a contract, so nothing matches.
+    await user.click(await screen.findByRole('button', { name: 'Reset filters' }));
+
+    await revisit(unmount);
+    await openFilters(user);
+    expect(await filterOptionChecked(user, 'Market BPOs')).toBe('false');
+    expect(await filterOptionChecked(user, 'Contracts')).toBe('true');
+    expect(await filterOptionChecked(user, 'Owned')).toBe('true');
+  });
+});
+
 describe('BpcSourcingPanel Location/Space', () => {
   it('shows an owned row resolved location in the Location column instead of "—"', async () => {
     loadCharacterBlueprints.mockResolvedValue(
@@ -1413,7 +1500,8 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
       const badge = await within(table).findByRole('button', { name: /BPO on contract: 4M/ });
-      expect(badge).toHaveTextContent('BPO may be cheaper');
+      // Short visible text; price and location live in the tooltip.
+      expect(badge).toHaveTextContent(/^BPO may be cheaper$/);
     });
 
     it('badges one copy per blueprint, not every offer row, when several are listed', async () => {

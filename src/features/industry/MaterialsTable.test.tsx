@@ -469,21 +469,30 @@ describe('MaterialsTable on a phone', () => {
     window.matchMedia = realMatchMedia;
   });
 
-  it('renders each material as a card with a Need | Have | Buy strip', () => {
+  it('renders a ledger: the column header once per section, plain numbers on each row', () => {
     render(<Harness initial={{ 34: { ownedQuantity: 400 } }} />);
 
     expect(screen.queryByRole('table')).toBeNull();
-    const card = screen.getByText('Tritanium').closest('li')!;
-    // The same three cells, in the same order, on every card.
-    const labels = Array.from(card.querySelectorAll('.grid > *')).map(
-      (cell) => cell.firstElementChild?.textContent
-    );
-    expect(labels).toEqual(['Need', 'Have', 'Buy']);
-    expect(card.querySelector('.grid')).toHaveTextContent(/^Need1,000Have.*Buy600$/);
-    // Have is a real field filling its cell, and the cell itself is its label.
-    const have = within(card).getByRole('textbox', { name: 'Have: Tritanium' });
-    expect(have.closest('label')).toBeTruthy();
-    expect(within(card).getByRole('textbox', { name: 'Price for Tritanium' })).toBeTruthy();
+    const section = screen.getByRole('heading', { name: /^To buy/ }).closest('section')!;
+    // NEED | HAVE | BUY printed once, not as a label on every row.
+    expect(within(section).getAllByText('Need')).toHaveLength(1);
+    expect(within(section).getAllByText('Buy')).toHaveLength(1);
+
+    const row = screen.getByText('Tritanium').closest('li')!;
+    expect(row).toHaveTextContent('1,000');
+    expect(row).toHaveTextContent('600');
+    // Have is a dashed number, not a field stretched across its column.
+    expect(within(row).queryByRole('textbox', { name: 'Have: Tritanium' })).toBeNull();
+    const have = within(row).getByRole('button', { name: /^Have: Tritanium/ });
+    expect(have).toHaveTextContent('400');
+    expect(have).toHaveClass('text-accent', 'decoration-dashed');
+
+    // A tap opens the field, focused; leaving it puts the number back.
+    fireEvent.click(have);
+    const field = within(row).getByRole('textbox', { name: 'Have: Tritanium' });
+    expect(field).toHaveFocus();
+    fireEvent.blur(field);
+    expect(within(row).getByRole('button', { name: /^Have: Tritanium/ })).toBeTruthy();
   });
 
   it('keeps the section headings and their subtotals', () => {
@@ -491,9 +500,8 @@ describe('MaterialsTable on a phone', () => {
     expect(screen.getByRole('heading', { name: /^To buy · 2/ })).toBeTruthy();
   });
 
-  it('puts Use assets and the price on the line under the strip', () => {
+  it('puts Use assets and the price on the line under the numbers', () => {
     const detection: OwnedStockDetection = {
-      stockFor: (typeID) => (typeID === 34 ? { quantity: 9000, placements: [] } : undefined),
       scopedQuantityFor: (typeID) => (typeID === 34 ? 9000 : 0),
       lowerBound: false,
       incompleteCharacters: [],
@@ -503,15 +511,13 @@ describe('MaterialsTable on a phone', () => {
     };
     render(<Harness detection={detection} />);
 
-    const card = screen.getByText('Tritanium').closest('li')!;
-    const strip = card.querySelector('.grid')!;
-    const offer = within(card).getByRole('button', { name: /^Use assets/ });
-    const price = within(card).getByRole('textbox', { name: 'Price for Tritanium' });
-    expect(strip).not.toContainElement(offer);
-    expect(strip).not.toContainElement(price);
-    const footer = offer.closest('li > div')!;
+    const row = screen.getByText('Tritanium').closest('li')!;
+    const offer = within(row).getByRole('button', { name: /^Use assets/ });
+    const price = within(row).getByRole('button', { name: /^Price for Tritanium/ });
+    const have = within(row).getByRole('button', { name: /^Have: Tritanium/ });
+    const footer = offer.closest('li > div:last-child')!;
     expect(footer).toContainElement(price);
-    expect(price.closest('span')?.parentElement).toHaveTextContent(/^@/);
+    expect(footer).not.toContainElement(have);
   });
 
   it('says Owned on a blueprint the pilot already has, with no strip and no price of 0', () => {
@@ -933,12 +939,8 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     overrides: Partial<OwnedStockDetection> = {}
   ): OwnedStockDetection {
     return {
-      stockFor: (typeID) => {
-        const entry = stock[typeID];
-        return entry ? { quantity: entry.quantity, placements: entry.placements ?? [] } : undefined;
-      },
-      // Defaults to the same total as `stockFor` — the "everywhere" scope,
-      // and today's only behavior before per-location scoping (#454) existed.
+      // Defaults to the whole detected total — the "everywhere" scope, and
+      // today's only behavior before per-location scoping (#454) existed.
       scopedQuantityFor: (typeID) => stock[typeID]?.quantity ?? 0,
       lowerBound: false,
       incompleteCharacters: [],

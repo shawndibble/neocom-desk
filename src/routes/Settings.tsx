@@ -14,6 +14,12 @@ import { SettingsBackLink, SettingsIndex, SettingsNav } from '@/features/setting
 import { DevicePanel } from '@/features/settings/DevicePanel';
 import { UpdatePanel } from '@/features/settings/UpdatePanel';
 import { TravelSettingsPanel } from '@/features/settings/TravelSettingsPanel';
+import { IndustrySettingsForm } from '@/features/settings/IndustrySettingsForm';
+import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
+import { BpcSourcingSettingsForm } from '@/features/settings/BpcSourcingSettingsForm';
+import { MiningTaxSettingsForm } from '@/features/settings/MiningTaxSettingsForm';
+import { ChipRow, DefaultsSyncHint } from '@/features/settings/settingsFields';
+import { useHydratedStore } from '@/features/settings/useHydratedStore';
 import { useDefaultRoutePreference } from '@/features/route/routeRules';
 import { ROUTE_PREFERENCE_LABEL_KEYS } from '@/features/route/routePreferences';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
@@ -38,7 +44,6 @@ import {
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import type { LocalSettingStore } from '@/lib/useLocalSetting';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
 import {
   DEFAULT_MOBILE_TABS,
@@ -61,11 +66,8 @@ import { useTicker } from '@/lib/ticker';
 import { formatTimestamp } from '@/lib/timestamp';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { useMarketHub } from '@/features/market/hub';
-import { useMiningTaxOreValueMode } from '@/features/miningTax/oreValueMode';
-import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
-import { useAssumedTe, MIN_ASSUMED_TE, MAX_ASSUMED_TE } from '@/features/industry/assumedTe';
-import { useIncludeBlueprintCost } from '@/features/industry/includeBlueprintCost';
-import { useExpiringWindowHours, EXPIRING_WINDOW_HOUR_OPTIONS } from '@/features/pi/expiringWindow';
+import { useAssumedMe } from '@/features/industry/assumedMe';
+import { useAssumedTe } from '@/features/industry/assumedTe';
 import {
   useSpExtractionMonitoringEnabled,
   useSpExtractionThresholdSp,
@@ -75,10 +77,6 @@ import {
   COLLATERAL_RATIO_OPTIONS,
   useCourierCollateralRatio,
 } from '@/features/contractSearch/collateralThreshold';
-import {
-  useBpcHideAuctionsDefault,
-  useBpcHidePlexDefault,
-} from '@/features/bpcContracts/sourcingDefaults';
 import { useDarkThreshold, DARK_AFTER_DAY_OPTIONS } from '@/features/corp/darkThreshold';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import {
@@ -545,67 +543,6 @@ function ResetViewPreferences() {
   );
 }
 
-/** The line every synced-defaults panel opens with. */
-function DefaultsSyncHint() {
-  const { t } = useTranslation();
-  return <p className="max-w-2xl text-xs text-text-dim">{t('settings.defaultsSyncHint')}</p>;
-}
-
-/** A labelled row of preset chips — the shape every threshold control here uses; a `Fields` row. */
-function ChipRow<T extends string | number>({
-  label,
-  hint,
-  options,
-  selected,
-  onSelect,
-  labelFor,
-}: {
-  label: string;
-  hint?: string;
-  options: readonly T[];
-  selected: T;
-  onSelect: (value: T) => void;
-  labelFor: (value: T) => string;
-}) {
-  return (
-    <Field label={label} note={hint}>
-      <div role="group" aria-label={label} className="flex flex-wrap gap-2">
-        {options.map((option) => (
-          <FilterChip
-            key={String(option)}
-            label={labelFor(option)}
-            selected={selected === option}
-            onToggle={() => onSelect(option)}
-          />
-        ))}
-      </div>
-    </Field>
-  );
-}
-
-/**
- * Hydrates a preference store and reports whether it has settled.
- *
- * Every other page reads these stores after its own `hydrate()`; this page is
- * the only one that *writes* them, and it mounts none of those pages. Without
- * this, a cold load of `/settings` — a deep-linkable route — renders every
- * control at its default rather than the stored value. For a packed record
- * that is destructive rather than merely wrong: spreading an unhydrated
- * `{ npcStation, none, null }` over a stored `{ azbel, t2, 5 }` while changing
- * one field silently discards the rig level and the facility tax.
- *
- * `fontScale` and `timeFormat` escape this only because `App.tsx` hydrates
- * them for the whole shell.
- */
-function useHydratedStore<T>(store: LocalSettingStore<T>): boolean {
-  const hydrated = store((state) => state.hydrated);
-  const hydrate = store((state) => state.hydrate);
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
-  return hydrated;
-}
-
 /**
  * Which four links the phone's bottom tab bar holds.
  *
@@ -707,94 +644,19 @@ function MobileTabsPanel() {
  */
 function IndustryDefaultsPanel() {
   const { t } = useTranslation();
-  const assumedMe = useAssumedMe((state) => state.value);
-  const setAssumedMe = useAssumedMe((state) => state.setValue);
-  const assumedTe = useAssumedTe((state) => state.value);
-  const setAssumedTe = useAssumedTe((state) => state.setValue);
-  const includeBlueprintCost = useIncludeBlueprintCost((state) => state.value);
-  const setIncludeBlueprintCost = useIncludeBlueprintCost((state) => state.setValue);
-
-  // Each on its own line, never `a() && b()`: `&&` short-circuits, which would
-  // make every hook after the first false one a conditional call.
-  const assumedMeHydrated = useHydratedStore(useAssumedMe);
-  const assumedTeHydrated = useHydratedStore(useAssumedTe);
-  const includeBlueprintCostHydrated = useHydratedStore(useIncludeBlueprintCost);
-  const ready = assumedMeHydrated && assumedTeHydrated && includeBlueprintCostHydrated;
-
-  if (!ready) {
-    return (
-      <Panel title={t('settings.industryDefaultsTitle')}>
-        <Spinner />
-      </Panel>
-    );
-  }
-
   return (
     <Panel title={t('settings.industryDefaultsTitle')}>
-      <div className="space-y-4">
-        <DefaultsSyncHint />
-        <Fields variant="form">
-          <Field
-            label={t('settings.assumedMeLabel')}
-            htmlFor="settings-assumed-me"
-            note={t('settings.assumedMeHint')}
-          >
-            <TextInput
-              id="settings-assumed-me"
-              type="number"
-              min={MIN_ASSUMED_ME}
-              max={MAX_ASSUMED_ME}
-              step={1}
-              value={assumedMe}
-              onChange={(event) => {
-                const parsed = Math.round(Number(event.target.value));
-                if (!Number.isFinite(parsed)) return;
-                void setAssumedMe(Math.min(MAX_ASSUMED_ME, Math.max(MIN_ASSUMED_ME, parsed)));
-              }}
-              className="w-24"
-            />
-          </Field>
+      <IndustrySettingsForm />
+    </Panel>
+  );
+}
 
-          {/*
-            Beside its ME twin rather than merged with it: the two answer
-            different questions (material cost, job time), and TE's range is
-            0..20 where ME's is 0..10 (issue #634).
-          */}
-          <Field
-            label={t('settings.assumedTeLabel')}
-            htmlFor="settings-assumed-te"
-            note={t('settings.assumedTeHint')}
-          >
-            <TextInput
-              id="settings-assumed-te"
-              type="number"
-              min={MIN_ASSUMED_TE}
-              max={MAX_ASSUMED_TE}
-              step={1}
-              value={assumedTe}
-              onChange={(event) => {
-                const parsed = Math.round(Number(event.target.value));
-                if (!Number.isFinite(parsed)) return;
-                void setAssumedTe(Math.min(MAX_ASSUMED_TE, Math.max(MIN_ASSUMED_TE, parsed)));
-              }}
-              className="w-24"
-            />
-          </Field>
-
-          <Field
-            label={t('settings.includeBlueprintCostLabel')}
-            htmlFor="settings-include-blueprint-cost"
-            inline
-            note={t('settings.includeBlueprintCostHint')}
-          >
-            <Checkbox
-              id="settings-include-blueprint-cost"
-              checked={includeBlueprintCost}
-              onChange={() => void setIncludeBlueprintCost(!includeBlueprintCost)}
-            />
-          </Field>
-        </Fields>
-      </div>
+/** BPC Sourcing is an Industry tab, so its starting filters live beside the Industry defaults. */
+function BpcSourcingDefaultsPanel() {
+  const { t } = useTranslation();
+  return (
+    <Panel title={t('settings.bpcSourcingDefaultsTitle')}>
+      <BpcSourcingSettingsForm />
     </Panel>
   );
 }
@@ -802,26 +664,9 @@ function IndustryDefaultsPanel() {
 /** Beside the Industry defaults because Planetary Industry is an industry page; its own panel because its one control has nothing to do with a build. */
 function PiDefaultsPanel() {
   const { t } = useTranslation();
-  const expiringHours = useExpiringWindowHours((state) => state.value);
-  const setExpiringHours = useExpiringWindowHours((state) => state.setValue);
-  const hydrated = useHydratedStore(useExpiringWindowHours);
-
   return (
     <Panel title={t('settings.piDefaultsTitle')}>
-      {hydrated ? (
-        <Fields variant="form">
-          <ChipRow
-            label={t('settings.piExpiringLabel')}
-            hint={t('settings.piExpiringHint')}
-            options={EXPIRING_WINDOW_HOUR_OPTIONS}
-            selected={expiringHours}
-            onSelect={(hours) => void setExpiringHours(hours)}
-            labelFor={(hours) => t('settings.hours', { count: hours })}
-          />
-        </Fields>
-      ) : (
-        <Spinner />
-      )}
+      <PiSettingsForm />
     </Panel>
   );
 }
@@ -834,13 +679,7 @@ function MarketDefaultsPanel() {
   const collateralRatio = useCourierCollateralRatio((state) => state.value);
   const setCollateralRatio = useCourierCollateralRatio((state) => state.setValue);
   const collateralHydrated = useHydratedStore(useCourierCollateralRatio);
-  const hideAuctions = useBpcHideAuctionsDefault((state) => state.value);
-  const setHideAuctions = useBpcHideAuctionsDefault((state) => state.setValue);
-  const hideAuctionsHydrated = useHydratedStore(useBpcHideAuctionsDefault);
-  const hidePlex = useBpcHidePlexDefault((state) => state.value);
-  const setHidePlex = useBpcHidePlexDefault((state) => state.setValue);
-  const hidePlexHydrated = useHydratedStore(useBpcHidePlexDefault);
-  const hydrated = hubHydrated && collateralHydrated && hideAuctionsHydrated && hidePlexHydrated;
+  const hydrated = hubHydrated && collateralHydrated;
 
   return (
     <Panel title={t('settings.marketDefaultsTitle')}>
@@ -875,30 +714,6 @@ function MarketDefaultsPanel() {
               onSelect={(ratio) => void setCollateralRatio(ratio)}
               labelFor={(ratio) => t('settings.courierCollateralOption', { count: ratio })}
             />
-
-            <Field
-              label={t('settings.bpcHideAuctionsLabel')}
-              htmlFor="settings-bpc-hide-auctions"
-              inline
-            >
-              <Checkbox
-                id="settings-bpc-hide-auctions"
-                checked={hideAuctions}
-                onChange={() => void setHideAuctions(!hideAuctions)}
-              />
-            </Field>
-            <Field
-              label={t('settings.bpcHidePlexLabel')}
-              htmlFor="settings-bpc-hide-plex"
-              inline
-              note={t('settings.bpcHideHint')}
-            >
-              <Checkbox
-                id="settings-bpc-hide-plex"
-                checked={hidePlex}
-                onChange={() => void setHidePlex(!hidePlex)}
-              />
-            </Field>
           </Fields>
         </div>
       ) : (
@@ -910,33 +725,9 @@ function MarketDefaultsPanel() {
 
 function MiningTaxDefaultsPanel() {
   const { t } = useTranslation();
-  const oreValueMode = useMiningTaxOreValueMode((state) => state.value);
-  const setOreValueMode = useMiningTaxOreValueMode((state) => state.setValue);
-  const hydrated = useHydratedStore(useMiningTaxOreValueMode);
-
   return (
     <Panel title={t('settings.miningTaxDefaultsTitle')}>
-      {hydrated ? (
-        <div className="space-y-4">
-          <DefaultsSyncHint />
-          <Fields variant="form">
-            <Field
-              label={t('settings.miningTaxOreValueModeLabel')}
-              htmlFor="settings-mining-tax-ore-value-mode"
-              inline
-              note={t('settings.miningTaxOreValueModeHint')}
-            >
-              <Checkbox
-                id="settings-mining-tax-ore-value-mode"
-                checked={oreValueMode}
-                onChange={() => void setOreValueMode(!oreValueMode)}
-              />
-            </Field>
-          </Fields>
-        </div>
-      ) : (
-        <Spinner />
-      )}
+      <MiningTaxSettingsForm />
     </Panel>
   );
 }
@@ -1247,6 +1038,7 @@ export function Settings() {
           {section === 'industry' && (
             <>
               <IndustryDefaultsPanel />
+              <BpcSourcingDefaultsPanel />
               <PiDefaultsPanel />
             </>
           )}
@@ -1261,10 +1053,11 @@ export function Settings() {
             The four short action panels sit two-up from `xl`: one column of
             them left most of each card empty. Export beside Import, since
             they are one round trip; the device's log-out row stays full width.
+            Data Age goes last: its list grows with every endpoint and
+            Character, and it is the least-used block on the page.
           */}
           {section === 'dataAge' && (
             <>
-              <DataAgePanel />
               <div className="grid items-start gap-4 xl:grid-cols-2">
                 <DataPanel />
                 <UpdatePanel />
@@ -1272,6 +1065,7 @@ export function Settings() {
                 <ImportPanel />
               </div>
               <DevicePanel />
+              <DataAgePanel />
             </>
           )}
           {section === 'activity' && <ActivityLogPanel />}

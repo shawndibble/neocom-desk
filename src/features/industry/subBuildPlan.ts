@@ -44,9 +44,9 @@ export interface MaterialTableRow extends MaterialCostLine {
    * Present only on a synthetic Blueprint Acquisition row (issue #838) — the
    * ME/TE tier it resolved to, for the row's caption, and (issue #1778) what
    * `shoppingListText` keys off to exclude the row from the multibuy text.
-   * `mergeInto` below carries it across a merge itself, since `mergeCostLines`
-   * returns a plain `MaterialCostLine` and dropping it there would silently
-   * let a merged Blueprint Acquisition row back into the shopping list.
+   * `mergeCostLines` carries it across a merge, since dropping it would
+   * silently let a merged Blueprint Acquisition row back into the shopping
+   * list.
    */
   acquisitionTier?: { me: number; te: number };
 }
@@ -78,7 +78,6 @@ function mergeInto(rows: Map<number, MaterialTableRow>, material: ResolvedMateri
   rows.set(material.typeID, {
     ...mergeCostLines(existing, line),
     subBuilds: subBuild ? [...existing.subBuilds, subBuild] : existing.subBuilds,
-    acquisitionTier: existing.acquisitionTier ?? line.acquisitionTier,
   });
 }
 

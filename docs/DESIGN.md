@@ -447,7 +447,9 @@ exactly the markup above.
   and an `end` box can add `className="dt-dense-tight"` instead: the tick
   box, title, figure and button share line one, centred on each other (the
   button's 44px target overhangs rather than heightening the line), and line
-  two centres on a 28px `end` box (Hauling). The box is under §3's 36px
+  two centres on a 28px `end` box (Hauling). BPC Sourcing uses it too,
+  with neither box: its `cardCorner` is an ISK amount, wider than the
+  pinned corner's room for a standing icon. The box is under §3's 36px
   touch tier on purpose: at 36px its height set the meta line's and opened a
   gap under the title, which is what the card's reader complained about. A
   cell holding only a `data-dense-omit` value (an empty cell's dash, a word
@@ -567,6 +569,12 @@ Rules:
 - A typed character ("+", "−", "Aa", "✓") is not an icon; icon-only controls
   take an `Icon.*` glyph (`Icon.Decrease` / `Icon.Increase` for a stepper). Lint
   rejects JSX text that is only "−", "+" or "Aa".
+- Sort direction is always the glyph trio: `Icon.Sort` (faint) on a sortable
+  column that isn't sorting, `Icon.Ascending` / `Icon.Descending` (accent) on
+  the active one, sized `ICON_SIZE.sm`, with the direction in the accessible
+  name ("Profit, sorted descending"). A "↑" / "↓" text arrow appears only where
+  a native `<option>` can't render an icon (`DataTable`'s stacked-mode sort
+  select); lint rejects it in every other `src` `.tsx` file.
 
 **Exception — the Fitting Add panel's filter and slot icons.** The module
 browser's Hull/Resources/Skills toggles and its "Fits this slot" toggle
@@ -606,7 +614,9 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
     unavailable rather than merely dim.
     Its one sibling is `.route-strip-hole`, Route Safety's wormhole jump
     on the route strip: a step with no security of its own to colour it,
-    hatched so it never reads as a system of some security band.
+    hatched so it never reads as a system of some security band. An Ansiblex
+    jump's strip cell is no hatch: a flat `bg-panel-2` edged top and bottom
+    in the bridge row's dashed `border-line-bright`.
   - The Ship Tree's corner brackets, grid and render mask (`shipTree.css`)
     are hard-stop drawings under its own exception — §1 "Ship Tree (ISIS)".
 - Layering: `bg` → `panel` → `panel-2`. Depth via background steps + hairlines,

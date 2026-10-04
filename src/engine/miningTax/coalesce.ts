@@ -8,8 +8,8 @@
  *   back to the original's leaves two Assignments over one entry on identical
  *   terms. That is one obligation stored as two — the pilot sees the same day
  *   listed twice inside a group and cannot get it back to one line.
- * - A **group whose members no longer agree.** `updateAssignment` edits a
- *   single member's Payee/tax %, and a `groupId` survives that edit, so a
+ * - A **group whose members no longer agree.** An older single-day editor
+ *   changed one member's Payee/tax % while its `groupId` survived, so a
  *   group could go on rendering as one row (under whichever Payee happened to
  *   be first) while its members billed two different ones.
  *

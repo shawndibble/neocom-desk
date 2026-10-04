@@ -658,11 +658,29 @@ describe('BuildPlanList sort and owned tag', () => {
     await user.click(screen.getByRole('button', { name: 'Sort by Profit' }));
     expect(order()).toEqual(['Astero', 'Merlin run', 'Bantam']);
 
-    await user.click(screen.getByRole('button', { name: 'Sort by Profit' }));
+    await user.click(screen.getByRole('button', { name: 'Profit, sorted descending' }));
     expect(order()).toEqual(['Merlin run', 'Astero', 'Bantam']);
 
-    await user.click(screen.getByRole('button', { name: 'Sort by Profit' }));
+    await user.click(screen.getByRole('button', { name: 'Profit, sorted ascending' }));
     expect(order()).toEqual(['Merlin run', 'Astero', 'Bantam']);
+    expect(screen.getByRole('button', { name: 'Sort by Profit' })).toBeInTheDocument();
+  });
+
+  it('names the active sort direction and draws it with a glyph, not a text arrow', async () => {
+    const user = userEvent.setup();
+    renderSortable();
+    const header = screen.getByRole('button', { name: 'Sort by Profit' });
+    expect(header.querySelector('svg')).not.toBeNull();
+
+    await user.click(header);
+    const active = screen.getByRole('button', { name: 'Profit, sorted descending' });
+    expect(active).toHaveAttribute('aria-pressed', 'true');
+    expect(active.querySelector('svg')).not.toBeNull();
+    expect(active).not.toHaveTextContent(/[↑↓]/);
+    expect(screen.getByRole('button', { name: 'Sort by Margin' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
   });
 
   it('offers ISK/h and Margin as further sortable columns', async () => {

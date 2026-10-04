@@ -27,7 +27,7 @@ beforeEach(async () => {
   useStatsSectionsPreference.setState({ value: {}, hydrated: false });
   useOverheatAll.setState({ overheatAll: false });
 });
-import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
+import { NO_HOLDS, neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
 
 function layer(hp: number, ehp: number) {
   return {
@@ -986,7 +986,7 @@ describe('FittingStatsSections — resources', () => {
     const user = userEvent.setup();
     renderSections(
       stats({
-        holds: { cargo: 450, fleetHangar: 5000, miningHold: 0 },
+        holds: { ...NO_HOLDS, cargo: 450, fleetHangar: 5000, miningHold: 0 },
         sensor: { strength: 21.6, type: 'gravimetric' },
         jumpDrive: { rangeLightYears: 7, fuelTypeId: 16274, fuelPerLightYear: 3000 },
       })
@@ -1141,7 +1141,7 @@ describe('FittingStatsSections — Mining', () => {
   it('shows each miner with its crystal, the total, the residue and when the ore hold fills', () => {
     renderSections(
       stats({
-        holds: { cargo: 350, fleetHangar: 0, miningHold: 11500 },
+        holds: { ...NO_HOLDS, cargo: 350, fleetHangar: 0, miningHold: 11500 },
         mining: {
           rows: [
             {

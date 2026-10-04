@@ -21,7 +21,6 @@ function placement(overrides: Partial<OwnedStockPlacement> = {}): OwnedStockPlac
 
 function detectionOf(overrides: Partial<OwnedStockDetection> = {}): OwnedStockDetection {
   return {
-    stockFor: () => undefined,
     scopedQuantityFor: () => 0,
     lowerBound: false,
     incompleteCharacters: [],

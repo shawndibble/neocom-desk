@@ -1102,6 +1102,13 @@ describe('DataTable opt-in phone features', () => {
       expect(screen.getByText('detail-3')).toBeInTheDocument();
     });
 
+    it('folds a single row under its own header when minSize is 1', () => {
+      renderOffers({ groupBy: { ...groupBy, allWidths: true, minSize: 1 } });
+      expect(screen.getByRole('button', { name: 'Dodixie→Rens ×1' })).toBeInTheDocument();
+      // A null key still never groups.
+      expect(offerIds()).toEqual(['2']);
+    });
+
     it('never groups off a phone', () => {
       renderOffers();
       expect(document.querySelector('.dt-group-header')).toBeNull();

@@ -1,11 +1,18 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Button, IconButton } from '@/components/ui';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  IconButton,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { MiningTaxPaymentLinkSource } from '@/db';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
+import { formatIsk } from '@/lib/isk';
 
 /** One linked transaction, resolved for display — this card itself does no lookups. */
 export interface LinkedTransaction {
@@ -31,9 +38,16 @@ interface PaymentLinksCardProps {
   busy: boolean;
   /** A single Assignment's own amount/paidOn line — `RowDetailModal` passes one, `GroupSummaryModal` doesn't (no one payment record to summarize for the whole group). */
   summary?: ReactNode;
+  /** The recorded payment, read as one sentence: "Paid 4,309,281 ISK · 2026-10-04 · auto-linked". */
+  paid?: { amount: number; paidOn: string };
 }
 
 /**
+ * The payment line on a paid entry (scope decision 20261004): what was paid,
+ * when, and whether it found its wallet transfer by itself — a sentence
+ * rather than a raw journal id with a red ✕ beside it, which read as "close
+ * this". Link and Unlink live in the card's ⋯ menu.
+ *
  * The linked-transactions list plus its Link/Unlink actions — shared between
  * `RowDetailModal` (a single Assignment's payment) and `GroupSummaryModal` (a
  * joined group's combined payment), which otherwise differed only in whether
@@ -47,66 +61,90 @@ export function PaymentLinksCard({
   onUnlinkTransaction,
   busy,
   summary,
+  paid,
 }: PaymentLinksCardProps) {
   const { t } = useTranslation();
+  const links = linkedTransactions ?? [];
+  const autoLinked = links.length > 0 && links.every((tx) => tx.source === 'auto');
+  const hasMenu = onLinkTransaction !== undefined || (onUnlinkTransaction && links.length > 0);
   return (
-    <div className="space-y-1.5 rounded-xs border border-line bg-panel-2 p-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+    <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('miningTax.paymentCardTitle')}
         </p>
-        {summary}
-      </div>
-      {linkedTransactions && linkedTransactions.length > 0 ? (
-        <ul className="divide-y divide-line text-xs">
-          {linkedTransactions.map((tx) => (
-            <li
-              key={`${tx.kind}:${tx.refId}`}
-              className="flex items-center justify-between gap-2 py-1 first:pt-0 last:pb-0"
-            >
-              <span className="min-w-0 flex-1 truncate">
-                {tx.label === null ? (
-                  <span className="text-text-dim">
-                    {t('miningTax.transactionNoLongerCached', { id: tx.refId })}
-                  </span>
-                ) : (
-                  <Link
-                    to={
-                      tx.kind === 'journal'
-                        ? `/wallet/journal?${HIGHLIGHT_PARAM}=${tx.refId}`
-                        : `/contracts?${HIGHLIGHT_PARAM}=${tx.refId}`
-                    }
-                    className={inlineLinkClassName}
+        {hasMenu && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton
+                variant="plain"
+                size="sm"
+                icon={<Icon.More />}
+                label={t('miningTax.payment.menuLabel')}
+                disabled={busy}
+              />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {onLinkTransaction && (
+                <DropdownMenuItem onSelect={onLinkTransaction}>
+                  {t('miningTax.linkTransactionAction')}
+                </DropdownMenuItem>
+              )}
+              {onUnlinkTransaction &&
+                links.map((tx) => (
+                  <DropdownMenuItem
+                    key={`${tx.kind}:${tx.refId}`}
+                    onSelect={() => onUnlinkTransaction(tx)}
                   >
-                    {tx.label}
-                  </Link>
-                )}
-                {tx.source === 'auto' && (
-                  <span className="ml-1.5 text-[0.6875rem] text-text-dim">
-                    {t('miningTax.transactionAutoMatchedBadge')}
-                  </span>
-                )}
-              </span>
-              {onUnlinkTransaction && (
-                <IconButton
-                  icon={<Icon.Close />}
-                  label={t('miningTax.unlinkTransactionAction')}
-                  size="sm"
-                  tone="danger"
-                  disabled={busy}
-                  onClick={() => onUnlinkTransaction(tx)}
-                />
+                    {links.length > 1
+                      ? t('miningTax.payment.unlinkNamed', { id: tx.refId })
+                      : t('miningTax.unlinkTransactionAction')}
+                  </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+      {paid && (
+        <p className="text-sm tabular-nums">
+          {t('miningTax.payment.paidLine', {
+            amount: formatIsk(paid.amount, 0),
+            date: paid.paidOn,
+          })}
+          {autoLinked && (
+            <span className="text-text-dim"> · {t('miningTax.payment.autoLinked')}</span>
+          )}
+        </p>
+      )}
+      {!paid && autoLinked && (
+        <p className="text-xs text-text-dim">{t('miningTax.payment.autoLinked')}</p>
+      )}
+      {summary}
+      {links.length > 0 ? (
+        <ul className="space-y-0.5 text-xs">
+          {links.map((tx) => (
+            <li key={`${tx.kind}:${tx.refId}`} className="min-w-0 truncate">
+              {tx.label === null ? (
+                <span className="text-text-dim">
+                  {t('miningTax.payment.notCached', { id: tx.refId })}
+                </span>
+              ) : (
+                <Link
+                  to={
+                    tx.kind === 'journal'
+                      ? `/wallet/journal?${HIGHLIGHT_PARAM}=${tx.refId}`
+                      : `/contracts?${HIGHLIGHT_PARAM}=${tx.refId}`
+                  }
+                  className={inlineLinkClassName}
+                >
+                  {tx.label}
+                </Link>
               )}
             </li>
           ))}
         </ul>
       ) : (
         <p className="text-xs text-text-dim">{t('miningTax.noLinkedTransactions')}</p>
-      )}
-      {onLinkTransaction && (
-        <Button size="sm" disabled={busy} onClick={onLinkTransaction}>
-          {t('miningTax.linkTransactionAction')}
-        </Button>
       )}
     </div>
   );
