@@ -11,7 +11,8 @@
  *
  * It's a planner: on "My clone" with no set of the Fitting's own, it starts
  * from the clone's implants, and the first change saves that plan to the
- * Fitting and switches the page to it — opening it alone changes nothing.
+ * Fitting — which is what puts the page on it — while opening it alone
+ * changes nothing. "Use my clone" drops the set again.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -44,9 +45,9 @@ interface ImplantSetPickerProps {
     fitting: Fitting;
     profile: PilotProfile;
     basis: ImplantBasis;
-    /** Called with "fitting" when a change is made on "My clone", so the page shows the plan. */
-    onBasisChange?: (basis: ImplantBasis) => void;
   };
+  /** Drops the Fitting's own set, so the stats go back to the clone; absent: no clone to go back to. */
+  onUseClone?: () => void;
 }
 
 /** Stable identity: a fresh `{implants: [], boosters: []}` every render would
@@ -185,6 +186,7 @@ export function ImplantSetPicker({
   implantSet,
   onChange,
   finder,
+  onUseClone,
 }: ImplantSetPickerProps) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<'find' | 'set'>('find');
@@ -210,11 +212,6 @@ export function ImplantSetPicker({
     [fitting, seed]
   );
   const set = implantSet ?? seed ?? EMPTY_SET;
-  const onBasisChange = finder?.onBasisChange;
-  function change(next: FittingImplantSet | undefined) {
-    onChange(next);
-    if (onClone) onBasisChange?.('fitting');
-  }
 
   useEffect(() => {
     if (!open) return;
@@ -234,13 +231,13 @@ export function ImplantSetPicker({
       return;
     }
     setError(null);
-    change({ ...set, [kind]: [...set[kind], entry.typeID] });
+    onChange({ ...set, [kind]: [...set[kind], entry.typeID] });
   }
 
   function removeFrom(kind: 'implants' | 'boosters', index: number) {
     const remaining = set[kind].filter((_, i) => i !== index);
     // A side effect whose booster is gone goes with it.
-    change(kind === 'boosters' ? withBoosters(set, remaining) : { ...set, implants: remaining });
+    onChange(kind === 'boosters' ? withBoosters(set, remaining) : { ...set, implants: remaining });
   }
 
   function toggleSideEffect(effectId: number, on: boolean) {
@@ -248,7 +245,7 @@ export function ImplantSetPicker({
     const sideEffects = on
       ? [...current.filter((id) => id !== effectId), effectId]
       : current.filter((id) => id !== effectId);
-    change({
+    onChange({
       implants: set.implants,
       boosters: set.boosters,
       ...(sideEffects.length > 0 ? { boosterSideEffects: sideEffects } : {}),
@@ -285,10 +282,29 @@ export function ImplantSetPicker({
     </div>
   );
 
+  // What the stats are on now, and the way back to the clone from a set.
+  const inUse = (
+    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-dim">
+      <p>
+        {implantSet === undefined && onUseClone
+          ? t('fittings.implants.cloneExplain')
+          : t('fittings.implants.fittingExplain')}
+      </p>
+      {implantSet !== undefined && onUseClone && (
+        <Button size="sm" onClick={onUseClone}>
+          {t('fittings.implants.useClone')}
+        </Button>
+      )}
+    </div>
+  );
+
   if (!finder || !plannedFitting) {
     return (
       <Modal open={open} onClose={onClose} title={t('fittings.implants.modalTitle')}>
-        <div className="p-3">{setEditor}</div>
+        <div className="space-y-3 p-3">
+          {inUse}
+          {setEditor}
+        </div>
       </Modal>
     );
   }
@@ -299,6 +315,7 @@ export function ImplantSetPicker({
   return (
     <Modal open={open} onClose={onClose} title={t('fittings.implants.modalTitle')} placement="wide">
       <div className="space-y-3 p-3">
+        {inUse}
         <Tabs
           tabs={tabs}
           value={tab}
@@ -312,7 +329,7 @@ export function ImplantSetPicker({
             profile={finder.profile}
             basis={finder.basis}
             implantSet={set}
-            onChange={change}
+            onChange={onChange}
           />
         ) : (
           setEditor
