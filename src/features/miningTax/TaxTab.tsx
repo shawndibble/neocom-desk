@@ -7,6 +7,7 @@ import {
   DataAgeBadge,
   DataTable,
   DataTableDenseCell,
+  DataTableSortPicker,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -315,6 +316,10 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   // name: the Payee is what a row is read by, the ore is one click away in
   // the entry itself (and at 1024px it pushed Status off-screen, #2147).
   const showOreColumn = useMediaQuery('(min-width: 87.5rem)');
+  // Est. value is out between the phone card and `lg`: there the other
+  // columns' fixed widths would leave the Payee column no room at all. The
+  // card still shows it, and so does every wider screen (and the export).
+  const showValueColumn = useMediaQuery('(min-width: 64rem)') || isPhone;
   const { data, error, loading, activeCharacterId, refresh } = useRouteSnapshot(
     loadSnapshot,
     undefined,
@@ -1228,6 +1233,24 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       ),
   };
 
+  const valueColumn: DataTableColumn<DisplayRow> = {
+    id: 'value',
+    headerCellClassName: 'sm:w-32',
+    header: t('miningTax.estimatedValueColumn'),
+    align: 'right',
+    className: 'whitespace-nowrap',
+    stackAffix: { after: ` ${t('miningTax.valueAffix')}` },
+    // Compact on a phone card, where it shares one meta line with the
+    // system, the Payee and the status.
+    render: (dr) =>
+      withDayLines(
+        dr,
+        isPhone ? formatIskCompact(estimatedValueOf(dr)) : `${formatIsk(estimatedValueOf(dr))} ISK`,
+        (m) => `${formatIsk(m.assignment.estimatedValue)} ISK`
+      ),
+    sortValue: (dr) => estimatedValueOf(dr),
+  };
+
   const baseColumns: DataTableColumn<DisplayRow>[] = [
     ...(showCharacterColumn
       ? [
@@ -1311,25 +1334,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       sortValue: (dr) => payeeDisplayName(dr),
     },
     ...(showOreColumn ? [oreColumn] : []),
-    {
-      id: 'value',
-      headerCellClassName: 'sm:w-32',
-      header: t('miningTax.estimatedValueColumn'),
-      align: 'right',
-      className: 'whitespace-nowrap',
-      stackAffix: { after: ` ${t('miningTax.valueAffix')}` },
-      // Compact on a phone card, where it shares one meta line with the
-      // system, the Payee and the status.
-      render: (dr) =>
-        withDayLines(
-          dr,
-          isPhone
-            ? formatIskCompact(estimatedValueOf(dr))
-            : `${formatIsk(estimatedValueOf(dr))} ISK`,
-          (m) => `${formatIsk(m.assignment.estimatedValue)} ISK`
-        ),
-      sortValue: (dr) => estimatedValueOf(dr),
-    },
+    ...(showValueColumn ? [valueColumn] : []),
     {
       id: 'taxOwed',
       headerCellClassName: 'sm:w-28',
@@ -1358,6 +1363,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       id: 'status',
       headerCellClassName: 'sm:w-32',
       header: t('miningTax.statusColumn'),
+      // Closes the phone card's second line at its right edge, so every
+      // status sits in one column under the tax figure above it.
+      stackEdge: 'end',
       render: (dr) => <StatusPill status={dr.status} label={statusLabel(t, dr.status)} />,
       sortValue: (dr) => statusLabel(t, dr.status),
     },
@@ -1387,14 +1395,16 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   ];
 
   // History has no checkboxes, but keeps an empty column the same width so
-  // its columns sit exactly under Open's (both tables are fixed-layout).
+  // its columns sit exactly under Open's (both tables are fixed-layout). Not
+  // on a phone: there it would be one more (empty) value on the card's meta
+  // line, opening it with a stray "·".
   const historyColumns: DataTableColumn<DisplayRow>[] = [
-    ...(showSelectColumn
+    ...(showSelectColumn && !isPhone
       ? [
           {
             id: 'spacer',
             header: '',
-            className: 'w-8 px-2 max-sm:hidden',
+            className: 'w-8 px-2',
             headerCellClassName: 'sm:w-8',
             render: () => null,
           } satisfies DataTableColumn<DisplayRow>,
@@ -1707,86 +1717,98 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center gap-2">
-                <CharacterFilterControl
-                  activeCharacterId={activeCharacterId}
-                  value={characterFilter}
-                  onChange={setCharacterFilter}
-                />
+              {/* The filters sit right on top of the Open list they filter
+                  first: no "Open" heading between them, since every row in
+                  it already carries its status. */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <CharacterFilterControl
+                    activeCharacterId={activeCharacterId}
+                    value={characterFilter}
+                    onChange={setCharacterFilter}
+                  />
 
-                {allPayees.length > 0 && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button size="sm">
-                        {resolvedPayeeFilter === 'all'
-                          ? t('miningTax.allPayees')
-                          : t('miningTax.payeesSelected', { count: resolvedPayeeFilter.size })}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      {allPayees.map((p) => (
-                        <DropdownMenuCheckboxItem
-                          key={p.id}
-                          checked={resolvedPayeeFilter === 'all' || resolvedPayeeFilter.has(p.id)}
-                          onSelect={(e) => e.preventDefault()}
-                          onCheckedChange={() => togglePayee(p.id)}
-                        >
-                          {characters.length > 1
-                            ? t('miningTax.payeeOptionWithCharacter', {
-                                payee: p.name,
-                                character:
-                                  characters.find((c) => c.characterId === p.characterId)
-                                    ?.characterName ?? '',
-                              })
-                            : p.name}
-                        </DropdownMenuCheckboxItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
+                  {allPayees.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm">
+                          {resolvedPayeeFilter === 'all'
+                            ? t('miningTax.allPayees')
+                            : t('miningTax.payeesSelected', { count: resolvedPayeeFilter.size })}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        {allPayees.map((p) => (
+                          <DropdownMenuCheckboxItem
+                            key={p.id}
+                            checked={resolvedPayeeFilter === 'all' || resolvedPayeeFilter.has(p.id)}
+                            onSelect={(e) => e.preventDefault()}
+                            onCheckedChange={() => togglePayee(p.id)}
+                          >
+                            {characters.length > 1
+                              ? t('miningTax.payeeOptionWithCharacter', {
+                                  payee: p.name,
+                                  character:
+                                    characters.find((c) => c.characterId === p.characterId)
+                                      ?.characterName ?? '',
+                                })
+                              : p.name}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
 
+                  {/* On a phone the stacked cards have no header row to sort
+                    from; the picker lives here rather than above the list. */}
+                  {isPhone && openRows.length > 1 && (
+                    <DataTableSortPicker
+                      columns={openColumns}
+                      sort={taxSort.sort}
+                      onSortChange={taxSort.onSortChange}
+                      size="sm"
+                    />
+                  )}
+
+                  {visibleRows.length > 0 && (
+                    <span className="ml-auto">
+                      <TableActionsMenu name={t('miningTax.title')} tableExport={taxExport} />
+                    </span>
+                  )}
+                </div>
+
+                {/* An empty ledger is EmptyState's to explain below; "nothing
+                  open — every entry is paid" would contradict it. */}
                 {visibleRows.length > 0 && (
-                  <span className="ml-auto">
-                    <TableActionsMenu name={t('miningTax.title')} tableExport={taxExport} />
-                  </span>
+                  <section aria-labelledby="mining-tax-open">
+                    <h2 id="mining-tax-open" className="sr-only">
+                      {t('miningTax.sections.open', { count: openRows.length })}
+                    </h2>
+                    {openRows.length === 0 ? (
+                      <p className="rounded-xs border border-dashed border-line px-3 py-3 text-xs text-text-dim">
+                        {t('miningTax.sections.openEmpty')}
+                      </p>
+                    ) : (
+                      <Panel padded={false}>
+                        <div className="overflow-x-auto">
+                          <DataTable
+                            {...taxExport.tableProps}
+                            columns={openColumns}
+                            rows={openRows}
+                            className="sm:table-fixed"
+                            rowKey={(dr) => dr.key}
+                            label={t('miningTax.sections.openLabel')}
+                            {...taxSort}
+                            stackLayout="dense"
+                            rowClassName={rowClassName}
+                            onRowClick={(dr) => setDetailTarget(dr)}
+                          />
+                        </div>
+                      </Panel>
+                    )}
+                  </section>
                 )}
               </div>
-
-              {/* An empty ledger is EmptyState's to explain below; "nothing
-                  open — every entry is paid" would contradict it. */}
-              {visibleRows.length > 0 && (
-                <section aria-labelledby="mining-tax-open" className="space-y-2">
-                  <h2
-                    id="mining-tax-open"
-                    className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-                  >
-                    {t('miningTax.sections.open', { count: openRows.length })}
-                  </h2>
-                  {openRows.length === 0 ? (
-                    <p className="rounded-xs border border-dashed border-line px-3 py-3 text-xs text-text-dim">
-                      {t('miningTax.sections.openEmpty')}
-                    </p>
-                  ) : (
-                    <Panel padded={false}>
-                      <div className="overflow-x-auto">
-                        <DataTable
-                          {...taxExport.tableProps}
-                          columns={openColumns}
-                          rows={openRows}
-                          className="sm:table-fixed"
-                          rowKey={(dr) => dr.key}
-                          label={t('miningTax.sections.openLabel')}
-                          {...taxSort}
-                          mobileSort={openRows.length > 1}
-                          stackLayout="dense"
-                          rowClassName={rowClassName}
-                          onRowClick={(dr) => setDetailTarget(dr)}
-                        />
-                      </div>
-                    </Panel>
-                  )}
-                </section>
-              )}
 
               {historyRows.length > 0 && (
                 <section aria-labelledby="mining-tax-history" className="space-y-2">
@@ -1801,7 +1823,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                       <DataTable
                         columns={historyColumns}
                         rows={historyRows}
-                        className="sm:table-fixed"
+                        // Months are sections here, not folded duplicates:
+                        // their entries line up with Open's, unindented.
+                        className="dt-flat-groups sm:table-fixed"
                         rowKey={(dr) => dr.key}
                         label={t('miningTax.sections.history')}
                         {...historySort}

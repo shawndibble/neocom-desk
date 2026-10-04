@@ -131,7 +131,7 @@ export function OwedBalances({
               </div>
             );
             return (
-              <Panel key={balance.payee.id} padded={false}>
+              <Panel key={balance.payee.id} padded={false} fill className="flex flex-col">
                 {wide ? (
                   <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-4">
                     <div className="min-w-0 flex-1 space-y-1">
@@ -145,21 +145,26 @@ export function OwedBalances({
                     {actions}
                   </div>
                 ) : (
-                  <div className="space-y-2 p-3">
+                  // Cards in a row share its height; the meta line and buttons
+                  // sit at the bottom, so they line up across cards whether a
+                  // Payee's name takes one line or two.
+                  <div className="flex flex-1 flex-col gap-2 p-3">
                     <div className="flex items-start gap-2">
                       {nameButton(balance)}
                       {amount(balance.owed, 'text-isk-neg')}
                     </div>
-                    {meta}
-                    {actions}
+                    <div className="mt-auto space-y-2">
+                      {meta}
+                      {actions}
+                    </div>
                   </div>
                 )}
               </Panel>
             );
           })}
           {unassigned.entryCount > 0 && (
-            <Panel padded={false} className="border-dashed">
-              <div className="space-y-2 p-3">
+            <Panel padded={false} fill className="flex flex-col border-dashed">
+              <div className="flex flex-1 flex-col gap-2 p-3">
                 <div className="flex items-start gap-2">
                   <span className="flex-1 text-base font-semibold text-warning">
                     {t('miningTax.unassignedCardTitle')}
@@ -167,18 +172,20 @@ export function OwedBalances({
                   {/* An unpriced day reads as "0 ISK", which looks like nothing to do. */}
                   {unassigned.estimatedValue > 0 && amount(unassigned.estimatedValue)}
                 </div>
-                <p className="text-xs text-text-dim">
-                  {t('miningTax.owed.unassignedHint', { count: unassigned.entryCount })}
-                </p>
-                <Button className="w-full" onClick={onAssignNext}>
-                  {t('miningTax.assignNextAction')}
-                </Button>
+                <div className="mt-auto space-y-2">
+                  <p className="text-xs text-text-dim">
+                    {t('miningTax.owed.unassignedHint', { count: unassigned.entryCount })}
+                  </p>
+                  <Button className="w-full" onClick={onAssignNext}>
+                    {t('miningTax.assignNextAction')}
+                  </Button>
+                </div>
               </div>
             </Panel>
           )}
           {unlinkedPaymentCount > 0 && (
-            <Panel padded={false} className="border-dashed">
-              <div className="space-y-2 p-3">
+            <Panel padded={false} fill className="flex flex-col border-dashed">
+              <div className="flex flex-1 flex-col gap-2 p-3">
                 <div className="flex items-start gap-2">
                   <span className="flex-1 text-base font-semibold">
                     {t('miningTax.unlinkedPaymentsCardTitle')}
@@ -187,10 +194,12 @@ export function OwedBalances({
                     {t('miningTax.unlinkedPaymentsCount', { count: unlinkedPaymentCount })}
                   </span>
                 </div>
-                <p className="text-xs text-text-dim">{t('miningTax.unlinkedPaymentsHint')}</p>
-                <Button className="w-full" onClick={onReviewPayments}>
-                  {t('miningTax.linkPaymentAction')}
-                </Button>
+                <div className="mt-auto space-y-2">
+                  <p className="text-xs text-text-dim">{t('miningTax.unlinkedPaymentsHint')}</p>
+                  <Button className="w-full" onClick={onReviewPayments}>
+                    {t('miningTax.linkPaymentAction')}
+                  </Button>
+                </div>
               </div>
             </Panel>
           )}

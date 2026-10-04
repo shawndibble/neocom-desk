@@ -917,6 +917,13 @@
     padding-left: 2rem;
   }
 
+  /* Opt-in (`dt-flat-groups` on the table, Mining Tax's History): groups that
+     are sections (a month) rather than folded duplicates. Their members keep
+     the card's own left inset, in line with the cards of the list above. */
+  .dt-stacked.dt-flat-groups tr.dt-group-member {
+    padding-left: 0.75rem;
+  }
+
   table:not(.dt-stacked) tr.dt-group-member > td:first-child {
     padding-left: 2rem;
   }
