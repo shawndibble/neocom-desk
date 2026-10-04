@@ -3615,6 +3615,7 @@
     "journalItemSold": "Sold {{quantity}} × {{unitPrice}} = {{total}}",
     "journalContractLink": "Contract →",
     "dailyGoal": "Daily goal",
+    "dailyGoalIdTitle": "Goal id {{id}}",
     "dailyGoalNames": {
       "712791": "Salvage 15 Wrecks",
       "1004953": "Complete 3 Jumps"

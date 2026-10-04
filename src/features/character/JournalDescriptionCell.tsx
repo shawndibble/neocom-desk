@@ -42,7 +42,12 @@ export function JournalDescriptionCell({
   const kills = useMemo(() => bountyKillsOf(entry), [entry]);
   const goalId = dailyGoalMessageIdOf(entry);
   if (goalId !== null) {
-    return <>{t(`wallet.dailyGoalNames.${goalId}`, { defaultValue: t('wallet.dailyGoal') })}</>;
+    const name = t(`wallet.dailyGoalNames.${goalId}`, { defaultValue: '' });
+    if (name) return <>{name}</>;
+    // An unnamed goal keeps its id on hover, so it can be added to the map.
+    return (
+      <span title={t('wallet.dailyGoalIdTitle', { id: goalId })}>{t('wallet.dailyGoal')}</span>
+    );
   }
   if (!transaction && !entry.reason && contractId === undefined) return <>{entry.description}</>;
   const fill = transaction

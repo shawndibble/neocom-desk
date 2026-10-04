@@ -64,6 +64,8 @@ describe('JournalDescriptionCell', () => {
     );
     expect(container).toHaveTextContent('Daily goal');
     expect(container).not.toHaveTextContent('697658');
+    // Kept on hover, so the goal can be named later.
+    expect(screen.getByTitle('Goal id 697658')).toBeInTheDocument();
   });
 
   it('shows a non-empty reason as a second line', () => {
