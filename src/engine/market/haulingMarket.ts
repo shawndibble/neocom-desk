@@ -25,6 +25,13 @@ import { roundPriceDown, undercutPrice } from './priceTick';
 export interface HaulingThresholds {
   /** Days of demand a load may lean on: the horizon a quantity and a "clearing price" are read over. */
   horizonDays: number;
+  /**
+   * The share of the horizon's unmet demand one hauler can realistically
+   * capture: other sellers undercut, and region volume includes trades a
+   * listing never sees. Bounds a lot on fast sellers, where a week of sales is
+   * more units than anyone moves in one trip.
+   */
+  ownShareOfDemand: number;
   /** The history window demand is read over. */
   historyDays: number;
   /** The recent-sale-price window. Falls back to the whole history window when nothing traded inside it. */
@@ -51,6 +58,7 @@ export interface HaulingThresholds {
  */
 export const HAULING_THRESHOLDS: HaulingThresholds = {
   horizonDays: 7,
+  ownShareOfDemand: 0.25,
   historyDays: 30,
   recentPriceDays: 7,
   minOrdersPerTradingDay: 2,
@@ -218,7 +226,7 @@ export interface SaleEstimate {
   dailyVolume: number;
   /** Days until those units plus a reference lot (one day's sales) have sold. */
   daysToSell: number;
-  /** Most units worth bringing: a week of sales less those ahead, never under 1. */
+  /** Most units worth bringing: `ownShareOfDemand` of a week's sales less those ahead, never under 1. */
   demandCapUnits: number;
 }
 
@@ -262,7 +270,10 @@ export function estimateSale(input: {
     unitsAhead,
     dailyVolume,
     daysToSell: (unitsAhead + referenceLot) / dailyVolume,
-    demandCapUnits: Math.max(1, Math.floor(horizonDemand - unitsAhead)),
+    demandCapUnits: Math.max(
+      1,
+      Math.floor(Math.max(0, horizonDemand - unitsAhead) * thresholds.ownShareOfDemand)
+    ),
   };
 }
 

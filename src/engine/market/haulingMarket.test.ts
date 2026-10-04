@@ -165,9 +165,11 @@ describe('estimateSale', () => {
     expect(e.daysToSell).toBeCloseTo(1);
   });
 
-  it('caps the units worth bringing at a week of sales minus those ahead, never below 1', () => {
-    const e = estimateSale({ ladder, dailyVolume: 5, recentSalePrice: 500 })!;
-    expect(e.demandCapUnits).toBe(5); // 35 - 30
+  it("caps the units worth bringing at a share of a week's sales minus those ahead, never below 1", () => {
+    const e = estimateSale({ ladder, dailyVolume: 20, recentSalePrice: 500 })!;
+    expect(e.demandCapUnits).toBe(27); // (140 - 30) * 0.25
+    const fast = estimateSale({ ladder, dailyVolume: 1_000_000, recentSalePrice: 500 })!;
+    expect(fast.demandCapUnits).toBe(1_750_000 - 8); // a quarter of a week, not all of it
     const thin = estimateSale({ ladder, dailyVolume: 0.1, recentSalePrice: 500 })!;
     expect(thin.demandCapUnits).toBe(1);
   });
