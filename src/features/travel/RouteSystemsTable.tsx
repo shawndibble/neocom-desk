@@ -20,8 +20,8 @@
  * A jump through a Thera / Turnur hole (issue #2476) is its own full-width
  * row between its two systems (`HoleStepRow`): where to warp, the signature
  * with Copy, size, life left and how old EVE-Scout's list is. Both systems
- * beside it never fold. A J-space system reads "—" for ESI's figures with
- * the reason, since ESI does not report wormhole space; zKillboard still
+ * beside it never fold. A J-space system reads "N/A" for ESI's figures with
+ * an info tip giving the reason, since ESI does not report wormhole space; zKillboard still
  * lists it.
  */
 import { useTranslation } from 'react-i18next';
@@ -30,6 +30,7 @@ import {
   Button,
   DataTable,
   DataTableDenseCell,
+  InfoTooltip,
   Tooltip,
   type DataTableColumn,
   type DataTableGroupBy,
@@ -98,8 +99,12 @@ function LastHour({ row }: { row: RouteSafetyRow }) {
   if (isWormholeSystem(row.systemId)) {
     return (
       <span className="inline-flex items-center gap-1.5 text-text-dim">
-        <span aria-hidden="true">{DASH}</span>
-        <span>{t('travel.wormholeSpace')}</span>
+        <span>{t('travel.notApplicable')}</span>
+        <InfoTooltip
+          glyph="info"
+          label={t('travel.wormholeSpace')}
+          content={t('travel.wormholeSpace')}
+        />
       </span>
     );
   }

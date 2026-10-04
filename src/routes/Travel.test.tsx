@@ -734,7 +734,10 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
     expect(firstCells[2]).toBe('Thera');
     expect(firstCells[3]).toContain('Warp to THR-002 in Thera');
     expect(firstCells[4]).toContain('Uedama');
-    expect(within(body[2]).getByText("ESI doesn't report wormhole space")).toBeInTheDocument();
+    expect(within(body[2]).getByText('N/A')).toBeInTheDocument();
+    expect(
+      within(body[2]).getByRole('button', { name: "ESI doesn't report wormhole space" })
+    ).toBeInTheDocument();
     expect(
       within(body[1]).getByRole('button', { name: 'Copy signature JIT-001 in Jita' })
     ).toBeInTheDocument();
