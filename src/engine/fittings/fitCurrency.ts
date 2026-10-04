@@ -11,10 +11,10 @@
  * typo, not a game change — Load still reports it). Missing data never makes
  * a fit out of date: with no slot counts for the hull, racks aren't counted.
  *
- * The loader resolves names against a catalogue that leaves out much of the
- * game — Abyssal filaments, LP boosters and mutated (Abyssal) modules among
- * them — so an item it can't read is only removed when the game's full list
- * of type names (`isGameItem`) doesn't have it either.
+ * The loader resolves names against a catalogue of what a fit can hold, not
+ * the whole game — mutaplasmids, PLEX, skill injectors and other cargo are
+ * left out — so an item it can't read is only removed when the game's full
+ * list of type names (`isGameItem`) doesn't have it either.
  */
 import type { LoadParts } from './load';
 import { FITTING_SLOT_KINDS, type FittingSlotKind } from './types';
