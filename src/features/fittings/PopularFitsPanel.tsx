@@ -12,7 +12,7 @@ import { loadFittingFromText } from './loadFittingFromText';
 import { usePopularFits } from './popularFits';
 import { RackIconStrip } from './RackIconStrip';
 import { useModuleNames } from './useModuleNames';
-import { VirtualFitList } from './VirtualFitList';
+import { FIT_ROW_CLASS, VirtualFitList } from './VirtualFitList';
 import { useWorkbenchFits, workbenchFitUrl, type WorkbenchFit } from './workbenchFits';
 import { useWorkbenchFitList } from './workbenchFitCurrency';
 import { useWorkbenchFitPrices } from './workbenchFitPrices';
@@ -96,10 +96,7 @@ function ZkillboardFits({
       ) : (
         <ul className={cx('space-y-1', capped && 'max-h-72 overflow-y-auto')}>
           {result.fits.map((fit, index) => (
-            <li
-              key={fit.key}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-line bg-panel px-2 py-1.5"
-            >
+            <li key={fit.key} className={FIT_ROW_CLASS}>
               <div className="min-w-0 flex-1">
                 <p className="text-sm">
                   {t('fittings.popular.losses', { count: fit.count })}
@@ -215,6 +212,7 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
           items={list.listed}
           itemKey={workbenchFitKey}
           estimateSize={WORKBENCH_ROW_ESTIMATE}
+          label={t('fittings.popular.tabWorkbench')}
           capped={capped}
           renderItem={(fit) => (
             <>

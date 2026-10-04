@@ -30,16 +30,23 @@ interface VirtualFitListProps<T> {
   itemKey: (item: T) => string;
   /** A first guess at one row's height, gap included; each row is then measured. */
   estimateSize: number;
+  /** The list's accessible name. */
+  label: string;
   /** Scroll in a fixed-height box, rather than letting the host scroll. */
   capped: boolean;
   renderItem: (item: T) => ReactNode;
 }
 
-/** The row box, shared by the windowed and plain shapes. */
-const ROW_CLASS =
+/** A fit row's box — here and on the zKillboard tab's rows, so the two tabs match. */
+export const FIT_ROW_CLASS =
   'flex flex-wrap items-center gap-x-3 gap-y-1 border border-line bg-panel px-2 py-1.5';
 
-/** The nearest ancestor that scrolls vertically, or `null` when only the page does. */
+/**
+ * The nearest ancestor that scrolls vertically, or `null` when only the page
+ * does. Read from computed `overflow-y`, which an `overflow-x`-only box also
+ * reports as `auto` — fine for today's hosts, whose only such box is the
+ * scrolling body itself.
+ */
 function scrollParentOf(element: Element): Element | null {
   for (let node = element.parentElement; node; node = node.parentElement) {
     const { overflowY } = getComputedStyle(node);
@@ -52,6 +59,7 @@ export function VirtualFitList<T>({
   items,
   itemKey,
   estimateSize,
+  label,
   capped,
   renderItem,
 }: VirtualFitListProps<T>) {
@@ -64,27 +72,34 @@ export function VirtualFitList<T>({
 
   // Uncapped: `undefined` until the list is in the DOM to look up from (no
   // rows yet, so the first commit never mounts the whole list); `null` when
-  // nothing but the page scrolls.
+  // nothing but the page scrolls. Looked up once per mount: the hosts don't
+  // change which element scrolls under a mounted list.
   const [scrollParent, setScrollParent] = useState<Element | null | undefined>(undefined);
   useLayoutEffect(() => {
     if (!capped && list) setScrollParent(scrollParentOf(list));
   }, [capped, list]);
 
-  // Where the list starts inside its scroll parent. Re-measured as whatever
-  // sits above it changes height — the pricing line comes and goes.
+  // Where the list starts inside its scroll parent's content. Re-measured
+  // whenever anything above it changes height — the pricing line comes and
+  // goes — which resizes one of the boxes between the list and its scroll
+  // parent, or the scroll parent's own content.
   const [scrollMargin, setScrollMargin] = useState(0);
   useLayoutEffect(() => {
     if (capped || !list || !scrollParent) return;
     const measure = () =>
       setScrollMargin(
         list.getBoundingClientRect().top -
-          scrollParent.getBoundingClientRect().top +
+          scrollParent.getBoundingClientRect().top -
+          scrollParent.clientTop +
           scrollParent.scrollTop
       );
     measure();
     window.addEventListener('resize', measure);
     const observer = new ResizeObserver(measure);
     for (const child of scrollParent.children) observer.observe(child);
+    for (let node = list.parentElement; node && node !== scrollParent; node = node.parentElement) {
+      observer.observe(node);
+    }
     return () => {
       window.removeEventListener('resize', measure);
       observer.disconnect();
@@ -115,9 +130,9 @@ export function VirtualFitList<T>({
   // No scrolling ancestor at all: the plain list.
   if (!capped && scrollParent === null) {
     return (
-      <ul className="space-y-1">
+      <ul aria-label={label} className="space-y-1">
         {items.map((item) => (
-          <li key={itemKey(item)} className={ROW_CLASS}>
+          <li key={itemKey(item)} className={FIT_ROW_CLASS}>
             {renderItem(item)}
           </li>
         ))}
@@ -128,6 +143,7 @@ export function VirtualFitList<T>({
   const rows = (
     <ul
       ref={listRef}
+      aria-label={label}
       className="relative"
       style={{ height: scrollElement ? virtualizer.getTotalSize() : 0 }}
     >
@@ -142,7 +158,7 @@ export function VirtualFitList<T>({
             className="absolute top-0 left-0 w-full pb-1"
             style={{ transform: `translateY(${virtualRow.start - margin}px)` }}
           >
-            <div className={ROW_CLASS}>{renderItem(items[virtualRow.index])}</div>
+            <div className={FIT_ROW_CLASS}>{renderItem(items[virtualRow.index])}</div>
           </li>
         ))}
     </ul>

@@ -479,6 +479,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
       const first = rowOf('Fit 1');
       expect(first.getAttribute('aria-posinset')).toBe('1');
       expect(first.getAttribute('aria-setsize')).toBe('80');
+      expect(first.parentElement).toBe(screen.getByRole('list', { name: 'EVE Workbench' }));
       expect(screen.queryByRole('link', { name: 'Fit 80' })).toBeNull();
     });
 
