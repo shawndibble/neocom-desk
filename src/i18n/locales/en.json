@@ -6516,7 +6516,8 @@
           "miningHistory": "90 days of mining ledger, longer than the 30 EVE returns.",
           "login": "Your EVE login token.",
           "loginNote": "It never leaves this device.",
-          "preferences": "Display settings (text size, time format) and the sorts, filters and sections each page remembers."
+          "preferences": "Display settings (text size, time format) and the sorts, filters and sections each page remembers.",
+          "ansiblex": "Route Safety's Ansiblex jump gate list, and whether Route Safety uses it. Structure access is private alliance information, so it never leaves this device."
         },
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
@@ -7418,7 +7419,8 @@
         "gates": "Gates only",
         "thera": "Via Thera",
         "turnur": "Via Turnur",
-        "hole": "Pinned hole via {{hub}}"
+        "hole": "Pinned hole via {{hub}}",
+        "ansiblex": "Via Ansiblex"
       },
       "inUse": "In use",
       "use": "Use for this leg",
@@ -7428,6 +7430,11 @@
       "nullsec": "{{count}} nullsec",
       "passes": "passes {{names}}",
       "hole": "{{from}} → {{to}}",
+      "bridge": "Ansiblex · {{from}} → {{to}}",
+      "noBridges": "no gates known",
+      "findBridges": "Find with a character",
+      "or": "or",
+      "pasteBridges": "paste a list",
       "compare": "compare",
       "hide": "hide",
       "phoneLine": "{{way}}: {{jumps}}",
@@ -7438,7 +7445,8 @@
         "no-hole": "No open {{hub}} hole fits the hole settings, so this leg flies the planner's pick.",
         "no-route": "The pinned way doesn't reach {{to}}, so this leg flies the planner's pick.",
         "no-list-off": "Route through Thera / Turnur is off, so the pinned way can't be checked. This leg flies the planner's pick.",
-        "no-list-unavailable": "EVE-Scout couldn't be reached, so the pinned way can't be checked. This leg flies the planner's pick."
+        "no-list-unavailable": "EVE-Scout couldn't be reached, so the pinned way can't be checked. This leg flies the planner's pick.",
+        "no-bridge": "Use jump bridges is off or no Ansiblex is known, so this leg flies the planner's pick."
       },
       "pickDestination": "Add a stop to fly there through the pinned wormhole."
     },
@@ -7546,7 +7554,53 @@
       "noChokepoints": "no Gank Chokepoints",
       "byGate": "{{count}} by gate",
       "throughHoles_one": "{{count}} through a wormhole",
-      "throughHoles_other": "{{count}} through wormholes"
+      "throughHoles_other": "{{count}} through wormholes",
+      "overBridges_one": "{{count}} over an Ansiblex",
+      "overBridges_other": "{{count}} over Ansiblex"
+    },
+    "bridges": {
+      "enabled": "Use jump bridges",
+      "chip": "Bridges",
+      "chipValue_one": "{{count}} gate",
+      "chipValue_other": "{{count}} gates",
+      "manage_one": "{{count}} Ansiblex known · Manage",
+      "manage_other": "{{count}} Ansiblex known · Manage",
+      "ansiblex": "Ansiblex",
+      "ends": "{{from}} → {{to}}",
+      "title": "Ansiblex jump gates",
+      "localOnly": "Kept on this device only. Never synced and never sent anywhere: structure access is private to your alliance.",
+      "searchTitle": "Find with a character",
+      "searchHint": "Each character's structure search finds only the gates that character can use, so search with each one.",
+      "noCharacters": "Add a character to search for gates.",
+      "find": "Find gates",
+      "findLabel": "Find gates with {{character}}",
+      "searching": "Searching…",
+      "searchFailed": "The search couldn't be run. Try again later, or paste a list.",
+      "found_one": "Found {{count}} gate.",
+      "found_other": "Found {{count}} gates.",
+      "foundUnknown": "Skipped gates to systems this app doesn't know: {{names}}.",
+      "needsGrant": "needs the structure search permission",
+      "grant": "Grant",
+      "pasteTitle": "Paste a list",
+      "pasteLabel": "Ansiblex gates, one per line",
+      "pastePlaceholder": "One gate per line: SYS1 » SYS2, or the full in-game name",
+      "pasteAdd": "Add gates",
+      "pasteAdded_one": "Added {{count}} gate.",
+      "pasteAdded_other": "Added {{count}} gates.",
+      "pasteError": {
+        "format": "Line {{line}}: “{{text}}” doesn't read as SYS1 » SYS2.",
+        "unknown": "Line {{line}}: no system named {{names}}.",
+        "same-system": "Line {{line}}: “{{text}}” joins a system to itself.",
+        "not-nullsec": "Line {{line}}: {{names}} isn't in nullsec, where Ansiblex stand."
+      },
+      "known_one": "{{count}} gate known",
+      "known_other": "{{count}} gates known",
+      "none": "No gates known yet.",
+      "pasted": "pasted",
+      "foundBy": "found by {{names}}",
+      "unknownCharacter": "character {{id}}",
+      "remove": "Remove",
+      "removeLabel": "Remove {{name}}"
     },
     "waypoints": {
       "action": "Set waypoints in game",

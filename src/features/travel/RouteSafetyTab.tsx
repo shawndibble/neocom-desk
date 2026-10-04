@@ -36,6 +36,12 @@
  *
  * Set waypoints in game (issue #2479) closes the facts line (`SetWaypoints`).
  *
+ * Ansiblex (issue #2478): with Use jump bridges on (a device-local default,
+ * overridable in the link as `jb`), the gates in this device's Ansiblex list
+ * join the route as one-jump connections, each crossing its own row, and
+ * each leg may list Via Ansiblex. The list is found with a character's
+ * structure search or pasted (`AnsiblexGatesDialog`).
+ *
  * Ways to fly each leg (issue #2477): beside each leg's rows, gates only and
  * the way through each hub with a qualifying hole, with facts side by side
  * (`LegWays`). Use for this leg pins one in the link (`pin`), and a Thera /
@@ -60,10 +66,13 @@ import {
   useRouteHoleShipSize,
 } from '@/features/route/routeHoleSettings';
 import { useAvoidedSystemsEnabled, useRouteQuery } from '@/features/route/routeRules';
+import { useRouteBridgeQuery, useRouteBridgesEnabled } from '@/features/route/routeBridgeSettings';
 import { useSolarSystemIndex, useSystemName } from '@/features/route/useSolarSystems';
 import { useUrlParams } from '@/lib/useUrlState';
+import { AnsiblexGatesDialog, type AnsiblexDialogMode } from './AnsiblexGatesDialog';
+import { useAnsiblexGates } from './ansiblexGates';
 import { AvoidSystemDialog, type AvoidTarget } from './AvoidSystemDialog';
-import { LegBody } from './LegWays';
+import { LegBody, type LegWaysProps } from './LegWays';
 import { RouteRulesPanel, type RouteHoleChange } from './RouteRulesPanel';
 import { RouteStrip } from './RouteStrip';
 import { RouteSystemsTable, type HoleRowProps } from './RouteSystemsTable';
@@ -117,18 +126,28 @@ interface AvoidLeg {
 }
 
 /**
- * The route's facts on one line: jumps (by gate · through wormholes, when a
- * hole is flown) · bands · lowest · last hour's kills · chokepoints.
+ * The route's facts on one line: jumps (by gate · through wormholes · over
+ * Ansiblex, when a hole or bridge is flown) · bands · lowest · last hour's
+ * kills · chokepoints.
  */
-function RouteFacts({ summary, holeJumps }: { summary: RouteSafetySummary; holeJumps: number }) {
+function RouteFacts({
+  summary,
+  holeJumps,
+  bridgeJumps,
+}: {
+  summary: RouteSafetySummary;
+  holeJumps: number;
+  bridgeJumps: number;
+}) {
   const { t } = useTranslation();
   const facts: string[] = [
     t('travel.summary.jumps', { count: summary.jumps }),
-    ...(holeJumps === 0
+    ...(holeJumps === 0 && bridgeJumps === 0
       ? []
       : [
-          t('travel.summary.byGate', { count: summary.jumps - holeJumps }),
-          t('travel.summary.throughHoles', { count: holeJumps }),
+          t('travel.summary.byGate', { count: summary.jumps - holeJumps - bridgeJumps }),
+          ...(holeJumps === 0 ? [] : [t('travel.summary.throughHoles', { count: holeJumps })]),
+          ...(bridgeJumps === 0 ? [] : [t('travel.summary.overBridges', { count: bridgeJumps })]),
         ]),
     t('travel.summary.bands', {
       highsec: summary.highsec,
@@ -195,6 +214,12 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
   const holesState = useRouteHoles(holeQuery);
   const holes = holesState.kind === 'ready' ? holesState.holes : NO_HOLES;
   const listed = holesState.kind === 'ready' ? holesState.listed : null;
+  const bridgeQuery = useRouteBridgeQuery(params.jb);
+  const gateRecords = useAnsiblexGates();
+  // `null` while the switch is off; held off too until the switch and the list are read.
+  const bridges =
+    bridgeQuery.enabled && bridgeQuery.hydrated && gateRecords !== undefined ? gateRecords : null;
+  const [bridgeDialog, setBridgeDialog] = useState<AnsiblexDialogMode | null>(null);
   const state = useRouteSafety(
     fromId,
     stops,
@@ -206,7 +231,8 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
     routeQuery,
     holes,
     params.pin,
-    listed
+    listed,
+    bridges
   );
   const pinLeg = (index: number, pin: string | null) => {
     const next = [...params.pin];
@@ -308,6 +334,15 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
               saveHoleDefault(change);
               setParams({ [HOLE_PARAM[change.field]]: null });
             }}
+            bridges={{
+              bridgeQuery,
+              onBridgesChange: (enabled) => {
+                void useRouteBridgesEnabled.getState().setValue(enabled);
+                setParams({ jb: null });
+              },
+              bridgeCount: gateRecords?.length ?? 0,
+              onManageBridges: () => setBridgeDialog('list'),
+            }}
           />
         </div>
         <div className="min-w-0 space-y-4">
@@ -320,6 +355,8 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
             holesState={holesState}
             pinned={params.pin.some((token) => token !== '')}
             onUse={pinLeg}
+            bridges={bridges === null ? 'off' : bridges.length === 0 ? 'none' : 'known'}
+            onSetUpBridges={setBridgeDialog}
           />
         </div>
       </div>
@@ -335,6 +372,13 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
           onClose={() => setAvoidTarget(null)}
         />
       )}
+      {bridgeDialog !== null && (
+        <AnsiblexGatesDialog
+          mode={bridgeDialog}
+          systems={systems}
+          onClose={() => setBridgeDialog(null)}
+        />
+      )}
     </div>
   );
 }
@@ -348,6 +392,8 @@ function RouteBody({
   holesState,
   pinned,
   onUse,
+  bridges,
+  onSetUpBridges,
 }: {
   state: ReturnType<typeof useRouteSafety>;
   multiStop: boolean;
@@ -358,7 +404,7 @@ function RouteBody({
   /** A leg is pinned: an incomplete route asks for the stop a Route via link left open. */
   pinned: boolean;
   onUse: (index: number, pin: string | null) => void;
-}) {
+} & Pick<LegWaysProps, 'bridges' | 'onSetUpBridges'>) {
   const { t } = useTranslation();
   switch (state.kind) {
     case 'incomplete':
@@ -385,19 +431,26 @@ function RouteBody({
       const onlyLeg = state.legs[0];
       const holeRows: HoleRowProps = {
         holeAt: state.holeAt,
+        bridgeAt: state.bridgeAt,
         holesFetchedAt: holesState.kind === 'ready' ? holesState.fetchedAt : null,
         now: holesState.kind === 'ready' ? holesState.now : 0,
       };
       const ways = {
         now: holesState.kind === 'ready' ? holesState.now : 0,
         holes: holesState.kind,
+        bridges,
+        onSetUpBridges,
       };
       return (
         <Panel>
           <div className="space-y-3">
             {trip && (
-              <SetWaypoints legs={state.legs} nameOf={nameOf}>
-                <RouteFacts summary={trip.summary} holeJumps={trip.holeJumps} />
+              <SetWaypoints legs={state.legs} nameOf={nameOf} bridgeAt={state.bridgeAt}>
+                <RouteFacts
+                  summary={trip.summary}
+                  holeJumps={trip.holeJumps}
+                  bridgeJumps={trip.bridgeJumps}
+                />
               </SetWaypoints>
             )}
             {trip && (

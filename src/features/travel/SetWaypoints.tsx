@@ -25,11 +25,11 @@ import {
 import { db } from '@/db';
 import type { EsiEndpointId } from '@/esi/registry';
 import type { TripLeg } from '@/engine/route/tripPlan';
-import { stargateHopKind, waypointSequence, type WaypointSequence } from '@/engine/route/waypoints';
+import { bridgeHopKind, waypointSequence, type WaypointSequence } from '@/engine/route/waypoints';
 import { loadJumpGraph } from '@/sde/jumpGraph';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { setWaypointsInGame } from './sendWaypoints';
-import type { RouteSafetyLeg } from './useRouteSafety';
+import type { BridgeAt, RouteSafetyLeg } from './useRouteSafety';
 
 const ENDPOINTS: readonly EsiEndpointId[] = ['postAutopilotWaypoint'];
 
@@ -46,18 +46,29 @@ function tripLegsOf(legs: readonly RouteSafetyLeg[]): TripLeg[] {
   }));
 }
 
-/** The waypoints to send, read off the plain stargate graph; `null` when it can't be read. */
-async function sequenceOf(legs: readonly RouteSafetyLeg[]): Promise<WaypointSequence | null> {
+/**
+ * The waypoints to send, read off the plain stargate graph and the route's
+ * known bridges (issue #2478); `null` when the graph can't be read.
+ */
+async function sequenceOf(
+  legs: readonly RouteSafetyLeg[],
+  bridgeAt: BridgeAt
+): Promise<WaypointSequence | null> {
   const gates = await loadJumpGraph().catch(() => undefined);
-  return gates ? waypointSequence(tripLegsOf(legs), stargateHopKind(gates)) : null;
+  return gates ? waypointSequence(tripLegsOf(legs), bridgeHopKind(gates, bridgeAt)) : null;
 }
+
+const NO_BRIDGES: BridgeAt = () => null;
 
 export function SetWaypoints({
   legs,
   nameOf,
+  bridgeAt = NO_BRIDGES,
   children,
 }: {
   legs: readonly RouteSafetyLeg[];
+  /** The Ansiblex a step crosses: a bridge hop cuts the waypoints, named as a bridge. */
+  bridgeAt?: BridgeAt;
   nameOf: (systemId: number) => string;
   /** The facts line the button closes. */
   children: ReactNode;
@@ -84,7 +95,7 @@ export function SetWaypoints({
     setSending(true);
     setOutcome(null);
     try {
-      const sequence = await sequenceOf(legs);
+      const sequence = await sequenceOf(legs, bridgeAt);
       if (sequence === null) {
         setOutcome({ tone: 'alert', text: t('travel.waypoints.noMap') });
         return;

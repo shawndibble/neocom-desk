@@ -8,9 +8,11 @@ import {
   legWays,
   parseLegPin,
   pinnedLegRoute,
+  routeOverBridges,
   routeThroughHoles,
 } from './legWays';
-import { stargateHopKind, waypointSequence } from './waypoints';
+import { bridgeConnections, bridgeStepFinder, type AnsiblexGate } from './ansiblex';
+import { bridgeHopKind, stargateHopKind, waypointSequence } from './waypoints';
 
 /**
  *   START ─ W1 ─ W2 ─ W3 ─ W4 ─ END          the gate way, five jumps
@@ -283,5 +285,106 @@ describe('pinnedLegRoute', () => {
     expect(pinnedLegRoute(GRAPH, START, ISLAND, { kind: 'gates' }, NETWORK, lists)).toEqual({
       kind: 'no-route',
     });
+  });
+});
+
+/**
+ *   W1 ═ W4        an Ansiblex: START ─ W1 ═ W4 ─ END is three jumps
+ */
+const BRIDGE: AnsiblexGate = { fromId: W1, toId: W4, name: 'W1 » W4 - Bridge' };
+const BY_BRIDGE = [START, W1, W4, END];
+
+describe('routeOverBridges', () => {
+  it('flies the leg by gates and bridges, leaving the holes out', () => {
+    expect(routeOverBridges(GRAPH, START, END, [BRIDGE], NETWORK)).toEqual({
+      kind: 'route',
+      systems: BY_BRIDGE,
+    });
+  });
+
+  it('is no-route when no bridge is crossed: that is the gate way, not a way over bridges', () => {
+    const offTheWay: AnsiblexGate = { fromId: F1, toId: FAR, name: 'F1 » FAR' };
+    expect(routeOverBridges(GRAPH, START, END, [offTheWay], {})).toEqual({ kind: 'no-route' });
+    expect(routeOverBridges(GRAPH, START, END, [], {})).toEqual({ kind: 'no-route' });
+  });
+});
+
+describe('legWays with bridges', () => {
+  it('lists Via Ansiblex after the hubs when a bridge flies the leg', () => {
+    const options = { ...NETWORK, extraConnections: [...NETWORK.extraConnections, [W1, W4]] };
+    expect(
+      legWays(GRAPH, START, END, options as typeof NETWORK, ALL_HOLES, [BRIDGE]).map(
+        (way) => way.way
+      )
+    ).toEqual(['gates', 'thera', 'turnur', 'ansiblex']);
+  });
+
+  it('keeps gates only by stargate alone, even when the planner may cross bridges', () => {
+    const [gates] = legWays(
+      GRAPH,
+      START,
+      END,
+      { extraConnections: bridgeConnections([BRIDGE]) },
+      [],
+      [BRIDGE]
+    );
+    expect(gates).toEqual({ way: 'gates', route: { kind: 'route', systems: BY_GATE } });
+  });
+
+  it('leaves Via Ansiblex out when no bridge is on the way', () => {
+    expect(legWays(GRAPH, START, END, {}, [], []).map((way) => way.way)).toEqual(['gates']);
+  });
+});
+
+describe('ansiblex pins', () => {
+  it('reads and writes ansiblex as its own pin, never a hole id', () => {
+    expect(parseLegPin('ansiblex')).toEqual({ kind: 'ansiblex' });
+    expect(legPinToken({ kind: 'ansiblex' })).toBe('ansiblex');
+  });
+
+  it('flies an ansiblex pin over the bridges', () => {
+    expect(
+      pinnedLegRoute(
+        GRAPH,
+        START,
+        END,
+        { kind: 'ansiblex' },
+        {},
+        {
+          qualifying: [],
+          listed: [],
+          bridges: [BRIDGE],
+        }
+      )
+    ).toEqual({ kind: 'route', systems: BY_BRIDGE, hole: null });
+  });
+
+  it('says so when no gate is known, or none is on the way', () => {
+    const pin = { kind: 'ansiblex' } as const;
+    expect(pinnedLegRoute(GRAPH, START, END, pin, {}, { qualifying: [], listed: [] })).toEqual({
+      kind: 'no-bridge',
+    });
+    expect(
+      pinnedLegRoute(
+        GRAPH,
+        START,
+        ISLAND,
+        pin,
+        {},
+        {
+          qualifying: [],
+          listed: [],
+          bridges: [BRIDGE],
+        }
+      )
+    ).toEqual({ kind: 'no-route' });
+  });
+
+  it('cuts the waypoints at the bridge’s entrance, as a bridge', () => {
+    const sequence = waypointSequence(
+      [{ from: START, to: END, route: { kind: 'route', systems: BY_BRIDGE } }],
+      bridgeHopKind(GRAPH, bridgeStepFinder(GRAPH, [BRIDGE]))
+    );
+    expect(sequence.cutOff).toEqual({ entrance: W1, exit: W4, kind: 'bridge' });
   });
 });

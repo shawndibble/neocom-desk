@@ -9,6 +9,9 @@
  * stargate graph is never touched, so Set waypoints still reads the hole
  * jump as a non-gate hop and cuts the waypoints at its entrance.
  *
+ * Via Ansiblex (issue #2478): the leg by stargates and the known bridges,
+ * no holes. Bridges are per-search connections too, never in the graph.
+ *
  * Facts only (decision `20260912-172628`): the ways are listed side by side,
  * never ranked as better or worse.
  */
@@ -21,6 +24,7 @@ import {
   type JumpRouteResult,
   type RouteSweep,
 } from './jumpRoute';
+import { bridgeConnections, type AnsiblexGate } from './ansiblex';
 import { holeNetwork, type HoleEnds } from './routeHoles';
 import { HUB_SYSTEM_IDS, type TheraHub } from './theraConnections';
 
@@ -122,9 +126,33 @@ export function routeThroughHoles(
   return found ? { kind: 'route', systems: found.systems } : { kind: 'no-route' };
 }
 
-/** One way to fly a leg: by gates alone, or the cheapest way through a hub. */
+/**
+ * The cheapest route from `from` to `to` by stargate and the known bridges,
+ * holes left out — or `no-route` when it crosses no bridge, since that is the
+ * gate way, not a way over bridges.
+ */
+export function routeOverBridges(
+  graph: JumpGraph,
+  from: number,
+  to: number,
+  bridges: readonly AnsiblexGate[],
+  options: FindJumpRouteOptions
+): JumpRouteResult {
+  if (bridges.length === 0) return { kind: 'no-route' };
+  const route = findJumpRoute(graph, from, to, {
+    ...gatesOnlyOptions(options),
+    extraConnections: bridgeConnections(bridges),
+  });
+  if (route.kind !== 'route') return route;
+  const crossesBridge = route.systems.some(
+    (id, index) => index > 0 && !graph.get(route.systems[index - 1])?.includes(id)
+  );
+  return crossesBridge ? route : { kind: 'no-route' };
+}
+
+/** One way to fly a leg: by gates alone, the cheapest way through a hub, or over the bridges. */
 export interface LegWay {
-  way: 'gates' | TheraHub;
+  way: 'gates' | TheraHub | 'ansiblex';
   route: JumpRouteResult;
 }
 
@@ -133,14 +161,16 @@ const HUBS: readonly TheraHub[] = ['thera', 'turnur'];
 /**
  * Every way to fly a leg: gates only, always — even when no gate route flies
  * it, which is itself the fact to show — then each hub with a qualifying hole
- * whose way through actually reaches. `options` are the planner's, holes and all.
+ * whose way through actually reaches, then Via Ansiblex when a known bridge
+ * is on the way. `options` are the planner's, holes and all.
  */
 export function legWays(
   graph: JumpGraph,
   from: number,
   to: number,
   options: FindJumpRouteOptions,
-  holes: readonly HoleEnds[]
+  holes: readonly HoleEnds[],
+  bridges: readonly AnsiblexGate[] = []
 ): LegWay[] {
   const ways: LegWay[] = [
     { way: 'gates', route: findJumpRoute(graph, from, to, gatesOnlyOptions(options)) },
@@ -151,12 +181,17 @@ export function legWays(
     const route = routeThroughHoles(graph, from, to, hubHoles, options);
     if (route.kind === 'route') ways.push({ way: hub, route });
   }
+  const overBridges = routeOverBridges(graph, from, to, bridges, options);
+  if (overBridges.kind === 'route') ways.push({ way: 'ansiblex', route: overBridges });
   return ways;
 }
 
-/** How a pilot pinned a leg (`gates` | `thera` | `turnur` | an EVE-Scout hole id). */
+/** How a pilot pinned a leg (`gates` | `thera` | `turnur` | `ansiblex` | an EVE-Scout hole id). */
 export type LegPin =
-  { kind: 'gates' } | { kind: 'hub'; hub: TheraHub } | { kind: 'hole'; id: string };
+  | { kind: 'gates' }
+  | { kind: 'hub'; hub: TheraHub }
+  | { kind: 'hole'; id: string }
+  | { kind: 'ansiblex' };
 
 /**
  * A pin read from its link token, or `null` for a token that names nothing.
@@ -165,6 +200,7 @@ export type LegPin =
 export function parseLegPin(token: string): LegPin | null {
   if (token === 'gates') return { kind: 'gates' };
   if (token === 'thera' || token === 'turnur') return { kind: 'hub', hub: token };
+  if (token === 'ansiblex') return { kind: 'ansiblex' };
   return /^[\w-]{1,40}$/.test(token) ? { kind: 'hole', id: token } : null;
 }
 
@@ -177,6 +213,8 @@ export function legPinToken(pin: LegPin): string {
       return pin.hub;
     case 'hole':
       return pin.id;
+    case 'ansiblex':
+      return 'ansiblex';
   }
 }
 
@@ -184,7 +222,9 @@ export function legPinToken(pin: LegPin): string {
  * A pinned leg's route, or why it cannot be flown that way:
  * - `no-hole`: a hub pin, and that hub has no qualifying hole;
  * - `closed`: a hole pin, and EVE-Scout no longer lists that hole open;
- * - `no-route`: the pinned way does not reach the leg's far end.
+ * - `no-bridge`: an ansiblex pin, and no Ansiblex is known;
+ * - `no-route`: the pinned way does not reach the leg's far end (for an
+ *   ansiblex pin, also when no known bridge is on the way).
  *
  * `qualifying` are the holes the filters allow; `listed` every open hole
  * EVE-Scout lists. A pinned hole is looked up in the second: the pilot chose
@@ -194,6 +234,7 @@ export type PinnedLegRoute<T extends PinnableHole> =
   | { kind: 'route'; systems: number[]; hole: T | null }
   | { kind: 'no-hole' }
   | { kind: 'closed' }
+  | { kind: 'no-bridge' }
   | { kind: 'no-route' };
 
 export function pinnedLegRoute<T extends PinnableHole>(
@@ -202,7 +243,7 @@ export function pinnedLegRoute<T extends PinnableHole>(
   to: number,
   pin: LegPin,
   options: FindJumpRouteOptions,
-  lists: { qualifying: readonly T[]; listed: readonly T[] }
+  lists: { qualifying: readonly T[]; listed: readonly T[]; bridges?: readonly AnsiblexGate[] }
 ): PinnedLegRoute<T> {
   let route: JumpRouteResult;
   let hole: T | null = null;
@@ -220,6 +261,12 @@ export function pinnedLegRoute<T extends PinnableHole>(
       hole = lists.listed.find((candidate) => candidate.id === pin.id) ?? null;
       if (hole === null) return { kind: 'closed' };
       route = routeThroughHoles(graph, from, to, [hole], options);
+      break;
+    }
+    case 'ansiblex': {
+      const bridges = lists.bridges ?? [];
+      if (bridges.length === 0) return { kind: 'no-bridge' };
+      route = routeOverBridges(graph, from, to, bridges, options);
       break;
     }
   }

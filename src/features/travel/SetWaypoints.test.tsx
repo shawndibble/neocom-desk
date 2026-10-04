@@ -5,7 +5,7 @@ import '@/i18n';
 import { db } from '@/db';
 import type { JumpGraph } from '@/engine/route/jumpRoute';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import type { RouteSafetyLeg } from './useRouteSafety';
+import type { BridgeAt, RouteSafetyLeg } from './useRouteSafety';
 
 const postAutopilotWaypointMock = vi.hoisted(() => vi.fn());
 vi.mock('@/esi/endpoints', () => ({ postAutopilotWaypoint: postAutopilotWaypointMock }));
@@ -61,9 +61,9 @@ async function seed(characters: { id: number; name: string; scopes: string[] }[]
   }
 }
 
-function show(legs: RouteSafetyLeg[]) {
+function show(legs: RouteSafetyLeg[], bridgeAt?: BridgeAt) {
   render(
-    <SetWaypoints legs={legs} nameOf={(id) => NAMES.get(id) ?? String(id)}>
+    <SetWaypoints legs={legs} nameOf={(id) => NAMES.get(id) ?? String(id)} bridgeAt={bridgeAt}>
       <span>facts</span>
     </SetWaypoints>
   );
@@ -115,6 +115,24 @@ describe('SetWaypoints', () => {
     expect(postAutopilotWaypointMock.mock.calls).toEqual([
       [ONE, UEDAMA, { clearOtherWaypoints: true }],
     ]);
+  });
+
+  it('sets waypoints only to a bridge entrance, naming it a bridge', async () => {
+    await seed([{ id: ONE, name: 'Pilot One', scopes: [WAYPOINT_SCOPE] }]);
+    // A stand-in Ansiblex from Uedama: the step is a bridge, not a hole.
+    const bridgeAt: BridgeAt = (from, to) =>
+      from === UEDAMA && to === THERA ? { fromId: UEDAMA, toId: THERA, name: 'gate' } : null;
+    show([leg(JITA, PERIMETER, UEDAMA, THERA)], bridgeAt);
+
+    const button = await screen.findByRole('button', { name: 'Set waypoints in game' });
+    await waitFor(() => expect(button).toBeEnabled());
+    await userEvent.click(button);
+
+    expect(
+      await screen.findByText(
+        'Waypoints set to Uedama. Take the bridge there, then set the rest from Thera. Your client plans the path to Uedama with its own settings.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('disables the button for a Character without the scope, with a way to grant it', async () => {

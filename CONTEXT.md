@@ -487,7 +487,7 @@ here — they go one per file in `docs/context/decisions/`.
   link in the order typed. Optimize stop order may fly them in a cheaper
   order under the active route rules; the typed order stays as written.
 - **Leg**: one route of a trip, by stargate (and, with **Hole jumps** on,
-  through Thera / Turnur holes), from its start or a **Stop** to the
+  through Thera / Turnur holes; with Use jump bridges on, over **Ansiblex**), from its start or a **Stop** to the
   next stop (and, with Return to start, the last stop home). Route Safety
   lists a trip leg by leg, each with its own jumps, lowest security and
   **Gank Chokepoints**; the facts line and **Route strip** cover the whole
@@ -497,14 +497,19 @@ here — they go one per file in `docs/context/decisions/`.
   Shown as its own row between those two systems and as a hatched **Route
   strip** cell. How it is costed and where it applies: decision
   `20261003-181618`.
+- **Ansiblex**: an alliance-built jump gate between two nullsec systems,
+  named "SYS1 » SYS2 - …" in game. Route Safety may route over the ones in
+  this device's list — found by a character's structure search or pasted —
+  each as one jump, shown as its own row. Decision `20261003-204009`.
 - **Way to fly**: one way a **Leg** can be flown, listed beside its rows:
   Gates only (always), Via Thera / Via Turnur (when that hub has a
-  qualifying hole), the planner's pick when it differs, and a **Pinned way**.
+  qualifying hole), Via Ansiblex (with Use jump bridges on, when a known
+  gate is on the way), the planner's pick when it differs, and a **Pinned way**.
   Each states jumps, lowest security, lowsec / nullsec counts and the
   **Gank Chokepoints** it passes — facts side by side, never ranked.
 - **Pinned way**: the **Way to fly** a pilot chose for one **Leg** with
   "Use for this leg", kept in the link (`pin`, by leg position): `gates`,
-  `thera`, `turnur` or an EVE-Scout hole id. A pin that cannot be flown (its
+  `thera`, `turnur`, `ansiblex` or an EVE-Scout hole id. A pin that cannot be flown (its
   hole closed, its hub has no qualifying hole) is reported on the leg, and
   the planner's pick flies it. Route via on a Thera / Turnur row opens Route
   Safety with that hole pinned for the first leg.
