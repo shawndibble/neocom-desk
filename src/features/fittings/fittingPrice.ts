@@ -12,28 +12,15 @@
  * per-item row, only the fit-wide `totals.buy`/`totals.sell`.
  */
 import { buildAppraisal, type Appraisal } from '@/engine/market/appraisal';
+import { FULL_PRICE_PERCENT, fitAppraisalItems } from '@/engine/fittings/fitSellPrice';
 import { getHubPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
 import { fittingItemCounts } from '@/engine/fittings/fittingExport';
 import type { Fitting } from '@/engine/fittings/types';
 
-const FULL_PRICE_PERCENT = 100;
-
 export async function loadFittingPrice(fitting: Fitting, hub: TradeHub): Promise<Appraisal> {
   const counts = fittingItemCounts(fitting);
-  const typeIds = [...counts.keys()];
-  const prices = await getHubPrices(hub, typeIds);
-
-  const items = typeIds.map((typeId) => {
-    const aggregate = prices.get(typeId);
-    return {
-      typeId,
-      name: String(typeId),
-      quantity: counts.get(typeId) ?? 0,
-      buy: aggregate?.buyMax ?? null,
-      sell: aggregate?.sellMin ?? null,
-    };
-  });
-
-  return buildAppraisal(items, FULL_PRICE_PERCENT);
+  const prices = await getHubPrices(hub, [...counts.keys()]);
+  // The same items an EVE Workbench row is priced from (`fitSellPrice.ts`).
+  return buildAppraisal(fitAppraisalItems(counts, prices), FULL_PRICE_PERCENT);
 }

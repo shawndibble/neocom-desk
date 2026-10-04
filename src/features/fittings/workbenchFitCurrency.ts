@@ -12,7 +12,8 @@
  * hiding fits on a guess would be worse than not marking them.
  *
  * The same pass keeps the modules it loaded (issue #2493), so a row can draw
- * its racks without parsing the EFT a second time.
+ * its racks without parsing the EFT a second time — and the whole fit's item
+ * counts, so the row's price (`workbenchFitPrices.ts`) needs no parse either.
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -27,6 +28,8 @@ import {
   type EftSlotLookup,
   type EftTypeLookup,
 } from '@/engine/fittings/eftLoader';
+import { fittingItemCounts } from '@/engine/fittings/fittingExport';
+import type { ItemCount } from '@/engine/fittings/fitSellPrice';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import type { RackModule } from '@/engine/fittings/types';
 import { loadFittingSlots, loadShipTree } from '@/sde/loadSde';
@@ -44,6 +47,12 @@ export interface CurrencyGameData {
 export interface WorkbenchFitCheck {
   verdict: FitCurrency;
   modules: readonly RackModule[];
+  /**
+   * `[typeId, quantity]` for everything that loaded — hull, modules, charges,
+   * drones, fighters, cargo — tallied as the Price section tallies a Fitting.
+   * Empty when the hull didn't load.
+   */
+  items: readonly ItemCount[];
 }
 
 const CHUNK_SIZE = 25;
@@ -86,6 +95,19 @@ function cachedCheck(
     // Rack and type only: the cache spans every hull's fits, and a row draws no more.
     modules:
       parts.hullTypeId === null ? [] : parts.modules.map(({ slot, typeId }) => ({ slot, typeId })),
+    items:
+      parts.hullTypeId === null
+        ? []
+        : [
+            ...fittingItemCounts({
+              name: '',
+              shipTypeId: parts.hullTypeId,
+              modules: parts.modules,
+              drones: parts.drones,
+              cargo: parts.cargo,
+              fighters: parts.fighters,
+            }),
+          ],
   };
   checkCache.set(fit.id, { eft: fit.eft, check });
   return check;
@@ -158,6 +180,8 @@ export function useWorkbenchFitCurrency(
 export interface WorkbenchFitList {
   /** Still checking: nothing is listed yet, so an out-of-date fit never shows unasked. */
   checking: boolean;
+  /** Every fit's check, out-of-date ones too; `null` while checking. */
+  checks: ReadonlyMap<string, WorkbenchFitCheck> | null;
   listed: WorkbenchFit[];
   /** Why a listed fit is out of date; `undefined` for a current one. */
   reasonsFor: (id: string) => OutOfDateReason[] | undefined;
@@ -201,6 +225,7 @@ export function useWorkbenchFitList(fits: readonly WorkbenchFit[] | null): Workb
   const checking = fits !== null && verdicts === null;
   return {
     checking,
+    checks,
     listed: checking
       ? []
       : showOutOfDate

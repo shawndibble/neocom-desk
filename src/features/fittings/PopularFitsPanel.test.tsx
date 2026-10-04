@@ -1,15 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@/i18n';
 import type { PopularFit } from '@/engine/fittings/popularFits';
 import type { PopularFitsResult } from './popularFits';
 import type { WorkbenchFit, WorkbenchFitsResult } from './workbenchFits';
 
-const { usePopularFitsMock, useWorkbenchFitsMock, loadFittingFromTextMock } = vi.hoisted(() => ({
-  usePopularFitsMock: vi.fn(),
-  useWorkbenchFitsMock: vi.fn(),
-  loadFittingFromTextMock: vi.fn(),
-}));
+const { usePopularFitsMock, useWorkbenchFitsMock, loadFittingFromTextMock, getHubPricesMock } =
+  vi.hoisted(() => ({
+    usePopularFitsMock: vi.fn(),
+    useWorkbenchFitsMock: vi.fn(),
+    loadFittingFromTextMock: vi.fn(),
+    getHubPricesMock: vi.fn(),
+  }));
+vi.mock('@/market/prices', () => ({ getHubPrices: getHubPricesMock }));
+// The synced Default Trade Hub, as a plain store a test can switch.
+vi.mock('@/features/market/hub', async () => {
+  const { create } = await import('zustand');
+  return {
+    useMarketHub: create<{ value: string; hydrate: () => Promise<void> }>(() => ({
+      value: 'jita',
+      hydrate: () => Promise.resolve(),
+    })),
+  };
+});
 vi.mock('./popularFits', () => ({ usePopularFits: usePopularFitsMock }));
 vi.mock('./workbenchFits', () => ({
   useWorkbenchFits: useWorkbenchFitsMock,
@@ -45,6 +58,7 @@ vi.mock('@/features/skills/typeCatalog', () => ({
     ),
 }));
 
+import { useMarketHub } from '@/features/market/hub';
 import { PopularFitsPanel } from './PopularFitsPanel';
 
 function fit(key: string, count: number, extra: Partial<PopularFit> = {}): PopularFit {
@@ -155,6 +169,8 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     usePopularFitsMock.mockReset().mockReturnValue({ ok: true, fits: [] });
     useWorkbenchFitsMock.mockReset();
     loadFittingFromTextMock.mockReset();
+    getHubPricesMock.mockReset().mockResolvedValue(new Map());
+    useMarketHub.setState({ value: 'jita' });
   });
 
   function wbFit(id: string, extra: Partial<WorkbenchFit> = {}): WorkbenchFit {
@@ -182,13 +198,13 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     expect(useWorkbenchFitsMock).not.toHaveBeenCalled();
   });
 
-  it('lists fits with name, author and date added, linking each to Workbench', async () => {
+  it('lists fits with name and date added, no author, linking each to Workbench', async () => {
     openWorkbench({ ok: true, fits: [wbFit('a'), wbFit('b', { name: '', authorName: '' })] });
     const link = await screen.findByRole('link', { name: 'Fit a' });
     expect(link.getAttribute('href')).toBe('https://eveworkbench.com/fit/a');
-    expect(screen.getByText('by Saryna Dach · added 2d ago')).toBeTruthy();
+    expect(screen.getAllByText('added 2d ago')).toHaveLength(2);
+    expect(screen.queryByText(/Saryna Dach/)).toBeNull();
     expect(screen.getByRole('link', { name: 'Unnamed fit' })).toBeTruthy();
-    expect(screen.getByText('by unknown pilot · added 2d ago')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'eveworkbench.com' })).toBeTruthy();
   });
 
@@ -308,5 +324,101 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     expect(screen.queryByRole('link', { name: 'Fit a' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Show 1 out-of-date fit' }));
     expect(screen.getByRole('link', { name: 'Fit a' })).toBeTruthy();
+  });
+
+  /** Sell-side prices by type, as `getHubPrices` answers. */
+  function sellPrices(entries: Record<number, number | null>) {
+    return new Map(
+      Object.entries(entries).map(([typeId, sellMin]) => [
+        Number(typeId),
+        { sellMin, buyMax: null, sellVolume: 0, buyVolume: 0 },
+      ])
+    );
+  }
+
+  function rowOf(name: string) {
+    const row = screen.getByRole('link', { name }).closest('li');
+    if (row === null) throw new Error('no row');
+    return row;
+  }
+
+  const PRICED_FITS = [
+    wbFit('a', { eft: '[Vexor, Fit a]\nHeavy Neutron Blaster II' }),
+    wbFit('b', { eft: '[Vexor, Fit b]' }),
+  ];
+
+  it("prices each fit at the Default Trade Hub, with one price lookup for the hull's fits", async () => {
+    getHubPricesMock.mockResolvedValue(sellPrices({ 626: 200_000_000, 3001: 45_000_000 }));
+    openWorkbench({ ok: true, fits: PRICED_FITS });
+    expect(
+      await screen.findByText(
+        'Prices: what each fit costs to buy today from sell orders at Jita, your default Trade Hub — not the loss value zKillboard reports.'
+      )
+    ).toBeTruthy();
+    expect(within(rowOf('Fit a')).getByText('≈ 245M ISK')).toBeTruthy();
+    expect(within(rowOf('Fit b')).getByText('≈ 200M ISK')).toBeTruthy();
+    expect(getHubPricesMock).toHaveBeenCalledTimes(1);
+    expect(getHubPricesMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'jita' }),
+      [626, 3001]
+    );
+  });
+
+  it('marks a total partial when an item has no sell order, rather than pricing it at 0', async () => {
+    getHubPricesMock.mockResolvedValue(sellPrices({ 626: 200_000_000, 3001: null }));
+    openWorkbench({ ok: true, fits: PRICED_FITS });
+    expect(
+      await within(await waitFor(() => rowOf('Fit a'))).findByText(
+        '≥ 200M ISK · 1 item has no sell order at Jita'
+      )
+    ).toBeTruthy();
+    expect(within(rowOf('Fit b')).getByText('≈ 200M ISK')).toBeTruthy();
+  });
+
+  it('shows no price, and no error, when prices cannot load', async () => {
+    getHubPricesMock.mockRejectedValue(new Error('offline'));
+    openWorkbench({ ok: true, fits: PRICED_FITS });
+    await screen.findByRole('link', { name: 'Fit a' });
+    await waitFor(() => expect(getHubPricesMock).toHaveBeenCalled());
+    expect(screen.queryByText(/ISK/)).toBeNull();
+    expect(screen.queryByText(/^Prices:/)).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('shows no price for a fit with nothing for sale at the hub', async () => {
+    getHubPricesMock.mockResolvedValue(sellPrices({ 626: null, 3001: null }));
+    openWorkbench({ ok: true, fits: PRICED_FITS });
+    await screen.findByRole('link', { name: 'Fit a' });
+    await waitFor(() => expect(getHubPricesMock).toHaveBeenCalled());
+    expect(screen.queryByText(/ISK/)).toBeNull();
+  });
+
+  it('prices an out-of-date fit for whatever loaded', async () => {
+    getHubPricesMock.mockResolvedValue(sellPrices({ 626: 200_000_000, 3001: 45_000_000 }));
+    openWorkbench({
+      ok: true,
+      fits: [wbFit('a', { eft: '[Vexor, Fit a]\nOld Gun I\nHeavy Neutron Blaster II' })],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Show 1 out-of-date fit' }));
+    expect(await within(rowOf('Fit a')).findByText('≈ 245M ISK')).toBeTruthy();
+  });
+
+  it('re-prices the rows when the Default Trade Hub changes', async () => {
+    getHubPricesMock.mockImplementation((hub: { id: string }) =>
+      Promise.resolve(
+        hub.id === 'amarr'
+          ? sellPrices({ 626: 250_000_000, 3001: 50_000_000 })
+          : sellPrices({ 626: 200_000_000, 3001: 45_000_000 })
+      )
+    );
+    openWorkbench({ ok: true, fits: PRICED_FITS });
+    expect(await screen.findByText('≈ 245M ISK')).toBeTruthy();
+    act(() => useMarketHub.setState({ value: 'amarr' }));
+    expect(await within(rowOf('Fit a')).findByText('≈ 300M ISK')).toBeTruthy();
+    expect(screen.getByText(/sell orders at Amarr, your default Trade Hub/)).toBeTruthy();
+    expect(getHubPricesMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 'amarr' }),
+      [626, 3001]
+    );
   });
 });

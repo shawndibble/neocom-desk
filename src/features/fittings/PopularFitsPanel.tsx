@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Spinner, Tabs } from '@/components/ui';
+import type { FitSellPrice } from '@/engine/fittings/fitSellPrice';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { popularFitLoad } from '@/engine/fittings/popularFits';
 import { formatAge } from '@/lib/age';
@@ -13,6 +14,7 @@ import { RackIconStrip } from './RackIconStrip';
 import { useModuleNames } from './useModuleNames';
 import { useWorkbenchFits, workbenchFitUrl, type WorkbenchFit } from './workbenchFits';
 import { useWorkbenchFitList } from './workbenchFitCurrency';
+import { useWorkbenchFitPrices } from './workbenchFitPrices';
 import { OutOfDateReasons, OutOfDateToggle } from './WorkbenchOutOfDate';
 import { useWorkbenchSightings } from './workbenchSightings';
 import { WorkbenchSightingBadge } from './WorkbenchSightingBadge';
@@ -145,6 +147,8 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
   // Each fit's modules come from that same check (issue #2493): no second parse.
   const names = useModuleNames(list.moduleTypeIds);
   const sightings = useWorkbenchSightings(shipTypeId, result?.ok ? result.fits : null);
+  // Priced from that same check too, at the Default Trade Hub.
+  const prices = useWorkbenchFitPrices(list.checks);
   const now = useNow();
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [failedId, setFailedId] = useState<string | null>(null);
@@ -177,6 +181,11 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
           eveworkbench.com
         </a>
       </p>
+      {result?.ok && prices.anyPriced && (
+        <p className="text-xs text-text-dim">
+          {t('fittings.popular.workbench.priceNote', { hub: prices.hub.systemName })}
+        </p>
+      )}
       {result === null ? (
         <Spinner size="sm" delayMs={200} label={t('fittings.popular.workbench.loading')} />
       ) : !result.ok ? (
@@ -202,11 +211,14 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
                   {fit.name || t('fittings.popular.workbench.unnamed')}
                 </a>
                 <p className="text-xs text-text-dim">
-                  {t('fittings.popular.workbench.byline', {
-                    author: fit.authorName || t('fittings.popular.workbench.unknownAuthor'),
+                  {t('fittings.popular.workbench.added', {
                     age: formatAge(Math.max(0, now - fit.dateAdded), t),
                   })}
                 </p>
+                <WorkbenchFitPrice
+                  price={prices.priceFor(fit.id)}
+                  hubName={prices.hub.systemName}
+                />
                 <RackIconStrip modules={list.modulesFor(fit.id) ?? []} names={names} />
                 <OutOfDateReasons reasons={list.reasonsFor(fit.id)} />
                 <WorkbenchSightingBadge sighting={sightings.get(fit.id)} />
@@ -229,5 +241,29 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
       )}
       {result?.ok && <OutOfDateToggle list={list} />}
     </>
+  );
+}
+
+/** A Workbench row's price at the Default Trade Hub; nothing while loading or with nothing priced. */
+function WorkbenchFitPrice({
+  price,
+  hubName,
+}: {
+  price: FitSellPrice | undefined;
+  hubName: string;
+}) {
+  const { t } = useTranslation();
+  if (price === undefined) return null;
+  const value = formatIskCompact(price.sell);
+  return (
+    <p className="text-xs tabular-nums">
+      {price.partial
+        ? t('fittings.popular.workbench.pricePartial', {
+            value,
+            count: price.unpricedTypes,
+            hub: hubName,
+          })
+        : t('fittings.popular.workbench.price', { value })}
+    </p>
   );
 }
