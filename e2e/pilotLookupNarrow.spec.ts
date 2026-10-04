@@ -31,12 +31,12 @@ const TASH_MURKON_PRIME = 30001671;
 const LONG_CORPORATION_NAME = 'Federation Navy Academy Reserve Division';
 const RIFTER = 587;
 
-const NAMES: Record<number, string> = {
-  [VICTIM_ID]: VICTIM_NAME,
-  [VICTIM_CORPORATION_ID]: 'Victim Corp',
-  [TASH_MURKON_PRIME]: 'Tash-Murkon Prime',
-  [CORPORATION_ID]: LONG_CORPORATION_NAME,
-  [ALLIANCE_ID]: ALLIANCE_NAME,
+const NAMES: Record<number, { name: string; category: string }> = {
+  [VICTIM_ID]: { name: VICTIM_NAME, category: 'character' },
+  [VICTIM_CORPORATION_ID]: { name: 'Victim Corp', category: 'corporation' },
+  [TASH_MURKON_PRIME]: { name: 'Tash-Murkon Prime', category: 'solar_system' },
+  [CORPORATION_ID]: { name: LONG_CORPORATION_NAME, category: 'corporation' },
+  [ALLIANCE_ID]: { name: ALLIANCE_NAME, category: 'alliance' },
 };
 
 const KILL = {
@@ -86,7 +86,10 @@ async function mockPilot(page: Page) {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(
-          ids.map((id) => ({ id, name: NAMES[id] ?? `Unknown ${id}`, category: 'character' }))
+          ids.map((id) => ({
+            id,
+            ...(NAMES[id] ?? { name: `Unknown ${id}`, category: 'character' }),
+          }))
         ),
       });
     }
@@ -117,9 +120,10 @@ test.describe('Pilot Lookup at 390px', () => {
     const alliance = page.getByRole('button', { name: ALLIANCE_NAME });
     const corpBox = await corporation.boundingBox();
     const allianceBox = await alliance.boundingBox();
-    expect(corpBox?.height).toBeGreaterThanOrEqual(44);
-    expect(allianceBox?.height).toBeGreaterThanOrEqual(44);
-    expect(corpBox!.y + corpBox!.height).toBeLessThanOrEqual(allianceBox!.y);
+    if (corpBox === null || allianceBox === null) throw new Error('org links not laid out');
+    expect(corpBox.height).toBeGreaterThanOrEqual(44);
+    expect(allianceBox.height).toBeGreaterThanOrEqual(44);
+    expect(corpBox.y + corpBox.height).toBeLessThanOrEqual(allianceBox.y);
 
     await expectNoPageOverflow(page);
   });
@@ -128,6 +132,7 @@ test.describe('Pilot Lookup at 390px', () => {
     await page.setViewportSize(DESKTOP);
     await openPilot(page);
 
+    // One line is ~32px (py-1.5 around a 20px icon); a wrapped name would make it ~56px.
     const rowBox = await killmailRow(page).boundingBox();
     expect(rowBox?.height).toBeLessThan(40);
     const corpBox = await page.getByRole('button', { name: LONG_CORPORATION_NAME }).boundingBox();
