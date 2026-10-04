@@ -2,4 +2,6 @@
 
 _Recorded 2026-10-04 · issue #2541._
 
-- **<Decision>.** <Why, and what it rules out.>
+- **A Build Group's "Use all" / "Use none" now answer with the same toast and Undo a Build Plan's do.** "Use all" overwrites a typed Have whenever the row's own "Use assets" offer would, and the owned-stock offer only accepts that because the caller confirms with Undo. The Group Owned Overlay was the one caller without it, so a click there could wipe hand-typed counts with no way back. Both pages now use the same `useOwnedStockBulk` hook, so the two can't drift apart again.
+- **"Use none" still stores each store's own empty count: a 0 in plan sourcing, a removed entry in the Group Owned Overlay.** The owned-stock offer says "to 0", and each adapter writes that the way its store has always written an empty count (the overlay has never held a 0). Both read as "nothing owned" and the next "Use all" refills both the same way, so unifying them would change stored data and change nothing the player sees.
+- **Blueprint Acquisition rows are now outside "Use all".** That row never shows "Use assets", so bulk no longer fills it either (the suspected bug in #2538). "Use none" still reaches every row, a blueprint row included, so a value an earlier "Use all" wrote there can still be cleared.
