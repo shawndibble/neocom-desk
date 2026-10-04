@@ -276,7 +276,8 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
             fromId={fromId}
             fromName={fromId === null ? fromTrigger : nameOf(fromId)}
             fromTrigger={fromTrigger}
-            onFromChange={(systemId) => setParams({ from: systemId }, { push: true })}
+            // A new start is a new first leg: its pin no longer applies.
+            onFromChange={(systemId) => setParams({ from: systemId, pin: [] }, { push: true })}
             stops={stops}
             onStopsChange={(next) =>
               setParams(
@@ -389,8 +390,7 @@ function RouteBody({
       };
       const ways = {
         now: holesState.kind === 'ready' ? holesState.now : 0,
-        holesOff: holesState.kind === 'off',
-        holesLoading: holesState.kind === 'loading',
+        holes: holesState.kind,
       };
       return (
         <Panel>

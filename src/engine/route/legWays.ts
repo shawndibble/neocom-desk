@@ -57,7 +57,7 @@ function withoutHole(options: FindJumpRouteOptions, hole: HoleEnds): FindJumpRou
 }
 
 /** A route that never visits a system twice: anything else is a detour, not a way. */
-function simple(systems: readonly number[]): boolean {
+function visitsEachOnce(systems: readonly number[]): boolean {
   return new Set(systems).size === systems.length;
 }
 
@@ -88,7 +88,7 @@ export function routeThroughHoles(
 
   let best: { systems: number[]; cost: number } | null = null;
   const consider = (systems: number[] | null) => {
-    if (systems === null || !simple(systems)) return;
+    if (systems === null || !visitsEachOnce(systems)) return;
     const cost = routeCost(graph, systems, forced);
     if (cost < (best?.cost ?? Number.POSITIVE_INFINITY)) best = { systems, cost };
   };

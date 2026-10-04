@@ -19,6 +19,7 @@ import { textActionClassName } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
 import { useIsPhone } from '@/lib/useIsPhone';
+import type { RouteHolesState } from './useRouteHoles';
 import type { RouteSafetyLeg, RouteSafetyWay } from './useRouteSafety';
 
 const badgeClassName =
@@ -65,8 +66,8 @@ function WayBox({
     if (summary.lowestSecurity !== null) {
       facts.push(t('travel.summary.lowest', { security: summary.lowestSecurity.toFixed(1) }));
     }
-    if (summary.lowsec > 0) facts.push(t('travel.ways.lowsec', { count: summary.lowsec }));
-    if (summary.nullsec > 0) facts.push(t('travel.ways.nullsec', { count: summary.nullsec }));
+    facts.push(t('travel.ways.lowsec', { count: summary.lowsec }));
+    facts.push(t('travel.ways.nullsec', { count: summary.nullsec }));
     if (summary.chokepoints.length > 0) {
       facts.push(t('travel.ways.passes', { names: summary.chokepoints.join(', ') }));
     }
@@ -147,22 +148,15 @@ export interface LegWaysProps {
   multiStop: boolean;
   nameOf: (systemId: number) => string;
   now: number;
-  /** Hole jumps are off: the panel says how to compare ways through a hole. */
-  holesOff: boolean;
-  /** The hole list is still loading: a pin waiting on it is not reported yet. */
-  holesLoading: boolean;
+  /**
+   * Where the hole list stands: off, the panel says how to compare ways
+   * through a hole; loading, a pin waiting on it is not reported yet.
+   */
+  holes: RouteHolesState['kind'];
   onUse: (pin: string | null) => void;
 }
 
-function LegWaysPanel({
-  leg,
-  number,
-  multiStop,
-  nameOf,
-  now,
-  holesOff,
-  onUse,
-}: Omit<LegWaysProps, 'holesLoading'>) {
+function LegWaysPanel({ leg, number, multiStop, nameOf, now, holes, onUse }: LegWaysProps) {
   const { t } = useTranslation();
   const ends = { number, from: nameOf(leg.from), to: nameOf(leg.to) };
   return (
@@ -183,7 +177,7 @@ function LegWaysPanel({
           />
         ))}
       </ul>
-      {holesOff && <p className="text-sm text-text-dim">{t('travel.ways.holesHint')}</p>}
+      {holes === 'off' && <p className="text-sm text-text-dim">{t('travel.ways.holesHint')}</p>}
     </section>
   );
 }
@@ -192,11 +186,13 @@ function LegWaysPanel({
 function PhoneLine({
   leg,
   number,
+  nameOf,
   open,
   onToggle,
 }: {
   leg: RouteSafetyLeg;
   number: number;
+  nameOf: (systemId: number) => string;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -217,7 +213,7 @@ function PhoneLine({
           way: label(way),
           jumps: way.summary
             ? t('travel.legs.jumps', { count: way.summary.jumps })
-            : t('travel.ways.noRoute', { to: '…' }),
+            : t('travel.ways.noRoute', { to: nameOf(leg.to) }),
         })}
       </span>
       <Dot />
@@ -237,11 +233,14 @@ export function LegBody({ children, ...props }: LegWaysProps & { children: React
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const [open, setOpen] = useState(false);
-  const { leg, holesLoading, holesOff, nameOf } = props;
+  const { leg, holes, nameOf } = props;
+  // A pin waiting on the hole list: said once the list is off or unreachable, not while it loads.
+  const noteKey =
+    leg.pinNote === 'no-list' ? (holes === 'loading' ? null : `no-list-${holes}`) : leg.pinNote;
   const note =
-    leg.pinNote === null || (leg.pinNote === 'holes-off' && holesLoading)
+    noteKey === null
       ? null
-      : t(`travel.ways.pinNote.${leg.pinNote}`, {
+      : t(`travel.ways.pinNote.${noteKey}`, {
           to: nameOf(leg.to),
           hub: t(`travel.thera.hub.${leg.pin === 'turnur' ? 'turnur' : 'thera'}`),
         });
@@ -259,13 +258,14 @@ export function LegBody({ children, ...props }: LegWaysProps & { children: React
               <PhoneLine
                 leg={leg}
                 number={props.number}
+                nameOf={nameOf}
                 open={open}
                 onToggle={() => setOpen((was) => !was)}
               />
-              {open && <LegWaysPanel {...props} holesOff={holesOff} />}
+              {open && <LegWaysPanel {...props} />}
             </>
           ) : (
-            <LegWaysPanel {...props} holesOff={holesOff} />
+            <LegWaysPanel {...props} />
           )}
         </div>
         <div className="min-w-0">{children}</div>

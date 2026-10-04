@@ -82,7 +82,7 @@ export interface RouteSafetyWay {
 }
 
 /** Why a leg's pin is not what it is flown by. */
-export type LegPinNote = 'closed' | 'no-hole' | 'no-route' | 'holes-off';
+export type LegPinNote = 'closed' | 'no-hole' | 'no-route' | 'no-list';
 
 /** One Leg of the trip: its rows and facts, or `null` for both when no stargate route flies it. */
 export interface RouteSafetyLeg {
@@ -324,7 +324,7 @@ export function useRouteSafety(
     const pinnedHoles = resolved.alternatives.flatMap(({ pinned }) => {
       const hole =
         pinned?.kind === 'route' && pinned.hole ? listedById?.get(pinned.hole.id) : undefined;
-      return hole && !holes.includes(hole) ? [hole] : [];
+      return hole && !holes.some((qualifying) => qualifying.id === hole.id) ? [hole] : [];
     });
     const holeAt: HoleAt = holeStepFinder(graph, [...holes, ...pinnedHoles]);
     // One stop is the page as it always was: no route is the whole answer.
@@ -357,7 +357,7 @@ export function useRouteSafety(
       const pin = parseLegPin(token);
       let pinNote: LegPinNote | null = null;
       if (pin !== null && pinned === null && pin.kind !== 'gates' && listed === null) {
-        pinNote = 'holes-off';
+        pinNote = 'no-list';
       } else if (pinned !== null && pinned.kind !== 'route') {
         pinNote = pinned.kind;
       }
@@ -378,10 +378,15 @@ export function useRouteSafety(
           systems: way.route.kind === 'route' ? way.route.systems : null,
         });
       }
+      // The pinned hole never hides a hub's own way: both stay listed.
       const distinct = candidates.filter(
         (candidate, at) =>
           candidate.systems === null ||
-          !candidates.slice(0, at).some((earlier) => sameRoute(earlier.systems, candidate.systems))
+          !candidates
+            .slice(0, at)
+            .some(
+              (earlier) => earlier.kind !== 'hole' && sameRoute(earlier.systems, candidate.systems)
+            )
       );
       if (
         planner !== null &&

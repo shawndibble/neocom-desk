@@ -7392,7 +7392,8 @@
         "closed": "The pinned wormhole has closed or is no longer on EVE-Scout's list, so this leg flies the planner's pick.",
         "no-hole": "No open {{hub}} hole fits the hole settings, so this leg flies the planner's pick.",
         "no-route": "The pinned way doesn't reach {{to}}, so this leg flies the planner's pick.",
-        "holes-off": "Route through Thera / Turnur is off, so the pinned way can't be checked. This leg flies the planner's pick."
+        "no-list-off": "Route through Thera / Turnur is off, so the pinned way can't be checked. This leg flies the planner's pick.",
+        "no-list-unavailable": "EVE-Scout couldn't be reached, so the pinned way can't be checked. This leg flies the planner's pick."
       },
       "pickDestination": "Add a stop to fly there through the pinned wormhole."
     },

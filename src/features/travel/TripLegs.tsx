@@ -34,7 +34,7 @@ export function TripLegs({
   killsOf: (systemId: number) => RouteKillsCell;
   avoidAction: (leg: RouteSafetyLeg, row: RouteSafetyRow) => (() => void) | null;
   holes?: HoleRowProps;
-  ways: Pick<LegWaysProps, 'now' | 'holesOff' | 'holesLoading'>;
+  ways: Pick<LegWaysProps, 'now' | 'holes'>;
   /** Pins a way for the leg at `index`; `null` un-pins it. */
   onUse: (index: number, pin: string | null) => void;
 }) {

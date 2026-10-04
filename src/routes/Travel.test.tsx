@@ -780,7 +780,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
       expect(inUse).toHaveTextContent('Thera → Uedama');
       expect(inUse).toHaveTextContent('fits Medium');
       expect(gates).toHaveTextContent(/^Gates only4 j/);
-      expect(gates).toHaveTextContent('lowest 0.5');
+      expect(gates).toHaveTextContent('lowest 0.5·0 lowsec·0 nullsec');
       expect(gates).toHaveTextContent('passes Uedama');
       expect(
         within(inUse).queryByRole('button', { name: /^Use .* for leg 1$/ })
@@ -831,6 +831,18 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
         )
       ).toBeInTheDocument();
       expect(summary().getByText('4 jumps')).toBeInTheDocument();
+    });
+
+    it('says EVE-Scout could not be reached for a pinned hole, never that the switch is off', async () => {
+      server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => new HttpResponse(null, { status: 503 })));
+      visit(`?from=${JITA}&to=${UEDAMA}&wh=1&pin=uedama`);
+
+      expect(
+        await screen.findByText(
+          "EVE-Scout couldn't be reached, so the pinned way can't be checked. This leg flies the planner's pick."
+        )
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/Route through Thera \/ Turnur is off/)).toBeNull();
     });
 
     it('opens a Route via link asking for a stop, then flies the pinned hole', async () => {
