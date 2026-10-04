@@ -37,6 +37,36 @@ describe('JournalDescriptionCell', () => {
     expect(container.querySelector('div')).toBeNull();
   });
 
+  it("names a daily goal payout's goal instead of printing its message id", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <JournalDescriptionCell
+          entry={entry({ ref_type: 'daily_goal_payouts', description: '-', reason: '1004953' })}
+          transaction={undefined}
+          itemName=""
+        />
+      </MemoryRouter>
+    );
+    // The goal's name replaces both ESI's `-` description and the bare id.
+    expect(container.textContent).toBe('Complete 3 Jumps');
+  });
+
+  it('falls back to a plain label for a daily goal it has no name for', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <JournalDescriptionCell
+          entry={entry({ ref_type: 'daily_goal_payouts', description: '-', reason: '999' })}
+          transaction={undefined}
+          itemName=""
+        />
+      </MemoryRouter>
+    );
+    expect(container).toHaveTextContent('Daily goal');
+    expect(container).not.toHaveTextContent('999');
+    // Kept on hover, so the goal can be named later.
+    expect(screen.getByTitle('Goal id 999')).toBeInTheDocument();
+  });
+
   it('shows a non-empty reason as a second line', () => {
     render(
       <MemoryRouter>
