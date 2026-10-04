@@ -1948,6 +1948,9 @@ export function BpcSourcingPanel() {
                 // and a sort picker, since the header row it would sort from
                 // is gone. The cap above follows that same sort.
                 stackLayout="dense"
+                // Line one's title and price centre on the ⋮ button instead
+                // of riding the top of its 44px touch target.
+                className="dt-dense-tight"
                 mobileSort
                 stackSummary={
                   displayRows.length > shownRows.length
