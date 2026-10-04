@@ -34,16 +34,18 @@ import {
   isWormholeSystem,
   type RouteSafetyRow,
 } from '@/engine/route/routeSafety';
+import { BridgeStepLine, type BridgeStep } from './BridgeStepLine';
 import { HoleStepLine, type HoleStep } from './HoleStepLine';
 import { RecentKillsCell, RecentKillsDetail } from './RecentKillsCell';
 import { routeSystemName } from './routeSystemName';
 import type { RouteKillsCell } from './useRouteKills';
-import type { HoleAt } from './useRouteSafety';
+import type { BridgeAt, HoleAt } from './useRouteSafety';
 
-type TableRow = RouteSafetyRow | HoleStep;
+type TableRow = RouteSafetyRow | HoleStep | BridgeStep;
 
-function isHoleStep(row: TableRow): row is HoleStep {
-  return 'hole' in row;
+/** A hole or bridge jump: its own full-width row, not a system. */
+function isHoleStep(row: TableRow): row is HoleStep | BridgeStep {
+  return 'hole' in row || 'bridge' in row;
 }
 
 /** A system column, drawn only for system rows — a hole row is one full-width cell. */
@@ -57,13 +59,21 @@ function systemColumn(column: DataTableColumn<RouteSafetyRow>): DataTableColumn<
   };
 }
 
-/** The route's systems in order, with each hole jump as its own row between its two. */
-function withHoleSteps(rows: readonly RouteSafetyRow[], holeAt: HoleAt): TableRow[] {
+/** The route's systems in order, with each hole or bridge jump as its own row between its two. */
+function withHoleSteps(
+  rows: readonly RouteSafetyRow[],
+  holeAt: HoleAt,
+  bridgeAt: BridgeAt
+): TableRow[] {
   const out: TableRow[] = [];
   rows.forEach((row, index) => {
     const previous = rows[index - 1];
-    const hole = previous ? holeAt(previous.systemId, row.systemId) : null;
-    if (previous && hole) out.push({ from: previous, to: row, hole });
+    if (previous) {
+      const hole = holeAt(previous.systemId, row.systemId);
+      const bridge = hole ? null : bridgeAt(previous.systemId, row.systemId);
+      if (hole) out.push({ from: previous, to: row, hole });
+      else if (bridge) out.push({ from: previous, to: row, bridge });
+    }
     out.push(row);
   });
   return out;
@@ -203,11 +213,14 @@ function RowDetail({ row, cell }: { row: RouteSafetyRow; cell: RouteKillsCell })
 }
 
 const GATES_ONLY: HoleAt = () => null;
+const NO_BRIDGES: BridgeAt = () => null;
 
-/** What a table needs to draw hole rows (issue #2476); a gate-only route passes none. */
+/** What a table needs to draw hole (issue #2476) and bridge (issue #2478) rows; a gate-only route passes none. */
 export interface HoleRowProps {
   /** The hole a step crosses, or `null` for a stargate jump. */
   holeAt?: HoleAt;
+  /** The Ansiblex a step crosses, or `null`. */
+  bridgeAt?: BridgeAt;
   /** When EVE-Scout's list was read, for each hole row's age. */
   holesFetchedAt?: Date | null;
   /** The clock a hole's remaining life is read against. */
@@ -220,6 +233,7 @@ export function RouteSystemsTable({
   avoidAction,
   label,
   holeAt = GATES_ONLY,
+  bridgeAt = NO_BRIDGES,
   holesFetchedAt = null,
   now = 0,
 }: {
@@ -232,8 +246,8 @@ export function RouteSystemsTable({
 } & HoleRowProps) {
   const { t } = useTranslation();
   const columns = useColumns(killsOf, avoidAction);
-  const tableRows = withHoleSteps(rows, holeAt);
-  // Both ends of a hole jump stay in view beside it.
+  const tableRows = withHoleSteps(rows, holeAt, bridgeAt);
+  // Both ends of a hole or bridge jump stay in view beside it.
   const pinned = new Set(
     tableRows.flatMap((row) => (isHoleStep(row) ? [row.from.systemId, row.to.systemId] : []))
   );
@@ -275,13 +289,19 @@ export function RouteSystemsTable({
       columns={columns}
       rows={tableRows}
       rowKey={(row) =>
-        isHoleStep(row) ? `hole:${row.from.systemId}-${row.to.systemId}` : String(row.systemId)
+        isHoleStep(row)
+          ? `${'hole' in row ? 'hole' : 'bridge'}:${row.from.systemId}-${row.to.systemId}`
+          : String(row.systemId)
       }
       label={label}
       stackLayout="dense"
       groupBy={groupBy}
       fullWidthRow={(row) =>
-        isHoleStep(row) ? <HoleStepLine step={row} fetchedAt={holesFetchedAt} now={now} /> : null
+        !isHoleStep(row) ? null : 'hole' in row ? (
+          <HoleStepLine step={row} fetchedAt={holesFetchedAt} now={now} />
+        ) : (
+          <BridgeStepLine step={row} />
+        )
       }
       rowClassName={(row) => (isHoleStep(row) ? 'bg-panel-2' : undefined)}
       expandableRow={{

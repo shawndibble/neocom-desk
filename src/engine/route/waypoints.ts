@@ -37,6 +37,22 @@ export function stargateHopKind(gates: JumpGraph): (from: number, to: number) =>
 }
 
 /**
+ * Hop kinds with the known Ansiblex (issue #2478): a step a stargate does not
+ * join but a known bridge does is a bridge; the rest reads off the stargates.
+ * The bridges come per search, never inside the stargate graph.
+ */
+export function bridgeHopKind(
+  gates: JumpGraph,
+  bridgeAt: (from: number, to: number) => unknown
+): (from: number, to: number) => HopKind {
+  const byGate = stargateHopKind(gates);
+  return (from, to) => {
+    const kind = byGate(from, to);
+    return kind !== 'gate' && bridgeAt(from, to) ? 'bridge' : kind;
+  };
+}
+
+/**
  * Each leg's Stop in flying order, cut at the first non-gate hop: the
  * sequence then ends at that hop's entrance. A leg with no route ends the
  * sequence too — the client could not fly it either.

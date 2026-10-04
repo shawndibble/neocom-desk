@@ -9,9 +9,12 @@
  * On a phone the panel folds under the leg header to one line — "Gates only:
  * 33 j · compare" — and opens in place.
  *
+ * Via Ansiblex (issue #2478) is one more way, with a line per bridge it
+ * crosses. With Use jump bridges on and no gate known yet, its box offers
+ * Find with a character or paste a list instead.
+ *
  * Facts only, never verdicts (decision `20260912-172628`): no way is called
- * better, safer or riskier than another. The list is a list so that more
- * kinds of way (an Ansiblex route) can join it later.
+ * better, safer or riskier than another.
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -113,6 +116,21 @@ function WayBox({
           )}
         </p>
       )}
+      {way.bridges.map(({ from, to: bridgeTo, gate }) => (
+        <p
+          key={`bridge-${from}-${bridgeTo}`}
+          className="flex flex-wrap items-center gap-x-1.5 text-sm text-text-dim"
+        >
+          <span aria-hidden="true">⇉</span>
+          <span>{t('travel.ways.bridge', { from: nameOf(from), to: nameOf(bridgeTo) })}</span>
+          {gate.name !== '' && (
+            <>
+              <Dot />
+              <span className="min-w-0 truncate">{gate.name}</span>
+            </>
+          )}
+        </p>
+      ))}
       {way.holes.map(({ from, to: holeTo, hole }) => (
         <p
           key={`${from}-${holeTo}`}
@@ -153,10 +171,58 @@ export interface LegWaysProps {
    * through a hole; loading, a pin waiting on it is not reported yet.
    */
   holes: RouteHolesState['kind'];
+  /**
+   * Where the Ansiblex list stands: `off` while Use jump bridges is off,
+   * `none` when it is on and no gate is known — Via Ansiblex then offers
+   * the ways to find some.
+   */
+  bridges: 'off' | 'none' | 'known';
+  /** Opens the Ansiblex list, at a character search or the paste box. */
+  onSetUpBridges: (mode: 'search' | 'paste') => void;
   onUse: (pin: string | null) => void;
 }
 
-function LegWaysPanel({ leg, number, multiStop, nameOf, now, holes, onUse }: LegWaysProps) {
+/** Via Ansiblex while no gate is known: the two ways to find some. */
+function BridgeSetupBox({ onSetUpBridges }: Pick<LegWaysProps, 'onSetUpBridges'>) {
+  const { t } = useTranslation();
+  return (
+    <li className="rounded-xs border border-dashed border-line px-2 py-1.5">
+      <div className="flex items-baseline gap-2">
+        <span className="font-semibold">{t('travel.ways.kind.ansiblex')}</span>
+        <span className="ml-auto text-text-dim">{t('travel.ways.noBridges')}</span>
+      </div>
+      <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-text-dim">
+        <button
+          type="button"
+          className={textActionClassName()}
+          onClick={() => onSetUpBridges('search')}
+        >
+          {t('travel.ways.findBridges')}
+        </button>
+        <span>{t('travel.ways.or')}</span>
+        <button
+          type="button"
+          className={textActionClassName()}
+          onClick={() => onSetUpBridges('paste')}
+        >
+          {t('travel.ways.pasteBridges')}
+        </button>
+      </p>
+    </li>
+  );
+}
+
+function LegWaysPanel({
+  leg,
+  number,
+  multiStop,
+  nameOf,
+  now,
+  holes,
+  bridges,
+  onSetUpBridges,
+  onUse,
+}: LegWaysProps) {
   const { t } = useTranslation();
   const ends = { number, from: nameOf(leg.from), to: nameOf(leg.to) };
   return (
@@ -176,6 +242,7 @@ function LegWaysPanel({ leg, number, multiStop, nameOf, now, holes, onUse }: Leg
             onUse={onUse}
           />
         ))}
+        {bridges === 'none' && <BridgeSetupBox onSetUpBridges={onSetUpBridges} />}
       </ul>
       {holes === 'off' && <p className="text-sm text-text-dim">{t('travel.ways.holesHint')}</p>}
     </section>

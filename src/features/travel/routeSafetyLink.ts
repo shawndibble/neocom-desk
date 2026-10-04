@@ -4,7 +4,7 @@
  *
  * Leg pins (`pin`): one token per Leg in flying order, comma-separated, an
  * empty token for a leg flown as the planner picks — `gates`, `thera`,
- * `turnur`, or an EVE-Scout hole id (`engine/route/legWays.ts`). A token the
+ * `turnur`, `ansiblex`, or an EVE-Scout hole id (`engine/route/legWays.ts`). A token the
  * page cannot read is dropped to "not pinned", never a broken page; a hole id
  * that has since closed is the page's to report.
  */
@@ -68,6 +68,8 @@ export const ROUTE_PARAMS = {
   whsize: optionalEnumParam(WORMHOLE_SHIP_SIZES),
   whlife: optionalIntParam({ min: MIN_ROUTE_HOLE_MIN_LIFE, max: MAX_ROUTE_HOLE_MIN_LIFE }),
   whhub: optionalEnumParam(ROUTE_HOLE_HUBS),
+  // Use jump bridges (issue #2478); absent means the page's saved default.
+  jb: optionalBoolParam(),
   pin: legPinsParam(),
 };
 

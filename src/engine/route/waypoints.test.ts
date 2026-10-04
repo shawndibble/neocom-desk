@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { JumpGraph } from './jumpRoute';
 import type { TripLeg } from './tripPlan';
-import { stargateHopKind, waypointSequence, type HopKind } from './waypoints';
+import { bridgeHopKind, stargateHopKind, waypointSequence, type HopKind } from './waypoints';
 
 /**
  *   A ─ B ─ C        X ─ Y ─ Z
@@ -105,5 +105,26 @@ describe('stargateHopKind', () => {
   it('calls any other hop a wormhole', () => {
     expect(gatesOnly(C, X)).toBe('wormhole');
     expect(gatesOnly(A, C)).toBe('wormhole');
+  });
+});
+
+describe('bridgeHopKind', () => {
+  const bridgeAt = (from: number, to: number) =>
+    (from === C && to === X) || (from === X && to === C) ? { name: 'C » X' } : null;
+  const hopKind = bridgeHopKind(GATES, bridgeAt);
+
+  it('reads a step over a known bridge as a bridge, and the rest off the stargates', () => {
+    expect(hopKind(C, X)).toBe('bridge');
+    expect(hopKind(X, C)).toBe('bridge');
+    expect(hopKind(A, B)).toBe('gate');
+    expect(hopKind(Y, A)).toBe('wormhole');
+  });
+
+  it('cuts the waypoints at a bridge’s entrance, saying it is a bridge', () => {
+    expect(waypointSequence([leg(A, B, C, X, Y)], hopKind).cutOff).toEqual({
+      entrance: C,
+      exit: X,
+      kind: 'bridge',
+    });
   });
 });
