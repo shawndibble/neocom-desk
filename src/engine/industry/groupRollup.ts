@@ -262,7 +262,18 @@ function mergeMaterials(
   for (const member of members) {
     for (const material of pick(member)) {
       const existing = merged.get(material.typeID);
-      merged.set(material.typeID, existing ? mergeCostLines(existing, material) : { ...material });
+      if (!existing) {
+        merged.set(material.typeID, { ...material });
+        continue;
+      }
+      // `mergeCostLines` drops the Blueprint Acquisition marker; keep it, or
+      // a blueprint two members share gains the "Use assets" offer a single
+      // member's row never shows (the owned-stock offer reads the marker).
+      const acquisitionTier = existing.acquisitionTier ?? material.acquisitionTier;
+      merged.set(material.typeID, {
+        ...mergeCostLines(existing, material),
+        ...(acquisitionTier !== undefined ? { acquisitionTier } : {}),
+      });
     }
   }
   return [...merged.values()];
