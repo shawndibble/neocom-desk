@@ -294,6 +294,26 @@ describe('reduceEditSession: toasts and their undo', () => {
       },
     },
     {
+      name: 'a row edit whose move lands after a later bulk action leaves the bulk toast up',
+      steps: [
+        // Clicking "Use all" blurs the Have field (its commit) and the
+        // section, then the click lands, then the Have write does.
+        focus('toBuy', [TRITANIUM, PYERITE]),
+        { type: 'haveCommitted', typeID: TRITANIUM, before: undefined, after: 100 },
+        { type: 'focusLeft' },
+        {
+          type: 'bulkApplied',
+          kind: 'all',
+          changes: [{ typeID: PYERITE, from: undefined, to: 20 }],
+        },
+        { type: 'store', owned: { [TRITANIUM]: 100, [PYERITE]: 20 } },
+      ],
+      toast: {
+        message: { kind: 'useAllDone', count: 1 },
+        undo: { kind: 'owned', changes: [{ typeID: PYERITE, from: undefined, to: 20 }] },
+      },
+    },
+    {
       name: 'the toast expiring clears it',
       steps: [{ type: 'bulkApplied', kind: 'all', changes: [] }, { type: 'toastExpired' }],
       toast: null,

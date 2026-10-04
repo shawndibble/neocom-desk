@@ -39,7 +39,10 @@ import type { MaterialTableRow } from './subBuildPlan';
 interface PendingEdit {
   before: number | undefined;
   after: number | undefined;
-  /** A bulk edit is already confirmed by its own toast; a row edit waits for its move. */
+  /**
+   * A row edit waits for its move to toast. A bulk edit is already confirmed
+   * by its own toast, and so is a row edit a later bulk action superseded.
+   */
   by: 'row' | 'bulk';
 }
 
@@ -194,7 +197,13 @@ export function reduceEditSession(
           },
         };
       }
-      const pending = new Map(session.pending);
+      // The latest edit owns the toast: a row edit still waiting to move (its
+      // write or its section's release yet to land) moves silently now, as
+      // the bulk action's own rows do, rather than replacing this toast and
+      // its Undo.
+      const pending = new Map(
+        [...session.pending].map(([typeID, edit]) => [typeID, { ...edit, by: 'bulk' as const }])
+      );
       for (const { typeID, from, to } of changes) {
         pending.set(typeID, { before: from, after: to, by: 'bulk' });
       }

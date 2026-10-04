@@ -750,11 +750,13 @@ export function MaterialsTable({
       case 'movedMany':
         return t('industry.errands.movedMany', { count: message.count });
       case 'useAllDone':
+        return t('industry.useAllDone', { count: message.count });
       case 'useNoneDone':
-        return t(`industry.${message.kind}`, { count: message.count });
+        return t('industry.useNoneDone', { count: message.count });
       case 'useAllNothing':
+        return t('industry.useAllNothing');
       case 'useNoneNothing':
-        return t(`industry.${message.kind}`);
+        return t('industry.useNoneNothing');
     }
   }
 
