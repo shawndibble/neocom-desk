@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import {
   CheckboxSelect,
+  DataAgeBadge,
   EmptyState,
+  IconButton,
   PageHeader,
   Select,
   SelectContent,
@@ -13,6 +15,7 @@ import {
   Spinner,
   Toast,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import type { PlanEntry } from '@/engine/types';
 import { CertificateRow } from '@/features/skills/certificates/CertificateRow';
 import {
@@ -283,7 +286,13 @@ export function SkillCertificates() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader title={t('nav.skills')} />
+      <PageHeader
+        title={t('nav.skills')}
+        meta={data.fetchedAt && <DataAgeBadge date={data.fetchedAt} />}
+        actions={
+          <IconButton icon={<Icon.Refresh />} label={t('skills.refresh')} onClick={data.refresh} />
+        }
+      />
       <SkillsSubNav />
       {body}
       {added && (

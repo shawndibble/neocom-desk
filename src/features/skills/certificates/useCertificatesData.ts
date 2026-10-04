@@ -51,5 +51,9 @@ export function useCertificatesData(characterId: number | null) {
     attributes: editor.attributes,
     implants: editor.implants,
     cloneState,
+    /** When the queue-corrected skills were read, for the header's `DataAgeBadge`. */
+    fetchedAt: editor.fetchedAt,
+    /** Re-reads skills and re-grades in place; the rows stay up meanwhile. */
+    refresh: editor.reload,
   };
 }
