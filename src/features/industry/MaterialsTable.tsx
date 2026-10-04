@@ -4,11 +4,14 @@ import {
   useEffect,
   useId,
   useMemo,
+  useImperativeHandle,
+  useReducer,
   useRef,
   useState,
   type FocusEvent,
   type ReactElement,
   type ReactNode,
+  type Ref,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -35,17 +38,24 @@ import { maskNumber, unmaskNumber } from '@/lib/numberMask';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatVolume } from './format';
 import { materialRowState } from './materialRow';
-import { ownedStockOffer } from '@/engine/industry/ownedStockOffer';
+import {
+  clearEveryOwned,
+  ownedStockOffer,
+  takeEveryOffer,
+  undoOwnedStockChanges,
+  type OwnedStockChange,
+} from '@/engine/industry/ownedStockOffer';
 import { OwnedStockHint } from './OwnedStockHint';
 import type { OwnedStockDetection } from './ownedStockDetection';
 import { buildRecipe, type MaterialTableRow } from './subBuildPlan';
 import { SkillGateMarker } from './SkillGateMarker';
+import { MATERIAL_ERRANDS, errandSubtotal, type MaterialErrand } from './materialErrands';
 import {
-  MATERIAL_ERRANDS,
-  errandSubtotal,
-  groupMaterialsByErrand,
-  type MaterialErrand,
-} from './materialErrands';
+  INITIAL_EDIT_SESSION,
+  editSessionGroups,
+  reduceEditSession,
+  type SessionToastMessage,
+} from './materialsEditSession';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 
@@ -60,6 +70,13 @@ interface MaterialsTableProps {
   /** False when the market snapshot couldn't be fetched — hub prices fall back to placeholder text. */
   pricesReady: boolean;
   onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
+  /**
+   * Writes several rows' owned quantities as one change — "Use all", "Use
+   * none" and every Undo. Omitted, each goes through `onSourcingChange`.
+   */
+  onOwnedStockChange?: (changes: readonly OwnedStockChange[]) => void;
+  /** "Use all" / "Use none" for controls the caller renders outside the table. */
+  ref?: Ref<MaterialsTableHandle>;
   /** ESI-detected owned stock (issue #181); omitted where no detection ran. Never written by itself. */
   detection?: OwnedStockDetection;
   /** Wraps each row in the shared item context menu; omitted where the caller has no menu to offer. */
@@ -104,6 +121,15 @@ interface MaterialsTableProps {
   characterNameFor?: (characterId: number) => string;
   /** `useTableExport(...).tableProps` — makes the table exportable from its row menus. */
   exportProps?: UseTableExport<MaterialTableRow>['tableProps'];
+}
+
+/**
+ * "Use all" / "Use none" over every row on the table, answered by the table's
+ * own toast so a row edit and a bulk one share one Undo (issue #2548).
+ */
+export interface MaterialsTableHandle {
+  fillAll: () => void;
+  clearAll: () => void;
 }
 
 /** Blank or garbage clears the field; anything real is kept as-is (the engine clamps). */
@@ -594,7 +620,13 @@ function NotApplicable() {
  * - A section holds its rows in place while focus is inside it, so a Have
  *   commit (which lands on blur, as the player tabs on) never unmounts the
  *   field focus is moving to. Rows move once focus leaves the section.
- * - Every move the player caused is confirmed by a toast with Undo.
+ * - Every move the player caused is confirmed by a toast with Undo — one
+ *   toast and one Undo shared with "Use all" / "Use none" (`fillAll` /
+ *   `clearAll` on the `ref`).
+ *
+ * Both rules, and which toast an edit earns, are the edit session's
+ * (`materialsEditSession.ts`); this component renders what it decides and
+ * makes the writes.
  *
  * Price is one field, not a market column beside an override column: the hub
  * price is its value and typing over it is the override, with a revert
@@ -608,6 +640,8 @@ export function MaterialsTable({
   sourcing,
   pricesReady,
   onSourcingChange,
+  onOwnedStockChange,
+  ref,
   detection,
   rowContextMenu,
   rowActions,
@@ -625,9 +659,7 @@ export function MaterialsTable({
   const besideCosts = useMediaQuery(BESIDE_COSTS_QUERY);
   const idPrefix = useId();
 
-  // Rows a focused section is holding in place, by typeID. See the component
-  // doc: null means nothing is held and every row sits in its own section.
-  const [held, setHeld] = useState<ReadonlyMap<number, MaterialErrand> | null>(null);
+  const [session, dispatch] = useReducer(reduceEditSession, INITIAL_EDIT_SESSION);
   const [haveOpen, setHaveOpen] = useState(false);
   const [phoneSort, setPhoneSort] = useState<PhoneSort>('plan');
   // The phone card whose price field is open; every other card shows its
@@ -635,119 +667,101 @@ export function MaterialsTable({
   const [editingPrice, setEditingPrice] = useState<number | null>(null);
   // Same for the ledger's Have number.
   const [editingHave, setEditingHave] = useState<number | null>(null);
-  const [toast, setToast] = useState<{ message: string; undo: () => void } | null>(null);
-
-  // Have edits not yet seen to land: what the field held before, and what the
-  // edit wrote. A row that changes section with one of these pending was
-  // moved by the player, and Undo can put the old number back.
-  const pendingOwned = useRef(
-    new Map<number, { before: number | undefined; after: number | undefined }>()
-  );
-  // Rows the player just switched between buying and building: their move is
-  // confirmed by the toggle's own toast, not the Have one.
-  const toggled = useRef(new Set<number>());
-  // After a toggle, the same row's swap control in its new section takes
-  // focus, so a keyboard user isn't dropped back at the top of the page.
-  const pendingFocus = useRef<{
-    typeID: number;
-    kind: 'build' | 'buy';
-    from: MaterialErrand;
-  } | null>(null);
-  const lastShown = useRef<ReadonlyMap<number, MaterialErrand> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const groups = useMemo(
-    () => groupMaterialsByErrand(materials, held ?? undefined),
-    [materials, held]
-  );
-  const shown = useMemo(() => {
-    const map = new Map<number, MaterialErrand>();
-    for (const errand of MATERIAL_ERRANDS) {
-      for (const row of groups[errand]) map.set(row.typeID, errand);
-    }
-    return map;
-  }, [groups]);
+  const groups = useMemo(() => editSessionGroups(session, materials), [session, materials]);
+  const ownedFor = useCallback((typeID: number) => sourcing?.[typeID]?.ownedQuantity, [sourcing]);
 
-  const sectionLabel = useCallback((errand: MaterialErrand) => t(ERRAND_LABEL_KEY[errand]), [t]);
+  // Owned-quantity writes the session makes (bulk, and every Undo) go out as
+  // one batch where the caller takes one.
+  function writeOwned(changes: readonly OwnedStockChange[]) {
+    if (onOwnedStockChange) onOwnedStockChange(changes);
+    else for (const { typeID, to } of changes) onSourcingChange(typeID, { ownedQuantity: to });
+  }
 
+  // The session confirms the moves an edit caused once they are actually
+  // shown, so it watches every render that could have moved a row.
+  useEffect(() => {
+    dispatch({ type: 'rendered', materials, ownedFor });
+  }, [materials, ownedFor, session.held]);
+
+  const toast = session.toast;
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(null), TOAST_MS);
+    const timer = setTimeout(() => dispatch({ type: 'toastExpired' }), TOAST_MS);
     return () => clearTimeout(timer);
   }, [toast]);
-
-  // Confirms the moves a Have edit caused, once they are actually shown.
-  useEffect(() => {
-    const previous = lastShown.current;
-    lastShown.current = shown;
-    if (!previous) return;
-    const moved: { typeID: number; to: MaterialErrand }[] = [];
-    for (const [typeID, errand] of shown) {
-      const was = previous.get(typeID);
-      if (was === undefined || was === errand) continue;
-      if (toggled.current.has(typeID)) {
-        toggled.current.delete(typeID);
-        continue;
-      }
-      moved.push({ typeID, to: errand });
-    }
-    const pending = pendingOwned.current;
-    // Only moves the player's own Have edits explain get a toast: a bulk
-    // "Use all", or a sub-build changing how much of an input is needed, is
-    // not something an Undo here could put back.
-    if (moved.length > 0 && moved.every((move) => pending.has(move.typeID))) {
-      const restore = moved.map((move) => [move.typeID, pending.get(move.typeID)?.before] as const);
-      const first = moved[0];
-      setToast({
-        message:
-          moved.length === 1 && first
-            ? t('industry.errands.moved', {
-                material: nameFor(first.typeID),
-                section: sectionLabel(first.to),
-              })
-            : t('industry.errands.movedMany', { count: moved.length }),
-        undo: () => {
-          for (const [typeID, ownedQuantity] of restore) {
-            onSourcingChange(typeID, { ownedQuantity });
-          }
-          setToast(null);
-        },
-      });
-    }
-    // An edit is settled once the plan holds what it wrote and its row is no
-    // longer held in place; whatever it moved has been confirmed above.
-    for (const [typeID, edit] of pending) {
-      const stored = sourcing?.[typeID]?.ownedQuantity ?? 0;
-      if (stored === (edit.after ?? 0) && !held?.has(typeID)) {
-        pending.delete(typeID);
-      }
-    }
-  }, [shown, sourcing, held, t, nameFor, sectionLabel, onSourcingChange]);
 
   // Runs after every render: the toggled row only reaches its new section
   // once the plan write lands, which can be several renders later.
   useEffect(() => {
-    const target = pendingFocus.current;
+    const target = session.focusAfterToggle;
     if (!target) return;
     const el = containerRef.current?.querySelector<HTMLElement>(
       `[data-swap-for="${target.typeID}"][data-swap-kind="${target.kind}"]`
     );
     if (el) {
-      pendingFocus.current = null;
+      dispatch({ type: 'focusSettled' });
       el.focus();
-    } else if (shown.get(target.typeID) !== target.from) {
+    } else if (session.shown?.get(target.typeID) !== target.from) {
       // It moved somewhere its control isn't mounted — the folded Already
       // have section. Give up rather than steal focus whenever that opens.
-      pendingFocus.current = null;
+      dispatch({ type: 'focusSettled' });
     }
   });
 
+  useImperativeHandle(ref, () => ({
+    fillAll() {
+      const changes = takeEveryOffer(
+        materials,
+        ownedFor,
+        detection?.scopedQuantityFor ?? (() => 0)
+      );
+      if (changes.length > 0) writeOwned(changes);
+      dispatch({ type: 'bulkApplied', kind: 'all', changes });
+    },
+    clearAll() {
+      const changes = clearEveryOwned(materials, ownedFor);
+      if (changes.length > 0) writeOwned(changes);
+      dispatch({ type: 'bulkApplied', kind: 'none', changes });
+    },
+  }));
+
+  // Built per render, so Undo writes through the latest props: a write made
+  // while the toast was up isn't dropped by a stale callback.
+  function undo() {
+    const patch = session.toast?.undo;
+    if (patch?.kind === 'owned') writeOwned(undoOwnedStockChanges(patch.changes));
+    else if (patch?.kind === 'toggle') onToggleBuildHere?.(patch.typeID);
+    dispatch({ type: 'undone' });
+  }
+
+  function toastText(message: SessionToastMessage): string {
+    switch (message.kind) {
+      case 'moved':
+        return t('industry.errands.moved', {
+          material: nameFor(message.typeID),
+          section: t(ERRAND_LABEL_KEY[message.to]),
+        });
+      case 'movedMany':
+        return t('industry.errands.movedMany', { count: message.count });
+      case 'useAllDone':
+      case 'useNoneDone':
+        return t(`industry.${message.kind}`, { count: message.count });
+      case 'useAllNothing':
+      case 'useNoneNothing':
+        return t(`industry.${message.kind}`);
+    }
+  }
+
+  const sectionLabel = useCallback((errand: MaterialErrand) => t(ERRAND_LABEL_KEY[errand]), [t]);
+
   const commitOwned = useCallback(
     (typeID: number, ownedQuantity: number | undefined) => {
-      const before = sourcing?.[typeID]?.ownedQuantity;
-      const earlier = pendingOwned.current.get(typeID);
-      pendingOwned.current.set(typeID, {
-        before: earlier ? earlier.before : before,
+      dispatch({
+        type: 'haveCommitted',
+        typeID,
+        before: sourcing?.[typeID]?.ownedQuantity,
         after: ownedQuantity,
       });
       onSourcingChange(typeID, { ownedQuantity });
@@ -758,35 +772,14 @@ export function MaterialsTable({
   const toggleBuild = useCallback(
     (material: MaterialTableRow) => {
       if (!onToggleBuildHere) return;
-      const { typeID } = material;
-      const building = material.subBuilds.length > 0;
-      toggled.current.add(typeID);
-      pendingFocus.current = {
-        typeID,
-        kind: building ? 'build' : 'buy',
-        from: shown.get(typeID) ?? (building ? 'building' : 'toBuy'),
-      };
-      // Released from any hold: this is a move the player asked for outright.
-      setHeld((current) => {
-        if (!current?.has(typeID)) return current;
-        const next = new Map(current);
-        next.delete(typeID);
-        return next;
+      dispatch({
+        type: 'buildToggled',
+        typeID: material.typeID,
+        building: material.subBuilds.length > 0,
       });
-      onToggleBuildHere(typeID);
-      setToast({
-        message: t('industry.errands.moved', {
-          material: nameFor(typeID),
-          section: sectionLabel(building ? 'toBuy' : 'building'),
-        }),
-        undo: () => {
-          toggled.current.add(typeID);
-          onToggleBuildHere(typeID);
-          setToast(null);
-        },
-      });
+      onToggleBuildHere(material.typeID);
     },
-    [onToggleBuildHere, nameFor, sectionLabel, t, shown]
+    [onToggleBuildHere]
   );
 
   /** The make-or-buy advice for a row, and whether a Build/Buy instead switch is offered on it. */
@@ -1168,15 +1161,12 @@ export function MaterialsTable({
   const tableColumns = besideCosts ? columns.filter((column) => column.id !== 'volume') : columns;
 
   function holdSection(errand: MaterialErrand) {
-    // Functional: tabbing straight from one section into the next queues the
-    // first one's release before this, and a closure would still see it held.
-    const rows = groups[errand];
-    setHeld((current) => current ?? new Map(rows.map((row) => [row.typeID, errand])));
+    dispatch({ type: 'focusEntered', errand, typeIDs: groups[errand].map((row) => row.typeID) });
   }
 
   function releaseSection(event: FocusEvent<HTMLElement>) {
     if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-    setHeld(null);
+    dispatch({ type: 'focusLeft' });
   }
 
   function renderHeading(
@@ -1531,8 +1521,8 @@ export function MaterialsTable({
       })}
       {toast && (
         <Toast
-          message={toast.message}
-          undo={{ label: t('industry.errands.undo'), onUndo: toast.undo }}
+          message={toastText(toast.message)}
+          undo={toast.undo ? { label: t('industry.errands.undo'), onUndo: undo } : undefined}
         />
       )}
     </div>
