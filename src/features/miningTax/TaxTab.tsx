@@ -387,6 +387,14 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   const [expandedCombined, setExpandedCombined] = useState<ReadonlySet<string>>(new Set());
   const [toast, setToast] = useState<{ message: string; onUndo?: () => void } | null>(null);
   const [busy, setBusy] = useState(false);
+  // A row action that failed to save leaves its detail modal open to say so;
+  // opening another row (or closing) clears it.
+  const [actionFailed, setActionFailed] = useState(false);
+  const [actionFailedFor, setActionFailedFor] = useState(detailTarget);
+  if (actionFailedFor !== detailTarget) {
+    setActionFailedFor(detailTarget);
+    setActionFailed(false);
+  }
 
   useEffect(() => {
     if (!toast) return;
@@ -925,10 +933,13 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   /** Every row action ends the same way: busy while it writes, then close and reload. */
   async function runAndClose(action: () => Promise<unknown>) {
     setBusy(true);
+    setActionFailed(false);
     try {
       await action();
       setDetailTarget(null);
       refresh();
+    } catch {
+      setActionFailed(true);
     } finally {
       setBusy(false);
     }
@@ -1888,6 +1899,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           typeNames={data.typeNames}
           payeeDisplayName={payeeDisplayName(detailTarget)}
           busy={busy}
+          saveError={actionFailed ? t('miningTax.saveFailed') : null}
           onEdit={() => {
             setEditTarget(detailTarget);
             setDetailTarget(null);
@@ -1952,6 +1964,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           suggestion={detailTarget.assignment ? undefined : suggestionFor(detailTarget.row)}
           pricesFor={pricesFor}
           busy={busy}
+          saveError={actionFailed ? t('miningTax.saveFailed') : null}
           onAssigned={handleAssignedFromDetail}
           onDismiss={handleDismissFromDetail}
           onMarkPaid={handleMarkPaidFromDetail}

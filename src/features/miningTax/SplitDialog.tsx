@@ -74,6 +74,7 @@ export function SplitDialog({
   const [moves, setMoves] = useState<ReadonlyMap<number, number>>(new Map());
   const [collector, setCollector] = useState<'original' | 'new'>('original');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // A third Assignment on this entry already collecting leaves nothing to
   // choose here — the split never silently steals that role from it.
@@ -122,6 +123,7 @@ export function SplitDialog({
   async function handleSplit() {
     if (!canSplit || !payeeId) return;
     setSaving(true);
+    setSaveError(null);
     try {
       await splitAssignment(
         assignment,
@@ -134,6 +136,8 @@ export function SplitDialog({
         prices
       );
       onSplit();
+    } catch {
+      setSaveError(t('miningTax.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -303,6 +307,12 @@ export function SplitDialog({
           </div>
         </div>
         <p className="text-[0.6875rem] text-text-dim">{t('miningTax.splitRepriceHint')}</p>
+
+        {saveError && (
+          <p role="alert" className="text-xs text-danger">
+            {saveError}
+          </p>
+        )}
 
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <Button
