@@ -15,7 +15,15 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, Disclosure, EmptyState, PageHeader, Panel, Spinner } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  Disclosure,
+  EmptyState,
+  PageHeader,
+  Panel,
+  Spinner,
+} from '@/components/ui';
 import {
   countTheraConnectionsByHub,
   filterTheraConnections,
@@ -46,6 +54,9 @@ const THERA_PARAMS = {
   space: enumParam(THERA_EXITS, 'kspace'),
   size: enumParam(SIZE_OPTIONS, 'any'),
 };
+
+/** What Reset filters goes back to: origin and Route Preference filter nothing, so they stay. */
+const DEFAULT_FILTERS = { hub: 'all', space: 'kspace', size: 'any' } as const;
 
 export function TheraTab({ tabBar }: { tabBar: ReactNode }) {
   const { t } = useTranslation();
@@ -111,6 +122,13 @@ export function TheraTab({ tabBar }: { tabBar: ReactNode }) {
         hasOrigin={originId !== null}
         originName={originName}
         routeVia={originId === null ? undefined : (row) => routeViaHref(originId, row.id)}
+        onResetFilters={
+          params.hub !== DEFAULT_FILTERS.hub ||
+          params.space !== DEFAULT_FILTERS.space ||
+          params.size !== DEFAULT_FILTERS.size
+            ? () => setParams(DEFAULT_FILTERS)
+            : undefined
+        }
       />
     </div>
   );
@@ -122,12 +140,15 @@ function TheraBody({
   hasOrigin,
   originName,
   routeVia,
+  onResetFilters,
 }: {
   state: TheraConnectionsState;
   filter: TheraConnectionFilter;
   hasOrigin: boolean;
   originName: string | null;
   routeVia?: (row: TheraConnectionRow) => string;
+  /** Set while any filter is off its default. */
+  onResetFilters?: () => void;
 }) {
   const { t } = useTranslation();
   if (state.kind === 'loading') {
@@ -192,6 +213,15 @@ function TheraBody({
                   : t('travel.thera.noMatchTitle')
             }
             hint={listed ? t('travel.thera.noMatchHint') : t('travel.thera.emptyHint')}
+            action={
+              // Only a zero the filters made: when EVE-Scout lists nothing,
+              // there is nothing to reset.
+              listed && onResetFilters ? (
+                <Button size="sm" onClick={onResetFilters}>
+                  {t('common.resetFilters')}
+                </Button>
+              ) : undefined
+            }
           />
         )}
         {jspace.length > 0 && <JspaceGroup rows={jspace} />}
