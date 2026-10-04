@@ -15,7 +15,12 @@ import { useHydratedStore } from './useHydratedStore';
  * merely flicker, a press landing in that window would write the default over
  * what is on disk.
  */
-export function IndustrySettingsForm() {
+export function IndustrySettingsForm({
+  onlyAssumedMe = false,
+}: {
+  /** Opportunities prices with assumed ME alone (#2055), so its modal shows only that. */
+  onlyAssumedMe?: boolean;
+}) {
   const { t } = useTranslation();
   const assumedMe = useAssumedMe((state) => state.value);
   const setAssumedMe = useAssumedMe((state) => state.setValue);
@@ -58,44 +63,48 @@ export function IndustrySettingsForm() {
           />
         </Field>
 
-        {/*
-          Beside its ME twin rather than merged with it: the two answer
-          different questions (material cost, job time), and TE's range is
-          0..20 where ME's is 0..10 (issue #634).
-        */}
-        <Field
-          label={t('settings.assumedTeLabel')}
-          htmlFor="settings-assumed-te"
-          note={t('settings.assumedTeHint')}
-        >
-          <TextInput
-            id="settings-assumed-te"
-            type="number"
-            min={MIN_ASSUMED_TE}
-            max={MAX_ASSUMED_TE}
-            step={1}
-            value={assumedTe}
-            onChange={(event) => {
-              const parsed = Math.round(Number(event.target.value));
-              if (!Number.isFinite(parsed)) return;
-              void setAssumedTe(Math.min(MAX_ASSUMED_TE, Math.max(MIN_ASSUMED_TE, parsed)));
-            }}
-            className="w-24"
-          />
-        </Field>
+        {!onlyAssumedMe && (
+          <>
+            {/*
+            Beside its ME twin rather than merged with it: the two answer
+            different questions (material cost, job time), and TE's range is
+            0..20 where ME's is 0..10 (issue #634).
+          */}
+            <Field
+              label={t('settings.assumedTeLabel')}
+              htmlFor="settings-assumed-te"
+              note={t('settings.assumedTeHint')}
+            >
+              <TextInput
+                id="settings-assumed-te"
+                type="number"
+                min={MIN_ASSUMED_TE}
+                max={MAX_ASSUMED_TE}
+                step={1}
+                value={assumedTe}
+                onChange={(event) => {
+                  const parsed = Math.round(Number(event.target.value));
+                  if (!Number.isFinite(parsed)) return;
+                  void setAssumedTe(Math.min(MAX_ASSUMED_TE, Math.max(MIN_ASSUMED_TE, parsed)));
+                }}
+                className="w-24"
+              />
+            </Field>
 
-        <Field
-          label={t('settings.includeBlueprintCostLabel')}
-          htmlFor="settings-include-blueprint-cost"
-          inline
-          note={t('settings.includeBlueprintCostHint')}
-        >
-          <Checkbox
-            id="settings-include-blueprint-cost"
-            checked={includeBlueprintCost}
-            onChange={() => void setIncludeBlueprintCost(!includeBlueprintCost)}
-          />
-        </Field>
+            <Field
+              label={t('settings.includeBlueprintCostLabel')}
+              htmlFor="settings-include-blueprint-cost"
+              inline
+              note={t('settings.includeBlueprintCostHint')}
+            >
+              <Checkbox
+                id="settings-include-blueprint-cost"
+                checked={includeBlueprintCost}
+                onChange={() => void setIncludeBlueprintCost(!includeBlueprintCost)}
+              />
+            </Field>
+          </>
+        )}
       </Fields>
     </div>
   );
