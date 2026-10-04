@@ -14,11 +14,11 @@
  * 15-minute TTL, so a tab switch or a hub switched back reads from it. If
  * prices can't load, every row simply has no price.
  *
- * Measured on a 507-fit hull (dev server): the check takes ~0.2 s and the
- * lookup ~0.7 s per 200 types, but rendering the rows blocks the main thread
- * for seconds, and the lookup waits behind it. Asking for prices before the
- * rows render moved the request earlier but not the prices; a virtualized
- * list is what would.
+ * Prices used to wait seconds behind rendering every row of a long list:
+ * the lookup is quick, but its answer re-rendered all of them again. The list
+ * is windowed now (`VirtualFitList.tsx`), and on the Gila's ~670 fits (dev
+ * server, prices cached) the first price shows ~0.9 s after the tab opens,
+ * down from ~18 s.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { fitSellPrice, type FitSellPrice } from '@/engine/fittings/fitSellPrice';

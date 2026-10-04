@@ -464,4 +464,66 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
       [626, 3001]
     );
   });
+
+  describe('a long list', () => {
+    // jsdom does no layout: `data-virtual-scroll-root` gets a 600px viewport
+    // (vitest.setup.dom.ts) and every row its ~96px estimate.
+    const MANY = Array.from({ length: 80 }, (_, i) => wbFit(String(i + 1)));
+    const loadButtons = () => screen.queryAllByRole('button', { name: 'Load' });
+
+    it('mounts only the rows in view, each telling its place in the whole list', async () => {
+      openWorkbench({ ok: true, fits: MANY });
+      await screen.findByRole('link', { name: 'Fit 1' });
+      expect(loadButtons().length).toBeGreaterThan(0);
+      expect(loadButtons().length).toBeLessThan(40);
+      const first = rowOf('Fit 1');
+      expect(first.getAttribute('aria-posinset')).toBe('1');
+      expect(first.getAttribute('aria-setsize')).toBe('80');
+      expect(first.parentElement).toBe(screen.getByRole('list', { name: 'EVE Workbench' }));
+      expect(screen.queryByRole('link', { name: 'Fit 80' })).toBeNull();
+    });
+
+    it('reaches the last fit by scrolling the capped box', async () => {
+      openWorkbench({ ok: true, fits: MANY });
+      await screen.findByRole('link', { name: 'Fit 1' });
+      const box = document.querySelector<HTMLElement>('[data-virtual-scroll-root]')!;
+      act(() => {
+        box.scrollTop = 1_000_000;
+        fireEvent.scroll(box);
+      });
+      expect(await screen.findByRole('link', { name: 'Fit 80' })).toBeTruthy();
+      expect(rowOf('Fit 80').getAttribute('aria-posinset')).toBe('80');
+      expect(screen.queryByRole('link', { name: 'Fit 1' })).toBeNull();
+    });
+
+    it('uncapped, windows against the host that scrolls it', async () => {
+      useWorkbenchFitsMock.mockReturnValue({ ok: true, fits: MANY });
+      render(
+        <div data-virtual-scroll-root style={{ overflowY: 'auto' }}>
+          <PopularFitsPanel shipTypeId={626} hullName="Vexor" onOpen={vi.fn()} capped={false} />
+        </div>
+      );
+      fireEvent.click(screen.getByRole('tab', { name: 'EVE Workbench' }));
+      await screen.findByRole('link', { name: 'Fit 1' });
+      // The list draws no scroll box of its own.
+      expect(document.querySelectorAll('[data-virtual-scroll-root]')).toHaveLength(1);
+      expect(loadButtons().length).toBeLessThan(40);
+      const host = document.querySelector<HTMLElement>('[data-virtual-scroll-root]')!;
+      act(() => {
+        host.scrollTop = 1_000_000;
+        fireEvent.scroll(host);
+      });
+      expect(await screen.findByRole('link', { name: 'Fit 80' })).toBeTruthy();
+    });
+
+    it('uncapped with nothing but the page to scroll, lists every fit', async () => {
+      useWorkbenchFitsMock.mockReturnValue({ ok: true, fits: MANY });
+      render(
+        <PopularFitsPanel shipTypeId={626} hullName="Vexor" onOpen={vi.fn()} capped={false} />
+      );
+      fireEvent.click(screen.getByRole('tab', { name: 'EVE Workbench' }));
+      await screen.findByRole('link', { name: 'Fit 80' });
+      expect(loadButtons()).toHaveLength(80);
+    });
+  });
 });
