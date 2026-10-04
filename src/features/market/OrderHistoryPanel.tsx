@@ -1,4 +1,3 @@
-import { marketIskDecimals } from '@/lib/isk';
 import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -49,6 +48,7 @@ import {
   useVisibleOrderHistoryColumns,
   type OrderHistoryColumnId,
 } from './orderHistoryColumns';
+import { marketIskDecimals } from '@/lib/isk';
 
 const HISTORY_SORT = { columnId: 'issued', direction: 'desc' } as const;
 

@@ -56,8 +56,9 @@ export const CONTRACT_ISK_CENTS_BELOW = 1000;
 
 /**
  * Anything that would print as 10,000.00 or more. EVE limits an order price to
- * four significant figures, so from 10,000 up a market price's cents are
- * always `.00`.
+ * four significant figures, so from 10,000 up an order's own cents are always
+ * `.00`; an average, total or margin does lose real cents there, which the
+ * Market page accepts as noise at that size.
  */
 const MARKET_ISK_CENTS_BELOW = 9_999.995;
 

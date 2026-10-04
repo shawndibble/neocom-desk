@@ -1,4 +1,3 @@
-import { marketIskDecimals } from '@/lib/isk';
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -23,6 +22,7 @@ import {
   type PriceHistoryRange,
 } from '@/engine/market/priceHistory';
 import { usePriceHistoryRange } from './priceHistoryRangePref';
+import { marketIskDecimals } from '@/lib/isk';
 
 const MOVING_AVERAGE_WINDOW_DAYS = 7;
 const MOVING_AVERAGE_WINDOW_DAYS_7D_RANGE = 3;

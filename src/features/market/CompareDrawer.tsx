@@ -12,7 +12,6 @@
  * drawer open on Attributes (`useCompareSet`'s `openIn`) instead of opening
  * a separate modal that covered the order book.
  */
-import { marketIskDecimals } from '@/lib/isk';
 import {
   useCallback,
   useEffect,
@@ -56,6 +55,7 @@ import type { TradeHub } from '@/market/hubs';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
+import { marketIskDecimals } from '@/lib/isk';
 
 const DRAWER_ID = 'compare-drawer';
 const MIN_HEIGHT = 160;

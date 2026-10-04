@@ -23,7 +23,6 @@
  * the same explicit column widths (the `--compare-*-width` variables below)
  * so the columns line up under the one header.
  */
-import { marketIskDecimals } from '@/lib/isk';
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, DataTable, TypeIcon } from '@/components/ui';
@@ -42,6 +41,7 @@ import type { CompareRow } from './useCompareRows';
 import { formatAttributeValue } from './format';
 import { useCompareAttributeGroups } from './useCompareAttributesExport';
 import { RemovableTypeIcon } from './RemovableTypeIcon';
+import { marketIskDecimals } from '@/lib/isk';
 
 export interface CompareAttributesMatrixProps {
   /** The drawer's own price rows — one per Compare Set item, loading state and best-sell summary included. */

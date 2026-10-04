@@ -17,7 +17,6 @@
  * reaction consumes gets "Used in" (`UsedInSection`), off the blueprint
  * catalog — the same SDE files Build Plan reads, not ESI.
  */
-import { marketIskDecimals } from '@/lib/isk';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
@@ -62,6 +61,7 @@ import {
 import { RequiredSkillsSection } from './RequiredSkillsSection';
 import { skillNameOrFallback } from './skillNameOrFallback';
 import { UsedInSection } from './UsedInSection';
+import { marketIskDecimals } from '@/lib/isk';
 
 export interface ItemDetailModalProps {
   typeId: number;

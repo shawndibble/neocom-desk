@@ -241,7 +241,9 @@ export default function PriceHistoryChart({
     return [lo, hi];
   }, [chartData]);
 
-  const priceDecimals = priceTickDecimals(priceDomain[1] - priceDomain[0]);
+  // Whole ISK once the axis starts at 10,000, the Market page's no-cents line.
+  const priceDecimals =
+    priceDomain[0] >= 10_000 ? 0 : priceTickDecimals(priceDomain[1] - priceDomain[0]);
 
   const columns = useMemo<DataTableColumn<ChartRow>[]>(
     () => [
