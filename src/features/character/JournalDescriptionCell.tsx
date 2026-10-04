@@ -3,6 +3,7 @@
  * optional extras — a dim `reason` line (issue #1721, e.g. a corp member's
  * "moon tax Aug" memo; on a bounty line, its kills summed per pirate
  * faction instead of ESI's raw `typeID: count` list), a link to the contract behind a contract-reward row,
+ * a daily goal payout's goal by name in place of ESI's `-` and bare message id,
  * and — when the line is a market fill we have loaded — the item it bought
  * or sold, with its icon, linked to that item's Market listing.
  *
@@ -21,6 +22,7 @@ import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { formatIsk } from '@/lib/isk';
 import { BountyFactionSummary } from './BountyFactionSummary';
 import { bountyKillsOf } from './bountyKills';
+import { dailyGoalMessageIdOf } from './dailyGoal';
 import { transactionTotal } from './walletTransactionsCsv';
 
 interface JournalDescriptionCellProps {
@@ -38,6 +40,15 @@ export function JournalDescriptionCell({
   const contractId = entry.context_id_type === 'contract_id' ? entry.context_id : undefined;
   // A bounty line's reason is its kill list as raw `typeID: count` pairs.
   const kills = useMemo(() => bountyKillsOf(entry), [entry]);
+  const goalId = dailyGoalMessageIdOf(entry);
+  if (goalId !== null) {
+    const name = t(`wallet.dailyGoalNames.${goalId}`, { defaultValue: '' });
+    if (name) return <>{name}</>;
+    // An unnamed goal keeps its id on hover, so it can be added to the map.
+    return (
+      <span title={t('wallet.dailyGoalIdTitle', { id: goalId })}>{t('wallet.dailyGoal')}</span>
+    );
+  }
   if (!transaction && !entry.reason && contractId === undefined) return <>{entry.description}</>;
   const fill = transaction
     ? t(transaction.is_buy ? 'wallet.journalItemBought' : 'wallet.journalItemSold', {

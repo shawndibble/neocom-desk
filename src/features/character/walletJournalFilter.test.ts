@@ -80,6 +80,14 @@ describe('filterWalletJournal', () => {
     expect(filterWalletJournal(rows, filter)).toEqual([]);
   });
 
+  it("does not match a daily goal line's raw message id, which the journal shows as the goal's name", () => {
+    const rows = [
+      entry({ id: 1, ref_type: 'daily_goal_payouts', description: '-', reason: '697658' }),
+    ];
+    const filter: WalletJournalFilter = { ...EMPTY_WALLET_JOURNAL_FILTER, text: '697658' };
+    expect(filterWalletJournal(rows, filter)).toEqual([]);
+  });
+
   it('combines every active criterion with AND', () => {
     const rows = [
       entry({ id: 1, ref_type: 'bounty_prize', date: '2026-08-01T00:00:00Z', description: 'x' }),
