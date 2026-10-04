@@ -281,38 +281,45 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
         }
       />
       {tabBar}
-      <div className="grid items-start gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <div className="space-y-4">
-          <StopsPanel
-            fromId={fromId}
-            fromName={fromId === null ? fromTrigger : nameOf(fromId)}
-            fromTrigger={fromTrigger}
-            onFromChange={(systemId) => setParams({ from: systemId }, { push: true })}
-            stops={stops}
-            onStopsChange={(next) => setParams({ stops: next, to: null }, { push: true })}
-            settings={settings}
-            onSettingsChange={(patch) =>
-              setParams({
-                ...(patch.optimize === undefined ? {} : { opt: patch.optimize }),
-                ...(patch.returnToStart === undefined ? {} : { ret: patch.returnToStart }),
-                ...(patch.keepLastStopLast === undefined ? {} : { keep: patch.keepLastStopLast }),
-              })
-            }
-            optimizeBlocked={state.kind === 'route' && state.unreachable}
-            orderNote={orderNote}
-            nameOf={nameOf}
-          />
-          <RouteRulesPanel
-            preference={routeQuery.rules.preference}
-            onPreferenceChange={(pref) => setParams({ pref })}
-            holeQuery={holeQuery}
-            onHoleChange={(change) => {
-              saveHoleDefault(change);
-              setParams({ [HOLE_PARAM[change.field]]: null });
-            }}
-          />
+      {/* The route table needs ~612px but only gets ~427px beside the rail at 1024, so the
+          rail and route sit side by side only from `xl` (#2591). Below it the rail
+          dissolves (`contents`) so Stops, the route, then Route rules stack in order. */}
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="contents space-y-4 xl:block">
+          <div className="order-1 xl:order-none">
+            <StopsPanel
+              fromId={fromId}
+              fromName={fromId === null ? fromTrigger : nameOf(fromId)}
+              fromTrigger={fromTrigger}
+              onFromChange={(systemId) => setParams({ from: systemId }, { push: true })}
+              stops={stops}
+              onStopsChange={(next) => setParams({ stops: next, to: null }, { push: true })}
+              settings={settings}
+              onSettingsChange={(patch) =>
+                setParams({
+                  ...(patch.optimize === undefined ? {} : { opt: patch.optimize }),
+                  ...(patch.returnToStart === undefined ? {} : { ret: patch.returnToStart }),
+                  ...(patch.keepLastStopLast === undefined ? {} : { keep: patch.keepLastStopLast }),
+                })
+              }
+              optimizeBlocked={state.kind === 'route' && state.unreachable}
+              orderNote={orderNote}
+              nameOf={nameOf}
+            />
+          </div>
+          <div className="order-3 xl:order-none">
+            <RouteRulesPanel
+              preference={routeQuery.rules.preference}
+              onPreferenceChange={(pref) => setParams({ pref })}
+              holeQuery={holeQuery}
+              onHoleChange={(change) => {
+                saveHoleDefault(change);
+                setParams({ [HOLE_PARAM[change.field]]: null });
+              }}
+            />
+          </div>
         </div>
-        <div className="min-w-0 space-y-4">
+        <div className="order-2 min-w-0 space-y-4 xl:order-none">
           <RouteBody
             state={state}
             multiStop={stops.length > 1}
