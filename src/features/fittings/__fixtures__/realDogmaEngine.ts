@@ -11,7 +11,7 @@ import { loadDogmaEngine, type DogmaEngine } from '../dogmaFittingEngine';
 const require = createRequire(import.meta.url);
 
 /** Serves the pinned engine and SDE from node_modules to `loadDogmaEngine`'s fetch. */
-export async function stubEngineAssets(): Promise<void> {
+async function stubEngineAssets(): Promise<void> {
   const wasmPath = require.resolve('@eveshipfit/dogma-engine/esf_dogma_engine_bg.wasm');
   const sdePath = require.resolve('@eveshipfit/sde/dist/sde.dat');
   const [wasm, sde] = await Promise.all([readFile(wasmPath), readFile(sdePath)]);

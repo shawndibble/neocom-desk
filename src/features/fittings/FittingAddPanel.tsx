@@ -607,7 +607,7 @@ function ChargesTab({
     );
   };
 
-  if (moduleResults === null || groups === null) {
+  if (groups === null) {
     return <p className="text-xs text-warning">{t('fittings.add.waitingForShipData')}</p>;
   }
   if (groups.length === 0) {

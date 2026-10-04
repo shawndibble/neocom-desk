@@ -922,21 +922,7 @@ function compareCharges(
  * `useDogmaEngine`) hands it out after that. Holding one is the proof the
  * WASM engine and its SDE are in, so no caller has to know the call order.
  */
-export interface DogmaEngine {
-  checkCandidates: typeof checkCandidates;
-  checkOneCandidate: typeof checkOneCandidate;
-  checkHullCandidate: typeof checkHullCandidate;
-  moduleSkillRequirements: typeof moduleSkillRequirements;
-  hullSlotCounts: typeof hullSlotCounts;
-  hullRacks: typeof hullRacks;
-  checkCharges: typeof checkCharges;
-  chargeGroupIdsFor: typeof chargeGroupIdsFor;
-  moduleChargeCapacity: typeof moduleChargeCapacity;
-  chargesMissingSkills: typeof chargesMissingSkills;
-  compareCharges: typeof compareCharges;
-}
-
-const dogmaEngine: DogmaEngine = {
+const dogmaEngine = {
   checkCandidates,
   checkOneCandidate,
   checkHullCandidate,
@@ -949,3 +935,5 @@ const dogmaEngine: DogmaEngine = {
   chargesMissingSkills,
   compareCharges,
 };
+
+export type DogmaEngine = typeof dogmaEngine;

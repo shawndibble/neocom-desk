@@ -5,6 +5,7 @@
  */
 import { vi } from 'vitest';
 import type { CandidateRack } from '@/engine/fittings/candidates';
+import { buildPilotProfile } from '@/engine/fittings/pilotProfile';
 import type { PilotProfile } from '@/engine/fittings/types';
 import type { DogmaEngine } from '../dogmaFittingEngine';
 import type { FittingContext } from '../fittingContext';
@@ -29,7 +30,7 @@ export function fakeDogmaEngine(overrides: Partial<DogmaEngine> = {}): DogmaEngi
   };
 }
 
-const NO_SKILLS: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] };
+const NO_SKILLS: PilotProfile = buildPilotProfile(new Map(), []);
 
 export function fakeFittingContext(
   catalogue: FittingCatalogue,

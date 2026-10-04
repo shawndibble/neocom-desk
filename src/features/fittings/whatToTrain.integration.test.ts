@@ -12,7 +12,7 @@ import {
 } from '@/engine/fittings/skillGains';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 import { computeFittingStats, fittingSkillSources } from './dogmaFittingEngine';
-import { loadRealDogmaEngine, stubEngineAssets } from './__fixtures__/realDogmaEngine';
+import { loadRealDogmaEngine } from './__fixtures__/realDogmaEngine';
 import {
   evaluateModuleUpgrades,
   moduleUpgradeCandidates,
@@ -82,7 +82,7 @@ describe('What to train on a railgun Rokh (real WASM + real pinned SDE)', () => 
   let gains: SkillGain[];
 
   beforeAll(async () => {
-    await stubEngineAssets();
+    await loadRealDogmaEngine();
     const decoded = await decodeFittingShare(ROKH_SHARE);
     if (!decoded.ok) throw new Error('share code did not decode');
     fitting = shareToFitting(decoded.value, 'Boom');

@@ -189,12 +189,13 @@ function vexorNavyIssueFit(): Fitting {
   };
 }
 
-describe('dogma engine integration (real WASM + real pinned SDE)', () => {
-  beforeAll(async () => {
-    await loadRealDogmaEngine();
-  });
-  afterAll(() => vi.unstubAllGlobals());
+let engine: DogmaEngine;
+beforeAll(async () => {
+  engine = await loadRealDogmaEngine();
+});
+afterAll(() => vi.unstubAllGlobals());
 
+describe('dogma engine integration (real WASM + real pinned SDE)', () => {
   it('computes stats for an All-V pilot matching the pinned engine within a tight tolerance', () => {
     const fitting = vexorNavyIssueFit();
     const profile = buildAllVProfile(ALL_TEST_SKILL_IDS);
@@ -1551,13 +1552,8 @@ const SUPPORT_SKILL_IDS = Array.from({ length: 200 }, (_, i) => 3300 + i);
 /** The core skills plus the mining ones outside 3300-3499 (Mining Barge, Exhumers). */
 const MINING_SKILL_IDS = [...SUPPORT_SKILL_IDS, 17940, 22551];
 
-// Runs on the engine and SDE the describe above loaded (the SDE loads once per process).
+// Runs on the engine and SDE loaded once for the whole file.
 describe('hull fit pre-filter (real WASM + real pinned SDE)', () => {
-  let engine: DogmaEngine;
-  beforeAll(async () => {
-    engine = await loadRealDogmaEngine();
-  });
-  afterAll(() => vi.unstubAllGlobals());
   // A Rifter (frigate), a Loki (Tech 3: no hi/med/low slots until subsystems
   // are fitted) and a Bestower (an industrial).
   const HULLS = [587, 29990, 1944];
