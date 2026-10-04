@@ -105,6 +105,8 @@ test.describe('Corp Wallet sort pickers', () => {
     await page.setViewportSize(PHONE);
     await page.goto('./corp/wallet');
 
+    // One division: nothing to fold, so no caret.
+    await expect(page.getByRole('button', { name: 'Show all divisions' })).toBeHidden();
     const firstCard = page
       .getByRole('table', { name: 'Journal' })
       .locator('tbody tr:not(.dt-spacer)')
@@ -148,7 +150,7 @@ const LONG_NAME = 'Division name that runs on to forty ch';
 
 const WALLETS = [1, 2, 3, 4, 5, 6, 7].map((division) => ({
   division,
-  balance: division === 1 ? 123_456_789_012_345.67 : division * 1_000_000,
+  balance: division === 2 ? 123_456_789_012_345.67 : division * 1_000_000,
 }));
 
 const NAMES = ['Master Wallet', LONG_NAME, 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth'].map(
@@ -206,8 +208,7 @@ test.describe('Corp Wallet divisions panel (issue #2593)', () => {
     await page.setViewportSize(PHONE);
     await page.goto('./corp/wallet?division=2');
     await expect(page.getByRole('button', { name: 'Show all divisions' })).toBeVisible();
-    await expectNoPageOverflow(page);
-    await page.goto('./corp/wallet?division=1');
+    await expect(page.getByText(LONG_NAME)).toBeVisible();
     await expect(page.getByText(/123,456,789,012,345/)).toBeVisible();
     await expectNoPageOverflow(page);
   });
