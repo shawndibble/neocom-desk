@@ -126,7 +126,7 @@ test.describe('Corp Wallet sort pickers', () => {
     const sortBy = page.getByLabel('Sort by', { exact: true });
     await sortBy.selectOption({ label: 'Total ↑' });
     await expect(sortBy.locator('option:checked')).toHaveText('Total ↑');
-    expect(new URL(page.url()).search).toContain('sort');
+    await expect(page).toHaveURL(/sort=/);
     await expectNoPageOverflow(page);
   });
 

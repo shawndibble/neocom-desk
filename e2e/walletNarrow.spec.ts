@@ -102,7 +102,8 @@ test.describe('Journal sort picker', () => {
   ];
 
   test.beforeEach(async ({ page }) => {
-    await signInAndGoto(page);
+    // Before signing in: boot prefetch reads the journal, and an empty answer
+    // from the shared mock would be cached as fresh.
     await page.route(
       (url) => url.pathname === `/characters/${CHARACTER_ID}/wallet/journal`,
       (route) =>
@@ -112,6 +113,7 @@ test.describe('Journal sort picker', () => {
           body: JSON.stringify(JOURNAL),
         })
     );
+    await signInAndGoto(page);
   });
 
   test('journal has a phone sort picker at 390px that reorders the cards', async ({ page }) => {
@@ -125,7 +127,6 @@ test.describe('Journal sort picker', () => {
     await expect(firstCard).toContainText('Newest small gift');
 
     const sortBy = page.getByLabel('Sort by', { exact: true });
-    await expect(sortBy).toBeAttached();
     await sortBy.selectOption({ label: 'Amount ↓' });
     await expect(sortBy.locator('option:checked')).toHaveText('Amount ↓');
     await expect(firstCard).toContainText('Middle huge payout');
