@@ -7862,6 +7862,7 @@
     "activityLoading": "Loading the last hour of jumps and kills…",
     "activityUnavailable": "Some of ESI's last-hour figures couldn't be read, so they show as —, not as zero.",
     "dataAgeNote": "Jumps and kills cover the last hour; ESI refreshes them about hourly.",
+    "notApplicable": "N/A",
     "wormholeSpace": "ESI doesn't report wormhole space",
     "holes": {
       "group": "Route Safety only · your default on this page, can be overridden in the link",
