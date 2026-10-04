@@ -121,11 +121,12 @@ which part of the app a deadline came from, and they are read by
 ### Security status
 
 `securityStatusColor(security)` (`src/engine/securityStatus.ts`) colors a solar
-system's security status on the game's own scale: blue-green across highsec
-(`success` at 0.5 blending to `accent` at 1.0), amber toward red across lowsec
-and nullsec (`warning` approaching 0.5 from below, blending to `danger` at
--1.0 and beyond). The step at exactly 0.5 is deliberate — it mirrors the
-game client's own highsec/lowsec boundary, not an interpolation artifact.
+system's security status on the game client's own scale. Highsec runs
+`warning` yellow at 0.5, through `success` green at 0.7, to `accent` blue at
+1.0. Lowsec is orange, a point partway along `warning`→`danger` that deepens
+from 0.4 to 0.1 without reaching red. Every nullsec system (0.0 and below) is
+flat `danger` red. The steps at 0.5 and 0.0 are deliberate — they mirror the
+game's own band boundaries, not an interpolation artifact.
 Computed, not a fixed token set: call the function rather than hand-picking a
 color, and always render the numeric value (`0.9`, `-0.3`, …) alongside the
 color — colour is never the only signal (§7).
