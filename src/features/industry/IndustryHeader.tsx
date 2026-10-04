@@ -32,10 +32,15 @@ export interface IndustryHeaderProps {
 function tabSettings(tab: IndustryTab, t: TFunction): ReactNode {
   switch (tab) {
     case 'plans':
-    case 'opportunities':
       return (
         <PageSettingsButton key={tab} pageName={t('nav.industry')} section="industry">
           <IndustrySettingsForm />
+        </PageSettingsButton>
+      );
+    case 'opportunities':
+      return (
+        <PageSettingsButton key={tab} pageName={t('industry.opportunitiesTab')} section="industry">
+          <IndustrySettingsForm onlyAssumedMe />
         </PageSettingsButton>
       );
     case 'sourcing':
@@ -51,8 +56,9 @@ function tabSettings(tab: IndustryTab, t: TFunction): ReactNode {
 
 /**
  * The chrome every Industry page shares above its own content: title (and
- * the current tab's settings gear beside it), Active Jobs, the reauth banner, and the 4-tab strip — identical whether
- * this is the index or a plan/group's own full-width page, so moving
+ * the current tab's settings gear beside it), Active Jobs, the reauth
+ * banner, and the 4-tab strip — identical whether this is the index or a
+ * plan/group's own full-width page, so moving
  * between them reads as "only the content under the tabs changed," not a
  * jump to a different page. `Industry.tsx`'s tab switch keeps this mounted
  * while it swaps content underneath; `IndustryPlanPage`/`IndustryGroupPage`

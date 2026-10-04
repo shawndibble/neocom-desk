@@ -6721,8 +6721,8 @@
           "settingsDetail": {
             "notifications": "Notifications: your notification preferences.",
             "defaults": "Defaults: trade hub, industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
-            "industry": "Industry: build groups, and whether blueprint cost counts toward profit.",
-            "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, and BPC Sourcing's hide auctions / hide PLEX.",
+            "industry": "Industry: build groups, whether blueprint cost counts toward profit, and BPC Sourcing's hide auctions / hide PLEX.",
+            "market": "Market: appraisal price %, ISK-per-LP value, and courier collateral warning.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, and how the Assign form edits ore values.",
