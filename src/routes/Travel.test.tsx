@@ -21,7 +21,6 @@ import {
   useDefaultRoutePreference,
 } from '@/features/route/routeRules';
 import { clearEveScoutCache, EVE_SCOUT_SIGNATURES_URL } from '@/lib/eveScout';
-import { configureClipboard } from '@/lib/clipboard';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -917,8 +916,6 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
 });
 
 describe('Travel › Thera / Turnur', () => {
-  afterEach(() => configureClipboard(null));
-
   const MAIN_TABLE = 'Open holes out of Thera and Turnur';
   const JSPACE_TABLE = 'Open holes into J-space';
   const JSPACE_GROUP = /exits? into J-space · no gate route from you/;
@@ -1095,29 +1092,14 @@ describe('Travel › Thera / Turnur', () => {
     expect(await screen.findByText(/Connections can.t be loaded right now/)).toBeInTheDocument();
   });
 
-  it('copies the hub-side signature without opening the row', async () => {
-    const write = vi.fn(async () => {});
-    configureClipboard(write);
+  it('lets the hub-side signature be selected without opening the row', async () => {
     visitThera('');
 
     await screen.findByRole('table', { name: MAIN_TABLE });
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Thera signature for Uedama' }));
-    expect(
-      await screen.findByRole('button', { name: 'Copied Thera signature for Uedama' })
-    ).toBeInTheDocument();
-    expect(write).toHaveBeenCalledWith('AAA-111');
+    const signature = within(holeRow('uedama')).getByText('AAA-111');
+    expect(signature).toHaveClass('select-all');
+    fireEvent.click(signature);
     expect(holeRow('uedama')).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('selects the signature to copy by hand when the clipboard refuses', async () => {
-    configureClipboard(async () => {
-      throw new Error('denied');
-    });
-    visitThera('');
-
-    await screen.findByRole('table', { name: MAIN_TABLE });
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Turnur signature for Perimeter' }));
-    await waitFor(() => expect(window.getSelection()?.toString()).toBe('AAA-111'));
   });
 
   it('shows dense cards and filter chips on a phone', async () => {
