@@ -1,0 +1,6 @@
+# Scope decisions — Out-of-date fits check names against every type the game has
+
+_Recorded 2026-10-03._
+
+- **An item the EFT loader can't read makes an EVE Workbench fit an Out-of-date fit only when `typeNames.json` doesn't have the name either.** `typeNames.json` lists every type name in the SDE, published or not. The loader's catalogue (`types.json`) only carries types that a blueprint, a skill or a refine references. That leaves out Abyssal filaments and LP boosters, because nothing builds them. It also leaves out mutated (Abyssal) modules, which have no blueprint and no market group. A Gila showed 372 of its 507 Workbench fits as out of date, and every one was a false positive. The check doesn't widen the loader's catalogue, so filaments, boosters and mutated modules still aren't loaded. They aren't priced, and they aren't drawn in a row's rack strip. Unknown hulls and lost slots are judged exactly as before.
+- **`typeNames.json` (~1.7 MB, ~0.3 MB gzip) loads on demand, like the other single-feature SDE files.** Only the Workbench check reads it. If it can't be read, no unread item counts as removed, because hiding fits on a guess is worse than not marking them. The rest of the check still runs. `scripts/build-sde.mjs` fails the build if `typeNames.json` is missing any name that `types.json`, `market/types.json` or `skills.json` carries.

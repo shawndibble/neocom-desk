@@ -3,6 +3,7 @@ import type { LoadParts, LoadWarning } from './load';
 import type { FittingModule, FittingSlotKind } from './types';
 import {
   classifyFitCurrency,
+  gameItemLookup,
   partitionByCurrency,
   type FitCurrency,
   type HullSlotCounts,
@@ -54,6 +55,62 @@ describe('classifyFitCurrency', () => {
     expect(classifyFitCurrency(fit, VEXOR)).toEqual({
       current: false,
       reasons: [{ kind: 'removed-item', name: 'Old Gun I' }],
+    });
+  });
+
+  describe('an item the game still has, though the loader did not resolve it', () => {
+    // Real names the Workbench flagged as removed: Abyssal filaments and Agency
+    // boosters (cargo, booster section) and a mutated module (fitted in a rack).
+    const STILL_IN_GAME = [
+      'Fierce Exotic Filament',
+      'Cataclysmic Electrical Filament',
+      'Raging Gamma Filament',
+      'Agitated Exotic Filament',
+      'Calm Exotic Filament',
+      'Tranquil Exotic Filament',
+      "Agency 'Hardshell' TB5 Dose II",
+      "Agency 'Overclocker' SB3 Dose I",
+      'Large Abyssal Shield Extender',
+    ];
+    const isGameItem = gameItemLookup([...STILL_IN_GAME, 'Gila']);
+    const unknown = (text: string): LoadWarning => ({
+      text,
+      reason: 'unknown item',
+      kind: 'unknown-item',
+    });
+
+    it.each(STILL_IN_GAME)('%s is never a removed item', (name) => {
+      const fit = parts(modules('high', 2), [unknown(name)]);
+      expect(classifyFitCurrency(fit, VEXOR, isGameItem)).toEqual({ current: true });
+    });
+
+    it('a fit whose only unresolved lines are filaments, boosters and an Abyssal module is current', () => {
+      const fit = parts([], STILL_IN_GAME.map(unknown));
+      expect(classifyFitCurrency(fit, VEXOR, isGameItem)).toEqual({ current: true });
+    });
+
+    it('matches the game’s names ignoring case, as the loader does', () => {
+      const fit = parts([], [unknown('large abyssal SHIELD extender')]);
+      expect(classifyFitCurrency(fit, VEXOR, isGameItem)).toEqual({ current: true });
+    });
+
+    it('a name the game does not have is still a removed item beside them', () => {
+      const fit = parts([], [unknown('Fierce Exotic Filament'), unknown('Old Gun I')]);
+      expect(classifyFitCurrency(fit, VEXOR, isGameItem)).toEqual({
+        current: false,
+        reasons: [{ kind: 'removed-item', name: 'Old Gun I' }],
+      });
+    });
+
+    it('a hull is judged by the loader alone, as before', () => {
+      const fit: LoadParts = {
+        hullTypeId: null,
+        unresolved: [{ text: 'Gila', reason: 'unknown ship', kind: 'unknown-ship' }],
+      };
+      expect(classifyFitCurrency(fit, null, isGameItem)).toEqual({
+        current: false,
+        reasons: [{ kind: 'unknown-hull', name: 'Gila' }],
+      });
     });
   });
 

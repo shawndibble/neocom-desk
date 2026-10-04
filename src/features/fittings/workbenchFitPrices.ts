@@ -28,6 +28,11 @@ export interface WorkbenchFitPrices {
   priceFor: (id: string) => FitSellPrice | undefined;
   /** At least one fit has a price. */
   anyPriced: boolean;
+  /**
+   * This hub's prices are still on their way. False once they land or fail,
+   * and while there is nothing to price (still checking, or no fit loaded).
+   */
+  loading: boolean;
 }
 
 const NO_PRICES: ReadonlyMap<number, HubAggregate> = new Map();
@@ -80,5 +85,10 @@ export function useWorkbenchFitPrices(
     return priced;
   }, [checks, prices]);
 
-  return { hub, priceFor: (id) => byFit.get(id), anyPriced: byFit.size > 0 };
+  return {
+    hub,
+    priceFor: (id) => byFit.get(id),
+    anyPriced: byFit.size > 0,
+    loading: typeIds !== null && typeIds.length > 0 && prices === null,
+  };
 }

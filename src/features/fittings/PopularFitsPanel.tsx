@@ -181,6 +181,12 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
           eveworkbench.com
         </a>
       </p>
+      {result?.ok && prices.loading && (
+        // One line for the whole tab, not one per row: a hull can list hundreds.
+        <p role="status" className="text-xs text-text-dim">
+          {t('fittings.popular.workbench.pricing', { hub: prices.hub.systemName })}
+        </p>
+      )}
       {result?.ok && prices.anyPriced && (
         <p className="text-xs text-text-dim">
           {t('fittings.popular.workbench.priceNote', { hub: prices.hub.systemName })}

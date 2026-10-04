@@ -47,6 +47,9 @@ vi.mock('@/sde/loadSde', () => ({
     Promise.resolve({
       ships: [{ typeID: 626, stats: { highSlots: 1, medSlots: 4, lowSlots: 5, rigSlots: 3 } }],
     }),
+  // Every name the game has — more than the loader's catalogue below carries.
+  loadTypeNames: () =>
+    Promise.resolve(['Vexor', 'Heavy Neutron Blaster II', 'Fierce Exotic Filament']),
 }));
 vi.mock('@/features/skills/typeCatalog', () => ({
   loadItemNameMap: () =>
@@ -281,6 +284,19 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     expect(screen.getByRole('button', { name: 'Hide out-of-date fits' })).toBeTruthy();
   });
 
+  it('never calls an item the game still has removed, though the loader cannot read it', async () => {
+    openWorkbench({
+      ok: true,
+      fits: [
+        wbFit('a', {
+          eft: '[Vexor, Fit a]\nHeavy Neutron Blaster II\n\nFierce Exotic Filament x3',
+        }),
+      ],
+    });
+    expect(await screen.findByRole('link', { name: 'Fit a' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /out-of-date fit/ })).toBeNull();
+  });
+
   it("shows a fit's modules by rack, from the out-of-date check's own load", async () => {
     openWorkbench({
       ok: true,
@@ -401,6 +417,33 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Show 1 out-of-date fit' }));
     expect(await within(rowOf('Fit a')).findByText('≈ 245M ISK')).toBeTruthy();
+  });
+
+  it('says prices are on their way until they land', async () => {
+    let answer: (prices: ReturnType<typeof sellPrices>) => void = () => {};
+    getHubPricesMock.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    openWorkbench({ ok: true, fits: PRICED_FITS });
+    expect((await screen.findByText('Pricing fits at Jita…')).getAttribute('role')).toBe('status');
+    expect(screen.queryByText(/ISK/)).toBeNull();
+    act(() => answer(sellPrices({ 626: 200_000_000, 3001: 45_000_000 })));
+    expect(await within(rowOf('Fit a')).findByText('≈ 245M ISK')).toBeTruthy();
+    expect(screen.queryByText('Pricing fits at Jita…')).toBeNull();
+  });
+
+  it('stops saying prices are on their way when they cannot load', async () => {
+    let fail: (error: Error) => void = () => {};
+    getHubPricesMock.mockReturnValue(new Promise((_, reject) => (fail = reject)));
+    openWorkbench({ ok: true, fits: PRICED_FITS });
+    expect((await screen.findByText('Pricing fits at Jita…')).getAttribute('role')).toBe('status');
+    act(() => fail(new Error('offline')));
+    await waitFor(() => expect(screen.queryByText('Pricing fits at Jita…')).toBeNull());
+  });
+
+  it('never says prices are on their way when no fit loaded anything to price', async () => {
+    openWorkbench({ ok: true, fits: [wbFit('a', { eft: '[Gone Hull, Fit a]' })] });
+    await screen.findByText(/out of date/);
+    expect(screen.queryByText(/Pricing fits/)).toBeNull();
+    expect(getHubPricesMock).not.toHaveBeenCalled();
   });
 
   it('re-prices the rows when the Default Trade Hub changes', async () => {

@@ -115,3 +115,10 @@ export const loadFittingSlots = cached<FittingSlotMap>('fittingSlots.json');
 
 /** The Ship Tree's classes, factions and hulls — see `ShipTreeData`. */
 export const loadShipTree = cached<ShipTreeData>('shipTree.json');
+
+/**
+ * Every type name the game has, published or not (`scripts/lib/typeNames.mjs`)
+ * — for telling an item CCP removed from one `types.json` just doesn't carry.
+ * ~1.7 MB, so not precached: only the EVE Workbench's out-of-date check reads it.
+ */
+export const loadTypeNames = cached<string[]>('typeNames.json');

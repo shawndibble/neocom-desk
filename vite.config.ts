@@ -334,6 +334,7 @@ export default defineConfig({
           '**/data/pi-planet-radius.json',
           '**/data/blueprints.json',
           '**/data/shipTree.json',
+          '**/data/typeNames.json',
           '**/icons/icon-512*.png',
           '**/brand/**',
         ],
