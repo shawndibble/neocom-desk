@@ -1,10 +1,17 @@
 /**
- * Assignment CRUD for the Moon Mining Tax ledger (issue #523): links a Mining
- * Ledger Entry (or a split slice of its ore lines) to a Payee, snapshotting
- * tax % and the hub-priced ISK value **at assignment time** (invoice
- * semantics — see `engine/miningTax/valuation.ts`). The hub is the Payee's own
- * (`PayeeRecord.hubId`, Jita when it names none), since the figure is a bill
- * one player sends another.
+ * Assignment record writes for the Moon Mining Tax ledger (issue #523): links
+ * a Mining Ledger Entry (or a split slice of its ore lines) to a Payee,
+ * snapshotting tax % and the hub-priced ISK value **at assignment time**
+ * (invoice semantics — see `engine/miningTax/valuation.ts`). The hub is the
+ * Payee's own (`PayeeRecord.hubId`, Jita when it names none), since the figure
+ * is a bill one player sends another.
+ *
+ * These are primitives, not actions: none of them schedules a sync, and a
+ * multi-step change is only safe when its steps share one transaction. The UI
+ * reaches them through `ledgerActions.ts`, which wraps each action in one
+ * Dexie transaction (covering `db.settings` too, for delete tombstones) and
+ * schedules the sync after it commits. Every write here is Dexie-only, so it
+ * can run inside that transaction.
  */
 import {
   db,
@@ -15,7 +22,8 @@ import {
   type MiningTaxPaymentLinkSource,
   type MiningTaxPaymentMethod,
 } from '@/db';
-import { markMiningTaxAssignmentDeleted, scheduleSync } from '@/sync';
+import { appendTombstones, tombstoneKey } from '@/sync/localBookkeeping';
+import { MINING_TAX_ASSIGNMENTS } from '@/sync/syncedCollections';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { linesOwnedBy } from '@/engine/miningTax/ownership';
 import { planSplit } from '@/engine/miningTax/split';
@@ -118,7 +126,8 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
     ...(input.markPaid ? { paidAt: now } : {}),
     updatedAt: now,
   };
-  // Check and write in one transaction so two tabs cannot both pass the check.
+  // Check and write in one transaction so two tabs cannot both pass the check
+  // (under a ledger action this joins the action's own transaction).
   await db.transaction('rw', db.miningTaxAssignments, async () => {
     await assertUnclaimed(
       input.characterId,
@@ -129,7 +138,6 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
     );
     await db.miningTaxAssignments.put(record);
   });
-  scheduleSync(input.characterId);
   return record;
 }
 
@@ -143,23 +151,12 @@ export interface DismissInput {
 }
 
 /**
- * Dismisses an entry ("I don't pay tax on this") — no Payee, no tax owed.
+ * Dismisses entries ("I don't pay tax on this") — no Payee, no tax owed — in
+ * one write, whether one row's or the ledger's bulk Dismiss (issue #539).
  * Still snapshots `oreLines` and still participates in `reconcileAssignments`
  * the same way a real Assignment does: growth on a dismissed entry surfaces
  * for reconsideration (`needs-review`) rather than being silently absorbed
  * into a standing "never taxed" verdict.
- */
-export async function dismissEntry(input: DismissInput): Promise<MiningTaxAssignmentRecord> {
-  const [record] = await dismissEntries([input]);
-  return record;
-}
-
-/**
- * Dismisses several entries in one write — the ledger's bulk Dismiss (issue
- * #539). Deliberately one `bulkPut` and one `scheduleSync` *per character*
- * rather than a loop over `dismissEntry`: dismissing a week of entries would
- * otherwise fire a week's worth of syncs for what is a single user action.
- * Same shape as `markAssignmentsPaid`.
  */
 export async function dismissEntries(
   inputs: readonly DismissInput[]
@@ -179,96 +176,97 @@ export async function dismissEntries(
     updatedAt: now,
   }));
   await db.miningTaxAssignments.bulkPut(records);
-  for (const characterId of new Set(inputs.map((i) => i.characterId))) scheduleSync(characterId);
   return records;
 }
 
-export interface UpdateAssignmentInput {
-  payeeId: string;
-  taxPct: number;
+export interface CombinedMemberValues {
   estimatedValue: number;
   taxOwed: number;
   /**
-   * The pilot's per-ore-type corrections, when the "edit ore values
-   * individually" setting is on — omit (not an empty object) to leave
-   * whatever was previously stored untouched only when the setting is off
-   * *and* the record never had any; otherwise this always replaces the
-   * stored map outright, so a line the pilot cleared back to tracking the
-   * computed default is actually gone, not silently kept from a prior edit.
+   * The pilot's per-ore corrections for this day. Replaces whatever was
+   * stored outright, and omitting it removes them, rather than merging: the
+   * edit form always sends the whole map, so a merge would resurrect a
+   * correction the pilot just cleared.
    */
   oreLineValues?: Record<number, number>;
 }
 
+export interface UpdateCombinedInput {
+  payeeId: string;
+  taxPct: number;
+  /** Each member's own figures, keyed by Assignment id. A member missing here keeps its stored ones. */
+  members: Readonly<Record<string, CombinedMemberValues>>;
+}
+
 /**
- * Edits an existing Assignment's Payee/tax %/value/tax owed from the row
- * detail view — the same four fields the Assign form itself collects, now
- * correctable after the fact (a Jita price or a Payee's rate can turn out
- * wrong after the invoice moment `createAssignment` snapshotted).
- *
- * Deliberately leaves one thing alone: `oreLines`, since line membership is
- * what the sole-vs-split ownership rule (`rowStatus.ts`) keys off — resplitting
- * a record happens through Undo + a fresh Assign, not this edit. `status`/
- * `paidAt` are also left alone here — correcting a Paid record's ISK doesn't
- * silently un-pay it; `unlockPaidAssignment` is the only thing that reopens a
- * Paid record, and only the pilot calling it explicitly does that.
- *
- * `oreLineValues` replaces whatever was stored outright (or is removed
- * entirely when omitted) rather than merging — the Assign form always
- * recomputes the whole map from what's currently in each per-ore box, so a
- * partial merge here would resurrect a correction the pilot just cleared.
- *
- * Moving a *joined* member onto a different Payee or rate does drop its
- * `groupId`, though. A group is one obligation billed to one Payee at one
- * rate and renders as a single row under a single Payee name, so a member on
- * other terms is no longer part of it — and leaving it in made the row claim
- * ore had gone somewhere it had not. `coalesce.ts` applies the same rule to
- * records already stored in that state.
+ * Saves an entry's edit form (`EntryEditDialog`) in one write: one Payee and
+ * one tax % for every day of it, plus each day's own value and tax owed. A
+ * Payee or rate change keeps the `groupId` — a combined entry moves
+ * together, which is exactly what keeps the "one obligation, one Payee, one
+ * rate" rule true. `oreLines` stay as they are (line membership is what the
+ * sole-vs-split ownership rule in `rowStatus.ts` keys off), and so do status
+ * and payment: correcting a Paid entry's figures doesn't un-pay it.
  */
-export async function updateAssignment(
-  assignment: MiningTaxAssignmentRecord,
-  input: UpdateAssignmentInput
-): Promise<MiningTaxAssignmentRecord> {
-  const updated: MiningTaxAssignmentRecord = {
-    ...assignment,
-    payeeId: input.payeeId,
-    taxPct: input.taxPct,
-    estimatedValue: input.estimatedValue,
-    taxOwed: input.taxOwed,
-    updatedAt: Date.now(),
-  };
-  if (input.oreLineValues !== undefined) updated.oreLineValues = input.oreLineValues;
-  else delete updated.oreLineValues;
-  const termsChanged = input.payeeId !== assignment.payeeId || input.taxPct !== assignment.taxPct;
-  if (termsChanged) delete updated.groupId;
-  await db.miningTaxAssignments.put(updated);
-  scheduleSync(assignment.characterId);
+export async function updateCombinedAssignments(
+  assignments: readonly MiningTaxAssignmentRecord[],
+  input: UpdateCombinedInput
+): Promise<MiningTaxAssignmentRecord[]> {
+  if (assignments.length === 0) return [];
+  const now = Date.now();
+  const updated = assignments.map((a): MiningTaxAssignmentRecord => {
+    const values = input.members[a.id];
+    const next: MiningTaxAssignmentRecord = {
+      ...a,
+      payeeId: input.payeeId,
+      taxPct: input.taxPct,
+      ...(values ? { estimatedValue: values.estimatedValue, taxOwed: values.taxOwed } : {}),
+      updatedAt: now,
+    };
+    if (values) {
+      if (values.oreLineValues !== undefined) next.oreLineValues = values.oreLineValues;
+      else delete next.oreLineValues;
+    }
+    return next;
+  });
+  await db.miningTaxAssignments.bulkPut(updated);
   return updated;
 }
 
 /**
- * Reopens a Paid Assignment for editing ("unlock to edit", grilling session
- * 2026-09-27) — reverts `status` to `outstanding` and clears `paidAt` so the
- * row detail view's fields stop rendering read-only, but deliberately leaves
- * `payment` (the recorded amount/method/date and any matched wallet-journal
- * or contract reference) exactly as it was: the pilot is correcting a
- * data-entry mistake, not reversing a real payment, and losing an
- * already-matched reconciliation over a routine ore-value fix would be a
- * real chore. Re-marking the corrected record paid afterward
- * (`markAssignmentsPaid`, with no `payment` argument) reuses that same
- * retained record rather than asking for it again.
+ * "Take out of combined" / "Uncombine all": clears `groupId` and nothing
+ * else, so each day goes back to being its own row with its Payee, figures,
+ * status and payment intact. Taking one day out of a two-day entry leaves a
+ * lone `groupId`, which already renders as an ordinary row (`flatten`).
  */
-export async function unlockPaidAssignment(
-  assignment: MiningTaxAssignmentRecord
-): Promise<MiningTaxAssignmentRecord> {
-  const updated: MiningTaxAssignmentRecord = {
-    ...assignment,
-    status: 'outstanding',
-    updatedAt: Date.now(),
-  };
-  delete updated.paidAt;
-  await db.miningTaxAssignments.put(updated);
-  scheduleSync(assignment.characterId);
-  return updated;
+export async function uncombineAssignments(
+  assignments: readonly MiningTaxAssignmentRecord[]
+): Promise<void> {
+  const now = Date.now();
+  const updated = assignments
+    .filter((a) => a.groupId !== undefined)
+    .map((a): MiningTaxAssignmentRecord => {
+      const next: MiningTaxAssignmentRecord = { ...a, updatedAt: now };
+      delete next.groupId;
+      return next;
+    });
+  if (updated.length === 0) return;
+  await db.miningTaxAssignments.bulkPut(updated);
+}
+
+/**
+ * Deleting a Payee that is still owed (scope decision 20261004): its
+ * Assignments move to another Payee rather than turning into "Unknown
+ * Payee". Only the Payee changes — the figures were the bill as it stood,
+ * and a combined entry moves whole, so its `groupId` stays.
+ */
+export async function moveAssignmentsToPayee(
+  assignments: readonly MiningTaxAssignmentRecord[],
+  payeeId: string
+): Promise<void> {
+  if (assignments.length === 0) return;
+  const now = Date.now();
+  const updated = assignments.map((a) => ({ ...a, payeeId, updatedAt: now }));
+  await db.miningTaxAssignments.bulkPut(updated);
 }
 
 export interface JoinMemberInput {
@@ -345,7 +343,6 @@ export async function joinAssignments(
     }
     await db.miningTaxAssignments.bulkPut(records);
   });
-  for (const characterId of new Set(members.map((m) => m.characterId))) scheduleSync(characterId);
   return records;
 }
 
@@ -381,8 +378,6 @@ export async function markAssignmentsPaid(
     updatedAt: now,
   }));
   await db.miningTaxAssignments.bulkPut(updated);
-  for (const characterId of new Set(assignments.map((a) => a.characterId)))
-    scheduleSync(characterId);
 }
 
 /** Which linked-transaction array a call targets — a wallet-journal entry id or a contract id, never both. */
@@ -434,8 +429,6 @@ export async function linkRecordedPayment(
     return { ...a, payment: withLink(a.payment, ref, 'auto'), updatedAt: now };
   });
   await db.miningTaxAssignments.bulkPut(updated);
-  for (const characterId of new Set(assignments.map((a) => a.characterId)))
-    scheduleSync(characterId);
 }
 
 /** A minimal payment to create from the transaction's own data, when the target Assignment(s) have no `payment` yet — see `linkPaymentTransaction`. */
@@ -482,8 +475,6 @@ export async function linkPaymentTransaction(
     return { ...a, payment: withLink(base, ref, source), updatedAt: now };
   });
   await db.miningTaxAssignments.bulkPut(updated);
-  for (const characterId of new Set(assignments.map((a) => a.characterId)))
-    scheduleSync(characterId);
 }
 
 /** Removes one linked transaction from every Assignment in `assignments` (a mistaken pick) — the mirror of `linkPaymentTransaction`. A no-op for an Assignment with no `payment` or without that link. */
@@ -515,7 +506,6 @@ export async function unlinkPaymentTransaction(
     });
   if (updated.length === 0) return;
   await db.miningTaxAssignments.bulkPut(updated);
-  for (const characterId of new Set(updated.map((a) => a.characterId))) scheduleSync(characterId);
 }
 
 export interface SplitInput {
@@ -591,7 +581,7 @@ export async function splitAssignment(
   if (input.collector === 'original') kept.collectsGrowth = true;
   if (original.status === 'needs-review') {
     // Splitting is how the growth gets settled, so the kept side re-opens
-    // exactly as `resolveNeedsReview` would leave it.
+    // exactly as `planNeedsReviewResolution` would leave it.
     kept.status = 'outstanding';
     delete kept.reviewDiff;
     delete kept.paidAt;
@@ -614,16 +604,34 @@ export async function splitAssignment(
   };
 
   await db.miningTaxAssignments.bulkPut([kept, created]);
-  scheduleSync(original.characterId);
   return { kept, created };
 }
 
-export async function deleteAssignment(assignment: MiningTaxAssignmentRecord): Promise<void> {
-  await markMiningTaxAssignmentDeleted(assignment.characterId, assignment.id);
+/**
+ * Deletes Assignments and tombstones each one under its character, so the
+ * deletion syncs instead of the next pull resurrecting it. Run inside a
+ * transaction covering `db.settings` as well, or a failure between the two
+ * writes leaves a row deleted here that comes back from the remote copy.
+ */
+export async function deleteAssignments(
+  assignments: readonly Pick<MiningTaxAssignmentRecord, 'id' | 'characterId'>[]
+): Promise<void> {
+  if (assignments.length === 0) return;
+  await db.miningTaxAssignments.bulkDelete(assignments.map((a) => a.id));
+  const idsByCharacter = new Map<number, string[]>();
+  for (const a of assignments) {
+    const ids = idsByCharacter.get(a.characterId);
+    if (ids) ids.push(a.id);
+    else idsByCharacter.set(a.characterId, [a.id]);
+  }
+  for (const [characterId, ids] of idsByCharacter) {
+    await appendTombstones(tombstoneKey(MINING_TAX_ASSIGNMENTS, characterId), ids);
+  }
 }
 
 /**
- * Accepts a `needs-review` Assignment's growth: re-prices and re-snapshots
+ * Plans accepting a `needs-review` Assignment's growth (the write is the
+ * caller's): re-prices and re-snapshots
  * its own ore lines to the entry's current fresh totals — a new valuation
  * moment, exactly like a fresh assignment — and clears `reviewDiff`.
  *
@@ -651,11 +659,11 @@ export async function deleteAssignment(assignment: MiningTaxAssignmentRecord): P
  * ore's value, and the day it was mined didn't change just because the pilot
  * came back to reconcile it later.
  */
-export async function resolveNeedsReview(
+export async function planNeedsReviewResolution(
   assignment: MiningTaxAssignmentRecord,
   freshEntry: MiningLedgerEntry,
   siblings: readonly MiningTaxAssignmentRecord[]
-): Promise<void> {
+): Promise<MiningTaxAssignmentRecord> {
   const relevantFresh = linesOwnedBy(freshEntry.oreLines, siblings, assignment.id);
   const payee =
     assignment.payeeId === undefined
@@ -686,6 +694,5 @@ export async function resolveNeedsReview(
   // against the pre-review line set, and growth can add or resize lines —
   // a carried-over override would misprice this fresh re-snapshot.
   delete updated.oreLineValues;
-  await db.miningTaxAssignments.put(updated);
-  scheduleSync(assignment.characterId);
+  return updated;
 }

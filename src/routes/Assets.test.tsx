@@ -55,7 +55,22 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadMarketGroups: vi.fn(async () => []),
   loadMarketTypes: vi.fn(async () => []),
   loadNpcStations: vi.fn(async () => []),
-  loadSolarSystems: vi.fn(async () => []),
+  loadSolarSystems: vi.fn(async () => [
+    { id: 30000142, name: 'Jita', security: 0.95, regionId: 10000002 },
+    { id: 30002053, name: 'Hed', security: 0.9, regionId: 10000002 },
+    { id: 30002054, name: 'Lowpoint', security: 0.3, regionId: 10000002 },
+    { id: 30002055, name: 'Far', security: 0.9, regionId: 10000002 },
+    { id: 30002187, name: 'Amamake', security: 0.9, regionId: 10000002 },
+  ]),
+  // Jita to Amamake: two jumps through low-sec Lowpoint, or three through
+  // high-sec Hed and Far. Prefer safer flies the three, Prefer shorter the two.
+  loadSolarSystemJumps: vi.fn(async () => ({
+    30000142: [30002054, 30002053],
+    30002054: [30000142, 30002187],
+    30002053: [30000142, 30002055],
+    30002055: [30002053, 30002187],
+    30002187: [30002054, 30002055],
+  })),
   loadMarketRegions: vi.fn(async () => []),
   loadGlobalMarkets: vi.fn(async () => []),
   loadAttributeDictionary: vi.fn(async () => new Map()),
@@ -1291,15 +1306,8 @@ describe('cross-character search (issue #85)', () => {
 });
 
 describe('jumps-away distance (issue #87)', () => {
-  it('shows 0 jumps for a pinned location in the character’s own system, without a route call', async () => {
+  it('shows 0 jumps for a pinned location in the character’s own system', async () => {
     const user = userEvent.setup();
-    let routeCalled = false;
-    server.use(
-      http.post('https://esi.evetech.net/route/:origin/:destination', () => {
-        routeCalled = true;
-        return HttpResponse.json({ route: [30000142] });
-      })
-    );
     render(<App />);
     const pinButton = await screen.findByRole('button', {
       name: new RegExp(`Pin toggle for ${escapeRegExp(JITA)}`),
@@ -1307,10 +1315,9 @@ describe('jumps-away distance (issue #87)', () => {
     await user.click(pinButton);
 
     expect(await screen.findByText('0 jumps')).toBeInTheDocument();
-    expect(routeCalled).toBe(false);
   });
 
-  it('shows jumps resolved from the ESI route waypoint list for a pinned structure', async () => {
+  it('counts jumps for a pinned structure on the stargate graph, as Route Safety does', async () => {
     server.use(
       http.get('https://esi.evetech.net/universe/structures/1000000000001', () =>
         HttpResponse.json({
@@ -1318,9 +1325,6 @@ describe('jumps-away distance (issue #87)', () => {
           owner_id: 1,
           solar_system_id: 30002187,
         })
-      ),
-      http.post('https://esi.evetech.net/route/30000142/30002187', () =>
-        HttpResponse.json({ route: [30000142, 30002053, 30002187] })
       )
     );
     await db.stationPins.put({
@@ -1333,7 +1337,7 @@ describe('jumps-away distance (issue #87)', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('2 jumps')).toBeInTheDocument();
+    expect(await screen.findByText('3 jumps')).toBeInTheDocument();
   });
 
   it('resolves jumps-away for an "in space" location from its own location id, instead of always showing 0', async () => {
@@ -1356,9 +1360,6 @@ describe('jumps-away distance (issue #87)', () => {
       ),
       http.get('https://esi.evetech.net/universe/systems/30002187', () =>
         HttpResponse.json({ system_id: 30002187, name: 'Amamake', security_status: 0.3 })
-      ),
-      http.post('https://esi.evetech.net/route/30000142/30002187', () =>
-        HttpResponse.json({ route: [30000142, 30002053, 30002187] })
       )
     );
     await db.stationPins.put({
@@ -1371,7 +1372,7 @@ describe('jumps-away distance (issue #87)', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('2 jumps')).toBeInTheDocument();
+    expect(await screen.findByText('3 jumps')).toBeInTheDocument();
   });
 
   it('shows "-" with a reason tooltip when the destination system cannot be resolved', async () => {
@@ -1411,7 +1412,6 @@ describe('jumps-away distance (issue #87)', () => {
 
   it('opens on the Travel default and lets the user switch preference for this view', async () => {
     const user = userEvent.setup();
-    const seenFlags: (string | undefined)[] = [];
     server.use(
       http.get('https://esi.evetech.net/universe/structures/1000000000001', () =>
         HttpResponse.json({
@@ -1419,11 +1419,7 @@ describe('jumps-away distance (issue #87)', () => {
           owner_id: 1,
           solar_system_id: 30002187,
         })
-      ),
-      http.post('https://esi.evetech.net/route/30000142/30002187', async ({ request }) => {
-        seenFlags.push(((await request.json()) as { preference?: string }).preference);
-        return HttpResponse.json({ route: [30000142, 30002187] });
-      })
+      )
     );
     await db.stationPins.put({
       id: `${CHAR_ID}:1000000000001`,
@@ -1434,14 +1430,13 @@ describe('jumps-away distance (issue #87)', () => {
     });
 
     render(<App />);
-    await screen.findByText('1 jump');
-    // The Travel default is Prefer safer, sent in ESI's own word.
-    expect(seenFlags).toEqual(['Safer']);
+    // The Travel default is Prefer safer: the three jumps through high-sec Hed and Far.
+    await screen.findByText('3 jumps');
 
     await user.click(screen.getByRole('combobox', { name: 'Route' }));
     await user.click(await screen.findByRole('option', { name: 'Prefer shorter' }));
 
-    await waitFor(() => expect(seenFlags).toEqual(['Safer', 'Shorter']));
+    expect(await screen.findByText('2 jumps')).toBeInTheDocument();
   });
 });
 

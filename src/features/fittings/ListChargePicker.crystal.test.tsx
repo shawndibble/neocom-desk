@@ -5,8 +5,9 @@ import '@/i18n';
 import type { Fitting, FittingModule } from '@/engine/fittings/types';
 import { ListChargePicker } from './ListChargePicker';
 import type { FittingCatalogue } from './useFittingCatalogue';
+import { fakeDogmaEngine, fakeFittingContext } from './__fixtures__/fakeDogmaEngine';
 
-vi.mock('./dogmaFittingEngine', () => ({
+const engine = fakeDogmaEngine({
   checkCharges: () => new Set([60281]),
   chargesMissingSkills: () => new Set<number>(),
   compareCharges: () => [
@@ -28,7 +29,7 @@ vi.mock('./dogmaFittingEngine', () => ({
       },
     },
   ],
-}));
+});
 vi.mock('@/market/prices', () => ({
   getHubPrices: async () => new Map(),
 }));
@@ -65,8 +66,7 @@ describe('ListChargePicker — a mining laser', () => {
         result={{ state: 'active', maxState: 'overload', chargeGroupIds: [482] }}
         fitting={fitting}
         catalogue={catalogue}
-        engineReady
-        profile={{ skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] }}
+        context={fakeFittingContext(catalogue, { engine })}
         edit={vi.fn()}
       />
     );

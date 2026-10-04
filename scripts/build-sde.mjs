@@ -14,7 +14,9 @@ import { npcCorporations, probeLpStores } from './lib/lpCorporations.mjs';
 import { marketTypeEntry } from './lib/marketTypeVolumes.mjs';
 import { bakeCertifiedPlans, factionNames, parseJsonl } from './lib/certifiedPlans.mjs';
 import { readCcpStaticDataFiles } from './lib/ccpStaticData.mjs';
+import { fitTypeIds } from './lib/fitTypeIds.mjs';
 import { bakeCertificates } from './lib/certificates.mjs';
+import { bakeTypeNames, namesMissingFrom } from './lib/typeNames.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -1191,6 +1193,9 @@ async function main() {
     for (const p of bp.products) referenced.add(p.typeID);
     for (const sk of bp.skills) referenced.add(sk.typeID);
   }
+  // Every published type a Fitting can hold, blueprint or not: without them an
+  // EFT paste naming an LP booster or a filament read "unknown item".
+  for (const typeID of fitTypeIds(types, groups)) referenced.add(typeID);
   const typeMap = {};
   for (const typeID of [...referenced].sort((a, b) => a - b)) {
     const t = types.get(typeID);
@@ -2081,6 +2086,9 @@ async function main() {
     bakedSkillIds
   );
 
+  // --- typeNames.json: every type name, published or not; see lib/typeNames.mjs ---
+  const typeNames = bakeTypeNames([...types.values()].map((t) => t.name));
+
   // --- write outputs (compact) ---
   await mkdir(OUT_DIR, { recursive: true });
   await mkdir(MARKET_OUT_DIR, { recursive: true });
@@ -2105,6 +2113,10 @@ async function main() {
     ['marketWideTrees.json', marketWideTrees],
     ['reprocessing.json', reprocessing],
     ['types.json', typeMap],
+    // groupID -> categoryID: which Specialised Holds accept an item is keyed
+    // partly by category (`engine/market/cargoHolds.ts`), and `types.json`
+    // carries only the group.
+    ['groupCategories.json', Object.fromEntries([...groups].map(([id, g]) => [id, g.categoryID]))],
     ['pi.json', pi],
     // Its own file, not folded into pi.json: it is one entry per planet in New
     // Eden and every other consumer of pi.json would pay for it on load.
@@ -2114,6 +2126,8 @@ async function main() {
     ['gasCloudTypeIds.json', gasCloudTypeIds],
     ['compressedOreTypeIds.json', compressedOreTypeIds],
     ['shipTree.json', shipTree],
+    // Only the Workbench's out-of-date check reads it (~1.7 MB), so it loads on demand.
+    ['typeNames.json', typeNames],
   ];
   console.log('Writing outputs...');
   for (const [name, data] of outputs) {
@@ -2212,6 +2226,21 @@ async function main() {
       '  FAIL: ore/ice type ids came out implausibly small — the ore/ice market group structure may have changed'
     );
     process.exitCode = 1;
+  }
+  // Every name another file carries is a name the game has: typeNames.json
+  // missing one would mark a fit using it as out of date.
+  {
+    const missing = namesMissingFrom(typeNames, [
+      ...Object.values(typeMap).map((t) => t.name),
+      ...marketTypes.map((t) => t.name),
+      ...skills.map((s) => s.name),
+    ]);
+    if (missing.length > 0) {
+      console.error(
+        `  FAIL: ${missing.length} type names missing from typeNames.json (e.g. ${missing.slice(0, 5).join(', ')})`
+      );
+      process.exitCode = 1;
+    }
   }
   // Mining Yield reports m3, so every mineable type must carry a volume.
   // Checked rather than assumed: raw ore reaches types.json only through the

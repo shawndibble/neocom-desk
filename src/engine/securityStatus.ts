@@ -36,8 +36,15 @@ const WARNING = { r: 0xf5, g: 0xb9, b: 0x4a }; // --warning
 const DANGER = { r: 0xff, g: 0x73, b: 0x69 }; // --danger
 
 const HIGHSEC_FLOOR = 0.5;
+const HIGHSEC_GREEN = 0.7;
 const HIGHSEC_CEIL = 1.0;
-const LOW_NULL_FLOOR = -1.0;
+const LOWSEC_CEIL = 0.4;
+const LOWSEC_FLOOR = 0.1;
+// Lowsec's orange, as a point on the warning→danger blend: 40% of the way at
+// 0.4, deepening to 60% by 0.1 — far enough short of nullsec's full red that a
+// 0.1 and a 0.0 cell side by side on the route strip still read apart.
+const LOWSEC_BLEND_TOP = 0.4;
+const LOWSEC_BLEND_BOTTOM = 0.6;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -55,24 +62,39 @@ function lerpColor(a: { r: number; g: number; b: number }, b: typeof a, t: numbe
   return `#${toHex(lerpChannel(a.r, b.r, t))}${toHex(lerpChannel(a.g, b.g, t))}${toHex(lerpChannel(a.b, b.b, t))}`;
 }
 
+const DANGER_HEX = lerpColor(DANGER, DANGER, 0);
+
 /**
- * Colors a solar system's security status on the game's own scale: blue-green
- * across highsec (success at 0.5 blending to accent at 1.0), amber toward red
- * across lowsec and nullsec (warning approaching 0.5 from below, blending to
- * danger at -1.0 and beyond). The sharp jump mirrors the game client's own
- * highsec/lowsec boundary, not an interpolation artifact.
+ * Colors a solar system's security status on the game client's own scale:
+ * across highsec, warning yellow at 0.5 blending to success green at 0.7 and
+ * on to accent blue at 1.0; orange across lowsec (deepening from 0.4 to 0.1
+ * without reaching red); and flat danger red for every nullsec system. The
+ * sharp jumps at both boundaries mirror the game's bands, not an
+ * interpolation artifact.
  *
  * Which side of that jump a system falls on is `securityBand`'s call, on the
  * rounded status — the same number the badge prints beside this color. Testing
  * the raw float here instead painted Ainsan (0.4730616, a highsec system shown
- * as 0.5) in the lowsec amber. Only the branch rounds: the gradient within each
- * band still interpolates the raw value, so neighbours stay distinguishable.
+ * as 0.5) in the lowsec color. Only the branch rounds: the gradients within
+ * highsec and lowsec still interpolate the raw value, so neighbours stay
+ * distinguishable. The gradients run between the shown stops (0.5, 0.4, 0.1),
+ * so the half-step of raw values that rounds onto a stop shares its color.
  */
 export function securityStatusColor(security: number): string {
-  if (securityBand(security) === 'highsec') {
-    const t = clamp((security - HIGHSEC_FLOOR) / (HIGHSEC_CEIL - HIGHSEC_FLOOR), 0, 1);
+  const band = securityBand(security);
+  if (band === 'nullsec') return DANGER_HEX;
+  if (band === 'highsec') {
+    if (security < HIGHSEC_GREEN) {
+      const t = clamp((security - HIGHSEC_FLOOR) / (HIGHSEC_GREEN - HIGHSEC_FLOOR), 0, 1);
+      return lerpColor(WARNING, SUCCESS, t);
+    }
+    const t = clamp((security - HIGHSEC_GREEN) / (HIGHSEC_CEIL - HIGHSEC_GREEN), 0, 1);
     return lerpColor(SUCCESS, ACCENT, t);
   }
-  const t = clamp((HIGHSEC_FLOOR - security) / (HIGHSEC_FLOOR - LOW_NULL_FLOOR), 0, 1);
-  return lerpColor(WARNING, DANGER, t);
+  const t = clamp((LOWSEC_CEIL - security) / (LOWSEC_CEIL - LOWSEC_FLOOR), 0, 1);
+  return lerpColor(
+    WARNING,
+    DANGER,
+    LOWSEC_BLEND_TOP + t * (LOWSEC_BLEND_BOTTOM - LOWSEC_BLEND_TOP)
+  );
 }

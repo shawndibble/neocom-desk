@@ -31,10 +31,9 @@ import { SkillRow } from '@/features/skills/SkillRow';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
 import { HeaderBadgeSlot } from './HeaderBadgeSlot';
+import { useTimedToast } from '@/components/ui/useTimedToast';
 
 const TIERS = [0, 1, 2, 3, 4] as const;
-const TOAST_MS = 8000;
-
 interface MasteryChipProps {
   hullTypeId: number;
   hullName: string;
@@ -76,11 +75,7 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
       .then(setMasteries)
       .catch(() => setMasteries({}));
   }, []);
-  useEffect(() => {
-    if (!added) return;
-    const timer = setTimeout(() => setAdded(null), TOAST_MS);
-    return () => clearTimeout(timer);
-  }, [added]);
+  useTimedToast(added, () => setAdded(null));
 
   const tiers = masteries?.[String(hullTypeId)];
   const hasData = tiers !== undefined && tiers.some((bundle) => bundle.length > 0);
@@ -111,6 +106,9 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
   const untrained = visible.filter((row) => row.status !== 'trained');
   const totalSeconds = untrained.reduce((sum, row) => sum + row.seconds, 0);
   const planEntries = targetPlanEntries(target);
+  const unplanned = untrained.filter(
+    (row) => !isEntryCovered(planEntries, row.skillTypeID, row.targetLevel)
+  );
 
   async function add(entries: readonly PlanEntry[]) {
     const result = await target.addEntries(entries, hullName);
@@ -191,6 +189,15 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
               </div>
             )}
             <p className="text-xs text-text-dim">{t('fittings.mastery.suggestedNote')}</p>
+            {untrained.length > 0 && unplanned.length < untrained.length && (
+              <p className="text-xs text-text-dim">
+                {unplanned.length === 0
+                  ? t('skills.fitCheck.allPlanned')
+                  : t('skills.fitCheck.alreadyPlanned', {
+                      count: untrained.length - unplanned.length,
+                    })}
+              </p>
+            )}
             {target.plans !== undefined && (
               <div className="flex flex-wrap items-center justify-end gap-2">
                 {untrained.length > 0 && (
@@ -199,13 +206,14 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
                   </span>
                 )}
                 <TargetPlanPicker target={target} />
-                {untrained.length > 0 && (
+                {unplanned.length > 0 && (
                   <Button
                     size="sm"
                     variant="primary"
+                    className="transition-transform active:scale-95"
                     onClick={() =>
                       void add(
-                        untrained.map((row) => ({
+                        unplanned.map((row) => ({
                           skillTypeID: row.skillTypeID,
                           targetLevel: row.targetLevel,
                         }))

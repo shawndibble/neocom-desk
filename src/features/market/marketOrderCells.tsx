@@ -19,9 +19,17 @@ export interface LocationCellProps {
   npcStations: ReadonlyMap<number, NpcStationLookup>;
   solarSystems: ReadonlyMap<number, SolarSystemLookup>;
   t: TFunction;
+  /** The two-line order card's title: one truncated line, no tooltip underline. */
+  card?: boolean;
 }
 
-export function LocationCell({ order, npcStations, solarSystems, t }: LocationCellProps) {
+export function LocationCell({
+  order,
+  npcStations,
+  solarSystems,
+  t,
+  card = false,
+}: LocationCellProps) {
   const location = resolveOrderLocation(order, npcStations, solarSystems);
   // Station name alone — an EVE station name already carries its system
   // ("Jita IV - Moon 4 - ..."), so a trailing system/security suffix would
@@ -31,6 +39,8 @@ export function LocationCell({ order, npcStations, solarSystems, t }: LocationCe
   if (location.stationName === null) {
     return <span>{t('market.unknownStructure')}</span>;
   }
+  // The card's title line: the expanded row carries the full name.
+  if (card) return <span className="block truncate">{location.stationName}</span>;
   // `sm:`-scoped: nothing truncates on the phone card, so the underline
   // would mislead there. No `openOnTap` — it reveals nothing new, and
   // `DataTable` treats an `openOnTap` trigger as the row's own click.
@@ -58,5 +68,25 @@ export function SecurityCell({ order, npcStations, solarSystems, t }: LocationCe
     >
       {value}
     </span>
+  );
+}
+
+/**
+ * A sell order priced ten times the best or more (`sellOutlierMultiple`):
+ * flagged beside its price rather than hidden, so the book stays complete but
+ * the row stops reading as a real offer. In words, not just a colour.
+ */
+export function BaitFlag({ multiple, t }: { multiple: number | null; t: TFunction }) {
+  if (multiple === null) return null;
+  const times = Math.round(multiple).toLocaleString();
+  return (
+    <Tooltip content={t('market.baitHint', { times })}>
+      <span
+        tabIndex={0}
+        className="mr-2 text-[0.6875rem] font-normal whitespace-nowrap text-warning"
+      >
+        {t('market.baitFlag', { times })}
+      </span>
+    </Tooltip>
   );
 }

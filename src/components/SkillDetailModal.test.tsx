@@ -195,7 +195,7 @@ describe('SkillDetailModal', () => {
 
     const dialog = await screen.findByRole('dialog');
     await within(dialog).findByText('Frigate');
-    expect(within(dialog).getByRole('link', { name: 'Open in Market' })).toHaveAttribute(
+    expect(within(dialog).getByRole('link', { name: 'View in Market' })).toHaveAttribute(
       'href',
       '/market/browser?type=2&region=10000002'
     );

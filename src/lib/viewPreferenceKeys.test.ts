@@ -29,7 +29,6 @@ const PINNED = [
   'mailFolders',
   'marketLocationMode',
   'marketPriceHistoryRange',
-  'miningTaxStatusFilter',
   'piAdvisorAltColonies',
   'piColoniesShowAlts',
   'piMarketSourcing',

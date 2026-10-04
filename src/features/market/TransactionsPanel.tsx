@@ -35,7 +35,7 @@ import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { iskToneClass } from '@/features/character/format';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { formatIsk } from '@/lib/isk';
+import { formatMarketIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -208,7 +208,7 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
         header: t('wallet.unitPrice'),
         align: 'right',
         className: 'tabular-nums',
-        render: (txn) => formatIsk(txn.unit_price, 2),
+        render: (txn) => formatMarketIsk(txn.unit_price),
         sortValue: (txn) => txn.unit_price,
       },
       {
@@ -217,7 +217,7 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
         align: 'right',
         className: 'tabular-nums',
         cellClassName: (txn) => iskToneClass(transactionTotal(txn)),
-        render: (txn) => formatIsk(transactionTotal(txn), 2),
+        render: (txn) => formatMarketIsk(transactionTotal(txn)),
         sortValue: (txn) => transactionTotal(txn),
       },
       {
@@ -237,11 +237,11 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
           return (
             <Tooltip
               content={t('wallet.marginWorking', {
-                unitCost: formatIsk(margin.unitCost, 2),
-                salesTax: formatIsk(margin.salesTax, 2),
+                unitCost: formatMarketIsk(margin.unitCost),
+                salesTax: formatMarketIsk(margin.salesTax),
               })}
             >
-              <span>{formatIsk(margin.margin, 2)}</span>
+              <span>{formatMarketIsk(margin.margin)}</span>
             </Tooltip>
           );
         },

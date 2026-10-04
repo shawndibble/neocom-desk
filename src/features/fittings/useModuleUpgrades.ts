@@ -19,7 +19,6 @@ import { levelGain, type LevelGain } from '@/engine/fittings/skillGains';
 import { fitsResourceBudget } from '@/engine/fittings/skillGaps';
 import { buildVariationIndex } from '@/engine/market/variations';
 import type { PlanEntry, ScheduledStep } from '@/engine/types';
-import { loadDogmaEngine, moduleSkillRequirements } from './dogmaFittingEngine';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { SkillGainEvaluator } from './useFittingEvaluation';
 import { yieldToEventLoop } from './yieldToEventLoop';
@@ -60,20 +59,14 @@ export function useModuleUpgrades(
     if (!evaluator || !catalogue || !index || !schedule) return;
     let cancelled = false;
     void (async () => {
-      const { fitting, profile } = evaluator;
-      try {
-        await loadDogmaEngine();
-      } catch {
-        // The ranking above already says the engine failed; this list stays empty.
-        if (!cancelled) setComputed({ evaluator, catalogue, schedule, rows: [] });
-        return;
-      }
+      const { fitting, profile, engine } = evaluator;
       const rows = await evaluateModuleUpgrades(
         moduleUpgradeCandidates(fitting.modules, index, catalogue.rackOf),
         {
           fitting,
           levels: profile.skillLevels,
-          requirements: (typeId, rack) => moduleSkillRequirements(fitting.shipTypeId, rack, typeId),
+          requirements: (typeId, rack) =>
+            engine.moduleSkillRequirements(fitting.shipTypeId, rack, typeId),
           schedule,
           compare: evaluator.compareTrained,
           gain: levelGain,
