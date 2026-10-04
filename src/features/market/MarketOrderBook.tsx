@@ -23,6 +23,7 @@ import { priceComparison } from '@/engine/market/orderBookDepth';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import type { RegionOrder } from '@/esi/endpoints';
 import { cx } from '@/lib/cx';
+import { toggleChipStateClassName } from '@/components/ui/controlStyles';
 import { formatIsk } from '@/lib/isk';
 import type { MarketOrderColumnId } from './marketOrderColumns';
 import { SetDestinationButton } from './SetDestinationButton';
@@ -165,7 +166,10 @@ export function HubComparisonLine({
 
 /**
  * A phone's Sell | Buy switch: one side at a time, each segment carrying its
- * count and best price so the hidden side is never a blind guess.
+ * count and best price so the hidden side is never a blind guess. Built by
+ * hand rather than as a `SegmentedControl` because each segment is two lines
+ * (label and price); the on/off tint is still the shared toggle-chip one, with
+ * the side's own colour only on its bottom edge.
  */
 export function BookSideToggle({
   side,
@@ -198,12 +202,9 @@ export function BookSideToggle({
             aria-pressed={pressed}
             onClick={() => onChange(segment.id)}
             className={cx(
-              'flex min-h-11 flex-1 flex-col items-start justify-center border px-3 py-1.5 text-left',
-              pressed
-                ? segment.id === 'sell'
-                  ? 'border-isk-neg bg-panel-2 text-text'
-                  : 'border-isk-pos bg-panel-2 text-text'
-                : 'border-line text-text-dim'
+              'flex min-h-11 flex-1 flex-col items-start justify-center border border-b-2 px-3 py-1.5 text-left',
+              toggleChipStateClassName(pressed),
+              pressed && (segment.id === 'sell' ? 'border-b-isk-neg' : 'border-b-isk-pos')
             )}
           >
             <span className="text-[0.6875rem] font-semibold tracking-widest uppercase">
@@ -278,7 +279,7 @@ export function OrderSideCard({
       {/* Each export sits with the table it exports, beside its own heading. */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 pt-2 pb-1">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
-          <h2 className="m-0 text-xs font-bold tracking-widest uppercase">{name}</h2>
+          <h2 className="m-0 text-xs font-semibold tracking-widest uppercase">{name}</h2>
           <span className="text-xs text-text-dim tabular-nums max-sm:hidden">
             {best === null
               ? t('market.sideSummary.none', { count: total })

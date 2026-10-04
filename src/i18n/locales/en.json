@@ -6327,7 +6327,8 @@
       "count_one": "{{count}} skill",
       "count_other": "{{count}} skills"
     },
-    "rangeOverridesHeader": "Distance filter overrides this for the order book"
+    "rangeOverridesHeader": "Distance filter overrides this for the order book",
+    "quantityAffix": "×"
   },
   "error": {
     "title": "Something went wrong",

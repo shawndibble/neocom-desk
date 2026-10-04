@@ -95,6 +95,10 @@ export function VariationsTable({
     );
   }
 
+  /** A row's best sell against the item it varies. */
+  const versusSelf = (row: VariationRow) =>
+    priceComparison(selfSummary?.bestSell ?? null, prices.get(row.typeId)?.bestSell ?? null);
+
   // Sibling-fallback rows carry no meta-group classification, so the column would be all dashes.
   const hasTier = rows.some((row) => row.tier !== null);
   const columns: DataTableColumn<VariationRow>[] = [
@@ -146,14 +150,9 @@ export function VariationsTable({
       headerTooltip: t('market.variations.versusHint', { name: selfName }),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: (row) =>
-        priceComparison(selfSummary?.bestSell ?? null, prices.get(row.typeId)?.bestSell ?? null)
-          ?.delta,
+      sortValue: (row) => versusSelf(row)?.delta,
       render: (row) => {
-        const delta = priceComparison(
-          selfSummary?.bestSell ?? null,
-          prices.get(row.typeId)?.bestSell ?? null
-        );
+        const delta = versusSelf(row);
         if (delta === null) return <span className="text-text-dim">—</span>;
         return (
           // Cheaper than the item you opened reads as good news.
@@ -181,7 +180,7 @@ export function VariationsTable({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
-          <h2 className="m-0 text-xs font-bold tracking-widest uppercase">
+          <h2 className="m-0 text-xs font-semibold tracking-widest uppercase">
             {t('market.variations.title')}
           </h2>
           <span className="text-xs text-text-dim">

@@ -712,6 +712,10 @@ export function Market() {
             jumpsAway: knownJumps?.get(effectiveHub.systemId) ?? null,
           }
         : { kind: 'region', regionName: scopeLabel, stationCount: bookStationCount };
+  // Where the per-item prices beside the book (the hub comparison, the
+  // Variations rows) are read: `orderBookLocation`, which is one region even
+  // under All regions — the hub's — so it is named as that, not "All regions".
+  const priceScopeName = allRegions ? hubRegionName : scopeLabel;
   // What still reads the header's hub or region while the book reaches past it.
   const scopeNote = allRegions
     ? t('market.allRegionsSecondaryNote', { regionName: hubRegionName })
@@ -1048,7 +1052,7 @@ export function Market() {
                         onCompare={handleCompareVariations}
                         selfName={selectedItem?.name ?? ''}
                         selfSummary={headerScopeSummary}
-                        scopeName={scopeLabel}
+                        scopeName={priceScopeName}
                       />
                     ) : (
                       <EmptyState title={t('market.variations.none')} className="py-8" />
@@ -1108,7 +1112,7 @@ export function Market() {
                       )}
                       {rangeAcross && stationFilter === null && (
                         <HubComparisonLine
-                          placeName={scopeLabel}
+                          placeName={priceScopeName}
                           summary={headerScopeSummary}
                           inRangeBestSell={loadedView?.summary.bestSell ?? null}
                           inRangeBestBuy={loadedView?.summary.bestBuy ?? null}

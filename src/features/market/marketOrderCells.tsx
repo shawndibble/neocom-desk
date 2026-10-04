@@ -80,11 +80,13 @@ export function BaitFlag({ multiple, t }: { multiple: number | null; t: TFunctio
   if (multiple === null) return null;
   const times = Math.round(multiple).toLocaleString();
   return (
-    <span
-      className="mr-2 text-[0.6875rem] font-normal whitespace-nowrap text-warning"
-      title={t('market.baitHint', { times })}
-    >
-      {t('market.baitFlag', { times })}
-    </span>
+    <Tooltip content={t('market.baitHint', { times })}>
+      <span
+        tabIndex={0}
+        className="mr-2 text-[0.6875rem] font-normal whitespace-nowrap text-warning"
+      >
+        {t('market.baitFlag', { times })}
+      </span>
+    </Tooltip>
   );
 }

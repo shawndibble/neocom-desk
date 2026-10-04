@@ -142,7 +142,7 @@ export function useMarketOrderColumns({
         header: t('market.quantity'),
         align: 'right',
         className: 'tabular-nums',
-        stackAffix: { before: '×' },
+        stackAffix: { before: t('market.quantityAffix') },
         render: (o) => formatVolume(o.volume_remain),
         sortValue: (o) => o.volume_remain,
       },
@@ -175,7 +175,9 @@ export function useMarketOrderColumns({
         // Truncated (the full name is in the row's tooltip and its expanded
         // row), and only as wide as the screen can spare, so the book never
         // scrolls sideways beside the finder column.
-        className: 'truncate sm:max-w-[16rem]',
+        // Chosen with `cards` (ADR 0017): a card forced on a desktop is
+        // titled by the station, uncapped; a table row caps it.
+        className: cards ? '' : 'max-w-[16rem] truncate',
         // The phone card's title: the station a pilot would fly to.
         primary: true,
         sortValue: (o) =>

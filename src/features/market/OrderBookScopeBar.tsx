@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { FilterBar, FilterChip, FilterField, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
 import { SPACE_KINDS } from '@/engine/space';
 import { securityStatusColor } from '@/engine/securityStatus';
@@ -217,7 +218,10 @@ export function OrderBookScopeBar({
             <button
               type="button"
               onClick={() => onFilterChange({ ...filterValue, jumps: DEFAULT_JUMP_RANGE })}
-              className="text-accent underline underline-offset-2 hover:text-text max-sm:inline-flex max-sm:min-h-11 max-sm:items-center"
+              className={cx(
+                inlineLinkClassName,
+                'max-sm:inline-flex max-sm:min-h-11 max-sm:items-center'
+              )}
             >
               {t('market.scope.clearRange')}
             </button>
