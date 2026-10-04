@@ -96,8 +96,14 @@ export function SolarSystemPicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button disabled={disabled} aria-label={ariaLabel} className="whitespace-nowrap">
-          {shown}
+        {/* Shrinks inside a tight row and ends in an ellipsis rather than
+            widening the page or wrapping to a second line (issue #2519). */}
+        <Button
+          disabled={disabled}
+          aria-label={ariaLabel}
+          className="max-w-full min-w-0 whitespace-nowrap"
+        >
+          <span className="truncate">{shown}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-2">

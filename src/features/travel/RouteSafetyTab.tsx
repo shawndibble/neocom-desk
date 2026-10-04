@@ -310,7 +310,9 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
         }
       />
       {tabBar}
-      <div className="grid items-start gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+      {/* `grid-cols-1` below lg, not the implicit `auto` column: that one
+          grows to a truncating picker's full label and widens the page. */}
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
         <div className="space-y-4">
           <StopsPanel
             fromId={fromId}

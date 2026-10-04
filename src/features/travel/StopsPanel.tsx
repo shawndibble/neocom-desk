@@ -9,7 +9,8 @@
  * anything while it is on, so they sit under it and are off with it.
  *
  * On a phone the panel folds to one line — "Sabusi → 4 stops" — with Edit
- * to open it.
+ * to open it. With no stops yet there is nothing worth folding, so it stays
+ * open: the start picker and Add stop are how a route begins (issue #2519).
  */
 import {
   DndContext,
@@ -199,13 +200,11 @@ export function StopsPanel({
       title={t('travel.stops.title')}
       expanded={expanded}
       onToggle={() => setExpanded((open) => !open)}
-      collapsible={isPhone}
+      collapsible={isPhone && stops.length > 0}
       labels={{ show: t('travel.stops.edit'), hide: t('travel.stops.done') }}
       collapsedSummary={
         <p className="text-xs">
-          {stops.length === 0
-            ? fromName
-            : t('travel.stops.summary', { from: fromName, count: stops.length })}
+          {t('travel.stops.summary', { from: fromName, count: stops.length })}
         </p>
       }
     >
@@ -251,7 +250,12 @@ export function StopsPanel({
         <div className="space-y-1">
           <SolarSystemPicker
             value={null}
-            onChange={(systemId) => onStopsChange([...stops, systemId])}
+            onChange={(systemId) => {
+              // The first stop makes the panel foldable; keep it open under
+              // the pilot's hand rather than folding it away mid-edit.
+              if (stops.length === 0) setExpanded(true);
+              onStopsChange([...stops, systemId]);
+            }}
             ariaLabel={t('travel.stops.addLabel')}
             triggerLabel={t('travel.stops.add')}
             disabled={full}
