@@ -6542,7 +6542,7 @@
     },
     "autopilot": {
       "label": "Autopilot waypoints",
-      "caption": "Set a route's waypoints in your EVE client from Route Safety."
+      "caption": "Set waypoints in your EVE client from Route Safety, order books and the station right-click menus."
     },
     "fittings": {
       "label": "Fittings",
@@ -7832,6 +7832,9 @@
     },
     "waypoints": {
       "action": "Set waypoints in game",
+      "menuItem": "Set waypoint in game",
+      "menuItemTo": "Set waypoint in game: {{placeName}}",
+      "menuSending": "Setting waypoint…",
       "sending": "Setting waypoints…",
       "character": "Character to set waypoints for",
       "needCharacter": "Log in a character to set waypoints in its EVE client.",

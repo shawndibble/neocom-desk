@@ -123,6 +123,7 @@ import {
 } from '@/features/route/JumpRangeControls';
 import { renderJumpsCell } from '@/features/route/jumpsCell';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
+import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { loadBlueprints } from '@/sde/loadSde';
 import { isSyncConfigured } from '@/app/syncStatus';
@@ -314,6 +315,24 @@ function marketLookupRegion(
 ): number | null {
   if (regionId !== null) return regionId;
   return hubHydrated ? hubRegionId : null;
+}
+
+/**
+ * "Set waypoint in game" for a row whose Location names its station or
+ * structure; nothing for one that names none (an unresolved location, or an
+ * owned blueprint inside a container or ship).
+ */
+function waypointItemFor(row: BpcSearchRow, ownedPlaceIds: ReadonlyMap<number, number>): ReactNode {
+  if (row.locationName === null) return null;
+  const placeId =
+    row.source === 'contract'
+      ? row.contract.locationId
+      : row.source === 'market'
+        ? row.locationId
+        : ownedPlaceIds.get(row.itemId);
+  return placeId === undefined ? null : (
+    <SetWaypointMenuItem locationId={placeId} placeName={row.locationName} />
+  );
 }
 
 /** The Trade Hub station in `regionId`, or 0 when the region holds none — nothing gets marked. */
@@ -1036,6 +1055,18 @@ export function BpcSourcingPanel() {
           systemId: location?.systemId ?? null,
         });
       }),
+    [ownedBlueprints, ownedLocations]
+  );
+  // An owned blueprint's `location_id` can be a container or ship; it only
+  // resolved to a name because it is a station or structure, so only then is
+  // it somewhere a waypoint can go.
+  const ownedPlaceIds = useMemo(
+    () =>
+      new Map(
+        ownedBlueprints.flatMap((bp): [number, number][] =>
+          ownedLocations.get(bp.location_id)?.name != null ? [[bp.item_id, bp.location_id]] : []
+        )
+      ),
     [ownedBlueprints, ownedLocations]
   );
   const filteredOwnedRows = useMemo(
@@ -1982,6 +2013,7 @@ export function BpcSourcingPanel() {
                     itemName={blueprintNames.get(row.typeId)}
                     seed={row.runs === -1 ? null : { me: row.me, te: row.te, runs: row.runs }}
                     trigger={tr}
+                    extraItems={waypointItemFor(row, ownedPlaceIds)}
                   />
                 )}
                 // At most RESULT_LIMIT rows, but a phone still mounts only a screenful.
