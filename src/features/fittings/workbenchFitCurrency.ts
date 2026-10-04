@@ -10,6 +10,9 @@
  * each verdict (keyed by the fit's id and EFT) so a tab switch back doesn't
  * redo it. If the game data can't be read, every fit counts as current —
  * hiding fits on a guess would be worse than not marking them.
+ *
+ * The same pass keeps the modules it loaded (issue #2493), so a row can draw
+ * its racks without parsing the EFT a second time.
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -25,6 +28,7 @@ import {
   type EftTypeLookup,
 } from '@/engine/fittings/eftLoader';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
+import type { RackModule } from '@/engine/fittings/types';
 import { loadFittingSlots, loadShipTree } from '@/sde/loadSde';
 import type { WorkbenchFit } from './workbenchFits';
 
@@ -36,46 +40,60 @@ export interface CurrencyGameData {
   hullSlots: (shipTypeId: number) => HullSlotCounts | null;
 }
 
+/** One fit's check: its verdict, and the modules its EFT loaded (unread lines left out). */
+export interface WorkbenchFitCheck {
+  verdict: FitCurrency;
+  modules: readonly RackModule[];
+}
+
 const CHUNK_SIZE = 25;
 
 const nextTask = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-/** Each fit's verdict, `CHUNK_SIZE` at a time; `null` if `cancelled()` turned true part way. */
+/** Each fit's check, `CHUNK_SIZE` at a time; `null` if `cancelled()` turned true part way. */
 export async function checkFitsCurrency(
   fits: readonly Pick<WorkbenchFit, 'id' | 'eft'>[],
   data: CurrencyGameData,
   cancelled: () => boolean = () => false,
   yieldToUi: () => Promise<void> = nextTask
-): Promise<Map<string, FitCurrency> | null> {
-  const verdicts = new Map<string, FitCurrency>();
+): Promise<Map<string, WorkbenchFitCheck> | null> {
+  const checks = new Map<string, WorkbenchFitCheck>();
   for (let start = 0; start < fits.length; start += CHUNK_SIZE) {
     if (start > 0) await yieldToUi();
     if (cancelled()) return null;
     for (const fit of fits.slice(start, start + CHUNK_SIZE)) {
-      verdicts.set(fit.id, cachedVerdict(fit, data));
+      checks.set(fit.id, cachedCheck(fit, data));
     }
   }
-  return verdicts;
+  return checks;
 }
 
-/** Verdicts by fit id, each held with the EFT it was made from. */
-const verdictCache = new Map<string, { eft: string; verdict: FitCurrency }>();
+/** Checks by fit id, each held with the EFT it was made from. */
+const checkCache = new Map<string, { eft: string; check: WorkbenchFitCheck }>();
 
-function cachedVerdict(fit: Pick<WorkbenchFit, 'id' | 'eft'>, data: CurrencyGameData) {
-  const hit = verdictCache.get(fit.id);
-  if (hit?.eft === fit.eft) return hit.verdict;
+function cachedCheck(
+  fit: Pick<WorkbenchFit, 'id' | 'eft'>,
+  data: CurrencyGameData
+): WorkbenchFitCheck {
+  const hit = checkCache.get(fit.id);
+  if (hit?.eft === fit.eft) return hit.check;
   const parts = loadEftFitting(fit.eft, data.typeByName, data.slotByTypeId);
-  const verdict = classifyFitCurrency(
-    parts,
-    parts.hullTypeId === null ? null : data.hullSlots(parts.hullTypeId)
-  );
-  verdictCache.set(fit.id, { eft: fit.eft, verdict });
-  return verdict;
+  const check: WorkbenchFitCheck = {
+    verdict: classifyFitCurrency(
+      parts,
+      parts.hullTypeId === null ? null : data.hullSlots(parts.hullTypeId)
+    ),
+    // Rack and type only: the cache spans every hull's fits, and a row draws no more.
+    modules:
+      parts.hullTypeId === null ? [] : parts.modules.map(({ slot, typeId }) => ({ slot, typeId })),
+  };
+  checkCache.set(fit.id, { eft: fit.eft, check });
+  return check;
 }
 
-/** For tests: forget every verdict. */
+/** For tests: forget every check. */
 export function resetFitCurrencyCache(): void {
-  verdictCache.clear();
+  checkCache.clear();
 }
 
 let gameDataPromise: Promise<CurrencyGameData> | null = null;
@@ -109,30 +127,31 @@ function loadGameData(): Promise<CurrencyGameData> {
   return gameDataPromise;
 }
 
+const NO_CHECKS: ReadonlyMap<string, WorkbenchFitCheck> = new Map();
 const NO_VERDICTS: ReadonlyMap<string, FitCurrency> = new Map();
 
-/** The fits' verdicts; `null` while checking. A failed game-data read reads as every fit current. */
+/** The fits' checks; `null` while checking. A failed game-data read reads as every fit current. */
 export function useWorkbenchFitCurrency(
   fits: readonly WorkbenchFit[] | null
-): ReadonlyMap<string, FitCurrency> | null {
+): ReadonlyMap<string, WorkbenchFitCheck> | null {
   const [state, setState] = useState<{
     fits: readonly WorkbenchFit[];
-    verdicts: ReadonlyMap<string, FitCurrency>;
+    checks: ReadonlyMap<string, WorkbenchFitCheck>;
   } | null>(null);
   useEffect(() => {
     if (fits === null) return;
     let cancelled = false;
     void loadGameData()
       .then((data) => checkFitsCurrency(fits, data, () => cancelled))
-      .catch(() => NO_VERDICTS)
-      .then((verdicts) => {
-        if (!cancelled && verdicts !== null) setState({ fits, verdicts });
+      .catch(() => NO_CHECKS)
+      .then((checks) => {
+        if (!cancelled && checks !== null) setState({ fits, checks });
       });
     return () => {
       cancelled = true;
     };
   }, [fits]);
-  return state !== null && state.fits === fits ? state.verdicts : null;
+  return state !== null && state.fits === fits ? state.checks : null;
 }
 
 /** What the Workbench tab lists: current fits, then out-of-date ones only on request. */
@@ -142,6 +161,10 @@ export interface WorkbenchFitList {
   listed: WorkbenchFit[];
   /** Why a listed fit is out of date; `undefined` for a current one. */
   reasonsFor: (id: string) => OutOfDateReason[] | undefined;
+  /** A fit's loaded modules, from the same check; `undefined` while checking or unchecked. */
+  modulesFor: (id: string) => readonly RackModule[] | undefined;
+  /** Every module type across the checked fits, for looking their names up once; `null` while checking. */
+  moduleTypeIds: readonly number[] | null;
   outOfDateCount: number;
   /** Every fit is out of date — the list would otherwise look empty. */
   allOutOfDate: boolean;
@@ -151,7 +174,19 @@ export interface WorkbenchFitList {
 
 /** The Workbench tab's list for `fits`; empty until the check lands. */
 export function useWorkbenchFitList(fits: readonly WorkbenchFit[] | null): WorkbenchFitList {
-  const verdicts = useWorkbenchFitCurrency(fits);
+  const checks = useWorkbenchFitCurrency(fits);
+  const verdicts = useMemo(
+    () =>
+      checks === null
+        ? null
+        : new Map([...checks].map(([id, check]): [string, FitCurrency] => [id, check.verdict])),
+    [checks]
+  );
+  const moduleTypeIds = useMemo(
+    () =>
+      checks === null ? null : [...checks.values()].flatMap((c) => c.modules.map((m) => m.typeId)),
+    [checks]
+  );
   // Held against the fits it was asked for, so another hull starts hidden again.
   const [shownFor, setShownFor] = useState<readonly WorkbenchFit[] | null>(null);
   const showOutOfDate = fits !== null && shownFor === fits;
@@ -172,6 +207,8 @@ export function useWorkbenchFitList(fits: readonly WorkbenchFit[] | null): Workb
         ? [...current, ...outOfDate.map(({ fit }) => fit)]
         : current,
     reasonsFor: (id) => reasonsById.get(id),
+    modulesFor: (id) => checks?.get(id)?.modules,
+    moduleTypeIds,
     outOfDateCount: outOfDate.length,
     allOutOfDate: outOfDate.length > 0 && current.length === 0,
     showOutOfDate,

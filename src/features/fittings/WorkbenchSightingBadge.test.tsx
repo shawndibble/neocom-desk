@@ -15,6 +15,8 @@ vi.mock('./workbenchFitCurrency', () => ({
     checking: false,
     listed: fits ?? [],
     reasonsFor: () => undefined,
+    modulesFor: () => undefined,
+    moduleTypeIds: null,
     outOfDateCount: 0,
     allOutOfDate: false,
     showOutOfDate: false,

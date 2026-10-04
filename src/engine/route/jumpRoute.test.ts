@@ -362,3 +362,166 @@ describe('routeSweepFrom', () => {
     expect(sweep.routeTo(NOT_A_SYSTEM)).toBeNull();
   });
 });
+
+/**
+ * Wormhole connections (issue #2476): extra two-way edges the stargate graph
+ * does not hold, and a set of systems charged no security cost.
+ *
+ *   START ─ W1 ─ W2 ─ W3 ─ W4 ─ END        five highsec gate jumps
+ *   START ─ ENTRY ⤳ HUB ⤳ EXIT ─ END       four jumps, two of them holes
+ *
+ * HUB is Thera's shape: in the graph with no stargates at all, and -0.99.
+ */
+describe('extra connections and free systems', () => {
+  const START = 31000001;
+  const W1 = 31000002;
+  const W2 = 31000003;
+  const W3 = 31000004;
+  const W4 = 31000005;
+  const END = 31000006;
+  const ENTRY = 31000007;
+  const HUB = 31000008;
+  const EXIT = 31000009;
+
+  const graph: JumpGraph = new Map([
+    [START, [W1, ENTRY]],
+    [W1, [START, W2]],
+    [W2, [W1, W3]],
+    [W3, [W2, W4]],
+    [W4, [W3, END]],
+    [END, [W4, EXIT]],
+    [ENTRY, [START]],
+    [HUB, []],
+    [EXIT, [END]],
+  ]);
+  const security = new Map([
+    [START, 1.0],
+    [W1, 0.9],
+    [W2, 0.9],
+    [W3, 0.9],
+    [W4, 0.9],
+    [END, 0.9],
+    [ENTRY, 0.8],
+    [HUB, -0.99],
+    [EXIT, 0.9],
+  ]);
+  const holeSecurityOf = (systemId: number) => security.get(systemId);
+  const extraConnections = [
+    [ENTRY, HUB],
+    [HUB, EXIT],
+  ] as const;
+  const freeSystems = new Set([HUB]);
+  const holes = { extraConnections, freeSystems, securityOf: holeSecurityOf };
+  const viaHole = [START, ENTRY, HUB, EXIT, END];
+  const byGate = [START, W1, W2, W3, W4, END];
+  const penaltyCost = Math.exp(0.15 * 50);
+
+  it('never reaches a gateless hub without the extra connections', () => {
+    expect(findJumpRoute(graph, START, HUB)).toEqual({ kind: 'no-route' });
+  });
+
+  it('crosses an extra connection both ways, each counting as one jump', () => {
+    expect(findJumpRoute(graph, START, END, { ...holes, preference: 'shortest' })).toEqual({
+      kind: 'route',
+      systems: viaHole,
+    });
+    expect(findJumpRoute(graph, END, START, { ...holes, preference: 'shortest' })).toEqual({
+      kind: 'route',
+      systems: [...viaHole].reverse(),
+    });
+    expect(routeSweepFrom(graph, START, holes).jumps.get(END)).toBe(4);
+  });
+
+  it('under Prefer safer, takes the hole only because the hub is free', () => {
+    const options = { ...holes, preference: 'prefer-highsec' as const };
+    expect(findJumpRoute(graph, START, END, options)).toEqual({ kind: 'route', systems: viaHole });
+    expect(routeSweepFrom(graph, START, options).costs.get(END)).toBeCloseTo(0.9 + 1 + 0.9 + 0.9);
+    expect(findJumpRoute(graph, START, END, { ...options, freeSystems: undefined })).toEqual({
+      kind: 'route',
+      systems: byGate,
+    });
+  });
+
+  it('under Prefer less secure, charges entrance and exit normally and the hub nothing', () => {
+    const options = { ...holes, preference: 'avoid-highsec' as const };
+    expect(findJumpRoute(graph, START, END, options)).toEqual({ kind: 'route', systems: viaHole });
+    expect(routeSweepFrom(graph, START, options).costs.get(END)).toBeCloseTo(3 * penaltyCost + 1);
+  });
+
+  it('under Prefer shorter, costs the hub one jump like any other', () => {
+    const options = { ...holes, preference: 'shortest' as const };
+    expect(routeSweepFrom(graph, START, options).costs.get(END)).toBe(4);
+    expect(routeSweepFrom(graph, START, options).costs.get(HUB)).toBe(2);
+  });
+
+  it('charges the exit system by the preference, so a lowsec exit loses under Prefer safer', () => {
+    const lowExit = new Map(security).set(EXIT, 0.2);
+    const options = {
+      ...holes,
+      preference: 'prefer-highsec' as const,
+      securityOf: (systemId: number) => lowExit.get(systemId),
+    };
+    expect(findJumpRoute(graph, START, END, options)).toEqual({ kind: 'route', systems: byGate });
+  });
+
+  it('charges an avoided entrance normally, under every preference', () => {
+    for (const preference of ['shortest', 'prefer-highsec', 'avoid-highsec'] as const) {
+      const options = { ...holes, preference, avoid: new Set([ENTRY]) };
+      expect(findJumpRoute(graph, START, END, options)).toEqual({ kind: 'route', systems: byGate });
+    }
+  });
+
+  describe('a hub with stargates, as Turnur has', () => {
+    // GATED_HUB (0.39) sits on the only path START ─ GATED_HUB ─ FAR_END,
+    // and a hole joins SIDE (no stargates) to it.
+    const GATED_HUB = 31100001;
+    const FAR_END = 31100002;
+    const SIDE = 31100003;
+    const gatedGraph: JumpGraph = new Map([
+      [START, [GATED_HUB]],
+      [GATED_HUB, [START, FAR_END]],
+      [FAR_END, [GATED_HUB]],
+      [SIDE, []],
+    ]);
+    const gatedSecurity = new Map([
+      [START, 1.0],
+      [GATED_HUB, 0.39],
+      [FAR_END, 0.9],
+      [SIDE, 0.9],
+    ]);
+    const options = {
+      preference: 'prefer-highsec' as const,
+      securityOf: (systemId: number) => gatedSecurity.get(systemId),
+      extraConnections: [[SIDE, GATED_HUB]] as const,
+      freeSystems: new Set([GATED_HUB]),
+    };
+
+    it('charges the hub as lowsec when entered by stargate, holes or not', () => {
+      const sweep = routeSweepFrom(gatedGraph, START, options);
+      expect(sweep.routeTo(FAR_END)).toEqual([START, GATED_HUB, FAR_END]);
+      // Entered by gate from START: lowsec under Prefer safer, never the free 1.
+      expect(sweep.costs.get(GATED_HUB)).toBeCloseTo(penaltyCost);
+      expect(sweep.costs.get(FAR_END)).toBeCloseTo(penaltyCost + 0.9);
+      const gateOnly = routeSweepFrom(gatedGraph, START, {
+        ...options,
+        extraConnections: undefined,
+      });
+      expect(gateOnly.costs.get(GATED_HUB)).toBeCloseTo(penaltyCost);
+    });
+
+    it('still makes the hub free when entered through a hole', () => {
+      const sweep = routeSweepFrom(gatedGraph, SIDE, options);
+      expect(sweep.routeTo(GATED_HUB)).toEqual([SIDE, GATED_HUB]);
+      expect(sweep.costs.get(GATED_HUB)).toBe(1);
+    });
+  });
+
+  it('ignores a connection to a system the graph does not hold', () => {
+    const options = {
+      ...holes,
+      extraConnections: [...extraConnections, [EXIT, 39999998]] as const,
+    };
+    expect(findJumpRoute(graph, START, 39999998, options)).toEqual({ kind: 'no-route' });
+    expect(findJumpRoute(graph, START, END, options)).toEqual({ kind: 'route', systems: viaHole });
+  });
+});

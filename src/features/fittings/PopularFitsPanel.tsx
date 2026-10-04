@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Spinner, Tabs, Tooltip, TypeIcon } from '@/components/ui';
+import { Button, Spinner, Tabs } from '@/components/ui';
 import type { LoadedFitting } from '@/engine/fittings/load';
-import { popularFitLoad, type PopularFit } from '@/engine/fittings/popularFits';
-import { FITTING_SLOT_KINDS, type FittingSlotKind } from '@/engine/fittings/types';
-import { typeName } from '@/sde/loadSde';
+import { popularFitLoad } from '@/engine/fittings/popularFits';
 import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
 import { useNow } from '@/lib/useNow';
 import { loadFittingFromText } from './loadFittingFromText';
 import { usePopularFits } from './popularFits';
+import { RackIconStrip } from './RackIconStrip';
+import { useModuleNames } from './useModuleNames';
 import { useWorkbenchFits, workbenchFitUrl, type WorkbenchFit } from './workbenchFits';
 import { useWorkbenchFitList } from './workbenchFitCurrency';
 import { OutOfDateReasons, OutOfDateToggle } from './WorkbenchOutOfDate';
@@ -28,36 +28,6 @@ interface PopularFitsPanelProps {
    * content below it. Off, the list runs its full length and the host scrolls.
    */
   capped?: boolean;
-}
-
-/** A row's fitted modules by rack, in rack order; empty racks left out. */
-function modulesByRack(fit: PopularFit): { rack: FittingSlotKind; typeIds: number[] }[] {
-  return FITTING_SLOT_KINDS.map((rack) => ({
-    rack,
-    typeIds: fit.parts.modules.filter((module) => module.slot === rack).map((m) => m.typeId),
-  })).filter((group) => group.typeIds.length > 0);
-}
-
-/** Names for every fitted module across the fits, from the SDE; empty until they land. */
-function useModuleNames(fits: readonly PopularFit[] | null): ReadonlyMap<number, string> {
-  const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
-  useEffect(() => {
-    if (fits === null) return;
-    let cancelled = false;
-    const typeIds = [...new Set(fits.flatMap((fit) => fit.parts.modules.map((m) => m.typeId)))];
-    void Promise.all(
-      typeIds.map(async (typeId): Promise<[number, string]> => [typeId, await typeName(typeId)])
-    )
-      .then((resolved) => {
-        if (!cancelled) setNames(new Map(resolved));
-      })
-      // No SDE, no names: the icons keep their `#id` fallback.
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [fits]);
-  return names;
 }
 
 type PopularFitsSource = 'zkillboard' | 'workbench';
@@ -103,7 +73,12 @@ function ZkillboardFits({
   const { t } = useTranslation();
   const result = usePopularFits(shipTypeId);
   const now = useNow();
-  const names = useModuleNames(result?.ok ? result.fits : null);
+  const fits = result?.ok ? result.fits : null;
+  const typeIds = useMemo(
+    () => fits?.flatMap((fit) => fit.parts.modules.map((m) => m.typeId)) ?? null,
+    [fits]
+  );
+  const names = useModuleNames(typeIds);
 
   return (
     <>
@@ -134,32 +109,7 @@ function ZkillboardFits({
                       ` · ${t('fittings.popular.value', { value: formatIskCompact(fit.value) })}`}
                   </span>
                 </p>
-                <div className="mt-1 flex flex-wrap items-center gap-y-1">
-                  {modulesByRack(fit).map(({ rack, typeIds }, rackIndex) => (
-                    <div
-                      key={rack}
-                      role="group"
-                      aria-label={t(`fittings.list.rack.${rack}`)}
-                      className={cx(
-                        'flex flex-wrap gap-0.5',
-                        rackIndex > 0 && 'ml-1.5 border-l border-line pl-1.5'
-                      )}
-                    >
-                      {typeIds.map((typeId, slotIndex) => {
-                        const name = names.get(typeId) ?? `#${typeId}`;
-                        // Not a tab stop: ~20 per fit would bury Open; the name reaches
-                        // screen readers as the icon's label, and touch reads it by tap.
-                        return (
-                          <Tooltip key={slotIndex} content={name} openOnTap>
-                            <span role="img" aria-label={name} className="inline-flex">
-                              <TypeIcon typeId={typeId} size={32} width={20} height={20} />
-                            </span>
-                          </Tooltip>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
+                <RackIconStrip modules={fit.parts.modules} names={names} />
               </div>
               <Button
                 size="sm"
@@ -192,6 +142,8 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
   const result = useWorkbenchFits(shipTypeId);
   // Out-of-date fits (issue #2485) sort below, shown only on request.
   const list = useWorkbenchFitList(result?.ok ? result.fits : null);
+  // Each fit's modules come from that same check (issue #2493): no second parse.
+  const names = useModuleNames(list.moduleTypeIds);
   const sightings = useWorkbenchSightings(shipTypeId, result?.ok ? result.fits : null);
   const now = useNow();
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -255,6 +207,7 @@ function WorkbenchFits({ shipTypeId, onOpen, busy = false, capped = true }: Popu
                     age: formatAge(Math.max(0, now - fit.dateAdded), t),
                   })}
                 </p>
+                <RackIconStrip modules={list.modulesFor(fit.id) ?? []} names={names} />
                 <OutOfDateReasons reasons={list.reasonsFor(fit.id)} />
                 <WorkbenchSightingBadge sighting={sightings.get(fit.id)} />
                 {failedId === fit.id && (

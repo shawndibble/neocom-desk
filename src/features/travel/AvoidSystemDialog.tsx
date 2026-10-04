@@ -14,6 +14,7 @@ import { Button, Modal, Spinner } from '@/components/ui';
 import { avoidListKey } from '@/engine/route/avoidRules';
 import { addAvoidedSystem, useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { useAvoidedSystemsEnabled, type RouteRules } from '@/features/route/routeRules';
+import type { RouteGraphExtras } from '@/features/route/localRoute';
 import { previewAvoid, type AvoidPreviewResult } from './avoidPreview';
 
 export interface AvoidTarget {
@@ -54,6 +55,8 @@ export function AvoidSystemDialog({
   toId,
   rules,
   currentJumps,
+  extras,
+  extrasKey = '',
   onClose,
 }: {
   /** `null` keeps the dialog closed. */
@@ -63,6 +66,9 @@ export function AvoidSystemDialog({
   /** The rules the page's route is drawn with now. */
   rules: RouteRules;
   currentJumps: number;
+  /** The holes the page's route may cross (issue #2476); stable while `extrasKey` is. */
+  extras?: RouteGraphExtras;
+  extrasKey?: string;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -86,6 +92,7 @@ export function AvoidSystemDialog({
     avoidListKey(rules.avoid),
     enabled,
     avoidListKey(avoided),
+    extrasKey,
   ].join(':');
 
   useEffect(() => {
@@ -99,13 +106,14 @@ export function AvoidSystemDialog({
       currentJumps,
       avoidList: avoided,
       avoidListEnabled: enabled,
+      extras,
     }).then((result) => {
       if (!cancelled) setPreview({ key: requestKey, result });
     });
     return () => {
       cancelled = true;
     };
-  }, [systemId, fromId, toId, rules, currentJumps, avoided, enabled, requestKey]);
+  }, [systemId, fromId, toId, rules, currentJumps, avoided, enabled, extras, requestKey]);
 
   if (target === null) return null;
   const current = preview?.key === requestKey ? preview.result : null;

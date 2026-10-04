@@ -860,7 +860,33 @@ export function MaterialsTable({
   }
 
   /** The Have field, with the detected-stock offer under it. A blueprint row only ever says Owned. */
-  function renderHave(material: MaterialTableRow) {
+  /**
+   * The detected-stock offer ("Use assets") for a row, or nothing. Its own
+   * piece so the phone row can put it on the line under the subtraction
+   * instead of inside it, where it split Need − Have = To buy over two lines.
+   */
+  function renderOwnedHint(material: MaterialTableRow) {
+    if (material.acquisitionTier) return null;
+    const stock = detection?.stockFor(material.typeID);
+    if (!stock || !detection) return null;
+    const owned = sourcing?.[material.typeID]?.ownedQuantity;
+    // The offer respects the plan's owned-stock scope (issue #454), and is
+    // dropped once the row already holds the clamped suggestion.
+    const scopedQuantity = detection.scopedQuantityFor(material.typeID) ?? 0;
+    const suggestion = suggestedOwnedQuantity(scopedQuantity, material.quantity);
+    return (
+      <OwnedStockHint
+        scopedQuantity={scopedQuantity}
+        detection={detection}
+        materialName={nameFor(material.typeID)}
+        suggestion={suggestion}
+        canApply={owned !== suggestion && suggestion > 0}
+        onApply={() => commitOwned(material.typeID, suggestion)}
+      />
+    );
+  }
+
+  function renderHave(material: MaterialTableRow, withHint = true) {
     // Blueprint Acquisition (issue #838): ownership comes entirely from the
     // Character's real BPO/BPC, never from a typed quantity — an editable
     // field here would silently do nothing.
@@ -873,12 +899,7 @@ export function MaterialsTable({
         <NotApplicable />
       );
     }
-    const stock = detection?.stockFor(material.typeID);
     const owned = sourcing?.[material.typeID]?.ownedQuantity;
-    // The offer respects the plan's owned-stock scope (issue #454), and is
-    // dropped once the row already holds the clamped suggestion.
-    const scopedQuantity = detection?.scopedQuantityFor(material.typeID) ?? 0;
-    const suggestion = stock ? suggestedOwnedQuantity(scopedQuantity, material.quantity) : 0;
     return (
       <span className="flex flex-col items-start gap-0.5 sm:items-end">
         <SourcingInput
@@ -891,22 +912,18 @@ export function MaterialsTable({
           parse={parseCount}
           onCommit={(ownedQuantity) => commitOwned(material.typeID, ownedQuantity)}
         />
-        {stock && detection && (
-          <OwnedStockHint
-            scopedQuantity={scopedQuantity}
-            detection={detection}
-            materialName={nameFor(material.typeID)}
-            suggestion={suggestion}
-            canApply={owned !== suggestion && suggestion > 0}
-            onApply={() => commitOwned(material.typeID, suggestion)}
-          />
-        )}
+        {withHint && renderOwnedHint(material)}
       </span>
     );
   }
 
-  /** The price field and what kind of price it holds. A built row has no purchase price at all. */
-  function renderPrice(material: MaterialTableRow) {
+  /**
+   * The price field and what kind of price it holds. A built row has no
+   * purchase price at all. `inline` is the phone row's form: "@ [field]" on
+   * one line with its tag beside it rather than stacked under it, and no tier
+   * caption, which the phone row prints beside Change tier instead.
+   */
+  function renderPrice(material: MaterialTableRow, inline = false) {
     const name = nameFor(material.typeID);
     if (material.subBuilds.length > 0) {
       // "Something under this has no price" is a warning about the plan's
@@ -935,7 +952,18 @@ export function MaterialsTable({
         ? () => onOpenAcquisitionPicker(material.typeID)
         : undefined;
     return (
-      <span className="flex flex-col items-start gap-0.5 sm:items-end">
+      <span
+        className={
+          inline
+            ? 'inline-flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5'
+            : 'flex flex-col items-start gap-0.5 sm:items-end'
+        }
+      >
+        {inline && (
+          <span className="text-text-dim" aria-hidden="true">
+            {t('industry.errands.at')}
+          </span>
+        )}
         <SourcingInput
           value={state.unitPrice ?? undefined}
           label={t('industry.priceFor', { material: name })}
@@ -970,7 +998,7 @@ export function MaterialsTable({
             )}
           </span>
         )}
-        {material.acquisitionTier && (
+        {!inline && material.acquisitionTier && (
           <span className="text-[0.6875rem] text-text-dim">
             {t('industry.blueprintAcquisitionTier', material.acquisitionTier)}
           </span>
@@ -1175,8 +1203,10 @@ export function MaterialsTable({
   function renderPhoneRow(material: MaterialTableRow) {
     const building = isBuilt(material);
     const item = (
-      <li key={material.typeID} className="flex flex-col gap-1.5 py-2">
-        <div className="flex items-start justify-between gap-2">
+      <li key={material.typeID} className="flex flex-col gap-1 py-2">
+        {/* Centred, not top-aligned: the row menu button is taller than a
+            line of text, and top alignment dropped the total below the name. */}
+        <div className="flex items-center justify-between gap-2">
           <span className="min-w-0 text-sm font-semibold">{renderName(material, false)}</span>
           <span className="flex shrink-0 items-center gap-1 text-sm font-semibold tabular-nums">
             {renderTotal(material)}
@@ -1191,7 +1221,7 @@ export function MaterialsTable({
             <span aria-hidden="true">{t('industry.errands.minus')}</span>
             {/* The field's own accessible name starts with this word. */}
             <span aria-hidden="true">{t('industry.errands.haveColumn')}</span>
-            {renderHave(material)}
+            {renderHave(material, false)}
             {!building && (
               <>
                 <span aria-hidden="true">{t('industry.errands.equals')}</span>
@@ -1204,16 +1234,20 @@ export function MaterialsTable({
             )}
           </div>
         )}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span>{renderAction(material)}</span>
-          {!building && (
-            <span className="flex items-start gap-1.5 text-xs">
-              <span className="pt-1 text-text-dim" aria-hidden="true">
-                {t('industry.price')}
+        {/* What to do about the row on the left — use what's in the hangar,
+            switch build/buy, change the blueprint tier — and its price on the
+            right, as "@ price": one line, not a labelled box of its own. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <span className="flex min-w-0 flex-wrap items-center gap-x-3">
+            {renderOwnedHint(material)}
+            {renderAction(material)}
+            {material.acquisitionTier && (
+              <span className="text-[0.6875rem] text-text-dim">
+                {t('industry.blueprintAcquisitionTier', material.acquisitionTier)}
               </span>
-              {renderPrice(material)}
-            </span>
-          )}
+            )}
+          </span>
+          {!building && <span className="ml-auto text-xs">{renderPrice(material, true)}</span>}
           {building && material.unpriced && renderPrice(material)}
         </div>
       </li>

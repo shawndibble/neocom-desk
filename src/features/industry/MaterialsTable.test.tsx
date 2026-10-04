@@ -485,6 +485,34 @@ describe('MaterialsTable on a phone', () => {
     expect(screen.getByRole('heading', { name: /^To buy · 2/ })).toBeTruthy();
   });
 
+  it('keeps the subtraction on its own line, with Use assets and the price on the line under it', () => {
+    const detection: OwnedStockDetection = {
+      stockFor: (typeID) => (typeID === 34 ? { quantity: 9000, placements: [] } : undefined),
+      scopedQuantityFor: (typeID) => (typeID === 34 ? 9000 : 0),
+      lowerBound: false,
+      incompleteCharacters: [],
+      characterNameFor: () => 'Main Pilot',
+      corporationNameFor: () => 'Unknown Corp',
+      locationLabelFor: () => 'Jita IV - Moon 4',
+    };
+    render(<Harness detection={detection} />);
+
+    const item = screen.getByText('Tritanium').closest('li')!;
+    const have = within(item).getByRole('textbox', { name: 'Have: Tritanium' });
+    const offer = within(item).getByRole('button', { name: /^Use assets/ });
+    const price = within(item).getByRole('textbox', { name: 'Price for Tritanium' });
+    // Need − Have = To buy is one line: the offer used to sit inside it,
+    // under the Have field, splitting it over two.
+    const subtraction = within(item).getByText('Need 1,000').parentElement!;
+    expect(subtraction).toContainElement(have);
+    expect(subtraction).not.toContainElement(offer);
+    // Offer and price share the next line, the price as "@ [field]" rather
+    // than a labelled box of its own.
+    const footer = offer.closest('li > div')!;
+    expect(footer).toContainElement(price);
+    expect(price.closest('span')?.parentElement).toHaveTextContent(/^@/);
+  });
+
   it('sorts within each section from its own picker, since a phone has no table header', () => {
     render(<Harness />);
     const names = () =>

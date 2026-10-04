@@ -618,6 +618,149 @@ describe('Travel › Route Safety › Route rules', () => {
   });
 });
 
+describe('Travel › Route Safety › Thera / Turnur holes', () => {
+  /** Jita ─ Niyabainen ─ Muvolailen ─ Sobaseki ─ Uedama by gate; Thera has none. */
+  const LONG_WAY = {
+    [JITA]: [NIYABAINEN],
+    [NIYABAINEN]: [JITA, MUVOLAILEN],
+    [MUVOLAILEN]: [NIYABAINEN, SOBASEKI],
+    [SOBASEKI]: [MUVOLAILEN, UEDAMA],
+    [UEDAMA]: [SOBASEKI],
+    [THERA]: [],
+  };
+  const HOLES = [
+    signature({
+      id: 'jita',
+      in_system_id: JITA,
+      in_system_name: 'Jita',
+      in_signature: 'JIT-001',
+      out_signature: 'THR-001',
+    }),
+    signature({
+      id: 'uedama',
+      in_system_id: UEDAMA,
+      in_system_name: 'Uedama',
+      in_signature: 'UED-002',
+      out_signature: 'THR-002',
+    }),
+  ];
+
+  beforeEach(() => {
+    loadSolarSystemJumps.mockResolvedValue(LONG_WAY);
+  });
+
+  it('routes through the holes when that costs less, each a row of its own', async () => {
+    server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json(HOLES)));
+    visit(`?from=${JITA}&to=${UEDAMA}&wh=1`);
+
+    expect(await screen.findAllByTestId('route-strip-hole')).toHaveLength(2);
+    const table = await screen.findByRole('table', { name: 'Systems on the route' });
+    const body = (await within(table).findAllByRole('row')).slice(1);
+    const firstCells = body.map((row) => within(row).getAllByRole('cell')[0].textContent ?? '');
+    expect(firstCells).toHaveLength(5);
+    expect(firstCells[0]).toBe('Jita');
+    expect(firstCells[1]).toContain('Warp to JIT-001 in Jita');
+    expect(firstCells[1]).toContain('Q063');
+    expect(firstCells[2]).toBe('Thera');
+    expect(firstCells[3]).toContain('Warp to THR-002 in Thera');
+    expect(firstCells[4]).toContain('Uedama');
+    expect(within(body[2]).getByText("ESI doesn't report wormhole space")).toBeInTheDocument();
+    expect(
+      within(body[1]).getByRole('button', { name: 'Copy signature JIT-001 in Jita' })
+    ).toBeInTheDocument();
+
+    const facts = within(screen.getByRole('list', { name: 'Route summary' }));
+    expect(facts.getByText('2 jumps')).toBeInTheDocument();
+    expect(facts.getByText('0 by gate')).toBeInTheDocument();
+    expect(facts.getByText('2 through wormholes')).toBeInTheDocument();
+    // Thera is counted as wormhole jumps, never as a nullsec system or the lowest security.
+    expect(facts.getByText('2 highsec / 0 lowsec / 0 nullsec')).toBeInTheDocument();
+    expect(facts.getByText('lowest 0.5')).toBeInTheDocument();
+    expect(screen.getAllByTestId('route-strip-cell')).toHaveLength(3);
+  });
+
+  it('sets in-game waypoints only up to the hole entrance', async () => {
+    const user = userEvent.setup();
+    loadSolarSystemJumps.mockResolvedValue({
+      ...LONG_WAY,
+      [PERIMETER]: [JITA],
+      [JITA]: [PERIMETER, NIYABAINEN],
+    });
+    await db.tokens.update(CHAR_ID, {
+      scopes: ['esi-location.read_location.v1', 'esi-ui.write_waypoint.v1'],
+    });
+    const sent: string[] = [];
+    server.use(
+      http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json(HOLES)),
+      http.post(`${ESI}/ui/autopilot/waypoint`, ({ request }) => {
+        sent.push(new URL(request.url).searchParams.get('destination_id') ?? '');
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    visit(`?from=${PERIMETER}&to=${UEDAMA}&wh=1`);
+
+    expect(await screen.findAllByTestId('route-strip-hole')).toHaveLength(2);
+    const button = await screen.findByRole('button', { name: 'Set waypoints in game' });
+    await waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+    expect(
+      await screen.findByText(
+        /Waypoints set to Jita\. Take the wormhole there, then set the rest from Thera\./
+      )
+    ).toBeInTheDocument();
+    expect(sent).toEqual([String(JITA)]);
+  });
+
+  it('skips holes the ship does not fit, and flies the gates', async () => {
+    server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json(HOLES)));
+    visit(`?from=${JITA}&to=${UEDAMA}&wh=1&whsize=large`);
+    await waitFor(() =>
+      expect(screen.queryByText('Checking Thera / Turnur connections…')).toBeNull()
+    );
+
+    const table = await screen.findByRole('table', { name: 'Systems on the route' });
+    await waitFor(() =>
+      expect(within(table).getAllByRole('row').slice(1)[0]).toHaveTextContent('Jita')
+    );
+    expect(screen.queryByTestId('route-strip-hole')).toBeNull();
+    expect(
+      within(screen.getByRole('list', { name: 'Route summary' })).getByText('4 jumps')
+    ).toBeInTheDocument();
+  });
+
+  it('never asks EVE-Scout with the switch off', async () => {
+    const asked = vi.fn(() => HttpResponse.json(HOLES));
+    server.use(http.get(EVE_SCOUT_SIGNATURES_URL, asked));
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    await screen.findByRole('table', { name: 'Systems on the route' });
+    expect(
+      within(screen.getByRole('list', { name: 'Route summary' })).getByText('4 jumps')
+    ).toBeInTheDocument();
+    expect(asked).not.toHaveBeenCalled();
+  });
+
+  it('shows the gate route while the hole list loads, and says so', async () => {
+    server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => new Promise<never>(() => {})));
+    visit(`?from=${JITA}&to=${UEDAMA}&wh=1`);
+
+    expect(await screen.findByText('Checking Thera / Turnur connections…')).toBeInTheDocument();
+    expect(await screen.findByRole('table', { name: 'Systems on the route' })).toBeInTheDocument();
+  });
+
+  it('falls back to gates when EVE-Scout cannot be reached, and says so', async () => {
+    server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => new HttpResponse(null, { status: 503 })));
+    visit(`?from=${JITA}&to=${UEDAMA}&wh=1`);
+
+    expect(
+      await screen.findByText("EVE-Scout couldn't be reached, so this route uses gates only.")
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'Route summary' })).getByText('4 jumps')
+    ).toBeInTheDocument();
+  });
+});
+
 describe('Travel › Thera / Turnur', () => {
   afterEach(() => configureClipboard(null));
 
