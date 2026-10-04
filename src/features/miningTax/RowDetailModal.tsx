@@ -49,6 +49,8 @@ interface RowDetailModalProps {
    */
   pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   busy: boolean;
+  /** Set when the last action taken from here failed to save; the modal stays open to show it. */
+  saveError?: string | null;
   /** A new Assignment from the Assign form lands here — refresh and close, same as every other action below. */
   onAssigned: () => void;
   /** Opens `EntryEditDialog` for this entry — the same edit form a combined entry uses, owed or paid. */
@@ -104,6 +106,7 @@ export function RowDetailModal({
   payees,
   pricesFor,
   busy,
+  saveError,
   onAssigned,
   onEdit,
   onDismiss,
@@ -317,6 +320,12 @@ export function RowDetailModal({
               </Button>
             </div>
           </div>
+        )}
+
+        {saveError && (
+          <p role="alert" className="text-xs text-danger">
+            {saveError}
+          </p>
         )}
 
         {status === 'dismissed' ? (

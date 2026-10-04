@@ -398,8 +398,8 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
  * Ledger table phone sort picker (issue #2148): `DataTable` defaults to
  * `responsive="stack"` below `sm`, which hides the `<thead>` and its sort
  * buttons entirely — the same bug class already fixed for Industry (#1627),
- * Market (#1628) and Contacts (#1978). The fix is a bare `mobileSort` prop on
- * the Tax tab's `DataTable` call (every column already carries `sortValue`),
+ * Market (#1628) and Contacts (#1978). The Tax tab renders `DataTableSortPicker`
+ * in its filter row on a phone (every column already carries `sortValue`),
  * so this only needs to prove the picker renders on phone, is absent on
  * desktop, and actually reorders the stacked cards.
  */
