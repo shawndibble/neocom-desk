@@ -2,9 +2,9 @@
  * Edits the implant/booster set a Fitting carries.
  *
  * Adds by exact (case-insensitive) item name via the same `loadItemNameMap`
- * the EFT loader resolves names through — there is no per-slot SDE attribute
- * baked into this build's snapshot to drive a "browse implant slot 3" style
- * picker, so this trims to a name-search add/remove list instead.
+ * the EFT loader resolves names through, from one box: the implant catalog
+ * (`loadImplantCatalog`) says which slot the item takes, and it goes there
+ * (`placeInSet`), replacing whatever held that slot, as Find by goal does.
  *
  * Given the open Fitting and pilot (`finder`), it opens on "Find by goal"
  * (`ImplantFinder`) instead, with this list under "Your set".
@@ -14,7 +14,7 @@
  * Fitting — which is what puts the page on it — while opening it alone
  * changes nothing. "Use my clone" drops the set again.
  */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -28,12 +28,15 @@ import {
 } from '@/components/ui';
 import { boosterSideEffects, withBoosters } from '@/engine/fittings/boosterSideEffects';
 import * as Icon from '@/components/ui/icons';
-import { MAX_BOOSTERS, MAX_IMPLANTS } from '@/engine/fitting/fittingShare';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { ImplantBasis } from '@/engine/fittings/implantBasis';
+import { placeInSet } from '@/engine/fittings/implantFinder';
 import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { ImplantFinder } from './ImplantFinder';
+import { loadImplantCatalog } from './useImplantFinder';
 
 interface ImplantSetPickerProps {
   open: boolean;
@@ -58,12 +61,11 @@ const EMPTY_SET: FittingImplantSet = { implants: [], boosters: [] };
 interface SlotListProps {
   heading: string;
   typeIds: readonly number[];
-  max: number;
   names: Map<number, string>;
-  onAdd: (name: string) => void;
   /** By position, not type id — a set may legally carry the same id twice. */
   onRemove: (index: number) => void;
-  error: string | null;
+  /** Opens an entry's details (Show Info), from its name. */
+  onInfo: (typeId: number) => void;
   /** Under an entry: its own controls (a booster's side effects). */
   renderDetail?: (typeId: number) => ReactNode;
 }
@@ -106,19 +108,38 @@ function SideEffectSwitches({
   );
 }
 
-function SlotList({
-  heading,
-  typeIds,
-  max,
-  names,
-  onAdd,
-  onRemove,
-  error,
-  renderDetail,
-}: SlotListProps) {
+/** One box for both lists: the item itself decides where it goes. */
+function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: string | null }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
-  const full = typeIds.length >= max;
+  return (
+    <div className="space-y-1">
+      <form
+        className="flex items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (query.trim() === '') return;
+          onAdd(query.trim());
+          setQuery('');
+        }}
+      >
+        <SearchInput
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t('fittings.implants.addPlaceholder')}
+          aria-label={t('fittings.implants.addLabel')}
+        />
+        <Button type="submit" size="sm" disabled={query.trim() === ''}>
+          {t('fittings.implants.add')}
+        </Button>
+      </form>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
+
+function SlotList({ heading, typeIds, names, onRemove, onInfo, renderDetail }: SlotListProps) {
+  const { t } = useTranslation();
 
   return (
     <div className="space-y-2">
@@ -138,7 +159,13 @@ function SlotList({
               >
                 <div className="flex items-center gap-2">
                   <TypeIcon typeId={typeId} size={32} width={20} height={20} />
-                  <span className="flex-1 truncate text-sm">{name}</span>
+                  <button
+                    type="button"
+                    className={`${tappableRowClassName} min-w-0 flex-1 cursor-pointer truncate text-left text-sm text-accent underline-offset-2 hover:underline`}
+                    onClick={() => onInfo(typeId)}
+                  >
+                    {name}
+                  </button>
                   <IconButton
                     variant="plain"
                     size="sm"
@@ -154,28 +181,6 @@ function SlotList({
           })}
         </ul>
       )}
-      <form
-        className="flex items-center gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (query.trim() === '') return;
-          onAdd(query.trim());
-          setQuery('');
-        }}
-      >
-        <SearchInput
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t('fittings.implants.addPlaceholder')}
-          disabled={full}
-          aria-label={heading}
-        />
-        <Button type="submit" size="sm" disabled={full || query.trim() === ''}>
-          {t('fittings.implants.add')}
-        </Button>
-      </form>
-      {full && <p className="text-xs text-warning">{t('fittings.implants.full')}</p>}
-      {error && <p className="text-xs text-danger">{error}</p>}
     </div>
   );
 }
@@ -192,8 +197,8 @@ export function ImplantSetPicker({
   const [tab, setTab] = useState<'find' | 'set'>('find');
   const [nameMap, setNameMap] = useState<Map<string, { typeID: number }>>(new Map());
   const [names, setNames] = useState<Map<number, string>>(new Map());
-  const [implantError, setImplantError] = useState<string | null>(null);
-  const [boosterError, setBoosterError] = useState<string | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [infoTypeId, setInfoTypeId] = useState<number | null>(null);
 
   const fitting = finder?.fitting;
   const onClone = finder?.basis === 'clone';
@@ -212,10 +217,15 @@ export function ImplantSetPicker({
     [fitting, seed]
   );
   const set = implantSet ?? seed ?? EMPTY_SET;
+  const latestSet = useRef(set);
+  useEffect(() => {
+    latestSet.current = set;
+  }, [set]);
 
   useEffect(() => {
     if (!open) return;
     void loadItemNameMap().then(setNameMap);
+    void loadImplantCatalog().catch(() => undefined); // warm, so an add sorts at once
   }, [open]);
 
   useEffect(() => {
@@ -223,15 +233,26 @@ export function ImplantSetPicker({
     void loadTypeNames([...set.implants, ...set.boosters]).then(setNames);
   }, [open, set.implants, set.boosters]);
 
-  function addTo(kind: 'implants' | 'boosters', rawName: string) {
+  async function add(rawName: string) {
     const entry = nameMap.get(rawName.toLowerCase());
-    const setError = kind === 'implants' ? setImplantError : setBoosterError;
     if (!entry) {
-      setError(t('fittings.implants.notFound'));
+      setAddError(t('fittings.implants.notFound'));
       return;
     }
-    setError(null);
-    onChange({ ...set, [kind]: [...set[kind], entry.typeID] });
+    const catalog = await loadImplantCatalog().catch(() => null);
+    if (!catalog) {
+      setAddError(t('fittings.implants.catalogFailed'));
+      return;
+    }
+    if (!catalog.slotOf(entry.typeID)) {
+      setAddError(t('fittings.implants.notImplantOrBooster', { name: rawName }));
+      return;
+    }
+    setAddError(null);
+    // The set as of now, not as of the submit: another add may have landed meanwhile.
+    const next = placeInSet(latestSet.current, catalog.slotOf, entry.typeID);
+    latestSet.current = next;
+    onChange(next);
   }
 
   function removeFrom(kind: 'implants' | 'boosters', index: number) {
@@ -254,23 +275,20 @@ export function ImplantSetPicker({
 
   const setEditor = (
     <div className="space-y-4">
+      <AddItemForm onAdd={(name) => void add(name)} error={addError} />
       <SlotList
         heading={t('fittings.implants.implantsHeading')}
         typeIds={set.implants}
-        max={MAX_IMPLANTS}
         names={names}
-        onAdd={(name) => addTo('implants', name)}
         onRemove={(index) => removeFrom('implants', index)}
-        error={implantError}
+        onInfo={setInfoTypeId}
       />
       <SlotList
         heading={t('fittings.implants.boostersHeading')}
         typeIds={set.boosters}
-        max={MAX_BOOSTERS}
         names={names}
-        onAdd={(name) => addTo('boosters', name)}
         onRemove={(index) => removeFrom('boosters', index)}
-        error={boosterError}
+        onInfo={setInfoTypeId}
         renderDetail={(typeId) => (
           <SideEffectSwitches
             boosterTypeId={typeId}
@@ -279,6 +297,16 @@ export function ImplantSetPicker({
           />
         )}
       />
+      {infoTypeId !== null && (
+        <ItemDetailModal
+          typeId={infoTypeId}
+          itemName={
+            names.get(infoTypeId) ?? t('fittings.implants.unknownType', { typeId: infoTypeId })
+          }
+          onClose={() => setInfoTypeId(null)}
+          showOpenInMarket
+        />
+      )}
     </div>
   );
 
