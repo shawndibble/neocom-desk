@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   loadSkillCatalog,
   toAttributeBaseline,
@@ -58,6 +58,16 @@ export interface PlanEditorData {
   totalSp: number | null;
   /** ESI's `unallocated_sp`, null until /skills has loaded or when ESI omits it. */
   unallocatedSp: number | null;
+  /**
+   * Freshness of `trainedSkills` for a `DataAgeBadge`: the older of the
+   * /skills and queue reads (`loadCorrectedSkills`), null until either was read.
+   */
+  fetchedAt: Date | null;
+  /**
+   * Re-runs the load. The previous answer stays in place until the new one
+   * lands, so a view can keep its rows on screen while it refreshes.
+   */
+  reload: () => void;
 }
 
 /**
@@ -83,6 +93,9 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
   const [queueFetchedAt, setQueueFetchedAt] = useState<Date | null>(null);
   const [totalSp, setTotalSp] = useState<number | null>(null);
   const [unallocatedSp, setUnallocatedSp] = useState<number | null>(null);
+  const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
+  const [reloads, setReloads] = useState(0);
+  const reload = useCallback(() => setReloads((n) => n + 1), []);
 
   useEffect(() => {
     if (characterId === null) return;
@@ -105,6 +118,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
       setQueueFetchedAt(corrected.queueResult?.fetchedAt ?? null);
       setTotalSp(corrected.totalSp);
       setUnallocatedSp(corrected.skillsResult?.data.unallocated_sp ?? null);
+      setFetchedAt(corrected.fetchedAt);
       if (attrs?.data) {
         // An `impossible` sheet yields no baseline at all, so the scheduler
         // falls back to the same placeholder it uses when ESI cannot be read.
@@ -122,7 +136,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
     return () => {
       cancelled = true;
     };
-  }, [characterId]);
+  }, [characterId, reloads]);
 
   return {
     loaded: characterId !== null && loadedFor === characterId,
@@ -138,5 +152,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
     queueFetchedAt,
     totalSp,
     unallocatedSp,
+    fetchedAt,
+    reload,
   };
 }
