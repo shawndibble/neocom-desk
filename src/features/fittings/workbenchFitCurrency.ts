@@ -133,8 +133,8 @@ let gameDataPromise: Promise<CurrencyGameData> | null = null;
 /** With the game's names unreadable, nothing is called removed on a guess. */
 const everyNameIsTheGames = (): boolean => true;
 
-/** Never rejects: an unreadable list falls back to `everyNameIsTheGames`. */
-function loadGameItemNames(): Promise<(name: string) => boolean> {
+/** Never rejects: an unreadable list falls back to `everyNameIsTheGames`. Also read by the sightings (#2536). */
+export function loadGameItemNames(): Promise<(name: string) => boolean> {
   return Promise.resolve()
     .then(() => loadGameTypeNames())
     .then(gameItemLookup, () => everyNameIsTheGames);
