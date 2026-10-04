@@ -136,8 +136,9 @@ const everyNameIsTheGames = (): boolean => true;
 let gameItemNamesPromise: Promise<(name: string) => boolean> | null = null;
 
 /**
- * Never rejects: an unreadable list falls back to `everyNameIsTheGames`, and is
- * read again next time. Built once and shared with the sightings (#2536).
+ * Never rejects: an unreadable list falls back to `everyNameIsTheGames`, and
+ * the next call tries the list again. Built once and shared with the sightings
+ * (#2536).
  */
 export function loadGameItemNames(): Promise<(name: string) => boolean> {
   gameItemNamesPromise ??= Promise.resolve()
