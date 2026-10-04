@@ -22,19 +22,14 @@ import { useSetDestination } from './useSetDestination';
 export function SetWaypointMenuItem({
   locationId,
   placeName,
-  named = false,
 }: {
   /** An NPC station, player structure or solar system id — never an item id (see `useSetDestination`). */
   locationId: number;
   placeName: string;
-  /** Names the place in the label: for a row with two places (a haul's buy and sell stations). */
-  named?: boolean;
 }) {
   const { t } = useTranslation();
   const { blockedReason, sending, outcome, send } = useSetDestination(locationId, placeName);
-  const label = named
-    ? t('travel.waypoints.menuItemTo', { placeName })
-    : t('travel.waypoints.menuItem');
+  const label = t('travel.waypoints.menuItem');
 
   if (blockedReason !== null) {
     return <DisabledMenuItem reason={blockedReason}>{label}</DisabledMenuItem>;

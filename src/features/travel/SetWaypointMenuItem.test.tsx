@@ -27,11 +27,11 @@ async function seed(scopes: string[]) {
   });
 }
 
-function openMenu(named = false) {
+function openMenu() {
   render(
     <RowActionsMenu
       name="row"
-      items={<SetWaypointMenuItem locationId={JITA_4_4} placeName={PLACE} named={named} />}
+      items={<SetWaypointMenuItem locationId={JITA_4_4} placeName={PLACE} />}
     >
       <div>row</div>
     </RowActionsMenu>
@@ -75,15 +75,6 @@ describe('SetWaypointMenuItem', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Waypoints not set: Character is not online'
     );
-  });
-
-  it('names the place when asked, for a row with two', async () => {
-    await seed([WAYPOINT_SCOPE]);
-    openMenu(true);
-
-    expect(
-      await screen.findByRole('menuitem', { name: `Set waypoint in game: ${PLACE}` })
-    ).toBeInTheDocument();
   });
 
   it('stays inert for a Character without the waypoint scope', async () => {
