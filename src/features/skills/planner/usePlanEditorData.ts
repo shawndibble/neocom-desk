@@ -11,6 +11,7 @@ import {
   type CachedResult,
 } from '@/features/skills/data';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { invalidateFreshness } from '@/esi/cache';
 import { DEFAULT_ATTRIBUTES } from './planSchedule';
 import { remapAvailability, type RemapAvailability } from './remapAvailability';
 import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
@@ -64,8 +65,10 @@ export interface PlanEditorData {
    */
   fetchedAt: Date | null;
   /**
-   * Re-runs the load. The previous answer stays in place until the new one
-   * lands, so a view can keep its rows on screen while it refreshes.
+   * Re-runs the load, reaching ESI rather than a freshness-window hit (the
+   * same bypass as `useRouteSnapshot`'s `refresh`). The previous answer
+   * stays in place until the new one lands, so a view can keep its rows on
+   * screen while it refreshes.
    */
   reload: () => void;
 }
@@ -94,8 +97,11 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
   const [totalSp, setTotalSp] = useState<number | null>(null);
   const [unallocatedSp, setUnallocatedSp] = useState<number | null>(null);
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
-  const [reloads, setReloads] = useState(0);
-  const reload = useCallback(() => setReloads((n) => n + 1), []);
+  const [reloadCount, setReloadCount] = useState(0);
+  const reload = useCallback(() => {
+    invalidateFreshness();
+    setReloadCount((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     if (characterId === null) return;
@@ -136,7 +142,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
     return () => {
       cancelled = true;
     };
-  }, [characterId, reloads]);
+  }, [characterId, reloadCount]);
 
   return {
     loaded: characterId !== null && loadedFor === characterId,

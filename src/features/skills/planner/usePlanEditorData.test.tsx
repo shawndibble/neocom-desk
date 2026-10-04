@@ -4,6 +4,11 @@ import type { CorrectedSkills } from '@/features/skills/correctedSkills';
 import { usePlanEditorData } from './usePlanEditorData';
 
 const loadCorrectedSkills = vi.fn();
+const invalidateFreshness = vi.fn();
+
+vi.mock('@/esi/cache', () => ({
+  invalidateFreshness: () => invalidateFreshness(),
+}));
 
 vi.mock('@/features/skills/correctedSkills', () => ({
   loadCorrectedSkills: (...args: unknown[]) => loadCorrectedSkills(...args),
@@ -39,6 +44,7 @@ function corrected(fetchedAt: Date | null, level: number): CorrectedSkills {
 
 beforeEach(() => {
   loadCorrectedSkills.mockReset();
+  invalidateFreshness.mockReset();
 });
 
 describe('usePlanEditorData', () => {
@@ -70,7 +76,10 @@ describe('usePlanEditorData', () => {
         resolveSecond = resolve;
       })
     );
+    expect(invalidateFreshness).not.toHaveBeenCalled();
     act(() => result.current.reload());
+    // A manual refresh must reach ESI, not the cached rows' freshness window.
+    expect(invalidateFreshness).toHaveBeenCalledTimes(1);
     expect(loadCorrectedSkills).toHaveBeenCalledTimes(2);
     expect(loadCorrectedSkills.mock.calls[1][0]).toBe(7);
     expect(result.current.loaded).toBe(true);
