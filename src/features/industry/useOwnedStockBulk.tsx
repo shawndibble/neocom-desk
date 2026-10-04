@@ -20,7 +20,7 @@ interface BulkToast {
 }
 
 interface OwnedStockBulkInput {
-  /** The store's adapter: plan sourcing or the Group Owned Overlay. */
+  /** The Group Owned Overlay's adapter. */
   write: (changes: readonly OwnedStockChange[]) => void;
   ownedFor: OwnedQuantityFor;
   scopedQuantityFor: ScopedQuantityFor;

@@ -89,7 +89,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { writeToClipboard } from '@/lib/clipboard';
 import { unmaskNumber } from '@/lib/numberMask';
-import { MaterialsTable, SourcingInput } from './MaterialsTable';
+import { MaterialsTable, SourcingInput, type MaterialsTableHandle } from './MaterialsTable';
 import { BuildRecipeModal } from './BuildRecipeModal';
 import { BlueprintAcquisitionModal } from './BlueprintAcquisitionModal';
 import { buyPricedLine } from './materialRow';
@@ -112,7 +112,6 @@ import {
   planSourcingPatches,
   typeIdsFromKey,
 } from './planMaterialsView';
-import { useOwnedStockBulk } from './useOwnedStockBulk';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import type { CorpOwnedStockState } from './corpOwnedStock';
 import { pricingSourcesForHub, type BuildPlanPricingInputs } from './buildPlanPricingInputs';
@@ -788,18 +787,10 @@ export function BuildPlanDetail({
     ]
   );
 
-  // Over every row on the table, not the blueprint's own materials: the bulk
-  // action has to reach exactly what the per-row offers reach, or "use all"
-  // silently skips every mineral a sub-build introduced while the row beside
-  // it is still offering to apply one. Which of those rows each action
-  // changes is the owned-stock offer's call (`ownedStockOffer.ts`), shared
-  // with the row's own "Use assets" and the Build Group's ledger. Written
-  // through the plan-sourcing adapter.
-  const ownedBulk = useOwnedStockBulk({
-    write: (changes) => changeSourcing(planSourcingPatches(changes)),
-    ownedFor: (typeID) => plan.materialSourcing?.[typeID]?.ownedQuantity,
-    scopedQuantityFor: detection.scopedQuantityFor,
-  });
+  // "Use all" / "Use none" run inside the Materials table over every row on
+  // it (the rows the per-row offers reach, sub-build inputs included) and
+  // share a row edit's toast and Undo (`materialsEditSession.ts`).
+  const materialsTable = useRef<MaterialsTableHandle>(null);
 
   /**
    * The recipe behind whichever built row's "Build it" is open — the runs and
@@ -1808,10 +1799,10 @@ export function BuildPlanDetail({
                   }
                   action={
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={() => ownedBulk.fillAll(visibleMaterials)}>
+                      <Button size="sm" onClick={() => materialsTable.current?.fillAll()}>
                         {t('industry.useAllOwned')}
                       </Button>
-                      <Button size="sm" onClick={() => ownedBulk.clearAll(visibleMaterials)}>
+                      <Button size="sm" onClick={() => materialsTable.current?.clearAll()}>
                         {t('industry.useNoneOwned')}
                       </Button>
                     </div>
@@ -1826,6 +1817,8 @@ export function BuildPlanDetail({
                 sourcing={plan.materialSourcing}
                 pricesReady={pricesReady}
                 onSourcingChange={changeOneSourcing}
+                onOwnedStockChange={(changes) => changeSourcing(planSourcingPatches(changes))}
+                ref={materialsTable}
                 detection={detection}
                 rowContextMenu={materialContextMenu}
                 rowActions={materialActionsFor}
@@ -2022,7 +2015,6 @@ export function BuildPlanDetail({
         standing={standing}
         logRequest={logRequest}
       />
-      {ownedBulk.toast}
       {copyState === 'copied' && blueprintsLeftOut > 0 && (
         <Toast
           message={t('industry.copyShoppingListBlueprintsLeftOut', { count: blueprintsLeftOut })}
