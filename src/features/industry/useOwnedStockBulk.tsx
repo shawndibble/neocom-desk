@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Toast } from '@/components/ui';
 import {
@@ -33,7 +33,10 @@ interface OwnedStockBulkInput {
  * "Use all" overwrites typed counts, so it needs a way back.
  *
  * Which rows change is the owned-stock offer's rule (`ownedStockOffer.ts`);
- * Undo writes the same changes reversed through `write`.
+ * Undo writes the same changes reversed through the *latest* `write`. A
+ * store's write can be built from what it last rendered (the Group Owned
+ * Overlay copies its whole ledger), so the click-time one would drop any
+ * edit made while the toast was up.
  */
 export function useOwnedStockBulk({ write, ownedFor, scopedQuantityFor }: OwnedStockBulkInput): {
   fillAll: (rows: readonly OwnedStockOfferRow[]) => void;
@@ -42,6 +45,10 @@ export function useOwnedStockBulk({ write, ownedFor, scopedQuantityFor }: OwnedS
 } {
   const { t } = useTranslation();
   const [bulkToast, setBulkToast] = useState<BulkToast | null>(null);
+  const latestWrite = useRef(write);
+  useEffect(() => {
+    latestWrite.current = write;
+  });
   useEffect(() => {
     if (!bulkToast) return;
     const timer = setTimeout(() => setBulkToast(null), TOAST_MS);
@@ -61,7 +68,7 @@ export function useOwnedStockBulk({ write, ownedFor, scopedQuantityFor }: OwnedS
         count: changes.length,
       }),
       undo: () => {
-        write(undoOwnedStockChanges(changes));
+        latestWrite.current(undoOwnedStockChanges(changes));
         setBulkToast(null);
       },
     });

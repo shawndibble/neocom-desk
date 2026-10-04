@@ -24,7 +24,7 @@ import { suggestedOwnedQuantity } from './ownedStock';
 export interface OwnedStockOfferRow {
   typeID: number;
   quantity: number;
-  acquisitionTier?: unknown;
+  acquisitionTier?: { me: number; te: number };
 }
 
 /** A row's stored owned quantity; `undefined` when nothing is stored. */
