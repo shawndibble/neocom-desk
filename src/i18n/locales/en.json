@@ -1425,6 +1425,7 @@
       "loadAllCompatibleCount_other": "Load into all compatible ({{count}} modules)",
       "loadInto": "Load into…",
       "changeQuantity": "Change quantity…",
+      "chargeToCargo": "Put {{name}} in cargo…",
       "quantityTitle": "Quantity of {{name}}",
       "quantityConfirm": "Set quantity",
       "fitFirstFree": "Fit to first free slot",

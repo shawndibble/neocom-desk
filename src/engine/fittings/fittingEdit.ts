@@ -632,7 +632,8 @@ export function addDrones(fitting: Fitting, typeId: number, quantity: number): F
 
 /**
  * Sets how many of `typeId` the cargo holds, as one stack where the type
- * first appeared; zero or less removes it.
+ * first appeared (a new last stack when it holds none yet); zero or less
+ * removes it.
  */
 export function setCargoQuantity(fitting: Fitting, typeId: number, quantity: number): Fitting {
   const whole = wholeCount(quantity);
@@ -646,6 +647,7 @@ export function setCargoQuantity(fitting: Fitting, typeId: number, quantity: num
       placed = true;
     }
   }
+  if (!placed && whole > 0) cargo.push({ typeId, quantity: whole });
   return { ...fitting, cargo };
 }
 
