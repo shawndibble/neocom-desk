@@ -172,20 +172,6 @@ export function bridgeConnections(gates: readonly AnsiblexGate[]): [number, numb
   return pairs;
 }
 
-/** The connections the gates make, as a string: the trip re-plans only when it changes. */
-export function bridgeKey(gates: readonly AnsiblexGate[]): string {
-  return [...new Set(gates.map((gate) => bridgePairKey(gate.fromId, gate.toId)))].sort().join(',');
-}
-
-/** The pairs a {@link bridgeKey} was made from, as gates with no name: enough to route on. */
-export function bridgeEndsFromKey(key: string): AnsiblexGate[] {
-  if (key === '') return [];
-  return key.split(',').flatMap((part) => {
-    const [fromId, toId] = part.split(':').map(Number);
-    return Number.isFinite(fromId) && Number.isFinite(toId) ? [{ fromId, toId, name: '' }] : [];
-  });
-}
-
 /** The gate a step from one system to the next crosses, or `null`. */
 export type BridgeAt = (from: number, to: number) => AnsiblexGate | null;
 
