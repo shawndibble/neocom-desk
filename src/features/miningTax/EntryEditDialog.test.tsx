@@ -8,8 +8,8 @@ import { MINING_TAX_ORE_VALUE_MODE_KEY, useMiningTaxOreValueMode } from './oreVa
 import type { GroupMember } from './groupRows';
 import type { MoonMiningTaxRow } from './snapshot';
 
-const assignmentsMock = vi.hoisted(() => ({ updateCombinedAssignments: vi.fn() }));
-vi.mock('./assignments', () => assignmentsMock);
+const actionsMock = vi.hoisted(() => ({ editEntry: vi.fn() }));
+vi.mock('./ledgerActions', () => actionsMock);
 
 const ZEOLITES = 45490;
 const BITUMENS = 45492;
@@ -92,7 +92,7 @@ function renderDialog(members: GroupMember[]) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  assignmentsMock.updateCombinedAssignments.mockResolvedValue([]);
+  actionsMock.editEntry.mockResolvedValue({ ok: true, value: [] });
   useMiningTaxOreValueMode.setState({ value: true, hydrated: true });
 });
 
@@ -109,7 +109,7 @@ describe('EntryEditDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save all 2 days' }));
 
     await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
-    const [records, input] = assignmentsMock.updateCombinedAssignments.mock.calls[0];
+    const [records, input] = actionsMock.editEntry.mock.calls[0];
     expect(records.map((a: MiningTaxAssignmentRecord) => a.id)).toEqual(['d3', 'd4']);
     expect(input.payeeId).toBe('st');
     expect(input.taxPct).toBe(5);
@@ -143,7 +143,7 @@ describe('EntryEditDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
-    const [records, input] = assignmentsMock.updateCombinedAssignments.mock.calls[0];
+    const [records, input] = actionsMock.editEntry.mock.calls[0];
     expect(records.map((a: MiningTaxAssignmentRecord) => a.id)).toEqual(['d3']);
     expect(input.members.d3).toEqual({
       estimatedValue: 3_000,
@@ -164,7 +164,7 @@ describe('EntryEditDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
-    const [, input] = assignmentsMock.updateCombinedAssignments.mock.calls[0];
+    const [, input] = actionsMock.editEntry.mock.calls[0];
     expect(input.members.d3).toEqual({ estimatedValue: 4_000, taxOwed: 200 });
   });
 
@@ -179,7 +179,11 @@ describe('EntryEditDialog', () => {
   });
 
   it('says so when the save fails, and stays open', async () => {
-    assignmentsMock.updateCombinedAssignments.mockRejectedValue(new Error('quota'));
+    actionsMock.editEntry.mockResolvedValue({
+      ok: false,
+      reason: 'save-failed',
+      cause: new Error('quota'),
+    });
     const { onSaved } = renderDialog([member('d3', '2026-10-03'), member('d4', '2026-10-04')]);
     fireEvent.click(screen.getByRole('button', { name: 'Save all 2 days' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn’t save/);

@@ -9,11 +9,11 @@
  * rowStatus.ts). A *split* entry (2+ Assignments) keeps the narrower
  * per-type check, since a brand-new type has no obvious owner among several
  * Payees. Never silently absorbed into `oreLines` either way (decision doc)
- * — only `status`/`reviewDiff` move; `resolveNeedsReview` (assignments.ts) is
+ * — only `status`/`reviewDiff` move; `planNeedsReviewResolution` (assignments.ts) is
  * the one place `oreLines` itself re-snapshots.
  *
  * Unpaid growth skips the flag: it is absorbed straight into the Assignment
- * (`resolveNeedsReview`), since an unsettled obligation has no paid history to
+ * (`planNeedsReviewResolution`), since an unsettled obligation has no paid history to
  * protect. That includes a member of a combined entry — a session that crossed
  * midnight UTC is usually combined while the second day is still growing
  * (scope decision 20261004, "combined entries absorb unpaid growth"). Paid and
@@ -27,7 +27,7 @@ import { db, type MiningTaxAssignmentRecord } from '@/db';
 import { scheduleSync } from '@/sync';
 import { diffAssignedOreLines } from '@/engine/miningTax/needsReview';
 import { computeOwnership, type Ownership } from '@/engine/miningTax/ownership';
-import { resolveNeedsReview } from './assignments';
+import { planNeedsReviewResolution } from './assignments';
 import type { MiningLedgerEntry, QuantityDiff } from '@/engine/miningTax/types';
 
 function sameDiffs(a: readonly QuantityDiff[] | undefined, b: readonly QuantityDiff[]): boolean {
@@ -94,7 +94,9 @@ export async function reconcileAssignments(
 
   for (const { assignment, key } of absorbs) {
     try {
-      await resolveNeedsReview(assignment, freshByKey.get(key)!, siblingsByKey.get(key)!);
+      updates.push(
+        await planNeedsReviewResolution(assignment, freshByKey.get(key)!, siblingsByKey.get(key)!)
+      );
     } catch {
       // Re-pricing can fail (no prices yet); fall back to surfacing the growth.
       const diffs = diffAssignedOreLines(

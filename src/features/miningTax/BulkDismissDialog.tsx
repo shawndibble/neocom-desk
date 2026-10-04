@@ -4,8 +4,10 @@ import { Button, Modal, Checkbox } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
-import { dismissEntries } from './assignments';
 import type { DisplayRow } from './groupRows';
+import { dismiss } from './ledgerActions';
+import { useLedgerAction } from './useLedgerAction';
+import { LedgerActionError } from './LedgerActionError';
 
 interface BulkDismissDialogProps {
   open: boolean;
@@ -38,8 +40,7 @@ export function BulkDismissDialog({
 }: BulkDismissDialogProps) {
   const { t } = useTranslation();
   const [excluded, setExcluded] = useState<ReadonlySet<string>>(new Set());
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const { pending: saving, error: saveError, run } = useLedgerAction();
 
   const included = useMemo(() => rows.filter((dr) => !excluded.has(dr.key)), [rows, excluded]);
   const total = included.reduce((sum, dr) => sum + estimatedValueOf(dr), 0);
@@ -58,25 +59,22 @@ export function BulkDismissDialog({
 
   async function commit() {
     if (included.length === 0) return;
-    setSaving(true);
-    setSaveError(null);
-    try {
-      await dismissEntries(
-        included.map((dr) => ({
-          characterId: dr.row.characterId,
-          date: dr.row.entry.date,
-          solarSystemId: dr.row.entry.solarSystemId,
-          oreLines: dr.row.unassignedOreLines,
-          estimatedValue: estimatedValueOf(dr),
-        }))
-      );
-      onDismissed();
-      onClose();
-    } catch {
-      setSaveError(t('miningTax.saveFailed'));
-    } finally {
-      setSaving(false);
-    }
+    await run(
+      () =>
+        dismiss(
+          included.map((dr) => ({
+            characterId: dr.row.characterId,
+            date: dr.row.entry.date,
+            solarSystemId: dr.row.entry.solarSystemId,
+            oreLines: dr.row.unassignedOreLines,
+            estimatedValue: estimatedValueOf(dr),
+          }))
+        ),
+      () => {
+        onDismissed();
+        onClose();
+      }
+    );
   }
 
   return (
@@ -123,11 +121,7 @@ export function BulkDismissDialog({
           <span className="text-sm font-semibold tabular-nums">{formatIsk(total)} ISK</span>
         </div>
 
-        {saveError && (
-          <p role="alert" className="text-xs text-danger">
-            {saveError}
-          </p>
-        )}
+        <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"

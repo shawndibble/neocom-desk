@@ -23,6 +23,7 @@ import { formatDateRange } from './groupRows';
 import { PaymentLinksCard, type LinkedTransaction } from './PaymentLinksCard';
 import { STATUS_TONE } from './statusTone';
 import type { MoonMiningTaxRow } from './snapshot';
+import { LedgerActionError } from './LedgerActionError';
 
 export interface GroupMember {
   row: MoonMiningTaxRow;
@@ -39,7 +40,7 @@ interface GroupSummaryModalProps {
   typeNames: ReadonlyMap<number, string>;
   payeeDisplayName: string;
   busy: boolean;
-  /** Set when the last action taken from here failed to save; the modal stays open to show it. */
+  /** Why the last row action wrote nothing, shown until the next one — `useLedgerAction`'s message. */
   saveError?: string | null;
   /** Opens the one edit form for the whole combined entry (`EntryEditDialog`). */
   onEdit: () => void;
@@ -246,11 +247,7 @@ export function GroupSummaryModal({
           </div>
         )}
 
-        {saveError && (
-          <p role="alert" className="text-xs text-danger">
-            {saveError}
-          </p>
-        )}
+        <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
           {anyGrown ? (
             <Button variant="primary" disabled={busy} onClick={onResolve}>

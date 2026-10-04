@@ -19,8 +19,10 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import { unmaskNumber } from '@/lib/numberMask';
-import { splitAssignment } from './assignments';
+import { split } from './ledgerActions';
 import type { MoonMiningTaxRow } from './snapshot';
+import { useLedgerAction } from './useLedgerAction';
+import { LedgerActionError } from './LedgerActionError';
 
 interface SplitDialogProps {
   open: boolean;
@@ -73,8 +75,7 @@ export function SplitDialog({
   const [taxPct, setTaxPct] = useState('');
   const [moves, setMoves] = useState<ReadonlyMap<number, number>>(new Map());
   const [collector, setCollector] = useState<'original' | 'new'>('original');
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const { pending: saving, error: saveError, run } = useLedgerAction();
 
   // A third Assignment on this entry already collecting leaves nothing to
   // choose here — the split never silently steals that role from it.
@@ -122,25 +123,20 @@ export function SplitDialog({
 
   async function handleSplit() {
     if (!canSplit || !payeeId) return;
-    setSaving(true);
-    setSaveError(null);
-    try {
-      await splitAssignment(
-        assignment,
-        {
-          moves: movedLines,
-          payeeId,
-          taxPct: pctValue,
-          ...(someoneElseCollects ? {} : { collector }),
-        },
-        prices
-      );
-      onSplit();
-    } catch {
-      setSaveError(t('miningTax.saveFailed'));
-    } finally {
-      setSaving(false);
-    }
+    await run(
+      () =>
+        split(
+          assignment,
+          {
+            moves: movedLines,
+            payeeId,
+            taxPct: pctValue,
+            ...(someoneElseCollects ? {} : { collector }),
+          },
+          prices
+        ),
+      onSplit
+    );
   }
 
   const originalPayeeName =
@@ -308,11 +304,7 @@ export function SplitDialog({
         </div>
         <p className="text-[0.6875rem] text-text-dim">{t('miningTax.splitRepriceHint')}</p>
 
-        {saveError && (
-          <p role="alert" className="text-xs text-danger">
-            {saveError}
-          </p>
-        )}
+        <LedgerActionError error={saveError} />
 
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <Button

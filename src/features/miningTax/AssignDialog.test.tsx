@@ -5,15 +5,15 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { PayeeRecord } from '@/db';
 import { AssignDialog } from './AssignDialog';
-import { createAssignment } from './assignments';
+import { assign } from './ledgerActions';
 import type { MoonMiningTaxRow } from './snapshot';
 
-vi.mock('./assignments', () => ({
-  createAssignment: vi.fn(async () => ({})),
+vi.mock('./ledgerActions', () => ({
+  assign: vi.fn(async () => ({ ok: true, value: {} })),
 }));
 vi.mock('./payees', () => ({ updatePayee: vi.fn(async () => ({})) }));
 
-const mockedCreate = vi.mocked(createAssignment);
+const mockedCreate = vi.mocked(assign);
 
 const CHAR = 1;
 const SYSTEM = 30000142;
@@ -69,7 +69,8 @@ function payee(overrides: Partial<PayeeRecord> = {}): PayeeRecord {
 function renderDialog(
   payees: PayeeRecord[],
   onAddPayee?: () => void,
-  targetRow: MoonMiningTaxRow = row
+  targetRow: MoonMiningTaxRow = row,
+  onAssigned = vi.fn()
 ) {
   render(
     <MemoryRouter>
@@ -85,7 +86,7 @@ function renderDialog(
         }
         pricesFor={pricesFor}
         busy={false}
-        onAssigned={vi.fn()}
+        onAssigned={onAssigned}
         onCancel={vi.fn()}
         onAddPayee={onAddPayee}
       />
@@ -196,5 +197,29 @@ describe('AssignDialog — the money path', () => {
 
     expect(screen.queryByText(HEK_HINT)).not.toBeInTheDocument();
     expect(screen.getByLabelText('Estimated value')).toHaveValue('100,000');
+  });
+});
+
+describe('AssignDialog — saving', () => {
+  it('shows the failure and stays open when the save fails', async () => {
+    mockedCreate.mockResolvedValueOnce({ ok: false, reason: 'save-failed', cause: null });
+    const onAssigned = vi.fn();
+    renderDialog([payee()], undefined, row, onAssigned);
+
+    await userEvent.click(screen.getByRole('button', { name: /^Assign( to |$)/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t save');
+    expect(onAssigned).not.toHaveBeenCalled();
+  });
+
+  it('closes and reloads when the ore was claimed meanwhile', async () => {
+    mockedCreate.mockResolvedValueOnce({ ok: false, reason: 'already-assigned', cause: null });
+    const onAssigned = vi.fn();
+    renderDialog([payee()], undefined, row, onAssigned);
+
+    await userEvent.click(screen.getByRole('button', { name: /^Assign( to |$)/ }));
+
+    expect(onAssigned).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

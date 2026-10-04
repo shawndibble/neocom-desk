@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db';
 import {
+  appendTombstones,
   clearCharacterSyncBookkeeping,
   heartbeatKey,
   ownerHashKey,
+  readTombstones,
   tombstoneKey,
 } from './localBookkeeping';
 import { EDITABLE_COLLECTIONS } from './syncedCollections';
@@ -38,5 +40,26 @@ describe('clearCharacterSyncBookkeeping', () => {
 
   it('is a no-op when nothing is stored for the character', async () => {
     await expect(clearCharacterSyncBookkeeping(999)).resolves.toBeUndefined();
+  });
+});
+
+describe('appendTombstones', () => {
+  it('adds a tombstone per id, replacing an older one for the same id', async () => {
+    await db.settings.put({
+      key: 'k',
+      value: [
+        { id: 'a', deletedAt: 1 },
+        { id: 'b', deletedAt: 1 },
+      ],
+    });
+    await appendTombstones('k', ['b', 'c']);
+    const tombstones = await readTombstones('k');
+    expect(tombstones.map((t) => t.id)).toEqual(['a', 'b', 'c']);
+    expect(tombstones.find((t) => t.id === 'b')!.deletedAt).toBeGreaterThan(1);
+  });
+
+  it('writes nothing for an empty batch', async () => {
+    await appendTombstones('k', []);
+    expect(await db.settings.get('k')).toBeUndefined();
   });
 });

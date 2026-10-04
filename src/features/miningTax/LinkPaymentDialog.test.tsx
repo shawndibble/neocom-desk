@@ -3,11 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { LinkPaymentDialog } from './LinkPaymentDialog';
+import type { LedgerActionResult } from './ledgerActions';
 import type { LinkSuggestion } from './paymentLinks';
 
-const markAssignmentsPaid = vi.fn<(...args: unknown[]) => Promise<void>>();
-vi.mock('./assignments', () => ({
-  markAssignmentsPaid: (...args: unknown[]) => markAssignmentsPaid(...args),
+const settle = vi.fn<(...args: unknown[]) => Promise<LedgerActionResult>>();
+vi.mock('./ledgerActions', () => ({
+  settle: (...args: unknown[]) => settle(...args),
 }));
 const rememberPayeeEntity = vi.fn<(...args: unknown[]) => Promise<void>>(() => Promise.resolve());
 vi.mock('./payees', () => ({
@@ -53,14 +54,14 @@ function renderDialog(
 }
 
 function recordedAmount(): unknown {
-  const [, payment] = markAssignmentsPaid.mock.calls[0];
+  const [, payment] = settle.mock.calls[0];
   return (payment as { amount: number }).amount;
 }
 
 describe('LinkPaymentDialog — value handed over', () => {
   beforeEach(() => {
-    markAssignmentsPaid.mockReset();
-    markAssignmentsPaid.mockResolvedValue();
+    settle.mockReset();
+    settle.mockResolvedValue({ ok: true, value: undefined });
   });
 
   it('records ISK shorthand as the full amount (issue #2227)', async () => {
@@ -71,7 +72,7 @@ describe('LinkPaymentDialog — value handed over', () => {
     expect(screen.getByText('= 1,000,000,000 ISK')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Mark 1 paid' }));
 
-    await waitFor(() => expect(markAssignmentsPaid).toHaveBeenCalled());
+    await waitFor(() => expect(settle).toHaveBeenCalled());
     expect(recordedAmount()).toBe(1_000_000_000);
   });
 
@@ -98,21 +99,21 @@ describe('LinkPaymentDialog — value handed over', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Mark 1 paid' }));
 
-    await waitFor(() => expect(markAssignmentsPaid).toHaveBeenCalled());
+    await waitFor(() => expect(settle).toHaveBeenCalled());
     expect(recordedAmount()).toBe(250_000);
   });
 });
 
 describe('LinkPaymentDialog — a failed save', () => {
   beforeEach(() => {
-    markAssignmentsPaid.mockReset();
-    markAssignmentsPaid.mockResolvedValue();
+    settle.mockReset();
+    settle.mockResolvedValue({ ok: true, value: undefined });
     rememberPayeeEntity.mockReset();
     rememberPayeeEntity.mockResolvedValue();
   });
 
   it('says so and stays open when marking paid fails', async () => {
-    markAssignmentsPaid.mockRejectedValueOnce(new Error('quota'));
+    settle.mockResolvedValueOnce({ ok: false, reason: 'save-failed', cause: new Error('quota') });
     const onLinked = vi.fn();
     const onClose = vi.fn();
     const user = userEvent.setup();
@@ -145,7 +146,7 @@ describe('LinkPaymentDialog — a failed save', () => {
     expect(onClose).not.toHaveBeenCalled();
     // Already recorded: a second click must not mark it paid twice.
     expect(screen.getByRole('button', { name: 'Mark 1 paid' })).toBeDisabled();
-    expect(markAssignmentsPaid).toHaveBeenCalledTimes(1);
+    expect(settle).toHaveBeenCalledTimes(1);
     // The reload waits for the close, so it can't unmount the message unread.
     expect(onLinked).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
