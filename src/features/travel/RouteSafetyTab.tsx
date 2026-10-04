@@ -16,7 +16,7 @@
  * in place — and the route on the right. Every middle row can Avoid its
  * system, previewing the new route before it saves.
  *
- * Itinerary (issue #2474): one panel holds the route's facts on one line,
+ * Itinerary (issue #2474): one panel holds the route's facts as a chip strip,
  * the route strip (`RouteStrip`), and one-line rows with quiet stretches
  * folded (`RouteSystemsTable`).
  *
@@ -52,7 +52,16 @@
  */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, EmptyState, PageHeader, Panel, Spinner } from '@/components/ui';
+import { SecurityStatus } from '@/components/SecurityStatus';
+import {
+  DataAgeBadge,
+  EmptyState,
+  PageHeader,
+  Panel,
+  Spinner,
+  StatChip,
+  StatChips,
+} from '@/components/ui';
 import type { RouteSafetyRow, RouteSafetySummary } from '@/engine/route/routeSafety';
 import type { TheraConnection } from '@/engine/route/theraConnections';
 import { MAX_STOPS } from '@/engine/route/tripPlan';
@@ -126,9 +135,10 @@ interface AvoidLeg {
 }
 
 /**
- * The route's facts on one line: jumps (by gate · through wormholes · over
- * Ansiblex, when a hole or bridge is flown) · bands · lowest · last hour's
- * kills · chokepoints.
+ * The route's facts as a `StatChips` strip: jumps (by gate · through
+ * wormholes · over Ansiblex, when a hole or bridge is flown) · bands · lowest
+ * · last hour's kills · chokepoints. Each is a labelled figure rather than
+ * prose, so a wrapped line still reads as separate facts.
  */
 function RouteFacts({
   summary,
@@ -140,50 +150,50 @@ function RouteFacts({
   bridgeJumps: number;
 }) {
   const { t } = useTranslation();
-  const facts: string[] = [
-    t('travel.summary.jumps', { count: summary.jumps }),
-    ...(holeJumps === 0 && bridgeJumps === 0
-      ? []
-      : [
-          t('travel.summary.byGate', { count: summary.jumps - holeJumps - bridgeJumps }),
-          ...(holeJumps === 0 ? [] : [t('travel.summary.throughHoles', { count: holeJumps })]),
-          ...(bridgeJumps === 0 ? [] : [t('travel.summary.overBridges', { count: bridgeJumps })]),
-        ]),
-    t('travel.summary.bands', {
-      highsec: summary.highsec,
-      lowsec: summary.lowsec,
-      nullsec: summary.nullsec,
-    }),
-  ];
-  if (summary.lowestSecurity !== null) {
-    facts.push(t('travel.summary.lowest', { security: summary.lowestSecurity.toFixed(1) }));
-  }
-  if (summary.shipKills !== null && summary.podKills !== null) {
-    facts.push(
-      t('travel.summary.kills', {
-        ships: summary.shipKills.toLocaleString(),
-        pods: summary.podKills.toLocaleString(),
-      })
-    );
-  }
-  facts.push(
-    summary.chokepoints.length === 0
-      ? t('travel.summary.noChokepoints')
-      : t('travel.summary.chokepoints', { names: summary.chokepoints.join(', ') })
-  );
+  const flownOtherwise = holeJumps > 0 || bridgeJumps > 0;
   return (
-    <ul aria-label={t('travel.summary.label')} className="flex flex-wrap gap-x-2 gap-y-1">
-      {facts.map((fact, index) => (
-        <li key={fact} className="inline-flex gap-2">
-          {index > 0 && (
-            <span aria-hidden="true" className="text-text-faint">
-              ·
-            </span>
-          )}
-          <span>{fact}</span>
-        </li>
-      ))}
-    </ul>
+    <div role="group" aria-label={t('travel.summary.label')} className="min-w-0">
+      <StatChips>
+        <StatChip label={t('travel.summary.jumpsLabel')} value={summary.jumps} />
+        {flownOtherwise && (
+          <StatChip
+            label={t('travel.summary.byGateLabel')}
+            value={summary.jumps - holeJumps - bridgeJumps}
+          />
+        )}
+        {holeJumps > 0 && <StatChip label={t('travel.summary.holesLabel')} value={holeJumps} />}
+        {bridgeJumps > 0 && (
+          <StatChip label={t('travel.summary.bridgesLabel')} value={bridgeJumps} />
+        )}
+        <StatChip label={t('travel.summary.highsecLabel')} value={summary.highsec} />
+        <StatChip label={t('travel.summary.lowsecLabel')} value={summary.lowsec} />
+        <StatChip label={t('travel.summary.nullsecLabel')} value={summary.nullsec} />
+        {summary.lowestSecurity !== null && (
+          <StatChip
+            label={t('travel.summary.lowestLabel')}
+            value={<SecurityStatus security={summary.lowestSecurity} />}
+          />
+        )}
+        {summary.shipKills !== null && summary.podKills !== null && (
+          <StatChip
+            label={t('travel.summary.killsLabel')}
+            value={t('travel.summary.killsValue', {
+              ships: summary.shipKills.toLocaleString(),
+              pods: summary.podKills.toLocaleString(),
+            })}
+          />
+        )}
+        <StatChip
+          label={t('travel.summary.chokepointsLabel')}
+          value={
+            summary.chokepoints.length === 0
+              ? t('travel.summary.chokepointsNone')
+              : summary.chokepoints.join(', ')
+          }
+          tone={summary.chokepoints.length === 0 ? 'default' : 'warning'}
+        />
+      </StatChips>
+    </div>
   );
 }
 

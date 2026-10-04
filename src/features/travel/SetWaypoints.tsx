@@ -146,7 +146,8 @@ export function SetWaypoints({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         {children}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Full width under the facts on a phone, so it reads as the panel's action rather than one more fact. */}
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {characters.length > 1 && characterId !== null && (
             <Select
               value={String(characterId)}
@@ -173,6 +174,7 @@ export function SetWaypoints({
           )}
           <Button
             size="sm"
+            className="max-sm:flex-1"
             disabled={blockedReason !== null || sending}
             title={blockedReason ?? undefined}
             onClick={() => {
@@ -184,7 +186,7 @@ export function SetWaypoints({
         </div>
       </div>
       {characterId === null && blockedReason !== null && (
-        <p className="text-right text-text-dim">{blockedReason}</p>
+        <p className="text-text-dim sm:text-right">{blockedReason}</p>
       )}
       {lacksScope && characterId !== null && (
         <GrantBanner

@@ -197,6 +197,13 @@ beforeEach(async () => {
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
 });
 
+/** One labelled figure from the route summary strip, e.g. `routeFact('Jumps')` → "4". */
+function routeFact(label: string) {
+  const summary = within(screen.getByRole('group', { name: 'Route summary' }));
+  return summary.getByText(label, { selector: 'span' }).parentElement?.lastElementChild
+    ?.textContent;
+}
+
 function visit(search: string) {
   window.history.pushState({}, '', `/travel/route${search}`);
   render(<App />);
@@ -222,12 +229,13 @@ describe('Travel › Route Safety', () => {
     expect(await uedama.findByText('The Citadel')).toBeInTheDocument();
     expect(within(body[0]).getByText('The Forge')).toBeInTheDocument();
 
-    const facts = within(screen.getByRole('list', { name: 'Route summary' }));
-    expect(facts.getByText('Gank Chokepoints: Uedama')).toBeInTheDocument();
-    expect(facts.getByText('2 jumps')).toBeInTheDocument();
-    expect(facts.getByText('3 highsec / 0 lowsec / 0 nullsec')).toBeInTheDocument();
-    expect(facts.getByText('lowest 0.5')).toBeInTheDocument();
-    expect(facts.getByText('12 ship · 4 pod kills in the last hour')).toBeInTheDocument();
+    expect(routeFact('Chokepoints')).toBe('Uedama');
+    expect(routeFact('Jumps')).toBe('2');
+    expect(routeFact('High')).toBe('3');
+    expect(routeFact('Low')).toBe('0');
+    expect(routeFact('Null')).toBe('0');
+    expect(routeFact('Lowest')).toBe('0.5');
+    expect(routeFact('Kills 1h')).toBe('12 ship · 4 pod');
   });
 
   it('draws the route strip with a spoken description and its key systems', async () => {
@@ -407,8 +415,7 @@ describe('Travel › Route Safety › Stops', () => {
     expect(second).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('table', { name: 'Systems on leg 2' })).not.toBeInTheDocument();
 
-    const facts = within(screen.getByRole('list', { name: 'Route summary' }));
-    expect(facts.getByText('8 jumps')).toBeInTheDocument();
+    expect(routeFact('Jumps')).toBe('8');
     expect(screen.getAllByTestId('route-strip-cell')).toHaveLength(9);
 
     await user.click(second);
@@ -469,6 +476,32 @@ describe('Travel › Route Safety › Stops', () => {
         'Order changed: Uedama → Sobaseki → Niyabainen · 11 jumps in typed order → 9 jumps'
       )
     ).toBeInTheDocument();
+  });
+
+  it('leaves zero kill counts off a phone row, keeping its jumps', async () => {
+    const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation(
+      (media: string) =>
+        ({
+          media,
+          matches: media === PHONE_QUERY,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList
+    );
+    try {
+      visit(`?from=${JITA}&to=${UEDAMA}`);
+
+      const table = await screen.findByRole('table', { name: 'Systems on the route' });
+      const body = (await within(table).findAllByRole('row')).slice(1);
+      const lastHour = (row: HTMLElement) => within(row).getAllByRole('cell')[3];
+      await waitFor(() => expect(lastHour(body[2])).toHaveTextContent('12ship kills'));
+      expect(lastHour(body[2])).toHaveTextContent('4pod kills');
+      expect(lastHour(body[0])).toHaveTextContent('4,200jumps');
+      expect(lastHour(body[0])).not.toHaveTextContent('ship kills');
+      expect(lastHour(body[0])).not.toHaveTextContent('pod kills');
+    } finally {
+      matchMedia.mockRestore();
+    }
   });
 
   it('folds the stops to one line on a phone, with Edit to open them', async () => {
@@ -669,13 +702,13 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
       within(body[1]).getByRole('button', { name: 'Copy signature JIT-001 in Jita' })
     ).toBeInTheDocument();
 
-    const facts = within(screen.getByRole('list', { name: 'Route summary' }));
-    expect(facts.getByText('2 jumps')).toBeInTheDocument();
-    expect(facts.getByText('0 by gate')).toBeInTheDocument();
-    expect(facts.getByText('2 through wormholes')).toBeInTheDocument();
+    expect(routeFact('Jumps')).toBe('2');
+    expect(routeFact('By gate')).toBe('0');
+    expect(routeFact('Wormhole')).toBe('2');
     // Thera is counted as wormhole jumps, never as a nullsec system or the lowest security.
-    expect(facts.getByText('2 highsec / 0 lowsec / 0 nullsec')).toBeInTheDocument();
-    expect(facts.getByText('lowest 0.5')).toBeInTheDocument();
+    expect(routeFact('High')).toBe('2');
+    expect(routeFact('Null')).toBe('0');
+    expect(routeFact('Lowest')).toBe('0.5');
     expect(screen.getAllByTestId('route-strip-cell')).toHaveLength(3);
   });
 
@@ -723,9 +756,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
       expect(within(table).getAllByRole('row').slice(1)[0]).toHaveTextContent('Jita')
     );
     expect(screen.queryByTestId('route-strip-hole')).toBeNull();
-    expect(
-      within(screen.getByRole('list', { name: 'Route summary' })).getByText('4 jumps')
-    ).toBeInTheDocument();
+    expect(routeFact('Jumps')).toBe('4');
   });
 
   it('never asks EVE-Scout with the switch off', async () => {
@@ -734,9 +765,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
     visit(`?from=${JITA}&to=${UEDAMA}`);
 
     await screen.findByRole('table', { name: 'Systems on the route' });
-    expect(
-      within(screen.getByRole('list', { name: 'Route summary' })).getByText('4 jumps')
-    ).toBeInTheDocument();
+    expect(routeFact('Jumps')).toBe('4');
     expect(asked).not.toHaveBeenCalled();
   });
 
@@ -755,15 +784,12 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
     expect(
       await screen.findByText("EVE-Scout couldn't be reached, so this route uses gates only.")
     ).toBeInTheDocument();
-    expect(
-      within(screen.getByRole('list', { name: 'Route summary' })).getByText('4 jumps')
-    ).toBeInTheDocument();
+    expect(routeFact('Jumps')).toBe('4');
   });
 
   describe('ways to fly a leg', () => {
     const pinInLink = () => new URLSearchParams(window.location.search).get('pin');
     const waysPanel = () => screen.findByRole('region', { name: 'Ways to fly leg 1' });
-    const summary = () => within(screen.getByRole('list', { name: 'Route summary' }));
 
     beforeEach(() => {
       server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json(HOLES)));
@@ -796,7 +822,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
         await within(panel).findByRole('button', { name: 'Use Gates only for leg 1' })
       );
       expect(pinInLink()).toBe('gates');
-      await waitFor(() => expect(summary().getByText('4 jumps')).toBeInTheDocument());
+      await waitFor(() => expect(routeFact('Jumps')).toBe('4'));
       // The leg re-plans, so the panel is drawn afresh.
       await waitFor(async () =>
         expect(within(await waysPanel()).getAllByRole('listitem')[0]).toHaveTextContent(
@@ -808,7 +834,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
         within(await waysPanel()).getByRole('button', { name: 'Use Via Thera for leg 1' })
       );
       expect(pinInLink()).toBe('thera');
-      await waitFor(() => expect(summary().getByText('2 jumps')).toBeInTheDocument());
+      await waitFor(() => expect(routeFact('Jumps')).toBe('2'));
     });
 
     it('says when a pinned hole has closed, and flies the planner’s pick', async () => {
@@ -819,7 +845,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
           "The pinned wormhole has closed or is no longer on EVE-Scout's list, so this leg flies the planner's pick."
         )
       ).toBeInTheDocument();
-      expect(summary().getByText('2 jumps')).toBeInTheDocument();
+      expect(routeFact('Jumps')).toBe('2');
     });
 
     it('says when a pinned hub has no qualifying hole', async () => {
@@ -830,7 +856,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
           "No open Thera hole fits the hole settings, so this leg flies the planner's pick."
         )
       ).toBeInTheDocument();
-      expect(summary().getByText('4 jumps')).toBeInTheDocument();
+      expect(routeFact('Jumps')).toBe('4');
     });
 
     it('says EVE-Scout could not be reached for a pinned hole, never that the switch is off', async () => {
@@ -879,7 +905,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
         visit(`?from=${JITA}&to=${UEDAMA}&wh=1`);
 
         const toggle = await screen.findByRole('button', { name: 'Compare ways to fly leg 1' });
-        await waitFor(() => expect(toggle).toHaveTextContent('Gates only: 4 j·compare'));
+        await waitFor(() => expect(toggle).toHaveTextContent('Gates only·4 jumpsCompare'));
         expect(screen.queryByRole('region', { name: 'Ways to fly leg 1' })).toBeNull();
         await user.click(toggle);
         expect(await waysPanel()).toBeInTheDocument();
