@@ -8,12 +8,18 @@
  * hub badge with jumps on the right, then security, region, fits and life
  * left, then the signature pair and Copy on a line of their own.
  *
+ * Route via (issue #2477): a K-space row with a gate route from the page's
+ * origin links to Route Safety from that origin with the hole pinned for the
+ * first leg — after Copy in the action cell (and so on the phone card's
+ * signature line), and on the expanded row.
+ *
  * Conditions, never verdicts (decision `20260912-172628`).
  */
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { SecurityStatus } from '@/components/SecurityStatus';
-import { Button, DataTable, type DataTableColumn } from '@/components/ui';
+import { Button, DataTable, textActionClassName, type DataTableColumn } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import {
@@ -33,7 +39,34 @@ const DEFAULT_SORT = { columnId: 'jumps', direction: 'asc' } as const;
 const hubBadgeClassName =
   'rounded-xs border border-line px-1 text-[0.625rem] font-normal tracking-widest text-text-dim uppercase';
 
-function useColumns(): DataTableColumn<TheraConnectionRow>[] {
+/** Route Safety through a row's hole, or `null` for a row it is not offered on. */
+type RouteViaHref = (row: TheraConnectionRow) => string | null;
+
+/** Where Route via goes: only from a K-space exit a gate route reaches from the origin. */
+function routeViaTarget(row: TheraConnectionRow, href?: RouteViaHref): string | null {
+  return row.exitSpace !== 'wormhole' && row.jumps.kind === 'known' ? (href?.(row) ?? null) : null;
+}
+
+function RouteVia({ row, href }: { row: TheraConnectionRow; href?: RouteViaHref }) {
+  const { t } = useTranslation();
+  const to = routeViaTarget(row, href);
+  if (to === null) return null;
+  return (
+    <Link
+      to={to}
+      data-row-control
+      className={textActionClassName('whitespace-nowrap')}
+      aria-label={t('travel.thera.routeViaLabel', {
+        hub: t(`travel.thera.hub.${row.hub}`),
+        system: row.exitSystemName ?? DASH,
+      })}
+    >
+      {t('travel.thera.routeVia')}
+    </Link>
+  );
+}
+
+function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow>[] {
   const { t } = useTranslation();
   return [
     {
@@ -114,8 +147,12 @@ function useColumns(): DataTableColumn<TheraConnectionRow>[] {
       header: t('travel.thera.col.signature'),
       className: 'w-0 whitespace-nowrap',
       stackEdge: 'below',
-      // The Route via link (issue #2477) joins this cell, after Copy.
-      render: (row) => <SignatureCopy row={row} />,
+      render: (row) => (
+        <span className="inline-flex items-center gap-3 max-sm:flex max-sm:w-full max-sm:flex-wrap">
+          <SignatureCopy row={row} />
+          <RouteVia row={row} href={routeVia} />
+        </span>
+      ),
     },
   ];
 }
@@ -213,7 +250,7 @@ function SignatureCopy({ row }: { row: TheraConnectionRow }) {
 }
 
 /** The expanded row: wormhole type, where to enter and leave, the exit's zKillboard page. */
-function HoleDetail({ row }: { row: TheraConnectionRow }) {
+function HoleDetail({ row, routeVia }: { row: TheraConnectionRow; routeVia?: RouteViaHref }) {
   const { t } = useTranslation();
   const parts = [
     row.wormholeType === null ? null : (
@@ -236,7 +273,9 @@ function HoleDetail({ row }: { row: TheraConnectionRow }) {
     >
       {t('travel.thera.detail.zkillboard')}
     </a>,
-    // The Route via link (issue #2477) joins this line.
+    routeViaTarget(row, routeVia) === null ? null : (
+      <RouteVia key="route-via" row={row} href={routeVia} />
+    ),
   ].filter((part) => part !== null);
   return (
     <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
@@ -257,12 +296,15 @@ function HoleDetail({ row }: { row: TheraConnectionRow }) {
 export function TheraTable({
   rows,
   label,
+  routeVia,
 }: {
   /** Longest life first (`longestLifeFirst`): the stable jumps sort keeps it for ties. */
   rows: readonly TheraConnectionRow[];
   label: string;
+  /** Route Safety through a row's hole; absent where there is no origin to route from. */
+  routeVia?: RouteViaHref;
 }) {
-  const columns = useColumns();
+  const columns = useColumns(routeVia);
   return (
     <DataTable
       columns={columns}
@@ -273,7 +315,7 @@ export function TheraTable({
       density="compact"
       stackLayout="dense"
       mobileSort
-      expandableRow={{ renderDetail: (row) => <HoleDetail row={row} /> }}
+      expandableRow={{ renderDetail: (row) => <HoleDetail row={row} routeVia={routeVia} /> }}
     />
   );
 }

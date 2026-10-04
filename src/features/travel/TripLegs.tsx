@@ -7,11 +7,15 @@
  *
  * A leg no stargate route flies says so in place of its rows — the other legs
  * still draw.
+ *
+ * Each open leg lists its ways to fly beside its rows (`LegBody`, issue
+ * #2477), and Use for this leg pins one.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret } from '@/components/ui';
 import type { RouteSafetyRow } from '@/engine/route/routeSafety';
+import { LegBody, type LegWaysProps } from './LegWays';
 import { RouteSystemsTable, type HoleRowProps } from './RouteSystemsTable';
 import type { RouteKillsCell } from './useRouteKills';
 import type { RouteSafetyLeg } from './useRouteSafety';
@@ -22,12 +26,17 @@ export function TripLegs({
   killsOf,
   avoidAction,
   holes,
+  ways,
+  onUse,
 }: {
   legs: readonly RouteSafetyLeg[];
   nameOf: (systemId: number) => string;
   killsOf: (systemId: number) => RouteKillsCell;
   avoidAction: (leg: RouteSafetyLeg, row: RouteSafetyRow) => (() => void) | null;
   holes?: HoleRowProps;
+  ways: Pick<LegWaysProps, 'now' | 'holesOff' | 'holesLoading'>;
+  /** Pins a way for the leg at `index`; `null` un-pins it. */
+  onUse: (index: number, pin: string | null) => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set([0]));
@@ -88,19 +97,28 @@ export function TripLegs({
             </button>
             {expanded && (
               <div className="pb-3">
-                {leg.rows ? (
-                  <RouteSystemsTable
-                    rows={leg.rows}
-                    killsOf={killsOf}
-                    avoidAction={(row) => avoidAction(leg, row)}
-                    label={t('travel.legs.tableLabel', { number })}
-                    {...holes}
-                  />
-                ) : (
-                  <p className="text-text-dim">
-                    {t('travel.legs.noRouteHint', { from: nameOf(leg.from), to: nameOf(leg.to) })}
-                  </p>
-                )}
+                <LegBody
+                  leg={leg}
+                  number={number}
+                  multiStop
+                  nameOf={nameOf}
+                  onUse={(pin) => onUse(index, pin)}
+                  {...ways}
+                >
+                  {leg.rows ? (
+                    <RouteSystemsTable
+                      rows={leg.rows}
+                      killsOf={killsOf}
+                      avoidAction={(row) => avoidAction(leg, row)}
+                      label={t('travel.legs.tableLabel', { number })}
+                      {...holes}
+                    />
+                  ) : (
+                    <p className="text-text-dim">
+                      {t('travel.legs.noRouteHint', { from: nameOf(leg.from), to: nameOf(leg.to) })}
+                    </p>
+                  )}
+                </LegBody>
               </div>
             )}
           </li>

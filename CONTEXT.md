@@ -497,6 +497,17 @@ here — they go one per file in `docs/context/decisions/`.
   Shown as its own row between those two systems and as a hatched **Route
   strip** cell. How it is costed and where it applies: decision
   `20261003-181618`.
+- **Way to fly**: one way a **Leg** can be flown, listed beside its rows:
+  Gates only (always), Via Thera / Via Turnur (when that hub has a
+  qualifying hole), the planner's pick when it differs, and a **Pinned way**.
+  Each states jumps, lowest security, lowsec / nullsec counts and the
+  **Gank Chokepoints** it passes — facts side by side, never ranked.
+- **Pinned way**: the **Way to fly** a pilot chose for one **Leg** with
+  "Use for this leg", kept in the link (`pin`, by leg position): `gates`,
+  `thera`, `turnur` or an EVE-Scout hole id. A pin that cannot be flown (its
+  hole closed, its hub has no qualifying hole) is reported on the leg, and
+  the planner's pick flies it. Route via on a Thera / Turnur row opens Route
+  Safety with that hole pinned for the first leg.
 - **Pilot Lookup**: Travel's view of one pilot, found by name — portrait,
   corporation, alliance and character age from public ESI, and the all-time
   kills, losses, ISK, solo kills, danger and gang ratios and most-used hulls

@@ -7364,6 +7364,38 @@
       "noRouteHint": "No stargate route connects {{from}} and {{to}}. Remove the stop, or pick another.",
       "tableLabel": "Systems on leg {{number}}"
     },
+    "ways": {
+      "title": "Ways to fly leg {{number}} · {{from}} → {{to}}",
+      "titleRoute": "Ways to fly {{from}} → {{to}}",
+      "label": "Ways to fly leg {{number}}",
+      "kind": {
+        "planner": "Planner's pick",
+        "gates": "Gates only",
+        "thera": "Via Thera",
+        "turnur": "Via Turnur",
+        "hole": "Pinned hole via {{hub}}"
+      },
+      "inUse": "In use",
+      "use": "Use for this leg",
+      "useLabel": "Use {{way}} for leg {{number}}",
+      "noRoute": "doesn't reach {{to}}",
+      "lowsec": "{{count}} lowsec",
+      "nullsec": "{{count}} nullsec",
+      "passes": "passes {{names}}",
+      "hole": "{{from}} → {{to}}",
+      "compare": "compare",
+      "hide": "hide",
+      "phoneLine": "{{way}}: {{jumps}}",
+      "phoneToggle": "Compare ways to fly leg {{number}}",
+      "holesHint": "Turn on Route through Thera / Turnur to compare ways through a hole.",
+      "pinNote": {
+        "closed": "The pinned wormhole has closed or is no longer on EVE-Scout's list, so this leg flies the planner's pick.",
+        "no-hole": "No open {{hub}} hole fits the hole settings, so this leg flies the planner's pick.",
+        "no-route": "The pinned way doesn't reach {{to}}, so this leg flies the planner's pick.",
+        "holes-off": "Route through Thera / Turnur is off, so the pinned way can't be checked. This leg flies the planner's pick."
+      },
+      "pickDestination": "Add a stop to fly there through the pinned wormhole."
+    },
     "pickTitle": "Pick where the route starts and ends",
     "pickHint": "Every system on the route is listed with its security, region, and the last hour of jumps and kills ESI reports.",
     "sameSystemTitle": "Start and destination are the same system",
@@ -7575,6 +7607,9 @@
       "jspaceGroup_other": "{{count}} exits into J-space · no gate route from you",
       "fitsAffix": "Fits ",
       "lifeAffix": " left",
+      "lifeLeft": "{{time}} left",
+      "routeVia": "Route via",
+      "routeViaLabel": "Plan a route through the {{hub}} hole at {{system}}",
       "jumpsUnit_one": "jump",
       "jumpsUnit_other": "jumps",
       "detail": {
