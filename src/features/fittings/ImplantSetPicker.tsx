@@ -28,6 +28,7 @@ import {
 } from '@/components/ui';
 import { boosterSideEffects, withBoosters } from '@/engine/fittings/boosterSideEffects';
 import * as Icon from '@/components/ui/icons';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { MAX_BOOSTERS, MAX_IMPLANTS } from '@/engine/fitting/fittingShare';
 import type { ImplantBasis } from '@/engine/fittings/implantBasis';
 import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
@@ -170,7 +171,7 @@ function SlotList({ heading, typeIds, names, onRemove, onInfo, renderDetail }: S
                   <TypeIcon typeId={typeId} size={32} width={20} height={20} />
                   <button
                     type="button"
-                    className="min-w-0 flex-1 cursor-pointer truncate text-left text-sm text-accent underline-offset-2 hover:underline"
+                    className={`${tappableRowClassName} min-w-0 flex-1 cursor-pointer truncate text-left text-sm text-accent underline-offset-2 hover:underline`}
                     onClick={() => onInfo(typeId)}
                   >
                     {name}
