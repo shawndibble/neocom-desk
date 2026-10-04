@@ -183,27 +183,27 @@ export function Calendar() {
    * response over what the pilot just clicked, so the override stands in
    * for that source.
    *
-   * Scoped to the snapshot (`asOfMs`, `data.loadedAtMs`) it was set against
-   * rather than kept forever: the moment a *newer* snapshot loads (manual
-   * refresh, background poll, remount), that snapshot's own data is trusted
-   * over a possibly-stale local guess — an override must not go on masking
-   * what ESI, another device, or another session says once fresher
-   * information actually arrives.
+   * Each is stamped with when it was answered (`atMs`, after the cache
+   * patch) and holds over any snapshot whose load *started* no later
+   * (`data.loadedAtMs` is taken at load start): such a snapshot read its data
+   * before the RSVP could show in it — including a reload already running,
+   * or one committing while the PUT is in flight (opening an event fetches
+   * its detail, and that cache write reloads the board). A snapshot started
+   * afterwards (manual refresh, background poll, remount) is trusted over
+   * the local guess — an override must not go on masking what ESI, another
+   * device, or another session says once fresher information arrives.
    */
-  const [responseOverrides, setResponseOverrides] = useState<{
-    asOfMs: number;
-    values: Map<number, CalendarRsvpResponse>;
-  } | null>(null);
-  const activeOverrides =
-    data && responseOverrides?.asOfMs === data.loadedAtMs ? responseOverrides.values : undefined;
-  // The snapshot showing *when the RSVP lands*, not when it was clicked: a
-  // reload can commit while the PUT is in flight (the event detail fetch
-  // writes the cache, which reloads the board from it), and an override
-  // stamped with the older snapshot would never show.
-  const loadedAtMsRef = useRef(data?.loadedAtMs ?? 0);
-  useEffect(() => {
-    loadedAtMsRef.current = data?.loadedAtMs ?? 0;
-  });
+  const [responseOverrides, setResponseOverrides] = useState<
+    ReadonlyMap<number, { response: CalendarRsvpResponse; atMs: number }>
+  >(new Map());
+  const activeOverrides = useMemo(() => {
+    if (!data) return undefined;
+    const active = new Map<number, CalendarRsvpResponse>();
+    for (const [eventId, { response, atMs }] of responseOverrides) {
+      if (data.loadedAtMs <= atMs) active.set(eventId, response);
+    }
+    return active.size > 0 ? active : undefined;
+  }, [data, responseOverrides]);
 
   /**
    * The instant the snapshot was assembled, threaded into everything below.
@@ -480,14 +480,10 @@ export function Calendar() {
           characterId={activeCharacterId}
           event={selectedEvent}
           onClose={() => setSelectedEventId(null)}
-          onResponded={(eventId, response) =>
-            setResponseOverrides((prev) => {
-              const asOfMs = loadedAtMsRef.current;
-              const values = prev?.asOfMs === asOfMs ? new Map(prev.values) : new Map();
-              values.set(eventId, response);
-              return { asOfMs, values };
-            })
-          }
+          onResponded={(eventId, response) => {
+            const atMs = Date.now();
+            setResponseOverrides((prev) => new Map(prev).set(eventId, { response, atMs }));
+          }}
         />
       )}
     </div>
