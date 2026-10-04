@@ -9,9 +9,15 @@
  * Yield Detail (#1130) and PI Plan Sensitivity (#1134): `stackColumns={2}`,
  * pairing the short figures two per line.
  *
+ * The order book rework (2026-10-04) went further: an order is now the dense
+ * two-line card — station and price, then quantity, distance and security —
+ * and a phone shows one side at a time behind a Sell | Buy toggle. The card is
+ * picked by the order book's own width, not the viewport, so a desktop whose
+ * finder column leaves the book narrow (1280px) gets it too.
+ *
  * Playwright rather than jsdom, same reasoning `miningTaxYieldDetailNarrow.spec.ts`
- * gives: the pairing lives in `.dt-stack-2col`'s phone
- * grid (`.dt-stacked`, `src/styles/index.css`), which jsdom cannot evaluate. Assertions are
+ * gives: the card lives in `.dt-stack-dense` (`.dt-stacked`,
+ * `src/styles/index.css`), which jsdom cannot evaluate. Assertions are
  * bounding boxes: which cells share a line, and that a long station name and
  * an 8-figure quantity still fit without overlap or sideways scroll.
  *
@@ -100,8 +106,8 @@ async function openTritanium(page: Page): Promise<void> {
   await signInAndGoto(page, './market');
   await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritanium');
   await page.getByRole('button', { name: 'Tritanium', exact: true }).click();
+  // Only Sell: a phone shows one side at a time, behind the Sell | Buy toggle.
   await expect(page.getByRole('table', { name: 'Sell Orders' })).toBeVisible();
-  await expect(page.getByRole('table', { name: 'Buy Orders' })).toBeVisible();
 }
 
 interface CellBox {
@@ -133,7 +139,11 @@ async function readRow(page: Page, tableLabel: string, orderId: number): Promise
       // absolute to the card's corner (`.dt-actions`) rather than flowing
       // with the labelled fields — excluded here so it can't be mistaken for
       // a field sharing the primary cell's line.
-      const cells = [...rowEl.querySelectorAll(':scope > td[data-label]')].map((td) => {
+      // Cells a width or a card leaves out (`display: none`) have no box.
+      const shown = [...rowEl.querySelectorAll(':scope > td[data-label]')].filter(
+        (td) => td.getBoundingClientRect().width > 0
+      );
+      const cells = shown.map((td) => {
         const cellBox = td.getBoundingClientRect();
         return {
           label: td.getAttribute('data-label') ?? '',
@@ -154,19 +164,24 @@ async function readRow(page: Page, tableLabel: string, orderId: number): Promise
   );
 }
 
-/** Cells clustered into the lines they render on, top-to-bottom then left-to-right; 1px tolerance for grid subpixel rounding. */
-function lines(cells: CellBox[]): CellBox[][] {
+/**
+ * Cells clustered into the lines they render on, top-to-bottom then
+ * left-to-right; 1px tolerance for grid subpixel rounding by default. The
+ * dense card aligns its first line on the text baseline, so its bigger price
+ * figure sits a few px below the station name on the same line.
+ */
+function lines(cells: CellBox[], tolerance = 1): CellBox[][] {
   const grouped: CellBox[][] = [];
   for (const cell of [...cells].sort((a, b) => a.top - b.top || a.left - b.left)) {
     const last = grouped.at(-1);
-    if (last && Math.abs(last[0].top - cell.top) <= 1) last.push(cell);
+    if (last && Math.abs(last[0].top - cell.top) <= tolerance) last.push(cell);
     else grouped.push([cell]);
   }
-  return grouped;
+  return grouped.map((line) => line.sort((a, b) => a.left - b.left));
 }
 
-function labelLines(cells: CellBox[]): string[][] {
-  return lines(cells).map((line) => line.map((cell) => cell.label));
+function labelLines(cells: CellBox[], tolerance = 1): string[][] {
+  return lines(cells, tolerance).map((line) => line.map((cell) => cell.label));
 }
 
 test.describe('Market Browser — order book stacked cards', () => {
@@ -174,65 +189,40 @@ test.describe('Market Browser — order book stacked cards', () => {
     await seedOrderBook(page);
   });
 
-  test('sell and buy cards pair their figures two per line at 390px, with no overlap or scroll', async ({
-    page,
-  }) => {
+  /** The two-line order card: station and price, then quantity, distance and security (and a buy's range). */
+  async function expectTwoLineCards(page: Page) {
+    const sell = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
+    expect(sell.display).toBe('flex');
+    expect(labelLines(sell.cells, 8)).toEqual([
+      ['Location', 'Price'],
+      ['Quantity', 'Jumps', 'Security'],
+    ]);
+    // The real station, not the "Unknown Structure" fallback — truncated on
+    // the card's title line, in full in the DOM (and the expanded row).
+    expect(sell.cells.find((c) => c.label === 'Location')!.text).toBe(STATION_A_NAME);
+    for (const cell of sell.cells.filter((c) => c.label !== 'Location')) {
+      expect(cell.clipped, cell.label).toBe(false);
+    }
+    const rowHeight = await page
+      .locator(`table[aria-label="Sell Orders"] tr[data-row-key="${SELL_ORDER.order_id}"]`)
+      .evaluate((el) => el.getBoundingClientRect().height);
+    expect(rowHeight).toBeLessThanOrEqual(64);
+  }
+
+  test('a phone reads each order as a two-line card, one side at a time', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await openTritanium(page);
 
-    const sell = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
-    expect(sell.display).toBe('grid');
-    // Price (primary, full width) + Quantity/Location paired, Security/Jumps
-    // paired, Expires trailing alone (5 secondary columns, odd) — exact
-    // labels, not just line lengths, so a dropped or reordered column fails
-    // here rather than passing on a coincidentally-matching count.
-    expect(labelLines(sell.cells)).toEqual([
-      ['Price'],
-      ['Quantity', 'Location'],
-      ['Security', 'Jumps'],
-      ['Expires'],
-    ]);
+    await expectTwoLineCards(page);
+    await expect(page.getByRole('table', { name: 'Buy Orders' })).toBeHidden();
 
+    await page.getByRole('button', { name: /^Buy · 1/ }).click();
+    await expect(page.getByRole('table', { name: 'Sell Orders' })).toBeHidden();
     const buy = await readRow(page, 'Buy Orders', BUY_ORDER.order_id);
-    expect(buy.display).toBe('grid');
-    // Same as Sell, plus Range/Min. Volume paired before the trailing Expires.
-    expect(labelLines(buy.cells)).toEqual([
-      ['Price'],
-      ['Quantity', 'Location'],
-      ['Security', 'Jumps'],
-      ['Expires', 'Range'],
-      ['Min. Volume'],
+    expect(labelLines(buy.cells, 8)).toEqual([
+      ['Location', 'Price'],
+      ['Quantity', 'Jumps', 'Security', 'Range'],
     ]);
-
-    for (const { cells, contentWidth } of [sell, buy]) {
-      const [[price], ...valueLines] = lines(cells);
-      // The long station name renders in full rather than as the "Unknown
-      // Structure" fallback (which would satisfy every geometry check below
-      // while showing the pilot nothing useful) — the whole point of seeding
-      // it, not just its byte length.
-      const location = cells.find((c) => c.label === 'Location')!;
-      expect(location.text).toBe(STATION_A_NAME);
-
-      // The primary cell still titles the card, full width.
-      expect(price.width).toBeCloseTo(contentWidth, -1);
-
-      for (const line of valueLines) {
-        for (const cell of line) {
-          // A wrapped-but-clipped cell (e.g. the long station name hitting
-          // `useMarketOrderColumns.tsx`'s `truncate` class, which only
-          // applies `sm:`-scoped, but a regression here would silently
-          // clip it inside its half-width track without changing its box)
-          // would pass every check above while hiding its own text.
-          expect(cell.clipped).toBe(false);
-        }
-        if (line.length === 2) {
-          const [first, second] = line;
-          // Side by side, not overlapping: the second starts at or past the
-          // end of the first (the grid's own column gap).
-          expect(second.left).toBeGreaterThanOrEqual(first.left + first.width);
-        }
-      }
-    }
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth
@@ -240,8 +230,18 @@ test.describe('Market Browser — order book stacked cards', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 
-  test('sell and buy tables keep one real row per order at 1280px', async ({ page }) => {
+  test('a desktop whose order book column is too narrow for its columns uses the same cards (1280px)', async ({
+    page,
+  }) => {
     await page.setViewportSize(DESKTOP);
+    await openTritanium(page);
+    await expectTwoLineCards(page);
+    // Both sides at once off a phone — the toggle is phone-only.
+    await expect(page.getByRole('table', { name: 'Buy Orders' })).toBeVisible();
+  });
+
+  test('a wide desktop keeps one real row per order (1440px)', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await openTritanium(page);
 
     const sell = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);

@@ -22,6 +22,8 @@ function scanRow(
     toHub: AMARR,
     destBuyLadder: [],
     name: `Item ${over.typeId}`,
+    groupId: null,
+    categoryId: null,
     unitVolumeM3: 1,
     buyLadder: [{ price: 100, units: 10_000, orders: 3 }],
     destLadder: [{ price: 200, units: 50, orders: 3 }],
@@ -47,6 +49,8 @@ function instantRow(over: Partial<InstantHaulingScanRow> & { typeId: number }): 
     fromHub: JITA,
     toHub: AMARR,
     name: `Item ${over.typeId}`,
+    groupId: null,
+    categoryId: null,
     unitVolumeM3: 2,
     buyLadder: [
       { price: 100, units: 10, orders: 1 },

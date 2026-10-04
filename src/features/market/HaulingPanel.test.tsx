@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { TRADE_HUBS } from '@/market/hubs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useHaulingCargo } from './haulingCargo';
 import type { HaulingScanRow } from './haulingData';
 import type { HaulingScanState } from './useHaulingScan';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
@@ -27,6 +28,8 @@ const SCAN_ROW: HaulingScanRow = {
   typeId: 2048,
   destBuyLadder: [],
   name: 'Damage Control II',
+  groupId: 60,
+  categoryId: 7,
   unitVolumeM3: 5,
   buyLadder: [{ price: 100, units: 10_000, orders: 3 }],
   destLadder: [{ price: 200, units: 50, orders: 3 }],
@@ -58,6 +61,8 @@ const INSTANT_READY: HaulingScanState = {
         toHub: AMARR,
         typeId: 2048,
         name: 'Damage Control II',
+        groupId: 60,
+        categoryId: 7,
         unitVolumeM3: 5,
         buyLadder: [{ price: 100, units: 10, orders: 1 }],
         destLadder: [],
@@ -243,5 +248,40 @@ describe('HaulingPanel, Any hub', () => {
     renderPanel('from=any&to=any');
     expect(screen.getByText('Any hub works at one end only')).toBeInTheDocument();
     expect(scanCalls.every((call) => !call.enabled)).toBe(true);
+  });
+});
+
+describe('HaulingPanel, a Cargo Space of several holds', () => {
+  beforeEach(() => {
+    useActiveCharacter.setState({ activeCharacterId: null });
+    useHaulingCargo.setState({
+      hydrated: true,
+      value: {
+        label: 'Hoarder',
+        holds: [
+          { kind: 'general', capacityM3: 300 },
+          { kind: 'ammo', capacityM3: 41_000 },
+        ],
+      },
+    });
+  });
+  afterEach(() => useHaulingCargo.setState({ value: null }));
+
+  it('shows one fill bar per hold, leaving a hold no item fits empty', () => {
+    renderPanel();
+    // Damage Control II is a module: it fills the cargo hold, never the ammo hold.
+    expect(
+      screen.getByRole('img', { name: 'Cargo hold: 300 of 300 cubic metres used' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: 'Ammo hold: 0 of 41,000 cubic metres used' })
+    ).toBeInTheDocument();
+  });
+
+  it('says which hold each plan line rides in', () => {
+    renderPanel();
+    expect(
+      screen.getByRole('textbox', { name: 'Quantity of Damage Control II to bring' })
+    ).toHaveAttribute('title', '300 m³ · in Cargo hold · limited by space');
   });
 });
