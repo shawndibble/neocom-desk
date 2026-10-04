@@ -56,16 +56,16 @@ describe('JournalDescriptionCell', () => {
     const { container } = render(
       <MemoryRouter>
         <JournalDescriptionCell
-          entry={entry({ ref_type: 'daily_goal_payouts', description: '-', reason: '697658' })}
+          entry={entry({ ref_type: 'daily_goal_payouts', description: '-', reason: '999' })}
           transaction={undefined}
           itemName=""
         />
       </MemoryRouter>
     );
     expect(container).toHaveTextContent('Daily goal');
-    expect(container).not.toHaveTextContent('697658');
+    expect(container).not.toHaveTextContent('999');
     // Kept on hover, so the goal can be named later.
-    expect(screen.getByTitle('Goal id 697658')).toBeInTheDocument();
+    expect(screen.getByTitle('Goal id 999')).toBeInTheDocument();
   });
 
   it('shows a non-empty reason as a second line', () => {
