@@ -35,7 +35,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { useRememberedUrlParams, useUrlSort } from '@/lib/useUrlState';
 import {
   bpcSourcingParams,
   BPC_SOURCING_SORT_KEY,
@@ -82,6 +82,7 @@ import {
   type BpcSearchColumnId,
 } from '@/features/bpcContracts/bpcSearchColumns';
 import { useSpaceFilter } from '@/features/bpcContracts/bpcSpaceFilterPref';
+import { useBpcSources } from '@/features/bpcContracts/bpcSourcesPref';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
 import { bpcSourcingCsvColumns } from '@/features/bpcContracts/bpcSourcingCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -627,7 +628,28 @@ export function BpcSourcingPanel() {
     () => bpcSourcingParams({ hideAuctions: hideAuctionsDefault, hidePlex: hidePlexDefault }),
     [hideAuctionsDefault, hidePlexDefault]
   );
-  const [params, setParams] = useUrlParams(sourcingParams);
+  // Source is a remembered default behind its URL key (`bpcSourcesPref.ts`):
+  // a bare visit reopens the pilot's last picks, a link's `sourcing.src` still
+  // wins, and only an edit is stored. Same group, so it writes in the same
+  // navigation as the rest.
+  const rememberedSources = useBpcSources((state) => state.value);
+  const hydrateRememberedSources = useBpcSources((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateRememberedSources();
+  }, [hydrateRememberedSources]);
+  const rememberedParams = useMemo(
+    () => ({
+      values: { 'sourcing.src': new Set(rememberedSources) },
+      remember: (patch: { 'sourcing.src'?: ReadonlySet<SourceToggle> }) => {
+        const next = patch['sourcing.src'];
+        if (next !== undefined) {
+          void useBpcSources.getState().setValue(SOURCE_TOGGLES.filter((s) => next.has(s)));
+        }
+      },
+    }),
+    [rememberedSources]
+  );
+  const [params, setParams] = useRememberedUrlParams(sourcingParams, rememberedParams);
   const uiFilter: UiFilter = useMemo(
     () => ({
       typeQuery: params['sourcing.q'],
