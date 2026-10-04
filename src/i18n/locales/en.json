@@ -252,7 +252,7 @@
       "unresolvedItem": "\"{{text}}\" — {{reason}}",
       "xml": {
         "browseLabel": "Load a fittings file (EVE XML)",
-        "browse": "Browse",
+        "browse": "Choose file",
         "error": {
           "tooLarge": "That file is too large to be a fittings export.",
           "readFailed": "Couldn't read that file.",
@@ -1779,7 +1779,7 @@
       "priceNpcHint": "The fixed price NPC stations sell this skillbook at, in regions where NPCs seed it. Find nearby shows where it is on sale.",
       "priceNoSellOrders": "No sell orders",
       "priceUnavailable": "Couldn't load",
-      "openInMarket": "Open in Market",
+      "openInMarket": "View in Market",
       "findNearby": "Find nearby (≤{{jumps}} jumps)",
       "facts": "{{group}} · Rank {{rank}} · {{primary}} / {{secondary}}"
     },
@@ -5970,7 +5970,7 @@
       "compare": "Compare"
     },
     "itemDetail": {
-      "openInMarket": "Open in Market",
+      "openInMarket": "View in Market",
       "volume": "Volume: {{volume}} m3",
       "bestSell": "Best sell:",
       "bestBuy": "Best buy:",

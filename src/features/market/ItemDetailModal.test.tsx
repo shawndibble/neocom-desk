@@ -59,7 +59,7 @@ afterEach(async () => {
 });
 
 describe('ItemDetailModal', () => {
-  it('offers Open in Market only when asked, closing itself on the way', async () => {
+  it('offers View in Market only when asked, closing itself on the way', async () => {
     server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => new Promise(() => {})));
     mockedLoadDictionary.mockReturnValue(new Promise(() => {}));
     const onClose = vi.fn();
@@ -68,7 +68,7 @@ describe('ItemDetailModal', () => {
         <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={onClose} showOpenInMarket />
       </MemoryRouter>
     );
-    const link = screen.getByRole('link', { name: 'Open in Market' });
+    const link = screen.getByRole('link', { name: 'View in Market' });
     expect(link).toHaveAttribute('href', `/market/browser?type=${TYPE_ID}`);
     await userEvent.setup().click(link);
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -78,7 +78,7 @@ describe('ItemDetailModal', () => {
         <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={onClose} />
       </MemoryRouter>
     );
-    expect(screen.queryByRole('link', { name: 'Open in Market' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'View in Market' })).not.toBeInTheDocument();
   });
 
   it('shows a loading state while ESI and the attribute dictionary are in flight', () => {
