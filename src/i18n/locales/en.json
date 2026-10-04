@@ -7735,8 +7735,6 @@
         "zkillboard": "zKillboard ↗",
         "zkillboardLabel": "{{system}} on zKillboard (opens in a new tab)"
       },
-      "copy": "Copy",
-      "copied": "Copied",
       "copySignature": "Copy {{hub}} signature for {{system}}",
       "copiedSignature": "Copied {{hub}} signature for {{system}}",
       "noGateRoute": "No gate route",

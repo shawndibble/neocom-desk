@@ -6,7 +6,7 @@
  *
  * Below `sm` each hole is one dense card (`DataTable`'s dense stack): exit and
  * hub badge with jumps on the right, then security, region, fits and life
- * left, then the signature pair and Copy on a line of their own.
+ * left, then the signature pair with Route via and Copy at its right end.
  *
  * Route via (issue #2477): a K-space row with a gate route from the page's
  * origin links to Route Safety from that origin with the hole pinned for the
@@ -148,7 +148,10 @@ function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow
       className: 'w-0 whitespace-nowrap',
       stackEdge: 'below',
       render: (row) => (
-        <span className="inline-flex items-center gap-3 max-sm:flex max-sm:w-full max-sm:flex-wrap">
+        // On a phone SignatureCopy's own box dissolves (`contents`), so the
+        // signature, Route via and Copy share one line instead of Route via
+        // wrapping onto a line of its own.
+        <span className="inline-flex items-center gap-3 max-sm:flex max-sm:w-full">
           <SignatureCopy row={row} />
           <RouteVia row={row} href={routeVia} />
         </span>
@@ -218,14 +221,15 @@ function SignatureCopy({ row }: { row: TheraConnectionRow }) {
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 max-sm:flex max-sm:w-full">
+    <span className="inline-flex items-center gap-1.5 max-sm:contents">
       <Button
         size="sm"
-        className="max-sm:order-last max-sm:ml-auto"
+        className="shrink-0 max-sm:order-last"
         disabled={signature === null}
         onClick={() => void copy()}
         aria-label={copyLabel}
-        // Above `sm` the button is the icon alone; the tooltip names it.
+        // The icon alone at every width, so a phone card's signature, Route
+        // via and Copy fit one line; the tooltip and label name it.
         title={copyLabel}
       >
         {copied ? (
@@ -233,13 +237,13 @@ function SignatureCopy({ row }: { row: TheraConnectionRow }) {
         ) : (
           <Icon.CopyToClipboard size={Icon.ICON_SIZE.sm} />
         )}
-        <span className="sm:hidden">
-          {copied ? t('travel.thera.copied') : t('travel.thera.copy')}
-        </span>
       </Button>
       {/* A control of its own, so selecting the signature by hand never
           opens the row. */}
-      <span data-row-control className="font-mono text-sm tabular-nums">
+      <span
+        data-row-control
+        className="font-mono text-sm whitespace-nowrap tabular-nums max-sm:mr-auto"
+      >
         <span ref={signatureRef} className="select-all">
           {signature ?? DASH}
         </span>
