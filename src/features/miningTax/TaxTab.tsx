@@ -1902,7 +1902,8 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           typeNames={data.typeNames}
           payeeDisplayName={payeeDisplayName(detailTarget)}
           busy={busy}
-          saveError={actionError}
+          // A failed link shows in its own dialog, open on top of this one.
+          saveError={linkTransactionTarget ? null : actionError}
           onEdit={() => {
             setEditTarget(detailTarget);
             setDetailTarget(null);
@@ -1967,7 +1968,8 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           suggestion={detailTarget.assignment ? undefined : suggestionFor(detailTarget.row)}
           pricesFor={pricesFor}
           busy={busy}
-          saveError={actionError}
+          // A failed link shows in its own dialog, open on top of this one.
+          saveError={linkTransactionTarget ? null : actionError}
           onAssigned={handleAssignedFromDetail}
           onDismiss={handleDismissFromDetail}
           onMarkPaid={handleMarkPaidFromDetail}

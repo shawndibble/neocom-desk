@@ -163,7 +163,6 @@ export function LinkWalletPaymentDialog({
     // `recorded` keeps the button disabled from here on, so the remember step
     // below can't be raced into recording the payment twice.
     setRecorded(true);
-    onLinked();
     try {
       if (remember && selected.counterpartyId !== undefined) {
         await rememberPayeeEntity(payee, selected.counterpartyId);
@@ -171,9 +170,11 @@ export function LinkWalletPaymentDialog({
     } catch {
       // The payment is recorded; only learning who the Payee is paid failed.
       // Say so and keep the dialog open, rather than closing as if all went.
+      onLinked();
       setSaveError(t('miningTax.linkWallet.rememberFailed', { payee: payee.name }));
       return;
     }
+    onLinked();
     onClose();
   }
 
