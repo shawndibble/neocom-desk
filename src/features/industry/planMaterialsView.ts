@@ -1,20 +1,18 @@
 /**
  * The pure half of a materials table's owned-stock handling: which material
  * types detection scans, the `OwnedStockDetection` object every row reads,
- * and the "use all" / "use none" bulk rules. `BuildPlanDetail.tsx` (one plan)
- * and `BuildGroupPanel.tsx` (a Build Group's merged table) both call these, so
- * a group and its members can never hold two opinions about what the hangar
+ * and the two stores' adapters for the owned-stock offer
+ * (`src/engine/industry/ownedStockOffer.ts`, which owns "Use assets",
+ * "Use all", "Use none" and their Undo). `BuildPlanDetail.tsx` (one plan) and
+ * `BuildGroupPanel.tsx` (a Build Group's merged table) both call these, so a
+ * group and its members can never hold two opinions about what the hangar
  * contains or which rows a bulk action may touch.
  */
 import type { BuildPlanRecord } from '@/db';
-import {
-  bulkOwnedStockSuggestions,
-  clearOwnedStockSuggestions,
-  filterStockByScope,
-  type DetectedOwnedStockMap,
-  type OwnedStockSuggestion,
-} from '@/engine/industry/ownedStock';
-import type { MaterialSourcingMap, OwnedStockScope } from '@/engine/industry/types';
+import { filterStockByScope, type DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
+import type { OwnedStockChange } from '@/engine/industry/ownedStockOffer';
+import type { OwnedStockScope } from '@/engine/industry/types';
+import type { SourcingPatchEntry } from './buildPlanStore';
 import { toIndustryBlueprint } from './blueprintCatalog';
 import { buildPlanTypeIds, type RecipeCatalog } from './recipes';
 import { stockLocationLabel, type OwnedStockDetection } from './ownedStockDetection';
@@ -85,8 +83,6 @@ export interface OwnedStockViewInput {
 
 export interface OwnedStockView {
   detection: OwnedStockDetection;
-  /** `stock` narrowed to the scope — what the bulk "use all" fills from. */
-  scopedStock: DetectedOwnedStockMap;
 }
 
 export function ownedStockView(input: OwnedStockViewInput, t: Translate): OwnedStockView {
@@ -95,7 +91,6 @@ export function ownedStockView(input: OwnedStockViewInput, t: Translate): OwnedS
     ? [...input.incompleteCharacters, input.incompleteCorporation]
     : input.incompleteCharacters;
   const detection: OwnedStockDetection = {
-    stockFor: (typeID) => input.stock.get(typeID),
     scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
     lowerBound: incompleteCharacters.length > 0,
     incompleteCharacters,
@@ -103,46 +98,31 @@ export function ownedStockView(input: OwnedStockViewInput, t: Translate): OwnedS
     corporationNameFor: () => input.corporationName ?? t('common.unknown'),
     locationLabelFor: (placement) => stockLocationLabel(placement, input.locationNames, t),
   };
-  return { detection, scopedStock };
+  return { detection };
 }
 
-/** Adapts either owned-quantity store (a plan's sourcing, a group's ledger) to the engine's shape. */
-function asSourcing(
-  rows: readonly { typeID: number }[],
-  ownedQuantityFor: (typeID: number) => number | undefined
-): MaterialSourcingMap {
-  const sourcing: MaterialSourcingMap = {};
-  for (const { typeID } of rows) {
-    const ownedQuantity = ownedQuantityFor(typeID);
-    if (ownedQuantity !== undefined) sourcing[typeID] = { ownedQuantity };
+/**
+ * The owned-stock offer's plan-sourcing adapter: its changes as the plan's
+ * `sourcing` edits. A `to` of `undefined` clears the field (an Undo back to an
+ * untouched row); a 0 is stored as 0, which is how a plan has always kept
+ * "Use none".
+ */
+export function planSourcingPatches(changes: readonly OwnedStockChange[]): SourcingPatchEntry[] {
+  return changes.map(({ typeID, to }) => ({ typeID, patch: { ownedQuantity: to } }));
+}
+
+/**
+ * The owned-stock offer's Group Owned Overlay adapter: applies its changes to
+ * `ledger` (a copy of the group's `ownedStock`) in place. An empty count — 0 or
+ * nothing — removes the entry, the overlay's one rule for it, the same one a
+ * typed value commits through.
+ */
+export function applyToGroupOwnedStock(
+  ledger: Record<number, number>,
+  changes: readonly Pick<OwnedStockChange, 'typeID' | 'to'>[]
+): void {
+  for (const { typeID, to } of changes) {
+    if (to === undefined || to <= 0) delete ledger[typeID];
+    else ledger[typeID] = to;
   }
-  return sourcing;
-}
-
-/**
- * "Use all": every row whose own "Use assets" offer is showing, filled with
- * its scoped detected stock capped at what the row needs — a row already at
- * that number is left out, a typed or zeroed one is not. Callers pass every
- * row the per-row action can reach, or "Use all" silently skips rows the row
- * beside it still offers to fill — and no row whose offer their surface hides
- * (a plan's Blueprint Acquisition rows), or it fills what no row offers.
- */
-export function bulkUseDetected(
-  rows: readonly { typeID: number; quantity: number }[],
-  ownedQuantityFor: (typeID: number) => number | undefined,
-  scopedStock: DetectedOwnedStockMap
-): OwnedStockSuggestion[] {
-  return bulkOwnedStockSuggestions(rows, asSourcing(rows, ownedQuantityFor), scopedStock);
-}
-
-/**
- * "Use none": the reverse — zeroes every row carrying a non-zero owned
- * quantity, hand-typed or bulk-filled alike (issue #612). A deliberate
- * clobber, not the "untouched rows only" rule above.
- */
-export function bulkUseNone(
-  rows: readonly { typeID: number }[],
-  ownedQuantityFor: (typeID: number) => number | undefined
-): OwnedStockSuggestion[] {
-  return clearOwnedStockSuggestions(rows, asSourcing(rows, ownedQuantityFor));
 }

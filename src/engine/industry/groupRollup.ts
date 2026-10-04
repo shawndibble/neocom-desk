@@ -55,11 +55,7 @@
  * skips any row whose typeID any member's own `acquisitionTier`-marked row
  * names (see `acquisitionTypeIds`) instead of asking the ledger for an
  * opinion it was never meant to have — read from each member's own
- * pre-merge `tableMaterials`, not the merged result, because `mergeCostLines`
- * drops the marker the moment two members need the same blueprint typeID
- * (same rule `features/industry/subBuildPlan.ts`'s own per-plan merge
- * already accepts), which would otherwise silently exclude that exact case
- * from the fix.
+ * `tableMaterials`, because the buy list never carries the marker at all.
  *
  * ## What it deliberately does not do
  *
@@ -207,14 +203,11 @@ function applyOwnedLedger(line: MaterialCostLine, ledgerQuantity: number): Mater
 
 /**
  * typeIDs of every Blueprint Acquisition row (issue #838), read from each
- * member's own `tableMaterials` *before* the group merge — never from the
- * merged result, since `mergeCostLines` drops the `acquisitionTier` marker
- * the instant two members collide on the same blueprint typeID, which would
- * silently un-skip exactly the case a group of two identical plans hits.
- * `shoppingMaterials` has already lost the marker by the time it reaches this
- * module regardless (`shoppingListMaterials`'s `costLine` strips it), but the
- * same blueprint typeID appears in both member lists, so this set — built
- * from `tableMaterials` alone — covers netting either merged list. Keyed by
+ * member's own `tableMaterials`. `shoppingMaterials` has already lost the
+ * marker by the time it reaches this module (`shoppingListMaterials`'s
+ * `costLine` strips it), but the same blueprint typeID appears in both member
+ * lists, so this set — built from `tableMaterials` alone — covers netting
+ * either merged list. Keyed by
  * bare typeID, safe only because a blueprint typeID and a manufacturing
  * input's typeID are disjoint namespaces in the SDE (a blueprint is never a
  * material) — no ordinary material can collide with an entry here.

@@ -11,17 +11,19 @@ import { fakeItemActions } from './__fixtures__/itemActions';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import { db } from '@/db';
 import { clearHullFitMemory } from './hullFitService';
+import type { ChargeEngineStats } from './dogmaFittingEngine';
+import { fakeDogmaEngine, fakeFittingContext } from './__fixtures__/fakeDogmaEngine';
 
 const checkCandidates = vi.fn();
 const checkCharges = vi.fn();
 const compareCharges = vi.fn((): unknown[] => []);
 const chargesMissingSkills = vi.fn(() => new Set<number>());
-vi.mock('./dogmaFittingEngine', () => ({
-  checkCandidates: (...args: unknown[]) => checkCandidates(...args),
-  checkCharges: (...args: unknown[]) => checkCharges(...args),
-  compareCharges: () => compareCharges(),
+const engine = fakeDogmaEngine({
+  checkCandidates,
+  checkCharges,
+  compareCharges: () => compareCharges() as ChargeEngineStats[],
   chargesMissingSkills: () => chargesMissingSkills(),
-}));
+});
 const getHubPrices = vi.fn(async () => new Map<number, { sellMin: number | null }>());
 vi.mock('@/market/prices', () => ({
   getHubPrices: () => getHubPrices(),
@@ -50,15 +52,19 @@ const catalogue: FittingCatalogue = {
   variations: { types: {}, metaGroups: {} },
 };
 
-function renderPanel(overrides: Partial<Parameters<typeof FittingAddPanel>[0]> = {}) {
+/** `ready: false` is before the ship data: no fitting context yet. */
+function renderPanel({
+  ready = true,
+  ...overrides
+}: Partial<Parameters<typeof FittingAddPanel>[0]> & { ready?: boolean } = {}) {
   const onAdd = vi.fn();
+  const shown = overrides.catalogue === undefined ? catalogue : overrides.catalogue;
   render(
     <FittingAddPanel
       fitting={fitting}
       catalogue={catalogue}
       target={{ kind: 'slot', slot: 'low', slotIndex: 0 }}
-      engineReady
-      profile={profile}
+      context={ready && shown !== null ? fakeFittingContext(shown, { engine, profile }) : null}
       onAdd={onAdd}
       {...overrides}
     />
@@ -75,7 +81,7 @@ describe('FittingAddPanel', () => {
 
   it('before ship data: search still works, but Add is disabled and the note says why', async () => {
     const user = userEvent.setup();
-    renderPanel({ engineReady: false });
+    renderPanel({ ready: false });
 
     expect(screen.getByText(/Ship data is still downloading/)).toBeInTheDocument();
     await user.type(screen.getByLabelText('Search items to add'), 'II');
@@ -544,8 +550,7 @@ describe('FittingAddPanel', () => {
               fitting={holding}
               catalogue={catalogue}
               target={{ kind: 'cargo' }}
-              engineReady
-              profile={profile}
+              context={fakeFittingContext(catalogue, { engine, profile })}
               onAdd={vi.fn()}
               onAddCargo={onAddCargo}
             />
@@ -595,8 +600,7 @@ describe('FittingAddPanel', () => {
               fitting={fitting}
               catalogue={catalogue}
               target={{ kind: 'cargo' }}
-              engineReady
-              profile={profile}
+              context={fakeFittingContext(catalogue, { engine, profile })}
               onAdd={vi.fn()}
               onAddCargo={vi.fn()}
             />
