@@ -69,18 +69,19 @@ import {
 import { loadTypeNames } from '@/features/character/typeNames';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import {
-  AlreadyAssignedError,
+  acceptNewTotal,
   assignmentsSharingPayment,
-  deleteAssignment,
-  dismissEntry,
-  joinAssignments,
-  linkPaymentTransaction,
+  continueSession as continueSessionAction,
+  dismiss,
   linkRecordedPayment,
-  markAssignmentsPaid,
-  resolveNeedsReview,
-  uncombineAssignments,
-  unlinkPaymentTransaction,
-} from '@/features/miningTax/assignments';
+  linkTransaction,
+  settle,
+  unassign,
+  uncombine,
+  undoContinue,
+  unlinkTransaction,
+  type LedgerActionResult,
+} from '@/features/miningTax/ledgerActions';
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { TypeOverridesDialog } from '@/features/miningTax/TypeOverridesDialog';
 import { computePayeeBalances, summarizeUnassigned } from '@/features/miningTax/balances';
@@ -127,6 +128,7 @@ import {
   findSessionContinuations,
   type SessionContinuation,
 } from '@/features/miningTax/sessionContinuation';
+import { useLedgerAction } from '@/features/miningTax/useLedgerAction';
 import { splitLedger } from '@/features/miningTax/ledgerSections';
 import { suggestPayeeForSystem, systemsByPayee } from '@/features/miningTax/suggestPayee';
 
@@ -391,15 +393,26 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   // Combined rows the pilot has expanded in place (desktop), to show each day.
   const [expandedCombined, setExpandedCombined] = useState<ReadonlySet<string>>(new Set());
   const [toast, setToast] = useState<{ message: string; onUndo?: () => void } | null>(null);
-  const [busy, setBusy] = useState(false);
-  // A row action that failed to save leaves its detail modal open to say so.
-  // Reset whenever the target changes, not keyed on it: after a failure nothing
-  // reloads, so reopening the same row hands back the very same object.
-  const [detailSaveError, setDetailSaveError] = useState<string | null>(null);
-  const [lastDetailTarget, setLastDetailTarget] = useState(detailTarget);
-  if (lastDetailTarget !== detailTarget) {
-    setLastDetailTarget(detailTarget);
-    setDetailSaveError(null);
+  const [continuing, setContinuing] = useState(false);
+  // Every row action and the Link-transaction confirm run through this, so a
+  // failure reads the same as in every dialog: the modal stays open saying
+  // nothing was changed (each action is one transaction, so that is true).
+  const {
+    pending: acting,
+    error: actionError,
+    setError: setActionError,
+    run: runRowAction,
+  } = useLedgerAction();
+  const busy = continuing || acting;
+  // Reset whenever the target changes, not keyed on it: after a failure
+  // nothing reloads, so reopening the same row hands back the very same object.
+  const [errorTargets, setErrorTargets] = useState({ detailTarget, linkTransactionTarget });
+  if (
+    errorTargets.detailTarget !== detailTarget ||
+    errorTargets.linkTransactionTarget !== linkTransactionTarget
+  ) {
+    setErrorTargets({ detailTarget, linkTransactionTarget });
+    setActionError(null);
   }
 
   useEffect(() => {
@@ -624,63 +637,44 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     return pricesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, hubId, date);
   }
 
-  /** Continues one session; `false` when there was nothing to write (its Payee is gone). */
+  /**
+   * Continues one session, offering Undo in a toast. `false` when nothing was
+   * written: its Payee is gone, the day was claimed meanwhile (the refresh
+   * shows what exists), or the write failed (the toast says so).
+   */
   async function continueSession(continuation: SessionContinuation): Promise<boolean> {
-    const { next, previous } = continuation;
     const payee = allPayees.find((p) => p.id === continuation.payeeId);
     if (!payee) return false;
-    const wasCombined = previous.groupId !== undefined;
-    const records = await joinAssignments(
-      [
-        {
-          characterId: previous.characterId,
-          date: previous.date,
-          solarSystemId: previous.solarSystemId,
-          assignment: previous,
-        },
-        {
-          characterId: next.row.characterId,
-          date: next.row.entry.date,
-          solarSystemId: next.row.entry.solarSystemId,
-          assignment: null,
-          oreLines: next.row.unassignedOreLines,
-          entryOreLines: next.row.entry.oreLines,
-        },
-      ],
-      continuation.payeeId,
-      previous.taxPct,
-      (date) => pricesFor(payee.hubId, date)
+    const result = await continueSessionAction(continuation, (date) =>
+      pricesFor(payee.hubId, date)
     );
-    const created = records.find((r) => r.id !== previous.id);
-    const rejoined = records.find((r) => r.id === previous.id);
-    setToast({
-      message: t('miningTax.continue.done', { date: next.row.entry.date, payee: payee.name }),
-      onUndo: created
-        ? () => {
-            setToast(null);
-            void (async () => {
-              await deleteAssignment(created);
-              if (!wasCombined && rejoined) await uncombineAssignments([rejoined]);
-              refresh();
-            })();
-          }
-        : undefined,
-    });
     refresh();
+    if (!result.ok) {
+      if (result.reason === 'save-failed') setToast({ message: t('miningTax.saveFailed') });
+      return false;
+    }
+    setToast({
+      message: t('miningTax.continue.done', {
+        date: continuation.next.row.entry.date,
+        payee: payee.name,
+      }),
+      onUndo: () => {
+        setToast(null);
+        void undoContinue(result.value).then((undone) => {
+          if (!undone.ok) setToast({ message: t('miningTax.saveFailed') });
+          refresh();
+        });
+      },
+    });
     return true;
   }
 
   async function handleContinue(continuation: SessionContinuation) {
-    setBusy(true);
+    setContinuing(true);
     try {
       await continueSession(continuation);
-    } catch (error) {
-      // The day was claimed meanwhile (another tab, or the pilot assigning
-      // it by hand) — refreshing shows what exists instead of a twin.
-      if (error instanceof AlreadyAssignedError) refresh();
-      else throw error;
     } finally {
-      setBusy(false);
+      setContinuing(false);
     }
   }
 
@@ -696,14 +690,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     for (const c of fresh) autoContinuedRef.current.add(c.next.key);
     void (async () => {
       for (const c of fresh) {
-        let continued = false;
-        try {
-          continued = await continueSession(c);
-        } catch {
-          // Claimed meanwhile, or the write failed: the refresh shows what
-          // actually exists.
-          refresh();
-        }
+        const continued = await continueSession(c);
         // Not continued: bring the offer back as a card so the pilot can retry
         // or choose, rather than it vanishing until the next page load.
         if (!continued) setAutoSkip((previous) => new Set(previous).add(c.next.key));
@@ -789,20 +776,21 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   }
 
   /** "I don't pay tax on this entry" — dismisses the whole unassigned residual in one action, no Payee needed. */
-  async function handleDismiss(row: MoonMiningTaxRow) {
+  function dismissRow(row: MoonMiningTaxRow) {
     const { estimatedValue } = computeAssignmentValue(
       row.unassignedOreLines,
       pricesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, undefined, row.entry.date),
       0
     );
-    await dismissEntry({
-      characterId: row.characterId,
-      date: row.entry.date,
-      solarSystemId: row.entry.solarSystemId,
-      oreLines: row.unassignedOreLines,
-      estimatedValue,
-    });
-    refresh();
+    return dismiss([
+      {
+        characterId: row.characterId,
+        date: row.entry.date,
+        solarSystemId: row.entry.solarSystemId,
+        oreLines: row.unassignedOreLines,
+        estimatedValue,
+      },
+    ]);
   }
 
   function payeeName(payeeId: string | undefined): string {
@@ -936,28 +924,15 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     refresh();
   }
 
-  /** Every row action ends the same way: busy while it writes, then close and reload. */
-  /** Closing after a failed save reloads: a per-day action may have written some days. */
-  function closeDetail() {
-    if (detailSaveError) refresh();
-    setDetailTarget(null);
-  }
-
-  async function runAndClose(
-    action: () => Promise<unknown>,
-    failedMessage: string = t('miningTax.saveFailed')
-  ) {
-    setBusy(true);
-    setDetailSaveError(null);
-    try {
-      await action();
+  /**
+   * Every row action ends the same way: busy while it writes, then close and
+   * reload — or, when it wrote nothing, stay open and say so.
+   */
+  async function runAndClose(action: () => Promise<LedgerActionResult<unknown>>) {
+    await runRowAction(action, () => {
       setDetailTarget(null);
       refresh();
-    } catch {
-      setDetailSaveError(failedMessage);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   function handleMarkGroupPaidFromDetail() {
@@ -966,7 +941,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       .filter((m) => m.assignment.status === 'outstanding')
       .map((m) => m.assignment);
     if (outstanding.length === 0) return;
-    void runAndClose(() => markAssignmentsPaid(outstanding));
+    void runAndClose(() => settle(outstanding));
   }
 
   /** The Assign form's submit, from inside RowDetailModal — same refresh-and-close every other row action takes. */
@@ -978,7 +953,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   function handleDismissFromDetail() {
     if (!detailTarget) return;
     const { row } = detailTarget;
-    void runAndClose(() => handleDismiss(row));
+    void runAndClose(() => dismissRow(row));
   }
 
   const detailLinkedTransactions: LinkedTransaction[] | undefined = useMemo(() => {
@@ -999,7 +974,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     if (!detailTarget) return;
     const targets = assignmentsForLinkTarget(detailTarget, everyAssignment);
     void runAndClose(() =>
-      unlinkPaymentTransaction(
+      unlinkTransaction(
         targets,
         transaction.kind === 'journal'
           ? { journalRefId: transaction.refId }
@@ -1027,76 +1002,69 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     if (!linkTransactionTarget) return;
     const targets = assignmentsForLinkTarget(linkTransactionTarget, everyAssignment);
     if (targets.length === 0) return;
-    setBusy(true);
-    try {
-      await linkPaymentTransaction(
-        targets,
-        payment.kind === 'journal'
-          ? { journalRefId: payment.refId }
-          : { contractId: payment.refId },
-        source,
-        {
-          paidOn: paidOnFromMadePaymentDate(payment.date),
-          method: payment.method,
-          amount: payment.amount === null ? 0 : Math.round(payment.amount),
-        }
-      );
-      setLinkTransactionTarget(null);
-      setDetailTarget(null);
-      refresh();
-    } finally {
-      setBusy(false);
-    }
+    await runRowAction(
+      () =>
+        linkTransaction(
+          targets,
+          payment.kind === 'journal'
+            ? { journalRefId: payment.refId }
+            : { contractId: payment.refId },
+          source,
+          {
+            paidOn: paidOnFromMadePaymentDate(payment.date),
+            method: payment.method,
+            amount: payment.amount === null ? 0 : Math.round(payment.amount),
+          }
+        ),
+      () => {
+        setLinkTransactionTarget(null);
+        setDetailTarget(null);
+        refresh();
+      }
+    );
   }
 
   function handleMarkPaidFromDetail() {
     const assignment = detailTarget?.assignment;
     if (!assignment) return;
-    void runAndClose(() => markAssignmentsPaid([assignment]));
+    void runAndClose(() => settle([assignment]));
   }
 
   function handleResolveFromDetail() {
     const target = detailTarget;
     if (!target?.assignment) return;
     const assignment = target.assignment;
-    void runAndClose(() =>
-      resolveNeedsReview(assignment, target.row.entry, target.row.assignments)
-    );
+    void runAndClose(() => acceptNewTotal([{ assignment, row: target.row }]));
   }
 
   function handleUndoFromDetail() {
     const assignment = detailTarget?.assignment;
     if (!assignment) return;
-    void runAndClose(() => deleteAssignment(assignment));
+    void runAndClose(() => unassign([assignment]));
   }
 
   /** Taking one day out of a combined entry keeps its Assignment; only the combination goes. */
   function handleTakeOut(member: GroupMember) {
-    void runAndClose(() => uncombineAssignments([member.assignment]));
+    void runAndClose(() => uncombine([member.assignment]));
   }
 
   /** "Accept new total" on a combined entry: every day that grew since it was paid. */
   function handleResolveGroup() {
     if (!detailTarget) return;
     const grown = allMembers(detailTarget).filter((m) => m.assignment.status === 'needs-review');
-    // One write per day: a failure partway leaves the earlier days written.
-    void runAndClose(async () => {
-      for (const m of grown) await resolveNeedsReview(m.assignment, m.row.entry, m.row.assignments);
-    }, t('miningTax.saveFailedPartway'));
+    void runAndClose(() => acceptNewTotal(grown));
   }
 
   function handleUnassignGroup() {
     if (!detailTarget) return;
     const members = allMembers(detailTarget).map((m) => m.assignment);
-    void runAndClose(async () => {
-      for (const a of members) await deleteAssignment(a);
-    }, t('miningTax.saveFailedPartway'));
+    void runAndClose(() => unassign(members));
   }
 
   function handleUncombineAll() {
     if (!detailTarget) return;
     const members = allMembers(detailTarget).map((m) => m.assignment);
-    void runAndClose(() => uncombineAssignments(members));
+    void runAndClose(() => uncombine(members));
   }
 
   const { open: openRows, history } = useMemo(
@@ -1927,14 +1895,15 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       {detailTarget && data && detailTarget.groupMembers && (
         <GroupSummaryModal
           open={detailTarget !== null}
-          onClose={closeDetail}
+          onClose={() => setDetailTarget(null)}
           members={allMembers(detailTarget)}
           systemName={systemName(detailTarget)}
           systemSecurity={systemSecurityOf(detailTarget)}
           typeNames={data.typeNames}
           payeeDisplayName={payeeDisplayName(detailTarget)}
           busy={busy}
-          saveError={detailSaveError}
+          // A failed link shows in its own dialog, open on top of this one.
+          saveError={linkTransactionTarget ? null : actionError}
           onEdit={() => {
             setEditTarget(detailTarget);
             setDetailTarget(null);
@@ -1988,7 +1957,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       {detailTarget && data && !detailTarget.groupMembers && (
         <RowDetailModal
           open={detailTarget !== null}
-          onClose={closeDetail}
+          onClose={() => setDetailTarget(null)}
           row={detailTarget.row}
           assignment={detailTarget.assignment}
           status={detailTarget.status}
@@ -1999,7 +1968,8 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           suggestion={detailTarget.assignment ? undefined : suggestionFor(detailTarget.row)}
           pricesFor={pricesFor}
           busy={busy}
-          saveError={detailSaveError}
+          // A failed link shows in its own dialog, open on top of this one.
+          saveError={linkTransactionTarget ? null : actionError}
           onAssigned={handleAssignedFromDetail}
           onDismiss={handleDismissFromDetail}
           onMarkPaid={handleMarkPaidFromDetail}
@@ -2056,6 +2026,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             candidates={linkTransactionCandidates}
             targetAmount={linkTransactionTargetAmount}
             busy={busy}
+            saveError={actionError}
             onConfirm={(payment, source) => void handleConfirmLinkTransaction(payment, source)}
           />
         )}

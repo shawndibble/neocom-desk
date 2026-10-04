@@ -92,15 +92,6 @@ export async function markPayeeDeleted(characterId: number, payeeId: string): Pr
   return markPayeeDeleted(characterId, payeeId);
 }
 
-/** Mining Tax Assignment analogue of markPlanDeleted — same tombstone semantics (issue #523). */
-export async function markMiningTaxAssignmentDeleted(
-  characterId: number,
-  assignmentId: string
-): Promise<void> {
-  const { markMiningTaxAssignmentDeleted } = await import('./planSync');
-  return markMiningTaxAssignmentDeleted(characterId, assignmentId);
-}
-
 /** Pin a station for one Character only (issue #84's per-character pin state). */
 export async function setCharacterStationPin(
   characterId: number,

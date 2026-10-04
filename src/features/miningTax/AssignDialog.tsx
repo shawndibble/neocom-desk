@@ -18,10 +18,12 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { maskIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
-import { AlreadyAssignedError, createAssignment } from './assignments';
+import { assign } from './ledgerActions';
 import { hubForPayee } from './pricing';
 import type { MoonMiningTaxRow } from './snapshot';
 import type { PayeeSuggestion } from './suggestPayee';
+import { useLedgerAction } from './useLedgerAction';
+import { LedgerActionError } from './LedgerActionError';
 
 interface AssignDialogProps {
   row: MoonMiningTaxRow;
@@ -155,7 +157,7 @@ export function AssignDialog({
     new Set(oreLines.map((line) => line.typeId))
   );
   const [markPaid, setMarkPaid] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const { pending: saving, error: saveError, run } = useLedgerAction();
   // Empty means "track the computed default"; any other string is a pilot
   // override that stops following `taxPct`/line-selection changes until
   // cleared back to empty.
@@ -243,29 +245,24 @@ export function AssignDialog({
 
   async function handleAssign() {
     if (!canAssign || !payeeId) return;
-    setSaving(true);
-    try {
-      await createAssignment({
-        characterId: row.characterId,
-        date: row.entry.date,
-        solarSystemId: row.entry.solarSystemId,
-        payeeId,
-        oreLines: selectedLines,
-        entryOreLines: row.entry.oreLines,
-        taxPct: pctValue,
-        estimatedValue,
-        taxOwed,
-        markPaid,
-      });
-      onAssigned();
-    } catch (error) {
-      // The row was stale — something else already claimed this ore. Refresh
-      // so the pilot sees the Assignment that exists instead of saving a twin.
-      if (error instanceof AlreadyAssignedError) onAssigned();
-      else throw error;
-    } finally {
-      setSaving(false);
-    }
+    // A stale row (something else already claimed this ore) also lands on
+    // `onAssigned`: the refresh shows the Assignment that exists.
+    await run(
+      () =>
+        assign({
+          characterId: row.characterId,
+          date: row.entry.date,
+          solarSystemId: row.entry.solarSystemId,
+          payeeId,
+          oreLines: selectedLines,
+          entryOreLines: row.entry.oreLines,
+          taxPct: pctValue,
+          estimatedValue,
+          taxOwed,
+          markPaid,
+        }),
+      onAssigned
+    );
   }
 
   const canAssign =
@@ -425,6 +422,7 @@ export function AssignDialog({
         {t('miningTax.markPaidLabel')}
       </label>
 
+      <LedgerActionError error={saveError} />
       <div className="flex flex-wrap gap-2 pt-1">
         <Button
           variant="primary"

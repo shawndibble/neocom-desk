@@ -4,10 +4,11 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { BulkDismissDialog } from './BulkDismissDialog';
 import type { DisplayRow } from './groupRows';
+import type { LedgerActionResult } from './ledgerActions';
 
-const dismissEntries = vi.fn<(...args: unknown[]) => Promise<void>>();
-vi.mock('./assignments', () => ({
-  dismissEntries: (...args: unknown[]) => dismissEntries(...args),
+const dismiss = vi.fn<(...args: unknown[]) => Promise<LedgerActionResult<unknown>>>();
+vi.mock('./ledgerActions', () => ({
+  dismiss: (...args: unknown[]) => dismiss(...args),
 }));
 
 const ROW = {
@@ -25,7 +26,7 @@ const ROW = {
 
 describe('BulkDismissDialog — a failed save', () => {
   it('says so and stays open', async () => {
-    dismissEntries.mockRejectedValueOnce(new Error('quota'));
+    dismiss.mockResolvedValueOnce({ ok: false, reason: 'save-failed', cause: new Error('quota') });
     const onDismissed = vi.fn();
     const onClose = vi.fn();
     render(

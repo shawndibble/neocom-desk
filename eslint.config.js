@@ -44,6 +44,22 @@ const restrictedSyntax = [
 // scripts/lib/sortArrowLint.test.mjs.
 const sortArrowMessage =
   'Draw sort direction with Icon.Sort / Icon.Ascending / Icon.Descending, not a "↑" / "↓" character (DESIGN.md §5).';
+const restrictedImportPaths = [
+  {
+    name: 'radix-ui',
+    message: 'Import Radix primitives through src/components/ui, not directly.',
+  },
+  {
+    // Not only a layering rule, a speed one: this barrel re-exports
+    // 3045 icons and costs ~1.4s to import, which Vitest pays once
+    // per test file whose graph reaches it. `src/components/ui`
+    // (exempt above) imports each icon from `dist/csr/<Name>`.
+    name: '@phosphor-icons/react',
+    message:
+      'Import icons from src/components/ui/icons, not the barrel — it pulls in 3045 modules.',
+  },
+];
+
 const sortArrowSyntax = [
   { selector: 'Literal[value=/[↑↓]/]', message: sortArrowMessage },
   { selector: 'TemplateElement[value.raw=/[↑↓]/]', message: sortArrowMessage },
@@ -82,22 +98,33 @@ export default tseslint.config(
     ignores: ['src/components/ui/**'],
     rules: {
       'no-restricted-syntax': ['error', ...restrictedSyntax],
+      'no-restricted-imports': ['error', { paths: restrictedImportPaths }],
+    },
+  },
+  {
+    // Mining Tax writes go through ledgerActions.ts, which makes each one a
+    // single transaction that schedules its sync after commit. Only it and
+    // the load path (coalesce, reconcile, snapshot) touch the record
+    // primitives directly.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: [
+      'src/components/ui/**',
+      'src/features/miningTax/ledgerActions.ts',
+      'src/features/miningTax/coalesce.ts',
+      'src/features/miningTax/reconcile.ts',
+      'src/features/miningTax/snapshot.ts',
+      'src/features/miningTax/assignments.test.ts',
+      'src/features/miningTax/reconcile.test.ts',
+    ],
+    rules: {
       'no-restricted-imports': [
         'error',
         {
-          paths: [
+          paths: restrictedImportPaths,
+          patterns: [
             {
-              name: 'radix-ui',
-              message: 'Import Radix primitives through src/components/ui, not directly.',
-            },
-            {
-              // Not only a layering rule, a speed one: this barrel re-exports
-              // 3045 icons and costs ~1.4s to import, which Vitest pays once
-              // per test file whose graph reaches it. `src/components/ui`
-              // (exempt above) imports each icon from `dist/csr/<Name>`.
-              name: '@phosphor-icons/react',
-              message:
-                'Import icons from src/components/ui/icons, not the barrel — it pulls in 3045 modules.',
+              group: ['./assignments', '**/miningTax/assignments'],
+              message: 'Write Mining Tax Assignments through ./ledgerActions, not the primitives.',
             },
           ],
         },
