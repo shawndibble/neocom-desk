@@ -106,7 +106,7 @@ export interface FittingEvaluationInput {
   fitting: Fitting | null;
   /** The pilot's own skills and clone; null while loading. */
   profile: PilotProfile | null;
-  /** "My clone" vs "Fitting's", already resolved for this Fitting. */
+  /** "My clone" vs the Fitting's own set, already resolved for this Fitting. */
   implantBasis: ImplantBasis;
 }
 

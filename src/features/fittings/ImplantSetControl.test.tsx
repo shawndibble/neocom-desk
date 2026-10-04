@@ -13,7 +13,8 @@ function setup(implantSet: FittingImplantSet | undefined, canUseClone = true) {
   const onImplantSetChange = vi.fn();
   render(
     <ImplantSetControl
-      canUseClone={canUseClone}
+      basis={implantSet === undefined && canUseClone ? 'clone' : 'fitting'}
+      canUseCloneBasis={canUseClone}
       implantSet={implantSet}
       onImplantSetChange={onImplantSetChange}
     />

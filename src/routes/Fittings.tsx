@@ -523,7 +523,8 @@ function FittingsPage() {
       implants={
         <>
           <ImplantSetControl
-            canUseClone={workspace.canUseCloneBasis}
+            basis={workspace.implantBasis}
+            canUseCloneBasis={workspace.canUseCloneBasis}
             implantSet={fitting.implantSet}
             onImplantSetChange={workspace.setImplantSet}
             fitting={fitting}

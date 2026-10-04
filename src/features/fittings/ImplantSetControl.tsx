@@ -1,8 +1,9 @@
 /**
  * Which implants the Fitting's numbers assume, as one chip that names them
  * — "My clone", or the Fitting's own custom set — and opens the set's editor.
- * A Fitting that carries a set is stated on it (`defaultImplantBasis`); the
- * editor's "Use my clone" drops the set, which is the only way back.
+ * A Fitting that carries a set is stated on it (`defaultImplantBasis`, as
+ * the workspace resolves `basis`); the editor's "Use my clone" drops the
+ * set, which is the only way back.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,8 +16,10 @@ import { STAT_FIELD_WIDTH } from './statKit';
 import { fieldBaseClassName, fieldSizeClassName } from '@/components/ui/controlStyles';
 
 interface ImplantSetControlProps {
-  /** A Character is active, so there is a clone to state the Fitting on. */
-  canUseClone: boolean;
+  /** What the stats are on, as the workspace resolved it. */
+  basis: ImplantBasis;
+  /** A Character is active, so there is a clone to go back to. */
+  canUseCloneBasis: boolean;
   implantSet: FittingImplantSet | undefined;
   onImplantSetChange: (implantSet: FittingImplantSet | undefined) => void;
   /** The open Fitting and pilot, for the set editor's "Find by goal"; absent until the pilot loads. */
@@ -25,7 +28,8 @@ interface ImplantSetControlProps {
 }
 
 export function ImplantSetControl({
-  canUseClone,
+  basis,
+  canUseCloneBasis,
   implantSet,
   onImplantSetChange,
   fitting,
@@ -34,20 +38,16 @@ export function ImplantSetControl({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
-  const basis: ImplantBasis = implantSet === undefined && canUseClone ? 'clone' : 'fitting';
-  const count = (implantSet?.implants.length ?? 0) + (implantSet?.boosters.length ?? 0);
+  const implants = implantSet?.implants.length ?? 0;
+  const boosters = implantSet?.boosters.length ?? 0;
   const summary =
     basis === 'clone'
       ? t('fittings.implants.basis.clone')
-      : count === 0
+      : implants + boosters === 0
         ? t('fittings.implants.none')
         : t('fittings.implants.custom', {
-            implants: t('fittings.implants.implantCount', {
-              count: implantSet?.implants.length ?? 0,
-            }),
-            boosters: t('fittings.implants.boosterCount', {
-              count: implantSet?.boosters.length ?? 0,
-            }),
+            implants: t('fittings.implants.implantCount', { count: implants }),
+            boosters: t('fittings.implants.boosterCount', { count: boosters }),
           });
 
   const label = t('fittings.implants.label');
@@ -69,7 +69,7 @@ export function ImplantSetControl({
         onClose={() => setOpen(false)}
         implantSet={implantSet}
         onChange={onImplantSetChange}
-        {...(canUseClone ? { onUseClone: () => onImplantSetChange(undefined) } : {})}
+        {...(canUseCloneBasis ? { onUseClone: () => onImplantSetChange(undefined) } : {})}
         {...(fitting && profile ? { finder: { fitting, profile, basis } } : {})}
       />
     </StatField>

@@ -509,7 +509,8 @@ export function useFittingWorkspace(): FittingWorkspace {
 
   const setImplantSet = useCallback(
     (implantSet: FittingImplantSet | undefined) => {
-      edit((f) => ({ ...f, implantSet }), 'implant-set');
+      // Dropping the set ("Use my clone") is its own step for Back, never folded into the last implant edit.
+      edit((f) => ({ ...f, implantSet }), implantSet === undefined ? undefined : 'implant-set');
     },
     [edit]
   );

@@ -94,9 +94,9 @@ export interface FittingImplantSet {
 
 /**
  * One ship hull plus everything loaded into it (CONTEXT.md **Fitting**).
- * `implantSet`, when carried, is what a "Fitting's" implant basis toggle
- * reads from; `undefined` means stats fall back to the active Character's
- * clone via `PilotProfile` instead.
+ * `implantSet`, when carried, is the implants and boosters its stats are
+ * stated on (`defaultImplantBasis`); `undefined` means stats fall back to
+ * the active Character's clone via `PilotProfile` instead.
  */
 export interface Fitting {
   name: string;
