@@ -18,9 +18,10 @@ import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
 import { unmaskNumber } from '@/lib/numberMask';
-import { markAssignmentsPaid, type PaymentInput } from './assignments';
 import { buildSettleUpReason, formatDateRange } from './groupRows';
+import { settle, type PaymentInput } from './ledgerActions';
 import { allocateOldestFirst } from './settleAllocation';
+import { useLedgerAction } from './useLedgerAction';
 
 export interface SettleUpRow {
   assignment: MiningTaxAssignmentRecord;
@@ -83,8 +84,7 @@ export function SettleUpDialog({
   const [method, setMethod] = useState<MiningTaxPaymentMethod>('donation');
   const [contractId, setContractId] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const { pending: saving, error: saveError, run } = useLedgerAction();
   // "Sent a different amount?": the ids ticked when it opened, which each new
   // figure re-allocates over (and closing it restores). `null` while closed.
   const [differentBase, setDifferentBase] = useState<ReadonlySet<string> | null>(null);
@@ -192,20 +192,17 @@ export function SettleUpDialog({
 
   async function commit(withPayment: boolean) {
     if (included.length === 0) return;
-    setSaving(true);
-    setSaveError(null);
-    try {
-      await markAssignmentsPaid(
-        included.map((r) => r.assignment),
-        withPayment ? paymentInput() : undefined
-      );
-      onPaid();
-      onClose();
-    } catch {
-      setSaveError(t('miningTax.saveFailed'));
-    } finally {
-      setSaving(false);
-    }
+    await run(
+      () =>
+        settle(
+          included.map((r) => r.assignment),
+          withPayment ? paymentInput() : undefined
+        ),
+      () => {
+        onPaid();
+        onClose();
+      }
+    );
   }
 
   const copyRow = (key: string, label: string, value: string, copyText: string, dim = false) => (

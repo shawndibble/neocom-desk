@@ -14,6 +14,10 @@
  *   Payee and then moved back becomes. They are written back as one record,
  *   quantities and snapshots summed.
  *
+ * A safety net, not the rule's enforcement: every write now goes through
+ * `ledgerActions.ts`, which keeps a Combined Entry whole on write. This still
+ * repairs data written before that, or arriving from another device's sync.
+ *
  * Run as eject, fuse, eject: a dissolved group's two halves have to be free
  * of their `groupId` before they can fuse, and fusing can itself leave a group
  * holding a single member, which is no longer a group. Both steps are

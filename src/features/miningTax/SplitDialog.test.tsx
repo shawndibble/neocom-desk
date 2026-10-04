@@ -20,7 +20,7 @@ import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { SplitDialog } from './SplitDialog';
 import type { MoonMiningTaxRow } from './snapshot';
 
-vi.mock('./assignments', () => ({ splitAssignment: vi.fn(async () => ({})) }));
+vi.mock('./ledgerActions', () => ({ split: vi.fn(async () => ({ ok: true, value: {} })) }));
 
 const CHAR = 1;
 const SYSTEM = 30000142;

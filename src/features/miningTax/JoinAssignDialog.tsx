@@ -14,9 +14,10 @@ import {
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
-import { AlreadyAssignedError, joinAssignments, type JoinMemberInput } from './assignments';
+import { combine, type JoinMemberInput } from './ledgerActions';
 import { agreedTerms } from './selection';
 import type { MoonMiningTaxRow } from './snapshot';
+import { useLedgerAction } from './useLedgerAction';
 
 export interface JoinCandidate {
   row: MoonMiningTaxRow;
@@ -100,7 +101,7 @@ export function JoinAssignDialog({
   );
   const [payeeId, setPayeeId] = useState<string | null>(null);
   const [taxPct, setTaxPct] = useState('');
-  const [saving, setSaving] = useState(false);
+  const { pending: saving, error: saveError, run } = useLedgerAction();
 
   const selected = candidates.filter((c) => selectedKeys.has(candidateKey(c)));
   /**
@@ -150,28 +151,23 @@ export function JoinAssignDialog({
 
   async function handleJoin() {
     if (!canJoin || effectivePayeeId === null || effectivePayeeId === undefined) return;
-    setSaving(true);
-    try {
-      const hubId = payees.find((p) => p.id === effectivePayeeId)?.hubId;
-      await joinAssignments(
-        [primary, ...selected].map(memberInput),
-        effectivePayeeId,
-        effectiveTaxPct,
-        // Every member of a join shares one Payee (that is the merge rule), so
-        // one hub prices the whole group — the Payee's, never the device's —
-        // but each member keeps its own mined date, hence a resolver rather
-        // than one flat map.
-        (date) => pricesFor(hubId, date)
-      );
-      onJoined();
-    } catch (error) {
-      // A member's ore was claimed since this dialog's snapshot — refresh
-      // rather than create a second claim on it.
-      if (error instanceof AlreadyAssignedError) onJoined();
-      else throw error;
-    } finally {
-      setSaving(false);
-    }
+    const hubId = payees.find((p) => p.id === effectivePayeeId)?.hubId;
+    // A member's ore claimed since this dialog's snapshot also lands on
+    // `onJoined`: refresh rather than create a second claim on it.
+    await run(
+      () =>
+        combine(
+          [primary, ...selected].map(memberInput),
+          effectivePayeeId,
+          effectiveTaxPct,
+          // Every member of a join shares one Payee (that is the merge rule), so
+          // one hub prices the whole group — the Payee's, never the device's —
+          // but each member keeps its own mined date, hence a resolver rather
+          // than one flat map.
+          (date) => pricesFor(hubId, date)
+        ),
+      onJoined
+    );
   }
 
   return (
@@ -309,6 +305,11 @@ export function JoinAssignDialog({
           )
         )}
 
+        {saveError && (
+          <p role="alert" className="text-xs text-danger">
+            {saveError}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"

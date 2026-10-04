@@ -3,14 +3,15 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
+import type { LedgerActionResult } from './ledgerActions';
 import type { GroupMember } from './groupRows';
 import type { MadePayment } from './paymentLinks';
 import { LinkWalletPaymentDialog } from './LinkWalletPaymentDialog';
 
-const markAssignmentsPaid = vi.fn<(...args: unknown[]) => Promise<void>>();
+const settle = vi.fn<(...args: unknown[]) => Promise<LedgerActionResult>>();
 const rememberPayeeEntity = vi.fn<(...args: unknown[]) => Promise<void>>();
-vi.mock('./assignments', () => ({
-  markAssignmentsPaid: (...args: unknown[]) => markAssignmentsPaid(...args),
+vi.mock('./ledgerActions', () => ({
+  settle: (...args: unknown[]) => settle(...args),
 }));
 vi.mock('./payees', () => ({
   rememberPayeeEntity: (...args: unknown[]) => rememberPayeeEntity(...args),
@@ -74,14 +75,14 @@ function renderDialog(candidates: readonly MadePayment[] = [DONATION, IN_KIND]) 
 }
 
 function paidIds(): string[] {
-  const [assignments] = markAssignmentsPaid.mock.calls[0] as [MiningTaxAssignmentRecord[]];
+  const [assignments] = settle.mock.calls[0] as [MiningTaxAssignmentRecord[]];
   return assignments.map((a) => a.id).sort();
 }
 
 describe('LinkWalletPaymentDialog', () => {
   beforeEach(() => {
-    markAssignmentsPaid.mockReset();
-    markAssignmentsPaid.mockResolvedValue();
+    settle.mockReset();
+    settle.mockResolvedValue({ ok: true, value: undefined });
     rememberPayeeEntity.mockReset();
     rememberPayeeEntity.mockResolvedValue();
   });
@@ -126,7 +127,7 @@ describe('LinkWalletPaymentDialog', () => {
     await waitFor(() => expect(onLinked).toHaveBeenCalled());
     expect(onClose).toHaveBeenCalled();
     expect(paidIds()).toEqual(['a-1', 'a-2']);
-    expect(markAssignmentsPaid.mock.calls[0][1]).toEqual({
+    expect(settle.mock.calls[0][1]).toEqual({
       paidOn: expect.stringMatching(/^2026-09-1[01]$/),
       method: 'donation',
       amount: 350_000,
@@ -168,7 +169,7 @@ describe('LinkWalletPaymentDialog', () => {
 
     await waitFor(() => expect(onLinked).toHaveBeenCalled());
     expect(paidIds()).toEqual(['a-1', 'a-2', 'a-3']);
-    expect(markAssignmentsPaid.mock.calls[0][1]).toMatchObject({
+    expect(settle.mock.calls[0][1]).toMatchObject({
       method: 'contract',
       amount: 500_000,
       contractLinks: [{ refId: 5, source: 'manual' }],

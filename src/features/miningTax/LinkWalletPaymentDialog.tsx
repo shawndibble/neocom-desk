@@ -6,11 +6,12 @@ import type { PayeeRecord } from '@/db';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
-import { markAssignmentsPaid } from './assignments';
 import type { GroupMember } from './groupRows';
+import { settle } from './ledgerActions';
 import { rememberPayeeEntity } from './payees';
 import { exactAmountMatches, type MadePayment } from './paymentLinks';
 import { allocateOldestFirst } from './settleAllocation';
+import { useLedgerAction } from './useLedgerAction';
 
 interface LinkWalletPaymentDialogProps {
   open: boolean;
@@ -75,10 +76,9 @@ export function LinkWalletPaymentDialog({
   const [valueText, setValueText] = useState('');
   const [valueParses, setValueParses] = useState(true);
   const [remember, setRemember] = useState(true);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const { pending: saving, error: saveError, setError: setSaveError, run } = useLedgerAction();
   // Set once the entries are marked paid, so a retry after a later failure can't record it twice.
   const [recorded, setRecorded] = useState(false);
-  const [saving, setSaving] = useState(false);
 
   function ticksFor(payment: MadePayment | null): ReadonlySet<string> {
     if (payment === null || payment.amount === null) {
@@ -146,11 +146,11 @@ export function LinkWalletPaymentDialog({
 
   async function commit() {
     if (!selected || included.length === 0 || !amountValid || paymentAmount === null) return;
-    setSaving(true);
-    setSaveError(null);
-    try {
-      const link = [{ refId: selected.refId, source: 'manual' as const }];
-      await markAssignmentsPaid(
+    const counterpartyId = remember ? selected.counterpartyId : undefined;
+    let rememberFailed = false;
+    const link = [{ refId: selected.refId, source: 'manual' as const }];
+    const result = await run(async () => {
+      const saved = await settle(
         included.map((m) => m.assignment),
         {
           paidOn: paidOnFor(selected.date),
@@ -159,26 +159,25 @@ export function LinkWalletPaymentDialog({
           ...(selected.kind === 'journal' ? { journalLinks: link } : { contractLinks: link }),
         }
       );
-    } catch {
-      setSaveError(t('miningTax.saveFailed'));
-      setSaving(false);
-      return;
-    }
-    setRecorded(true);
-    try {
-      if (remember && selected.counterpartyId !== undefined) {
-        await rememberPayeeEntity(payee, selected.counterpartyId);
+      if (saved.ok) {
+        setRecorded(true);
+        if (counterpartyId !== undefined) {
+          rememberFailed = await rememberPayeeEntity(payee, counterpartyId).then(
+            () => false,
+            () => true
+          );
+        }
       }
-    } catch {
+      return saved;
+    });
+    if (!result.ok) return;
+    onLinked();
+    if (rememberFailed) {
       // The payment is recorded; only learning who the Payee is paid failed.
       // Say so and keep the dialog open, rather than closing as if all went.
-      onLinked();
       setSaveError(t('miningTax.linkWallet.rememberFailed', { payee: payee.name }));
-      setSaving(false);
       return;
     }
-    setSaving(false);
-    onLinked();
     onClose();
   }
 

@@ -17,7 +17,8 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatIsk } from '@/lib/isk';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { updateCombinedAssignments, type CombinedMemberValues } from './assignments';
+import { editEntry, type CombinedMemberValues } from './ledgerActions';
+import { useLedgerAction } from './useLedgerAction';
 import { formatDateRange, type GroupMember } from './groupRows';
 import { combinedDayValues, combinedLineDefaults, dayTotalValues } from './combinedValues';
 import { useMiningTaxOreValueMode } from './oreValueMode';
@@ -56,7 +57,7 @@ const LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppe
  * A Paid entry opens ready to edit: the pilot already chose Edit, so there
  * is no second unlock step. Save corrects the figures while the entry stays
  * Paid with its recorded payment — the "correcting isn't un-paying" rule
- * `updateCombinedAssignments` keeps — and Cancel writes nothing.
+ * `editEntry` keeps — and Cancel writes nothing.
  */
 export function EntryEditDialog({
   open,
@@ -91,8 +92,7 @@ export function EntryEditDialog({
   const [overrides, setOverrides] = useState<Record<string, Record<number, string>>>({});
   // Per day, the whole day's value when ore values aren't edited one by one.
   const [dayOverrides, setDayOverrides] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const { pending: saving, error: saveError, run } = useLedgerAction();
   const paid = current.some((m) => m.assignment.status === 'paid');
 
   const payee = payees.find((p) => p.id === payeeId);
@@ -131,19 +131,14 @@ export function EntryEditDialog({
 
   async function handleSave() {
     if (!payeeId || !pctValid) return;
-    setSaving(true);
-    setSaveError(null);
-    try {
-      await updateCombinedAssignments(
-        current.map((m) => m.assignment),
-        { payeeId, taxPct: pct, members: Object.fromEntries(values) }
-      );
-      onSaved();
-    } catch {
-      setSaveError(t('miningTax.saveFailed'));
-    } finally {
-      setSaving(false);
-    }
+    await run(
+      () =>
+        editEntry(
+          current.map((m) => m.assignment),
+          { payeeId, taxPct: pct, members: Object.fromEntries(values) }
+        ),
+      onSaved
+    );
   }
 
   return (

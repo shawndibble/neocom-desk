@@ -6,10 +6,11 @@ import type { PayeeRecord } from '@/db';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
-import { markAssignmentsPaid } from './assignments';
 import { formatDateRange } from './groupRows';
+import { settle } from './ledgerActions';
 import { rememberPayeeEntity } from './payees';
 import type { LinkSuggestion } from './paymentLinks';
+import { useLedgerAction } from './useLedgerAction';
 
 interface LinkPaymentDialogProps {
   open: boolean;
@@ -61,7 +62,7 @@ export function LinkPaymentDialog({
   // False while the field shows text `amountInKind` doesn't reflect ("1bx"):
   // saving then would record a figure the pilot can't see.
   const [amountInKindParses, setAmountInKindParses] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const { pending: saving, error: saveError, run } = useLedgerAction();
 
   const selected = suggestions.find((s) => s.payment.key === selectedKey) ?? null;
 
@@ -106,30 +107,34 @@ export function LinkPaymentDialog({
 
   async function commit() {
     if (!selected || included.length === 0 || !amountValid) return;
-    setSaving(true);
-    try {
-      const { payment, balance } = selected;
-      await markAssignmentsPaid(
-        included.map((m) => m.assignment),
-        {
-          paidOn: paidOnFor(payment.date),
-          method: payment.method,
-          amount: Math.round(recordedAmount),
-          ...(payment.kind === 'journal'
-            ? { journalLinks: [{ refId: payment.refId, source: 'manual' as const }] }
-            : { contractLinks: [{ refId: payment.refId, source: 'manual' as const }] }),
+    const { payment, balance } = selected;
+    await run(
+      async () => {
+        const result = await settle(
+          included.map((m) => m.assignment),
+          {
+            paidOn: paidOnFor(payment.date),
+            method: payment.method,
+            amount: Math.round(recordedAmount),
+            ...(payment.kind === 'journal'
+              ? { journalLinks: [{ refId: payment.refId, source: 'manual' as const }] }
+              : { contractLinks: [{ refId: payment.refId, source: 'manual' as const }] }),
+          }
+        );
+        // Learned only on confirmation — the pilot agreeing this payment settled
+        // this Payee is what makes the recipient identification trustworthy.
+        // Best effort: the payment is recorded either way, and failing to
+        // learn who was paid is no reason to hold the dialog open.
+        if (result.ok && payment.counterpartyId !== undefined) {
+          await rememberPayeeEntity(balance.payee, payment.counterpartyId).catch(() => {});
         }
-      );
-      // Learned only on confirmation — the pilot agreeing this payment settled
-      // this Payee is what makes the recipient identification trustworthy.
-      if (payment.counterpartyId !== undefined) {
-        await rememberPayeeEntity(balance.payee, payment.counterpartyId);
+        return result;
+      },
+      () => {
+        onLinked();
+        onClose();
       }
-      onLinked();
-      onClose();
-    } finally {
-      setSaving(false);
-    }
+    );
   }
 
   const confidenceLabel = (suggestion: LinkSuggestion, payee: PayeeRecord) =>
@@ -269,6 +274,11 @@ export function LinkPaymentDialog({
           </>
         )}
 
+        {saveError && (
+          <p role="alert" className="text-xs text-danger">
+            {saveError}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"

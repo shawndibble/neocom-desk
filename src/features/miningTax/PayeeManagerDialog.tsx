@@ -21,7 +21,7 @@ import * as Icon from '@/components/ui/icons';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { formatIsk } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { moveAssignmentsToPayee } from './assignments';
+import { moveToPayee } from './ledgerActions';
 import { createPayee, deletePayee, loadPayees, updatePayee } from './payees';
 import { payeeSystemNames } from './payeeSystemNames';
 import { hubForPayee } from './pricing';
@@ -214,10 +214,14 @@ export function PayeeManagerDialog({
   async function handleDelete(payee: PayeeRecord, moveTo?: PayeeOwed & { targetId: string }) {
     // Move first: a failed move must leave the Payee (and its entries' label) intact.
     setDeleteError(null);
-    try {
-      if (moveTo) await moveAssignmentsToPayee(moveTo.assignments, moveTo.targetId);
-      await deletePayee(payee);
-    } catch {
+    const moved = moveTo ? (await moveToPayee(moveTo.assignments, moveTo.targetId)).ok : true;
+    const deleted =
+      moved &&
+      (await deletePayee(payee).then(
+        () => true,
+        () => false
+      ));
+    if (!deleted) {
       setDeleteError(t('miningTax.payees.deleteFailed', { name: payee.name }));
       return;
     }
