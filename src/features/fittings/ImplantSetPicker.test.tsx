@@ -1,10 +1,29 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
 
-vi.mock('@/features/skills/typeCatalog', () => ({ loadItemNameMap: async () => new Map() }));
+vi.mock('@/features/skills/typeCatalog', () => ({
+  loadItemNameMap: async () =>
+    new Map([
+      ['standard blue pill booster', { typeID: 9950 }],
+      ["inherent implants 'squire' power grid management eg-602", { typeID: 13283 }],
+      ['damage control ii', { typeID: 2048 }],
+    ]),
+}));
+// Which kind of slot each item goes in; anything else is neither.
+vi.mock('./useImplantFinder', () => ({
+  loadImplantCatalog: async () => ({
+    families: [],
+    slotOf: (id: number) =>
+      id === 9950
+        ? { kind: 'booster', slot: 1 }
+        : id === 13283
+          ? { kind: 'implant', slot: 6 }
+          : undefined,
+  }),
+}));
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: async () => new Map([[9950, 'Standard Blue Pill Booster']]),
 }));
@@ -29,6 +48,15 @@ vi.mock('./ImplantFinder', () => ({
         Plan one more
       </button>
     </>
+  ),
+}));
+
+// The item's details, as the dialog that opens on them.
+vi.mock('@/features/market/ItemDetailModal', () => ({
+  ItemDetailModal: ({ typeId, itemName }: { typeId: number; itemName: string }) => (
+    <p>
+      Info: {itemName} ({typeId})
+    </p>
   ),
 }));
 
@@ -137,5 +165,71 @@ describe('ImplantSetPicker — planning from the clone', () => {
 
     await user.click(screen.getByRole('button', { name: 'Use my clone' }));
     expect(onUseClone).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ImplantSetPicker — item info', () => {
+  it('opens an item’s details from its name', async () => {
+    const user = userEvent.setup();
+    render(
+      <ImplantSetPicker
+        open
+        onClose={vi.fn()}
+        implantSet={{ implants: [], boosters: [9950] }}
+        onChange={vi.fn()}
+      />
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Standard Blue Pill Booster' }));
+    expect(screen.getByText('Info: Standard Blue Pill Booster (9950)')).toBeInTheDocument();
+  });
+});
+
+describe('ImplantSetPicker — one add box', () => {
+  function renderEmpty() {
+    const onChange = vi.fn();
+    render(
+      <ImplantSetPicker
+        open
+        onClose={vi.fn()}
+        implantSet={{ implants: [], boosters: [] }}
+        onChange={onChange}
+      />
+    );
+    return onChange;
+  }
+
+  it('has a single search box for implants and boosters', () => {
+    renderEmpty();
+    expect(screen.getAllByRole('searchbox')).toHaveLength(1);
+  });
+
+  it('adds a booster to the boosters', async () => {
+    const user = userEvent.setup();
+    const onChange = renderEmpty();
+    await user.type(screen.getByRole('searchbox'), 'Standard Blue Pill Booster{Enter}');
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith({ implants: [], boosters: [9950] })
+    );
+  });
+
+  it('adds an implant to the implants', async () => {
+    const user = userEvent.setup();
+    const onChange = renderEmpty();
+    await user.type(
+      screen.getByRole('searchbox'),
+      "Inherent Implants 'Squire' Power Grid Management EG-602{Enter}"
+    );
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith({ implants: [13283], boosters: [] })
+    );
+  });
+
+  it('refuses an item that is neither', async () => {
+    const user = userEvent.setup();
+    const onChange = renderEmpty();
+    await user.type(screen.getByRole('searchbox'), 'Damage Control II{Enter}');
+    expect(await screen.findByText('Damage Control II isn’t an implant or booster.')).toBeVisible();
+    expect(onChange).not.toHaveBeenCalled();
   });
 });
