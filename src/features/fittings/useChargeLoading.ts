@@ -10,7 +10,7 @@
  * boosters and paste all go through here with no special cases. The engine
  * answers are memoized per hull, pilot and (rack, module type, charge).
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   chargesPerLoad as chargesInCapacity,
@@ -22,8 +22,7 @@ import type { Fitting, FittingModule, FittingModuleResult } from '@/engine/fitti
 import type { FittingContext } from './fittingContext';
 import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
-
-const MESSAGE_MS = 6000;
+import { useTimedToast, MESSAGE_MS } from '@/components/ui/useTimedToast';
 
 interface ChargeLoadingParams {
   fitting: Fitting | null;
@@ -64,11 +63,7 @@ export function useChargeLoading({
   const { t } = useTranslation();
   const [message, setMessage] = useState<string | null>(null);
   // The status line says what the last load did, then clears.
-  useEffect(() => {
-    if (message === null) return;
-    const timer = setTimeout(() => setMessage(null), MESSAGE_MS);
-    return () => clearTimeout(timer);
-  }, [message]);
+  useTimedToast(message, () => setMessage(null), MESSAGE_MS);
   const shipTypeId = fitting?.shipTypeId ?? null;
 
   // Rebuilt when the hull or pilot changes, which is also when an answer could.

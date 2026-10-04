@@ -132,6 +132,7 @@ import {
 import { useLedgerAction } from '@/features/miningTax/useLedgerAction';
 import { splitLedger } from '@/features/miningTax/ledgerSections';
 import { suggestPayeeForSystem, systemsByPayee } from '@/features/miningTax/suggestPayee';
+import { useTimedToast } from '@/components/ui/useTimedToast';
 
 /**
  * A `MadePayment`'s own timestamp as a local calendar date, falling back to
@@ -416,11 +417,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     setActionError(null);
   }
 
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 8000);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
+  useTimedToast(toast, () => setToast(null));
 
   // Every tracked character, not just those with a Mining Ledger Entry this
   // refresh (CONTEXT.md: the point of the feature is not missing an alt's

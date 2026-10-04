@@ -94,6 +94,7 @@ import { useOrderBookOrchestration } from '@/features/market/useOrderBookOrchest
 import { useOrderRowSkills } from '@/features/market/useOrderRowSkills';
 import { useMarketOrderColumns } from '@/features/market/useMarketOrderColumns';
 import { SELL_ORDER_COLUMN_IDS, BUY_ORDER_COLUMN_IDS } from '@/features/market/marketOrderColumns';
+import { useTimedToast } from '@/components/ui/useTimedToast';
 
 /** Rows shown per side before "show all" (CONTEXT.md). */
 const ROW_CAP = 15;
@@ -364,11 +365,7 @@ export function Market() {
     count: number;
     itemName: string;
   } | null>(null);
-  useEffect(() => {
-    if (!compareUndo) return;
-    const timer = setTimeout(() => setCompareUndo(null), 8000);
-    return () => clearTimeout(timer);
-  }, [compareUndo]);
+  useTimedToast(compareUndo, () => setCompareUndo(null));
   function handleCompareVariations() {
     if (!variationsResult || !selectedItem || selectedTypeId === null) return;
     const added = addManyToCompare([
