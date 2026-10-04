@@ -7,7 +7,6 @@ import {
   partitionByCurrency,
   type FitCurrency,
   type HullSlotCounts,
-  unreadItemStatus,
 } from './fitCurrency';
 
 /** The game's names don't matter to a test that leaves none unread; with them unknown, an unread item is removed. */
@@ -104,11 +103,6 @@ describe('classifyFitCurrency', () => {
         current: false,
         reasons: [{ kind: 'removed-item', name: 'Old Gun I' }],
       });
-    });
-
-    it('with the game’s names unreadable, no unread item is removed', () => {
-      const fit = parts([], [unknown('Old Gun I')]);
-      expect(classifyFitCurrency(fit, VEXOR, null)).toEqual({ current: true });
     });
 
     it('a hull is judged by the loader alone, as before', () => {
@@ -278,21 +272,5 @@ describe('partitionByCurrency', () => {
       current: [a],
       outOfDate: [{ fit: b, reasons: outOfDate.reasons }],
     });
-  });
-});
-
-describe('unreadItemStatus', () => {
-  const isGameItem = gameItemLookup(['Fierce Exotic Filament']);
-
-  it('an unread name the game still lists is in the game, ignoring case', () => {
-    expect(unreadItemStatus('fierce exotic FILAMENT', isGameItem)).toBe('in-game');
-  });
-
-  it('an unread name the game does not list is removed', () => {
-    expect(unreadItemStatus('Old Gun I', isGameItem)).toBe('removed');
-  });
-
-  it('with the game’s names unreadable, it is unknown — neither', () => {
-    expect(unreadItemStatus('Old Gun I', null)).toBe('unknown');
   });
 });

@@ -4,33 +4,22 @@
  * modules its rack icons draw, the item counts its price sums, and the key
  * "Seen on zKillboard" matches it by (`workbenchSightings.ts`).
  *
- * An item the loader couldn't read is judged by one rule, `unreadItemStatus`
- * (#2513): one the game still has never makes the fit out of date — the
- * loader's catalogue leaves out Abyssal filaments, LP boosters and mutated
- * modules, which Workbench fits carry all the time. For matching (#2536) such
- * a line is overlooked only when it is written with a count (`x1`): that can
- * never load as a fitted module, so it can't change the key. An unread line
- * without a count may be a fitted module (a mutated one, say) and still rules
- * the fit out, as does an item the game no longer has or one nobody can tell
- * (the game's names unreadable): matching on what's left could equal a
- * smaller group, and a missed badge is harmless where a false one is not.
+ * An item the loader couldn't read is judged by one rule, the game's full list
+ * of type names (`isGameItem`, #2513): one the game still has never makes the
+ * fit out of date — the loader's catalogue leaves out Abyssal filaments, LP
+ * boosters and mutated modules, which Workbench fits carry all the time. For
+ * matching (#2536) such a line is also overlooked, but only when it was
+ * written with a count (`countWritten`): that can never be a fitted module,
+ * so it can't change the key. An unread line without a count may be a fitted
+ * module (a mutated one, say) and still rules the fit out: matching on what's
+ * left could equal a smaller group, and a missed badge is harmless where a
+ * false one is not.
  *
  * What it keeps is small on purpose — rack and type per module, counts per
  * type — since a caller caches one per fit across every hull it has shown.
  */
-import {
-  classifyFitCurrency,
-  unreadItemStatus,
-  type FitCurrency,
-  type GameItemLookup,
-  type HullSlotCounts,
-} from './fitCurrency';
-import {
-  HAS_QUANTITY_SUFFIX,
-  loadEftFitting,
-  type EftSlotLookup,
-  type EftTypeLookup,
-} from './eftLoader';
+import { classifyFitCurrency, type FitCurrency, type HullSlotCounts } from './fitCurrency';
+import { loadEftFitting, type EftSlotLookup, type EftTypeLookup } from './eftLoader';
 import { fittingItemCounts } from './fittingExport';
 import type { ItemCount } from './fitSellPrice';
 import type { LoadParts } from './load';
@@ -43,8 +32,8 @@ export interface WorkbenchGameData {
   slotByTypeId: EftSlotLookup;
   /** `null` for a hull the Ship Tree doesn't list — its racks then aren't counted. */
   hullSlots: (shipTypeId: number) => HullSlotCounts | null;
-  /** Whether a name the loader couldn't read is still a type in the game; `null`: unreadable. */
-  isGameItem: GameItemLookup;
+  /** Whether a name the loader couldn't read is still a type in the game. */
+  isGameItem: (name: string) => boolean;
 }
 
 /** One Workbench fit, checked. */
@@ -68,15 +57,10 @@ export interface WorkbenchFitCheck {
  * Its modules are all there: every line loaded, or the only ones that didn't
  * are counted (never fitted) items the game still has.
  */
-function modulesAreWhole(eft: string, parts: LoadParts, isGameItem: GameItemLookup): boolean {
-  if (parts.unresolved.length === 0) return true;
-  const lines = eft.split(/\r\n|\r|\n/);
+function modulesAreWhole(parts: LoadParts, isGameItem: (name: string) => boolean): boolean {
   return parts.unresolved.every(
     (warning) =>
-      warning.kind === 'unknown-item' &&
-      warning.line !== undefined &&
-      HAS_QUANTITY_SUFFIX.test((lines[warning.line - 1] ?? '').trim()) &&
-      unreadItemStatus(warning.text, isGameItem) === 'in-game'
+      warning.kind === 'unknown-item' && warning.countWritten === true && isGameItem(warning.text)
   );
 }
 
@@ -106,6 +90,6 @@ export function checkWorkbenchFit(eft: string, data: WorkbenchGameData): Workben
         fighters: parts.fighters,
       }),
     ],
-    sightingKey: modulesAreWhole(eft, parts, data.isGameItem) ? popularFitKey(parts.modules) : null,
+    sightingKey: modulesAreWhole(parts, data.isGameItem) ? popularFitKey(parts.modules) : null,
   };
 }

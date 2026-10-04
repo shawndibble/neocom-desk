@@ -105,12 +105,12 @@ describe('checkWorkbenchFit', () => {
     expect(check.sightingKey).toBeNull();
   });
 
-  it('with the game’s names unreadable, an unread item is neither removed nor matched on', () => {
-    const check = checkWorkbenchFit('[Vexor, A]\nHeavy Neutron Blaster II\n\nMystery Thing x1', {
-      ...data,
-      isGameItem: null,
-    });
-    expect(check.verdict).toEqual({ current: true });
+  it('an unread counted item the game no longer has is never matched on', () => {
+    const check = checkWorkbenchFit(
+      '[Vexor, A]\nHeavy Neutron Blaster II\n\nRetired Booster x1',
+      data
+    );
+    expect(check.verdict.current).toBe(false);
     expect(check.sightingKey).toBeNull();
   });
 

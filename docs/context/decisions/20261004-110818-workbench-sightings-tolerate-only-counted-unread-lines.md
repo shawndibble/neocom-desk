@@ -14,3 +14,11 @@ _Recorded 2026-10-04 · issue #2536._
   the fit out, as do parse errors, an unknown hull and too-many-slots. Whether
   the item still exists uses the same `typeNames.json` rule (`isGameItem`) as
   the Out-of-date check (#2513).
+- **An unread loaded charge still rules the fit out.** It can't change the key
+  either, but the catalogue lacks few charges and the loader would need a
+  second marker for them; a missed badge is harmless, so it stays out of this
+  change.
+- **If `typeNames.json` can't be read, counted unread lines are tolerated.**
+  The sightings share the Out-of-date check's fallback (every name counts as
+  the game's), which lists such fits as current too, so the badge and the
+  list agree. The key is unaffected either way.

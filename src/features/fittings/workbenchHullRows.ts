@@ -7,7 +7,7 @@
  * against game data loaded once. That one check says whether the fit is an
  * **Out-of-date fit**, which modules its rack icons draw, what its price sums
  * and which key "Seen on zKillboard" matches it by — so an item the loader
- * can't read is judged by a single rule everywhere (`unreadItemStatus`).
+ * can't read is judged by a single rule everywhere (`isGameItem`).
  *
  * Everything from outside — the stored fits (Firestore), the game data (SDE),
  * hub prices, the hull's zKillboard losses, and the text Load — comes in
@@ -35,7 +35,6 @@ import {
   gameItemLookup,
   partitionByCurrency,
   type FitCurrency,
-  type GameItemLookup,
   type HullSlotCounts,
   type OutOfDateReason,
 } from '@/engine/fittings/fitCurrency';
@@ -89,16 +88,23 @@ export interface WorkbenchSde {
   gameTypeNames: () => Promise<readonly string[]>;
 }
 
+/** With the game's names unreadable, nothing is called removed on a guess. */
+const everyNameIsTheGames = (): boolean => true;
+
 /**
  * The game data, read once and shared; a failed read is retried next time.
- * An unreadable list of type names is `isGameItem: null`, not a failure.
+ * An unreadable list of type names counts every name as the game's (nothing
+ * is called removed on a guess), and is read again next time.
  */
 export function workbenchGameDataLoader(sde: WorkbenchSde): () => Promise<WorkbenchGameData> {
   let pending: Promise<WorkbenchGameData> | null = null;
-  const isGameItem = (): Promise<GameItemLookup> =>
+  const isGameItem = (): Promise<(name: string) => boolean> =>
     Promise.resolve()
       .then(sde.gameTypeNames)
-      .then(gameItemLookup, () => null);
+      .then(gameItemLookup, () => {
+        pending = null; // the rest is good; read the names again next time
+        return everyNameIsTheGames;
+      });
   return () => {
     // Started inside a `then`, so even a synchronous throw lands in the `catch`.
     pending ??= Promise.resolve()

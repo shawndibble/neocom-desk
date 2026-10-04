@@ -789,9 +789,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   fitted modules exactly match one of its hull's **Popular fit**s (the same
   grouping, so charges, drones and cargo don't count). Shows how many of the
   hull's recent losses flew that group and when it was last seen. A fit that
-  matches nothing, has any line that doesn't load cleanly (other than a line
-  written with a count, like a filament in cargo, naming an item the game still
-  has), or whose hull's losses can't be fetched shows nothing — never a warning.
+  matches nothing, has any line that doesn't load cleanly, or whose hull's losses
+  can't be fetched shows nothing — never a warning. The one exception is a line
+  written with a count (`x1`) naming an item the game still has but the app
+  can't read, such as a filament in cargo: it can't be a fitted module, so the
+  fit is still matched.
 - **Price History**: The Market Browser item tab charting one item's daily
   history in a Region: **Daily Range**, average price and its moving average
   above, **Traded Volume** and **Order Count** below, on one shared date axis.

@@ -89,7 +89,7 @@ describe('workbenchGameDataLoader', () => {
     const game = await workbenchGameDataLoader(sde())();
     expect(game.hullSlots(626)).toEqual({ high: 1, medium: 4, low: 5, rig: 3 });
     expect(game.hullSlots(627)).toBeNull();
-    expect(game.isGameItem?.('fierce exotic filament')).toBe(true);
+    expect(game.isGameItem('fierce exotic filament')).toBe(true);
   });
 
   it('reads the files once, however often it is asked', async () => {
@@ -100,12 +100,16 @@ describe('workbenchGameDataLoader', () => {
     expect(itemNames).toHaveBeenCalledTimes(1);
   });
 
-  it("without the game's names, leaves them unknown rather than failing", async () => {
-    const game = await workbenchGameDataLoader(
-      sde({ gameTypeNames: () => Promise.reject(new Error('offline')) })
-    )();
-    expect(game.isGameItem).toBeNull();
+  it("without the game's names, calls nothing removed, and reads them again next time", async () => {
+    const gameTypeNames = vi
+      .fn<WorkbenchSde['gameTypeNames']>()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue(['Vexor']);
+    const load = workbenchGameDataLoader(sde({ gameTypeNames }));
+    const game = await load();
+    expect(game.isGameItem('Old Gun I')).toBe(true);
     expect(game.hullSlots(626)).not.toBeNull();
+    expect((await load()).isGameItem('Old Gun I')).toBe(false);
   });
 
   it('fails without the catalogue, and tries again next time', async () => {

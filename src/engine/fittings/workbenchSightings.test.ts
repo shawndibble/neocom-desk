@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EftSlotLookup, EftTypeLookup } from './eftLoader';
-import { gameItemLookup, type GameItemLookup } from './fitCurrency';
+import { gameItemLookup } from './fitCurrency';
 import type { KillmailVictim } from './linkLoader';
 import { groupPopularFits, type HullLoss } from './popularFits';
 import { checkWorkbenchFit } from './workbenchFitCheck';
@@ -85,7 +85,10 @@ const GAME_ITEMS = gameItemLookup([
   'Gravid Warp Scrambler',
 ]);
 
-function checks(fits: { id: string; eft: string }[], isGameItem: GameItemLookup = GAME_ITEMS) {
+function checks(
+  fits: { id: string; eft: string }[],
+  isGameItem: (name: string) => boolean = GAME_ITEMS
+) {
   return new Map(
     fits.map(({ id, eft }) => [
       id,
@@ -102,7 +105,7 @@ function checks(fits: { id: string; eft: string }[], isGameItem: GameItemLookup 
 function match(
   fits: { id: string; eft: string }[],
   hullTypeId = HULL,
-  isGameItem: GameItemLookup = GAME_ITEMS
+  isGameItem: (name: string) => boolean = GAME_ITEMS
 ) {
   return matchWorkbenchSightings(checks(fits, isGameItem), POPULAR, hullTypeId);
 }
@@ -147,16 +150,14 @@ Medium Auxiliary Nano Pump I`;
     expect(match([{ id: 'h', eft: 'not a fit' }]).size).toBe(0);
   });
 
-  it('still matches a fit carrying an item the game has but the loader cannot read (#2536)', () => {
-    const filament = `${EFT}\nFierce Exotic Filament x3`;
-    expect(match([{ id: 'i', eft: filament }]).get('i')?.count).toBe(3);
+  const WITH_FILAMENT = `${EFT}\n\nFierce Exotic Filament x1`;
+
+  it('still matches a fit carrying a game item the catalog leaves out, like a filament in cargo', () => {
+    expect(match([{ id: 'i', eft: WITH_FILAMENT }]).get('i')?.count).toBe(3);
   });
 
-  it('leaves it out when that item is gone from the game, or nobody can tell', () => {
-    const gone = `${EFT}\nRetired Booster x1`;
-    expect(match([{ id: 'j', eft: gone }]).size).toBe(0);
-    const filament = `${EFT}\nFierce Exotic Filament x3`;
-    expect(match([{ id: 'k', eft: filament }], HULL, null).size).toBe(0);
+  it('leaves out a fit carrying an item the game no longer has', () => {
+    expect(match([{ id: 'j', eft: WITH_FILAMENT }], HULL, () => false).size).toBe(0);
   });
 
   it('leaves out a fit with an unread fitted module, even one the game still has', () => {
