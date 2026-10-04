@@ -4,6 +4,7 @@ import {
   avoidPreviewOutcome,
   candidateAvoid,
   effectiveAvoid,
+  listOnlyOutcome,
   type AvoidRules,
 } from './avoidRules';
 import { buildRouteSafetyRows } from './routeSafety';
@@ -156,5 +157,29 @@ describe('avoidPreviewOutcome', () => {
         systemId: 2,
       })
     ).toMatchObject({ jumps: 3, jumpDelta: 1 });
+  });
+});
+
+describe('listOnlyOutcome', () => {
+  const SYSTEMS = new Map([
+    [1, { id: 1, name: 'One', security: 0.9, regionId: 10 }],
+    [2, { id: 2, name: 'Two', security: 0.9, regionId: 10 }],
+    [3, { id: 3, name: 'Three', security: 0.9, regionId: 10 }],
+  ]);
+  const rows = (route: number[]) =>
+    buildRouteSafetyRows(route, {
+      systems: SYSTEMS,
+      regionNames: new Map(),
+      kills: null,
+      jumps: null,
+    });
+
+  it('leaves the trip as drawn: the switch stays off, so the list changes nothing', () => {
+    expect(listOnlyOutcome([rows([1, 2, 3]), rows([3, 2]), null])).toEqual({
+      jumps: 3,
+      jumpDelta: 0,
+      lowestSecurity: null,
+      stillCrosses: false,
+    });
   });
 });

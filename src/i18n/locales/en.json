@@ -7735,13 +7735,15 @@
       "becomesLowest_one": "The route becomes {{count}} jump ({{delta}}), lowest {{security}}",
       "becomesLowest_other": "The route becomes {{count}} jumps ({{delta}}), lowest {{security}}",
       "noWayAround": "There's no way around {{name}} on this trip. Avoiding a system makes it cost more, never closes it, so the route still goes through it.",
-      "switchedOff": "Avoided Systems is switched off, so routes don't use your list right now. This preview counts it switched on, with every system already on the list.",
+      "switchedOff": "Avoided Systems is switched off, so routes ignore your list until you switch it on. Each choice below shows what it does to this route.",
       "appWide": "{{name}} goes on your Avoided Systems, one of your travel settings: jump counts change everywhere in the app, not only on this route.",
       "unknown": "The route with {{name}} avoided can't be worked out right now.",
       "noRoute": "No stargate route connects these systems with {{name}} avoided.",
       "confirm": "Avoid {{name}}",
       "confirmSwitchOn": "Switch on and avoid",
-      "addOnly": "Add to the list only"
+      "addOnly": "Add to the list only",
+      "listOnlyUnchanged_one": "The route stays at {{count}} jump ({{delta}}): the list is still off",
+      "listOnlyUnchanged_other": "The route stays at {{count}} jumps ({{delta}}): the list is still off"
     },
     "kills": {
       "loading": "Loading zKillboard kills…",

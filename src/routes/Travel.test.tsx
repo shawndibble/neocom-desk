@@ -651,6 +651,7 @@ describe('Travel › Route Safety › Route rules', () => {
       await within(dialog).findByText('The route becomes 2 jumps (+0), lowest 0.5')
     ).toBeInTheDocument();
     expect(within(dialog).getByText(/no way around Perimeter/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/the list is still off/)).not.toBeInTheDocument();
     expect(
       within(dialog).getByText(/jump counts change everywhere in the app/)
     ).toBeInTheDocument();
@@ -672,6 +673,13 @@ describe('Travel › Route Safety › Route rules', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Avoid Perimeter?' });
     expect(within(dialog).getByText(/Avoided Systems is switched off/)).toBeInTheDocument();
     await within(dialog).findByText(/The route becomes 2 jumps/);
+    // Each button carries its own outcome.
+    const switchOn = within(dialog).getByRole('group', { name: 'Switch on and avoid' });
+    expect(within(switchOn).getByText(/The route becomes 2 jumps/)).toBeInTheDocument();
+    const listOnly = within(dialog).getByRole('group', { name: 'Add to the list only' });
+    expect(
+      within(listOnly).getByText(/The route stays at 2 jumps \(\+0\): the list is still off/)
+    ).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole('button', { name: 'Switch on and avoid' }));
 

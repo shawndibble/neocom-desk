@@ -119,3 +119,17 @@ export function avoidPreviewOutcome(input: {
     stillCrosses: input.next.some((rows) => rows?.some((row) => row.systemId === input.systemId)),
   };
 }
+
+/**
+ * The outcome of adding the system to the list with the Avoided Systems
+ * switch left off: the list does nothing to routes, so the trip is the one
+ * already drawn, +0.
+ */
+export function listOnlyOutcome(current: TripLegRows): AvoidPreviewOutcome {
+  return {
+    jumps: tripSummary(current).jumps,
+    jumpDelta: 0,
+    lowestSecurity: null,
+    stillCrosses: false,
+  };
+}
