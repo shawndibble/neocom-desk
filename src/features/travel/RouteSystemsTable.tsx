@@ -70,10 +70,11 @@ function withHoleSteps(rows: readonly RouteSafetyTripRow[]): TableRow[] {
   const out: TableRow[] = [];
   rows.forEach((row, index) => {
     const previous = rows[index - 1];
-    if (previous && row.entry?.kind === 'hole') {
-      out.push({ from: previous, to: row, hole: row.entry.hole });
-    } else if (previous && row.entry?.kind === 'bridge') {
-      out.push({ from: previous, to: row, bridge: row.entry.gate });
+    if (previous) {
+      if (row.entry?.kind === 'hole') out.push({ from: previous, to: row, hole: row.entry.hole });
+      else if (row.entry?.kind === 'bridge') {
+        out.push({ from: previous, to: row, bridge: row.entry.gate });
+      }
     }
     out.push(row);
   });

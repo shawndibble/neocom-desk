@@ -21,10 +21,29 @@ import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { Tooltip } from '@/components/ui';
 import { routeStripKeySystems, type RouteSafetyRow } from '@/engine/route/routeSafety';
+import { stepJumps } from '@/engine/route/routeSafetyTrip';
 import { securityStatusColor } from '@/engine/securityStatus';
 import { routeSystemName } from './routeSystemName';
 import type { RouteKillsCell } from './useRouteKills';
 import type { RouteSafetyTripRow } from './useRouteSafety';
+
+/**
+ * The cell a hole or bridge jump draws between its two systems. A bridge
+ * takes the bridge row's dashed line, top and bottom only: a full box would
+ * read as a control.
+ */
+const STEP_CELL = {
+  hole: {
+    tip: 'travel.holes.stripCell',
+    testId: 'route-strip-hole',
+    className: 'route-strip-hole',
+  },
+  bridge: {
+    tip: 'travel.bridges.stripCell',
+    testId: 'route-strip-bridge',
+    className: 'border-y border-dashed border-line-bright',
+  },
+} as const;
 
 function securityText(row: RouteSafetyRow): string {
   return row.security === null ? '—' : row.security.toFixed(1);
@@ -65,10 +84,7 @@ export function RouteStrip({
         })
       : t('travel.strip.system', { name: routeSystemName(row), security: securityText(row) });
   const withKills = rows.filter((row) => hasKills(row, killsOf(row.systemId)));
-  const jumpsBy = (kind: 'hole' | 'bridge') =>
-    rows.filter((row) => row.entry?.kind === kind).length;
-  const holeJumps = jumpsBy('hole');
-  const bridgeJumps = jumpsBy('bridge');
+  const { holeJumps, bridgeJumps } = stepJumps(rows);
   const label = [
     t('travel.strip.label', {
       count: rows.length,
@@ -94,32 +110,19 @@ export function RouteStrip({
           const kills = withKills.includes(row);
           const tip = [describe(row), ...(kills ? [t('travel.strip.kills')] : [])].join('\n');
           const previous = rows[index - 1];
+          const step = row.entry && row.entry.kind !== 'gate' ? STEP_CELL[row.entry.kind] : null;
           return (
             <Fragment key={index}>
-              {row.entry?.kind === 'hole' && previous && (
+              {step && previous && (
                 <Tooltip
-                  content={t('travel.holes.stripCell', {
+                  content={t(step.tip, {
                     from: routeSystemName(previous),
                     to: routeSystemName(row),
                   })}
                 >
                   <span
-                    data-testid="route-strip-hole"
-                    className="route-strip-hole min-w-0 flex-1 rounded-[1px] bg-panel-2"
-                  />
-                </Tooltip>
-              )}
-              {row.entry?.kind === 'bridge' && previous && (
-                <Tooltip
-                  content={t('travel.bridges.stripCell', {
-                    from: routeSystemName(previous),
-                    to: routeSystemName(row),
-                  })}
-                >
-                  {/* The bridge row's dashed line, top and bottom only: a full box would read as a control. */}
-                  <span
-                    data-testid="route-strip-bridge"
-                    className="min-w-0 flex-1 rounded-[1px] border-y border-dashed border-line-bright bg-panel-2"
+                    data-testid={step.testId}
+                    className={`min-w-0 flex-1 rounded-[1px] bg-panel-2 ${step.className}`}
                   />
                 </Tooltip>
               )}

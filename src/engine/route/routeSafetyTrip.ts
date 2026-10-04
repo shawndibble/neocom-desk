@@ -233,6 +233,20 @@ export type RouteSafetyAssembly =
 
 const GATE_STEP: RouteStep = { kind: 'gate' };
 
+/** How many of a route's rows were entered through a hole, and how many over a bridge. */
+export function stepJumps(rows: readonly Pick<RouteSafetyTripRow, 'entry'>[]): {
+  holeJumps: number;
+  bridgeJumps: number;
+} {
+  let holeJumps = 0;
+  let bridgeJumps = 0;
+  for (const { entry } of rows) {
+    if (entry?.kind === 'hole') holeJumps += 1;
+    else if (entry?.kind === 'bridge') bridgeJumps += 1;
+  }
+  return { holeJumps, bridgeJumps };
+}
+
 /**
  * How each step of a route was flown. A step a stargate joins is a gate jump,
  * whatever else joins it. A step nothing known joins reads as a gate too:
@@ -285,6 +299,13 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
     regionNames: input.regionNames,
     kills: activity?.kills ?? null,
     jumps: activity?.jumps ?? null,
+  };
+  const tagRows = (systems: readonly number[]): RouteSafetyTripRow[] => {
+    const steps = stepsOn(systems);
+    return buildRouteSafetyRows(systems, inputs).map((row, at) => ({
+      ...row,
+      entry: steps[at] ?? null,
+    }));
   };
   const summaryOf = (systems: readonly number[]) =>
     summarizeRouteSafety(buildRouteSafetyRows(systems, inputs));
@@ -359,14 +380,7 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
       ...listedWays.filter((way) => !way.inUse),
     ];
 
-    const steps = flown === null ? [] : stepsOn(flown);
-    const rows =
-      flown === null
-        ? null
-        : buildRouteSafetyRows(flown, inputs).map((row, at): RouteSafetyTripRow => ({
-            ...row,
-            entry: steps[at] ?? null,
-          }));
+    const rows = flown === null ? null : tagRows(flown);
     return {
       from: leg.from,
       to: leg.to,
@@ -382,14 +396,11 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
   let tripFacts: RouteSafetyTrip | null = null;
   if (legRows.length === legs.length) {
     const joined = joinLegs(legRows);
-    const jumpsBy = (kind: RouteStep['kind']) =>
-      joined.rows.filter((row) => row.entry?.kind === kind).length;
     tripFacts = {
       rows: joined.rows,
       stopIndexes: joined.stopIndexes,
       summary: summarizeTrip(legRows),
-      holeJumps: jumpsBy('hole'),
-      bridgeJumps: jumpsBy('bridge'),
+      ...stepJumps(joined.rows),
     };
   }
   return {
