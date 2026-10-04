@@ -4,7 +4,9 @@
  * `engine/fittings/workbenchSightings.ts`. The losses come from
  * `loadPopularFits` — the zKillboard tab's own load, cached and shared per
  * hull — so the badges never cost a zKillboard request of their own. If
- * zKillboard can't be reached the answer is simply "no badges".
+ * zKillboard can't be reached the answer is simply "no badges". An item the
+ * catalog can't read is checked against the game's full list of names, as the
+ * Out-of-date check does (`loadGameItemNames`).
  */
 import { useEffect, useState } from 'react';
 import {
@@ -14,6 +16,7 @@ import {
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadFittingSlots } from '@/sde/loadSde';
 import { loadPopularFits } from './popularFits';
+import { loadGameItemNames } from './workbenchFitCurrency';
 import type { WorkbenchFit } from './workbenchFits';
 
 const NONE: ReadonlyMap<string, WorkbenchSighting> = new Map();
@@ -27,8 +30,19 @@ export async function loadWorkbenchSightings(
   try {
     const popular = await loadPopularFits(shipTypeId);
     if (!popular.ok || popular.fits.length === 0) return NONE;
-    const [typeByName, slotByTypeId] = await Promise.all([loadItemNameMap(), loadFittingSlots()]);
-    return matchWorkbenchSightings(fits, popular.fits, shipTypeId, typeByName, slotByTypeId);
+    const [typeByName, slotByTypeId, isGameItem] = await Promise.all([
+      loadItemNameMap(),
+      loadFittingSlots(),
+      loadGameItemNames(),
+    ]);
+    return matchWorkbenchSightings(
+      fits,
+      popular.fits,
+      shipTypeId,
+      typeByName,
+      slotByTypeId,
+      isGameItem
+    );
   } catch {
     return NONE;
   }
