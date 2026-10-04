@@ -142,10 +142,13 @@ export interface DataTableColumn<T> {
    * 11px meta line, where a control is neither tappable nor readable. A
    * `start` cell (a row-selection checkbox) is centred across both lines; an
    * `end` cell (Hauling's Bring box) closes the second line at its right end,
-   * leaving the title line its full width. At most one column per edge;
-   * elsewhere (the labelled stack, the table) it is an ordinary cell.
+   * leaving the title line its full width. A `below` cell takes a third line
+   * of its own under the meta line, for a value and its control that would
+   * crowd line two (Thera's signature pair and Copy button). At most one
+   * column per edge; elsewhere (the labelled stack, the table) it is an
+   * ordinary cell.
    */
-  stackEdge?: 'start' | 'end';
+  stackEdge?: 'start' | 'end' | 'below';
 }
 
 /**

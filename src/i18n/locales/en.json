@@ -2940,7 +2940,8 @@
         "total": "Total, highest first",
         "toBuy": "To buy, most first",
         "name": "Name, A to Z"
-      }
+      },
+      "at": "@"
     }
   },
   "login": {
@@ -7569,10 +7570,19 @@
       "changeOrigin": "Change the system jumps are counted from — {{current}}",
       "hubLabel": "Hub",
       "fitsLabel": "Fits",
+      "exitLabel": "Exit",
+      "hubOption": "{{hub}} {{count}}",
       "hub": {
         "all": "Both",
         "thera": "Thera",
         "turnur": "Turnur"
+      },
+      "exit": {
+        "kspace": "K-space",
+        "highsec": "Highsec",
+        "lowsec": "Lowsec",
+        "nullsec": "Nullsec",
+        "wormhole": "J-space"
       },
       "fits": {
         "any": "Any",
@@ -7589,32 +7599,29 @@
         "xlarge": "Very large",
         "capital": "Capital"
       },
-      "band": {
-        "highsec": "Highsec",
-        "lowsec": "Lowsec",
-        "nullsec": "Nullsec",
-        "wormhole": "J-space"
+      "col": {
+        "exit": "Exit system",
+        "security": "Sec",
+        "region": "Region",
+        "fits": "Fits",
+        "life": "Life left",
+        "jumps": "Jumps",
+        "signature": "Signature"
       },
-      "bandTabsLabel": "Where the holes come out",
-      "bandTab": {
-        "highsec": "High {{count}}",
-        "lowsec": "Low {{count}}",
-        "nullsec": "Null {{count}}",
-        "wormhole": "J {{count}}"
+      "tableLabel": "Open holes out of Thera and Turnur",
+      "jspaceTableLabel": "Open holes into J-space",
+      "jspaceGroup_one": "{{count}} exit into J-space · no gate route from you",
+      "jspaceGroup_other": "{{count}} exits into J-space · no gate route from you",
+      "fitsAffix": "Fits ",
+      "lifeAffix": " left",
+      "jumpsUnit_one": "jump",
+      "jumpsUnit_other": "jumps",
+      "detail": {
+        "type": "Type {{type}}",
+        "signatures": "enter at {{hubSignature}} in {{hub}}, leave at {{exitSignature}}",
+        "zkillboard": "zKillboard ↗",
+        "zkillboardLabel": "{{system}} on zKillboard (opens in a new tab)"
       },
-      "emptyBand": {
-        "highsec": "No open holes into highsec right now",
-        "lowsec": "No open holes into lowsec right now",
-        "nullsec": "No open holes into nullsec right now",
-        "wormhole": "No open holes into J-space right now"
-      },
-      "maxSize": "Up to {{size}}",
-      "lifeLeft": "{{time}} left",
-      "jumps_one": "{{count}} jump",
-      "jumps_other": "{{count}} jumps",
-      "jumpsBlank": "— jumps",
-      "wormholeType": "Wormhole type {{type}}",
-      "hubSignature": "{{hub}} sig",
       "copy": "Copy",
       "copied": "Copied",
       "copySignature": "Copy {{hub}} signature for {{system}}",
@@ -7627,7 +7634,8 @@
       "emptyTitle": "EVE-Scout lists no open connections right now",
       "emptyHint": "Scouts add connections as they find them. Check back later.",
       "noMatchTitle": "No connections match these filters",
-      "noMatchHint": "Widen the hub or ship size filter.",
+      "noMatchHint": "Widen the hub, exit or ship size filter.",
+      "noKspaceMatchTitle": "No holes into K-space match these filters",
       "unavailableTitle": "Connections can't be loaded right now",
       "unavailableHint": "EVE-Scout couldn't be reached. Check your connection and try again.",
       "dataAgeNote": "Connections come from EVE-Scout's volunteer scouts and are refreshed every 5 minutes."

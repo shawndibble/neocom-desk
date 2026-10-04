@@ -889,6 +889,19 @@ describe('DataTable opt-in phone features', () => {
       expect(amount).toHaveClass('dt-meta', 'dt-meta-first');
     });
 
+    it('puts a below stackEdge cell on its own line under the meta line', () => {
+      renderTable({
+        columns: [
+          ...denseColumns,
+          { id: 'copy', header: 'Copy', stackEdge: 'below', render: () => 'copy' },
+        ],
+        stackLayout: 'dense',
+      });
+      const copy = screen.getAllByRole('cell').at(-1);
+      expect(copy).toHaveClass('dt-edge', 'dt-edge-below');
+      expect(copy).not.toHaveClass('dt-meta');
+    });
+
     it('leaves stackEdge cells as plain cells outside the dense stack', () => {
       renderTable({
         columns: [

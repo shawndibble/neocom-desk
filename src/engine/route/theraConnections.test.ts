@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildTheraConnectionRows,
+  countTheraConnectionsByHub,
   filterTheraConnections,
-  groupTheraConnectionsByBand,
   jumpsSortValue,
-  type ConnectionDistances,
+  longestLifeFirst,
+  THERA_EXITS,
   type TheraConnection,
+  type TheraExit,
 } from './theraConnections';
 
 const NOW = Date.parse('2026-09-30T09:00:00Z');
@@ -215,93 +217,86 @@ describe('jumpsSortValue', () => {
   });
 });
 
-describe('groupTheraConnectionsByBand', () => {
-  const build = (connections: TheraConnection[], distances: ConnectionDistances) =>
-    groupTheraConnectionsByBand(
-      buildTheraConnectionRows(connections, { now: NOW, systems: SYSTEMS, distances })
-    );
-  const idsOf = (rows: readonly { id: string }[]) => rows.map((row) => row.id);
-
-  it('puts each exit in the column for the space it comes out in', () => {
-    const bands = build(
-      [
-        connection({ id: 'hs' }),
-        connection({ id: 'shown-hs', exitSystemId: 30003807, exitClass: 'ls' }),
-        connection({ id: 'ls', exitSystemId: 9, exitClass: 'ls' }),
-        connection({ id: 'ns', exitSystemId: 30004629, exitClass: 'ns' }),
-        connection({
-          id: 'c2',
-          exitSystemId: 31000629,
-          exitSystemName: 'J120704',
-          exitClass: 'c2',
-        }),
-      ],
-      NO_ORIGIN
-    );
-    expect({
-      highsec: idsOf(bands.highsec),
-      lowsec: idsOf(bands.lowsec),
-      nullsec: idsOf(bands.nullsec),
-      wormhole: idsOf(bands.wormhole),
-    }).toEqual({
-      highsec: ['hs', 'shown-hs'],
-      lowsec: ['ls'],
-      nullsec: ['ns'],
-      wormhole: ['c2'],
-    });
-  });
-
-  it('leaves out an exit whose space nothing can tell', () => {
-    const bands = build([connection({ id: 'none', exitSystemId: 3, exitClass: null })], NO_ORIGIN);
-    expect(Object.values(bands).flat()).toEqual([]);
-  });
-
-  it('sorts a k-space column nearest first, then longest life, with no known distance last', () => {
-    const bands = build(
-      [
-        connection({ id: 'island', exitSystemId: 11, exitClass: 'hs' }),
-        connection({ id: 'far', exitSystemId: 12, exitClass: 'hs' }),
-        connection({ id: 'near-short', exitSystemId: 13, exitClass: 'hs', expiresAt: NOW + HOUR }),
-        connection({
-          id: 'near-long',
-          exitSystemId: 14,
-          exitClass: 'hs',
-          expiresAt: NOW + 9 * HOUR,
-        }),
-      ],
-      {
-        kind: 'known',
-        jumps: new Map([
-          [12, 9],
-          [13, 2],
-          [14, 2],
-        ]),
-      }
-    );
-    expect(idsOf(bands.highsec)).toEqual(['near-long', 'near-short', 'far', 'island']);
-  });
-
-  it('sorts a k-space column by remaining life when no jumps are known', () => {
-    const bands = build(
-      [
-        connection({ id: 'short', expiresAt: NOW + HOUR }),
-        connection({ id: 'long', expiresAt: NOW + 9 * HOUR }),
-      ],
-      NO_ORIGIN
-    );
-    expect(idsOf(bands.highsec)).toEqual(['long', 'short']);
-  });
-
-  it('sorts the J-space column by remaining life, longest first', () => {
-    const jspace = (id: string, hours: number) =>
+describe('filterTheraConnections by exit', () => {
+  const rows = buildTheraConnectionRows(
+    [
+      connection({ id: 'hs' }),
+      connection({ id: 'shown-hs', exitSystemId: 30003807, exitClass: 'ls' }),
+      connection({ id: 'ls', exitSystemId: 9, exitClass: 'ls' }),
+      connection({ id: 'ns', exitSystemId: 30004629, exitClass: 'ns' }),
       connection({
-        id,
+        id: 'c2',
         exitSystemId: 31000629,
         exitSystemName: 'J120704',
         exitClass: 'c2',
-        expiresAt: NOW + hours * HOUR,
-      });
-    const bands = build([jspace('3h', 3), jspace('12h', 12), jspace('1h', 1)], NO_ORIGIN);
-    expect(idsOf(bands.wormhole)).toEqual(['12h', '3h', '1h']);
+      }),
+      connection({ id: 'untold', exitSystemId: 3, exitClass: null }),
+    ],
+    { now: NOW, systems: SYSTEMS, distances: NO_ORIGIN }
+  );
+  const ids = (exit: TheraExit) =>
+    filterTheraConnections(rows, { hub: 'all', shipSize: 'any', exit }).map((row) => row.id);
+
+  it('keeps every exit outside J-space under K-space, one whose band nothing can tell included', () => {
+    expect(ids('kspace')).toEqual(['hs', 'shown-hs', 'ls', 'ns', 'untold']);
+  });
+
+  it('keeps one band, on the security the exit shows', () => {
+    expect(ids('highsec')).toEqual(['hs', 'shown-hs']);
+    expect(ids('lowsec')).toEqual(['ls']);
+    expect(ids('nullsec')).toEqual(['ns']);
+  });
+
+  it('keeps only J-space exits under J-space', () => {
+    expect(ids('wormhole')).toEqual(['c2']);
+  });
+
+  it('offers K-space first, then each band', () => {
+    expect(THERA_EXITS).toEqual(['kspace', 'highsec', 'lowsec', 'nullsec', 'wormhole']);
+  });
+});
+
+describe('countTheraConnectionsByHub', () => {
+  const rows = buildTheraConnectionRows(
+    [
+      connection({ id: 'thera-hs' }),
+      connection({ id: 'thera-hs-capital', maxShipSize: 'capital' }),
+      connection({ id: 'turnur-hs', hub: 'turnur' }),
+      connection({
+        id: 'turnur-c2',
+        hub: 'turnur',
+        exitSystemId: 31000629,
+        exitSystemName: 'J120704',
+        exitClass: 'c2',
+      }),
+    ],
+    { now: NOW, systems: SYSTEMS, distances: NO_ORIGIN }
+  );
+
+  it('counts each hub under the exit and ship size filters, whichever hub is picked', () => {
+    expect(
+      countTheraConnectionsByHub(rows, { hub: 'thera', shipSize: 'any', exit: 'kspace' })
+    ).toEqual({ all: 3, thera: 2, turnur: 1 });
+    expect(
+      countTheraConnectionsByHub(rows, { hub: 'all', shipSize: 'capital', exit: 'kspace' })
+    ).toEqual({ all: 1, thera: 1, turnur: 0 });
+    expect(
+      countTheraConnectionsByHub(rows, { hub: 'all', shipSize: 'any', exit: 'wormhole' })
+    ).toEqual({ all: 1, thera: 0, turnur: 1 });
+  });
+});
+
+describe('longestLifeFirst', () => {
+  it('orders rows by remaining life, longest first, then by exit name', () => {
+    const rows = buildTheraConnectionRows(
+      [
+        connection({ id: '3h', expiresAt: NOW + 3 * HOUR }),
+        connection({ id: '12h-b', exitSystemName: 'B', expiresAt: NOW + 12 * HOUR }),
+        connection({ id: '12h-a', exitSystemName: 'A', expiresAt: NOW + 12 * HOUR }),
+        connection({ id: '1h', expiresAt: NOW + HOUR }),
+      ],
+      { now: NOW, systems: SYSTEMS, distances: NO_ORIGIN }
+    );
+    expect(longestLifeFirst(rows).map((row) => row.id)).toEqual(['12h-a', '12h-b', '3h', '1h']);
   });
 });
