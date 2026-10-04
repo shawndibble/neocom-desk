@@ -110,6 +110,20 @@ describe('findSessionContinuations', () => {
     expect(findSessionContinuations(rows)).toEqual([]);
   });
 
+  it('looks past a dismissed slice of the previous day', () => {
+    const owed = assignment('2026-10-03');
+    const rows = flatten([
+      row('2026-10-03', [
+        owed,
+        assignment('2026-10-03', { payeeId: undefined, status: 'dismissed', id: 'dismissed' }),
+      ]),
+      row('2026-10-04', []),
+    ]);
+    const found = findSessionContinuations(rows);
+    expect(found.map((c) => c.previous.id)).toEqual([owed.id]);
+    expect(found[0].payeeId).toBe('st');
+  });
+
   it('only offers a day nobody has assigned any of', () => {
     const rows = flatten([
       row('2026-10-03', [assignment('2026-10-03')]),

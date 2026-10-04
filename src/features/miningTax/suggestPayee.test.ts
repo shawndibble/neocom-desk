@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import { suggestPayeeForSystem } from './suggestPayee';
+import { suggestPayeeForSystem, systemsByPayee } from './suggestPayee';
 
 const AINSAN = 30001;
 const TALIDAL = 30002;
@@ -50,6 +50,7 @@ describe('suggestPayeeForSystem', () => {
       AINSAN
     );
     expect(result.suggested?.id).toBe('ion');
+    expect(result.fromHistory).toBe(true);
   });
 
   it('ranks the rest by how often they were used in that system, then by name', () => {
@@ -93,6 +94,7 @@ describe('suggestPayeeForSystem', () => {
     const remembered = payee('pl', 'Plenitude Highsec Police', { systemId: TALIDAL });
     const result = suggestPayeeForSystem([], [...payees, remembered], TALIDAL);
     expect(result.suggested?.id).toBe('pl');
+    expect(result.fromHistory).toBe(false);
     expect(result.ranked[0].id).toBe('pl');
   });
 
@@ -106,13 +108,19 @@ describe('suggestPayeeForSystem', () => {
       'Star Tail Industries',
     ]);
   });
+});
 
-  it('lists the systems each Payee has been used in', () => {
-    const result = suggestPayeeForSystem(
-      [assigned('st', '2026-09-01'), assigned('st', '2026-09-02', TALIDAL)],
-      payees,
-      AINSAN
+describe('systemsByPayee', () => {
+  it('lists the systems each Payee has been used in, ignoring dismissals', () => {
+    const systems = systemsByPayee(
+      [
+        assigned('st', '2026-09-01'),
+        assigned('st', '2026-09-02', TALIDAL),
+        assigned(undefined, '2026-09-03', 30009, { status: 'dismissed' }),
+      ],
+      payees
     );
-    expect([...(result.systemsByPayee.get('st') ?? [])].sort()).toEqual([AINSAN, TALIDAL]);
+    expect([...(systems.get('st') ?? [])].sort()).toEqual([AINSAN, TALIDAL]);
+    expect(systems.size).toBe(1);
   });
 });

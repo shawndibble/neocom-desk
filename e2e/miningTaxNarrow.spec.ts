@@ -506,8 +506,8 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
  * long enough to fill the column was pushing Status and the row's edit
  * affordance off-screen at 1024px, the narrowest width the table's `md:`
  * layout (not the phone stacked-card) has to support. The fix truncates the
- * `payee` column (`sm:max-w-[9rem]`, wider from `lg` and again from 1200px,
- * where a name like "Bureau of Unified Harvesting" fits) with an ellipsis, same shape as
+ * `payee` column (the one flexible column of a fixed-layout table, so it
+ * takes what the others leave and truncates past that) with an ellipsis, same shape as
  * Market's `location` column/`LocationCell`, so the full name stays
  * discoverable via the app's `Tooltip` rather than being lost outright.
  */

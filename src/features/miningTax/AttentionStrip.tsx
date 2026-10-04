@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Caret } from '@/components/ui';
+import { Disclosure } from '@/components/ui';
 import { cx } from '@/lib/cx';
 
 export interface AttentionItem {
@@ -35,41 +35,37 @@ export function AttentionStrip({ items }: { items: readonly AttentionItem[] }) {
         warning ? 'border-warning/60 bg-warning/10' : 'border-line bg-panel-2'
       )}
     >
-      <button
-        type="button"
-        aria-expanded={expanded}
-        onClick={() => setExpanded(!expanded)}
-        className={cx(
-          'flex min-h-11 w-full items-center gap-2 px-2.5 py-1.5 text-left font-semibold uppercase focus-visible:outline-2 focus-visible:outline-accent md:min-h-0',
-          warning ? 'text-warning' : 'text-text'
-        )}
+      <Disclosure
+        expanded={expanded}
+        onToggle={() => setExpanded(!expanded)}
+        label={
+          <span className={warning ? 'text-warning' : 'text-text'}>
+            {t('miningTax.attention.title', { count: items.length })}
+          </span>
+        }
+        trailing={
+          <span className="font-normal text-text-dim">
+            {expanded ? t('miningTax.attention.hide') : t('miningTax.attention.show')}
+          </span>
+        }
       >
-        <Caret expanded={expanded} />
-        <span className="flex-1">{t('miningTax.attention.title', { count: items.length })}</span>
-        <span className="text-[0.6875rem] font-medium tracking-wider text-text-dim normal-case">
-          {expanded ? t('miningTax.attention.hide') : t('miningTax.attention.show')}
-        </span>
-      </button>
-      {expanded && (
-        <ul className="divide-y divide-line border-t border-line">
-          {items.map((item) => (
-            <li key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-1.5 px-2.5 py-2">
-              <div className="min-w-0 flex-1 space-y-1">
-                <p
-                  className={cx(
-                    'font-semibold',
-                    item.tone === 'warning' ? 'text-warning' : 'text-text'
-                  )}
-                >
-                  {item.title}
-                </p>
-                {item.detail && <div className="space-y-1 text-text-dim">{item.detail}</div>}
-              </div>
-              {item.action && <div className="flex shrink-0 flex-wrap gap-1.5">{item.action}</div>}
-            </li>
-          ))}
-        </ul>
-      )}
+        {items.map((item) => (
+          <div key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-1.5 px-2.5 py-2">
+            <div className="min-w-0 flex-1 space-y-1">
+              <p
+                className={cx(
+                  'font-semibold',
+                  item.tone === 'warning' ? 'text-warning' : 'text-text'
+                )}
+              >
+                {item.title}
+              </p>
+              {item.detail && <div className="space-y-1 text-text-dim">{item.detail}</div>}
+            </div>
+            {item.action && <div className="flex shrink-0 flex-wrap gap-1.5">{item.action}</div>}
+          </div>
+        ))}
+      </Disclosure>
     </section>
   );
 }

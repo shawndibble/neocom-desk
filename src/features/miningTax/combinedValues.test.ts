@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord } from '@/db';
-import { combinedLineDefaults } from './combinedValues';
+import { combinedDayValues, combinedLineDefaults } from './combinedValues';
 
 const Z = 45490;
 const B = 45492;
@@ -48,5 +48,31 @@ describe('combinedLineDefaults', () => {
     const lines = combinedLineDefaults(day(), new Map());
     expect(lines.get(Z)).toBeCloseTo(250);
     expect(lines.get(B)).toBeCloseTo(750);
+  });
+});
+
+describe('combinedDayValues', () => {
+  const defaults = new Map([
+    [Z, 400],
+    [B, 600],
+  ]);
+
+  it('keeps an untouched day exactly as billed, tax owed included', () => {
+    expect(combinedDayValues(day({ taxOwed: 49.6 }), {}, defaults, 5)).toEqual({
+      estimatedValue: 1000,
+      taxOwed: 49.6,
+    });
+  });
+
+  it('re-derives an untouched day’s tax only when the rate changed', () => {
+    expect(combinedDayValues(day(), {}, defaults, 8).taxOwed).toBeCloseTo(80);
+  });
+
+  it('re-totals an edited day from its lines and remembers them', () => {
+    expect(combinedDayValues(day(), { [Z]: 1000 }, defaults, 5)).toEqual({
+      estimatedValue: 1600,
+      taxOwed: 80,
+      oreLineValues: { [Z]: 1000, [B]: 600 },
+    });
   });
 });

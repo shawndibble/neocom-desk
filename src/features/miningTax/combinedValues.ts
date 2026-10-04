@@ -27,3 +27,40 @@ export function combinedLineDefaults(
     })
   );
 }
+
+export interface CombinedDayValues {
+  estimatedValue: number;
+  taxOwed: number;
+  oreLineValues?: Record<number, number>;
+}
+
+/**
+ * One day's figures as the combined edit form would save them. A day with no
+ * edited line keeps the value it was billed at, and its tax owed too unless
+ * the rate changed; an edited day is re-totalled from its lines — the edited
+ * ones as typed, the rest at their `lineDefaults` share — and stores them as
+ * its per-ore corrections.
+ */
+export function combinedDayValues(
+  assignment: MiningTaxAssignmentRecord,
+  edits: Readonly<Record<number, number>>,
+  lineDefaults: ReadonlyMap<number, number>,
+  taxPct: number
+): CombinedDayValues {
+  if (Object.keys(edits).length === 0) {
+    return {
+      estimatedValue: assignment.estimatedValue,
+      taxOwed:
+        taxPct === assignment.taxPct
+          ? assignment.taxOwed
+          : (assignment.estimatedValue * taxPct) / 100,
+      ...(assignment.oreLineValues ? { oreLineValues: assignment.oreLineValues } : {}),
+    };
+  }
+  const oreLineValues: Record<number, number> = {};
+  for (const line of assignment.oreLines) {
+    oreLineValues[line.typeId] = edits[line.typeId] ?? lineDefaults.get(line.typeId) ?? 0;
+  }
+  const estimatedValue = Object.values(oreLineValues).reduce((sum, v) => sum + v, 0);
+  return { estimatedValue, taxOwed: (estimatedValue * taxPct) / 100, oreLineValues };
+}

@@ -215,7 +215,7 @@ here — they go one per file in `docs/context/decisions/`.
   ore and value. The UI word is "Combine" (never "Join") for making one, "Take
   out of combined" for removing a day without unassigning it, and "Continue
   the <date> session" for the one-tap offer that combines a new day into the
-  previous day's owed entry (see the 20261004 scope decision).
+  previous day's owed entry (see `docs/context/decisions/20261004-135551-mining-tax-redesign-owed-first-combined-entries-edit.md`).
 - **Compare**: A resizable bottom drawer over the **Compare Set**, not a tab
   — it opens beside the order book rather than covering it, since comparing
   happens _while_ browsing. Two views: Prices (best sell, best buy, spread

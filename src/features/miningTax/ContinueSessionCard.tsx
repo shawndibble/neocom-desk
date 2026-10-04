@@ -67,10 +67,10 @@ export function ContinueSessionCard({
           <Button variant="primary" disabled={busy} onClick={onContinue}>
             {t('miningTax.continue.action', { date: previous.date })}
           </Button>
-          <Button size="sm" disabled={busy} onClick={onChooseOther}>
+          <Button disabled={busy} onClick={onChooseOther}>
             {t('miningTax.continue.otherPayee')}
           </Button>
-          <Button size="sm" variant="ghost" disabled={busy} onClick={onKeepSeparate}>
+          <Button variant="ghost" disabled={busy} onClick={onKeepSeparate}>
             {t('miningTax.continue.keepSeparate')}
           </Button>
         </div>

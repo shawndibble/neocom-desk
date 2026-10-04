@@ -6,6 +6,7 @@ import {
   Disclosure,
   FilterChip,
   Modal,
+  IskInput,
   TextInput,
   textActionClassName,
 } from '@/components/ui';
@@ -18,7 +19,7 @@ import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
 import { unmaskNumber } from '@/lib/numberMask';
 import { markAssignmentsPaid, type PaymentInput } from './assignments';
-import { buildSettleUpReason } from './groupRows';
+import { buildSettleUpReason, formatDateRange } from './groupRows';
 import { allocateOldestFirst } from './settleAllocation';
 
 export interface SettleUpRow {
@@ -44,23 +45,10 @@ interface SettleUpDialogProps {
 
 const METHODS: readonly MiningTaxPaymentMethod[] = ['donation', 'contract', 'other'];
 
-const shortDateFormat = new Intl.DateTimeFormat('en', {
-  month: 'short',
-  day: 'numeric',
-  timeZone: 'UTC',
-});
-
-/** "Sep 30" for an EVE `YYYY-MM-DD` date — read in UTC so the day never shifts. */
-function shortEveDate(date: string): string {
-  const parsed = new Date(`${date}T00:00:00Z`);
-  return Number.isNaN(parsed.getTime()) ? date : shortDateFormat.format(parsed);
-}
-
+/** The summary line's date span, in the same EVE `YYYY-MM-DD` form as every other date on the page. */
 function shortEveRange(sortedDates: readonly string[]): string {
   if (sortedDates.length === 0) return '';
-  const first = shortEveDate(sortedDates[0]);
-  const last = shortEveDate(sortedDates[sortedDates.length - 1]);
-  return first === last ? first : `${first} – ${last}`;
+  return formatDateRange([sortedDates[0], sortedDates[sortedDates.length - 1]]);
 }
 
 const FIELD_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
@@ -355,14 +343,11 @@ export function SettleUpDialog({
           </button>
           {differentBase !== null && (
             <div className="space-y-1">
-              <TextInput
-                type="text"
-                inputMode="numeric"
+              <IskInput
                 value={sentText}
-                onChange={(e) => changeSent(e.target.value)}
+                onChange={changeSent}
                 placeholder={t('miningTax.settleUp.sentAmountPlaceholder')}
                 aria-label={t('miningTax.settleUp.sentAmountLabel')}
-                className="w-full"
               />
               {allocationSummary && (
                 <p
@@ -379,7 +364,7 @@ export function SettleUpDialog({
           )}
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
           <div className="space-y-1 sm:w-36 sm:shrink-0">
             <p className={FIELD_LABEL}>{t('miningTax.settleUpPaidOnLabel')}</p>
             <TextInput
@@ -420,30 +405,30 @@ export function SettleUpDialog({
           )}
         </div>
 
-        <p className="text-[0.6875rem] text-text-dim">{t('miningTax.settleUp.hint')}</p>
+        <p className="text-xs text-text-dim">
+          {t('miningTax.settleUp.hint')}
+          {onPickFromWallet && (
+            <>
+              {' '}
+              <button type="button" className={textActionClassName()} onClick={onPickFromWallet}>
+                {t('miningTax.settleUp.pickFromWallet')}
+              </button>
+            </>
+          )}
+        </p>
 
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"
-            size="sm"
             disabled={saving || included.length === 0 || paidOn === ''}
             onClick={() => void commit(true)}
           >
             {t('miningTax.settleUp.recordAction')}
           </Button>
-          <Button
-            size="sm"
-            disabled={saving || included.length === 0}
-            onClick={() => void commit(false)}
-          >
+          <Button disabled={saving || included.length === 0} onClick={() => void commit(false)}>
             {t('miningTax.settleUpJustMarkPaid')}
           </Button>
-          {onPickFromWallet && (
-            <Button size="sm" onClick={onPickFromWallet}>
-              {t('miningTax.settleUp.pickFromWallet')}
-            </Button>
-          )}
-          <Button size="sm" onClick={onClose}>
+          <Button className="ml-auto" onClick={onClose}>
             {t('filters.cancel')}
           </Button>
         </div>

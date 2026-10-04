@@ -58,6 +58,8 @@ function renderGroup(overrides: Partial<Parameters<typeof GroupSummaryModal>[0]>
         onMarkAllPaid={noop}
         onTakeOut={noop}
         onUncombine={noop}
+        onResolve={noop}
+        onUnassignAll={noop}
         {...overrides}
       />
     </MemoryRouter>
@@ -114,7 +116,7 @@ describe('GroupSummaryModal payment', () => {
         { kind: 'journal', refId: 42, source: 'auto', label: '100 ISK · 2026-09-10 — donation' },
       ],
     });
-    expect(screen.getByText(/linked automatically/)).toBeInTheDocument();
+    expect(screen.getByText(/auto-linked/)).toBeInTheDocument();
   });
 
   it('calls onUnlinkTransaction with the clicked transaction', async () => {

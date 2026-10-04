@@ -15,6 +15,8 @@ export interface SessionContinuation {
   previousRow: DisplayRow;
   /** The previous day's own Assignment: whose Payee, tax % and `groupId` the continuation adopts. */
   previous: MiningTaxAssignmentRecord;
+  /** `previous`'s Payee — always set, since only an owed Assignment qualifies. */
+  payeeId: string;
 }
 
 /**
@@ -26,10 +28,11 @@ export interface SessionContinuation {
  * - none of it is assigned yet, so continuing it decides nothing a pilot
  *   already decided;
  * - the same pilot mined in the same system on the EVE day immediately before;
- * - that day has exactly one Assignment and it is still owed — a paid bill is
- *   a closed session, and a split day has no single Payee to follow.
+ * - that day has exactly one Assignment besides any dismissed slice, and it is
+ *   still owed — a paid bill is a closed session, and a split day has no single
+ *   Payee to follow.
  *
- * Only ever an offer. Ainsan alone can hold three Payees' moons, so the pilot
+ * Only ever an offer. One system can hold several Payees' moons, so the pilot
  * confirms which session this belongs to unless they turned on the automatic
  * mode themselves.
  */
@@ -37,6 +40,8 @@ export function findSessionContinuations(rows: readonly DisplayRow[]): SessionCo
   const assignedByDay = new Map<string, { member: MiningTaxAssignmentRecord; dr: DisplayRow }[]>();
   for (const dr of rows) {
     for (const { assignment } of allMembers(dr)) {
+      // A dismissed slice is "not taxed", not another Payee's claim on the day.
+      if (assignment.status === 'dismissed') continue;
       const key = `${assignment.characterId}:${assignment.solarSystemId}:${assignment.date}`;
       const list = assignedByDay.get(key) ?? [];
       list.push({ member: assignment, dr });
@@ -58,7 +63,7 @@ export function findSessionContinuations(rows: readonly DisplayRow[]): SessionCo
     if (candidates.length !== 1) continue;
     const [{ member, dr: previousRow }] = candidates;
     if (member.status !== 'outstanding' || member.payeeId === undefined) continue;
-    out.push({ next: dr, previousRow, previous: member });
+    out.push({ next: dr, previousRow, previous: member, payeeId: member.payeeId });
   }
   return out;
 }

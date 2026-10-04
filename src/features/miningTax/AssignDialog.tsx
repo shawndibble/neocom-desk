@@ -503,7 +503,7 @@ export function AssignDialog({
         </Select>
       </div>
 
-      {!isEditing && autoMatch && payeeId === autoMatch.id && (
+      {!isEditing && suggestion?.fromHistory && autoMatch && payeeId === autoMatch.id && (
         <p className="text-[0.6875rem] text-text-dim">
           {t('miningTax.suggestedPayeeHint', { system: systemName })}
         </p>

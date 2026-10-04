@@ -173,7 +173,7 @@ describe('RowDetailModal payment', () => {
 
   it('shows when the row was marked paid', () => {
     renderPaid();
-    expect(screen.getByText('2026-09-10')).toBeInTheDocument();
+    expect(screen.getByText(/Paid on 2026-09-10/)).toBeInTheDocument();
   });
 
   it('links a linked transaction to the Wallet Journal, highlighting it', () => {
@@ -202,7 +202,7 @@ describe('RowDetailModal payment', () => {
         },
       ],
     });
-    expect(screen.getByText(/linked automatically/)).toBeInTheDocument();
+    expect(screen.getByText(/auto-linked/)).toBeInTheDocument();
   });
 
   it('calls onUnlinkTransaction with the clicked transaction', async () => {

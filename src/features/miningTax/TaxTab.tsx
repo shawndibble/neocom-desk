@@ -83,7 +83,6 @@ import {
 } from '@/features/miningTax/assignments';
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { TypeOverridesDialog } from '@/features/miningTax/TypeOverridesDialog';
-import { STATUS_TEXT_CLASS } from '@/features/miningTax/statusTone';
 import { computePayeeBalances, summarizeUnassigned } from '@/features/miningTax/balances';
 import {
   combineEligibility,
@@ -112,6 +111,7 @@ import { SplitDialog } from '@/features/miningTax/SplitDialog';
 import { findPricingGaps, type PricingGap } from '@/features/miningTax/pricingGaps';
 import { linesOwnedBy } from '@/engine/miningTax/ownership';
 import { taxCsvColumns } from '@/features/miningTax/taxCsv';
+import { StatusPill } from '@/features/miningTax/StatusPill';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { AttentionStrip, type AttentionItem } from '@/features/miningTax/AttentionStrip';
@@ -128,7 +128,7 @@ import {
   type SessionContinuation,
 } from '@/features/miningTax/sessionContinuation';
 import { splitLedger } from '@/features/miningTax/ledgerSections';
-import { suggestPayeeForSystem } from '@/features/miningTax/suggestPayee';
+import { suggestPayeeForSystem, systemsByPayee } from '@/features/miningTax/suggestPayee';
 
 /**
  * A `MadePayment`'s own timestamp as a local calendar date, falling back to
@@ -313,8 +313,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   // The Ore column only where the table has room for it beside a full Payee
-  // name — at 1024px it pushed Status off-screen (the issue #2147 width).
-  const showOreColumn = useMediaQuery('(min-width: 75rem)');
+  // name: the Payee is what a row is read by, the ore is one click away in
+  // the entry itself (and at 1024px it pushed Status off-screen, #2147).
+  const showOreColumn = useMediaQuery('(min-width: 87.5rem)');
   const { data, error, loading, activeCharacterId, refresh } = useRouteSnapshot(
     loadSnapshot,
     undefined,
@@ -359,8 +360,15 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   // What the Settle-up dialog is settling: a balance card's whole balance, or
   // the table's checkbox selection. `null` keeps it closed.
   const [settleUpRows, setSettleUpRows] = useState<SettleUpRow[] | null>(null);
-  // Which Payee's owed entries "Link a wallet payment" is choosing a payment for.
-  const [linkWalletPayeeId, setLinkWalletPayeeId] = useState<string | null>(null);
+  // Whose owed entries "Link a wallet payment" is choosing a payment for: a
+  // Payee's whole balance, or just the entries ticked or settling.
+  const [linkWalletTarget, setLinkWalletTarget] = useState<{
+    payeeId: string;
+    members?: readonly GroupMember[];
+  } | null>(null);
+  // Offers on screen when automatic mode was switched on — "next time" means
+  // they stay offers rather than being continued the moment the box is ticked.
+  const [autoSkip, setAutoSkip] = useState<ReadonlySet<string>>(new Set());
   const [detailTarget, setDetailTarget] = useState<DisplayRow | null>(null);
   // The combined entry whose single edit form is open (mockup F1).
   const [combinedEditTarget, setCombinedEditTarget] = useState<DisplayRow | null>(null);
@@ -556,13 +564,15 @@ export function TaxTab({ tabBar }: TaxTabProps) {
 
   // Every Payee's systems and owed entries, for the Payee manager's rows.
   const payeeSystems = useMemo(
-    () => suggestPayeeForSystem(everyAssignment, allPayees, -1).systemsByPayee,
+    () => systemsByPayee(everyAssignment, allPayees),
     [everyAssignment, allPayees]
   );
   const owedByPayee = useMemo(() => {
     const out = new Map<string, { amount: number; assignments: MiningTaxAssignmentRecord[] }>();
     for (const a of everyAssignment) {
-      if (!a.payeeId || (a.status !== 'outstanding' && a.status !== 'needs-review')) continue;
+      // Owed means Outstanding, as on the balance cards: a needs-review entry
+      // was already paid (or dismissed) before it grew.
+      if (!a.payeeId || a.status !== 'outstanding') continue;
       const entry = out.get(a.payeeId) ?? { amount: 0, assignments: [] };
       entry.amount += a.taxOwed;
       entry.assignments.push(a);
@@ -603,7 +613,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
 
   async function continueSession(continuation: SessionContinuation): Promise<void> {
     const { next, previous } = continuation;
-    const payee = allPayees.find((p) => p.id === previous.payeeId);
+    const payee = allPayees.find((p) => p.id === continuation.payeeId);
     if (!payee) return;
     const wasCombined = previous.groupId !== undefined;
     const records = await joinAssignments(
@@ -623,7 +633,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           entryOreLines: next.row.entry.oreLines,
         },
       ],
-      previous.payeeId as string,
+      continuation.payeeId,
       previous.taxPct,
       (date) => pricesFor(payee.hubId, date)
     );
@@ -664,24 +674,40 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   const autoContinuedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!autoContinue || !data) return;
-    const fresh = continuations.filter((c) => !autoContinuedRef.current.has(c.next.key));
+    const fresh = continuations.filter(
+      (c) => !autoContinuedRef.current.has(c.next.key) && !autoSkip.has(c.next.key)
+    );
     if (fresh.length === 0) return;
     for (const c of fresh) autoContinuedRef.current.add(c.next.key);
     void (async () => {
       for (const c of fresh) {
         try {
           await continueSession(c);
-        } catch (error) {
-          if (!(error instanceof AlreadyAssignedError)) throw error;
+        } catch {
+          // Claimed meanwhile, or the write failed: the refresh shows what
+          // actually exists, and the offer stays for the pilot to retry.
+          refresh();
         }
       }
     })();
-    // `continueSession` reads only state this effect already depends on.
+    // `continueSession` closes over `allPayees`/`pricesFor`/`t`/`refresh`,
+    // all derived from `data` (or stable) — re-running on those would retry
+    // the same offers for nothing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoContinue, continuations, data]);
+  }, [autoContinue, autoSkip, continuations, data]);
 
+  function setAutoContinueFromCard(next: boolean) {
+    if (next) setAutoSkip(new Set(continuations.map((c) => c.next.key)));
+    void setAutoContinue(next);
+  }
+
+  /** "Keep separate", remembered — pruned to entries still in the ledger so the list can't grow forever. */
   function keepSeparate(continuation: SessionContinuation) {
-    void setDismissedContinuations([...dismissedContinuations, continuation.next.key]);
+    const present = new Set(allDisplayRows.map((dr) => dr.key));
+    void setDismissedContinuations([
+      ...dismissedContinuations.filter((key) => present.has(key)),
+      continuation.next.key,
+    ]);
   }
 
   function togglePayee(payeeId: string) {
@@ -1036,6 +1062,23 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     void runAndClose(() => uncombineAssignments([member.assignment]));
   }
 
+  /** "Accept new total" on a combined entry: every day that grew since it was paid. */
+  function handleResolveGroup() {
+    if (!detailTarget) return;
+    const grown = allMembers(detailTarget).filter((m) => m.assignment.status === 'needs-review');
+    void runAndClose(async () => {
+      for (const m of grown) await resolveNeedsReview(m.assignment, m.row.entry, m.row.assignments);
+    });
+  }
+
+  function handleUnassignGroup() {
+    if (!detailTarget) return;
+    const members = allMembers(detailTarget).map((m) => m.assignment);
+    void runAndClose(async () => {
+      for (const a of members) await deleteAssignment(a);
+    });
+  }
+
   function handleUncombineAll() {
     if (!detailTarget) return;
     const members = allMembers(detailTarget).map((m) => m.assignment);
@@ -1118,7 +1161,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     if (!days) return main;
     return (
       <span className="block">
-        <span className="block">{main}</span>
+        <span className="block h-5 leading-5">{main}</span>
         {days}
       </span>
     );
@@ -1141,6 +1184,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
 
   const oreColumn: DataTableColumn<DisplayRow> = {
     id: 'ore',
+    headerCellClassName: 'sm:w-40',
     header: t('miningTax.oreColumn'),
     render: (dr) =>
       withDayLines(
@@ -1155,7 +1199,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
               .slice(0, 5)
               .map((typeId) => (
                 <Tooltip key={typeId} content={data?.typeNames.get(typeId) ?? `#${typeId}`}>
-                  <span tabIndex={0} data-row-control>
+                  <span tabIndex={0}>
                     <TypeIcon typeId={typeId} size={32} className="h-4 w-4" />
                   </span>
                 </Tooltip>
@@ -1180,6 +1224,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       ? [
           {
             id: 'character',
+            headerCellClassName: 'sm:w-28',
             header: t('miningTax.characterColumn'),
             render: (dr: DisplayRow) => dr.row.characterName,
             sortValue: (dr: DisplayRow) => dr.row.characterName,
@@ -1188,33 +1233,42 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       : []),
     {
       id: 'date',
+      headerCellClassName: 'sm:w-36',
       header: t('miningTax.dateColumn'),
       headerTooltip: t('miningTax.dateEveHint'),
       className: 'whitespace-nowrap',
       render: (dr) =>
         withDayLines(
           dr,
-          <span className="inline-flex items-center gap-1.5">
+          <span className="relative inline-flex items-center">
             {dr.groupMembers && (
               <button
                 type="button"
                 aria-expanded={expandedCombined.has(dr.key)}
                 aria-label={t('miningTax.combined.showDays', { date: dateLabel(dr) })}
                 onClick={() => toggleCombinedExpanded(dr.key)}
-                className="hidden size-5 items-center justify-center rounded-xs text-text-dim hover:text-accent focus-visible:outline-2 focus-visible:outline-accent sm:inline-flex"
+                // In the gutter left of the date, so a combined row's date
+                // keeps the same left edge as every other row's.
+                className="absolute top-0 -left-6 hidden size-5 items-center justify-center rounded-xs text-text-dim hover:text-accent focus-visible:outline-2 focus-visible:outline-accent sm:inline-flex"
               >
                 <Caret expanded={expandedCombined.has(dr.key)} />
               </button>
             )}
             {shortDateLabel(dr)}
+            {isPhone && dr.groupMembers && (
+              <span className="ml-1.5 text-[0.6875rem] font-semibold tracking-wider text-accent uppercase">
+                {t('miningTax.combined.days', { count: allMembers(dr).length })}
+              </span>
+            )}
           </span>,
-          (m) => <span className="pl-6">{m.row.entry.date}</span>
+          (m) => <span className="pl-3">{m.row.entry.date}</span>
         ),
       sortValue: (dr) => dateRangeOf(dr)[0],
       primary: true,
     },
     {
       id: 'system',
+      headerCellClassName: 'sm:w-24',
       header: t('miningTax.systemColumn'),
       render: (dr) => (
         <DataTableDenseCell>
@@ -1227,10 +1281,11 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     {
       id: 'payee',
       header: t('miningTax.payeeColumn'),
-      // Room for "Bureau of Unified Harvesting" from `lg` up, where today's
-      // 8rem cap cut it off with half the table empty; still capped at `sm`
-      // so Status and Tax owed stay on screen at 1024px.
-      className: 'sm:max-w-[9rem] lg:max-w-[11rem] min-[75rem]:max-w-[13rem] truncate',
+      // The one column without a fixed width (both tables are `table-fixed`),
+      // so it takes whatever the others leave — room for "Bureau of Unified
+      // Harvesting" — and truncates rather than pushing Status off-screen at
+      // 1024px. `sm:`-scoped so the phone card shows the whole name.
+      className: 'sm:truncate',
       render: (dr) => {
         const name = payeeDisplayName(dr);
         return (
@@ -1249,6 +1304,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     ...(showOreColumn ? [oreColumn] : []),
     {
       id: 'value',
+      headerCellClassName: 'sm:w-32',
       header: t('miningTax.estimatedValueColumn'),
       align: 'right',
       className: 'whitespace-nowrap',
@@ -1267,11 +1323,18 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     },
     {
       id: 'taxOwed',
+      headerCellClassName: 'sm:w-28',
       header: t('miningTax.taxOwedColumn'),
       align: 'right',
       className: 'whitespace-nowrap',
       cardCorner: true,
-      cellClassName: (dr) => (dr.status === 'outstanding' ? 'text-isk-neg' : undefined),
+      // Owed is the figure the page is about; settled history recedes.
+      cellClassName: (dr) =>
+        dr.status === 'outstanding'
+          ? 'text-isk-neg'
+          : dr.status === 'paid' || dr.status === 'dismissed'
+            ? 'text-text-dim font-normal'
+            : undefined,
       render: (dr) =>
         dr.assignment
           ? withDayLines(
@@ -1284,6 +1347,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     },
     {
       id: 'status',
+      headerCellClassName: 'sm:w-32',
       header: t('miningTax.statusColumn'),
       render: (dr) => <StatusPill status={dr.status} label={statusLabel(t, dr.status)} />,
       sortValue: (dr) => statusLabel(t, dr.status),
@@ -1297,6 +1361,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             id: 'select',
             header: '',
             className: 'w-8 px-2',
+            headerCellClassName: 'sm:w-8',
             stackEdge: 'start',
             render: (dr: DisplayRow) =>
               isSelectableRow(dr) ? (
@@ -1306,6 +1371,23 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                   onChange={() => toggleRowSelected(dr.key)}
                 />
               ) : null,
+          } satisfies DataTableColumn<DisplayRow>,
+        ]
+      : []),
+    ...baseColumns,
+  ];
+
+  // History has no checkboxes, but keeps an empty column the same width so
+  // its columns sit exactly under Open's (both tables are fixed-layout).
+  const historyColumns: DataTableColumn<DisplayRow>[] = [
+    ...(showSelectColumn
+      ? [
+          {
+            id: 'spacer',
+            header: '',
+            className: 'w-8 px-2 max-sm:hidden',
+            headerCellClassName: 'sm:w-8',
+            render: () => null,
           } satisfies DataTableColumn<DisplayRow>,
         ]
       : []),
@@ -1469,16 +1551,32 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     }
   }
 
-  const linkWalletBalance = balances.find((b) => b.payee.id === linkWalletPayeeId) ?? null;
+  const linkWalletPayee = allPayees.find((p) => p.id === linkWalletTarget?.payeeId) ?? null;
+  const linkWalletOwed = useMemo(
+    () =>
+      linkWalletTarget?.members ??
+      balances.find((b) => b.payee.id === linkWalletTarget?.payeeId)?.members ??
+      [],
+    [linkWalletTarget, balances]
+  );
   // Only payments from a pilot who mined one of the owed entries — the ISK
   // has to have left a wallet that owes this bill.
   const linkWalletCandidates = useMemo(() => {
-    const miners = new Set(linkWalletBalance?.members.map((m) => m.row.characterId) ?? []);
+    const miners = new Set(linkWalletOwed.map((m) => m.row.characterId));
     return unlinkedPayments(
       madePayments.filter((p) => miners.has(p.characterId)),
       everyAssignment
     );
-  }, [linkWalletBalance, madePayments, everyAssignment]);
+  }, [linkWalletOwed, madePayments, everyAssignment]);
+
+  // The selection bar's "Link payment": one transfer pays one Payee.
+  const selectedPayeeIds = [...new Set(selectedSettleUpRows.map((r) => r.assignment.payeeId))];
+  const linkSelectedBlocked =
+    selectedSettleUpRows.length === 0
+      ? t('miningTax.settleUpBlockedHint')
+      : selectedPayeeIds.length > 1
+        ? t('miningTax.linkPaymentOnePayeeHint')
+        : null;
 
   const rowClassName = (dr: DisplayRow) =>
     cx(
@@ -1516,6 +1614,12 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                 <DropdownMenuItem onSelect={() => setOreTagsOpen(true)}>
                   {t('miningTax.oreTagsAction')}
                 </DropdownMenuItem>
+                <DropdownMenuCheckboxItem
+                  checked={autoContinue}
+                  onCheckedChange={(next) => setAutoContinueFromCard(next === true)}
+                >
+                  {t('miningTax.continue.autoMenuLabel')}
+                </DropdownMenuCheckboxItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <IconButton
@@ -1567,28 +1671,30 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                 isSoleFilter={isSolePayeeFilter}
                 onFilterPayee={filterToPayee}
                 onSettleUp={(balance) => settleUpBalance(balance.members)}
-                onLinkPayment={(balance) => setLinkWalletPayeeId(balance.payee.id)}
+                onLinkPayment={(balance) => setLinkWalletTarget({ payeeId: balance.payee.id })}
                 onAssignNext={assignNext}
                 onReviewPayments={() => setLinkPaymentOpen(true)}
               />
 
-              {continuations.length > 0 && !autoContinue && data && (
+              {data && continuations.some((c) => !autoContinue || autoSkip.has(c.next.key)) && (
                 <div className="space-y-2">
-                  {continuations.map((c) => (
-                    <ContinueSessionCard
-                      key={c.next.key}
-                      continuation={c}
-                      systemName={systemName(c.next)}
-                      payeeName={payeeName(c.previous.payeeId)}
-                      typeNames={data.typeNames}
-                      busy={busy}
-                      autoContinue={autoContinue}
-                      onContinue={() => void handleContinue(c)}
-                      onChooseOther={() => setDetailTarget(c.next)}
-                      onKeepSeparate={() => keepSeparate(c)}
-                      onAutoContinueChange={(next) => void setAutoContinue(next)}
-                    />
-                  ))}
+                  {continuations
+                    .filter((c) => !autoContinue || autoSkip.has(c.next.key))
+                    .map((c) => (
+                      <ContinueSessionCard
+                        key={c.next.key}
+                        continuation={c}
+                        systemName={systemName(c.next)}
+                        payeeName={payeeName(c.previous.payeeId)}
+                        typeNames={data.typeNames}
+                        busy={busy}
+                        autoContinue={autoContinue}
+                        onContinue={() => void handleContinue(c)}
+                        onChooseOther={() => setDetailTarget(c.next)}
+                        onKeepSeparate={() => keepSeparate(c)}
+                        onAutoContinueChange={setAutoContinueFromCard}
+                      />
+                    ))}
                 </div>
               )}
 
@@ -1655,10 +1761,11 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                         {...taxExport.tableProps}
                         columns={openColumns}
                         rows={openRows}
+                        className="sm:table-fixed"
                         rowKey={(dr) => dr.key}
                         label={t('miningTax.sections.openLabel')}
                         {...taxSort}
-                        mobileSort
+                        mobileSort={openRows.length > 1}
                         stackLayout="dense"
                         rowClassName={rowClassName}
                         onRowClick={(dr) => setDetailTarget(dr)}
@@ -1679,8 +1786,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                   <Panel padded={false}>
                     <div className="overflow-x-auto">
                       <DataTable
-                        columns={baseColumns}
+                        columns={historyColumns}
                         rows={historyRows}
+                        className="sm:table-fixed"
                         rowKey={(dr) => dr.key}
                         label={t('miningTax.sections.history')}
                         {...historySort}
@@ -1728,6 +1836,15 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                     onCombine={handleCombineSelected}
                     dismissCount={dismissTargets.length}
                     onDismiss={() => setBulkDismissOpen(true)}
+                    linkPaymentBlockedReason={linkSelectedBlocked}
+                    onLinkPayment={() => {
+                      const payeeId = selectedPayeeIds[0];
+                      if (!payeeId) return;
+                      setLinkWalletTarget({
+                        payeeId,
+                        members: settleUpMembers(selectedRows),
+                      });
+                    }}
                   />
                 </div>
               )}
@@ -1787,6 +1904,19 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           onMarkAllPaid={handleMarkGroupPaidFromDetail}
           onTakeOut={handleTakeOut}
           onUncombine={handleUncombineAll}
+          onResolve={handleResolveGroup}
+          onUnassignAll={handleUnassignGroup}
+          onLinkWalletPayment={() => {
+            const payeeId = detailTarget.assignment?.payeeId;
+            if (!payeeId) return;
+            setLinkWalletTarget({
+              payeeId,
+              members: allMembers(detailTarget).filter(
+                (m) => m.assignment.status === 'outstanding'
+              ),
+            });
+            setDetailTarget(null);
+          }}
           linkedTransactions={groupLinkedTransactions}
           onLinkTransaction={
             allMembers(detailTarget).every((m) => m.assignment.status === 'paid')
@@ -1803,6 +1933,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           onClose={() => setCombinedEditTarget(null)}
           members={allMembers(combinedEditTarget)}
           systemName={systemName(combinedEditTarget)}
+          systemSecurity={systemSecurityOf(combinedEditTarget)}
           payees={allPayees}
           typeNames={data.typeNames}
           pricesFor={pricesFor}
@@ -1839,7 +1970,8 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           onLinkWalletPayment={
             detailTarget.status === 'outstanding' && detailTarget.assignment?.payeeId
               ? () => {
-                  setLinkWalletPayeeId(detailTarget.assignment?.payeeId ?? null);
+                  const payeeId = detailTarget.assignment?.payeeId;
+                  if (payeeId) setLinkWalletTarget({ payeeId });
                   setDetailTarget(null);
                 }
               : undefined
@@ -1949,23 +2081,26 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           onPickFromWallet={(() => {
             const payeeIds = [...new Set(settleUpRows.map((r) => r.assignment.payeeId))];
             const only = payeeIds.length === 1 ? payeeIds[0] : undefined;
-            return only
-              ? () => {
-                  setSettleUpRows(null);
-                  setLinkWalletPayeeId(only);
-                }
-              : undefined;
+            if (!only) return undefined;
+            // The entries being settled, not the Payee's whole balance.
+            const members = settleUpRows.flatMap((r) =>
+              allDisplayRows.flatMap(allMembers).filter((m) => m.assignment.id === r.assignment.id)
+            );
+            return () => {
+              setSettleUpRows(null);
+              setLinkWalletTarget({ payeeId: only, members });
+            };
           })()}
         />
       )}
 
-      {linkWalletBalance && data && (
+      {linkWalletPayee && data && (
         <LinkWalletPaymentDialog
-          key={linkWalletBalance.payee.id}
+          key={linkWalletPayee.id}
           open
-          onClose={() => setLinkWalletPayeeId(null)}
-          payee={linkWalletBalance.payee}
-          owed={linkWalletBalance.members}
+          onClose={() => setLinkWalletTarget(null)}
+          payee={linkWalletPayee}
+          owed={linkWalletOwed}
           candidates={linkWalletCandidates}
           systemNames={data.systemNames}
           onLinked={() => {
@@ -2003,29 +2138,6 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     </div>
   );
 }
-
-/** A status as a small bordered pill — readable without its colour, and still one word on a dense phone card. */
-function StatusPill({ status, label }: { status: MiningTaxRowStatus; label: string }) {
-  return (
-    <span
-      className={cx(
-        'inline-flex rounded-xs border px-1.5 text-[0.6875rem] font-semibold tracking-wider whitespace-nowrap uppercase',
-        STATUS_TEXT_CLASS[status],
-        STATUS_PILL_BORDER[status]
-      )}
-    >
-      {label}
-    </span>
-  );
-}
-
-const STATUS_PILL_BORDER: Record<MiningTaxRowStatus, string> = {
-  unassigned: 'border-line-bright',
-  'needs-review': 'border-warning/50 bg-warning/10',
-  outstanding: 'border-danger/50 bg-danger/10',
-  paid: 'border-success/40',
-  dismissed: 'border-line',
-};
 
 /** A History month's fold row: which month, how many entries, what was paid in it. */
 function HistoryMonthHeader({

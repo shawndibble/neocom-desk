@@ -95,7 +95,7 @@ describe('SettleUpDialog', () => {
 
     renderDialog(ONE_ROW);
     expect(screen.queryByRole('checkbox', { name: 'Include 2026-09-30' })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /1 entry · Sep 30/ }));
+    await userEvent.click(screen.getByRole('button', { name: /1 entry · 2026-09-30/ }));
     expect(screen.getByRole('checkbox', { name: 'Include 2026-09-30' })).toBeChecked();
   });
 

@@ -11,7 +11,6 @@ import {
   InfoTooltip,
   Modal,
   StatChip,
-  StatChips,
   TypeIcon,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -26,7 +25,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { cx } from '@/lib/cx';
 import { AssignDialog } from './AssignDialog';
 import { PaymentLinksCard, type LinkedTransaction } from './PaymentLinksCard';
-import { STATUS_TONE } from './statusTone';
+import { StatusPill } from './StatusPill';
 import type { MoonMiningTaxRow } from './snapshot';
 import type { PayeeSuggestion } from './suggestPayee';
 
@@ -199,46 +198,36 @@ export function RowDetailModal({
       }
     >
       <div className="space-y-3 text-sm">
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <span className="text-text-dim">{row.characterName}</span>
-          <StatChips>
-            {assignment?.paidAt !== undefined && (
-              <StatChip
-                label={t('miningTax.paidAtLabel')}
-                value={formatLocalDate(new Date(assignment.paidAt))}
-              />
-            )}
-            <StatChip
-              label={t('miningTax.statusColumn')}
-              value={t(`miningTax.status.${STATUS_LABEL_KEY[status]}`)}
-              tone={STATUS_TONE[status]}
-            />
-          </StatChips>
-        </div>
-
-        {assigned && !editing && assignment && (
-          <div className="flex items-end justify-between gap-3 rounded-xs border border-line bg-panel-2 p-2">
-            <div className="min-w-0">
-              <p className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {payeeName} · {assignment.taxPct}%
-              </p>
-              <p
-                className={cx(
-                  'text-lg font-semibold tabular-nums',
-                  status === 'outstanding' && 'text-isk-neg'
-                )}
-              >
-                {formatIsk(assignment.taxOwed)} <span className="text-xs text-text-dim">ISK</span>
-              </p>
-              <p className="text-[0.6875rem] text-text-dim">
-                {t('miningTax.detail.valueLine', { value: formatIsk(estimatedValue) })}
-              </p>
-            </div>
-            <Button size="sm" variant="ghost" disabled={busy} onClick={() => setEditing(true)}>
-              {t('miningTax.detail.editAction')}
-            </Button>
+        {/* Who it's owed to and how much lead, the same way the combined
+            view does; the pilot and the paperwork sit on the line below. */}
+        {assigned && assignment && !editing && (
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 text-base font-semibold">{payeeName}</span>
+            <span
+              className={cx(
+                'shrink-0 text-xl font-medium tabular-nums',
+                status === 'outstanding' && 'text-isk-neg'
+              )}
+            >
+              {formatIsk(assignment.taxOwed)} ISK
+            </span>
           </div>
         )}
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-text-dim">
+          <span>
+            {row.characterName}
+            {assigned && assignment && !editing && (
+              <>
+                {' · '}
+                {assignment.taxPct}%{' · '}
+                {t('miningTax.detail.valueLine', { value: formatIsk(estimatedValue) })}
+              </>
+            )}
+            {assignment?.paidAt !== undefined &&
+              ` · ${t('miningTax.paidAtLabel')} ${formatLocalDate(new Date(assignment.paidAt))}`}
+          </span>
+          <StatusPill status={status} label={t(`miningTax.status.${STATUS_LABEL_KEY[status]}`)} />
+        </div>
 
         {status === 'paid' && !editing && (onLinkTransaction || assignment?.payment) && (
           <PaymentLinksCard
@@ -246,16 +235,7 @@ export function RowDetailModal({
             onLinkTransaction={onLinkTransaction}
             onUnlinkTransaction={onUnlinkTransaction}
             busy={busy}
-            summary={
-              assignment?.payment && (
-                <p className="text-xs tabular-nums">
-                  {t('miningTax.payment.paidLine', {
-                    amount: formatIsk(assignment.payment.amount, 0),
-                    date: assignment.payment.paidOn,
-                  })}
-                </p>
-              )
-            }
+            paid={assignment?.payment}
           />
         )}
 
@@ -382,21 +362,24 @@ export function RowDetailModal({
         ) : (
           <div className="flex flex-wrap gap-2 pt-1">
             {status === 'outstanding' && onSettleUp && (
-              <Button variant="primary" size="sm" disabled={busy} onClick={onSettleUp}>
+              <Button variant="primary" disabled={busy} onClick={onSettleUp}>
                 {t('miningTax.detail.settleUpPayee', { payee: payeeName })}
               </Button>
             )}
-            {status === 'outstanding' && (
-              <Button size="sm" disabled={busy} onClick={onMarkPaid}>
-                {t('miningTax.markPaidAction')}
-              </Button>
-            )}
             {status === 'needs-review' && (
-              <Button variant="primary" size="sm" disabled={busy} onClick={onResolve}>
+              <Button variant="primary" disabled={busy} onClick={onResolve}>
                 {t('miningTax.resolveConfirm')}
               </Button>
             )}
-            <Button size="sm" className="ml-auto" onClick={onClose}>
+            {status === 'outstanding' && (
+              <Button disabled={busy} onClick={onMarkPaid}>
+                {t('miningTax.markPaidAction')}
+              </Button>
+            )}
+            <Button disabled={busy} onClick={() => setEditing(true)}>
+              {t('miningTax.detail.editAction')}
+            </Button>
+            <Button className="ml-auto" onClick={onClose}>
               {t('common.close')}
             </Button>
           </div>

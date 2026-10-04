@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -47,6 +48,12 @@ interface GroupSummaryModalProps {
   onTakeOut: (member: GroupMember) => void;
   /** "Uncombine all": every day keeps its Assignment and becomes its own row. */
   onUncombine: () => void;
+  /** Accepts the new ore total on every day that grew since it was paid. */
+  onResolve: () => void;
+  /** Opens "Link a wallet payment" for this entry's owed days. */
+  onLinkWalletPayment?: () => void;
+  /** Deletes every day's Assignment — asked first. */
+  onUnassignAll: () => void;
   /**
    * Every linked transaction across the whole group's members, deduplicated
    * — present only once every member is Paid. Absent entirely (rather than
@@ -81,17 +88,22 @@ export function GroupSummaryModal({
   onMarkAllPaid,
   onTakeOut,
   onUncombine,
+  onResolve,
+  onLinkWalletPayment,
+  onUnassignAll,
   linkedTransactions,
   onLinkTransaction,
   onUnlinkTransaction,
 }: GroupSummaryModalProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
+  const [confirmUnassign, setConfirmUnassign] = useState(false);
   const sorted = [...members].sort((a, b) => a.row.entry.date.localeCompare(b.row.entry.date));
   const dates = sorted.map((m) => m.row.entry.date);
   const totalTaxOwed = members.reduce((sum, m) => sum + m.assignment.taxOwed, 0);
   const totalValue = members.reduce((sum, m) => sum + m.assignment.estimatedValue, 0);
   const anyOutstanding = members.some((m) => m.assignment.status === 'outstanding');
+  const anyGrown = members.some((m) => m.assignment.status === 'needs-review');
   const allPaid = members.every((m) => m.assignment.status === 'paid');
   const taxPct = members[0]?.assignment.taxPct;
   const payment = members.find((m) => m.assignment.payment)?.assignment.payment;
@@ -122,6 +134,14 @@ export function GroupSummaryModal({
             />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {anyOutstanding && onLinkWalletPayment && (
+              <>
+                <DropdownMenuItem onSelect={onLinkWalletPayment}>
+                  {t('miningTax.detail.linkWalletPayment')}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             {sorted.map((member) => (
               <DropdownMenuItem key={member.assignment.id} onSelect={() => onTakeOut(member)}>
                 {t('miningTax.combined.takeOut', { date: member.row.entry.date })}
@@ -130,6 +150,10 @@ export function GroupSummaryModal({
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={onUncombine}>
               {t('miningTax.combined.uncombineAll')}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => setConfirmUnassign(true)} className="text-danger">
+              {t('miningTax.combined.unassignAll')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -157,16 +181,7 @@ export function GroupSummaryModal({
               onLinkTransaction={onLinkTransaction}
               onUnlinkTransaction={onUnlinkTransaction}
               busy={busy}
-              summary={
-                payment && (
-                  <p className="text-xs tabular-nums">
-                    {t('miningTax.payment.paidLine', {
-                      amount: formatIsk(payment.amount, 0),
-                      date: payment.paidOn,
-                    })}
-                  </p>
-                )
-              }
+              paid={payment}
             />
           )}
 
@@ -211,21 +226,45 @@ export function GroupSummaryModal({
           {t('miningTax.groupTotalValueLabel', { value: `${formatIsk(totalValue)} ISK` })}
         </p>
 
+        {confirmUnassign && (
+          <div
+            role="alert"
+            className="space-y-2 rounded-xs border border-danger/60 bg-danger/10 p-2 text-xs"
+          >
+            <p>{t('miningTax.combined.unassignConfirm', { count: members.length })}</p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="danger" disabled={busy} onClick={onUnassignAll}>
+                {t('miningTax.unassignAction')}
+              </Button>
+              <Button size="sm" onClick={() => setConfirmUnassign(false)}>
+                {t('filters.cancel')}
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-2 pt-1">
-          {anyOutstanding && onSettleUp && (
-            <Button variant="primary" size="sm" disabled={busy} onClick={onSettleUp}>
-              {t('miningTax.settleUpAction')}
+          {anyGrown ? (
+            <Button variant="primary" disabled={busy} onClick={onResolve}>
+              {t('miningTax.resolveConfirm')}
             </Button>
+          ) : (
+            anyOutstanding &&
+            onSettleUp && (
+              <Button variant="primary" disabled={busy} onClick={onSettleUp}>
+                {t('miningTax.settleUpAction')}
+              </Button>
+            )
           )}
           {anyOutstanding && (
-            <Button size="sm" disabled={busy} onClick={onMarkAllPaid}>
+            <Button disabled={busy} onClick={onMarkAllPaid}>
               {t('miningTax.markGroupPaidAction')}
             </Button>
           )}
-          <Button size="sm" disabled={busy} onClick={onEdit}>
+          <Button disabled={busy} onClick={onEdit}>
             {t('miningTax.combined.edit')}
           </Button>
-          <Button size="sm" className="ml-auto" onClick={onClose}>
+          <Button className="ml-auto" onClick={onClose}>
             {t('common.close')}
           </Button>
         </div>

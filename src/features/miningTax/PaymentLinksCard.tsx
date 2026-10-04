@@ -12,6 +12,7 @@ import * as Icon from '@/components/ui/icons';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { MiningTaxPaymentLinkSource } from '@/db';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
+import { formatIsk } from '@/lib/isk';
 
 /** One linked transaction, resolved for display — this card itself does no lookups. */
 export interface LinkedTransaction {
@@ -37,6 +38,8 @@ interface PaymentLinksCardProps {
   busy: boolean;
   /** A single Assignment's own amount/paidOn line — `RowDetailModal` passes one, `GroupSummaryModal` doesn't (no one payment record to summarize for the whole group). */
   summary?: ReactNode;
+  /** The recorded payment, read as one sentence: "Paid 4,309,281 ISK · 2026-10-04 · auto-linked". */
+  paid?: { amount: number; paidOn: string };
 }
 
 /**
@@ -58,6 +61,7 @@ export function PaymentLinksCard({
   onUnlinkTransaction,
   busy,
   summary,
+  paid,
 }: PaymentLinksCardProps) {
   const { t } = useTranslation();
   const links = linkedTransactions ?? [];
@@ -68,11 +72,6 @@ export function PaymentLinksCard({
       <div className="flex items-center justify-between gap-2">
         <p className="min-w-0 truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('miningTax.paymentCardTitle')}
-          {autoLinked && (
-            <span className="ml-1.5 font-normal tracking-normal normal-case">
-              {t('miningTax.payment.autoLinked')}
-            </span>
-          )}
         </p>
         {hasMenu && (
           <DropdownMenu>
@@ -106,6 +105,20 @@ export function PaymentLinksCard({
           </DropdownMenu>
         )}
       </div>
+      {paid && (
+        <p className="text-sm tabular-nums">
+          {t('miningTax.payment.paidLine', {
+            amount: formatIsk(paid.amount, 0),
+            date: paid.paidOn,
+          })}
+          {autoLinked && (
+            <span className="text-text-dim"> · {t('miningTax.payment.autoLinked')}</span>
+          )}
+        </p>
+      )}
+      {!paid && autoLinked && (
+        <p className="text-xs text-text-dim">{t('miningTax.payment.autoLinked')}</p>
+      )}
       {summary}
       {links.length > 0 ? (
         <ul className="space-y-0.5 text-xs">

@@ -333,13 +333,12 @@ export function LinkWalletPaymentDialog({
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"
-            size="sm"
             disabled={!selected || included.length === 0 || !amountValid || saving}
             onClick={() => void commit()}
           >
             {t('miningTax.linkWallet.confirm', { count: included.length })}
           </Button>
-          <Button size="sm" onClick={onClose}>
+          <Button className="ml-auto" onClick={onClose}>
             {t('filters.cancel')}
           </Button>
         </div>

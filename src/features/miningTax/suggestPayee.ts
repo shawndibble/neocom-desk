@@ -3,10 +3,26 @@ import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 export interface PayeeSuggestion {
   /** The Payee to pre-select, or `undefined` when nothing in the pilot's own history points at one. */
   suggested: PayeeRecord | undefined;
+  /** Whether `suggested` is the Payee last used in this system (rather than the legacy remembered `systemId`) — only then may the UI say "last used here". */
+  fromHistory: boolean;
   /** Every Payee, best first: the suggestion, then by uses in this system, then by name. */
   ranked: PayeeRecord[];
-  /** Every system each Payee has been assigned in, learned from the pilot's own Assignments. */
-  systemsByPayee: ReadonlyMap<string, ReadonlySet<number>>;
+}
+
+/** Every system each Payee has been assigned in, learned from the pilot's own Assignments (dismissals and unknown Payees aside). */
+export function systemsByPayee(
+  assignments: readonly MiningTaxAssignmentRecord[],
+  payees: readonly PayeeRecord[]
+): Map<string, Set<number>> {
+  const known = new Set(payees.map((p) => p.id));
+  const out = new Map<string, Set<number>>();
+  for (const a of assignments) {
+    if (a.payeeId === undefined || a.status === 'dismissed' || !known.has(a.payeeId)) continue;
+    let systems = out.get(a.payeeId);
+    if (!systems) out.set(a.payeeId, (systems = new Set()));
+    systems.add(a.solarSystemId);
+  }
+  return out;
 }
 
 /**
@@ -27,15 +43,11 @@ export function suggestPayeeForSystem(
   solarSystemId: number
 ): PayeeSuggestion {
   const byId = new Map(payees.map((p) => [p.id, p]));
-  const systemsByPayee = new Map<string, Set<number>>();
   const usesHere = new Map<string, number>();
   let last: MiningTaxAssignmentRecord | undefined;
 
   for (const a of assignments) {
     if (a.payeeId === undefined || a.status === 'dismissed' || !byId.has(a.payeeId)) continue;
-    let systems = systemsByPayee.get(a.payeeId);
-    if (!systems) systemsByPayee.set(a.payeeId, (systems = new Set()));
-    systems.add(a.solarSystemId);
     if (a.solarSystemId !== solarSystemId) continue;
     usesHere.set(a.payeeId, (usesHere.get(a.payeeId) ?? 0) + 1);
     if (!last || a.date > last.date || (a.date === last.date && a.updatedAt > last.updatedAt)) {
@@ -43,9 +55,8 @@ export function suggestPayeeForSystem(
     }
   }
 
-  const suggested =
-    (last?.payeeId !== undefined ? byId.get(last.payeeId) : undefined) ??
-    payees.find((p) => p.systemId === solarSystemId);
+  const fromHistory = last?.payeeId !== undefined ? byId.get(last.payeeId) : undefined;
+  const suggested = fromHistory ?? payees.find((p) => p.systemId === solarSystemId);
 
   const ranked = [...payees].sort((a, b) => {
     if (a.id === suggested?.id) return -1;
@@ -54,5 +65,5 @@ export function suggestPayeeForSystem(
     return uses !== 0 ? uses : a.name.localeCompare(b.name);
   });
 
-  return { suggested, ranked, systemsByPayee };
+  return { suggested, fromHistory: fromHistory !== undefined, ranked };
 }

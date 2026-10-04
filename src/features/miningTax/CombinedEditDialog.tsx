@@ -8,17 +8,18 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  IskInput,
   TextInput,
   TypeIcon,
 } from '@/components/ui';
 import type { PayeeRecord } from '@/db';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
-import { formatIsk, maskIsk } from '@/lib/isk';
-import { unmaskNumber } from '@/lib/numberMask';
+import { formatIsk } from '@/lib/isk';
+import { SecurityValue } from '@/features/character/assetBrowserRows';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { updateCombinedAssignments, type CombinedMemberValues } from './assignments';
 import { formatDateRange, type GroupMember } from './groupRows';
-import { combinedLineDefaults } from './combinedValues';
+import { combinedDayValues, combinedLineDefaults } from './combinedValues';
 
 interface CombinedEditDialogProps {
   open: boolean;
@@ -26,14 +27,11 @@ interface CombinedEditDialogProps {
   /** Every day of the combined entry. */
   members: readonly GroupMember[];
   systemName: string;
+  systemSecurity: number | null | undefined;
   payees: readonly PayeeRecord[];
   typeNames: ReadonlyMap<number, string>;
   pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   onSaved: () => void;
-}
-
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
 }
 
 /**
@@ -60,6 +58,7 @@ export function CombinedEditDialog({
   onClose,
   members,
   systemName,
+  systemSecurity,
   payees,
   typeNames,
   pricesFor,
@@ -74,7 +73,8 @@ export function CombinedEditDialog({
   const first = current[0]?.assignment;
   const [payeeId, setPayeeId] = useState<string | undefined>(first?.payeeId);
   const [taxPct, setTaxPct] = useState(String(first?.taxPct ?? ''));
-  // Per day, per ore type: the pilot's own text. Absent means "untouched".
+  // Per day, per ore type: the pilot's own whole-ISK figure as `IskInput`
+  // reports it (plain digits). Absent or blank means "untouched".
   const [overrides, setOverrides] = useState<Record<string, Record<number, string>>>({});
   const [saving, setSaving] = useState(false);
   // Unlocking only opens the fields: nothing is written until Save, and Save
@@ -100,28 +100,16 @@ export function CombinedEditDialog({
 
   function dayValues(member: GroupMember): CombinedMemberValues {
     const { assignment } = member;
-    const edits = overrides[assignment.id];
-    const rate = pctValid ? pct : assignment.taxPct;
-    if (!edits || Object.keys(edits).length === 0) {
-      return {
-        estimatedValue: assignment.estimatedValue,
-        // The billed figure stands until something it depends on changes.
-        taxOwed:
-          rate === assignment.taxPct
-            ? assignment.taxOwed
-            : (assignment.estimatedValue * rate) / 100,
-        ...(assignment.oreLineValues ? { oreLineValues: assignment.oreLineValues } : {}),
-      };
+    const edits: Record<number, number> = {};
+    for (const [typeId, raw] of Object.entries(overrides[assignment.id] ?? {})) {
+      if (raw !== '') edits[Number(typeId)] = Number(raw);
     }
-    const lineDefaults = defaults.get(assignment.id) ?? new Map<number, number>();
-    const oreLineValues: Record<number, number> = {};
-    for (const line of assignment.oreLines) {
-      const raw = edits[line.typeId];
-      const parsed = raw === undefined || raw.trim() === '' ? undefined : unmaskNumber(raw);
-      oreLineValues[line.typeId] = parsed ?? lineDefaults.get(line.typeId) ?? 0;
-    }
-    const estimatedValue = Object.values(oreLineValues).reduce((sum, v) => sum + v, 0);
-    return { estimatedValue, taxOwed: (estimatedValue * rate) / 100, oreLineValues };
+    return combinedDayValues(
+      assignment,
+      edits,
+      defaults.get(assignment.id) ?? new Map(),
+      pctValid ? pct : assignment.taxPct
+    );
   }
 
   const values = new Map(current.map((m) => [m.assignment.id, dayValues(m)]));
@@ -151,10 +139,15 @@ export function CombinedEditDialog({
       open={open}
       onClose={onClose}
       placement={isPhone ? 'sheet-full' : 'center'}
-      title={t('miningTax.combined.editTitle', {
-        date: formatDateRange(current.map((m) => m.assignment.date)),
-        system: systemName,
-      })}
+      title={
+        <span className="flex items-center gap-1.5">
+          {t('miningTax.combined.editTitle', {
+            date: formatDateRange(current.map((m) => m.assignment.date)),
+            system: systemName,
+          })}
+          <SecurityValue security={systemSecurity} t={t} />
+        </span>
+      }
     >
       <div className="space-y-3 text-sm">
         {locked && (
@@ -231,7 +224,7 @@ export function CombinedEditDialog({
                 {assignment.oreLines.map((line) => {
                   const name = typeNames.get(line.typeId) ?? `#${line.typeId}`;
                   const raw = overrides[assignment.id]?.[line.typeId];
-                  const fallback = round2(lineDefaults.get(line.typeId) ?? 0);
+                  const fallback = Math.round(lineDefaults.get(line.typeId) ?? 0);
                   return (
                     <li key={line.typeId} className="flex items-center gap-1.5 py-1.5 text-xs">
                       <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
@@ -241,23 +234,20 @@ export function CombinedEditDialog({
                           {line.quantity.toLocaleString()}
                         </span>
                       </span>
-                      <TextInput
-                        type="text"
-                        inputMode="decimal"
+                      <IskInput
+                        echo={false}
                         aria-label={t('miningTax.combined.oreValueLabel', {
                           name,
                           date: assignment.date,
                         })}
-                        className="w-32 shrink-0 text-right tabular-nums"
+                        className="w-32 shrink-0"
                         disabled={locked}
-                        value={raw ?? maskIsk(fallback)}
-                        onChange={(e) =>
+                        value={raw ?? ''}
+                        defaultAmount={fallback}
+                        onChange={(value) =>
                           setOverrides((previous) => ({
                             ...previous,
-                            [assignment.id]: {
-                              ...previous[assignment.id],
-                              [line.typeId]: e.target.value,
-                            },
+                            [assignment.id]: { ...previous[assignment.id], [line.typeId]: value },
                           }))
                         }
                       />
@@ -283,13 +273,12 @@ export function CombinedEditDialog({
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"
-            size="sm"
             disabled={locked || saving || !payeeId || !pctValid}
             onClick={() => void handleSave()}
           >
             {t('miningTax.combined.saveAll', { count: current.length })}
           </Button>
-          <Button size="sm" onClick={onClose}>
+          <Button className="ml-auto" onClick={onClose}>
             {t('filters.cancel')}
           </Button>
         </div>

@@ -68,6 +68,7 @@ function renderDialog(members: GroupMember[]) {
         onClose={vi.fn()}
         members={members}
         systemName="Ainsan"
+        systemSecurity={0.5}
         payees={payees}
         typeNames={
           new Map([
@@ -101,7 +102,7 @@ describe('CombinedEditDialog', () => {
 
     // One box per ore line per day, each starting at its share of the billed value.
     const zeolitesOct4 = screen.getByRole('textbox', { name: 'Zeolites value on 2026-10-04' });
-    expect(zeolitesOct4).toHaveValue('1,000');
+    expect(zeolitesOct4).toHaveAttribute('placeholder', '1,000');
     fireEvent.change(zeolitesOct4, { target: { value: '3000' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save all 2 days' }));
 
