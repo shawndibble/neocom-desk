@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { gameItemLookup } from '@/engine/fittings/fitCurrency';
 import {
   checkFitsCurrency,
   resetFitCurrencyCache,
@@ -13,6 +14,7 @@ const data: CurrencyGameData = {
   ]),
   slotByTypeId: { 3001: 'high', 2048: 'low' },
   hullSlots: () => ({ high: 4, medium: 4, low: 5, rig: 3 }),
+  isGameItem: gameItemLookup(['Vexor', 'Heavy Neutron Blaster II', 'Damage Control II']),
 };
 
 function fits(count: number) {
@@ -32,6 +34,55 @@ describe('checkFitsCurrency', () => {
       current: false,
       reasons: [{ kind: 'removed-item', name: 'Old Gun I' }],
     });
+  });
+
+  it('a fit using filaments, boosters and an Abyssal module the loader cannot read is current', async () => {
+    // A Gila as EVE Workbench stores one: a mutated shield extender in a rack,
+    // Abyssal filaments and Agency boosters in cargo. None of them is in the
+    // loader's catalogue, and every one is still in the game.
+    const gila: CurrencyGameData = {
+      typeByName: new Map([
+        ['gila', { typeID: 17715 }],
+        ['damage control ii', { typeID: 2048 }],
+      ]),
+      slotByTypeId: { 2048: 'low' },
+      hullSlots: () => ({ high: 3, medium: 5, low: 4, rig: 3 }),
+      isGameItem: gameItemLookup([
+        'Gila',
+        'Damage Control II',
+        'Large Abyssal Shield Extender',
+        'Fierce Exotic Filament',
+        'Cataclysmic Electrical Filament',
+        'Raging Gamma Filament',
+        'Agitated Exotic Filament',
+        'Calm Exotic Filament',
+        'Tranquil Exotic Filament',
+        "Agency 'Hardshell' TB5 Dose II",
+        "Agency 'Overclocker' SB3 Dose I",
+      ]),
+    };
+    const eft = [
+      '[Gila, Abyssal runner]',
+      'Damage Control II',
+      '',
+      'Large Abyssal Shield Extender',
+      '',
+      '',
+      '',
+      '',
+      "Agency 'Hardshell' TB5 Dose II x1",
+      '',
+      'Fierce Exotic Filament x3',
+      'Cataclysmic Electrical Filament x1',
+      'Raging Gamma Filament x2',
+      'Agitated Exotic Filament x1',
+      'Calm Exotic Filament x1',
+      'Tranquil Exotic Filament x1',
+      "Agency 'Overclocker' SB3 Dose I x2",
+    ].join('\n');
+    const checks = await checkFitsCurrency([{ id: 'gila', eft }], gila);
+    expect(checks?.get('gila')?.verdict).toEqual({ current: true });
+    expect(checks?.get('gila')?.modules).toEqual([{ slot: 'low', typeId: 2048 }]);
   });
 
   it('keeps the modules the same pass loaded, rack and type only', async () => {

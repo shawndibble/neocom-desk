@@ -14,10 +14,17 @@
  * The same pass keeps the modules it loaded (issue #2493), so a row can draw
  * its racks without parsing the EFT a second time — and the whole fit's item
  * counts, so the row's price (`workbenchFitPrices.ts`) needs no parse either.
+ *
+ * An item the loader can't read is only a removed one if the game's full list
+ * of type names (`typeNames.json`) lacks it too: the loader's catalogue
+ * leaves out Abyssal filaments, LP boosters and mutated modules, which
+ * Workbench fits carry all the time. If that list can't be read, no unread
+ * item counts as removed — the rest of the check still runs.
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
   classifyFitCurrency,
+  gameItemLookup,
   partitionByCurrency,
   type FitCurrency,
   type HullSlotCounts,
@@ -32,15 +39,17 @@ import { fittingItemCounts } from '@/engine/fittings/fittingExport';
 import type { ItemCount } from '@/engine/fittings/fitSellPrice';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import type { RackModule } from '@/engine/fittings/types';
-import { loadFittingSlots, loadShipTree } from '@/sde/loadSde';
+import { loadFittingSlots, loadShipTree, loadGameTypeNames } from '@/sde/loadSde';
 import type { WorkbenchFit } from './workbenchFits';
 
-/** What the check reads: the loader's catalog and each hull's slots. */
+/** What the check reads: the loader's catalog, each hull's slots and the game's type names. */
 export interface CurrencyGameData {
   typeByName: EftTypeLookup;
   slotByTypeId: EftSlotLookup;
   /** `null` for a hull the Ship Tree doesn't list — its racks then aren't counted. */
   hullSlots: (shipTypeId: number) => HullSlotCounts | null;
+  /** Whether a name the loader couldn't read is still a type in the game. */
+  isGameItem: (name: string) => boolean;
 }
 
 /** One fit's check: its verdict, and the modules its EFT loaded (unread lines left out). */
@@ -90,7 +99,8 @@ function cachedCheck(
   const check: WorkbenchFitCheck = {
     verdict: classifyFitCurrency(
       parts,
-      parts.hullTypeId === null ? null : data.hullSlots(parts.hullTypeId)
+      parts.hullTypeId === null ? null : data.hullSlots(parts.hullTypeId),
+      data.isGameItem
     ),
     // Rack and type only: the cache spans every hull's fits, and a row draws no more.
     modules:
@@ -120,11 +130,23 @@ export function resetFitCurrencyCache(): void {
 
 let gameDataPromise: Promise<CurrencyGameData> | null = null;
 
+/** With the game's names unreadable, nothing is called removed on a guess. */
+const everyNameIsTheGames = (): boolean => true;
+
+/** Never rejects: an unreadable list falls back to `everyNameIsTheGames`. */
+function loadGameItemNames(): Promise<(name: string) => boolean> {
+  return Promise.resolve()
+    .then(() => loadGameTypeNames())
+    .then(gameItemLookup, () => everyNameIsTheGames);
+}
+
 function loadGameData(): Promise<CurrencyGameData> {
   // Started inside a `then`, so even a synchronous throw lands in the `catch`.
   gameDataPromise ??= Promise.resolve()
-    .then(() => Promise.all([loadItemNameMap(), loadFittingSlots(), loadShipTree()]))
-    .then(([typeByName, slotByTypeId, shipTree]) => {
+    .then(() =>
+      Promise.all([loadItemNameMap(), loadFittingSlots(), loadShipTree(), loadGameItemNames()])
+    )
+    .then(([typeByName, slotByTypeId, shipTree, isGameItem]) => {
       const slotsByHull = new Map<number, HullSlotCounts>(
         shipTree.ships.map(({ typeID, stats }) => [
           typeID,
@@ -140,6 +162,7 @@ function loadGameData(): Promise<CurrencyGameData> {
         typeByName,
         slotByTypeId,
         hullSlots: (shipTypeId: number) => slotsByHull.get(shipTypeId) ?? null,
+        isGameItem,
       };
     })
     .catch((error: unknown) => {

@@ -15,6 +15,7 @@ import { marketTypeEntry } from './lib/marketTypeVolumes.mjs';
 import { bakeCertifiedPlans, factionNames, parseJsonl } from './lib/certifiedPlans.mjs';
 import { readCcpStaticDataFiles } from './lib/ccpStaticData.mjs';
 import { bakeCertificates } from './lib/certificates.mjs';
+import { bakeTypeNames, namesMissingFrom } from './lib/typeNames.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -2081,6 +2082,9 @@ async function main() {
     bakedSkillIds
   );
 
+  // --- typeNames.json: every type name, published or not; see lib/typeNames.mjs ---
+  const typeNames = bakeTypeNames([...types.values()].map((t) => t.name));
+
   // --- write outputs (compact) ---
   await mkdir(OUT_DIR, { recursive: true });
   await mkdir(MARKET_OUT_DIR, { recursive: true });
@@ -2114,6 +2118,8 @@ async function main() {
     ['gasCloudTypeIds.json', gasCloudTypeIds],
     ['compressedOreTypeIds.json', compressedOreTypeIds],
     ['shipTree.json', shipTree],
+    // Only the Workbench's out-of-date check reads it (~1.7 MB), so it loads on demand.
+    ['typeNames.json', typeNames],
   ];
   console.log('Writing outputs...');
   for (const [name, data] of outputs) {
@@ -2212,6 +2218,21 @@ async function main() {
       '  FAIL: ore/ice type ids came out implausibly small — the ore/ice market group structure may have changed'
     );
     process.exitCode = 1;
+  }
+  // Every name another file carries is a name the game has: typeNames.json
+  // missing one would mark a fit using it as out of date.
+  {
+    const missing = namesMissingFrom(typeNames, [
+      ...Object.values(typeMap).map((t) => t.name),
+      ...marketTypes.map((t) => t.name),
+      ...skills.map((s) => s.name),
+    ]);
+    if (missing.length > 0) {
+      console.error(
+        `  FAIL: ${missing.length} type names missing from typeNames.json (e.g. ${missing.slice(0, 5).join(', ')})`
+      );
+      process.exitCode = 1;
+    }
   }
   // Mining Yield reports m3, so every mineable type must carry a volume.
   // Checked rather than assumed: raw ore reaches types.json only through the

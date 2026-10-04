@@ -13,6 +13,12 @@
  * the per-hub cache: `market/prices.ts` keeps each station's prices for its
  * 15-minute TTL, so a tab switch or a hub switched back reads from it. If
  * prices can't load, every row simply has no price.
+ *
+ * Measured on a 507-fit hull (dev server): the check takes ~0.2 s and the
+ * lookup ~0.7 s per 200 types, but rendering the rows blocks the main thread
+ * for seconds, and the lookup waits behind it. Asking for prices before the
+ * rows render moved the request earlier but not the prices; a virtualized
+ * list is what would.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { fitSellPrice, type FitSellPrice } from '@/engine/fittings/fitSellPrice';
@@ -28,6 +34,11 @@ export interface WorkbenchFitPrices {
   priceFor: (id: string) => FitSellPrice | undefined;
   /** At least one fit has a price. */
   anyPriced: boolean;
+  /**
+   * This hub's prices are still on their way. False once they land or fail,
+   * and while there is nothing to price (still checking, or no fit loaded).
+   */
+  loading: boolean;
 }
 
 const NO_PRICES: ReadonlyMap<number, HubAggregate> = new Map();
@@ -80,5 +91,10 @@ export function useWorkbenchFitPrices(
     return priced;
   }, [checks, prices]);
 
-  return { hub, priceFor: (id) => byFit.get(id), anyPriced: byFit.size > 0 };
+  return {
+    hub,
+    priceFor: (id) => byFit.get(id),
+    anyPriced: byFit.size > 0,
+    loading: typeIds !== null && typeIds.length > 0 && prices === null,
+  };
 }

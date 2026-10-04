@@ -10,6 +10,11 @@
  * written text (an unparseable line or a missing header is the author's
  * typo, not a game change — Load still reports it). Missing data never makes
  * a fit out of date: with no slot counts for the hull, racks aren't counted.
+ *
+ * The loader resolves names against a catalogue that leaves out much of the
+ * game — Abyssal filaments, LP boosters and mutated (Abyssal) modules among
+ * them — so an item it can't read is only removed when the game's full list
+ * of type names (`isGameItem`) doesn't have it either.
  */
 import type { LoadParts } from './load';
 import { FITTING_SLOT_KINDS, type FittingSlotKind } from './types';
@@ -37,10 +42,22 @@ function subsystemSetsRacks(parts: LoadParts & { hullTypeId: number }, slots: Hu
   );
 }
 
-/** Classifies one fit from what the EFT loader made of it and its hull's slots (`null`: unknown). */
+/** `isGameItem` over a list of the game's type names, matched ignoring case as the EFT loader matches. */
+export function gameItemLookup(names: Iterable<string>): (name: string) => boolean {
+  const known = new Set<string>();
+  for (const name of names) known.add(name.toLowerCase());
+  return (name) => known.has(name.toLowerCase());
+}
+
+/**
+ * Classifies one fit from what the EFT loader made of it and its hull's slots
+ * (`null`: unknown). `isGameItem` says whether a name the loader couldn't
+ * read is still a type in the game.
+ */
 export function classifyFitCurrency(
   parts: LoadParts,
-  hullSlots: HullSlotCounts | null
+  hullSlots: HullSlotCounts | null,
+  isGameItem: (name: string) => boolean
 ): FitCurrency {
   const removed: OutOfDateReason[] = [];
   const removedNames = new Set<string>();
@@ -51,7 +68,7 @@ export function classifyFitCurrency(
       // An empty name is a missing header — a typo, not a removed hull.
       if (warning.text.trim() !== '') removed.push({ kind: 'unknown-hull', name: warning.text });
     } else if (warning.kind === 'unknown-item') {
-      if (!removedNames.has(warning.text)) {
+      if (!removedNames.has(warning.text) && !isGameItem(warning.text)) {
         removedNames.add(warning.text);
         removed.push({ kind: 'removed-item', name: warning.text });
       }
