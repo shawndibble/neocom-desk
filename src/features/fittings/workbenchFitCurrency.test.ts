@@ -57,6 +57,61 @@ describe('checkFitsCurrency', () => {
   it('has no modules for a hull the game no longer knows', async () => {
     const checks = await checkFitsCurrency([{ id: 'a', eft: '[Gone Hull, A]' }], data);
     expect(checks?.get('a')?.modules).toEqual([]);
+    expect(checks?.get('a')?.items).toEqual([]);
+  });
+
+  it('keeps the whole fit as item counts for pricing: hull, modules, charges, drones, cargo', async () => {
+    const checks = await checkFitsCurrency(
+      [
+        {
+          id: 'a',
+          eft: [
+            '[Vexor, A]',
+            'Damage Control II',
+            '',
+            'Heavy Neutron Blaster II, Void M',
+            'Heavy Neutron Blaster II, Void M',
+            '',
+            'Hammerhead II x5',
+            '',
+            'Void M x1000',
+          ].join('\n'),
+        },
+      ],
+      {
+        ...data,
+        typeByName: new Map([
+          ['vexor', { typeID: 626 }],
+          ['heavy neutron blaster ii', { typeID: 3001 }],
+          ['damage control ii', { typeID: 2048 }],
+          ['void m', { typeID: 12789 }],
+          ['hammerhead ii', { typeID: 2185 }],
+        ]),
+        slotByTypeId: { 3001: 'high', 2048: 'low', 2185: 'drone' },
+      }
+    );
+    expect(new Map(checks?.get('a')?.items)).toEqual(
+      new Map([
+        [626, 1],
+        [2048, 1],
+        [3001, 2],
+        [12789, 1002],
+        [2185, 5],
+      ])
+    );
+  });
+
+  it('keeps the items that did load on an out-of-date fit', async () => {
+    const checks = await checkFitsCurrency(
+      [{ id: 'a', eft: '[Vexor, A]\nOld Gun I\nHeavy Neutron Blaster II' }],
+      data
+    );
+    expect(new Map(checks?.get('a')?.items)).toEqual(
+      new Map([
+        [626, 1],
+        [3001, 1],
+      ])
+    );
   });
 
   it('parses each EFT once, answering a repeat from the cache', async () => {
