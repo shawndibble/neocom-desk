@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { fieldBaseClassName } from './controlStyles';
+import { controlHeightClassName, fieldBaseClassName, type ControlSize } from './controlStyles';
 import { groupSortedRows } from './dataTableGroup';
 import * as Icon from './icons';
 import { InfoTooltip } from './Tooltip';
@@ -717,6 +717,11 @@ interface DataTableSortPickerProps<T> {
   /** The sort in force, or `undefined` before any. */
   sort: DataTableSort | undefined;
   onSortChange: (sort: DataTableSort) => void;
+  /**
+   * `md` (the default) is the 44px touch target of the bar above a table;
+   * `sm` matches the `size="sm"` buttons of a filter row it sits in.
+   */
+  size?: ControlSize;
   className?: string;
 }
 
@@ -734,6 +739,7 @@ export function DataTableSortPicker<T>({
   columns,
   sort,
   onSortChange,
+  size = 'md',
   className,
 }: DataTableSortPickerProps<T>) {
   const { t } = useTranslation();
@@ -743,7 +749,9 @@ export function DataTableSortPicker<T>({
     <label
       className={cx(
         fieldBaseClassName,
-        'relative inline-flex h-11 shrink-0 items-center gap-1.5 px-3 text-xs focus-within:outline-2 focus-within:outline-accent',
+        controlHeightClassName[size],
+        size === 'sm' ? 'px-2' : 'px-3',
+        'relative inline-flex shrink-0 items-center gap-1.5 text-xs focus-within:outline-2 focus-within:outline-accent',
         className
       )}
     >

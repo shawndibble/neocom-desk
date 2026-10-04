@@ -1744,6 +1744,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                       columns={openColumns}
                       sort={taxSort.sort}
                       onSortChange={taxSort.onSortChange}
+                      size="sm"
                     />
                   )}
 
