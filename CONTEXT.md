@@ -1096,8 +1096,9 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Expected Sell Price**: What a hauler should expect per unit at the destination hub if they list to sell: the lower of one tick under the cheapest listing and the volume-weighted median price the item sold at recently. Never above today's cheapest listing, and never the cheapest listing that every other user of a price-gap tool sees too. `estimateSale` in `src/engine/market/haulingMarket.ts`.
 - **Days to Sell**: How long the units listed within 1% of the **Expected Sell Price** (they will relist below the hauler), plus about one day's worth of the hauler's own, take to sell at the region's recent sales rate. Not **Traded Volume** (units sold), and not a promise for the whole load.
 - **Any hub**: A **Hauling Opportunities** From or To choice (`from=any` / `to=any`, `ANY_HUB` in code) that scans every other **Trade Hub** for that end and keeps each item on its single best lane; a Hub column names the hub each row uses. Allowed at one end only. A **Trip Plan** made with From on Any can buy at several hubs.
-- **Cargo Space**: The m³ a hauler can carry, chosen once per device as a ship's base hold, a saved **Fitting**'s exact hold or a typed number. A ship's hold here is its cargo hold plus its fleet hangar (a Deep Space Transport carries most of its load in the hangar), never an ore-only mining hold. Optional: without it a **Trip Plan** stops only at sales and profitable supply. Hauled volume is the packaged volume where a type has one.
-- **Trip Plan**: The suggested load for one hold on one route (with **Any hub** at one end, each item on its own lane): a quantity per item capped by a week of sales, the units worth buying at all, the remaining **Cargo Space** and an optional ISK budget, with the limit that applied named on each line. A suggestion the user edits by unticking or typing a quantity; the multibuy list copies from it (`planTrip`, `multibuyText` in `src/engine/market/haulingPlan.ts`).
+- **Cargo Space**: The holds a hauler can fill, each with its own m³, chosen once per device as a ship's base holds, a saved **Fitting**'s exact holds or a typed number. A ship's general hold is its cargo hold plus its fleet hangar (a Deep Space Transport carries most of its load in the hangar), which take anything; beside it sit any **Specialised Holds** the ship has. Optional: without it a **Trip Plan** stops only at sales and profitable supply. Hauled volume is the packaged volume where a type has one.
+- **Specialised Hold**: A ship hold that takes only certain contents, such as an ammo, planetary commodities, command center, mineral, gas, mining, ice, fuel or infrastructure hold, as opposed to the general hold (cargo hold plus fleet hangar). Which holds count and what each accepts: `docs/context/decisions/20261004-101406-cargo-space-counts-specialised-holds-whose-contents-fit.md`.
+- **Trip Plan**: The suggested load for one trip's **Cargo Space** on one route (with **Any hub** at one end, each item on its own lane): a quantity per item capped by a week of sales, the units worth buying at all, the remaining **Cargo Space** and an optional ISK budget, with the limit that applied named on each line. A suggestion the user edits by unticking or typing a quantity; the multibuy list copies from it (`planTrip`, `multibuyText` in `src/engine/market/haulingPlan.ts`).
 - **Training Progress**: How much SP a Character has already banked toward
   the level it is training _right now_. Distinct from **Trained Skills**,
   which is levels finished. ESI reports it in two places that disagree:
@@ -1127,9 +1128,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   stack at the hub's sell price: sales tax plus broker fee, 100 ISK minimum per
   stack). Independent of a plan's material price basis, which is about buying.
 - **Variations**: The selected item's Tech I/II/Faction/Storyline/Officer
-  variation group, shown as a sortable table (Name, Tier, Sell, Buy) beside
-  it for price comparison; falls back to its Market Group siblings when it
-  has no variation data.
+  variation group, shown on its own item tab (beside Order Book and Price
+  History) as a sortable table grouped by tier — Name, Tier, Sell, Buy and a
+  signed "vs <item>" sell delta, the item's own prices above it — for price
+  comparison; falls back to its Market Group siblings when it has no
+  variation data.
 - **What We Store**: The section of Settings' FAQ tab that tells a pilot, in
   their own words, what leaves their device. Not documentation — a
   **commitment**: the **Synced Collection** registry's `REMOTE_COLLECTIONS` is

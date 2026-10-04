@@ -2109,6 +2109,10 @@ async function main() {
     ['marketWideTrees.json', marketWideTrees],
     ['reprocessing.json', reprocessing],
     ['types.json', typeMap],
+    // groupID -> categoryID: which Specialised Holds accept an item is keyed
+    // partly by category (`engine/market/cargoHolds.ts`), and `types.json`
+    // carries only the group.
+    ['groupCategories.json', Object.fromEntries([...groups].map(([id, g]) => [id, g.categoryID]))],
     ['pi.json', pi],
     // Its own file, not folded into pi.json: it is one entry per planet in New
     // Eden and every other consumer of pi.json would pay for it on load.
