@@ -59,6 +59,8 @@ import type { FittingChange } from './useFittingWorkspace';
 interface EditorItemActionsInput {
   fitting: Fitting | null;
   stats: FittingStats | null;
+  /** The stats for exactly this Fitting; null while a calculation is pending. `stats` lags an edit by one. */
+  currentStats: FittingStats | null;
   edit: (change: FittingChange, coalesceKey?: string) => void;
   /** Null while the engine, pilot or catalogue loads. */
   context: FittingContext | null;
@@ -104,6 +106,7 @@ const RECENT_PER_RACK = 5;
 export function useEditorItemActions({
   fitting,
   stats,
+  currentStats,
   edit,
   context,
   catalogue,
@@ -141,7 +144,10 @@ export function useEditorItemActions({
         : { capacity: droneCapacity, volumeOf: (typeId) => catalogueVolume(catalogue, typeId) },
     [droneCapacity, catalogue]
   );
-  const launchLimits = useMemo<DroneLaunchLimits | null>(() => launchLimitsFrom(stats), [stats]);
+  const launchLimits = useMemo<DroneLaunchLimits | null>(
+    () => launchLimitsFrom(currentStats),
+    [currentStats]
+  );
 
   /**
    * The charges a not-yet-fitted `typeId` could default to at `rack` — its
@@ -278,7 +284,7 @@ export function useEditorItemActions({
   const shipTypeId = fitting?.shipTypeId ?? null;
   // Read by "Change charge ▸" only when it opens: a ref, so each edit doesn't rebuild the actions.
   const chargePickerRef = useRef<ChargePickerInput | null>(null);
-  const statModules = stats?.modules ?? null;
+  const statModules = currentStats?.modules ?? null;
   useLayoutEffect(() => {
     chargePickerRef.current =
       fitting === null || catalogue === null

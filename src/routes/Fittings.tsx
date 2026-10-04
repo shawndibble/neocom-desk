@@ -259,6 +259,7 @@ function FittingsPage() {
   const { itemActions, fitAt, droneBay, noteRecent, defaultCharges } = useEditorItemActions({
     fitting,
     stats,
+    currentStats: workspace.currentStats,
     edit,
     context,
     catalogue,
