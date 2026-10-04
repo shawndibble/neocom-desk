@@ -60,7 +60,7 @@ import {
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { useTimedToast } from '@/components/ui/useTimedToast';
-import { ownedStockBulkText } from './useOwnedStockBulk';
+import { ownedStockBulkText } from './ownedStockBulkText';
 
 interface MaterialsTableProps {
   /** Engine cost lines — already resolved against the plan's sourcing overrides and hub prices. */
@@ -486,7 +486,6 @@ function isBuilt(material: MaterialTableRow): boolean {
 /** A number in the phone ledger, right-aligned under its section's column header. */
 const LEDGER_VALUE = 'flex min-w-0 justify-end text-sm tabular-nums';
 
-/** How long the "moved to …" confirmation stays up — the same beat every other Undo toast in the app keeps. */
 /**
  * Each section's colour, carried by its heading. Never the only cue
  * (docs/DESIGN.md §7): every heading also names its section in words and,

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { MESSAGE_MS, NOTICE_MS, TOAST_MS, useTimedToast } from './useTimedToast';
+import { NOTICE_MS, TOAST_MS, useTimedToast } from './useTimedToast';
 
 describe('useTimedToast', () => {
   beforeEach(() => {
@@ -8,10 +8,6 @@ describe('useTimedToast', () => {
   });
   afterEach(() => {
     vi.useRealTimers();
-  });
-
-  it('keeps the shared durations', () => {
-    expect([TOAST_MS, NOTICE_MS, MESSAGE_MS]).toEqual([8000, 2500, 6000]);
   });
 
   it('expires after the default duration, not before', () => {

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Toast } from '@/components/ui';
 import {
@@ -14,23 +13,9 @@ import {
 import {
   ownedStockBulkConfirmation,
   type OwnedStockBulkKind,
-  type OwnedStockBulkMessage,
 } from '@/engine/industry/ownedStockBulkConfirmation';
 import { useTimedToast } from '@/components/ui/useTimedToast';
-
-/** The words for a "Use all" / "Use none" confirmation; the Materials table shows the same ones. */
-export function ownedStockBulkText(t: TFunction, message: OwnedStockBulkMessage): string {
-  switch (message.kind) {
-    case 'useAllDone':
-      return t('industry.useAllDone', { count: message.count });
-    case 'useNoneDone':
-      return t('industry.useNoneDone', { count: message.count });
-    case 'useAllNothing':
-      return t('industry.useAllNothing');
-    case 'useNoneNothing':
-      return t('industry.useNoneNothing');
-  }
-}
+import { ownedStockBulkText } from './ownedStockBulkText';
 
 interface BulkToast {
   message: string;
