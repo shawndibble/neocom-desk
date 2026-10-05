@@ -32,6 +32,12 @@ export interface HaulingThresholds {
    * more units than anyone moves in one trip.
    */
   ownShareOfDemand: number;
+  /**
+   * The least a unit must earn, as a percent of what it costs to buy, to be
+   * worth buying at all. A unit that only breaks even on today's books loses
+   * money the moment a price slips between planning and buying or selling.
+   */
+  minUnitMarginPct: number;
   /** The history window demand is read over. */
   historyDays: number;
   /** The recent-sale-price window. Falls back to the whole history window when nothing traded inside it. */
@@ -59,6 +65,7 @@ export interface HaulingThresholds {
 export const HAULING_THRESHOLDS: HaulingThresholds = {
   horizonDays: 7,
   ownShareOfDemand: 0.25,
+  minUnitMarginPct: 5,
   historyDays: 30,
   recentPriceDays: 7,
   minOrdersPerTradingDay: 2,
@@ -345,8 +352,11 @@ export function walkInstant(input: {
   destBuyLadder: readonly LadderLevel[];
   accountingLevel: number;
   maxUnits?: number;
+  /** Stop at the first unit earning less than this percent of its buy price; 0 (the default) stops at break-even. */
+  minMarginPct?: number;
 }): InstantWalk {
   const { originLadder, destBuyLadder, accountingLevel } = input;
+  const minMargin = 1 + Math.max(0, input.minMarginPct ?? 0) / 100;
   let remaining = input.maxUnits === undefined ? Infinity : Math.max(0, Math.floor(input.maxUnits));
   let units = 0;
   let cost = 0;
@@ -358,7 +368,7 @@ export function walkInstant(input: {
   while (remaining > 0 && i < originLadder.length && j < destBuyLadder.length) {
     const buyAt = originLadder[i]!.price;
     const sellAt = destBuyLadder[j]!.price;
-    if (sellAt - salesTax(sellAt, accountingLevel) <= buyAt) break;
+    if (sellAt - salesTax(sellAt, accountingLevel) <= buyAt * minMargin) break;
     const take = Math.min(leftAtOrigin, leftAtDest, remaining);
     units += take;
     cost += take * buyAt;

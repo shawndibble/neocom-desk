@@ -5919,6 +5919,8 @@
         "eachShort": "{{isk}} each",
         "margin": "Margin",
         "marginHow": "profit ÷ buy cost",
+        "maxBuy": "Never pay more than",
+        "maxBuyHow": "each in {{hub}} · past it the margin is under {{pct}}%",
         "listedOnlyGap": "A tool that only compares listed prices would promise {{listed}} each here. We expect {{ours}}.",
         "ordersTitle": "Sell orders in {{hub}}",
         "colPrice": "Price",

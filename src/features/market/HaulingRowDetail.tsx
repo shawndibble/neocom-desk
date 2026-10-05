@@ -25,6 +25,7 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip } from '@/components/ui';
 import { HAULING_THRESHOLDS, lotEconomics } from '@/engine/market/haulingMarket';
+import { maxBuyPrice } from '@/engine/market/haulingPlan';
 import { formatIsk, formatMarketIsk } from '@/lib/isk';
 import { MarketItemLink } from './MarketItemLink';
 import type { InstantHaulingScanRow, ListHaulingScanRow } from './haulingData';
@@ -165,6 +166,29 @@ function LoadNote({ row, note }: { row: HaulingViewRow; note: string | undefined
   );
 }
 
+/**
+ * The price line to hold while buying: the dearest unit still clearing the
+ * margin floor after every fee. Buying is live — the origin's book moves
+ * between this scan and the purchase — so the cheapest units are not a promise
+ * that the last ones are worth taking.
+ */
+function PriceLimit({ row }: { row: HaulingViewRow }) {
+  const { t } = useTranslation();
+  const limit = maxBuyPrice(row.candidate, row.fees);
+  if (limit === null) return null;
+  return (
+    <Line
+      strong
+      label={t('market.hauling.detail.maxBuy')}
+      detail={t('market.hauling.detail.maxBuyHow', {
+        hub: row.fromHub.systemName,
+        pct: HAULING_THRESHOLDS.minUnitMarginPct,
+      })}
+      amount={formatMarketIsk(limit)}
+    />
+  );
+}
+
 function InstantDetail({ row, loadNote }: DetailProps<HaulingViewRow & InstantHaulingScanRow>) {
   const { t } = useTranslation();
   const { fromHub: from, toHub: to, fees } = row;
@@ -232,6 +256,7 @@ function InstantDetail({ row, loadNote }: DetailProps<HaulingViewRow & InstantHa
                   detail={t('market.hauling.detail.marginHow')}
                   amount={`${lot.marginPct.toFixed(1)}%`}
                 />
+                <PriceLimit row={row} />
               </div>
               <LoadNote row={row} note={loadNote} />
             </>
@@ -439,6 +464,7 @@ function ListingDetail({ row, loadNote }: DetailProps<HaulingViewRow & ListHauli
                 detail={t('market.hauling.detail.marginHow')}
                 amount={`${lot.marginPct.toFixed(1)}%`}
               />
+              <PriceLimit row={row} />
             </div>
             <LoadNote row={row} note={loadNote} />
           </Section>
