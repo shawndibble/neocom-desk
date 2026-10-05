@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { loadContractLocationName } from './contractLocationName';
 import { CONTRACT_TYPE_KEY } from './contractLabels';
-import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
+import { formatIsk } from '@/lib/isk';
 import type { Contract } from '@/esi/endpoints';
 
 function isUntitledCourier(contract: Contract): boolean {
@@ -54,7 +54,7 @@ export function ContractIdentity({
       {contract.collateral !== undefined && (
         <span className="block text-xs font-normal text-text-dim">
           {t('contracts.collateralMeta', {
-            value: formatIskAuto(contract.collateral, CONTRACT_ISK_CENTS_BELOW),
+            value: formatIsk(contract.collateral, 2),
           })}
         </span>
       )}

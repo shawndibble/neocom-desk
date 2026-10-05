@@ -2168,7 +2168,7 @@ function NodeRowView({
       estimatedValue={estimatedValue}
       characterBadge={badge}
       blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
-      onShowInfo={() => pageActions.showInfo(asset.type_id, label)}
+      typeId={asset.type_id}
       selectMode={selectMode}
       selectionState={selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
       onToggleSelection={() => onToggleSelection([asset.item_id])}

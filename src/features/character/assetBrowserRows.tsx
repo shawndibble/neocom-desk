@@ -14,11 +14,12 @@
 
 import { type ReactElement, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { IconButton, IskAmount, RowActionsMenu, RowMoreActions } from '@/components/ui';
+import { IconButton, IskAmount, RowActionsMenu, RowMoreActions, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { focusRingInsetClassName, tappableRowClassName } from '@/components/ui/controlStyles';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatUnitVolume } from '@/lib/volume';
 import { securityStatusColor } from '@/engine/securityStatus';
 import { formatBadge } from './assetBrowserFormat';
@@ -34,10 +35,15 @@ export type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
 /* ------------------------------------------------------------------ badges */
 
+/** A navigating row's trailing caret (§6c): faint at rest, accent while the row's link is hovered or focused. */
+const rowCaretClassName =
+  'shrink-0 text-text-faint transition-colors group-hover:text-accent group-focus-visible:text-accent';
+
 interface SecurityValueProps {
   /** Undefined while still resolving, null when unresolvable — renders nothing either way. */
   security: number | null | undefined;
-  t: Translate;
+  /** Unused now (the number is its own label); callers still pass it. */
+  t?: Translate;
 }
 
 /**
@@ -45,14 +51,13 @@ interface SecurityValueProps {
  * (`securityStatusColor`). The number is always spelled out rather than
  * reduced to a coloured dot — DESIGN.md §7, colour is never the only signal.
  */
-export function SecurityValue({ security, t }: SecurityValueProps) {
+export function SecurityValue({ security }: SecurityValueProps) {
   if (security === null || security === undefined) return null;
   const value = security.toFixed(1);
   return (
     <span
       className="shrink-0 text-[0.6875rem] font-semibold tabular-nums"
       style={{ color: securityStatusColor(security) }}
-      title={t('assets.security.ariaLabel', { value })}
     >
       {value}
     </span>
@@ -82,24 +87,24 @@ export function JumpsAwayText({ result, t, locationId, preference }: JumpsAwayTe
     );
   }
   return (
-    <span className="tabular-nums" title={t(`assets.jumpsAway.unknownReason.${result.reason}`)}>
-      {t('assets.jumpsAway.unknown')}
-    </span>
+    // Plain Tooltip, not HintText: this sits inside a row link, where a focusable,
+    // tap-to-toggle trigger would fight the navigation.
+    <Tooltip content={t(`assets.jumpsAway.unknownReason.${result.reason}`)}>
+      <span className="tabular-nums">{t('assets.jumpsAway.unknown')}</span>
+    </Tooltip>
   );
 }
 
 interface CharacterBadgeProps {
   characterName: string;
-  t: Translate;
+  /** Unused now (the name is its own label); callers still pass it. */
+  t?: Translate;
 }
 
 /** Marks a row as belonging to a Character other than the active one. */
-export function CharacterBadge({ characterName, t }: CharacterBadgeProps) {
+export function CharacterBadge({ characterName }: CharacterBadgeProps) {
   return (
-    <span
-      className="ml-1.5 shrink-0 rounded-xs border border-line bg-panel-2 px-1 py-0.5 text-[0.6875rem] text-text-dim"
-      title={t('assets.crossCharacterBadge', { character: characterName })}
-    >
+    <span className="ml-1.5 shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem] text-text-dim">
       {characterName}
     </span>
   );
@@ -115,12 +120,12 @@ const BLUEPRINT_BADGE: Record<BlueprintKind, { label: string; name: string; clas
   original: {
     label: 'assets.blueprintBadge.original.label',
     name: 'assets.blueprintBadge.original.name',
-    className: 'border-accent-dim text-accent',
+    className: 'text-accent',
   },
   copy: {
     label: 'assets.blueprintBadge.copy.label',
     name: 'assets.blueprintBadge.copy.name',
-    className: 'border-blueprint-copy/50 text-blueprint-copy',
+    className: 'text-blueprint-copy',
   },
 };
 
@@ -135,7 +140,7 @@ export function BlueprintBadge({ kind, t }: BlueprintBadgeProps) {
   return (
     <span
       className={cx(
-        'ml-1.5 shrink-0 rounded-xs border px-1 py-0.5 text-[0.6875rem] font-semibold',
+        'ml-1.5 shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem] font-semibold',
         badge.className
       )}
     >
@@ -202,7 +207,10 @@ export function LocationRow({
       )}
       <Link
         to={href}
-        className="flex min-h-16 min-w-0 flex-1 items-center gap-2.5 py-2 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
+        className={cx(
+          'group flex min-h-16 min-w-0 flex-1 items-center gap-2.5 py-2',
+          focusRingInsetClassName
+        )}
       >
         <span className="flex w-7 shrink-0 justify-end">
           {unresolvedParent ? (
@@ -227,7 +235,7 @@ export function LocationRow({
             </span>
           </span>
         </span>
-        <Icon.Descend size={Icon.ICON_SIZE.md} className="shrink-0 text-text-faint" />
+        <Icon.Descend size={Icon.ICON_SIZE.md} className={rowCaretClassName} />
       </Link>
       {!unresolvedParent && showPin && (
         <IconButton
@@ -292,7 +300,10 @@ export function ContainerRow({
       )}
       <Link
         to={href}
-        className="flex min-h-12 min-w-0 flex-1 items-center gap-2.5 py-1.5 pr-3 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
+        className={cx(
+          'group flex min-h-12 min-w-0 flex-1 items-center gap-2.5 py-1.5 pr-3',
+          focusRingInsetClassName
+        )}
       >
         <Icon.Container size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-faint" />
         <span className="flex min-w-0 flex-1 items-center">
@@ -306,7 +317,7 @@ export function ContainerRow({
         <span className="shrink-0 text-[0.6875rem] text-text-dim tabular-nums">
           {formatBadge({ itemCount, estimatedValue }, t)}
         </span>
-        <Icon.Descend size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-faint" />
+        <Icon.Descend size={Icon.ICON_SIZE.sm} className={rowCaretClassName} />
       </Link>
       {menu && <RowMoreActions className="mr-1" />}
     </div>
@@ -361,34 +372,6 @@ export function ItemColumnLabels({ t }: ItemColumnLabelsProps) {
   );
 }
 
-/**
- * An item's name as the way into its Show info. It sits inside the row menu's
- * trigger, so a touch-and-hold on it opens that menu — and some browsers
- * still send a click when the finger lifts. That click is swallowed: a press
- * that became a context menu (or was held that long) never opens Show info
- * on top of the menu it just opened.
- */
-function ItemNameButton({ name, onShowInfo }: { name: string; onShowInfo: () => void }) {
-  const guard = useLiftAfterHoldGuard();
-  return (
-    <button
-      type="button"
-      className={cx(
-        'min-w-0 cursor-pointer truncate text-left text-sm underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
-        tappableRowClassName
-      )}
-      title={name}
-      {...guard.handlers}
-      onClick={(event) => {
-        if (guard.swallowClick(event)) return;
-        onShowInfo();
-      }}
-    >
-      {name}
-    </button>
-  );
-}
-
 interface ItemRowProps {
   name: string;
   quantity: number;
@@ -397,8 +380,8 @@ interface ItemRowProps {
   characterBadge: string | null;
   /** Set on a blueprint stack: a BPO or BPC badge beside the name. */
   blueprintKind?: BlueprintKind | null;
-  /** Makes the name a button opening Show info — the row menu's first action, one click closer. */
-  onShowInfo?: () => void;
+  /** Makes the name a Market link (§6c); Show info stays in the row menu. */
+  typeId?: number;
   /** Wraps the row in the shared item context menu — supplied by the route. */
   wrap: (children: ReactElement) => ReactNode;
   selectMode: boolean;
@@ -415,10 +398,9 @@ interface ItemRowProps {
  *
  * Full item detail (icon, volume, location, jumps-away) lives behind the
  * row's menu's "Show info" action — right-click, or the More actions button
- * the menu publishes into the row — not on the row itself. With `onShowInfo`
- * the name opens it directly too: a real button inside the menu's trigger,
- * never wrapping another control, so right-click and long-press still reach
- * the menu from it.
+ * the menu publishes into the row — not on the row itself. With `typeId`
+ * the name links to the item's Market listing; a link inside the menu's
+ * trigger, so right-click and long-press still reach the menu from it.
  */
 export function ItemRow({
   name,
@@ -427,7 +409,7 @@ export function ItemRow({
   estimatedValue,
   characterBadge,
   blueprintKind = null,
-  onShowInfo,
+  typeId,
   wrap,
   selectMode,
   selectionState,
@@ -453,12 +435,18 @@ export function ItemRow({
               above). */}
           <span className="flex min-w-0 flex-1 flex-col gap-0.5 md:contents">
             <span className="flex min-w-0 items-center md:flex-1">
-              {onShowInfo ? (
-                <ItemNameButton name={name} onShowInfo={onShowInfo} />
+              {typeId === undefined ? (
+                <span className="truncate text-sm">{name}</span>
               ) : (
-                <span className="truncate text-sm" title={name}>
-                  {name}
-                </span>
+                <MarketItemLink
+                  typeId={typeId}
+                  className={cx(
+                    entityLinkClassName('flex min-w-0 items-center text-sm'),
+                    tappableRowClassName
+                  )}
+                >
+                  <span className="truncate">{name}</span>
+                </MarketItemLink>
               )}
               {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
               {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
@@ -525,25 +513,31 @@ export function SearchResultRow({
     <div className="border-b border-line hover:bg-panel-2">
       <Link
         to={href}
-        className="flex min-h-16 flex-col gap-1 px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
+        className={cx(
+          'group flex min-h-16 items-center gap-2.5 px-3 py-2',
+          focusRingInsetClassName
+        )}
       >
-        <span className="flex min-w-0 items-baseline gap-2">
-          <span className="flex min-w-0 flex-1 items-center">
-            <span className="truncate text-sm font-medium">{name}</span>
-            {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
-            {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="flex min-w-0 flex-1 items-center">
+              <span className="truncate text-sm font-medium">{name}</span>
+              {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
+              {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
+            </span>
+            <span className="shrink-0 text-sm tabular-nums">×{quantity.toLocaleString()}</span>
           </span>
-          <span className="shrink-0 text-sm tabular-nums">×{quantity.toLocaleString()}</span>
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
+              <SecurityValue security={security} t={t} />
+              <span className="truncate text-[0.6875rem] text-text-dim">{trail.join(' › ')}</span>
+            </span>
+            <span className="shrink-0 text-[0.6875rem] text-isk-pos tabular-nums">
+              <IskAmount value={estimatedValue} decimals={0} />
+            </span>
+          </span>
         </span>
-        <span className="flex min-w-0 items-baseline gap-2">
-          <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-            <SecurityValue security={security} t={t} />
-            <span className="truncate text-[0.6875rem] text-text-dim">{trail.join(' › ')}</span>
-          </span>
-          <span className="shrink-0 text-[0.6875rem] text-isk-pos tabular-nums">
-            <IskAmount value={estimatedValue} decimals={0} />
-          </span>
-        </span>
+        <Icon.Descend size={Icon.ICON_SIZE.sm} className={rowCaretClassName} />
       </Link>
     </div>
   );

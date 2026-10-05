@@ -13,7 +13,6 @@ import {
   FilterBar,
   FilterChip,
   IconButton,
-  IskAmount,
   PageHeader,
   Panel,
   SearchInput,
@@ -36,6 +35,7 @@ import { ContractContextMenu } from '@/features/character/ContractContextMenu';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
 import { ContractIdentity } from '@/features/character/ContractIdentity';
 import { CharacterLink } from '@/features/entities';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { StandingTag } from '@/features/character/StandingTag';
 import { loadContacts } from '@/features/character/contacts';
 import {
@@ -61,6 +61,7 @@ import {
 } from '@/features/contractSearch/ContractSearchPanel';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
+import { formatIsk } from '@/lib/isk';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatTimestamp } from '@/lib/timestamp';
 import { formatCountdown } from '@/lib/duration';
@@ -416,7 +417,7 @@ export function Contracts() {
         sortValue: (contract) => contractAmount(contract),
         render: (contract) => {
           const amount = contractAmount(contract);
-          return amount !== undefined ? <IskAmount value={amount} /> : t('common.unknown');
+          return amount !== undefined ? formatIsk(amount, 2) : t('common.unknown');
         },
       },
       issued: {
@@ -458,7 +459,9 @@ export function Contracts() {
           <button
             type="button"
             onClick={() => setSelectedContract(contract)}
-            className="flex min-h-11 w-full items-center text-left font-medium text-accent hover:underline md:block md:min-h-0 md:w-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className={entityLinkClassName(
+              'flex min-h-11 w-full items-center text-left font-medium md:block md:min-h-0 md:w-auto'
+            )}
           >
             <ContractIdentity contract={contract} characterId={activeCharacterId} />
           </button>

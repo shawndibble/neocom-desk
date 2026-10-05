@@ -13,6 +13,9 @@ import { recordCharacterCorporation } from '@/auth/session';
 export interface PublicInfoEntry {
   corporationName: string | null;
   allianceName: string | null;
+  /** Ids behind the names, so a name can be an entity link. Absent on entries built without them. */
+  corporationId?: number;
+  allianceId?: number;
 }
 
 interface PublicInfoState {
@@ -62,7 +65,12 @@ export const usePublicInfo = create<PublicInfoState>((set, get) => ({
       set((state) => ({
         byCharacterId: {
           ...state.byCharacterId,
-          [characterId]: { corporationName, allianceName },
+          [characterId]: {
+            corporationName,
+            allianceName,
+            corporationId: info.corporation_id,
+            allianceId: info.alliance_id,
+          },
         },
       }));
     } catch {
@@ -101,6 +109,8 @@ export const usePublicInfo = create<PublicInfoState>((set, get) => ({
         for (const affiliation of affiliations) {
           byCharacterId[affiliation.character_id] = {
             corporationName: nameById.get(affiliation.corporation_id) ?? null,
+            corporationId: affiliation.corporation_id,
+            allianceId: affiliation.alliance_id,
             allianceName:
               affiliation.alliance_id === undefined
                 ? null

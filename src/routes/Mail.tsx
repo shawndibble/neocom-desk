@@ -1,4 +1,8 @@
-import { selectedRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  interactiveClassName,
+  selectedRowClassName,
+} from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -706,10 +710,11 @@ export function Mail() {
                           <div
                             aria-current={isSelected ? 'true' : undefined}
                             className={cx(
-                              'flex items-center transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none',
+                              'flex items-center',
+                              interactiveClassName,
                               isSelected
                                 ? selectedRowClassName
-                                : 'border-l-2 border-l-transparent hover:bg-panel-2/60'
+                                : 'border-l-2 border-l-transparent hover:bg-panel-2'
                             )}
                           >
                             <button
@@ -732,7 +737,7 @@ export function Mail() {
                               aria-current={isSelected ? 'true' : undefined}
                               className={cx(
                                 'flex min-w-0 flex-1 items-start gap-2 self-stretch py-1.5 pr-3 pl-2.5 text-left',
-                                'focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent'
+                                focusRingInsetClassName
                               )}
                             >
                               {/* Unread marker, in a fixed-width gutter so read and

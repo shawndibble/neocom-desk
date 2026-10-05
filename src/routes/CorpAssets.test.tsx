@@ -446,14 +446,13 @@ describe('item name and blueprint badge', () => {
     });
   });
 
-  it('opens Show info from the item name', async () => {
+  it('links the item name to its Market listing', async () => {
     const user = userEvent.setup();
     renderAssets();
     await user.click(await screen.findByRole('link', { name: /Division 1/ }));
 
-    await user.click(await screen.findByRole('button', { name: 'Tritanium' }));
-
-    expect(screen.getByRole('dialog', { name: 'Item detail: Tritanium' })).toBeInTheDocument();
+    const name = await screen.findByRole('link', { name: 'Tritanium' });
+    expect(name.getAttribute('href')).toMatch(/^\/market\/browser\?.*34/);
   });
 
   it('badges a corp BPO and BPC, and leaves an ordinary item bare', async () => {

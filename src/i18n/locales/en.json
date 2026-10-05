@@ -5620,6 +5620,7 @@
     "points": "Loyalty Points",
     "browseStores": "Browse LP Stores",
     "openStore": "Open LP Store",
+    "storeColumn": "LP Store",
     "reauthTitle": "Log in again to see your loyalty points",
     "reauthHint": "Log in again to fetch this character's loyalty point balances.",
     "reauthAction": "Log in again with EVE Online"

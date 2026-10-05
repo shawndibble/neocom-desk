@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLockedRoutes } from '@/app/useGrantedScopes';
 import type { AppRoutePath } from '@/app/routeScopes';
 import { cx } from '@/lib/cx';
+import { Tooltip } from '@/components/ui';
 import {
   tabItemActiveClassName,
   tabItemClassName,
@@ -32,6 +33,25 @@ const TAB_PATHS = [
  * paths stay top-level rather than nesting under `/overview`, so each view
  * keeps its own `ScopeGate` and every existing bookmark still resolves.
  */
+function ClonesTab({ locked }: { locked: boolean }) {
+  const { t } = useTranslation();
+  const tab = (
+    <NavLink to="/clones" className={subNavClass}>
+      {t('nav.clones')}
+      {locked && <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-warning" />}
+    </NavLink>
+  );
+  // A span carries the tooltip: `NavLink`'s class is a function, which Tooltip's
+  // className merge would stringify.
+  return locked ? (
+    <Tooltip content={t('reauth.navLocked')}>
+      <span className="inline-flex">{tab}</span>
+    </Tooltip>
+  ) : (
+    tab
+  );
+}
+
 export function OverviewSubNav() {
   const { t } = useTranslation();
   const locked = useLockedRoutes(TAB_PATHS);
@@ -48,16 +68,7 @@ export function OverviewSubNav() {
           rides on `title` rather than extra text so the link stays named
           "Clones" — see `NavItem` in Layout.tsx for the full reasoning.
         */}
-        <NavLink
-          to="/clones"
-          className={subNavClass}
-          title={locked.has('/clones') ? t('reauth.navLocked') : undefined}
-        >
-          {t('nav.clones')}
-          {locked.has('/clones') && (
-            <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-warning" />
-          )}
-        </NavLink>
+        <ClonesTab locked={locked.has('/clones')} />
         <NavLink to="/employment-history" className={subNavClass}>
           {t('nav.employmentHistory')}
         </NavLink>

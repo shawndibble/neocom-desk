@@ -83,6 +83,7 @@ import { GearSix } from '@phosphor-icons/react/dist/csr/GearSix';
 import { GraduationCap } from '@phosphor-icons/react/dist/csr/GraduationCap';
 import { Hammer } from '@phosphor-icons/react/dist/csr/Hammer';
 import { Handshake } from '@phosphor-icons/react/dist/csr/Handshake';
+import { Hourglass } from '@phosphor-icons/react/dist/csr/Hourglass';
 import { Info as InfoGlyph } from '@phosphor-icons/react/dist/csr/Info';
 import { ListBullets } from '@phosphor-icons/react/dist/csr/ListBullets';
 import { LockKey } from '@phosphor-icons/react/dist/csr/LockKey';
@@ -219,6 +220,8 @@ export const RetargetGroup = withWeight(Target);
 export const Warn = withWeight(Warning);
 /** Opens a longer explanation of the numbers on screen, e.g. a Build Plan's calculation breakdown. */
 export const Info = withWeight(InfoGlyph);
+/** Waiting on an answer or an outcome (an RSVP not yet given). A status glyph, never a button: ⓘ (`Info`) is reserved for Show Info and explanation modals (§6c). */
+export const Pending = withWeight(Hourglass);
 /**
  * The Corp ops board's severity ladder, shaped as well as coloured (issue
  * #419) — `SEVERITY_TONE`'s four colours alone are not a signal for a

@@ -26,6 +26,7 @@ import {
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { ICON_SIZE } from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -922,15 +923,15 @@ export function Contacts() {
         id: 'labels',
         header: t('contacts.labels'),
         // One line however many labels or however long: the full list is the
-        // cell's title, so truncation hides nothing.
+        // cell's tooltip, so truncation hides nothing.
         render: (contact) => {
           const names = contactLabelNames(contact, contactLabels);
           if (names.length === 0) return <EmptyCell />;
           const text = names.join(', ');
           return (
-            <span className="inline-block max-w-56 truncate align-bottom" title={text}>
+            <HintText content={text} className="inline-block max-w-56 truncate align-bottom">
               {text}
-            </span>
+            </HintText>
           );
         },
         sortValue: (contact) => contactLabelNames(contact, contactLabels)[0],

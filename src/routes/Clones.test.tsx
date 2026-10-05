@@ -275,7 +275,8 @@ describe('Clones', () => {
     // Identity, corp/alliance and SP: identical to /overview, so nothing above
     // the tabs moves as you switch between them.
     expect(await screen.findByRole('heading', { level: 1, name: 'Pilot One' })).toBeInTheDocument();
-    expect(await screen.findByText('Test Corp / Test Alliance')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Test Corp' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Test Alliance' })).toBeInTheDocument();
     expect(await screen.findByText('135,765')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: 'Clones' })).not.toBeInTheDocument();
   });
