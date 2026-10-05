@@ -76,6 +76,7 @@ function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow
     {
       id: 'exit',
       header: t('travel.thera.col.exit'),
+      headerClassName: 'whitespace-nowrap',
       primary: true,
       sortValue: (row) => row.exitSystemName ?? undefined,
       render: (row) => (
@@ -88,6 +89,7 @@ function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow
     {
       id: 'security',
       header: t('travel.thera.col.security'),
+      headerClassName: 'whitespace-nowrap',
       align: 'right',
       className: 'whitespace-nowrap',
       sortValue: (row) => row.exitSecurity ?? undefined,
@@ -105,6 +107,7 @@ function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow
     {
       id: 'region',
       header: t('travel.thera.col.region'),
+      headerClassName: 'whitespace-nowrap',
       className: 'whitespace-nowrap text-text-dim',
       sortValue: (row) => row.exitRegionName ?? undefined,
       render: (row) => row.exitRegionName ?? <span data-dense-omit>{DASH}</span>,
@@ -112,6 +115,7 @@ function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow
     {
       id: 'fits',
       header: t('travel.thera.col.fits'),
+      headerClassName: 'whitespace-nowrap',
       className: 'whitespace-nowrap',
       stackAffix: { before: t('travel.thera.fitsAffix') },
       sortValue: (row) => (row.maxShipSize === null ? undefined : shipSizeRank(row.maxShipSize)),
@@ -125,6 +129,7 @@ function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow
     {
       id: 'life',
       header: t('travel.thera.col.life'),
+      headerClassName: 'whitespace-nowrap',
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
       stackAffix: { after: t('travel.thera.lifeAffix') },
@@ -140,6 +145,7 @@ function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow
     {
       id: 'jumps',
       header: t('travel.thera.col.jumps'),
+      headerClassName: 'whitespace-nowrap',
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
       cardCorner: true,
@@ -149,7 +155,11 @@ function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow
     {
       id: 'signature',
       header: t('travel.thera.col.signature'),
-      className: 'w-0 whitespace-nowrap',
+      headerClassName: 'whitespace-nowrap',
+      // Trailing column: a tighter right edge keeps the table inside its panel
+      // at 1024px now that no header may wrap.
+      className: 'w-0 pr-1 whitespace-nowrap',
+      headerCellClassName: 'pr-1',
       stackEdge: 'below',
       render: (row) => (
         <span className="inline-flex items-center gap-3 max-sm:flex max-sm:w-full">
