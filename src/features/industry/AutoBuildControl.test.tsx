@@ -14,6 +14,21 @@ describe('AutoBuildControl', () => {
     expect(strategySelect()).toHaveTextContent('Cost-effective');
   });
 
+  it('renders trailing tools in the same row as the Build Strategy', () => {
+    render(
+      <AutoBuildControl
+        maxDepth={2}
+        scope={['manufacturing']}
+        onApply={vi.fn()}
+        trailing={<button type="button">Extra tool</button>}
+      />
+    );
+
+    const row = strategySelect().closest('.flex-wrap');
+    expect(row).not.toBeNull();
+    expect(row).toContainElement(screen.getByRole('button', { name: 'Extra tool' }));
+  });
+
   it('has no depth control (issue #798)', () => {
     render(<AutoBuildControl maxDepth={2} scope={['manufacturing']} onApply={vi.fn()} />);
 

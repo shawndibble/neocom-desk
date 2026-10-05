@@ -569,39 +569,6 @@ export function BuildGroupPanel({
             {t('industry.groupMemberCount', { count: plans.length })}
           </span>
         </div>
-        <div className="flex items-center gap-1">
-          <IconButton
-            size="sm"
-            icon={<Icon.RetargetGroup />}
-            label={t('industry.retargetGroupAction')}
-            onClick={() => setRetargeting(true)}
-          />
-          <IconButton
-            size="sm"
-            icon={
-              copyStatusFor(GROUP_COPY) === 'copied' ? (
-                <Icon.Done />
-              ) : copyStatusFor(GROUP_COPY) === 'failed' ? (
-                <Icon.Warn />
-              ) : (
-                <Icon.CopyToClipboard />
-              )
-            }
-            // Both outcomes change the glyph as well as the tone, so neither
-            // is carried by colour alone (docs/DESIGN.md §7) — mirrors the
-            // single-plan copy control (`BuildPlanDetail.tsx`).
-            tone={copyStatusFor(GROUP_COPY) === 'failed' ? 'danger' : 'default'}
-            label={
-              copyStatusFor(GROUP_COPY) === 'copied'
-                ? t('industry.copyShoppingListDone')
-                : copyStatusFor(GROUP_COPY) === 'failed'
-                  ? t('industry.copyShoppingListFailed')
-                  : t('industry.copyShoppingList')
-            }
-            onClick={() => void handleCopy(GROUP_COPY, rollup.shoppingMaterials)}
-            disabled={!canCopy}
-          />
-        </div>
       </div>
 
       {loading && (
@@ -662,6 +629,41 @@ export function BuildGroupPanel({
       )}
 
       <AutoBuildControl
+        trailing={
+          <>
+            <IconButton
+              size="sm"
+              icon={<Icon.RetargetGroup />}
+              label={t('industry.retargetGroupAction')}
+              onClick={() => setRetargeting(true)}
+            />
+            <IconButton
+              size="sm"
+              icon={
+                copyStatusFor(GROUP_COPY) === 'copied' ? (
+                  <Icon.Done />
+                ) : copyStatusFor(GROUP_COPY) === 'failed' ? (
+                  <Icon.Warn />
+                ) : (
+                  <Icon.CopyToClipboard />
+                )
+              }
+              // Both outcomes change the glyph as well as the tone, so neither
+              // is carried by colour alone (docs/DESIGN.md §7) — mirrors the
+              // single-plan copy control (`BuildPlanDetail.tsx`).
+              tone={copyStatusFor(GROUP_COPY) === 'failed' ? 'danger' : 'default'}
+              label={
+                copyStatusFor(GROUP_COPY) === 'copied'
+                  ? t('industry.copyShoppingListDone')
+                  : copyStatusFor(GROUP_COPY) === 'failed'
+                    ? t('industry.copyShoppingListFailed')
+                    : t('industry.copyShoppingList')
+              }
+              onClick={() => void handleCopy(GROUP_COPY, rollup.shoppingMaterials)}
+              disabled={!canCopy}
+            />
+          </>
+        }
         maxDepth={autoBuildMaxDepth}
         scope={autoBuildScope}
         disabled={applyingAutoBuild}
@@ -676,8 +678,6 @@ export function BuildGroupPanel({
           );
         }}
       />
-
-      <p className="text-xs text-text-dim">{t('industry.groupEstimateNote')}</p>
 
       {/* Shown as a line rather than as the button's own label: the message
           is about the clipboard, not about which list, and it is a sentence
@@ -803,74 +803,77 @@ export function BuildGroupPanel({
         {/* Materials and the Group Owned Overlay (issue #697) as one table:
             typing an owned quantity updates that same row's Still To Buy
             instead of a separate panel scroll-lengths away. */}
-        <Panel
-          title={t('industry.groupMaterials')}
-          padded={false}
-          actions={
-            buyRows.length > 0 ? (
-              <TableActionsMenu
-                name={t('industry.groupMaterials')}
-                tableExport={buyMaterialsExport}
+        <div className="space-y-2">
+          <Panel
+            title={t('industry.groupMaterials')}
+            padded={false}
+            actions={
+              buyRows.length > 0 ? (
+                <TableActionsMenu
+                  name={t('industry.groupMaterials')}
+                  tableExport={buyMaterialsExport}
+                />
+              ) : undefined
+            }
+          >
+            <div className="space-y-3 p-2.5">
+              <OwnedStockScopeControl
+                scope={group.ownedStockScope}
+                detectedStock={detected.stock}
+                detection={detection}
+                onChange={onOwnedStockScopeChange}
+                action={
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      // The buy table's rows: a fully-crafted row (see above) is
+                      // never bought, so it has no Have and no offer.
+                      onClick={() => ownedBulk.fillAll(buyRows)}
+                    >
+                      {t('industry.useAllOwned')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      // Every merged material: a ledger entry from before its
+                      // material became fully crafted (see `craftedTypeIds`) is
+                      // still read by the rollup though the Crafted section
+                      // shows no input for it, so "Use none" must reach it.
+                      onClick={() => ownedBulk.clearAll(rollup.tableMaterials)}
+                    >
+                      {t('industry.useNoneOwned')}
+                    </Button>
+                  </div>
+                }
               />
-            ) : undefined
-          }
-        >
-          <div className="space-y-3 p-2.5">
-            <OwnedStockScopeControl
-              scope={group.ownedStockScope}
-              detectedStock={detected.stock}
-              detection={detection}
-              onChange={onOwnedStockScopeChange}
-              action={
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    // The buy table's rows: a fully-crafted row (see above) is
-                    // never bought, so it has no Have and no offer.
-                    onClick={() => ownedBulk.fillAll(buyRows)}
-                  >
-                    {t('industry.useAllOwned')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    // Every merged material: a ledger entry from before its
-                    // material became fully crafted (see `craftedTypeIds`) is
-                    // still read by the rollup though the Crafted section
-                    // shows no input for it, so "Use none" must reach it.
-                    onClick={() => ownedBulk.clearAll(rollup.tableMaterials)}
-                  >
-                    {t('industry.useNoneOwned')}
-                  </Button>
-                </div>
-              }
-            />
-          </div>
+            </div>
 
-          {/* An empty buy table two different ways: genuinely nothing left
+            {/* An empty buy table two different ways: genuinely nothing left
               (every material owned, or there are none) reads "Nothing left
               to buy," but a table empty because everything is crafted has
               its own panel beside Members explaining that — showing both
               would call a crafted material "owned," which is exactly the
               hangar-vs-job confusion the Crafted panel exists to avoid. */}
-          {buyRows.length === 0 && craftedTypeIds.length === 0 ? (
-            <EmptyState title={t('industry.groupNothingToBuy')} className="py-6" />
-          ) : buyRows.length > 0 ? (
-            <div className="overflow-x-auto">
-              <DataTable
-                {...buyMaterialsExport.tableProps}
-                columns={buyMaterialColumns}
-                rows={buyRows}
-                rowKey={(material) => material.typeID}
-                label={t('industry.groupMaterials')}
-                density="compact"
-                // Five figures broke to a 5-line stack at 390px; pair two per line,
-                // same fix as MaterialsTable's single-plan buy table.
-                stackColumns={2}
-                mobileSort
-              />
-            </div>
-          ) : null}
-        </Panel>
+            {buyRows.length === 0 && craftedTypeIds.length === 0 ? (
+              <EmptyState title={t('industry.groupNothingToBuy')} className="py-6" />
+            ) : buyRows.length > 0 ? (
+              <div className="overflow-x-auto">
+                <DataTable
+                  {...buyMaterialsExport.tableProps}
+                  columns={buyMaterialColumns}
+                  rows={buyRows}
+                  rowKey={(material) => material.typeID}
+                  label={t('industry.groupMaterials')}
+                  density="compact"
+                  // Five figures broke to a 5-line stack at 390px; pair two per line,
+                  // same fix as MaterialsTable's single-plan buy table.
+                  stackColumns={2}
+                  mobileSort
+                />
+              </div>
+            ) : null}
+          </Panel>
+          <p className="text-xs text-text-dim">{t('industry.groupEstimateNote')}</p>
+        </div>
       </div>
 
       {retargeting && (
