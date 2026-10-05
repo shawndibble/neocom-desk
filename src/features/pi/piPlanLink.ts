@@ -12,3 +12,15 @@ export function piPlanHref(typeId: number, pathname: string, search: string): st
   params.set('type', String(typeId));
   return `${PLAN_PATH}?${params.toString()}`;
 }
+
+/** One colony, opened on the Colonies tab (`?colony=`). */
+export function piColonyHref(planetId: number): string {
+  return `/planetary-industry/colonies?colony=${planetId}`;
+}
+
+/** The Advisor on one system (`?system=`), or on its own default without one. */
+export function piAdvisorHref(systemId: number | undefined): string {
+  return systemId === undefined
+    ? '/planetary-industry/advisor'
+    : `/planetary-industry/advisor?system=${systemId}`;
+}

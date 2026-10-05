@@ -57,6 +57,7 @@ import {
 import type { PlanHauling, PlanVerdict, PlannerColonyRow } from './goalPlannerModel';
 import type { TotalColonyEarnings } from './colonyEarningsModel';
 import { commodityName, formatUnits } from './goalPlannerFormat';
+import { piAdvisorHref, piColonyHref } from './piPlanLink';
 import type {
   ColonyStep,
   GoalAttainment,
@@ -80,19 +81,9 @@ function namesList(typeIds: readonly number[], pi: PiData): string {
   return typeIds.map((id) => commodityName(id, pi)).join(', ');
 }
 
-function colonyHref(planetId: number): string {
-  return `/planetary-industry/colonies?colony=${planetId}`;
-}
-
-function advisorHref(systemId: number | undefined): string {
-  return systemId === undefined
-    ? '/planetary-industry/advisor'
-    : `/planetary-industry/advisor?system=${systemId}`;
-}
-
 function ColonyLink({ planetId, names }: { planetId: number; names: PlanNames }) {
   return (
-    <Link className={inlineLinkClassName} to={colonyHref(planetId)}>
+    <Link className={inlineLinkClassName} to={piColonyHref(planetId)}>
       {names.planet(planetId)}
     </Link>
   );
@@ -422,7 +413,7 @@ function shortfallText(
               {t('piPlan.shortSwitchedOff')} <ColonyNames ids={hint.planetIds} names={names} />.
             </>
           ) : (
-            <Link className={inlineLinkClassName} to={advisorHref(advisorSystem)}>
+            <Link className={inlineLinkClassName} to={piAdvisorHref(advisorSystem)}>
               {t('piPlan.openAdvisor')}
             </Link>
           )}
