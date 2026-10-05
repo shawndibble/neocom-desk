@@ -5,6 +5,7 @@
  * this must only ever be reached through a dynamic `import()`, never
  * imported eagerly.
  */
+import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import {
   ResponsiveContainer,
   LineChart,
@@ -48,12 +49,12 @@ function ProfitTooltip({ active, payload }: TooltipContentProps): React.ReactEle
   const point = payload[0]?.payload as ProductionProfitPoint | undefined;
   if (!point) return null;
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs text-text tabular-nums shadow-lg shadow-black/50">
-      <p className="font-semibold">{formatDateTick(point.date)}</p>
+    <ChartTooltipShell>
+      <p className="font-semibold text-text">{formatDateTick(point.date)}</p>
       <p>
         {t('industry.totalRealizedProfit')}: {formatIsk(point.profit, 2)}
       </p>
-    </div>
+    </ChartTooltipShell>
   );
 }
 

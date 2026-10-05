@@ -12,11 +12,12 @@
  * (`w-14`/`w-16`/`w-20`) wrap with everything else.
  */
 
-import { useRef, type ReactElement, type ReactNode } from 'react';
+import { type ReactElement, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { IconButton, IskAmount, RowActionsMenu, RowMoreActions } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
+import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { formatUnitVolume } from '@/lib/volume';
 import { securityStatusColor } from '@/engine/securityStatus';
@@ -361,13 +362,6 @@ export function ItemColumnLabels({ t }: ItemColumnLabelsProps) {
 }
 
 /**
- * How long a touch has to be held before it reads as the row menu's
- * long-press rather than a tap — Radix opens the context menu at 700ms, so
- * anything past `Tooltip`'s own 500ms hold is already that gesture.
- */
-const LONG_PRESS_MS = 500;
-
-/**
  * An item's name as the way into its Show info. It sits inside the row menu's
  * trigger, so a touch-and-hold on it opens that menu — and some browsers
  * still send a click when the finger lifts. That click is swallowed: a press
@@ -375,7 +369,7 @@ const LONG_PRESS_MS = 500;
  * on top of the menu it just opened.
  */
 function ItemNameButton({ name, onShowInfo }: { name: string; onShowInfo: () => void }) {
-  const press = useRef<{ start: number; touch: boolean; menu: boolean } | null>(null);
+  const guard = useLiftAfterHoldGuard();
   return (
     <button
       type="button"
@@ -384,20 +378,9 @@ function ItemNameButton({ name, onShowInfo }: { name: string; onShowInfo: () => 
         tappableRowClassName
       )}
       title={name}
-      onPointerDown={(event) => {
-        press.current = {
-          start: event.timeStamp,
-          touch: event.pointerType !== 'mouse',
-          menu: false,
-        };
-      }}
-      onContextMenu={() => {
-        if (press.current) press.current.menu = true;
-      }}
+      {...guard.handlers}
       onClick={(event) => {
-        const p = press.current;
-        press.current = null;
-        if (p && (p.menu || (p.touch && event.timeStamp - p.start >= LONG_PRESS_MS))) return;
+        if (guard.swallowClick(event)) return;
         onShowInfo();
       }}
     >

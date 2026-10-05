@@ -4,6 +4,7 @@
  * `market/PriceHistoryChart.tsx` — this must only ever be reached through a
  * dynamic `import()` from `OverviewTab.tsx`, never imported eagerly.
  */
+import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import {
   ResponsiveContainer,
   BarChart,
@@ -94,8 +95,10 @@ export function RateTooltip({
   const point = payload[0]?.payload as DailyRatePoint | undefined;
   if (!point) return null;
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs tabular-nums text-text shadow-lg shadow-black/50">
-      <p className="font-semibold">{typeof label === 'string' ? formatDateTick(label) : ''}</p>
+    <ChartTooltipShell>
+      <p className="font-semibold text-text">
+        {typeof label === 'string' ? formatDateTick(label) : ''}
+      </p>
       <p>
         {t('miningTax.overview.iskPerHour')}: {formatIsk(point.iskPerHour, 0)} ISK
       </p>
@@ -106,7 +109,7 @@ export function RateTooltip({
           {t(`miningTax.overview.priceSource.${point.source}`)}
         </p>
       )}
-    </div>
+    </ChartTooltipShell>
   );
 }
 
@@ -120,8 +123,8 @@ function CompareTooltip({
   const point = payload[0]?.payload as ComparisonBar | undefined;
   if (!point) return null;
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs tabular-nums text-text shadow-lg shadow-black/50">
-      <p className="font-semibold">{point.typeName}</p>
+    <ChartTooltipShell>
+      <p className="font-semibold text-text">{point.typeName}</p>
       <p>
         {t('miningTax.overview.rawSellValue')}: {formatIsk(point.rawValue, 0)} ISK
       </p>
@@ -140,7 +143,7 @@ function CompareTooltip({
           ))}
         </ul>
       )}
-    </div>
+    </ChartTooltipShell>
   );
 }
 
@@ -168,8 +171,10 @@ function MetricRateTooltip({
     metric === 'volume' ? 'miningTax.overview.m3PerHour' : 'miningTax.overview.countPerHour'
   );
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs tabular-nums text-text shadow-lg shadow-black/50">
-      <p className="font-semibold">{typeof label === 'string' ? formatDateTick(label) : ''}</p>
+    <ChartTooltipShell>
+      <p className="font-semibold text-text">
+        {typeof label === 'string' ? formatDateTick(label) : ''}
+      </p>
       <p>
         {valueLabel}: {formatMetricCompact(metric, point.value)}
       </p>
@@ -180,7 +185,7 @@ function MetricRateTooltip({
             : 'miningTax.overview.rateChartBasisCount'
         )}
       </p>
-    </div>
+    </ChartTooltipShell>
   );
 }
 
@@ -197,8 +202,8 @@ function MetricCompareTooltip({
     metric === 'volume' ? 'miningTax.overview.volumeTotal' : 'miningTax.overview.countTotal'
   );
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs tabular-nums text-text shadow-lg shadow-black/50">
-      <p className="font-semibold">{point.typeName}</p>
+    <ChartTooltipShell>
+      <p className="font-semibold text-text">{point.typeName}</p>
       <p>
         {valueLabel}: {formatMetricCompact(metric, point.value)}
       </p>
@@ -211,7 +216,7 @@ function MetricCompareTooltip({
           ))}
         </ul>
       )}
-    </div>
+    </ChartTooltipShell>
   );
 }
 

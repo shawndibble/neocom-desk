@@ -8,6 +8,7 @@
  * against solid before reaching for a second hue): both lines are `accent`,
  * the overlay dashed, and the key draws the dash too.
  */
+import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import {
   ResponsiveContainer,
   LineChart,
@@ -74,14 +75,14 @@ function DpsTooltip({
   const row = payload[0]?.payload as AppliedDpsRow | undefined;
   if (!row) return null;
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs text-text tabular-nums shadow-lg shadow-black/50">
-      <p className="font-semibold">{formatX(row.x)}</p>
+    <ChartTooltipShell>
+      <p className="font-semibold text-text">{formatX(row.x)}</p>
       {payload.map((entry) => (
         <p key={String(entry.dataKey)}>
           {entry.name}: {Number(entry.value).toFixed(1)}
         </p>
       ))}
-    </div>
+    </ChartTooltipShell>
   );
 }
 

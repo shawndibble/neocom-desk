@@ -4,6 +4,7 @@
  * `import()` (see `PriceHistoryPanel.tsx`) — importing it eagerly would put
  * Recharts back in the initial page bundle.
  */
+import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -118,8 +119,8 @@ function HistoryTooltip({
   const point = payload[0]?.payload as ChartRow | undefined;
   if (!point) return null;
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs tabular-nums text-text shadow-lg shadow-black/50">
-      <p className="font-semibold">{label}</p>
+    <ChartTooltipShell>
+      <p className="font-semibold text-text">{label}</p>
       <p>
         {t('market.priceHistory.average')}: {formatMarketIsk(point.average)}
       </p>
@@ -132,7 +133,7 @@ function HistoryTooltip({
       <p>
         {t('market.priceHistory.orderCount')}: {formatVolume(point.orderCount)}
       </p>
-    </div>
+    </ChartTooltipShell>
   );
 }
 

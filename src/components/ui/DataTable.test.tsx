@@ -153,6 +153,61 @@ describe('DataTable selectedRowKey', () => {
     renderTable();
     expect(document.querySelector('[aria-current]')).toBeNull();
   });
+
+  it('draws the selected visual on the selected row only, not on hover alone', () => {
+    renderTable({ selectedRowKey: 2 });
+    const selected = document.querySelector('[data-row-key="2"]');
+    const other = document.querySelector('[data-row-key="1"]');
+    expect(selected).toHaveClass('border-l-2', 'border-l-accent', 'bg-panel-2');
+    expect(other).not.toHaveClass('border-l-2');
+    expect(other).not.toHaveClass('border-l-accent');
+  });
+});
+
+describe('DataTable lift-after-hold', () => {
+  function setup() {
+    const onRowClick = vi.fn();
+    renderTable({ onRowClick });
+    const row = screen.getByText('Tritanium').closest('tr')!;
+    return { onRowClick, row };
+  }
+
+  it('opens the row on an ordinary touch tap', () => {
+    const { onRowClick, row } = setup();
+    fireEvent.pointerDown(row, { pointerType: 'touch' });
+    fireEvent.click(row);
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores the click that follows a touch held as long as the context-menu hold', () => {
+    vi.useFakeTimers();
+    try {
+      const { onRowClick, row } = setup();
+      fireEvent.pointerDown(row, { pointerType: 'touch' });
+      vi.advanceTimersByTime(700);
+      fireEvent.click(row);
+      expect(onRowClick).not.toHaveBeenCalled();
+      // The next ordinary tap still opens it.
+      fireEvent.pointerDown(row, { pointerType: 'touch' });
+      fireEvent.click(row);
+      expect(onRowClick).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not swallow a slow mouse click', () => {
+    vi.useFakeTimers();
+    try {
+      const { onRowClick, row } = setup();
+      fireEvent.pointerDown(row, { pointerType: 'mouse' });
+      vi.advanceTimersByTime(2000);
+      fireEvent.click(row);
+      expect(onRowClick).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('DataTable', () => {
