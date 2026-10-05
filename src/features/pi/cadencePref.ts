@@ -23,7 +23,7 @@
  * reasonable constant standing in for an unanswerable question. The constant
  * was invisible and unchangeable, so a pilot stepping away for a week read a
  * whole tab of figures computed for somebody else's week. This is the same
- * class of value as `planControlsPref`'s hub: a standing fact about the
+ * class of value as `goalPlannerPrefs`' hub: a standing fact about the
  * pilot, not about what they happen to be pricing.
  *
  * ## One key, not two
@@ -32,7 +32,7 @@
  * Advisor tab is derived from the pair — so a half-restored record (the
  * pilot's haul window against a default restart) would misprice the page with
  * no visible edit to explain it. One record, rejected as a whole, exactly as
- * `planControlsPref` and `market/locationMode.ts` do.
+ * `market/locationMode.ts` does.
  *
  * The engine never reads any of this. `engine/pi/stopTier.ts` and
  * `engine/pi/pinBudget.ts` take `bufferHours` as a parameter and must keep

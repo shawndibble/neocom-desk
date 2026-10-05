@@ -13,7 +13,7 @@
  *   one-view override of it.
  *
  * One record, rejected as a whole if any field is unusable — same rule
- * `pi/planControlsPref.ts` and `market/locationMode.ts` follow for a combined
+ * `market/locationMode.ts` follows for a combined
  * setting: a half-restored filter is worse than a fully default one.
  *
  * URL wins whenever present (decision `20260922-221531` / ADR 0015): this

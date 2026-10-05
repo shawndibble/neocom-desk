@@ -17,7 +17,7 @@
  *
  * A type the hub has no sell order for stays *absent* from `prices`, never
  * zero: `engine/pi/chain.ts` refuses to cost a chain with a missing price, and
- * `planModel.costPlan` turns that refusal into a "not priceable" state. Zero
+ * the Goal Planner's economics turn that refusal into a "not priceable" state. Zero
  * would instead produce a confident wrong margin, which is the one outcome
  * CONTEXT.md round 29's rule exists to prevent.
  */

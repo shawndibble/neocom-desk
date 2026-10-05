@@ -140,6 +140,7 @@ export function Headline({ best, earnings, verdict, hasGoals, pi, hub }: Headlin
 
   const liftPerDay = Math.abs(economics.liftPerHour * HOURS_PER_DAY);
   const liftWords = formatIskCompact(liftPerDay);
+  const unmet = best.plan.achieved.filter((goal) => goal.fraction < 0.999);
   const buysPerHour = economics.buys;
   const customsPerHour =
     economics.customs.exportFromExtractors +
@@ -163,7 +164,22 @@ export function Headline({ best, earnings, verdict, hasGoals, pi, hub }: Headlin
             </span>
           </div>
           <p className="text-xs text-text-dim">{t('piPlan.liftExplain')}</p>
-          {verdict && <p className="text-sm text-text">{verdictText(verdict, liftWords, t)}</p>}
+          {verdict && (
+            <p className="text-sm text-text">
+              {verdictText(verdict, liftWords, t)}
+              {unmet.length > 0 &&
+                ` ${t('piPlan.verdictUnmet', {
+                  goals: unmet
+                    .map((goal) =>
+                      t('piPlan.shortAchievedGoal', {
+                        name: commodityName(goal.typeId, pi),
+                        percent: PERCENT_FORMAT.format(goal.fraction * 100),
+                      })
+                    )
+                    .join(', '),
+                })}`}
+            </p>
+          )}
           <StatChips>
             <StatChip
               label={t('piPlan.netPerDay')}
@@ -352,10 +368,18 @@ function ChangeRow({
           {name}{' '}
           {change.from.length === 0
             ? t('piPlan.changeStart', { to: namesList(change.to, pi) })
-            : t('piPlan.changeRetarget', {
-                from: namesList(change.from, pi),
-                to: namesList(change.to, pi),
-              })}
+            : change.to.length > 0 && change.to.every((id) => change.from.includes(id))
+              ? t('piPlan.changeStop', {
+                  dropped: namesList(
+                    change.from.filter((id) => !change.to.includes(id)),
+                    pi
+                  ),
+                  keep: namesList(change.to, pi),
+                })
+              : t('piPlan.changeRetarget', {
+                  from: namesList(change.from, pi),
+                  to: namesList(change.to, pi),
+                })}
         </DirectiveRow>
       );
     case 'convert-to-factory':

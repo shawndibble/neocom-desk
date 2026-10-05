@@ -31,6 +31,7 @@ import { customsRatePercent, type CustomsRateSource } from './customsRate';
 import type { PlannerColonyRow } from './goalPlannerModel';
 import type { ProductOption } from './products';
 import { TierChip } from './TierChip';
+import { DEFAULT_GOAL_PER_DAY } from './goalsParam';
 
 function parseNonNegative(text: string): number | null {
   if (text.trim() === '') return null;
@@ -216,7 +217,8 @@ export function GoalsSection({
         options={options}
         value={null}
         onChange={(typeId) => {
-          if (typeId !== null) onGoalsChange([...goals, { typeId, unitsPerDay: 10 }]);
+          if (typeId !== null)
+            onGoalsChange([...goals, { typeId, unitsPerDay: DEFAULT_GOAL_PER_DAY }]);
         }}
         placeholder={t('piPlan.goalAdd')}
         searchPlaceholder={t('piPlan.goalSearch')}

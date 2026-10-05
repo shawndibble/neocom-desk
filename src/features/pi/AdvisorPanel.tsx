@@ -923,7 +923,7 @@ export function AdvisorPanel({
 
   // Edits made since the snapshot loaded, layered over it rather than copied
   // into their own state. Copying would mean a `setState` in an effect keyed
-  // on the snapshot (which `PlanPanel` avoids for the same reason) and would
+  // on the snapshot (which `GoalPlannerPanel` avoids the same way) and would
   // silently drop an edit made while a reload was in flight. Layering keeps
   // the picker repainting immediately — ticking a resource re-sizes the build
   // plan without a page reload — with no second source of truth.
@@ -947,8 +947,8 @@ export function AdvisorPanel({
   // unreachable: after "12", typing "." parses back to 12, the prop never
   // changes, and React restores "12" — so `step={0.5}` invited a precision the
   // control silently refused. Held per system, so switching systems shows that
-  // system's own figure rather than the last one typed. `PlanPanel` holds its
-  // rate the same way.
+  // system's own figure rather than the last one typed. The Goal Planner's
+  // number boxes hold their text the same way.
   const customsOverrides = customsEdits ?? snapshot?.customsOverrides ?? EMPTY_CUSTOMS;
 
   const writeCustoms = useCallback(
