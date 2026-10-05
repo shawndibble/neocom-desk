@@ -34,4 +34,15 @@ describe('PercentInput', () => {
     expect(onCommit).not.toHaveBeenCalled();
     expect(field).toHaveAttribute('aria-invalid', 'true');
   });
+
+  it('drops the error with the typed text once the box reverts on blur', () => {
+    const { field } = setup('blur');
+    fireEvent.change(field, { target: { value: '150' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    fireEvent.blur(field);
+    expect(field).toHaveValue('6');
+    expect(field).not.toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByText('Enter 0 to 100.')).not.toBeInTheDocument();
+  });
 });

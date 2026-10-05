@@ -70,14 +70,17 @@ vi.mock('@/features/pi/planPrices', () => ({
 
 // Jumps to the hub: the real count walks a stargate snapshot this suite does
 // not serve. The planner's own wiring is what is under test here.
+// One basis object for every render, as the real hook memoises it: a fresh
+// object each render would re-run the planner's distance effect every time.
+const JUMP_BASIS = vi.hoisted(() => ({
+  rules: {},
+  network: {},
+  key: 'test',
+  hydrated: true,
+  podKillsUnavailable: false,
+}));
 vi.mock('@/features/route/jumpBasis', () => ({
-  useJumpBasis: () => ({
-    rules: {},
-    network: {},
-    key: 'test',
-    hydrated: true,
-    podKillsUnavailable: false,
-  }),
+  useJumpBasis: () => JUMP_BASIS,
   jumpsBetween: vi.fn(async () => ({ kind: 'known', jumps: 7 })),
 }));
 

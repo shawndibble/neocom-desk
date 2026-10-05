@@ -164,7 +164,10 @@ export function PercentInput({
         }}
         onBlur={(event) => {
           if (commitOn === 'blur') settle(event.target.value, true);
+          // The typed text is gone, so an error about it would describe a
+          // value the box no longer shows.
           setText(null);
+          setInvalid(false);
         }}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && commitOn === 'blur') settle(event.currentTarget.value, true);

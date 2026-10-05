@@ -106,6 +106,7 @@ function UnitsBox({
         onBlur={(event) => {
           settle(event.target.value);
           setText(null);
+          setInvalid(false);
         }}
         onKeyDown={(event) => {
           if (event.key === 'Enter') settle(event.currentTarget.value);
