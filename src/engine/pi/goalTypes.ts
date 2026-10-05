@@ -20,8 +20,8 @@
  * colonies into `PlannerColony`.
  */
 
-import type { PiRawResource } from '@/sde/types';
-import type { PinLoad, PiTier } from './types';
+import type { PiFactoryKind, PiRawResource } from '@/sde/types';
+import type { PinCounts, PinLoad, PiTier } from './types';
 
 /** A planet type as the SDE names it — the same strings ESI reports for a colony. */
 export type PlanetType = PiRawResource['planetTypes'][number];
@@ -110,3 +110,87 @@ export interface ExtractionSlot {
 }
 
 export type FitLimit = 'cpu' | 'powergrid';
+
+// --- The solver's answer (goalPlan.ts), read by planEconomics.ts and planDiff.ts ---
+
+/**
+ * How a demanded type is covered. A line partly covered takes the worst of
+ * its parts — any shortfall makes it `'short'`, else any purchase makes it
+ * `'bought'` — and `GoalPlan.buys` / `GoalPlan.shortfalls` carry the amounts.
+ */
+export type DemandSource = 'made' | 'bought' | 'short' | 'extracted';
+
+/** One type the goals need, summed across every goal that needs it. */
+export interface DemandLine {
+  typeId: number;
+  tier: PiTier;
+  unitsPerHour: number;
+  /** Factories of this schematic, re-ceiled on the summed rate. Null on P0, which no factory makes. */
+  factories: number | null;
+  source: DemandSource;
+}
+
+export type ColonyRole = 'extract' | 'factory' | 'idle';
+
+export interface ColonyAssignment {
+  planetId: number;
+  role: ColonyRole;
+  /** Empty unless `role` is `'extract'`. */
+  slots: ExtractionSlot[];
+  /** The P2+ factory pins on the host. Empty unless `role` is `'factory'`. */
+  factories: PinCounts;
+  /** Every planned pin, the Launchpad included. Empty for an idle colony. */
+  pins: PinCounts;
+  used: PinLoad;
+  budget: PinLoad;
+  /** The axes the host's factories overrun. Always empty for an extractor, which is only ever planned to fit. */
+  limitedBy: FitLimit[];
+}
+
+export type Shortfall =
+  /** No enabled colony's planet type yields this P0. `unitsPerHour` is P0 units. */
+  | { kind: 'type-gap'; p0TypeId: number; unitsPerHour: number; fixPlanetTypes: PlanetType[] }
+  /** Colonies that could yield it are full (or the only one is the factory host). P0 units. */
+  | { kind: 'budget-gap'; p0TypeId: number; unitsPerHour: number }
+  /** P2+ is demanded but no enabled colony's planet type carries every factory the chain needs. */
+  | { kind: 'no-factory-host'; facility: PiFactoryKind }
+  /** The host was chosen but its factories overrun its CPU/Powergrid. */
+  | { kind: 'host-over-budget'; planetId: number; limitedBy: FitLimit[] };
+
+/** Either end of a haul: a colony by planet id, or the trade hub. */
+export type FlowEnd = number | 'hub';
+
+/**
+ * One leg of goods moving per hour. The plan's whole routing ledger: a colony
+ * origin pays that colony's export customs, a colony destination its import
+ * customs, a hub destination is a sale and a hub origin a purchase.
+ * `'hub'` → `'hub'` is a goal bought outright: bought, never hauled.
+ */
+export interface Flow {
+  from: FlowEnd;
+  to: FlowEnd;
+  typeId: number;
+  tier: PiTier;
+  unitsPerHour: number;
+}
+
+export interface GoalPlan {
+  /** The goals as planned: merged by type, zero-rate goals dropped. */
+  goals: Goal[];
+  /** Highest tier first, then typeId. */
+  demand: DemandLine[];
+  /** One per colony, by planet id. */
+  assignments: ColonyAssignment[];
+  factoryHost: { planetId: number; reason: 'only-eligible' | 'least-needed-extraction' } | null;
+  shortfalls: Shortfall[];
+  buys: { typeId: number; tier: PiTier; unitsPerHour: number }[];
+  /** P1 extracted beyond what the goals need — whole ECUs overshoot — sold at the hub. */
+  surplusP1: { typeId: number; unitsPerHour: number }[];
+  flows: Flow[];
+  hauling: {
+    /** Every leg once, hub-to-hub excluded. */
+    m3PerWeek: number;
+    /** What each colony ships out plus what it takes in. */
+    perColony: Map<number, number>;
+  };
+}
