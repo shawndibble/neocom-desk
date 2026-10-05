@@ -15,10 +15,10 @@
  * being null (first load) is treated as "not yet known to be invalid", not
  * "invalid".
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useRememberedUrlParams, useUrlParam, type UrlParamValues } from '@/lib/useUrlState';
-import { enumParam, type UrlParamCodec } from '@/lib/urlState';
+import { enumParam, textParam, type UrlParamCodec } from '@/lib/urlState';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { useMarketBrowserHub } from '@/features/market/browserHub';
 import { useLocationMode, type LocationMode } from '@/features/market/locationMode';
@@ -37,11 +37,12 @@ import {
 } from '@/engine/market/urlState';
 import type { MarketGroupNode, MarketTypeEntry, MarketRegionEntry } from '@/sde/marketTypes';
 
-/** Tree search, in the URL (ADR 0015) scoped to the Browser tab. */
-const BROWSER_SEARCH_PARAM: UrlParamCodec<string> = {
-  parse: (raw) => raw ?? '',
-  serialize: (value) => (value === '' ? null : value),
-};
+/**
+ * Tree search, in the URL (ADR 0015) scoped to the Browser tab. Debounced:
+ * written per keystroke, the navigation lags the box and a fast typist's
+ * letters are dropped and the caret jumps to the end.
+ */
+const BROWSER_SEARCH_PARAM = textParam();
 
 /** The selected item's own views: its Order Book, its Variations, its Price History. */
 export type MarketItemTab = 'orders' | 'variations' | 'history';
@@ -269,9 +270,12 @@ export function useMarketBrowser({
       ? effectiveLocation.regionId
       : effectiveHub.regionId;
 
+  // The tree filters off a deferred copy so a keystroke paints in the box
+  // first; the filter and tree render catch up after.
+  const deferredQuery = useDeferredValue(query);
   const filterResult = useMemo(
-    () => (groups && types ? filterMarketTree(groups, types, query) : null),
-    [groups, types, query]
+    () => (groups && types ? filterMarketTree(groups, types, deferredQuery) : null),
+    [groups, types, deferredQuery]
   );
 
   function handleToggle(groupId: number) {

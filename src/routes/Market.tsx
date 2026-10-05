@@ -918,6 +918,12 @@ export function Market() {
                 </p>
               )}
 
+              {filterResult?.fuzzy && (
+                <p className="pt-2 text-[0.6875rem] text-text-dim uppercase">
+                  {t('market.searchFuzzy')}
+                </p>
+              )}
+
               {filterResult?.capped && (
                 <p className="pt-2 text-[0.6875rem] text-warning uppercase">
                   {t('market.searchCapped', {

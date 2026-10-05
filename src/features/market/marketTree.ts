@@ -4,6 +4,7 @@
  * to the root. Pure and synchronous — the route debounces keystrokes itself.
  */
 import { rankedSearch } from '@/lib/rankedSearch';
+import { fuzzySearch } from '@/lib/fuzzySearch';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 
 /** Search starts filtering the tree at this many characters (CONTEXT.md). */
@@ -38,6 +39,8 @@ export interface MarketTreeFilterResult {
   /** Full match count before the cap, for the "N total" / capped copy. */
   totalMatches: number;
   capped: boolean;
+  /** True when no name contained the query and these are the closest spellings instead. */
+  fuzzy: boolean;
 }
 
 /**
@@ -51,10 +54,12 @@ export function filterMarketTree(
 ): MarketTreeFilterResult | null {
   if (query.trim().length < MARKET_TREE_MIN_QUERY_LENGTH) return null;
 
-  const matches = rankedSearch(types, query, {
-    primary: (entry) => entry.name,
-    limit: Infinity,
-  });
+  const byName = { primary: (entry: MarketTypeEntry) => entry.name, limit: Infinity };
+  const exactMatches = rankedSearch(types, query, byName);
+  // A typo is the usual reason for no hits, so only then look for close spellings.
+  const closeMatches = exactMatches.length === 0 ? fuzzySearch(types, query, byName) : [];
+  const fuzzy = closeMatches.length > 0;
+  const matches = fuzzy ? closeMatches : exactMatches;
   const totalMatches = matches.length;
   const capped = totalMatches > MARKET_TREE_MATCH_LIMIT;
   const shown = capped ? matches.slice(0, MARKET_TREE_MATCH_LIMIT) : matches;
@@ -78,5 +83,5 @@ export function filterMarketTree(
     addAncestors(type.marketGroupId, groupsById, visibleGroupIds);
   }
 
-  return { visibleGroupIds, matchedTypesByGroup, bestMatch, totalMatches, capped };
+  return { visibleGroupIds, matchedTypesByGroup, bestMatch, totalMatches, capped, fuzzy };
 }

@@ -1723,6 +1723,28 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
 });
 
 describe('Shareable Market Browser URLs (issue #4)', () => {
+  it('keeps the caret and every letter when editing the middle of the search text', async () => {
+    server.use(ordersHandler({ count: 0 }));
+    const user = userEvent.setup();
+    render(<App />);
+
+    const box = await screen.findByRole('searchbox');
+    await user.type(box, 'rifer{ArrowLeft}{ArrowLeft}t');
+    await user.type(box, 'x{Backspace}');
+    expect(box).toHaveValue('rifter');
+    await waitFor(() => expect(window.location.search).toBe('?browser.q=rifter'));
+  });
+
+  it('offers close spellings when a typo matches nothing', async () => {
+    server.use(ordersHandler({ count: 0 }));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rifetr');
+    expect(await screen.findByText('Rifter')).toBeInTheDocument();
+    expect(screen.getByText(/close spellings/i)).toBeInTheDocument();
+  });
+
   it('selecting an item and changing location updates the query string', async () => {
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup();
@@ -1730,13 +1752,16 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
-    // The tree search box is URL-backed too (ADR 0015), written immediately —
-    // it rides along with every location change from here on.
-    expect(window.location.search).toBe('?browser.q=rift&type=587&hub=jita');
+    // The tree search box is URL-backed too (ADR 0015), written once typing
+    // pauses — it rides along with every location change from here on.
+    const params = () => Object.fromEntries(new URLSearchParams(window.location.search));
+    await waitFor(() =>
+      expect(params()).toEqual({ 'browser.q': 'rift', type: '587', hub: 'jita' })
+    );
 
     await user.click(screen.getByRole('button', { name: 'Region' }));
     await waitFor(() =>
-      expect(window.location.search).toBe('?browser.q=rift&type=587&region=10000002')
+      expect(params()).toEqual({ 'browser.q': 'rift', type: '587', region: '10000002' })
     );
   });
 
