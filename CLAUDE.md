@@ -21,7 +21,12 @@ dev`) — Shawn frequently has another agent working there at the same
   one shared file conflicted on nearly every merge, which is exactly what this
   layout removes. Genuinely new vocabulary still goes in `CONTEXT.md`'s
   glossary. See `docs/context/decisions/README.md`.
-- Design tokens/components: `docs/DESIGN.md`. Decisions: `docs/adr/`.
+- **UI work follows `docs/DESIGN.md`.** Read it before building a new page,
+  rewriting one, or adding a component or interactive element: tokens,
+  the `src/components/ui` primitives to compose, and §6c's interaction
+  grammar (how a link, tooltip, menu, row or gesture looks, and what it
+  does). Use the cue §6c assigns to the intent; if §6c has none, add it there
+  in the same PR. Decisions: `docs/adr/`.
 - TDD for all calculation/logic modules (`src/engine`, `src/auth`, industry
   math): failing test first, then code.
 - Pure engines stay pure: no fetch/DOM/Dexie imports in `src/engine`.
