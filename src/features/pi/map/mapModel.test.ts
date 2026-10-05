@@ -102,6 +102,16 @@ describe('traceProduct', () => {
     expect(raws).toEqual(new Set([...trace.ids].filter((pid) => graph.byId.get(pid)!.tier === 0)));
   });
 
+  it('builds a pick on the planet type the pick names, not just any one the pilot has', () => {
+    const water = id('Water');
+    const trace = traceProduct(graph, water, {
+      owned: set('barren', 'oceanic'),
+      ticked: set('barren', 'oceanic'),
+      prefer: ['oceanic'],
+    });
+    expect(trace.planets.map((p) => p.type)).toEqual(['oceanic']);
+  });
+
   it('names every one-planet host when one planet can do it all', () => {
     const water = traceProduct(graph, id('Water'), { owned: set(), ticked: set() });
     expect(water.planets).toHaveLength(1);

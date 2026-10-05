@@ -154,8 +154,15 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   );
   const newIds = useMemo(() => unlock?.highlight ?? new Set<number>(), [unlock]);
   const trace = useMemo(
-    () => (traced ? traceProduct(graph, traced.id, { owned, ticked }) : null),
-    [graph, traced, owned, ticked]
+    () =>
+      traced
+        ? traceProduct(graph, traced.id, {
+            owned,
+            ticked,
+            prefer: picks.picks.find((p) => p.typeId === traced.id)?.planetTypes,
+          })
+        : null,
+    [graph, traced, owned, ticked, picks]
   );
   const figures = useMemo(
     () =>
@@ -415,7 +422,10 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
       <div
         ref={layoutRef}
         data-detail-mode={mode}
-        className={cx('grid items-start gap-3', docked && 'grid-cols-[minmax(0,1fr)_22.5rem]')}
+        className={cx(
+          'grid items-start gap-3',
+          docked ? 'grid-cols-[minmax(0,1fr)_22.5rem]' : 'grid-cols-1'
+        )}
       >
         <Panel
           title={t('piMap.title')}

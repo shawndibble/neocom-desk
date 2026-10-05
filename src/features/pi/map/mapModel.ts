@@ -159,7 +159,12 @@ export interface Trace {
 export function traceProduct(
   graph: MapGraph,
   typeId: number,
-  who: { owned: ReadonlySet<PlanetType>; ticked: ReadonlySet<PlanetType> }
+  who: {
+    owned: ReadonlySet<PlanetType>;
+    ticked: ReadonlySet<PlanetType>;
+    /** Planet types to choose first: the ones a Plan pick is built on. */
+    prefer?: readonly PlanetType[];
+  }
 ): Trace {
   const product = graph.byId.get(typeId)!;
   const ids = new Set<number>();
@@ -176,6 +181,7 @@ export function traceProduct(
 
   const preferred = [...graph.planetTypes].sort(
     (a, b) =>
+      Number(who.prefer?.includes(b) ?? false) - Number(who.prefer?.includes(a) ?? false) ||
       Number(who.owned.has(b)) - Number(who.owned.has(a)) ||
       Number(who.ticked.has(b)) - Number(who.ticked.has(a))
   );

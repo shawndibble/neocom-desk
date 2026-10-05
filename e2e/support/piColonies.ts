@@ -8,8 +8,12 @@
  * the link cost is priced from the shipped radius rather than borrowed. Names,
  * systems and security are this fixture's own (mocked below).
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import { CHARACTER_ID } from './fixtureData';
+import { piTier } from '../../src/engine/pi/chain';
+import type { PiData } from '../../src/sde/types';
 
 const HIGHSEC_SYSTEM = 30000142;
 const NULLSEC_SYSTEM = 30000001;
@@ -181,4 +185,66 @@ export async function mockPlannerColonies(page: Page): Promise<void> {
       })
     );
   });
+}
+
+/** Flat per tier, high enough that a made tier out-earns selling the raw ore. */
+const UNIT_PRICE = [5, 1_500, 36_000, 140_000, 1_000_000];
+
+/**
+ * Quotes every planetary type the app asks the hub about, at its tier's price,
+ * both sides of the book. A later `page.route` wins over an earlier one — see
+ * `support/testBase.ts`.
+ */
+export async function mockPiHubPrices(page: Page): Promise<void> {
+  const pi = JSON.parse(
+    readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
+  ) as PiData;
+  await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
+    const types = new URL(route.request().url()).searchParams.get('types') ?? '';
+    const body: Record<string, unknown> = {};
+    for (const raw of types.split(',').filter(Boolean)) {
+      const sell = UNIT_PRICE[piTier(Number(raw), pi)];
+      body[raw] = {
+        buy: { max: sell * 0.95, volume: 500_000, orderCount: 40 },
+        sell: { min: sell, volume: 500_000, orderCount: 40 },
+      };
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+  });
+}
+
+/**
+ * A pilot with Command Center Upgrades V and Interplanetary Consolidation III,
+ * so the ranking has a colony budget to fit recipes in (the default fixture's
+ * untrained pilot fits none).
+ */
+export async function mockPiSkills(page: Page): Promise<void> {
+  await page.route(`https://esi.evetech.net/characters/${CHARACTER_ID}/skills`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        skills: [
+          {
+            skill_id: 2505,
+            trained_skill_level: 5,
+            active_skill_level: 5,
+            skillpoints_in_skill: 1,
+          },
+          {
+            skill_id: 2495,
+            trained_skill_level: 3,
+            active_skill_level: 3,
+            skillpoints_in_skill: 1,
+          },
+        ],
+        total_sp: 2,
+        unallocated_sp: 0,
+      }),
+    })
+  );
 }
