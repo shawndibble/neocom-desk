@@ -25,7 +25,8 @@ import { GrantBanner } from '@/app/GrantNote';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
-import { GoalPlannerPanel } from '@/features/pi/GoalPlannerPanel';
+import { PlanPanel } from '@/features/pi/PlanPanel';
+import { PiExplainer } from '@/features/pi/PiExplainer';
 import { goalsParam, idListParam, seedGoal } from '@/features/pi/goalsParam';
 import { loadPlannableTypeIds } from '@/features/pi/products';
 import type { Goal } from '@/engine/pi/goalTypes';
@@ -959,6 +960,7 @@ export function PlanetaryIndustry() {
     void hydrateExpiringWindow();
   }, [hydrateExpiringWindow]);
   const [tab, setTab] = usePageTab(PI_TABS);
+  const [explainerOpen, setExplainerOpen] = useState(false);
   // Same store the Advisor tab reads (`AdvisorPanel.tsx`) — one haul cadence
   // for the whole app, so the two tabs' "Storage full in" figures can never
   // gate on different windows.
@@ -1263,6 +1265,9 @@ export function PlanetaryIndustry() {
         meta={planetsResult && <DataAgeBadge date={planetsResult.fetchedAt} />}
         actions={
           <>
+            <Button size="md" onClick={() => setExplainerOpen(true)}>
+              {t('piPlan.newToPi')}
+            </Button>
             <PageSettingsButton pageName={t('pi.title')} section="industry">
               <PiSettingsForm />
             </PageSettingsButton>
@@ -1275,6 +1280,8 @@ export function PlanetaryIndustry() {
           </>
         }
       />
+
+      <PiExplainer open={explainerOpen} onClose={() => setExplainerOpen(false)} />
 
       <Tabs
         label={t('piPlan.tabsLabel')}
@@ -1295,7 +1302,8 @@ export function PlanetaryIndustry() {
       {tab === 'map' ? (
         <EmptyState title={t('piPlan.mapEmptyTitle')} hint={t('piPlan.mapEmptyHint')} />
       ) : tab === 'plan' ? (
-        <GoalPlannerPanel
+        <PlanPanel
+          seedingGoal={seedTypeId !== null}
           characterId={activeCharacterId}
           goals={goals}
           onGoalsChange={setGoals}

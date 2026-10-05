@@ -33,6 +33,8 @@ import { ArrowBendUpRight } from '@phosphor-icons/react/dist/csr/ArrowBendUpRigh
 import { ArrowClockwise } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
 import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
 import { ArrowDown } from '@phosphor-icons/react/dist/csr/ArrowDown';
+import { ArrowLineDown } from '@phosphor-icons/react/dist/csr/ArrowLineDown';
+import { ArrowLineUp } from '@phosphor-icons/react/dist/csr/ArrowLineUp';
 import { ArrowSquareOut } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
 import { ArrowsDownUp } from '@phosphor-icons/react/dist/csr/ArrowsDownUp';
 import { ArrowsLeftRight } from '@phosphor-icons/react/dist/csr/ArrowsLeftRight';
@@ -59,6 +61,7 @@ import { CloudSlash } from '@phosphor-icons/react/dist/csr/CloudSlash';
 import { Code } from '@phosphor-icons/react/dist/csr/Code';
 import { Columns as ColumnsGlyph } from '@phosphor-icons/react/dist/csr/Columns';
 import { Copy } from '@phosphor-icons/react/dist/csr/Copy';
+import { Crosshair } from '@phosphor-icons/react/dist/csr/Crosshair';
 import { Diamond } from '@phosphor-icons/react/dist/csr/Diamond';
 import { DotsSixVertical } from '@phosphor-icons/react/dist/csr/DotsSixVertical';
 import { DotsThree } from '@phosphor-icons/react/dist/csr/DotsThree';
@@ -326,6 +329,13 @@ export const Wallet = withWeight(WalletGlyph);
 export const Planetary = withWeight(Planet);
 /** An extractor program's live telemetry — the one PI card with real-time data. */
 export const Extraction = withWeight(Gauge);
+/** Planetary Industry buildings, for the explainer and the in-game checklist. */
+export const PiExtractor = withWeight(ArrowLineDown);
+export const PiFactory = withWeight(Factory);
+export const PiLaunchpad = withWeight(RocketLaunch);
+export const PiCommandCenter = withWeight(Broadcast);
+export const PiCustomsOffice = withWeight(Crosshair);
+export const PiSkyhook = withWeight(ArrowLineUp);
 /** Mail, calendar and contacts, grouped as one row. */
 export const Social = withWeight(EnvelopeSimple);
 /**
