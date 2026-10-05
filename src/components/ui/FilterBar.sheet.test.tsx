@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
@@ -90,8 +90,10 @@ describe('FilterBar sheet dismissal', () => {
     await user.click(screen.getByRole('button', { name: 'Unread only' }));
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.getByRole('button', { name: 'Keep editing' })).toBeInTheDocument();
-    await user.keyboard('{Escape}');
-    expect(screen.getByRole('button', { name: 'Unread only' })).toBeInTheDocument();
+    // The platform's Escape, dispatched directly: the close button still has
+    // focus and its tooltip would swallow a real first Escape.
+    fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
+    expect(await screen.findByRole('button', { name: 'Unread only' })).toBeInTheDocument();
   });
 
   it('keeps the sheet and puts its history entry back when Back is pressed over a changed draft', async () => {
