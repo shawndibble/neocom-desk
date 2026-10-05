@@ -17,7 +17,10 @@ import { useMediaQuery } from '@/lib/useMediaQuery';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { EstimateBadge } from './DirectiveRow';
 import { homeSystemId, routeFigures, type RouteFigures } from './sellRoute';
+import { DEFAULT_BUYBACK_PCT, PI_BUYBACK_PCT_OPTIONS } from './piSettings';
 import { useSellHub } from './sellHub';
+
+const BUYBACK = 'buyback';
 
 interface Props {
   /** The solar system of each of the active Character's colonies. */
@@ -39,7 +42,7 @@ interface Home {
  */
 export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
   const { t } = useTranslation();
-  const { hub, setHub } = useSellHub();
+  const { hub, buybackPct, setHub, setBuyback } = useSellHub();
   const mdUp = useMediaQuery('(min-width: 48rem)');
   const basis = useJumpBasis();
   const homeId = homeSystemId(colonySystemIds);
@@ -61,7 +64,7 @@ export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
 
   const routeKey = `${basis.key}|${homeId}|${hub.systemId}`;
   useEffect(() => {
-    if (homeId === null || !basis.hydrated) return;
+    if (homeId === null || !basis.hydrated || buybackPct !== null) return;
     let cancelled = false;
     void routeExposure(homeId, hub.systemId, basis.rules, basis.network)
       .catch(() => ({ kind: 'unknown' as const }))
@@ -76,10 +79,10 @@ export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [homeId, hub.systemId, basis, routeKey]);
+  }, [homeId, hub.systemId, basis, routeKey, buybackPct]);
 
   const shownHome = home?.systemId === homeId ? home : null;
-  const figures = route?.key === routeKey ? route.figures : null;
+  const figures = buybackPct === null && route?.key === routeKey ? route.figures : null;
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2" data-testid="pi-header-strip">
@@ -108,7 +111,12 @@ export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
         <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('piPlan.strip.sellAt')}
         </span>
-        <Select value={hub.id} onValueChange={(id) => setHub(id as TradeHub['id'])}>
+        <Select
+          value={buybackPct === null ? hub.id : BUYBACK}
+          onValueChange={(value) =>
+            value === BUYBACK ? setBuyback(DEFAULT_BUYBACK_PCT) : setHub(value as TradeHub['id'])
+          }
+        >
           <SelectTrigger
             size={mdUp ? 'sm' : 'md'}
             className="w-40"
@@ -122,9 +130,35 @@ export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
                 {option.systemName}
               </SelectItem>
             ))}
+            <SelectItem value={BUYBACK}>{t('piPlan.strip.corpBuyback')}</SelectItem>
           </SelectContent>
         </Select>
+        {buybackPct !== null && (
+          <Select value={String(buybackPct)} onValueChange={(pct) => setBuyback(Number(pct))}>
+            <SelectTrigger
+              size={mdUp ? 'sm' : 'md'}
+              className="w-40"
+              aria-label={t('piPlan.strip.buybackRate')}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[...new Set([...PI_BUYBACK_PCT_OPTIONS, buybackPct])]
+                .sort((x, y) => x - y)
+                .map((pct) => (
+                  <SelectItem key={pct} value={String(pct)}>
+                    {t('piPlan.strip.buybackPct', { pct, hub: hub.systemName })}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        )}
       </label>
+      {buybackPct !== null && homeId !== null && (
+        <StatChips>
+          <StatChip label={t('piPlan.strip.route')} value={t('piPlan.strip.dropOff')} />
+        </StatChips>
+      )}
       {figures && (
         <StatChips>
           <StatChip

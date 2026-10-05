@@ -40,7 +40,7 @@ import { useAutoDismiss } from '@/lib/useAutoDismiss';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
 import { findRemovalBlockers, planEntryKey } from '@/engine/plan';
-import { openSkillDetailModal } from '@/stores/skillDetailModal';
+import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import {
   milestoneKey,
   milestoneStates,
@@ -555,10 +555,11 @@ export function PlanEditor({
     [removalBlockers, nameFor, t]
   );
 
-  /** A row's skill name opens the shared Skill Detail modal, carrying this plan's own (possibly unsaved) entries so a prereq already staged here reads "Planned". */
-  const handleOpenSkillDetail = useCallback(
-    (skillTypeID: number) => openSkillDetailModal(skillTypeID, { planEntries: editable.entries }),
-    [editable.entries]
+  /** A row's skill name is a link to the shared Skill Detail modal; as it is clicked this plan's own (possibly unsaved) entries are staged for it, so a prereq already staged here reads "Planned". */
+  const stageSkillPlanEntries = useSkillDetailModalStore((state) => state.stage);
+  const handleStageSkillDetail = useCallback(
+    (skillTypeID: number) => stageSkillPlanEntries(skillTypeID, editable.entries),
+    [editable.entries, stageSkillPlanEntries]
   );
 
   // Manual overrides (RemapMarkerModal), aligned to the current markers.
@@ -2134,7 +2135,7 @@ export function PlanEditor({
                 onReorder={handleDrop}
                 onPromotePrereq={handlePromotePrereq}
                 onRemove={requestRemoveEntry}
-                onOpenSkillDetail={handleOpenSkillDetail}
+                onStageSkillDetail={handleStageSkillDetail}
                 removalBlockedReason={removalBlockedReason}
                 pinnedInProgress={pinnedInProgress}
                 onRemoveMarker={handleRemoveMarker}

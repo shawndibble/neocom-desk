@@ -308,7 +308,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     render(<App />);
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
-    const [issuerButton] = within(table).getAllByRole('button', { name: 'Some Trader' });
+    const [issuerButton] = within(table).getAllByRole('link', { name: 'Some Trader' });
     await user.click(issuerButton);
 
     const dialog = await screen.findByRole('dialog');

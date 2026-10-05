@@ -18,6 +18,12 @@ const WHOLE = 0.995;
 /** The source, with how much is made where the line is partial. */
 function sourceLabel(line: DemandLine, t: TFunction): string {
   const percent = PERCENT_FORMAT.format(line.madeFraction * 100);
+  if (line.source === 'bought') {
+    // The tier names what is bought; a part made as well is said alongside.
+    return line.madeFraction > 1 - WHOLE
+      ? t('piPlan.sourceBoughtPartial', { tier: line.tier, percent })
+      : t('piPlan.sourceBoughtTier', { tier: line.tier });
+  }
   if (line.source === 'short' && line.madeFraction > 1 - WHOLE) {
     return t('piPlan.sourceShortPartial', { percent });
   }

@@ -577,7 +577,7 @@ function analyseColony(args: {
   // with two, no figure says which one a new ECU would pull.
   const ecus = colony.pinLoad.counts.extractorControlUnit ?? 0;
   const room = plan.headroom.extractorControlUnit ?? 0;
-  const maxEcus = plannerPolicy({ maxP0Types: 1, buyP1: false }).maxEcusPerColony;
+  const maxEcus = plannerPolicy({ maxP0Types: 1, buyTiers: [] }).maxEcusPerColony;
   const extraEcus = Math.min(room, Math.max(0, maxEcus - ecus));
   // Extra heads for idle factories and extra ECUs draw on the same CPU/Powergrid
   // headroom, so when the idle win already buys heads, this one would count it twice.
@@ -589,7 +589,7 @@ function analyseColony(args: {
     const perEcu = only.unitsPerHour / ecus;
     // The same flat falloff the rebuild scorer applies to every ECU after the first.
     const extra =
-      perEcu * extraEcus * plannerPolicy({ maxP0Types: 1, buyP1: false }).extraEcuFactor;
+      perEcu * extraEcus * plannerPolicy({ maxP0Types: 1, buyTiers: [] }).extraEcuFactor;
     const gain = gainPerDay(earnWith(new Map([[only.typeId, extra]])), nominal);
     if (gain !== null && gain > 0) {
       wins.push(

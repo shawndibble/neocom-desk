@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { PlanEntry } from '@/engine/types';
 import { Button, SkillBar } from '@/components/ui';
 import type { SkillTrainingStatus } from './skillStatus';
-import { SkillNameButton } from './SkillNameButton';
+import { SkillLink } from '@/features/entities';
 import { SkillStatusIcon } from './SkillStatusIcon';
 
 export interface SkillRowProps {
@@ -55,13 +55,9 @@ export function SkillRow({
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
       <SkillStatusIcon status={status} />
       {skillTypeID !== undefined ? (
-        <SkillNameButton
-          skillTypeID={skillTypeID}
-          planEntries={planEntries}
-          className="flex-auto text-text"
-        >
+        <SkillLink typeId={skillTypeID} planEntries={planEntries} className="flex-auto">
           {name}
-        </SkillNameButton>
+        </SkillLink>
       ) : (
         <span className="flex-auto text-text">{name}</span>
       )}

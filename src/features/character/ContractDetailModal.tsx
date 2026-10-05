@@ -39,7 +39,7 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
-import { IssuerLink } from './IssuerLink';
+import { CharacterLink } from '@/features/entities';
 import { StandingTag } from './StandingTag';
 import type { EffectiveStanding } from './contactStandings';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
@@ -204,7 +204,7 @@ export function ContractDetailModal({
 
             <dt className="text-text-dim uppercase">{t('contracts.detailIssuedBy')}</dt>
             <dd className="flex items-center gap-1.5">
-              <IssuerLink issuerId={contract.issuer_id} name={issuerName} />
+              <CharacterLink id={contract.issuer_id}>{issuerName}</CharacterLink>
               <StandingTag standing={issuerStanding} />
             </dd>
 
