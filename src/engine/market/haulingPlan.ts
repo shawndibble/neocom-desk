@@ -13,8 +13,9 @@
  * Each suggested quantity is the smallest of four limits, and the plan names
  * the one that applied so a hauler can see why (`limitedBy`):
  * - `sales`: a week of expected sales (`demandCapUnits`),
- * - `supply`: the units that are profitable to buy at all — the origin's
- *   ladder past the break-even price only loses money. Sold straight into the
+ * - `supply`: the units that are profitable to buy with a margin to spare — the
+ *   origin's ladder past the break-even price loses money, and a unit just
+ *   under it loses the moment a price slips. Sold straight into the
  *   destination's buy orders there is no sales horizon, and this is the depth
  *   both books keep a unit profitable to (`walkInstant`),
  * - `space`: what fits in the room left in the holds that accept the item,
@@ -27,7 +28,7 @@
  *
  * Pure: no fetch/DOM/Dexie.
  */
-import { brokerFeePct, salesTaxPct } from '@/engine/industry/fees';
+import { brokerFeePct, salesTax, salesTaxPct } from '@/engine/industry/fees';
 import type { AppraisalNetFees } from './appraisal';
 import {
   HOLD_KINDS,
@@ -36,7 +37,14 @@ import {
   type CargoHold,
   type HoldKind,
 } from './cargoHolds';
-import { lotEconomics, walkInstant, walkLadder, type LadderLevel } from './haulingMarket';
+import {
+  HAULING_THRESHOLDS,
+  lotEconomics,
+  walkInstant,
+  walkLadder,
+  type LadderLevel,
+} from './haulingMarket';
+import { roundPriceDown } from './priceTick';
 
 export interface TripCandidate {
   typeId: number;
@@ -80,6 +88,8 @@ export interface TripLine {
   volumeM3: number;
   cost: number;
   profit: number;
+  /** The dearest unit price still worth paying at the origin; null when no unit clears the margin. */
+  maxBuyPrice: number | null;
   selected: boolean;
   limitedBy: QuantityLimit;
   /** The holds the line is loaded into, in fill order; empty when space never limits or nothing ships. */
@@ -118,22 +128,79 @@ export interface PlanTripInput {
   overrides: ReadonlyMap<number, TripOverride>;
 }
 
-/** Units of `ladder` that cost less than a unit is worth after fees — past this every further unit loses money. */
-export function profitableDepth(candidate: TripCandidate, planFees: AppraisalNetFees): number {
+/**
+ * Units of `ladder` that cost enough less than a unit is worth after fees to
+ * clear `minUnitMarginPct` — past this every further unit earns too little to
+ * survive a price slipping before it is bought or sold.
+ */
+export function profitableDepth(
+  candidate: TripCandidate,
+  planFees: AppraisalNetFees,
+  minMarginPct: number = HAULING_THRESHOLDS.minUnitMarginPct
+): number {
   const { accountingLevel, brokerRelationsLevel, standing } = candidate.fees ?? planFees;
   if (candidate.destBuyLadder !== undefined) {
     return walkInstant({
       originLadder: candidate.buyLadder,
       destBuyLadder: candidate.destBuyLadder,
       accountingLevel,
+      minMarginPct,
     }).units;
   }
   const feeRate =
     (salesTaxPct(accountingLevel) +
       brokerFeePct(brokerRelationsLevel, standing.factionStanding, standing.corpStanding)) /
     100;
-  const breakEven = candidate.expectedPrice * (1 - feeRate);
+  const breakEven = (candidate.expectedPrice * (1 - feeRate)) / (1 + minMarginPct / 100);
   return candidate.buyLadder.reduce((sum, l) => (l.price <= breakEven ? sum + l.units : sum), 0);
+}
+
+/**
+ * The dearest price a unit may be bought at and still clear `minMarginPct`
+ * after every fee: the line to hold when the origin's book has moved since
+ * the plan was made. Buying past it only loses money once the sale is paid
+ * for. Null when no unit on today's books clears the margin.
+ *
+ * Listed, it is the break-even price less the margin, rounded down to a price
+ * the market can hold. Sold into buy orders it is what the weakest bid the lot
+ * sells into nets after sales tax, less the margin: the origin price of any
+ * unit in the lot can rise to there before that unit stops clearing it.
+ */
+export function maxBuyPrice(
+  candidate: TripCandidate,
+  planFees: AppraisalNetFees,
+  minMarginPct: number = HAULING_THRESHOLDS.minUnitMarginPct
+): number | null {
+  const { accountingLevel, brokerRelationsLevel, standing } = candidate.fees ?? planFees;
+  if (candidate.destBuyLadder !== undefined) {
+    const { units } = walkInstant({
+      originLadder: candidate.buyLadder,
+      destBuyLadder: candidate.destBuyLadder,
+      accountingLevel,
+      minMarginPct,
+    });
+    if (units <= 0) return null;
+    // The weakest bid the lot sells into sets the ceiling: any unit bought
+    // dearer than what that bid nets, less the margin, loses its margin.
+    let sold = 0;
+    for (const level of candidate.destBuyLadder) {
+      sold += level.units;
+      if (sold >= units) {
+        const net = level.price - salesTax(level.price, accountingLevel);
+        const limit = net / (1 + minMarginPct / 100);
+        return roundPriceDown(limit) ?? limit;
+      }
+    }
+    return null;
+  }
+  const feeRate =
+    (salesTaxPct(accountingLevel) +
+      brokerFeePct(brokerRelationsLevel, standing.factionStanding, standing.corpStanding)) /
+    100;
+  const limit = (candidate.expectedPrice * (1 - feeRate)) / (1 + minMarginPct / 100);
+  const cheapest = candidate.buyLadder[0]?.price;
+  if (cheapest === undefined || cheapest > limit) return null;
+  return roundPriceDown(limit) ?? limit;
 }
 
 /** The most units `budget` ISK buys through `ladder`, up to `max`. */
@@ -169,6 +236,7 @@ function lineFor(
     volumeM3: economics.filled * candidate.unitVolumeM3,
     cost: economics.cost,
     profit: economics.profit,
+    maxBuyPrice: maxBuyPrice(candidate, planFees),
     selected,
     limitedBy,
     placements: [],

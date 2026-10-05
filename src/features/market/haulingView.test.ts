@@ -181,17 +181,18 @@ describe('ISK/m³', () => {
 describe('selling into buy orders', () => {
   it('works the load to the profitable depth of both books, after sales tax only', () => {
     const [row] = toViewRows([instantRow({ typeId: 1 })], FEES_AT);
-    // The walkInstant worked example: 17 units, 1,735 ISK in, 1,895 ISK out.
-    const profit = 1895 - 1895 * 0.03375 - 1735;
-    expect(row!.suggestedUnits).toBe(17);
-    expect(row!.marginPct).toBeCloseTo((profit / 1735) * 100);
-    expect(row!.profitPerUnit).toBeCloseTo(profit / 17);
+    // The walkInstant worked example, stopped before the 5%-margin line:
+    // 10 units, 1,000 ISK in, 1,125 ISK out.
+    const profit = 1125 - 1125 * 0.03375 - 1000;
+    expect(row!.suggestedUnits).toBe(10);
+    expect(row!.marginPct).toBeCloseTo((profit / 1000) * 100);
+    expect(row!.profitPerUnit).toBeCloseTo(profit / 10);
     expect(row!.candidate.demandCapUnits).toBeNull();
   });
 
   it('shows the realised buy-order price, not an Expected Sell Price', () => {
     const [row] = toViewRows([instantRow({ typeId: 1 })], FEES_AT);
-    expect(row!.price).toBeCloseTo(1895 / 17);
+    expect(row!.price).toBeCloseTo(1125 / 10);
     const [listed] = toViewRows([scanRow({ typeId: 2 })], FEES_AT);
     expect(listed!.price).toBe(150);
   });
