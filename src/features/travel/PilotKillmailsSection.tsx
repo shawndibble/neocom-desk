@@ -16,7 +16,7 @@ import { resolveNames } from '@/features/character/names';
 import { FittingModuleList } from '@/features/fittings/FittingModuleList';
 import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { cx } from '@/lib/cx';
-import { formatIsk } from '@/lib/isk';
+import { formatIskCompact } from '@/lib/isk';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatTimestamp } from '@/lib/timestamp';
 import {
@@ -251,7 +251,7 @@ function KillmailRow({
           <span className="text-text">{partyName(other)}</span>
         </span>
         <span className="text-text tabular-nums">
-          {entry.value === null ? dash : formatIsk(entry.value, 0)}
+          {entry.value === null ? dash : formatIskCompact(entry.value)}
         </span>
       </button>
       {isOpen && (

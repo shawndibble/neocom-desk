@@ -269,7 +269,7 @@ describe('PilotLookupPanel', () => {
       expect(within(list).getByText('Vexor')).toBeTruthy();
       expect(within(list).getByText('Kill')).toBeTruthy();
       expect(within(list).getByText('Loss')).toBeTruthy();
-      expect(within(list).getByText('12,500,000')).toBeTruthy();
+      expect(within(list).getByText('12.5M')).toBeTruthy();
       expect(mocks.loadKillmailFit).not.toHaveBeenCalled();
       expect(screen.getByRole('link', { name: /^More on zKillboard/ }).getAttribute('href')).toBe(
         'https://zkillboard.com/character/42/'

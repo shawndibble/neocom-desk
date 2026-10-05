@@ -137,8 +137,8 @@ function CompareTooltip({
         <ul className="mt-1 border-t border-line pt-1 text-text-dim">
           {point.folded.map((type) => (
             <li key={type.typeId}>
-              {type.typeName}: {formatIsk(type.rawValue, 0)}
-              {showRefining && ` / ${formatIsk(type.refineValue, 0)}`}
+              {type.typeName}: {formatIskCompact(type.rawValue)}
+              {showRefining && ` / ${formatIskCompact(type.refineValue)}`}
             </li>
           ))}
         </ul>
