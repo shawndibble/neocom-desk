@@ -6,7 +6,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Button, IskAmount, TypeIcon } from '@/components/ui';
-import { buttonClassName } from '@/components/ui/buttonClassName';
+import * as Icon from '@/components/ui/icons';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeRank } from '@/engine/pi/planRecipes';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
@@ -230,12 +230,13 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
           <button
             type="button"
             onClick={() => props.onTraceRecipe(recipe.typeId)}
-            className={`${buttonClassName({ variant: 'ghost', size: 'md' })} w-full justify-start normal-case tracking-normal`}
+            className="flex min-h-11 w-full items-center gap-2 rounded-xs border border-line px-2 py-1.5 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <TypeIcon typeId={recipe.typeId} size={64} width={28} height={28} />
             <span className="min-w-0 text-left text-xs">
               {t('piMap.add.bestRecipe')} <b>{recipe.name}</b>
             </span>
+            <Icon.Descend aria-hidden="true" className="ml-auto shrink-0 text-text-dim" />
           </button>
           <p className="mt-1 text-xs text-isk-pos">
             +<IskAmount value={recipe.iskPerDay} decimals={0} />

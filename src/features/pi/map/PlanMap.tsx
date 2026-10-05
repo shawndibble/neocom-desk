@@ -293,7 +293,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   const hint = !hintDismissed && (
     <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-1.5 text-xs text-text-dim">
       <span>{t('piMap.hint')}</span>
-      <Button size="sm" onClick={dismissHint}>
+      <Button size={phone ? 'md' : 'sm'} onClick={dismissHint}>
         {t('piMap.hintDismiss')}
       </Button>
     </div>
@@ -343,7 +343,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
         </>
       )}
       {traced && (
-        <Button size="sm" className="ml-auto" onClick={clearTrace}>
+        <Button size={phone ? 'md' : 'sm'} className="ml-auto" onClick={clearTrace}>
           {t('piMap.clearTrace')}
         </Button>
       )}
@@ -433,7 +433,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
           padded={false}
           actions={
             <Button
-              size="sm"
+              size={phone ? 'md' : 'sm'}
               aria-haspopup="dialog"
               onClick={() => {
                 remember();

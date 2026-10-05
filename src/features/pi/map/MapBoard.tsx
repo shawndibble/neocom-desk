@@ -345,7 +345,7 @@ export function MapBoard(props: MapBoardProps) {
                     <li
                       key={product.typeId}
                       aria-hidden="true"
-                      className="h-[34px] flex-none rounded-xs bg-panel-2/35"
+                      className="h-11 flex-none rounded-xs bg-panel-2/35 md:h-[34px] touch:h-11"
                     />
                   );
                 }
@@ -385,7 +385,7 @@ export function MapBoard(props: MapBoardProps) {
                         onKeyDown={(e) => move(key, e)}
                         onClick={() => props.onProduct(product.typeId)}
                         className={cx(
-                          'grid h-[34px] w-full grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xs border py-0 pr-[5px] pl-[3px] text-left text-xs',
+                          'grid h-11 w-full md:h-[34px] touch:h-11 grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xs border py-0 pr-[5px] pl-[3px] text-left text-xs',
                           interactiveClassName,
                           focusRingClassName,
                           goal
@@ -545,7 +545,7 @@ function PlanetToggle({
         <span
           aria-hidden="true"
           className={cx(
-            'absolute top-0.5 right-1.5 grid size-3.5 place-items-center rounded-xs border text-[10px] leading-none',
+            'absolute top-0.5 right-1.5 z-[1] grid size-3.5 place-items-center rounded-xs border text-[10px] leading-none',
             pressed
               ? 'border-accent bg-accent text-accent-contrast'
               : 'border-line-bright bg-panel-2'
@@ -558,8 +558,7 @@ function PlanetToggle({
           size={40}
           className={cx(
             'outline-2 outline-offset-1',
-            !pressed && have && 'brightness-[.45] grayscale',
-            !have && !props.whatIf && 'brightness-[.45] grayscale',
+            !pressed && 'brightness-[.45] grayscale',
             props.ranks.length > 0 && have ? 'outline-warning' : 'outline-transparent',
             props.whatIf && 'outline-map-whatif brightness-100 grayscale-0'
           )}
