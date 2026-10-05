@@ -2,15 +2,17 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  Caret,
   Checkbox,
   Disclosure,
   FilterChip,
   Modal,
   IskInput,
   TextInput,
+  Tooltip,
   textActionClassName,
 } from '@/components/ui';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { MiningTaxAssignmentRecord, MiningTaxPaymentMethod } from '@/db';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -214,15 +216,16 @@ export function SettleUpDialog({
   const copyRow = (key: string, label: string, value: string, copyText: string, dim = false) => (
     <div key={key} className="flex min-w-0 items-center gap-2 px-2 py-1.5">
       <span className={cx(FIELD_LABEL, 'w-14 shrink-0')}>{label}</span>
-      <span
-        className={cx(
-          'min-w-0 flex-1 truncate text-xs tabular-nums',
-          dim ? 'text-text-dim' : 'font-semibold'
-        )}
-        title={value}
-      >
-        {value}
-      </span>
+      <Tooltip content={value}>
+        <span
+          className={cx(
+            'min-w-0 flex-1 truncate text-xs tabular-nums',
+            dim ? 'text-text-dim' : 'font-semibold'
+          )}
+        >
+          {value}
+        </span>
+      </Tooltip>
       <Button
         size="sm"
         className="shrink-0"
@@ -345,10 +348,11 @@ export function SettleUpDialog({
         <div className="space-y-1.5">
           <button
             type="button"
-            className={textActionClassName()}
+            className={textActionClassName('gap-1.5')}
             aria-expanded={differentBase !== null}
             onClick={toggleDifferent}
           >
+            <Caret expanded={differentBase !== null} />
             {differentBase === null
               ? t('miningTax.settleUp.differentAmountAction')
               : t('miningTax.settleUp.differentAmountHide')}
@@ -422,7 +426,7 @@ export function SettleUpDialog({
           {onPickFromWallet && (
             <>
               {' '}
-              <button type="button" className={textActionClassName()} onClick={onPickFromWallet}>
+              <button type="button" className={inlineLinkClassName} onClick={onPickFromWallet}>
                 {t('miningTax.settleUp.pickFromWallet')}
               </button>
             </>

@@ -6,6 +6,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SearchInput } from '@/components/ui';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import type { ShipTreeData, ShipTreeShip } from '@/sde/types';
 import { FlyDot } from './FlyDot';
@@ -55,7 +57,6 @@ export function MapSearch({
         placeholder={t('ships.tree.searchPlaceholder')}
         aria-label={t('ships.tree.searchLabel')}
         aria-keyshortcuts="/"
-        title={t('ships.tree.searchShortcut')}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && results[0]) {
             // The Ship Info window takes focus as it opens; without this the
@@ -69,14 +70,18 @@ export function MapSearch({
       {results.length > 0 && (
         <ul
           aria-label={t('ships.tree.searchResults')}
-          className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-xs border border-line-bright bg-panel-2 py-1 shadow-lg shadow-black/50"
+          className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-xs border border-line-bright bg-panel py-1 shadow-lg shadow-black/50"
         >
           {results.map((s) => (
             <li key={s.typeID}>
               <button
                 type="button"
                 onClick={() => pick(s)}
-                className="flex w-full items-center gap-2 px-2 py-1 text-left text-sm hover:bg-panel"
+                className={cx(
+                  'flex w-full items-center gap-2 px-2 py-1 text-left text-sm',
+                  rowInteractiveClassName,
+                  focusRingInsetClassName
+                )}
               >
                 <FlyDot status={statuses.get(s.typeID)} />
                 <span className="flex-1 truncate">{s.name}</span>

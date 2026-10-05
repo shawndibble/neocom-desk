@@ -23,7 +23,11 @@ import { priceComparison } from '@/engine/market/orderBookDepth';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import type { RegionOrder } from '@/esi/endpoints';
 import { cx } from '@/lib/cx';
-import { toggleChipStateClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  interactiveClassName,
+  toggleChipStateClassName,
+} from '@/components/ui/controlStyles';
 import { formatMarketIsk } from '@/lib/isk';
 import type { MarketOrderColumnId } from './marketOrderColumns';
 import { SetDestinationButton } from './SetDestinationButton';
@@ -212,6 +216,8 @@ export function BookSideToggle({
             onClick={() => onChange(segment.id)}
             className={cx(
               'flex min-h-11 flex-1 flex-col items-start justify-center border border-b-2 px-3 py-1.5 text-left',
+              interactiveClassName,
+              focusRingInsetClassName,
               toggleChipStateClassName(pressed),
               pressed && (segment.id === 'sell' ? 'border-b-isk-neg' : 'border-b-isk-pos')
             )}
@@ -219,6 +225,7 @@ export function BookSideToggle({
             <span className="text-[0.6875rem] font-semibold tracking-widest uppercase">
               {t(`market.sideToggle.${segment.id}`, { count: segment.count })}
             </span>
+            {/* Exception: exact market price on a tap target; IskAmount would nest a tab stop. */}
             <span className={cx('text-sm tabular-nums', pressed ? 'font-semibold' : 'font-normal')}>
               {segment.best === null ? '—' : formatMarketIsk(segment.best)}
             </span>
@@ -330,7 +337,9 @@ export function OrderSideCard({
               // not read.
               stackLayout="dense"
               stacked={cards}
+              className="dt-actions-pinned-only"
               rowContextMenu={rowContextMenu}
+              rowMoreActions
               rowClassName={rowClassName}
               expandableRow={{ renderDetail }}
             />

@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button, Caret } from '@/components/ui';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { romanLevel } from '@/engine/projection';
 import type { PlanEntry } from '@/engine/types';
 import { isEntryCovered, plannedLevelFor } from '@/features/skills/planner/reorder';
@@ -110,7 +111,11 @@ export function CertificateRow({
               : t('skills.certificates.showNeeds', { grade: nextGrade, name: certificate.name })
           }
           onClick={onToggle}
-          className="flex min-h-11 min-w-0 items-center gap-1.5 text-left text-sm font-medium text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-9"
+          className={cx(
+            'flex min-h-11 min-w-0 items-center gap-1.5 rounded-xs text-left text-sm font-medium text-text md:min-h-9',
+            interactiveClassName,
+            focusRingClassName
+          )}
         >
           <Caret expanded={expanded} />
           <span className="truncate">{certificate.name}</span>

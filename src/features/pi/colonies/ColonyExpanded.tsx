@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { InfoTooltip, StatChip, TypeIcon } from '@/components/ui';
+import { InfoTooltip, IskAmount, StatChip, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
@@ -17,7 +17,6 @@ import type { ExtractorYieldProgram } from '@/engine/pi/types';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { formatIskCompact } from '@/lib/isk';
 import {
   extractorExpiryMs,
   extractorProgramsFromPins,
@@ -373,9 +372,14 @@ export function ColonyExpanded({
                   </span>
                   <span className="min-w-0 flex-1">{line.text}</span>
                   <span className="shrink-0 text-isk-pos tabular-nums">
-                    {win.gainPerDay === null
-                      ? t('piColonies.noFigure')
-                      : `+${formatIskCompact(win.gainPerDay)}${t('piColonies.perDay')}`}
+                    {win.gainPerDay === null ? (
+                      t('piColonies.noFigure')
+                    ) : (
+                      <>
+                        +<IskAmount value={win.gainPerDay} decimals={0} />
+                        {t('piColonies.perDay')}
+                      </>
+                    )}
                     <span className="text-text-dim">
                       {' '}
                       · {t('piColonies.login.minutes', { minutes: win.minutes })}

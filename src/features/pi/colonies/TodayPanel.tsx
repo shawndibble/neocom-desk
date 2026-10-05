@@ -14,7 +14,6 @@ import {
   type StatChipTone,
 } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import { formatIskCompact } from '@/lib/isk';
 import { PI_CADENCE_DAYS, type PiCadence, type PiCadenceDays } from '../cadencePref';
 import { EstimateBadge } from '../DirectiveRow';
 import { HOUR_MS, type CheckStatus, type ColonyCheckRow, type TodayCheck } from './coloniesModel';
@@ -125,7 +124,7 @@ function Hero({
                   : 'piColonies.today.bringsBackLead'
               )}{' '}
               <span className="text-isk-pos">
-                +{formatIskCompact(gain)} {t('piColonies.iskPerDay')}
+                +<IskAmount value={gain} decimals={0} /> {t('piColonies.iskPerDay')}
               </span>
             </>
           )}
@@ -173,7 +172,7 @@ function CountChips({
               {fixCount}
               {fixGainPerDay > 0 && (
                 <span className="text-isk-pos">
-                  {' · '}+{formatIskCompact(fixGainPerDay)}
+                  {' · '}+<IskAmount value={fixGainPerDay} decimals={0} />
                   {t('piColonies.perDay')}
                 </span>
               )}

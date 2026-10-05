@@ -317,15 +317,18 @@ describe('FittingStatsSections offense', () => {
     expect(offense.getByText('784 volley')).toBeInTheDocument();
   });
 
-  it('shows sustained DPS with reload under the total and on a reloading row, never on drones', () => {
+  it('shows sustained DPS with reload under the total and on a reloading row, never on drones', async () => {
+    const user = userEvent.setup();
     renderSections(heatedStats());
     const offense = within(sectionBody('Offense'));
 
     expect(offense.getByText('Sustained with reload: 170.1 DPS')).toBeInTheDocument();
-    const blasters = offense.getByText('53.7 DPS').closest('[title]');
-    expect(blasters).toHaveAttribute('title', 'Sustained with reload: 50.1 DPS');
-    expect(blasters).toHaveTextContent('(Sustained with reload: 50.1 DPS)');
-    expect(offense.getByText('120.0 DPS').closest('[title]')).toBeNull();
+    expect(offense.getByText('53.7 DPS').closest('.ml-auto')).toHaveTextContent(
+      '(Sustained with reload: 50.1 DPS)'
+    );
+    await user.hover(offense.getByText('53.7 DPS'));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Sustained with reload: 50.1 DPS');
+    expect(offense.getByText('120.0 DPS').closest('[tabindex]')).toBeNull();
   });
 
   it("shows a turret's optimal and falloff, and a launcher's single range, under its DPS", () => {
@@ -451,12 +454,14 @@ describe('FittingStatsSections — Defense', () => {
     expect(screen.getByText('Depletes in 30s')).toHaveClass('text-danger');
   });
 
-  it('keeps the Capacitor tone over the heat tone, with the unheated figure on hover', () => {
+  it('keeps the Capacitor tone over the heat tone, with the unheated figure on hover', async () => {
+    const user = userEvent.setup();
     renderSections(stats({ capacitor: { stable: true, stablePercentage: 40 }, unheated: stats() }));
     const headline = screen.getByText('Stable at 40%');
     expect(headline).toHaveClass('text-success');
     expect(headline).not.toHaveClass('text-warning');
-    expect(headline).toHaveAttribute('title', 'Unheated: Stable at 60%');
+    await user.hover(headline);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Unheated: Stable at 60%');
   });
 
   it("labels a Reactive Armor Hardener's resists as adapted to the chosen profile", () => {
@@ -852,13 +857,16 @@ describe('FittingStatsSections — Overheat all and Copy stats', () => {
     expect(useOverheatAll.getState().overheatAll).toBe(true);
   });
 
-  it('reads only the figures heat changed in the warning tone, with their unheated value on hover', () => {
+  it('reads only the figures heat changed in the warning tone, with their unheated value on hover', async () => {
+    const user = userEvent.setup();
     renderSections(allOverheatedStats());
 
     // The Defense headline: heated, and what it reads unheated.
     const ehp = screen.getByText('17,400 EHP');
     expect(inWarningTone(ehp)).toBe(true);
-    expect(ehp).toHaveAttribute('title', 'Unheated: 4,619 EHP');
+    await user.hover(ehp);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Unheated: 4,619 EHP');
+    await user.unhover(ehp);
     // Colour and hover alone reach neither touch nor screen readers: the value is also in the text.
     expect(ehp).toHaveTextContent('(Unheated: 4,619 EHP)');
     expect(inWarningTone(screen.getByText('81.8 HP/s'))).toBe(true);
@@ -867,10 +875,11 @@ describe('FittingStatsSections — Overheat all and Copy stats', () => {
     const offense = within(sectionBody('Offense'));
     expect(inWarningTone(offense.getByText('61.7 DPS'))).toBe(true);
     // Heat's own hover keeps the row's sustained figure beside the unheated one.
-    expect(offense.getByText('61.7 DPS')).toHaveAttribute(
-      'title',
+    await user.hover(offense.getByText('61.7 DPS'));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'Unheated: 53.7 DPS · Sustained with reload: 50.1 DPS'
     );
+    await user.unhover(offense.getByText('61.7 DPS'));
     expect(inWarningTone(offense.getByText('304 volley'))).toBe(false);
     expect(inWarningTone(offense.getByText('120.0 DPS'))).toBe(false);
     // The total, in the body and as the section's headline.
@@ -898,7 +907,8 @@ describe('FittingStatsSections — Overheat all and Copy stats', () => {
     expect(screen.queryByText(/overheated$/)).toBeNull();
   });
 
-  it('marks a heated support module’s amount or range, and the capacitor drain it costs, but not the rest', () => {
+  it('marks a heated support module’s amount or range, and the capacitor drain it costs, but not the rest', async () => {
+    const user = userEvent.setup();
     const neut = {
       kind: 'neutralizer' as const,
       typeId: 12267,
@@ -944,10 +954,8 @@ describe('FittingStatsSections — Overheat all and Copy stats', () => {
     expect(inWarningTone(support.getByText('Range within 10.0 km'))).toBe(false);
     // The scrambler reaches further, with the same two points.
     expect(inWarningTone(support.getByText('Range within 10.8 km'))).toBe(true);
-    expect(support.getByText('Range within 10.8 km')).toHaveAttribute(
-      'title',
-      'Unheated: Range within 9.0 km'
-    );
+    await user.hover(support.getByText('Range within 10.8 km'));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Unheated: Range within 9.0 km');
 
     const capacitor = within(sectionBody('Capacitor'));
     expect(inWarningTone(capacitor.getByText('−23.5 GJ/s'))).toBe(true);
@@ -1253,17 +1261,24 @@ describe('FittingStatsSections price', () => {
     } as unknown as Appraisal;
     const user = userEvent.setup();
     render(
-      <FittingStatsSections
-        stats={stats()}
-        statsProgress={null}
-        statsError={false}
-        price={price}
-        damageProfiles={damageProfiles()}
-        targetProfiles={targetProfiles()}
-        typeName={priceTypeName}
-      />
+      <MemoryRouter>
+        <FittingStatsSections
+          stats={stats()}
+          statsProgress={null}
+          statsError={false}
+          price={price}
+          damageProfiles={damageProfiles()}
+          targetProfiles={targetProfiles()}
+          typeName={priceTypeName}
+        />
+      </MemoryRouter>
     );
     await user.click(screen.getByRole('button', { name: /^Price/ }));
+    // The compact figure is an IskAmount: shorthand on screen, the exact value in its tooltip.
+    const sellFigure = within(sectionBody('Price')).getAllByText('3K')[0]!;
+    await user.hover(sellFigure);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('3,000');
+    await user.unhover(sellFigure);
     await user.click(within(sectionBody('Price')).getByRole('button', { name: 'Appraise' }));
 
     const dialog = within(screen.getByRole('dialog', { name: 'Price breakdown' }));

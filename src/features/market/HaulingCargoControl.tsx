@@ -31,6 +31,12 @@ import { HOLD_KINDS, type CargoHold, type HoldKind } from '@/engine/market/cargo
 import { useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
 import { savedRows, useSavedFittings } from '@/features/fittings/useLibraryFittings';
+import {
+  disabledClassName,
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { parseIskAmount } from '@/lib/isk';
 import { fittingCargoHolds, hullCargoHolds, totalCargoM3, type HaulingCargo } from './haulingCargo';
 
@@ -255,7 +261,7 @@ function ShipTab({
                 type="button"
                 disabled={disabled}
                 onClick={() => onChoose(hull.typeId, hull.name)}
-                className="flex w-full items-baseline justify-between gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-panel-2 disabled:cursor-not-allowed disabled:opacity-60"
+                className={`flex w-full items-baseline justify-between gap-2 rounded-xs px-2 py-1.5 text-left text-sm ${tappableRowClassName} ${rowInteractiveClassName} ${focusRingInsetClassName} ${disabledClassName}`}
               >
                 <span>{hull.name}</span>
                 <span className="text-[0.6875rem] text-text-dim">{hull.group}</span>
@@ -292,7 +298,7 @@ function FittingTab({
             type="button"
             disabled={disabled}
             onClick={() => onChoose(row.record)}
-            className="flex w-full items-baseline justify-between gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-panel-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className={`flex w-full items-baseline justify-between gap-2 rounded-xs px-2 py-1.5 text-left text-sm ${tappableRowClassName} ${rowInteractiveClassName} ${focusRingInsetClassName} ${disabledClassName}`}
           >
             <span>{row.name}</span>
             <span className="text-[0.6875rem] text-text-dim">{row.hull}</span>

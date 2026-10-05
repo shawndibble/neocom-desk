@@ -13,6 +13,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip } from '@/components/ui';
+import {
+  focusRingClassName,
+  interactiveClassName,
+  toggleChipStateClassName,
+} from '@/components/ui/controlStyles';
 import { Done } from '@/components/ui/icons';
 import { romanLevel } from '@/engine/projection';
 import type { PlanEntry } from '@/engine/types';
@@ -200,10 +205,10 @@ export function SkillsMasteryTab({
                     onClick={() => setTier(n)}
                     className={cx(
                       'flex h-9 min-w-12 items-center justify-center gap-1 rounded-xs border px-2 font-bold',
-                      tier === n
-                        ? 'border-accent bg-accent/10'
-                        : 'border-line hover:border-line-bright',
-                      n === 5 ? 'text-mastery-elite' : tier === n ? 'text-accent' : 'text-text-dim'
+                      interactiveClassName,
+                      focusRingClassName,
+                      toggleChipStateClassName(tier === n),
+                      n === 5 && 'text-mastery-elite'
                     )}
                   >
                     {complete && <Done size={12} aria-hidden="true" />}

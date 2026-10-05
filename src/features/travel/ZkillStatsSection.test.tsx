@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { PilotStats } from '@/lib/zkillboard';
 import { ZkillStatsSection, ZkillStatsStatus, ZkillTopShips } from './ZkillStatsSection';
@@ -87,12 +88,14 @@ describe('ZkillStatsStatus', () => {
 describe('ZkillTopShips', () => {
   it('ranks the hulls in order with their names and kill counts', async () => {
     render(
-      <ZkillTopShips
-        ships={[
-          { shipTypeId: 29990, kills: 612 },
-          { shipTypeId: 22456, kills: 306 },
-        ]}
-      />
+      <MemoryRouter>
+        <ZkillTopShips
+          ships={[
+            { shipTypeId: 29990, kills: 612 },
+            { shipTypeId: 22456, kills: 306 },
+          ]}
+        />
+      </MemoryRouter>
     );
     const items = within(screen.getByRole('list')).getAllByRole('listitem');
     expect(items).toHaveLength(2);

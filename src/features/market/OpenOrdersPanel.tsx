@@ -1,7 +1,16 @@
 import { HintText } from '@/components/ui/HintText';
-import { useDeferredValue, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import {
+  Fragment,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { Navigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   Button,
   Caret,
@@ -14,6 +23,7 @@ import {
   FilterChip,
   IconButton,
   InfoTooltip,
+  IskAmount,
   MenuItem,
   MultiSelect,
   Panel,
@@ -1028,7 +1038,11 @@ export function OpenOrdersPanel() {
                         type="button"
                         aria-expanded={!folded}
                         onClick={toggle}
-                        className="flex min-h-11 flex-1 items-center gap-1.5 px-3 py-2 text-left text-xs font-semibold tracking-widest text-text-dim uppercase hover:bg-panel focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-0"
+                        className={cx(
+                          'flex min-h-11 flex-1 items-center gap-1.5 px-3 py-2 text-left text-xs font-semibold tracking-widest text-text-dim uppercase md:min-h-0',
+                          rowInteractiveClassName,
+                          focusRingInsetClassName
+                        )}
                       >
                         <Caret expanded={!folded} />
                         {groupTitle} · {group.rows.length}
@@ -1096,13 +1110,9 @@ export function OpenOrdersPanel() {
           )}
 
           <div className="flex flex-wrap items-center gap-3 px-3 py-2">
-            <button
-              type="button"
-              className={textActionClassName()}
-              onClick={() => setLegendOpen(true)}
-            >
+            <Button size="sm" onClick={() => setLegendOpen(true)}>
               {t('market.orders.legendOpen')}
-            </button>
+            </Button>
           </div>
         </>
       )}
@@ -1166,10 +1176,16 @@ function groupHeaderLine(
     showCharacters,
     t,
   }: { showCharacters: boolean; t: (key: string, options?: Record<string, unknown>) => string }
-): string {
-  const parts: string[] = [t(`market.orders.group.${problem}Hint`)];
+): ReactNode {
+  const parts: ReactNode[] = [t(`market.orders.group.${problem}Hint`)];
   if (summary) {
-    parts.push(t('market.orders.groupSummaryIsk', { isk: formatIskCompact(summary.iskTiedUp) }));
+    parts.push(
+      <Trans
+        key="isk"
+        i18nKey="market.orders.groupSummaryIsk"
+        components={{ isk: <IskAmount value={summary.iskTiedUp} /> }}
+      />
+    );
     if (summary.worstGapPct !== null) {
       parts.push(t('market.orders.groupSummaryWorst', { pct: summary.worstGapPct.toFixed(1) }));
     }
@@ -1177,5 +1193,10 @@ function groupHeaderLine(
       parts.push(summary.byCharacter.map((s) => `${s.characterName} ${s.count}`).join(', '));
     }
   }
-  return parts.join(' \u00b7 ');
+  return parts.map((part, index) => (
+    <Fragment key={index}>
+      {index > 0 && ' \u00b7 '}
+      {part}
+    </Fragment>
+  ));
 }

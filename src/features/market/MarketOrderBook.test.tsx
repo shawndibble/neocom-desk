@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import { BookSideToggle, HubComparisonLine } from './MarketOrderBook';
+import { MemoryRouter } from 'react-router-dom';
+import { useTableExport } from '@/components/ui/useTableExport';
+import { fakeItemActions, withItemActions } from './__fixtures__/itemActions';
+import { ItemContextMenu } from './ItemContextMenu';
+import { BookSideToggle, HubComparisonLine, OrderSideCard } from './MarketOrderBook';
 
 const summary = (bestSell: number | null, bestBuy: number | null) => ({
   bestSell,
@@ -101,5 +105,75 @@ describe('BookSideToggle', () => {
     );
     await user.click(screen.getByRole('button', { name: /Buy · 1/ }));
     expect(onChange).toHaveBeenCalledWith('buy');
+  });
+});
+
+describe('OrderSideCard', () => {
+  it('shows a visible More actions button on each order row', async () => {
+    const order = {
+      duration: 90,
+      is_buy_order: false,
+      issued: '2026-01-01T00:00:00Z',
+      location_id: 60003760,
+      min_volume: 1,
+      order_id: 1,
+      price: 100,
+      range: 'region',
+      system_id: 30000142,
+      type_id: 34,
+      volume_remain: 5,
+      volume_total: 10,
+    };
+    const columns = [
+      {
+        id: 'price',
+        header: 'Price',
+        render: (o: typeof order) => String(o.price),
+        sortValue: (o: typeof order) => o.price,
+      },
+    ];
+    function Harness() {
+      const tableExport = useTableExport({
+        surface: 'market-appraisal',
+        rows: [order],
+        columns: [],
+      });
+      return (
+        <OrderSideCard
+          side="sell"
+          rows={[order]}
+          total={1}
+          best={100}
+          columns={columns}
+          availableColumns={[]}
+          visibleColumns={[]}
+          columnsById={{} as never}
+          onToggleColumn={vi.fn()}
+          tableExport={tableExport}
+          empty={null}
+          onShowAll={null}
+          renderDetail={() => <div>detail</div>}
+          rowContextMenu={(o, tr) => (
+            <ItemContextMenu typeId={o.type_id} itemName="Tritanium">
+              {tr}
+            </ItemContextMenu>
+          )}
+          rowClassName={() => undefined}
+          hiddenOnPhone={false}
+          cards={false}
+        />
+      );
+    }
+    render(
+      withItemActions(
+        <MemoryRouter>
+          <Harness />
+        </MemoryRouter>,
+        fakeItemActions()
+      )
+    );
+    expect(
+      await screen.findByRole('button', { name: 'More actions for Tritanium' })
+    ).toBeInTheDocument();
   });
 });

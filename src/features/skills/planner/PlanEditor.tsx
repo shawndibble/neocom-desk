@@ -31,12 +31,12 @@ import {
   SelectValue,
   TextInput,
   Tooltip,
-  iconButtonClassName,
   Checkbox,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useAutoDismiss } from '@/lib/useAutoDismiss';
+import { MarketGroupLink } from './MarketGroupLink';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
 import { findRemovalBlockers, planEntryKey } from '@/engine/plan';
@@ -163,7 +163,6 @@ import { ImportClipboardDialog } from './ImportClipboardDialog';
 import { useScopedState } from './useScopedState';
 import { attributeShort, remapInstruction } from './remapInstruction';
 import { ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID } from './plannerMarketGroups';
-import { buildMarketGroupParams } from '@/engine/market/urlState';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
@@ -503,19 +502,7 @@ export function PlanEditor({
 
   /** A cross-link into Market Browser, landed pre-expanded to the given category. */
   function marketGroupLink(label: string, marketGroupId: number) {
-    return (
-      <IconButton
-        icon={<Icon.Market size={Icon.ICON_SIZE.sm} />}
-        label={label}
-        onClick={() =>
-          navigate(
-            `/market/browser?${new URLSearchParams(buildMarketGroupParams(marketGroupId)).toString()}`
-          )
-        }
-        size="sm"
-        variant="plain"
-      />
-    );
+    return <MarketGroupLink groupId={marketGroupId} label={label} />;
   }
 
   const stepLabel = (step: PlanStep): string =>
@@ -1670,7 +1657,7 @@ export function PlanEditor({
   }[] = [
     {
       key: 'for-me',
-      label: t('plans.optimizeForMe'),
+      label: t('plans.optimizeForMeItem'),
       hint: t('plans.optimizeForMeHint'),
       disabled: scheduled.length === 0,
       onSelect: handleOptimizeForMe,
@@ -2068,18 +2055,16 @@ export function PlanEditor({
             {orphanedMilestones.map((status) => (
               <span
                 key={status.milestone.id}
-                className="inline-flex items-center gap-1.5 rounded-xs border border-warning/60 px-1.5 py-0.5 text-warning"
+                className="inline-flex items-center gap-1.5 text-warning"
               >
                 {t('plans.milestone.orphanedNotice', { name: status.milestone.name })}
-                <button
-                  type="button"
-                  // Matches the entry rows' own remove button.
-                  className={iconButtonClassName({ size: 'sm', tone: 'danger' })}
+                <IconButton
+                  icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
+                  label={t('plans.milestone.removeLabel', { name: status.milestone.name })}
                   onClick={() => handleRemoveMilestone(status.milestone.id)}
-                  aria-label={t('plans.milestone.removeLabel', { name: status.milestone.name })}
-                >
-                  <Icon.Close size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-                </button>
+                  size="sm"
+                  tone="danger"
+                />
               </span>
             ))}
           </div>

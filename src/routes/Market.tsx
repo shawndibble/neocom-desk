@@ -58,6 +58,7 @@ import { ALL_REGIONS } from '@/engine/market/locationMode';
 import type { RegionOrder } from '@/esi/endpoints';
 import type { MarketAppraiseState } from '@/lib/shortcuts';
 import { buttonClassName } from '@/components/ui/buttonClassName';
+import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { orderBookCsvColumns } from '@/features/market/orderBookCsv';
 import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
@@ -185,7 +186,7 @@ function MarketGroupTree({
               // whenever a search collapses or re-expands a group.
               data-tree-item-id={item.typeId}
               aria-current={selectedTypeId === item.typeId ? 'true' : undefined}
-              className={`flex min-h-11 min-w-0 flex-1 items-center gap-1.5 truncate py-1 text-left text-xs hover:text-accent md:min-h-0 ${
+              className={`flex min-h-11 min-w-0 flex-1 items-center gap-1.5 truncate py-1 text-left text-xs hover:text-accent md:min-h-0 ${interactiveClassName} ${focusRingInsetClassName} ${
                 selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
               }`}
             >
@@ -228,7 +229,7 @@ function MarketGroupTree({
           aria-expanded={expandable ? expanded : undefined}
           onClick={() => onToggle(group.id)}
           style={{ paddingLeft: `${depth * 0.75}rem` }}
-          className={`flex w-full items-center gap-1.5 py-1 text-left text-xs text-text hover:text-accent disabled:hover:text-text ${
+          className={`flex w-full items-center gap-1.5 py-1 text-left text-xs text-text hover:text-accent disabled:hover:text-text ${interactiveClassName} ${focusRingInsetClassName} ${
             expandable ? 'min-h-11 md:min-h-0' : ''
           }`}
         >

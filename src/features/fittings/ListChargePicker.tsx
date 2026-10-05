@@ -16,6 +16,7 @@ import type { Fitting, FittingModule, FittingModuleResult } from '@/engine/fitti
 import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { CapBoosterGuide } from './CapBoosterGuide';
+import { chargeRowClassName } from './chargeRowStyle';
 import { MiningCrystalGuide } from './MiningCrystalGuide';
 import { ChargePickerGroup } from './ChargePicker';
 import { DEFAULT_PICKER_SETTINGS } from './chargePickerSettings';
@@ -253,15 +254,18 @@ function ChargePickerPanel({
                   type="button"
                   aria-pressed={isLoaded}
                   onClick={() => load(typeId)}
-                  className={cx(
-                    'flex min-h-11 w-full items-center gap-2 border-l-2 px-2 text-left text-xs hover:bg-panel-2 md:min-h-9',
-                    isLoaded ? 'border-accent text-accent' : 'border-transparent'
+                  className={chargeRowClassName(
+                    isLoaded,
+                    'flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs md:min-h-9'
                   )}
                 >
                   <TypeIcon typeId={typeId} size={32} width={20} height={20} />
                   <span className="min-w-0 flex-1 truncate">
                     {catalogueTypeName(catalogue, typeId)}
                   </span>
+                  {isLoaded && (
+                    <span className="shrink-0 text-[0.6875rem]">{t('fittings.add.loaded')}</span>
+                  )}
                 </button>
               </li>
             );

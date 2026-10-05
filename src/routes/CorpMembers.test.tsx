@@ -204,6 +204,17 @@ describe('the roster table', () => {
     expect(row).toHaveTextContent('Rifter');
     expect(row).toHaveTextContent('Jita IV - Moon 4');
     expect(row).toHaveTextContent('1h ago');
+    // Member and ship names are real links (§6c): Show Info and Market.
+    expect(
+      within(row as HTMLElement)
+        .getByRole('link', { name: 'Jita Local' })
+        .getAttribute('href')
+    ).toContain('info=character-');
+    expect(
+      within(row as HTMLElement)
+        .getByRole('link', { name: 'Rifter' })
+        .getAttribute('href')
+    ).toContain('/market/browser');
   });
 
   it('says Never for a member who joined and has not logged in', async () => {
@@ -340,8 +351,13 @@ describe('the joins/leaves summary', () => {
     mocked.readPreviousRoster.mockResolvedValue([1001, 1004]);
     mocked.loadCorporationMemberIds.mockResolvedValue(cached([1001, 1002]));
     await rosterTable();
-    expect(screen.getByText('1 joined: Silent Ren')).toBeInTheDocument();
-    expect(screen.getByText('1 left: Departed Soul')).toBeInTheDocument();
+    expect(screen.getByText(/^1 joined:/)).toBeInTheDocument();
+    const summary = screen.getByText(/^1 joined:/).closest('p');
+    expect(
+      within(summary as HTMLElement).getByRole('link', { name: 'Silent Ren' })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^1 left:/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Departed Soul' })).toBeInTheDocument();
   });
 
   /** A leaver is in neither read any more, so their name has to be asked for. */

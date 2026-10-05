@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
 import type { SkillQueueEntry } from '@/esi/endpoints';
+import { SkillLink } from '@/features/entities';
 import { loadCharacterSkillQueue, type CachedResult } from '../data';
 import { classifySkillQueue, isQueuePaused, type SkillQueueStatus } from '../queueStatus';
 import type { SkillCatalog } from '../skillMap';
@@ -31,9 +32,9 @@ const REFETCH_MS = 5 * 60_000;
 const REFETCH_SLACK_MS = 5_000;
 
 const BADGE_STYLE: Record<SkillQueueStatus, string> = {
-  training: 'border-accent/50 bg-accent/15 text-accent',
-  completed: 'border-success/50 bg-success/15 text-success',
-  paused: 'border-warning/50 bg-warning/15 text-warning',
+  training: 'bg-accent/15 text-accent',
+  completed: 'bg-success/15 text-success',
+  paused: 'bg-warning/15 text-warning',
   pending: '',
 };
 
@@ -144,11 +145,12 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
                   }`}
                 >
                   <span className="flex-1 truncate">
-                    {nameFor(entry.skill_id)} {ROMAN[entry.finished_level - 1]}
+                    <SkillLink typeId={entry.skill_id}>{nameFor(entry.skill_id)}</SkillLink>{' '}
+                    {ROMAN[entry.finished_level - 1]}
                   </span>
                   {badgeKey && (
                     <span
-                      className={`rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${BADGE_STYLE[status]}`}
+                      className={`rounded-xs px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${BADGE_STYLE[status]}`}
                     >
                       {t(badgeKey)}
                     </span>

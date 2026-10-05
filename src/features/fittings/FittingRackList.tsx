@@ -2,6 +2,7 @@ import { Fragment, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  entityLinkClassName,
   IconButton,
   NativeSelect,
   Panel,
@@ -10,7 +11,14 @@ import {
   Tooltip,
   TypeIcon,
 } from '@/components/ui';
-import { gripHitAreaClassName, tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  gripHitAreaClassName,
+  interactiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { AddRow, Close, Compare, DragHandle } from '@/components/ui/icons';
 import {
   cargoGroups,
@@ -143,20 +151,20 @@ export interface ModuleRowProps extends EditContext {
 }
 
 /**
- * A fitted item's name: the way into its info, when the page has Item
+ * A fitted item's name: a link to the item in Market, when the page has Item
  * Actions (a shared-fitting preview renders no provider, and stays a span).
+ * Show Info is in the row's ⋮ menu.
  */
 function SlotName({ typeId, name }: { typeId: number; name: string }) {
   const actions = useOptionalItemActions();
   if (!actions) return <span className={SLOT_NAME_CLASS}>{name}</span>;
   return (
-    <button
-      type="button"
-      className={`${SLOT_NAME_CLASS} ${tappableRowClassName} cursor-pointer text-accent underline-offset-2 hover:underline`}
-      onClick={() => actions.showInfo(typeId, name)}
+    <MarketItemLink
+      typeId={typeId}
+      className={entityLinkClassName(`${SLOT_NAME_CLASS} ${tappableRowClassName}`)}
     >
       {name}
-    </button>
+    </MarketItemLink>
   );
 }
 
@@ -328,7 +336,6 @@ function SlotCard({
               draggable
               role="img"
               aria-label={grip.label}
-              title={grip.label}
               onDragStart={(event) => startFittingDrag(event, grip.payload)}
               onDragEnd={endFittingDrag}
               className={`flex h-6 w-4 shrink-0 cursor-grab items-center justify-center text-text-dim active:cursor-grabbing ${gripHitAreaClassName}`}
@@ -455,7 +462,11 @@ function LaunchSquares({
             onClick={() => {
               if (!blocked) onLaunch(count === inSpace ? count - 1 : count);
             }}
-            className="group flex size-11 items-center justify-center aria-disabled:cursor-not-allowed md:size-6"
+            className={cx(
+              'group flex size-11 items-center justify-center rounded-xs aria-disabled:cursor-not-allowed md:size-6',
+              interactiveClassName,
+              focusRingClassName
+            )}
           >
             <span
               className={`size-3.5 rounded-xs border ${lit ? 'border-accent bg-accent' : blocked ? 'border-line-bright opacity-40' : 'border-line-bright group-hover:border-accent'}`}
@@ -504,7 +515,7 @@ function AddSlotButton({
 
 /**
  * An empty List slot: tap to add there, drop a module on it. With the
- * editor's actions it has the Ring's empty-slot menu too (Add module ▸,
+ * editor's actions it has the Ring's empty-slot menu too (Add module,
  * Paste, Fill rack), on right-click, touch-and-hold or its ⋮.
  */
 function EmptySlot({

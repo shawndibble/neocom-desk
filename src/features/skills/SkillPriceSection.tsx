@@ -16,6 +16,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { InfoTooltip, IskAmount } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { PriceHubSelect } from '@/features/fittings/PriceHubSelect';
 import { useMarketHub } from '@/features/market/hub';
 import { getOrderBook } from '@/features/market/orderBook';
@@ -129,13 +130,13 @@ export function SkillPriceSection({
           to={marketBrowserHref(
             buildMarketParams(typeID, { mode: 'region', regionId: hub.regionId })
           )}
-          className="inline-block text-accent hover:underline"
+          className={inlineLinkClassName}
         >
           {t('skills.inspector.openInMarket')}
         </Link>
         <Link
           to={marketBrowserHref(marketNearbyParams(typeID, NEARBY_JUMPS))}
-          className="inline-block text-accent hover:underline"
+          className={inlineLinkClassName}
         >
           {t('skills.inspector.findNearby', { jumps: NEARBY_JUMPS })}
         </Link>

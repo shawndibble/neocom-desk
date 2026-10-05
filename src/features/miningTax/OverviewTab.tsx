@@ -25,9 +25,10 @@ import {
   PageHeader,
   Panel,
   Spinner,
-  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
+import { CharacterLink, SystemLink } from '@/features/entities';
+import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -110,21 +111,18 @@ function dateRangeLabel(dates: readonly string[]): string {
 
 /**
  * Saved / Daily avg / Live / No price — where a row's ore prices came from on
- * the chosen basis, with a tooltip saying what that means. A button so the
- * tooltip is reachable by keyboard and a tap; the table keeps the click from
- * also opening the row's detail modal.
+ * the chosen basis, with a tooltip saying what that means. `HintText`: focusable, taps reveal
+ * the bubble, and the table leaves those taps from opening the row's modal.
  */
 function PriceSourceTag({ source }: { source: PriceSource }) {
   const { t } = useTranslation();
   return (
-    <Tooltip content={t(`miningTax.overview.priceSourceHint.${source}`)} openOnTap>
-      <button
-        type="button"
-        className={`cursor-help rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase focus-visible:outline-2 focus-visible:outline-accent ${SOURCE_TAG_CLASS[source]}`}
-      >
-        {t(`miningTax.overview.priceSource.${source}`)}
-      </button>
-    </Tooltip>
+    <HintText
+      content={t(`miningTax.overview.priceSourceHint.${source}`)}
+      className={`text-[0.6875rem] font-semibold tracking-widest uppercase ${SOURCE_TAG_CLASS[source]}`}
+    >
+      {t(`miningTax.overview.priceSource.${source}`)}
+    </HintText>
   );
 }
 
@@ -376,7 +374,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
     character: {
       id: 'character',
       header: t('miningTax.characterColumn'),
-      render: (row) => row.characterName,
+      render: (row) => <CharacterLink id={row.characterId}>{row.characterName}</CharacterLink>,
       sortValue: (row) => row.characterName,
     },
     system: {
@@ -384,7 +382,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.systemColumn'),
       render: (row) => (
         <DataTableDenseCell>
-          {systemName(row)}
+          <SystemLink systemId={row.entry.solarSystemId}>{systemName(row)}</SystemLink>
           <SecurityValue security={data?.systemSecurity.get(row.entry.solarSystemId)} />
         </DataTableDenseCell>
       ),
@@ -477,6 +475,8 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.dateColumn'),
       headerTooltip: t('miningTax.dateEveHint'),
       render: (row) => row.entry.date,
+      // Row opens its detail modal: the accent primary cell is the cue (§6c).
+      cellClassName: () => 'text-accent',
       sortValue: (row) => row.entry.date,
       primary: true,
     },

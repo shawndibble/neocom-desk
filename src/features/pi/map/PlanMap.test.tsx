@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { PlanetType } from '@/engine/pi/goalTypes';
-import { formatIskCompact } from '@/lib/isk';
+import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { buildPlanAdvice, type PlanAdvice } from '../planAdviceModel';
 import { planPicks } from '../planPicks';
 import { adviceInput, pi } from './mapFixtures.testutil';
@@ -248,7 +248,7 @@ describe('PlanMap: the same numbers as Plan', () => {
     expect(fig.kind).toBe('ranked');
     const tile = product(recipe.name);
     expect(tile.getAttribute('aria-label')).toContain(
-      `About ${formatIskCompact(recipe.iskPerDay)} ISK a day from one`
+      `About ${formatIsk(recipe.iskPerDay, 0)} ISK a day from one`
     );
     if (recipe.comparison?.verdict === 'better') {
       expect(tile.getAttribute('aria-label')).toContain('Better than');

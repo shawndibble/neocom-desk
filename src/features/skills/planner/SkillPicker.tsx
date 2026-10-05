@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, FilterChip, SearchInput } from '@/components/ui';
-import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
+import { Button, Caret, FilterChip, SearchInput } from '@/components/ui';
+import {
+  focusRingInsetClassName,
+  inlineLinkClassName,
+  rowInteractiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import type { SkillType } from '@/sde/types';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import { rankedSearch } from '@/lib/rankedSearch';
@@ -235,9 +241,18 @@ export function SkillPicker({
               <button
                 type="button"
                 onClick={() => setSelected(selected === skill.typeID ? null : skill.typeID)}
-                className={`${tappableRowClassName} flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
+                aria-expanded={selected === skill.typeID}
+                className={cx(
+                  tappableRowClassName,
+                  'flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs',
+                  rowInteractiveClassName,
+                  focusRingInsetClassName
+                )}
               >
-                <span className="truncate">{skill.name}</span>
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <Caret expanded={selected === skill.typeID} />
+                  <span className="truncate">{skill.name}</span>
+                </span>
                 <span className="shrink-0 text-text-dim">{skill.groupName}</span>
               </button>
               {selected === skill.typeID && (

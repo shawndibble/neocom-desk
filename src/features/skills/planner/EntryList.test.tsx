@@ -827,7 +827,7 @@ describe('EntryList Plan Milestones (CONTEXT.md)', () => {
     expect(screen.getByText(formatLocalDate(finish))).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /milestone actions for skill 1 iv/i }));
-    await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Rename…' }));
     expect(renamed).toEqual(['m1']);
 
     await user.click(screen.getByRole('button', { name: /milestone actions for skill 1 iv/i }));

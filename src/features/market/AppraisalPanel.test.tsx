@@ -496,12 +496,13 @@ describe('AppraisalPanel', () => {
       expect(within(dcuRow).getByText('—')).toBeInTheDocument();
     });
 
-    it('marks a partially priced refine value', () => {
+    it('marks a partially priced refine value', async () => {
       const partial = refineOutcome();
       partial.appraisal.rows[0].refinePricedAll = false;
       renderPanel({ controller: controller({ result: partial }) });
       const veldsparRow = screen.getByRole('row', { name: /Veldspar/ });
-      expect(within(veldsparRow).getByTitle(/no price at this hub/)).toBeInTheDocument();
+      await userEvent.hover(within(veldsparRow).getByText('*'));
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(/no price at this hub/);
     });
 
     it('omits the refine column entirely with no active Character', () => {
@@ -677,12 +678,13 @@ describe('AppraisalPanel', () => {
       expect(screen.queryAllByText('Cheapest total')).toHaveLength(0);
     });
 
-    it('marks an unaffordable LP option rather than hiding it', () => {
+    it('marks an unaffordable LP option rather than hiding it', async () => {
       const unaffordable = lpOutcome();
       unaffordable.appraisal.rows[0].lpAffordable = false;
       renderPanel({ controller: controller({ result: unaffordable }) });
       const asteroRow = screen.getByRole('row', { name: /Astero/ });
-      expect(within(asteroRow).getByTitle(/does not hold enough LP/)).toBeInTheDocument();
+      await userEvent.hover(within(asteroRow).getByText('*'));
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(/does not hold enough LP/);
     });
 
     it('shows a dash on a row with no LP option, when the column is present', () => {

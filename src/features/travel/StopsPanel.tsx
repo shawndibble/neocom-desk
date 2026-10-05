@@ -35,7 +35,12 @@ import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { Checkbox, CollapsiblePanel, IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { gripHitAreaClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  gripHitAreaClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { MAX_STOPS, type TripOptions } from '@/engine/route/tripPlan';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
@@ -88,7 +93,12 @@ function StopRow({
         {...attributes}
         {...listeners}
         aria-label={t('travel.stops.reorder', { name })}
-        className={`cursor-grab touch-none px-0.5 py-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${gripHitAreaClassName}`}
+        className={cx(
+          'cursor-grab touch-none rounded-xs px-0.5 py-1 text-text-faint hover:text-text',
+          interactiveClassName,
+          focusRingClassName,
+          gripHitAreaClassName
+        )}
       >
         <Icon.DragHandle />
       </button>

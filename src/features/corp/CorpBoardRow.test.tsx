@@ -93,13 +93,21 @@ describe('CorpBoardRow', () => {
     expect(actions.showInfo).toHaveBeenCalledWith(587, 'Rifter Blueprint');
   });
 
-  it('titles the truncated subject and detail lines with their full text', () => {
+  it('shows the truncated subject and detail lines in full in a tooltip, not a native title', async () => {
     renderRow(jobItem);
 
-    expect(screen.getByText('Rifter Blueprint')).toHaveAttribute('title', 'Rifter Blueprint');
-    expect(screen.getByText('Job finished, waiting on delivery')).toHaveAttribute(
-      'title',
+    const detail = screen.getByText('Job finished, waiting on delivery');
+    expect(detail).not.toHaveAttribute('title');
+    await userEvent.hover(detail);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'Job finished, waiting on delivery'
+    );
+  });
+
+  it('links an item subject to its Market listing and leaves other subjects plain', () => {
+    renderRow(jobItem);
+    expect(screen.getByRole('link', { name: 'Rifter Blueprint' }).getAttribute('href')).toContain(
+      '/market/browser'
     );
   });
 });

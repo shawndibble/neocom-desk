@@ -3,12 +3,13 @@
  * apart from the components so the module they live in exports components
  * only.
  */
-import { formatIskCompact } from '@/lib/isk';
 import type { PilotStats } from '@/lib/zkillboard';
 
 export interface StatTileItem {
   label: string;
   value: string;
+  /** An ISK figure: rendered as an `IskAmount` (compact, exact on hover) in place of `value`. */
+  isk?: number;
   /** A one-line explanation behind a "?" beside the label. */
   help?: string;
   /** Colours the value: kills read green, losses red (decision `20261002-163430`). */
@@ -33,8 +34,9 @@ export function killFigures(
     },
     iskDestroyed: {
       label: t('travel.pilot.iskDestroyed'),
-      value: s ? formatIskCompact(s.iskDestroyed) : '—',
+      value: '—',
+      isk: s?.iskDestroyed,
     },
-    iskLost: { label: t('travel.pilot.iskLost'), value: s ? formatIskCompact(s.iskLost) : '—' },
+    iskLost: { label: t('travel.pilot.iskLost'), value: '—', isk: s?.iskLost },
   };
 }

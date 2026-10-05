@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TextArea } from '@/components/ui';
+import { entityLinkClassName, TextArea } from '@/components/ui';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatSeconds } from '@/lib/duration';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
@@ -158,10 +159,19 @@ export function OffensePanel({
           {offense.weapons.map((row) => (
             <tr key={`${row.typeId}-${row.chargeTypeId ?? 0}`} className="border-t border-line">
               <td className="py-1.5 pr-2">
-                {typeName(row.typeId)} ×{row.count}
+                <MarketItemLink typeId={row.typeId} className={entityLinkClassName()}>
+                  {typeName(row.typeId)}
+                </MarketItemLink>{' '}
+                ×{row.count}
               </td>
               <td className="py-1.5 pr-2 text-text-dim">
-                {row.chargeTypeId === undefined ? '—' : typeName(row.chargeTypeId)}
+                {row.chargeTypeId === undefined ? (
+                  '—'
+                ) : (
+                  <MarketItemLink typeId={row.chargeTypeId} className={entityLinkClassName()}>
+                    {typeName(row.chargeTypeId)}
+                  </MarketItemLink>
+                )}
               </td>
               <td className="py-1.5 text-right tabular-nums">{formatCompactNumber(row.dps)}</td>
             </tr>

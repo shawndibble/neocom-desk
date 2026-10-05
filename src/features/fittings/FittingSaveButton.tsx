@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -6,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Tooltip,
 } from '@/components/ui';
 import { Expanded } from '@/components/ui/icons';
 
@@ -40,17 +42,25 @@ export function FittingSaveButton({
   saveToEveBlockedReason,
 }: FittingSaveButtonProps) {
   const { t } = useTranslation();
+  const withReason = (button: ReactElement<{ className?: string }>) =>
+    !canSave && saveBlockedReason ? (
+      <Tooltip content={saveBlockedReason}>{button}</Tooltip>
+    ) : (
+      button
+    );
   return (
     <div className="flex">
-      <Button
-        variant="primary"
-        disabled={!canSave}
-        title={saveBlockedReason}
-        onClick={onSave}
-        className="rounded-r-none"
-      >
-        {updating ? t('fittings.myFittings.update') : t('fittings.myFittings.save')}
-      </Button>
+      {/* `aria-disabled`, not the native attribute, so the reason stays reachable. */}
+      {withReason(
+        <Button
+          variant="primary"
+          aria-disabled={!canSave || undefined}
+          onClick={onSave}
+          className="rounded-r-none"
+        >
+          {updating ? t('fittings.myFittings.update') : t('fittings.myFittings.save')}
+        </Button>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

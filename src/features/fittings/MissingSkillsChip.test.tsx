@@ -1,10 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { EngineSkill, PlanEntry } from '@/engine/types';
 import type { TargetPlan } from '@/features/skills/useTargetPlan';
 import { MissingSkillsChip } from './MissingSkillsChip';
+
+// Entity names are real links, so every render needs a Router.
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 
 const GUNNERY: EngineSkill = {
   typeID: 3300,
