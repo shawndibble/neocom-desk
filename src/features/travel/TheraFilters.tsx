@@ -1,8 +1,9 @@
 /**
  * Thera / Turnur's filter row (issues #2499, #2607): From, Hub (with counts),
  * Exit, Fits and Route Preference as content-sized selects in one row. On a
- * phone each becomes a chip that opens its options, so the row wraps instead
- * of scrolling sideways.
+ * phone From keeps its own labelled line and the other four become chips that
+ * open their options, each growing to fill its line, so the filters read as
+ * full rows instead of a ragged wrap.
  */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -73,39 +74,49 @@ export function TheraFilters({
 
   if (isPhone) {
     return (
-      <div className="flex flex-wrap items-center gap-2">
-        {origin}
-        <ChipMenu
-          label={t('travel.thera.hubLabel')}
-          value={values.hub}
-          options={hubOptions}
-          isDefault={values.hub === 'all'}
-          onChange={(hub) => onChange({ hub })}
-        />
-        <ChipMenu
-          label={t('travel.thera.exitLabel')}
-          value={values.space}
-          options={exitOptions}
-          isDefault={values.space === 'kspace'}
-          onChange={(space) => onChange({ space })}
-        />
-        <ChipMenu
-          label={t('travel.thera.fitsLabel')}
-          value={values.size}
-          options={sizeOptions}
-          isDefault={values.size === 'any'}
-          onChange={(size) => onChange({ size })}
-        />
-        <ChipMenu
-          label={t('travel.preferenceLabel')}
-          value={values.pref}
-          options={ROUTE_PREFERENCES.map((preference) => ({
-            value: preference,
-            label: t(ROUTE_PREFERENCE_LABEL_KEYS[preference]),
-          }))}
-          isDefault={prefIsDefault}
-          onChange={(pref) => onChange({ pref })}
-        />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <span
+            aria-hidden="true"
+            className="shrink-0 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap text-text-dim uppercase"
+          >
+            {t('travel.thera.originLabel')}
+          </span>
+          {origin}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <ChipMenu
+            label={t('travel.thera.hubLabel')}
+            value={values.hub}
+            options={hubOptions}
+            isDefault={values.hub === 'all'}
+            onChange={(hub) => onChange({ hub })}
+          />
+          <ChipMenu
+            label={t('travel.thera.exitLabel')}
+            value={values.space}
+            options={exitOptions}
+            isDefault={values.space === 'kspace'}
+            onChange={(space) => onChange({ space })}
+          />
+          <ChipMenu
+            label={t('travel.thera.fitsLabel')}
+            value={values.size}
+            options={sizeOptions}
+            isDefault={values.size === 'any'}
+            onChange={(size) => onChange({ size })}
+          />
+          <ChipMenu
+            label={t('travel.preferenceLabel')}
+            value={values.pref}
+            options={ROUTE_PREFERENCES.map((preference) => ({
+              value: preference,
+              label: t(ROUTE_PREFERENCE_LABEL_KEYS[preference]),
+            }))}
+            isDefault={prefIsDefault}
+            onChange={(pref) => onChange({ pref })}
+          />
+        </div>
       </div>
     );
   }
@@ -196,7 +207,7 @@ function ChipMenu<V extends string>({
         <button
           type="button"
           className={cx(
-            'inline-flex items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+            'inline-flex grow items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
             controlHeightClassName.sm,
             toggleChipStateClassName(!isDefault)
           )}
@@ -204,7 +215,7 @@ function ChipMenu<V extends string>({
           {/* A real space between the two: a flex gap is not one, and the
               accessible name would run together as "ExitK-space". */}
           <span className="text-text-dim">{label}</span> <span>{current}</span>
-          <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+          <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" className="ml-auto shrink-0" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">

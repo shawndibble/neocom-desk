@@ -245,6 +245,23 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     expect(screen.queryByText('EverMarks')).toBeNull();
   });
 
+  it('carries a long division name in full as the label tooltip (issue #2600)', async () => {
+    const long = 'Industry operating expenses and logistics';
+    server.use(
+      http.get(`${BASE}/corporations/${CORP_ID}/divisions`, () =>
+        HttpResponse.json({ wallet: [{ division: 1, name: long }] })
+      )
+    );
+    render(<App />);
+    await findDivisions();
+
+    const label = await within(screen.getByRole('group', { name: 'Wallet division' })).findByText(
+      long
+    );
+    expect(label).toHaveAttribute('title', long);
+    expect(label.closest('button')).not.toHaveAttribute('title');
+  });
+
   it('opens on the journal, and it follows the selected division', async () => {
     const user = userEvent.setup();
     render(<App />);

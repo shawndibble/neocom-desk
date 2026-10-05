@@ -662,9 +662,10 @@ export type MiningTaxAssignmentStatus = 'outstanding' | 'paid' | 'needs-review' 
  * a paid one).
  *
  * Re-diffed on every ledger refresh: if ESI reports *more* ore for the same
- * (characterId, date, solarSystemId) after assignment, `status` flips to
- * `needs-review` and `reviewDiff` records the before/after — never silently
- * absorbed into `oreLines`.
+ * (characterId, date, solarSystemId) after assignment, an `outstanding` one
+ * (combined or not) absorbs it straight into `oreLines`, re-priced; a `paid`
+ * or `dismissed` one flips to `needs-review` with `reviewDiff` recording the
+ * before/after (`reconcile.ts`).
  */
 export interface MiningTaxAssignmentRecord {
   id: string;
@@ -961,6 +962,26 @@ export interface HullFitCacheRecord {
   entries: [number, number][];
 }
 
+/**
+ * One Ansiblex jump gate Route Safety may route over (issue #2478), found by a
+ * character's structure search or pasted by the pilot. Device-local only:
+ * structure access is private alliance information, so this table is never
+ * synced, backed up to Firebase, or sent anywhere.
+ */
+export interface AnsiblexGateRecord {
+  /** `search:<structure id>` for a found gate, `paste:<low id>:<high id>` for a pasted one. */
+  id: string;
+  fromId: number;
+  toId: number;
+  /** The gate's name as found or pasted, e.g. "SYS1 » SYS2 - name". */
+  name: string;
+  source: 'search' | 'paste';
+  /** The characters whose search found it; empty for a pasted gate. */
+  foundBy: number[];
+  /** Epoch ms it was last found or pasted. */
+  savedAt: number;
+}
+
 export const db = new Dexie('neocom') as Dexie & {
   characters: EntityTable<CharacterRecord, 'characterId'>;
   tokens: EntityTable<TokenRecord, 'characterId'>;
@@ -985,6 +1006,7 @@ export const db = new Dexie('neocom') as Dexie & {
   miningLedgerHistory: EntityTable<MiningLedgerHistoryRecord, 'characterId'>;
   jitaPriceSnapshots: EntityTable<JitaPriceSnapshotRecord, 'date'>;
   hullFitCache: EntityTable<HullFitCacheRecord, 'key'>;
+  ansiblexGates: EntityTable<AnsiblexGateRecord, 'id'>;
 };
 
 /**
@@ -1384,4 +1406,33 @@ db.version(19).stores({
   jitaPriceSnapshots: 'date',
   fittings: 'id, characterId',
   hullFitCache: 'key, savedAt',
+});
+
+// Adds `ansiblexGates`, Route Safety's device-local Ansiblex list (issue #2478).
+// Additive, and never synced.
+db.version(20).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  esiCacheMeta: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: null,
+  orderProblemSamples: 'orderId, characterId',
+  mailDrafts: 'id, characterId',
+  miningLedgerHistory: 'characterId',
+  jitaPriceSnapshots: 'date',
+  fittings: 'id, characterId',
+  hullFitCache: 'key, savedAt',
+  ansiblexGates: 'id',
 });

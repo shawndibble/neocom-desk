@@ -12,18 +12,14 @@ import {
 import { fieldBaseClassName, fieldSizeClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { setModuleCharge } from '@/engine/fittings/fittingEdit';
-import type {
-  Fitting,
-  FittingModule,
-  FittingModuleResult,
-  PilotProfile,
-} from '@/engine/fittings/types';
+import type { Fitting, FittingModule, FittingModuleResult } from '@/engine/fittings/types';
 import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { CapBoosterGuide } from './CapBoosterGuide';
 import { MiningCrystalGuide } from './MiningCrystalGuide';
 import { ChargePickerGroup } from './ChargePicker';
 import { DEFAULT_PICKER_SETTINGS } from './chargePickerSettings';
+import type { FittingContext } from './fittingContext';
 import { useChargeChoices } from './useChargeChoices';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
@@ -36,8 +32,8 @@ interface ListChargePickerProps {
   result: FittingModuleResult | undefined;
   fitting: Fitting;
   catalogue: FittingCatalogue | null;
-  engineReady: boolean;
-  profile: PilotProfile | null;
+  /** Null while the engine or pilot loads: the picker lists charges by name, without figures. */
+  context: FittingContext | null;
   edit: (change: FittingChange) => void;
   className?: string;
 }
@@ -54,8 +50,7 @@ export function ListChargePicker({
   result,
   fitting,
   catalogue,
-  engineReady,
-  profile,
+  context,
   edit,
   className,
 }: ListChargePickerProps) {
@@ -101,8 +96,7 @@ export function ListChargePicker({
       result={result}
       fitting={fitting}
       catalogue={catalogue}
-      engineReady={engineReady}
-      profile={profile}
+      context={context}
       edit={edit}
       onDone={() => setOpen(false)}
     />
@@ -156,8 +150,7 @@ function ChargePickerPanel({
   result,
   fitting,
   catalogue,
-  engineReady,
-  profile,
+  context,
   edit,
   onDone,
 }: Omit<ListChargePickerProps, 'className'> & { onDone: () => void }) {
@@ -182,9 +175,7 @@ function ChargePickerPanel({
   );
   const { groups, pricesLoading } = useChargeChoices({
     fitting,
-    catalogue,
-    engineReady,
-    profile,
+    context,
     moduleResults,
     moduleTypeId: module.typeId,
   });

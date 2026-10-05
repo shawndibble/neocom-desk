@@ -242,7 +242,7 @@ describe('Ship Info window', () => {
     });
     const { user, dialog } = await openShip(/^Merlin/);
     await user.click(within(dialog).getByRole('tab', { name: 'Fitting' }));
-    expect(usePopularFitsMock).toHaveBeenLastCalledWith(HULL_ID);
+    expect(usePopularFitsMock.mock.lastCall?.[0]).toBe(HULL_ID);
     expect(within(dialog).getByText('4 losses')).toBeVisible();
     await user.click(within(dialog).getByRole('button', { name: 'Open' }));
     await waitFor(() => {

@@ -9,12 +9,15 @@
  * rowStatus.ts). A *split* entry (2+ Assignments) keeps the narrower
  * per-type check, since a brand-new type has no obvious owner among several
  * Payees. Never silently absorbed into `oreLines` either way (decision doc)
- * — only `status`/`reviewDiff` move; `resolveNeedsReview` (assignments.ts) is
+ * — only `status`/`reviewDiff` move; `planNeedsReviewResolution` (assignments.ts) is
  * the one place `oreLines` itself re-snapshots.
  *
- * Unpaid, ungrouped growth skips the flag: it is absorbed straight into the
- * Assignment (`resolveNeedsReview`), since an unsettled obligation has no paid
- * history to protect. Paid, dismissed and joined-group growth still flags.
+ * Unpaid growth skips the flag: it is absorbed straight into the Assignment
+ * (`planNeedsReviewResolution`), since an unsettled obligation has no paid history to
+ * protect. That includes a member of a combined entry — a session that crossed
+ * midnight UTC is usually combined while the second day is still growing
+ * (scope decision 20261004, "combined entries absorb unpaid growth"). Paid and
+ * dismissed growth still flags.
  *
  * Run once per character after loading its fresh ledger (see
  * `snapshot.ts`), not on every render — `sameDiffs` skips the write (and the
@@ -24,7 +27,7 @@ import { db, type MiningTaxAssignmentRecord } from '@/db';
 import { scheduleSync } from '@/sync';
 import { diffAssignedOreLines } from '@/engine/miningTax/needsReview';
 import { computeOwnership, type Ownership } from '@/engine/miningTax/ownership';
-import { resolveNeedsReview } from './assignments';
+import { planNeedsReviewResolution } from './assignments';
 import type { MiningLedgerEntry, QuantityDiff } from '@/engine/miningTax/types';
 
 function sameDiffs(a: readonly QuantityDiff[] | undefined, b: readonly QuantityDiff[]): boolean {
@@ -78,10 +81,11 @@ export async function reconcileAssignments(
     const diffs = diffAssignedOreLines(assignment.oreLines, relevantFresh);
     if (diffs.length === 0) continue;
     if (assignment.status === 'needs-review' && sameDiffs(assignment.reviewDiff, diffs)) continue;
-    // Unpaid, ungrouped growth has no settled history to protect, so it folds
-    // straight in — the pilot then splits it from the ordinary row if the
-    // new ore belongs to another Payee.
-    if (assignment.status === 'outstanding' && !assignment.groupId) {
+    // Unpaid growth has no settled history to protect, so it folds straight
+    // in — the pilot then splits it from the ordinary row if the new ore
+    // belongs to another Payee. Combined or not: a combined member is billed
+    // with its siblings, but its own ore is still only its own day's.
+    if (assignment.status === 'outstanding') {
       absorbs.push({ assignment, key });
       continue;
     }
@@ -90,7 +94,9 @@ export async function reconcileAssignments(
 
   for (const { assignment, key } of absorbs) {
     try {
-      await resolveNeedsReview(assignment, freshByKey.get(key)!, siblingsByKey.get(key)!);
+      updates.push(
+        await planNeedsReviewResolution(assignment, freshByKey.get(key)!, siblingsByKey.get(key)!)
+      );
     } catch {
       // Re-pricing can fail (no prices yet); fall back to surfacing the growth.
       const diffs = diffAssignedOreLines(

@@ -47,6 +47,8 @@ function toCandidate(row: HaulingScanRow, fees: AppraisalNetFees): TripCandidate
     name: row.name,
     unitVolumeM3: row.unitVolumeM3,
     buyLadder: row.buyLadder,
+    groupId: row.groupId,
+    categoryId: row.categoryId,
   };
   return row.mode === 'instant'
     ? {

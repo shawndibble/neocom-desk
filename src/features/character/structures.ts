@@ -262,6 +262,17 @@ async function loadStructure(
   return structure;
 }
 
+/**
+ * The whole structure row, or null if unresolvable — for a reader that needs
+ * the name and the type together (Route Safety's Ansiblex search, issue #2478).
+ */
+export async function loadStructureInfo(
+  characterId: number,
+  structureId: number
+): Promise<UniverseStructure | null> {
+  return loadStructure(characterId, structureId);
+}
+
 /** Structure name, or null if unresolvable (no ACL access, offline, or uncached). */
 export async function loadStructureName(
   characterId: number,

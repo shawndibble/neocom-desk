@@ -24,6 +24,9 @@ function defaultProps(overrides: Partial<VariationsTableProps> = {}): Variations
     prices: new Map(),
     onSelect: vi.fn(),
     onCompare: vi.fn(),
+    selfName: 'Slasher',
+    selfSummary: summary(10_000, 8_000),
+    scopeName: 'Jita',
     ...overrides,
   };
 }
@@ -100,7 +103,7 @@ describe('VariationsTable', () => {
   it('omits the Tier column when every row is a sibling fallback with no tier', () => {
     renderTable({ rows: [{ typeId: 34, name: 'Tritanium', tier: null }] });
     expect(screen.queryByRole('button', { name: /Tier/ })).not.toBeInTheDocument();
-    expect(screen.queryByText('—')).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /Tier/ })).not.toBeInTheDocument();
   });
 
   it('keeps the Tier column when at least one row has a tier', () => {
@@ -229,5 +232,49 @@ describe('VariationsTable', () => {
       expect(onSelect).toHaveBeenCalledWith(587);
       expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
     });
+  });
+
+  it('prices each variation against the item it varies, signed, cheaper reading as a saving', () => {
+    renderTable({
+      prices: new Map([
+        [588, summary(25_000, 20_000)],
+        [587, summary(4_000, 3_000)],
+        [589, summary(null, 500)],
+      ]),
+    });
+    const table = screen.getByRole('table', { name: 'Variations' });
+    expect(within(table).getByRole('columnheader', { name: /vs Slasher/ })).toBeInTheDocument();
+    const rifter = within(table).getByText('Rifter').closest('tr');
+    const fleet = within(table).getByText('Republic Fleet Rifter').closest('tr');
+    if (!rifter || !fleet) throw new Error('expected rows');
+    expect(within(rifter).getByText('−6K')).toBeInTheDocument();
+    expect(within(fleet).getByText('+15K')).toBeInTheDocument();
+  });
+
+  it('names the item the rows vary and where they are priced', () => {
+    renderTable({ prices: new Map([[587, summary(4_000, 3_000)]]) });
+    expect(screen.getByText('This item')).toBeInTheDocument();
+    expect(screen.getByText('Priced at Jita')).toBeInTheDocument();
+  });
+
+  it('groups rows by tier and folds a tier nobody sells here, one click from open', async () => {
+    const user = userEvent.setup();
+    renderTable({
+      rows: [...ROWS, { typeId: 590, name: "Gistum's Slasher", tier: 'Faction' }],
+      prices: new Map([
+        [588, summary(25_000, 20_000)],
+        [587, summary(4_000, 3_000)],
+        [589, summary(null, 500)],
+        [590, summary(null, null)],
+      ]),
+    });
+    const table = screen.getByRole('table', { name: 'Variations' });
+    expect(within(table).getByText('Rifter')).toBeInTheDocument();
+    const faction = within(table).getByRole('button', { name: /Faction.*none sold at Jita/ });
+    expect(faction).toHaveAttribute('aria-expanded', 'false');
+    expect(within(table).queryByText("Vherokior's Slasher")).not.toBeInTheDocument();
+
+    await user.click(faction);
+    expect(within(table).getByText("Vherokior's Slasher")).toBeInTheDocument();
   });
 });

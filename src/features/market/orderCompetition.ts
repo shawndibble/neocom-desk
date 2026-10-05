@@ -37,12 +37,9 @@
 import { fetchAggregates, type HubAggregate } from '@/market/fuzzwork';
 import { getOrderBook } from './orderBook';
 import { getStructureMarketOrders, type StructureMarketOrder } from '@/esi/endpoints';
-import { getRouteUnderRules, rulesCacheKey } from '@/features/route/esiRoute';
-import type { RouteRules } from '@/features/route/routeRules';
 import { conditionalPagedFetch, loadPaginatedWithCache } from '@/esi/cache';
 import { AuthError } from '@/auth/sso';
 import { EsiError } from '@/esi/client';
-import { jumpsAwayFromRoute, type JumpsAwayResult } from '@/engine/jumpsAway';
 import type { CompetingOrder } from '@/engine/market/undercut';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { stationPriceKey } from './stationPriceKey';
@@ -181,65 +178,4 @@ export async function loadStructureCompetition(
     isBuyOrder: o.is_buy_order,
   }));
   return { competitors, truncated: result.truncated };
-}
-
-function jumpsCacheKey(
-  originSystemId: number,
-  destinationSystemId: number,
-  rules: RouteRules
-): string {
-  return `${originSystemId}:${destinationSystemId}:${rulesCacheKey(originSystemId, destinationSystemId, rules)}`;
-}
-
-// Module-level, session-lifetime memo: a route between two fixed systems
-// cannot change inside a session, so a repeated pair (e.g. one hub compared
-// against several of the character's home systems) never re-calls ESI.
-const jumpsCache = new Map<string, Promise<JumpsAwayResult>>();
-
-/** Clears the session memo — tests only. */
-export function clearJumpsCache(): void {
-  jumpsCache.clear();
-}
-
-/**
- * Jumps between two solar systems, memoized per ordered pair for the session.
- * Same system for both ends is 0 jumps with no ESI call. A route ESI cannot
- * resolve (or a failed call) degrades to `{kind:'unknown', reason:'noRoute'}`
- * rather than throwing — a route lookup failing must not take the rest of a
- * page's undercut check down with it.
- *
- * Only a `known` answer is retained in the memo. A transient failure resolves
- * to `unknown` for its caller but is then evicted, so a later call for the
- * same pair gets a fresh attempt rather than being stuck on a stale negative
- * for the rest of the session — same "don't poison the entry" rule
- * `esi/cache.ts`'s `inFlightLoads`/`orderBook.ts`'s `inFlight` both follow for
- * a rejection.
- */
-export function loadJumpsBetween(
-  originSystemId: number,
-  destinationSystemId: number,
-  /** The pilot's Travel Settings — see `features/route/esiRoute.ts` for how ESI is asked. */
-  rules: RouteRules
-): Promise<JumpsAwayResult> {
-  if (originSystemId === destinationSystemId) {
-    return Promise.resolve(jumpsAwayFromRoute([originSystemId]));
-  }
-
-  const key = jumpsCacheKey(originSystemId, destinationSystemId, rules);
-  const cached = jumpsCache.get(key);
-  if (cached) return cached;
-
-  const promise = (async () => {
-    try {
-      const { data } = await getRouteUnderRules(originSystemId, destinationSystemId, rules);
-      return jumpsAwayFromRoute(data);
-    } catch {
-      return jumpsAwayFromRoute(null);
-    }
-  })();
-  jumpsCache.set(key, promise);
-  void promise.then((result) => {
-    if (result.kind === 'unknown') jumpsCache.delete(key);
-  });
-  return promise;
 }

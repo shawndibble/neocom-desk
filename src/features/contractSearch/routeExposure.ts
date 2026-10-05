@@ -16,7 +16,11 @@
  * ganking happens: CONCORD responds slowest there, so it is the cheapest
  * highsec system in the game to be killed in.
  */
-import { findLocalRoute, type LocalRouteRules } from '@/features/route/localRoute';
+import {
+  findLocalRoute,
+  type LocalRouteRules,
+  type RouteGraphExtras,
+} from '@/features/route/localRoute';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { shownSecurity } from '@/engine/securityStatus';
 import { chokepointsOnRoute, isGankChokepoint } from '@/engine/route/chokepoints';
@@ -55,12 +59,13 @@ export type RouteExposure =
 export async function routeExposure(
   originSystemId: number | null,
   destinationSystemId: number | null,
-  rules: LocalRouteRules
+  rules: LocalRouteRules,
+  extras: RouteGraphExtras = {}
 ): Promise<RouteExposure> {
   if (originSystemId === null || destinationSystemId === null) return { kind: 'unknown' };
 
   const [route, systems] = await Promise.all([
-    findLocalRoute(originSystemId, destinationSystemId, rules),
+    findLocalRoute(originSystemId, destinationSystemId, rules, extras),
     loadSolarSystemsById(),
   ]);
   if (route.kind === 'no-route') return { kind: 'no-route' };

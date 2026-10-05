@@ -197,7 +197,7 @@ describe('loadDogmaEngine', () => {
     vi.mocked(cachesMock.keys!).mockRejectedValue(new Error('SecurityError'));
     const { loadDogmaEngine } = await freshModule();
 
-    await expect(loadDogmaEngine()).resolves.toBeUndefined();
+    await expect(loadDogmaEngine()).resolves.toBeDefined();
   });
 
   it('clears the failed load so a later call can retry instead of rejecting forever', async () => {
@@ -218,7 +218,7 @@ describe('loadDogmaEngine', () => {
     await expect(loadDogmaEngine()).rejects.toThrow('offline');
 
     stubNetwork();
-    await expect(loadDogmaEngine()).resolves.toBeUndefined();
+    await expect(loadDogmaEngine()).resolves.toBeDefined();
   });
 });
 
@@ -530,10 +530,38 @@ describe('computeFittingStats overheated values', () => {
 describe('fit checks', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('is not ready, and refuses to check, before the engine has loaded', async () => {
-    const { isDogmaEngineReady, checkCandidates } = await freshModule();
-    expect(isDogmaEngineReady()).toBe(false);
-    expect(() => checkCandidates(587, 'low', [2048], profile)).toThrow();
+  it('hands out no engine before it has loaded, then the one the load resolved to', async () => {
+    stubNetwork();
+    const { loadDogmaEngine, readyDogmaEngine, subscribeDogmaEngine } = await freshModule();
+    expect(readyDogmaEngine()).toBeNull();
+    const listener = vi.fn();
+    const unsubscribe = subscribeDogmaEngine(listener);
+
+    const engine = await loadDogmaEngine();
+
+    expect(readyDogmaEngine()).toBe(engine);
+    expect(listener).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  it('stays without an engine after a failed load', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('offline');
+      })
+    );
+    vi.stubGlobal('caches', {
+      open: vi.fn(async () => ({
+        match: vi.fn(async () => undefined),
+        put: vi.fn(async () => {}),
+      })),
+    });
+    const { loadDogmaEngine, readyDogmaEngine } = await freshModule();
+
+    await expect(loadDogmaEngine()).rejects.toThrow('offline');
+
+    expect(readyDogmaEngine()).toBeNull();
   });
 
   it('checks each candidate alone on the hull, reading its own rules and the hull-level ones it causes', async () => {
@@ -556,9 +584,8 @@ describe('fit checks', () => {
       ];
       return { ship: { attributes: new Map() }, items: [], violations };
     });
-    const { loadDogmaEngine, isDogmaEngineReady, checkCandidates } = await freshModule();
-    await loadDogmaEngine();
-    expect(isDogmaEngineReady()).toBe(true);
+    const { loadDogmaEngine } = await freshModule();
+    const { checkCandidates } = await loadDogmaEngine();
     calculateMock.mockClear();
 
     const result = checkCandidates(587, 'low', [1, 2, 3, 4, 5], profile);
@@ -580,8 +607,8 @@ describe('fit checks', () => {
   it('puts a drone candidate in the drone bay', async () => {
     stubNetwork();
     calculateMock.mockReturnValue({ ship: { attributes: new Map() }, items: [], violations: [] });
-    const { loadDogmaEngine, checkCandidates } = await freshModule();
-    await loadDogmaEngine();
+    const { loadDogmaEngine } = await freshModule();
+    const { checkCandidates } = await loadDogmaEngine();
     calculateMock.mockClear();
 
     checkCandidates(587, 'drone', [2454], profile);
@@ -608,8 +635,8 @@ describe('fit checks', () => {
               : [];
       return { ship: { attributes: new Map() }, items: [], violations };
     });
-    const { loadDogmaEngine, checkCharges } = await freshModule();
-    await loadDogmaEngine();
+    const { loadDogmaEngine } = await freshModule();
+    const { checkCharges } = await loadDogmaEngine();
 
     const fitting = checkCharges(587, { slot: 'high', typeId: 2889 }, [9, 10, 11, 12], profile);
 

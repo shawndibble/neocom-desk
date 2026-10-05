@@ -16,6 +16,8 @@ interface Props {
   fitting: Fitting;
   /** The Fitting's Jita price (`fittingPrice.ts`); null while it loads. */
   price: Appraisal | null;
+  /** The pilot's active clone, left off the multibuy list (`useFittingExport`). */
+  cloneImplants?: readonly number[];
 }
 
 /** The notice a copy leaves, announced politely. */
@@ -77,9 +79,9 @@ export function FittingExportItems({
  * an in-game chat link or a multibuy list, and see the Fitting's Jita price
  * with a way into Appraisal for the same list.
  */
-export function FittingExportMenu({ fitting, price }: Props) {
+export function FittingExportMenu({ fitting, price, cloneImplants }: Props) {
   const { t } = useTranslation();
-  const actions = useFittingExport(fitting);
+  const actions = useFittingExport(fitting, cloneImplants);
   return (
     <div className="flex items-center gap-2">
       <FittingExportNotice notice={actions.notice} />

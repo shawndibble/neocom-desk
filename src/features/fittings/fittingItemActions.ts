@@ -12,7 +12,6 @@ import type {
   FittingModule,
   FittingModuleResult,
   FittingSlotKind,
-  PilotProfile,
 } from '@/engine/fittings/types';
 import {
   acceptsDrop,
@@ -25,14 +24,13 @@ import {
   type FittingDropHandlers,
   type FittingDropTarget,
 } from './fittingDrag';
+import type { FittingContext } from './fittingContext';
 import type { ChargeLoading } from './useChargeLoading';
-import type { FittingCatalogue } from './useFittingCatalogue';
 
 export interface ChargePickerInput {
   fitting: Fitting;
-  catalogue: FittingCatalogue;
-  engineReady: boolean;
-  profile: PilotProfile | null;
+  /** Null while the engine or pilot loads: the picker lists charges without figures. */
+  context: FittingContext | null;
   moduleResults: FittingModuleResult[] | null;
 }
 

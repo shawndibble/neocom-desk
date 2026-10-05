@@ -2,7 +2,7 @@ import { Fragment, useMemo, useRef, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RowMoreActions } from '@/components/ui';
 import { cx } from '@/lib/cx';
-import { formatIsk } from '@/lib/isk';
+import { formatMarketIsk, marketIskDecimals } from '@/lib/isk';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { iskToneClass } from '@/features/character/format';
@@ -70,7 +70,7 @@ export function TransactionsDayList({
                 {dayLabel(day.rows[0].date)}
               </span>
               <span className={cx('text-xs font-semibold tabular-nums', iskToneClass(day.net))}>
-                {signedIsk(day.net, 2)}
+                {signedIsk(day.net, marketIskDecimals(day.net))}
               </span>
             </h3>
             <ul className="divide-y divide-line border-b border-line">
@@ -93,7 +93,7 @@ export function TransactionsDayList({
                       </span>
                       <span className="truncate text-xs text-text-dim tabular-nums">
                         {txn.is_buy ? t('wallet.buy') : t('wallet.sell')} ·{' '}
-                        {txn.quantity.toLocaleString()} × {formatIsk(txn.unit_price, 2)}
+                        {txn.quantity.toLocaleString()} × {formatMarketIsk(txn.unit_price)}
                       </span>
                     </span>
                     <span
@@ -102,7 +102,7 @@ export function TransactionsDayList({
                         iskToneClass(total)
                       )}
                     >
-                      {signedIsk(total, 2)}
+                      {signedIsk(total, marketIskDecimals(total))}
                     </span>
                     <RowMoreActions />
                   </li>

@@ -102,6 +102,26 @@ function ModuleChargeItems({
 }
 
 /**
+ * "Put <charge> in cargo…": the cargo quantity dialog for the charge a module
+ * holds, so the spare rounds a fit carries are one step from the weapon
+ * instead of a trip through the Add panel. Starts at what the cargo holds.
+ */
+function ChargeToCargoItem({
+  actions,
+  chargeTypeId,
+}: {
+  actions: FittingItemActions;
+  chargeTypeId: number;
+}) {
+  const { t } = useTranslation();
+  return (
+    <MenuItem onSelect={() => actions.changeCargoQuantity(chargeTypeId)}>
+      {t('fittings.item.chargeToCargo', { name: actions.typeName(chargeTypeId) })}
+    </MenuItem>
+  );
+}
+
+/**
  * "Change charge (all N) ▸" on a Ring tile or List row: the Charge Picker for
  * every fitted module of this type — the weapon group the Offense row's own
  * menu changes. Only with the editor's Fitting to work it out from.
@@ -203,6 +223,7 @@ export function ModuleMenuItems({
           <MenuItem onSelect={() => actions.unloadCharge(rack, index)}>
             {t('fittings.ring.menu.unload', { name: actions.typeName(module.chargeTypeId) })}
           </MenuItem>
+          <ChargeToCargoItem actions={actions} chargeTypeId={module.chargeTypeId} />
         </>
       )}
       <MenuSeparator />
@@ -342,9 +363,12 @@ export function WeaponMenuItems({
         </MenuSubContent>
       </MenuSub>
       {first.chargeTypeId !== undefined && (
-        <MenuItem onSelect={() => actions.unloadGroup(at)}>
-          {t('fittings.ring.menu.unload', { name: actions.typeName(first.chargeTypeId) })}
-        </MenuItem>
+        <>
+          <MenuItem onSelect={() => actions.unloadGroup(at)}>
+            {t('fittings.ring.menu.unload', { name: actions.typeName(first.chargeTypeId) })}
+          </MenuItem>
+          <ChargeToCargoItem actions={actions} chargeTypeId={first.chargeTypeId} />
+        </>
       )}
       {first.slot !== 'subsystem' && (
         <MenuSub>

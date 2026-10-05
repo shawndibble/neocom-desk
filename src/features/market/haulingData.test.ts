@@ -75,6 +75,19 @@ describe('runHaulingScan, selling into buy orders', () => {
     });
   });
 
+  it("carries each item's group and category, which decide the holds it may ride in", async () => {
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 99,
+      types: { '34': { name: 'Tritanium', volume: 0.01, groupID: 18 } } as never,
+      groupCategories: { '18': 4 },
+      mode: 'instant',
+    });
+    expect(scan.rows[0]).toMatchObject({ groupId: 18, categoryId: 4 });
+  });
+
   it('does not answer an instant scan from a cached listing scan', async () => {
     loadPriceHistory.mockRejectedValue(new Error('no history'));
     const list = await runHaulingScan({

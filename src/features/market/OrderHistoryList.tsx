@@ -9,7 +9,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { formatIskCompact, formatMarketIsk } from '@/lib/isk';
 import { formatDateOnly } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { MarketOrderHistory } from '@/esi/endpoints';
@@ -164,7 +164,7 @@ export function OrderHistoryList({
                       value={`${order.volume_remain.toLocaleString()} / ${order.volume_total.toLocaleString()}`}
                     />
                     <Field label={t('orders.issued')} value={issued} />
-                    <Field label={t('orders.price')} value={formatIsk(order.price, 2)} />
+                    <Field label={t('orders.price')} value={formatMarketIsk(order.price)} />
                   </dl>
                   <MarketItemLink
                     typeId={order.type_id}

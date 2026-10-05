@@ -5,14 +5,15 @@
  * it out — in a Web Worker where the browser has one, in slices on the page
  * otherwise (jsdom, old browsers) — and keeps one run per key, so the
  * route's background warm-up and the Add panel share a single computation.
- * Call it only once the page's own engine is ready: the worker then reads the
- * engine assets from Cache Storage instead of racing the page to download
- * them.
+ * It takes a fitting context, so it only runs once the page's own engine is
+ * ready: the worker then reads the engine assets from Cache Storage instead
+ * of racing the page to download them.
  */
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import { skillsKey, unpackCheck } from '@/engine/fittings/hullFitKey';
 import type { PilotProfile } from '@/engine/fittings/types';
-import { checkCandidates, type CandidateCheck } from './dogmaFittingEngine';
+import type { CandidateCheck, DogmaEngine } from './dogmaFittingEngine';
+import type { FittingContext } from './fittingContext';
 import { loadSavedHullFit, saveHullFit } from './hullFitCache';
 import type { HullFitReply, HullFitRequest } from './hullFit.worker';
 import type { FittingCatalogue } from './useFittingCatalogue';
@@ -142,6 +143,7 @@ function computeInWorker(
 
 /** The page's own path: every item through the memoizing engine call, in slices that yield. */
 function computeOnPage(
+  engine: DogmaEngine,
   shipTypeId: number,
   jobs: [CandidateRack, number[]][],
   profile: PilotProfile
@@ -157,7 +159,7 @@ function computeOnPage(
       const until = performance.now() + SLICE_MS;
       while (next < slices.length && performance.now() < until) {
         const [rack, ids] = slices[next++];
-        for (const [id, check] of checkCandidates(shipTypeId, rack, ids, profile)) {
+        for (const [id, check] of engine.checkCandidates(shipTypeId, rack, ids, profile)) {
           checks.set(id, check);
         }
       }
@@ -169,9 +171,8 @@ function computeOnPage(
 }
 
 async function compute(
-  catalogue: FittingCatalogue,
-  shipTypeId: number,
-  profile: PilotProfile
+  { engine, catalogue, profile }: FittingContext,
+  shipTypeId: number
 ): Promise<HullFitChecks> {
   const jobs = jobsFor(catalogue);
   const target = ensureWorker();
@@ -183,7 +184,7 @@ async function compute(
       if (error instanceof Error && error.message === 'superseded') throw error;
     }
   }
-  return computeOnPage(shipTypeId, jobs, profile);
+  return computeOnPage(engine, shipTypeId, jobs, profile);
 }
 
 /**
@@ -191,12 +192,8 @@ async function compute(
  * `superseded` if a newer hull was asked for while the worker was still on
  * this one; the caller has moved on and should ignore it.
  */
-export function getHullFit(
-  catalogue: FittingCatalogue,
-  shipTypeId: number,
-  profile: PilotProfile
-): Promise<HullFitChecks> {
-  const key = hullFitKey(catalogue, shipTypeId, profile);
+export function getHullFit(context: FittingContext, shipTypeId: number): Promise<HullFitChecks> {
+  const key = hullFitKey(context.catalogue, shipTypeId, context.profile);
   const known = memory.get(key);
   if (known) {
     // Most recently used last, so the oldest goes first.
@@ -209,7 +206,7 @@ export function getHullFit(
 
   const run = (async () => {
     const saved = await loadSavedHullFit(key);
-    const checks = saved ?? (await compute(catalogue, shipTypeId, profile));
+    const checks = saved ?? (await compute(context, shipTypeId));
     if (!saved) void saveHullFit(key, checks);
     memory.set(key, checks);
     if (memory.size > MEMORY_HULLS) memory.delete(memory.keys().next().value!);

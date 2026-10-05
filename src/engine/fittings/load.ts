@@ -33,7 +33,11 @@ import type {
  */
 export type LoadWarningKind =
   | { kind: 'unknown-ship' }
-  | { kind: 'unknown-item' }
+  | {
+      kind: 'unknown-item';
+      /** EFT only: the line was written with a count (`x1`), so it was never a fitted module. */
+      countWritten?: true;
+    }
   | { kind: 'too-many-slots'; rack: FittingSlotKind }
   | { kind: 'malformed-item' }
   /** An In-game Fitting item in an ESI flag the app doesn't fit (a service slot, say). */

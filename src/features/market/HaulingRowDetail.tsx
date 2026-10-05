@@ -25,7 +25,8 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip } from '@/components/ui';
 import { HAULING_THRESHOLDS, lotEconomics } from '@/engine/market/haulingMarket';
-import { formatIsk } from '@/lib/isk';
+import { maxBuyPrice } from '@/engine/market/haulingPlan';
+import { formatIsk, formatMarketIsk } from '@/lib/isk';
 import { MarketItemLink } from './MarketItemLink';
 import type { InstantHaulingScanRow, ListHaulingScanRow } from './haulingData';
 import { formatDaysToSell, type HaulingViewRow } from './haulingView';
@@ -165,6 +166,29 @@ function LoadNote({ row, note }: { row: HaulingViewRow; note: string | undefined
   );
 }
 
+/**
+ * The price line to hold while buying: the dearest unit still clearing the
+ * margin floor after every fee. Buying is live — the origin's book moves
+ * between this scan and the purchase — so the cheapest units are not a promise
+ * that the last ones are worth taking.
+ */
+function PriceLimit({ row }: { row: HaulingViewRow }) {
+  const { t } = useTranslation();
+  const limit = maxBuyPrice(row.candidate, row.fees);
+  if (limit === null) return null;
+  return (
+    <Line
+      strong
+      label={t('market.hauling.detail.maxBuy')}
+      detail={t('market.hauling.detail.maxBuyHow', {
+        hub: row.fromHub.systemName,
+        pct: HAULING_THRESHOLDS.minUnitMarginPct,
+      })}
+      amount={formatMarketIsk(limit)}
+    />
+  );
+}
+
 function InstantDetail({ row, loadNote }: DetailProps<HaulingViewRow & InstantHaulingScanRow>) {
   const { t } = useTranslation();
   const { fromHub: from, toHub: to, fees } = row;
@@ -200,7 +224,7 @@ function InstantDetail({ row, loadNote }: DetailProps<HaulingViewRow & InstantHa
                 label={t('market.hauling.detail.buyIn', { hub: from.systemName })}
                 detail={t('market.hauling.detail.unitsAt', {
                   units: lot.filled.toLocaleString(),
-                  price: formatIsk(avgBuy, 2),
+                  price: formatMarketIsk(avgBuy),
                 })}
                 amount={`−${isk0(lot.cost)}`}
               />
@@ -208,7 +232,7 @@ function InstantDetail({ row, loadNote }: DetailProps<HaulingViewRow & InstantHa
                 label={t('market.hauling.detail.sellInto', { hub: to.systemName })}
                 detail={t('market.hauling.detail.unitsAt', {
                   units: lot.filled.toLocaleString(),
-                  price: formatIsk(row.price, 2),
+                  price: formatMarketIsk(row.price),
                 })}
                 amount={`+${isk0(lot.revenue)}`}
               />
@@ -232,6 +256,7 @@ function InstantDetail({ row, loadNote }: DetailProps<HaulingViewRow & InstantHa
                   detail={t('market.hauling.detail.marginHow')}
                   amount={`${lot.marginPct.toFixed(1)}%`}
                 />
+                <PriceLimit row={row} />
               </div>
               <LoadNote row={row} note={loadNote} />
             </>
@@ -265,7 +290,7 @@ function InstantDetail({ row, loadNote }: DetailProps<HaulingViewRow & InstantHa
                       key={level.price}
                       className={`border-t border-line/60 ${level.soldInto ? 'bg-accent/10' : ''}`}
                     >
-                      <td className="py-1">{formatIsk(level.price, 2)}</td>
+                      <td className="py-1">{formatMarketIsk(level.price)}</td>
                       <td className="py-1 text-right">{level.units.toLocaleString()}</td>
                       <td className="py-1 text-right text-text-dim">
                         {level.running.toLocaleString()}
@@ -337,24 +362,24 @@ function ListingDetail({ row, loadNote }: DetailProps<HaulingViewRow & ListHauli
               indent
               label={t('market.hauling.detail.recentSale')}
               detail={usesRecent ? t('market.hauling.detail.used') : undefined}
-              amount={formatIsk(sale.recentSalePrice, 2)}
+              amount={formatMarketIsk(sale.recentSalePrice)}
             />
             <Line
               indent
               label={t('market.hauling.detail.undercut')}
               detail={usesRecent ? undefined : t('market.hauling.detail.used')}
-              amount={formatIsk(sale.undercutPrice, 2)}
+              amount={formatMarketIsk(sale.undercutPrice)}
             />
             <Line
               strong
               tone="success"
               label={t('market.hauling.detail.expected')}
-              amount={formatIsk(sale.price, 2)}
+              amount={formatMarketIsk(sale.price)}
             />
             <Line
               indent
               label={t('market.hauling.detail.cheapest')}
-              amount={formatIsk(sale.lowestAsk, 2)}
+              amount={formatMarketIsk(sale.lowestAsk)}
             />
           </Section>
 
@@ -384,7 +409,7 @@ function ListingDetail({ row, loadNote }: DetailProps<HaulingViewRow & ListHauli
               label={t('market.hauling.detail.buyIn', { hub: from.systemName })}
               detail={t('market.hauling.detail.unitsAt', {
                 units: lot.filled.toLocaleString(),
-                price: formatIsk(avgBuy, 2),
+                price: formatMarketIsk(avgBuy),
               })}
               amount={`−${isk0(lot.cost)}`}
             />
@@ -392,7 +417,7 @@ function ListingDetail({ row, loadNote }: DetailProps<HaulingViewRow & ListHauli
               label={t('market.hauling.detail.sellIn', { hub: to.systemName })}
               detail={t('market.hauling.detail.unitsAt', {
                 units: lot.filled.toLocaleString(),
-                price: formatIsk(sale.price, 2),
+                price: formatMarketIsk(sale.price),
               })}
               amount={`+${isk0(lot.revenue)}`}
             />
@@ -439,6 +464,7 @@ function ListingDetail({ row, loadNote }: DetailProps<HaulingViewRow & ListHauli
                 detail={t('market.hauling.detail.marginHow')}
                 amount={`${lot.marginPct.toFixed(1)}%`}
               />
+              <PriceLimit row={row} />
             </div>
             <LoadNote row={row} note={loadNote} />
           </Section>
@@ -484,7 +510,7 @@ function ListingDetail({ row, loadNote }: DetailProps<HaulingViewRow & ListHauli
                           key={level.price}
                           className={`border-t border-line/60 ${level.price <= reach ? 'bg-warning/10' : ''}`}
                         >
-                          <td className="py-1">{formatIsk(level.price, 2)}</td>
+                          <td className="py-1">{formatMarketIsk(level.price)}</td>
                           <td className="py-1 text-right">{level.units.toLocaleString()}</td>
                           <td className="py-1 text-right text-text-dim">
                             {level.running.toLocaleString()}
@@ -511,7 +537,7 @@ function MarkerRow({ price }: { price: number }) {
   return (
     <tr className="border-y border-accent-dim bg-accent/10 text-accent">
       <td className="py-1 font-semibold" colSpan={3}>
-        {t('market.hauling.detail.yourPrice', { price: formatIsk(price, 2) })}
+        {t('market.hauling.detail.yourPrice', { price: formatMarketIsk(price) })}
       </td>
     </tr>
   );

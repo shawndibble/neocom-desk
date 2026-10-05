@@ -235,6 +235,8 @@ export function JournalTable({
           highlightRowKey={highlightRowKey}
           sort={sort}
           onSortChange={onSortChange}
+          // A phone's stacked cards hide the header sort buttons (DESIGN.md §4a).
+          mobileSort
           // Every page of the journal, uncapped: thousands of rows for an
           // active trader.
           virtualize="auto"

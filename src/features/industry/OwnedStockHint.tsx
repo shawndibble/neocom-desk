@@ -10,10 +10,8 @@ interface OwnedStockHintProps {
   scopedQuantity: number;
   detection: OwnedStockDetection;
   materialName: string;
-  /** What the "use" action writes: min(scoped detected, required). */
+  /** What the "use" action writes — the row's owned-stock offer (`ownedStockOffer`). */
   suggestion: number;
-  /** False when the row's stored value already equals `suggestion` — nothing left to apply. */
-  canApply: boolean;
   onApply: () => void;
 }
 
@@ -43,9 +41,10 @@ interface OwnedStockHintProps {
  * "N owned" text it used to hang off was gone it had no trigger left — so it
  * is dropped rather than badly housed.
  *
- * Nothing renders once the offer is taken (`canApply` false): by then the
- * quantity is in the input beside it, which is the thing the plan actually
- * uses.
+ * Rendered only while the row has an offer: `ownedStockOffer`
+ * (`src/engine/industry/ownedStockOffer.ts`) decides that, and the caller
+ * leaves this out once it answers `null` — by then the quantity is in the
+ * input beside it, which is the thing the plan actually uses.
  *
  * When any Character's asset list was short or unreadable the total is rendered
  * as a lower bound. Under-reporting owned stock inflates the plan's buy list
@@ -56,11 +55,9 @@ export function OwnedStockHint({
   detection,
   materialName,
   suggestion,
-  canApply,
   onApply,
 }: OwnedStockHintProps) {
   const { t } = useTranslation();
-  if (!canApply) return null;
 
   const quantity = scopedQuantity.toLocaleString();
   // The lower-bound marker is part of the number, so it has to be part of the
