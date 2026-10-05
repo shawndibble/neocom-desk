@@ -4685,6 +4685,7 @@
     "flowSource": "Source",
     "sourceMade": "Made",
     "sourceExtracted": "Extracted",
+    "sourceNotExtracted": "Not extracted",
     "sourceBought": "Bought",
     "sourceShort": "Short",
     "noColoniesTitle": "No colonies to plan with",

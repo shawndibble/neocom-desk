@@ -241,13 +241,14 @@ export function plannerColonies(
       ? meanHeadsPerExtractor(own)
       : (pilotHeads ?? DEFAULT_PLANNER_HEADS);
 
-    const p0TypeIds = [
-      ...new Set(
-        own.extractors
-          .map((extractor) => extractor.productTypeId)
-          .filter((id): id is number => id !== null)
-      ),
-    ].sort((a, b) => a - b);
+    // Per P0, how many ECUs run it today: the capacity model accepts that
+    // layout as fitting, since the colony runs it (engine/pi/colonyCapacity.ts).
+    const ecusByP0 = new Map<number, number>();
+    for (const extractor of own.extractors) {
+      if (extractor.productTypeId === null) continue;
+      ecusByP0.set(extractor.productTypeId, (ecusByP0.get(extractor.productTypeId) ?? 0) + 1);
+    }
+    const p0TypeIds = [...ecusByP0.keys()].sort((a, b) => a - b);
 
     return {
       ...base,
@@ -263,7 +264,7 @@ export function plannerColonies(
         headsPerExtractor,
         taxRate,
         ratePerEcu,
-        current: { p0TypeIds, productTypeIds: currentProductTypeIds(own, pi) },
+        current: { p0TypeIds, productTypeIds: currentProductTypeIds(own, pi), ecusByP0 },
       },
     };
   });

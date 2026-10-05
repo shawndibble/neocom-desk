@@ -55,8 +55,11 @@ export type ColonyExtraction =
       /** Sorted by P0 typeId. */
       slots: ExtractionSlot[];
       pins: PinCounts;
+      /** The model's figure, which may exceed `budget` when `runningToday`. */
       used: PinLoad;
       budget: PinLoad;
+      /** Accepted because the colony runs this extraction today, not because the model fits it. */
+      runningToday?: true;
     }
   | { status: 'does-not-fit'; limitedBy: FitLimit[]; used: PinLoad; budget: PinLoad }
   /** P0s this colony's planet type does not yield (no rate on the colony). Sorted. */
@@ -135,6 +138,13 @@ export function fitPlannedPins(
   return { fits: limitedBy.length === 0, pins, used, budget: colony.budget, limitedBy };
 }
 
+/** True when every slot in `want` is within what the colony runs today on that P0. */
+function runsToday(colony: PlannerColony, want: readonly ExtractionWant[]): boolean {
+  const today = colony.current.ecusByP0;
+  if (!today || want.length === 0) return false;
+  return want.every((w) => (today.get(w.p0TypeId) ?? 0) >= w.ecus);
+}
+
 /**
  * Fit `want` — one or two P0s with their ECU counts — on `colony`, refining
  * each to its P1 on the spot.
@@ -143,6 +153,20 @@ export function fitPlannedPins(
  * the policy caps (`over-policy`), then CPU/Powergrid (`does-not-fit`). An
  * empty `want` with no `fixed` pins fits with no pins at all — an unused
  * colony builds nothing, not even a pad.
+ *
+ * ## What the colony runs today fits, whatever the model says
+ *
+ * The model is a little pessimistic against real colonies, for three
+ * reasons it cannot see past: it refines every slot on the spot, so a
+ * measured 12,000 P0/h ECU is charged two basics a colony shipping raw P0
+ * does not run; it charges every planned pin a link at the colony's own
+ * *longest* hop (`newLinkCost`), where real layouts cluster pins near the
+ * pad; and its heads are the colony's mean. The e2e fixture's Jita I — CC4,
+ * two 8-head ECUs — models at ~18,200 MW against 17,000 and yet runs. So a
+ * want within `current.ecusByP0` (no more ECUs on any P0 than today, no P0
+ * it does not run) is accepted as `runningToday` without the check: the
+ * colony itself is the proof. Anything beyond today's layout, or any factory
+ * pin on top of it, is new load and is fitted by the model as before.
  *
  * `fixed` is production the colony carries whatever it extracts — the factory
  * host's P2+ pins — fitted on the same Command Center as the slots, so a host
@@ -219,6 +243,16 @@ export function colonyExtraction(
           basic: slots.reduce((sum, s) => sum + s.basicFactories, 0),
         });
   const fit = fitPlannedPins(colony, production, totalEcus * headsPerExtractor, pi);
+  if (!hasFixed && runsToday(colony, want)) {
+    return {
+      status: 'fits',
+      slots,
+      pins: fit.pins,
+      used: fit.used,
+      budget: fit.budget,
+      runningToday: true,
+    };
+  }
   if (!fit.fits) {
     return { status: 'does-not-fit', limitedBy: fit.limitedBy, used: fit.used, budget: fit.budget };
   }

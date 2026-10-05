@@ -2,8 +2,16 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
+import { piTier } from './chain';
 import { planGoals } from './goalPlan';
-import type { Goal, PlannerColony, PlannerPolicy, PlanetType, PriceBooks } from './goalTypes';
+import type {
+  Goal,
+  GoalPlan,
+  PlannerColony,
+  PlannerPolicy,
+  PlanetType,
+  PriceBooks,
+} from './goalTypes';
 
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
@@ -18,6 +26,7 @@ const WATER = 3645;
 const COOLANT = 9832;
 const WATER_COOLED_CPU = 2328;
 const WETWARE_MAINFRAME = 2876;
+const ROBOTICS = 9848;
 
 const POLICY: PlannerPolicy = {
   maxEcusPerColony: 2,
@@ -108,7 +117,7 @@ describe('planGoals — factory host', () => {
   it('reports a P4 with no Barren or Temperate colony as a missing High-Tech host', () => {
     const result = plan([goal(WETWARE_MAINFRAME, 1)], [colony(1, 'lava'), colony(2, 'gas')]);
     expect(result.factoryHost).toBeNull();
-    expect(result.shortfalls).toEqual([{ kind: 'no-factory-host', facility: 'highTech' }]);
+    expect(result.shortfalls).toContainEqual({ kind: 'no-factory-host', facility: 'highTech' });
     expect(result.demand).toEqual([
       expect.objectContaining({ typeId: WETWARE_MAINFRAME, source: 'short' }),
     ]);
@@ -200,6 +209,7 @@ describe('planGoals — extraction and shortfalls', () => {
         p0TypeId: BASE_METALS,
         p1TypeId: REACTIVE_METALS,
         unitsPerHour: 6000,
+        p1UnitsPerHour: 40,
         fixPlanetTypes: ['barren', 'gas', 'lava', 'plasma', 'storm'],
       },
     ]);
@@ -216,6 +226,7 @@ describe('planGoals — extraction and shortfalls', () => {
         p0TypeId: BASE_METALS,
         p1TypeId: REACTIVE_METALS,
         unitsPerHour: expect.closeTo(48 * 150, 6),
+        p1UnitsPerHour: expect.closeTo(48, 6),
       },
     ]);
     expect(result.buys).toEqual([]);
@@ -342,5 +353,176 @@ describe('planGoals — extraction and shortfalls', () => {
   it('sells whole-ECU overshoot as surplus P1', () => {
     const result = plan([goal(REACTIVE_METALS, 30)], [colony(1, 'barren')]);
     expect(result.surplusP1).toEqual([{ typeId: REACTIVE_METALS, unitsPerHour: 10 }]);
+  });
+});
+
+/**
+ * The e2e fixture (`e2e/support/piColonies.ts`) as `goalPlannerModel` turns
+ * it into `PlannerColony` values: budgets from each CC level, link cost from
+ * each colony's own measured hop, heads read off its ECUs, rates measured
+ * where it extracts and the pilot's own mean elsewhere.
+ */
+function fixtureColonies(): PlannerColony[] {
+  const OWN_MEAN = 12_033;
+  const make = (
+    planetId: number,
+    planetType: PlanetType,
+    cc: number,
+    link: { cpu: number; powergrid: number },
+    heads: number,
+    taxRate: number,
+    measured: Record<number, number>,
+    ecus: Record<number, number>
+  ): PlannerColony => {
+    const row = pi.infrastructure.commandCenterUpgrades[cc];
+    return {
+      planetId,
+      planetType,
+      budget: { cpu: row.cpu, powergrid: row.powergrid },
+      newLinkCost: link,
+      headsPerExtractor: heads,
+      taxRate,
+      ratePerEcu: new Map(
+        pi.raw
+          .filter((r) => r.planetTypes.includes(planetType))
+          .map((r) => [
+            r.typeID,
+            measured[r.typeID] !== undefined
+              ? { unitsPerHour: measured[r.typeID], source: 'measured' as const }
+              : { unitsPerHour: OWN_MEAN, source: 'own-mean' as const },
+          ])
+      ),
+      current: {
+        p0TypeIds: Object.keys(ecus).map(Number),
+        productTypeIds: [],
+        ecusByP0: new Map(Object.entries(ecus).map(([k, v]) => [Number(k), v])),
+      },
+    };
+  };
+  return [
+    make(
+      40009077,
+      'barren',
+      4,
+      { cpu: 73.7, powergrid: 54.0 },
+      8,
+      0.06,
+      { [BASE_METALS]: 12_133 },
+      { [BASE_METALS]: 2 }
+    ),
+    make(
+      40009080,
+      'temperate',
+      4,
+      { cpu: 152.1, powergrid: 112.8 },
+      9,
+      0.06,
+      { [AQUEOUS_LIQUIDS]: 11_637 },
+      { [AQUEOUS_LIQUIDS]: 1 }
+    ),
+    make(
+      40009082,
+      'gas',
+      5,
+      { cpu: 553.4, powergrid: 413.8 },
+      7,
+      0.06,
+      { [IONIC_SOLUTIONS]: 11_637, 2310: 12_629 },
+      { [IONIC_SOLUTIONS]: 1, 2310: 1 }
+    ),
+    make(40000005, 'oceanic', 3, { cpu: 131.6, powergrid: 97.5 }, 8, 0, {}, {}),
+  ];
+}
+
+/** The e2e hub: flat per tier, bid at 95% of the ask. */
+function fixtureBooks(): PriceBooks {
+  const unit = [5, 760, 14_000, 100_000, 1_900_000];
+  const ask: Record<number, number> = {};
+  const bid: Record<number, number> = {};
+  for (const id of [...Object.keys(pi.schematics).map(Number), ...pi.raw.map((r) => r.typeID)]) {
+    ask[id] = unit[piTier(id, pi)];
+    bid[id] = ask[id] * 0.95;
+  }
+  return { ask, bid, salesTaxPct: 3.6 };
+}
+
+describe('planGoals — the plan describes itself consistently', () => {
+  it('reports no budget gap for a goal a type gap already blocks (e2e fixture, Coolant + Robotics)', () => {
+    const result = plan(
+      [
+        { typeId: COOLANT, unitsPerDay: 200 },
+        { typeId: ROBOTICS, unitsPerDay: 30 },
+      ],
+      fixtureColonies(),
+      POLICY,
+      fixtureBooks()
+    );
+    // Robotics needs Toxic Metals and Chiral Structures, which no fixture planet yields.
+    expect(result.shortfalls.map((s) => [s.kind, 'p0TypeId' in s ? s.p0TypeId : null])).toEqual([
+      ['type-gap', 2272],
+      ['type-gap', 2306],
+    ]);
+    expect(result.achieved).toEqual([
+      {
+        typeId: COOLANT,
+        unitsPerHour: expect.closeTo(200 / 24, 6),
+        fraction: expect.closeTo(1, 6),
+      },
+      { typeId: ROBOTICS, unitsPerHour: 0, fraction: 0 },
+    ]);
+    // Nothing extracts for the blocked goal.
+    const extracted = result.assignments
+      .filter((a) => a.role === 'extract' || a.role === 'factory')
+      .flatMap((a) => a.slots.map((s) => s.p0TypeId));
+    expect(extracted).not.toContain(BASE_METALS);
+  });
+
+  it('never calls a rationed input a budget gap while a colony could yield more of it', () => {
+    // Coolant at 10/h: storm is the only Ionic Solutions source and makes 72
+    // of 80, so Coolant runs at 90%. Water is rationed to 72 by that, not
+    // short — the temperates have room for more.
+    const result = plan(
+      [goal(COOLANT, 10)],
+      [colony(1, 'storm'), colony(2, 'temperate'), colony(3, 'temperate'), colony(4, 'temperate')]
+    );
+    expect(result.shortfalls).toEqual([
+      {
+        kind: 'budget-gap',
+        p0TypeId: IONIC_SOLUTIONS,
+        p1TypeId: 2390,
+        unitsPerHour: expect.closeTo(8 * 150, 6),
+        p1UnitsPerHour: expect.closeTo(8, 6),
+      },
+    ]);
+    const line = (id: number) => result.demand.find((l) => l.typeId === id)!;
+    expect(line(2390)).toMatchObject({ source: 'short', madeFraction: expect.closeTo(0.9, 6) });
+    expect(line(WATER)).toMatchObject({ source: 'made', madeFraction: expect.closeTo(0.9, 6) });
+    expect(line(COOLANT)).toMatchObject({ source: 'short', madeFraction: expect.closeTo(0.9, 6) });
+  });
+
+  it('labels the P0 under a bought P1 as not extracted, and a part-bought line by its made share', () => {
+    const allBought = plan([goal(REACTIVE_METALS, 40)], [colony(1, 'temperate')], {
+      ...POLICY,
+      buyTiers: [1],
+    });
+    const line = (r: GoalPlan, id: number) => r.demand.find((l) => l.typeId === id)!;
+    expect(line(allBought, BASE_METALS)).toMatchObject({
+      source: 'not-extracted',
+      madeFraction: 0,
+    });
+    expect(line(allBought, REACTIVE_METALS)).toMatchObject({ source: 'bought', madeFraction: 0 });
+
+    const partBought = plan([goal(REACTIVE_METALS, 120)], [colony(1, 'barren')], {
+      ...POLICY,
+      buyTiers: [1],
+    });
+    expect(line(partBought, REACTIVE_METALS)).toMatchObject({
+      source: 'bought',
+      madeFraction: expect.closeTo(0.6, 6),
+    });
+    expect(line(partBought, BASE_METALS)).toMatchObject({
+      source: 'extracted',
+      madeFraction: expect.closeTo(0.6, 6),
+    });
   });
 });

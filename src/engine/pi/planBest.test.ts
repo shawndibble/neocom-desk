@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
 import { planGoals } from './goalPlan';
 import type { PlannerColony, PlannerPolicy, PlanetType, PriceBooks } from './goalTypes';
-import { planBest } from './planBest';
+import { compareCandidates, planBest } from './planBest';
 
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
@@ -28,8 +28,8 @@ const POLICY: PlannerPolicy = {
 const prices = { [ELECTROLYTES]: 600, [WATER]: 700, [BIOFUELS]: 300, [COOLANT]: 40_000 };
 const BOOKS: PriceBooks = { bid: prices, ask: prices, salesTaxPct: 4 };
 
-function colony(planetId: number, planetType: PlanetType, rates: number[]): PlannerColony {
-  const row = pi.infrastructure.commandCenterUpgrades[5];
+function colony(planetId: number, planetType: PlanetType, rates: number[], cc = 5): PlannerColony {
+  const row = pi.infrastructure.commandCenterUpgrades[cc];
   return {
     planetId,
     planetType,
@@ -97,5 +97,38 @@ describe('planBest', () => {
       pi
     );
     expect(best.plan.factoryHost).toEqual({ planetId: 1, reason: 'only-eligible' });
+  });
+
+  it('ranks a host that reaches the goals above one that nets more by making nothing', () => {
+    // A CC0 Barren cannot carry even the Launchpad, so hosting there makes no
+    // Coolant at all — its colonies just keep selling — while the gas colony
+    // makes all of it. At a Coolant price under its inputs' worth, making
+    // nothing nets more; the pilot asked for Coolant, so it still loses.
+    const cheap = { ...prices, [COOLANT]: 8_000 };
+    const best = planBest(
+      {
+        goals: [{ typeId: COOLANT, unitsPerDay: 120 }],
+        colonies: [
+          colony(1, 'gas', [IONIC_SOLUTIONS, AQUEOUS_LIQUIDS]),
+          colony(2, 'barren', [CARBON_COMPOUNDS], 0),
+        ],
+        policy: POLICY,
+        books: { bid: cheap, ask: cheap, salesTaxPct: 4 },
+      },
+      pi
+    );
+    expect(best.plan.factoryHost?.planetId).toBe(1);
+    expect(best.plan.achieved[0].fraction).toBeCloseTo(1);
+  });
+
+  it('orders candidates by goal attainment, then shortfalls, then net, then forfeit, then id', () => {
+    const base = { attainment: 1, shortfalls: 0, net: 100, forfeit: 10, planetId: 5 };
+    const sorted = (xs: (typeof base)[]) => [...xs].sort(compareCandidates).map((x) => x.planetId);
+    // Most of the goal at a lower net beats less of it at a higher one.
+    expect(sorted([{ ...base, attainment: 0.6, net: 900, planetId: 1 }, base])).toEqual([5, 1]);
+    expect(sorted([{ ...base, shortfalls: 1, net: 900, planetId: 1 }, base])).toEqual([5, 1]);
+    expect(sorted([{ ...base, net: 90, planetId: 1 }, base])).toEqual([5, 1]);
+    expect(sorted([{ ...base, forfeit: 20, planetId: 1 }, base])).toEqual([5, 1]);
+    expect(sorted([base, { ...base, planetId: 1 }])).toEqual([1, 5]);
   });
 });
