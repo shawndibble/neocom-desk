@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { InfoTooltip, StatChip, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
@@ -391,7 +392,9 @@ export function ColonyExpanded({
         {planHref && (
           <Link
             to={planHref}
-            className="inline-flex min-h-11 items-center gap-1 font-semibold tracking-widest text-accent uppercase hover:underline md:min-h-0"
+            className={entityLinkClassName(
+              'inline-flex min-h-11 items-center gap-1 font-semibold md:min-h-0'
+            )}
           >
             {t('piColonies.expanded.planThis')}
             <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
