@@ -1448,7 +1448,7 @@ describe('SkillPlans editor: suggest reorder', () => {
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    await clickOptimizeMode(user, 'Reorder only');
+    await clickOptimizeMode(user, 'Reorder only…');
 
     expect(await screen.findByRole('heading', { name: 'Suggested reorder' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Accept' }));
@@ -1482,7 +1482,7 @@ describe('SkillPlans editor: suggest reorder', () => {
 
     await screen.findByText('Your entries');
     const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
-    await clickOptimizeMode(user, 'Reorder only');
+    await clickOptimizeMode(user, 'Reorder only…');
 
     // Additive: the reorder-preview modal (asserted elsewhere above) still
     // opens — this only checks the new beside-the-button confirmation.

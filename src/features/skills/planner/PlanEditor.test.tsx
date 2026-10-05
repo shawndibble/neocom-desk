@@ -287,8 +287,8 @@ describe('PlanEditor tools pane', () => {
     await user.click(within(actions).getByRole('button', { name: 'Optimize' }));
     for (const name of [
       'Optimize for me…',
-      'Reorder only',
-      'Shortest first',
+      'Reorder only…',
+      'Shortest first…',
       'Place remaps only…',
       'Use my remap markers…',
     ]) {
@@ -395,7 +395,7 @@ describe('PlanEditor tools pane', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    await clickOptimizeMode(user, 'Reorder only');
+    await clickOptimizeMode(user, 'Reorder only…');
 
     const dialog = screen.getByRole('dialog', { name: 'Suggested reorder' });
     expect(within(dialog).getByText('Skill B I')).toBeInTheDocument();
@@ -417,7 +417,7 @@ describe('PlanEditor tools pane', () => {
     const { onUpdate } = renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Reorder only');
+    await clickOptimizeMode(user, 'Reorder only…');
     const dialog = screen.getByRole('dialog', { name: 'Suggested reorder' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
@@ -433,7 +433,7 @@ describe('PlanEditor tools pane', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    await clickOptimizeMode(user, 'Shortest first');
+    await clickOptimizeMode(user, 'Shortest first…');
 
     const dialog = screen.getByRole('dialog', { name: 'Suggested shortest-first sort' });
     expect(within(dialog).getByText('Skill B I')).toBeInTheDocument();
@@ -455,7 +455,7 @@ describe('PlanEditor tools pane', () => {
     const { onUpdate } = renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Shortest first');
+    await clickOptimizeMode(user, 'Shortest first…');
     const dialog = screen.getByRole('dialog', { name: 'Suggested shortest-first sort' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
@@ -522,7 +522,7 @@ describe('PlanEditor tools pane', () => {
     const { replacePlan } = renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Reorder only');
+    await clickOptimizeMode(user, 'Reorder only…');
     expect(screen.getByRole('dialog', { name: 'Suggested reorder' })).toBeInTheDocument();
 
     replacePlan((current) => ({ ...current, id: 'plan-2' }));
