@@ -103,6 +103,15 @@ describe('planDiff', () => {
     ]);
   });
 
+  it('keeps a colony the plan does not need, saying so', () => {
+    const changes = planDiff(planOf([assignment(1, 'baseline', [NOBLE_METALS])]), [
+      colony(1, [BASE_METALS]),
+    ]);
+    expect(changes).toEqual([
+      { verb: 'keep', planetId: 1, p0TypeIds: [BASE_METALS], notNeeded: true },
+    ]);
+  });
+
   it('idles a colony the plan does not use, by planet id', () => {
     const changes = planDiff(planOf([assignment(2, 'idle'), assignment(1, 'idle')]), [
       colony(1, [BASE_METALS]),

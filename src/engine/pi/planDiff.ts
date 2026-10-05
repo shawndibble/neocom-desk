@@ -10,13 +10,17 @@
  *
  * - `keep` — the plan extracts the same P0 set it does now. ECU counts are
  *   not compared: `PlannerColony.current` carries the P0s, not the programs.
+ *   `notNeeded` marks a colony the plan has no role for: it is left alone.
+ *   Its economics are its Baseline, which may be a better P1 than it runs
+ *   today — but that colony contributes the same to the plan and to the
+ *   Baseline, so it cannot move the Lift either way.
  * - `add-extractor` — today's P0s all stay and the plan adds another beside
  *   them. Distinct from `retarget` because nothing is torn down.
  * - `retarget` — anything else on an extractor, including a colony that
  *   extracts nothing today (`from: []`).
  * - `convert-to-factory` — the factory host, naming the extraction it gives
  *   up and the factory pins it gains.
- * - `idle` — the plan has no role for it.
+ * - `idle` — no role and no priced Baseline to fall back on.
  *
  * P0 lists are sorted so a reordering is never reported as a change.
  *
@@ -27,7 +31,7 @@ import type { GoalPlan, PlannerColony } from './goalTypes';
 import type { PinCounts } from './types';
 
 export type ColonyChange =
-  | { verb: 'keep'; planetId: number; p0TypeIds: number[] }
+  | { verb: 'keep'; planetId: number; p0TypeIds: number[]; notNeeded?: true }
   | { verb: 'add-extractor'; planetId: number; keep: number[]; add: number[] }
   | { verb: 'retarget'; planetId: number; from: number[]; to: number[] }
   | { verb: 'convert-to-factory'; planetId: number; from: number[]; factories: PinCounts }
@@ -53,6 +57,9 @@ export function planDiff(plan: GoalPlan, colonies: readonly PlannerColony[]): Co
         return { verb: 'convert-to-factory', planetId, from, factories: assignment.factories };
       }
       if (assignment.role === 'idle') return { verb: 'idle', planetId, from };
+      if (assignment.role === 'baseline') {
+        return { verb: 'keep', planetId, p0TypeIds: from, notNeeded: true };
+      }
 
       const to = sortedUnique(assignment.slots.map((s) => s.p0TypeId));
       const kept = from.filter((id) => to.includes(id));
