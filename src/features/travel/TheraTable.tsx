@@ -80,7 +80,7 @@ function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow
       primary: true,
       sortValue: (row) => row.exitSystemName ?? undefined,
       render: (row) => (
-        <span className="inline-flex min-w-0 items-center gap-1.5">
+        <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate font-semibold">{row.exitSystemName ?? DASH}</span>
           <span className={hubBadgeClassName}>{t(`travel.thera.hub.${row.hub}`)}</span>
         </span>
