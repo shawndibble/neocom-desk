@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
 import { planGoals } from './goalPlan';
 import type { PlannerColony, PlannerPolicy, PlanetType, PriceBooks } from './goalTypes';
-import { compareCandidates, planBest } from './planBest';
+import { pickBest, planBest, type CandidateScore } from './planBest';
 
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
@@ -121,14 +121,71 @@ describe('planBest', () => {
     expect(best.plan.achieved[0].fraction).toBeCloseTo(1);
   });
 
-  it('orders candidates by goal attainment, then shortfalls, then net, then forfeit, then id', () => {
-    const base = { attainment: 1, shortfalls: 0, net: 100, forfeit: 10, planetId: 5 };
-    const sorted = (xs: (typeof base)[]) => [...xs].sort(compareCandidates).map((x) => x.planetId);
+  it('orders candidates by attainment, shortfalls, haul among near-best nets, then net, forfeit, id', () => {
+    const base = { attainment: 1, shortfalls: 0, net: 100_000, haul: 50, forfeit: 10, planetId: 5 };
+    const pick = (xs: CandidateScore[]) => pickBest(xs, 0).planetId;
     // Most of the goal at a lower net beats less of it at a higher one.
-    expect(sorted([{ ...base, attainment: 0.6, net: 900, planetId: 1 }, base])).toEqual([5, 1]);
-    expect(sorted([{ ...base, shortfalls: 1, net: 900, planetId: 1 }, base])).toEqual([5, 1]);
-    expect(sorted([{ ...base, net: 90, planetId: 1 }, base])).toEqual([5, 1]);
-    expect(sorted([{ ...base, forfeit: 20, planetId: 1 }, base])).toEqual([5, 1]);
-    expect(sorted([base, { ...base, planetId: 1 }])).toEqual([1, 5]);
+    expect(pick([{ ...base, attainment: 0.6, net: 900_000, planetId: 1 }, base])).toBe(5);
+    expect(pick([{ ...base, shortfalls: 1, net: 900_000, planetId: 1 }, base])).toBe(5);
+    // Within 5% of the best net (here 5,000 of 100,000), the shorter haul wins...
+    expect(pick([{ ...base, net: 96_000, haul: 10, planetId: 1 }, base])).toBe(1);
+    // ...but not beyond it.
+    expect(pick([{ ...base, net: 94_000, haul: 10, planetId: 1 }, base])).toBe(5);
+    expect(pick([{ ...base, net: 99_000, planetId: 1 }, base])).toBe(5);
+    expect(pick([{ ...base, forfeit: 20, planetId: 1 }, base])).toBe(5);
+    expect(pick([base, { ...base, planetId: 1 }])).toBe(1);
+  });
+
+  it('takes the 5% from the Baseline when it is the larger figure', () => {
+    const base = { attainment: 1, shortfalls: 0, net: 1_000, haul: 50, forfeit: 0, planetId: 5 };
+    // Nets of 1,000 vs 600 are 400 apart: beyond 5% of 1,000 (and the 100
+    // ISK/h floor), within 5% of a 100,000 Baseline.
+    expect(pickBest([{ ...base, net: 600, haul: 1, planetId: 1 }, base], 0).planetId).toBe(5);
+    expect(pickBest([{ ...base, net: 600, haul: 1, planetId: 1 }, base], 100_000).planetId).toBe(1);
+  });
+
+  it('hosts on a nearby self-supplying colony over a 28-jump one when their nets are close', () => {
+    // Two gas colonies that each make Coolant from their own P0. The far one
+    // nets a little more (lower customs); the near one hauls far less.
+    const far = { ...colony(1, 'gas', [IONIC_SOLUTIONS, AQUEOUS_LIQUIDS]), taxRate: 0.1 };
+    const near = { ...colony(2, 'gas', [IONIC_SOLUTIONS, AQUEOUS_LIQUIDS]), taxRate: 0.11 };
+    // P1 bids under their own export customs: neither colony has a Baseline to sell.
+    const thin = { [ELECTROLYTES]: 30, [WATER]: 30, [COOLANT]: 40_000 };
+    const input = {
+      goals: [{ typeId: COOLANT, unitsPerDay: 5 * 24 }],
+      colonies: [far, near],
+      policy: POLICY,
+      books: { bid: thin, ask: thin, salesTaxPct: 4 },
+    };
+    expect(planBest(input, pi).plan.factoryHost?.planetId).toBe(1);
+
+    const jumps = (from: number, to: number | 'hub') =>
+      to === 'hub' ? (from === 1 ? 28 : 2) : from === to ? 0 : 30;
+    const best = planBest({ ...input, jumps }, pi);
+    expect(best.plan.factoryHost?.planetId).toBe(2);
+    expect(best.plan.flows).toContainEqual(
+      expect.objectContaining({ from: 2, to: 'hub', typeId: COOLANT, jumps: 2 })
+    );
+    // 5 Coolant/h at 0.75 m3, 2 jumps; the host feeding itself moves nothing.
+    expect(best.plan.haulEffort).toEqual({
+      m3JumpsPerHour: expect.closeTo(5 * 0.75 * 2, 6),
+      unknownLegs: 0,
+    });
+  });
+
+  it('counts legs with no known distance instead of guessing them', () => {
+    const best = planBest(
+      {
+        goals: [{ typeId: COOLANT, unitsPerDay: 5 * 24 }],
+        colonies: [colony(1, 'gas', [IONIC_SOLUTIONS, AQUEOUS_LIQUIDS])],
+        policy: POLICY,
+        books: BOOKS,
+        jumps: () => null,
+      },
+      pi
+    );
+    expect(best.plan.haulEffort).toEqual({ m3JumpsPerHour: 0, unknownLegs: 1 });
+    expect(best.plan.flows.find((f) => f.to === 'hub')?.jumps).toBeNull();
+    expect(best.baseline.haulEffort.unknownLegs).toBeGreaterThan(0);
   });
 });

@@ -110,9 +110,11 @@ import type {
   GoalPlan,
   PlannerColony,
   PlannerPolicy,
+  JumpsFn,
   PriceBooks,
   Shortfall,
 } from './goalTypes';
+import { haulEffortOf, legJumps, volumeOf } from './haulEffort';
 import { singleFactoryRate } from './pinBudget';
 import type { PinCounts } from './types';
 
@@ -128,6 +130,12 @@ export interface PlanGoalsInput {
    * uses it to try each candidate.
    */
   hostPlanetId?: number;
+  /**
+   * Jumps between colonies and to the hub. When given, every flow carries its
+   * leg's `jumps` and `haulEffort` weighs m3 by distance; `planBest` uses it
+   * to prefer the nearer of two hosts whose nets are close.
+   */
+  jumps?: JumpsFn;
 }
 
 const HOURS_PER_DAY = 24;
@@ -137,14 +145,6 @@ const EPSILON = 1e-9;
 
 function byId(a: number, b: number): number {
   return a - b;
-}
-
-function volumeOf(typeId: number, pi: PiData): number {
-  const schematic = pi.schematics[String(typeId)];
-  if (schematic) return schematic.volume;
-  const raw = pi.raw.find((r) => r.typeID === typeId);
-  if (!raw) throw new Error(`${typeId} is not a planetary commodity`);
-  return raw.volume;
 }
 
 function factoriesFor(typeId: number, unitsPerHour: number, pi: PiData): number | null {
@@ -849,8 +849,10 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
   // --- Flows ---------------------------------------------------------------
   const flows: Flow[] = [];
   const push = (from: FlowEnd, to: FlowEnd, typeId: number, unitsPerHour: number) => {
-    if (unitsPerHour > EPSILON)
-      flows.push({ from, to, typeId, tier: tierOf(typeId), unitsPerHour });
+    if (unitsPerHour <= EPSILON) return;
+    const leg: Flow = { from, to, typeId, tier: tierOf(typeId), unitsPerHour };
+    if (input.jumps) leg.jumps = legJumps(from, to, input.jumps);
+    flows.push(leg);
   };
   const hostLeft = new Map([...hostUse].filter(([id]) => tierOf(id) === 1));
   // The host feeds itself before anyone ships it anything. Spare slots are
@@ -920,6 +922,7 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
     buys,
     surplusP1,
     flows,
+    haulEffort: haulEffortOf(flows, pi, input.jumps),
     hauling: { m3PerWeek, perColony },
   };
 }

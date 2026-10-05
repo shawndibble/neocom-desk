@@ -38,7 +38,15 @@
 import type { PiData } from '@/sde/types';
 import { CUSTOMS_TAXABLE_VALUE } from './chain';
 import { extractionOptions } from './colonyCapacity';
-import type { ExtractionSlot, PlannerColony, PlannerPolicy, PriceBooks } from './goalTypes';
+import type {
+  ExtractionSlot,
+  HaulEffort,
+  JumpsFn,
+  PlannerColony,
+  PlannerPolicy,
+  PriceBooks,
+} from './goalTypes';
+import { haulEffortOf } from './haulEffort';
 
 export type ColonyBaseline =
   | { status: 'ok'; slots: ExtractionSlot[]; iskPerHour: number }
@@ -55,6 +63,8 @@ export interface BaselineTotal {
   perColony: Map<number, ColonyBaseline>;
   /** Every unpriced P1 across all colonies, sorted. */
   missing: number[];
+  /** The Baseline's hauling: each selling colony's P1 to the hub, weighted by jumps. */
+  haulEffort: HaulEffort;
 }
 
 /** A finite bid, or undefined: an absent price is never a zero one. */
@@ -126,7 +136,9 @@ export function baselineTotal(
   colonies: readonly PlannerColony[],
   pi: PiData,
   policy: PlannerPolicy,
-  books: PriceBooks
+  books: PriceBooks,
+  /** Distances for `haulEffort`; without them every leg is unknown. */
+  jumps?: JumpsFn
 ): BaselineTotal {
   const perColony = new Map<number, ColonyBaseline>();
   const missing = new Set<number>();
@@ -137,5 +149,21 @@ export function baselineTotal(
     if (result.status === 'ok') iskPerHour += result.iskPerHour;
     if (result.status === 'needs-price') result.missing.forEach((id) => missing.add(id));
   }
-  return { iskPerHour, perColony, missing: [...missing].sort((a, b) => a - b) };
+  const legs = colonies.flatMap((colony) => {
+    const result = perColony.get(colony.planetId);
+    return result?.status === 'ok'
+      ? result.slots.map((slot) => ({
+          from: colony.planetId,
+          to: 'hub' as const,
+          typeId: slot.p1TypeId,
+          unitsPerHour: slot.p1PerHour,
+        }))
+      : [];
+  });
+  return {
+    iskPerHour,
+    perColony,
+    missing: [...missing].sort((a, b) => a - b),
+    haulEffort: haulEffortOf(legs, pi, jumps),
+  };
 }

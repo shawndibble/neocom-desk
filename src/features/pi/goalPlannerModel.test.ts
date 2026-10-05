@@ -334,7 +334,17 @@ describe('planHauling', () => {
         { from: 'hub', to: 2, typeId: IONIC_SOLUTIONS, tier: 0, unitsPerHour: 0 },
       ],
     } as unknown as GoalPlan;
-    const hauling = planHauling(plan, { iskPerHour: 0, perColony: new Map(), missing: [] }, pi, 1);
+    const hauling = planHauling(
+      plan,
+      {
+        iskPerHour: 0,
+        perColony: new Map(),
+        missing: [],
+        haulEffort: { m3JumpsPerHour: 0, unknownLegs: 0 },
+      },
+      pi,
+      1
+    );
     const vol = pi.schematics[String(ELECTROLYTES)].volume;
     expect(hauling.perColony.get(1)).toEqual({ outM3: 10 * vol, inM3: 0 });
     expect(hauling.perColony.get(2)).toEqual({ outM3: 0, inM3: 10 * vol });

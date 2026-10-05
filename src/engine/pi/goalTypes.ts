@@ -216,6 +216,26 @@ export interface Flow {
   typeId: number;
   tier: PiTier;
   unitsPerHour: number;
+  /**
+   * Jumps this leg covers, when the planner was given a `JumpsFn`: 0 for a
+   * leg that stays put, null where the distance is unknown. Absent without one.
+   */
+  jumps?: number | null;
+}
+
+/**
+ * Jumps between a colony and another colony, or the trade hub. Null when the
+ * distance is not known (yet). The feature layer resolves these on the
+ * pilot's route basis; the engine never routes.
+ */
+export type JumpsFn = (fromPlanetId: number, to: number | 'hub') => number | null;
+
+/** Hauling weighted by distance — see `haulEffort.ts`. */
+export interface HaulEffort {
+  /** Σ over legs of m3/h × jumps, over the legs whose distance is known. */
+  m3JumpsPerHour: number;
+  /** Legs that move but whose distance is unknown: left out of the sum, not guessed. */
+  unknownLegs: number;
 }
 
 /**
@@ -245,6 +265,8 @@ export interface GoalPlan {
   /** P1 extracted beyond what the goals need — whole ECUs overshoot — sold at the hub. */
   surplusP1: { typeId: number; unitsPerHour: number }[];
   flows: Flow[];
+  /** Distance-weighted hauling over `flows`; every moving leg unknown without a `JumpsFn`. */
+  haulEffort: HaulEffort;
   hauling: {
     /** Every leg once, hub-to-hub excluded. */
     m3PerWeek: number;

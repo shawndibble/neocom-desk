@@ -19,9 +19,18 @@
  * 1. goal attainment — Σ over goals of min(1, achieved / requested), each
  *    goal weighted equally;
  * 2. fewer shortfalls;
- * 3. higher `netPerHour` (only when every candidate is priced);
- * 4. the smaller Baseline the host forfeits;
- * 5. the lower planet id.
+ * 3. among the candidates left whose net is within `NET_TOLERANCE` of the
+ *    best, the lowest haul effort (m3 × jumps an hour; legs of unknown
+ *    distance add nothing, so an unresolved route never penalises a host);
+ * 4. higher `netPerHour` (only when every candidate is priced);
+ * 5. the smaller Baseline the host forfeits;
+ * 6. the lower planet id.
+ *
+ * "Within" is 5% of the larger of |best net| and |Baseline| — two plans that
+ * close are the same plan to a pilot, and the one 28 jumps out costs real
+ * hauling time the ISK figure never sees — with a floor of 100 ISK/h so two
+ * near-zero nets are not called different over rounding. Without a `JumpsFn`
+ * every haul effort is 0 and step 3 falls through to net.
  *
  * Its own module so neither of `goalPlan` and `planEconomics` has to import
  * the other: the solver stays price-free and the ledger stays plan-agnostic.
@@ -48,6 +57,8 @@ export interface CandidateScore {
   attainment: number;
   shortfalls: number;
   net: number | null;
+  /** `HaulEffort.m3JumpsPerHour`. */
+  haul: number;
   forfeit: number;
   planetId: number;
 }
@@ -55,13 +66,37 @@ export interface CandidateScore {
 /** Below this, two attainments or nets are the same. */
 const EPSILON = 1e-9;
 
-/** Sorts the better candidate first; see the module header for the order. */
-export function compareCandidates(a: CandidateScore, b: CandidateScore): number {
-  if (Math.abs(a.attainment - b.attainment) > EPSILON) return b.attainment - a.attainment;
-  if (a.shortfalls !== b.shortfalls) return a.shortfalls - b.shortfalls;
-  if (a.net !== null && b.net !== null && Math.abs(a.net - b.net) > EPSILON) return b.net - a.net;
-  if (a.forfeit !== b.forfeit) return a.forfeit - b.forfeit;
-  return a.planetId - b.planetId;
+/** Nets within this share of max(|best net|, |Baseline|) count as equal; see the header. */
+export const NET_TOLERANCE = 0.05;
+/** ISK/h: the least two nets must differ by to count as different. */
+export const NET_TOLERANCE_FLOOR = 100;
+
+/** The best candidate; see the module header for the order. */
+export function pickBest(
+  candidates: readonly CandidateScore[],
+  baselinePerHour: number
+): CandidateScore {
+  if (candidates.length === 0) throw new Error('pickBest needs at least one candidate');
+  const bestAttainment = Math.max(...candidates.map((c) => c.attainment));
+  const reaching = candidates.filter((c) => c.attainment >= bestAttainment - EPSILON);
+  const fewest = Math.min(...reaching.map((c) => c.shortfalls));
+  let pool = reaching.filter((c) => c.shortfalls === fewest);
+  const priced = pool.every((c) => c.net !== null);
+  if (priced) {
+    const bestNet = Math.max(...pool.map((c) => c.net!));
+    const tolerance = Math.max(
+      NET_TOLERANCE * Math.max(Math.abs(bestNet), Math.abs(baselinePerHour)),
+      NET_TOLERANCE_FLOOR
+    );
+    pool = pool.filter((c) => c.net! >= bestNet - tolerance);
+  }
+  return [...pool].sort(
+    (a, b) =>
+      a.haul - b.haul ||
+      (priced ? b.net! - a.net! : 0) ||
+      a.forfeit - b.forfeit ||
+      a.planetId - b.planetId
+  )[0];
 }
 
 function attainment(plan: GoalPlan): number {
@@ -69,7 +104,7 @@ function attainment(plan: GoalPlan): number {
 }
 
 export function planBest(input: PlanGoalsInput, pi: PiData): BestPlan {
-  const baseline = baselineTotal(input.colonies, pi, input.policy, input.books);
+  const baseline = baselineTotal(input.colonies, pi, input.policy, input.books, input.jumps);
   const cost = (plan: GoalPlan): BestPlan => ({
     plan,
     economics: planEconomics(plan, input.colonies, baseline, input.books),
@@ -95,6 +130,7 @@ export function planBest(input: PlanGoalsInput, pi: PiData): BestPlan {
       attainment: attainment(result.plan),
       shortfalls: result.plan.shortfalls.length,
       net: result.economics.status === 'costed' ? result.economics.netPerHour : null,
+      haul: result.plan.haulEffort.m3JumpsPerHour,
       forfeit: forfeit(hostPlanetId),
       planetId: hostPlanetId,
     };
@@ -102,9 +138,11 @@ export function planBest(input: PlanGoalsInput, pi: PiData): BestPlan {
   });
   // Net only ranks when every candidate has one: a partial comparison is not one.
   const priced = tried.every((t) => t.score.net !== null);
-  const rank = (s: CandidateScore): CandidateScore => (priced ? s : { ...s, net: null });
-  const chosen = [...tried].sort((a, b) => compareCandidates(rank(a.score), rank(b.score)))[0]
-    .result;
+  const winner = pickBest(
+    tried.map((t) => (priced ? t.score : { ...t.score, net: null })),
+    baseline.iskPerHour
+  );
+  const chosen = tried.find((t) => t.score.planetId === winner.planetId)!.result;
   // A goal that reaches zero leaves no host, whichever was tried.
   if (chosen.plan.factoryHost) {
     chosen.plan.factoryHost = { planetId: chosen.plan.factoryHost.planetId, reason: 'best-net' };

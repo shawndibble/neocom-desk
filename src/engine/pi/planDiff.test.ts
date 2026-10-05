@@ -59,6 +59,7 @@ function planOf(assignments: ColonyAssignment[]): GoalPlan {
     buys: [],
     surplusP1: [],
     flows: [],
+    haulEffort: { m3JumpsPerHour: 0, unknownLegs: 0 },
     hauling: { m3PerWeek: 0, perColony: new Map() },
   };
 }
