@@ -122,7 +122,16 @@ describe('planBest', () => {
   });
 
   it('orders candidates by attainment, shortfalls, haul among near-best nets, then net, forfeit, id', () => {
-    const base = { attainment: 1, shortfalls: 0, net: 100_000, haul: 50, forfeit: 10, planetId: 5 };
+    const base = {
+      attainment: 1,
+      shortfalls: 0,
+      net: 100_000,
+      changes: 2,
+      haul: 50,
+      unknownLegs: 0,
+      forfeit: 10,
+      planetId: 5,
+    };
     const pick = (xs: CandidateScore[]) => pickBest(xs, 0).planetId;
     // Most of the goal at a lower net beats less of it at a higher one.
     expect(pick([{ ...base, attainment: 0.6, net: 900_000, planetId: 1 }, base])).toBe(5);
@@ -133,11 +142,37 @@ describe('planBest', () => {
     expect(pick([{ ...base, net: 94_000, haul: 10, planetId: 1 }, base])).toBe(5);
     expect(pick([{ ...base, net: 99_000, planetId: 1 }, base])).toBe(5);
     expect(pick([{ ...base, forfeit: 20, planetId: 1 }, base])).toBe(5);
+    // Within the tolerance, touching fewer colonies beats hauling less.
+    expect(pick([{ ...base, net: 97_000, changes: 1, haul: 900, planetId: 1 }, base])).toBe(1);
     expect(pick([base, { ...base, planetId: 1 }])).toBe(1);
   });
 
+  it('never lets an unknown distance pass for a short haul', () => {
+    const base = {
+      attainment: 1,
+      shortfalls: 0,
+      changes: 0,
+      forfeit: 0,
+    };
+    // Haul 0 only because two legs have no distance yet: the known 7.5 wins.
+    const unknown = { ...base, net: 96_000, haul: 0, unknownLegs: 2, planetId: 1 };
+    const known = { ...base, net: 100_000, haul: 7.5, unknownLegs: 0, planetId: 2 };
+    expect(pickBest([unknown, known], 0).planetId).toBe(2);
+    // Equally unknown: haul is not compared, so net decides.
+    expect(pickBest([unknown, { ...known, unknownLegs: 2, haul: 900 }], 0).planetId).toBe(2);
+  });
+
   it('takes the 5% from the Baseline when it is the larger figure', () => {
-    const base = { attainment: 1, shortfalls: 0, net: 1_000, haul: 50, forfeit: 0, planetId: 5 };
+    const base = {
+      attainment: 1,
+      shortfalls: 0,
+      net: 1_000,
+      changes: 0,
+      haul: 50,
+      unknownLegs: 0,
+      forfeit: 0,
+      planetId: 5,
+    };
     // Nets of 1,000 vs 600 are 400 apart: beyond 5% of 1,000 (and the 100
     // ISK/h floor), within 5% of a 100,000 Baseline.
     expect(pickBest([{ ...base, net: 600, haul: 1, planetId: 1 }, base], 0).planetId).toBe(5);

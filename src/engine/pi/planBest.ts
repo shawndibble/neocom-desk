@@ -20,11 +20,17 @@
  *    goal weighted equally;
  * 2. fewer shortfalls;
  * 3. among the candidates left whose net is within `NET_TOLERANCE` of the
- *    best, the lowest haul effort (m3 × jumps an hour; legs of unknown
- *    distance add nothing, so an unresolved route never penalises a host);
- * 4. higher `netPerHour` (only when every candidate is priced);
- * 5. the smaller Baseline the host forfeits;
- * 6. the lower planet id.
+ *    best: fewer changed colonies (`planDiff` verbs other than `keep`, and
+ *    other than an `idle` that runs nothing today either) — a
+ *    plan that moves working colonies for no real ISK is churn;
+ * 4. then less hauling: fewer legs of unknown distance first, and the haul
+ *    effort (m3 × jumps an hour) compared only between candidates whose
+ *    every leg is known — an unknown leg adds nothing to the sum, so
+ *    comparing sums across it would reward exactly the host whose distances
+ *    have not resolved;
+ * 5. higher `netPerHour` (only when every candidate is priced);
+ * 6. the smaller Baseline the host forfeits;
+ * 7. the lower planet id.
  *
  * "Within" is 5% of the larger of |best net| and |Baseline| — two plans that
  * close are the same plan to a pilot, and the one 28 jumps out costs real
@@ -44,6 +50,7 @@ import type { PiData } from '@/sde/types';
 import { baselineTotal, type BaselineTotal } from './baseline';
 import { hostCandidates, planGoals, type PlanGoalsInput } from './goalPlan';
 import type { GoalPlan } from './goalTypes';
+import { planDiff } from './planDiff';
 import { planEconomics, type PlanEconomics } from './planEconomics';
 
 export interface BestPlan {
@@ -57,8 +64,12 @@ export interface CandidateScore {
   attainment: number;
   shortfalls: number;
   net: number | null;
+  /** Colonies whose role or extraction changes against today. */
+  changes: number;
   /** `HaulEffort.m3JumpsPerHour`. */
   haul: number;
+  /** `HaulEffort.unknownLegs`. */
+  unknownLegs: number;
   forfeit: number;
   planetId: number;
 }
@@ -90,9 +101,12 @@ export function pickBest(
     );
     pool = pool.filter((c) => c.net! >= bestNet - tolerance);
   }
+  const hauling = (a: CandidateScore, b: CandidateScore) =>
+    a.unknownLegs - b.unknownLegs || (a.unknownLegs === 0 ? a.haul - b.haul : 0);
   return [...pool].sort(
     (a, b) =>
-      a.haul - b.haul ||
+      a.changes - b.changes ||
+      hauling(a, b) ||
       (priced ? b.net! - a.net! : 0) ||
       a.forfeit - b.forfeit ||
       a.planetId - b.planetId
@@ -130,7 +144,11 @@ export function planBest(input: PlanGoalsInput, pi: PiData): BestPlan {
       attainment: attainment(result.plan),
       shortfalls: result.plan.shortfalls.length,
       net: result.economics.status === 'costed' ? result.economics.netPerHour : null,
+      changes: planDiff(result.plan, input.colonies).filter(
+        (c) => c.verb !== 'keep' && !(c.verb === 'idle' && c.from.length === 0)
+      ).length,
       haul: result.plan.haulEffort.m3JumpsPerHour,
+      unknownLegs: result.plan.haulEffort.unknownLegs,
       forfeit: forfeit(hostPlanetId),
       planetId: hostPlanetId,
     };
