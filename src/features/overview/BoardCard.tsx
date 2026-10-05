@@ -11,7 +11,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { InfoTooltip, Panel, SEVERITY_TEXT, SeverityIcon } from '@/components/ui';
+import { InfoTooltip, Panel, RowCaret, SEVERITY_TEXT, SeverityIcon } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { boardRowLinkBase, boardRowLinkClassName } from './boardRowLink';
@@ -37,20 +37,6 @@ export interface BoardCardProps {
    * not a `?` beside every number.
    */
   help?: string;
-}
-
-/**
- * The trailing `CaretRight` of a row that navigates (DESIGN.md §6c): faint at
- * rest, accent while the row (a `group`) is hovered or focused.
- */
-export function RowCaret() {
-  return (
-    <Icon.Descend
-      size={Icon.ICON_SIZE.sm}
-      className="shrink-0 text-text-faint group-hover:text-accent group-focus-visible:text-accent"
-      aria-hidden="true"
-    />
-  );
 }
 
 export function BoardCard({ title, meta, to, openLabel, children, footer, help }: BoardCardProps) {
@@ -237,6 +223,8 @@ export interface FoldedRowProps {
   domain: string;
   /** One line from `boardSummary.ts`: the worst true thing this domain has to say. */
   summary: string;
+  /** The summary with figures as `IskAmount`s (§6c); `summary` stays the plain aria-label text. */
+  summaryNode?: ReactNode;
   /** Null while the domain's read is still in flight — no glyph rather than a guessed one. */
   severity: DeadlineSeverity | null;
   to: string;
@@ -258,28 +246,30 @@ export interface FoldedRowProps {
  * colonies have stopped" still tells you where to tap, and the reverse does
  * not.
  */
-export function FoldedRow({ domain, summary, severity, to, danger }: FoldedRowProps) {
+export function FoldedRow({ domain, summary, summaryNode, severity, to, danger }: FoldedRowProps) {
   const { t } = useTranslation();
   return (
     <li className="border-b border-line last:border-b-0">
-      <Link
-        to={to}
-        aria-label={t('overview.board.foldedRowLabel', { domain, summary })}
-        className={cx(boardRowLinkBase, 'gap-2 py-2')}
-      >
-        {/* A fixed slot, so a domain still loading lines its name up with the
-            ones that have answered instead of sliding left. */}
-        <span className="flex w-4 shrink-0 justify-center">
-          {severity && <SeverityIcon severity={severity} />}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-xs">{domain}</span>
-        <span
-          className={`shrink-0 text-[0.6875rem] whitespace-nowrap ${danger ? 'text-danger' : 'text-text-dim'}`}
+      <RowTappableContext.Provider value>
+        <Link
+          to={to}
+          aria-label={t('overview.board.foldedRowLabel', { domain, summary })}
+          className={cx(boardRowLinkBase, 'gap-2 py-2')}
         >
-          {summary}
-        </span>
-        <RowCaret />
-      </Link>
+          {/* A fixed slot, so a domain still loading lines its name up with the
+            ones that have answered instead of sliding left. */}
+          <span className="flex w-4 shrink-0 justify-center">
+            {severity && <SeverityIcon severity={severity} />}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-xs">{domain}</span>
+          <span
+            className={`shrink-0 text-[0.6875rem] whitespace-nowrap ${danger ? 'text-danger' : 'text-text-dim'}`}
+          >
+            {summaryNode ?? summary}
+          </span>
+          <RowCaret />
+        </Link>
+      </RowTappableContext.Provider>
     </li>
   );
 }

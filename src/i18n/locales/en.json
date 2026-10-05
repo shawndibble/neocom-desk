@@ -3459,6 +3459,7 @@
       "programCount_other": "{{count}} extractor programs",
       "ordersClear": "Nothing needs work",
       "miningUnpaid": "{{isk}} unpaid",
+      "miningUnpaidRich": "<isk/> unpaid",
       "miningUnassigned_one": "{{count}} entry unassigned",
       "miningUnassigned_other": "{{count}} entries unassigned",
       "noColonies": "No colonies",

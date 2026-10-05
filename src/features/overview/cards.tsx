@@ -6,11 +6,13 @@
  * state, including the boring one: a card that vanishes when a Character has
  * no colonies is a card you cannot tell from a card that failed to load.
  */
+import type { ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
   IskAmount,
   Panel,
+  RowCaret,
   SEVERITY_LABEL,
   SeverityIcon,
   textActionClassName,
@@ -32,7 +34,7 @@ import { openOrderProblemCounts, needsAttentionCount } from '@/features/market/o
 import { openOrdersHref } from '@/features/market/openOrdersFilter';
 import { UNDERCUT_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
 import type { DisplayAlertGroup } from '@/features/notifications/alertsFilter';
-import { BoardCard, FoldedRow, NumberTile, RowCaret, TileRow, TriageRow } from './BoardCard';
+import { BoardCard, FoldedRow, NumberTile, TileRow, TriageRow } from './BoardCard';
 import { boardRowLinkClassName } from './boardRowLink';
 import {
   industrySeverity,
@@ -945,6 +947,7 @@ export interface FoldedDomain {
   key: string;
   domain: string;
   summary: string;
+  summaryNode?: ReactNode;
   severity: DeadlineSeverity | null;
   to: string;
   danger?: boolean;
@@ -974,6 +977,7 @@ export function EverythingElseCard({ domains }: { domains: readonly FoldedDomain
             key={entry.key}
             domain={entry.domain}
             summary={entry.summary}
+            summaryNode={entry.summaryNode}
             severity={entry.severity}
             to={entry.to}
             danger={entry.danger}
