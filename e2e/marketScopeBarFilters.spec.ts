@@ -51,6 +51,8 @@ test('with a Jump Range set, neither the distance nor the origin repeats in the 
   await page.getByRole('option', { name: 'Within 5 jumps' }).click();
   const fromButtons = page.getByRole('button', { name: /^Change current system/ });
   await expect(fromButtons).toHaveCount(1);
+  // The range is on the bar, so the funnel's badge does not count it.
+  await expect(bar.getByRole('button', { name: 'Filters', exact: true })).toBeVisible();
 
   await bar.getByRole('button', { name: /^Filters/ }).click();
   const popover = page.getByRole('dialog', { name: 'Where to look' });

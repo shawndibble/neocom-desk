@@ -10,6 +10,7 @@ import {
   SELL_ORDER_COLUMN_IDS,
   BUY_ORDER_COLUMN_IDS,
   useVisibleMarketOrderColumns,
+  ORDER_BOOK_LOCATION_CLASS,
   type MarketOrderColumnId,
 } from '@/features/market/marketOrderColumns';
 import { formatVolume } from '@/features/market/format';
@@ -116,7 +117,9 @@ export function useMarketOrderColumns({
         align: 'right',
         className: 'tabular-nums',
         // The phone card's headline figure: a book is scanned by price.
-        cardCorner: true,
+        // With Location unticked, Price is the card's title instead
+        // (DataTable falls back to the first column), not both at once.
+        cardCorner: visibleOrderColumns.includes('location'),
         render: (o) => (
           <>
             {/* Left of the figure, so the prices stay right-aligned in one column. */}
@@ -158,13 +161,8 @@ export function useMarketOrderColumns({
         // scrolls sideways beside the finder column.
         // Chosen with `cards` (ADR 0017): a card forced on a desktop is
         // titled by the station, uncapped; a table row caps it.
-        // Squeezed before the rows give up to cards: the two caps are
-        // `ORDER_BOOK_LOCATION_REM`, spelled out for Tailwind to find.
-        className: cards
-          ? ''
-          : locationSqueezed
-            ? 'max-w-[9rem] truncate'
-            : 'max-w-[16rem] truncate',
+        // Squeezed before the rows give up to cards (`orderBookWidthsRem`).
+        className: cards ? '' : ORDER_BOOK_LOCATION_CLASS[locationSqueezed ? 'squeezed' : 'roomy'],
         // The phone card's title: the station a pilot would fly to.
         primary: true,
         sortValue: (o) =>
@@ -243,7 +241,17 @@ export function useMarketOrderColumns({
         sortValue: (o) => o.min_volume,
       },
     }),
-    [t, npcStationMap, solarSystemMap, myOrderIds, orderJumps, bestSell, cards, locationSqueezed]
+    [
+      t,
+      npcStationMap,
+      solarSystemMap,
+      myOrderIds,
+      orderJumps,
+      bestSell,
+      cards,
+      locationSqueezed,
+      visibleOrderColumns,
+    ]
   );
 
   const baseColumns = useMemo<DataTableColumn<RegionOrder>[]>(

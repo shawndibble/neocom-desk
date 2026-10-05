@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS, orderBookWidthsRem } from './marketOrderColumns';
+import {
+  DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS,
+  ORDER_BOOK_LOCATION_CLASS,
+  ORDER_BOOK_LOCATION_REM,
+  orderBookWidthsRem,
+} from './marketOrderColumns';
 
 describe('orderBookWidthsRem', () => {
   it('keeps every default column, Expires included, as a table down to 47.25rem', () => {
@@ -28,5 +33,13 @@ describe('orderBookWidthsRem', () => {
 
   it('leaves Min. Volume off by default', () => {
     expect(DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS).not.toContain('minVolume');
+  });
+
+  it("caps Location's cell at the widths the budget assumes", () => {
+    for (const size of ['roomy', 'squeezed'] as const) {
+      expect(ORDER_BOOK_LOCATION_CLASS[size]).toContain(
+        `max-w-[${ORDER_BOOK_LOCATION_REM[size]}rem]`
+      );
+    }
   });
 });

@@ -69,6 +69,12 @@ export const useVisibleMarketOrderColumns = createLocalSetting<readonly MarketOr
  */
 export const ORDER_BOOK_LOCATION_REM = { roomy: 16, squeezed: 9 } as const;
 
+/** `ORDER_BOOK_LOCATION_REM` as the cell's class, spelled out for Tailwind to find. */
+export const ORDER_BOOK_LOCATION_CLASS = {
+  roomy: 'max-w-[16rem] truncate',
+  squeezed: 'max-w-[9rem] truncate',
+} as const;
+
 /**
  * What each column needs in a table row, in rem, measured in Chrome: mostly
  * the header (its `px-3` and sort icon) rather than the value, except Price,

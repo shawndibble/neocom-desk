@@ -12,9 +12,8 @@
  * The order book rework (2026-10-04) went further: an order is now the dense
  * two-line card — station and price, then quantity, distance, security and
  * expiry — and a phone shows one side at a time behind a Sell | Buy toggle.
- * The card is
- * picked by the order book's own width, not the viewport, so a desktop whose
- * finder column leaves the book narrow (1280px) gets it too.
+ * The card is picked by the order book's own width, not the viewport, so a
+ * desktop whose finder column leaves the book narrow (1280px) gets it too.
  *
  * Playwright rather than jsdom, same reasoning `miningTaxYieldDetailNarrow.spec.ts`
  * gives: the card lives in `.dt-stack-dense` (`.dt-stacked`,
@@ -263,6 +262,29 @@ test.describe('Market Browser — order book stacked cards', () => {
     const table = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
     expect(table.display).toBe('table-row');
     expect(lines(table.cells)).toHaveLength(1);
+  });
+
+  test('with Location unticked, Price titles the card rather than doubling as its corner (390px)', async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await openTritanium(page);
+    await page
+      .getByRole('region', { name: 'Sell Orders' })
+      .getByRole('button', { name: 'Columns' })
+      .click();
+    await page.getByRole('menuitemcheckbox', { name: 'Location' }).click();
+    await page.keyboard.press('Escape');
+
+    const sell = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
+    expect(labelLines(sell.cells, 8)).toEqual([
+      ['Price'],
+      ['Quantity', 'Jumps', 'Security', 'Expires'],
+    ]);
+    const priceCell = page.locator(
+      `table[aria-label="Sell Orders"] tr[data-row-key="${SELL_ORDER.order_id}"] td.dt-primary`
+    );
+    await expect(priceCell).not.toHaveClass(/dt-corner/);
   });
 
   test('Min. Volume, once ticked, rides on the buy card (390px)', async ({ page }) => {
