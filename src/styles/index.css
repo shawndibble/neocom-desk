@@ -568,9 +568,16 @@
   /* `dt-actions-pinned-only`: same pinned button, headline figure left in
      flow on line one (Market order book: a long ISK price would not fit the
      pinned corner's fixed width). */
-  .dt-stacked.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions),
-  .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) {
+  .dt-stacked.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions) {
     padding-right: 3rem;
+  }
+
+  /* `-only` clears the button on line one alone (the headline figure's
+     right margin: button spans 0.25-3rem from the edge, row pads 0.75rem).
+     Line two keeps the full card width so a buy's five meta cells fit one
+     line on a phone. */
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) td.dt-corner {
+    margin-right: 2.25rem;
   }
 
   /* The headline figure (`cardCorner`) pinned beside it, centred across both
