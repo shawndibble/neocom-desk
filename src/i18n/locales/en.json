@@ -2070,6 +2070,7 @@
     "headerNoFinish": "—",
     "headerSavingsLabel": "Remap savings",
     "headerSavingsNone": "None",
+    "headerSavingsShrankWithImplants": "Higher attributes make every skill train faster, so a remap saves less time once these implants are counted.",
     "headerTrained": "Trained",
     "headerTrainedSp": "{{trained}} / {{total}} SP",
     "injectors": {

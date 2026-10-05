@@ -61,3 +61,17 @@ export function evaluateOptimizationBadge(
   const result = placeRemaps(steps, skills, { ...options, remapCount: evaluatedRemapCount });
   return toOptimizationBadge(result.savingsSeconds, evaluatedRemapCount, options.remapCount);
 }
+
+/**
+ * True when the saving under the what-if implants is meaningfully smaller than
+ * under the clone's real ones. Faster attributes shorten every skill, so the
+ * same remap recovers less time: the header explains that rather than leave a
+ * falling number looking like a fault.
+ */
+export function remapSavingsShrank(
+  whatIfSavingsSeconds: number | null,
+  realSavingsSeconds: number | null
+): boolean {
+  if (whatIfSavingsSeconds === null || realSavingsSeconds === null) return false;
+  return realSavingsSeconds - whatIfSavingsSeconds >= MIN_MEANINGFUL_SAVINGS_SECONDS;
+}
