@@ -390,6 +390,7 @@ describe('parseBuildGroups — snapshot', () => {
       { rigFit: ['none', 'none'] },
       { facilityTaxPct: 'a lot' },
       { buildLocationId: 'x' },
+      { buildLocationName: 'K2-18' },
     ]) {
       const raw = {
         1: [{ id: 'g1', name: 'G', order: 0, snapshot: { ...snapshot(), ...bad } }],

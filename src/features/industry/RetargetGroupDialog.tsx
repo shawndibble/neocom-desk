@@ -121,7 +121,12 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
       ...patch,
       ...(structure ? {} : CLEARED_STRUCTURE_FIELDS),
     }));
-    if (!structure) setTaxText('0');
+    // The tax is cleared with the rigs (a non-structure, or a fresh pick), so
+    // the field and its edited flag reset with it.
+    if (!structure || patch.buildLocationId !== undefined) {
+      setTaxText('0');
+      setTaxEdited(false);
+    }
   }
 
   function commitTax() {
@@ -162,6 +167,9 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
                 buildSystemName: option.systemName,
                 buildLocationId: option.structureId,
                 buildLocationName: option.name ?? undefined,
+                // A rig fit and tax typed for the previous place do not
+                // describe this one.
+                ...CLEARED_STRUCTURE_FIELDS,
               })
             }
           >

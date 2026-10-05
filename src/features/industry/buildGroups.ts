@@ -171,7 +171,9 @@ function usableSnapshot(value: unknown): value is BuildGroupSnapshot {
     (buildSystemId === undefined || typeof buildSystemId === 'number') &&
     (buildSystemName === undefined || typeof buildSystemName === 'string') &&
     (buildLocationId === undefined || Number.isFinite(buildLocationId)) &&
-    (buildLocationName === undefined || typeof buildLocationName === 'string') &&
+    // The name is optional (ESI withholds it), but never without its id.
+    (buildLocationName === undefined ||
+      (typeof buildLocationName === 'string' && buildLocationId !== undefined)) &&
     (rigFit === undefined ||
       (Array.isArray(rigFit) &&
         rigFit.length === 3 &&
