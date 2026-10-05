@@ -1,12 +1,21 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useExpiringWindowHours } from '@/features/pi/expiringWindow';
-import { DataAgeBadge, EmptyState, IconButton, PageHeader, Spinner, Tabs } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  EmptyState,
+  IconButton,
+  PageHeader,
+  Spinner,
+  Tabs,
+} from '@/components/ui';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import * as Icon from '@/components/ui/icons';
-import { GoalPlannerPanel } from '@/features/pi/GoalPlannerPanel';
+import { PlanPanel } from '@/features/pi/PlanPanel';
+import { PiExplainer } from '@/features/pi/PiExplainer';
 import { goalsParam, idListParam, seedGoal } from '@/features/pi/goalsParam';
 import { loadPlannableTypeIds } from '@/features/pi/products';
 import type { Goal } from '@/engine/pi/goalTypes';
@@ -76,6 +85,7 @@ export function PlanetaryIndustry() {
     void hydrateExpiringWindow();
   }, [hydrateExpiringWindow]);
   const [tab, setTab] = usePageTab(PI_TABS);
+  const [explainerOpen, setExplainerOpen] = useState(false);
   const [
     {
       type: seedTypeId,
@@ -144,6 +154,9 @@ export function PlanetaryIndustry() {
         meta={planetsResult && <DataAgeBadge date={planetsResult.fetchedAt} />}
         actions={
           <>
+            <Button size="md" onClick={() => setExplainerOpen(true)}>
+              {t('piPlan.newToPi')}
+            </Button>
             <PageSettingsButton pageName={t('pi.title')} section="industry">
               <PiSettingsForm />
             </PageSettingsButton>
@@ -156,6 +169,8 @@ export function PlanetaryIndustry() {
           </>
         }
       />
+
+      <PiExplainer open={explainerOpen} onClose={() => setExplainerOpen(false)} />
 
       <Tabs
         label={t('piPlan.tabsLabel')}
@@ -176,7 +191,8 @@ export function PlanetaryIndustry() {
       {tab === 'map' ? (
         <EmptyState title={t('piPlan.mapEmptyTitle')} hint={t('piPlan.mapEmptyHint')} />
       ) : tab === 'plan' ? (
-        <GoalPlannerPanel
+        <PlanPanel
+          seedingGoal={seedTypeId !== null}
           characterId={activeCharacterId}
           goals={goals}
           onGoalsChange={setGoals}

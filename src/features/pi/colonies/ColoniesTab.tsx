@@ -26,7 +26,7 @@ import { extractorProgramsFromPins } from '../adapters';
 import { colonyStatus } from '@/engine/pi/colonyStatus';
 import { useShowAltColonies } from '../showAltColoniesPref';
 import type { RosterCharacter } from '../roster';
-import { usePlanAdvice } from '../usePlanAdvice';
+import { useColoniesAdvice } from './useColoniesAdvice';
 import { EMPTY_ROSTER, NO_DETAILS, NO_NAMES, mergeNames, type Snapshot } from './coloniesSnapshot';
 import {
   colonyCheckRow,
@@ -303,7 +303,7 @@ export function ColoniesTab({
   // The shared recommendation model: quick wins and today's figure come from
   // the same `buildPlanAdvice` Plan reads. It carries its own clock, so status
   // and fixes agree about whether a program has expired.
-  const planAdvice = usePlanAdvice(data ? characterId : null, data?.loadedAt ?? 0);
+  const planAdvice = useColoniesAdvice(data ? characterId : null, data?.loadedAt ?? 0);
   const advice = planAdvice.advice;
   const nowMs = planAdvice.snapshot?.nowMs ?? data?.loadedAt ?? 0;
 

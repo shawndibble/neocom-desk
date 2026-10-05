@@ -14,7 +14,7 @@ import { CHARACTER_ID } from './fixtureData';
 const HIGHSEC_SYSTEM = 30000142;
 const NULLSEC_SYSTEM = 30000001;
 
-interface Colony {
+export interface Colony {
   planetId: number;
   systemId: number;
   name: string;
@@ -23,18 +23,17 @@ interface Colony {
   /** P0 typeIds, one ECU each. */
   extracts: number[];
   heads: number;
-  /** Hours until the programs expire; negative is already stopped. Default 52. */
+  /** Basic factories per extractor; default two, `0` sells the raw. */
+  basicsPerEcu?: number;
+  /** Hours until the extractors expire; negative is already stopped. */
   expiresInHours?: number;
   /** Hours since the programs were installed. Default 20. */
   installedHoursAgo?: number;
-  /** Basic factories set to a schematic nothing feeds, so they sit idle. */
+  /** Extra Basic factories set to a schematic nothing feeds, so they sit idle. */
   idleBasics?: number;
-  /** P0 per cycle per ECU. Default 6,000 (+500 per extra ECU); a big one fills storage fast. */
+  /** P0 per cycle per ECU. Default 6,000 (+500 per extra ECU). */
   qtyPerCycle?: number;
 }
-
-/** Per-planet overrides a spec layers over `COLONIES`; the defaults stay what the planner specs rely on. */
-export type ColonyVariants = Record<number, Partial<Colony>>;
 
 const COLONIES: Colony[] = [
   {
@@ -81,15 +80,13 @@ const HOUR = 3_600_000;
 const BASIC_SCHEMATIC: Record<number, number> = { 2267: 126, 2268: 121, 2309: 123, 2310: 124 };
 
 function detailFor(colony: Colony, now: number) {
-  const installedHoursAgo = colony.installedHoursAgo ?? 20;
-  const expiresInHours = colony.expiresInHours ?? 52;
   const pins: unknown[] = colony.extracts.map((product, i) => ({
     pin_id: 100 + i,
     type_id: 2848,
     latitude: 0.3 + i * 0.05,
     longitude: 1.1 + i * 0.07,
-    install_time: new Date(now - installedHoursAgo * HOUR).toISOString(),
-    expiry_time: new Date(now + expiresInHours * HOUR).toISOString(),
+    install_time: new Date(now - (colony.installedHoursAgo ?? 20) * HOUR).toISOString(),
+    expiry_time: new Date(now + (colony.expiresInHours ?? 52) * HOUR).toISOString(),
     extractor_details: {
       heads: Array.from({ length: colony.heads }, (_, h) => ({
         head_id: h,
@@ -105,7 +102,7 @@ function detailFor(colony: Colony, now: number) {
   // Each ECU's P0 refined on the spot, as a real colony runs it: two Basic
   // Industry Facilities per program (~12,000 P0/h against 6,000 each).
   const basics = colony.extracts.flatMap((product, i) =>
-    [0, 1].map((j) => ({
+    Array.from({ length: colony.basicsPerEcu ?? 2 }, (_, j) => j).map((j) => ({
       pin_id: 200 + i * 2 + j,
       type_id: 2469,
       latitude: 0.42 + i * 0.03,
@@ -115,15 +112,16 @@ function detailFor(colony: Colony, now: number) {
   );
   pins.push(...basics);
   for (let k = 0; k < (colony.idleBasics ?? 0); k += 1) {
-    basics.push({
+    // Electrolytes needs Ionic Solutions, which no colony here extracts.
+    const idle = {
       pin_id: 300 + k,
       type_id: 2469,
       latitude: 0.5 + k * 0.03,
       longitude: 1.5,
-      // Electrolytes needs Ionic Solutions, which no colony here extracts.
       schematic_id: 123,
-    });
-    pins.push(basics[basics.length - 1]);
+    };
+    basics.push(idle);
+    pins.push(idle);
   }
   // A tree rooted at the Launchpad: every ECU and every basic one hop from it.
   const links = [...colony.extracts.map((_, i) => 100 + i), ...basics.map((b) => b.pin_id)].map(
@@ -136,13 +134,55 @@ function detailFor(colony: Colony, now: number) {
   return { pins, links, routes: [] };
 }
 
+/** The default colonies with per-planet overrides layered on, for a spec that needs one stopped, one expiring and so on. */
+export function withVariants(variants: Record<number, Partial<Colony>>): Colony[] {
+  return COLONIES.map((colony) => ({ ...colony, ...variants[colony.planetId] }));
+}
+
+/**
+ * Colonies with something to fix, for the Plan tab's "Make more" view: one
+ * selling raw P0 (a rebuild), one with a stopped extractor (a quick win), and
+ * one with factories nothing feeds.
+ */
+export const PLAN_WINS_COLONIES: Colony[] = [
+  {
+    planetId: 40009077,
+    systemId: HIGHSEC_SYSTEM,
+    name: 'Hek VI',
+    type: 'barren',
+    level: 4,
+    extracts: [2267, 2267],
+    heads: 8,
+    basicsPerEcu: 0,
+  },
+  {
+    planetId: 40009080,
+    systemId: HIGHSEC_SYSTEM,
+    name: 'Hek VIII',
+    type: 'temperate',
+    level: 4,
+    extracts: [2268],
+    heads: 9,
+    expiresInHours: -6,
+  },
+  {
+    planetId: 40009082,
+    systemId: HIGHSEC_SYSTEM,
+    name: 'Uttindar V',
+    type: 'gas',
+    level: 5,
+    extracts: [2309],
+    heads: 7,
+    basicsPerEcu: 5,
+  },
+];
+
 /** Routes the active Character's colony reads, and the public lookups they pull. */
 export async function mockPlannerColonies(
   page: Page,
-  variants: ColonyVariants = {}
+  colonies: readonly Colony[] = COLONIES
 ): Promise<void> {
   const now = Date.now();
-  const colonies = COLONIES.map((colony) => ({ ...colony, ...variants[colony.planetId] }));
   const json = (body: unknown) => ({
     status: 200,
     contentType: 'application/json',

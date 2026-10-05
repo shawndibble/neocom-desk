@@ -97,12 +97,12 @@ describe('ItemRow Show info', () => {
     const button = screen.getByRole('button', { name: 'Rifter Blueprint' });
     fireEvent.pointerDown(button, { pointerType: 'touch' });
     fireEvent.contextMenu(button);
-    fireEvent.click(button);
+    fireEvent.click(button, { detail: 1 });
     expect(onShowInfo).not.toHaveBeenCalled();
 
     // The next ordinary tap still opens it.
     fireEvent.pointerDown(button, { pointerType: 'touch' });
-    fireEvent.click(button);
+    fireEvent.click(button, { detail: 1 });
     expect(onShowInfo).toHaveBeenCalledTimes(1);
   });
 
@@ -114,7 +114,7 @@ describe('ItemRow Show info', () => {
       const button = screen.getByRole('button', { name: 'Rifter Blueprint' });
       fireEvent.pointerDown(button, { pointerType: 'touch' });
       vi.advanceTimersByTime(800);
-      fireEvent.click(button);
+      fireEvent.click(button, { detail: 1 });
       expect(onShowInfo).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();

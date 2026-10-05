@@ -13,7 +13,9 @@ import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { SCOPES } from './support/fixtureData';
-import { mockPlannerColonies, type ColonyVariants } from './support/piColonies';
+import { mockPlannerColonies, withVariants, type Colony } from './support/piColonies';
+
+type ColonyVariants = Record<number, Partial<Colony>>;
 import { piTier } from '../src/engine/pi/chain';
 import type { PiData } from '../src/sde/types';
 
@@ -57,7 +59,7 @@ async function mockHubPrices(page: Page): Promise<void> {
 
 async function openColonies(page: Page, variants: ColonyVariants = DAILY): Promise<void> {
   await signInAndGoto(page, './planetary-industry/colonies');
-  await mockPlannerColonies(page, variants);
+  await mockPlannerColonies(page, withVariants(variants));
   await mockHubPrices(page);
   await page.goto('./planetary-industry/colonies');
   await expect(page.getByRole('heading', { name: "Today's check" })).toBeVisible({
@@ -216,7 +218,7 @@ test.describe('PI Colonies, the daily check', () => {
     await page.route(`https://esi.evetech.net/characters/${ALT_ID}/**`, (route) =>
       route.fulfill({ status: 404, contentType: 'application/json', body: '{}' })
     );
-    await mockPlannerColonies(page, DAILY);
+    await mockPlannerColonies(page, withVariants(DAILY));
     await mockHubPrices(page);
     await page.goto('./planetary-industry/colonies');
     await expect(page.locator('[data-colony-status]')).toHaveCount(4, { timeout: 20_000 });

@@ -286,6 +286,19 @@ describe('buildPlanAdvice: rebuild', () => {
     expect(colony.rebuild.steps.some((step) => step.verb === 'set')).toBe(true);
   });
 
+  it('carries the rebuild layout draw against the Command Center it needs, for the fit meters', () => {
+    const changed = temperate(buildPlanAdvice(input({ snapshot: leanSnapshot() })));
+    if (changed.rebuild.status !== 'change') throw new Error('expected a change');
+    expect(changed.rebuildFit).not.toBeNull();
+    const fit = changed.rebuildFit!;
+    expect(fit.used.cpu).toBeGreaterThan(0);
+    expect(fit.used.cpu).toBeLessThanOrEqual(fit.budget.cpu);
+    expect(fit.used.powergrid).toBeLessThanOrEqual(fit.budget.powergrid);
+    expect(fit.level).toBeGreaterThanOrEqual(changed.upgradeLevel);
+    const kept = temperate(buildPlanAdvice(input()));
+    expect(kept.rebuildFit).toBeNull();
+  });
+
   it('keeps a colony whose ore out-earns every refined recipe, rather than selling nothing', () => {
     const colony = temperate(buildPlanAdvice(input()));
     expect(colony.rebuild).toMatchObject({ status: 'keep', reason: 'gain-too-small' });

@@ -108,6 +108,7 @@ import {
   currentProductTypeIds,
   meanHeadsPerExtractor,
 } from './stopTierModel';
+import { pinsLoad } from '@/engine/pi/pinBudget';
 import { medianNewLinkLoad } from './unbuiltPlanModel';
 import { planetSlots } from './planetSlots';
 
@@ -183,6 +184,13 @@ export interface PlanColonyAdvice extends ColonyAdvice {
   taxRate: number;
   /** The customs rate is a stand-in for an unknown player-office rate. */
   taxAssumed: boolean;
+  /**
+   * What the recommended rebuild draws against the Command Center it needs, for
+   * the checklist's fit meters. Null unless the recommendation is a change.
+   */
+  rebuildFit: { level: number; used: PinLoad; budget: PinLoad } | null;
+  /** The typeIDs the colony sells today: what a Keep card says it stays on. */
+  sells: readonly number[];
 }
 
 export interface RankingBasis {
@@ -269,7 +277,8 @@ function candidateOf(
   entry: ScoredStopTier,
   needsCcLevel: number | null,
   pi: PiData,
-  iskPerHour: number
+  iskPerHour: number,
+  headsPerExtractor: number
 ): RebuildCandidate | null {
   const volume = safeVolume(entry.typeId, pi);
   if (volume === null) return null;
@@ -284,6 +293,9 @@ function candidateOf(
     pins: entry.pins,
     recipe: recipeOf(entry.typeId, pi),
     needsCcLevel,
+    load: pinsLoad(entry.pins, pi.infrastructure, {
+      extractorHeads: (entry.pins.extractorControlUnit ?? 0) * headsPerExtractor,
+    }),
   };
 }
 
@@ -295,8 +307,27 @@ function recipeEntries(advice: StopTierAdvice): ScoredStopTier[] {
     .filter((entry) => entry.tier === 1 || entry.tier === 2);
 }
 
+function sellsOf(colony: BuiltColonyAdvice, pi: PiData): number[] {
+  const made = currentProductTypeIds(colony, pi);
+  return made.length > 0 ? [...new Set(made)] : colony.extractedPerHour.map((e) => e.typeId);
+}
+
+function rebuildFitOf(
+  advice: ColonyAdvice,
+  upgradeLevel: number,
+  pi: PiData
+): PlanColonyAdvice['rebuildFit'] {
+  if (advice.rebuild.status !== 'change') return null;
+  const { load, needsCcLevel } = advice.rebuild.pick;
+  if (!load) return null;
+  const { level, budget } = colonyBudget(Math.max(upgradeLevel, needsCcLevel ?? 0), pi);
+  return { level, used: load, budget };
+}
+
 interface ColonyWork {
   advice: ColonyAdvice;
+  /** What the colony sells today: its factories' products, else the raw it extracts. */
+  sells: number[];
   m3PerDay: number | null;
   todayM3PerDay: number | null;
 }
@@ -347,8 +378,17 @@ export function buildPlanAdvice(input: PlanAdviceInput): PlanAdvice {
       upgradeLevel: row.upgradeLevel,
       taxRate: row.taxRate,
       taxAssumed: row.taxAssumed,
+      rebuildFit: rebuildFitOf(result.advice, row.upgradeLevel, pi),
+      sells: result.sells,
     };
   });
+
+  // Two names can slug alike; a duplicate id would send a deep link to the wrong card.
+  const anchors = new Set<string>();
+  for (const colony of colonies) {
+    if (anchors.has(colony.anchor)) colony.anchor = `${colony.anchor}-${colony.planetId}`;
+    anchors.add(colony.anchor);
+  }
 
   const haulColonies: HaulColony[] = colonies.map((colony) => {
     const w = work.get(colony.planetId)!;
@@ -641,6 +681,7 @@ function analyseColony(args: {
       rebuild,
       preference,
     }),
+    sells: sellsOf(colony, pi),
     m3PerDay: todayM3PerDay,
     todayM3PerDay,
   };
@@ -669,13 +710,14 @@ function rebuildFacts(args: {
       ...(budgetOverride ? { budgetOverride } : {}),
     });
 
+  const heads = meanHeadsPerExtractor(colony);
   const own = scoreAt();
   if (own.status !== 'advised') return { refused: own.status };
 
   const candidates = new Map<number, RebuildCandidate>();
   for (const entry of recipeEntries(own.advice)) {
     const isk = iskPerHourOf(entry, books, row.taxRate);
-    const candidate = isk === null ? null : candidateOf(entry, null, pi, isk);
+    const candidate = isk === null ? null : candidateOf(entry, null, pi, isk, heads);
     if (candidate) candidates.set(candidate.typeId, candidate);
   }
 
@@ -688,7 +730,7 @@ function rebuildFacts(args: {
     for (const entry of recipeEntries(higher.advice)) {
       if (candidates.has(entry.typeId)) continue;
       const isk = iskPerHourOf(entry, books, row.taxRate);
-      const candidate = isk === null ? null : candidateOf(entry, level, pi, isk);
+      const candidate = isk === null ? null : candidateOf(entry, level, pi, isk, heads);
       if (candidate) candidates.set(candidate.typeId, candidate);
     }
   }

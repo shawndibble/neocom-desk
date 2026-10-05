@@ -160,8 +160,41 @@ describe('DataTable selectedRowKey', () => {
     const selected = document.querySelector('[data-row-key="2"]');
     const other = document.querySelector('[data-row-key="1"]');
     expect(selected).toHaveClass('border-l-2', 'border-l-accent', 'bg-panel-2');
-    expect(other).not.toHaveClass('border-l-2');
+    // Same 2px edge on every row, transparent when unselected: no cell shifts.
+    expect(other).toHaveClass('border-l-2', 'border-l-transparent');
     expect(other).not.toHaveClass('border-l-accent');
+    expect(other).not.toHaveClass('bg-panel-2');
+  });
+
+  it('keeps the selected fill while pressed on a clickable row', () => {
+    renderTable({ selectedRowKey: 2, onRowClick: vi.fn() });
+    const selected = document.querySelector('[data-row-key="2"]');
+    const other = document.querySelector('[data-row-key="1"]');
+    expect(selected).not.toHaveClass('active:bg-panel');
+    expect(other).toHaveClass('active:bg-panel');
+  });
+
+  it('draws the same selected visual on the phone card render', () => {
+    const real = window.matchMedia;
+    window.matchMedia = ((media: string) =>
+      ({
+        media,
+        matches: media === PHONE_QUERY,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList) as typeof window.matchMedia;
+    try {
+      renderTable({ selectedRowKey: 2 });
+      expect(screen.getByRole('table')).toHaveClass('dt-stacked');
+      // The card is the row itself (`display: flex` under `dt-stacked`).
+      const card = document.querySelector('[data-row-key="2"]');
+      expect(card).toHaveAttribute('aria-current', 'true');
+      expect(card).toHaveClass('border-l-2', 'border-l-accent', 'bg-panel-2');
+      expect(card?.className).toContain('[&_.dt-primary]:text-accent');
+      expect(document.querySelector('[data-row-key="1"]')).toHaveClass('border-l-transparent');
+    } finally {
+      window.matchMedia = real;
+    }
   });
 });
 
@@ -176,7 +209,7 @@ describe('DataTable lift-after-hold', () => {
   it('opens the row on an ordinary touch tap', () => {
     const { onRowClick, row } = setup();
     fireEvent.pointerDown(row, { pointerType: 'touch' });
-    fireEvent.click(row);
+    fireEvent.click(row, { detail: 1 });
     expect(onRowClick).toHaveBeenCalledTimes(1);
   });
 
@@ -186,15 +219,37 @@ describe('DataTable lift-after-hold', () => {
       const { onRowClick, row } = setup();
       fireEvent.pointerDown(row, { pointerType: 'touch' });
       vi.advanceTimersByTime(700);
-      fireEvent.click(row);
+      fireEvent.click(row, { detail: 1 });
       expect(onRowClick).not.toHaveBeenCalled();
       // The next ordinary tap still opens it.
       fireEvent.pointerDown(row, { pointerType: 'touch' });
-      fireEvent.click(row);
+      fireEvent.click(row, { detail: 1 });
       expect(onRowClick).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('a cancelled touch press does not swallow a later keyboard-activated click', () => {
+    vi.useFakeTimers();
+    try {
+      const { onRowClick, row } = setup();
+      fireEvent.pointerDown(row, { pointerType: 'touch' });
+      vi.advanceTimersByTime(900);
+      fireEvent.pointerCancel(row, { pointerType: 'touch' });
+      fireEvent.click(row, { detail: 1 });
+      expect(onRowClick).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a stale contextmenu record does not swallow a later keyboard click (detail 0)', () => {
+    const { onRowClick, row } = setup();
+    fireEvent.pointerDown(row, { pointerType: 'touch' });
+    fireEvent.contextMenu(row);
+    fireEvent.click(row, { detail: 0 });
+    expect(onRowClick).toHaveBeenCalledTimes(1);
   });
 
   it('does not swallow a slow mouse click', () => {
@@ -203,7 +258,7 @@ describe('DataTable lift-after-hold', () => {
       const { onRowClick, row } = setup();
       fireEvent.pointerDown(row, { pointerType: 'mouse' });
       vi.advanceTimersByTime(2000);
-      fireEvent.click(row);
+      fireEvent.click(row, { detail: 1 });
       expect(onRowClick).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();

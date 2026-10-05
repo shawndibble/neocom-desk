@@ -243,6 +243,8 @@ export interface RebuildCandidate {
   };
   /** Command Center level the layout needs; null when it fits the colony's own. */
   needsCcLevel: number | null;
+  /** CPU and Powergrid the layout draws, extractor heads included. Absent when not costed. */
+  load?: PinLoad;
 }
 
 export interface RebuildFacts {

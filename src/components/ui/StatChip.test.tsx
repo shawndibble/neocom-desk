@@ -29,6 +29,14 @@ describe('StatChip', () => {
     expect(chip.className).not.toMatch(/(^|\s)(border|bg-|rounded)/);
   });
 
+  it('draws "?" for a tooltip by default and "i" when it is a note on the value', () => {
+    const { rerender } = render(<StatChip label="Saves" value="1d" tooltip="Why" />);
+    expect(screen.getByRole('button')).toHaveTextContent('?');
+
+    rerender(<StatChip label="Saves" value="1d" tooltip="Why" tooltipGlyph="info" />);
+    expect(screen.getByRole('button')).toHaveTextContent('i');
+  });
+
   it('keeps caller classes alongside its own', () => {
     render(<StatChip label="SP" value="54.3M" className="w-40" />);
 

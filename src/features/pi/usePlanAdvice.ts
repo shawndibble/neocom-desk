@@ -1,128 +1,165 @@
-/**
- * The recommendation model, fed from the live reads: the hook a tab calls to
- * get a `PlanAdvice` (`planAdviceModel.ts`) without owning any of its inputs.
- *
- * The colony snapshot, the hub's prices and the pilot's skills are three reads
- * on three clocks. Prices are keyed on the hub, so changing hub re-prices
- * without refetching a colony; the advice itself is a memo over them and the
- * prefs, so a cadence or market change recomputes without any read at all.
- *
- * Every read degrades rather than failing the tab: no prices means no advice
- * (the caller still has the snapshot, and shows status without money), and an
- * unknown skill is `null`, which the model prices conservatively.
- */
 import { useEffect, useMemo, useState } from 'react';
+import type { RebuildPreference } from '@/engine/pi/planAdvice';
+import type { RouteSystem } from '@/engine/pi/planHaul';
+import { routeExposure } from '@/features/contractSearch/routeExposure';
+import { useJumpBasis } from '@/features/route/jumpBasis';
+import { useCadence } from './cadencePref';
 import { loadCommandCenterUpgrades } from './colonyBudget';
-import { useCadence, cadenceHours } from './cadencePref';
-import {
-  loadGoalPlannerPrices,
-  loadGoalPlannerSnapshot,
-  type GoalPlannerSnapshot,
-} from './goalPlannerSnapshot';
 import { useGoalPlannerPrefs } from './goalPlannerPrefs';
-import { loadInterplanetaryConsolidation } from './planetSlots';
-import type { PlanPrices } from './planPrices';
+import { loadGoalPlannerPrices, type GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { buildPlanAdvice, hubBooks, type PlanAdvice } from './planAdviceModel';
+import type { PlanPrices } from './planPrices';
+import { loadInterplanetaryConsolidation } from './planetSlots';
 import { useSellHub } from './sellHub';
 
-export interface PlanAdviceState {
-  /** The colony reads the advice was built from; null while loading or after a failure. */
-  snapshot: GoalPlannerSnapshot | null;
-  /** Null until prices and skills are in, or when the model could not price this pilot. */
-  advice: PlanAdvice | null;
-  /** The snapshot read failed outright. */
-  failed: boolean;
+export type PlanAdviceState =
+  | { status: 'loading' }
+  | { status: 'prices-failed' }
+  | { status: 'error' }
+  | { status: 'ready'; advice: PlanAdvice; pricesFetchedAt: Date; hubName: string };
+
+interface Skills {
+  commandCenterUpgrades: number | null;
+  interplanetaryConsolidation: number | null;
 }
 
 /**
- * @param reloadKey Any value that changes when the colonies must be re-read
- *   (the route's own load stamp), so a manual refresh reaches this read too.
+ * Everything `buildPlanAdvice` needs, read once and kept apart so a change to
+ * one input (the sell market, the hauling preference) recomputes without
+ * refetching the others: the snapshot comes in, prices follow the hub, skills
+ * follow the character, and the routes to the market follow the hub and the
+ * pilot's route rules. The plan is drawn as soon as prices and skills are in;
+ * routes land after and re-make it, a leg that has not resolved being unknown
+ * rather than assumed.
  */
-export function usePlanAdvice(characterId: number | null, reloadKey: number): PlanAdviceState {
-  const [loaded, setLoaded] = useState<{
-    characterId: number;
-    snapshot: GoalPlannerSnapshot;
-    ccLevel: number | null;
-    consolidation: number | null;
-  } | null>(null);
-  const [failedFor, setFailedFor] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (characterId === null) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const snapshot = await loadGoalPlannerSnapshot(characterId);
-        const [ccLevel, consolidation] = await Promise.all([
-          loadCommandCenterUpgrades(characterId, snapshot.nowMs).catch(() => null),
-          loadInterplanetaryConsolidation(characterId, snapshot.nowMs).catch(() => null),
-        ]);
-        if (cancelled) return;
-        setFailedFor(null);
-        setLoaded({ characterId, snapshot, ccLevel, consolidation });
-      } catch {
-        if (!cancelled) setFailedFor(characterId);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, reloadKey]);
-  const current = loaded?.characterId === characterId ? loaded : null;
-  const snapshot = current?.snapshot ?? null;
-
+export function usePlanAdvice(
+  snapshot: GoalPlannerSnapshot,
+  characterId: number,
+  preference: RebuildPreference
+): PlanAdviceState {
   const { hub, buybackPct } = useSellHub();
   const cadence = useCadence((state) => state.value);
   const hydrateCadence = useCadence((state) => state.hydrate);
-  const prefs = useGoalPlannerPrefs((state) => state.value);
-  const hydratePrefs = useGoalPlannerPrefs((state) => state.hydrate);
+  const goalPrefs = useGoalPlannerPrefs((state) => state.value);
+  const hydrateGoalPrefs = useGoalPlannerPrefs((state) => state.hydrate);
   useEffect(() => {
     void hydrateCadence();
-    void hydratePrefs();
-  }, [hydrateCadence, hydratePrefs]);
+    void hydrateGoalPrefs();
+  }, [hydrateCadence, hydrateGoalPrefs]);
 
-  const pi = snapshot?.pi ?? null;
+  const { pi } = snapshot;
   const [priced, setPriced] = useState<{ hubId: string; prices: PlanPrices } | null>(null);
   useEffect(() => {
-    if (!pi) return;
     let cancelled = false;
-    void loadGoalPlannerPrices(hub, pi).then(
-      (prices) => {
-        if (!cancelled) setPriced({ hubId: hub.id, prices });
-      },
-      () => {}
-    );
+    void loadGoalPlannerPrices(hub, pi).then((prices) => {
+      if (!cancelled) setPriced({ hubId: hub.id, prices });
+    });
     return () => {
       cancelled = true;
     };
-  }, [pi, hub, reloadKey]);
+  }, [pi, hub]);
   const prices = priced?.hubId === hub.id ? priced.prices : null;
 
-  const advice = useMemo(() => {
-    if (!current || !prices) return null;
+  const [skillsFor, setSkillsFor] = useState<{ key: string; skills: Skills } | null>(null);
+  const skillsKey = `${characterId}|${snapshot.nowMs}`;
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([
+      loadCommandCenterUpgrades(characterId, snapshot.nowMs).catch(() => null),
+      loadInterplanetaryConsolidation(characterId, snapshot.nowMs).catch(() => null),
+    ]).then(([commandCenterUpgrades, interplanetaryConsolidation]) => {
+      if (!cancelled) {
+        setSkillsFor({
+          key: skillsKey,
+          skills: { commandCenterUpgrades, interplanetaryConsolidation },
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [characterId, snapshot.nowMs, skillsKey]);
+  const skills = skillsFor?.key === skillsKey ? skillsFor.skills : null;
+
+  const basis = useJumpBasis();
+  const systemKey = useMemo(
+    () =>
+      [...new Set(snapshot.colonies.map((colony) => colony.solar_system_id))]
+        .sort((a, b) => a - b)
+        .join(','),
+    [snapshot.colonies]
+  );
+  const routesKey = `${basis.key}|${hub.systemId}|${systemKey}`;
+  const [routed, setRouted] = useState<{
+    key: string;
+    routes: Map<number, RouteSystem[] | null>;
+  } | null>(null);
+  useEffect(() => {
+    if (buybackPct !== null || !basis.hydrated || systemKey === '') return;
+    let cancelled = false;
+    const ids = systemKey.split(',').map(Number);
+    void Promise.all(
+      ids.map((id) =>
+        routeExposure(id, hub.systemId, basis.rules, basis.network)
+          .then((result): RouteSystem[] | null =>
+            result.kind === 'known'
+              ? result.path.map((system) => ({
+                  systemId: system.systemId,
+                  security: system.security,
+                }))
+              : null
+          )
+          .catch(() => null)
+      )
+    ).then((routes) => {
+      if (!cancelled) {
+        setRouted({ key: routesKey, routes: new Map(ids.map((id, i) => [id, routes[i]])) });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [basis, hub.systemId, systemKey, routesKey, buybackPct]);
+  const routes = routed?.key === routesKey ? routed.routes : undefined;
+
+  return useMemo((): PlanAdviceState => {
+    if (!prices || !skills) return { status: 'loading' };
+    if (prices.failed) return { status: 'prices-failed' };
     try {
-      return buildPlanAdvice({
-        snapshot: current.snapshot,
+      const advice = buildPlanAdvice({
+        snapshot,
         prefs: {
-          restartHours: cadenceHours(cadence).restartHours,
-          fallbackRatePerHour: prefs.fallbackRatePerHour,
-          customsOverrides: current.snapshot.customsOverrides,
+          restartHours: cadence.restartDays * 24,
+          fallbackRatePerHour: goalPrefs.fallbackRatePerHour,
+          customsOverrides: snapshot.customsOverrides,
         },
-        books: hubBooks(prices, current.snapshot.accountingLevel),
+        books: hubBooks(prices, snapshot.accountingLevel),
         market: buybackPct === null ? { kind: 'hub' } : { kind: 'buyback', pct: buybackPct },
         cadence,
-        preference: 'isk',
+        preference,
         recipeFilter: 'any',
-        skills: {
-          commandCenterUpgrades: current.ccLevel,
-          interplanetaryConsolidation: current.consolidation,
-        },
-        planetNames: current.snapshot.planetNames,
+        skills,
+        ...(routes ? { routesBySystem: routes } : {}),
+        planetNames: snapshot.planetNames,
       });
+      return {
+        status: 'ready',
+        advice,
+        pricesFetchedAt: prices.fetchedAt,
+        hubName: hub.systemName,
+      };
     } catch {
-      return null;
+      return { status: 'error' };
     }
-  }, [current, prices, cadence, prefs.fallbackRatePerHour, buybackPct]);
-
-  return { snapshot, advice, failed: failedFor === characterId && characterId !== null };
+  }, [
+    snapshot,
+    prices,
+    skills,
+    cadence,
+    goalPrefs,
+    buybackPct,
+    preference,
+    routes,
+    hub.systemName,
+  ]);
 }
