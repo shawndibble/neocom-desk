@@ -141,14 +141,19 @@ export function fitPlannedPins(
  *
  * Checked in order: a P0 the colony has no rate for (`not-extractable`), then
  * the policy caps (`over-policy`), then CPU/Powergrid (`does-not-fit`). An
- * empty `want` fits with no pins at all — an unused colony builds nothing,
- * not even a pad.
+ * empty `want` with no `fixed` pins fits with no pins at all — an unused
+ * colony builds nothing, not even a pad.
+ *
+ * `fixed` is production the colony carries whatever it extracts — the factory
+ * host's P2+ pins — fitted on the same Command Center as the slots, so a host
+ * extracts only from what its factories leave.
  */
 export function colonyExtraction(
   colony: PlannerColony,
   want: readonly ExtractionWant[],
   pi: PiData,
-  policy: PlannerPolicy
+  policy: PlannerPolicy,
+  fixed: PinCounts = {}
 ): ColonyExtraction {
   const { headsPerExtractor } = colony;
   if (
@@ -200,15 +205,19 @@ export function colonyExtraction(
       };
     });
 
-  if (slots.length === 0) {
+  const hasFixed = Object.values(fixed).some((count) => (count ?? 0) > 0);
+  if (slots.length === 0 && !hasFixed) {
     const zero = { cpu: 0, powergrid: 0 };
     return { status: 'fits', slots, pins: {}, used: zero, budget: colony.budget };
   }
 
-  const production: PinCounts = {
-    extractorControlUnit: totalEcus,
-    basic: slots.reduce((sum, s) => sum + s.basicFactories, 0),
-  };
+  const production: PinCounts =
+    slots.length === 0
+      ? fixed
+      : addCounts(fixed, {
+          extractorControlUnit: totalEcus,
+          basic: slots.reduce((sum, s) => sum + s.basicFactories, 0),
+        });
   const fit = fitPlannedPins(colony, production, totalEcus * headsPerExtractor, pi);
   if (!fit.fits) {
     return { status: 'does-not-fit', limitedBy: fit.limitedBy, used: fit.used, budget: fit.budget };

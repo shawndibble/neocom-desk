@@ -139,6 +139,36 @@ describe('colonyExtraction', () => {
     });
   });
 
+  it('fits extraction beside fixed factory pins on the same Command Center', () => {
+    const want = [{ p0TypeId: BASE_METALS, ecus: 1 }];
+    const withFactory = colonyExtraction(colony({ cc: 4 }), want, pi, POLICY, { advanced: 2 });
+    if (withFactory.status !== 'fits') throw new Error(withFactory.status);
+    expect(withFactory.pins).toEqual({
+      advanced: 2,
+      extractorControlUnit: 1,
+      basic: 1,
+      launchpad: 1,
+    });
+
+    // Exactly the extraction alone; two factories more no longer fit.
+    const bare = colonyExtraction(
+      colony({ cc: 4, link: { cpu: 0, powergrid: 0 } }),
+      want,
+      pi,
+      POLICY
+    );
+    if (bare.status !== 'fits') throw new Error(bare.status);
+    const tight = { ...colony({ cc: 4, link: { cpu: 0, powergrid: 0 } }), budget: bare.used };
+    expect(colonyExtraction(tight, want, pi, POLICY, { advanced: 2 }).status).toBe('does-not-fit');
+
+    // No extraction at all still fits the factories against the budget.
+    expect(colonyExtraction(colony({ cc: 4 }), [], pi, POLICY, { advanced: 2 })).toMatchObject({
+      status: 'fits',
+      slots: [],
+      pins: { advanced: 2, launchpad: 1 },
+    });
+  });
+
   it('refuses a P0 the planet cannot yield', () => {
     const result = colonyExtraction(
       colony({ planetType: 'lava' }),
