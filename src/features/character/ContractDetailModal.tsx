@@ -42,7 +42,7 @@ import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { CharacterLink } from '@/features/entities';
 import { StandingTag } from './StandingTag';
 import type { EffectiveStanding } from './contactStandings';
-import { formatIsk } from '@/lib/isk';
+import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -423,7 +423,9 @@ function IskRow({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1.5">
       <span className="text-text-dim">{label}</span>
-      <span className="tabular-nums font-semibold">{formatIsk(value, 2)}</span>
+      <span className="tabular-nums font-semibold">
+        {formatIskAuto(value, CONTRACT_ISK_CENTS_BELOW)}
+      </span>
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
   FilterBar,
   FilterChip,
   IconButton,
+  IskAmount,
   PageHeader,
   Panel,
   SearchInput,
@@ -61,7 +62,6 @@ import {
 } from '@/features/contractSearch/ContractSearchPanel';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
-import { formatIsk } from '@/lib/isk';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatTimestamp } from '@/lib/timestamp';
 import { formatCountdown } from '@/lib/duration';
@@ -417,7 +417,7 @@ export function Contracts() {
         sortValue: (contract) => contractAmount(contract),
         render: (contract) => {
           const amount = contractAmount(contract);
-          return amount !== undefined ? formatIsk(amount, 2) : t('common.unknown');
+          return amount !== undefined ? <IskAmount value={amount} /> : t('common.unknown');
         },
       },
       issued: {
