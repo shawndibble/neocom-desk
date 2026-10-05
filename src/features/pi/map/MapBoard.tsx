@@ -51,6 +51,8 @@ const TIERS: readonly MapTier[] = [0, 1, 2, 3, 4];
 export interface MapBoardProps {
   graph: MapGraph;
   owned: ReadonlySet<PlanetType>;
+  /** No colony yet: every type is in play and each is a plain toggle. */
+  noColonies: boolean;
   /** Planet types the map is filtered to: what it can make is lit, the rest leaves ghost slots. */
   ticked: ReadonlySet<PlanetType>;
   /** Products the ticked planet types can make. */
@@ -296,8 +298,9 @@ export function MapBoard(props: MapBoardProps) {
                 <PlanetToggle
                   type={type}
                   have={owned.has(type)}
+                  togglable={props.noColonies || owned.has(type)}
                   pressed={
-                    owned.has(type)
+                    props.noColonies || owned.has(type)
                       ? ticked.has(type)
                       : props.whatIfOpen && props.whatIfType === type
                   }
@@ -310,7 +313,7 @@ export function MapBoard(props: MapBoardProps) {
                   onKeyDown={(e) => move(planetKey(type), e)}
                   onClick={() => props.onPlanet(type)}
                   onPreview={props.onPreview}
-                  whatIf={props.whatIfType === type && !owned.has(type)}
+                  whatIf={props.whatIfType === type && !owned.has(type) && !props.noColonies}
                 />
               </li>
             ))}
@@ -487,6 +490,8 @@ function PlanetToggle({
 }: {
   type: PlanetType;
   have: boolean;
+  /** A plain show/hide toggle: the pilot has this type, or has no colony at all. */
+  togglable: boolean;
   pressed: boolean;
   names: string[];
   ranks: number[];
@@ -500,15 +505,17 @@ function PlanetToggle({
   onPreview: (type: PlanetType | null) => void;
 }) {
   const { t } = useTranslation();
-  const { type, have, pressed } = props;
+  const { type, have, togglable, pressed } = props;
   const name = planetName(t, type);
   const label = have
     ? t('piMap.planetHave', { name, count: props.names.length, names: props.names.join(', ') })
-    : t('piMap.planetMissing', { name });
-  const tip = have
+    : togglable
+      ? t('piMap.planetToggle', { name })
+      : t('piMap.planetMissing', { name });
+  const tip = togglable
     ? t(pressed ? 'piMap.planetTipOn' : 'piMap.planetTipOff', { name })
     : t('piMap.planetTipMissing', { name });
-  const previewable = !have;
+  const previewable = !togglable;
   return (
     <Tooltip content={tip}>
       <button

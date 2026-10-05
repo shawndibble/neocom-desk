@@ -400,6 +400,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
     <MapBoard
       graph={graph}
       owned={owned}
+      noColonies={noColonies}
       ticked={ticked}
       litIds={litIds}
       newIds={newIds}
@@ -450,6 +451,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
             <MapPhone
               graph={graph}
               owned={owned}
+              noColonies={noColonies}
               ticked={ticked}
               whatIfType={whatIf}
               litIds={litIds}

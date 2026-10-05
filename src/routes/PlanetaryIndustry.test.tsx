@@ -792,11 +792,12 @@ describe('PlanetaryIndustry', () => {
     expect(window.location.pathname).toBe('/planetary-industry/plan');
   });
 
-  it('shows a placeholder on the Map tab', async () => {
+  it('draws the planet map on the Map tab', async () => {
     window.history.pushState({}, '', '/planetary-industry/map');
     render(<App />);
-    expect(await screen.findByText('The PI map is coming')).toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Map' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByText('The PI map is coming')).toBeNull();
   });
 
   it('redirects the retired Advisor URL to Colonies, keeping the query, and still shows the Advisor there', async () => {

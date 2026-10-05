@@ -4647,6 +4647,7 @@
     "planetHave_one": "{{name}} planet. You have a colony on it: {{names}}. Toggle it to show or hide it on the map.",
     "planetHave_other": "{{name}} planet. You have {{count}} colonies on it: {{names}}. Toggle it to show or hide it on the map.",
     "planetHaveShort": "{{name}} planet, one of yours. Toggle it to show or hide it on the map.",
+    "planetToggle": "{{name}} planet. Toggle it to show or hide it on the map.",
     "planetMissing": "{{name}} planet, you don't have one. Opens what adding one would unlock and where to find it.",
     "planetTipOn": "{{name}}: shown on the map. Click to hide.",
     "planetTipOff": "{{name}}: hidden. Click to show.",
