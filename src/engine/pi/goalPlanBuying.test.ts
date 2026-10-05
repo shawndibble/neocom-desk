@@ -91,6 +91,22 @@ describe('planGoals — buying P2 and P3', () => {
     ).toBe(true);
   });
 
+  it('hauls the bought P2 from the hub to the host, with its jumps', () => {
+    const result = planGoals(
+      {
+        goals: [goal(ROBOTICS, 0.5)],
+        colonies: TWO_BARREN(),
+        policy: { ...POLICY, buyTiers: [2] },
+        books: books(),
+        jumps: (_from, to) => (to === 'hub' ? 7 : 0),
+      },
+      pi
+    );
+    const leg = result.flows.find((f) => f.from === 'hub' && f.typeId === CONSUMER_ELECTRONICS)!;
+    expect(leg.jumps).toBeDefined();
+    expect(result.hauling.m3PerWeek).toBeGreaterThan(0);
+  });
+
   it('is unchanged when only P1 is allowed: the P1s are bought, no P2', () => {
     const result = plan([1]);
     expect(result.shortfalls).toEqual([]);

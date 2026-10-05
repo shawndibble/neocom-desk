@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
-import { DEFAULT_BUYBACK_PCT, usePiSettings, type PiBuyTier } from './piSettings';
+import { usePiSettings, type PiBuyTier } from './piSettings';
 
 export interface SellHub {
   /** The hub PI is priced at: sold to, or the basis of the corp buyback, and bought from. */
@@ -34,5 +34,3 @@ export function useSellHub(): SellHub {
     setBuyback: (pct) => void setSettings({ ...settings, buybackPct: pct === null ? null : pct }),
   };
 }
-
-export { DEFAULT_BUYBACK_PCT };

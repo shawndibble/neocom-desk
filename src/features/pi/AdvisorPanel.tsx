@@ -867,7 +867,6 @@ export function AdvisorPanel({
         : {
             ...piSettings,
             hub: value,
-            buybackPct: null,
             buyTiers: buyInputs ? piSettings.buyTiers : [1],
           }
     );
