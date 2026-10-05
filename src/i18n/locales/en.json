@@ -4647,7 +4647,7 @@
     "unpricedHint": "{{hub}} quotes no price for {{names}}. Without one there is no honest Lift, so none is shown.",
     "shortfallsTitle_one": "{{count}} shortfall",
     "shortfallsTitle_other": "{{count}} shortfalls",
-    "shortTypeGap": "Needs a {{types}} planet for {{p0}} (for {{p1}}).",
+    "shortTypeGap": "No colony of yours yields {{p0}} (for {{p1}}). It needs a planet of type {{types}}.",
     "or": " or ",
     "shortBudgetGap": "Your colonies that yield {{p0}} are full — {{rate}}/h short for {{p1}}. Buy {{p1}} at the hub or free a slot.",
     "shortNoHost": "No enabled colony can host the {{facility}} this needs.",

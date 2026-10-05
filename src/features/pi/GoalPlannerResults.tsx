@@ -36,6 +36,7 @@ import type { ColonyChange } from '@/engine/pi/planDiff';
 import type { PinCounts } from '@/engine/pi/types';
 import type { TradeHub } from '@/market/hubs';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { formatIskCompact } from '@/lib/isk';
 import { DirectiveRow, EstimateBadge, LoadMeter } from './DirectiveRow';
 import type { PlanHauling, PlanVerdict, PlannerColonyRow } from './goalPlannerModel';
 import type { TotalColonyEarnings } from './colonyEarningsModel';
@@ -138,10 +139,7 @@ export function Headline({ best, earnings, verdict, hasGoals, pi, hub }: Headlin
   }
 
   const liftPerDay = Math.abs(economics.liftPerHour * HOURS_PER_DAY);
-  const liftWords = new Intl.NumberFormat('en', {
-    notation: 'compact',
-    maximumFractionDigits: 2,
-  }).format(liftPerDay);
+  const liftWords = formatIskCompact(liftPerDay);
   const buysPerHour = economics.buys;
   const customsPerHour =
     economics.customs.exportFromExtractors +
