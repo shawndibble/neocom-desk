@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   fetchHullLosses,
+  fetchRegionRecentKills,
+  REGION_PAGE_SIZE,
   fetchSystemRecentKills,
   parseHullLosses,
+  parseRegionKills,
   parseSystemKills,
   systemZkillUrl,
 } from './zkillboard';
@@ -179,6 +182,126 @@ describe('fetchSystemRecentKills', () => {
 
     stubFetch(new TypeError('network'));
     expect(await fetchSystemRecentKills(1)).toEqual({ ok: false });
+  });
+});
+
+describe('parseRegionKills', () => {
+  it('groups player kills by the system they happened in', () => {
+    const other = { ...SYSTEM_KILL, killmail_id: 2, solar_system_id: 30000142 };
+    const sameSystem = { ...SYSTEM_KILL, killmail_id: 3 };
+    const byId = parseRegionKills([SYSTEM_KILL, other, sameSystem]);
+    expect([...byId.keys()]).toEqual([30002813, 30000142]);
+    expect(byId.get(30002813)?.map((kill) => kill.killmailId)).toEqual([138801220, 3]);
+    expect(byId.get(30000142)?.map((kill) => kill.killmailId)).toEqual([2]);
+  });
+
+  it('drops NPC kills and kills with no system', () => {
+    const npc = { ...SYSTEM_KILL, killmail_id: 2, zkb: { ...SYSTEM_KILL.zkb, npc: true } };
+    const noSystem = { ...SYSTEM_KILL, killmail_id: 3, solar_system_id: undefined };
+    expect([...parseRegionKills([npc, noSystem]).keys()]).toEqual([]);
+  });
+
+  it('reads anything but an array as no kills', () => {
+    expect(parseRegionKills({ error: 'nope' }).size).toBe(0);
+  });
+});
+
+describe('fetchRegionRecentKills', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const page = (count: number, firstId = 1) =>
+    Array.from({ length: count }, (_, i) => ({ ...SYSTEM_KILL, killmail_id: firstId + i }));
+
+  function stubPages(pages: unknown[]) {
+    const fetchMock = vi.fn((url: string) => {
+      const n = Number(/\/page\/(\d+)\//.exec(url)?.[1] ?? 1);
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(pages[n - 1] ?? []),
+      } as Response);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it("asks zKillboard for the region's last hour, with no custom headers", async () => {
+    const fetchMock = stubPages([[SYSTEM_KILL]]);
+    const result = await fetchRegionRecentKills(10000002);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://zkillboard.com/api/kills/regionID/10000002/pastSeconds/3600/'
+    );
+    expect(result.ok && result.bySystem.get(30002813)).toHaveLength(1);
+  });
+
+  it('reads the next page while a page comes back full, so nothing is cut off', async () => {
+    const fetchMock = stubPages([
+      page(REGION_PAGE_SIZE),
+      page(REGION_PAGE_SIZE, 5000),
+      page(2, 9000),
+    ]);
+    const result = await fetchRegionRecentKills(10000002);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      'https://zkillboard.com/api/kills/regionID/10000002/pastSeconds/3600/page/3/'
+    );
+    expect(result.ok && result.bySystem.get(30002813)).toHaveLength(2 * REGION_PAGE_SIZE + 2);
+  });
+
+  it('counts a kill once when it shows on two pages', async () => {
+    stubPages([page(REGION_PAGE_SIZE), page(3, REGION_PAGE_SIZE)]);
+    const result = await fetchRegionRecentKills(1);
+    expect(result.ok && result.bySystem.get(30002813)).toHaveLength(REGION_PAGE_SIZE + 2);
+  });
+
+  it('fails when the pages never end, rather than show a cut-off hour', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(page(REGION_PAGE_SIZE)),
+        } as Response)
+      )
+    );
+    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false });
+  });
+
+  it('fails on an error body, rather than read it as no kills', async () => {
+    stubPages([{ error: 'nope' }]);
+    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false });
+  });
+
+  it('fails when any page fails, rather than show a partial hour', async () => {
+    let call = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => {
+        call += 1;
+        return Promise.resolve({
+          ok: call === 1,
+          status: call === 1 ? 200 : 429,
+          json: () => Promise.resolve(page(REGION_PAGE_SIZE)),
+        } as Response);
+      })
+    );
+    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false });
+  });
+
+  it('fails on a network error or an unreadable body', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('network')))
+    );
+    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({ ok: true, json: () => Promise.reject(new SyntaxError('x')) } as Response)
+      )
+    );
+    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false });
   });
 });
 
