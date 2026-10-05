@@ -228,12 +228,12 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
 
   it('lists fits with name and date created, no author, linking each to Workbench', async () => {
     openWorkbench({ ok: true, fits: [wbFit('a'), wbFit('b', { name: '', authorName: '' })] });
-    const link = await screen.findByRole('link', { name: 'Fit a' });
+    const link = await screen.findByRole('link', { name: /^Fit a/ });
     expect(link.getAttribute('href')).toBe('https://eveworkbench.com/fit/a');
     expect(screen.getAllByText('Created: 2d ago')).toHaveLength(2);
     expect(screen.queryByText(/Saryna Dach/)).toBeNull();
-    expect(screen.getByRole('link', { name: 'Unnamed fit' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'eveworkbench.com' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: /^Unnamed fit/ })).toBeTruthy();
+    expect(screen.getByRole('link', { name: /^eveworkbench\.com/ })).toBeTruthy();
   });
 
   it('Loads the picked fit from its stored EFT', async () => {
@@ -285,10 +285,10 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
       ],
     });
     // Nothing is listed until the check lands, so an out-of-date fit never flashes up.
-    expect(screen.queryByRole('link', { name: 'Fit a' })).toBeNull();
-    expect(await screen.findByRole('link', { name: 'Fit c' })).toBeTruthy();
-    expect(screen.queryByRole('link', { name: 'Fit a' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Fit b' })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Fit a/ })).toBeNull();
+    expect(await screen.findByRole('link', { name: /^Fit c/ })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /^Fit a/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Fit b/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /out-of-date/ })).toBeNull();
   });
 
@@ -301,7 +301,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
         }),
       ],
     });
-    expect(await screen.findByRole('link', { name: 'Fit a' })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: /^Fit a/ })).toBeTruthy();
   });
 
   it("shows a fit's modules by rack, from the out-of-date check's own load", async () => {
@@ -309,7 +309,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
       ok: true,
       fits: [wbFit('a', { eft: '[Vexor, Fit a]\nHeavy Neutron Blaster II' }), wbFit('b')],
     });
-    const row = (await screen.findByRole('link', { name: 'Fit a' })).closest('li');
+    const row = (await screen.findByRole('link', { name: /^Fit a/ })).closest('li');
     if (row === null) throw new Error('no row');
     const highs = within(row).getByRole('group', { name: 'High slots' });
     expect(
@@ -317,7 +317,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     ).toBeTruthy();
     expect(within(row).queryByRole('group', { name: 'Mid slots' })).toBeNull();
     // A fit with nothing fitted draws no strip at all.
-    const bare = screen.getByRole('link', { name: 'Fit b' }).closest('li');
+    const bare = screen.getByRole('link', { name: /^Fit b/ }).closest('li');
     if (bare === null) throw new Error('no row');
     expect(within(bare).queryByRole('group')).toBeNull();
   });
@@ -329,7 +329,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
         "This hull's only EVE Workbench fit is out of date with today's game."
       )
     ).toBeTruthy();
-    expect(screen.queryByRole('link', { name: 'Fit a' })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Fit a/ })).toBeNull();
   });
 
   /** Sell-side prices by type, as `getHubPrices` answers. */
@@ -343,7 +343,9 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
   }
 
   function rowOf(name: string) {
-    const row = screen.getByRole('link', { name }).closest('li');
+    const row = screen
+      .getByRole('link', { name: new RegExp(String.raw`^${name}\s*\(opens`) })
+      .closest('li');
     if (row === null) throw new Error('no row');
     return row;
   }
@@ -381,7 +383,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
   it('shows no price, and no error, when prices cannot load', async () => {
     getHubPricesMock.mockRejectedValue(new Error('offline'));
     openWorkbench({ ok: true, fits: PRICED_FITS });
-    await screen.findByRole('link', { name: 'Fit a' });
+    await screen.findByRole('link', { name: /^Fit a/ });
     await waitFor(() => expect(getHubPricesMock).toHaveBeenCalled());
     expect(screen.queryByText(/ISK/)).toBeNull();
     expect(screen.queryByText(/^Prices:/)).toBeNull();
@@ -391,7 +393,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
   it('shows no price for a fit with nothing for sale at the hub', async () => {
     getHubPricesMock.mockResolvedValue(sellPrices({ 626: null, 3001: null }));
     openWorkbench({ ok: true, fits: PRICED_FITS });
-    await screen.findByRole('link', { name: 'Fit a' });
+    await screen.findByRole('link', { name: /^Fit a/ });
     await waitFor(() => expect(getHubPricesMock).toHaveBeenCalled());
     expect(screen.queryByText(/ISK/)).toBeNull();
   });
@@ -515,7 +517,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
         vi.fn(),
         { popularFits: unreachable }
       );
-      await screen.findByRole('link', { name: 'Fit a' });
+      await screen.findByRole('link', { name: /^Fit a/ });
       await waitFor(() => expect(unreachable).toHaveBeenCalledWith(626));
       expect(screen.queryByText(/Seen on zKillboard/)).toBeNull();
       expect(screen.queryByRole('alert')).toBeNull();
@@ -530,27 +532,27 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
 
     it('mounts only the rows in view, each telling its place in the whole list', async () => {
       openWorkbench({ ok: true, fits: MANY });
-      await screen.findByRole('link', { name: 'Fit 1' });
+      await screen.findByRole('link', { name: /^Fit 1\s*\(opens/ });
       expect(loadButtons().length).toBeGreaterThan(0);
       expect(loadButtons().length).toBeLessThan(40);
       const first = rowOf('Fit 1');
       expect(first.getAttribute('aria-posinset')).toBe('1');
       expect(first.getAttribute('aria-setsize')).toBe('80');
       expect(first.parentElement).toBe(screen.getByRole('list', { name: 'EVE Workbench' }));
-      expect(screen.queryByRole('link', { name: 'Fit 80' })).toBeNull();
+      expect(screen.queryByRole('link', { name: /^Fit 80/ })).toBeNull();
     });
 
     it('reaches the last fit by scrolling the capped box', async () => {
       openWorkbench({ ok: true, fits: MANY });
-      await screen.findByRole('link', { name: 'Fit 1' });
+      await screen.findByRole('link', { name: /^Fit 1\s*\(opens/ });
       const box = document.querySelector<HTMLElement>('[data-virtual-scroll-root]')!;
       act(() => {
         box.scrollTop = 1_000_000;
         fireEvent.scroll(box);
       });
-      expect(await screen.findByRole('link', { name: 'Fit 80' })).toBeTruthy();
+      expect(await screen.findByRole('link', { name: /^Fit 80/ })).toBeTruthy();
       expect(rowOf('Fit 80').getAttribute('aria-posinset')).toBe('80');
-      expect(screen.queryByRole('link', { name: 'Fit 1' })).toBeNull();
+      expect(screen.queryByRole('link', { name: /^Fit 1\s*\(opens/ })).toBeNull();
     });
 
     it('uncapped, windows against the host that scrolls it', async () => {
@@ -566,7 +568,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
         </div>
       );
       fireEvent.click(screen.getByRole('tab', { name: 'EVE Workbench' }));
-      await screen.findByRole('link', { name: 'Fit 1' });
+      await screen.findByRole('link', { name: /^Fit 1\s*\(opens/ });
       // The list draws no scroll box of its own.
       expect(document.querySelectorAll('[data-virtual-scroll-root]')).toHaveLength(1);
       expect(loadButtons().length).toBeLessThan(40);
@@ -575,7 +577,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
         host.scrollTop = 1_000_000;
         fireEvent.scroll(host);
       });
-      expect(await screen.findByRole('link', { name: 'Fit 80' })).toBeTruthy();
+      expect(await screen.findByRole('link', { name: /^Fit 80/ })).toBeTruthy();
     });
 
     it('uncapped with nothing but the page to scroll, lists every fit', async () => {
@@ -589,7 +591,7 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
         />
       );
       fireEvent.click(screen.getByRole('tab', { name: 'EVE Workbench' }));
-      await screen.findByRole('link', { name: 'Fit 80' });
+      await screen.findByRole('link', { name: /^Fit 80/ });
       expect(loadButtons()).toHaveLength(80);
     });
   });

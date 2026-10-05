@@ -1,3 +1,4 @@
+import { selectedRowClassName } from '@/components/ui/controlStyles';
 import { HintText } from '@/components/ui/HintText';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -313,8 +314,8 @@ function CharacterCard({
   return (
     <li
       aria-current={isActive ? 'true' : undefined}
-      className={`flex flex-col gap-2 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none hover:border-line-bright hover:bg-panel-2 ${
-        isActive ? 'border-l-2 border-l-accent' : ''
+      className={`flex flex-col gap-2 rounded-xs border border-line p-3 backdrop-blur-sm transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none hover:border-line-bright hover:bg-panel-2 ${
+        isActive ? selectedRowClassName : 'bg-panel/85'
       }`}
     >
       <div className="flex flex-wrap items-start gap-2">

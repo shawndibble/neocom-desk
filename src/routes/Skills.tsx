@@ -16,7 +16,7 @@ import {
   StatChips,
   IconButton,
 } from '@/components/ui';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
@@ -539,7 +539,9 @@ export function Skills() {
                                   )
                                 }
                                 className={`${tappableRowClassName} flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
-                                  selected ? 'bg-panel-2' : ''
+                                  selected
+                                    ? selectedRowClassName
+                                    : 'border-l-2 border-l-transparent'
                                 }`}
                               >
                                 <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">

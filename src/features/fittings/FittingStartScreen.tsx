@@ -1,3 +1,4 @@
+import { selectedRowClassName } from '@/components/ui/controlStyles';
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -323,7 +324,7 @@ export function FittingStartScreen({
                             event.preventDefault();
                             open(row);
                           }}
-                          className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 border-l-2 px-3 text-left text-sm hover:bg-panel-2 md:min-h-9 ${isSelected ? 'border-accent bg-panel-2 text-accent' : 'border-transparent'}`}
+                          className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 text-left text-sm hover:bg-panel-2 md:min-h-9 ${isSelected ? `${selectedRowClassName} text-accent` : 'border-l-2 border-l-transparent'}`}
                         >
                           <span className="min-w-0 flex-1 truncate">{row.name}</span>
                           <span className="shrink-0 border border-line-bright px-1.5 text-[0.625rem] tracking-widest text-text-dim uppercase">

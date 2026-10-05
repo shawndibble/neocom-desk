@@ -21,6 +21,7 @@
  * Comparing: once two or more cards are ticked, a bar pinned above the bottom
  * tab bar carries the Compare action — the panel header has no room for it.
  */
+import { selectedRowClassName } from '@/components/ui/controlStyles';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -213,9 +214,10 @@ export function MobileOpportunityList({
           return (
             <li
               key={row.candidate.id}
+              aria-current={selected ? 'true' : undefined}
               className={cx(
                 'grid grid-cols-[2.75rem_minmax(0,1fr)_auto] border-b border-line pr-1 last:border-b-0',
-                selected && 'bg-accent-dim/15 shadow-[inset_2px_0_0_var(--color-accent)]'
+                selected ? selectedRowClassName : 'border-l-2 border-l-transparent'
               )}
             >
               <label className="flex size-11 cursor-pointer items-center justify-center self-start">
