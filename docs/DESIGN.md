@@ -782,30 +782,31 @@ Material, Windows).
 
 Some primitives named here (`ExternalLink`, `HintText`, `Button loading`, the
 shared interaction recipe) are being built during the rollout. Until one
-exists, follow the rule it encodes. Where a §4 component row describes older
-behaviour (hold-to-reveal inside rows, `InfoTooltip`'s `onClick` mode), §6c
-is the target. The rollout PR that changes a primitive also updates its §4
+exists, follow the rule it encodes. Where §3 or a §4 component row describes
+older behaviour (the touch tier keyed on width alone, hold-to-reveal inside
+rows, `InfoTooltip`'s `onClick` mode, `opacity-50` for a disabled
+`Checkbox`/`Radio`), §6c is the target. The rollout PR that changes a primitive also updates its §4
 row.
 
 ### Cue vocabulary
 
-| Cue                             | Means only                                                        |
-| ------------------------------- | ----------------------------------------------------------------- |
-| Accent text                     | Clickable                                                         |
-| Solid underline at rest         | A link inside a sentence (`inlineLinkClassName`)                  |
-| Trailing `ArrowSquareOut`       | Leaves Neocom Desk (`ExternalLink`)                               |
-| Dotted underline                | Has a tooltip (`HintText`)                                        |
-| "?" circle                      | Explains a term (`InfoTooltip`): a tooltip, never a dialog        |
-| ⓘ `IconButton`                  | Opens Show Info or an explanation modal                           |
-| Faint pencil after a value      | Edit this value in place                                          |
-| "…" ending a label              | Opens a dialog that needs more input or a confirmation            |
-| Trailing `CaretRight` on a row  | Goes to another page or view                                      |
-| Leading caret that rotates      | Expands in place (`Disclosure`'s `Caret`)                         |
-| `CaretDown` inside field chrome | Opens a list to pick from                                         |
-| Paired carets in `IconButton`s  | Pages (previous / next month, a wizard's step back)               |
-| ⋮                               | The row's or table's action menu (⋯ is only the phone nav's More) |
-| Accent 2px left border          | Selected                                                          |
-| A box sized like a field        | A control (§6)                                                    |
+| Cue                                                  | Means only                                                                                                                                                                                               |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Accent text                                          | Clickable                                                                                                                                                                                                |
+| Solid underline at rest                              | A link inside a sentence (`inlineLinkClassName`)                                                                                                                                                         |
+| Trailing `Icon.External` (Phosphor `ArrowSquareOut`) | Leaves Neocom Desk (`ExternalLink`)                                                                                                                                                                      |
+| Dotted underline                                     | Has a tooltip (`HintText`)                                                                                                                                                                               |
+| "?" circle                                           | Explains a term (`InfoTooltip`): a tooltip, never a dialog                                                                                                                                               |
+| ⓘ `IconButton`                                       | Opens Show Info or an explanation modal                                                                                                                                                                  |
+| Faint pencil after a value                           | Edit this value in place                                                                                                                                                                                 |
+| "…" ending a label                                   | Opens a dialog that needs more input or a confirmation before the action runs (Windows' rule). Not on a button that only shows a window (Show info, Payees, Settings), and never on an icon-only button. |
+| Trailing `CaretRight` on a row                       | Goes to another page or view                                                                                                                                                                             |
+| Leading caret that rotates                           | Expands in place (`Disclosure`'s `Caret`)                                                                                                                                                                |
+| `CaretDown` inside field chrome                      | Opens a list to pick from                                                                                                                                                                                |
+| Paired carets in `IconButton`s                       | Pages (previous / next month, a wizard's step back)                                                                                                                                                      |
+| ⋮                                                    | The row's or table's action menu (⋯ is only the phone nav's More)                                                                                                                                        |
+| Accent 2px left border                               | Selected                                                                                                                                                                                                 |
+| A box sized like a field                             | A control (§6)                                                                                                                                                                                           |
 
 Retired meanings, each with its replacement:
 
@@ -830,7 +831,7 @@ Retired meanings, each with its replacement:
 | Entity                      | Click goes to                                              |
 | --------------------------- | ---------------------------------------------------------- |
 | Item type                   | Market browser (Show Info is in the ⋮ menu and Market's ⓘ) |
-| Character, corp or alliance | Show Info (the PublicInfo modal)                           |
+| Character, corp or alliance | Show Info (`PublicInfoModal`)                              |
 | Skill                       | Skill modal                                                |
 | Contract                    | Contract modal (the accent type cell)                      |
 | Solar system                | Route Safety, with that system as the destination          |
@@ -882,6 +883,7 @@ Rows:
 | Swipe down     | Dismisses a bottom sheet (with a visible grabber).                                                                                                                                                                       |
 | Back / Escape  | Closes the top overlay.                                                                                                                                                                                                  |
 | Tap outside    | Closes a menu, popover or sheet. A sheet holding unsaved edits asks before discarding them.                                                                                                                              |
+| Double tap     | Nothing. Controls set `touch-action: manipulation`, so there is no zoom delay.                                                                                                                                           |
 
 - **Touch sizing follows the input, not only the width.** The 44px tier
   applies below `md` _or_ on `(pointer: coarse)`, so a touch laptop or tablet
