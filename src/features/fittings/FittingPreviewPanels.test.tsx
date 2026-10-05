@@ -101,7 +101,7 @@ describe('OffensePanel', () => {
       .getByRole('link', { name: 'Heavy Missile Launcher II' })
       .closest('tr') as HTMLElement;
     expect(within(row).getByText('Scourge Fury')).toBeInTheDocument();
-    const drone = screen.getByText('Hammerhead II ×5').closest('tr') as HTMLElement;
+    const drone = screen.getByRole('link', { name: 'Hammerhead II' }).closest('tr') as HTMLElement;
     expect(within(drone).getByText('—')).toBeInTheDocument();
   });
 
