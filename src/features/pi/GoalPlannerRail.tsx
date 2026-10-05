@@ -28,7 +28,8 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import type { PiCadence } from './cadencePref';
 import { customsRatePercent, customsSourceText } from './customsRate';
-import { ASSUMED_UNKNOWN_CUSTOMS, type PlannerColonyRow } from './goalPlannerModel';
+import type { PlannerColonyRow } from './goalPlannerModel';
+import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';
 import { DEFAULT_GOAL_PER_DAY } from './goalsParam';
 import type { ProductOption } from './products';
 import { SectionLabel, TierChip } from './DirectiveRow';
@@ -36,7 +37,7 @@ import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
 import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import { PercentInput } from './piControls';
 import { parseDecimal } from './goalPlannerFormat';
-import { piAdvisorHref } from './piPlanLink';
+import { PI_MAP_HREF } from './piPlanLink';
 
 /** How long typing pauses before a units box re-plans. */
 const COMMIT_DEBOUNCE_MS = 300;
@@ -363,8 +364,8 @@ export function ColoniesSection({
       {rows.length === 0 ? (
         <p className="text-xs text-text-dim">
           {t('piPlan.coloniesNone')}{' '}
-          <Link className={inlineLinkClassName} to={piAdvisorHref(undefined)}>
-            {t('piPlan.openAdvisor')}
+          <Link className={inlineLinkClassName} to={PI_MAP_HREF}>
+            {t('piPlan.openMap')}
           </Link>
         </p>
       ) : (

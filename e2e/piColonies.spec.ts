@@ -101,6 +101,25 @@ test.describe('PI Colonies, the daily check', () => {
     await shot(page, 'colonies-desk');
   });
 
+  test('has no Advisor left: no panel, no Advisor links, the old URL lands here', async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text());
+    });
+    await page.setViewportSize(DESKTOP);
+    await openColonies(page);
+    await expect(page.getByRole('heading', { name: 'Advisor' })).toHaveCount(0);
+    await expect(page.locator('a[href*="advisor"]')).toHaveCount(0);
+
+    await page.goto('./planetary-industry/advisor');
+    await expect(page).toHaveURL(/\/planetary-industry\/colonies/);
+    await expect(page.getByRole('heading', { name: "Today's check" })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
   test('expands a row in place to its extractors, production and launchpad', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await openColonies(page);

@@ -11,7 +11,6 @@ import { PiExplainer } from '@/features/pi/PiExplainer';
 import { goalsParam, idListParam, seedGoal } from '@/features/pi/goalsParam';
 import { loadPlannableTypeIds } from '@/features/pi/products';
 import type { Goal } from '@/engine/pi/goalTypes';
-import { AdvisorPanel } from '@/features/pi/AdvisorPanel';
 import { PiHeaderStrip } from '@/features/pi/PiHeaderStrip';
 import { ColoniesTab } from '@/features/pi/colonies/ColoniesTab';
 import { loadPiSnapshot } from '@/features/pi/colonies/coloniesSnapshot';
@@ -20,7 +19,7 @@ import { cx } from '@/lib/cx';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { usePageTab } from '@/lib/usePageTab';
 import { useUrlParams } from '@/lib/useUrlState';
-import { boolParam, type UrlParamCodec } from '@/lib/urlState';
+import { type UrlParamCodec } from '@/lib/urlState';
 import { PI_TABS } from '@/app/pageTabs';
 
 function parsePositiveInt(value: string | null): number | null {
@@ -28,7 +27,7 @@ function parsePositiveInt(value: string | null): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-/** `type` (a goal to seed) and `system` (the Advisor's system) — present only once chosen. */
+/** `type` (a goal to seed) and `colony` — present only once chosen. */
 function positiveIntParam(): UrlParamCodec<number | null> {
   return {
     parse: (raw) => parsePositiveInt(raw),
@@ -43,8 +42,6 @@ const PI_URL_PARAMS = {
   off: idListParam(),
   // A colony to open on the Colonies tab — the Goal Planner's colony links.
   colony: positiveIntParam(),
-  system: positiveIntParam(),
-  includeRebuilds: boolParam(),
 };
 
 /**
@@ -59,12 +56,11 @@ const PI_URL_PARAMS = {
  * mobile nav sheet, which is the surface that can least afford one.
  *
  * The tab is a path segment (`/planetary-industry/plan`,
- * `/planetary-industry/advisor`); every input each peer tab needs to redraw
+ * `/planetary-industry/map`); every input each peer tab needs to redraw
  * its answer stays a scoped query param on top of it — Plan's goals and
  * switched-off colonies (`?goals=`, `?off=`; `?type=` seeds a goal and is
- * cleared), Advisor's system and rebuilds toggle (`?system=`,
- * `?includeRebuilds=`) — so a plan or
- * a worklist survives a reload and can be deep-linked into later. All fall
+ * cleared), Colonies' opened colony (`?colony=`) — so a plan
+ * survives a reload and can be deep-linked into later. All fall
  * back silently: an unknown segment lands on `colonies` (`TabRoute`), and an
  * unknown value is handled by each param's own default rather than rendering
  * nothing.
@@ -80,17 +76,8 @@ export function PlanetaryIndustry() {
   }, [hydrateExpiringWindow]);
   const [tab, setTab] = usePageTab(PI_TABS);
   const [explainerOpen, setExplainerOpen] = useState(false);
-  const [
-    {
-      type: seedTypeId,
-      goals,
-      off: disabledColonies,
-      colony: linkedColonyId,
-      system: advisorSystemId,
-      includeRebuilds,
-    },
-    setPiParams,
-  ] = useUrlParams(PI_URL_PARAMS);
+  const [{ type: seedTypeId, goals, off: disabledColonies, colony: linkedColonyId }, setPiParams] =
+    useUrlParams(PI_URL_PARAMS);
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadPiSnapshot,
     undefined,
@@ -118,14 +105,6 @@ export function PlanetaryIndustry() {
   const setGoals = useCallback((next: Goal[]) => setPiParams({ goals: next }), [setPiParams]);
   const setDisabledColonies = useCallback(
     (next: number[]) => setPiParams({ off: next }),
-    [setPiParams]
-  );
-  const setAdvisorSystemId = useCallback(
-    (next: number) => setPiParams({ system: next }),
-    [setPiParams]
-  );
-  const setIncludeRebuilds = useCallback(
-    (next: boolean) => setPiParams({ includeRebuilds: next }),
     [setPiParams]
   );
   const clearLinkedColony = useCallback(() => setPiParams({ colony: null }), [setPiParams]);
@@ -206,26 +185,6 @@ export function PlanetaryIndustry() {
           linkedColonyId={linkedColonyId}
           onClearLinkedColony={clearLinkedColony}
         />
-      )}
-
-      {/*
-        Temporary: the Advisor's own tab is gone, but its worklist stays
-        reachable until it retires (#2618), below the colonies it advises on.
-        Old `/advisor` links and `?system=` land here.
-      */}
-      {tab === 'colonies' && (
-        <section aria-label={t('piPlan.advisorSection')} className="space-y-4">
-          <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('piPlan.advisorSection')}
-          </h2>
-          <AdvisorPanel
-            characterId={activeCharacterId}
-            systemId={advisorSystemId}
-            onSystemIdChange={setAdvisorSystemId}
-            includeRebuilds={includeRebuilds}
-            onIncludeRebuildsChange={setIncludeRebuilds}
-          />
-        </section>
       )}
     </div>
   );

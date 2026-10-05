@@ -14,7 +14,7 @@
  * the number it is worth, right-aligned and tabular. The eye runs down the
  * verb column to find the work and down the number column to rank it, without
  * parsing a sentence. The reasoning is not deleted: it moves to the colony's
- * detail modal, which is what `AdvisorPanel`'s Details button opens.
+ * detail view.
  *
  * ## The verbs are a closed set, and the colour is the meaning
  *
@@ -171,7 +171,7 @@ export function InputChip({ source, children }: { source: InputSource; children:
 /**
  * A colony's load on one axis, as a percentage.
  *
- * The card's version of `AdvisorPanel`'s `BudgetBar`: the same reading with
+ * The card's budget bar: the same reading with
  * the raw figures dropped, because "8,017 / 25,415 tf" is four numbers to
  * compare across six cards and "32%" is one. The exact figures are in the
  * detail modal, where a pilot checking the arithmetic will be.

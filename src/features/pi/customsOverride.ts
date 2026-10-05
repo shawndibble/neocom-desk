@@ -35,7 +35,7 @@
  * not bite it.
  *
  * These functions are pure: the Dexie read and the `setSyncedSetting` write
- * live in `AdvisorPanel.tsx`, the same split `syncedPreferences.ts` uses.
+ * live in `GoalPlannerPanel.tsx`, the same split `syncedPreferences.ts` uses.
  */
 
 export const SYNCED_PI_CUSTOMS_KEY = 'sync.piCustomsRates';

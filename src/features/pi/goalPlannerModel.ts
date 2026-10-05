@@ -4,12 +4,8 @@
  * readings the engine leaves to its caller (hauling split out/in, and the
  * plain verdict).
  *
- * ## Why a new loader, not the Advisor's
+ * ## Loader
  *
- * `AdvisorPanel` keeps a private snapshot loader that also reads every system's
- * planet list, every unbuilt planet's type and the alt roster — none of which
- * the planner uses — and its behaviour is pinned by a 1,700-line test. Moving
- * it out to share would put that at risk for nothing the planner needs, so
  * `goalPlannerSnapshot.ts` is a slim loader over the *same* lower-level reads
  * (`loadCharacterPlanets`, `loadAllColonyDetails`, `loadSystemSecurity`,
  * `loadCustomsCodeExpertise`, `loadPlanPrices` ...). Both tabs therefore see
@@ -65,19 +61,9 @@ import {
   totalColonyEarnings,
   type TotalColonyEarnings,
 } from './colonyEarningsModel';
-import {
-  colonySpaceFor,
-  customsRateSource,
-  defaultCustomsRate,
-  type CustomsRateSource,
-} from './customsRate';
-import { customsRateFor, type CustomsOverrides } from './customsOverride';
-
-/**
- * What an unknown player-office rate is costed at: the untrained highsec NPC
- * rate, a common owner tax and the conservative direction (never 0%).
- */
-export const ASSUMED_UNKNOWN_CUSTOMS = 0.1;
+import { type CustomsRateSource } from './customsRate';
+import { type CustomsOverrides } from './customsOverride';
+import { resolveColonyCustoms } from './colonyCustoms';
 
 /** Heads per ECU when the pilot runs no extractor at all to read one off. */
 export const DEFAULT_PLANNER_HEADS = 10;
@@ -188,13 +174,13 @@ export function plannerColonies(
   return snapshot.colonies.map((planet): PlannerColonyRow => {
     const planetId = planet.planet_id;
     const systemId = planet.solar_system_id;
-    const space = colonySpaceFor(snapshot.securityBySystem.get(systemId) ?? null);
-    const derived = defaultCustomsRate(space, snapshot.customsSkill);
-    const taxOverridden = prefs.customsOverrides[systemId] !== undefined;
-    const rateUnknown = space !== 'highsec' && !taxOverridden;
-    const taxRate = rateUnknown
-      ? ASSUMED_UNKNOWN_CUSTOMS
-      : customsRateFor(systemId, prefs.customsOverrides, derived);
+    const customs = resolveColonyCustoms({
+      systemId,
+      security: snapshot.securityBySystem.get(systemId) ?? null,
+      skill: snapshot.customsSkill,
+      overrides: prefs.customsOverrides,
+    });
+    const { taxRate } = customs;
     const own = advice.get(planetId) ?? null;
     const base = {
       planetId,
@@ -202,11 +188,7 @@ export function plannerColonies(
       upgradeLevel: planet.upgrade_level,
       planetType: planet.planet_type,
       advice: own,
-      taxRate,
-      taxSource: customsRateSource(space, snapshot.customsSkill),
-      taxOverridden,
-      rateUnknown,
-      taxAssumed: rateUnknown,
+      ...customs,
     };
     const excluded = (reason: ExcludedReason): PlannerColonyRow => ({
       ...base,

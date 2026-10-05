@@ -1068,7 +1068,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   condition shows up: the Overview PI card, the Colonies attention chip and
   colony row state, and the Characters table's PI column. Distinct from
   **Idle**, which names an unfed facility with nothing feeding it (the
-  Advisor's `piAdvisor.summaryChipIdle`) — a Stopped program has nothing left
+  retired Advisor's idle chip) — a Stopped program has nothing left
   to run, an Idle facility has something to run and no input for it. One word
   per condition, not shared.
 - **Sustained Extraction Rate**: An extractor program's whole output averaged

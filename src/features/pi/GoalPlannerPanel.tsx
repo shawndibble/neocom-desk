@@ -8,7 +8,7 @@
  * `goalPlanView` reads the answer, and `GoalPlannerRail` /
  * `GoalPlannerResults` draw. Goals and switched-off colonies are URL state
  * (the route owns them); the standing assumptions are device-local prefs; the
- * customs rate is the synced per-system override the Advisor writes too.
+ * customs rate is the synced per-system override Colonies and Map read too.
  *
  * ## Layout
  *
@@ -36,7 +36,7 @@ import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { useCadence } from './cadencePref';
-import { piAdvisorHref } from './piPlanLink';
+import { PI_MAP_HREF } from './piPlanLink';
 import { useSellHub } from './sellHub';
 import {
   SYNCED_PI_CUSTOMS_KEY,
@@ -185,7 +185,7 @@ function GoalPlanner({
   }, [pi, hub]);
   const prices = priced?.hubId === hub.id ? priced.prices : null;
 
-  // --- Customs: edits layered over the snapshot, written through like the Advisor's ---
+  // --- Customs: edits layered over the snapshot, written through to the synced setting ---
   const [customsEdits, setCustomsEdits] = useState<CustomsOverrides | null>(null);
   const customsOverrides = customsEdits ?? snapshot?.customsOverrides ?? null;
   const writeCustoms = useCallback(
@@ -338,7 +338,6 @@ function GoalPlanner({
   const systemName = (id: number) =>
     snapshot.systemNames.get(id) ?? t('piAdvisor.systemLabel', { id });
   const noColonies = snapshot.colonies.length === 0;
-  const advisorSystem = rows.find((row) => row.enabled)?.systemId;
 
   let results: React.ReactNode;
   if (noColonies && !buysAnything) {
@@ -353,8 +352,8 @@ function GoalPlanner({
             : t('piPlan.noColoniesHint')
         }
         action={
-          <Link className={inlineLinkClassName} to={piAdvisorHref(undefined)}>
-            {t('piPlan.openAdvisor')}
+          <Link className={inlineLinkClassName} to={PI_MAP_HREF}>
+            {t('piPlan.openMap')}
           </Link>
         }
       />
@@ -410,7 +409,6 @@ function GoalPlanner({
               shortfalls={best.plan.shortfalls}
               hints={best.plan.shortfalls.map((s) => shortfallHint(s, rows, buysP1))}
               names={names}
-              advisorSystem={advisorSystem}
             />
             <Changes
               steps={steps}

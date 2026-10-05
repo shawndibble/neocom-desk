@@ -34,7 +34,7 @@ const PRICES: Record<number, number> = {
 
 /**
  * Every planetary commodity priced, which is what production does:
- * `AdvisorPanel` asks the hub for `pi.raw` plus every plannable type in one
+ * The planner asks the hub for `pi.raw` plus every plannable type in one
  * read. The eight real Jita reads above stand; the rest get a plausible
  * per-tier ladder, because a market-sourced candidate that is silently
  * `needs-price` would make these tests pass for the wrong reason.

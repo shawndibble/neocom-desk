@@ -341,6 +341,9 @@ async function addAlt(characterId: number, name: string, scopes: string[]) {
  * colony therefore says which row it means rather than loosening its counts.
  */
 async function colonyPanelFor(name: RegExp): Promise<HTMLElement> {
+  // The page's load has settled (its Refresh button re-enables): a row can draw
+  // from the first, detail-less snapshot and then redraw as the pins arrive.
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled());
   const heading = await screen.findByRole('heading', { name });
   const panel = heading.closest('[data-colony-status]');
   if (!(panel instanceof HTMLElement)) throw new Error(`no colony panel for ${String(name)}`);
@@ -476,7 +479,6 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
 
     // The banner is not a substitute for the panel: both render.
-    // One from the Colonies tab; the Advisor below it (until it retires) says the same.
     expect(
       (await screen.findAllByText('Log in again to see your colonies')).length
     ).toBeGreaterThan(0);
@@ -883,13 +885,13 @@ describe('PlanetaryIndustry', () => {
     expect(screen.queryByText('The PI map is coming')).toBeNull();
   });
 
-  it('redirects the retired Advisor URL to Colonies, keeping the query, and still shows the Advisor there', async () => {
-    window.history.pushState({}, '', '/planetary-industry/advisor?system=30000142');
+  it('redirects the retired Advisor URL to Colonies, with no Advisor left on the page', async () => {
+    window.history.pushState({}, '', '/planetary-industry/advisor');
     render(<App />);
     await colonyPanelFor(/Jita IV/);
     expect(window.location.pathname).toBe('/planetary-industry/colonies');
-    expect(window.location.search).toBe('?system=30000142');
-    expect(screen.getByRole('heading', { name: 'Advisor' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Advisor' })).toBeNull();
+    expect(screen.queryByText('Advisor')).toBeNull();
   });
 
   it('puts the shared header strip, with the Sell at picker, under the tabs on every tab', async () => {

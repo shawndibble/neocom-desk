@@ -8,7 +8,7 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { Shortfall } from '@/engine/pi/goalTypes';
 import { commodityName, formatUnits } from '../goalPlannerFormat';
-import { piAdvisorHref } from '../piPlanLink';
+import { PI_MAP_HREF } from '../piPlanLink';
 import type { ShortfallHint } from '../goalPlanView';
 import { ColonyLink } from './ColonyLink';
 import { limitsText, planetTypesText, type PlanNames } from './format';
@@ -30,7 +30,6 @@ function shortfallText(
   shortfall: Shortfall,
   hint: ShortfallHint,
   names: PlanNames,
-  advisorSystem: number | undefined,
   t: TFunction
 ): ReactNode {
   const { pi } = names;
@@ -50,8 +49,8 @@ function shortfallText(
               {t('piPlan.shortSwitchedOff')} <ColonyNames ids={hint.planetIds} names={names} />.
             </>
           ) : (
-            <Link className={inlineLinkClassName} to={piAdvisorHref(advisorSystem)}>
-              {t('piPlan.openAdvisor')}
+            <Link className={inlineLinkClassName} to={PI_MAP_HREF}>
+              {t('piPlan.openMap')}
             </Link>
           )}
         </>
@@ -91,12 +90,10 @@ export function Shortfalls({
   shortfalls,
   hints,
   names,
-  advisorSystem,
 }: {
   shortfalls: readonly Shortfall[];
   hints: readonly ShortfallHint[];
   names: PlanNames;
-  advisorSystem: number | undefined;
 }) {
   const { t } = useTranslation();
   if (shortfalls.length === 0) return null;
@@ -110,7 +107,7 @@ export function Shortfalls({
               size={Icon.ICON_SIZE.sm}
               className="mt-px shrink-0 text-warning"
             />
-            <span>{shortfallText(shortfall, hints[i] ?? null, names, advisorSystem, t)}</span>
+            <span>{shortfallText(shortfall, hints[i] ?? null, names, t)}</span>
           </li>
         ))}
       </ul>
