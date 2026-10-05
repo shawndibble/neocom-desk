@@ -298,7 +298,7 @@ beforeAll(async () => {
   await resetSession();
   window.history.pushState({}, '', '/planetary-industry/plan');
   const { unmount } = render(<App />);
-  await screen.findByRole('heading', { name: 'Goals' }, { timeout: 25_000 });
+  await screen.findByRole('heading', { name: 'What do you want to do?' }, { timeout: 25_000 });
   unmount();
   server.resetHandlers();
 }, 30_000);
@@ -694,6 +694,8 @@ describe('PlanetaryIndustry', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Plan' }));
 
+    // A pilot with colonies is asked what to do with them; the planner is one answer.
+    await user.click(await screen.findByRole('button', { name: /Make a specific product/ }));
     await screen.findByRole('heading', { name: 'Goals' });
     expect(window.location.pathname).toBe('/planetary-industry/plan');
     // The colony surface is a peer view, not a section below the planner.
@@ -714,7 +716,6 @@ describe('PlanetaryIndustry', () => {
     window.history.pushState({}, '', '/planetary-industry/plan?type=2268');
     render(<App />);
 
-    await screen.findByRole('heading', { name: 'Goals' });
     await waitFor(() => expect(window.location.search).toBe(''));
     expect(screen.queryByLabelText(/per day$/)).not.toBeInTheDocument();
   });
@@ -776,20 +777,62 @@ describe('PlanetaryIndustry', () => {
   it('falls back to the Plan tab rather than crashing on a tab it does not know', async () => {
     window.history.pushState({}, '', '/planetary-industry/nonsense?type=not-a-number');
     render(<App />);
-    await screen.findByRole('heading', { name: 'Goals' });
+    await screen.findByRole('heading', { name: 'What do you want to do?' });
     expect(screen.getByRole('tab', { name: 'Plan' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('opens on Plan, with the tabs in Plan, Map, Colonies order', async () => {
     window.history.pushState({}, '', '/planetary-industry');
     render(<App />);
-    await screen.findByRole('heading', { name: 'Goals' });
+    await screen.findByRole('heading', { name: 'What do you want to do?' });
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Plan',
       'Map',
       'Colonies',
     ]);
     expect(window.location.pathname).toBe('/planetary-industry/plan');
+  });
+
+  it('opens Plan on "Make more from my planets" when the pilot has colonies, and says why', async () => {
+    window.history.pushState({}, '', '/planetary-industry/plan');
+    render(<App />);
+    const option = await screen.findByRole('button', { name: /Make more from my planets/ });
+    expect(option).toHaveAttribute('aria-current', 'true');
+    expect(
+      screen.getByText(/Opened “Make more from my planets” because we found 1 colony/)
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Goals' })).not.toBeInTheDocument();
+  });
+
+  it('opens Plan on "Find the best thing to build" when there are no colonies', async () => {
+    server.use(http.get(`${ESI}/characters/${CHAR_ID}/planets`, () => HttpResponse.json([])));
+    window.history.pushState({}, '', '/planetary-industry/plan');
+    render(<App />);
+    const option = await screen.findByRole('button', { name: /Find the best thing to build/ });
+    expect(option).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByText(/You have no colonies yet, so we opened/)).toBeInTheDocument();
+  });
+
+  it('keeps the Goal Planner behind a ?goals= link, with no picker choice needed', async () => {
+    window.history.pushState({}, '', `/planetary-industry/plan?goals=${WATER}:24`);
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Goals' });
+    expect(screen.getByRole('button', { name: /Make a specific product/ })).toHaveAttribute(
+      'aria-current',
+      'true'
+    );
+    expect(screen.getByLabelText(`${WATER_NAME} per day`)).toHaveValue('24');
+  });
+
+  it('opens the 60-second explainer from "New to PI?" on every tab', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/planetary-industry/colonies');
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'New to PI?' }));
+    expect(
+      await screen.findByRole('dialog', { name: /New to PI\? The 60-second explainer/ })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Skyhook (nullsec only)')).toBeInTheDocument();
   });
 
   it('shows a placeholder on the Map tab', async () => {
