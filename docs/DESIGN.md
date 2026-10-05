@@ -330,7 +330,7 @@ Built in `src/components/ui/` (✓) or planned (○):
 | `Modal`                                    | ✓      | Native `<dialog>` + `showModal()`. Platform-supplied focus trap, inert background, Escape-to-close and `::backdrop` — never hand-roll a focus trap. `placement="center"` (default), `"sheet"` (bottom-anchored, mobile nav) or `"wide"` (`max-w-5xl`, for multi-column content such as a comparison matrix). Escape and backdrop click both close.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `SlideOver`                                | ✓      | Non-modal panel over one edge of the page (Radix `Dialog`, `modal={false}`): no backdrop, nothing inert, an outside click never closes it — Escape or its close button do. For a panel the page behind must keep steering, such as the Fittings module browser (the Ring retargets it; items drag out of it onto the Ring). `side` left or right.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `DataTable`                                | ✓      | Dense table: hairline-underlined uppercase header row (no fill — matches every shipped table), hairline row separators, tabular-nums right-aligned numerics, row hover `panel-2`. No empty branch — callers branch to `EmptyState` themselves. Sorting is opt-in per column via `sortValue`: a column that declares one gets a clickable header (`aria-sort`, ascending/descending toggle, missing values sink to the end); a table that declares none behaves exactly as before. Below `sm` each row collapses into a labelled card — see §4a. `exportable` (usually spread from `useTableExport(...).tableProps`) makes every row menu grow an "Export table" submenu — or, with no row menus, gives the table a right-click menu of its own — exporting the rows in on-screen sort order.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `TableActionsMenu` / `TableExportProvider` | ✓      | Every data table's export, one way in: the `TableActionsMenu` in the table block's title bar (Panel `actions`, a section heading row, PageHeader actions). Export is a menu's only job there, so it is a download-icon button ("Export {name}") opening **Download CSV / Download Excel (.xlsx) / Copy for Google Sheets / Excel** directly (`ExportTableItems`); a table with no row menus gets the same flat items on right-click. Only a menu with other actions nests them in an **Export table ▸** submenu (`ExportTableSub`): the row menus `DataTable`'s `exportable` appends it to, and a `TableActionsMenu` given `children` (which then shows ⋯). Wire both from one `useTableExport({ surface, rows, columns })`. A list that isn't a `DataTable` (a virtualized list, a raw `<table>`) wraps its rows in `TableExportProvider` so their `RowActionsMenu`s get the submenu too. Replaces per-surface "Export CSV" icon buttons — never add one.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `TableActionsMenu` / `TableExportProvider` | ✓      | Every data table's export, one way in: the `TableActionsMenu` in the table block's title bar (Panel `actions`, a section heading row, PageHeader actions). Export is a menu's only job there, so it is a download-icon button ("Export {name}") opening **Download CSV / Download Excel (.xlsx) / Copy for Google Sheets / Excel** directly (`ExportTableItems`); a table with no row menus gets the same flat items on right-click. Only a menu with other actions nests them in an **Export table ▸** submenu (`ExportTableSub`): the row menus `DataTable`'s `exportable` appends it to, and a `TableActionsMenu` given `children` (which then shows ⋮). Wire both from one `useTableExport({ surface, rows, columns })`. A list that isn't a `DataTable` (a virtualized list, a raw `<table>`) wraps its rows in `TableExportProvider` so their `RowActionsMenu`s get the submenu too. Replaces per-surface "Export CSV" icon buttons — never add one.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `CharacterAvatar`                          | ✓      | ESI portrait, `rounded-xs` (house radius, §3), 1px `line` ring; sizes `sm`/`md`/`lg`; accent ring when selected. Decorative by default — pass `alt` only for standalone use.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `Fields`                                   | ✓      | Labelled controls lined up as a label column and a control column, with a hint under the control (§6, "Stacked controls line up"). `variant="compact"` (stats column) or `"form"` (Settings panels; stacks below `lg`). Each `Field` row is a subgrid, so a hairline runs across it and a stacked row keeps its label, control and note together. `htmlFor` makes the label a real `<label>`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `FilterBar`                                | ✓      | A page's filter row: search box, view `actions` (a table's column picker) and one funnel trigger, on one line at every width. The funnel reveals the filters — a box under the row on a pointer viewport, edits committing immediately; a bottom sheet below `md`, edits a draft committed with Apply or dropped with Cancel. Filters are written once, as `children(draft, setDraft)`, so the two surfaces cannot drift. `FilterField` captions a control in the sheet only. `actions` never goes in the draft; its controls act immediately. Every searchable table uses it, with its column picker in `actions` — see §4b.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -684,11 +684,12 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
 - **In-sentence links underline at rest.** An accent link inside a sentence or
   a definition list uses `inlineLinkClassName` (`controlStyles.ts`:
   `text-accent font-medium underline`) — colour must not be the only cue
-  (WCAG 1.4.1). Add touch-size extras alongside it, don't fork the recipe. A
-  link that is a table-cell entity name (`MarketItemLink`, `IssuerLink`, the
-  Contracts type column) keeps its hover underline; `textActionClassName`
-  stays the recipe for uppercase text actions. `inlineLinkClassName.test.ts`
-  fails on a hand-rolled `text-accent underline`.
+  (WCAG 1.4.1). Add touch-size extras alongside it, don't fork the recipe. It
+  means navigation only; an in-sentence _action_ (Undo, Set runs) is a
+  `textActionClassName` button. A table-cell entity name is accent at rest
+  with a hover underline, and where it goes is fixed per entity type (§6c).
+  `textActionClassName` stays the recipe for uppercase text actions.
+  `inlineLinkClassName.test.ts` fails on a hand-rolled `text-accent underline`.
 - Status colors carry meaning; never use them decoratively. ISK amounts use
   `isk-pos`/`isk-neg`, not success/danger.
 - Density: tables are the norm; avoid card grids for data lists.
@@ -759,6 +760,180 @@ route ad hoc.
   unrelated and stays: it covers full **cross-document** reloads (the
   service-worker update `ReloadPrompt` triggers), where the browser has both
   fully-laid-out documents and the problem above does not arise.
+
+## 6c. Interaction grammar
+
+A pilot should be able to tell what they can click, hover, tap or hold, and
+what it will do, before they try it. Two rules govern everything below:
+
+- **Visible at rest.** The cue shows without hover. Hover, cursor and colour
+  can reinforce it but never carry it alone: a phone has no hover and no
+  cursor, and colour alone fails WCAG 1.4.1.
+- **One meaning per cue.** Every cue in the vocabulary below has exactly one
+  meaning. A new surface picks the cue for its intent instead of inventing
+  one.
+
+**Familiar look, our own content.** How a link, button, tooltip, menu or
+gesture _looks and behaves_ follows what pilots already know from the web
+and other EVE tools (zKillboard, EveWho, EVE Tycoon, the client). _Where_ a
+link goes and _what_ a view shows is Neocom Desk's own. When this section is
+silent, follow the platform convention (WCAG 2.2, WAI-ARIA APG, Apple HIG,
+Material, Windows).
+
+Some primitives named here (`ExternalLink`, `HintText`, `Button loading`, the
+shared interaction recipe) are being built during the rollout. Until one
+exists, follow the rule it encodes. Where §3 or a §4 component row describes
+older behaviour (the touch tier keyed on width alone, hold-to-reveal inside
+rows, `InfoTooltip`'s `onClick` mode, `opacity-50` for a disabled
+`Checkbox`/`Radio`), §6c is the target. The rollout PR that changes a primitive also updates its §4
+row.
+
+### Cue vocabulary
+
+| Cue                                                  | Means only                                                                                                                                                                                               |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Accent text                                          | Clickable                                                                                                                                                                                                |
+| Solid underline at rest                              | A link inside a sentence (`inlineLinkClassName`)                                                                                                                                                         |
+| Trailing `Icon.External` (Phosphor `ArrowSquareOut`) | Leaves Neocom Desk (`ExternalLink`)                                                                                                                                                                      |
+| Dotted underline                                     | Has a tooltip (`HintText`)                                                                                                                                                                               |
+| "?" circle                                           | Explains a term (`InfoTooltip`): a tooltip, never a dialog                                                                                                                                               |
+| ⓘ `IconButton`                                       | Opens Show Info or an explanation modal                                                                                                                                                                  |
+| Faint pencil after a value                           | Edit this value in place                                                                                                                                                                                 |
+| "…" ending a label                                   | Opens a dialog that needs more input or a confirmation before the action runs (Windows' rule). Not on a button that only shows a window (Show info, Payees, Settings), and never on an icon-only button. |
+| Trailing `CaretRight` on a row                       | Goes to another page or view                                                                                                                                                                             |
+| Leading caret that rotates                           | Expands in place (`Disclosure`'s `Caret`)                                                                                                                                                                |
+| `CaretDown` inside field chrome                      | Opens a list to pick from                                                                                                                                                                                |
+| Paired carets in `IconButton`s                       | Pages (previous / next month, a wizard's step back)                                                                                                                                                      |
+| ⋮                                                    | The row's or table's action menu (⋯ is only the phone nav's More)                                                                                                                                        |
+| Accent 2px left border                               | Selected                                                                                                                                                                                                 |
+| A box sized like a field                             | A control (§6)                                                                                                                                                                                           |
+
+Retired meanings, each with its replacement:
+
+| Retired                                               | Use instead                                                                      |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Dashed underline to mark an editable value            | The pencil                                                                       |
+| Bare `CaretLeft` for "back to the parent"             | A labelled breadcrumb                                                            |
+| ⓘ as a static status glyph                            | `WarningCircle` or `Lightbulb`                                                   |
+| Accent left bar for "loaded" or "in use"              | A status word                                                                    |
+| A gear that navigates                                 | The gear opens _this page's_ settings modal; link to Settings with labelled text |
+| `textActionClassName` that navigates or opens a modal | It performs an action; navigation is a link or a row                             |
+
+### Entities
+
+- **Look:** every clickable entity name is accent at rest, underlined on
+  hover and focus. A non-clickable name stays in text colour. A column is
+  all links or none.
+- **Real links:** the name is a real `<a href>` with its own URL, even when
+  it opens a modal. Middle-click and Ctrl+click open a new tab, and Back
+  closes the modal.
+
+| Entity                      | Click goes to                                              |
+| --------------------------- | ---------------------------------------------------------- |
+| Item type                   | Market browser (Show Info is in the ⋮ menu and Market's ⓘ) |
+| Character, corp or alliance | Show Info (`PublicInfoModal`)                              |
+| Skill                       | Skill modal                                                |
+| Contract                    | Contract modal (the accent type cell)                      |
+| Solar system                | Route Safety, with that system as the destination          |
+| Station                     | Not clickable                                              |
+
+Rows:
+
+- **A row that navigates** is a real link ending in a trailing `CaretRight`
+  (faint at rest, accent on hover).
+- **A row that opens a modal** carries its cue on the primary cell (the
+  accent entity name). The row click is a pointer convenience.
+- **A row that selects** for a detail pane shows the selected treatment.
+- **A table with a row menu** always shows the ⋮ (`rowMoreActions`).
+  Right-click and touch-and-hold are shortcuts to the same menu, never the
+  only way in.
+
+### Tooltips, external links, numbers
+
+- **Tooltips:**
+  - Use `Tooltip`, `InfoTooltip` or `HintText`. Native `title=` is out:
+    touch, keyboard and screen-reader users can't reach it.
+  - Tooltip content is never essential.
+  - A disabled control's reason uses `aria-disabled`, so the bubble stays
+    reachable, plus visible text where the reason matters.
+- **External links** use `ExternalLink`, which renders:
+  - a trailing `Icon.External`
+  - `target="_blank" rel="noopener noreferrer"`
+  - a visually hidden "(opens in a new tab)"
+
+  A button that calls `window.open` carries the same icon. New tabs are for
+  third-party sites only; our own pages, including same-origin static pages,
+  open in the same tab.
+
+- **ISK** has two forms:
+  - full `formatIsk(…, 2)` where the exact figure is the point (ledgers,
+    wallet, contract price)
+  - `IskAmount` everywhere else
+
+  The B/M/K suffix is the cue that the exact value is one hover or tap away.
+  No other compact formatter renders on screen.
+
+### Touch and hold
+
+| Gesture        | Means                                                                                                                                                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Tap            | The same as a click. On an explain-only trigger ("?", `HintText`, an `IskAmount` outside a tappable row) it toggles the bubble.                                                                                          |
+| Touch and hold | Opens the row's or tile's menu (the same as its ⋮) wherever one exists, and then never a tooltip. On a control with no menu (an icon button, a chip), hold shows its label. On a link, the browser's own link menu wins. |
+| Drag           | Only from a visible grip (`touch-none`, 4px activation distance).                                                                                                                                                        |
+| Swipe down     | Dismisses a bottom sheet (with a visible grabber).                                                                                                                                                                       |
+| Back / Escape  | Closes the top overlay.                                                                                                                                                                                                  |
+| Tap outside    | Closes a menu, popover or sheet. A sheet holding unsaved edits asks before discarding them.                                                                                                                              |
+| Double tap     | Nothing. Controls set `touch-action: manipulation`, so there is no zoom delay.                                                                                                                                           |
+
+- **Touch sizing follows the input, not only the width.** The 44px tier
+  applies below `md` _or_ on `(pointer: coarse)`, so a touch laptop or tablet
+  is treated as touch. Menu items, select items, checkboxes (through a 44px
+  label row) and drag grips meet it too.
+- **Phone cards:**
+  - The whole card is the primary action, and its title carries the accent
+    cue.
+  - ⋮ is pinned top-right at 44px.
+  - `DataTable` draws a selected card's accent border itself.
+  - A tap that fires as the finger lifts after a long-press is ignored.
+- **Bottom sheets** all behave the same way:
+  - a grabber and swipe-down to dismiss
+  - tap the scrim, the close button, Back or Escape to close
+  - `env(safe-area-inset-bottom)` under the footer
+
+### States and motion
+
+Every interactive element takes its states from one shared recipe in
+`controlStyles.ts`, which every primitive composes:
+
+- **Transition:** colour properties only, 120ms ease-out. Press snaps in at
+  40ms. Overlays take 200–250ms. A control never animates a transform.
+- **Hover:** one step brighter. Rows and ghost controls use the `panel-2`
+  fill and no other. Raw CSS `:hover` goes inside `@media (hover: hover)` so
+  it never sticks after a tap.
+- **Pressed:** a colour step darker than hover (`active:`). On touch, this is
+  the tap feedback.
+- **Focus:** a 2px accent outline on every interactive element, navigation
+  included.
+  - Outset (`outline-offset-2`) on boxed controls and inline links.
+  - Inset (`-outline-offset-2`) on full-bleed rows, tabs and nav items.
+  - `scroll-padding` keeps a focused row clear of sticky headers and the
+    phone tab bar (WCAG 2.4.11).
+- **Disabled:** `opacity-40` and `cursor-not-allowed`. When there's a reason
+  to show, use `aria-disabled` plus a tooltip instead of the native
+  attribute.
+- **Loading:** `Button loading` puts a small `Spinner` in place of the
+  leading icon and locks the width. The button is `aria-disabled` while it
+  runs, and the start and result are announced through a toast or a polite
+  live region.
+- **Selected / on:**
+  - A toggle (`aria-pressed`) takes the accent tint.
+  - A selected row takes the accent left border, the `panel-2` fill and an
+    accent label. Mark a single active row `aria-current="true"` and a
+    multi-select row `aria-selected`.
+  - Selected must never look like hover.
+- **Reduced motion:** under `prefers-reduced-motion: reduce` there are no
+  transitions, no smooth scroll and no pulse. A `Spinner` keeps turning at
+  half speed because it carries status.
 
 ## 7. Accessibility
 
