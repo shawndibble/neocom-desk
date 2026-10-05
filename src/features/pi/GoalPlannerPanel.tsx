@@ -465,7 +465,7 @@ function GoalPlanner({
 
   return (
     <div className="grid items-start gap-4 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:grid-rows-[auto_auto_auto_1fr]">
-      <div className="order-1 md:order-none md:col-start-1 md:row-start-1">
+      <div className="md:col-start-1 md:row-start-1">
         <GoalsSection
           goals={goals}
           products={products}
@@ -474,7 +474,7 @@ function GoalPlanner({
           size={size}
         />
       </div>
-      <div className="order-3 md:order-none md:col-start-1 md:row-start-2">
+      <div className="md:col-start-1 md:row-start-2">
         <ColoniesSection
           rows={liveRows}
           planetName={names.planet}
@@ -490,7 +490,7 @@ function GoalPlanner({
           onCustomsChange={writeCustoms}
         />
       </div>
-      <div className="order-4 md:order-none md:col-start-1 md:row-start-3">
+      <div className="md:col-start-1 md:row-start-3">
         <AssumptionsSection
           hubId={hub.id}
           onHubChange={setHub}
@@ -510,9 +510,7 @@ function GoalPlanner({
           onToggleExpanded={() => setAssumptionsOpen(!(assumptionsOpen ?? mdUp))}
         />
       </div>
-      <div className="order-2 min-w-0 md:order-none md:col-start-2 md:row-span-4 md:row-start-1">
-        {results}
-      </div>
+      <div className="min-w-0 md:col-start-2 md:row-span-4 md:row-start-1">{results}</div>
     </div>
   );
 }
