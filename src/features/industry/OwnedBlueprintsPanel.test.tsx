@@ -146,6 +146,12 @@ describe('OwnedBlueprintsPanel', () => {
     expect(screen.getByText('In container')).toBeInTheDocument();
   });
 
+  it('links the blueprint name to its Market listing', () => {
+    renderPanel();
+    const link = screen.getByRole('link', { name: 'Rifter Blueprint' });
+    expect(link.getAttribute('href')).toMatch(/^\/market\/browser\?.*100/);
+  });
+
   it('filters by BPO/BPC and activity', async () => {
     const user = userEvent.setup();
     renderPanel();

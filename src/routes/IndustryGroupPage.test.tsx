@@ -191,8 +191,8 @@ describe('IndustryGroupPage', () => {
     render(<App />);
 
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: /Rifter run/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Parts run/ })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /Rifter run/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Parts run/ })).toBeInTheDocument();
   });
 
   it("opening a member navigates to that plan's own page", async () => {
@@ -201,7 +201,7 @@ describe('IndustryGroupPage', () => {
     await db.buildPlans.add(seedPlan({ id: 'bp-1', name: 'Rifter run', buildGroupId: 'g1' }));
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: /Rifter run/ }));
+    await user.click(await screen.findByRole('link', { name: /Rifter run/ }));
 
     await waitFor(() => expect(window.location.pathname).toBe('/industry/plans/bp-1'));
     expect(await screen.findByRole('heading', { name: 'Rifter' })).toBeInTheDocument();

@@ -445,7 +445,7 @@ function ProductionRunForm({ hint, initial, onSubmit, submitLabel }: ProductionR
         <span className="font-semibold tracking-widest text-text-dim uppercase">
           {t('industry.totalCost')}
         </span>
-        <span className="font-medium tabular-nums text-accent">
+        <span className="font-medium tabular-nums text-text">
           {formatIsk(materialCost + jobFee)}
         </span>
       </div>

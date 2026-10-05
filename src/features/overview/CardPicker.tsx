@@ -26,7 +26,12 @@ import {
   textActionClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { gripHitAreaClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  gripHitAreaClassName,
+  interactiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { isCardShown, OVERVIEW_CARD_LABEL, type OverviewCardKey } from './hiddenCards';
 
 function CardToggle({
@@ -40,7 +45,9 @@ function CardToggle({
 }) {
   const { t } = useTranslation();
   return (
-    <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-1.5 text-xs">
+    <label
+      className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-1.5 text-xs ${tappableRowClassName}`}
+    >
       <Checkbox checked={shown} onChange={() => onToggle(cardKey)} />
       <span className="truncate">{t(OVERVIEW_CARD_LABEL[cardKey])}</span>
     </label>
@@ -71,7 +78,7 @@ function SortableCardRow({
         {...attributes}
         {...listeners}
         aria-label={t('overview.board.reorderCard', { name: t(OVERVIEW_CARD_LABEL[cardKey]) })}
-        className={`cursor-grab touch-none px-1 py-1.5 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${gripHitAreaClassName}`}
+        className={`cursor-grab touch-none px-1 py-1.5 text-text-faint hover:text-text ${interactiveClassName} ${focusRingClassName} ${gripHitAreaClassName}`}
       >
         <Icon.DragHandle />
       </button>

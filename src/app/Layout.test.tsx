@@ -322,14 +322,17 @@ describe('Layout nav marks routes the character cannot use', () => {
     const rail = screen.getAllByRole('navigation')[0];
     await waitFor(() =>
       expect(within(rail).getByRole('link', { name: 'Assets' })).toHaveAttribute(
-        'title',
-        'Needs a new login'
+        'data-locked',
+        'true'
       )
     );
     // Granted, so unmarked — and so is every ungated route.
-    expect(within(rail).getByRole('link', { name: 'Mail' })).not.toHaveAttribute('title');
-    expect(within(rail).getByRole('link', { name: 'Market' })).not.toHaveAttribute('title');
-    expect(within(rail).getByRole('link', { name: 'Overview' })).not.toHaveAttribute('title');
+    expect(within(rail).getByRole('link', { name: 'Mail' })).not.toHaveAttribute('data-locked');
+    expect(within(rail).getByRole('link', { name: 'Market' })).not.toHaveAttribute('data-locked');
+    expect(within(rail).getByRole('link', { name: 'Overview' })).not.toHaveAttribute('data-locked');
+    // The explanation is a Tooltip, not a native title.
+    await userEvent.setup().hover(within(rail).getByRole('link', { name: 'Assets' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Needs a new login');
   });
 
   it('leaves the marked link navigable — the gate is where the explanation lives', async () => {
@@ -339,7 +342,7 @@ describe('Layout nav marks routes the character cannot use', () => {
 
     const rail = screen.getAllByRole('navigation')[0];
     await waitFor(() =>
-      expect(within(rail).getByRole('link', { name: 'Mail' })).toHaveAttribute('title')
+      expect(within(rail).getByRole('link', { name: 'Mail' })).toHaveAttribute('data-locked')
     );
     expect(within(rail).getByRole('link', { name: 'Mail' })).toHaveAttribute('href', '/mail');
   });
@@ -689,7 +692,7 @@ describe('Layout corp nav entry', () => {
     expect(link).toHaveAttribute('href', '/corp');
     // No lock marker: there is no state in which this renders and is unusable,
     // so the amber dot would offer a re-login for a role nobody can grant here.
-    expect(link).not.toHaveAttribute('title');
+    expect(link).not.toHaveAttribute('data-locked');
   });
 });
 
@@ -859,7 +862,7 @@ describe('Layout intent warming', () => {
     });
     renderLayout();
     await waitFor(() =>
-      expect(screen.getAllByRole('link', { name: 'Assets' })[0]).toHaveAttribute('title')
+      expect(screen.getAllByRole('link', { name: 'Assets' })[0]).toHaveAttribute('data-locked')
     );
     mockedWarmRoute.mockClear();
   }
@@ -983,8 +986,8 @@ describe("Layout mobile tab bar follows the pilot's choice", () => {
     // the bar did not draw one, and the sheet no longer lists what the bar holds.
     await waitFor(() =>
       expect(within(mobileNav).getByRole('link', { name: 'Assets' })).toHaveAttribute(
-        'title',
-        'Needs a new login'
+        'data-locked',
+        'true'
       )
     );
   });

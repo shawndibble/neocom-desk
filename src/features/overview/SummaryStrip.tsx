@@ -19,6 +19,14 @@ import * as Icon from '@/components/ui/icons';
 import type { DeadlineSeverity } from '@/engine/severity';
 import { formatAge, HOUR_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
+
+/** A strip readout that navigates: keeps its tone colour (severity, ISK), underlines on hover. */
+const STRIP_LINK = cx(
+  'min-w-0 rounded-xs hover:underline',
+  interactiveClassName,
+  focusRingClassName
+);
 
 export interface SummaryStripProps {
   deadline: { label: string; note: string; severity: DeadlineSeverity; to: string } | null;
@@ -84,7 +92,7 @@ export function SummaryStrip({
           {deadline === null ? (
             <Value muted>{t('overview.board.noDeadline')}</Value>
           ) : (
-            <Link to={deadline.to} className="min-w-0 hover:underline">
+            <Link to={deadline.to} className={STRIP_LINK}>
               <Value className={`text-3xl ${SEVERITY_TEXT[deadline.severity]}`}>
                 {deadline.label}
               </Value>
@@ -103,7 +111,7 @@ export function SummaryStrip({
               <Value muted>{t('overview.board.notTraining')}</Value>
             )
           ) : (
-            <Link to={training.to} className="min-w-0 hover:underline">
+            <Link to={training.to} className={STRIP_LINK}>
               <Value>{training.label}</Value>
               <Note>{training.note}</Note>
             </Link>
@@ -118,7 +126,7 @@ export function SummaryStrip({
           ) : wallet === null ? (
             <Value muted>—</Value>
           ) : (
-            <Link to={wallet.to} className="min-w-0 hover:underline">
+            <Link to={wallet.to} className={STRIP_LINK}>
               <Value className="text-isk-pos">{wallet.label}</Value>
             </Link>
           )}
@@ -223,7 +231,10 @@ function Note({ children }: { children: ReactNode }) {
  * `to` makes it a link, for the idle case's "go fix this" destination.
  */
 function WarningLine({ to, children }: { to?: string; children: ReactNode }) {
-  const className = `flex min-w-0 items-center gap-1.5 text-base font-medium text-warning${to ? ' hover:underline' : ''}`;
+  const className = cx(
+    'flex min-w-0 items-center gap-1.5 rounded-xs text-base font-medium text-warning',
+    to && cx('hover:underline', interactiveClassName, focusRingClassName)
+  );
   const content = (
     <>
       <SeverityIcon severity="warning" />
