@@ -332,6 +332,7 @@ export default defineConfig({
           '**/data/marketWideTrees.json',
           '**/data/reprocessing.json',
           '**/data/pi-planet-radius.json',
+          '**/data/pi-system-planets.json',
           '**/data/blueprints.json',
           '**/data/shipTree.json',
           '**/data/typeNames.json',

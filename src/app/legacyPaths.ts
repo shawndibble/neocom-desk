@@ -10,6 +10,8 @@ const MOVES: readonly (readonly [from: string, to: string])[] = [
   ['/settings/shortcuts', '/help/shortcuts'],
   ['/settings/faq', '/help/faq'],
   ['/settings/help', '/help/support'],
+  // The PI Advisor tab retired; its content lives on Colonies for now (`?system=` rides along).
+  ['/planetary-industry/advisor', '/planetary-industry/colonies'],
 ];
 
 export interface LegacyTarget {

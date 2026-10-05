@@ -69,7 +69,7 @@ async function assertNoOverflow(page: Page): Promise<void> {
 test.describe('PI Plan — Goal Planner', () => {
   test('lays the whole plan out at 390px without a sideways scroll', async ({ page }) => {
     await page.setViewportSize(PHONE);
-    await signInAndGoto(page, './planetary-industry');
+    await signInAndGoto(page, './planetary-industry/colonies');
     await mockPlannerColonies(page);
     await mockHubPrices(page);
     await page.goto(`./planetary-industry/plan?goals=${GOALS}`);
@@ -127,7 +127,7 @@ test.describe('PI Colonies — Switch to an alt (issue #1770)', () => {
 
   test('offers a 44px Switch action that stays on the page at 390px', async ({ page }) => {
     await page.setViewportSize(PHONE);
-    await signInAndGoto(page, './planetary-industry');
+    await signInAndGoto(page, './planetary-industry/colonies');
     await seedNotLoadedAlt(page);
     // The app reads every signed-in character's ESI feeds; a 404 (not an empty list) keeps the alt's planets uncached, so it stays "not loaded".
     await page.route(`https://esi.evetech.net/characters/${ALT_ID}/**`, (route) =>
@@ -216,7 +216,7 @@ test.describe('PI Colonies — alt group data age (issue #2291)', () => {
     page,
   }) => {
     await page.setViewportSize(LAPTOP);
-    await signInAndGoto(page, './planetary-industry');
+    await signInAndGoto(page, './planetary-industry/colonies');
     const listFetchedAt = await seedCachedAlt(page);
     // Alts are cache-only; a 404 keeps any stray live read from overwriting the seeded rows.
     await page.route(`https://esi.evetech.net/characters/${ALT_ID}/**`, (route) =>
