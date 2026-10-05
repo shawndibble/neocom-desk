@@ -332,6 +332,7 @@ function IskCharts({
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
                 width={COMPACT_ISK_Y_AXIS_WIDTH}
+                // SVG axis text: IskAmount can't render inside the chart (documented exception).
                 tickFormatter={(value: number) => formatIskCompact(value)}
               />
               <Tooltip content={(props) => <RateTooltip {...props} />} />
@@ -392,6 +393,7 @@ function IskCharts({
                 type="number"
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                // SVG axis text: IskAmount can't render inside the chart (documented exception).
                 tickFormatter={(value: number) => formatIskCompact(value)}
               />
               <YAxis
@@ -416,6 +418,7 @@ function IskCharts({
                   <LabelList
                     dataKey="rawValue"
                     position="right"
+                    // SVG label text: IskAmount can't render inside the chart (documented exception).
                     formatter={(value: unknown) => formatIskCompact(Number(value))}
                     style={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
                   />

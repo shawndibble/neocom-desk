@@ -829,7 +829,7 @@ Retired meanings, each with its replacement:
 | ----------------------------------------------------- | -------------------------------------------------------------------------------- |
 | Dashed underline to mark an editable value            | The pencil                                                                       |
 | Bare `CaretLeft` for "back to the parent"             | A labelled breadcrumb                                                            |
-| ⓘ as a static status glyph                            | `WarningCircle` or `Lightbulb`                                                   |
+| ⓘ as a static status glyph (`Icon.Tip`)               | `WarningCircle` or `Lightbulb`                                                   |
 | Accent left bar for "loaded" or "in use"              | A status word                                                                    |
 | A gear that navigates                                 | The gear opens _this page's_ settings modal; link to Settings with labelled text |
 | `textActionClassName` that navigates or opens a modal | It performs an action; navigation is a link or a row                             |

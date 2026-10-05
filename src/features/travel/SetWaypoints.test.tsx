@@ -151,7 +151,11 @@ describe('SetWaypoints', () => {
     expect(
       await screen.findByText(/Setting waypoints needs a permission this character hasn't granted/)
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Set waypoints in game' })).toBeDisabled();
+    // `aria-disabled`, not `disabled`: the reason stays reachable in a tooltip.
+    expect(screen.getByRole('button', { name: 'Set waypoints in game' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     expect(screen.getByRole('button', { name: 'Log in again' })).toBeInTheDocument();
   });
 

@@ -297,7 +297,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
 
   async function openSettleUp(page: Page): Promise<Locator> {
     // Exact: the selection toolbar's own action is "Settle up {{count}}".
-    await page.getByRole('button', { name: 'Settle up', exact: true }).click();
+    await page.getByRole('button', { name: 'Settle up…', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: `Settle up — ${PAYEE_NAME}` });
     await expect(dialog).toBeVisible();
     // A single entry starts folded into its summary line; the itemized row
@@ -471,7 +471,7 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
     await expect(boxes).toHaveCount(1);
     await boxes.first().check();
 
-    const settleUp = page.getByRole('button', { name: /^Settle up \d+$/ });
+    const settleUp = page.getByRole('button', { name: /^Settle up \d+…$/ });
     await expect(settleUp).toBeVisible();
     return {
       settleUpHeight: async () => (await settleUp.boundingBox())?.height,

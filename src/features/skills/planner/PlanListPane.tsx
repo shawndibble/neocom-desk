@@ -303,7 +303,7 @@ export function PlanListPane({
             activePlanId={activePlanId}
             autoRenamePlanId={autoRenamePlanId}
             onAutoRenameStarted={spendFocusName}
-            onOpen={(id) => navigate(`/skills/plans/${id}`)}
+            planHref={(id) => `/skills/plans/${id}`}
             onDuplicate={(id) => void handleDuplicate(id)}
             otherCharacters={otherCharacters}
             onCopyToCharacter={(id, characterId) => void handleCopyToCharacter(id, characterId)}

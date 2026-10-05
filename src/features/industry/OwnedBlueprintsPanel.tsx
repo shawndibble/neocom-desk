@@ -25,6 +25,8 @@ import {
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { CharacterAsset, CharacterBlueprint } from '@/esi/endpoints';
+import { CharacterLink } from '@/features/entities';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { iskToneClass } from '@/features/character/format';
 import { loadBlueprintLocation } from '@/features/bpcContracts/blueprintLocation';
 import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
@@ -237,7 +239,7 @@ export function OwnedBlueprintsPanel({
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.blueprint,
       render: (row) => (
         <span className="flex flex-wrap items-center gap-1.5">
-          {row.name}
+          <MarketItemLink typeId={row.blueprint.type_id}>{row.name}</MarketItemLink>
           {row.activity === 'reaction' && (
             <span className="text-[0.6875rem] text-text-dim">
               {t('industry.ownedBlueprintsActivity.reaction')}
@@ -251,7 +253,7 @@ export function OwnedBlueprintsPanel({
       header: t('industry.ownedBlueprintsKind'),
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.kind,
       render: (row) => (
-        <span className={row.kind === 'bpo' ? 'font-medium text-accent' : undefined}>
+        <span className={row.kind === 'bpo' ? 'font-medium' : undefined}>
           {row.kind === 'bpo' ? t('industry.bpo') : t('industry.bpc')}
         </span>
       ),
@@ -300,7 +302,11 @@ export function OwnedBlueprintsPanel({
       header: t('industry.ownedBlueprintsOwner'),
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.owner,
       render: (row) =>
-        row.owner.kind === 'character' ? row.owner.name : t('industry.ownedBlueprintsCorporation'),
+        row.owner.kind === 'character' ? (
+          <CharacterLink id={row.owner.characterId}>{row.owner.name}</CharacterLink>
+        ) : (
+          t('industry.ownedBlueprintsCorporation')
+        ),
     },
     {
       id: 'iskPerHour',

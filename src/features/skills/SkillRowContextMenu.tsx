@@ -5,6 +5,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuTrigger,
+  DisabledMenuItem,
   MenuItem,
   MenuSub,
   MenuSubContent,
@@ -105,14 +106,14 @@ export function SkillRowContextMenu({
     withMenu
   );
 
-  const items = (
+  // Maxed: an aria-disabled item with a tap-reachable reason, not a native title.
+  const items = maxed ? (
+    <DisabledMenuItem reason={t('skills.contextMenu.maxLevelTitle')}>
+      {t('skills.contextMenu.addToSkillPlan')}
+    </DisabledMenuItem>
+  ) : (
     <MenuSub>
-      <MenuSubTrigger
-        disabled={maxed}
-        title={maxed ? t('skills.contextMenu.maxLevelTitle') : undefined}
-      >
-        {t('skills.contextMenu.addToSkillPlan')}
-      </MenuSubTrigger>
+      <MenuSubTrigger>{t('skills.contextMenu.addToSkillPlan')}</MenuSubTrigger>
       <MenuSubContent>
         {plans && plans.length > 0 ? (
           plans.map((plan) => (

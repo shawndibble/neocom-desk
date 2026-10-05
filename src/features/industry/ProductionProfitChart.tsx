@@ -100,6 +100,7 @@ export default function ProductionProfitChart({ points, trend }: ProductionProfi
               stroke="var(--color-text-dim)"
               tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
               width={COMPACT_ISK_Y_AXIS_WIDTH}
+              // SVG axis tick: IskAmount can't render here (documented exception).
               tickFormatter={(value: number) => formatIskCompact(value)}
             />
             <Tooltip content={(props) => <ProfitTooltip {...props} />} />

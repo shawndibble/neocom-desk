@@ -1499,9 +1499,9 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       );
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
-      const badge = await within(table).findByRole('button', { name: /BPO on contract: 4M/ });
+      const badge = (await within(table).findByText(/BPO on contract: 4M/)).parentElement!;
       // Short visible text; price and location live in the tooltip.
-      expect(badge).toHaveTextContent(/^BPO may be cheaper$/);
+      expect(badge).toHaveTextContent(/BPO may be cheaper$/);
     });
 
     it('badges one copy per blueprint, not every offer row, when several are listed', async () => {
@@ -1517,8 +1517,8 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       );
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
-      await within(table).findByRole('button', { name: /BPO on contract: 4M/ });
-      expect(within(table).getAllByRole('button', { name: /BPO on contract/ })).toHaveLength(1);
+      await within(table).findByText(/BPO on contract: 4M/);
+      expect(within(table).getAllByText(/BPO on contract/)).toHaveLength(1);
     });
 
     it('badges the cheapest copy across the whole set, even when the snapshot lists it last', async () => {
@@ -1533,8 +1533,8 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       );
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
-      await within(table).findByRole('button', { name: /BPO on contract: 4M/ });
-      expect(within(table).getAllByRole('button', { name: /BPO on contract/ })).toHaveLength(1);
+      await within(table).findByText(/BPO on contract: 4M/);
+      expect(within(table).getAllByText(/BPO on contract/)).toHaveLength(1);
     });
 
     it('with one blueprint picked, says BPO once in callout cards rather than on every row', async () => {
@@ -1605,7 +1605,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       expect(contractCard).not.toHaveTextContent('BPO may be cheaper');
 
       // Said once, in the cards: no row badge, and no duplicate chip.
-      expect(within(table).queryByRole('button', { name: /BPO on/ })).not.toBeInTheDocument();
+      expect(within(table).queryByText(/BPO on/)).not.toBeInTheDocument();
       expect(screen.queryByText('Cheapest BPO')).not.toBeInTheDocument();
     });
 
@@ -1618,7 +1618,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       );
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
-      const badge = await within(table).findByRole('button', { name: /BPO on contract: 40M/ });
+      const badge = (await within(table).findByText(/BPO on contract: 40M/)).parentElement!;
       expect(badge).not.toHaveTextContent('BPO may be cheaper');
     });
 
@@ -1638,7 +1638,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
 
       await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
 
-      const badge = await within(table).findByRole('button', { name: /BPO on market: 2M/ });
+      const badge = (await within(table).findByText(/BPO on market: 2M/)).parentElement!;
       expect(badge).toHaveTextContent('BPO may be cheaper');
       // "All regions" reads the pilot's market hub (Jita by default) region.
       expect(getOrderBook).toHaveBeenCalledWith(10000002, 638);
@@ -1803,12 +1803,17 @@ describe('BpcSourcingPanel Jump Range', () => {
     const jitaRow = rows.find((r) => within(r).queryByText('Jita IV - Moon 4'));
     expect(jitaRow).toBeDefined();
     const jumpsCell = (jitaRow as HTMLElement).querySelector('[data-label="Jumps"]');
-    // findByTitle, not getByTitle: the cell can still show the "…" pending
-    // placeholder for a tick after loadCharacterSolarSystemId's mock resolves.
+    // The dash is a HintText trigger now (no native title). waitFor: the cell can
+    // still show the "…" pending placeholder for a tick after
+    // loadCharacterSolarSystemId's mock resolves.
+    const trigger = await waitFor(() => {
+      const el = (jumpsCell as HTMLElement).querySelector<HTMLElement>('[tabindex="0"]');
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    await userEvent.hover(trigger);
     expect(
-      await within(jumpsCell as HTMLElement).findByTitle(
-        'Set your current system to filter by distance.'
-      )
+      await screen.findByRole('tooltip', { name: 'Set your current system to filter by distance.' })
     ).toBeInTheDocument();
   });
 

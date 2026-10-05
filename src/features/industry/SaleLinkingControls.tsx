@@ -53,7 +53,7 @@ export function SoldSplitButton({
     <div className="flex items-center gap-1.5 sm:justify-end">
       <div className="flex">
         <Button size="sm" className="rounded-r-none" onClick={onSold}>
-          {t('industry.soldButton')}
+          {t('industry.soldButton')}…
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
