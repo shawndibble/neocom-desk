@@ -15,6 +15,16 @@ let activeOverlays = 0;
 let restorePushState: (() => void) | null = null;
 let pushingOwnEntry = false;
 
+/** Whether a pushState target is a different pathname from the current page. */
+function leavesPage(url: string | URL | null | undefined): boolean {
+  if (url === null || url === undefined) return false;
+  try {
+    return new URL(String(url), window.location.href).pathname !== window.location.pathname;
+  } catch {
+    return false;
+  }
+}
+
 function pushOwnEntry(id: string): void {
   const base: unknown = window.history.state;
   const carried = typeof base === 'object' && base !== null ? base : {};
@@ -31,15 +41,18 @@ function pushOwnEntry(id: string): void {
  * router's `pushState`, from a `Link` or `navigate()`) *replaces* the
  * overlay's entry instead of stacking on top of it. Back from the new page
  * then goes to the page that was under the overlay, as people expect, and no
- * dead same-URL step is left behind. Only a push made while an overlay's entry
- * is the current one is converted; any other push passes through untouched.
+ * dead same-URL step is left behind. Only a push that changes the *pathname*
+ * (the user is leaving the page) while an overlay's entry is current is
+ * converted. A search-param or hash push (an entity link's `?info=`, a modal
+ * writing its own param) stays a real push, so Back closes just that layer and
+ * the overlay's entry survives beneath it.
  */
 function trackOverlay(): () => void {
   activeOverlays += 1;
   if (activeOverlays === 1) {
     const original = window.history.pushState;
     window.history.pushState = function (this: History, ...args: Parameters<History['pushState']>) {
-      if (!pushingOwnEntry && ownerOf(window.history.state) !== undefined) {
+      if (!pushingOwnEntry && ownerOf(window.history.state) !== undefined && leavesPage(args[2])) {
         return window.history.replaceState(...args);
       }
       return original.apply(this, args);
