@@ -13,7 +13,7 @@ import type {
 } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
-import { useMarketSourcing } from './marketSourcingPref';
+import { usePiSettings } from './piSettings';
 import { useAltColonies } from './altColoniesPref';
 
 const pi = JSON.parse(
@@ -265,7 +265,10 @@ beforeEach(() => {
   vi.setSystemTime(new Date(INSTALL + 3 * DAY_MS));
   // A module-scoped store outlives the test that set it, and buying changes
   // what every card says. Back to the shipped default each time.
-  useMarketSourcing.setState({ value: 'none', hydrated: true });
+  usePiSettings.setState({
+    value: { hub: 'jita', buybackPct: null, buyTiers: [] },
+    hydrated: true,
+  });
   useAltColonies.setState({ value: false, hydrated: true });
   loadPiRosterSnapshot.mockResolvedValue({
     colonies: [],
@@ -654,7 +657,10 @@ describe('AdvisorPanel', () => {
   it('prices the whole tab at the hub the pilot picked', async () => {
     // The control is both the permission and the price basis: an Amarr pilot's
     // margins are Amarr's, not Jita's read through an Amarr-shaped label.
-    useMarketSourcing.setState({ value: 'amarr', hydrated: true });
+    usePiSettings.setState({
+      value: { hub: 'amarr', buybackPct: null, buyTiers: [1] },
+      hydrated: true,
+    });
     renderPanel();
     await screen.findAllByText('Ashab III');
 
@@ -977,7 +983,10 @@ describe('AdvisorPanel', () => {
   it('separates what a factory would buy from what it merely gives up', async () => {
     // Buying is off by default — it assumes a hub within reach — so this is
     // the opted-in state, set the way the checkbox sets it.
-    useMarketSourcing.setState({ value: 'jita', hydrated: true });
+    usePiSettings.setState({
+      value: { hub: 'jita', buybackPct: null, buyTiers: [1] },
+      hydrated: true,
+    });
     // The pilot asked to "take into account the cost of buying it on the local
     // market hub". Superconductors need Plasmoids, which neither colony makes,
     // so those are a purchase — while the Water feeding the same factory is

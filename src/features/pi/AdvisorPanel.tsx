@@ -89,7 +89,8 @@ import { ColonyDetail } from './ColonyDetailModal';
 import { colonyPlan, layoutLabel, useColonyPlan } from './colonyPlan';
 import { DirectiveRow, EstimateBadge, SectionLabel } from './DirectiveRow';
 import { medianNewLinkLoad, unbuiltPlanAdvice, type UnbuiltPlanAdvice } from './unbuiltPlanModel';
-import { useMarketSourcing } from './marketSourcingPref';
+import { usePiSettings } from './piSettings';
+import type { MarketSourcing } from './HowYouPlay';
 import type { NetworkConversion, NetworkOpportunity } from '@/engine/pi/network';
 import {
   colonySpaceFor,
@@ -851,15 +852,25 @@ export function AdvisorPanel({
   // is a fact about the pilot rather than about any colony.
   // Which hub the pilot can reach, or 'none'. It is both the permission to
   // plan a purchase and the market every figure on the tab is priced at.
-  const sourcing = useMarketSourcing((state) => state.value);
-  const hydrateBuyInputs = useMarketSourcing((state) => state.hydrate);
-  const setSourcing = useMarketSourcing((state) => state.setValue);
-  // 'none' is a refusal to plan a purchase, not a refusal to price anything:
-  // the output still has to be valued somewhere, so the reference hub stands
-  // in and nothing is offered as a buy.
-  const buyHub = getTradeHub(sourcing === 'none' ? DEFAULT_TRADE_HUB.id : sourcing);
-  const priceHub = buyHub ?? DEFAULT_TRADE_HUB;
-  const buyInputs = sourcing !== 'none';
+  // The shared PI settings (`piSettings.ts`): the Advisor can only say "buy or
+  // not", so any tier allowed counts as buying on, at the settings' hub.
+  const piSettings = usePiSettings((state) => state.value);
+  const hydratePiSettings = usePiSettings((state) => state.hydrate);
+  const setPiSettings = usePiSettings((state) => state.setValue);
+  const priceHub = getTradeHub(piSettings.hub) ?? DEFAULT_TRADE_HUB;
+  const buyInputs = piSettings.buyTiers.length > 0;
+  const sourcing: MarketSourcing = buyInputs ? priceHub.id : 'none';
+  const setSourcing = (value: MarketSourcing) =>
+    setPiSettings(
+      value === 'none'
+        ? { ...piSettings, buyTiers: [] }
+        : {
+            ...piSettings,
+            hub: value,
+            buybackPct: null,
+            buyTiers: buyInputs ? piSettings.buyTiers : [1],
+          }
+    );
   const withAlts = useAltColonies((state) => state.value);
   const hydrateAlts = useAltColonies((state) => state.hydrate);
   const setWithAlts = useAltColonies((state) => state.setValue);
@@ -867,8 +878,8 @@ export function AdvisorPanel({
     void hydrateAlts();
   }, [hydrateAlts]);
   useEffect(() => {
-    void hydrateBuyInputs();
-  }, [hydrateBuyInputs]);
+    void hydratePiSettings();
+  }, [hydratePiSettings]);
   const { restartDays, haulDays } = useCadence((state) => state.value);
   const [failed, setFailed] = useState(false);
 

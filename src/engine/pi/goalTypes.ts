@@ -79,6 +79,13 @@ export interface PlannerColony {
 export interface Goal {
   typeId: number;
   unitsPerDay: number;
+  /**
+   * Set by the planner, never by a caller: per chain type (P2+), the share 0..1
+   * of that type's need in this goal that is bought at the hub instead of made.
+   * A share is a fraction, not units, so a goal scaled to the rate it reaches
+   * keeps buying in proportion. Absent means everything is made.
+   */
+  buyShare?: ReadonlyMap<number, number>;
 }
 
 export interface PlannerPolicy {

@@ -35,8 +35,7 @@ import {
   buttonClassName,
   Checkbox,
 } from '@/components/ui';
-import { TRADE_HUBS } from '@/market/hubs';
-import type { MarketSourcing } from './marketSourcingPref';
+import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { useCadence, type PiCadence } from './cadencePref';
 import { Assume, CadenceRow, PercentInput } from './piControls';
 
@@ -44,6 +43,9 @@ import { Assume, CadenceRow, PercentInput } from './piControls';
 function Footnote({ children }: { children: React.ReactNode }) {
   return <p className="mt-1 text-[0.625rem] leading-relaxed text-text-dim">{children}</p>;
 }
+
+/** The Advisor's view of the PI buy setting: a hub it may buy at, or `'none'`. */
+export type MarketSourcing = TradeHub['id'] | 'none';
 
 export interface HowYouPlayProps {
   systems: readonly { systemId: number; name: string | null }[];

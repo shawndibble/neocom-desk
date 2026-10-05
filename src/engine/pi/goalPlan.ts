@@ -67,7 +67,12 @@
  *    yields it can take more — never while a colony able to yield it sits on
  *    its Baseline with room. A P1 merely rationed by a scarcer input is not a
  *    gap; its demand line says how much is made (`madeFraction`). Shortfalls
- *    carry both P0 and P1 units. Buying stops at P1 in milestone 1.
+ *    carry both P0 and P1 units. P2 and P3 are bought too when the pilot allows
+ *    them and not P1 (`goalPlanSteps/buying.ts`): a gap is bought at the lowest
+ *    allowed tier above it and everything higher is still made. A type gap is
+ *    bought in full before the solve; a P1 that stays short is bought in the
+ *    share it falls short of its demand, and the plan is solved again on the
+ *    reduced demand (a few rounds at most). Buying P1 or nothing never re-solves.
  *
  * 7. **Spare capacity sells.** A colony the plan uses but does not fill takes
  *    one more slot on its best-selling P1 if one fits; a colony the plan does
@@ -113,6 +118,7 @@ import type {
   PriceBooks,
 } from './goalTypes';
 import { haulEffortOf } from './haulEffort';
+import { buysHigherTiers, withShortPurchases, withTypeGapPurchases } from './goalPlanSteps/buying';
 import { assignColonies } from './goalPlanSteps/assignments';
 import { achievedOf, demandLines } from './goalPlanSteps/demand';
 import { extractionProblem, solveExtraction } from './goalPlanSteps/extraction';
@@ -150,7 +156,12 @@ export interface PlanGoalsInput {
  * out, as `planGoals` leaves them out. What `planBest` iterates.
  */
 export function hostCandidates(input: PlanGoalsInput, pi: PiData): number[] {
-  const goals = normaliseGoals(input.goals, pi);
+  const goals = withTypeGapPurchases(
+    normaliseGoals(input.goals, pi),
+    input.colonies,
+    input.policy,
+    pi
+  );
   const { live } = triageGoals(goals, input.colonies, input.policy, pi);
   const madeHigh = madeHighOf(live, pi);
   if (madeHigh.length === 0) return [];
@@ -159,9 +170,31 @@ export function hostCandidates(input: PlanGoalsInput, pi: PiData): number[] {
     .sort(byId);
 }
 
+/** Most times a budget gap is bought and the plan solved again. */
+const MAX_BUY_ROUNDS = 4;
+
 export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
+  const { colonies, policy } = input;
+  let goals = withTypeGapPurchases(normaliseGoals(input.goals, pi), colonies, policy, pi);
+  let { plan, shortShare } = solve(input, goals, pi);
+  if (!buysHigherTiers(policy)) return plan;
+  for (let round = 0; round < MAX_BUY_ROUNDS && shortShare.size > 0; round++) {
+    const bought = withShortPurchases(goals, shortShare, policy, pi);
+    if (!bought) break;
+    goals = bought;
+    ({ plan, shortShare } = solve(input, goals, pi));
+  }
+  return plan;
+}
+
+/** A solved plan, and per P1 that holds a goal back, the share of its demand the extraction left unmet. */
+interface Solved {
+  plan: GoalPlan;
+  shortShare: Map<number, number>;
+}
+
+function solve(input: PlanGoalsInput, goals: readonly Goal[], pi: PiData): Solved {
   const { colonies, policy, books } = input;
-  const goals = normaliseGoals(input.goals, pi);
   const baselines = new Map(
     colonies.map((c) => [c.planetId, colonyBaseline(c, pi, policy, books)] as const)
   );
@@ -229,8 +262,13 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
 
   const shortfalls = [...triage.typeGaps, ...placed.shortfalls, ...gaps.shortfalls];
   shortfalls.sort(compareShortfalls);
-  return {
-    goals,
+  const shortShare = new Map<number, number>();
+  for (const p1 of solved.binding) {
+    const need = problem.demand.get(p1) ?? 0;
+    if (need > 0) shortShare.set(p1, 1 - Math.min(1, (extracted.get(p1) ?? 0) / need));
+  }
+  const plan: GoalPlan = {
+    goals: [...goals],
     achieved: achievedOf({ goals, dead, boughtOutright, highFraction, p1GoalReach, pi }),
     demand: demandLines({
       problem,
@@ -254,4 +292,5 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
     haulEffort: haulEffortOf(flows, pi, input.jumps),
     hauling: haulingOf(flows, pi),
   };
+  return { plan, shortShare };
 }
