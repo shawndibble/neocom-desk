@@ -1073,9 +1073,12 @@ describe('Travel › Thera / Turnur', () => {
 
     const table = await screen.findByRole('table', { name: MAIN_TABLE });
     expect(holesIn(table)).toEqual(['uedama']);
-    expect(screen.getByRole('button', { name: 'Thera 1' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Both 2' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Turnur 1' })).toBeInTheDocument();
+    const user = userEvent.setup();
+    const hub = screen.getByRole('combobox', { name: 'Hub' });
+    expect(hub).toHaveTextContent('Thera 1');
+    await user.click(hub);
+    expect(await screen.findByRole('option', { name: 'Both 2' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Turnur 1' })).toBeInTheDocument();
   });
 
   it.each(['all', 'bogus'])('reads an unknown exit param (space=%s) as K-space', async (space) => {
@@ -1083,7 +1086,7 @@ describe('Travel › Thera / Turnur', () => {
 
     const table = await screen.findByRole('table', { name: MAIN_TABLE });
     await waitFor(() => expect(holesIn(table)).toEqual(['perimeter', 'uedama']));
-    expect(screen.getByRole('button', { name: 'K-space' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('combobox', { name: 'Exit' })).toHaveTextContent('K-space');
     expect(screen.getByRole('button', { name: JSPACE_GROUP })).toBeInTheDocument();
   });
 
