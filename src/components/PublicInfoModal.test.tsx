@@ -313,17 +313,16 @@ describe('PublicInfoModal', () => {
     act(() => usePublicInfoModalStore.getState().open('character', 95));
 
     const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByRole('link', { name: 'zKillboard' })).toHaveAttribute(
-      'href',
-      'https://zkillboard.com/character/95/'
-    );
+    expect(
+      await within(dialog).findByRole('link', { name: /^zKillboard\s*\(opens/ })
+    ).toHaveAttribute('href', 'https://zkillboard.com/character/95/');
 
     await waitFor(() =>
       expect(within(dialog).getByRole('tab', { name: 'Corporation' })).toBeInTheDocument()
     );
     within(dialog).getByRole('tab', { name: 'Corporation' }).click();
     await waitFor(() =>
-      expect(within(dialog).getByRole('link', { name: 'zKillboard' })).toHaveAttribute(
+      expect(within(dialog).getByRole('link', { name: /^zKillboard\s*\(opens/ })).toHaveAttribute(
         'href',
         'https://zkillboard.com/corporation/7/'
       )
@@ -334,7 +333,7 @@ describe('PublicInfoModal', () => {
     );
     within(dialog).getByRole('tab', { name: 'Alliance' }).click();
     await waitFor(() =>
-      expect(within(dialog).getByRole('link', { name: 'zKillboard' })).toHaveAttribute(
+      expect(within(dialog).getByRole('link', { name: /^zKillboard\s*\(opens/ })).toHaveAttribute(
         'href',
         'https://zkillboard.com/alliance/700/'
       )
@@ -600,7 +599,7 @@ describe('PublicInfoModal', () => {
       expect(within(dialog).getByText('10%')).toBeInTheDocument();
       expect(within(dialog).getByRole('button', { name: 'Kaelen Vrask' })).toBeInTheDocument();
       expect(within(dialog).getByRole('button', { name: 'Oren Vrask' })).toBeInTheDocument();
-      expect(within(dialog).getByRole('link', { name: 'Website' })).toHaveAttribute(
+      expect(within(dialog).getByRole('link', { name: /^Website\s*\(opens/ })).toHaveAttribute(
         'href',
         'https://example.com/vrsk'
       );
@@ -651,7 +650,9 @@ describe('PublicInfoModal', () => {
       const dialog = await screen.findByRole('dialog');
       expect(await within(dialog).findByText('NPC corporation')).toBeInTheDocument();
       expect(await within(dialog).findByText('Servant Sisters of EVE')).toBeInTheDocument();
-      expect(within(dialog).queryByRole('link', { name: 'zKillboard' })).not.toBeInTheDocument();
+      expect(
+        within(dialog).queryByRole('link', { name: /^zKillboard\s*\(opens/ })
+      ).not.toBeInTheDocument();
       expect(within(dialog).queryByRole('region', { name: 'Alliance history' })).toBeNull();
     });
   });
