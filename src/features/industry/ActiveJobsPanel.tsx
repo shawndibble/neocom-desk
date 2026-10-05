@@ -79,7 +79,7 @@ import {
 } from '@/engine/industry/jobSlots';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import { CharacterBadge } from '@/features/character/assetBrowserRows';
+import { CharacterLink } from '@/features/entities';
 import {
   useResolvedCharacterFilter,
   fromStoredCharacterFilterValue,
@@ -726,23 +726,25 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
               {nameForBlueprint(job.blueprint_type_id)}
             </MarketItemLink>
             {soon(job) && (
-              <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
+              <span className="rounded-xs bg-warning/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
                 {t('industry.jobsCompletingSoon')}
               </span>
             )}
             {done(job) && (
-              <span className="rounded-xs border border-success/50 bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
+              <span className="rounded-xs bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
                 {t('industry.jobsDone')}
               </span>
             )}
             {/* Only once more than one Character's jobs are on screen (`showCharacterColumn`) — same gate as `OpenOrdersPanel`'s `showCharacterStrip`. */}
             {job.owner === 'corporation' && (
-              <span className="shrink-0 rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <span className="shrink-0 rounded-xs bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('industry.jobsCorpBadge')}
               </span>
             )}
             {showCharacterColumn && job.characterName !== '' && (
-              <CharacterBadge characterName={job.characterName} />
+              <span className="ml-1.5 shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem]">
+                <CharacterLink id={job.characterId}>{job.characterName}</CharacterLink>
+              </span>
             )}
           </span>
         ),
@@ -871,7 +873,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
    * actually free *capacity* — unrelated to whether anything is running at
    * all (issue: the numbers looked like they described the same thing).
    *
-   * A dashed underline expands to the used/max breakdown per category on
+   * A dotted underline (HintText) expands to the used/max breakdown per category on
    * hover/focus, same wording `Characters.tsx`'s `openJobsColumn` tooltip
    * already uses (`{{used}}/{{max}} slots used`) — used, not open, is the
    * numerator a reader expects under a fraction, and here it also stays

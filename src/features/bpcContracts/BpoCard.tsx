@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { InfoTooltip, IskAmount } from '@/components/ui';
+import { SystemLink } from '@/features/entities';
 import type { OfferLocation } from '@/features/contractSearch/offerLocations';
 import { cx } from '@/lib/cx';
 import type { BpoOffer } from './bpoAvailability';
@@ -64,7 +65,11 @@ export function BpoCard({ bpo, mayBeCheaper, cheapest, location, className }: Bp
           t('bpcContracts.notApplicable')
         ) : (
           <>
-            {location.systemName}
+            {location.systemId !== null ? (
+              <SystemLink systemId={location.systemId}>{location.systemName}</SystemLink>
+            ) : (
+              location.systemName
+            )}
             {location.security !== null && (
               <>
                 {' '}

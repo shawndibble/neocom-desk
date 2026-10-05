@@ -78,7 +78,7 @@ export function AutoBuildControl({
           onClick={() => setConfirmOpen(true)}
           disabled={disabled || maxDepth === 0}
         >
-          {t('industry.autoBuildApply')}
+          {t('industry.autoBuildApply')}…
         </Button>
         {trailing && <div className="ml-auto flex items-center gap-1">{trailing}</div>}
       </div>

@@ -98,7 +98,7 @@ export function DevicePanel() {
               disabled={loggedIn === 0}
               onClick={() => openDialog('logout')}
             >
-              {t('settings.deviceLogoutAction')}
+              {t('settings.deviceLogoutOpen')}
             </Button>
           </Field>
           <Field
@@ -113,7 +113,7 @@ export function DevicePanel() {
               disabled={loggedIn === 0}
               onClick={() => openDialog('delete')}
             >
-              {t('settings.deviceDeleteAction')}
+              {t('settings.deviceDeleteOpen')}
             </Button>
           </Field>
         </Fields>

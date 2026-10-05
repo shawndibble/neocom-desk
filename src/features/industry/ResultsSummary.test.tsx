@@ -407,7 +407,9 @@ describe('ResultsSummary: unpriced-product Market link (#409)', () => {
       result: { ...RESULT, buyCost: null, unpriceable: true, unpricedMaterials: [] },
       productTypeID: 587,
     });
-    await userEvent.click(screen.getByRole('button', { name: /Rifter has no hub sell price/ }));
+    const link = screen.getByRole('link', { name: /Rifter has no hub sell price/ });
+    expect(link).toHaveAttribute('href', expect.stringContaining('/market/browser'));
+    await userEvent.click(link);
     expect(screen.getByText('Market Browser')).toBeInTheDocument();
   });
 
@@ -417,7 +419,7 @@ describe('ResultsSummary: unpriced-product Market link (#409)', () => {
       productTypeID: null,
     });
     expect(
-      screen.queryByRole('button', { name: /Rifter has no hub sell price/ })
+      screen.queryByRole('link', { name: /Rifter has no hub sell price/ })
     ).not.toBeInTheDocument();
     expect(screen.getByText(/Rifter has no hub sell price/)).toBeInTheDocument();
   });
