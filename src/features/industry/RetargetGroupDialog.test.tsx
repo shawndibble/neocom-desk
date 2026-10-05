@@ -114,4 +114,26 @@ describe('RetargetGroupDialog', () => {
       buildLocationName: 'K2-18 R&D',
     });
   });
+
+  it('leaves the facility tax unset when the field is focused and left again untouched', async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    render(
+      <RetargetGroupDialog
+        group={{
+          ...GROUP,
+          snapshot: { hubId: 'jita', facility: 'raitaru', security: 'highsec', appliedAt: 1 },
+        }}
+        plans={[plan({ id: 'p1', name: 'Hull A' })]}
+        onApply={onApply}
+        onClose={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('textbox', { name: 'Facility tax %' }));
+    await user.tab();
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onApply.mock.calls[0][0].facilityTaxPct).toBeUndefined();
+  });
 });

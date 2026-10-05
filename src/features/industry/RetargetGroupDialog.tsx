@@ -82,7 +82,10 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
   const [target, setTarget] = useState<RetargetTarget>(() => initialTarget(group));
   // Held as typed and committed on blur, like the plan page's tax field, so a
   // half-typed "1." is not rewritten under the cursor.
+  // `taxEdited` keeps a bare focus-and-blur from committing the displayed 0:
+  // an undefined tax means "leave each plan's own alone".
   const [taxText, setTaxText] = useState(() => String(target.facilityTaxPct ?? 0));
+  const [taxEdited, setTaxEdited] = useState(false);
   const [checked, setChecked] = useState<ReadonlySet<string>>(
     () => new Set(plans.map((p) => p.id))
   );
@@ -122,6 +125,8 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
   }
 
   function commitTax() {
+    if (!taxEdited) return;
+    setTaxEdited(false);
     const n = Number(taxText.replace(',', '.'));
     if (taxText.trim() === '' || !Number.isFinite(n)) {
       setTaxText(String(target.facilityTaxPct ?? 0));
@@ -138,9 +143,9 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
         <div className="flex flex-col gap-3 text-xs">
           <p className="text-text-dim">{t('industry.retargetFormHint')}</p>
 
-          {/* Manufacturing only: a Build Group is a set of things being built, and
-            the plan page's own search offers just the places that can host the
-            job (issue #460). */}
+          {/* The search offers manufacturing places only — a Build Group is a set of
+            things being built (issue #460). The facility list below stays
+            unfiltered, as it was before the search arrived. */}
           <BuildLocationPicker
             activity="manufacturing"
             idPrefix="retarget-location"
@@ -172,13 +177,11 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.values(FACILITY_PRESETS)
-                    .filter((f) => f.activity === 'manufacturing')
-                    .map((f) => (
-                      <SelectItem key={f.kind} value={f.kind}>
-                        {f.name}
-                      </SelectItem>
-                    ))}
+                  {Object.values(FACILITY_PRESETS).map((f) => (
+                    <SelectItem key={f.kind} value={f.kind}>
+                      {f.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </label>
@@ -272,7 +275,10 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
                   size="sm"
                   inputMode="decimal"
                   value={taxText}
-                  onChange={(e) => setTaxText(e.target.value)}
+                  onChange={(e) => {
+                    setTaxText(e.target.value);
+                    setTaxEdited(true);
+                  }}
                   onBlur={commitTax}
                 />
               </label>
