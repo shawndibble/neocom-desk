@@ -41,12 +41,30 @@ describe('retargetPatch', () => {
     expect(patch.facilityTaxPct).toBeUndefined();
   });
 
-  it('leaves rig fit and facility tax alone when the target is a structure', () => {
-    // Mirrors buildLocationPatch: ESI publishes no structure rig fitting, so
-    // a plan's own rig/tax survive a facility pick the same way here.
+  it('leaves rig fit and facility tax alone when a structure target carries neither', () => {
+    // ESI publishes no structure rig fitting, so a pick alone has nothing
+    // truer to write than what the plan already had.
     const patch = retargetPatch(snapshot({ facility: 'raitaru' }));
     expect('rigFit' in patch).toBe(false);
     expect('facilityTaxPct' in patch).toBe(false);
+  });
+
+  it('writes the rig fit and tax a structure target carries', () => {
+    const patch = retargetPatch(
+      snapshot({ facility: 'raitaru', rigFit: ['meT2', 'none', 'none'], facilityTaxPct: 2 })
+    );
+    expect(patch.rigFit).toEqual(['meT2', 'none', 'none']);
+    expect(patch.facilityTaxPct).toBe(2);
+  });
+
+  it('writes the picked location pair, and clears it when the snapshot has none', () => {
+    const picked = retargetPatch(snapshot({ buildLocationId: 1035, buildLocationName: 'K2-18' }));
+    expect(picked.buildLocationId).toBe(1035);
+    expect(picked.buildLocationName).toBe('K2-18');
+    const none = retargetPatch(snapshot());
+    expect('buildLocationId' in none).toBe(true);
+    expect(none.buildLocationId).toBeUndefined();
+    expect(none.buildLocationName).toBeUndefined();
   });
 });
 
@@ -76,5 +94,30 @@ describe('planMatchesSnapshot', () => {
     expect(
       planMatchesSnapshot({ ...plan, buildSystemId: 30000142, buildSystemName: 'Jita' }, snapshot())
     ).toBe(false);
+  });
+
+  it('is false when only the picked location, rig fit or tax differs', () => {
+    expect(planMatchesSnapshot(plan, snapshot({ buildLocationId: 7 }))).toBe(false);
+    expect(
+      planMatchesSnapshot(
+        { ...plan, facility: 'raitaru', rigFit: ['none', 'none', 'none'] },
+        snapshot({ facility: 'raitaru', rigFit: ['meT2', 'none', 'none'] })
+      )
+    ).toBe(false);
+    expect(
+      planMatchesSnapshot(
+        { ...plan, facility: 'raitaru', facilityTaxPct: 1 },
+        snapshot({ facility: 'raitaru', facilityTaxPct: 2 })
+      )
+    ).toBe(false);
+  });
+
+  it('ignores rig fit and tax when the snapshot carries none', () => {
+    expect(
+      planMatchesSnapshot(
+        { ...plan, facility: 'raitaru', rigFit: ['meT2', 'none', 'none'], facilityTaxPct: 3 },
+        snapshot({ facility: 'raitaru' })
+      )
+    ).toBe(true);
   });
 });

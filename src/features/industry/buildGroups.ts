@@ -53,8 +53,10 @@
 
 import {
   FACILITY_PRESETS,
+  RIG_KIND_OPTIONS,
   type FacilityKind,
   type OwnedStockScope,
+  type RigFit,
   type SecurityBand,
 } from '@/engine/industry/types';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
@@ -85,6 +87,21 @@ export interface BuildGroupSnapshot {
    */
   buildSystemId?: number;
   buildSystemName?: string;
+  /**
+   * The station or structure picked in the Retarget dialog's search, so a
+   * retargeted plan's own search box names it too. Id and name travel
+   * together the way a plan's `buildLocationId`/`buildLocationName` do; the
+   * name is absent where ESI withheld it.
+   */
+  buildLocationId?: number;
+  buildLocationName?: string;
+  /**
+   * A structure's rig fit and owner-set tax, when the pilot entered them in
+   * the dialog. Absent means "leave each plan's own alone" — ESI publishes
+   * neither, so there is nothing truer to write.
+   */
+  rigFit?: RigFit;
+  facilityTaxPct?: number;
   /** When the group was last Retargeted onto these values. */
   appliedAt: number;
 }
@@ -132,8 +149,18 @@ export type BuildGroupsValue = Record<number, BuildGroup[]>;
 
 function usableSnapshot(value: unknown): value is BuildGroupSnapshot {
   if (typeof value !== 'object' || value === null) return false;
-  const { hubId, facility, security, buildSystemId, buildSystemName, appliedAt } =
-    value as Partial<BuildGroupSnapshot>;
+  const {
+    hubId,
+    facility,
+    security,
+    buildSystemId,
+    buildSystemName,
+    buildLocationId,
+    buildLocationName,
+    rigFit,
+    facilityTaxPct,
+    appliedAt,
+  } = value as Partial<BuildGroupSnapshot>;
   return (
     typeof hubId === 'string' &&
     TRADE_HUBS.some((hub) => hub.id === hubId) &&
@@ -143,6 +170,15 @@ function usableSnapshot(value: unknown): value is BuildGroupSnapshot {
     (buildSystemId === undefined) === (buildSystemName === undefined) &&
     (buildSystemId === undefined || typeof buildSystemId === 'number') &&
     (buildSystemName === undefined || typeof buildSystemName === 'string') &&
+    (buildLocationId === undefined || Number.isFinite(buildLocationId)) &&
+    // The name is optional (ESI withholds it), but never without its id.
+    (buildLocationName === undefined ||
+      (typeof buildLocationName === 'string' && buildLocationId !== undefined)) &&
+    (rigFit === undefined ||
+      (Array.isArray(rigFit) &&
+        rigFit.length === 3 &&
+        rigFit.every((kind) => RIG_KIND_OPTIONS.includes(kind)))) &&
+    (facilityTaxPct === undefined || Number.isFinite(facilityTaxPct)) &&
     typeof appliedAt === 'number' &&
     Number.isFinite(appliedAt)
   );

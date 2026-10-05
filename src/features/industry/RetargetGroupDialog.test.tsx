@@ -21,6 +21,16 @@ function plan(overrides: Partial<BuildPlanRecord> & { id: string; name: string }
   };
 }
 
+vi.mock('@/app/useGrantedScopes', () => ({
+  useGrantedScopes: () => ['esi-search.search_structures.v1'],
+}));
+vi.mock('@/stores/activeCharacter', () => ({
+  useActiveCharacter: (select: (s: { activeCharacterId: number | null }) => unknown) =>
+    select({ activeCharacterId: 91 }),
+}));
+const searchBuildLocations = vi.hoisted(() => vi.fn());
+vi.mock('./searchBuildLocations', () => ({ searchBuildLocations, MIN_SEARCH_LENGTH: 3 }));
+
 const GROUP: BuildGroup = { id: 'g1', name: 'Doctrine', order: 0 };
 
 describe('RetargetGroupDialog', () => {
@@ -64,5 +74,66 @@ describe('RetargetGroupDialog', () => {
 
     const [, planIds] = onApply.mock.calls[0];
     expect(planIds).toEqual(['p1']);
+  });
+
+  it('fills facility, system and location from a searched pick and hands them to Apply', async () => {
+    searchBuildLocations.mockResolvedValue([
+      {
+        structureId: 1035,
+        name: 'K2-18 R&D',
+        facility: 'azbel',
+        systemId: 30003888,
+        systemName: 'Badivefi',
+        security: 'highsec',
+      },
+    ]);
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    render(
+      <RetargetGroupDialog
+        group={GROUP}
+        plans={[plan({ id: 'p1', name: 'Hull A' })]}
+        onApply={onApply}
+        onClose={vi.fn()}
+      />
+    );
+
+    await user.type(screen.getByRole('combobox', { name: 'Build location' }), 'K2-18');
+    await user.click(await screen.findByRole('option', { name: /K2-18 R&D/ }));
+    // A structure shows its rig slots, like the plan page.
+    expect(screen.getByRole('combobox', { name: 'Rig 1' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onApply.mock.calls[0][0]).toMatchObject({
+      facility: 'azbel',
+      security: 'highsec',
+      buildSystemId: 30003888,
+      buildSystemName: 'Badivefi',
+      buildLocationId: 1035,
+      buildLocationName: 'K2-18 R&D',
+    });
+  });
+
+  it('leaves the facility tax unset when the field is focused and left again untouched', async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    render(
+      <RetargetGroupDialog
+        group={{
+          ...GROUP,
+          snapshot: { hubId: 'jita', facility: 'raitaru', security: 'highsec', appliedAt: 1 },
+        }}
+        plans={[plan({ id: 'p1', name: 'Hull A' })]}
+        onApply={onApply}
+        onClose={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('textbox', { name: 'Facility tax %' }));
+    await user.tab();
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onApply.mock.calls[0][0].facilityTaxPct).toBeUndefined();
   });
 });

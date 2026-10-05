@@ -370,6 +370,35 @@ describe('parseBuildGroups — snapshot', () => {
     expect(parseBuildGroups(raw)).toEqual({});
   });
 
+  it('keeps a snapshot carrying a picked location, rig fit and facility tax', () => {
+    const full = snapshot({
+      facility: 'raitaru',
+      buildLocationId: 1035,
+      buildLocationName: 'K2-18 R&D',
+      rigFit: ['meT2', 'teT1', 'none'],
+      facilityTaxPct: 1.5,
+    });
+    const raw = { 1: [{ id: 'g1', name: 'G', order: 0, snapshot: full }] };
+    expect(parseBuildGroups(raw)).toEqual({
+      1: [{ id: 'g1', name: 'G', order: 0, snapshot: full }],
+    });
+  });
+
+  it('drops a snapshot whose rig fit, tax or location id is malformed', () => {
+    for (const bad of [
+      { rigFit: ['meT2', 'bogus', 'none'] },
+      { rigFit: ['none', 'none'] },
+      { facilityTaxPct: 'a lot' },
+      { buildLocationId: 'x' },
+      { buildLocationName: 'K2-18' },
+    ]) {
+      const raw = {
+        1: [{ id: 'g1', name: 'G', order: 0, snapshot: { ...snapshot(), ...bad } }],
+      };
+      expect(parseBuildGroups(raw)).toEqual({});
+    }
+  });
+
   it('keeps a group with no snapshot at all — the pre-#632 shape', () => {
     const raw = { 1: [{ id: 'g1', name: 'G', order: 0 }] };
     expect(parseBuildGroups(raw)).toEqual({ 1: [{ id: 'g1', name: 'G', order: 0 }] });

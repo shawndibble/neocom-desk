@@ -1,16 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { Tooltip, textActionClassName } from '@/components/ui';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
-import type { BuildPlanRecord } from '@/db';
 import type { BuildGroupSnapshot } from './buildGroups';
 import { planMatchesSnapshot } from './retargetPatch';
 import { getTradeHub } from '@/market/hubs';
 
 interface GroupTargetLinkProps {
-  plan: Pick<
-    BuildPlanRecord,
-    'hubId' | 'facility' | 'security' | 'buildSystemId' | 'buildSystemName'
-  >;
+  plan: Parameters<typeof planMatchesSnapshot>[0];
   /** The plan's group's last Retarget, or `null` for an ungrouped plan or one whose group has none yet. */
   snapshot: BuildGroupSnapshot | null;
   onApply: () => void;
@@ -33,6 +29,7 @@ export function GroupTargetLink({ plan, snapshot, onApply }: GroupTargetLinkProp
     FACILITY_PRESETS[snapshot.facility].name,
     t(`industry.${snapshot.security}`),
     ...(snapshot.buildSystemName ? [snapshot.buildSystemName] : []),
+    ...(snapshot.buildLocationName ? [snapshot.buildLocationName] : []),
   ].join(', ');
 
   return (
