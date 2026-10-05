@@ -99,7 +99,11 @@ import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import { InjectorFactsPanel } from './InjectorFactsPanel';
 import { LiveQueueLead } from './LiveQueueLead';
 import { projectQueueEnd } from '@/features/skills/queueStatus';
-import { evaluateOptimizationBadge, toOptimizationBadge } from './planHeaderStats';
+import {
+  evaluateOptimizationBadge,
+  remapSavingsShrank,
+  toOptimizationBadge,
+} from './planHeaderStats';
 import { markerVerdict, remapVerdict, type OptimizeVerdict } from './optimizeVerdict';
 import { cloneStateFor, useCloneStates, withCloneState } from '../cloneState';
 import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
@@ -611,7 +615,7 @@ export function PlanEditor({
   // The what-if chip's "vs current" figure: one more pass of the same costing
   // against the clone's real implants, run only while the lens is hypothetical.
   const hypotheticalLens = isHypotheticalLens(whatIf);
-  const currentLensTotalSeconds = useMemo(
+  const currentLensSchedule = useMemo(
     () =>
       hypotheticalLens
         ? schedulePlan(
@@ -633,7 +637,7 @@ export function PlanEditor({
               cloneState,
             },
             loadedAtMs
-          ).totalSeconds
+          )
         : null,
     [
       hypotheticalLens,
@@ -652,6 +656,7 @@ export function PlanEditor({
       loadedAtMs,
     ]
   );
+  const currentLensTotalSeconds = currentLensSchedule?.totalSeconds ?? null;
   const {
     scheduled,
     entryBoundaries,
@@ -858,6 +863,37 @@ export function PlanEditor({
     catalog,
     attributes,
     effectiveImplants,
+    cloneState,
+    timedRemap,
+  ]);
+
+  // The remap saving the header would show on the clone's real implants, so a
+  // what-if lens that shrinks it can say why (`remapSavingsShrank`). Mirrors
+  // `headerBadge`'s two Booster-blind paths; with a Booster active there is no
+  // live figure on either side, so no comparison.
+  const realLensSavingsSeconds = useMemo(() => {
+    if (!currentLensSchedule || activeBoosters.length > 0) return null;
+    const { markersResult, scheduled: realScheduled } = currentLensSchedule;
+    if (markersResult && markerVerdict(markersResult).kind !== 'markersAtEnd') {
+      return markersResult.savingsSeconds;
+    }
+    if (requestedRemapCount <= 0) return null;
+    return (
+      evaluateOptimizationBadge(realScheduled, catalog.engineSkills, {
+        remapCount: requestedRemapCount,
+        currentAttributes: attributes,
+        implants,
+        cloneState,
+        timedRemap: timedRemap ?? undefined,
+      })?.savingsSeconds ?? null
+    );
+  }, [
+    currentLensSchedule,
+    activeBoosters,
+    requestedRemapCount,
+    catalog,
+    attributes,
+    implants,
     cloneState,
     timedRemap,
   ]);
@@ -1999,6 +2035,10 @@ export function PlanEditor({
                 }
               : null
           }
+          savingsShrankWithImplants={remapSavingsShrank(
+            headerBadge?.savingsSeconds ?? null,
+            realLensSavingsSeconds
+          )}
           trainedKnown={trainedSkillsKnown}
           name={plan.name}
           onRename={isDesktop ? undefined : (name) => onUpdate({ name })}

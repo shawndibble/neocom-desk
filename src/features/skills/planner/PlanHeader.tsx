@@ -34,6 +34,11 @@ interface PlanHeaderProps {
    * null while the plan is costed on the real implants.
    */
   whatIf?: { lens: string; verdict: WhatIfVerdict } | null;
+  /**
+   * True when the what-if implants made the remap saving smaller than it is
+   * on the real ones; adds a "?" tooltip saying why (`remapSavingsShrank`).
+   */
+  savingsShrankWithImplants?: boolean;
   /** False until the character's trained skills have loaded: progress reads `—`, not 0%. */
   trainedKnown?: boolean;
   /**
@@ -60,6 +65,7 @@ export function PlanHeader({
   nextMilestone,
   progress,
   whatIf = null,
+  savingsShrankWithImplants = false,
   trainedKnown = true,
   name,
   onRename,
@@ -166,6 +172,10 @@ export function PlanHeader({
         {badge && (
           <StatChip
             label={t('plans.headerSavingsLabel')}
+            tooltipGlyph="info"
+            tooltip={
+              savingsShrankWithImplants ? t('plans.headerSavingsShrankWithImplants') : undefined
+            }
             tone={showsSavings ? 'success' : 'default'}
             value={
               <>

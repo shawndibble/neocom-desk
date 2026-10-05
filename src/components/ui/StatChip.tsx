@@ -12,6 +12,8 @@ interface StatChipProps {
   className?: string;
   /** One-line plain-language explanation, rendered as a small "?" tooltip next to the label. */
   tooltip?: string;
+  /** `info` draws an "i" for a note on this value; the default "?" explains the label's term. */
+  tooltipGlyph?: 'help' | 'info';
   testId?: string;
 }
 
@@ -25,6 +27,7 @@ export function StatChip({
   tone = 'default',
   className = '',
   tooltip,
+  tooltipGlyph,
   testId,
 }: StatChipProps) {
   const { t } = useTranslation();
@@ -39,7 +42,13 @@ export function StatChip({
       className={`inline-flex h-7 shrink-0 items-center gap-1.5 text-[0.6875rem] whitespace-nowrap ${className}`}
     >
       <span className="font-semibold tracking-widest text-text-dim uppercase">{label}</span>
-      {tooltip && <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />}
+      {tooltip && (
+        <InfoTooltip
+          label={t('common.aboutLabel', { label })}
+          content={tooltip}
+          glyph={tooltipGlyph}
+        />
+      )}
       <span className={`font-medium tabular-nums ${STAT_CHIP_TONE_TEXT_CLASS[tone]}`}>{value}</span>
     </span>
   );

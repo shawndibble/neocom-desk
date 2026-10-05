@@ -8,8 +8,12 @@
  * the link cost is priced from the shipped radius rather than borrowed. Names,
  * systems and security are this fixture's own (mocked below).
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import { CHARACTER_ID } from './fixtureData';
+import { piTier } from '../../src/engine/pi/chain';
+import type { PiData } from '../../src/sde/types';
 
 const HIGHSEC_SYSTEM = 30000142;
 const NULLSEC_SYSTEM = 30000001;
@@ -27,6 +31,12 @@ export interface Colony {
   basicsPerEcu?: number;
   /** Hours until the extractors expire; negative is already stopped. */
   expiresInHours?: number;
+  /** Hours since the programs were installed. Default 20. */
+  installedHoursAgo?: number;
+  /** Extra Basic factories set to a schematic nothing feeds, so they sit idle. */
+  idleBasics?: number;
+  /** P0 per cycle per ECU. Default 6,000 (+500 per extra ECU). */
+  qtyPerCycle?: number;
 }
 
 const COLONIES: Colony[] = [
@@ -79,7 +89,7 @@ function detailFor(colony: Colony, now: number) {
     type_id: 2848,
     latitude: 0.3 + i * 0.05,
     longitude: 1.1 + i * 0.07,
-    install_time: new Date(now - 20 * HOUR).toISOString(),
+    install_time: new Date(now - (colony.installedHoursAgo ?? 20) * HOUR).toISOString(),
     expiry_time: new Date(now + (colony.expiresInHours ?? 52) * HOUR).toISOString(),
     extractor_details: {
       heads: Array.from({ length: colony.heads }, (_, h) => ({
@@ -88,7 +98,7 @@ function detailFor(colony: Colony, now: number) {
         longitude: 1.1,
       })),
       product_type_id: product,
-      qty_per_cycle: 6_000 + i * 500,
+      qty_per_cycle: (colony.qtyPerCycle ?? 6_000) + i * 500,
       cycle_time: 1800,
     },
   }));
@@ -105,6 +115,18 @@ function detailFor(colony: Colony, now: number) {
     }))
   );
   pins.push(...basics);
+  for (let k = 0; k < (colony.idleBasics ?? 0); k += 1) {
+    // Electrolytes needs Ionic Solutions, which no colony here extracts.
+    const idle = {
+      pin_id: 300 + k,
+      type_id: 2469,
+      latitude: 0.5 + k * 0.03,
+      longitude: 1.5,
+      schematic_id: 123,
+    };
+    basics.push(idle);
+    pins.push(idle);
+  }
   // A tree rooted at the Launchpad: every ECU and every basic one hop from it.
   const links = [...colony.extracts.map((_, i) => 100 + i), ...basics.map((b) => b.pin_id)].map(
     (pinId) => ({ source_pin_id: 1, destination_pin_id: pinId, link_level: 0 })
@@ -114,6 +136,11 @@ function detailFor(colony: Colony, now: number) {
     links.push({ source_pin_id: 1, destination_pin_id: 2, link_level: 0 });
   }
   return { pins, links, routes: [] };
+}
+
+/** The default colonies with per-planet overrides layered on, for a spec that needs one stopped, one expiring and so on. */
+export function withVariants(variants: Record<number, Partial<Colony>>): Colony[] {
+  return COLONIES.map((colony) => ({ ...colony, ...variants[colony.planetId] }));
 }
 
 /**
@@ -226,4 +253,66 @@ export async function mockPlannerColonies(
       })
     );
   });
+}
+
+/** Flat per tier, high enough that a made tier out-earns selling the raw ore. */
+const UNIT_PRICE = [5, 1_500, 36_000, 140_000, 1_000_000];
+
+/**
+ * Quotes every planetary type the app asks the hub about, at its tier's price,
+ * both sides of the book. A later `page.route` wins over an earlier one — see
+ * `support/testBase.ts`.
+ */
+export async function mockPiHubPrices(page: Page): Promise<void> {
+  const pi = JSON.parse(
+    readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
+  ) as PiData;
+  await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
+    const types = new URL(route.request().url()).searchParams.get('types') ?? '';
+    const body: Record<string, unknown> = {};
+    for (const raw of types.split(',').filter(Boolean)) {
+      const sell = UNIT_PRICE[piTier(Number(raw), pi)];
+      body[raw] = {
+        buy: { max: sell * 0.95, volume: 500_000, orderCount: 40 },
+        sell: { min: sell, volume: 500_000, orderCount: 40 },
+      };
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+  });
+}
+
+/**
+ * A pilot with Command Center Upgrades V and Interplanetary Consolidation III,
+ * so the ranking has a colony budget to fit recipes in (the default fixture's
+ * untrained pilot fits none).
+ */
+export async function mockPiSkills(page: Page): Promise<void> {
+  await page.route(`https://esi.evetech.net/characters/${CHARACTER_ID}/skills`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        skills: [
+          {
+            skill_id: 2505,
+            trained_skill_level: 5,
+            active_skill_level: 5,
+            skillpoints_in_skill: 1,
+          },
+          {
+            skill_id: 2495,
+            trained_skill_level: 3,
+            active_skill_level: 3,
+            skillpoints_in_skill: 1,
+          },
+        ],
+        total_sp: 2,
+        unallocated_sp: 0,
+      }),
+    })
+  );
 }
