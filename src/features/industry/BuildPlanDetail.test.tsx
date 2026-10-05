@@ -1207,14 +1207,14 @@ describe('BuildPlanDetail Include Reactions (issue #698)', () => {
     render(<Harness plan={{ runs: 10, includeReactions: true }} />);
     await screen.findByText('Tritanium');
 
-    expect(screen.getByText('Reactions')).not.toHaveAttribute('aria-disabled');
+    expect(screen.getByText('Reactions')).not.toHaveClass('text-text-dim');
   });
 
   it("leaves Auto Build's Reactions chip disabled while Include Reactions is off", async () => {
     render(<Harness plan={{ runs: 10 }} />);
     await screen.findByText('Tritanium');
 
-    expect(screen.getByText('Reactions')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText('Reactions')).toHaveClass('text-text-dim');
   });
 });
 

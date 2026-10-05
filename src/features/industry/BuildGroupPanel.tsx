@@ -26,7 +26,13 @@ import {
   Spinner,
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
+import { Link } from 'react-router-dom';
+import { onPlanLinkClick, planHref } from './planLinkClick';
 import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
@@ -605,7 +611,7 @@ export function BuildGroupPanel({
           >
             <span className="sr-only">{t('industry.acquisitionVerdictLabel')} </span>
             {groupProfit === null ? (
-              <Icon.Info size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
+              <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
             ) : groupVerdict === 'build' ? (
               <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
             ) : (
@@ -741,24 +747,25 @@ export function BuildGroupPanel({
                 const row = rowByPlanId.get(plan.id);
                 return (
                   <li key={plan.id}>
-                    <button
-                      type="button"
-                      onClick={() => onOpenPlan(plan.id)}
-                      className={`${tappableRowClassName} flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
+                    <Link
+                      to={planHref(plan.id)}
+                      onClick={onPlanLinkClick(() => onOpenPlan(plan.id))}
+                      className={`${tappableRowClassName} group flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left ${rowInteractiveClassName} ${focusRingInsetClassName}`}
                     >
-                      <span className="truncate" title={plan.name}>
-                        {plan.name}
-                      </span>
+                      <span className="truncate text-accent">{plan.name}</span>
                       <span className="shrink-0 tabular-nums text-text-dim">
                         {row?.result ? (
-                          // Long press, not tap: the whole row is a button
-                          // that opens the plan.
                           <IskAmount value={row.result.totalCost} decimals={0} />
                         ) : (
                           '—'
                         )}
                       </span>
-                    </button>
+                      <Icon.Descend
+                        size={Icon.ICON_SIZE.sm}
+                        aria-hidden="true"
+                        className="-mr-1 shrink-0 text-text-faint group-hover:text-accent"
+                      />
+                    </Link>
                   </li>
                 );
               })}
@@ -783,7 +790,7 @@ export function BuildGroupPanel({
                     className="flex items-center justify-between gap-2 px-2.5 py-1.5"
                   >
                     <span className="truncate">{nameForType(catalog, typeID)}</span>
-                    <span className="shrink-0 rounded-xs border border-accent-dim/50 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+                    <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
                       {t('industry.groupCraftedTag')}
                     </span>
                   </li>

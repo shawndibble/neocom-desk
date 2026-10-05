@@ -18,8 +18,10 @@
  * here, and the same is already true of the top-level `eveNotification` row
  * above it.
  */
+import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
-import { Caret } from '@/components/ui';
+import { Caret, Tooltip } from '@/components/ui';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { NOTIFICATION_EVENT_IDS, eventLabelKey, type NotificationEventId } from './events';
 import {
@@ -140,9 +142,9 @@ export function AllCharactersNotificationSection({
                           key={type}
                           className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs"
                         >
-                          <span className="truncate text-text-dim" title={typeLabel}>
-                            {typeLabel}
-                          </span>
+                          <Tooltip content={typeLabel}>
+                            <span className="truncate text-text-dim">{typeLabel}</span>
+                          </Tooltip>
                           <div className={CHANNEL_COLUMNS}>
                             {NOTIFICATION_CHANNELS.map((channel) => (
                               <SelectionCheckbox
@@ -192,7 +194,11 @@ export function AllCharactersNotificationSection({
           type="button"
           aria-expanded={expanded}
           onClick={onToggleExpanded}
-          className="flex min-h-11 min-w-0 flex-1 items-center gap-1.5 py-1.5 pl-2.5 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-0"
+          className={cx(
+            'flex min-h-11 min-w-0 flex-1 items-center gap-1.5 py-1.5 pl-2.5 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text md:min-h-0',
+            interactiveClassName,
+            focusRingInsetClassName
+          )}
         >
           <Caret expanded={expanded} />
           <span className="min-w-0 truncate">{t('settings.notifications.allCharactersLabel')}</span>

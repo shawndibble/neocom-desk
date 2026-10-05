@@ -314,21 +314,23 @@ describe('BuildPlanList: build groups (#626)', () => {
     expect(screen.getByText('Data Analyzer II')).toBeInTheDocument();
   });
 
-  it('titles the truncated group name button with the full name (#2175)', () => {
+  it('shows the full group name in a tooltip when truncated (#2175)', async () => {
     const longName = 'Punisher Hull Line — bulk run for the Amarr Navy Issue reprocessing project';
     renderGrouped({
       groups: [{ id: 'g1', name: longName, order: 0 }],
     });
-    expect(screen.getByText(longName)).toHaveAttribute('title', longName);
+    await userEvent.hover(screen.getByText(longName));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(longName);
   });
 
-  it('titles the truncated plan name button with the full name (#2175)', () => {
+  it('shows the full plan name in a tooltip when truncated (#2175)', async () => {
     const longName = 'Punisher Hull Line — bulk run for the Amarr Navy Issue reprocessing project';
     renderGrouped({
       plans: [plan({ id: 'a', name: longName, buildGroupId: 'g1' })],
       expandedGroupIds: new Set(['g1']),
     });
-    expect(screen.getByText(longName)).toHaveAttribute('title', longName);
+    await userEvent.hover(screen.getByText(longName));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(longName);
   });
 
   it('always lists a plan that is in no group', () => {
@@ -396,7 +398,6 @@ describe('BuildPlanList: build groups (#626)', () => {
 // the list. So these cover the rendered contract only: the handle is there, and
 // it is deliberately not the accessibility path.
 describe('BuildPlanList: dragging a plan into a group (#627)', () => {
-  const HANDLE_TITLE = 'Drag onto a group to move this plan into it';
   const GROUPS = [{ id: 'g1', name: 'Buzzard fit', order: 0 }];
   const PLANS = [
     plan({ id: 'a', name: 'Buzzard', buildGroupId: 'g1' }),
@@ -425,14 +426,14 @@ describe('BuildPlanList: dragging a plan into a group (#627)', () => {
 
   it('gives every plan row a drag handle', () => {
     renderDraggable();
-    expect(screen.getAllByTitle(HANDLE_TITLE)).toHaveLength(2);
+    expect(screen.getAllByTestId('plan-drag-handle')).toHaveLength(2);
   });
 
   it('offers no handle at all until there is a group to drag into', () => {
     // With no groups every drop resolves to the plan's own (absent) group, so
     // a grab cursor would be advertising a move that cannot happen.
     renderDraggable({ groups: [] });
-    expect(screen.queryByTitle(HANDLE_TITLE)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('plan-drag-handle')).not.toBeInTheDocument();
   });
 
   it('keeps the handle out of the tab order and hidden from assistive tech', () => {
@@ -440,7 +441,7 @@ describe('BuildPlanList: dragging a plan into a group (#627)', () => {
     // raw droppable ids; the per-row menu reaches the same destinations
     // properly, so the handle is pointer-only on purpose.
     renderDraggable();
-    for (const handle of screen.getAllByTitle(HANDLE_TITLE)) {
+    for (const handle of screen.getAllByTestId('plan-drag-handle')) {
       expect(handle).toHaveAttribute('aria-hidden', 'true');
       expect(handle).toHaveAttribute('tabindex', '-1');
       // Without this a touch-drag scrolls the list instead of dragging (#408).

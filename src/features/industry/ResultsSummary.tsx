@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { useLocation, useNavigate } from 'react-router-dom';
 import {
   DataTable,
   Disclosure,
@@ -22,7 +21,7 @@ import {
   type OwnedStockSale,
   type OwnedStockSaleLine,
 } from '@/engine/industry/ownedStockSale';
-import { marketItemUrl } from '@/engine/market/urlState';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
@@ -189,8 +188,6 @@ export function ResultsSummary({
   itemActionsFor,
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const location = useLocation();
   const [jobFeeExpanded, setJobFeeExpanded] = useState(false);
   const [profitView, setProfitView] = useState<'net' | 'gross'>('net');
   const [saleBasis, setSaleBasis] = useState<LiquidationBasis>('instant');
@@ -312,13 +309,9 @@ export function ResultsSummary({
           {result.unpricedMaterials.length > 0 && result.buyCost === null && ' '}
           {result.buyCost === null &&
             (productTypeID !== null ? (
-              <button
-                type="button"
-                className="underline"
-                onClick={() => navigate(marketItemUrl(productTypeID, location.search))}
-              >
+              <MarketItemLink typeId={productTypeID}>
                 {t('industry.productUnpriced', { name: productName })}
-              </button>
+              </MarketItemLink>
             ) : (
               t('industry.productUnpriced', { name: productName })
             ))}
@@ -416,6 +409,8 @@ export function ResultsSummary({
                     ? (_row, tr) => itemMenuFor(productTypeID, tr)
                     : undefined
                 }
+                // No ⋮ here on purpose: the hero above carries this product's, and the
+                // row menu stays right-click/hold (exception to §6c, same item).
               />
             </div>
             <div className="divide-y divide-line rounded-xs border border-line">
@@ -567,6 +562,7 @@ export function ResultsSummary({
                   label={t('industry.useOrSell.perMaterial')}
                   density="compact"
                   rowContextMenu={itemMenuFor && ((row, tr) => itemMenuFor(row.typeID, tr))}
+                  rowMoreActions={itemMenuFor !== undefined}
                   mobileSort
                 />
               </div>

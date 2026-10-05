@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { IconButton } from '@/components/ui';
+import { IconButton, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
@@ -117,10 +117,11 @@ export function NavItem({
   const counted = badge !== undefined && badge > 0;
   const Glyph = NAV_ICON_BY_PATH[to];
   const linkClass = tab ? mobileNavClass : tile ? tileClass : navClass;
-  // The lock marker rides on `title`, and the count on `aria-label`: a second
-  // string inside the link would rewrite its accessible name from "Assets" to
-  // "Assets, needs a new login", which is not what the link is called.
-  return (
+  // The lock marker rides on a `Tooltip` (and `data-locked`), and the count on
+  // `aria-label`: a second string inside the link would rewrite its accessible
+  // name from "Assets" to "Assets, needs a new login", which is not what the
+  // link is called.
+  const link = (
     <NavLink
       to={to}
       state={originState}
@@ -129,7 +130,7 @@ export function NavItem({
       onFocus={warm}
       onPointerDown={warm}
       className={(state) => cx(linkClass(state), className)}
-      title={locked ? t('reauth.navLocked') : undefined}
+      data-locked={locked ? 'true' : undefined}
       aria-label={counted ? t('nav.alertsWithCount', { count: badge }) : undefined}
     >
       {Glyph && (
@@ -164,6 +165,7 @@ export function NavItem({
       )}
     </NavLink>
   );
+  return locked ? <Tooltip content={t('reauth.navLocked')}>{link}</Tooltip> : link;
 }
 
 /**
