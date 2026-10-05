@@ -286,7 +286,9 @@ function LadderClass({
                 {/* The accent name is the cue that the row opens Ship Info. */}
                 <span
                   className={cx(
-                    'min-w-0 flex-1 truncate text-accent underline decoration-transparent underline-offset-2 group-hover:decoration-current group-focus-visible:decoration-current',
+                    'min-w-0 flex-1 truncate text-accent',
+                    // Underline follows the whole row (group), unlike entityLinkClassName's own hover.
+                    'underline decoration-transparent underline-offset-2 group-hover:decoration-current group-focus-visible:decoration-current',
                     !status?.canFly && 'opacity-70'
                   )}
                 >

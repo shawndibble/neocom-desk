@@ -93,7 +93,7 @@
       },
       "factions": "Factions",
       "mapLabel": "{{faction}} ship tree",
-      "searchPlaceholder": "Search hulls… (press /)",
+      "searchPlaceholder": "Search hulls (press /)…",
       "searchLabel": "Search hulls in every faction",
       "searchResults": "Matching hulls",
       "filterPlaceholder": "Search this faction…",
