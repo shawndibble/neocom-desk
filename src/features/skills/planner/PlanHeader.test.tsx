@@ -305,4 +305,33 @@ describe('PlanHeader progress chips (#1409)', () => {
       expect(screen.getByRole('textbox', { name: 'Plan name' })).toHaveFocus();
     });
   });
+
+  describe('savings shrank with implants', () => {
+    const badge = {
+      savingsSeconds: 13 * 86400,
+      evaluatedRemapCount: 1,
+      requestedRemapCount: 1,
+      capped: false,
+    };
+    const header = (shrank: boolean) => (
+      <PlanHeader
+        totalSeconds={0}
+        skillCount={1}
+        projectedFinish={null}
+        badge={badge}
+        nextMilestone={null}
+        savingsShrankWithImplants={shrank}
+      />
+    );
+
+    it('explains the smaller saving in a tooltip on the savings chip', () => {
+      render(header(true));
+      expect(screen.getByRole('button', { name: /remap savings/i })).toHaveTextContent('i');
+    });
+
+    it('shows no tooltip trigger otherwise', () => {
+      render(header(false));
+      expect(screen.queryByRole('button', { name: /remap savings/i })).not.toBeInTheDocument();
+    });
+  });
 });
