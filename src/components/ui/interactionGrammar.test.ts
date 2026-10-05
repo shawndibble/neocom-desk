@@ -62,6 +62,14 @@ function htmlTags(raw: string): Tag[] {
   return tags;
 }
 
+/** The top-level statement starting at `from`: up to the next column-0 declaration. */
+function statementAt(src: string, from: number): string {
+  const next = src
+    .slice(from + 1)
+    .search(/\n(?=\/\*\*|export |const |function |interface |type |class |enum )/);
+  return next < 0 ? src.slice(from) : src.slice(from, from + 1 + next);
+}
+
 /**
  * True when a className expression reaches one of `recipe`'s names or
  * patterns: inline, as a shared export, or through a same-file constant or
@@ -72,11 +80,7 @@ function reachesRecipe(src: string, attrs: string, recipes: Recipes, depth = 0):
   for (const name of new Set(attrs.match(/\b[A-Za-z_]\w*\b/g) ?? [])) {
     if (recipes.names.has(name)) return true;
     const def = new RegExp(`(?:const|function)\\s+${name}\\b`).exec(src);
-    if (
-      def &&
-      depth < 3 &&
-      reachesRecipe(src, src.slice(def.index, def.index + 900), recipes, depth + 1)
-    ) {
+    if (def && depth < 3 && reachesRecipe(src, statementAt(src, def.index), recipes, depth + 1)) {
       return true;
     }
   }
@@ -88,13 +92,13 @@ interface Recipes {
   names: Set<string>;
 }
 
-/** Recipes = every export in src whose body (first 1200 chars) matches `pattern`. */
+/** Recipes = every export in src whose own statement matches `pattern`. */
 function recipesMatching(pattern: RegExp, seed: string[]): Recipes {
   const names = new Set(seed);
   for (const f of sourceFiles('src')) {
     const src = readFileSync(f, 'utf8');
     for (const m of src.matchAll(/export (?:const|function) (\w+)/g)) {
-      if (pattern.test(src.slice(m.index, m.index + 1200))) names.add(m[1]);
+      if (pattern.test(statementAt(src, m.index))) names.add(m[1]);
     }
   }
   return { pattern, names };
@@ -109,11 +113,29 @@ const touchRecipes = recipesMatching(/\b(min-h|size|h)-11\b/, [
   'tappableRowClassName',
 ]);
 
+const hasUnfocusedButton = (src: string) =>
+  htmlTags(src).some((t) => t.name === 'button' && !reachesRecipe(src, t.attrs, focusRecipes));
+
 const offendersOf = (test: (src: string, file: string) => boolean) =>
   files.filter((f) => test(read.get(f)!, f));
 
 const tagOffenders = (test: (tag: Tag) => boolean, allow: string[] = []) =>
   offendersOf((src, f) => !allow.includes(f) && htmlTags(src).some(test));
+
+describe('guard internals', () => {
+  it('does not leak a recipe into the export that follows it', () => {
+    const src =
+      "const MOBILE_NAV_IDLE = 'p-1 text-dim';\nconst MOBILE_NAV_ACTIVE = 'focus-visible:outline-2';\nexport const A = () => <button className={MOBILE_NAV_IDLE}>a</button>;\n";
+    expect(hasUnfocusedButton(src)).toBe(true);
+    expect(hasUnfocusedButton(src.replace('MOBILE_NAV_IDLE}', 'MOBILE_NAV_ACTIVE}'))).toBe(false);
+  });
+
+  it('keeps unfocused recipes out of the recipe sets', () => {
+    expect(focusRecipes.names.has('controlHeightClassName')).toBe(false);
+    expect(touchRecipes.names.has('disabledClassName')).toBe(false);
+    expect(touchRecipes.names.has('selectedRowClassName')).toBe(false);
+  });
+});
 
 describe('interaction grammar source guards (DESIGN.md §6c)', () => {
   it('writes target="_blank" only in ExternalLink', () => {
@@ -157,27 +179,25 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
     // recipe, or via a same-file constant/function its className uses.
     // Exceptions, by file: styled by a stylesheet rule, not utilities.
     const exceptions = [
-      'src/features/fittings/shipTree/FactionGrid.tsx', // .isis-faction (isis.css :focus-visible)
-      'src/features/fittings/shipTree/IsisTile.tsx', // .isis-tile (isis.css :focus-visible)
-      'src/features/fittings/shipTree/ShipTreeMap.tsx', // .isis-emblem (isis.css :focus-visible)
+      'src/features/skills/planner/EntryList.tsx', // PriorityPill: ring drawn on the child via group-focus-visible
+      'src/features/fittings/shipTree/FactionGrid.tsx', // .isis-faction (shipTree.css :focus-visible)
+      'src/features/fittings/shipTree/IsisTile.tsx', // .isis-tile (shipTree.css :focus-visible)
+      'src/features/fittings/shipTree/ShipTreeMap.tsx', // .isis-emblem (shipTree.css :focus-visible)
     ];
-    const reaches = (src: string, attrs: string) => reachesRecipe(src, attrs, focusRecipes);
-    expect(
-      offendersOf(
-        (src, f) =>
-          !exceptions.includes(f) &&
-          htmlTags(src).some((t) => t.name === 'button' && !reaches(src, t.attrs))
-      )
-    ).toEqual([]);
+    expect(offendersOf((src, f) => !exceptions.includes(f) && hasUnfocusedButton(src))).toEqual([]);
   });
 
   it('uses no hover:bg-panel / hover:bg-line fill (rows use rowInteractiveClassName)', () => {
+    // The `-2`, `-bright` etc. variants (hover:bg-panel-2, hover:bg-line-bright)
+    // are deliberately allowed: only the bare tokens are the retired fills.
     expect(
       offendersOf((src) => /hover:bg-panel(?![-\w])|hover:bg-line(?![-\w])/.test(src))
     ).toEqual([]);
   });
 
   it('draws no ▸ / ▾ dingbat carets and no rotate-180 caret (use Disclosure Caret)', () => {
+    // rotate-180 stays banned: a flipped CaretDown is the retired expand cue;
+    // the sweep checklists replaced it with Disclosure's rotating Caret.
     expect(offendersOf((src) => /[▸▾]|\brotate-180\b/.test(src))).toEqual([]);
   });
 

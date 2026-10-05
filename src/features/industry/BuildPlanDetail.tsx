@@ -1,4 +1,4 @@
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { tappableRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
@@ -1575,7 +1575,10 @@ export function BuildPlanDetail({
                           onChange={(e) => toggleIncludeReactions(e.target.checked)}
                         />
                       </label>
-                      <label htmlFor="build-plan-include-reactions">
+                      <label
+                        htmlFor="build-plan-include-reactions"
+                        className={`inline-flex items-center ${tappableRowClassName}`}
+                      >
                         {t('industry.includeReactions')}
                       </label>
                       <InfoTooltip
