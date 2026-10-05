@@ -111,7 +111,7 @@ export function industryActivityOf(blueprint: IndustryBlueprint): IndustryActivi
  * same number — otherwise a stored 2,000,000 displays as itself while every
  * figure on the page came from the clamp.
  */
-export const MAX_JOB_RUNS = 100_000;
+export const MAX_JOB_RUNS = 1_000_000;
 
 /**
  * Pre-issue-#609 single-tier rig model: one tier value read into both the ME
