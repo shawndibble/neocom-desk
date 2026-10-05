@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { PlanEntry } from '@/engine/types';
 import { TargetPlanPicker } from './TargetPlanPicker';
 import type { TargetPlan } from './useTargetPlan';
@@ -35,7 +36,7 @@ export function AddToPlanBar({ target, unplannedCount, added, onAdd, onUndo }: A
             count: added.entries.length,
             plan: added.planName,
           })}
-          <button type="button" className="underline" onClick={onUndo}>
+          <button type="button" className={inlineLinkClassName} onClick={onUndo}>
             {t('skills.fitCheck.addedToastUndo')}
           </button>
         </span>

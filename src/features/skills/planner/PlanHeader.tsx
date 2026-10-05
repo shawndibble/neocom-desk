@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Panel, StatChip, StatChips, TextInput, type StatChipTone } from '@/components/ui';
+import { Panel, StatChip, StatChips, TextInput, Tooltip, type StatChipTone } from '@/components/ui';
+import { focusRingClassName } from '@/components/ui/controlStyles';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { formatCompactNumber } from '@/lib/compactNumber';
@@ -149,12 +150,14 @@ export function PlanHeader({
             label={t('plans.milestone.next')}
             value={
               <>
-                <span
-                  title={nextMilestone.name}
-                  className="inline-block max-w-[8rem] overflow-hidden text-ellipsis whitespace-nowrap align-bottom md:max-w-none md:overflow-visible"
-                >
-                  {nextMilestone.name}
-                </span>{' '}
+                <Tooltip content={nextMilestone.name}>
+                  <span
+                    tabIndex={0}
+                    className={`inline-block max-w-[8rem] overflow-hidden rounded-xs text-ellipsis whitespace-nowrap align-bottom md:max-w-none md:overflow-visible ${focusRingClassName}`}
+                  >
+                    {nextMilestone.name}
+                  </span>
+                </Tooltip>{' '}
                 <span className="text-text-dim">{formatLocalDate(nextMilestone.finish)}</span>
               </>
             }

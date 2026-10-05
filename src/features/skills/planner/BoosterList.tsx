@@ -15,13 +15,19 @@
  * this component's whole point is to stop the user from typing one.
  */
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, TextInput } from '@/components/ui';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  disabledClassName,
+  focusRingClassName,
+  interactiveClassName,
+  tappableRowClassName,
+  toggleChipStateClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import * as Icon from '@/components/ui/icons';
 import type { PlanBooster } from '@/db';
-import { buildMarketGroupParams } from '@/engine/market/urlState';
+import { MarketGroupLink } from './MarketGroupLink';
 import { CEREBRAL_ACCELERATORS_MARKET_GROUP_ID } from './plannerMarketGroups';
 import {
   BOOSTER_QUICK_PICKS,
@@ -194,7 +200,14 @@ function BoosterRow({
             onClick={() =>
               patch({ expiresAt: boosterExpiryFromNow(hours, row.startsAt ?? Date.now()) })
             }
-            className={`${tappableRowClassName} rounded-xs border border-line px-1.5 text-[0.6875rem] text-text-dim hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
+            className={cx(
+              tappableRowClassName,
+              'rounded-xs border px-1.5 text-[0.6875rem]',
+              toggleChipStateClassName(false),
+              interactiveClassName,
+              focusRingClassName,
+              disabledClassName
+            )}
           >
             {hours % 24 === 0
               ? t('plans.boosterQuickPickDays', { days: hours / 24 })
@@ -213,7 +226,6 @@ function BoosterRow({
 
 export function BoosterList({ boosters, detectedAccelerator, onChange }: BoosterListProps) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
 
   function patchRow(index: number, patch: Partial<PlanBooster>): boolean {
     const next = boosters.map((row, i) => (i === index ? { ...row, ...patch } : row));
@@ -237,16 +249,9 @@ export function BoosterList({ boosters, detectedAccelerator, onChange }: Booster
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-1.5">
         <span>{t('plans.booster')}</span>
-        <IconButton
-          icon={<Icon.Market size={Icon.ICON_SIZE.sm} />}
+        <MarketGroupLink
+          groupId={CEREBRAL_ACCELERATORS_MARKET_GROUP_ID}
           label={t('plans.boosterMarketLink')}
-          onClick={() =>
-            navigate(
-              `/market/browser?${new URLSearchParams(buildMarketGroupParams(CEREBRAL_ACCELERATORS_MARKET_GROUP_ID)).toString()}`
-            )
-          }
-          size="sm"
-          variant="plain"
         />
       </div>
       {detectedAccelerator !== null && (

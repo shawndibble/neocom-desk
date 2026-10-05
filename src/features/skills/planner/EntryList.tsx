@@ -25,7 +25,14 @@ import {
   Tooltip,
   iconButtonClassName,
 } from '@/components/ui';
-import { controlHeightClassName, gripHitAreaClassName } from '@/components/ui/controlStyles';
+import {
+  controlHeightClassName,
+  focusRingClassName,
+  gripHitAreaClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { cx } from '@/lib/cx';
 import * as Icon from '@/components/ui/icons';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
 import type { MilestoneState, MilestoneStatus } from '@/engine/skillPlanMilestones';
@@ -53,6 +60,13 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
  * 1rem icon into what was left, down to a dot.
  */
 const ICON_BUTTON = iconButtonClassName({ size: 'sm' });
+/** A row's drag grip: the shared recipe plus the grab cursor and the touch hit area. */
+const GRIP_BUTTON = cx(
+  'cursor-grab touch-none rounded-xs px-1 text-text-faint hover:text-text',
+  interactiveClassName,
+  focusRingClassName,
+  gripHitAreaClassName
+);
 const DANGER_ICON_BUTTON = iconButtonClassName({ size: 'sm', tone: 'danger' });
 /**
  * Every training-time cell and its desktop column header, so the two cannot
@@ -110,7 +124,7 @@ function AttributePairBadge({ primary, secondary }: AttributePairBadgeProps) {
   return (
     <span
       aria-label={t('plans.attributePairLabel', { pair: label })}
-      className="rounded-xs border border-line px-1 text-[0.6875rem] tracking-widest text-text-dim uppercase"
+      className="px-1 text-[0.6875rem] tracking-widest text-text-dim uppercase"
     >
       {label}
     </span>
@@ -209,9 +223,14 @@ function PriorityPill({
           className={`group inline-flex items-center ${touchTarget ? controlHeightClassName.sm : ''}`}
         >
           <span
-            className={`rounded-xs border px-1 text-[0.6875rem] tracking-widest uppercase group-hover:border-line-bright group-focus-visible:outline-2 group-focus-visible:outline-offset-1 group-focus-visible:outline-accent ${PRIORITY_TONE[priority]}`}
+            className={`${interactiveClassName} rounded-xs border px-1 text-[0.6875rem] tracking-widest uppercase group-hover:border-line-bright group-focus-visible:outline-2 group-focus-visible:outline-offset-1 group-focus-visible:outline-accent ${PRIORITY_TONE[priority]}`}
           >
             {t(priorityLabelKey(priority))}
+            <Icon.Expanded
+              size="0.75rem"
+              aria-hidden="true"
+              className="ml-0.5 inline-block align-[-0.125em]"
+            />
           </span>
         </button>
       </DropdownMenuTrigger>
@@ -322,14 +341,19 @@ function MilestoneMark({ status }: { status: MilestoneStatus }) {
       ? formatLocalDate(status.finish)
       : t(milestoneStateKey(status.state));
   return (
-    <span
-      title={status.milestone.name}
-      className="ml-2 inline-flex shrink-0 items-center gap-1 rounded-xs border border-line-bright px-1 text-[0.6875rem] text-text-dim"
-    >
-      <Icon.Milestone size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-      <span className="max-w-[8rem] truncate">{status.milestone.name}</span>
-      <span className="tabular-nums">{dateText}</span>
-    </span>
+    <Tooltip content={status.milestone.name}>
+      <span
+        tabIndex={0}
+        className={cx(
+          'ml-2 inline-flex shrink-0 items-center gap-1 rounded-xs px-1 text-[0.6875rem] text-text-dim',
+          focusRingClassName
+        )}
+      >
+        <Icon.Milestone size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+        <span className="max-w-[8rem] truncate">{status.milestone.name}</span>
+        <span className="tabular-nums">{dateText}</span>
+      </span>
+    </Tooltip>
   );
 }
 
@@ -470,7 +494,7 @@ const EntryRow = memo(function EntryRow({
       type="button"
       {...handleProps}
       aria-label={t('plans.reorderEntry', { name: rowLabel })}
-      className={`cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${gripHitAreaClassName}`}
+      className={GRIP_BUTTON}
     >
       <Icon.DragHandle />
     </button>
@@ -680,7 +704,7 @@ const PrereqRow = memo(function PrereqRow({
       type="button"
       {...handleProps}
       aria-label={t('plans.dragPrereq', { name: label })}
-      className={`cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${gripHitAreaClassName}`}
+      className={GRIP_BUTTON}
     >
       <Icon.DragHandle />
     </button>
@@ -827,7 +851,7 @@ const MarkerRow = memo(function MarkerRow({
         type="button"
         {...handleProps}
         aria-label={t('plans.reorderMarker')}
-        className={`cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${gripHitAreaClassName}`}
+        className={GRIP_BUTTON}
       >
         <Icon.DragHandle />
       </button>
@@ -835,7 +859,7 @@ const MarkerRow = memo(function MarkerRow({
         <button
           type="button"
           onClick={() => onEdit(markerIndex)}
-          className="flex-1 truncate text-left tabular-nums hover:underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+          className={entityLinkClassName('flex-1 truncate text-left tabular-nums')}
         >
           {remapInstruction(attributes, implants)}
         </button>
@@ -845,7 +869,7 @@ const MarkerRow = memo(function MarkerRow({
           <button
             type="button"
             onClick={() => onEdit(markerIndex)}
-            className="font-semibold tracking-widest uppercase hover:underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+            className={entityLinkClassName('font-semibold tracking-widest uppercase')}
           >
             {t('plans.markerRow')}
           </button>

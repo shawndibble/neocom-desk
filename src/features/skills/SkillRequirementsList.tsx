@@ -73,8 +73,8 @@ export function SkillRequirementsList({
                       req.trained
                         ? 'bg-accent/20 text-accent'
                         : req.planned
-                          ? 'border border-accent/40 text-accent'
-                          : 'border border-line text-text-dim'
+                          ? 'text-accent'
+                          : 'text-text-dim'
                     }`}
                   >
                     {req.trained

@@ -18,7 +18,7 @@ describe('ImplantChip', () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Ocular Filter - Basic/ }));
+    fireEvent.click(screen.getByRole('link', { name: /Ocular Filter - Basic/ }));
 
     expect(screen.getByTestId('location')).toHaveTextContent('/market/browser?type=9899');
   });
@@ -31,7 +31,7 @@ describe('ImplantChip', () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Ocular Filter - Basic/ }));
+    fireEvent.click(screen.getByRole('link', { name: /Ocular Filter - Basic/ }));
 
     expect(screen.getByTestId('location')).toHaveTextContent(
       '/market/browser?type=9899&region=10000002'
