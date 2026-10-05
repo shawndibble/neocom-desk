@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 
@@ -49,8 +50,9 @@ export function FullIskTotal({ value }: { value: number }) {
         aria-label={t('market.appraisal.copyTotal', {
           amount: t('common.iskExact', { amount: full }),
         })}
-        className="cursor-copy rounded-xs hover:underline focus-visible:outline-2 focus-visible:outline-accent"
+        className={`cursor-copy rounded-xs hover:underline ${interactiveClassName} ${focusRingClassName}`}
       >
+        {/* Exception: the exact figure is printed beside the shorthand, so IskAmount's tooltip would repeat it. */}
         {t('market.appraisal.totalFull', { full, short: formatIskCompact(value) })}
       </button>
       {/* Mounted only while showing, so a page of these isn't a page of

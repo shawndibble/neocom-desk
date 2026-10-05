@@ -6058,7 +6058,7 @@
       "daysLeft_other": "{{count}} days left",
       "buyDownTo": "Buying down to here:",
       "sellDownTo": "Selling down to here:",
-      "depthUnits": "{{units}} units for {{isk}}",
+      "depthUnits": "{{units}} units for <isk/>",
       "depthAverage": "avg {{price}}",
       "setDestination": "Set destination",
       "setDestinationTo": "Set destination to {{placeName}}",
@@ -6574,7 +6574,7 @@
         "best": "Nobody is cheaper where this order sits",
         "topBid": "Nobody bids higher where this order sits"
       },
-      "groupSummaryIsk": "{{isk}} ISK listed",
+      "groupSummaryIsk": "<isk/> ISK listed",
       "groupSummaryWorst": "worst -{{pct}}%",
       "headerSummary_one": "{{count}} order",
       "headerSummary_other": "{{count}} orders",

@@ -26,7 +26,8 @@
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, DataTable, TypeIcon } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import { Caret } from '@/components/ui/Disclosure';
 import type { DataTableColumn } from '@/components/ui';
 import { IskAmount } from '@/components/ui';
 import type { UseTableExport } from '@/components/ui/useTableExport';
@@ -36,6 +37,7 @@ import {
   type CompareCell,
 } from '@/engine/market/attributeCompareMatrix';
 import { shortCompareLabels } from '@/engine/market/compareLabels';
+import { MarketItemLink } from './MarketItemLink';
 import type { CompareAttributesData } from './useCompareAttributes';
 import type { CompareRow } from './useCompareRows';
 import { formatAttributeValue } from './format';
@@ -189,7 +191,6 @@ export function CompareAttributesMatrix({
               <th
                 key={row.typeId}
                 scope="col"
-                title={row.itemName}
                 className="w-(--compare-item-width) px-1 pt-2 pb-1 align-bottom font-semibold text-text"
               >
                 <span className="flex flex-col items-center gap-1 text-center">
@@ -204,14 +205,16 @@ export function CompareAttributesMatrix({
                     <TypeIcon typeId={row.typeId} size={64} className="size-7 rounded-xs" />
                   )}
                   <span className="max-w-full break-words hyphens-auto">
-                    {labels.shared ? (
-                      <>
-                        <span aria-hidden="true">{labels.labels[index]}</span>
-                        <span className="sr-only">{row.itemName}</span>
-                      </>
-                    ) : (
-                      row.itemName
-                    )}
+                    <MarketItemLink typeId={row.typeId}>
+                      {labels.shared ? (
+                        <>
+                          <span aria-hidden="true">{labels.labels[index]}</span>
+                          <span className="sr-only">{row.itemName}</span>
+                        </>
+                      ) : (
+                        row.itemName
+                      )}
+                    </MarketItemLink>
                   </span>
                 </span>
               </th>
@@ -233,13 +236,9 @@ export function CompareAttributesMatrix({
                   type="button"
                   aria-expanded={!isCollapsed}
                   onClick={() => toggleCategory(group.category)}
-                  className="flex min-h-11 items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text focus-visible:outline-2 focus-visible:outline-accent md:min-h-0"
+                  className={`flex min-h-11 items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text md:min-h-0 ${interactiveClassName} ${focusRingClassName}`}
                 >
-                  {isCollapsed ? (
-                    <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-                  ) : (
-                    <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-                  )}
+                  <Caret expanded={!isCollapsed} />
                   {group.category}
                   {isCollapsed && (
                     <>

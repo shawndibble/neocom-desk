@@ -8,6 +8,8 @@
  * panel owns the snapshot, the mode and the region names; this owns
  * everything that is only true of a haul.
  */
+import { HintText } from '@/components/ui/HintText';
+import { SystemLink } from '@/features/entities';
 import { JumpsLink } from '@/features/travel/JumpsLink';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -755,7 +757,18 @@ function useJumpCounts(rows: readonly CourierRouteRow[], route: JumpBasis): Jump
  *
  * Rendered inside the toggle `<button>`, so everything here is plain text —
  * no `IskAmount` long-press reveal, which would be a control inside a control.
+ * Documented exception to the IskAmount rule: `formatIskCompact` stays here.
  */
+/** A system name that links to Route Safety when the system is known; plain otherwise (station, structure, unplaced). */
+function EndpointSystem({ endpoint }: { endpoint: CourierRouteRow['origin'] }) {
+  const name = endpointSystemName(endpoint);
+  return endpoint.systemId == null ? (
+    <>{name}</>
+  ) : (
+    <SystemLink systemId={endpoint.systemId}>{name}</SystemLink>
+  );
+}
+
 function LaneGroupHeader({
   rows,
   regionNames,
@@ -826,6 +839,7 @@ function LaneGroupHeader({
               <RiskMarker
                 key={kind}
                 kind={kind}
+                plain
                 detailOptions={
                   kind === 'over-rate'
                     ? { multiple: formatMagnitude(Math.max(...multiples)) }
@@ -1200,9 +1214,12 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           const count = jumpsByContract.get(row.contractId) ?? null;
           if (count === null) {
             return (
-              <span className="text-text-dim" title={t('contractSearch.jumpsUnavailableHint')}>
+              <HintText
+                content={t('contractSearch.jumpsUnavailableHint')}
+                className="text-text-dim"
+              >
                 —
-              </span>
+              </HintText>
             );
           }
           return row.destination.systemId == null ? (
@@ -1302,6 +1319,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         // the ISK/jump column never sees, and whole-ISK formatting clamps
         // anything under half an ISK to "0" — which would print a low-paying
         // bulk haul exactly like the deliberate zero of a favour run.
+        // Exception to "IskAmount for compact figures": a sub-ISK rate is not compact.
         render: (row) => {
           const rate = iskPerVolume(row.reward, row.volume);
           return rate === null ? <span className="text-text-dim">—</span> : formatIskAuto(rate);
@@ -1333,7 +1351,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         render: (row) => (
           <div className="flex flex-col gap-0.5">
             <span>
-              {endpointSystemName(row.origin)}
+              <EndpointSystem endpoint={row.origin} />
               <EndpointSecurity security={row.origin.security} />
               {originRegion(row) && (
                 <span className="ml-1.5 text-[0.6875rem] text-text-dim">{originRegion(row)}</span>
@@ -1342,7 +1360,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
             </span>
             <span className="text-text-dim">
               {'→ '}
-              {endpointSystemName(row.destination)}
+              <EndpointSystem endpoint={row.destination} />
               <EndpointSecurity security={row.destination.security} />
               {destinationRegion(row) && (
                 <span className="ml-1.5 text-[0.6875rem]">{destinationRegion(row)}</span>

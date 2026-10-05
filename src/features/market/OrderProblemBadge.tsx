@@ -30,12 +30,12 @@ type BadgeTone = 'danger-strong' | 'danger' | 'warning' | 'accent' | 'success' |
 
 /** Class strings lifted from this repo's own pills (`PlanVerdictHero`'s `PILL_TONE`, `ProductionRunStatusChip`'s `TONE_CLASS`) rather than invented. */
 const TONE_CLASS: Record<BadgeTone, string> = {
-  'danger-strong': 'border-danger bg-danger/25 text-danger',
-  danger: 'border-danger/50 bg-danger/15 text-danger',
-  warning: 'border-warning/50 bg-warning/15 text-warning',
-  accent: 'border-accent/50 bg-accent/15 text-accent',
-  success: 'border-success/50 bg-success/15 text-success',
-  neutral: 'border-line bg-panel-2 text-text-dim',
+  'danger-strong': 'bg-danger/25 text-danger',
+  danger: 'bg-danger/15 text-danger',
+  warning: 'bg-warning/15 text-warning',
+  accent: 'bg-accent/15 text-accent',
+  success: 'bg-success/15 text-success',
+  neutral: 'bg-panel-2 text-text-dim',
 };
 
 const KIND_TONE: Record<OrderBadgeKind, BadgeTone> = {
@@ -85,7 +85,7 @@ export function OrderProblemBadge({
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1 rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase',
+        'inline-flex items-center gap-1 rounded-xs px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase',
         TONE_CLASS[KIND_TONE[kind]],
         className
       )}

@@ -221,9 +221,9 @@ function deepScopeState(
  */
 /** Scope pill colours: the same station/system/region ladder the row badges use. */
 const SCOPE_PILL: Record<UndercutScope, string> = {
-  station: 'border-danger/50 bg-danger/15 text-danger',
-  system: 'border-warning/50 bg-warning/15 text-warning',
-  region: 'border-accent/50 bg-accent/15 text-accent',
+  station: 'bg-danger/15 text-danger',
+  system: 'bg-warning/15 text-warning',
+  region: 'bg-accent/15 text-accent',
 };
 
 /**
@@ -299,7 +299,7 @@ function ScopeRow({
     <span role="rowheader" className={cx(CELL, 'pl-3')}>
       <span
         className={cx(
-          'inline-flex h-5 w-fit items-center rounded-xs border px-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase',
+          'inline-flex h-5 w-fit items-center rounded-xs px-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase',
           SCOPE_PILL[scope]
         )}
       >

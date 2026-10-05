@@ -34,9 +34,16 @@ import {
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { controlHeightClassName, resizeHandleTouchClassName } from '@/components/ui/controlStyles';
+import {
+  controlHeightClassName,
+  focusRingInsetClassName,
+  resizeHandleTouchClassName,
+  rowInteractiveClassName,
+} from '@/components/ui/controlStyles';
+import { Caret } from '@/components/ui/Disclosure';
 import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
 import { useIsNarrow } from '@/lib/useIsNarrow';
+import { MarketItemLink } from './MarketItemLink';
 import { RemovableTypeIcon } from './RemovableTypeIcon';
 import { useCompareSet } from './compareSet';
 import { useCompareRows, type CompareRow } from './useCompareRows';
@@ -271,7 +278,7 @@ export function CompareDrawer({
                 onRemove={removeItem}
                 sizeClassName="size-6"
               />
-              <span>{row.itemName}</span>
+              <MarketItemLink typeId={row.typeId}>{row.itemName}</MarketItemLink>
               <RowMoreActions />
             </span>
           </ItemContextMenu>
@@ -398,8 +405,9 @@ export function CompareDrawer({
         aria-expanded={mode !== 'closed'}
         aria-controls={DRAWER_ID}
         onClick={() => setMode((m) => (m === 'closed' ? 'open' : 'closed'))}
-        className={`flex ${controlHeightClassName.md} items-center justify-center border border-line bg-panel px-4 text-[0.6875rem] font-semibold tracking-widest text-text uppercase hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
+        className={`flex ${controlHeightClassName.md} items-center justify-center gap-1.5 border border-line bg-panel px-4 text-[0.6875rem] font-semibold tracking-widest text-text uppercase ${rowInteractiveClassName} ${focusRingInsetClassName}`}
       >
+        <Caret expanded={mode !== 'closed'} />
         {t('market.compare.handle', { count: items.length })}
       </button>
       {mode !== 'closed' && (

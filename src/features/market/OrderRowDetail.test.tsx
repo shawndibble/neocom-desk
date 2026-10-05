@@ -67,7 +67,7 @@ describe('OrderRowDetail', () => {
   it('totals what taking the book down to this order costs, with the average price', () => {
     renderDetail();
     expect(screen.getByText('Buying down to here:')).toBeInTheDocument();
-    expect(screen.getByText('546 units for 195.5M')).toBeInTheDocument();
+    expect(screen.getByText(/546 units for/)).toHaveTextContent('195.5M');
     expect(screen.getByText(/avg 358,087/)).toBeInTheDocument();
   });
 

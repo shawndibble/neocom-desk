@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { CourierEndpoint, CourierRouteRow } from '@/engine/contracts/courierSearch';
@@ -60,16 +61,18 @@ const KNOWN: RouteExposure = {
 
 function renderModal(jumps: CourierJumps = { kind: 'known', count: 2 }) {
   return render(
-    <CourierContractDetailModal
-      row={ROW}
-      regionNames={new Map()}
-      jumps={jumps}
-      goingRateMultiple={null}
-      preference="prefer-highsec"
-      reverseLane={{ kind: 'unresolved' }}
-      onSearchReverseLane={() => {}}
-      onClose={() => {}}
-    />
+    <MemoryRouter>
+      <CourierContractDetailModal
+        row={ROW}
+        regionNames={new Map()}
+        jumps={jumps}
+        goingRateMultiple={null}
+        preference="prefer-highsec"
+        reverseLane={{ kind: 'unresolved' }}
+        onSearchReverseLane={() => {}}
+        onClose={() => {}}
+      />
+    </MemoryRouter>
   );
 }
 
@@ -78,6 +81,12 @@ beforeEach(() => {
 });
 
 describe('CourierContractDetailModal route path', () => {
+  it('links the system name to Route Safety', () => {
+    renderModal();
+    const link = screen.getByRole('link', { name: 'Jita' });
+    expect(link).toHaveAttribute('href', expect.stringContaining('30000142'));
+  });
+
   it('opens the route system by system, each with its security, from the jump count', async () => {
     routeExposure.mockResolvedValue(KNOWN);
     const user = userEvent.setup();

@@ -94,6 +94,16 @@ const offerRowKey = (row: LoyaltyOfferRow) => row.offer.offer_id;
  * View in Market/Plan in Industry buttons and the row's context menu, so the
  * two can't drift on which field means "the real item".
  */
+/** Item name: Market link (§6c); plain when the product type is unknown. */
+function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
+  const { typeId } = resolveLoyaltyRowItem(row);
+  return typeId === null ? (
+    <span className="text-text">{row.itemName}</span>
+  ) : (
+    <MarketItemLink typeId={typeId}>{row.itemName}</MarketItemLink>
+  );
+}
+
 function resolveLoyaltyRowItem(row: LoyaltyOfferRow): { typeId: number | null; itemName: string } {
   if (!row.isBlueprint) return { typeId: row.offer.type_id, itemName: row.itemName };
   return { typeId: row.productTypeId, itemName: row.productName ?? row.itemName };
@@ -554,12 +564,12 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       render: (row) => (
         <span className="flex flex-col">
           <span className="inline-flex items-center gap-1.5">
-            <span className="text-text">{row.itemName}</span>
+            <LoyaltyItemName row={row} />
             {row.isBlueprint && (
               // `shrink-0` + `whitespace-nowrap`: as a flex item next to a
               // long item name the badge was being squeezed until "BP" broke
               // across two lines, one letter each.
-              <span className="shrink-0 rounded-xs border border-warning/40 px-1 text-[0.6875rem] font-bold tracking-widest whitespace-nowrap text-warning uppercase">
+              <span className="shrink-0 px-1 text-[0.6875rem] font-bold tracking-widest whitespace-nowrap text-warning uppercase">
                 BP
               </span>
             )}
@@ -655,6 +665,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
             stackSummary={t('loyaltyStore.offerCount', { count: filteredRows.length })}
             onRowClick={selectRow}
             rowContextMenu={rowContextMenu}
+            rowMoreActions
             selectedRowKey={selectedOfferId}
           />
         </>

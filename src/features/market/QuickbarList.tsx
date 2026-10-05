@@ -30,7 +30,13 @@ import {
   TypeIcon,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { gripHitAreaClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  gripHitAreaClassName,
+  interactiveClassName,
+  selectedRowClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
 import { ItemContextMenu } from './ItemContextMenu';
 import { PriceAlertForm } from './PriceAlertForm';
@@ -58,16 +64,23 @@ function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget }: Quickb
     <li
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-1 border-b border-line px-1 py-1 text-xs last:border-b-0 ${
-        isDragging ? 'bg-panel-2' : ''
-      }`}
+      className={cx(
+        'flex items-center gap-1 border-b border-line px-1 py-1 text-xs last:border-b-0',
+        isDragging && 'bg-panel-2',
+        selected && selectedRowClassName
+      )}
     >
       <button
         type="button"
         {...attributes}
         {...listeners}
         aria-label={t('market.quickbar.reorderItem', { name: item.name })}
-        className={`cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${gripHitAreaClassName}`}
+        className={cx(
+          'cursor-grab touch-none px-1 text-text-faint hover:text-text',
+          interactiveClassName,
+          focusRingClassName,
+          gripHitAreaClassName
+        )}
       >
         <Icon.DragHandle />
       </button>
@@ -79,14 +92,17 @@ function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget }: Quickb
             type="button"
             onClick={() => onSelect(item.typeId)}
             aria-current={selected ? 'true' : undefined}
-            className={`flex min-w-0 flex-1 items-center gap-1.5 truncate text-left hover:text-accent ${
-              selected ? 'text-accent' : 'text-text-dim'
-            }`}
+            className={cx(
+              'dt-primary flex min-w-0 flex-1 items-center gap-1.5 truncate text-left text-accent hover:underline',
+              interactiveClassName,
+              focusRingClassName
+            )}
           >
             <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
             <span className="truncate">{item.name}</span>
             {hasTarget && (
               <span className="shrink-0 text-text-dim">
+                {/* Compact stays text: IskAmount's focusable trigger can't nest in this button. */}
                 {(item.targetDirection === 'above' ? '≥ ' : '≤ ') +
                   formatIskCompact(item.targetPrice!)}
               </span>

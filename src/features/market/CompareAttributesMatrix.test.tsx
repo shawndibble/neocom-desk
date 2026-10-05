@@ -1,10 +1,14 @@
+import type { ReactElement } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { CompareAttributesMatrix } from './CompareAttributesMatrix';
 import type { CompareAttributesData } from './useCompareAttributes';
 import type { CompareRow } from './useCompareRows';
+
+const renderMatrix = (ui: ReactElement) => render(<MemoryRouter>{ui}</MemoryRouter>);
 
 function row(typeId: number, itemName: string, opts: Partial<CompareRow> = {}): CompareRow {
   return { typeId, itemName, loading: false, summary: null, ...opts };
@@ -32,7 +36,7 @@ describe('CompareAttributesMatrix', () => {
       names: {},
     };
 
-    render(<CompareAttributesMatrix rows={rows} data={data} />);
+    renderMatrix(<CompareAttributesMatrix rows={rows} data={data} />);
 
     expect(screen.getByText('Structure Hitpoints')).toBeInTheDocument();
     expect(screen.getAllByText('Rifter').length).toBeGreaterThan(0);
@@ -42,6 +46,11 @@ describe('CompareAttributesMatrix', () => {
     expect(screen.getByText('250 m/sec')).toBeInTheDocument();
     // Neither item's dogma attributes include the other's — one blank cell per row.
     expect(screen.getAllByText('—')).toHaveLength(2);
+    // Item names in the header link to the Market (§6c).
+    expect(screen.getByRole('link', { name: 'Rifter' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('/market/browser?')
+    );
   });
 
   it('shows the Worth section with Estimated Price as the first row, from each row’s own summary', () => {
@@ -55,7 +64,7 @@ describe('CompareAttributesMatrix', () => {
       names: {},
     };
 
-    render(<CompareAttributesMatrix rows={rows} data={data} />);
+    renderMatrix(<CompareAttributesMatrix rows={rows} data={data} />);
 
     expect(screen.getByText('Worth')).toBeInTheDocument();
     expect(screen.getByText('Estimated Price')).toBeInTheDocument();
@@ -70,7 +79,7 @@ describe('CompareAttributesMatrix', () => {
     ];
     const data: CompareAttributesData = { dogmaByTypeId: new Map(), dictionary: {}, names: {} };
 
-    render(<CompareAttributesMatrix rows={rows} data={data} />);
+    renderMatrix(<CompareAttributesMatrix rows={rows} data={data} />);
 
     expect(screen.getByText('…')).toBeInTheDocument();
     expect(screen.getByText('—')).toBeInTheDocument();
@@ -90,7 +99,7 @@ describe('CompareAttributesMatrix', () => {
       names: {},
     };
 
-    render(<CompareAttributesMatrix rows={rows} data={data} />);
+    renderMatrix(<CompareAttributesMatrix rows={rows} data={data} />);
 
     const [header, ...tables] = screen.getAllByRole('table');
     expect(header).toHaveAttribute('aria-label', 'Compared items');
@@ -112,7 +121,7 @@ describe('CompareAttributesMatrix', () => {
       names: {},
     };
 
-    render(<CompareAttributesMatrix rows={rows} data={data} />);
+    renderMatrix(<CompareAttributesMatrix rows={rows} data={data} />);
 
     const header = screen.getByRole('table', { name: 'Compared items' });
     expect(header).toHaveClass('sticky', 'top-0');
@@ -126,7 +135,7 @@ describe('CompareAttributesMatrix', () => {
     const rows = [row(587, 'Rifter'), row(588, 'Republic Fleet Rifter')];
     const data: CompareAttributesData = { dogmaByTypeId: new Map(), dictionary: {}, names: {} };
 
-    render(<CompareAttributesMatrix rows={rows} data={data} onRemove={onRemove} />);
+    renderMatrix(<CompareAttributesMatrix rows={rows} data={data} onRemove={onRemove} />);
 
     const header = screen.getByRole('table', { name: 'Compared items' });
     await userEvent.click(
@@ -139,7 +148,7 @@ describe('CompareAttributesMatrix', () => {
     const rows = [row(1, 'Large Shield Extender II'), row(2, 'Caldari Navy Large Shield Extender')];
     const data: CompareAttributesData = { dogmaByTypeId: new Map(), dictionary: {}, names: {} };
 
-    render(<CompareAttributesMatrix rows={rows} data={data} />);
+    renderMatrix(<CompareAttributesMatrix rows={rows} data={data} />);
 
     const header = screen.getByRole('table', { name: 'Compared items' });
     expect(within(header).getByText('Large Shield Extender')).toBeInTheDocument();
@@ -176,7 +185,7 @@ describe('CompareAttributesMatrix', () => {
       names: {},
     };
 
-    render(<CompareAttributesMatrix rows={rows} data={data} />);
+    renderMatrix(<CompareAttributesMatrix rows={rows} data={data} />);
 
     expect(screen.getByRole('checkbox', { name: 'Differences only' })).toBeChecked();
     expect(screen.getByText('Maximum Velocity')).toBeInTheDocument();
@@ -204,7 +213,7 @@ describe('CompareAttributesMatrix', () => {
       names: {},
     };
 
-    render(<CompareAttributesMatrix rows={rows} data={data} />);
+    renderMatrix(<CompareAttributesMatrix rows={rows} data={data} />);
 
     const toggle = screen.getByRole('button', { name: 'Speed and Travel' });
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
