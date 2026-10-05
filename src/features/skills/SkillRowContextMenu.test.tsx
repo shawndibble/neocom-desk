@@ -87,7 +87,7 @@ describe('SkillRowContextMenu — Add to Skill Plan (#405)', () => {
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Gunnery' }));
 
     const trigger = await screen.findByRole('menuitem', { name: 'Add to Skill Plan' });
-    expect(trigger).toHaveAttribute('data-disabled');
+    expect(trigger).toHaveAttribute('aria-disabled', 'true');
   });
 
   it("composes with a row tooltip without breaking either the tooltip or the row's own click, or the context menu", async () => {

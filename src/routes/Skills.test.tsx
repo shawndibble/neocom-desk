@@ -137,7 +137,7 @@ describe('Skills', () => {
     expect(screen.getByText('8,000 SP')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Level 5 of 5' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Level 3 of 5' })).toBeInTheDocument();
-    const implantTrigger = (await screen.findByText('Ocular Filter - Basic')).closest('button')!;
+    const implantTrigger = (await screen.findByText('Ocular Filter - Basic')).closest('a')!;
     const frigateTrigger = screen.getByText('Frigate').closest('button')!;
     // Tooltip content only mounts once its trigger is focused/hovered, and
     // Radix closes any other open tooltip document-wide when a new one opens

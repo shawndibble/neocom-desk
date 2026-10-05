@@ -16,7 +16,13 @@ import {
   StatChips,
   IconButton,
 } from '@/components/ui';
-import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  selectedRowClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
@@ -178,7 +184,7 @@ export function Skills() {
   const training = data?.training ?? null;
   const completedSp = data?.completedSp ?? 0;
   const trainingChip = training && (
-    <span className="shrink-0 rounded-xs border border-line bg-panel-2 px-1.5 text-[0.6875rem] whitespace-nowrap text-accent tabular-nums">
+    <span className="shrink-0 text-[0.6875rem] whitespace-nowrap text-accent tabular-nums">
       {t('skills.trainingChip', {
         level: ROMAN[training.targetLevel - 1] ?? training.targetLevel,
         time: formatCountdown(training.secondsRemaining),
@@ -504,9 +510,12 @@ export function Skills() {
                         aria-expanded={expanded}
                         disabled={searching}
                         onClick={() => toggleGroup(group.groupName)}
-                        className={`flex min-h-11 w-full items-center justify-between gap-2 border-line px-3 py-1 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent disabled:hover:bg-transparent md:min-h-0 ${
-                          expanded ? 'border-b' : ''
-                        }`}
+                        className={cx(
+                          'flex min-h-11 w-full items-center justify-between gap-2 border-line px-3 py-1 text-left disabled:hover:bg-transparent md:min-h-0',
+                          rowInteractiveClassName,
+                          focusRingInsetClassName,
+                          expanded && 'border-b'
+                        )}
                       >
                         <span className="flex min-w-0 items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                           <Caret expanded={expanded} />
@@ -538,14 +547,18 @@ export function Skills() {
                                     current === skill.skillTypeID ? null : skill.skillTypeID
                                   )
                                 }
-                                className={`${tappableRowClassName} flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
+                                className={cx(
+                                  tappableRowClassName,
+                                  'flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs',
+                                  rowInteractiveClassName,
+                                  focusRingInsetClassName,
                                   selected
                                     ? selectedRowClassName
                                     : 'border-l-2 border-l-transparent'
-                                }`}
+                                )}
                               >
                                 <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
-                                  <span className="line-clamp-2 min-w-0 sm:line-clamp-none sm:flex-1 sm:truncate">
+                                  <span className="dt-primary line-clamp-2 min-w-0 sm:line-clamp-none sm:flex-1 sm:truncate">
                                     {skill.name}
                                   </span>
                                   {training?.skillTypeID === skill.skillTypeID && trainingChip}
