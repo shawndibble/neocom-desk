@@ -40,6 +40,15 @@ export interface PlanCaveats {
   estimatedRates: number[];
   /** Enabled colonies costed at an assumed customs rate (nobody set theirs). */
   assumedCustoms: number[];
+  /** Types the plan or the Baseline sells at the hub's ask: it has no buy order for them. */
+  valuedAtAsk: number[];
+}
+
+/** What is sold at the hub, and which of the hub's bids are really asks. */
+export interface PlanSales {
+  flows: GoalPlan['flows'];
+  baseline: ReadonlyMap<number, ColonyBaseline>;
+  valuedAtAsk: ReadonlySet<number>;
 }
 
 /**
@@ -62,8 +71,15 @@ export function slotEstimate(
 
 export function planCaveats(
   assignments: readonly ColonyAssignment[],
-  rows: readonly PlannerColonyRow[]
+  rows: readonly PlannerColonyRow[],
+  sales?: PlanSales
 ): PlanCaveats {
+  const sold = new Set<number>();
+  for (const flow of sales?.flows ?? [])
+    if (flow.to === 'hub' && flow.from !== 'hub') sold.add(flow.typeId);
+  for (const own of sales?.baseline.values() ?? []) {
+    if (own.status === 'ok') for (const slot of own.slots) sold.add(slot.p1TypeId);
+  }
   const ecusToday = new Map(rows.map((row) => [row.planetId, row.colony?.current.ecusByP0]));
   return {
     estimatedRates: assignments
@@ -78,6 +94,7 @@ export function planCaveats(
       .filter((row) => row.enabled && row.taxAssumed)
       .map((row) => row.planetId)
       .sort((a, b) => a - b),
+    valuedAtAsk: sorted([...sold].filter((id) => sales?.valuedAtAsk.has(id))),
   };
 }
 

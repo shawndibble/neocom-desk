@@ -381,12 +381,8 @@ function GoalPlanner({
     const { best } = result;
     const planned = goalPlannerInput(rows);
     const hauling = planHauling(best.plan, best.baseline, pi, haulHours);
-    const earnings = earningsNow(
-      rows,
-      pi,
-      prices,
-      priceBooks(prices, snapshot.accountingLevel).salesTaxPct
-    );
+    const books = priceBooks(prices, snapshot.accountingLevel);
+    const earnings = earningsNow(rows, pi, prices, books.salesTaxPct);
     const verdict =
       best.economics.status === 'costed'
         ? planVerdict(
@@ -408,7 +404,11 @@ function GoalPlanner({
           earnings={earnings}
           verdict={hasGoals ? verdict : null}
           attainment={goalAttainment(best.plan.achieved)}
-          caveats={planCaveats(best.plan.assignments, rows)}
+          caveats={planCaveats(best.plan.assignments, rows, {
+            flows: best.plan.flows,
+            baseline: best.baseline.perColony,
+            valuedAtAsk: books.valuedAtAsk,
+          })}
           hasGoals={hasGoals}
           pricesFetchedAt={prices.fetchedAt}
           distancesPending={distancesPending}

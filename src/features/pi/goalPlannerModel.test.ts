@@ -284,6 +284,11 @@ describe('priceBooks', () => {
     expect(books.bid).toEqual({ 1: 90, 2: 50 });
   });
 
+  it('names the types it values at the ask for want of a buy order', () => {
+    const books = priceBooks({ prices: { 1: 100, 2: 50, 3: 7 }, buyPrices: { 1: 90 } }, 3);
+    expect([...books.valuedAtAsk].sort((a, b) => a - b)).toEqual([2, 3]);
+  });
+
   it('charges sales tax at the Accounting level, Accounting 0 when unknown', () => {
     expect(priceBooks({ prices: {}, buyPrices: {} }, 5).salesTaxPct).toBeLessThan(
       priceBooks({ prices: {}, buyPrices: {} }, null).salesTaxPct

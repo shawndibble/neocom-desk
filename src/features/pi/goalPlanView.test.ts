@@ -138,7 +138,7 @@ describe('planCaveats', () => {
       ],
       rows
     );
-    expect(caveats).toEqual({ estimatedRates: [1], assumedCustoms: [2] });
+    expect(caveats).toEqual({ estimatedRates: [1], assumedCustoms: [2], valuedAtAsk: [] });
   });
 
   it('counts a measured rate on a changed ECU count as an estimate', () => {
@@ -154,6 +154,23 @@ describe('planCaveats', () => {
       [today, same]
     );
     expect(caveats.estimatedRates).toEqual([1]);
+  });
+
+  it('names what the plan or the Baseline sells at the ask for want of a buy order', () => {
+    const caveats = planCaveats([], [], {
+      flows: [
+        { from: 1, to: 'hub', typeId: COOLANT, tier: 2, unitsPerHour: 5 },
+        { from: 'hub', to: 1, typeId: ROBOTICS, tier: 3, unitsPerHour: 1 },
+        { from: 1, to: 2, typeId: WATER, tier: 1, unitsPerHour: 5 },
+      ],
+      baseline: new Map([
+        [1, { status: 'ok', slots: [slot(BASE_METALS, REACTIVE_METALS)], iskPerHour: 1 }],
+        [2, { status: 'nothing-fits' }],
+      ]),
+      valuedAtAsk: new Set([COOLANT, ROBOTICS, WATER, REACTIVE_METALS, ELECTROLYTES]),
+    });
+    // Robotics is bought, Water never reaches the hub, Electrolytes nobody sells.
+    expect(caveats.valuedAtAsk).toEqual([REACTIVE_METALS, COOLANT]);
   });
 });
 

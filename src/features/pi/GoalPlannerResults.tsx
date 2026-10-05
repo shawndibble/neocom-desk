@@ -54,7 +54,13 @@ import {
   TierChip,
   type DirectiveVerb,
 } from './DirectiveRow';
-import type { PlanHauling, PlanVerdict, PlannerColonyRow } from './goalPlannerModel';
+import {
+  ASSUMED_UNKNOWN_CUSTOMS,
+  type PlanHauling,
+  type PlanVerdict,
+  type PlannerColonyRow,
+} from './goalPlannerModel';
+import { customsRatePercent } from './customsRate';
 import type { TotalColonyEarnings } from './colonyEarningsModel';
 import { commodityName, formatUnits } from './goalPlannerFormat';
 import { piAdvisorHref, piColonyHref } from './piPlanLink';
@@ -248,6 +254,25 @@ export function Headline({
   }
 
   const short = hasGoals && attainment.unmet.length > 0;
+  // Rates and customs only matter to a plan with goals; a price read off the
+  // ask flatters the Baseline as much as the plan, so it is said either way.
+  const caveatLines = [
+    hasGoals && caveats.estimatedRates.length > 0
+      ? t('piPlan.caveatRates', { names: caveats.estimatedRates.map(names.planet).join(', ') })
+      : null,
+    hasGoals && caveats.assumedCustoms.length > 0
+      ? t('piPlan.caveatCustoms', {
+          names: caveats.assumedCustoms.map(names.planet).join(', '),
+          percent: customsRatePercent(ASSUMED_UNKNOWN_CUSTOMS),
+        })
+      : null,
+    caveats.valuedAtAsk.length > 0
+      ? t('piPlan.caveatAskPriced', {
+          hub: hub.systemName,
+          names: namesList(caveats.valuedAtAsk, pi),
+        })
+      : null,
+  ].filter((line): line is string => line !== null);
   const liftPerDay = economics.liftPerHour * HOURS_PER_DAY;
   const verdictLine = verdict
     ? verdictText(
@@ -353,25 +378,10 @@ export function Headline({
             })}
           </p>
         )}
-        {hasGoals && (caveats.estimatedRates.length > 0 || caveats.assumedCustoms.length > 0) && (
+        {caveatLines.length > 0 && (
           <p className="flex items-start gap-1.5 text-[0.6875rem] text-text-dim">
             <EstimateBadge />
-            <span>
-              {[
-                caveats.estimatedRates.length > 0
-                  ? t('piPlan.caveatRates', {
-                      names: caveats.estimatedRates.map(names.planet).join(', '),
-                    })
-                  : null,
-                caveats.assumedCustoms.length > 0
-                  ? t('piPlan.caveatCustoms', {
-                      names: caveats.assumedCustoms.map(names.planet).join(', '),
-                    })
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            </span>
+            <span>{caveatLines.join(' ')}</span>
           </p>
         )}
       </div>

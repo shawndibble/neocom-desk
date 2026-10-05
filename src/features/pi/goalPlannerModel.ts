@@ -285,20 +285,32 @@ export function plannerPolicy(options: { maxP0Types: 1 | 2; buyP1: boolean }): P
   };
 }
 
+/** The hub's books, plus which bids are really asks. */
+export interface HubBooks extends PriceBooks {
+  /** Types with a sell price but no buy order: their "bid" is the ask. */
+  valuedAtAsk: ReadonlySet<number>;
+}
+
 /**
  * The hub's books. A sale is valued at the bid, falling back to the ask for a
  * type with no buy order — the Advisor's `revenuePrices` rule, so a thin bid
- * book does not turn the whole plan into `needs-price`. Unknown Accounting
- * prices at level 0, the highest tax.
+ * book does not turn the whole plan into `needs-price`. The fallback is named
+ * in `valuedAtAsk` so the page can say which sales it flatters. Unknown
+ * Accounting prices at level 0, the highest tax.
  */
 export function priceBooks(
   prices: { prices: Readonly<Record<number, number>>; buyPrices: Readonly<Record<number, number>> },
   accountingLevel: number | null
-): PriceBooks {
+): HubBooks {
   return {
     ask: prices.prices,
     bid: { ...prices.prices, ...prices.buyPrices },
     salesTaxPct: salesTaxPct(accountingLevel ?? 0),
+    valuedAtAsk: new Set(
+      Object.keys(prices.prices)
+        .filter((id) => !Object.hasOwn(prices.buyPrices, id))
+        .map(Number)
+    ),
   };
 }
 
