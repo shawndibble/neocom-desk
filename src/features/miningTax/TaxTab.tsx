@@ -106,6 +106,9 @@ import {
 import { LinkPaymentDialog } from '@/features/miningTax/LinkPaymentDialog';
 import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
 import { SettleUpDialog, type SettleUpRow } from '@/features/miningTax/SettleUpDialog';
+import { useTicker } from '@/lib/ticker';
+import { useSettleUpRecheck } from '@/features/miningTax/useSettleUpRecheck';
+import { isInArrivalWindow } from '@/engine/miningTax/oreArrival';
 import { JoinAssignDialog } from '@/features/miningTax/JoinAssignDialog';
 import { PayeeManagerDialog, type PayeeOwed } from '@/features/miningTax/PayeeManagerDialog';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
@@ -371,6 +374,13 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   // What the Settle-up dialog is settling: a balance card's whole balance, or
   // the table's checkbox selection. `null` keeps it closed.
   const [settleUpRows, setSettleUpRows] = useState<SettleUpRow[] | null>(null);
+  // Pull the ledger fresh only when an entry on offer could still grow.
+  const minuteNow = useTicker(60_000);
+  const settleUpCanGrow = useMemo(
+    () => settleUpRows?.some((r) => isInArrivalWindow(r.assignment.date, minuteNow)) ?? false,
+    [settleUpRows, minuteNow]
+  );
+  const settleUpRecheck = useSettleUpRecheck({ active: settleUpCanGrow, refresh, loading });
   // Whose owed entries "Link a wallet payment" is choosing a payment for: a
   // Payee's whole balance, or just the entries ticked or settling.
   const [linkWalletTarget, setLinkWalletTarget] = useState<{
@@ -2100,6 +2110,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           onClose={() => setSettleUpRows(null)}
           rows={settleUpRows}
           systemNames={data.systemNames}
+          arrivalCheck={settleUpRecheck}
           onPaid={() => {
             setSelection(new Set());
             refresh();

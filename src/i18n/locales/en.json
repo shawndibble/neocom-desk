@@ -4028,6 +4028,14 @@
       "deleteFailed": "Couldn’t delete {{name}} — nothing was changed. Try again."
     },
     "settleUp": {
+      "arrival": {
+        "arriving": "Ore still arriving · wait ~{{minutes}} min",
+        "arrivingSome_one": "{{count}} entry still receiving ore · wait ~{{minutes}} min",
+        "arrivingSome_other": "{{count}} entries still receiving ore · wait ~{{minutes}} min",
+        "quiet": "ESI can lag up to 1 h",
+        "checking": "Checking ESI…",
+        "unchecked": "Couldn't check ESI · it can lag up to 1 h"
+      },
       "entriesSummary_one": "{{count}} entry · {{range}}",
       "entriesSummary_other": "{{count}} entries · {{range}}",
       "amountLabel": "Amount",

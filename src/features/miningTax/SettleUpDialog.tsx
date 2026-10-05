@@ -23,6 +23,8 @@ import { settle, type PaymentInput } from './ledgerActions';
 import { allocateOldestFirst } from './settleAllocation';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
+import { OreArrivalNotice } from './OreArrivalNotice';
+import type { SettleUpRecheck } from './useSettleUpRecheck';
 
 export interface SettleUpRow {
   assignment: MiningTaxAssignmentRecord;
@@ -43,6 +45,8 @@ interface SettleUpDialogProps {
    * when this is given.
    */
   onPickFromWallet?: () => void;
+  /** The fresh ledger pull behind the "Ore still arriving" line; absent, the line judges what is already loaded. */
+  arrivalCheck?: SettleUpRecheck;
 }
 
 const METHODS: readonly MiningTaxPaymentMethod[] = ['donation', 'contract', 'other'];
@@ -76,6 +80,7 @@ export function SettleUpDialog({
   systemNames,
   onPaid,
   onPickFromWallet,
+  arrivalCheck,
 }: SettleUpDialogProps) {
   const { t } = useTranslation();
   const [excluded, setExcluded] = useState<ReadonlySet<string>>(new Set());
@@ -258,6 +263,11 @@ export function SettleUpDialog({
   return (
     <Modal open={open} onClose={onClose} title={t('miningTax.settleUpTitle', { payee: title })}>
       <div className="space-y-3 text-sm">
+        <OreArrivalNotice
+          entries={included.map((r) => r.assignment)}
+          checking={arrivalCheck?.checking ?? false}
+          pullStartedAt={arrivalCheck?.pullStartedAt ?? null}
+        />
         <Disclosure
           className="overflow-hidden rounded-xs border border-line"
           label={t('miningTax.settleUp.entriesSummary', {
