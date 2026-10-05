@@ -40,7 +40,7 @@ export interface PlanCaveats {
   estimatedRates: number[];
   /** Enabled colonies costed at an assumed customs rate (nobody set theirs). */
   assumedCustoms: number[];
-  /** Types the plan or the Baseline sells at the hub's ask: it has no buy order for them. */
+  /** Types the plan, the Baseline or Earns now sells at the hub's ask: it has no buy order for them. */
   valuedAtAsk: number[];
 }
 
@@ -79,6 +79,14 @@ export function planCaveats(
     if (flow.to === 'hub' && flow.from !== 'hub') sold.add(flow.typeId);
   for (const own of sales?.baseline.values() ?? []) {
     if (own.status === 'ok') for (const slot of own.slots) sold.add(slot.p1TypeId);
+  }
+  // Earns now: what the colonies it counts make today (see `earningsNow`).
+  if (sales) {
+    for (const row of rows) {
+      if (row.enabled && row.advice && row.colony) {
+        for (const id of row.colony.current.productTypeIds) sold.add(id);
+      }
+    }
   }
   const ecusToday = new Map(rows.map((row) => [row.planetId, row.colony?.current.ecusByP0]));
   return {

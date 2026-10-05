@@ -172,6 +172,20 @@ describe('planCaveats', () => {
     // Robotics is bought, Water never reaches the hub, Electrolytes nobody sells.
     expect(caveats.valuedAtAsk).toEqual([REACTIVE_METALS, COOLANT]);
   });
+
+  it("names what Earns now sells at the ask: enabled colonies' products today", () => {
+    const advice = {} as NonNullable<PlannerColonyRow['advice']>;
+    const selling = row(1, 'barren', { advice });
+    selling.colony!.current.productTypeIds = [COOLANT];
+    const off = row(2, 'barren', { advice, enabled: false });
+    off.colony!.current.productTypeIds = [ROBOTICS];
+    const caveats = planCaveats([], [selling, off], {
+      flows: [],
+      baseline: new Map(),
+      valuedAtAsk: new Set([COOLANT, ROBOTICS]),
+    });
+    expect(caveats.valuedAtAsk).toEqual([COOLANT]);
+  });
 });
 
 describe('slotEstimate', () => {
