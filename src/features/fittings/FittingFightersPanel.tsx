@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   Checkbox,
+  entityLinkClassName,
   IconButton,
   MenuItem,
   MenuSeparator,
@@ -17,6 +18,7 @@ import {
   SearchInput,
   TypeIcon,
 } from '@/components/ui';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import {
@@ -141,7 +143,12 @@ export function FittingFightersPanel({
               >
                 <TypeIcon typeId={squadron.typeId} size={32} width={24} height={24} />
                 <span className="min-w-0 flex-1 basis-40">
-                  <span className="block truncate text-sm">{name}</span>
+                  <MarketItemLink
+                    typeId={squadron.typeId}
+                    className={entityLinkClassName('block truncate text-sm')}
+                  >
+                    {name}
+                  </MarketItemLink>
                   {kind && (
                     <span className="block text-text-dim">
                       {t(`fittings.fighters.class.${kind}`)}

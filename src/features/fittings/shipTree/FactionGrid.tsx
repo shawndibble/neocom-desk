@@ -5,6 +5,7 @@
  */
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Tooltip } from '@/components/ui';
 import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import type { ShipTreeData } from '@/sde/types';
 import { factionEmblemUrl } from './shipTreeAssets';
@@ -47,21 +48,21 @@ export const FactionGrid = memo(function FactionGrid({
           const c = counts.get(f.id) ?? { flyable: 0, total: 0 };
           const emblem = factionEmblemUrl(f.id);
           return (
-            <button
-              key={f.id}
-              type="button"
-              aria-pressed={f.id === factionID}
-              aria-label={f.name}
-              title={`${f.name} — ${t('ships.tree.flyableOfTotal', c)}`}
-              onClick={() => onFaction(f.id)}
-              className="isis-faction"
-            >
-              {emblem ? (
-                <img src={emblem} alt="" width={28} height={28} draggable={false} />
-              ) : (
-                <span className="text-[0.625rem] font-bold">{f.name.slice(0, 3)}</span>
-              )}
-            </button>
+            <Tooltip key={f.id} content={`${f.name} — ${t('ships.tree.flyableOfTotal', c)}`}>
+              <button
+                type="button"
+                aria-pressed={f.id === factionID}
+                aria-label={f.name}
+                onClick={() => onFaction(f.id)}
+                className="isis-faction"
+              >
+                {emblem ? (
+                  <img src={emblem} alt="" width={28} height={28} draggable={false} />
+                ) : (
+                  <span className="text-[0.625rem] font-bold">{f.name.slice(0, 3)}</span>
+                )}
+              </button>
+            </Tooltip>
           );
         })}
       </div>

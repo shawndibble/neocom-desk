@@ -118,7 +118,7 @@ export function useEditorItemActions({
   openCargoQuantity,
 }: EditorItemActionsInput): EditorItemActions {
   // The types last fitted to each rack, newest first — an empty slot's
-  // "Add module ▸" and "Fill rack with last used".
+  // "Add module" and "Fill rack with last used".
   const [recent, setRecent] = useState<Partial<Record<FittingSlotKind, number[]>>>({});
   const noteRecent = useCallback((rack: FittingSlotKind, typeId: number) => {
     setRecent((prev) => ({
@@ -282,7 +282,7 @@ export function useEditorItemActions({
   const cargoCapacity = stats?.holds.cargo ?? null;
   const open = fitting !== null;
   const shipTypeId = fitting?.shipTypeId ?? null;
-  // Read by "Change charge ▸" only when it opens: a ref, so each edit doesn't rebuild the actions.
+  // Read by "Change charge" only when it opens: a ref, so each edit doesn't rebuild the actions.
   const chargePickerRef = useRef<ChargePickerInput | null>(null);
   const statModules = currentStats?.modules ?? null;
   useLayoutEffect(() => {

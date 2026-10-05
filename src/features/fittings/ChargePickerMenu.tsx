@@ -13,14 +13,11 @@ import {
 } from '@/engine/fittings/chargeChoice';
 import type { FittingModule, FittingSlotKind } from '@/engine/fittings/types';
 import type { FittingItemActions } from './fittingItemActions';
+import { formatIsk } from './chargeFormat';
 import { useChargeChoices } from './useChargeChoices';
 
-function formatIsk(value: number): string {
-  return value >= 10_000 ? formatCompactNumber(value) : Math.round(value).toLocaleString('en-US');
-}
-
 /**
- * "Change charge ▸" as the Charge Picker, sized for a menu (a Ring tile,
+ * "Change charge" as the Charge Picker, sized for a menu (a Ring tile,
  * a List row, an Offense row): the quick picks, then one submenu per type —
  * long range down to most damage — holding its Tech I and faction versions
  * with damage and price. Each loads into `at` only, out of the cargo when it
@@ -101,7 +98,7 @@ export function ChargePickerMenuItems({
               <span
                 className={cx(
                   'flex w-full min-w-0 items-baseline justify-between gap-4',
-                  holds && 'text-accent'
+                  holds && 'font-semibold'
                 )}
               >
                 <span className="truncate">
@@ -129,7 +126,7 @@ export function ChargePickerMenuItems({
                     className={cx(worse !== null && 'opacity-60')}
                   >
                     <span className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-3">
-                      <span className={cx('truncate', c.typeId === loaded && 'text-accent')}>
+                      <span className={cx('truncate', c.typeId === loaded && 'font-semibold')}>
                         {c.typeId === loaded && '● '}
                         {c.tier === 'faction'
                           ? c.faction

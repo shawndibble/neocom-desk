@@ -48,7 +48,7 @@ export interface FittingItemActions {
   /** Every charge `module` takes, whether carried or not (alphabetical) — worked out on the engine, so ask only when a menu opens. */
   chargesFor: (module: FittingModule) => number[];
   /**
-   * What "Change charge ▸"'s Charge Picker works its figures out from — read
+   * What "Change charge"'s Charge Picker works its figures out from — read
    * when the submenu opens, so a new Fitting doesn't rebuild every menu's
    * actions. Absent (a surface without the editor) leaves the plain list.
    */
@@ -56,7 +56,7 @@ export interface FittingItemActions {
   /** A weapon group's charges out, in one edit. */
   unloadGroup: (at: readonly ModuleAt[]) => void;
   copyToAllOfType: (rack: FittingSlotKind, index: number) => void;
-  /** A type's meta variants (itself left out), for "Swap for meta variant ▸". */
+  /** A type's meta variants (itself left out), for "Swap for meta variant". */
   variantsOf: (typeId: number) => { typeId: number; name: string }[];
   swapType: (rack: FittingSlotKind, index: number, typeId: number) => void;
   removeAllOfType: (typeId: number) => void;
@@ -73,7 +73,7 @@ export interface FittingItemActions {
   /** The copied module's type, when it goes in this rack. */
   clipboardFor: (rack: FittingSlotKind) => number | null;
   addModule: (rack: FittingSlotKind, index: number, typeId: number) => void;
-  /** Opens the Add panel on a slot — "Add module ▸ Browse…". */
+  /** Opens the Add panel on a slot — "Add module Browse…". */
   browseFor: (rack: FittingSlotKind, index: number) => void;
   fillRack: (rack: FittingSlotKind, typeId: number) => void;
 

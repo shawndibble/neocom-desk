@@ -2,7 +2,7 @@
  * Which fitted modules take a charge, and loading it into them — the one
  * path behind every way a charge goes in: a drag from Cargo onto the Ring or
  * the List, a cargo item's "Load into all compatible", a module's
- * "Load charge ▸", the Add panel's Charges tab.
+ * "Load charge", the Add panel's Charges tab.
  *
  * A module takes a charge when the charge's group is one of the module's
  * own charge groups and the engine's own check (`checkCharges`: size,

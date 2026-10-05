@@ -51,7 +51,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await page.setViewportSize(PHONE);
 
     // The Start screen's Import opens the Load card in a dialog.
-    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await page.getByRole('button', { name: 'Import…', exact: true }).click();
     await page.getByLabel('Link or text').fill(RIFTER_EFT);
     const loadButton = page.getByRole('button', { name: 'Load', exact: true });
     const box = await loadButton.boundingBox();
@@ -80,7 +80,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await page.setViewportSize(PHONE);
 
     // The Start screen's Import opens the Load card in a dialog.
-    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await page.getByRole('button', { name: 'Import…', exact: true }).click();
     await page.getByLabel('Link or text').fill(RIFTER_EFT);
     await page.getByRole('button', { name: 'Load', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'List' })).toBeVisible();
@@ -144,7 +144,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await page.setViewportSize(PHONE);
 
     const longName = 'Rifter - long PvE mission tackle fit name here for the header';
-    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await page.getByRole('button', { name: 'Import…', exact: true }).click();
     await page.getByLabel('Link or text').fill(`[Rifter, ${longName}]
 1MN Afterburner I`);
     await page.getByRole('button', { name: 'Load', exact: true }).click();

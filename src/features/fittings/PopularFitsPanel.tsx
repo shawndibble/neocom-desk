@@ -1,13 +1,12 @@
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Button, Spinner, Tabs } from '@/components/ui';
+import { Trans, useTranslation } from 'react-i18next';
+import { Button, IskAmount, Spinner, Tabs } from '@/components/ui';
 import type { FitSellPrice } from '@/engine/fittings/fitSellPrice';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { popularFitLoad } from '@/engine/fittings/popularFits';
 import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
-import { formatIskCompact } from '@/lib/isk';
 import { useNow } from '@/lib/useNow';
 import { typeName } from '@/sde/loadSde';
 import { usePopularFits } from './popularFits';
@@ -120,8 +119,15 @@ function ZkillboardFits({
                       ` · ${t('fittings.popular.lastSeen', {
                         age: formatAge(Math.max(0, now - Date.parse(fit.lastSeen)), t),
                       })}`}
-                    {fit.value !== null &&
-                      ` · ${t('fittings.popular.value', { value: formatIskCompact(fit.value) })}`}
+                    {fit.value !== null && (
+                      <>
+                        {' · '}
+                        <Trans
+                          i18nKey="fittings.popular.value"
+                          components={{ isk: <IskAmount value={fit.value} /> }}
+                        />
+                      </>
+                    )}
                   </span>
                 </p>
                 <RackIconStrip modules={fit.parts.modules} names={names} />
@@ -258,18 +264,21 @@ function WorkbenchFits({
  * on the line below.
  */
 function WorkbenchFitPrice({ price }: { price: FitSellPrice | undefined }) {
-  const { t } = useTranslation();
   if (price === undefined) return null;
-  const value = formatIskCompact(price.sell);
   return (
     <>
       <span aria-hidden className="shrink-0 text-text-dim">
         ·
       </span>
       <span className="shrink-0 tabular-nums">
-        {price.partial
-          ? t('fittings.popular.workbench.pricePartial', { value })
-          : t('fittings.popular.workbench.price', { value })}
+        <Trans
+          i18nKey={
+            price.partial
+              ? 'fittings.popular.workbench.pricePartial'
+              : 'fittings.popular.workbench.price'
+          }
+          components={{ isk: <IskAmount value={price.sell} /> }}
+        />
       </span>
     </>
   );

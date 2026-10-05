@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -12,6 +13,9 @@ import {
 import { FittingFightersPanel } from './FittingFightersPanel';
 import { FittingItemActionsProvider } from './fittingItemActions';
 import { fakeItemActions } from './__fixtures__/itemActions';
+
+// Entity names are real links, so every render needs a Router.
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 
 const NAMES: Record<number, string> = { 23055: 'Templar I', 37599: 'Cenobite I' };
 const typeName = (typeId: number) => NAMES[typeId] ?? `#${typeId}`;
@@ -126,7 +130,7 @@ describe('FittingFightersPanel item menu', () => {
     const actions = fakeItemActions({ names: NAMES });
     const marketActions = fakeMarketItemActions();
     render(
-      <MemoryRouter>
+      <>
         <FakeItemActions actions={marketActions}>
           <FittingItemActionsProvider value={actions}>
             <FittingFightersPanel
@@ -137,7 +141,7 @@ describe('FittingFightersPanel item menu', () => {
             />
           </FittingItemActionsProvider>
         </FakeItemActions>
-      </MemoryRouter>
+      </>
     );
     return { onChange, actions, marketActions };
   }

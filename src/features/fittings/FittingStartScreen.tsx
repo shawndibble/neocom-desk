@@ -1,4 +1,9 @@
-import { selectedRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  selectedRowClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -241,7 +246,7 @@ export function FittingStartScreen({
             )}
             {showImport && (
               <Button onClick={() => setImportOpen(true)}>
-                {t('fittings.start.importButton')}
+                {t('fittings.start.importAction')}
               </Button>
             )}
           </div>
@@ -324,14 +329,28 @@ export function FittingStartScreen({
                             event.preventDefault();
                             open(row);
                           }}
-                          className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 text-left text-sm hover:bg-panel-2 md:min-h-9 ${isSelected ? `${selectedRowClassName} text-accent` : 'border-l-2 border-l-transparent'}`}
+                          className={cx(
+                            'group flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 text-left text-sm md:min-h-9',
+                            rowInteractiveClassName,
+                            focusRingInsetClassName,
+                            isSelected
+                              ? `${selectedRowClassName} text-accent`
+                              : 'border-l-2 border-l-transparent'
+                          )}
                         >
                           <span className="min-w-0 flex-1 truncate">{row.name}</span>
-                          <span className="shrink-0 border border-line-bright px-1.5 text-[0.625rem] tracking-widest text-text-dim uppercase">
+                          <span className="shrink-0 text-[0.625rem] tracking-widest text-text-dim uppercase">
                             {row.source === 'saved'
                               ? t('fittings.start.sourceSaved')
                               : t('fittings.start.sourceInGame')}
                           </span>
+                          {/* Without the preview pane a row opens the editor (it loads state, so no href). */}
+                          {!previewing && (
+                            <Icon.Descend
+                              aria-hidden
+                              className="shrink-0 text-text-faint group-hover:text-accent"
+                            />
+                          )}
                         </button>
                         {rowMenus && <RowMoreActions className="shrink-0" />}
                       </li>

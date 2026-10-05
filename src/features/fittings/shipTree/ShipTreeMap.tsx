@@ -351,27 +351,27 @@ const MapWorld = memo(function MapWorld({
         const emblem = factionEmblemUrl(e.factionID);
         const name = factionNameOf(factions, e.factionID);
         return (
-          <button
-            key={`eb${i}`}
-            type="button"
-            className="isis-emblem"
-            style={{ left: e.x, top: e.y }}
-            title={name}
-            aria-label={t('ships.tree.switchFaction', { name })}
-            onClick={() => onFaction(e.factionID)}
-          >
-            {emblem && (
-              <img
-                src={emblem}
-                alt=""
-                width={22}
-                height={22}
-                draggable={false}
-                loading="lazy"
-                decoding="async"
-              />
-            )}
-          </button>
+          <Tooltip key={`eb${i}`} content={name}>
+            <button
+              type="button"
+              className="isis-emblem"
+              style={{ left: e.x, top: e.y }}
+              aria-label={t('ships.tree.switchFaction', { name })}
+              onClick={() => onFaction(e.factionID)}
+            >
+              {emblem && (
+                <img
+                  src={emblem}
+                  alt=""
+                  width={22}
+                  height={22}
+                  draggable={false}
+                  loading="lazy"
+                  decoding="async"
+                />
+              )}
+            </button>
+          </Tooltip>
         );
       })}
       {layout.nodes.map((n) => (

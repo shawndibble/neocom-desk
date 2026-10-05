@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   Checkbox,
+  entityLinkClassName,
   IconButton,
   Modal,
   SearchInput,
@@ -28,6 +29,7 @@ import {
 } from '@/components/ui';
 import { boosterSideEffects, withBoosters } from '@/engine/fittings/boosterSideEffects';
 import * as Icon from '@/components/ui/icons';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { ImplantBasis } from '@/engine/fittings/implantBasis';
 import { placeInSet } from '@/engine/fittings/implantFinder';
@@ -64,7 +66,7 @@ interface SlotListProps {
   names: Map<number, string>;
   /** By position, not type id — a set may legally carry the same id twice. */
   onRemove: (index: number) => void;
-  /** Opens an entry's details (Show Info), from its name. */
+  /** Opens an entry's details (Show Info), from the row's ⓘ; the name goes to Market. */
   onInfo: (typeId: number) => void;
   /** Under an entry: its own controls (a booster's side effects). */
   renderDetail?: (typeId: number) => ReactNode;
@@ -159,13 +161,21 @@ function SlotList({ heading, typeIds, names, onRemove, onInfo, renderDetail }: S
               >
                 <div className="flex items-center gap-2">
                   <TypeIcon typeId={typeId} size={32} width={20} height={20} />
-                  <button
-                    type="button"
-                    className={`${tappableRowClassName} min-w-0 flex-1 cursor-pointer truncate text-left text-sm text-accent underline-offset-2 hover:underline`}
-                    onClick={() => onInfo(typeId)}
+                  <MarketItemLink
+                    typeId={typeId}
+                    className={entityLinkClassName(
+                      `${tappableRowClassName} flex min-w-0 flex-1 items-center text-sm`
+                    )}
                   >
-                    {name}
-                  </button>
+                    <span className="truncate">{name}</span>
+                  </MarketItemLink>
+                  <IconButton
+                    variant="plain"
+                    size="sm"
+                    icon={<Icon.Info />}
+                    label={t('fittings.implantFinder.info', { name })}
+                    onClick={() => onInfo(typeId)}
+                  />
                   <IconButton
                     variant="plain"
                     size="sm"

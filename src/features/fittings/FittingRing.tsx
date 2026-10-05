@@ -7,7 +7,9 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel, Tooltip, TypeIcon } from '@/components/ui';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { AddRow, Warn } from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
 import {
   RING_GAUGES,
   RING_GAUGE_RADIUS,
@@ -622,7 +624,7 @@ function SlotTile({
       data-ring-slot={`${slot.rack}-${slot.index}`}
       data-module-state={module ? shownState : undefined}
       tabIndex={tabbable ? 0 : -1}
-      className={`absolute border bg-bg ${border} ${lights === 'dim' ? 'opacity-35' : ''} ${interactive ? 'cursor-pointer hover:border-accent' : ''} ${draggable ? 'active:cursor-grabbing' : ''}`}
+      className={`absolute border bg-bg ${border} ${interactiveClassName} ${focusRingClassName} ${lights === 'dim' ? 'opacity-35' : ''} ${interactive ? 'cursor-pointer hover:border-accent' : ''} ${draggable ? 'active:cursor-grabbing' : ''}`}
       style={{ ...position, transform: `rotate(${angle.toFixed(1)}deg)` }}
       onClick={interactive ? () => onSelect(slot.rack, slot.index) : undefined}
       onKeyDown={(event) => {
@@ -731,7 +733,7 @@ function CargoTile({ typeId, count, tooltip }: { typeId: number; count: number; 
       type="button"
       aria-label={name}
       aria-haspopup={actions ? 'menu' : undefined}
-      className={`relative h-11 w-11 shrink-0 border border-line-bright bg-bg ${actions ? 'cursor-pointer hover:border-accent' : ''}`}
+      className={`relative h-11 w-11 shrink-0 border border-line-bright bg-bg ${interactiveClassName} ${focusRingClassName} ${actions ? 'cursor-pointer hover:border-accent' : ''}`}
       onClick={actions ? openItemMenu : undefined}
       draggable={draggable}
       onDragStart={
@@ -1166,7 +1168,11 @@ export function FittingRing({
                     type="button"
                     aria-label={t('fittings.item.addCargo')}
                     onClick={itemActions.openAddCargo}
-                    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center border border-dashed border-line-bright bg-bg text-text-dim hover:border-accent"
+                    className={cx(
+                      'flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center border border-dashed border-line-bright bg-bg text-text-dim hover:border-accent',
+                      interactiveClassName,
+                      focusRingClassName
+                    )}
                   >
                     <AddRow aria-hidden />
                   </button>

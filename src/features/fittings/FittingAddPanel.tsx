@@ -11,7 +11,14 @@ import {
   TextInput,
   TypeIcon,
 } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import {
+  disabledClassName,
+  focusRingInsetClassName,
+  inlineLinkClassName,
+  rowInteractiveClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
+import { chargeRowClassName } from './chargeRowStyle';
 import { Close } from '@/components/ui/icons';
 import {
   browserTree,
@@ -178,7 +185,12 @@ function ItemRow({ entry, rack, check, placeable, draggable, onAdd }: ItemRowPro
         type="button"
         disabled={!placeable}
         onClick={() => onAdd(entry.typeId, rack)}
-        className="flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs hover:bg-panel-2 disabled:opacity-40 md:min-h-9"
+        className={cx(
+          'flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs md:min-h-9',
+          rowInteractiveClassName,
+          focusRingInsetClassName,
+          disabledClassName
+        )}
       >
         <TypeIcon typeId={entry.typeId} size={32} width={24} height={24} />
         <span className="min-w-0 flex-1 truncate">{entry.name}</span>
@@ -341,7 +353,12 @@ export function FittingAddPanel({
           type="button"
           aria-expanded={open}
           onClick={() => toggle(node.id)}
-          className={`flex min-h-11 w-full items-center gap-2 px-1 text-left text-xs hover:bg-panel-2 md:min-h-9 ${depth === 0 ? 'font-semibold' : ''}`}
+          className={cx(
+            'flex min-h-11 w-full items-center gap-2 px-1 text-left text-xs md:min-h-9',
+            rowInteractiveClassName,
+            focusRingInsetClassName,
+            depth === 0 && 'font-semibold'
+          )}
         >
           <Caret expanded={open} />
           <span className="min-w-0 flex-1 truncate">{node.label}</span>
@@ -637,7 +654,11 @@ function ChargesTab({
                 aria-expanded={open}
                 aria-controls={bodyId}
                 onClick={() => toggleSection(group.moduleTypeId)}
-                className="flex min-h-11 w-full items-center gap-2 px-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
+                className={cx(
+                  'flex min-h-11 w-full items-center gap-2 px-2 text-left md:min-h-9',
+                  rowInteractiveClassName,
+                  focusRingInsetClassName
+                )}
               >
                 <Caret expanded={open} />
                 <TypeIcon typeId={group.moduleTypeId} size={32} width={20} height={20} />
@@ -700,7 +721,10 @@ function ChargesTab({
                             aria-pressed={loaded}
                             disabled={!onLoadCharge}
                             onClick={() => onLoadCharge?.(choice.typeId)}
-                            className={`flex min-h-11 w-full items-center gap-2 border-l-2 px-2 text-left text-xs hover:bg-panel-2 md:min-h-9 ${loaded ? 'border-accent text-accent' : 'border-transparent'}`}
+                            className={chargeRowClassName(
+                              loaded,
+                              'flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs md:min-h-9'
+                            )}
                           >
                             <TypeIcon typeId={choice.typeId} size={32} width={20} height={20} />
                             <span className="min-w-0 flex-1 truncate">{choice.name}</span>
@@ -787,7 +811,12 @@ function CargoTab({
                   type="button"
                   disabled={!valid}
                   onClick={() => onAddCargo(entry.typeId, count)}
-                  className="flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs hover:bg-panel-2 disabled:opacity-40 md:min-h-9"
+                  className={cx(
+                    'flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs md:min-h-9',
+                    rowInteractiveClassName,
+                    focusRingInsetClassName,
+                    disabledClassName
+                  )}
                 >
                   <TypeIcon typeId={entry.typeId} size={32} width={24} height={24} />
                   <span className="min-w-0 flex-1 truncate">{entry.name}</span>
