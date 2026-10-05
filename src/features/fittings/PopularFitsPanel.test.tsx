@@ -85,6 +85,17 @@ function renderPanel(result: PopularFitsResult | null, onOpen = vi.fn()) {
   return onOpen;
 }
 
+/** A price figure is `IskAmount` inside a sentence: the figure, its hidden exact value, then the unit. */
+const priceBeside = (
+  scope: ReturnType<typeof within> | typeof screen,
+  figure: string,
+  lead: string
+) => {
+  const parent = scope.getByText(figure).parentElement!;
+  expect(parent.textContent).toContain(lead + figure);
+  expect(parent.textContent?.endsWith(' ISK')).toBe(true);
+};
+
 describe('PopularFitsPanel', () => {
   it('lists each fit with its count, last seen and value, and opens one', async () => {
     const lastSeen = new Date(Date.now() - 3 * 86_400_000).toISOString();
@@ -94,7 +105,7 @@ describe('PopularFitsPanel', () => {
     });
     expect(await screen.findByText('5 losses')).toBeTruthy();
     expect(screen.getByText(/last seen 3d ago/)).toBeTruthy();
-    expect(screen.getByText(/~12\.3M ISK/)).toBeTruthy();
+    priceBeside(screen, '12.3M', '~');
     expect(screen.getByText('1 loss')).toBeTruthy();
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[0]);
@@ -359,8 +370,8 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     getHubPricesMock.mockResolvedValue(sellPrices({ 626: 200_000_000, 3001: 45_000_000 }));
     openWorkbench({ ok: true, fits: PRICED_FITS });
     expect(await screen.findByText('Prices: Jita, your default Trade Hub')).toBeTruthy();
-    expect(within(rowOf('Fit a')).getByText('≈ 245M ISK')).toBeTruthy();
-    expect(within(rowOf('Fit b')).getByText('≈ 200M ISK')).toBeTruthy();
+    priceBeside(within(rowOf('Fit a')), '245M', '≈ ');
+    priceBeside(within(rowOf('Fit b')), '200M', '≈ ');
     expect(getHubPricesMock).toHaveBeenCalledTimes(1);
     expect(getHubPricesMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'jita' }),
@@ -372,12 +383,13 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     getHubPricesMock.mockResolvedValue(sellPrices({ 626: 200_000_000, 3001: null }));
     openWorkbench({ ok: true, fits: PRICED_FITS });
     const row = await waitFor(() => rowOf('Fit a'));
-    expect(await within(row).findByText('≥ 200M ISK')).toBeTruthy();
+    await within(row).findByText('200M');
+    priceBeside(within(row), '200M', '≥ ');
     expect(
       within(row).getByText('Created: 2d ago · 1 item has no sell order at Jita')
     ).toBeTruthy();
     expect(within(rowOf('Fit b')).getByText('Created: 2d ago')).toBeTruthy();
-    expect(within(rowOf('Fit b')).getByText('≈ 200M ISK')).toBeTruthy();
+    priceBeside(within(rowOf('Fit b')), '200M', '≈ ');
   });
 
   it('shows no price, and no error, when prices cannot load', async () => {
@@ -405,7 +417,8 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     expect((await screen.findByText('Pricing fits at Jita…')).getAttribute('role')).toBe('status');
     expect(screen.queryByText(/ISK/)).toBeNull();
     act(() => answer(sellPrices({ 626: 200_000_000, 3001: 45_000_000 })));
-    expect(await within(rowOf('Fit a')).findByText('≈ 245M ISK')).toBeTruthy();
+    await within(rowOf('Fit a')).findByText('245M');
+    priceBeside(within(rowOf('Fit a')), '245M', '≈ ');
     expect(screen.queryByText('Pricing fits at Jita…')).toBeNull();
   });
 
@@ -445,9 +458,11 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
       )
     );
     openWorkbench({ ok: true, fits: PRICED_FITS });
-    expect(await screen.findByText('≈ 245M ISK')).toBeTruthy();
+    await screen.findByText('245M');
+    priceBeside(screen, '245M', '≈ ');
     act(() => useMarketHub.setState({ value: 'amarr' }));
-    expect(await within(rowOf('Fit a')).findByText('≈ 300M ISK')).toBeTruthy();
+    await within(rowOf('Fit a')).findByText('300M');
+    priceBeside(within(rowOf('Fit a')), '300M', '≈ ');
     expect(screen.getByText(/Prices: Amarr, your default Trade Hub/)).toBeTruthy();
     expect(getHubPricesMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ id: 'amarr' }),

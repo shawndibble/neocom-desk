@@ -314,7 +314,7 @@ function FitView({ fitting, typeLabel }: { fitting: Fitting; typeLabel: TypeLabe
       {isEmpty ? (
         <p className="text-xs text-text-dim">{t('travel.pilot.recent.emptyFit')}</p>
       ) : (
-        <FittingModuleList fitting={fitting} typeName={typeLabel} />
+        <FittingModuleList fitting={fitting} typeName={typeLabel} linkNames />
       )}
       <Button size="sm" disabled={busy} onClick={() => void openInFittings()}>
         {t('travel.pilot.recent.openInFittings')}

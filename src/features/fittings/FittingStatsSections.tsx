@@ -1,8 +1,9 @@
 import { HintText } from '@/components/ui/HintText';
 import { useEffect, useState, type ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Button, Caret, RowMoreActions } from '@/components/ui';
-import { formatIskCompact } from '@/lib/isk';
+import { Trans, useTranslation } from 'react-i18next';
+import { Button, Caret, IskAmount, RowMoreActions } from '@/components/ui';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { formatSeconds } from '@/lib/duration';
 import {
   alignTimeSeconds,
@@ -119,17 +120,17 @@ function ResistCell({
           className={`absolute inset-y-0 left-0 opacity-45 ${DMG_FILL_CLASS[tone]}`}
           style={{ width: `${pct}%` }}
         />
-        <span
-          className={`relative ${unheated === undefined ? '' : 'text-warning'}`}
-          title={
-            unheated === undefined ? undefined : t('fittings.stats.unheated', { value: unheated })
-          }
-        >
-          {pct.toFixed(0)}%
-          {unheated !== undefined && (
+        {unheated === undefined ? (
+          <span className="relative">{pct.toFixed(0)}%</span>
+        ) : (
+          <HintText
+            content={t('fittings.stats.unheated', { value: unheated })}
+            className="relative text-warning"
+          >
+            {pct.toFixed(0)}%
             <span className="sr-only"> ({t('fittings.stats.unheated', { value: unheated })})</span>
-          )}
-        </span>
+          </HintText>
+        )}
       </div>
     </td>
   );
@@ -193,20 +194,24 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
                 unheated={row.unheated?.[type]}
               />
             ))}
-            <td
-              className={`text-right text-xs tabular-nums ${row.unheated?.ehp === undefined ? '' : 'text-warning'}`}
-              title={
-                row.unheated?.ehp === undefined
-                  ? undefined
-                  : t('fittings.stats.unheated', { value: row.unheated.ehp })
-              }
-            >
-              {row.ehp === undefined ? '' : formatEhp(row.ehp)}
-              {row.unheated?.ehp !== undefined && (
-                <span className="sr-only">
-                  {' '}
-                  ({t('fittings.stats.unheated', { value: row.unheated.ehp })})
-                </span>
+            <td className="text-right text-xs tabular-nums">
+              {row.unheated?.ehp === undefined ? (
+                row.ehp === undefined ? (
+                  ''
+                ) : (
+                  formatEhp(row.ehp)
+                )
+              ) : (
+                <HintText
+                  content={t('fittings.stats.unheated', { value: row.unheated.ehp })}
+                  className="text-warning"
+                >
+                  {row.ehp === undefined ? '' : formatEhp(row.ehp)}
+                  <span className="sr-only">
+                    {' '}
+                    ({t('fittings.stats.unheated', { value: row.unheated.ehp })})
+                  </span>
+                </HintText>
               )}
             </td>
           </tr>
@@ -239,7 +244,7 @@ function DamageFigures({
   const reloads = sustainedDps.toFixed(1) !== dps.toFixed(1);
   const tooltip = sustained === 'tooltip' && reloads ? sustainedLabel(stats) : undefined;
   const numbers = (
-    <span className="ml-auto shrink-0 text-right tabular-nums" title={tooltip}>
+    <span className="ml-auto shrink-0 text-right tabular-nums">
       <span>
         <HeatFigure
           stats={stats}
@@ -321,14 +326,17 @@ function StatSection({
 }) {
   return (
     <section className="border-b border-line last:border-b-0">
-      {/* Every section's row is shaded alike, open or shut: its small-caps title, the headline figure beside. */}
-      <div className="flex items-center gap-2 bg-panel-2 pr-3 transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none hover:bg-line">
+      {/* Every section's row looks alike, open or shut: its small-caps title, the headline figure beside. Hover fills it `panel-2`, so it rests unfilled. */}
+      <div className={cx('flex items-center gap-2 pr-3', rowInteractiveClassName)}>
         <h3 className="min-w-0 flex-1">
           <button
             type="button"
             aria-expanded={expanded}
             onClick={onToggle}
-            className="flex min-h-11 w-full items-center gap-2 pl-3 text-left text-xs font-semibold tracking-widest uppercase md:min-h-9"
+            className={cx(
+              'flex min-h-11 w-full items-center gap-2 pl-3 text-left text-xs font-semibold tracking-widest uppercase md:min-h-9',
+              focusRingInsetClassName
+            )}
           >
             <Caret expanded={expanded} />
             {title}
@@ -565,8 +573,12 @@ export function FittingStatsSections({
     price === null
       ? null
       : { ...price, rows: price.rows.map((row) => ({ ...row, name: typeName(row.typeId) })) };
-  const iskLabel = (value: number) =>
-    t('fittings.stats.unit.isk', { value: formatIskCompact(value) });
+  const iskLabel = (value: number) => (
+    <Trans
+      i18nKey="fittings.stats.unit.iskAmount"
+      components={{ isk: <IskAmount value={value} /> }}
+    />
+  );
   // A RAH's resists move with the profile (the engine adapts it), so the
   // armor row does too — label that, and show the RAH's own adapted resists.
   const adaptedHardeners = (stats?.modules ?? []).flatMap((module) =>

@@ -2,10 +2,11 @@
 import { useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
-import { IskAmount, TypeIcon } from '@/components/ui';
+import { entityLinkClassName, IskAmount, TypeIcon } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { changeLabel, fittingVariationsCsvColumns } from './fittingVariationsCsv';
 import type { VariationRow } from './useModuleVariations';
 
@@ -78,7 +79,9 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
       render: (row) => (
         <span className="flex items-center gap-1.5 font-medium">
           <TypeIcon typeId={row.typeId} size={32} className="h-4 w-4 shrink-0" />
-          <span className="min-w-0 truncate">{row.name}</span>
+          <MarketItemLink typeId={row.typeId} className={entityLinkClassName('min-w-0 truncate')}>
+            {row.name}
+          </MarketItemLink>
           <span className="shrink-0 text-[0.6875rem] text-text-dim">{row.metaGroupName}</span>
         </span>
       ),

@@ -3,12 +3,20 @@ import { fittingCompareHref, fittingsRedirect } from '@/features/fittings/fittin
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { formatIskCompact } from '@/lib/isk';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { FittingLoadState } from '@/lib/shortcuts';
-import { Button, Disclosure, Modal, Panel, SlideOver, Tabs, TextInput } from '@/components/ui';
+import {
+  Button,
+  Disclosure,
+  IskAmount,
+  Modal,
+  Panel,
+  SlideOver,
+  Tabs,
+  TextInput,
+} from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
 import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
@@ -568,9 +576,10 @@ function FittingsPage() {
           </span>
           {workspace.price && (
             <span className="text-text tabular-nums">
-              {t('fittings.stats.unit.isk', {
-                value: formatIskCompact(workspace.price.totals.sell),
-              })}
+              <Trans
+                i18nKey="fittings.stats.unit.iskAmount"
+                components={{ isk: <IskAmount value={workspace.price.totals.sell} /> }}
+              />
             </span>
           )}
         </>

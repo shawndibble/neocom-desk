@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
+import { SkillLink } from '@/features/entities';
 import { AddToPlanBar, type AddedToPlan } from '@/features/skills/AddToPlanBar';
 import { exceedsAlphaCap } from '@/engine/alphaCap';
 import { romanLevel } from '@/engine/projection';
@@ -87,11 +88,14 @@ export function MissingSkillsChip({ entries, characterId, fittingName }: Missing
               return (
                 <li key={row.skillTypeID} className="flex flex-wrap items-center gap-x-2">
                   <span className="text-text">
-                    {row.name} {romanLevel(row.targetLevel)}
+                    <SkillLink typeId={row.skillTypeID} planEntries={planEntries}>
+                      {row.name}
+                    </SkillLink>{' '}
+                    {romanLevel(row.targetLevel)}
                   </span>
                   <span className="text-text-dim">{formatCountdown(row.seconds)}</span>
                   {isEntryCovered(planEntries, row.skillTypeID, row.targetLevel) && (
-                    <span className="text-accent">{t('skills.fitCheck.inPlan')}</span>
+                    <span className="text-success">{t('skills.fitCheck.inPlan')}</span>
                   )}
                   {capped && <span className="text-warning">{t('plans.alphaCapped')}</span>}
                 </li>
