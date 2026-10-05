@@ -36,6 +36,7 @@ import {
   DataTableDenseCell,
   type DataTableColumn,
 } from '@/components/ui';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
@@ -476,12 +477,15 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       headerClassName: 'w-8',
       className: 'w-8',
       stackEdge: 'start',
+      // The label is the 44px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
       render: (row) => (
-        <Checkbox
-          aria-label={t('market.hauling.selectRow', { item: row.name })}
-          checked={overrides.get(row.typeId)?.selected !== false}
-          onChange={(event) => patchOverride(row.typeId, { selected: event.target.checked })}
-        />
+        <label className={touchCheckboxLabelClassName}>
+          <Checkbox
+            aria-label={t('market.hauling.selectRow', { item: row.name })}
+            checked={overrides.get(row.typeId)?.selected !== false}
+            onChange={(event) => patchOverride(row.typeId, { selected: event.target.checked })}
+          />
+        </label>
       ),
     },
     {

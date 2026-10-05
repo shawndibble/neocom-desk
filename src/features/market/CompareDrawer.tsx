@@ -34,7 +34,7 @@ import {
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { controlHeightClassName } from '@/components/ui/controlStyles';
+import { controlHeightClassName, resizeHandleTouchClassName } from '@/components/ui/controlStyles';
 import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { RemovableTypeIcon } from './RemovableTypeIcon';
@@ -430,7 +430,7 @@ export function CompareDrawer({
               tabIndex={mode === 'open' ? 0 : -1}
               onPointerDown={startDrag}
               onKeyDown={onHandleKeyDown}
-              className={`h-1.5 shrink-0 touch-none border-b border-line touch:relative touch:before:absolute touch:before:inset-x-0 touch:before:top-1/2 touch:before:h-11 touch:before:-translate-y-1/2 touch:before:content-[''] ${mode === 'open' ? 'cursor-row-resize hover:bg-panel-2' : ''}`}
+              className={`h-1.5 shrink-0 touch-none border-b border-line ${resizeHandleTouchClassName} ${mode === 'open' ? 'cursor-row-resize hover:bg-panel-2' : ''}`}
             />
           )}
           <header className="flex min-h-11 flex-wrap items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">

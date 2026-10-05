@@ -7,7 +7,8 @@ import {
   controlHeightClassName,
   gripHitAreaClassName,
   tappableRowClassName,
-  touchHitAreaClassName,
+  resizeHandleTouchClassName,
+  touchCheckboxLabelClassName,
   disabledClassName,
   focusRingClassName,
   focusRingInsetClassName,
@@ -123,10 +124,23 @@ describe('touch tier', () => {
     expect(menuItemClassName).toContain('touch:min-h-11');
   });
 
-  it('gives checkboxes and grips a padded pseudo-element, not a layout change', () => {
-    expect(touchHitAreaClassName).toContain('touch:before:-inset-3.5');
-    expect(gripHitAreaClassName).toContain('touch:before:size-11');
-    expect(`${touchHitAreaClassName} ${gripHitAreaClassName}`).not.toMatch(/(^| )(p|m|size|h|w)-/);
+  it('gives a bare checkbox its 44px target through its label, never a pseudo-element', () => {
+    expect(touchCheckboxLabelClassName).toContain('touch:size-11');
+    for (const file of ['Checkbox', 'Radio']) {
+      expect(readFileSync(`src/components/ui/${file}.tsx`, 'utf8')).not.toMatch(/before:/);
+    }
+  });
+
+  it('grows a grip hit area along the vertical axis only, so it cannot cover a neighbour', () => {
+    expect(gripHitAreaClassName).toContain('touch:before:inset-x-0');
+    expect(gripHitAreaClassName).toContain('touch:before:h-11');
+    expect(gripHitAreaClassName).not.toMatch(/before:(size|w|-inset-x|-left|-right)/);
+  });
+
+  it('makes the resize separator itself 44px tall on touch, with its hairline centred', () => {
+    expect(resizeHandleTouchClassName).toContain('touch:h-11');
+    expect(resizeHandleTouchClassName).toContain('touch:after:top-1/2');
+    expect(resizeHandleTouchClassName).not.toContain('before:');
   });
 
   it('declares the touch variant against a coarse pointer', () => {

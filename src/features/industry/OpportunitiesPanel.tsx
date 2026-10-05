@@ -36,6 +36,7 @@ import {
   SelectValue,
   STAT_CHIP_TONE_TEXT_CLASS,
 } from '@/components/ui';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
@@ -338,14 +339,17 @@ export function OpportunitiesPanel({
       id: 'select',
       header: '',
       className: 'w-8',
+      // The label is the 44px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
       render: (row) => (
-        <Checkbox
-          checked={selectedIds.has(row.candidate.id)}
-          onChange={() => toggleSelected(row.candidate.id)}
-          aria-label={t('industry.opportunitiesSelectFor', {
-            name: row.candidate.catalogEntry.productName,
-          })}
-        />
+        <label className={touchCheckboxLabelClassName}>
+          <Checkbox
+            checked={selectedIds.has(row.candidate.id)}
+            onChange={() => toggleSelected(row.candidate.id)}
+            aria-label={t('industry.opportunitiesSelectFor', {
+              name: row.candidate.catalogEntry.productName,
+            })}
+          />
+        </label>
       ),
     },
     {

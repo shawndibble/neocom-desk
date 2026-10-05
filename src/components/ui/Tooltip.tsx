@@ -277,7 +277,8 @@ interface InfoTooltipProps {
   /**
    * @deprecated Tooltip-only now (DESIGN.md §6c): a trigger that acts on click
    * is an `IconButton` with its own tooltip. Kept only until `ResultsSummary`
-   * migrates (package B); delete once nothing passes it.
+   * migrates (package B, #2659); delete once nothing passes it.
+   * TODO(#2659): remove `onClick` and `aria-haspopup` with that migration.
    */
   onClick?: () => void;
   /** @deprecated See `onClick`. */

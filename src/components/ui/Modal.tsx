@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { IconButton } from './IconButton';
 import * as Icon from './icons';
 import { PortalContainerProvider } from './portalContainer';
+import { RowTappableContext } from './tooltipHold';
 
 export type ModalPlacement = 'center' | 'sheet' | 'sheet-full' | 'wide' | 'media';
 
@@ -146,45 +147,47 @@ export function Modal({
         // carry its own overlay (e.g. an item name's right-click menu), and
         // one portaled to `document.body` would
         // land behind the top layer — see `portalContainer.ts`.
-        <PortalContainerProvider value={portalContainer}>
-          <div className={`flex ${heightClass} flex-col`}>
-            <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
-              <h2
-                id={titleId}
-                className="min-w-0 flex-1 truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-              >
-                {title}
-              </h2>
-              {titleActions}
-              {/* `Icon.Close` via `IconButton`, not the hand-rolled "×" glyph
+        <RowTappableContext.Provider value={false}>
+          <PortalContainerProvider value={portalContainer}>
+            <div className={`flex ${heightClass} flex-col`}>
+              <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
+                <h2
+                  id={titleId}
+                  className="min-w-0 flex-1 truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                >
+                  {title}
+                </h2>
+                {titleActions}
+                {/* `Icon.Close` via `IconButton`, not the hand-rolled "×" glyph
                 this replaced: DESIGN.md's icon rules require an icon-only
                 control to be an `IconButton` and forbid a dingbat character
                 standing in for one, and the mobile "More" sheet's close
                 control was flagged at 23×28px — under the documented 44px
                 touch tier every other icon action in the header now gets. */}
-              <IconButton
-                variant="plain"
-                icon={<Icon.Close />}
-                label={t('common.close')}
-                onClick={onClose}
-              />
-            </header>
-            {/* `overscroll-contain` plus the `body:has(dialog[open])` rule in
+                <IconButton
+                  variant="plain"
+                  icon={<Icon.Close />}
+                  label={t('common.close')}
+                  onClick={onClose}
+                />
+              </header>
+              {/* `overscroll-contain` plus the `body:has(dialog[open])` rule in
               index.css: a native dialog does not lock the page behind it, so
               on a phone a scroll that starts over the sheet would otherwise
               chain straight into the page underneath. */}
-            {/* A sheet's content may end in a sticky action footer
+              {/* A sheet's content may end in a sticky action footer
               (FilterSheet); the scroll padding keeps a control focused near
               the bottom from scrolling in underneath it (WCAG 2.4.11). */}
-            <div
-              ref={bodyRef}
-              tabIndex={-1}
-              className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none${placement.startsWith('sheet') ? ' scroll-pb-20' : ''}`}
-            >
-              {children}
+              <div
+                ref={bodyRef}
+                tabIndex={-1}
+                className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none${placement.startsWith('sheet') ? ' scroll-pb-20' : ''}`}
+              >
+                {children}
+              </div>
             </div>
-          </div>
-        </PortalContainerProvider>
+          </PortalContainerProvider>
+        </RowTappableContext.Provider>
       )}
     </dialog>
   );
