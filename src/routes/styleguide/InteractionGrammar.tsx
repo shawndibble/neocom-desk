@@ -11,11 +11,21 @@ import {
   Panel,
   RowActionsMenu,
   RowCaret,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   textActionClassName,
 } from '@/components/ui';
 import { ExternalLink, ExternalMark } from '@/components/ui/ExternalLink';
 import { HintText } from '@/components/ui/HintText';
-import { inlineLinkClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  focusRingInsetClassName,
+  inlineLinkClassName,
+  rowInteractiveClassName,
+} from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { CharacterLink, SkillLink, SystemLink } from '@/features/entities';
 import { cx } from '@/lib/cx';
@@ -73,7 +83,7 @@ export function InteractionGrammar() {
         <Cue rule={k('rules.inlineLink')}>
           <span>
             {k('samples.sentenceBefore')}{' '}
-            <a href="#interaction-grammar" className={inlineLinkClassName}>
+            <a href="#" className={inlineLinkClassName}>
               {k('samples.inlineLink')}
             </a>{' '}
             {k('samples.sentenceAfter')}
@@ -122,9 +132,10 @@ export function InteractionGrammar() {
       <Group title={k('groups.carets')}>
         <Cue rule={k('rules.rowCaret')}>
           <a
-            href="#interaction-grammar"
+            href="#"
             className={cx(
-              'group flex w-full items-center justify-between rounded-xs px-2 py-2 -outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent',
+              'group flex w-full items-center justify-between rounded-xs px-2 py-2 ',
+              focusRingInsetClassName,
               rowInteractiveClassName
             )}
           >
@@ -137,11 +148,31 @@ export function InteractionGrammar() {
             type="button"
             aria-expanded={expanded}
             onClick={() => setExpanded((v) => !v)}
-            className="flex items-center gap-1.5 text-xs font-semibold text-text-dim uppercase"
+            className={cx(
+              'flex items-center gap-1.5 rounded-xs text-xs font-semibold text-text-dim uppercase',
+              focusRingClassName
+            )}
           >
             <Caret expanded={expanded} />
             {k('samples.disclosure')}
           </button>
+        </Cue>
+        <Cue rule={k('rules.fieldCaret')} note={k('notes.fieldCaret')}>
+          <Select defaultValue="forge">
+            <SelectTrigger aria-label={k('samples.region')} className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="forge">The Forge</SelectItem>
+              <SelectItem value="domain">Domain</SelectItem>
+            </SelectContent>
+          </Select>
+        </Cue>
+        <Cue rule={k('rules.pending')}>
+          <span className="inline-flex items-center gap-1.5">
+            <Icon.Pending size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+            {k('samples.pending')}
+          </span>
         </Cue>
         <Cue rule={k('rules.pagerCarets')}>
           <IconButton icon={<Icon.Back />} label={k('samples.previous')} />
@@ -217,7 +248,7 @@ export function InteractionGrammar() {
             </Cue>
             <Cue rule={k('rules.stateFocus')} note={k('notes.focus')}>
               <Button>{k('samples.boxed')}</Button>
-              <a href="#interaction-grammar" className={inlineLinkClassName}>
+              <a href="#" className={inlineLinkClassName}>
                 {k('samples.inlineLink')}
               </a>
             </Cue>

@@ -8937,7 +8937,9 @@
         "stateFocus": "Focus-visible",
         "stateDisabled": "Disabled",
         "stateLoading": "Loading (Button loading)",
-        "stateSelected": "Selected / on (aria-pressed)"
+        "stateSelected": "Selected / on (aria-pressed)",
+        "fieldCaret": "CaretDown in field chrome (a box sized like a field): opens a list to pick from",
+        "pending": "Hourglass: pending, awaiting an answer"
       },
       "notes": {
         "textAction": "Actions only. Navigation is a link or a row.",
@@ -8949,7 +8951,8 @@
         "hoverPressed": "Hover with a pointer: one step brighter. Press and hold: a step darker.",
         "focus": "Press Tab: 2px accent outline, outset on boxed controls and inline links.",
         "disabled": "opacity-40. aria-disabled keeps the tooltip reachable.",
-        "selectedToggle": "On takes the accent tint."
+        "selectedToggle": "On takes the accent tint.",
+        "fieldCaret": "The box is a control (§6); the caret says it opens a list."
       },
       "samples": {
         "character": "Character name",
@@ -8984,7 +8987,9 @@
         "ariaDisabled": "aria-disabled",
         "saving": "Saving",
         "toggleOn": "Toggle on",
-        "toggleOff": "Toggle off"
+        "toggleOff": "Toggle off",
+        "region": "Region",
+        "pending": "RSVP pending"
       }
     }
   }

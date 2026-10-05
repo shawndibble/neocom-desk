@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import en from '@/i18n/locales/en.json';
 import { InteractionGrammar } from './InteractionGrammar';
 
 describe('InteractionGrammar styleguide section', () => {
@@ -20,7 +21,9 @@ describe('InteractionGrammar styleguide section', () => {
     ]) {
       expect(screen.getByRole('heading', { name: group })).toBeInTheDocument();
     }
-    expect(screen.getByText(/Dotted underline: has a tooltip/)).toBeInTheDocument();
+    const rules = Object.values(en.styleguide.interactionGrammar.rules);
+    expect(rules.length).toBeGreaterThan(20);
+    for (const rule of rules) expect(screen.getByText(rule)).toBeInTheDocument();
     // External links carry the hidden "opens in a new tab" text and a real href.
     expect(screen.getByRole('link', { name: /zKillboard/ })).toHaveAttribute('target', '_blank');
     // Entity links are real anchors.
