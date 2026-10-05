@@ -251,6 +251,21 @@ export function colonyHoursToFull(
   pi: PiData,
   haulHours: number
 ): number | null {
+  return colonyStorage(colony, pins, pi, haulHours)?.hoursToFull ?? null;
+}
+
+/**
+ * `colonyHoursToFull`'s reading plus the buffer it was measured against (the
+ * launchpad and storage facilities' own capacity, m3), so the Colonies row's
+ * "Storage full in" and its expanded Launchpad block come from one check.
+ * Null when nothing is extracted, so there is nothing to fill it.
+ */
+export function colonyStorage(
+  colony: BuiltColonyAdvice,
+  pins: readonly PlanetPin[],
+  pi: PiData,
+  haulHours: number
+): { hoursToFull: number | null; bufferM3: number } | null {
   if (colony.extractedPerHour.length === 0) return null;
   const check = colonyThroughputCheck({
     colony,
@@ -261,5 +276,5 @@ export function colonyHoursToFull(
     linkCapacityPerHour: null,
     bufferHours: haulHours,
   });
-  return check.peak.hoursToFull;
+  return { hoursToFull: check.peak.hoursToFull, bufferM3: check.peak.bufferM3 };
 }
