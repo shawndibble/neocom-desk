@@ -249,6 +249,30 @@ describe('fetchRegionRecentKills', () => {
     expect(result.ok && result.bySystem.get(30002813)).toHaveLength(2 * REGION_PAGE_SIZE + 2);
   });
 
+  it('counts a kill once when it shows on two pages', async () => {
+    stubPages([page(REGION_PAGE_SIZE), page(3, REGION_PAGE_SIZE)]);
+    const result = await fetchRegionRecentKills(1);
+    expect(result.ok && result.bySystem.get(30002813)).toHaveLength(REGION_PAGE_SIZE + 2);
+  });
+
+  it('fails when the pages never end, rather than show a cut-off hour', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(page(REGION_PAGE_SIZE)),
+        } as Response)
+      )
+    );
+    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false });
+  });
+
+  it('fails on an error body, rather than read it as no kills', async () => {
+    stubPages([{ error: 'nope' }]);
+    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false });
+  });
+
   it('fails when any page fails, rather than show a partial hour', async () => {
     let call = 0;
     vi.stubGlobal(

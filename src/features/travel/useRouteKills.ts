@@ -39,6 +39,18 @@ export interface RouteKillsSystem {
   band: SecurityBand | null;
 }
 
+/** A route system and its place in flight order. */
+interface WalkRow {
+  system: RouteKillsSystem;
+  index: number;
+}
+
+/** One zKillboard request: a region's rows, or (no known region) a single system's. */
+interface WalkStep {
+  regionId: number | null;
+  rows: WalkRow[];
+}
+
 const LOADING: RouteKillsCell = { status: 'loading' };
 
 /** `route` in flight order; `null` while there is no route to read. */
@@ -82,12 +94,11 @@ export function useRouteKills(
     // Read alongside the first zKillboard requests, never ahead of them.
     const groups = loadTypeGroups();
     const regions = loadSolarSystemsById();
-    const fill = async (system: RouteKillsSystem, kills: readonly RecentKill[]) => {
+    const fillRow = async ({ system, index }: WalkRow, kills: readonly RecentKill[]) => {
       const groupOf = await groups;
       const locations = await resolveKillLocations(
         kills.flatMap((kill) => (kill.locationId === null ? [] : [kill.locationId]))
       );
-      const index = systems.indexOf(system);
       const pathNeighbours = new Set(
         [systems[index - 1], systems[index + 1]].flatMap((neighbour) =>
           neighbour ? [neighbour.systemId] : []
@@ -106,34 +117,39 @@ export function useRouteKills(
     };
     void (async () => {
       const regionOf = await regions;
-      // One walk step per region (in order of first appearance) or, for a
-      // system with no known region, per system.
-      const steps = new Map<number, RouteKillsSystem[]>();
-      for (const system of systems) {
+      // One step per region, in order of first appearance; a system with no
+      // known region is a step of its own.
+      const steps: WalkStep[] = [];
+      const byRegion = new Map<number, WalkStep>();
+      systems.forEach((system, index) => {
+        const row = { system, index };
         const regionId = regionOf?.get(system.systemId)?.regionId ?? null;
-        const key = regionId ?? -system.systemId;
-        steps.set(key, [...(steps.get(key) ?? []), system]);
-      }
-      await mapWithConcurrencyLimit(
-        [...steps.entries()],
-        ZKILL_CONCURRENCY,
-        async ([key, step]) => {
-          if (cancelled) return;
-          if (key > 0) {
-            const result = await loadRegionRecentKills(key);
-            for (const system of step) {
-              if (cancelled) return;
-              if (result.ok) await fill(system, result.bySystem.get(system.systemId) ?? []);
-              else set(system.systemId, { status: 'unavailable' });
-            }
-            return;
-          }
-          const [system] = step;
-          const result = await loadSystemRecentKills(system.systemId);
-          if (result.ok) await fill(system, result.kills);
-          else set(system.systemId, { status: 'unavailable' });
+        const known = regionId === null ? undefined : byRegion.get(regionId);
+        if (known) {
+          known.rows.push(row);
+          return;
         }
-      );
+        const step = { regionId, rows: [row] };
+        steps.push(step);
+        if (regionId !== null) byRegion.set(regionId, step);
+      });
+      await mapWithConcurrencyLimit(steps, ZKILL_CONCURRENCY, async ({ regionId, rows }) => {
+        if (cancelled) return;
+        // Each row's kills, or null when zKillboard could not answer.
+        let killsOf: ((systemId: number) => readonly RecentKill[]) | null;
+        if (regionId === null) {
+          const result = await loadSystemRecentKills(rows[0].system.systemId);
+          killsOf = result.ok ? () => result.kills : null;
+        } else {
+          const result = await loadRegionRecentKills(regionId);
+          killsOf = result.ok ? (systemId) => result.bySystem.get(systemId) ?? [] : null;
+        }
+        for (const row of rows) {
+          if (cancelled) return;
+          if (killsOf) await fillRow(row, killsOf(row.system.systemId));
+          else set(row.system.systemId, { status: 'unavailable' });
+        }
+      });
     })();
     return () => {
       cancelled = true;

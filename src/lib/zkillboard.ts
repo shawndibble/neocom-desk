@@ -444,11 +444,13 @@ export type RegionRecentKillsResult =
  * Safety: one request covers every route system in the region, where the
  * system API needs one each (zKillboard no longer takes comma-separated ids).
  * Follows `/page/n/` while a page is full, so a busy region is never cut at
- * 1,000 kills; any page failing fails the whole answer. A browser fetch with
+ * 1,000 kills; any page failing, or the page cap being hit, fails the whole answer. A browser fetch with
  * no custom headers, as `fetchKillmailHash`.
  */
 export async function fetchRegionRecentKills(regionId: number): Promise<RegionRecentKillsResult> {
   const bySystem = new Map<number, RecentKill[]>();
+  // New kills shift the pages while they are read, so one can show on two.
+  const seen = new Set<number>();
   try {
     for (let pageNumber = 1; pageNumber <= REGION_MAX_PAGES; pageNumber += 1) {
       const suffix = pageNumber === 1 ? '' : `page/${pageNumber}/`;
@@ -457,12 +459,19 @@ export async function fetchRegionRecentKills(regionId: number): Promise<RegionRe
       );
       if (!response.ok) return { ok: false };
       const body: unknown = await response.json();
+      // An error body is a failure, not an empty hour.
+      if (!Array.isArray(body)) return { ok: false };
       for (const [systemId, kills] of parseRegionKills(body)) {
-        bySystem.set(systemId, [...(bySystem.get(systemId) ?? []), ...kills]);
+        const fresh = kills.filter((kill) => !seen.has(kill.killmailId));
+        for (const kill of fresh) seen.add(kill.killmailId);
+        const known = bySystem.get(systemId);
+        if (known) known.push(...fresh);
+        else bySystem.set(systemId, fresh);
       }
-      if (!Array.isArray(body) || body.length < REGION_PAGE_SIZE) break;
+      if (body.length < REGION_PAGE_SIZE) return { ok: true, bySystem };
     }
-    return { ok: true, bySystem };
+    // Still full at the page cap: a partial hour would read as quiet.
+    return { ok: false };
   } catch {
     return { ok: false };
   }
