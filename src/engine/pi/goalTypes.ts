@@ -186,6 +186,13 @@ export interface Flow {
   unitsPerHour: number;
 }
 
+/**
+ * Why this colony hosts the factories. `planGoals` alone picks by scarcity
+ * (`'least-needed-extraction'`) or takes the caller's (`'forced'`);
+ * `planBest` tries every eligible host and keeps the best net (`'best-net'`).
+ */
+export type FactoryHostReason = 'only-eligible' | 'least-needed-extraction' | 'forced' | 'best-net';
+
 export interface GoalPlan {
   /** The goals as planned: merged by type, zero-rate goals dropped. */
   goals: Goal[];
@@ -199,7 +206,7 @@ export interface GoalPlan {
   demand: DemandLine[];
   /** One per colony, by planet id. */
   assignments: ColonyAssignment[];
-  factoryHost: { planetId: number; reason: 'only-eligible' | 'least-needed-extraction' } | null;
+  factoryHost: { planetId: number; reason: FactoryHostReason } | null;
   shortfalls: Shortfall[];
   buys: { typeId: number; tier: PiTier; unitsPerHour: number }[];
   /** P1 extracted beyond what the goals need — whole ECUs overshoot — sold at the hub. */

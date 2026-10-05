@@ -21,7 +21,8 @@
  *    needs least: score each by Σ, over the demanded P0s it could yield, of
  *    1 / (colonies able to yield that P0), and take the lowest — then the
  *    smaller Baseline forfeited, then the larger Powergrid, then CPU, then the
- *    lower planet id. Its P2+ factories are fitted first (`fitPlannedPins`);
+ *    lower planet id. That is the price-free default; `planBest` instead
+ *    solves once per eligible host (`hostPlanetId`) and keeps the best net. Its P2+ factories are fitted first (`fitPlannedPins`);
  *    an overrun is a `host-over-budget` shortfall, and a host that cannot be
  *    built makes nothing. With no eligible colony, P2+ goals are not expanded
  *    at all — each is one `'short'` (or, if its tier is buyable, `'bought'`)
@@ -100,6 +101,7 @@ import type {
   Flow,
   FlowEnd,
   Goal,
+  FactoryHostReason,
   GoalPlan,
   PlannerColony,
   PlannerPolicy,
@@ -115,6 +117,12 @@ export interface PlanGoalsInput {
   policy: PlannerPolicy;
   /** Read for each colony's Baseline and spare slot only; see the module header. */
   books: PriceBooks;
+  /**
+   * Host the factories here instead of choosing by scarcity. Must be a colony
+   * that can carry every made schematic's factory, or this throws. `planBest`
+   * uses it to try each candidate.
+   */
+  hostPlanetId?: number;
 }
 
 const HOURS_PER_DAY = 24;
@@ -168,6 +176,38 @@ interface SolveContext {
   books: PriceBooks;
   baselines: ReadonlyMap<number, ColonyBaseline>;
   pi: PiData;
+  hostPlanetId: number | undefined;
+}
+
+/** Colonies whose planet type carries every factory `madeHigh` needs. */
+function eligibleHosts(
+  madeHigh: readonly number[],
+  colonies: readonly PlannerColony[],
+  pi: PiData
+): PlannerColony[] {
+  const schematics = madeHigh.map((id) => pi.schematics[String(id)]);
+  return colonies.filter((c) => schematics.every((s) => s.planetTypes.includes(c.planetType)));
+}
+
+function madeHighOf(goals: readonly Goal[], pi: PiData): number[] {
+  const made = new Set<number>();
+  for (const g of goals) {
+    const chain = expandChain(g.typeId, pi, { unitsPerHour: g.unitsPerDay / HOURS_PER_DAY });
+    for (const node of chain.nodes) if (node.tier >= 2) made.add(node.typeId);
+  }
+  return [...made].sort(byId);
+}
+
+/**
+ * Planet ids that could host these goals' factories, sorted — empty when no
+ * P2+ is made or no colony can carry it. What `planBest` iterates.
+ */
+export function hostCandidates(input: PlanGoalsInput, pi: PiData): number[] {
+  const madeHigh = madeHighOf(normaliseGoals(input.goals, pi), pi);
+  if (madeHigh.length === 0) return [];
+  return eligibleHosts(madeHigh, input.colonies, pi)
+    .map((c) => c.planetId)
+    .sort(byId);
 }
 
 /**
@@ -178,14 +218,17 @@ function chooseHost(
   madeHigh: readonly number[],
   demandedP0: readonly number[],
   ctx: SolveContext
-):
-  | { host: PlannerColony; reason: 'only-eligible' | 'least-needed-extraction' }
-  | { host: null; facility: PiFactoryKind } {
+): { host: PlannerColony; reason: FactoryHostReason } | { host: null; facility: PiFactoryKind } {
   const { colonies, pi } = ctx;
   const schematics = madeHigh.map((id) => pi.schematics[String(id)]);
-  const eligible = colonies.filter((c) =>
-    schematics.every((s) => s.planetTypes.includes(c.planetType))
-  );
+  const eligible = eligibleHosts(madeHigh, colonies, pi);
+  if (ctx.hostPlanetId !== undefined) {
+    const forced = eligible.find((c) => c.planetId === ctx.hostPlanetId);
+    if (!forced) {
+      throw new Error(`planet ${ctx.hostPlanetId} cannot host these goals' factories`);
+    }
+    return { host: forced, reason: 'forced' };
+  }
   if (eligible.length === 0) {
     // Name the factory no colony can carry; the P4's High-Tech plant in practice.
     const stranded =
@@ -608,7 +651,14 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
   const baselines = new Map(
     colonies.map((c) => [c.planetId, colonyBaseline(c, pi, policy, books)] as const)
   );
-  const ctx: SolveContext = { colonies, policy, books, baselines, pi };
+  const ctx: SolveContext = {
+    colonies,
+    policy,
+    books,
+    baselines,
+    pi,
+    hostPlanetId: input.hostPlanetId,
+  };
 
   const first = solve(goals, ctx);
   const allMet = first.achieved.every((a) => a.fraction >= 1 - EPSILON);
