@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useExpiringWindowHours, useExpiringWindowMs } from '@/features/pi/expiringWindow';
@@ -990,13 +990,17 @@ export function PlanetaryIndustry() {
       ? `${activeCharacterId}:${linkedColonyId}`
       : null;
   const isExpanded = (key: string) => expandedKeys.has(key) || key === linkedKey;
+  // Scrolled to and focused once per link, not on every refresh of `data`.
+  const focusedLink = useRef<string | null>(null);
   useEffect(() => {
     if (tab !== 'colonies' || linkedColonyId === null || !data) return;
-    const trigger = document.getElementById(
-      `pi-colony-${activeCharacterId}-${linkedColonyId}-trigger`
-    );
-    trigger?.scrollIntoView?.({ block: 'center' });
-    trigger?.focus({ preventScroll: true });
+    const id = `pi-colony-${activeCharacterId}-${linkedColonyId}-trigger`;
+    if (focusedLink.current === id) return;
+    const trigger = document.getElementById(id);
+    if (!trigger) return;
+    focusedLink.current = id;
+    trigger.scrollIntoView?.({ block: 'center' });
+    trigger.focus({ preventScroll: true });
   }, [tab, linkedColonyId, data, activeCharacterId]);
   const toggleColony = (key: string) => {
     if (key === linkedKey) {

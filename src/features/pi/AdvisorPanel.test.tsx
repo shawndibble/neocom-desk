@@ -1594,12 +1594,12 @@ describe('AdvisorPanel build advice', () => {
     // Collapsed by default; the number input only appears once the pilot asks
     // to edit it.
     await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
-    const field = screen.getByRole('spinbutton', { name: 'Customs rate' });
+    const field = screen.getByRole('textbox', { name: 'Customs rate' });
     fireEvent.change(field, { target: { value: '17' } });
 
     expect(setSyncedSetting).toHaveBeenCalledWith('sync.piCustomsRates', { [ASHAB]: 0.17 });
     // Repainted from the layered edit, with no reload.
-    expect(screen.getByRole('spinbutton', { name: 'Customs rate' })).toHaveValue(17);
+    expect(screen.getByRole('textbox', { name: 'Customs rate' })).toHaveValue('17');
     // Scheduled off the write's own promise, so it lands a microtask later.
     await vi.waitFor(() => expect(scheduleSync).toHaveBeenCalledWith(1));
   });
@@ -1608,7 +1608,7 @@ describe('AdvisorPanel build advice', () => {
     priceEverything();
     renderPanel();
     await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
-    const field = screen.getByRole('spinbutton', { name: 'Customs rate' });
+    const field = screen.getByRole('textbox', { name: 'Customs rate' });
     fireEvent.change(field, { target: { value: '' } });
 
     expect(setSyncedSetting).not.toHaveBeenCalled();
@@ -1618,7 +1618,7 @@ describe('AdvisorPanel build advice', () => {
     priceEverything();
     renderPanel();
     await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
-    fireEvent.change(screen.getByRole('spinbutton', { name: 'Customs rate' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Customs rate' }), {
       target: { value: '17' },
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Reset' }));

@@ -16,3 +16,15 @@ export function commodityName(typeId: number, pi: PiData): string {
     String(typeId)
   );
 }
+
+/**
+ * A typed non-negative decimal, with "," read as the decimal separator (a
+ * pilot's locale keyboard). Null for blank or anything that is not a plain
+ * number — never a partial parse of garbage.
+ */
+export function parseDecimal(text: string): number | null {
+  const normalised = text.trim().replace(',', '.');
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(normalised)) return null;
+  const value = Number(normalised);
+  return Number.isFinite(value) ? value : null;
+}

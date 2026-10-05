@@ -4,7 +4,7 @@
  * other two fold into collapsible panels after the results there; on a
  * pointer all three sit in a rail beside the results.
  */
-import { useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
@@ -38,8 +38,16 @@ import { DEFAULT_GOAL_PER_DAY } from './goalsParam';
 import type { ProductOption } from './products';
 import { SectionLabel, TierChip } from './DirectiveRow';
 import { CadenceRow, PercentInput } from './piControls';
+import { parseDecimal } from './goalPlannerFormat';
 
-/** A units box that holds what is typed while it has focus; commits each valid value. */
+/** How long typing pauses before a units box re-plans. */
+const COMMIT_DEBOUNCE_MS = 300;
+
+/**
+ * A units box. Text, not `type="number"`, so a comma decimal reads (and the
+ * browser never swallows what it cannot parse); committed on Enter, on blur,
+ * or once typing pauses — never per digit, since each commit re-plans.
+ */
 function UnitsBox({
   value,
   onCommit,
@@ -47,7 +55,6 @@ function UnitsBox({
   size,
   className = 'w-20',
   min = 0,
-  step,
   describedBy,
   id,
 }: {
@@ -58,30 +65,58 @@ function UnitsBox({
   size: ControlSize;
   className?: string;
   min?: number;
-  step?: number;
   describedBy?: string;
 }) {
+  const { t } = useTranslation();
   const [text, setText] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const errorId = useId();
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const settle = (raw: string) => {
+    clearTimeout(timer.current);
+    const next = parseDecimal(raw);
+    const ok = next !== null && next >= min;
+    setInvalid(raw.trim() !== '' && !ok);
+    if (ok && next !== value) onCommit(next);
+  };
+
   return (
-    <TextInput
-      id={id}
-      type="number"
-      inputMode="decimal"
-      size={size}
-      min={min}
-      step={step}
-      aria-label={label}
-      aria-describedby={describedBy}
-      className={`${className} text-right tabular-nums`}
-      value={text ?? String(value)}
-      onBlur={() => setText(null)}
-      onChange={(event) => {
-        setText(event.target.value);
-        const next = Number(event.target.value);
-        if (event.target.value.trim() !== '' && Number.isFinite(next) && next >= min)
-          onCommit(next);
-      }}
-    />
+    <span className="inline-flex flex-col">
+      <TextInput
+        id={id}
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        size={size}
+        aria-label={label}
+        aria-describedby={
+          [describedBy, invalid ? errorId : undefined].filter(Boolean).join(' ') || undefined
+        }
+        aria-invalid={invalid || undefined}
+        className={`${className} text-right tabular-nums ${invalid ? 'border-danger' : ''}`}
+        value={text ?? String(value)}
+        onChange={(event) => {
+          const raw = event.target.value;
+          setText(raw);
+          clearTimeout(timer.current);
+          timer.current = setTimeout(() => settle(raw), COMMIT_DEBOUNCE_MS);
+        }}
+        onBlur={(event) => {
+          settle(event.target.value);
+          setText(null);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') settle(event.currentTarget.value);
+        }}
+      />
+      {invalid && (
+        <span id={errorId} className="mt-0.5 text-[0.6875rem] text-danger">
+          {t('piPlan.numberInvalid')}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -223,7 +258,11 @@ function ColonyRow({
   const inputId = useId();
   const noteId = useId();
   const assumedPercent = customsRatePercent(ASSUMED_UNKNOWN_CUSTOMS);
-  const customsLabel = t('piPlan.colonyCustomsLabel', { name, system: systemName });
+  const customsLabel = t('piPlan.colonyCustomsLabel', {
+    label: t('piPlan.colonyCustoms'),
+    name,
+    system: systemName,
+  });
   return (
     <li className="space-y-1 border-b border-line pb-2 last:border-b-0 last:pb-0">
       <label className={`flex items-center gap-2 ${tappableRowClassName}`}>
@@ -455,6 +494,7 @@ export function AssumptionsSection(props: AssumptionsProps) {
             value={String(props.maxP0Types) as '1' | '2'}
             onChange={(value) => props.onMaxP0TypesChange(value === '1' ? 1 : 2)}
             size={props.size}
+            describedBy={typesHint}
             fill
           />
           <Hint id={typesHint}>{t('piPlan.maxP0TypesHint')}</Hint>
@@ -466,6 +506,7 @@ export function AssumptionsSection(props: AssumptionsProps) {
             hint={t('piAdvisor.cadenceRestartHint')}
             value={props.cadence.restartDays}
             size={props.size}
+            describedBy={cadenceHint}
             onChange={(restartDays) => props.onCadenceChange({ ...props.cadence, restartDays })}
           />
           <CadenceRow
@@ -473,6 +514,7 @@ export function AssumptionsSection(props: AssumptionsProps) {
             hint={t('piAdvisor.cadenceHaulHint')}
             value={props.cadence.haulDays}
             size={props.size}
+            describedBy={cadenceHint}
             onChange={(haulDays) => props.onCadenceChange({ ...props.cadence, haulDays })}
           />
           <Hint id={cadenceHint}>{t('piPlan.cadenceHint')}</Hint>
@@ -490,7 +532,6 @@ export function AssumptionsSection(props: AssumptionsProps) {
               label={t('piPlan.fallbackRate')}
               className="w-full"
               min={1}
-              step={500}
               describedBy={rateHint}
               onCommit={(value) => {
                 if (value > 0) props.onFallbackRateChange(value);

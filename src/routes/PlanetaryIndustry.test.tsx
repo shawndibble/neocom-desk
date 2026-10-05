@@ -701,7 +701,7 @@ describe('PlanetaryIndustry', () => {
     window.history.pushState({}, '', `/planetary-industry/plan?type=${TRANSMITTER}`);
     render(<App />);
 
-    expect(await screen.findByLabelText(`${TRANSMITTER_NAME} per day`)).toHaveValue(10);
+    expect(await screen.findByLabelText(`${TRANSMITTER_NAME} per day`)).toHaveValue('10');
     expect(screen.getByRole('tab', { name: 'Plan' })).toHaveAttribute('aria-selected', 'true');
     await waitFor(() => expect(window.location.search).toBe(`?goals=${TRANSMITTER}%3A10`));
   });
@@ -737,7 +737,7 @@ describe('PlanetaryIndustry', () => {
     const headline = await screen.findByTestId('goal-plan-headline');
     await waitFor(() => expect(headline).toHaveTextContent(/selling each colony.s best P1/));
     expect(within(headline).getByText(/^ISK\/day vs/)).toBeInTheDocument();
-    expect(screen.getByLabelText(`${WATER_NAME} per day`)).toHaveValue(24);
+    expect(screen.getByLabelText(`${WATER_NAME} per day`)).toHaveValue('24');
     const changes = screen.getByRole('heading', { name: 'Changes' });
     // DOM order, not a visual reorder: this is the phone's reading order.
     expect(
@@ -748,8 +748,10 @@ describe('PlanetaryIndustry', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Show colonies' }));
     // The colony's customs is its system's highsec rate after level 4.
     expect(
-      screen.getByLabelText('Customs rate for Jita IV (applies to all colonies in Jita) %')
-    ).toHaveValue(6);
+      screen.getByLabelText(
+        'Customs tax (POCO/Skyhook) for Jita IV (applies to all colonies in Jita)'
+      )
+    ).toHaveValue('6');
     expect(
       screen.getByRole('table', { name: 'Everything the goals need, by tier' })
     ).toBeInTheDocument();

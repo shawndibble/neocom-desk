@@ -406,6 +406,9 @@ describe('earningsNow', () => {
     expect(total.coloniesWithoutFigure).toBe(1);
     // Named, so the page can say which colony the figure leaves out.
     expect(total.leftOut).toEqual([OCEANIC_ID]);
+    // Per colony too, for a not-needed colony's switch tip.
+    expect(total.byPlanet.get(TEMPERATE_ID)).toBeCloseTo(alone.iskPerHour!, 6);
+    expect(total.byPlanet.get(OCEANIC_ID)).toBeNull();
 
     const off = earningsNow(
       plannerColonies(snapshot(), { ...PREFS, disabled: new Set([TEMPERATE_ID]) }),

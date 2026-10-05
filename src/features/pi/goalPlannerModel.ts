@@ -393,9 +393,10 @@ export function earningsNow(
   pi: PiData,
   prices: { prices: Readonly<Record<number, number>>; buyPrices: Readonly<Record<number, number>> },
   salesTaxPercent: number
-): TotalColonyEarnings & { leftOut: number[] } {
+): TotalColonyEarnings & { leftOut: number[]; byPlanet: Map<number, number | null> } {
   const revenuePrices = { ...prices.prices, ...prices.buyPrices };
   const leftOut: number[] = [];
+  const byPlanet = new Map<number, number | null>();
   const perColony = rows.flatMap((row) => {
     // The same colonies the Baseline counts: enabled and costable.
     if (!row.enabled || !row.advice || !row.colony) return [];
@@ -406,7 +407,12 @@ export function earningsNow(
       salesTaxPct: salesTaxPercent,
     });
     if (earned.iskPerHour === null) leftOut.push(row.planetId);
+    byPlanet.set(row.planetId, earned.iskPerHour);
     return [earned];
   });
-  return { ...totalColonyEarnings(perColony), leftOut: leftOut.sort((a, b) => a - b) };
+  return {
+    ...totalColonyEarnings(perColony),
+    leftOut: leftOut.sort((a, b) => a - b),
+    byPlanet,
+  };
 }

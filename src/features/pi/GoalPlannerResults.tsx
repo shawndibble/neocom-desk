@@ -40,6 +40,7 @@ import type {
 import type { BestPlan } from '@/engine/pi/planBest';
 import type { BaselineTotal } from '@/engine/pi/baseline';
 import { volumeOf } from '@/engine/pi/haulEffort';
+import { piTier as piTierOf } from '@/engine/pi/chain';
 import type { TradeHub } from '@/market/hubs';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
@@ -203,12 +204,14 @@ function attainmentText(attainment: GoalAttainment, pi: PiData, t: TFunction): s
  * The verdict, announced politely once the inputs settle — half a second
  * after the last recompute, so typing a rate does not read out every digit.
  */
-function LiveVerdict({ text }: { text: string }) {
+function LiveVerdict({ text, pending }: { text: string; pending: boolean }) {
   const [announced, setAnnounced] = useState('');
   useEffect(() => {
-    const timer = setTimeout(() => setAnnounced(text), 500);
+    // Wait for distances so the verdict is said once, but not forever: if
+    // they never land, say what there is after five seconds.
+    const timer = setTimeout(() => setAnnounced(text), pending ? 5_000 : 500);
     return () => clearTimeout(timer);
-  }, [text]);
+  }, [text, pending]);
   return (
     <span role="status" aria-live="polite" className="sr-only">
       {announced}
@@ -302,7 +305,7 @@ export function Headline({
 
   return (
     <Panel title={t('piPlan.headlineTitle')} actions={badge}>
-      <LiveVerdict text={distancesPending ? '' : announcement} />
+      <LiveVerdict text={announcement} pending={distancesPending} />
       <div className="space-y-3" data-testid="goal-plan-headline">
         {hasGoals ? (
           <>
@@ -405,7 +408,7 @@ function shortfallText(
     case 'type-gap':
       return (
         <>
-          {t('piPlan.shortTypeGap', {
+          {t(hint?.kind === 'switched-off' ? 'piPlan.shortTypeGapEnabled' : 'piPlan.shortTypeGap', {
             types: shortfall.fixPlanetTypes
               .map((type) => t(`pi.planetType.${type}`))
               .join(t('piPlan.or')),
@@ -499,20 +502,18 @@ const STEP_VERB: Record<StepKind, DirectiveVerb> = {
   idle: 'asIs',
 };
 
-function stepHeadline(step: ColonyStep, pi: PiData, t: TFunction): string {
+function stepHeadline(step: ColonyStep, t: TFunction): string {
   switch (step.kind) {
     case 'as-is':
-      return step.switchTo.length > 0
-        ? t('piPlan.stepSwitch', { p1s: namesList(step.switchTo, pi) })
-        : t('piPlan.stepAsIs');
+      return step.notNeeded ? t('piPlan.stepNotNeeded') : t('piPlan.stepAsIs');
     case 'start':
       return t('piPlan.stepStart');
     case 'add':
       return t('piPlan.stepAdd');
     case 'stop':
-      return t('piPlan.stepStop', { p0s: namesList(step.stop, pi) });
+      return t('piPlan.stepStopHeadline');
     case 'retarget':
-      return t('piPlan.stepRetarget', { p0s: namesList(step.stop, pi) });
+      return t('piPlan.stepRetargetHeadline');
     case 'host':
       return t('piPlan.stepHost');
     case 'idle':
@@ -520,13 +521,26 @@ function stepHeadline(step: ColonyStep, pi: PiData, t: TFunction): string {
   }
 }
 
-function StepDetail({ step, names }: { step: ColonyStep; names: PlanNames }) {
+function StepDetail({
+  step,
+  names,
+  switchGainPerDay,
+}: {
+  step: ColonyStep;
+  names: PlanNames;
+  /** Not needed: what switching to its best P1 would add a day, when known. */
+  switchGainPerDay: number | null;
+}) {
   const { t } = useTranslation();
   const { pi } = names;
-  const lines: string[] = [];
+  const lines: { key: string; text: string; tone?: 'tip' }[] = [];
+  const push = (text: string, tone?: 'tip') => lines.push({ key: text, text, tone });
+  for (const stop of step.stop) {
+    push(t('piPlan.stepRemove', { count: stop.ecus, p0: commodityName(stop.p0TypeId, pi) }));
+  }
   if (step.kind !== 'as-is' && step.kind !== 'idle') {
     for (const slot of step.extract) {
-      lines.push(
+      push(
         t('piPlan.stepExtract', {
           count: slot.ecus,
           p0: commodityName(slot.p0TypeId, pi),
@@ -536,7 +550,7 @@ function StepDetail({ step, names }: { step: ColonyStep; names: PlanNames }) {
       );
     }
     for (const factory of step.factories) {
-      lines.push(
+      push(
         t('piPlan.stepFactory', {
           count: factory.count,
           product: commodityName(factory.typeId, pi),
@@ -545,24 +559,46 @@ function StepDetail({ step, names }: { step: ColonyStep; names: PlanNames }) {
     }
   }
   for (const ship of step.ships) {
-    lines.push(
-      t('piPlan.stepShip', {
-        item: commodityName(ship.typeId, pi),
-        to: destinationName(ship.to, names),
-      })
+    // A colony left as it is already sells at the hub: only a new leg is a step.
+    if (step.kind === 'as-is' && !ship.isNew) continue;
+    const text = t('piPlan.stepShip', {
+      item: commodityName(ship.typeId, pi),
+      to: destinationName(ship.to, names),
+    });
+    push(ship.isNew ? t('piPlan.stepNew', { step: text }) : text);
+  }
+  if (step.switchTo.length > 0) {
+    push(
+      switchGainPerDay !== null && clampIskZero(switchGainPerDay, 0) > 0
+        ? t('piPlan.stepTipGain', {
+            p1s: namesList(step.switchTo, pi),
+            isk: signedCompact(switchGainPerDay),
+          })
+        : t('piPlan.stepTip', { p1s: namesList(step.switchTo, pi) }),
+      'tip'
     );
   }
   if (lines.length === 0) return null;
   return (
     <ul className="col-span-full space-y-0.5 pl-1 text-[0.6875rem] text-text-dim">
       {lines.map((line) => (
-        <li key={line}>{line}</li>
+        <li key={line.key} className={line.tone === 'tip' ? 'italic' : undefined}>
+          {line.text}
+        </li>
       ))}
     </ul>
   );
 }
 
-export function Changes({ steps, names }: { steps: readonly ColonyStep[]; names: PlanNames }) {
+export function Changes({
+  steps,
+  names,
+  switchGainPerDay,
+}: {
+  steps: readonly ColonyStep[];
+  names: PlanNames;
+  switchGainPerDay: (planetId: number) => number | null;
+}) {
   const { t } = useTranslation();
   if (steps.length === 0) return null;
   return (
@@ -572,11 +608,17 @@ export function Changes({ steps, names }: { steps: readonly ColonyStep[]; names:
           <li key={step.planetId}>
             <DirectiveRow
               verb={STEP_VERB[step.kind]}
-              chips={<StepDetail step={step} names={names} />}
+              chips={
+                <StepDetail
+                  step={step}
+                  names={names}
+                  switchGainPerDay={switchGainPerDay(step.planetId)}
+                />
+              }
             >
               <ColonyLink planetId={step.planetId} names={names} />
               {' — '}
-              {stepHeadline(step, names.pi, t)}
+              {stepHeadline(step, t)}
             </DirectiveRow>
           </li>
         ))}
@@ -640,14 +682,18 @@ function SlotLine({ slot, pi }: { slot: ExtractionSlot; pi: PiData }) {
 export function ColonyFit({
   assignments,
   rows,
+  steps,
   names,
 }: {
   assignments: readonly ColonyAssignment[];
   rows: readonly PlannerColonyRow[];
+  /** The change list's steps, so a colony reads "As is" in both places. */
+  steps: readonly ColonyStep[];
   names: PlanNames;
 }) {
   const { t } = useTranslation();
   const rowById = new Map(rows.map((row) => [row.planetId, row]));
+  const stepById = new Map(steps.map((step) => [step.planetId, step]));
   const shown = assignments.filter((assignment) => assignment.role !== 'idle');
   if (shown.length === 0) return null;
   return (
@@ -666,7 +712,9 @@ export function ColonyFit({
                   <ColonyLink planetId={assignment.planetId} names={names} />
                 </span>
                 <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {roleText(assignment.role, t)}
+                  {stepById.get(assignment.planetId)?.kind === 'as-is'
+                    ? t('piPlan.roleBaseline')
+                    : roleText(assignment.role, t)}
                 </span>
               </div>
               {assignment.runningToday &&
@@ -675,7 +723,11 @@ export function ColonyFit({
                 <p className="flex items-center gap-1.5 text-xs text-text">
                   {t('piPlan.fitAsBuilt')}
                   <InfoTooltip
-                    label={t('common.aboutLabel', { label: t('piPlan.fitAsBuilt') })}
+                    label={t('common.aboutLabel', {
+                      label: t('piPlan.fitAsBuiltNamed', {
+                        name: names.planet(assignment.planetId),
+                      }),
+                    })}
                     content={t('piPlan.fitAsBuiltTooltip')}
                   />
                 </p>
@@ -803,6 +855,8 @@ export function Hauling({
     [plan.flows, pi, haulHours]
   );
   const unknown = plan.haulEffort.unknownLegs + baseline.haulEffort.unknownLegs;
+  // What the note counts: the plan's own legs on screen with no distance.
+  const unknownShown = rows.filter((row) => row.jumps === null).length;
   const planEffort = plan.haulEffort.m3JumpsPerHour * haulHours;
   const baselineEffort = baseline.haulEffort.m3JumpsPerHour * haulHours;
   const changePercent =
@@ -829,7 +883,14 @@ export function Hauling({
         id: 'item',
         header: t('piPlan.legItem'),
         sortValue: (row) => row.name,
-        render: (row) => row.name,
+        render: (row) => (
+          <span className="inline-flex items-center gap-2">
+            <TierChip tier={piTierOf(row.typeId, names.pi)} />
+            <MarketItemLink typeId={row.typeId} hubId={names.hub.id}>
+              {row.name}
+            </MarketItemLink>
+          </span>
+        ),
       },
       {
         id: 'm3',
@@ -849,14 +910,16 @@ export function Hauling({
           if (row.jumps === undefined) {
             return (
               <span className="text-text-dim" title={t('piPlan.legJumpsPending')}>
-                …
+                <span aria-hidden="true">…</span>
+                <span className="sr-only">{t('piPlan.legJumpsPending')}</span>
               </span>
             );
           }
           if (row.jumps === null) {
             return (
               <span className="text-text-dim" title={t('jumpRange.distanceUnavailable')}>
-                —
+                <span aria-hidden="true">—</span>
+                <span className="sr-only">{t('jumpRange.distanceUnavailable')}</span>
               </span>
             );
           }
@@ -926,7 +989,7 @@ export function Hauling({
                   ? t('piPlan.haulLess', { percent: -changePercent })
                   : changePercent > 0
                     ? t('piPlan.haulMore', { percent: changePercent })
-                    : t('piPlan.haulSame')
+                    : t('piPlan.haulSameEffort')
               }
             />
           )}
@@ -936,13 +999,15 @@ export function Hauling({
             value={formatVolume(hauling.baselineM3PerTrip)}
           />
         </StatChips>
-        {unknown > 0 && (
+        {distancesPending ? (
+          <p className="text-[0.6875rem] text-text-dim">{t('piPlan.haulDistancesPending')}</p>
+        ) : unknownShown > 0 ? (
           <p className="text-[0.6875rem] text-text-dim">
-            {distancesPending
-              ? t('piPlan.haulDistancesPending')
-              : t('piPlan.haulDistancesUnknown', { count: unknown })}
+            {t('piPlan.haulDistancesUnknown', { count: unknownShown })}
           </p>
-        )}
+        ) : unknown > 0 ? (
+          <p className="text-[0.6875rem] text-text-dim">{t('piPlan.haulBaselineUnknown')}</p>
+        ) : null}
         {perColony.length > 0 && (
           <p className="text-[0.6875rem] text-text-dim">
             {perColony
@@ -966,6 +1031,11 @@ export function Hauling({
           rowKey={(row) => row.key}
           density="compact"
           stackColumns={2}
+          rowContextMenu={(row, tr) => (
+            <ItemContextMenu typeId={row.typeId} itemName={row.name}>
+              {tr}
+            </ItemContextMenu>
+          )}
         />
       )}
     </Panel>
@@ -1017,12 +1087,12 @@ const SOURCE_TONE: Record<DemandSource, string> = {
 
 export function Flow({
   demand,
-  blockedBy,
+  typeGaps,
   names,
 }: {
   demand: readonly DemandLine[];
-  /** Planet types the type gaps need, for the blocked group's header. */
-  blockedBy: readonly string[];
+  /** The plan's type gaps by P0, for naming what blocks the blocked goals. */
+  typeGaps: ReadonlyMap<number, readonly string[]>;
   names: PlanNames;
 }) {
   const { t } = useTranslation();
@@ -1071,6 +1141,7 @@ export function Flow({
       {
         id: 'factories',
         header: t('piPlan.flowFactories'),
+        headerTooltip: t('piPlan.flowFactoriesTooltip'),
         align: 'right',
         className: 'tabular-nums',
         sortValue: (line) => line.factories ?? -1,
@@ -1124,13 +1195,25 @@ export function Flow({
         rowClassName={(line) => (line.source === 'blocked' ? 'text-text-dim' : undefined)}
         groupBy={{
           key: (line) => (line.source === 'blocked' ? 'blocked' : null),
-          renderHeader: (lines) =>
-            blockedBy.length > 0
+          renderHeader: (lines) => {
+            const p0s = [...new Set(lines.flatMap((line) => line.blockedBy ?? []))].sort(
+              (a, b) => a - b
+            );
+            const needs = p0s
+              .filter((p0) => typeGaps.has(p0))
+              .map((p0) =>
+                t('piPlan.blockedNeed', {
+                  types: (typeGaps.get(p0) ?? []).join(t('piPlan.or')),
+                  p0: commodityName(p0, pi),
+                })
+              );
+            return needs.length > 0
               ? t('piPlan.flowBlockedGroup', {
                   count: lines.length,
-                  types: blockedBy.join(t('piPlan.or')),
+                  needs: needs.join(t('piPlan.and')),
                 })
-              : t('piPlan.flowBlockedGroupPlain', { count: lines.length }),
+              : t('piPlan.flowBlockedGroupPlain', { count: lines.length });
+          },
           defaultExpanded: () => true,
           allWidths: true,
           minSize: 1,

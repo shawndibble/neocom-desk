@@ -23,6 +23,7 @@ import {
 } from '@/components/ui';
 import type { ControlSize } from '@/components/ui';
 import { PI_CADENCE_DAYS, type PiCadenceDays } from './cadencePref';
+import { parseDecimal } from './goalPlannerFormat';
 
 /** A label and its control, on one line. */
 export function Assume({ label, children }: { label: ReactNode; children: ReactNode }) {
@@ -45,12 +46,14 @@ export function CadenceRow({
   value,
   onChange,
   size = 'sm',
+  describedBy,
 }: {
   label: string;
   hint: string;
   value: PiCadenceDays;
   onChange: (days: PiCadenceDays) => void;
   size?: ControlSize;
+  describedBy?: string;
 }) {
   const { t } = useTranslation();
   return (
@@ -69,6 +72,7 @@ export function CadenceRow({
         <SelectTrigger
           size={size}
           aria-label={label}
+          aria-describedby={describedBy}
           className="w-24 border-accent/70 bg-accent/10"
         >
           <SelectValue />
@@ -85,11 +89,10 @@ export function CadenceRow({
   );
 }
 
-/** A finite number in [0, 100], or null for anything else (blank included). */
+/** A typed rate in [0, 100] (comma or dot decimals), or null. */
 function parsePercent(text: string): number | null {
-  if (text.trim() === '') return null;
-  const value = Number(text);
-  return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
+  const value = parseDecimal(text);
+  return value !== null && value <= 100 ? value : null;
 }
 
 export interface PercentInputProps {
@@ -123,14 +126,15 @@ export function PercentInput({
   const errorId = useId();
   const shown = text ?? (value === null ? '' : String(value));
 
-  const commit = (raw: string) => {
+  /** Checks the text, says so when it is not a rate, and commits one that is. */
+  const settle = (raw: string, commit: boolean) => {
     if (raw.trim() === '') {
       setInvalid(false);
       return;
     }
     const percent = parsePercent(raw);
     setInvalid(percent === null);
-    if (percent !== null && percent !== value) onCommit(percent);
+    if (commit && percent !== null && percent !== value) onCommit(percent);
   };
 
   const describedBy = [aria['aria-describedby'], invalid ? errorId : undefined]
@@ -142,11 +146,9 @@ export function PercentInput({
       <TextInput
         id={id}
         size={size}
-        type="number"
-        min={0}
-        max={100}
-        step={0.5}
+        type="text"
         inputMode="decimal"
+        autoComplete="off"
         autoFocus={autoFocus}
         aria-label={aria['aria-label']}
         aria-describedby={describedBy || undefined}
@@ -156,19 +158,16 @@ export function PercentInput({
         value={shown}
         onChange={(event) => {
           setText(event.target.value);
-          if (commitOn === 'change') {
-            // An empty or half-typed field is shown but not stored — a NaN
-            // would declare the system tax-free until the pilot noticed.
-            const percent = parsePercent(event.target.value);
-            if (percent !== null) onCommit(percent);
-          }
+          // Every keystroke is checked, so "150" says it is out of range
+          // instead of quietly leaving "15" stored; only `change` commits here.
+          settle(event.target.value, commitOn === 'change');
         }}
         onBlur={(event) => {
-          if (commitOn === 'blur') commit(event.target.value);
+          if (commitOn === 'blur') settle(event.target.value, true);
           setText(null);
         }}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' && commitOn === 'blur') commit(event.currentTarget.value);
+          if (event.key === 'Enter' && commitOn === 'blur') settle(event.currentTarget.value, true);
         }}
       />
       {invalid && (

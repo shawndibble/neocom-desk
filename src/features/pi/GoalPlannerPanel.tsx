@@ -12,12 +12,12 @@
  *
  * ## Layout
  *
- * DOM order is Goals, results, Colonies, Assumptions — the phone's reading
- * order: say what you want, see the answer, then adjust what you have and
- * how you play (both folded by default there). On a pointer a grid puts
- * Goals, Colonies and Assumptions in a rail beside the results; the results
- * span the rail's rows plus a trailing `1fr` row, so the rail panels stay
- * packed at the top instead of stretching to the results' height.
+ * DOM (and so tab) order is Goals, Colonies, Assumptions, results: the
+ * inputs before the answer they drive. On a pointer a grid puts the three in
+ * a rail beside the results, which span the rail's rows plus a trailing `1fr`
+ * row so the rail panels stay packed at the top. On a phone `order` shows
+ * Goals, then the results, then Colonies and Assumptions folded — say what
+ * you want, see the answer, then adjust what you have.
  */
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -346,7 +346,13 @@ function GoalPlanner({
     results = (
       <EmptyState
         title={t('piPlan.noColoniesTitle')}
-        hint={t('piPlan.noColoniesHint')}
+        hint={
+          // Buying P1 covers P1 goals only; a P2+ goal needs a colony to host it.
+          plannedGoals.length > 0 &&
+          plannedGoals.every((goal) => products.find((p) => p.typeId === goal.typeId)?.tier === 1)
+            ? `${t('piPlan.noColoniesHint')} ${t('piPlan.noColoniesBuyHint')}`
+            : t('piPlan.noColoniesHint')
+        }
         action={
           <Link className={inlineLinkClassName} to="/planetary-industry/advisor">
             {t('piPlan.openAdvisor')}
@@ -407,8 +413,23 @@ function GoalPlanner({
               names={names}
               advisorSystem={advisorSystem}
             />
-            <Changes steps={steps} names={names} />
-            <ColonyFit assignments={best.plan.assignments} rows={rows} names={names} />
+            <Changes
+              steps={steps}
+              names={names}
+              switchGainPerDay={(planetId) => {
+                const own = best.baseline.perColony.get(planetId);
+                const now = earnings.byPlanet.get(planetId);
+                return own?.status === 'ok' && now != null
+                  ? (own.iskPerHour - now) * HOURS_PER_DAY
+                  : null;
+              }}
+            />
+            <ColonyFit
+              assignments={best.plan.assignments}
+              rows={rows}
+              steps={steps}
+              names={names}
+            />
             <Hauling
               hauling={hauling}
               plan={best.plan}
@@ -420,15 +441,20 @@ function GoalPlanner({
             />
             <Flow
               demand={best.plan.demand}
-              blockedBy={[
-                ...new Set(
+              typeGaps={
+                new Map(
                   best.plan.shortfalls.flatMap((gap) =>
                     gap.kind === 'type-gap'
-                      ? gap.fixPlanetTypes.map((type) => t(`pi.planetType.${type}`))
+                      ? [
+                          [
+                            gap.p0TypeId,
+                            gap.fixPlanetTypes.map((type) => t(`pi.planetType.${type}`)),
+                          ] as const,
+                        ]
                       : []
                   )
-                ),
-              ]}
+                )
+              }
               names={names}
             />
           </>
@@ -439,7 +465,7 @@ function GoalPlanner({
 
   return (
     <div className="grid items-start gap-4 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:grid-rows-[auto_auto_auto_1fr]">
-      <div className="md:col-start-1 md:row-start-1">
+      <div className="order-1 md:order-none md:col-start-1 md:row-start-1">
         <GoalsSection
           goals={goals}
           products={products}
@@ -448,8 +474,7 @@ function GoalPlanner({
           size={size}
         />
       </div>
-      <div className="min-w-0 md:col-start-2 md:row-span-4 md:row-start-1">{results}</div>
-      <div className="md:col-start-1 md:row-start-2">
+      <div className="order-3 md:order-none md:col-start-1 md:row-start-2">
         <ColoniesSection
           rows={liveRows}
           planetName={names.planet}
@@ -465,7 +490,7 @@ function GoalPlanner({
           onCustomsChange={writeCustoms}
         />
       </div>
-      <div className="md:col-start-1 md:row-start-3">
+      <div className="order-4 md:order-none md:col-start-1 md:row-start-3">
         <AssumptionsSection
           hubId={hub.id}
           onHubChange={setHub}
@@ -484,6 +509,9 @@ function GoalPlanner({
           expanded={assumptionsOpen ?? mdUp}
           onToggleExpanded={() => setAssumptionsOpen(!(assumptionsOpen ?? mdUp))}
         />
+      </div>
+      <div className="order-2 min-w-0 md:order-none md:col-start-2 md:row-span-4 md:row-start-1">
+        {results}
       </div>
     </div>
   );

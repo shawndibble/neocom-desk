@@ -170,19 +170,20 @@ describe('changeSteps', () => {
     expect(steps[0]).toMatchObject({
       planetId: 1,
       kind: 'stop',
-      stop: [NOBLE_GAS],
+      stop: [{ p0TypeId: NOBLE_GAS, ecus: 1 }],
       extract: [{ p0TypeId: IONIC, p1TypeId: ELECTROLYTES, ecus: 1, basicFactories: 1 }],
-      ships: [{ typeId: ELECTROLYTES, to: 2 }],
+      // A colony-to-colony leg is new: a colony left alone only sells.
+      ships: [{ typeId: ELECTROLYTES, to: 2, isNew: true }],
     });
     expect(steps[1]).toMatchObject({
       planetId: 2,
       kind: 'host',
       factories: [{ typeId: COOLANT, count: 2 }],
       extract: [{ p0TypeId: AQUEOUS }],
-      ships: [{ typeId: COOLANT, to: 'hub' }],
+      ships: [{ typeId: COOLANT, to: 'hub', isNew: false }],
     });
-    // Already running what its Baseline sells: as is.
-    expect(steps[2]).toMatchObject({ planetId: 3, kind: 'as-is', switchTo: [] });
+    // Already running what its Baseline sells: as is, and not needed.
+    expect(steps[2]).toMatchObject({ planetId: 3, kind: 'as-is', notNeeded: true, switchTo: [] });
   });
 
   it('starts a colony that extracts nothing today, and adds beside what it keeps', () => {
@@ -197,13 +198,53 @@ describe('changeSteps', () => {
     expect(steps.map((s) => s.kind)).toEqual(['start', 'add']);
   });
 
+  it('lists what the factory planet removes, with how many extractors today', () => {
+    const steps = changeSteps(
+      plan,
+      [
+        {
+          verb: 'convert-to-factory',
+          planetId: 2,
+          from: [BASE_METALS],
+          factories: { advanced: 2 },
+        },
+      ],
+      [
+        row(2, 'barren', {
+          colony: {
+            ...row(2, 'barren').colony!,
+            current: {
+              p0TypeIds: [BASE_METALS],
+              productTypeIds: [],
+              ecusByP0: new Map([[BASE_METALS, 2]]),
+            },
+          },
+        }),
+      ]
+    );
+    expect(steps[0]).toMatchObject({ kind: 'host', stop: [{ p0TypeId: BASE_METALS, ecus: 2 }] });
+  });
+
+  it('reads an extractor whose P0s do not change as as-is, with its new legs marked', () => {
+    const steps = changeSteps(
+      plan,
+      [{ verb: 'keep', planetId: 1, p0TypeIds: [IONIC] }],
+      [row(1, 'gas', {}, [IONIC])]
+    );
+    expect(steps[0]).toMatchObject({
+      kind: 'as-is',
+      notNeeded: false,
+      ships: [{ typeId: ELECTROLYTES, to: 2, isNew: true }],
+    });
+  });
+
   it('tells a not-needed colony to switch when its best P1 is not what it runs today', () => {
     const steps = changeSteps(
       plan,
       [{ verb: 'keep', planetId: 3, p0TypeIds: [AQUEOUS], notNeeded: true }],
       [row(3, 'barren', {}, [AQUEOUS])]
     );
-    expect(steps[0]).toMatchObject({ kind: 'as-is', switchTo: [REACTIVE_METALS] });
+    expect(steps[0]).toMatchObject({ kind: 'as-is', notNeeded: true, switchTo: [REACTIVE_METALS] });
   });
 });
 
@@ -226,7 +267,8 @@ describe('shortfallHint', () => {
     ).toEqual({ kind: 'switched-off', planetIds: [5] });
   });
 
-  it('with buying off, suggests re-targeting a named colony that can yield the P0', () => {
+  it("with buying off, names the engine's re-target candidates", () => {
+    // Colony 2 yields it too but is at the ECU cap: the engine leaves it out.
     const rows = [row(1, 'barren'), row(2, 'gas'), row(3, 'temperate')];
     expect(
       shortfallHint(
@@ -236,12 +278,12 @@ describe('shortfallHint', () => {
           p1TypeId: REACTIVE_METALS,
           unitsPerHour: 5000,
           p1UnitsPerHour: 5000 / 150,
-          retargetCandidates: [1, 2],
+          retargetCandidates: [1],
         },
         rows,
         false
       )
-    ).toEqual({ kind: 'retarget', planetIds: [1, 2] });
+    ).toEqual({ kind: 'retarget', planetIds: [1] });
     expect(
       shortfallHint(
         {
