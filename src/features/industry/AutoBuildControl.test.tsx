@@ -52,7 +52,7 @@ describe('AutoBuildControl', () => {
     render(<AutoBuildControl maxDepth={2} scope={['manufacturing']} onApply={vi.fn()} />);
 
     expect(screen.queryByText('Manufacturing')).not.toBeInTheDocument();
-    expect(screen.getByText('Reactions')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText('Reactions')).toHaveClass('text-text-dim');
     expect(screen.queryByText('Planetary')).not.toBeInTheDocument();
   });
 
@@ -62,7 +62,7 @@ describe('AutoBuildControl', () => {
     );
 
     expect(screen.queryByText('Manufacturing')).not.toBeInTheDocument();
-    expect(screen.getByText('Reactions')).not.toHaveAttribute('aria-disabled');
+    expect(screen.getByText('Reactions')).not.toHaveClass('text-text-dim');
     expect(screen.queryByText('Planetary')).not.toBeInTheDocument();
   });
 

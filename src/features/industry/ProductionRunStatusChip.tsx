@@ -3,7 +3,7 @@ import type { ProductionRunStatus } from './productionRunSummary';
 
 /** Same inline-badge shape as `ActiveJobsPanel`'s "Completing soon" tag — bg/text at one tone, no box (static). */
 const TONE_CLASS: Record<ProductionRunStatus, string> = {
-  new: 'bg-accent/15 text-accent',
+  new: 'bg-panel-2 text-text-dim',
   open: 'bg-warning/15 text-warning',
   closed: 'bg-success/15 text-success',
 };

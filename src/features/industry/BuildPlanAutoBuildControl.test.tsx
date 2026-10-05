@@ -40,7 +40,7 @@ describe('BuildPlanAutoBuildControl', () => {
 
     expect(screen.queryByText('Manufacturing')).not.toBeInTheDocument();
     const reactionsChip = screen.getByText('Reactions');
-    expect(reactionsChip).toHaveAttribute('aria-disabled', 'true');
+    expect(reactionsChip).toHaveClass('text-text-dim');
     fireEvent.pointerMove(reactionsChip);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'Edit setup and turn on Include Reactions to use this'
@@ -59,7 +59,7 @@ describe('BuildPlanAutoBuildControl', () => {
 
     expect(screen.queryByText('Manufacturing')).not.toBeInTheDocument();
     const reactionsChip = screen.getByText('Reactions');
-    expect(reactionsChip).not.toHaveAttribute('aria-disabled');
+    expect(reactionsChip).not.toHaveClass('text-text-dim');
     fireEvent.pointerMove(reactionsChip);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'Reaction materials are included when Auto Build runs'

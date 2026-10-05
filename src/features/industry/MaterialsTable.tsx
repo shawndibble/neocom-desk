@@ -1259,8 +1259,8 @@ export function MaterialsTable({
 
   /**
    * One phone ledger row, under its section's NEED | HAVE | BUY header: the
-   * name and total; the three numbers in the header's columns, Have a dashed
-   * number you tap to edit; then the row's action on the left and its price
+   * name and total; the three numbers in the header's columns, Have a
+   * number with a pencil you tap to edit; then the row's action on the left and its price
    * (or what a build saves) on the right. No card and no box — rows are told
    * apart by a zebra tint, so the Materials panel is the only frame. A
    * Blueprint row has no numbers line, and an owned one says Owned instead of

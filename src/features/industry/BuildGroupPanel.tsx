@@ -790,7 +790,7 @@ export function BuildGroupPanel({
                     className="flex items-center justify-between gap-2 px-2.5 py-1.5"
                   >
                     <span className="truncate">{nameForType(catalog, typeID)}</span>
-                    <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+                    <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
                       {t('industry.groupCraftedTag')}
                     </span>
                   </li>

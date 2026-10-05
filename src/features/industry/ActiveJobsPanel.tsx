@@ -79,7 +79,7 @@ import {
 } from '@/engine/industry/jobSlots';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import { CharacterBadge } from '@/features/character/assetBrowserRows';
+import { CharacterLink } from '@/features/entities';
 import {
   useResolvedCharacterFilter,
   fromStoredCharacterFilterValue,
@@ -742,7 +742,12 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
               </span>
             )}
             {showCharacterColumn && job.characterName !== '' && (
-              <CharacterBadge characterName={job.characterName} t={t} />
+              <span
+                className="ml-1.5 shrink-0 rounded-xs border border-line bg-panel-2 px-1 py-0.5 text-[0.6875rem]"
+                title={t('assets.crossCharacterBadge', { character: job.characterName })}
+              >
+                <CharacterLink id={job.characterId}>{job.characterName}</CharacterLink>
+              </span>
             )}
           </span>
         ),
@@ -871,7 +876,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
    * actually free *capacity* — unrelated to whether anything is running at
    * all (issue: the numbers looked like they described the same thing).
    *
-   * A dashed underline expands to the used/max breakdown per category on
+   * A dotted underline (HintText) expands to the used/max breakdown per category on
    * hover/focus, same wording `Characters.tsx`'s `openJobsColumn` tooltip
    * already uses (`{{used}}/{{max}} slots used`) — used, not open, is the
    * numerator a reader expects under a fraction, and here it also stays

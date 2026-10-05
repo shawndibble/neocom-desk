@@ -11,6 +11,7 @@
  * account-level alt-linking, just this feature's own scoped selector.
  */
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { CharacterLink } from '@/features/entities';
 import { useCharacterModifiersByCharacter } from '@/features/character/characterModifiers';
 import { useTradeHubStandingsByCharacter } from '@/features/market/useTradeHubStandings';
 import { useTranslation } from 'react-i18next';
@@ -377,7 +378,9 @@ export function OpportunitiesPanel({
               />
             )}
             {showCharacterColumn && (
-              <span className="text-[0.6875rem] text-text-dim">{row.candidate.characterName}</span>
+              <CharacterLink id={row.candidate.characterId} className="text-[0.6875rem]">
+                {row.candidate.characterName}
+              </CharacterLink>
             )}
           </span>
         );
