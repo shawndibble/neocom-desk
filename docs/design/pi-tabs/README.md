@@ -40,6 +40,8 @@ The full rules are in [DESIGN-RULES.md](DESIGN-RULES.md); its `app-ref/` screens
 - Tone colours carry meaning only, and accent is for interactive elements.
 - Dense 11/12/14px type, with tabular numbers.
 
+**Interaction cues: see `GRAMMAR.md` (DESIGN.md §6c overrides the mockups).**
+
 ## Reference shots (`ref/`)
 
 JPEG q75, full page; desk 1440 wide, phone 390 touch; † = viewport only. Name, then state:

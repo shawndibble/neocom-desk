@@ -35,7 +35,7 @@ import { contractAmount } from '@/features/character/contractAmount';
 import { ContractContextMenu } from '@/features/character/ContractContextMenu';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
 import { ContractIdentity } from '@/features/character/ContractIdentity';
-import { IssuerLink } from '@/features/character/IssuerLink';
+import { CharacterLink } from '@/features/entities';
 import { StandingTag } from '@/features/character/StandingTag';
 import { loadContacts } from '@/features/character/contacts';
 import {
@@ -399,11 +399,9 @@ export function Contracts() {
         sortValue: (contract) => issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`,
         render: (contract) => (
           <span className="inline-flex items-center gap-1.5">
-            <IssuerLink
-              issuerId={contract.issuer_id}
-              name={issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`}
-              className="text-left"
-            />
+            <CharacterLink id={contract.issuer_id} className="text-left">
+              {issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`}
+            </CharacterLink>
             <StandingTag
               standing={characterStanding(standingIndex, contract.issuer_id, issuerAffiliations)}
             />

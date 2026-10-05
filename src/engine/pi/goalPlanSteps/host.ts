@@ -6,12 +6,12 @@
  */
 import type { PiData, PiFactoryKind } from '@/sde/types';
 import type { ColonyBaseline } from '../baseline';
-import { expandChain, piTier } from '../chain';
+import { piTier } from '../chain';
 import { fitPlannedPins } from '../colonyCapacity';
 import type { FactoryHostReason, Goal, PlannerColony, Shortfall } from '../goalTypes';
 import type { PinCounts } from '../types';
 import type { GoalTriage } from './triage';
-import { EPSILON, HOURS_PER_DAY, byId, expandInto, factoriesOf, schematicOf } from './shared';
+import { EPSILON, byId, expandInto, factoriesOf, madeNodes, schematicOf } from './shared';
 
 export interface HostContext {
   colonies: readonly PlannerColony[];
@@ -40,8 +40,7 @@ export function eligibleHosts(
 export function madeHighOf(goals: readonly Goal[], pi: PiData): number[] {
   const made = new Set<number>();
   for (const g of goals) {
-    const chain = expandChain(g.typeId, pi, { unitsPerHour: g.unitsPerDay / HOURS_PER_DAY });
-    for (const node of chain.nodes) if (node.tier >= 2) made.add(node.typeId);
+    for (const node of madeNodes(g, pi)) if (node.tier >= 2) made.add(node.typeId);
   }
   return [...made].sort(byId);
 }
@@ -177,7 +176,7 @@ export function settleHost(
   pi: PiData
 ): SettledHost {
   const highAchieved = plannedHigh.map((g) => ({
-    typeId: g.typeId,
+    ...g,
     unitsPerDay: g.unitsPerDay * (highFraction.get(g.typeId) ?? 0),
   }));
   const madeHighRates = new Map<number, number>();

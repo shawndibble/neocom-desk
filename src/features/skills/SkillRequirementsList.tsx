@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PlanEntry } from '@/engine/types';
-import { SkillNameButton } from './SkillNameButton';
+import { SkillLink } from '@/features/entities';
 import type { PrereqRow, UnlockRow } from './skillRequirements';
 
 interface SkillRequirementsListProps {
@@ -9,7 +9,7 @@ interface SkillRequirementsListProps {
   unlocks: readonly UnlockRow[];
   className?: string;
   /**
-   * Carried into a nested `SkillNameButton` so drilling into a
+   * Carried into a nested `SkillLink` so drilling into a
    * prereq/unlock's own detail keeps reading the same open plan's entries —
    * otherwise a skill two levels deep would lose "Planned" and fall back to
    * "Level needed" the instant its own detail opened.
@@ -20,7 +20,6 @@ interface SkillRequirementsListProps {
 interface RequirementRowProps {
   typeID: number;
   name: string;
-  muted?: boolean;
   trailing: ReactNode;
   planEntries?: readonly PlanEntry[];
 }
@@ -31,22 +30,12 @@ interface RequirementRowProps {
  * skill row, so a prereq/unlock two levels deep in another skill's detail
  * re-targets the same popover instead of opening a second one.
  */
-function RequirementRow({
-  typeID,
-  name,
-  muted = false,
-  trailing,
-  planEntries,
-}: RequirementRowProps) {
+function RequirementRow({ typeID, name, trailing, planEntries }: RequirementRowProps) {
   return (
     <li className="flex items-center justify-between gap-2 py-1 text-xs">
-      <SkillNameButton
-        skillTypeID={typeID}
-        planEntries={planEntries}
-        className={`truncate ${muted ? 'text-text-dim' : 'text-text'}`}
-      >
+      <SkillLink typeId={typeID} planEntries={planEntries} className="truncate">
         {name}
-      </SkillNameButton>
+      </SkillLink>
       {trailing}
     </li>
   );
@@ -75,7 +64,6 @@ export function SkillRequirementsList({
                 key={req.typeID}
                 typeID={req.typeID}
                 name={req.name}
-                muted={!req.trained}
                 planEntries={planEntries}
                 trailing={
                   <span

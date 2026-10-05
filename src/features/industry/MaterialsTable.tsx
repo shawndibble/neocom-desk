@@ -795,7 +795,11 @@ export function MaterialsTable({
   function renderName(material: MaterialTableRow, withAction: boolean, badge = false) {
     const name = nameFor(material.typeID);
     const { advice, toggleable } = buildChoice(material);
-    const skillGate = isBuilt(material) ? skillGates?.get(material.typeID) : undefined;
+    // A built row always says what blocks it. A bought row says so only when
+    // the cost call is to build it: that is the row a pilot expects Auto Build
+    // to have taken, and the gate is why it did not.
+    const gateVerdict = skillGates?.get(material.typeID);
+    const skillGate = isBuilt(material) || advice?.verdict === 'build' ? gateVerdict : undefined;
     return (
       <span className="flex min-w-0 flex-col items-start gap-0.5">
         <span className="inline-flex min-w-0 items-center gap-1.5">
