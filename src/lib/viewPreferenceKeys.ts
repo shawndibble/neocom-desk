@@ -50,7 +50,6 @@ export const VIEW_PREFERENCE_KEYS: readonly string[] = [
   'marketPriceHistoryRange',
   'piAdvisorAltColonies',
   'piColoniesShowAlts',
-  'piMarketSourcing',
   'piPlanControls',
   'planColumnVisibility.v2',
   'planGroupingMode',

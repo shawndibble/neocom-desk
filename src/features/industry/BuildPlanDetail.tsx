@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import {
@@ -80,6 +80,7 @@ import {
   volumeForType,
   type BlueprintCatalog,
 } from './blueprintCatalog';
+import { breakEvenRuns } from '@/engine/industry/breakEvenRuns';
 import { planOwnedBlueprints, resolveBuildPlan } from './resolveBuildPlan';
 import { buildPlanTypeIds, recipeForLookup } from './recipes';
 import { materialPriceBasisOf } from './priceBasis';
@@ -364,6 +365,11 @@ export function BuildPlanDetail({
   // folded on a phone until asked), and the one Calculation Breakdown is
   // owned here so the hero's button and the ledger's "?"s open the same modal.
   const [setupOpen, setSetupOpen] = useState(false);
+  // The plan and profit a failed search ran against: the note is stale once either moves.
+  const [noBreakEvenAt, setNoBreakEvenAt] = useState<{
+    plan: BuildPlanRecord;
+    profit: number | null;
+  } | null>(null);
   const isDesktop = useIsDesktop();
   const [costsOpen, setCostsOpen] = useState<boolean | null>(null);
   const costsExpanded = costsOpen ?? isDesktop;
@@ -573,10 +579,12 @@ export function BuildPlanDetail({
    * claims share it, and a re-run of this memo starts from nothing rather
    * than re-claiming against copies a previous run already took.
    */
-  const resolved = useMemo(
-    () =>
+  // One resolver for the page's own plan and for Break Even's trial run counts,
+  // so a trial can never price a plan differently from what the page shows.
+  const resolveAt = useCallback(
+    (candidate: BuildPlanRecord) =>
       resolveBuildPlan(
-        plan,
+        candidate,
         {
           catalog,
           pi,
@@ -593,7 +601,6 @@ export function BuildPlanDetail({
         { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex }
       ),
     [
-      plan,
       catalog,
       pi,
       ownedBlueprints,
@@ -609,8 +616,19 @@ export function BuildPlanDetail({
       reactionSnapshot?.systemCostIndex,
     ]
   );
+  const resolved = useMemo(() => resolveAt(plan), [resolveAt, plan]);
   const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices, bpcCoverage } =
     resolved;
+
+  /** Runs at which this plan's profit first reaches zero — buying a BPO is the case it exists for. */
+  const applyBreakEvenRuns = () => {
+    const runs = breakEvenRuns(
+      (trial) => resolveAt({ ...plan, runs: trial }).result?.profit ?? null,
+      plan.runs
+    );
+    setNoBreakEvenAt(runs === null ? { plan, profit: result?.profit ?? null } : null);
+    if (runs !== null) update({ runs });
+  };
 
   /**
    * Both liquidation bases at once, so the Use-or-sell toggle switches between
@@ -725,25 +743,14 @@ export function BuildPlanDetail({
   // `MarketWideOpportunitiesPanel` both follow.
   const skillGateCharacterIds = [...characterNames.keys()];
   const accountSkills = useAccountSkillLevels(skillGateCharacterIds);
-  // Materials the most recent Auto Build pass routed to buy specifically for
-  // a skill gate (issue #1231's "and says why") — those rows leave
-  // `visibleMaterials`'s sub-build set, so the marker below must be told
-  // about them separately rather than losing the reason a pilot just saw.
-  const [autoBuildSkillGated, setAutoBuildSkillGated] = useState<
-    ReadonlyMap<number, Extract<SkillGateVerdict, { gated: true }>>
-  >(new Map());
   const skillGates = useMemo(() => {
     const gates = new Map<number, SkillGateVerdict>();
     for (const material of visibleMaterials) {
-      if (material.subBuilds.length === 0) continue;
       const requirements = catalog.byProductTypeID.get(material.typeID)?.blueprint.skills ?? [];
       gates.set(material.typeID, evaluateSkillGate(requirements, accountSkills));
     }
-    for (const [typeID, verdict] of autoBuildSkillGated) {
-      if (!gates.has(typeID)) gates.set(typeID, verdict);
-    }
     return gates;
-  }, [visibleMaterials, catalog, accountSkills, autoBuildSkillGated]);
+  }, [visibleMaterials, catalog, accountSkills]);
 
   // The plan's own top-level product (issue #1231) — the header this same
   // account-wide check used to explicitly skip (see the 2026-09-14 decision
@@ -1048,7 +1055,6 @@ export function BuildPlanDetail({
    */
   function applyAutoBuild(options: { strategy: BuildStrategy }) {
     if (!blueprint || !makeOrBuyContext) return;
-    const gated = new Map<number, Extract<SkillGateVerdict, { gated: true }>>();
     const picked = autoBuildHere(blueprint, resolvedMe, {
       recipeFor,
       // Account-wide (issue #1231): a material nobody on the account can
@@ -1059,10 +1065,8 @@ export function BuildPlanDetail({
       runs: plan.runs,
       scope: craftScopeList,
       strategy: options.strategy,
-      onSkillGated: (typeID, verdict) => gated.set(typeID, verdict),
     });
     update({ buildHere: [...picked] });
-    setAutoBuildSkillGated(gated);
   }
 
   /**
@@ -1312,20 +1316,35 @@ export function BuildPlanDetail({
                 </div>
               )}
               <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <label className="flex flex-col gap-1 text-xs">
-                  {t('industry.runs')}
-                  <SourcingInput
-                    value={plan.runs}
-                    label={t('industry.runs')}
-                    inputMode="numeric"
-                    widthClassName="w-full"
-                    // Blank/garbage reverts to the last committed value rather than
-                    // snapping to the minimum — clearing the box to retype "10" as
-                    // "100" must not overwrite it with 1 mid-edit.
-                    parse={(raw) => parseOrKeep(plan.runs, raw, (n) => Math.max(1, Math.round(n)))}
-                    onCommit={(runs) => update({ runs })}
-                  />
-                </label>
+                <div className="flex items-end gap-2">
+                  <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs">
+                    {t('industry.runs')}
+                    <SourcingInput
+                      value={plan.runs}
+                      label={t('industry.runs')}
+                      inputMode="numeric"
+                      widthClassName="w-full"
+                      // Blank/garbage reverts to the last committed value rather than
+                      // snapping to the minimum — clearing the box to retype "10" as
+                      // "100" must not overwrite it with 1 mid-edit.
+                      parse={(raw) =>
+                        parseOrKeep(plan.runs, raw, (n) => Math.max(1, Math.round(n)))
+                      }
+                      onCommit={(runs) => update({ runs })}
+                    />
+                  </label>
+                  {pricesReady && result?.profit != null && result.profit < 0 && (
+                    <Button size="sm" onClick={applyBreakEvenRuns}>
+                      {t('industry.breakEvenRuns')}
+                    </Button>
+                  )}
+                </div>
+                {noBreakEvenAt?.plan === plan &&
+                  noBreakEvenAt.profit === (result?.profit ?? null) && (
+                    <p role="status" className="col-span-full text-xs text-text-dim">
+                      {t('industry.breakEvenRunsNone')}
+                    </p>
+                  )}
 
                 {/*
                 ME/TE are no longer pilot-set fields (issue #838): the

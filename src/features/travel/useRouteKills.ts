@@ -2,16 +2,25 @@
  * Route Safety's zKillboard column (issue #2329): each route system's last
  * hour of player kills, filled in row by row without holding up the page.
  *
- * zKillboard answers one system per request, so the route is walked at low
- * concurrency, nearest the start first. A row that fails (a 429 included)
- * says so on its own and the walk carries on.
+ * zKillboard answers one system or one region per request, and no longer takes
+ * a list of ids. A route crosses far fewer regions than systems, so it is
+ * walked region by region at low concurrency, nearest the start first, and one
+ * answer fills every route system in that region. A system whose region is
+ * unknown asks on its own. A row that fails (a 429 included) says so and the
+ * walk carries on.
  */
 import { useEffect, useState } from 'react';
-import { summarizeRecentKills, type RecentKillsSummary } from '@/engine/route/recentKills';
+import {
+  summarizeRecentKills,
+  type RecentKill,
+  type RecentKillsSummary,
+} from '@/engine/route/recentKills';
 import type { SecurityBand } from '@/engine/securityStatus';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { loadSolarSystemsById } from '@/sde/solarSystems';
 import {
   RECENT_KILLS_TTL_MS,
+  loadRegionRecentKills,
   loadSystemRecentKills,
   loadTypeGroups,
   resolveKillLocations,
@@ -28,6 +37,18 @@ export type RouteKillsCell =
 export interface RouteKillsSystem {
   systemId: number;
   band: SecurityBand | null;
+}
+
+/** A route system and its place in flight order. */
+interface WalkRow {
+  system: RouteKillsSystem;
+  index: number;
+}
+
+/** One zKillboard request: a region's rows, or (no known region) a single system's. */
+interface WalkStep {
+  regionId: number | null;
+  rows: WalkRow[];
 }
 
 const LOADING: RouteKillsCell = { status: 'loading' };
@@ -72,38 +93,63 @@ export function useRouteKills(
 
     // Read alongside the first zKillboard requests, never ahead of them.
     const groups = loadTypeGroups();
-    void (async () => {
-      await mapWithConcurrencyLimit(
-        systems.map((system, index) => ({ system, index })),
-        ZKILL_CONCURRENCY,
-        async ({ system, index }) => {
-          if (cancelled) return;
-          const result = await loadSystemRecentKills(system.systemId);
-          if (!result.ok) {
-            set(system.systemId, { status: 'unavailable' });
-            return;
-          }
-          const groupOf = await groups;
-          const locations = await resolveKillLocations(
-            result.kills.flatMap((kill) => (kill.locationId === null ? [] : [kill.locationId]))
-          );
-          const pathNeighbours = new Set(
-            [systems[index - 1], systems[index + 1]].flatMap((neighbour) =>
-              neighbour ? [neighbour.systemId] : []
-            )
-          );
-          set(system.systemId, {
-            status: 'ready',
-            summary: summarizeRecentKills(result.kills, {
-              groupOf,
-              band: system.band,
-              locations,
-              pathNeighbours,
-              now: Date.now(),
-            }),
-          });
-        }
+    const regions = loadSolarSystemsById();
+    const fillRow = async ({ system, index }: WalkRow, kills: readonly RecentKill[]) => {
+      const groupOf = await groups;
+      const locations = await resolveKillLocations(
+        kills.flatMap((kill) => (kill.locationId === null ? [] : [kill.locationId]))
       );
+      const pathNeighbours = new Set(
+        [systems[index - 1], systems[index + 1]].flatMap((neighbour) =>
+          neighbour ? [neighbour.systemId] : []
+        )
+      );
+      set(system.systemId, {
+        status: 'ready',
+        summary: summarizeRecentKills(kills, {
+          groupOf,
+          band: system.band,
+          locations,
+          pathNeighbours,
+          now: Date.now(),
+        }),
+      });
+    };
+    void (async () => {
+      const regionOf = await regions;
+      // One step per region, in order of first appearance; a system with no
+      // known region is a step of its own.
+      const steps: WalkStep[] = [];
+      const byRegion = new Map<number, WalkStep>();
+      systems.forEach((system, index) => {
+        const row = { system, index };
+        const regionId = regionOf?.get(system.systemId)?.regionId ?? null;
+        const known = regionId === null ? undefined : byRegion.get(regionId);
+        if (known) {
+          known.rows.push(row);
+          return;
+        }
+        const step = { regionId, rows: [row] };
+        steps.push(step);
+        if (regionId !== null) byRegion.set(regionId, step);
+      });
+      await mapWithConcurrencyLimit(steps, ZKILL_CONCURRENCY, async ({ regionId, rows }) => {
+        if (cancelled) return;
+        // Each row's kills, or null when zKillboard could not answer.
+        let killsOf: ((systemId: number) => readonly RecentKill[]) | null;
+        if (regionId === null) {
+          const result = await loadSystemRecentKills(rows[0].system.systemId);
+          killsOf = result.ok ? () => result.kills : null;
+        } else {
+          const result = await loadRegionRecentKills(regionId);
+          killsOf = result.ok ? (systemId) => result.bySystem.get(systemId) ?? [] : null;
+        }
+        for (const row of rows) {
+          if (cancelled) return;
+          if (killsOf) await fillRow(row, killsOf(row.system.systemId));
+          else set(row.system.systemId, { status: 'unavailable' });
+        }
+      });
     })();
     return () => {
       cancelled = true;

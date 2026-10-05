@@ -38,6 +38,7 @@ import type { PlanetType } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { EXTRACTOR_HEADS_MAX } from '@/engine/pi/pinBudget';
 import { recommendStopTier, type StopTierAdvice } from '@/engine/pi/stopTier';
+import type { PinLoad } from '@/engine/pi/types';
 import { localResourcesFor, type BuiltColonyAdvice } from './advisorModel';
 import { productBySchematicId } from './products';
 
@@ -84,6 +85,12 @@ export interface ColonyStopTierInput {
    * where it now comes from.
    */
   bufferHours: number;
+  /**
+   * Score against this budget instead of the colony's own Command Center, for
+   * "what would it earn at level N". Link load is still taken off it. Omitted
+   * means the colony's own level, which is what every other caller wants.
+   */
+  budgetOverride?: PinLoad;
 }
 
 /**
@@ -145,9 +152,10 @@ export function colonyStopTierAdvice(input: ColonyStopTierInput): ColonyStopTier
   if (rate === null) return { status: 'needs-measured-extraction' };
 
   const linkLoad = colony.pinLoad.linkLoad ?? { cpu: 0, powergrid: 0 };
+  const supply = input.budgetOverride ?? colony.budget;
   const budget = {
-    cpu: Math.max(0, colony.budget.cpu - linkLoad.cpu),
-    powergrid: Math.max(0, colony.budget.powergrid - linkLoad.powergrid),
+    cpu: Math.max(0, supply.cpu - linkLoad.cpu),
+    powergrid: Math.max(0, supply.powergrid - linkLoad.powergrid),
   };
 
   const advice = recommendStopTier(

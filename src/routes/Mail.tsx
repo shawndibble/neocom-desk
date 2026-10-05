@@ -17,7 +17,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
-import { IssuerLink } from '@/features/character/IssuerLink';
+import { CharacterLink } from '@/features/entities';
 import { StandingTag } from '@/features/character/StandingTag';
 import { MailRowContextMenu } from '@/features/character/MailRowContextMenu';
 import {
@@ -912,7 +912,7 @@ export function Mail() {
                       {t('mail.from')}
                       {selectedHeader?.from !== undefined ? (
                         <>
-                          <IssuerLink issuerId={selectedHeader.from} name={selectedSender} />
+                          <CharacterLink id={selectedHeader.from}>{selectedSender}</CharacterLink>
                           <StandingTag
                             standing={characterStanding(
                               standingIndex,
@@ -931,10 +931,9 @@ export function Mail() {
                         {recipients.map((recipient, index) => (
                           <span key={`${recipient.recipient_type}-${recipient.recipient_id}`}>
                             {recipient.recipient_type === 'character' ? (
-                              <IssuerLink
-                                issuerId={recipient.recipient_id}
-                                name={resolveRecipientName(recipient)}
-                              />
+                              <CharacterLink id={recipient.recipient_id}>
+                                {resolveRecipientName(recipient)}
+                              </CharacterLink>
                             ) : (
                               resolveRecipientName(recipient)
                             )}

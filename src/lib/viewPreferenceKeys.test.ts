@@ -31,7 +31,6 @@ const PINNED = [
   'marketPriceHistoryRange',
   'piAdvisorAltColonies',
   'piColoniesShowAlts',
-  'piMarketSourcing',
   'piPlanControls',
   'planColumnVisibility.v2',
   'planGroupingMode',

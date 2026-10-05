@@ -52,7 +52,7 @@ import type {
   PriceBooks,
 } from '@/engine/pi/goalTypes';
 import type { BaselineTotal } from '@/engine/pi/baseline';
-import type { PinLoad } from '@/engine/pi/types';
+import type { PinLoad, PiTier } from '@/engine/pi/types';
 import { restartCadenceYield } from '@/engine/pi/restartCadence';
 import { DEFAULT_EXTRA_EXTRACTOR_YIELD_FACTOR } from '@/engine/pi/stopTier';
 import { salesTaxPct } from '@/engine/industry/fees';
@@ -276,13 +276,31 @@ export function goalPlannerInput(rows: readonly PlannerColonyRow[]): PlannerColo
   return rows.flatMap((row) => (row.enabled && row.colony ? [row.colony] : []));
 }
 
-export function plannerPolicy(options: { maxP0Types: 1 | 2; buyP1: boolean }): PlannerPolicy {
+export function plannerPolicy(options: {
+  maxP0Types: 1 | 2;
+  buyTiers: readonly PiTier[];
+}): PlannerPolicy {
   return {
     maxEcusPerColony: 2,
     maxP0TypesPerColony: options.maxP0Types,
     extraEcuFactor: DEFAULT_EXTRA_EXTRACTOR_YIELD_FACTOR,
-    buyTiers: options.buyP1 ? [1] : [],
+    buyTiers: options.buyTiers,
   };
+}
+
+/**
+ * What a sale fetches per unit: the hub's bid, or its ask where there is no
+ * bid. A corp buyback pays `buybackPct` percent of that.
+ */
+export function sellPrices(
+  prices: { prices: Readonly<Record<number, number>>; buyPrices: Readonly<Record<number, number>> },
+  buybackPct: number | null
+): Record<number, number> {
+  const bid = { ...prices.prices, ...prices.buyPrices };
+  if (buybackPct === null) return bid;
+  return Object.fromEntries(
+    Object.entries(bid).map(([id, price]) => [id, (price * buybackPct) / 100])
+  );
 }
 
 /** The hub's books, plus which bids are really asks. */
@@ -300,12 +318,14 @@ export interface HubBooks extends PriceBooks {
  */
 export function priceBooks(
   prices: { prices: Readonly<Record<number, number>>; buyPrices: Readonly<Record<number, number>> },
-  accountingLevel: number | null
+  accountingLevel: number | null,
+  buybackPct: number | null = null
 ): HubBooks {
   return {
     ask: prices.prices,
-    bid: { ...prices.prices, ...prices.buyPrices },
-    salesTaxPct: salesTaxPct(accountingLevel ?? 0),
+    bid: sellPrices(prices, buybackPct),
+    // A corp buyback pays out of its own pocket: no market sale, no sales tax.
+    salesTaxPct: buybackPct === null ? salesTaxPct(accountingLevel ?? 0) : 0,
     valuedAtAsk: new Set(
       Object.keys(prices.prices)
         .filter((id) => !Object.hasOwn(prices.buyPrices, id))
@@ -404,9 +424,10 @@ export function earningsNow(
   rows: readonly PlannerColonyRow[],
   pi: PiData,
   prices: { prices: Readonly<Record<number, number>>; buyPrices: Readonly<Record<number, number>> },
-  salesTaxPercent: number
+  salesTaxPercent: number,
+  buybackPct: number | null = null
 ): TotalColonyEarnings & { leftOut: number[]; byPlanet: Map<number, number | null> } {
-  const revenuePrices = { ...prices.prices, ...prices.buyPrices };
+  const revenuePrices = sellPrices(prices, buybackPct);
   const leftOut: number[] = [];
   const byPlanet = new Map<number, number | null>();
   const perColony = rows.flatMap((row) => {

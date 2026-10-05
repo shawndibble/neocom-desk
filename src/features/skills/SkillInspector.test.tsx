@@ -1,7 +1,12 @@
+import type { ReactElement } from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render as rtlRender, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { SkillInspector } from './SkillInspector';
+
+/** Skill names are links, so every render sits in a router. */
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 
 describe('SkillInspector', () => {
   it('shows prerequisites, marking already-trained ones distinct from those still needed', () => {

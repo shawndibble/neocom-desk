@@ -18,6 +18,7 @@ vi.mock('@/sde/loadSde', () => ({ loadTypes: vi.fn(async () => ({})) }));
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { PublicInfoModal } from './PublicInfoModal';
+import { EntityInfoRoute } from '@/features/entities';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 
 const server = setupServer();
@@ -59,6 +60,7 @@ const navigateTo = (path: string) => probe.navigate(path);
 function renderModal() {
   render(
     <MemoryRouter initialEntries={['/contacts']}>
+      <EntityInfoRoute />
       <PublicInfoModal />
       <NavigateProbe />
     </MemoryRouter>
@@ -450,7 +452,7 @@ describe('PublicInfoModal', () => {
     act(() => usePublicInfoModalStore.getState().open('corporation', 2));
     await screen.findByText('[SOME]');
 
-    act(() => navigateTo('/contacts?tab=all'));
+    act(() => navigateTo('/contacts?tab=all&info=corporation-2'));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
     act(() => navigateTo('/fittings/edit'));
@@ -597,8 +599,8 @@ describe('PublicInfoModal', () => {
       expect(within(dialog).getByText('War eligible')).toBeInTheDocument();
       expect(within(dialog).getByText('142')).toBeInTheDocument();
       expect(within(dialog).getByText('10%')).toBeInTheDocument();
-      expect(within(dialog).getByRole('button', { name: 'Kaelen Vrask' })).toBeInTheDocument();
-      expect(within(dialog).getByRole('button', { name: 'Oren Vrask' })).toBeInTheDocument();
+      expect(within(dialog).getByRole('link', { name: 'Kaelen Vrask' })).toBeInTheDocument();
+      expect(within(dialog).getByRole('link', { name: 'Oren Vrask' })).toBeInTheDocument();
       expect(within(dialog).getByRole('link', { name: /^Website\s*\(opens/ })).toHaveAttribute(
         'href',
         'https://example.com/vrsk'
@@ -606,7 +608,7 @@ describe('PublicInfoModal', () => {
       expect(within(dialog).getByText('Recruiting').tagName).toBe('B');
 
       const history = await within(dialog).findByRole('region', { name: 'Alliance history' });
-      expect(within(history).getByRole('button', { name: 'Test Alliance' })).toBeInTheDocument();
+      expect(within(history).getByRole('link', { name: 'Test Alliance' })).toBeInTheDocument();
       expect(within(dialog).getByText(/^since /)).toBeInTheDocument();
     });
 
@@ -625,11 +627,13 @@ describe('PublicInfoModal', () => {
       act(() => usePublicInfoModalStore.getState().open('corporation', 98000001));
 
       const dialog = await screen.findByRole('dialog');
-      (await within(dialog).findAllByRole('button', { name: 'Kaelen Vrask' }))[0].click();
-      expect(usePublicInfoModalStore.getState().request).toEqual({
-        kind: 'character',
-        id: 90000001,
-      });
+      (await within(dialog).findAllByRole('link', { name: 'Kaelen Vrask' }))[0].click();
+      await waitFor(() =>
+        expect(usePublicInfoModalStore.getState().request).toEqual({
+          kind: 'character',
+          id: 90000001,
+        })
+      );
     });
 
     it('gives an NPC corporation no killboard and no alliance history', async () => {
@@ -716,16 +720,18 @@ describe('PublicInfoModal', () => {
 
       const dialog = await screen.findByRole('dialog');
       await within(dialog).findByText('[SC0UT]');
-      expect(await within(dialog).findByRole('button', { name: 'G8keeper' })).toBeInTheDocument();
+      expect(await within(dialog).findByRole('link', { name: 'G8keeper' })).toBeInTheDocument();
       expect(within(dialog).getByText('Jan 23, 2015')).toBeInTheDocument();
 
       const members = await within(dialog).findByRole('region', { name: 'Member corporations' });
       expect(within(members).getByText('2 member corporations')).toBeInTheDocument();
-      within(members).getByRole('button', { name: 'Signal Cartel' }).click();
-      expect(usePublicInfoModalStore.getState().request).toEqual({
-        kind: 'corporation',
-        id: 98372649,
-      });
+      within(members).getByRole('link', { name: 'Signal Cartel' }).click();
+      await waitFor(() =>
+        expect(usePublicInfoModalStore.getState().request).toEqual({
+          kind: 'corporation',
+          id: 98372649,
+        })
+      );
     });
   });
 });

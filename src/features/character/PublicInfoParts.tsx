@@ -5,38 +5,21 @@
  */
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { CharacterLink, CorporationLink } from '@/features/entities';
 import { corporationLogoUrl } from '@/lib/eveImages';
 
-export function PersonLink({
-  id,
-  name,
-  onOpen,
-}: {
-  id: number;
-  name: string | null;
-  onOpen: (characterId: number) => void;
-}) {
+export function PersonLink({ id, name }: { id: number; name: string | null }) {
   const { t } = useTranslation();
   return (
     <span className="flex items-center gap-2">
       <CharacterAvatar characterId={id} size="sm" loading="lazy" />
-      <button type="button" className={inlineLinkClassName} onClick={() => onOpen(id)}>
-        {name ?? t('common.unknown')}
-      </button>
+      <CharacterLink id={id}>{name ?? t('common.unknown')}</CharacterLink>
     </span>
   );
 }
 
-export function CorporationLink({
-  id,
-  name,
-  onOpen,
-}: {
-  id: number;
-  name: string | null;
-  onOpen: (corporationId: number) => void;
-}) {
+/** A corporation with its logo; the name is the `CorporationLink` entity link. */
+export function CorporationEntry({ id, name }: { id: number; name: string | null }) {
   return (
     <span className="flex min-w-0 items-center gap-2">
       <img
@@ -48,13 +31,9 @@ export function CorporationLink({
         loading="lazy"
         className="size-6 max-w-none shrink-0 rounded-xs border border-line"
       />
-      <button
-        type="button"
-        className={`${inlineLinkClassName} min-w-0 truncate text-left`}
-        onClick={() => onOpen(id)}
-      >
+      <CorporationLink id={id} className="min-w-0 truncate text-left">
         {name ?? `#${id}`}
-      </button>
+      </CorporationLink>
     </span>
   );
 }

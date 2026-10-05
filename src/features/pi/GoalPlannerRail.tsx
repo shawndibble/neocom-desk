@@ -17,18 +17,13 @@ import {
   Panel,
   RegionSelect,
   SegmentedControl,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   TextInput,
   type ControlSize,
 } from '@/components/ui';
 import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { Goal } from '@/engine/pi/goalTypes';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import type { TradeHub } from '@/market/hubs';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import type { PiCadence } from './cadencePref';
@@ -37,7 +32,9 @@ import { ASSUMED_UNKNOWN_CUSTOMS, type PlannerColonyRow } from './goalPlannerMod
 import { DEFAULT_GOAL_PER_DAY } from './goalsParam';
 import type { ProductOption } from './products';
 import { SectionLabel, TierChip } from './DirectiveRow';
-import { CadenceRow, PercentInput } from './piControls';
+import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
+import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
+import { PercentInput } from './piControls';
 import { parseDecimal } from './goalPlannerFormat';
 import { piAdvisorHref } from './piPlanLink';
 
@@ -392,10 +389,10 @@ export function ColoniesSection({
 // --- Assumptions ---------------------------------------------------------
 
 export interface AssumptionsProps {
-  hubId: TradeHub['id'];
-  onHubChange: (hubId: TradeHub['id']) => void;
-  buyP1: boolean;
-  onBuyP1Change: (buy: boolean) => void;
+  /** The shared PI settings, shown here and edited in the settings form. */
+  hubName: string;
+  buybackPct: number | null;
+  buyTiers: readonly number[];
   fallbackRate: number;
   onFallbackRateChange: (rate: number) => void;
   /** Whether any colony's rate leans on the fallback — the field shows only then. */
@@ -403,7 +400,6 @@ export interface AssumptionsProps {
   maxP0Types: 1 | 2;
   onMaxP0TypesChange: (value: 1 | 2) => void;
   cadence: PiCadence;
-  onCadenceChange: (cadence: PiCadence) => void;
   size: ControlSize;
   expanded: boolean;
   onToggleExpanded: () => void;
@@ -417,15 +413,57 @@ function Hint({ id, children }: { id: string; children: ReactNode }) {
   );
 }
 
+/** The PI settings at a glance, with the way into the shared form. */
+function SettingsSummary(props: AssumptionsProps) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const days = (count: number) => t('piAdvisor.cadenceDays', { count });
+  return (
+    <div className="space-y-1">
+      <ul className="space-y-0.5 text-xs text-text">
+        <li>
+          {props.buybackPct === null
+            ? t('piPlan.settingsSellHub', { hub: props.hubName })
+            : t('piPlan.settingsSellBuyback', { pct: props.buybackPct, hub: props.hubName })}
+        </li>
+        <li>
+          {props.buyTiers.length > 0
+            ? t('piPlan.settingsBuys', {
+                tiers: props.buyTiers.map((tier) => t('piPlan.tierChip', { tier })).join(', '),
+              })
+            : t('piPlan.settingsBuysNothing')}
+        </li>
+        <li>
+          {t('piPlan.settingsCadence', {
+            restart: days(props.cadence.restartDays),
+            haul: days(props.cadence.haulDays),
+          })}
+        </li>
+      </ul>
+      <button
+        type="button"
+        className={`${inlineLinkClassName} ${tappableRowClassName} text-xs`}
+        onClick={() => setOpen(true)}
+      >
+        {t('piPlan.settingsChange')}
+      </button>
+      <PageSettingsModal
+        open={open}
+        onClose={() => setOpen(false)}
+        pageName={t('pi.title')}
+        section="industry"
+      >
+        <PiSettingsForm />
+      </PageSettingsModal>
+    </div>
+  );
+}
+
 export function AssumptionsSection(props: AssumptionsProps) {
   const { t } = useTranslation();
-  const hubId = useId();
-  const hubHint = useId();
-  const buyHint = useId();
   const rateId = useId();
   const rateHint = useId();
   const typesHint = useId();
-  const cadenceHint = useId();
   return (
     <CollapsiblePanel
       title={t('piPlan.assumptionsTitle')}
@@ -434,44 +472,7 @@ export function AssumptionsSection(props: AssumptionsProps) {
       labels={{ show: t('piPlan.assumptionsShow'), hide: t('piPlan.assumptionsHide') }}
     >
       <div className="space-y-3">
-        <div className="space-y-1">
-          <label htmlFor={hubId} className="block">
-            <SectionLabel>{t('piPlan.hub')}</SectionLabel>
-          </label>
-          <Select
-            value={props.hubId}
-            onValueChange={(id) => props.onHubChange(id as TradeHub['id'])}
-          >
-            <SelectTrigger
-              id={hubId}
-              size={props.size}
-              aria-describedby={hubHint}
-              className="w-full"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TRADE_HUBS.map((hub) => (
-                <SelectItem key={hub.id} value={hub.id}>
-                  {hub.systemName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Hint id={hubHint}>{t('piPlan.hubHint')}</Hint>
-        </div>
-
-        <div className="space-y-1">
-          <label className={`flex items-center gap-2 text-xs text-text ${tappableRowClassName}`}>
-            <Checkbox
-              checked={props.buyP1}
-              aria-describedby={buyHint}
-              onChange={(event) => props.onBuyP1Change(event.target.checked)}
-            />
-            {t('piPlan.buyP1')}
-          </label>
-          <Hint id={buyHint}>{t('piPlan.buyP1Hint')}</Hint>
-        </div>
+        <SettingsSummary {...props} />
 
         <div className="space-y-1">
           <SegmentedControl
@@ -487,26 +488,6 @@ export function AssumptionsSection(props: AssumptionsProps) {
             fill
           />
           <Hint id={typesHint}>{t('piPlan.maxP0TypesHint')}</Hint>
-        </div>
-
-        <div className="space-y-2">
-          <CadenceRow
-            label={t('piAdvisor.cadenceRestartLabel')}
-            hint={t('piAdvisor.cadenceRestartHint')}
-            value={props.cadence.restartDays}
-            size={props.size}
-            describedBy={cadenceHint}
-            onChange={(restartDays) => props.onCadenceChange({ ...props.cadence, restartDays })}
-          />
-          <CadenceRow
-            label={t('piAdvisor.cadenceHaulLabel')}
-            hint={t('piAdvisor.cadenceHaulHint')}
-            value={props.cadence.haulDays}
-            size={props.size}
-            describedBy={cadenceHint}
-            onChange={(haulDays) => props.onCadenceChange({ ...props.cadence, haulDays })}
-          />
-          <Hint id={cadenceHint}>{t('piPlan.cadenceHint')}</Hint>
         </div>
 
         {props.fallbackInUse && (

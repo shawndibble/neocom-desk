@@ -11,6 +11,8 @@ import { useTranslation } from 'react-i18next';
 import { IconButton } from './IconButton';
 import * as Icon from './icons';
 import { PortalContainerProvider } from './portalContainer';
+import { useOverlayHistory } from '@/lib/useOverlayHistory';
+import { useSheetSwipe } from './useSheetSwipe';
 
 export type ModalPlacement = 'center' | 'sheet' | 'sheet-full' | 'wide' | 'media';
 
@@ -38,6 +40,12 @@ interface ModalProps {
   initialFocusRef?: RefObject<HTMLElement | null>;
   /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `sheet-full` for the same drawer at full viewport height (long lists), `wide` for multi-column content (e.g. a comparison matrix), `media` for an enlarged image — sized to its content up to 95% of the viewport. */
   placement?: ModalPlacement;
+  /**
+   * Whether the modal owns a history entry so Back closes it (default). Pass
+   * `false` only for a modal already backed by a URL (the `info` search
+   * param), whose own history entry would otherwise be pushed twice.
+   */
+  closeOnBack?: boolean;
 }
 
 /**
@@ -78,9 +86,13 @@ export function Modal({
   children,
   placement = 'center',
   initialFocusRef,
+  closeOnBack = true,
 }: ModalProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const isSheet = placement.startsWith('sheet');
+  useOverlayHistory(open, onClose, closeOnBack);
+  const swipe = useSheetSwipe(dialogRef, onClose, isSheet);
   const titleId = useId();
   // State, not a ref: a Radix portal needs to re-render once the node exists,
   // and a ref assignment alone would not schedule that render.
@@ -148,27 +160,39 @@ export function Modal({
         // land behind the top layer — see `portalContainer.ts`.
         <PortalContainerProvider value={portalContainer}>
           <div className={`flex ${heightClass} flex-col`}>
-            <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
-              <h2
-                id={titleId}
-                className="min-w-0 flex-1 truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-              >
-                {title}
-              </h2>
-              {titleActions}
-              {/* `Icon.Close` via `IconButton`, not the hand-rolled "×" glyph
+            {/* The drag zone for swipe-down-to-dismiss: grabber plus header,
+              never the scrolled body. `touch-none` keeps the browser from
+              taking the vertical pan for itself. */}
+            <div {...swipe} className={isSheet ? 'touch-none bg-panel-2' : undefined}>
+              {isSheet && (
+                // Decorative: Escape, Back and the close button are the
+                // accessible ways out, so it is neither focusable nor read.
+                <div aria-hidden="true" className="flex justify-center pt-2">
+                  <span className="h-1 w-10 rounded-full bg-line-bright" />
+                </div>
+              )}
+              <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
+                <h2
+                  id={titleId}
+                  className="min-w-0 flex-1 truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                >
+                  {title}
+                </h2>
+                {titleActions}
+                {/* `Icon.Close` via `IconButton`, not the hand-rolled "×" glyph
                 this replaced: DESIGN.md's icon rules require an icon-only
                 control to be an `IconButton` and forbid a dingbat character
                 standing in for one, and the mobile "More" sheet's close
                 control was flagged at 23×28px — under the documented 44px
                 touch tier every other icon action in the header now gets. */}
-              <IconButton
-                variant="plain"
-                icon={<Icon.Close />}
-                label={t('common.close')}
-                onClick={onClose}
-              />
-            </header>
+                <IconButton
+                  variant="plain"
+                  icon={<Icon.Close />}
+                  label={t('common.close')}
+                  onClick={onClose}
+                />
+              </header>
+            </div>
             {/* `overscroll-contain` plus the `body:has(dialog[open])` rule in
               index.css: a native dialog does not lock the page behind it, so
               on a phone a scroll that starts over the sheet would otherwise
@@ -179,7 +203,7 @@ export function Modal({
             <div
               ref={bodyRef}
               tabIndex={-1}
-              className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none${placement.startsWith('sheet') ? ' scroll-pb-20' : ''}`}
+              className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none${isSheet ? ' scroll-pb-20 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]' : ''}`}
             >
               {children}
             </div>
