@@ -156,7 +156,10 @@ function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow
       id: 'signature',
       header: t('travel.thera.col.signature'),
       headerClassName: 'whitespace-nowrap',
-      className: 'w-0 whitespace-nowrap',
+      // Trailing column: a tighter right edge keeps the table inside its panel
+      // at 1024px now that no header may wrap.
+      className: 'w-0 pr-1 whitespace-nowrap',
+      headerCellClassName: 'pr-1',
       stackEdge: 'below',
       render: (row) => (
         <span className="inline-flex items-center gap-3 max-sm:flex max-sm:w-full">
