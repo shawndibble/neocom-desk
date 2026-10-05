@@ -32,9 +32,19 @@
 
 import { NET_TOLERANCE } from './planBest';
 import type { PlanetType } from './goalTypes';
-import type { PiTier } from './types';
+import type { PiTier, PinCounts } from './types';
 
 export type { PlanetType };
+
+/** How a recipe's one-planet layout is built and run: what "Show me how" draws. */
+export interface RecipeLayout {
+  unitsPerDay: number;
+  /** The pins the layout is built from, overhead included. */
+  pins: PinCounts;
+  /** The P0s it extracts, and the factories in the order they are set (inputs first). */
+  extracts: readonly number[];
+  makes: readonly { typeId: number; facility: 'basic' | 'advanced' | 'highTech' }[];
+}
 
 /** One recipe valued on one planet type. */
 export interface RecipeRow {
@@ -47,6 +57,7 @@ export interface RecipeRow {
   iskPerDay: number;
   /** m3 a day that planet ships. */
   m3PerDay: number;
+  layout?: RecipeLayout;
 }
 
 export type RecipeFilter = 'any' | 'p1' | 'p2';
@@ -72,6 +83,8 @@ export interface RecipeRank {
   /** The hosts the pilot has. */
   haveTypes: PlanetType[];
   comparison: RecipeComparison | null;
+  /** The layout for `useType`, when the caller supplied one. */
+  layout?: RecipeLayout;
 }
 
 export interface RecipeRanking {
@@ -147,6 +160,7 @@ export function rankRecipes(input: {
       hostTypes,
       haveTypes: hostTypes.filter((type) => have.has(type)),
       comparison,
+      ...(used.layout ? { layout: used.layout } : {}),
     });
   }
 

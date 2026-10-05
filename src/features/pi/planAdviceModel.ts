@@ -213,6 +213,12 @@ export interface PlanAdvice {
   haul: HaulSummary;
   slots: SlotNudge;
   recipes: RecipeRanking;
+  /**
+   * Every priced one-planet recipe on every planet type, before filtering. Plan's
+   * "Find the best thing to build" re-ranks these under its own toggles and
+   * what-if planets, so the figures stay this model's.
+   */
+  recipeRows: RecipeRow[];
   rankingBasis: RankingBasis;
 }
 
@@ -226,7 +232,7 @@ export function planColonyAnchor(name: string | null, planetId: number): string 
 }
 
 /** The P0s a product needs, and the factories in the order they are set (inputs first). */
-function recipeOf(typeId: number, pi: PiData): RebuildCandidate['recipe'] {
+export function recipeOf(typeId: number, pi: PiData): RebuildCandidate['recipe'] {
   const extracts = new Set<number>();
   const makes: { typeId: number; facility: 'basic' | 'advanced' | 'highTech' }[] = [];
   const seen = new Set<number>();
@@ -427,6 +433,7 @@ export function buildPlanAdvice(input: PlanAdviceInput): PlanAdvice {
       bestOnePlanetGainPerDay: ranking.ranking.bestAnywherePerDay,
     }),
     recipes: ranking.ranking,
+    recipeRows: ranking.rows,
     rankingBasis: ranking.basis,
   };
 }
@@ -829,7 +836,7 @@ function rankingFor(args: {
   books: SellBooks;
   pi: PiData;
   haulHours: number;
-}): { ranking: RecipeRanking; basis: RankingBasis } {
+}): { ranking: RecipeRanking; rows: RecipeRow[]; basis: RankingBasis } {
   const { input, rows, books, pi, haulHours } = args;
   const withAdvice = rows.flatMap((row) => (row.advice ? [row.advice] : []));
 
@@ -904,6 +911,11 @@ function rankingFor(args: {
         planetType,
         iskPerDay: isk * HOURS_PER_DAY,
         m3PerDay: entry.unitsPerHour * HOURS_PER_DAY * volume,
+        layout: {
+          unitsPerDay: entry.unitsPerHour * HOURS_PER_DAY,
+          pins: entry.pins,
+          ...recipeOf(entry.typeId, pi),
+        },
       });
     }
   }
@@ -913,6 +925,7 @@ function rankingFor(args: {
   ] as PlanetType[];
 
   return {
+    rows: recipeRows,
     ranking: rankRecipes({
       rows: recipeRows,
       haveTypes: have,
