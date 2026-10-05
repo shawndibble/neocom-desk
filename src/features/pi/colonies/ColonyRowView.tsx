@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
   Button,
@@ -12,6 +12,7 @@ import {
   Tooltip,
   TypeIcon,
 } from '@/components/ui';
+import { IskAmount } from '@/components/ui';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { HintText } from '@/components/ui/HintText';
 import { SystemLink } from '@/features/entities';
@@ -30,7 +31,6 @@ import {
 import { eveClock, hoursLabel, schematicOutputTypeId } from './coloniesFormat';
 import { ColonyExpanded } from './ColonyExpanded';
 import { planColonyHref } from './coloniesText';
-import { tWithIsk } from './iskSlot';
 import { PlanetImage } from './PlanetImage';
 import { StatusWord } from './TodayPanel';
 
@@ -96,6 +96,23 @@ function LoadLine({ label, fraction }: { label: string; fraction: number | null 
   );
 }
 
+/** A translated line whose `<isk/>` slot is an `IskAmount` (shorthand, exact on hover/focus/screen reader). */
+function iskTrans(
+  t: TFunction,
+  i18nKey: string,
+  values: Record<string, unknown>,
+  value: number
+): ReactNode {
+  return (
+    <Trans
+      t={t}
+      i18nKey={i18nKey}
+      values={values}
+      components={{ isk: <IskAmount value={value} decimals={0} /> }}
+    />
+  );
+}
+
 /**
  * `label` sits inside a Button, where a focusable `IskAmount` cannot go, so it
  * keeps shorthand and `labelGain` carries the figure for the exact reveal.
@@ -130,7 +147,7 @@ function actionText(
         note:
           action.keepsPerDay === null
             ? t('piColonies.action.restartByNote')
-            : tWithIsk(t, 'piColonies.action.keeps', { perDay }, action.keepsPerDay),
+            : iskTrans(t, 'piColonies.action.keeps', { perDay }, action.keepsPerDay),
       };
     }
     case 'haul': {
@@ -182,7 +199,7 @@ function actionText(
         note:
           action.perDay === null
             ? t('piColonies.action.detailsNote')
-            : tWithIsk(t, 'piColonies.action.allGood', { perDay }, action.perDay),
+            : iskTrans(t, 'piColonies.action.allGood', { perDay }, action.perDay),
       };
     }
   }
@@ -220,7 +237,7 @@ function tagText(
         text:
           tag.gainPerDay === null
             ? t('piColonies.tag.roomExtractors', { count: tag.count })
-            : tWithIsk(
+            : iskTrans(
                 t,
                 'piColonies.tag.roomExtractorsGain',
                 { count: tag.count, perDay: t('piColonies.perDay') },
