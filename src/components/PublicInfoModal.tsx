@@ -66,7 +66,7 @@ export function PublicInfoModal() {
   const { t } = useTranslation();
   const request = usePublicInfoModalStore((state) => state.request);
   const close = usePublicInfoModalStore((state) => state.close);
-  const open = usePublicInfoModalStore((state) => state.open);
+  const clear = usePublicInfoModalStore((state) => state.clear);
   const { pathname } = useLocation();
   const shownPathname = useRef(pathname);
 
@@ -80,8 +80,8 @@ export function PublicInfoModal() {
   useEffect(() => {
     if (shownPathname.current === pathname) return;
     shownPathname.current = pathname;
-    close();
-  }, [pathname, close]);
+    clear();
+  }, [pathname, clear]);
 
   useEffect(() => {
     if (!request) return;
@@ -191,17 +191,9 @@ export function PublicInfoModal() {
             allianceId={character.status === 'ready' ? character.data.allianceId : undefined}
             allianceName={alliance.status === 'ready' ? alliance.data.name : undefined}
             onOpenAlliance={alliance.status !== 'idle' ? () => setActiveTab('alliance') : undefined}
-            onShowCharacter={(id) => open('character', id)}
-            onShowAlliance={(id) => open('alliance', id)}
           />
         )}
-        {activeTab === 'alliance' && (
-          <AllianceTab
-            state={alliance}
-            onShowCharacter={(id) => open('character', id)}
-            onShowCorporation={(id) => open('corporation', id)}
-          />
-        )}
+        {activeTab === 'alliance' && <AllianceTab state={alliance} />}
         {activeTab === 'employment' && (
           <Suspense
             fallback={
@@ -289,8 +281,6 @@ function CorporationTab({
   allianceId: liveAllianceId,
   allianceName,
   onOpenAlliance,
-  onShowCharacter,
-  onShowAlliance,
 }: {
   state: TabState<PublicCorporationInfo>;
   /**
@@ -301,8 +291,6 @@ function CorporationTab({
   /** Filled in once the alliance fetch resolves; a bare id shows until then. */
   allianceName?: string;
   onOpenAlliance?: () => void;
-  onShowCharacter: (characterId: number) => void;
-  onShowAlliance: (allianceId: number) => void;
 }) {
   if (state.status !== 'ready')
     return <TabStatus status={state.status === 'idle' ? 'loading' : state.status} />;
@@ -316,32 +304,17 @@ function CorporationTab({
         allianceId={allianceId}
         allianceName={allianceName}
         onOpenAlliance={onOpenAlliance}
-        onShowCharacter={onShowCharacter}
-        onShowAlliance={onShowAlliance}
       />
     </Suspense>
   );
 }
 
-function AllianceTab({
-  state,
-  onShowCharacter,
-  onShowCorporation,
-}: {
-  state: TabState<PublicAllianceInfo>;
-  onShowCharacter: (characterId: number) => void;
-  onShowCorporation: (corporationId: number) => void;
-}) {
+function AllianceTab({ state }: { state: TabState<PublicAllianceInfo> }) {
   if (state.status !== 'ready')
     return <TabStatus status={state.status === 'idle' ? 'loading' : state.status} />;
   return (
     <Suspense fallback={<TabStatus status="loading" />}>
-      <LazyAllianceTab
-        key={state.data.alliance_id}
-        data={state.data}
-        onShowCharacter={onShowCharacter}
-        onShowCorporation={onShowCorporation}
-      />
+      <LazyAllianceTab key={state.data.alliance_id} data={state.data} />
     </Suspense>
   );
 }

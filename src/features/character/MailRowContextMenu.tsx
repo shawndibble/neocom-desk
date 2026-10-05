@@ -5,7 +5,7 @@
  * The sender comes in as the header's own `from` id, never as the text the row
  * renders: on the Sent tab that text is the *recipient* summary, so deriving
  * the identity from what is on screen would open the wrong character there.
- * Like `IssuerLink` — the reading pane's entry point into the same modal — a
+ * Like `CharacterLink` — the reading pane's entry point into the same modal — a
  * mail sender is always addressed as a character, so there is no `kind`
  * branching (CONTEXT.md round 49).
  *
