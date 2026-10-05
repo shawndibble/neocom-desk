@@ -5328,7 +5328,7 @@
       "inGame": "~{{minutes}} min in the PI window",
       "restartBy": "Restart by {{clock}}",
       "restartByNote": "Keeps its output coming",
-      "keeps": "Keeps {{gain}}{{perDay}} coming",
+      "keeps": "Keeps <isk/>{{perDay}} coming",
       "haul": "Haul now",
       "haulSaves": "Haul now: saves ~{{gain}}",
       "haulNote": "or add a storage unit · ~{{minutes}} min",
@@ -5347,7 +5347,7 @@
       "smallFix": "Small fix · ~{{minutes}} min",
       "details": "Details",
       "detailsNote": "All good",
-      "allGood": "All good · ~{{gain}}{{perDay}}"
+      "allGood": "All good · ~<isk/>{{perDay}}"
     },
     "tag": {
       "slowed": "{{name}} · slowed to {{percent}}% of its first day",
@@ -5356,8 +5356,8 @@
       "idle_other": "{{count}} idle factories",
       "roomExtractors_one": "Room for {{count}} more extractor",
       "roomExtractors_other": "Room for {{count}} more extractors",
-      "roomExtractorsGain_one": "Room for {{count}} more extractor · +{{gain}}{{perDay}}",
-      "roomExtractorsGain_other": "Room for {{count}} more extractors · +{{gain}}{{perDay}}",
+      "roomExtractorsGain_one": "Room for {{count}} more extractor · +<isk/>{{perDay}}",
+      "roomExtractorsGain_other": "Room for {{count}} more extractors · +<isk/>{{perDay}}",
       "roomFactories_one": "Room for {{count}} more factory",
       "roomFactories_other": "Room for {{count}} more factories",
       "stale": "Data {{hours}} h old"

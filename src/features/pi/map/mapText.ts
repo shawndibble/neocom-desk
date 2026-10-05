@@ -5,7 +5,7 @@
  */
 import type { TFunction } from 'i18next';
 import type { PlanetType } from '@/engine/pi/goalTypes';
-import { formatIskCompact } from '@/lib/isk';
+import { formatIsk } from '@/lib/isk';
 import type { MapProduct, MapTier, ProductFigure } from './mapModel';
 
 export const planetName = (t: TFunction, type: PlanetType): string => t(`pi.planetType.${type}`);
@@ -36,11 +36,15 @@ export function comparisonSentence(t: TFunction, figure: ProductFigure): string 
   return t(`piMap.cmp.${figure.verdict}`, { name: figure.versus.name, type });
 }
 
-/** "About 717k ISK a day from one Barren planet", or null when there is no figure. */
+/**
+ * "About 717,234 ISK a day from one Barren planet", or null when there is no figure.
+ * Whole ISK, not shorthand: the tile and the phone row show the shorthand, and
+ * this sentence is where their exact figure lives (tooltip, accessible name).
+ */
 export function figureSentence(t: TFunction, figure: ProductFigure): string | null {
   if (figure.kind !== 'ranked') return null;
   return t('piMap.figure', {
-    isk: formatIskCompact(figure.iskPerDay),
+    isk: formatIsk(figure.iskPerDay, 0),
     type: planetName(t, figure.useType),
   });
 }
