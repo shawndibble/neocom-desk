@@ -195,7 +195,7 @@ test.describe('Market Browser — order book stacked cards', () => {
     expect(sell.display).toBe('flex');
     expect(labelLines(sell.cells, 8)).toEqual([
       ['Location', 'Price'],
-      ['Quantity', 'Jumps', 'Security', 'Expires'],
+      ['Qty', 'Jumps', 'Sec', 'Expires'],
     ]);
     // The real station, not the "Unknown Structure" fallback — truncated on
     // the card's title line, in full in the DOM (and the expanded row).
@@ -221,7 +221,7 @@ test.describe('Market Browser — order book stacked cards', () => {
     const buy = await readRow(page, 'Buy Orders', BUY_ORDER.order_id);
     expect(labelLines(buy.cells, 8)).toEqual([
       ['Location', 'Price'],
-      ['Quantity', 'Jumps', 'Security', 'Expires', 'Range'],
+      ['Qty', 'Jumps', 'Sec', 'Expires', 'Range'],
     ]);
 
     const overflow = await page.evaluate(
@@ -240,24 +240,37 @@ test.describe('Market Browser — order book stacked cards', () => {
     await expect(page.getByRole('table', { name: 'Buy Orders' })).toBeVisible();
   });
 
-  test('the column picker on a card chooses what the card carries, and enough unticks bring the table back (1280px)', async ({
-    page,
-  }) => {
-    await page.setViewportSize(DESKTOP);
+  test('the column picker on a card chooses what the card carries (390px)', async ({ page }) => {
+    await page.setViewportSize(PHONE);
     await openTritanium(page);
-    const sellSide = page.getByRole('region', { name: 'Sell Orders' });
+    await page
+      .getByRole('region', { name: 'Sell Orders' })
+      .getByRole('button', { name: 'Columns' })
+      .click();
+    await page.getByRole('menuitemcheckbox', { name: 'Sec' }).click();
+    await page.keyboard.press('Escape');
 
-    await sellSide.getByRole('button', { name: 'Columns' }).click();
-    await page.getByRole('menuitemcheckbox', { name: 'Security' }).click();
     const sell = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
     expect(sell.display).toBe('flex');
     expect(labelLines(sell.cells, 8)).toEqual([
       ['Location', 'Price'],
-      ['Quantity', 'Jumps', 'Expires'],
+      ['Qty', 'Jumps', 'Expires'],
     ]);
+  });
+
+  test('unticking a column brings the table back where the cards had taken over (1280px)', async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await openTritanium(page);
+    expect((await readRow(page, 'Sell Orders', SELL_ORDER.order_id)).display).toBe('flex');
 
     // Fewer columns need less width (`orderBookWidthsRem`): this book fits them as a table.
-    await page.getByRole('menuitemcheckbox', { name: 'Jumps' }).click();
+    await page
+      .getByRole('region', { name: 'Sell Orders' })
+      .getByRole('button', { name: 'Columns' })
+      .click();
+    await page.getByRole('menuitemcheckbox', { name: 'Sec' }).click();
     await page.keyboard.press('Escape');
     const table = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
     expect(table.display).toBe('table-row');
@@ -277,10 +290,7 @@ test.describe('Market Browser — order book stacked cards', () => {
     await page.keyboard.press('Escape');
 
     const sell = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
-    expect(labelLines(sell.cells, 8)).toEqual([
-      ['Price'],
-      ['Quantity', 'Jumps', 'Security', 'Expires'],
-    ]);
+    expect(labelLines(sell.cells, 8)).toEqual([['Price'], ['Qty', 'Jumps', 'Sec', 'Expires']]);
     const priceCell = page.locator(
       `table[aria-label="Sell Orders"] tr[data-row-key="${SELL_ORDER.order_id}"] td.dt-primary`
     );

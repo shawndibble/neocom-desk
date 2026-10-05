@@ -24,11 +24,11 @@ import type { MarketOrder } from '../src/esi/endpoints';
 const WIDTHS = [
   { width: 1024, height: 768 },
   { width: 1280, height: 800 },
-  // Either side of where the rows become cards with every column showing
-  // (`orderBookWidthsRem`), and of where Location narrows before that.
+  // This book's tightest table — just over its `cards` width
+  // (`orderBookWidthsRem`, sized by its ten-digit price) — and either side
+  // of where Location narrows before that.
+  { width: 1370, height: 900 },
   { width: 1400, height: 900 },
-  // The tightest table: the book just over its `cards` width.
-  { width: 1415, height: 900 },
   { width: 1440, height: 900 },
   { width: 1500, height: 900 },
   { width: 1560, height: 900 },

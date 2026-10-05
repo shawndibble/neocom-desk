@@ -4,7 +4,11 @@
  * the Sell and Buy tables, which share one picker and one stored preference
  * (`Market.tsx`'s `baseColumns` already builds `buyColumns` off the same base).
  */
+import { sellOutlierMultiple } from '@/engine/market/orderBookDepth';
+import type { RegionOrder } from '@/esi/endpoints';
+import { formatMarketIsk } from '@/lib/isk';
 import { createLocalSetting } from '@/lib/useLocalSetting';
+import { formatVolume } from './format';
 
 /**
  * In table column order. Sell only ever renders the `baseColumns` prefix
@@ -76,38 +80,98 @@ export const ORDER_BOOK_LOCATION_CLASS = {
 } as const;
 
 /**
- * What each column needs in a table row, in rem, measured in Chrome: mostly
- * the header (its `px-3` and sort icon) rather than the value, except Price,
- * sized for a twelve-digit ISK figure. Location is `ORDER_BOOK_LOCATION_REM`.
+ * What each column needs in a table row, in rem, measured in Chrome with the
+ * table squeezed to its floor. Each is its header's width (label, `px-3`,
+ * sort icon) — wider than any value it holds, except Price and Quantity,
+ * whose figures can outgrow theirs (`ORDER_BOOK_FIGURE`). Location is
+ * `ORDER_BOOK_LOCATION_REM`.
  */
 const ORDER_BOOK_COLUMN_REM: Record<Exclude<MarketOrderColumnId, 'location'>, number> = {
-  price: 6.5,
-  quantity: 6.5,
-  jumps: 5.25,
-  security: 6.25,
-  expiry: 5.75,
+  price: 4.75,
+  quantity: 4.125,
+  jumps: 5.125,
+  security: 4,
+  expiry: 5.625,
   range: 5.25,
-  minVolume: 8,
+  // Its header's 92px, with room for a ten-character minimum.
+  minVolume: 6.25,
 };
+
+/**
+ * A right-aligned figure's cell: one tabular-numeral character's width, and
+ * its padding (`px-3` plus the sort-icon gutter `pr-7`, `DataTable`).
+ */
+const ORDER_BOOK_FIGURE = { charRem: 0.36, paddingRem: 2.5 } as const;
 
 /** The row's expand toggle (`expandableRow`), plus the card's border. */
 const ORDER_BOOK_FIXED_REM = 2.5 + 0.25;
 
+/** `BaitFlag`'s icon and its margin, beside a flagged price. */
+const ORDER_BOOK_BAIT_FLAG_REM = 1.25;
+
+/** How long the widest Price and Quantity on screen are, as formatted. */
+export interface OrderBookFigureChars {
+  priceChars: number;
+  quantityChars: number;
+  /** Some sell order on screen carries `BaitFlag` beside its price. */
+  baitFlag: boolean;
+}
+
+function figureRem(headerRem: number, chars: number, extraRem = 0): number {
+  return Math.max(
+    headerRem,
+    chars * ORDER_BOOK_FIGURE.charRem + ORDER_BOOK_FIGURE.paddingRem + extraRem
+  );
+}
+
 /**
  * The order book widths its Sell and Buy tables need for the picked columns
- * (Buy's, the wider set — Sell's are a subset): below `roomy` Location's cap
- * shrinks to `squeezed`, below `cards` the rows become cards. Following the
- * picker means a pilot who hides columns keeps the table at a narrower width.
+ * (Buy's, the wider set — Sell's are a subset) and the figures actually on
+ * screen: below `roomy` Location's cap shrinks to `squeezed`, below `cards`
+ * the rows become cards. Following the picker means a pilot who hides
+ * columns keeps the table at a narrower width; following the figures means a
+ * book of seven-figure prices is not held to a twelve-figure budget.
  */
-export function orderBookWidthsRem(visible: readonly MarketOrderColumnId[]): {
-  roomy: number;
-  cards: number;
-} {
+export function orderBookWidthsRem(
+  visible: readonly MarketOrderColumnId[],
+  { priceChars, quantityChars, baitFlag }: OrderBookFigureChars
+): { roomy: number; cards: number } {
   let rest = ORDER_BOOK_FIXED_REM;
-  for (const id of visible) if (id !== 'location') rest += ORDER_BOOK_COLUMN_REM[id];
+  for (const id of visible) {
+    if (id === 'location') continue;
+    rest +=
+      id === 'price'
+        ? figureRem(
+            ORDER_BOOK_COLUMN_REM.price,
+            priceChars,
+            baitFlag ? ORDER_BOOK_BAIT_FLAG_REM : 0
+          )
+        : id === 'quantity'
+          ? figureRem(ORDER_BOOK_COLUMN_REM.quantity, quantityChars)
+          : ORDER_BOOK_COLUMN_REM[id];
+  }
   if (!visible.includes('location')) return { roomy: rest, cards: rest };
   return {
     roomy: rest + ORDER_BOOK_LOCATION_REM.roomy,
     cards: rest + ORDER_BOOK_LOCATION_REM.squeezed,
   };
+}
+
+/**
+ * The widest Price and Quantity among the rows on screen, in characters as
+ * the table prints them, and whether any price carries `BaitFlag`.
+ */
+export function orderBookFigureChars(
+  rows: readonly RegionOrder[],
+  bestSell: number | null
+): OrderBookFigureChars {
+  let priceChars = 0;
+  let quantityChars = 0;
+  let baitFlag = false;
+  for (const order of rows) {
+    priceChars = Math.max(priceChars, formatMarketIsk(order.price).length);
+    quantityChars = Math.max(quantityChars, formatVolume(order.volume_remain).length);
+    if (!order.is_buy_order && sellOutlierMultiple(order.price, bestSell) !== null) baitFlag = true;
+  }
+  return { priceChars, quantityChars, baitFlag };
 }
