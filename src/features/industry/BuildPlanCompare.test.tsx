@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { BuildPlanCompare } from './BuildPlanCompare';
 import { PRICING_INPUTS_FIXTURE } from './pricingInputsFixtures';
@@ -85,16 +86,18 @@ function renderCompare(rows: ComparedBuildRow[], onDone = vi.fn(), onOpenPlan = 
     onDone,
     onOpenPlan,
     ...render(
-      <BuildPlanCompare
-        plans={rows.map((r) => plan({ id: r.planId }))}
-        catalog={EMPTY_CATALOG}
-        pi={null}
-        ownedBlueprints={[]}
-        modifiers={NO_CHARACTER_MODIFIERS}
-        pricingInputs={PRICING_INPUTS_FIXTURE}
-        onDone={onDone}
-        onOpenPlan={onOpenPlan}
-      />
+      <MemoryRouter>
+        <BuildPlanCompare
+          plans={rows.map((r) => plan({ id: r.planId }))}
+          catalog={EMPTY_CATALOG}
+          pi={null}
+          ownedBlueprints={[]}
+          modifiers={NO_CHARACTER_MODIFIERS}
+          pricingInputs={PRICING_INPUTS_FIXTURE}
+          onDone={onDone}
+          onOpenPlan={onOpenPlan}
+        />
+      </MemoryRouter>
     ),
   };
 }
@@ -180,7 +183,7 @@ describe('BuildPlanCompare', () => {
     const { onOpenPlan } = renderCompare([
       row({ planId: 'a', planName: 'Raven mission fit', result: RESULT }),
     ]);
-    await userEvent.click(screen.getByRole('button', { name: 'Raven mission fit' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Raven mission fit' }));
     expect(onOpenPlan).toHaveBeenCalledWith('a');
   });
 });

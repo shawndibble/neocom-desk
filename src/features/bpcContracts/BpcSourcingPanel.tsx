@@ -122,6 +122,7 @@ import {
   JumpRangeNote,
   JumpRangeSelect,
 } from '@/features/route/JumpRangeControls';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { renderJumpsCell } from '@/features/route/jumpsCell';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
@@ -1230,7 +1231,7 @@ export function BpcSourcingPanel() {
         header: t('bpcContracts.sourceColumn'),
         sortValue: (row) => row.source,
         render: (row) => (
-          <span className="inline-flex items-center rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <span className="inline-flex items-center text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
             {row.source === 'contract'
               ? t('bpcContracts.sourceContractSingular')
               : row.source === 'market'
@@ -1264,7 +1265,7 @@ export function BpcSourcingPanel() {
           return (
             <span className="inline-flex flex-wrap items-center gap-x-1.5">
               {place}
-              <span className="text-[0.625rem] tracking-widest text-accent uppercase">
+              <span className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('bpcContracts.atTradeHub')}
               </span>
             </span>
@@ -1561,7 +1562,9 @@ export function BpcSourcingPanel() {
             ) : (
               // Ellipsised on the phone card, so a long name stops short of the
               // price beside it instead of running under it.
-              <span className="max-sm:block max-sm:truncate">{name}</span>
+              <span className="max-sm:block max-sm:truncate">
+                <MarketItemLink typeId={row.typeId}>{name}</MarketItemLink>
+              </span>
             );
           if (!bpo && !owned) return title;
           return (
@@ -1570,7 +1573,7 @@ export function BpcSourcingPanel() {
             <span className="flex min-w-0 flex-wrap items-center gap-1.5 sm:flex-col sm:flex-nowrap sm:items-start sm:gap-1">
               <span className="min-w-0 max-w-full">{title}</span>
               {owned && (
-                <span className="inline-flex w-fit items-center rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-normal text-text-dim">
+                <span className="inline-flex w-fit items-center text-[0.6875rem] font-normal text-text-dim">
                   {t('bpcContracts.sourceOwned')}
                 </span>
               )}
@@ -1766,7 +1769,7 @@ export function BpcSourcingPanel() {
           </span>
           {openSuggestions !== null && (
             <div className="border-b border-line bg-panel-2 px-3 py-2">
-              <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+              <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('bpcContracts.suggestionsHeading')}
               </p>
               <ul

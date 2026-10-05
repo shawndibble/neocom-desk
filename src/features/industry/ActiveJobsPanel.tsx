@@ -726,18 +726,18 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
               {nameForBlueprint(job.blueprint_type_id)}
             </MarketItemLink>
             {soon(job) && (
-              <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
+              <span className="rounded-xs bg-warning/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
                 {t('industry.jobsCompletingSoon')}
               </span>
             )}
             {done(job) && (
-              <span className="rounded-xs border border-success/50 bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
+              <span className="rounded-xs bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
                 {t('industry.jobsDone')}
               </span>
             )}
             {/* Only once more than one Character's jobs are on screen (`showCharacterColumn`) — same gate as `OpenOrdersPanel`'s `showCharacterStrip`. */}
             {job.owner === 'corporation' && (
-              <span className="shrink-0 rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <span className="shrink-0 rounded-xs bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('industry.jobsCorpBadge')}
               </span>
             )}

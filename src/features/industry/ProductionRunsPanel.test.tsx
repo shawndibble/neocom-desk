@@ -139,7 +139,7 @@ describe('ProductionRunsPanel', () => {
     renderPanel(null);
     await expandRuns(user);
 
-    const row = (await screen.findByRole('cell', { name: /^320,000$/ })).closest('tr');
+    const row = (await screen.findByRole('cell', { name: /^320,000\.00$/ })).closest('tr');
     expect(row).not.toBeNull();
   });
 
@@ -149,7 +149,7 @@ describe('ProductionRunsPanel', () => {
     renderPanel(null);
     await expandRuns(user);
 
-    await user.click(await screen.findByRole('cell', { name: /^320,000$/ }));
+    await user.click(await screen.findByRole('cell', { name: /^320,000\.00$/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Edit production run' });
     const jobFeeInput = within(dialog).getByLabelText('Total job cost');
     await user.clear(jobFeeInput);
@@ -181,7 +181,7 @@ describe('ProductionRunsPanel', () => {
     renderPanel(null);
     await expandRuns(user);
 
-    await user.click(await screen.findByRole('cell', { name: /^320,000$/ }));
+    await user.click(await screen.findByRole('cell', { name: /^320,000\.00$/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Edit production run' });
     await user.click(within(dialog).getByRole('button', { name: 'Delete production run' }));
 
@@ -207,7 +207,7 @@ describe('ProductionRunsPanel', () => {
     const user = userEvent.setup();
     renderPanel(null);
     await expandRuns(user);
-    await screen.findByRole('button', { name: 'Sold' });
+    await screen.findByRole('button', { name: 'Sold…' });
 
     await chooseSoldMenuItem(user, 'Delete production run');
     const dialog = await screen.findByRole('dialog', { name: 'Delete production run' });
@@ -224,7 +224,7 @@ describe('ProductionRunsPanel', () => {
     const user = userEvent.setup();
     renderPanel(null);
     await expandRuns(user);
-    await screen.findByRole('button', { name: 'Sold' });
+    await screen.findByRole('button', { name: 'Sold…' });
 
     await chooseSoldMenuItem(user, 'Delete production run');
     const dialog = await screen.findByRole('dialog', { name: 'Delete production run' });
@@ -251,7 +251,7 @@ describe('ProductionRunsPanel', () => {
     renderPanel(null);
     await expandRuns(user);
 
-    await user.click(await screen.findByRole('button', { name: 'Sold' }));
+    await user.click(await screen.findByRole('button', { name: 'Sold…' }));
     await waitFor(() => screen.getByRole('button', { name: 'Link' }));
     await user.click(screen.getByRole('button', { name: 'Link' }));
 
@@ -278,7 +278,7 @@ describe('ProductionRunsPanel', () => {
     const user = userEvent.setup();
     renderPanel(null);
     await expandRuns(user);
-    await screen.findByRole('cell', { name: /^320,000$/ });
+    await screen.findByRole('cell', { name: /^320,000\.00$/ });
 
     expect(screen.queryByRole('button', { name: 'Calculations?' })).not.toBeInTheDocument();
   });
@@ -345,7 +345,7 @@ describe('ProductionRunsPanel', () => {
     renderPanel(null);
     await expandRuns(user);
 
-    await user.click(await screen.findByRole('button', { name: 'Sold' }));
+    await user.click(await screen.findByRole('button', { name: 'Sold…' }));
 
     // Already linked to another run — the picker must not offer it again.
     await waitFor(() => {
@@ -365,7 +365,7 @@ describe('ProductionRunsPanel', () => {
     const user = userEvent.setup();
     renderPanel(null);
     await expandRuns(user);
-    await screen.findByRole('button', { name: 'Sold' });
+    await screen.findByRole('button', { name: 'Sold…' });
 
     await chooseSoldMenuItem(user, 'Watch Open Order');
     await waitFor(() => screen.getByRole('button', { name: 'Watch' }));
@@ -407,7 +407,7 @@ describe('ProductionRunsPanel', () => {
     const user = userEvent.setup();
     renderPanel(null);
     await expandRuns(user);
-    await screen.findByRole('button', { name: 'Sold' });
+    await screen.findByRole('button', { name: 'Sold…' });
 
     await chooseSoldMenuItem(user, 'Manual / Private Sale');
     const dialog = await screen.findByRole('dialog', { name: 'Manual / Private Sale' });
@@ -429,7 +429,7 @@ describe('ProductionRunsPanel', () => {
     const user = userEvent.setup();
     renderPanel(null);
     await expandRuns(user);
-    await screen.findByRole('button', { name: 'Sold' });
+    await screen.findByRole('button', { name: 'Sold…' });
 
     await chooseSoldMenuItem(user, 'Manual / Private Sale');
     const dialog = await screen.findByRole('dialog', { name: 'Manual / Private Sale' });

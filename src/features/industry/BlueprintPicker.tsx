@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SearchInput } from '@/components/ui';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import { searchByProductName } from './blueprintCatalog';
 import { findOwnedBlueprint } from './data';
@@ -50,11 +54,11 @@ export function BlueprintPicker({
                   onPick(entry);
                   setQuery('');
                 }}
-                className={`${tappableRowClassName} flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
+                className={`${tappableRowClassName} flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs ${rowInteractiveClassName} ${focusRingInsetClassName}`}
               >
                 <span className="truncate">{entry.productName}</span>
                 {findOwnedBlueprint(ownedBlueprints, entry.blueprintTypeID) && (
-                  <span className="shrink-0 rounded-xs border border-success/50 px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-widest text-success">
+                  <span className="shrink-0 text-[0.6875rem] font-semibold uppercase tracking-widest text-success">
                     {t('industry.blueprintOwned')}
                   </span>
                 )}

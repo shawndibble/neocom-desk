@@ -5,7 +5,7 @@ import '@/i18n';
 import { AutoBuildControl } from './AutoBuildControl';
 
 const strategySelect = () => screen.getByRole('combobox', { name: 'Build Strategy' });
-const applyButton = () => screen.getByRole('button', { name: 'Apply' });
+const applyButton = () => screen.getByRole('button', { name: 'Apply…' });
 
 describe('AutoBuildControl', () => {
   it('opens on Cost-effective', () => {

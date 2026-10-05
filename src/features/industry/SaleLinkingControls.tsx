@@ -53,7 +53,7 @@ export function SoldSplitButton({
     <div className="flex items-center gap-1.5 sm:justify-end">
       <div className="flex">
         <Button size="sm" className="rounded-r-none" onClick={onSold}>
-          {t('industry.soldButton')}
+          {t('industry.soldButton')}…
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -114,10 +114,10 @@ function SalePicker({
           <span>
             {t('industry.linkedSaleRow', {
               quantity: txn.quantity,
-              price: formatIsk(txn.unit_price),
+              price: formatIsk(txn.unit_price, 2),
             })}
             {' — '}
-            {formatIsk(txn.quantity * txn.unit_price)}
+            {formatIsk(txn.quantity * txn.unit_price, 2)}
             {' — '}
             {new Date(txn.date).toLocaleDateString()}
           </span>
@@ -152,7 +152,7 @@ function WatchPicker({
             {t('industry.watchedOrderRow', {
               filled: 0,
               total: order.volume_remain,
-              price: formatIsk(order.price),
+              price: formatIsk(order.price, 2),
               status: t('industry.watchedOrderOpen'),
             })}
           </span>
