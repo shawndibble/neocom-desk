@@ -165,6 +165,11 @@ function TheraBody({
       <EmptyState
         title={t('travel.thera.unavailableTitle')}
         hint={t('travel.thera.unavailableHint')}
+        action={
+          <Button size="sm" onClick={state.retry}>
+            {t('common.retry')}
+          </Button>
+        }
       />
     );
   }

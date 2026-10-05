@@ -1151,6 +1151,24 @@ describe('Travel › Thera / Turnur', () => {
     expect(await screen.findByText(/Connections can.t be loaded right now/)).toBeInTheDocument();
   });
 
+  it('asks EVE-Scout again from the unavailable state without a reload', async () => {
+    server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => new HttpResponse(null, { status: 503 })));
+    visitThera('');
+    await screen.findByText(/Connections can.t be loaded right now/);
+
+    server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json(SIGNATURES)));
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByRole('table', { name: MAIN_TABLE })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  });
+
+  it('offers no Try again once the connections are listed', async () => {
+    visitThera('');
+    await screen.findByRole('table', { name: MAIN_TABLE });
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  });
+
   it('lets the hub-side signature be selected without opening the row', async () => {
     visitThera('');
 
