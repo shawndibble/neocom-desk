@@ -11,6 +11,55 @@ function ownerOf(state: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+let activeOverlays = 0;
+let restorePushState: (() => void) | null = null;
+let pushingOwnEntry = false;
+
+function pushOwnEntry(id: string): void {
+  const base: unknown = window.history.state;
+  const carried = typeof base === 'object' && base !== null ? base : {};
+  pushingOwnEntry = true;
+  try {
+    window.history.pushState({ ...carried, [OVERLAY_KEY]: id }, '');
+  } finally {
+    pushingOwnEntry = false;
+  }
+}
+
+/**
+ * While any overlay is open, a navigation that starts from inside it (the
+ * router's `pushState`, from a `Link` or `navigate()`) *replaces* the
+ * overlay's entry instead of stacking on top of it. Back from the new page
+ * then goes to the page that was under the overlay, as people expect, and no
+ * dead same-URL step is left behind. Only a push made while an overlay's entry
+ * is the current one is converted; any other push passes through untouched.
+ */
+function trackOverlay(): () => void {
+  activeOverlays += 1;
+  if (activeOverlays === 1) {
+    const original = window.history.pushState;
+    window.history.pushState = function (this: History, ...args: Parameters<History['pushState']>) {
+      if (!pushingOwnEntry && ownerOf(window.history.state) !== undefined) {
+        return window.history.replaceState(...args);
+      }
+      return original.apply(this, args);
+    };
+    restorePushState = () => {
+      window.history.pushState = original;
+    };
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    activeOverlays -= 1;
+    if (activeOverlays === 0) {
+      restorePushState?.();
+      restorePushState = null;
+    }
+  };
+}
+
 /**
  * Back closes the top overlay (docs/DESIGN.md §6c, "Touch and hold").
  *
@@ -27,10 +76,10 @@ function ownerOf(state: unknown): string | undefined {
  * state is copied into the new entry, which keeps React Router's own
  * `key`/`idx` bookkeeping intact when Back lands on the entry beneath.
  *
- * One known leftover: if the overlay is closed *by navigating* (a link inside
- * it), the router has already pushed past our entry, which stays beneath it
- * as one extra same-URL Back step. It is never removed by `back()` because
- * that would navigate the user away from where they just went.
+ * Navigating from inside the overlay (a link in the More sheet, a palette
+ * result) replaces its entry rather than pushing past it (`trackOverlay`), so
+ * the page change adds no history step and Back returns to the page the
+ * overlay was opened over.
  *
  * `enabled: false` opts out, for an overlay that is already backed by a URL
  * (`PublicInfoModal` and `SkillDetailModal` use the `info` search param), so
@@ -52,10 +101,9 @@ export function useOverlayHistory(open: boolean, onClose: () => void, enabled = 
     const id = (idRef.current ??= `overlay-${(nextId += 1)}`);
     liveRef.current = true;
     if (ownerOf(window.history.state) !== id) {
-      const base: unknown = window.history.state;
-      const carried = typeof base === 'object' && base !== null ? base : {};
-      window.history.pushState({ ...carried, [OVERLAY_KEY]: id }, '');
+      pushOwnEntry(id);
     }
+    const release = trackOverlay();
 
     let popped = false;
     const onPop = () => {
@@ -69,15 +117,14 @@ export function useOverlayHistory(open: boolean, onClose: () => void, enabled = 
       setTimeout(() => {
         if (!liveRef.current || ownerOf(window.history.state) !== undefined) return;
         popped = false;
-        const base: unknown = window.history.state;
-        const carried = typeof base === 'object' && base !== null ? base : {};
-        window.history.pushState({ ...carried, [OVERLAY_KEY]: id }, '');
+        pushOwnEntry(id);
       }, 0);
     };
     window.addEventListener('popstate', onPop);
 
     return () => {
       window.removeEventListener('popstate', onPop);
+      release();
       liveRef.current = false;
       // Deferred a tick so a StrictMode remount (which re-runs this effect
       // straight away and finds our entry still on top) cancels the removal.

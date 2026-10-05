@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -172,6 +172,28 @@ describe('CommandPalette', () => {
     await user.keyboard('{Enter}');
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(screen.getByTestId('where')).toHaveTextContent('/industry/opportunities');
+  });
+
+  it('replaces its history entry when a result navigates, so Back returns to the page under it', async () => {
+    window.history.replaceState(null, '', '/overview');
+    const user = userEvent.setup();
+    render(
+      <BrowserRouter>
+        <CommandPaletteHost />
+        <Where />
+      </BrowserRouter>
+    );
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(await screen.findByRole('combobox'), 'opp');
+    await user.keyboard('{Enter}');
+    expect(screen.getByTestId('where')).toHaveTextContent('/industry/opportunities');
+    // The palette's own entry was replaced, not left behind.
+    expect(window.history.state).not.toHaveProperty('__neocomOverlay');
+
+    act(() => window.history.back());
+    await vi.waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/overview'));
+    // Landed on the original entry, not a dead one the overlay left behind.
+    expect(window.history.state).not.toHaveProperty('__neocomOverlay');
   });
 
   it('keeps groups in a fixed order, hides empty ones, and arrows across the boundary', async () => {
