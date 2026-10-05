@@ -1672,10 +1672,48 @@ describe('MaterialsTable skill-gate marker (issue #1015)', () => {
     expect(within(row('Mechanical Parts')).getByText('Industry V')).toBeInTheDocument();
   });
 
-  it('never marks a row bought, not built, even with a gated verdict on the books', () => {
+  it('marks a bought row whose cost call is build — the gate is why it was not built', () => {
     renderTable({
       materials: MENU_LINES,
       skillGates: new Map([[9840, GATED]]),
+      makeOrBuy: new Map([
+        [
+          9840,
+          {
+            method: 'manufacturing',
+            verdict: 'build',
+            makeUnitPrice: 40,
+            buyUnitPrice: 50,
+            savings: 100,
+            me: 0,
+            blueprintCost: 0,
+          },
+        ],
+      ]),
+      characterNameFor,
+    });
+
+    expect(within(row('Mechanical Parts')).getByText('Industry V')).toBeInTheDocument();
+  });
+
+  it('leaves a bought row unmarked when buying is cheaper anyway', () => {
+    renderTable({
+      materials: MENU_LINES,
+      skillGates: new Map([[9840, GATED]]),
+      makeOrBuy: new Map([
+        [
+          9840,
+          {
+            method: 'manufacturing',
+            verdict: 'buy',
+            makeUnitPrice: 60,
+            buyUnitPrice: 50,
+            savings: 0,
+            me: 0,
+            blueprintCost: 0,
+          },
+        ],
+      ]),
       characterNameFor,
     });
 
@@ -1695,6 +1733,6 @@ describe('MaterialsTable skill-gate marker (issue #1015)', () => {
       characterNameFor,
     });
 
-    expect(within(row('Mechanical Parts')).queryByRole('img')).toBeNull();
+    expect(within(row('Mechanical Parts')).queryByText('Industry V')).toBeNull();
   });
 });

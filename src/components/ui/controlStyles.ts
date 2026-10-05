@@ -1,3 +1,5 @@
+import { cx } from '@/lib/cx';
+
 /**
  * The one control size scale, and the one field treatment.
  *
@@ -14,6 +16,42 @@
  */
 
 export type ControlSize = 'sm' | 'md';
+
+/**
+ * The shared interaction recipe (DESIGN.md §6c "States and motion"): every
+ * interactive primitive composes these so transition, focus and disabled
+ * behave the same everywhere instead of being re-spelled per control.
+ *
+ * - `interactiveClassName`: colour properties only, 120ms ease-out, snapping
+ *   in at 40ms while pressed (`active:duration-40`), and no transition at all
+ *   under reduced motion. Never a transform.
+ * - `focusRingClassName`: the 2px accent outline, outset, for boxed controls
+ *   and inline links.
+ * - `focusRingInsetClassName`: the same ring drawn inside the box, for
+ *   full-bleed rows, tabs and nav items (an outset ring would be clipped by
+ *   the row's neighbours or its scroller).
+ * - `disabledClassName`: `opacity-40` and `cursor-not-allowed` for both the
+ *   native attribute and `aria-disabled` (the one that keeps a tooltip able
+ *   to open).
+ */
+export const interactiveClassName =
+  'transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none';
+
+export const focusRingClassName =
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
+
+export const focusRingInsetClassName =
+  'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent';
+
+/**
+ * A full-width row or list item that is itself the control: the `panel-2` hover
+ * fill, a step darker while pressed, and the shared transition. Compose the
+ * focus ring (inset for rows) separately.
+ */
+export const rowInteractiveClassName = cx('hover:bg-panel-2 active:bg-panel', interactiveClassName);
+
+export const disabledClassName =
+  'disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40';
 
 /**
  * Heights, per DESIGN.md §3: `h-7` compact / `h-9` default for a pointer, one
@@ -62,7 +100,11 @@ export const fieldSizeClassName: Record<ControlSize, string> = {
 export const tappableRowClassName = 'min-h-11 md:min-h-7';
 
 /** An inline text action beside a status message — an Undo, a "jump to it". */
-export const inlineLinkClassName = 'text-accent font-medium underline';
+export const inlineLinkClassName = cx(
+  'text-accent font-medium underline decoration-1 underline-offset-2 rounded-xs hover:decoration-2 active:text-accent/75',
+  interactiveClassName,
+  focusRingClassName
+);
 
 /**
  * A bordered toggle chip's on/off state, per DESIGN.md §4: `FilterChip`'s
@@ -80,7 +122,11 @@ export function toggleChipStateClassName(
   selected: boolean,
   { hoverable = true }: { hoverable?: boolean } = {}
 ): string {
-  if (selected) return 'border-accent-dim bg-accent/15 text-accent';
+  if (selected) {
+    return hoverable
+      ? 'border-accent-dim bg-accent/15 text-accent hover:bg-accent/22 active:bg-accent/28'
+      : 'border-accent-dim bg-accent/15 text-accent';
+  }
   const off = 'border-line bg-panel-2 text-text-dim';
-  return hoverable ? `${off} hover:border-line-bright hover:text-text` : off;
+  return hoverable ? `${off} hover:border-line-bright hover:text-text active:bg-panel` : off;
 }

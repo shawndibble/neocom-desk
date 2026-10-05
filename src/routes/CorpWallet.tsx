@@ -236,7 +236,7 @@ function CorpDivisionsPanel({
                     onSelect(entry.division);
                     setExpanded(false);
                   }}
-                  className={`min-h-11 rounded-xs border px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
+                  className={`min-h-11 rounded-xs border px-3 py-2 text-left transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
                     isSelected ? 'border-accent bg-accent/15' : 'border-line hover:border-text-dim'
                   }`}
                 >

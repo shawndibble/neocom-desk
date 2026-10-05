@@ -4,8 +4,9 @@
  * stations they happened at, and every type's group for the bubble and
  * smartbomb tags.
  *
- * zKillboard answers one system per request, so these are fetched per system
- * at low concurrency by the caller and cached here for five minutes each.
+ * zKillboard answers one system or one region per request, so these are fetched
+ * per region (per system when a system's region is unknown) at low concurrency
+ * by the caller and cached here for five minutes each.
  * A failure (429 included) is not cached: the next look simply asks again.
  *
  * Locations: `/universe/names` cannot name a stargate or a celestial — ESI
@@ -18,7 +19,12 @@
 import { getUniverseStargate } from '@/esi/endpoints';
 import { isNpcStationId, isStargateId } from '@/esi/locationIds';
 import type { ResolvedLocation } from '@/engine/route/recentKills';
-import { fetchSystemRecentKills, type SystemRecentKillsResult } from '@/lib/zkillboard';
+import {
+  fetchRegionRecentKills,
+  fetchSystemRecentKills,
+  type RegionRecentKillsResult,
+  type SystemRecentKillsResult,
+} from '@/lib/zkillboard';
 import { loadTypes } from '@/sde/loadSde';
 import { lookupNpcStation } from '@/sde/npcStations';
 
@@ -26,6 +32,7 @@ export const RECENT_KILLS_TTL_MS = 5 * 60_000;
 
 /** Promises, so two callers asking at once share one request. */
 const killsCache = new Map<number, { at: number; result: Promise<SystemRecentKillsResult> }>();
+const regionCache = new Map<number, { at: number; result: Promise<RegionRecentKillsResult> }>();
 /** Stargates never change, so each one is read once per session. */
 const stargateCache = new Map<number, Promise<ResolvedLocation | null>>();
 
@@ -41,6 +48,24 @@ export async function loadSystemRecentKills(
   const result = await entry.result;
   // A failure is forgotten, so the next look asks again.
   if (!result.ok && killsCache.get(systemId) === entry) killsCache.delete(systemId);
+  return result;
+}
+
+/**
+ * A region's last hour of player kills by system: one request covers every
+ * route system in it. Never rejects; `{ ok: false }` when zKillboard failed
+ * or rate-limited, and that is not cached.
+ */
+export async function loadRegionRecentKills(
+  regionId: number,
+  now: number = Date.now()
+): Promise<RegionRecentKillsResult> {
+  const cached = regionCache.get(regionId);
+  if (cached && now - cached.at < RECENT_KILLS_TTL_MS) return cached.result;
+  const entry = { at: now, result: fetchRegionRecentKills(regionId) };
+  regionCache.set(regionId, entry);
+  const result = await entry.result;
+  if (!result.ok && regionCache.get(regionId) === entry) regionCache.delete(regionId);
   return result;
 }
 
@@ -99,5 +124,6 @@ export async function loadTypeGroups(): Promise<(typeId: number) => number | und
 /** For tests. */
 export function clearRouteKillCaches(): void {
   killsCache.clear();
+  regionCache.clear();
   stargateCache.clear();
 }

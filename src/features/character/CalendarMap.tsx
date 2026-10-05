@@ -119,7 +119,7 @@ export function CalendarMap({
               // explanation, which is what the caption under the grid replaces.
               onClick={() => onSelectDay(isSelected ? null : dayStartMs)}
               className={cx(
-                'flex min-h-20 flex-col border-b border-line p-1.5 text-left transition-colors',
+                'flex min-h-20 flex-col border-b border-line p-1.5 text-left transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none',
                 isSelected ? 'bg-accent/15 ring-1 ring-accent-dim ring-inset' : 'hover:bg-panel-2',
                 day.isToday && !isSelected ? 'ring-1 ring-accent ring-inset' : '',
                 !day.inCurrentMonth ? 'bg-panel/40' : '',
