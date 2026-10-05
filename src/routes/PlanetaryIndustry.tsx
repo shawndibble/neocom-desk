@@ -25,7 +25,9 @@ import { GrantBanner } from '@/app/GrantNote';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
-import { PlanPanel } from '@/features/pi/PlanPanel';
+import { GoalPlannerPanel } from '@/features/pi/GoalPlannerPanel';
+import { goalsParam, idListParam, seedGoal } from '@/features/pi/goalsParam';
+import type { Goal } from '@/engine/pi/goalTypes';
 import { AdvisorPanel } from '@/features/pi/AdvisorPanel';
 import { builtAdvice } from '@/features/pi/advisorModel';
 import { colonyHoursToFull } from '@/features/pi/colonyThroughput';
@@ -78,15 +80,8 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { formatDuration } from '@/lib/duration';
 import { usePageTab } from '@/lib/usePageTab';
 import { useUrlParams } from '@/lib/useUrlState';
-import {
-  boolParam,
-  enumParam,
-  textParam,
-  TEXT_DEBOUNCE_MS,
-  type UrlParamCodec,
-} from '@/lib/urlState';
+import { boolParam, type UrlParamCodec } from '@/lib/urlState';
 import { PI_TABS } from '@/app/pageTabs';
-import { COLONY_SPACES, type ColonySpace } from '@/features/pi/customsRate';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 
@@ -910,7 +905,7 @@ function parsePositiveInt(value: string | null): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-/** `type` (the planned commodity) and `system` (the Advisor's system) — present only once chosen. */
+/** `type` (a goal to seed) and `system` (the Advisor's system) — present only once chosen. */
 function positiveIntParam(): UrlParamCodec<number | null> {
   return {
     parse: (raw) => parsePositiveInt(raw),
@@ -918,31 +913,12 @@ function positiveIntParam(): UrlParamCodec<number | null> {
   };
 }
 
-/**
- * `rate`'s override text: `null` means "follow the band default", same as
- * `PlanPanel`'s own state did. Anything that isn't a finite number — blank,
- * garbage, a hand-edited link — degrades to that default too, the same rule
- * every other codec here follows.
- */
-function nullableNumberTextParam(): UrlParamCodec<string | null> {
-  return {
-    parse: (raw) =>
-      raw !== null && raw.trim() !== '' && Number.isFinite(Number(raw)) ? raw : null,
-    serialize: (value) => value,
-    debounceMs: TEXT_DEBOUNCE_MS,
-  };
-}
-
 const PI_URL_PARAMS = {
+  // The Industry "PI Plan" context menu's deep link: seeds a goal, then clears.
   type: positiveIntParam(),
+  goals: goalsParam(),
+  off: idListParam(),
   system: positiveIntParam(),
-  perDay: textParam({ defaultValue: '10' }),
-  space: enumParam<ColonySpace>(COLONY_SPACES, 'highsec'),
-  rate: nullableNumberTextParam(),
-  // Not named in the ticket's "perDay/space/rate" list, but the same cited
-  // state (`PlanPanel.tsx:113-117`) and the same "result-defining view state"
-  // rule — it feeds `costPlan` exactly like the other three.
-  extractionRate: textParam({ defaultValue: '' }),
   includeRebuilds: boolParam(),
 };
 
@@ -959,10 +935,10 @@ const PI_URL_PARAMS = {
  *
  * The tab is a path segment (`/planetary-industry/plan`,
  * `/planetary-industry/advisor`); every input each peer tab needs to redraw
- * its answer stays a scoped query param on top of it — Plan's commodity,
- * output rate, space, customs-rate override and extraction-rate override
- * (`?type=`, `?perDay=`, `?space=`, `?rate=`, `?extractionRate=`), Advisor's
- * system and rebuilds toggle (`?system=`, `?includeRebuilds=`) — so a plan or
+ * its answer stays a scoped query param on top of it — Plan's goals and
+ * switched-off colonies (`?goals=`, `?off=`; `?type=` seeds a goal and is
+ * cleared), Advisor's system and rebuilds toggle (`?system=`,
+ * `?includeRebuilds=`) — so a plan or
  * a worklist survives a reload and can be deep-linked into later. All fall
  * back silently: an unknown segment lands on `colonies` (`TabRoute`), and an
  * unknown value is handled by each param's own default rather than rendering
@@ -984,15 +960,7 @@ export function PlanetaryIndustry() {
   // gate on different windows.
   const { haulHours } = cadenceHours(useCadence((state) => state.value));
   const [
-    {
-      type: plannedTypeId,
-      system: advisorSystemId,
-      perDay: perDayText,
-      space,
-      rate: ratePercentText,
-      extractionRate: extractionRateText,
-      includeRebuilds,
-    },
+    { type: seedTypeId, goals, off: disabledColonies, system: advisorSystemId, includeRebuilds },
     setPiParams,
   ] = useUrlParams(PI_URL_PARAMS);
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -1026,8 +994,14 @@ export function PlanetaryIndustry() {
     void hydrateShowAltColonies();
   }, [hydrateShowAltColonies]);
 
-  const setPlannedTypeId = useCallback(
-    (next: number) => setPiParams({ type: next }),
+  // `?type=` from the Industry "PI Plan" link becomes a goal, once.
+  useEffect(() => {
+    if (seedTypeId === null) return;
+    setPiParams({ goals: seedGoal(goals, seedTypeId), type: null });
+  }, [seedTypeId, goals, setPiParams]);
+  const setGoals = useCallback((next: Goal[]) => setPiParams({ goals: next }), [setPiParams]);
+  const setDisabledColonies = useCallback(
+    (next: number[]) => setPiParams({ off: next }),
     [setPiParams]
   );
 
@@ -1036,16 +1010,6 @@ export function PlanetaryIndustry() {
     [setPiParams]
   );
 
-  const setPerDayText = useCallback((next: string) => setPiParams({ perDay: next }), [setPiParams]);
-  const setSpace = useCallback((next: ColonySpace) => setPiParams({ space: next }), [setPiParams]);
-  const setRatePercentText = useCallback(
-    (next: string | null) => setPiParams({ rate: next }),
-    [setPiParams]
-  );
-  const setExtractionRateText = useCallback(
-    (next: string) => setPiParams({ extractionRate: next }),
-    [setPiParams]
-  );
   const setIncludeRebuilds = useCallback(
     (next: boolean) => setPiParams({ includeRebuilds: next }),
     [setPiParams]
@@ -1279,18 +1243,12 @@ export function PlanetaryIndustry() {
           onIncludeRebuildsChange={setIncludeRebuilds}
         />
       ) : tab === 'plan' ? (
-        <PlanPanel
+        <GoalPlannerPanel
           characterId={activeCharacterId}
-          typeId={plannedTypeId}
-          onTypeIdChange={setPlannedTypeId}
-          perDayText={perDayText}
-          onPerDayTextChange={setPerDayText}
-          space={space}
-          onSpaceChange={setSpace}
-          ratePercentText={ratePercentText}
-          onRatePercentTextChange={setRatePercentText}
-          extractionRateText={extractionRateText}
-          onExtractionRateTextChange={setExtractionRateText}
+          goals={goals}
+          onGoalsChange={setGoals}
+          disabled={disabledColonies}
+          onDisabledChange={setDisabledColonies}
         />
       ) : loading && !data ? (
         <div className="flex justify-center py-16">

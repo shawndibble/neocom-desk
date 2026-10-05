@@ -14,15 +14,15 @@ import {
   DEFAULT_PI_COLONIES_SHOW_ALTS,
   PI_COLONIES_SHOW_ALTS_KEY,
 } from '@/features/pi/showAltColoniesPref';
-import { usePlanControls, DEFAULT_PI_PLAN_CONTROLS } from '@/features/pi/planControlsPref';
 import { App } from '@/app/App';
-import { expandChain } from '@/engine/pi/chain';
+import { piTier } from '@/engine/pi/chain';
+import * as routeChunks from '@/app/routeChunks';
 import type { PiData } from '@/sde/types';
 
-/** The ticket's worked example, and the Plan tab's own default product. */
-const BROADCAST_NODE = 2867;
-const BROADCAST_NODE_NAME = 'Broadcast Node';
-/** A P2 inside that chain, and deliberately *not* the default — see the deep-link test. */
+/** A P1 a temperate colony makes from its own Aqueous Liquids. */
+const WATER = 3645;
+const WATER_NAME = 'Water';
+/** A P2 — the Industry "PI Plan" link's far end seeds it as a goal. */
 const TRANSMITTER = 9840;
 const TRANSMITTER_NAME = 'Transmitter';
 
@@ -36,7 +36,7 @@ vi.mock('virtual:pwa-register/react', () => ({
 
 // The Plan tab needs the real recipe graph — its numbers are claims about the
 // shipped `pi.json`, so a stub would pin nothing. Everything else this route
-// never reads.
+// never reads. Planet radius: so the colony's one link can be costed.
 const piData = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
 ) as PiData;
@@ -46,6 +46,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => ({})),
   loadBlueprints: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => piData),
+  loadPiPlanetRadius: vi.fn(async () => ({ [String(40000001)]: 5_000 })),
   loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
@@ -53,17 +54,31 @@ vi.mock('@/sde/loadSde', () => ({
 // to Fuzzwork, which this suite's MSW server (`onUnhandledRequest: 'error'`)
 // rightly refuses. The real path is covered by `planPrices.test.ts`.
 vi.mock('@/features/pi/planPrices', () => ({
-  loadPlanPrices: vi.fn(async () => ({
-    prices: Object.fromEntries(
-      expandChain(BROADCAST_NODE, piData, { unitsPerHour: 1 }).nodes.map((node) => [
-        node.typeId,
-        [5, 760, 14_000, 100_000, 1_900_000][node.tier],
-      ])
-    ),
-    unpriced: [],
-    failed: false,
-    fetchedAt: new Date(),
-  })),
+  // Every requested type at a flat price per tier, both sides of the book:
+  // the Baseline needs a bid for every P1 a colony could make.
+  loadPlanPrices: vi.fn(async (_hub: unknown, typeIds: number[]) => {
+    const prices: Record<number, number> = {};
+    const buyPrices: Record<number, number> = {};
+    for (const typeId of typeIds) {
+      const price = [5, 760, 14_000, 100_000, 1_900_000][piTier(typeId, piData)];
+      prices[typeId] = price;
+      buyPrices[typeId] = price * 0.95;
+    }
+    return { prices, buyPrices, unpriced: [], failed: false, fetchedAt: new Date() };
+  }),
+}));
+
+// Jumps to the hub: the real count walks a stargate snapshot this suite does
+// not serve. The planner's own wiring is what is under test here.
+vi.mock('@/features/route/jumpBasis', () => ({
+  useJumpBasis: () => ({
+    rules: {},
+    network: {},
+    key: 'test',
+    hydrated: true,
+    podKillsUnavailable: false,
+  }),
+  jumpsBetween: vi.fn(async () => ({ kind: 'known', jumps: 7 })),
 }));
 
 const CHAR_ID = 91;
@@ -212,13 +227,41 @@ const server = setupServer(
   http.post(`${ESI}/universe/names`, async ({ request }) => {
     const ids = (await request.json()) as number[];
     return HttpResponse.json(ids.filter((id) => NAMES[id]).map((id) => ({ id, ...NAMES[id] })));
-  })
+  }),
+  http.get(`${ESI}/universe/systems/${SYSTEM_ID}`, () =>
+    HttpResponse.json({
+      system_id: SYSTEM_ID,
+      name: 'Jita',
+      security_status: 0.95,
+      constellation_id: 20000020,
+      star_id: 40009076,
+    })
+  )
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
-beforeEach(async () => {
+/**
+ * A colony the planner can fit against: one measured ECU on Aqueous Liquids
+ * linked to its Launchpad, so its link cost is measured rather than refused.
+ */
+const plannableDetailPayload = {
+  links: [{ source_pin_id: 3, destination_pin_id: 2, link_level: 0 }],
+  routes: [],
+  pins: [
+    {
+      ...agedDetailPayload.pins[0],
+      latitude: 0.2,
+      longitude: 0.4,
+      extractor_details: {
+        ...agedDetailPayload.pins[0].extractor_details,
+        heads: Array.from({ length: 6 }, (_, i) => ({ head_id: i, latitude: 0, longitude: 0 })),
+        product_type_id: 2268,
+      },
+    },
+    { pin_id: 3, type_id: 2256, latitude: 0.5, longitude: 0.9 },
+  ],
+};
+
+async function resetSession(): Promise<void> {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -228,7 +271,6 @@ beforeEach(async () => {
   // Module-scope stores: without a reset, a choice one test makes is the state
   // the next one opens on.
   useShowAltColonies.setState({ value: DEFAULT_PI_COLONIES_SHOW_ALTS, hydrated: false });
-  usePlanControls.setState({ value: DEFAULT_PI_PLAN_CONTROLS, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -240,7 +282,24 @@ beforeEach(async () => {
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   window.history.pushState({}, '', '/planetary-industry');
-});
+}
+
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render of the page, so no test pays for a worker's first
+  // cold `App` render (lazy route chunks, jsdom, React warm-up) — the pattern
+  // `IndustryPlanPage.test.tsx` uses, under this hook's own budget.
+  await routeChunks.loadPlanetaryIndustry();
+  await resetSession();
+  window.history.pushState({}, '', '/planetary-industry/plan');
+  const { unmount } = render(<App />);
+  await screen.findByRole('heading', { name: 'Goals' }, { timeout: 25_000 });
+  unmount();
+  server.resetHandlers();
+}, 30_000);
+afterAll(() => server.close());
+afterEach(() => server.resetHandlers());
+beforeEach(resetSession);
 
 const PLANETS_SCOPE = 'esi-planets.manage_planets.v1';
 
@@ -630,31 +689,59 @@ describe('PlanetaryIndustry', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Plan' }));
 
-    await screen.findByRole('heading', { name: 'Verdict' });
+    await screen.findByRole('heading', { name: 'Goals' });
     expect(window.location.pathname).toBe('/planetary-industry/plan');
     // The colony surface is a peer view, not a section below the planner.
     expect(screen.queryByRole('heading', { name: /Jita IV/ })).not.toBeInTheDocument();
   });
 
-  it('restores the tab and the planned commodity from the URL alone', async () => {
-    window.history.pushState({}, '', `/planetary-industry/plan?type=${BROADCAST_NODE}`);
-    render(<App />);
-
-    await screen.findByRole('heading', { name: 'Verdict' });
-    expect(screen.getByRole('tab', { name: 'Plan' })).toHaveAttribute('aria-selected', 'true');
-    expect(await screen.findByLabelText('Product')).toHaveTextContent(BROADCAST_NODE_NAME);
-  });
-
-  it('plans the commodity the URL names, not the tier-4 default', async () => {
-    // Broadcast Node, in the test above, is also `PlanPanel`'s own fallback
-    // for an unrecognised `type`, so only a commodity that isn't the default
-    // proves the param is read at all. This is the far end of the item
-    // context menu's "PI Plan" link — the two must agree on `/plan?type=`.
+  it('seeds a goal from the Industry "PI Plan" link and clears ?type=', async () => {
     window.history.pushState({}, '', `/planetary-industry/plan?type=${TRANSMITTER}`);
     render(<App />);
 
-    await screen.findByRole('heading', { name: 'Verdict' });
-    expect(await screen.findByLabelText('Product')).toHaveTextContent(TRANSMITTER_NAME);
+    expect(await screen.findByLabelText(`${TRANSMITTER_NAME} per day`)).toHaveValue(10);
+    expect(screen.getByRole('tab', { name: 'Plan' })).toHaveAttribute('aria-selected', 'true');
+    await waitFor(() => expect(window.location.search).toBe(`?goals=${TRANSMITTER}%3A10`));
+  });
+
+  it("plans the URL's goals over the colony: Lift first, then the change list", async () => {
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
+        HttpResponse.json(plannableDetailPayload)
+      )
+    );
+    window.history.pushState({}, '', `/planetary-industry/plan?goals=${WATER}:24`);
+    render(<App />);
+
+    const headline = await screen.findByTestId('goal-plan-headline');
+    expect(within(headline).getByText('Lift / day')).toBeInTheDocument();
+    expect(
+      within(headline).getByText('vs your colonies each selling their best P1')
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(`${WATER_NAME} per day`)).toHaveValue(24);
+    const changes = screen.getByRole('heading', { name: 'Changes' });
+    // DOM order, not a visual reorder: this is the phone's reading order.
+    expect(
+      screen.getByRole('heading', { name: 'Plan' }).compareDocumentPosition(changes) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    // The colony's customs is its system's highsec rate after level 4.
+    expect(screen.getByLabelText('Customs rate in Jita (%)')).toHaveValue(6);
+    expect(
+      screen.getByRole('table', { name: 'Everything the goals need, by tier' })
+    ).toBeInTheDocument();
+  });
+
+  it('lists a colony it cannot cost, left out with the reason', async () => {
+    // The base fixture's colony has no link to measure and no other colony to
+    // borrow one from.
+    window.history.pushState({}, '', `/planetary-industry/plan?goals=${WATER}:24`);
+    render(<App />);
+
+    expect(
+      await screen.findByText(/Left out: no link on any of your colonies/)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Plan with Jita IV' })).toBeDisabled();
   });
 
   it('falls back to the colony view rather than crashing on a tab it does not know', async () => {
@@ -662,16 +749,6 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     await colonyPanelFor(/Jita IV/);
     expect(screen.getByRole('tab', { name: 'Colonies' })).toHaveAttribute('aria-selected', 'true');
-  });
-
-  it('puts the verdict before the chain table, so the answer is not below the tree', async () => {
-    window.history.pushState({}, '', '/planetary-industry/plan');
-    render(<App />);
-
-    const verdict = await screen.findByRole('heading', { name: 'Verdict' });
-    const chain = await screen.findByRole('heading', { name: 'Chain' });
-    // DOM order, not a visual reorder: this is the mobile stacking order.
-    expect(verdict.compareDocumentPosition(chain) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('reads an alt with nothing cached as "not loaded yet", never as having no colonies', async () => {

@@ -18,6 +18,8 @@ export interface RegionSelectProps {
   onChange: (regionId: number | null) => void;
   /** When given, an "All regions" row pinned at the top, standing for `null`. */
   allLabel?: string;
+  /** Dim text on the trigger while nothing is chosen and there is no `allLabel` row. */
+  placeholder?: string;
   searchPlaceholder: string;
   noResultsLabel: string;
   'aria-label': string;
@@ -46,6 +48,7 @@ export function RegionSelect({
   value,
   onChange,
   allLabel,
+  placeholder,
   searchPlaceholder,
   noResultsLabel,
   'aria-label': ariaLabel,
@@ -76,6 +79,7 @@ export function RegionSelect({
 
   const selectedName =
     value === null ? allLabel : (sorted.find((o) => o.id === value)?.name ?? allLabel);
+  const triggerText = selectedName ?? placeholder;
 
   useEffect(() => {
     if (highlight === null) return;
@@ -123,7 +127,7 @@ export function RegionSelect({
           )}
         >
           <span className={cx('min-w-0 truncate', selectedName === undefined && 'text-text-dim')}>
-            {selectedName}
+            {triggerText}
           </span>
           <Icon.Expanded
             aria-hidden="true"
