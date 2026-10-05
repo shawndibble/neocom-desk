@@ -243,11 +243,13 @@ describe('ItemDetailModal', () => {
     mockedLoadSkills.mockResolvedValue([]);
 
     render(
-      <ItemDetailModal
-        typeId={TYPE_ID}
-        itemName="Ubiquitous Moon Mining Crystal Type A I"
-        onClose={() => {}}
-      />
+      <MemoryRouter>
+        <ItemDetailModal
+          typeId={TYPE_ID}
+          itemName="Ubiquitous Moon Mining Crystal Type A I"
+          onClose={() => {}}
+        />
+      </MemoryRouter>
     );
 
     expect(await screen.findByText('Crystals Take Damage')).toBeInTheDocument();
@@ -293,7 +295,13 @@ describe('ItemDetailModal', () => {
     ]);
 
     render(
-      <ItemDetailModal typeId={TYPE_ID} itemName="Brand Manager Expert System" onClose={() => {}} />
+      <MemoryRouter>
+        <ItemDetailModal
+          typeId={TYPE_ID}
+          itemName="Brand Manager Expert System"
+          onClose={() => {}}
+        />
+      </MemoryRouter>
     );
 
     expect(
@@ -352,7 +360,13 @@ describe('ItemDetailModal', () => {
     const user = userEvent.setup();
 
     render(
-      <ItemDetailModal typeId={TYPE_ID} itemName="Brand Manager Expert System" onClose={() => {}} />
+      <MemoryRouter>
+        <ItemDetailModal
+          typeId={TYPE_ID}
+          itemName="Brand Manager Expert System"
+          onClose={() => {}}
+        />
+      </MemoryRouter>
     );
 
     expect(await screen.findByText('Caldari Frigate')).toBeInTheDocument();
@@ -418,7 +432,13 @@ describe('ItemDetailModal', () => {
     ]);
 
     render(
-      <ItemDetailModal typeId={TYPE_ID} itemName="Brand Manager Expert System" onClose={() => {}} />
+      <MemoryRouter>
+        <ItemDetailModal
+          typeId={TYPE_ID}
+          itemName="Brand Manager Expert System"
+          onClose={() => {}}
+        />
+      </MemoryRouter>
     );
 
     expect(await screen.findByText('Caldari Frigate')).toBeInTheDocument();
@@ -495,7 +515,11 @@ describe('ItemDetailModal', () => {
     });
     const user = userEvent.setup();
 
-    render(<ItemDetailModal typeId={TYPE_ID} itemName="1400mm Autocannon II" onClose={() => {}} />);
+    render(
+      <MemoryRouter>
+        <ItemDetailModal typeId={TYPE_ID} itemName="1400mm Autocannon II" onClose={() => {}} />
+      </MemoryRouter>
+    );
 
     const chip = await screen.findByRole('button', { name: '12,000 m' });
     await user.click(chip);

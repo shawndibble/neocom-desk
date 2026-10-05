@@ -1,8 +1,23 @@
+import type { ReactElement, ReactNode } from 'react';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { EntityInfoRoute } from '@/features/entities';
 import '@/i18n';
 import { SkillRequirementsList } from './SkillRequirementsList';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
+
+/** Skill names are links that open the modal through the URL, so every render sits in a router with its `EntityInfoRoute`. */
+function RoutedWithInfo({ children }: { children: ReactNode }) {
+  return (
+    <MemoryRouter>
+      <EntityInfoRoute />
+      {children}
+    </MemoryRouter>
+  );
+}
+
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: RoutedWithInfo });
 
 beforeEach(() => {
   useSkillDetailModalStore.setState({ request: null });

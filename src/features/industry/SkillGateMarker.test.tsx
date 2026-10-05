@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { EngineSkill, PlanEntry } from '@/engine/types';
@@ -53,11 +54,13 @@ const nameForCharacter = (id: number) => (id === 7 ? 'Vex Kado' : `#${id}`);
 
 function renderMarker(verdict: Extract<SkillGateVerdict, { gated: true }>) {
   return render(
-    <SkillGateMarker
-      verdict={verdict}
-      nameForSkill={nameForSkill}
-      nameForCharacter={nameForCharacter}
-    />
+    <MemoryRouter>
+      <SkillGateMarker
+        verdict={verdict}
+        nameForSkill={nameForSkill}
+        nameForCharacter={nameForCharacter}
+      />
+    </MemoryRouter>
   );
 }
 
@@ -95,7 +98,7 @@ describe('SkillGateMarker', () => {
       await screen.findByText('No character on this account can install this job')
     ).toBeInTheDocument();
     // The skill name is a link into the Skill modal.
-    expect(screen.getByRole('button', { name: 'Electronic Engineering' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Electronic Engineering' })).toBeInTheDocument();
     expect(screen.getByText('— → III')).toBeInTheDocument();
     expect(screen.getByText(/Closest: Vex Kado · .* to train/)).toBeInTheDocument();
   });

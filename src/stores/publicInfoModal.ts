@@ -6,6 +6,7 @@
  * `App.tsx` — renders it. See CONTEXT.md rounds 49-50.
  */
 import { create } from 'zustand';
+import { getEntityInfoNavigator } from './entityInfoNavigator';
 
 export type PublicInfoKind = 'character' | 'corporation' | 'alliance';
 
@@ -16,14 +17,29 @@ export interface PublicInfoRequest {
 
 interface PublicInfoModalState {
   request: PublicInfoRequest | null;
+  /** Moves the URL to `?info=<kind>-<id>` (`EntityInfoRoute` then shows it). */
   open: (kind: PublicInfoKind, id: number) => void;
+  /** Takes `info` off the URL. */
   close: () => void;
+  /** Raw setters for `EntityInfoRoute` and the modal's own cleanup: state only, no navigation. */
+  show: (request: PublicInfoRequest) => void;
+  clear: () => void;
 }
 
 export const usePublicInfoModalStore = create<PublicInfoModalState>((set) => ({
   request: null,
-  open: (kind, id) => set({ request: { kind, id } }),
-  close: () => set({ request: null }),
+  open: (kind, id) => {
+    const navigator = getEntityInfoNavigator();
+    if (navigator) navigator.open({ kind, id });
+    else set({ request: { kind, id } });
+  },
+  close: () => {
+    const navigator = getEntityInfoNavigator();
+    if (navigator) navigator.close();
+    else set({ request: null });
+  },
+  show: (request) => set({ request }),
+  clear: () => set({ request: null }),
 }));
 
 /** Hook for call sites inside a component: `const { open } = usePublicInfoModal();` */

@@ -1,5 +1,7 @@
+import type { ReactElement } from 'react';
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { EntryList } from './EntryList';
@@ -9,6 +11,9 @@ import { DEFAULT_COLUMN_VISIBILITY, type ColumnVisibility } from './columnPrefer
 import type { MergedRow } from './queueRows';
 import type { PlanEntry } from '@/engine/types';
 import { formatLocalDate } from '@/lib/localDate';
+
+/** Skill names are links, so every render sits in a router. */
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 
 const entry = (skillTypeID: number, targetLevel = 1): PlanEntry => ({ skillTypeID, targetLevel });
 
@@ -48,7 +53,7 @@ const defaultProps = {
   columns: DEFAULT_COLUMN_VISIBILITY,
   onReorder: noop,
   onRemove: noop,
-  onOpenSkillDetail: noop,
+  onStageSkillDetail: noop,
   removalBlockedReason: () => undefined,
   onRemoveMarker: noop,
   onEditMarker: noop,

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import { EntityInfoRoute } from '@/features/entities';
 import '@/i18n';
 import { db } from '@/db';
 import { normalizePlan } from '@/engine/plan';
@@ -153,6 +154,7 @@ afterEach(async () => {
 function renderPanel() {
   render(
     <MemoryRouter>
+      <EntityInfoRoute />
       <FittingWhatToTrainPanel
         evaluator={evaluator}
         characterId={CHARACTER_ID}
@@ -164,7 +166,11 @@ function renderPanel() {
 }
 
 function rowFor(name: string) {
-  const cell = screen.getByRole('button', { name });
+  // A plan can share a skill's name, so only the skill link (`?info=skill-…`) counts.
+  const cell = screen
+    .getAllByRole('link', { name })
+    .find((link) => link.getAttribute('href')?.includes('info=skill-'));
+  if (!cell) throw new Error(`no skill link for ${name}`);
   const row = cell.closest('li');
   if (!row) throw new Error(`no row for ${name}`);
   return row as HTMLElement;
@@ -323,7 +329,8 @@ describe('FittingWhatToTrainPanel — level picker', () => {
       expect(found).toHaveTextContent('II–III in plan Gunnery');
       return found;
     });
-    expect(within(row).getByRole('link', { name: 'Gunnery' })).toBeInTheDocument();
+    // The skill's own link and the plan's.
+    expect(within(row).getAllByRole('link', { name: 'Gunnery' })).toHaveLength(2);
   });
 });
 
@@ -373,7 +380,7 @@ describe('FittingWhatToTrainPanel — skill detail', () => {
     const user = userEvent.setup();
     renderPanel();
 
-    await user.click(await screen.findByRole('button', { name: 'Surgical Strike' }));
+    await user.click(await screen.findByRole('link', { name: 'Surgical Strike' }));
 
     expect(useSkillDetailModalStore.getState().request).toEqual({ typeID: 3315 });
   });
@@ -389,7 +396,7 @@ describe('FittingWhatToTrainPanel — skill detail', () => {
     renderPanel();
     await screen.findByRole('link', { name: 'Gunnery plan' });
 
-    await user.click(await screen.findByRole('button', { name: 'Surgical Strike' }));
+    await user.click(await screen.findByRole('link', { name: 'Surgical Strike' }));
 
     expect(useSkillDetailModalStore.getState().request).toEqual({
       typeID: 3315,

@@ -268,7 +268,7 @@ describe('Mail', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByText('Fleet up!'));
-    const senderButton = await screen.findByRole('button', { name: 'Fleet Commander' });
+    const senderButton = await screen.findByRole('link', { name: 'Fleet Commander' });
     await user.click(senderButton);
 
     const dialog = await screen.findByRole('dialog');
@@ -915,7 +915,7 @@ describe('Mail', () => {
     expect(await screen.findByText(/Fleet Announcements/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Fleet Announcements/ })).not.toBeInTheDocument();
 
-    const recipientButton = await screen.findByRole('button', { name: 'Corp Recruiter' });
+    const recipientButton = await screen.findByRole('link', { name: 'Corp Recruiter' });
     await user.click(recipientButton);
 
     const dialog = await screen.findByRole('dialog');

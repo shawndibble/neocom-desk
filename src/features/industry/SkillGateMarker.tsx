@@ -25,7 +25,7 @@ import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { isEntryCovered } from '@/features/skills/planner/reorder';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
-import { SkillNameButton } from '@/features/skills/SkillNameButton';
+import { SkillLink } from '@/features/entities';
 import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
 
 type GatedVerdict = Extract<SkillGateVerdict, { gated: true }>;
@@ -150,9 +150,7 @@ function SkillGatePopoverBody({
             .reduce((sum, step) => sum + step.seconds, 0);
           return (
             <li key={s.typeID} className="flex flex-wrap items-baseline gap-x-2">
-              <SkillNameButton skillTypeID={s.typeID} className="text-accent">
-                {nameForSkill(s.typeID)}
-              </SkillNameButton>
+              <SkillLink typeId={s.typeID}>{nameForSkill(s.typeID)}</SkillLink>
               <span className="text-text-dim tabular-nums">
                 {s.haveLevel === 0 ? '—' : romanLevel(s.haveLevel)} → {romanLevel(s.needLevel)}
               </span>

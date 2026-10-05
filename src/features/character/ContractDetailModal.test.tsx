@@ -294,18 +294,17 @@ describe('ContractDetailModal', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
-  it('issuer name opens the shared Public Info Modal (issue #417)', () => {
+  it('issuer name links to the shared Public Info Modal (issue #417)', () => {
     renderModal({
       characterId: CHAR_ID,
       contract: ITEM_EXCHANGE,
       issuerName: 'Mero Otichoda',
       onClose: () => {},
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Mero Otichoda' }));
-    expect(usePublicInfoModalStore.getState().request).toEqual({
-      kind: 'character',
-      id: ITEM_EXCHANGE.issuer_id,
-    });
+    expect(screen.getByRole('link', { name: 'Mero Otichoda' })).toHaveAttribute(
+      'href',
+      expect.stringContaining(`info=character-${ITEM_EXCHANGE.issuer_id}`)
+    );
   });
 
   describe('Market value (issue #717)', () => {

@@ -19,7 +19,7 @@ import type { PlanEntry } from '@/engine/types';
 import { RequiredSkillsSection } from '@/features/market/RequiredSkillsSection';
 import { isEntryCovered, plannedLevelFor } from '@/features/skills/planner/reorder';
 import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
-import { SkillNameButton } from '@/features/skills/SkillNameButton';
+import { SkillLink } from '@/features/entities';
 import { SkillRow } from '@/features/skills/SkillRow';
 import { skillTrainingStatus } from '@/features/skills/skillStatus';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
@@ -248,9 +248,9 @@ export function SkillsMasteryTab({
                         />
                       ) : (
                         <div className="flex items-center gap-3">
-                          <SkillNameButton skillTypeID={p.skillTypeID} className="flex-1 text-text">
+                          <SkillLink typeId={p.skillTypeID} className="flex-1">
                             {skillName(p.skillTypeID)}
-                          </SkillNameButton>
+                          </SkillLink>
                           <span className="text-text-dim">
                             {t('plans.level', { level: p.level })}
                           </span>

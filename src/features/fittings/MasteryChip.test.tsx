@@ -1,5 +1,7 @@
+import type { ReactElement } from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { EngineSkill, PlanEntry } from '@/engine/types';
@@ -7,6 +9,9 @@ import type { TargetPlan } from '@/features/skills/useTargetPlan';
 import { loadMasteries } from '@/sde/loadSde';
 import type { MasteryMap } from '@/sde/types';
 import { MasteryChip } from './MasteryChip';
+
+/** Skill names are links, so every render sits in a router. */
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 
 const GUNNERY: EngineSkill = {
   typeID: 3300,
