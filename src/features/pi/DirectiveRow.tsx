@@ -70,13 +70,13 @@ const TONE_CLASS: Record<DirectiveTone, string> = {
   muted: 'text-text-dim italic',
 };
 
-export function VerbTag({ verb }: { verb: DirectiveVerb }) {
+export function VerbTag({ verb, label }: { verb: DirectiveVerb; label?: string }) {
   const { t } = useTranslation();
   return (
     <span
       className={`inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border px-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${VERB_CLASS[verb]}`}
     >
-      {t(`piAdvisor.verb.${verb}`)}
+      {label ?? t(`piAdvisor.verb.${verb}`)}
     </span>
   );
 }

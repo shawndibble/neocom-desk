@@ -18,7 +18,7 @@ import type { PiData } from '../../src/sde/types';
 const HIGHSEC_SYSTEM = 30000142;
 const NULLSEC_SYSTEM = 30000001;
 
-interface Colony {
+export interface Colony {
   planetId: number;
   systemId: number;
   name: string;
@@ -27,6 +27,10 @@ interface Colony {
   /** P0 typeIds, one ECU each. */
   extracts: number[];
   heads: number;
+  /** Basic factories per extractor; default two, `0` sells the raw. */
+  basicsPerEcu?: number;
+  /** Hours until the extractors expire; negative is already stopped. */
+  expiresInHours?: number;
 }
 
 const COLONIES: Colony[] = [
@@ -80,7 +84,7 @@ function detailFor(colony: Colony, now: number) {
     latitude: 0.3 + i * 0.05,
     longitude: 1.1 + i * 0.07,
     install_time: new Date(now - 20 * HOUR).toISOString(),
-    expiry_time: new Date(now + 52 * HOUR).toISOString(),
+    expiry_time: new Date(now + (colony.expiresInHours ?? 52) * HOUR).toISOString(),
     extractor_details: {
       heads: Array.from({ length: colony.heads }, (_, h) => ({
         head_id: h,
@@ -96,7 +100,7 @@ function detailFor(colony: Colony, now: number) {
   // Each ECU's P0 refined on the spot, as a real colony runs it: two Basic
   // Industry Facilities per program (~12,000 P0/h against 6,000 each).
   const basics = colony.extracts.flatMap((product, i) =>
-    [0, 1].map((j) => ({
+    Array.from({ length: colony.basicsPerEcu ?? 2 }, (_, j) => j).map((j) => ({
       pin_id: 200 + i * 2 + j,
       type_id: 2469,
       latitude: 0.42 + i * 0.03,
@@ -116,8 +120,49 @@ function detailFor(colony: Colony, now: number) {
   return { pins, links, routes: [] };
 }
 
+/**
+ * Colonies with something to fix, for the Plan tab's "Make more" view: one
+ * selling raw P0 (a rebuild), one with a stopped extractor (a quick win), and
+ * one with factories nothing feeds.
+ */
+export const PLAN_WINS_COLONIES: Colony[] = [
+  {
+    planetId: 40009077,
+    systemId: HIGHSEC_SYSTEM,
+    name: 'Hek VI',
+    type: 'barren',
+    level: 4,
+    extracts: [2267, 2267],
+    heads: 8,
+    basicsPerEcu: 0,
+  },
+  {
+    planetId: 40009080,
+    systemId: HIGHSEC_SYSTEM,
+    name: 'Hek VIII',
+    type: 'temperate',
+    level: 4,
+    extracts: [2268],
+    heads: 9,
+    expiresInHours: -6,
+  },
+  {
+    planetId: 40009082,
+    systemId: HIGHSEC_SYSTEM,
+    name: 'Uttindar V',
+    type: 'gas',
+    level: 5,
+    extracts: [2309],
+    heads: 7,
+    basicsPerEcu: 5,
+  },
+];
+
 /** Routes the active Character's colony reads, and the public lookups they pull. */
-export async function mockPlannerColonies(page: Page): Promise<void> {
+export async function mockPlannerColonies(
+  page: Page,
+  colonies: readonly Colony[] = COLONIES
+): Promise<void> {
   const now = Date.now();
   const json = (body: unknown) => ({
     status: 200,
@@ -128,12 +173,12 @@ export async function mockPlannerColonies(page: Page): Promise<void> {
     const path = new URL(route.request().url()).pathname;
     const match = path.match(/\/planets\/(\d+)\/?$/);
     if (match) {
-      const colony = COLONIES.find((c) => c.planetId === Number(match[1]));
+      const colony = colonies.find((c) => c.planetId === Number(match[1]));
       return route.fulfill(colony ? json(detailFor(colony, now)) : { status: 404, body: '{}' });
     }
     return route.fulfill(
       json(
-        COLONIES.map((c) => ({
+        colonies.map((c) => ({
           solar_system_id: c.systemId,
           planet_id: c.planetId,
           planet_type: c.type,
@@ -162,7 +207,7 @@ export async function mockPlannerColonies(page: Page): Promise<void> {
   });
   await page.route('https://esi.evetech.net/universe/planets/**', (route) => {
     const id = Number(new URL(route.request().url()).pathname.match(/planets\/(\d+)/)?.[1]);
-    const colony = COLONIES.find((c) => c.planetId === id);
+    const colony = colonies.find((c) => c.planetId === id);
     return route.fulfill(
       json({
         planet_id: id,

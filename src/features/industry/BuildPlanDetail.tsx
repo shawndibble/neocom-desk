@@ -44,6 +44,7 @@ import type {
   RigKind,
 } from '@/engine/industry/types';
 import { rigKindLabelKey, rigFitSummaryLabel } from './rigFitLabels';
+import { RigMatchHelper } from './RigMatchHelper';
 import type { BuildPlanChange, SourcingPatchEntry } from './buildPlanStore';
 import type { BuildGroupSnapshot } from './buildGroups';
 import { GroupTargetLink } from './GroupTargetLink';
@@ -1441,7 +1442,7 @@ export function BuildPlanDetail({
                   {facilityPreset.structure && (
                     <div className="col-span-2 flex flex-col gap-1 text-xs sm:col-span-3">
                       <span>{t('industry.rigFitLabel')}</span>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {resolveRigFit(plan).map((kind, slot) => (
                           // A slot's position is its identity, not the kind
                           // fitted in it, so the index is a stable key.
@@ -1472,6 +1473,11 @@ export function BuildPlanDetail({
                             </Select>
                           </label>
                         ))}
+                        <RigMatchHelper
+                          facility={plan.facility}
+                          security={plan.security}
+                          onApply={(fit) => update({ rigFit: fit })}
+                        />
                       </div>
                     </div>
                   )}
@@ -1639,7 +1645,7 @@ export function BuildPlanDetail({
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                           <div className="col-span-2 flex flex-col gap-1 text-xs sm:col-span-3">
                             <span>{t('industry.rigFitLabel')}</span>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               {resolveRigFit({ rigFit: plan.reactionRigFit }).map((kind, slot) => (
                                 <label key={slot} className="flex flex-col gap-1">
                                   <span className="sr-only">
@@ -1672,6 +1678,11 @@ export function BuildPlanDetail({
                                   </Select>
                                 </label>
                               ))}
+                              <RigMatchHelper
+                                facility={plan.reactionFacility ?? 'athanor'}
+                                security={plan.reactionSecurity ?? 'highsec'}
+                                onApply={(fit) => update({ reactionRigFit: fit })}
+                              />
                             </div>
                           </div>
 
