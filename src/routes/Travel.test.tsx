@@ -60,9 +60,12 @@ const NIYABAINEN = 30000150;
 const MUVOLAILEN = 30000151;
 const SOBASEKI = 30000152;
 
+// Its own region, so one rate-limited region leaves the others filling in.
+const PERIMETER_REGION = 10000043;
+
 const SYSTEMS = [
   { id: JITA, name: 'Jita', security: 0.9459, regionId: 10000002 },
-  { id: PERIMETER, name: 'Perimeter', security: 0.95, regionId: 10000002 },
+  { id: PERIMETER, name: 'Perimeter', security: 0.95, regionId: PERIMETER_REGION },
   { id: UEDAMA, name: 'Uedama', security: 0.505, regionId: 10000033 },
   { id: THERA, name: 'Thera', security: -0.99, regionId: 11000031 },
   { id: NIYABAINEN, name: 'Niyabainen', security: 0.71, regionId: 10000002 },
@@ -134,12 +137,13 @@ const KILL_TIME = new Date(Date.now() - 12 * 60_000).toISOString();
 
 const server = setupServer(
   http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json(SIGNATURES)),
-  http.get('https://zkillboard.com/api/kills/systemID/:id/pastSeconds/3600/', ({ params }) => {
-    if (Number(params.id) === PERIMETER) return new HttpResponse(null, { status: 429 });
-    if (Number(params.id) !== UEDAMA) return HttpResponse.json([]);
+  http.get('https://zkillboard.com/api/kills/regionID/:id/pastSeconds/3600/', ({ params }) => {
+    if (Number(params.id) === PERIMETER_REGION) return new HttpResponse(null, { status: 429 });
+    if (Number(params.id) !== 10000033) return HttpResponse.json([]);
     const kill = (id: number, npc: boolean) => ({
       killmail_id: id,
       killmail_time: KILL_TIME,
+      solar_system_id: UEDAMA,
       attackers: [{ ship_type_id: 4310, weapon_type_id: 3995 }],
       victim: { ship_type_id: 670 },
       zkb: { locationID: UEDAMA_GATE_TO_PERIMETER, npc },

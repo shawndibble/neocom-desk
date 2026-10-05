@@ -2,16 +2,25 @@
  * Route Safety's zKillboard column (issue #2329): each route system's last
  * hour of player kills, filled in row by row without holding up the page.
  *
- * zKillboard answers one system per request, so the route is walked at low
- * concurrency, nearest the start first. A row that fails (a 429 included)
- * says so on its own and the walk carries on.
+ * zKillboard answers one system or one region per request, and no longer takes
+ * a list of ids. A route crosses far fewer regions than systems, so it is
+ * walked region by region at low concurrency, nearest the start first, and one
+ * answer fills every route system in that region. A system whose region is
+ * unknown asks on its own. A row that fails (a 429 included) says so and the
+ * walk carries on.
  */
 import { useEffect, useState } from 'react';
-import { summarizeRecentKills, type RecentKillsSummary } from '@/engine/route/recentKills';
+import {
+  summarizeRecentKills,
+  type RecentKill,
+  type RecentKillsSummary,
+} from '@/engine/route/recentKills';
 import type { SecurityBand } from '@/engine/securityStatus';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { loadSolarSystemsById } from '@/sde/solarSystems';
 import {
   RECENT_KILLS_TTL_MS,
+  loadRegionRecentKills,
   loadSystemRecentKills,
   loadTypeGroups,
   resolveKillLocations,
@@ -72,36 +81,57 @@ export function useRouteKills(
 
     // Read alongside the first zKillboard requests, never ahead of them.
     const groups = loadTypeGroups();
+    const regions = loadSolarSystemsById();
+    const fill = async (system: RouteKillsSystem, kills: readonly RecentKill[]) => {
+      const groupOf = await groups;
+      const locations = await resolveKillLocations(
+        kills.flatMap((kill) => (kill.locationId === null ? [] : [kill.locationId]))
+      );
+      const index = systems.indexOf(system);
+      const pathNeighbours = new Set(
+        [systems[index - 1], systems[index + 1]].flatMap((neighbour) =>
+          neighbour ? [neighbour.systemId] : []
+        )
+      );
+      set(system.systemId, {
+        status: 'ready',
+        summary: summarizeRecentKills(kills, {
+          groupOf,
+          band: system.band,
+          locations,
+          pathNeighbours,
+          now: Date.now(),
+        }),
+      });
+    };
     void (async () => {
+      const regionOf = await regions;
+      // One walk step per region (in order of first appearance) or, for a
+      // system with no known region, per system.
+      const steps = new Map<number, RouteKillsSystem[]>();
+      for (const system of systems) {
+        const regionId = regionOf?.get(system.systemId)?.regionId ?? null;
+        const key = regionId ?? -system.systemId;
+        steps.set(key, [...(steps.get(key) ?? []), system]);
+      }
       await mapWithConcurrencyLimit(
-        systems.map((system, index) => ({ system, index })),
+        [...steps.entries()],
         ZKILL_CONCURRENCY,
-        async ({ system, index }) => {
+        async ([key, step]) => {
           if (cancelled) return;
-          const result = await loadSystemRecentKills(system.systemId);
-          if (!result.ok) {
-            set(system.systemId, { status: 'unavailable' });
+          if (key > 0) {
+            const result = await loadRegionRecentKills(key);
+            for (const system of step) {
+              if (cancelled) return;
+              if (result.ok) await fill(system, result.bySystem.get(system.systemId) ?? []);
+              else set(system.systemId, { status: 'unavailable' });
+            }
             return;
           }
-          const groupOf = await groups;
-          const locations = await resolveKillLocations(
-            result.kills.flatMap((kill) => (kill.locationId === null ? [] : [kill.locationId]))
-          );
-          const pathNeighbours = new Set(
-            [systems[index - 1], systems[index + 1]].flatMap((neighbour) =>
-              neighbour ? [neighbour.systemId] : []
-            )
-          );
-          set(system.systemId, {
-            status: 'ready',
-            summary: summarizeRecentKills(result.kills, {
-              groupOf,
-              band: system.band,
-              locations,
-              pathNeighbours,
-              now: Date.now(),
-            }),
-          });
+          const [system] = step;
+          const result = await loadSystemRecentKills(system.systemId);
+          if (result.ok) await fill(system, result.kills);
+          else set(system.systemId, { status: 'unavailable' });
         }
       );
     })();

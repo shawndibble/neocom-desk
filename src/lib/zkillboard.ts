@@ -370,6 +370,23 @@ function parseAttacker(value: unknown): RecentKillAttacker | null {
   return attacker;
 }
 
+/** One killmail entry as a `RecentKill`; `null` for an NPC kill or one with no id or readable time. */
+function parseRecentKill(entry: unknown): RecentKill | null {
+  if (!isRecord(entry) || typeof entry.killmail_id !== 'number') return null;
+  const time = typeof entry.killmail_time === 'string' ? Date.parse(entry.killmail_time) : NaN;
+  if (!Number.isFinite(time)) return null;
+  const zkb = isRecord(entry.zkb) ? entry.zkb : {};
+  if (zkb.npc === true) return null;
+  return {
+    killmailId: entry.killmail_id,
+    time,
+    locationId: finiteOrNull(zkb.locationID),
+    attackers: Array.isArray(entry.attackers)
+      ? entry.attackers.flatMap((attacker) => parseAttacker(attacker) ?? [])
+      : [],
+  };
+}
+
 /**
  * Reads a `kills/systemID` body defensively (issue #2329). zKillboard sends
  * the killmail inline; an entry without an id or a readable time is dropped,
@@ -377,23 +394,22 @@ function parseAttacker(value: unknown): RecentKillAttacker | null {
  */
 export function parseSystemKills(body: unknown): RecentKill[] {
   if (!Array.isArray(body)) return [];
-  const kills: RecentKill[] = [];
+  return body.flatMap((entry) => parseRecentKill(entry) ?? []);
+}
+
+/** Reads a `kills/regionID` body as `parseSystemKills` does, grouped by `solar_system_id`. */
+export function parseRegionKills(body: unknown): Map<number, RecentKill[]> {
+  const bySystem = new Map<number, RecentKill[]>();
+  if (!Array.isArray(body)) return bySystem;
   for (const entry of body) {
-    if (!isRecord(entry) || typeof entry.killmail_id !== 'number') continue;
-    const time = typeof entry.killmail_time === 'string' ? Date.parse(entry.killmail_time) : NaN;
-    if (!Number.isFinite(time)) continue;
-    const zkb = isRecord(entry.zkb) ? entry.zkb : {};
-    if (zkb.npc === true) continue;
-    kills.push({
-      killmailId: entry.killmail_id,
-      time,
-      locationId: finiteOrNull(zkb.locationID),
-      attackers: Array.isArray(entry.attackers)
-        ? entry.attackers.flatMap((attacker) => parseAttacker(attacker) ?? [])
-        : [],
-    });
+    const kill = parseRecentKill(entry);
+    const systemId = isRecord(entry) ? finiteOrNull(entry.solar_system_id) : null;
+    if (kill === null || systemId === null) continue;
+    const kills = bySystem.get(systemId);
+    if (kills) kills.push(kill);
+    else bySystem.set(systemId, [kill]);
   }
-  return kills;
+  return bySystem;
 }
 
 /**
@@ -408,6 +424,45 @@ export async function fetchSystemRecentKills(systemId: number): Promise<SystemRe
     );
     if (!response.ok) return { ok: false };
     return { ok: true, kills: parseSystemKills(await response.json()) };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** zKillboard's page size: a page with this many entries may have a next page. */
+export const REGION_PAGE_SIZE = 1000;
+
+/** A backstop on paging, far above any real hour (a page holds 1,000 kills). */
+const REGION_MAX_PAGES = 10;
+
+/** `ok: false` when zKillboard failed or rate-limited, so "no kills" and "couldn't load" differ. */
+export type RegionRecentKillsResult =
+  { ok: true; bySystem: ReadonlyMap<number, RecentKill[]> } | { ok: false };
+
+/**
+ * A region's player kills from the last hour, grouped by system, for Route
+ * Safety: one request covers every route system in the region, where the
+ * system API needs one each (zKillboard no longer takes comma-separated ids).
+ * Follows `/page/n/` while a page is full, so a busy region is never cut at
+ * 1,000 kills; any page failing fails the whole answer. A browser fetch with
+ * no custom headers, as `fetchKillmailHash`.
+ */
+export async function fetchRegionRecentKills(regionId: number): Promise<RegionRecentKillsResult> {
+  const bySystem = new Map<number, RecentKill[]>();
+  try {
+    for (let pageNumber = 1; pageNumber <= REGION_MAX_PAGES; pageNumber += 1) {
+      const suffix = pageNumber === 1 ? '' : `page/${pageNumber}/`;
+      const response = await fetch(
+        `https://zkillboard.com/api/kills/regionID/${regionId}/pastSeconds/3600/${suffix}`
+      );
+      if (!response.ok) return { ok: false };
+      const body: unknown = await response.json();
+      for (const [systemId, kills] of parseRegionKills(body)) {
+        bySystem.set(systemId, [...(bySystem.get(systemId) ?? []), ...kills]);
+      }
+      if (!Array.isArray(body) || body.length < REGION_PAGE_SIZE) break;
+    }
+    return { ok: true, bySystem };
   } catch {
     return { ok: false };
   }
