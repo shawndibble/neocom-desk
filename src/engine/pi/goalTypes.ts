@@ -212,7 +212,8 @@ export interface Flow {
 /**
  * Why this colony hosts the factories. `planGoals` alone picks by scarcity
  * (`'least-needed-extraction'`) or takes the caller's (`'forced'`);
- * `planBest` tries every eligible host and keeps the best net (`'best-net'`).
+ * `planBest` tries every eligible host and keeps the best (`'best-net'`: goals
+ * reached first, then net — the name predates the ranking).
  */
 export type FactoryHostReason = 'only-eligible' | 'least-needed-extraction' | 'forced' | 'best-net';
 
