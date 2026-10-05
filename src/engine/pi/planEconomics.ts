@@ -12,6 +12,8 @@
  *   `CUSTOMS_TAXABLE_VALUE` — extractors and host each pay their own;
  * - arriving at a colony (only ever the host): import customs at the host's
  *   rate × value × `IMPORT_TAXABLE_FRACTION`;
+ * - a colony to itself (the host's own P1 feeding its own factories): nothing
+ *   — the classic P0 → P2 planet never pays customs on its P1;
  * - arriving at the hub: a sale at the **bid**, with sales tax on it;
  * - leaving the hub: a purchase at the **ask**.
  *
@@ -24,10 +26,12 @@
  * ## Lift counts every enabled colony
  *
  * `liftPerHour = netPerHour − baseline.iskPerHour`, the Baseline summed over
- * **all** enabled colonies. A colony the plan makes the factory host gives up
- * its own Baseline, and that forfeit is part of the plan's cost; so is any
- * colony the plan leaves idle. A plan that only repackages the Baseline nets
- * a Lift of zero by construction.
+ * **all** enabled colonies. A colony the plan does not need keeps selling its
+ * Baseline (its flows are in the plan), so it nets out of the Lift exactly;
+ * what a colony the plan re-targets or makes the host gives up is part of the
+ * plan's cost. A plan that only repackages the Baseline nets a Lift of zero
+ * by construction. `customs.exportFromHost` is everything leaving the host,
+ * its spare-slot P1 included.
  *
  * `perColony` says where the ISK lands, not who deserves it: an extractor is
  * credited its hub-bound sales less its own export customs (P1 it ships to
@@ -108,6 +112,8 @@ export function planEconomics(
   const credit = (id: number, isk: number) => planIsk.set(id, (planIsk.get(id) ?? 0) + isk);
 
   for (const f of plan.flows) {
+    // The host feeding itself: no customs office is crossed, nothing to price.
+    if (f.from !== 'hub' && f.from === f.to) continue;
     const value = CUSTOMS_TAXABLE_VALUE[f.tier];
     if (f.from !== 'hub') {
       const tax = f.unitsPerHour * colonyOf(f.from).taxRate * value;

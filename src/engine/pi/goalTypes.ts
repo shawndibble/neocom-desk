@@ -130,12 +130,17 @@ export interface DemandLine {
   source: DemandSource;
 }
 
-export type ColonyRole = 'extract' | 'factory' | 'idle';
+/**
+ * `'baseline'` is a colony the plan does not need: it keeps selling its best
+ * P1, credited at its Baseline. `'idle'` is only a colony with no priced
+ * Baseline to fall back on.
+ */
+export type ColonyRole = 'extract' | 'factory' | 'baseline' | 'idle';
 
 export interface ColonyAssignment {
   planetId: number;
   role: ColonyRole;
-  /** Empty unless `role` is `'extract'`. */
+  /** What it extracts: the plan's slots (the host's too), or its Baseline's. Empty when idle. */
   slots: ExtractionSlot[];
   /** The P2+ factory pins on the host. Empty unless `role` is `'factory'`. */
   factories: PinCounts;
@@ -148,10 +153,16 @@ export interface ColonyAssignment {
 }
 
 export type Shortfall =
-  /** No enabled colony's planet type yields this P0. `unitsPerHour` is P0 units. */
-  | { kind: 'type-gap'; p0TypeId: number; unitsPerHour: number; fixPlanetTypes: PlanetType[] }
-  /** Colonies that could yield it are full (or the only one is the factory host). P0 units. */
-  | { kind: 'budget-gap'; p0TypeId: number; unitsPerHour: number }
+  /** No enabled colony's planet type yields this P0. `unitsPerHour` is P0 units; `p1TypeId` is what it was for. */
+  | {
+      kind: 'type-gap';
+      p0TypeId: number;
+      p1TypeId: number;
+      unitsPerHour: number;
+      fixPlanetTypes: PlanetType[];
+    }
+  /** Colonies that could yield it are full. P0 units. */
+  | { kind: 'budget-gap'; p0TypeId: number; p1TypeId: number; unitsPerHour: number }
   /** P2+ is demanded but no enabled colony's planet type carries every factory the chain needs. */
   | { kind: 'no-factory-host'; facility: PiFactoryKind }
   /** The host was chosen but its factories overrun its CPU/Powergrid. */
@@ -164,7 +175,8 @@ export type FlowEnd = number | 'hub';
  * One leg of goods moving per hour. The plan's whole routing ledger: a colony
  * origin pays that colony's export customs, a colony destination its import
  * customs, a hub destination is a sale and a hub origin a purchase.
- * `'hub'` → `'hub'` is a goal bought outright: bought, never hauled.
+ * `'hub'` → `'hub'` is a goal bought outright: bought, never hauled. A
+ * colony → the same colony is the host feeding itself: no customs, no haul.
  */
 export interface Flow {
   from: FlowEnd;
