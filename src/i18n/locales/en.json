@@ -4708,6 +4708,8 @@
         "unknown": "{{planet}} {{type}}: we can't measure this colony yet, so there is nothing to recommend."
       },
       "to": "to",
+      "tagRebuild": "Rebuild",
+      "tagAsIs": "As-is",
       "alternative_one": "{{count}} alternative",
       "alternative_other": "{{count}} alternatives",
       "altP2": "A one-planet {{item}} factory here earns {{delta}}{{hauls}}.",

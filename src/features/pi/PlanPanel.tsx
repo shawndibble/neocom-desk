@@ -42,10 +42,10 @@ function Option({
       aria-current={selected ? 'true' : undefined}
       onClick={onSelect}
       className={cx(
-        'flex min-h-16 min-w-0 items-center gap-3 border-l-2 border-l-transparent px-3 py-3 text-left',
+        'flex min-h-16 min-w-0 items-center gap-3 border-l-2 px-3 py-3 text-left',
         rowInteractiveClassName,
         focusRingInsetClassName,
-        selected && selectedRowClassName
+        selected ? selectedRowClassName : 'border-l-transparent'
       )}
     >
       <span className="flex shrink-0 items-center -space-x-2">{art}</span>

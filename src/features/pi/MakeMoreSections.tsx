@@ -135,7 +135,7 @@ export function YourPlanetsPanel({
     <Panel
       title={t('piPlan.make.planetsTitle')}
       meta={
-        <span className="text-[0.6875rem] text-text-dim tabular-nums">
+        <span className="text-[0.6875rem] whitespace-nowrap text-text-dim tabular-nums">
           {t('piPlan.make.planetsCount', {
             used: view.slots.used,
             allowed: Math.max(view.slots.allowed, view.slots.used),
@@ -143,8 +143,8 @@ export function YourPlanetsPanel({
         </span>
       }
       actions={
-        <span className="flex items-center gap-2">
-          <span className="hidden text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:inline">
+        <span className="flex flex-wrap items-center justify-end gap-2">
+          <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
             {t('piPlan.make.matters')}
           </span>
           <SegmentedControl<RebuildPreference>
@@ -626,7 +626,7 @@ function RebuildCard({
   const nowItem = card.sells[0];
   return (
     <li id={card.anchor} tabIndex={-1} className="scroll-mt-4 px-3 py-3 outline-none">
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
         <PlanetImage type={card.planetType} px={44} />
         <div className="min-w-0 flex-1">
           <p className="text-sm text-text">
@@ -639,7 +639,7 @@ function RebuildCard({
                 aria-expanded={open}
                 aria-controls={altId}
                 onClick={() => setOpen(!open)}
-                className={textActionClassName('mt-1 gap-1')}
+                className={textActionClassName('mt-1 gap-1 whitespace-nowrap')}
               >
                 <Caret expanded={open} />
                 {t('piPlan.make.alternative', { count: 1 })}
@@ -653,7 +653,7 @@ function RebuildCard({
           )}
         </div>
         {card.status !== 'unknown' && (
-          <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+          <div className="flex shrink-0 items-center gap-3 max-sm:order-last max-sm:basis-full max-sm:pl-14">
             <span className="flex items-center gap-1.5 text-xs text-text-dim tabular-nums">
               {card.status === 'change' && card.fromPerDay !== null && (
                 <>
@@ -677,7 +677,10 @@ function RebuildCard({
                 </span>
               )}
             </span>
-            <VerbTag verb={card.status === 'change' ? 'rebuild' : 'asIs'} />
+            <VerbTag
+              verb={card.status === 'change' ? 'rebuild' : 'asIs'}
+              label={t(card.status === 'change' ? 'piPlan.make.tagRebuild' : 'piPlan.make.tagAsIs')}
+            />
           </div>
         )}
       </div>
@@ -954,7 +957,9 @@ function ChecklistColumnView({ column, ticks }: { column: ChecklistColumn; ticks
               >
                 <StepText step={step} />
               </span>
-              <Minutes value={Math.max(1, Math.round(step.minutes))} />
+              <span className="max-sm:hidden">
+                <Minutes value={Math.max(1, Math.round(step.minutes))} />
+              </span>
             </li>
           );
         })}
