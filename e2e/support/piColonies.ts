@@ -31,6 +31,12 @@ export interface Colony {
   basicsPerEcu?: number;
   /** Hours until the extractors expire; negative is already stopped. */
   expiresInHours?: number;
+  /** Hours since the programs were installed. Default 20. */
+  installedHoursAgo?: number;
+  /** Extra Basic factories set to a schematic nothing feeds, so they sit idle. */
+  idleBasics?: number;
+  /** P0 per cycle per ECU. Default 6,000 (+500 per extra ECU). */
+  qtyPerCycle?: number;
 }
 
 const COLONIES: Colony[] = [
@@ -83,7 +89,7 @@ function detailFor(colony: Colony, now: number) {
     type_id: 2848,
     latitude: 0.3 + i * 0.05,
     longitude: 1.1 + i * 0.07,
-    install_time: new Date(now - 20 * HOUR).toISOString(),
+    install_time: new Date(now - (colony.installedHoursAgo ?? 20) * HOUR).toISOString(),
     expiry_time: new Date(now + (colony.expiresInHours ?? 52) * HOUR).toISOString(),
     extractor_details: {
       heads: Array.from({ length: colony.heads }, (_, h) => ({
@@ -92,7 +98,7 @@ function detailFor(colony: Colony, now: number) {
         longitude: 1.1,
       })),
       product_type_id: product,
-      qty_per_cycle: 6_000 + i * 500,
+      qty_per_cycle: (colony.qtyPerCycle ?? 6_000) + i * 500,
       cycle_time: 1800,
     },
   }));
@@ -109,6 +115,18 @@ function detailFor(colony: Colony, now: number) {
     }))
   );
   pins.push(...basics);
+  for (let k = 0; k < (colony.idleBasics ?? 0); k += 1) {
+    // Electrolytes needs Ionic Solutions, which no colony here extracts.
+    const idle = {
+      pin_id: 300 + k,
+      type_id: 2469,
+      latitude: 0.5 + k * 0.03,
+      longitude: 1.5,
+      schematic_id: 123,
+    };
+    basics.push(idle);
+    pins.push(idle);
+  }
   // A tree rooted at the Launchpad: every ECU and every basic one hop from it.
   const links = [...colony.extracts.map((_, i) => 100 + i), ...basics.map((b) => b.pin_id)].map(
     (pinId) => ({ source_pin_id: 1, destination_pin_id: pinId, link_level: 0 })
@@ -118,6 +136,11 @@ function detailFor(colony: Colony, now: number) {
     links.push({ source_pin_id: 1, destination_pin_id: 2, link_level: 0 });
   }
   return { pins, links, routes: [] };
+}
+
+/** The default colonies with per-planet overrides layered on, for a spec that needs one stopped, one expiring and so on. */
+export function withVariants(variants: Record<number, Partial<Colony>>): Colony[] {
+  return COLONIES.map((colony) => ({ ...colony, ...variants[colony.planetId] }));
 }
 
 /**

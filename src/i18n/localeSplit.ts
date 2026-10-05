@@ -37,6 +37,7 @@ export const LAZY_SECTIONS: readonly string[] = [
   'contractSearch',
   'corp',
   'piPlan',
+  'piColonies',
   'bpcContracts',
   'wallet',
   'ships',
