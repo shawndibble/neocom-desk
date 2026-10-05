@@ -11,6 +11,7 @@ import {
   TextInput,
   TypeIcon,
 } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Close } from '@/components/ui/icons';
 import {
   browserTree,
@@ -307,7 +308,7 @@ export function FittingAddPanel({
     hiddenByFilters > 0 ? (
       <button
         type="button"
-        className="min-h-11 text-left text-xs text-accent underline-offset-2 hover:underline md:min-h-9"
+        className={`${inlineLinkClassName} min-h-11 text-left text-xs md:min-h-9`}
         onClick={() => setFitFilters(relaxed)}
       >
         {t('fittings.add.hiddenByFilters', { count: hiddenByFilters })}

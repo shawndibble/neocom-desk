@@ -240,7 +240,10 @@ function CorpDivisionsPanel({
                     isSelected ? 'border-accent bg-accent/15' : 'border-line hover:border-text-dim'
                   }`}
                 >
-                  <span className="block truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  <span
+                    title={divisionLabel(entry)}
+                    className="block truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                  >
                     {divisionLabel(entry)}
                   </span>
                   <span
