@@ -169,6 +169,43 @@ describe('colonyExtraction', () => {
     });
   });
 
+  it('accepts the extraction a colony runs today even where the model would not fit it', () => {
+    // The e2e fixture's Jita I: CC4, two 8-head ECUs on Base Metals at ~12,000/h
+    // each. Refined on the spot that is four basics, and the model puts it at
+    // ~18,200 MW against 17,000 — yet the colony runs those two ECUs today.
+    const jita = {
+      ...colony({
+        cc: 4,
+        heads: 8,
+        rates: { [BASE_METALS]: 12_133 },
+        link: { cpu: 74, powergrid: 54 },
+      }),
+    };
+    const want = [{ p0TypeId: BASE_METALS, ecus: 2 }];
+    expect(colonyExtraction(jita, want, pi, POLICY).status).toBe('does-not-fit');
+
+    const running = {
+      ...jita,
+      current: {
+        p0TypeIds: [BASE_METALS],
+        productTypeIds: [],
+        ecusByP0: new Map([[BASE_METALS, 2]]),
+      },
+    };
+    expect(colonyExtraction(running, want, pi, POLICY)).toMatchObject({
+      status: 'fits',
+      runningToday: true,
+    });
+    // A subset of today's layout is accepted too; anything beyond it is fitted as usual.
+    expect(colonyExtraction(running, [{ p0TypeId: BASE_METALS, ecus: 1 }], pi, POLICY).status).toBe(
+      'fits'
+    );
+    // Factory pins on top of today's layout are new load, so the model decides.
+    expect(colonyExtraction(running, want, pi, POLICY, { advanced: 1 }).status).toBe(
+      'does-not-fit'
+    );
+  });
+
   it('refuses a P0 the planet cannot yield', () => {
     const result = colonyExtraction(
       colony({ planetType: 'lava' }),

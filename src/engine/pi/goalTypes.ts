@@ -66,6 +66,12 @@ export interface PlannerColony {
   current: {
     p0TypeIds: readonly number[];
     productTypeIds: readonly number[];
+    /**
+     * ECUs the colony runs today on each P0. Optional: a caller that cannot
+     * count them leaves it out. When present, an extraction within it is
+     * accepted as fitting without a model check — see `colonyCapacity.ts`.
+     */
+    ecusByP0?: ReadonlyMap<number, number>;
   };
 }
 
