@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
   TextInput,
+  Tooltip,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { PayeeRecord } from '@/db';
@@ -284,9 +285,9 @@ export function PayeeManagerDialog({
                 <li key={payee.id} className="flex items-center gap-1 py-1.5">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2">
-                      <p className="min-w-0 flex-1 truncate text-sm" title={payee.name}>
-                        {payee.name}
-                      </p>
+                      <Tooltip content={payee.name}>
+                        <p className="min-w-0 flex-1 truncate text-sm">{payee.name}</p>
+                      </Tooltip>
                       {owed && owed.amount > 0 ? (
                         <span className="shrink-0 text-xs text-isk-neg tabular-nums">
                           {t('miningTax.payees.owed', { amount: formatIsk(owed.amount, 0) })}

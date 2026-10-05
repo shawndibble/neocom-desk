@@ -14,7 +14,12 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui';
-import { controlHeightClassName, toggleChipStateClassName } from '@/components/ui/controlStyles';
+import {
+  controlHeightClassName,
+  focusRingClassName,
+  interactiveClassName,
+  toggleChipStateClassName,
+} from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { THERA_EXITS, type TheraExit } from '@/engine/route/theraConnections';
@@ -207,7 +212,9 @@ function ChipMenu<V extends string>({
         <button
           type="button"
           className={cx(
-            'inline-flex grow items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+            'inline-flex grow items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase',
+            interactiveClassName,
+            focusRingClassName,
             controlHeightClassName.sm,
             toggleChipStateClassName(!isDefault)
           )}

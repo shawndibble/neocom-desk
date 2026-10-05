@@ -28,6 +28,7 @@ import {
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
+import { CharacterLink } from '@/features/entities';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import type { OreLineValuation } from '@/engine/miningTax/yieldValuation';
@@ -301,7 +302,9 @@ export function YieldDetailModal({
     >
       <div className="space-y-3 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <span className="text-text-dim">{row.characterName}</span>
+          <span className="text-text-dim">
+            <CharacterLink id={row.characterId}>{row.characterName}</CharacterLink>
+          </span>
           <StatChips>
             <StatChip
               label={t('miningTax.overview.volumeStat')}

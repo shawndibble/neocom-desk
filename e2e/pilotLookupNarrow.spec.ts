@@ -116,8 +116,8 @@ test.describe('Pilot Lookup at 390px', () => {
     const fits = await nameSpan.evaluate((el) => el.scrollWidth <= el.clientWidth);
     expect(fits).toBe(true);
 
-    const corporation = page.getByRole('button', { name: LONG_CORPORATION_NAME });
-    const alliance = page.getByRole('button', { name: ALLIANCE_NAME });
+    const corporation = page.getByRole('link', { name: LONG_CORPORATION_NAME });
+    const alliance = page.getByRole('link', { name: ALLIANCE_NAME });
     const corpBox = await corporation.boundingBox();
     const allianceBox = await alliance.boundingBox();
     if (corpBox === null || allianceBox === null) throw new Error('org links not laid out');
@@ -135,7 +135,7 @@ test.describe('Pilot Lookup at 390px', () => {
     // One line is ~32px (py-1.5 around a 20px icon); a wrapped name would make it ~56px.
     const rowBox = await killmailRow(page).boundingBox();
     expect(rowBox?.height).toBeLessThan(40);
-    const corpBox = await page.getByRole('button', { name: LONG_CORPORATION_NAME }).boundingBox();
+    const corpBox = await page.getByRole('link', { name: LONG_CORPORATION_NAME }).boundingBox();
     expect(corpBox?.height).toBeLessThanOrEqual(24);
   });
 });

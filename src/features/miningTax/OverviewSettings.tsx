@@ -17,6 +17,9 @@ import {
   Radio,
   SegmentedControl,
 } from '@/components/ui';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
 import { MINING_YIELD_RANGES, type MiningYieldRange } from '@/engine/miningTax/yieldRange';
 import { basisSide, isNowBasis, type PriceBasis } from '@/engine/miningTax/priceBasis';
 import { CHART_METRICS, type ChartMetric } from './chartMetricPref';
@@ -155,8 +158,16 @@ export function ShowRefiningToggle({ value, onChange }: ShowRefiningToggleProps)
   );
 }
 
-const triggerClassName =
-  'flex items-center gap-2 rounded-xs border border-accent-dim bg-panel-2 px-2.5 text-xs text-text hover:border-line-bright focus-visible:outline-2 focus-visible:outline-accent';
+const triggerClassName = cx(
+  'flex items-center gap-2 rounded-xs border border-line-bright bg-panel-2 px-2.5 text-xs text-text hover:border-text-dim',
+  interactiveClassName,
+  focusRingClassName
+);
+
+/** Field-chrome caret: both triggers open a list of settings to pick from (§6c). */
+const triggerCaret = (
+  <Icon.Expanded aria-hidden="true" size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-faint" />
+);
 
 /** Desktop: the header's "VALUE  Jita buy" button and its popover. */
 export function ValueMenu({
@@ -177,6 +188,7 @@ export function ValueMenu({
             {t('miningTax.overview.valueMenu')}
           </span>
           <span>{valueButtonLabel(t, basis, buybackRate)}</span>
+          {triggerCaret}
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 space-y-4 p-3.5">
@@ -209,6 +221,7 @@ export function MobileSettings({
         aria-haspopup="dialog"
       >
         {t(`miningTax.overview.range.${range}`)} · {valueButtonLabel(t, basis, buybackRate)}
+        {triggerCaret}
       </button>
       <Modal
         open={open}

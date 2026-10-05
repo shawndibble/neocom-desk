@@ -12,8 +12,10 @@
  * the bottom. Sorting on the date instead would put the people still playing
  * first, which answers a question nobody opened this page to ask.
  */
-import { useMemo, type ReactElement } from 'react';
+import { Fragment, useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CharacterLink } from '@/features/entities';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useUrlSort } from '@/lib/useUrlState';
 import {
@@ -73,22 +75,24 @@ export function CorpRosterSummary({
   if (isEmptyRosterDiff(diff)) return null;
 
   const nameList = (ids: readonly number[]) =>
-    ids.map((id) => names.get(id) ?? `#${id}`).join(', ');
+    ids.map((id, index) => (
+      <Fragment key={id}>
+        {index > 0 && ', '}
+        <CharacterLink id={id}>{names.get(id) ?? `#${id}`}</CharacterLink>
+      </Fragment>
+    ));
 
   return (
     <p className="text-text-dim text-xs">
       {diff.joined.length > 0 && (
         <span className="text-success">
-          {t('corp.members.joined', {
-            count: diff.joined.length,
-            names: nameList(diff.joined),
-          })}
+          {t('corp.members.joined', { count: diff.joined.length })} {nameList(diff.joined)}
         </span>
       )}
       {diff.joined.length > 0 && diff.left.length > 0 && <span> · </span>}
       {diff.left.length > 0 && (
         <span className="text-warning">
-          {t('corp.members.left', { count: diff.left.length, names: nameList(diff.left) })}
+          {t('corp.members.left', { count: diff.left.length })} {nameList(diff.left)}
         </span>
       )}
     </p>
@@ -150,9 +154,11 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
         // The name truncates, the tag does not: a long name must not ellipsize it away.
         render: (row) => (
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate">{label(row.name, row.characterId)}</span>
+            <CharacterLink id={row.characterId} className="truncate">
+              {label(row.name, row.characterId)}
+            </CharacterLink>
             {row.isSelf && (
-              <span className="shrink-0 rounded-xs border border-line bg-panel-2 px-1 py-0.5 text-[0.6875rem] text-text-dim">
+              <span className="shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem] text-text-dim">
                 {t('corp.members.you')}
               </span>
             )}
@@ -184,7 +190,14 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
         id: 'ship',
         header: t('corp.members.columnShip'),
         className: 'truncate',
-        render: (row) => label(row.shipName, row.shipTypeId),
+        render: (row) =>
+          row.shipTypeId === null ? (
+            label(row.shipName, row.shipTypeId)
+          ) : (
+            <MarketItemLink typeId={row.shipTypeId}>
+              {label(row.shipName, row.shipTypeId)}
+            </MarketItemLink>
+          ),
         sortValue: (row) => row.shipName ?? undefined,
       },
       {
@@ -257,7 +270,7 @@ export function CorpRosterTable({
   rows: readonly RosterRow[];
   /** Row context menu (issue #421): Show Info + Copy Character Name. */
   rowContextMenu?: (row: RosterRow, tr: ReactElement) => ReactElement;
-  /** `useTableExport(...).tableProps` — row menus gain "Export table ▸". */
+  /** `useTableExport(...).tableProps` — row menus gain "Export table". */
   tableProps?: UseTableExport<RosterRow>['tableProps'];
 }) {
   const { t } = useTranslation();

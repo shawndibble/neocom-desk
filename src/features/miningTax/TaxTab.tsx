@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   IconButton,
+  IskAmount,
   PageHeader,
   Panel,
   Spinner,
@@ -31,7 +32,13 @@ import {
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
-import { inlineLinkClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  inlineLinkClassName,
+  interactiveClassName,
+  touchCheckboxLabelClassName,
+} from '@/components/ui/controlStyles';
+import { CharacterLink, SystemLink } from '@/features/entities';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
@@ -40,7 +47,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { beginGrant } from '@/app/grantAction';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
-import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
 import { toggleFilterMember } from '@/lib/multiSelectFilter';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
@@ -1196,7 +1203,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       withDayLines(
         dr,
         dr.groupMembers ? (
-          <span className="inline-flex rounded-xs border border-accent-dim px-1.5 text-[0.6875rem] font-semibold tracking-wider text-accent uppercase">
+          <span className="inline-flex text-[0.6875rem] font-semibold tracking-wider text-text-dim uppercase">
             {t('miningTax.combined.days', { count: allMembers(dr).length })}
           </span>
         ) : (
@@ -1237,7 +1244,11 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     render: (dr) =>
       withDayLines(
         dr,
-        isPhone ? formatIskCompact(estimatedValueOf(dr)) : `${formatIsk(estimatedValueOf(dr))} ISK`,
+        isPhone ? (
+          <IskAmount value={estimatedValueOf(dr)} />
+        ) : (
+          `${formatIsk(estimatedValueOf(dr))} ISK`
+        ),
         (m) => `${formatIsk(m.assignment.estimatedValue)} ISK`
       ),
     sortValue: (dr) => estimatedValueOf(dr),
@@ -1250,7 +1261,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             id: 'character',
             headerCellClassName: 'sm:w-28',
             header: t('miningTax.characterColumn'),
-            render: (dr: DisplayRow) => dr.row.characterName,
+            render: (dr: DisplayRow) => (
+              <CharacterLink id={dr.row.characterId}>{dr.row.characterName}</CharacterLink>
+            ),
             sortValue: (dr: DisplayRow) => dr.row.characterName,
           } satisfies DataTableColumn<DisplayRow>,
         ]
@@ -1261,6 +1274,8 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       header: t('miningTax.dateColumn'),
       headerTooltip: t('miningTax.dateEveHint'),
       className: 'whitespace-nowrap',
+      // Row opens its detail modal: the accent primary cell is the cue (§6c).
+      cellClassName: () => 'text-accent',
       render: (dr) =>
         withDayLines(
           dr,
@@ -1273,7 +1288,11 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                 onClick={() => toggleCombinedExpanded(dr.key)}
                 // In the gutter left of the date, so a combined row's date
                 // keeps the same left edge as every other row's.
-                className="absolute top-0 -left-6 hidden size-5 items-center justify-center rounded-xs text-text-dim hover:text-accent focus-visible:outline-2 focus-visible:outline-accent sm:inline-flex"
+                className={cx(
+                  'absolute top-0 -left-6 hidden size-5 items-center justify-center rounded-xs text-text-dim hover:text-accent sm:inline-flex',
+                  interactiveClassName,
+                  focusRingClassName
+                )}
               >
                 <Caret expanded={expandedCombined.has(dr.key)} />
               </button>
@@ -1296,7 +1315,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       header: t('miningTax.systemColumn'),
       render: (dr) => (
         <DataTableDenseCell>
-          {systemName(dr)}
+          <SystemLink systemId={dr.row.entry.solarSystemId}>{systemName(dr)}</SystemLink>
           <SecurityValue security={systemSecurityOf(dr)} t={t} />
         </DataTableDenseCell>
       ),

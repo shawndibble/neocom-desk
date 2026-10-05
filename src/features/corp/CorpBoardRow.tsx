@@ -15,7 +15,9 @@
 import { HintText } from '@/components/ui/HintText';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { MenuItem, RowActionsMenu, RowMoreActions } from '@/components/ui';
+import { MenuItem, RowActionsMenu, RowMoreActions, Tooltip } from '@/components/ui';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import * as Icon from '@/components/ui/icons';
 import { SEVERITY_ICON, SEVERITY_LABEL, SEVERITY_TEXT } from '@/components/ui/severityTone';
 import { marketItemUrl } from '@/engine/market/urlState';
@@ -203,12 +205,21 @@ export function CorpBoardRow({ item }: { item: CorpBoardItem }) {
       <li className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 last:border-b-0">
         <Countdown item={item} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm" title={item.subject}>
-            {item.subject}
-          </p>
-          <p className="truncate text-xs text-text-dim" title={detail}>
-            {detail}
-          </p>
+          <Tooltip content={item.subject}>
+            <p className="truncate text-sm">
+              {/* Item rows go to Market (§6c); structures and the rest are plain names. */}
+              {item.typeId === null ? (
+                item.subject
+              ) : (
+                <MarketItemLink typeId={item.typeId} className={entityLinkClassName()}>
+                  {item.subject}
+                </MarketItemLink>
+              )}
+            </p>
+          </Tooltip>
+          <Tooltip content={detail}>
+            <p className="truncate text-xs text-text-dim">{detail}</p>
+          </Tooltip>
         </div>
         {/*
           The severity is already carried by the countdown's colour and shape;
