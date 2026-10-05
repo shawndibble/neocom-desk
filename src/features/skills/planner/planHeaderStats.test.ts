@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { MAX_SUPPORTED_REMAPS, placeRemaps } from '@/engine/optimizer';
-import { evaluateOptimizationBadge, toOptimizationBadge } from './planHeaderStats';
+import {
+  evaluateOptimizationBadge,
+  remapSavingsShrank,
+  toOptimizationBadge,
+} from './planHeaderStats';
 import type { AttributeName, Attributes, EngineSkill, PlanStep } from '@/engine/types';
 
 const skill = (
@@ -121,5 +125,22 @@ describe('toOptimizationBadge', () => {
       requestedRemapCount: 5,
       capped: true,
     });
+  });
+});
+
+describe('remapSavingsShrank', () => {
+  it('is true when the real-implant saving is meaningfully larger', () => {
+    expect(remapSavingsShrank(13 * 86400, 19 * 86400)).toBe(true);
+  });
+
+  it('is false when the saving grew, held, or moved under a minute', () => {
+    expect(remapSavingsShrank(19 * 86400, 13 * 86400)).toBe(false);
+    expect(remapSavingsShrank(1000, 1000)).toBe(false);
+    expect(remapSavingsShrank(1000, 1030)).toBe(false);
+  });
+
+  it('is false when either side has no figure', () => {
+    expect(remapSavingsShrank(null, 19 * 86400)).toBe(false);
+    expect(remapSavingsShrank(13 * 86400, null)).toBe(false);
   });
 });
