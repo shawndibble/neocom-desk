@@ -35,7 +35,9 @@
  *   the colony is excluded — fitting at a free link would overstate what fits.
  * - **Customs**: the pilot's per-system override, else the band default after
  *   Customs Code Expertise. Outside highsec that default is 0% only because a
- *   player office's rate is unknowable, so the row says `rateUnknown`.
+ *   player office's rate is unknowable, so the row says `rateUnknown` and the
+ *   plan is costed at `ASSUMED_UNKNOWN_CUSTOMS` (`taxAssumed`) until the pilot
+ *   sets one — a 0% placeholder made unknown-rate colonies the cheapest hosts.
  *
  * Pure: no fetch, no Dexie, no clock.
  */
@@ -69,6 +71,12 @@ import {
   type CustomsRateSource,
 } from './customsRate';
 import { customsRateFor, type CustomsOverrides } from './customsOverride';
+
+/**
+ * What an unknown player-office rate is costed at: the untrained highsec NPC
+ * rate, a common owner tax and the conservative direction (never 0%).
+ */
+export const ASSUMED_UNKNOWN_CUSTOMS = 0.1;
 
 /** Heads per ECU when the pilot runs no extractor at all to read one off. */
 export const DEFAULT_PLANNER_HEADS = 10;
@@ -113,8 +121,10 @@ export interface PlannerColonyRow {
   taxRate: number;
   taxSource: CustomsRateSource;
   taxOverridden: boolean;
-  /** Outside highsec with no override: the 0% is a placeholder, not a reading. */
+  /** Outside highsec with no override: the band's 0% is a placeholder, not a reading. */
   rateUnknown: boolean;
+  /** `taxRate` is `ASSUMED_UNKNOWN_CUSTOMS`, standing in for an unknown rate. */
+  taxAssumed: boolean;
   headsAssumed: boolean;
   linkCostBorrowed: boolean;
 }
@@ -180,7 +190,10 @@ export function plannerColonies(
     const space = colonySpaceFor(snapshot.securityBySystem.get(systemId) ?? null);
     const derived = defaultCustomsRate(space, snapshot.customsSkill);
     const taxOverridden = prefs.customsOverrides[systemId] !== undefined;
-    const taxRate = customsRateFor(systemId, prefs.customsOverrides, derived);
+    const rateUnknown = space !== 'highsec' && !taxOverridden;
+    const taxRate = rateUnknown
+      ? ASSUMED_UNKNOWN_CUSTOMS
+      : customsRateFor(systemId, prefs.customsOverrides, derived);
     const own = advice.get(planetId) ?? null;
     const base = {
       planetId,
@@ -191,7 +204,8 @@ export function plannerColonies(
       taxRate,
       taxSource: customsRateSource(space, snapshot.customsSkill),
       taxOverridden,
-      rateUnknown: space !== 'highsec' && !taxOverridden,
+      rateUnknown,
+      taxAssumed: rateUnknown,
     };
     const excluded = (reason: ExcludedReason): PlannerColonyRow => ({
       ...base,
@@ -362,20 +376,20 @@ export function earningsNow(
   pi: PiData,
   prices: { prices: Readonly<Record<number, number>>; buyPrices: Readonly<Record<number, number>> },
   salesTaxPercent: number
-): TotalColonyEarnings {
+): TotalColonyEarnings & { leftOut: number[] } {
   const revenuePrices = { ...prices.prices, ...prices.buyPrices };
-  return totalColonyEarnings(
-    rows.flatMap((row) =>
-      row.enabled && row.advice
-        ? [
-            builtColonyEarnings(row.advice, pi, {
-              prices: prices.prices,
-              revenuePrices,
-              taxRate: row.taxRate,
-              salesTaxPct: salesTaxPercent,
-            }),
-          ]
-        : []
-    )
-  );
+  const leftOut: number[] = [];
+  const perColony = rows.flatMap((row) => {
+    // The same colonies the Baseline counts: enabled and costable.
+    if (!row.enabled || !row.advice || !row.colony) return [];
+    const earned = builtColonyEarnings(row.advice, pi, {
+      prices: prices.prices,
+      revenuePrices,
+      taxRate: row.taxRate,
+      salesTaxPct: salesTaxPercent,
+    });
+    if (earned.iskPerHour === null) leftOut.push(row.planetId);
+    return [earned];
+  });
+  return { ...totalColonyEarnings(perColony), leftOut: leftOut.sort((a, b) => a - b) };
 }

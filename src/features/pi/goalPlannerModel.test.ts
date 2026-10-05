@@ -10,6 +10,7 @@ import { planBest } from '@/engine/pi/planBest';
 import { builtColonyEarnings } from './colonyEarningsModel';
 import type { GoalPlan } from '@/engine/pi/goalTypes';
 import {
+  ASSUMED_UNKNOWN_CUSTOMS,
   DEFAULT_PLANNER_HEADS,
   earningsNow,
   goalPlannerInput,
@@ -241,9 +242,12 @@ describe('plannerColonies', () => {
     expect(temperate.rateUnknown).toBe(false);
 
     const oceanic = rows.find((row) => row.planetId === OCEANIC_ID)!;
-    expect(oceanic.colony!.taxRate).toBe(0);
-    // Nullsec defaults to 0% only because a player office's rate is unknowable.
+    // A player office's rate is unknowable, so until the pilot sets it the
+    // plan is costed at a conservative 10%, never the band's 0% placeholder.
     expect(oceanic.rateUnknown).toBe(true);
+    expect(oceanic.taxAssumed).toBe(true);
+    expect(oceanic.colony!.taxRate).toBe(ASSUMED_UNKNOWN_CUSTOMS);
+    expect(ASSUMED_UNKNOWN_CUSTOMS).toBe(0.1);
 
     const overridden = plannerColonies(snapshot(), {
       ...PREFS,
@@ -252,6 +256,7 @@ describe('plannerColonies', () => {
     expect(overridden.colony!.taxRate).toBe(0.12);
     expect(overridden.taxOverridden).toBe(true);
     expect(overridden.rateUnknown).toBe(false);
+    expect(overridden.taxAssumed).toBe(false);
   });
 
   it('marks a colony the pilot switched off as not enabled, and goalPlannerInput leaves it out', () => {
@@ -366,6 +371,8 @@ describe('earningsNow', () => {
     // The oceanic colony extracts nothing, so it contributes no figure.
     expect(total.iskPerHour).toBeCloseTo(alone.iskPerHour!, 6);
     expect(total.coloniesWithoutFigure).toBe(1);
+    // Named, so the page can say which colony the figure leaves out.
+    expect(total.leftOut).toEqual([OCEANIC_ID]);
 
     const off = earningsNow(
       plannerColonies(snapshot(), { ...PREFS, disabled: new Set([TEMPERATE_ID]) }),
