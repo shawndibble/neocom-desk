@@ -1275,8 +1275,10 @@ describe('Market Browser item context menu (issue #6)', () => {
     await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
 
     // The navigation lands after the menu's close handler, not inside the click.
-    await waitFor(() =>
-      expect(new URLSearchParams(window.location.search).get('type')).toBe('587')
+    // The default 1s lapsed on a loaded CI runner (the file runs for a minute there).
+    await waitFor(
+      () => expect(new URLSearchParams(window.location.search).get('type')).toBe('587'),
+      { timeout: 4000 }
     );
     expect(window.location.pathname).toBe('/market/browser');
     expect(new URLSearchParams(window.location.search).get('hub')).toBe('jita');

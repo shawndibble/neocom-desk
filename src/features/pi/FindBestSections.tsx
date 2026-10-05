@@ -150,21 +150,23 @@ export function FindBestControls({
         ]}
       />
       {mode === 'picks' && (
-        <span className="flex flex-wrap items-center gap-2">
+        <span className="flex max-w-full flex-wrap items-center gap-2">
           <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
             {t('piPlan.find.make')}
           </span>
-          <SegmentedControl<RecipeFilter>
-            label={t('piPlan.find.make')}
-            size={size}
-            value={filter}
-            onChange={onFilter}
-            options={[
-              { value: 'any', label: t('piPlan.find.makeAny') },
-              { value: 'p1', label: t('piPlan.find.makeP1') },
-              { value: 'p2', label: t('piPlan.find.makeP2') },
-            ]}
-          />
+          <span className="max-w-full overflow-x-auto">
+            <SegmentedControl<RecipeFilter>
+              label={t('piPlan.find.make')}
+              size={size}
+              value={filter}
+              onChange={onFilter}
+              options={[
+                { value: 'any', label: t('piPlan.find.makeAny') },
+                { value: 'p1', label: t('piPlan.find.makeP1') },
+                { value: 'p2', label: t('piPlan.find.makeP2') },
+              ]}
+            />
+          </span>
           <span className="text-[0.6875rem] text-text-dim">{t('piPlan.find.makeHint')}</span>
         </span>
       )}
