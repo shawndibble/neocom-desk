@@ -2923,8 +2923,6 @@
     "skillGateBestOn": "Best on {{character}}",
     "skillGateBestOnTime": "Closest: {{character}} · {{time}} to train",
     "skillGatePlanName": "Industry skills",
-    "skillGateBestOnTime": "Closest: {{character}} · {{time}} to train",
-    "skillGatePlanName": "Industry skills",
     "skillGateFilterChip": "Hide skill-gated",
     "skillGateFilterChipCount_one": "{{count}} row hidden",
     "skillGateFilterChipCount_other": "{{count}} rows hidden",
@@ -7311,7 +7309,7 @@
     "jumpsWord_one": "jump",
     "jumpsWord_other": "jumps",
     "rangeAffix": "range ",
-    "minVolumeAffix": "min ",
+    "minVolumeAffix": "Min ",
     "baitHint": "Asks {{times}} times the best sell — likely bait, not a real price.",
     "baitLabel": "Likely bait price",
     "tabVariations": "Variations",
@@ -7362,8 +7360,7 @@
       "count_other": "{{count}} skills"
     },
     "quantityAffix": "×",
-    "expiryAffix": "Exp ",
-    "minVolumeAffix": "Min "
+    "expiryAffix": "Exp "
   },
   "error": {
     "title": "Something went wrong",
@@ -8906,6 +8903,89 @@
       "unavailableTitle": "Connections can't be loaded right now",
       "unavailableHint": "EVE-Scout couldn't be reached. Check your connection and try again.",
       "dataAgeNote": "Connections come from EVE-Scout's volunteer scouts and are refreshed every 5 minutes."
+    }
+  },
+  "styleguide": {
+    "interactionGrammar": {
+      "title": "Interaction grammar (§6c)",
+      "intro": "One cue per intent. Each item names its DESIGN.md §6c rule; compare the rendering to the rule to spot drift.",
+      "groups": {
+        "links": "Links",
+        "explain": "Explain and edit",
+        "carets": "Carets and openers",
+        "menusRows": "Menus and rows",
+        "states": "States"
+      },
+      "rules": {
+        "accentText": "Accent text: clickable (entity links)",
+        "inlineLink": "Solid underline at rest: link inside a sentence",
+        "textAction": "Text action: performs an action",
+        "externalLink": "Trailing external icon: leaves Neocom Desk",
+        "hintText": "Dotted underline: has a tooltip (HintText)",
+        "infoTooltip": "? circle: explains a term (InfoTooltip)",
+        "infoButton": "ⓘ IconButton: opens Show Info or an explanation modal",
+        "pencil": "Faint pencil after a value: edit in place",
+        "iskAmount": "IskAmount: B/M/K suffix, exact value on hover or tap",
+        "rowCaret": "Trailing CaretRight on a row: goes to another page (RowCaret)",
+        "disclosureCaret": "Leading caret that rotates: expands in place",
+        "pagerCarets": "Paired carets in IconButtons: pages",
+        "dialogOpener": "… ending a label: dialog needing input or confirmation",
+        "rowMenu": "⋮: the row's action menu (RowMoreActions)",
+        "selectedRow": "Accent 2px left border: selected row",
+        "stateRest": "Rest: variants",
+        "stateHoverPressed": "Hover and pressed",
+        "stateFocus": "Focus-visible",
+        "stateDisabled": "Disabled",
+        "stateLoading": "Loading (Button loading)",
+        "stateSelected": "Selected / on (aria-pressed)"
+      },
+      "notes": {
+        "textAction": "Actions only. Navigation is a link or a row.",
+        "iskAmount": "Hover, focus or tap reveals the exact figure.",
+        "dialogOpener": "Ellipsis on the first. A button that only shows a window has none.",
+        "rowMenu": "Always visible; right-click and touch-and-hold open the same menu.",
+        "selectedRow": "Click a row. Selected never looks like hover.",
+        "states": "Hover, pressed and focus can't be forced on real components. Try them on the samples below.",
+        "hoverPressed": "Hover with a pointer: one step brighter. Press and hold: a step darker.",
+        "focus": "Press Tab: 2px accent outline, outset on boxed controls and inline links.",
+        "disabled": "opacity-40. aria-disabled keeps the tooltip reachable.",
+        "selectedToggle": "On takes the accent tint."
+      },
+      "samples": {
+        "character": "Character name",
+        "skill": "Skill name",
+        "sentenceBefore": "A link",
+        "inlineLink": "inside",
+        "sentenceAfter": "a sentence.",
+        "textAction": "Clear filters",
+        "addToCalendar": "Add to Google Calendar",
+        "hintText": "Truncated name",
+        "hintContent": "The full name, in a tooltip.",
+        "term": "Material efficiency",
+        "infoLabel": "About material efficiency",
+        "infoContent": "Percent of materials saved per run.",
+        "showInfo": "Show info",
+        "editableValue": "Fleet name",
+        "rowLink": "Open the page",
+        "disclosure": "Details",
+        "previous": "Previous month",
+        "next": "Next month",
+        "renameDialog": "Rename…",
+        "showWindow": "Show info",
+        "tableLabel": "Row menu sample",
+        "selectableLabel": "Selected row sample",
+        "nameHeader": "Ship",
+        "menuItem": "Show info",
+        "ghost": "Ghost",
+        "primary": "Primary",
+        "danger": "Danger",
+        "boxed": "Boxed control",
+        "disabled": "Disabled",
+        "ariaDisabled": "aria-disabled",
+        "saving": "Saving",
+        "toggleOn": "Toggle on",
+        "toggleOff": "Toggle off"
+      }
     }
   }
 }

@@ -6,7 +6,7 @@ borders, minimal corner rounding, azure/cyan accent, amber caution, red alert,
 condensed uppercase micro-headings. Density over whitespace — this is a data tool.
 
 Tokens live in `src/styles/index.css` (`@theme`, Tailwind v4 CSS-first config).
-Live reference: hidden `/styleguide` route (`src/routes/Styleguide.tsx`).
+Live reference: hidden `/styleguide` route (`src/routes/Styleguide.tsx`). Its "Interaction grammar" section (`src/routes/styleguide/InteractionGrammar.tsx`) renders every §6c cue and state with the real primitives; add a new cue there in the same PR that adds it to §6c.
 
 Interactive primitives (menus, selects, dialogs) are built on
 [`radix-ui`](https://www.radix-ui.com/)'s unstyled components, styled to this
