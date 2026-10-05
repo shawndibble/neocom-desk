@@ -13,6 +13,7 @@ import {
   StatChips,
   type StatChipTone,
 } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { formatIskCompact } from '@/lib/isk';
 import { PI_CADENCE_DAYS, type PiCadence, type PiCadenceDays } from '../cadencePref';
 import { EstimateBadge } from '../DirectiveRow';
@@ -350,7 +351,7 @@ export function TodayPanel(props: TodayPanelProps) {
                     <IskAmount value={props.todayPerDay} className="font-semibold text-text" />
                   ),
                   fixes: <IskAmount value={props.fixGainPerDay} className="text-isk-pos" />,
-                  plan: <Link to={props.planHref} className="text-accent underline" />,
+                  plan: <Link to={props.planHref} className={inlineLinkClassName} />,
                 }}
               />
             )}
