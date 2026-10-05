@@ -15,9 +15,11 @@
  * DOM (and so tab) order is Goals, Colonies, Assumptions, results: the
  * inputs before the answer they drive. On a pointer a grid puts the three in
  * a rail beside the results, which span the rail's rows plus a trailing `1fr`
- * row so the rail panels stay packed at the top. On a phone `order` shows
- * Goals, then the results, then Colonies and Assumptions folded — say what
- * you want, see the answer, then adjust what you have.
+ * row so the rail panels stay packed at the top. On a phone the same order
+ * stacks: Colonies and Assumptions start folded there, so the answer sits two
+ * header rows below the goals. No CSS `order` — a reordered phone layout
+ * would send keyboard and screen-reader users through a different sequence
+ * than the one on screen (WCAG 2.4.3).
  */
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
