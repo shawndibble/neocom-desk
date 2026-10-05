@@ -27,6 +27,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { GoalPlannerPanel } from '@/features/pi/GoalPlannerPanel';
 import { goalsParam, idListParam, seedGoal } from '@/features/pi/goalsParam';
+import { loadPlannableTypeIds } from '@/features/pi/products';
 import type { Goal } from '@/engine/pi/goalTypes';
 import { AdvisorPanel } from '@/features/pi/AdvisorPanel';
 import { builtAdvice } from '@/features/pi/advisorModel';
@@ -918,6 +919,8 @@ const PI_URL_PARAMS = {
   type: positiveIntParam(),
   goals: goalsParam(),
   off: idListParam(),
+  // A colony to open on the Colonies tab — the Goal Planner's colony links.
+  colony: positiveIntParam(),
   system: positiveIntParam(),
   includeRebuilds: boolParam(),
 };
@@ -960,7 +963,14 @@ export function PlanetaryIndustry() {
   // gate on different windows.
   const { haulHours } = cadenceHours(useCadence((state) => state.value));
   const [
-    { type: seedTypeId, goals, off: disabledColonies, system: advisorSystemId, includeRebuilds },
+    {
+      type: seedTypeId,
+      goals,
+      off: disabledColonies,
+      colony: linkedColonyId,
+      system: advisorSystemId,
+      includeRebuilds,
+    },
     setPiParams,
   ] = useUrlParams(PI_URL_PARAMS);
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -973,6 +983,31 @@ export function PlanetaryIndustry() {
   // screen at once. Keyed by `${characterId}:${planetId}`, not the planet id
   // alone — two characters can each hold a colony on the same planet.
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(() => new Set());
+  // `?colony=` opens that colony's row, without owning it: toggling it closed
+  // drops the param, so the link is a way in, not a lock.
+  const linkedKey =
+    linkedColonyId !== null && activeCharacterId !== null
+      ? `${activeCharacterId}:${linkedColonyId}`
+      : null;
+  const isExpanded = (key: string) => expandedKeys.has(key) || key === linkedKey;
+  useEffect(() => {
+    if (tab !== 'colonies' || linkedColonyId === null || !data) return;
+    const trigger = document.getElementById(
+      `pi-colony-${activeCharacterId}-${linkedColonyId}-trigger`
+    );
+    trigger?.scrollIntoView?.({ block: 'center' });
+    trigger?.focus({ preventScroll: true });
+  }, [tab, linkedColonyId, data, activeCharacterId]);
+  const toggleColony = (key: string) => {
+    if (key === linkedKey) {
+      setPiParams({ colony: null });
+      setExpandedKeys((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+    } else toggleExpandedKey(key);
+  };
   const toggleExpandedKey = useCallback((key: string) => {
     setExpandedKeys((current) => {
       const next = new Set(current);
@@ -994,11 +1029,24 @@ export function PlanetaryIndustry() {
     void hydrateShowAltColonies();
   }, [hydrateShowAltColonies]);
 
-  // `?type=` from the Industry "PI Plan" link becomes a goal, once.
+  // `?type=` from the Industry "PI Plan" link becomes a goal, once, on the
+  // Plan tab only, and only for a type the planner can plan.
   useEffect(() => {
-    if (seedTypeId === null) return;
-    setPiParams({ goals: seedGoal(goals, seedTypeId), type: null });
-  }, [seedTypeId, goals, setPiParams]);
+    if (seedTypeId === null || tab !== 'plan') return;
+    let cancelled = false;
+    void loadPlannableTypeIds()
+      .catch(() => new Set<number>())
+      .then((plannable) => {
+        if (cancelled) return;
+        setPiParams({
+          goals: plannable.has(seedTypeId) ? seedGoal(goals, seedTypeId) : goals,
+          type: null,
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [seedTypeId, goals, setPiParams, tab]);
   const setGoals = useCallback((next: Goal[]) => setPiParams({ goals: next }), [setPiParams]);
   const setDisabledColonies = useCallback(
     (next: number[]) => setPiParams({ off: next }),
@@ -1334,8 +1382,8 @@ export function PlanetaryIndustry() {
                           planet={planet}
                           detail={details.get(planet.planet_id)?.cached?.data ?? null}
                           status={statusByPlanet.get(planet.planet_id) ?? EMPTY_STATUS}
-                          expanded={expandedKeys.has(key)}
-                          onToggle={() => toggleExpandedKey(key)}
+                          expanded={isExpanded(key)}
+                          onToggle={() => toggleColony(key)}
                           planetNames={planetNames}
                           pinTypeNames={pinTypeNames}
                           productNames={productNames}
@@ -1383,8 +1431,8 @@ export function PlanetaryIndustry() {
                               planet={colony.planet}
                               detail={colony.detail}
                               status={status}
-                              expanded={expandedKeys.has(key)}
-                              onToggle={() => toggleExpandedKey(key)}
+                              expanded={isExpanded(key)}
+                              onToggle={() => toggleColony(key)}
                               planetNames={planetNames}
                               pinTypeNames={pinTypeNames}
                               productNames={productNames}

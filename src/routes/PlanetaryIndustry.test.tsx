@@ -704,6 +704,24 @@ describe('PlanetaryIndustry', () => {
     await waitFor(() => expect(window.location.search).toBe(`?goals=${TRANSMITTER}%3A10`));
   });
 
+  it('drops a ?type= the planner cannot plan rather than seeding it', async () => {
+    // Aqueous Liquids is a P0: extracted, never a goal.
+    window.history.pushState({}, '', '/planetary-industry/plan?type=2268');
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Goals' });
+    await waitFor(() => expect(window.location.search).toBe(''));
+    expect(screen.queryByLabelText(/per day$/)).not.toBeInTheDocument();
+  });
+
+  it('opens the colony a ?colony= link names on the Colonies tab', async () => {
+    window.history.pushState({}, '', `/planetary-industry/colonies?colony=${PLANET_ID}`);
+    render(<App />);
+
+    const heading = await screen.findByRole('heading', { name: /Jita IV/ });
+    expect(within(heading).getByRole('button')).toHaveAttribute('aria-expanded', 'true');
+  });
+
   it("plans the URL's goals over the colony: Lift first, then the change list", async () => {
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
