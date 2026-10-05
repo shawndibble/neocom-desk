@@ -1,3 +1,4 @@
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, Field, Fields, Spinner } from '@/components/ui';
 import { useMiningTaxOreValueMode } from '@/features/miningTax/oreValueMode';
@@ -38,11 +39,13 @@ export function MiningTaxSettingsForm({ onAutoContinueChange }: MiningTaxSetting
           inline
           note={t('settings.miningTaxOreValueModeHint')}
         >
-          <Checkbox
-            id="settings-mining-tax-ore-value-mode"
-            checked={oreValueMode}
-            onChange={() => void setOreValueMode(!oreValueMode)}
-          />
+          <label className={touchCheckboxLabelClassName}>
+            <Checkbox
+              id="settings-mining-tax-ore-value-mode"
+              checked={oreValueMode}
+              onChange={() => void setOreValueMode(!oreValueMode)}
+            />
+          </label>
         </Field>
       </Fields>
       {/* Device-local (`continueSessionPref.ts`): outside the block the sync
@@ -54,14 +57,16 @@ export function MiningTaxSettingsForm({ onAutoContinueChange }: MiningTaxSetting
           inline
           note={t('settings.miningTaxAutoContinueHint')}
         >
-          <Checkbox
-            id="settings-mining-tax-auto-continue"
-            checked={autoContinue}
-            onChange={() => {
-              if (onAutoContinueChange) onAutoContinueChange(!autoContinue);
-              else void setAutoContinue(!autoContinue);
-            }}
-          />
+          <label className={touchCheckboxLabelClassName}>
+            <Checkbox
+              id="settings-mining-tax-auto-continue"
+              checked={autoContinue}
+              onChange={() => {
+                if (onAutoContinueChange) onAutoContinueChange(!autoContinue);
+                else void setAutoContinue(!autoContinue);
+              }}
+            />
+          </label>
         </Field>
       </Fields>
     </div>

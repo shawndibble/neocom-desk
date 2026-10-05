@@ -7,6 +7,7 @@
  * before showing them: a click on a default not yet replaced by the stored
  * value would write that default over it.
  */
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, IconButton, TextInput } from '@/components/ui';
@@ -96,18 +97,18 @@ export function AvoidRuleToggles({ podKillsUnavailable }: { podKillsUnavailable:
 
   return (
     <div className="space-y-2">
-      <label className="flex items-center gap-2 text-xs">
+      <label className={`flex items-center gap-2 text-xs ${tappableRowClassName}`}>
         <Checkbox checked={avoidEdencom} onChange={() => void setAvoidEdencom(!avoidEdencom)} />
         {t('settings.travel.avoidEdencom', { count: EDENCOM_SYSTEMS.length })}
       </label>
-      <label className="flex items-center gap-2 text-xs">
+      <label className={`flex items-center gap-2 text-xs ${tappableRowClassName}`}>
         <Checkbox
           checked={avoidTriglavian}
           onChange={() => void setAvoidTriglavian(!avoidTriglavian)}
         />
         {t('settings.travel.avoidTriglavian', { count: TRIGLAVIAN_MINOR_VICTORY_SYSTEMS.length })}
       </label>
-      <label className="flex items-center gap-2 text-xs">
+      <label className={`flex items-center gap-2 text-xs ${tappableRowClassName}`}>
         <Checkbox checked={avoidPodKills} onChange={() => void setAvoidPodKills(!avoidPodKills)} />
         {t('settings.travel.avoidPodKills')}
       </label>
@@ -195,7 +196,7 @@ export function AvoidedSystemsEditor({
         )}
       >
         {/* Off routes straight through the list without the pilot losing it. */}
-        <label className="flex items-center gap-2 text-xs font-semibold">
+        <label className={`flex items-center gap-2 text-xs font-semibold ${tappableRowClassName}`}>
           <Checkbox checked={enabled} onChange={() => void setEnabled(!enabled)} />
           {switchLabel ?? t('settings.avoidedSystems.enabled')}
         </label>

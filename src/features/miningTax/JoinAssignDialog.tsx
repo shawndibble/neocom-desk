@@ -1,3 +1,4 @@
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -184,7 +185,9 @@ export function JoinAssignDialog({
             <ul className="divide-y divide-line">
               {candidates.map((candidate) => (
                 <li key={candidateKey(candidate)} className="py-1">
-                  <label className="flex cursor-pointer items-center gap-2">
+                  <label
+                    className={`flex cursor-pointer items-center gap-2 ${tappableRowClassName}`}
+                  >
                     <Checkbox
                       checked={selectedKeys.has(candidateKey(candidate))}
                       onChange={() => toggle(candidateKey(candidate))}

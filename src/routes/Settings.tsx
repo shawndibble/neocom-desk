@@ -1,3 +1,4 @@
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -817,11 +818,13 @@ function CharacterDefaultsPanel() {
             inline
             note={t('settings.spExtractionEnabledHint')}
           >
-            <Checkbox
-              id="settings-sp-extraction-enabled"
-              checked={spExtractionEnabled}
-              onChange={() => void setSpExtractionEnabled(!spExtractionEnabled)}
-            />
+            <label className={touchCheckboxLabelClassName}>
+              <Checkbox
+                id="settings-sp-extraction-enabled"
+                checked={spExtractionEnabled}
+                onChange={() => void setSpExtractionEnabled(!spExtractionEnabled)}
+              />
+            </label>
           </Field>
           {spExtractionEnabled && (
             <Field

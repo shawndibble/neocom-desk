@@ -1,3 +1,4 @@
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox } from '@/components/ui';
@@ -48,7 +49,7 @@ export function StatsToolbar({ stats }: { stats: FittingStats }) {
             {notice}
           </span>
         )}
-        <Button size="sm" className="min-h-11 md:min-h-7" onClick={() => void copy()}>
+        <Button size="sm" className={tappableRowClassName} onClick={() => void copy()}>
           {t('fittings.stats.copy')}
         </Button>
       </span>

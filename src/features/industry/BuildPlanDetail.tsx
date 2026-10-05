@@ -1,3 +1,4 @@
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
@@ -1567,11 +1568,13 @@ export function BuildPlanDetail({
                 {activity === 'manufacturing' && (
                   <div className="flex flex-col gap-3 border-t border-line pt-3">
                     <span className="flex items-center gap-2 text-xs">
-                      <Checkbox
-                        id="build-plan-include-reactions"
-                        checked={includeReactions}
-                        onChange={(e) => toggleIncludeReactions(e.target.checked)}
-                      />
+                      <label className={touchCheckboxLabelClassName}>
+                        <Checkbox
+                          id="build-plan-include-reactions"
+                          checked={includeReactions}
+                          onChange={(e) => toggleIncludeReactions(e.target.checked)}
+                        />
+                      </label>
                       <label htmlFor="build-plan-include-reactions">
                         {t('industry.includeReactions')}
                       </label>

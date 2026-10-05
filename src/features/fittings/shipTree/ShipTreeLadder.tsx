@@ -13,6 +13,7 @@ import {
   focusRingInsetClassName,
   interactiveClassName,
   rowInteractiveClassName,
+  tappableRowClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import type { ShipTreeShip } from '@/sde/types';
@@ -79,7 +80,9 @@ export function ShipTreeLadder({ source, tree, onFaction, onOpenShip, viewSwitch
           placeholder={t('ships.tree.filterPlaceholder')}
           aria-label={t('ships.tree.filterLabel')}
         />
-        <label className="flex items-center gap-1.5 text-xs text-text-dim">
+        <label
+          className={`flex items-center gap-1.5 text-xs text-text-dim ${tappableRowClassName}`}
+        >
           <Checkbox checked={onlyFlyable} onChange={(e) => setOnlyFlyable(e.target.checked)} />
           {t('ships.tree.onlyFlyable')}
         </label>

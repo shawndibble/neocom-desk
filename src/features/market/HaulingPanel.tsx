@@ -40,7 +40,11 @@ import {
 } from '@/components/ui';
 import { SystemLink } from '@/features/entities';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { focusRingClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  touchCheckboxLabelClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
@@ -991,7 +995,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   screen; on a phone the meter and actions take a second. */}
               <div className="@container flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-panel-2 px-3 py-2 text-sm tabular-nums">
                 <div className="flex items-center gap-x-4">
-                  <label className="flex items-center gap-2 text-xs text-text-dim">
+                  <label
+                    className={`flex items-center gap-2 text-xs text-text-dim ${tappableRowClassName}`}
+                  >
                     <Checkbox
                       aria-label={t('market.hauling.selectAll')}
                       checked={allSelected}

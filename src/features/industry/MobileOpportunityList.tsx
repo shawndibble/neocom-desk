@@ -21,7 +21,7 @@
  * Comparing: once two or more cards are ticked, a bar pinned above the bottom
  * tab bar carries the Compare action — the panel header has no room for it.
  */
-import { selectedRowClassName } from '@/components/ui/controlStyles';
+import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -222,7 +222,9 @@ export function MobileOpportunityList({
                 selected ? selectedRowClassName : 'border-l-2 border-l-transparent'
               )}
             >
-              <label className="flex size-11 cursor-pointer items-center justify-center self-start">
+              <label
+                className={`flex size-11 cursor-pointer items-center justify-center self-start ${tappableRowClassName}`}
+              >
                 <Checkbox
                   checked={selected}
                   onChange={() => onToggleSelected(row.candidate.id)}

@@ -33,7 +33,12 @@
  * Characters actually on screen mount, and `CharacterNotificationSection` is
  * memoized so an edit to one Character's preferences doesn't force React to
  * re-diff every other Character's rows.
- */ import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
+ */ import {
+  focusRingInsetClassName,
+  interactiveClassName,
+  touchCheckboxLabelClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -536,7 +541,9 @@ export function NotificationsPanel() {
             </Button>
           </div>
         )}
-        <label className="flex items-center gap-2 text-xs font-medium text-text">
+        <label
+          className={`flex items-center gap-2 text-xs font-medium text-text ${tappableRowClassName}`}
+        >
           <Checkbox
             checked={prefsValue.masterEnabled}
             onChange={() =>
@@ -558,7 +565,7 @@ export function NotificationsPanel() {
           other.
         */}
         <fieldset disabled={!prefsValue.masterEnabled} className="ml-6 space-y-2">
-          <label className="flex items-center gap-2 text-xs text-text">
+          <label className={`flex items-center gap-2 text-xs text-text ${tappableRowClassName}`}>
             <Checkbox
               checked={isBrowserChannelEnabled(prefsValue) && !browserBlocked}
               disabled={browserBlocked}
@@ -573,7 +580,7 @@ export function NotificationsPanel() {
           <p className="ml-6 text-[0.6875rem] text-text-dim">
             {t('settings.notifications.browserChannelHint')}
           </p>
-          <label className="flex items-center gap-2 text-xs text-text">
+          <label className={`flex items-center gap-2 text-xs text-text ${tappableRowClassName}`}>
             <Checkbox
               checked={isFeedChannelEnabled(prefsValue)}
               onChange={() =>
@@ -1131,19 +1138,21 @@ function ChannelCheckbox({
   const { t } = useTranslation();
   const label = t(`settings.notifications.toggleLabel.${channel}`, { event: eventLabel });
   const checkbox = (
-    <Checkbox
-      checked={enabled && checked}
-      onChange={onToggle}
-      // Not `disabled` — same reasoning as MobileOpportunityList (keeps the
-      // Tooltip trigger in the hover/touch path). `preventDefault` on click
-      // blocks the toggle instead, before `onChange` fires.
-      onClick={(event) => {
-        if (!enabled) event.preventDefault();
-      }}
-      aria-disabled={enabled ? undefined : true}
-      aria-label={label}
-      className={enabled ? undefined : 'cursor-not-allowed! opacity-40'}
-    />
+    <label className={touchCheckboxLabelClassName}>
+      <Checkbox
+        checked={enabled && checked}
+        onChange={onToggle}
+        // Not `disabled` — same reasoning as MobileOpportunityList (keeps the
+        // Tooltip trigger in the hover/touch path). `preventDefault` on click
+        // blocks the toggle instead, before `onChange` fires.
+        onClick={(event) => {
+          if (!enabled) event.preventDefault();
+        }}
+        aria-disabled={enabled ? undefined : true}
+        aria-label={label}
+        className={enabled ? undefined : 'cursor-not-allowed! opacity-40'}
+      />
+    </label>
   );
   if (enabled) return checkbox;
   const hint =

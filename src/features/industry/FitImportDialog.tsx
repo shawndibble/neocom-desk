@@ -8,6 +8,7 @@
  * routine fit has a fifth of its lines unbuildable and the pilot needs to see
  * that before twelve plans appear in their list.
  */
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Checkbox, TextArea } from '@/components/ui';
@@ -168,7 +169,7 @@ export function FitImportDialog({ catalog, onApply, onClose, initialText }: FitI
               </div>
             )}
 
-            <label className="flex items-center gap-2 text-text-dim">
+            <label className={`flex items-center gap-2 text-text-dim ${tappableRowClassName}`}>
               <Checkbox
                 checked={includeCharges}
                 onChange={(e) => toggleCharges(e.target.checked)}

@@ -16,6 +16,7 @@
  *
  * On a phone the panel folds above the route, with chips naming the rules on.
  */
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -91,7 +92,7 @@ export function RouteBridgeFields({
   const { t } = useTranslation();
   return (
     <div className="space-y-1.5">
-      <label className="flex items-center gap-2 font-semibold">
+      <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
         <Checkbox
           checked={bridgeQuery.enabled}
           onChange={() => onBridgesChange(!bridgeQuery.enabled)}
@@ -127,7 +128,7 @@ export function RouteHoleFields({
   return (
     <section className={bare ? 'space-y-3 text-xs' : 'space-y-3 border-t border-line pt-4'}>
       {!bare && <GroupLabel>{t('travel.holes.group')}</GroupLabel>}
-      <label className="flex items-center gap-2 font-semibold">
+      <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
         <Checkbox
           checked={enabled}
           onChange={() => onChange({ field: 'enabled', value: !enabled })}
