@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -8,14 +9,16 @@ import {
   MenuItem,
   RowActionsMenu,
   RowMoreActions,
+  Tooltip,
   TypeIcon,
 } from '@/components/ui';
+import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { HintText } from '@/components/ui/HintText';
 import { SystemLink } from '@/features/entities';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import type { CharacterPlanet, CharacterPlanetDetail } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
-import { formatIskCompact } from '@/lib/isk';
+import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { groupFactoryPins } from '../adapters';
 import {
   HOUR_MS,
@@ -27,6 +30,7 @@ import {
 import { eveClock, hoursLabel, schematicOutputTypeId } from './coloniesFormat';
 import { ColonyExpanded } from './ColonyExpanded';
 import { planColonyHref } from './coloniesText';
+import { tWithIsk } from './iskSlot';
 import { PlanetImage } from './PlanetImage';
 import { StatusWord } from './TodayPanel';
 
@@ -92,13 +96,22 @@ function LoadLine({ label, fraction }: { label: string; fraction: number | null 
   );
 }
 
-function actionText(action: PrimaryAction, t: TFunction): { label: string; note: string } {
+/**
+ * `label` sits inside a Button, where a focusable `IskAmount` cannot go, so it
+ * keeps shorthand and `labelGain` carries the figure for the exact reveal.
+ * `note` is plain text and renders the figure as `IskAmount`.
+ */
+function actionText(
+  action: PrimaryAction,
+  t: TFunction
+): { label: string; labelGain: number | null; note: ReactNode } {
   const gain = (value: number | null) => (value === null ? null : formatIskCompact(value));
   const perDay = t('piColonies.perDay');
   switch (action.kind) {
     case 'restart': {
       const g = gain(action.gainPerDay);
       return {
+        labelGain: action.gainPerDay,
         label:
           g === null
             ? t('piColonies.action.restart')
@@ -111,18 +124,19 @@ function actionText(action: PrimaryAction, t: TFunction): { label: string; note:
       };
     }
     case 'restart-by': {
-      const g = gain(action.keepsPerDay);
       return {
         label: t('piColonies.action.restartBy', { clock: eveClock(action.byMs) }),
+        labelGain: null,
         note:
-          g === null
+          action.keepsPerDay === null
             ? t('piColonies.action.restartByNote')
-            : t('piColonies.action.keeps', { gain: g, perDay }),
+            : tWithIsk(t, 'piColonies.action.keeps', { perDay }, action.keepsPerDay),
       };
     }
     case 'haul': {
       const g = gain(action.savesPerDay);
       return {
+        labelGain: action.savesPerDay,
         label:
           g === null ? t('piColonies.action.haul') : t('piColonies.action.haulSaves', { gain: g }),
         note: t('piColonies.action.haulNote', { minutes: action.minutes }),
@@ -131,6 +145,7 @@ function actionText(action: PrimaryAction, t: TFunction): { label: string; note:
     case 'fix-factories': {
       const g = gain(action.gainPerDay);
       return {
+        labelGain: action.gainPerDay,
         label:
           g === null
             ? t('piColonies.action.fixFactories', { count: action.count })
@@ -141,6 +156,7 @@ function actionText(action: PrimaryAction, t: TFunction): { label: string; note:
     case 'add-extractors': {
       const g = gain(action.gainPerDay);
       return {
+        labelGain: action.gainPerDay,
         label:
           g === null
             ? t('piColonies.action.addExtractors', { count: action.count })
@@ -151,6 +167,7 @@ function actionText(action: PrimaryAction, t: TFunction): { label: string; note:
     case 'add-factories': {
       const g = gain(action.gainPerDay);
       return {
+        labelGain: action.gainPerDay,
         label:
           g === null
             ? t('piColonies.action.addFactories', { count: action.count })
@@ -159,13 +176,13 @@ function actionText(action: PrimaryAction, t: TFunction): { label: string; note:
       };
     }
     case 'details': {
-      const g = gain(action.perDay);
       return {
         label: t('piColonies.action.details'),
+        labelGain: null,
         note:
-          g === null
+          action.perDay === null
             ? t('piColonies.action.detailsNote')
-            : t('piColonies.action.allGood', { gain: g, perDay }),
+            : tWithIsk(t, 'piColonies.action.allGood', { perDay }, action.perDay),
       };
     }
   }
@@ -175,7 +192,7 @@ function tagText(
   tag: FaultTag,
   planetName: string,
   t: TFunction
-): { text: string; tone: string; hint?: string } {
+): { text: ReactNode; tone: string; hint?: string } {
   switch (tag.kind) {
     case 'slowed':
       return {
@@ -203,11 +220,12 @@ function tagText(
         text:
           tag.gainPerDay === null
             ? t('piColonies.tag.roomExtractors', { count: tag.count })
-            : t('piColonies.tag.roomExtractorsGain', {
-                count: tag.count,
-                gain: formatIskCompact(tag.gainPerDay),
-                perDay: t('piColonies.perDay'),
-              }),
+            : tWithIsk(
+                t,
+                'piColonies.tag.roomExtractorsGain',
+                { count: tag.count, perDay: t('piColonies.perDay') },
+                tag.gainPerDay
+              ),
         tone: 'border-accent/60 text-accent',
       };
     case 'room-factories':
@@ -338,13 +356,27 @@ export function ColonyRowView(props: ColonyRowViewProps) {
         ? Math.max(0, storage.hoursToFull) / storage.haulHours
         : 1;
 
-  const { label, note } = actionText(action, t);
+  const { label, labelGain, note } = actionText(action, t);
   const variant =
     action.kind === 'details'
       ? 'ghost'
       : props.primary && row.status !== 'stopped'
         ? 'primary'
         : BUTTON_VARIANT[row.status];
+
+  const exactGain =
+    labelGain === null ? null : t('common.iskExact', { amount: formatIsk(labelGain, 0) });
+  const actionButton = (
+    <Button size="md" variant={variant} className="w-full" onClick={props.onExpand}>
+      {label}
+      {exactGain && <span className="sr-only"> {exactGain}</span>}
+    </Button>
+  );
+  const actionWithExact = exactGain ? (
+    <Tooltip content={exactGain}>{actionButton}</Tooltip>
+  ) : (
+    actionButton
+  );
 
   const toggleLabel = t('piColonies.toggleColony', { name: planetName });
 
@@ -369,143 +401,143 @@ export function ColonyRowView(props: ColonyRowViewProps) {
   return (
     <div className="border-b border-line last:border-b-0" data-colony-status={row.status}>
       <RowActionsMenu name={planetName} items={menu}>
-        <div
-          // A pointer convenience: the real controls are the toggle button, the
-          // action and the ⋮ menu. A click on a link or button inside is theirs.
-          onClick={(event) => {
-            const target = event.target as HTMLElement;
-            if (target.closest('a, button:not([data-row-toggle]), input, [role="menuitem"]'))
-              return;
-            props.onToggle();
-          }}
-          className="relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_11rem_auto] md:items-start"
-        >
-          <div className="flex min-w-0 items-start gap-2.5 max-md:pr-11">
-            <button
-              type="button"
-              id={buttonId}
-              data-row-toggle
-              aria-expanded={expanded}
-              aria-controls={regionId}
-              aria-label={toggleLabel}
-              className="-m-1 inline-flex min-h-11 min-w-11 shrink-0 items-start justify-center rounded-xs p-1 pt-3 hover:bg-panel focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-0 md:pt-2.5"
-            >
-              <Caret expanded={expanded} />
-            </button>
-            <PlanetImage type={row.planetType} size={40} />
-            <div className="min-w-0 space-y-1">
-              <h3 className="flex flex-wrap items-baseline gap-x-2 text-sm leading-tight font-semibold">
-                <SystemLink systemId={row.systemId}>{planetName}</SystemLink>
-                <span className="text-xs font-normal">
-                  <span className="mr-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('piColonies.statusLabel')}
+        <RowTappableContext.Provider value>
+          <div
+            // A pointer convenience: the real controls are the toggle button, the
+            // action and the ⋮ menu. A click on a link or button inside is theirs.
+            onClick={(event) => {
+              const target = event.target as HTMLElement;
+              if (target.closest('a, button:not([data-row-toggle]), input, [role="menuitem"]'))
+                return;
+              props.onToggle();
+            }}
+            className="relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_11rem_auto] md:items-start"
+          >
+            <div className="flex min-w-0 items-start gap-2.5 max-md:pr-11">
+              <button
+                type="button"
+                id={buttonId}
+                data-row-toggle
+                aria-expanded={expanded}
+                aria-controls={regionId}
+                aria-label={toggleLabel}
+                className="-m-1 inline-flex min-h-11 min-w-11 shrink-0 items-start justify-center rounded-xs p-1 pt-3 hover:bg-panel focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-0 md:pt-2.5"
+              >
+                <Caret expanded={expanded} />
+              </button>
+              <PlanetImage type={row.planetType} size={40} />
+              <div className="min-w-0 space-y-1">
+                <h3 className="flex flex-wrap items-baseline gap-x-2 text-sm leading-tight font-semibold">
+                  <SystemLink systemId={row.systemId}>{planetName}</SystemLink>
+                  <span className="text-xs font-normal">
+                    <span className="mr-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {t('piColonies.statusLabel')}
+                    </span>
+                    <StatusWord status={row.status} />
                   </span>
-                  <StatusWord status={row.status} />
-                </span>
-              </h3>
-              <p className="flex min-w-0 items-center gap-1.5 text-xs text-text-dim">
-                {extractorProductId !== null && (
-                  <TypeIcon typeId={extractorProductId} size={32} width={16} height={16} />
-                )}
-                {outputId !== null && (
-                  <>
-                    <span aria-hidden="true">→</span>
-                    <TypeIcon typeId={outputId} size={32} width={16} height={16} />
-                  </>
-                )}
-                <span className="min-w-0 truncate">
-                  {shownProductId !== null && productName !== null ? (
-                    <MarketItemLink typeId={shownProductId}>{productName}</MarketItemLink>
-                  ) : (
-                    t('piColonies.nothingMade')
+                </h3>
+                <p className="flex min-w-0 items-center gap-1.5 text-xs text-text-dim">
+                  {extractorProductId !== null && (
+                    <TypeIcon typeId={extractorProductId} size={32} width={16} height={16} />
                   )}
-                  {' · '}
-                  {t(`pi.planetType.${row.planetType}`)}
+                  {outputId !== null && (
+                    <>
+                      <span aria-hidden="true">→</span>
+                      <TypeIcon typeId={outputId} size={32} width={16} height={16} />
+                    </>
+                  )}
+                  <span className="min-w-0 truncate">
+                    {shownProductId !== null && productName !== null ? (
+                      <MarketItemLink typeId={shownProductId}>{productName}</MarketItemLink>
+                    ) : (
+                      t('piColonies.nothingMade')
+                    )}
+                    {' · '}
+                    {t(`pi.planetType.${row.planetType}`)}
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <div className="min-w-0 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className={`flex items-center gap-1 ${MICRO}`}>
+                  {t('piColonies.extractors')}
+                  <InfoTooltip
+                    label={t('common.aboutLabel', { label: t('piColonies.extractors') })}
+                    content={t('piColonies.help.extractors')}
+                  />
                 </span>
+                <span
+                  className={`text-xs font-semibold tabular-nums ${stopped ? 'text-danger' : row.status === 'expiring' ? 'text-warning' : 'text-text'}`}
+                >
+                  {extractorRight}
+                </span>
+              </div>
+              <Meter fraction={stopped ? 1 : extractor.remainingFraction} tone={extractorTone} />
+              {extractorNote && <p className="text-[0.6875rem] text-text-dim">{extractorNote}</p>}
+            </div>
+
+            <div className="min-w-0 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className={`flex items-center gap-1 ${MICRO}`}>
+                  {t('piColonies.storageFull')}
+                  <InfoTooltip
+                    label={t('common.aboutLabel', { label: t('piColonies.storageFull') })}
+                    content={t('piColonies.help.storage', { hours: Math.round(storage.haulHours) })}
+                  />
+                </span>
+                <span
+                  className={`text-xs font-semibold tabular-nums ${storage.fillsBeforeHaul ? (storage.hoursToFull !== null && storage.hoursToFull < 24 ? 'text-danger' : 'text-warning') : 'text-text'}`}
+                >
+                  {storageRight}
+                </span>
+              </div>
+              <Meter
+                fraction={storageFraction}
+                tone={
+                  storage.fillsBeforeHaul
+                    ? storage.hoursToFull !== null && storage.hoursToFull < 24
+                      ? 'danger'
+                      : 'warning'
+                    : 'success'
+                }
+                rest="stall"
+              />
+              <p
+                className={`text-[0.6875rem] ${storage.fillsBeforeHaul ? 'text-warning' : 'text-text-dim'}`}
+              >
+                {storageNote}
               </p>
             </div>
-          </div>
 
-          <div className="min-w-0 space-y-1">
-            <div className="flex items-center justify-between gap-2">
-              <span className={`flex items-center gap-1 ${MICRO}`}>
-                {t('piColonies.extractors')}
-                <InfoTooltip
-                  label={t('common.aboutLabel', { label: t('piColonies.extractors') })}
-                  content={t('piColonies.help.extractors')}
-                />
-              </span>
-              <span
-                className={`text-xs font-semibold tabular-nums ${stopped ? 'text-danger' : row.status === 'expiring' ? 'text-warning' : 'text-text'}`}
-              >
-                {extractorRight}
-              </span>
+            <div className="min-w-0 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className={MICRO}>{t('piColonies.load')}</span>
+                <span className="text-[0.6875rem] text-text-dim">
+                  {t('piColonies.ccLevel', { level: row.load.ccLevel })}
+                </span>
+              </div>
+              <LoadLine label={t('piColonies.cpu')} fraction={row.load.cpu} />
+              <LoadLine label={t('piColonies.power')} fraction={row.load.power} />
             </div>
-            <Meter fraction={stopped ? 1 : extractor.remainingFraction} tone={extractorTone} />
-            {extractorNote && <p className="text-[0.6875rem] text-text-dim">{extractorNote}</p>}
-          </div>
 
-          <div className="min-w-0 space-y-1">
-            <div className="flex items-center justify-between gap-2">
-              <span className={`flex items-center gap-1 ${MICRO}`}>
-                {t('piColonies.storageFull')}
-                <InfoTooltip
-                  label={t('common.aboutLabel', { label: t('piColonies.storageFull') })}
-                  content={t('piColonies.help.storage', { hours: Math.round(storage.haulHours) })}
-                />
-              </span>
-              <span
-                className={`text-xs font-semibold tabular-nums ${storage.fillsBeforeHaul ? (storage.hoursToFull !== null && storage.hoursToFull < 24 ? 'text-danger' : 'text-warning') : 'text-text'}`}
-              >
-                {storageRight}
-              </span>
+            <div className="flex min-w-0 flex-col gap-1 md:items-stretch">
+              {actionWithExact}
+              <p className="text-center text-[0.6875rem] text-text-dim">{note}</p>
             </div>
-            <Meter
-              fraction={storageFraction}
-              tone={
-                storage.fillsBeforeHaul
-                  ? storage.hoursToFull !== null && storage.hoursToFull < 24
-                    ? 'danger'
-                    : 'warning'
-                  : 'success'
-              }
-              rest="stall"
-            />
-            <p
-              className={`text-[0.6875rem] ${storage.fillsBeforeHaul ? 'text-warning' : 'text-text-dim'}`}
-            >
-              {storageNote}
-            </p>
-          </div>
 
-          <div className="min-w-0 space-y-1">
-            <div className="flex items-center justify-between gap-2">
-              <span className={MICRO}>{t('piColonies.load')}</span>
-              <span className="text-[0.6875rem] text-text-dim">
-                {t('piColonies.ccLevel', { level: row.load.ccLevel })}
-              </span>
+            <div className="flex justify-end max-md:absolute max-md:top-1 max-md:right-1 md:items-start">
+              <RowMoreActions />
             </div>
-            <LoadLine label={t('piColonies.cpu')} fraction={row.load.cpu} />
-            <LoadLine label={t('piColonies.power')} fraction={row.load.power} />
-          </div>
 
-          <div className="flex min-w-0 flex-col gap-1 md:items-stretch">
-            <Button size="md" variant={variant} className="w-full" onClick={props.onExpand}>
-              {label}
-            </Button>
-            <p className="text-center text-[0.6875rem] text-text-dim">{note}</p>
+            {row.tags.length > 0 && (
+              <div className="md:col-span-6 md:col-start-1 md:pl-[4.6rem]">
+                <FaultTags tags={row.tags} planetName={planetName} />
+              </div>
+            )}
           </div>
-
-          <div className="flex justify-end max-md:absolute max-md:top-1 max-md:right-1 md:items-start">
-            <RowMoreActions />
-          </div>
-
-          {row.tags.length > 0 && (
-            <div className="md:col-span-6 md:col-start-1 md:pl-[4.6rem]">
-              <FaultTags tags={row.tags} planetName={planetName} />
-            </div>
-          )}
-        </div>
+        </RowTappableContext.Provider>
       </RowActionsMenu>
 
       {expanded && (
