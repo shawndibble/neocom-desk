@@ -49,7 +49,9 @@
  *
  * 5. **Host fit.** The host's P2+ factories are fitted through
  *    `colonyCapacity.fitPlannedPins`, the same model extraction uses. An
- *    overrun is a `host-over-budget` shortfall, not a silent shrink.
+ *    overrun is a `host-over-budget` shortfall, not a silent shrink — and
+ *    a host that cannot be built makes nothing, so its goals reach zero and
+ *    the P1 planned for it is sold instead.
  *
  * 6. Every other colony is **idle**.
  *
@@ -370,6 +372,7 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
     const tier = tierOf(id);
     if (tier === 0) return shortP0.has(id);
     if (tier === 1) return p1Short.has(id);
+    if (!hostFit?.fits) return true;
     if (seen.has(id)) return false;
     const next = new Set(seen).add(id);
     return pi.schematics[String(id)].inputs.some((input) => isShort(input.typeID, next));
@@ -421,10 +424,10 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
   const highGoals = host ? plannedGoals.filter((g) => tierOf(g.typeId) >= 2) : [];
   const highAchieved = highGoals.map((g) => {
     const chain = expandChain(g.typeId, pi, { unitsPerHour: g.unitsPerDay / HOURS_PER_DAY });
-    const fraction = Math.min(
-      1,
-      ...chain.nodes.filter((n) => n.tier === 1).map((n) => supplyFraction(n.typeId))
-    );
+    // A host that cannot carry its factories makes nothing at all.
+    const fraction = hostFit?.fits
+      ? Math.min(1, ...chain.nodes.filter((n) => n.tier === 1).map((n) => supplyFraction(n.typeId)))
+      : 0;
     return { typeId: g.typeId, unitsPerDay: g.unitsPerDay * fraction, fraction };
   });
   const hostUse = new Map<number, number>();

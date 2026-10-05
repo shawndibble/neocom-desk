@@ -134,13 +134,19 @@ describe('planGoals — factory host', () => {
   });
 
   it('flags a host whose factories overrun its Command Center', () => {
+    // CC0's 1675 tf cannot carry even the Launchpad's 3600; the extractors are fine.
     const result = plan(
-      [goal(WETWARE_MAINFRAME, 1)],
-      [colony(1, 'temperate', 0), colony(2, 'barren', 0)]
+      [goal(COOLANT, 5)],
+      [colony(1, 'gas'), colony(2, 'storm'), colony(3, 'temperate', 0)]
     );
+    expect(result.factoryHost?.planetId).toBe(3);
     expect(result.shortfalls).toContainEqual(
       expect.objectContaining({ kind: 'host-over-budget', planetId: result.factoryHost?.planetId })
     );
+    // Factories that cannot be built make nothing, so nothing is shipped or priced off them.
+    expect(result.achieved).toEqual([{ typeId: COOLANT, unitsPerHour: 0, fraction: 0 }]);
+    expect(result.flows.filter((f) => f.from === 3 || f.to === 3)).toEqual([]);
+    expect(result.demand.find((l) => l.typeId === COOLANT)?.source).toBe('short');
   });
 });
 
