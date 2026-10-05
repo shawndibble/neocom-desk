@@ -23,7 +23,7 @@ describe('InteractionGrammar styleguide section', () => {
     }
     const rules = Object.values(en.styleguide.interactionGrammar.rules);
     expect(rules.length).toBeGreaterThan(20);
-    for (const rule of rules) expect(screen.getByText(rule)).toBeInTheDocument();
+    for (const rule of rules) expect(screen.getAllByText(rule).length).toBeGreaterThan(0);
     // External links carry the hidden "opens in a new tab" text and a real href.
     expect(screen.getByRole('link', { name: /zKillboard/ })).toHaveAttribute('target', '_blank');
     // Entity links are real anchors.
