@@ -33,8 +33,6 @@ export const HAUL_SHIPS: readonly { id: ShipClass; label: string; m3: number }[]
   { id: 'epithal', label: 'Epithal planetary bay', m3: 45_000 },
 ];
 
-const INDUSTRIAL_M3 = 5_000;
-
 export interface HaulFit {
   fits: Record<ShipClass, boolean>;
   /** The smallest ship that holds the whole trip; null when none does. */
@@ -53,7 +51,10 @@ export function haulFit(m3: number | null): HaulFit | null {
   return {
     fits,
     smallest: HAUL_SHIPS.find((ship) => m3 <= ship.m3)?.id ?? null,
-    industrialTrips: Math.max(1, Math.ceil(m3 / INDUSTRIAL_M3)),
+    industrialTrips: Math.max(
+      1,
+      Math.ceil(m3 / (HAUL_SHIPS.find((ship) => ship.id === 'industrial')?.m3 ?? 5_000))
+    ),
   };
 }
 

@@ -42,11 +42,10 @@
 
 import type { CharacterPlanet, PlanetPin } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
-import { extractorState } from '@/engine/pi/colonyStatus';
-import { EFFICIENT_WINDOW_FRACTION } from '@/engine/pi/colonyStatus';
+import { extractorState, EFFICIENT_WINDOW_FRACTION } from '@/engine/pi/colonyStatus';
 import { hasYieldBaseline, pastEfficientWindow } from '@/engine/pi/extraction';
 import { volumeOf } from '@/engine/pi/haulEffort';
-import { CUSTOMS_TAXABLE_VALUE, isP0 } from '@/engine/pi/chain';
+import { CUSTOMS_TAXABLE_VALUE, DEFAULT_CUSTOMS_TAX_RATE, isP0 } from '@/engine/pi/chain';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import {
   colonyAdvice,
@@ -580,7 +579,12 @@ function analyseColony(args: {
   const room = plan.headroom.extractorControlUnit ?? 0;
   const maxEcus = plannerPolicy({ maxP0Types: 1, buyP1: false }).maxEcusPerColony;
   const extraEcus = Math.min(room, Math.max(0, maxEcus - ecus));
-  if (extraEcus > 0 && ecus > 0 && colony.extractedPerHour.length === 1) {
+  // Extra heads for idle factories and extra ECUs draw on the same CPU/Powergrid
+  // headroom, so when the idle win already buys heads, this one would count it twice.
+  const headroomSpent = wins.some(
+    (win) => win.detail.kind === 'idle-factories' && win.detail.headsToAdd !== null
+  );
+  if (extraEcus > 0 && ecus > 0 && colony.extractedPerHour.length === 1 && !headroomSpent) {
     const only = colony.extractedPerHour[0];
     const perEcu = only.unitsPerHour / ecus;
     // The same flat falloff the rebuild scorer applies to every ECU after the first.
@@ -732,7 +736,7 @@ function factoryRoom(
     revenuePrices: books.revenuePrices,
     allowMarketSourcing: false,
     taxRateByPlanet: new Map(built.map((row) => [row.planetId, row.taxRate])),
-    taxRate: built.length > 0 ? built[0].taxRate : 0.1,
+    taxRate: built.length > 0 ? built[0].taxRate : DEFAULT_CUSTOMS_TAX_RATE,
     salesTaxPct: books.salesTaxPct,
   });
   if (!network) return out;
