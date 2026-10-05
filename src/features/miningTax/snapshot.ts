@@ -5,6 +5,7 @@
  */
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { loadAllCharacterLedgers } from './ledger';
+import { recordLedgerArrivals } from './oreArrivalLog';
 import { loadPayees } from './payees';
 import { loadAssignments } from './assignments';
 import { reconcileAssignments } from './reconcile';
@@ -62,6 +63,8 @@ export interface MoonMiningTaxSnapshot {
 
 export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot> {
   const ledgers = await loadAllCharacterLedgers();
+  // Settle up's "Ore still arriving" line reads growth between loads.
+  await recordLedgerArrivals(ledgers);
 
   // Before reconcile, not after: reconcile's growth diff is defined per
   // Mining Ledger Entry over the Assignments covering it, so it has to see
