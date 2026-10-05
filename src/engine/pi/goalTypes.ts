@@ -146,6 +146,12 @@ export interface DemandLine {
   source: DemandSource;
   /** 0..1: the share of `unitsPerHour` the plan makes (extracts, for a P0). */
   madeFraction: number;
+  /**
+   * On a `'blocked'` line only: the P0s, ascending, whose type gaps block the
+   * goals this line serves. Each matches a `type-gap` shortfall's `p0TypeId`,
+   * which carries that P0's own `fixPlanetTypes`.
+   */
+  blockedBy?: number[];
 }
 
 /**

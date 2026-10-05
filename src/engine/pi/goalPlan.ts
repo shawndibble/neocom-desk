@@ -211,6 +211,8 @@ interface GoalTriage {
   live: Goal[];
   /** Goals a type gap blocks: they make nothing, so nothing is extracted for them. */
   blocked: Goal[];
+  /** Per blocked goal, the P0s whose type gaps block it, ascending. */
+  blockedBy: Map<Goal, number[]>;
   typeGaps: Shortfall[];
 }
 
@@ -233,6 +235,7 @@ function triageGoals(
   const gapUnits = new Map<number, number>(); // p1 → P1 units/h the blocked goals wanted
   const live: Goal[] = [];
   const blocked: Goal[] = [];
+  const blockedBy = new Map<Goal, number[]>();
   for (const g of goals) {
     const chain = expandChain(g.typeId, pi, { unitsPerHour: g.unitsPerDay / HOURS_PER_DAY });
     const gaps = buyP1
@@ -245,6 +248,12 @@ function triageGoals(
       continue;
     }
     blocked.push(g);
+    blockedBy.set(
+      g,
+      [...new Set(gaps.map((n) => pi.schematics[String(n.typeId)].inputs[0].typeID))].sort(
+        (a, b) => a - b
+      )
+    );
     for (const n of gaps) gapUnits.set(n.typeId, (gapUnits.get(n.typeId) ?? 0) + n.unitsPerHour);
   }
   const typeGaps: Shortfall[] = [...gapUnits]
@@ -262,7 +271,7 @@ function triageGoals(
         fixPlanetTypes: [...raw.planetTypes],
       };
     });
-  return { live, blocked, typeGaps };
+  return { live, blocked, blockedBy, typeGaps };
 }
 
 /**
@@ -829,11 +838,21 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
   // nothing, consuming and pricing nothing. A type both a live goal and a
   // blocked one need gets two lines: (typeId, source) is unique, typeId alone
   // is not.
+  // Each line names the type-gap P0s blocking the goals it serves, so a
+  // caller can say which planet type each blocked goal is waiting on.
   const blockedDemand = new Map<number, number>();
-  expandInto(
-    blockedDemand,
-    triage.blocked.filter((g) => !boughtOutright.has(g))
-  );
+  const blockedByType = new Map<number, Set<number>>();
+  for (const g of triage.blocked) {
+    if (boughtOutright.has(g)) continue;
+    const own = new Map<number, number>();
+    expandInto(own, [g]);
+    for (const [typeId, units] of own) {
+      blockedDemand.set(typeId, (blockedDemand.get(typeId) ?? 0) + units);
+      const by = blockedByType.get(typeId) ?? new Set<number>();
+      triage.blockedBy.get(g)!.forEach((p0) => by.add(p0));
+      blockedByType.set(typeId, by);
+    }
+  }
   for (const [typeId, unitsPerHour] of blockedDemand) {
     lines.push({
       typeId,
@@ -842,6 +861,7 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
       factories: factoriesFor(typeId, unitsPerHour, pi),
       source: 'blocked',
       madeFraction: 0,
+      blockedBy: [...blockedByType.get(typeId)!].sort((a, b) => a - b),
     });
   }
   for (const g of dead) {

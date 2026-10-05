@@ -616,4 +616,23 @@ describe('planGoals — what a gap can be fixed with', () => {
       }),
     ]);
   });
+
+  it('ties each blocked line to the type gaps that block its goal', () => {
+    const result = plan(
+      [
+        { typeId: COOLANT, unitsPerDay: 200 },
+        { typeId: ROBOTICS, unitsPerDay: 30 },
+      ],
+      fixtureColonies(),
+      POLICY,
+      fixtureBooks()
+    );
+    const blocked = result.demand.filter((l) => l.source === 'blocked');
+    expect(blocked.length).toBeGreaterThan(0);
+    // Robotics needs Heavy Metals (Toxic Metals) and Non-CS Crystals (Chiral Structures).
+    for (const line of blocked) expect(line.blockedBy).toEqual([2272, 2306]);
+    expect(result.demand.filter((l) => l.source !== 'blocked').every((l) => !l.blockedBy)).toBe(
+      true
+    );
+  });
 });
