@@ -210,7 +210,7 @@ export function YourPlanetsPanel({
               stats.m3PerWeek === null
                 ? '—'
                 : t('piPlan.make.m3PerWeek', {
-                    value: Math.round(stats.m3PerWeek).toLocaleString(),
+                    value: Math.round(stats.m3PerWeek).toLocaleString('en'),
                   })
             }
           />
@@ -734,7 +734,7 @@ export function HaulingPanel({ hauling, hubName }: { hauling: HaulView; hubName:
   const m3 = (value: number | null) =>
     value === null
       ? '—'
-      : t('piPlan.make.m3PerTrip', { value: Math.round(value).toLocaleString() });
+      : t('piPlan.make.m3PerTrip', { value: Math.round(value).toLocaleString('en') });
   const fitKey =
     fit.kind === 'unknown'
       ? 'piPlan.make.fitUnknown'
@@ -801,7 +801,7 @@ export function HaulingPanel({ hauling, hubName }: { hauling: HaulView; hubName:
               return (
                 <li key={ship.id} className={ship.fits ? 'text-success' : 'text-text-dim'}>
                   <span aria-hidden="true">{ship.fits ? '✓' : '✕'}</span>{' '}
-                  {t(`piPlan.make.ship.${ship.id}`, { m3: spec.m3.toLocaleString() })}
+                  {t(`piPlan.make.ship.${ship.id}`, { m3: spec.m3.toLocaleString('en') })}
                   <span className="sr-only">
                     {' '}
                     {ship.fits ? t('piPlan.make.shipFits') : t('piPlan.make.shipNoFit')}
@@ -922,11 +922,11 @@ function ChecklistColumnView({ column, ticks }: { column: ChecklistColumn; ticks
           <p className="truncate text-[0.6875rem] text-text-dim">
             {column.change.from.length > 0 && (
               <>
-                {column.change.from.map((item) => item.name).join(', ')}
+                <ItemList items={column.change.from} />
                 {' → '}
               </>
             )}
-            {column.change.to.name}
+            <ItemLink item={column.change.to} />
           </p>
         </div>
         <Minutes value={column.minutes} />

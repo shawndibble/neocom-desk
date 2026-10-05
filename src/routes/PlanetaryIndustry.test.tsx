@@ -817,6 +817,9 @@ describe('PlanetaryIndustry', () => {
     window.history.pushState({}, '', `/planetary-industry/plan?goals=${WATER}:24`);
     render(<App />);
     await screen.findByRole('heading', { name: 'Goals' });
+    expect(
+      screen.getByText('Opened “Make a specific product” because your link names a product.')
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Make a specific product/ })).toHaveAttribute(
       'aria-current',
       'true'

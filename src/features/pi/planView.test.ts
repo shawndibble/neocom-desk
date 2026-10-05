@@ -72,7 +72,10 @@ describe('buildPlanView', () => {
   it('prunes ticks whose row is gone', () => {
     const live = tickableIds(view);
     expect(live.has('1:restart')).toBe(true);
-    expect(pruneTicks(['1:restart', '9:gone'], live)).toEqual(['1:restart']);
+    expect(pruneTicks(['1:restart', '1:gone', '9:other'], live, new Set([1, 2]))).toEqual([
+      '1:restart',
+      '9:other',
+    ]);
   });
 
   it('is empty when no colony has a figure', () => {

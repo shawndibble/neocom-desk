@@ -200,7 +200,7 @@ function planetName(colony: PlanColonyAdvice, fallback: (planetId: number) => st
 }
 
 function percent(used: number, budget: number): number {
-  return budget > 0 ? Math.min(100, Math.round((used / budget) * 100)) : 0;
+  return Math.min(100, Math.round((used / budget) * 100));
 }
 
 function alternativeOf(primary: RebuildOption, alternative: RebuildOption): AlternativeView {
@@ -372,17 +372,20 @@ export function buildPlanView(
       steps: steps.map((step, i) =>
         stepView(step, `${colony.planetId}:${pick.typeId}:${i}:${step.verb}`, pi, carries)
       ),
-      fit: colony.rebuildFit
-        ? {
-            level: colony.rebuildFit.level,
-            cpuPercent: percent(colony.rebuildFit.used.cpu, colony.rebuildFit.budget.cpu),
-            powerPercent: percent(
-              colony.rebuildFit.used.powergrid,
-              colony.rebuildFit.budget.powergrid
-            ),
-            upgradeFromLevel,
-          }
-        : null,
+      fit:
+        colony.rebuildFit &&
+        colony.rebuildFit.budget.cpu > 0 &&
+        colony.rebuildFit.budget.powergrid > 0
+          ? {
+              level: colony.rebuildFit.level,
+              cpuPercent: percent(colony.rebuildFit.used.cpu, colony.rebuildFit.budget.cpu),
+              powerPercent: percent(
+                colony.rebuildFit.used.powergrid,
+                colony.rebuildFit.budget.powergrid
+              ),
+              upgradeFromLevel,
+            }
+          : null,
     });
   }
 
@@ -440,10 +443,16 @@ export function buildPlanView(
 /**
  * Tick state that survives only while its row does. A quick win that
  * disappears (the pilot fixed it, so the colony no longer has it) takes its
- * tick with it, and one that comes back starts unticked.
+ * tick with it, and one that comes back starts unticked. Only colonies the
+ * view covers are pruned: ticks are per device, so another character's rows
+ * are not this view's to drop.
  */
-export function pruneTicks(ticked: readonly string[], liveIds: ReadonlySet<string>): string[] {
-  return ticked.filter((id) => liveIds.has(id));
+export function pruneTicks(
+  ticked: readonly string[],
+  liveIds: ReadonlySet<string>,
+  coveredPlanetIds: ReadonlySet<number>
+): string[] {
+  return ticked.filter((id) => liveIds.has(id) || !coveredPlanetIds.has(Number.parseInt(id, 10)));
 }
 
 /** Every tickable id in the view: each quick win and each checklist step. */
@@ -452,4 +461,9 @@ export function tickableIds(view: PlanView): Set<string> {
     ...view.quickWins.map((win) => win.id),
     ...view.checklist.flatMap((column) => column.steps.map((step) => step.id)),
   ]);
+}
+
+/** The colonies the view has a figure for: the ones whose ticks it may prune. */
+export function coveredPlanets(view: PlanView): Set<number> {
+  return new Set(view.strips.map((strip) => strip.planetId));
 }

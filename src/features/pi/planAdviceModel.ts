@@ -383,6 +383,13 @@ export function buildPlanAdvice(input: PlanAdviceInput): PlanAdvice {
     };
   });
 
+  // Two names can slug alike; a duplicate id would send a deep link to the wrong card.
+  const anchors = new Set<string>();
+  for (const colony of colonies) {
+    if (anchors.has(colony.anchor)) colony.anchor = `${colony.anchor}-${colony.planetId}`;
+    anchors.add(colony.anchor);
+  }
+
   const haulColonies: HaulColony[] = colonies.map((colony) => {
     const w = work.get(colony.planetId)!;
     const rebuilt = colony.rebuild.status === 'change' ? colony.rebuild.pick.m3PerDay : null;

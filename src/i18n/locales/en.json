@@ -4789,6 +4789,8 @@
       "fitNeedsUpgrade_other": "Upgrade the Command Center to level {{level}} first (+{{steps}} steps)",
       "cpu": "CPU",
       "power": "Power",
+      "liveUnknown_one": "{{count}} colony could not be measured and is left out.",
+      "liveUnknown_other": "{{count}} colonies could not be measured and are left out.",
       "liveQuick": "Quick wins add {{gain}} ISK a day in about {{count}} minutes.",
       "liveRebuild_one": "Rebuilding {{count}} planet adds {{gain}} ISK a day on top.",
       "liveRebuild_other": "Rebuilding {{count}} planets adds {{gain}} ISK a day on top.",

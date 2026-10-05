@@ -69,9 +69,10 @@ describe('MakeMorePlan', () => {
   });
 
   it('forgets a tick whose quick win has gone, so a win that returns starts unticked', async () => {
-    await usePlanTicks.getState().setValue(['1:restart', '9:gone']);
+    // Another character's row (planet 9) is not this view's to drop.
+    await usePlanTicks.getState().setValue(['1:restart', '1:stale', '9:other']);
     renderPlan();
-    await waitFor(() => expect(usePlanTicks.getState().value).toEqual(['1:restart']));
+    await waitFor(() => expect(usePlanTicks.getState().value).toEqual(['1:restart', '9:other']));
   });
 
   it('says Change for a rebuild and Keep for a colony already on its best', () => {

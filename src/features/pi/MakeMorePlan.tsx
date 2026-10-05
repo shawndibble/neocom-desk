@@ -12,7 +12,7 @@ import {
   YourPlanetsPanel,
   type Ticks,
 } from './MakeMoreSections';
-import { buildPlanView, pruneTicks, tickableIds, type PlanView } from './planView';
+import { buildPlanView, coveredPlanets, pruneTicks, tickableIds, type PlanView } from './planView';
 import { usePlanPreference, usePlanTicks } from './planTicksPref';
 import { usePlanAdvice } from './usePlanAdvice';
 
@@ -39,6 +39,9 @@ function headlineText(view: PlanView, t: ReturnType<typeof useTranslation>['t'])
         count: headline.rebuildCount,
       })
     );
+  }
+  if (view.stats.unknownColonies > 0) {
+    parts.push(t('piPlan.make.liveUnknown', { count: view.stats.unknownColonies }));
   }
   return parts.join(' ');
 }
@@ -75,7 +78,7 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   // A row that is gone takes its tick with it.
   useEffect(() => {
     if (!view || !ticksHydrated) return;
-    const kept = pruneTicks(ticked, tickableIds(view));
+    const kept = pruneTicks(ticked, tickableIds(view), coveredPlanets(view));
     if (kept.length !== ticked.length) void setTicked(kept);
   }, [view, ticked, ticksHydrated, setTicked]);
 
@@ -99,7 +102,7 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   }, []);
   useEffect(() => {
     if (scrollTarget) scrollOnce(scrollTarget);
-  }, [scrollTarget, scrollOnce]);
+  }, [scrollTarget, scrollOnce, location.key]);
 
   if (state.status === 'prices-failed') {
     return <EmptyState title={t('piPlan.pricesFailedTitle')} hint={t('piPlan.pricesFailedHint')} />;
