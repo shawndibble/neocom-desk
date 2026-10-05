@@ -6,6 +6,7 @@ import type {
   MarketWideTreeMap,
   MasteryMap,
   PiData,
+  PiSystemPlanets,
   ReprocessingMap,
   SkillAttributeModifierMap,
   ShipTreeData,
@@ -68,6 +69,11 @@ export const loadReprocessing = cached<ReprocessingMap>('reprocessing.json');
  * other consumer of `pi.json` would otherwise pay for it on load.
  */
 export const loadPiPlanetRadius = cached<Record<string, number>>('pi-planet-radius.json');
+/**
+ * System -> planet-type counts (see `PiSystemPlanets`), for finding the
+ * nearest systems with a given planet type without per-system ESI calls.
+ */
+export const loadPiSystemPlanets = cached<PiSystemPlanets>('pi-system-planets.json');
 /**
  * TypeIDs of the five moon-ore rarity tiers (Ubiquitous/Common/Uncommon/Rare/
  * Exceptional), derived at build time from the "Moon Ores" market group

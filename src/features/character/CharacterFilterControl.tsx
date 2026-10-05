@@ -100,7 +100,7 @@ const TRIGGER_BOX: Record<'sm' | 'md', string> = {
  */
 const triggerBaseClassName =
   `inline-flex shrink-0 items-center justify-center rounded-xs border border-line font-semibold ` +
-  `tracking-widest uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ` +
+  `tracking-widest uppercase transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 ` +
   `focus-visible:outline-accent md:h-7 bg-panel-2 p-0 text-text-dim hover:border-line-bright ` +
   `hover:bg-panel-2 hover:text-text md:w-auto md:gap-1.5 md:bg-transparent md:px-2.5 ` +
   `md:text-[0.6875rem] md:text-text md:hover:bg-panel-2`;

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
+import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useGrantedScopes } from './useGrantedScopes';
 import { warmRoute } from './routeWarm';
@@ -13,10 +14,9 @@ import type { AppRoutePath } from './routeScopes';
 
 // `min-h-11 md:min-h-0`: the rail row is mouse-operated with room to spare, so
 // only a phone-width rendering ever gets the 44px touch target.
-const NAV_LINK =
-  'flex min-h-11 min-w-0 items-center gap-2 rounded-xs border border-transparent px-2 py-1.5 text-xs font-semibold tracking-widest uppercase transition-colors md:min-h-0';
+const NAV_LINK = `flex min-h-11 min-w-0 items-center gap-2 rounded-xs border border-transparent px-2 py-1.5 text-xs font-semibold tracking-widest uppercase md:min-h-0 ${interactiveClassName} ${focusRingInsetClassName}`;
 const NAV_ACTIVE = 'border-line-bright bg-panel-2 text-accent';
-const NAV_IDLE = 'text-text-dim hover:bg-panel-2 hover:text-text';
+const NAV_IDLE = 'text-text-dim hover:bg-panel-2 hover:text-text active:bg-panel';
 
 function navClass({ isActive }: { isActive: boolean }): string {
   return `${NAV_LINK} ${isActive ? NAV_ACTIVE : NAV_IDLE}`;
@@ -28,20 +28,19 @@ function navClass({ isActive }: { isActive: boolean }): string {
 // width, so a long label truncates instead of pushing later tabs off-screen.
 // `min-h-11` (44px) meets the mobile touch-target minimum; the icon sits above
 // the label.
-export const MOBILE_NAV_ITEM =
-  'relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 border-t-2 border-transparent px-1 py-1.5 text-[0.625rem] font-semibold uppercase transition-colors';
+export const MOBILE_NAV_ITEM = `relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 border-t-2 border-transparent px-1 py-1.5 text-[0.625rem] font-semibold uppercase ${interactiveClassName} ${focusRingInsetClassName}`;
 export const MOBILE_NAV_ACTIVE = 'border-accent bg-panel-2 text-accent';
-export const MOBILE_NAV_IDLE = 'text-text-dim hover:bg-panel-2 hover:text-text';
+export const MOBILE_NAV_IDLE = 'text-text-dim hover:bg-panel-2 hover:text-text active:bg-panel';
 
 function mobileNavClass({ isActive }: { isActive: boolean }): string {
   return `${MOBILE_NAV_ITEM} ${isActive ? MOBILE_NAV_ACTIVE : MOBILE_NAV_IDLE}`;
 }
 
 // The More sheet's tiles: an icon over a short label, four to a row.
-const TILE =
-  'relative flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-xs border px-1 py-2 text-center text-[0.6875rem] font-semibold tracking-wide uppercase transition-colors';
+const TILE = `relative flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-xs border px-1 py-2 text-center text-[0.6875rem] font-semibold tracking-wide uppercase ${interactiveClassName} ${focusRingInsetClassName}`;
 const TILE_ACTIVE = 'border-accent-dim bg-panel-2 text-accent';
-const TILE_IDLE = 'border-line bg-panel-2/60 text-text-dim hover:bg-panel-2 hover:text-text';
+const TILE_IDLE =
+  'border-line bg-panel-2/60 text-text-dim hover:bg-panel-2 hover:text-text active:bg-panel';
 
 function tileClass({ isActive }: { isActive: boolean }): string {
   return `${TILE} ${isActive ? TILE_ACTIVE : TILE_IDLE}`;

@@ -3,7 +3,12 @@ import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
 import { usePortalContainer } from './portalContainer';
 import * as Icon from './icons';
-import { fieldBaseClassName, fieldSizeClassName, type ControlSize } from './controlStyles';
+import {
+  fieldBaseClassName,
+  fieldSizeClassName,
+  interactiveClassName,
+  type ControlSize,
+} from './controlStyles';
 
 /**
  * Listbox select, and the default one: every select in the app is this.
@@ -95,7 +100,9 @@ export function SelectItem({
   return (
     <SelectPrimitive.Item
       className={cx(
-        'relative flex cursor-pointer items-center rounded-xs py-1.5 pr-2 pl-7 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:text-text-dim data-[disabled]:opacity-50 data-[highlighted]:bg-panel-2 data-[highlighted]:text-text',
+        'relative flex cursor-pointer items-center rounded-xs py-1.5 pr-2 pl-7 text-sm outline-none',
+        interactiveClassName,
+        'data-[disabled]:cursor-not-allowed data-[disabled]:text-text-dim data-[disabled]:opacity-40 data-[highlighted]:bg-panel-2 data-[highlighted]:text-text active:bg-panel',
         className
       )}
       {...props}

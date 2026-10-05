@@ -45,6 +45,7 @@ const ROUTE_TITLE_KEYS = {
   '/mining': ['nav.miningTax'],
   '/clones': ['clones.title'],
   '/planetary-industry': ['pi.title'],
+  '/planetary-industry/advisor': ['pi.title'],
   '/employment-history': ['employmentHistory.title'],
   '/corp': ['corp.title'],
   '/corp/members': ['corp.title', 'corp.members.title'],

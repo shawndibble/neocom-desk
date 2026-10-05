@@ -18,7 +18,14 @@ import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { controlHeightClassName, fieldBaseClassName, type ControlSize } from './controlStyles';
+import {
+  controlHeightClassName,
+  fieldBaseClassName,
+  focusRingInsetClassName,
+  interactiveClassName,
+  rowInteractiveClassName,
+  type ControlSize,
+} from './controlStyles';
 import { groupSortedRows } from './dataTableGroup';
 import * as Icon from './icons';
 import { InfoTooltip } from './Tooltip';
@@ -575,6 +582,8 @@ function DataTableRowImpl<T>({
       aria-current={selected ? 'true' : undefined}
       className={cx(
         'hover:bg-panel-2',
+        clickable && 'active:bg-panel',
+        interactiveClassName,
         member && 'dt-group-member',
         clickable && 'cursor-pointer',
         focusable &&
@@ -1339,7 +1348,9 @@ export function DataTable<T>({
                       onClick={() => toggleSort(column)}
                       className={cx(
                         headerTextClass[i],
-                        'inline-flex items-center gap-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                        'inline-flex items-center gap-1 hover:text-text active:text-text-dim',
+                        interactiveClassName,
+                        focusRingInsetClassName,
                         // Only a right-aligned label fills the cell (it is
                         // already pushed against the "?"); left/center ones
                         // stay content-width so the "?" sits beside them.
@@ -1408,7 +1419,7 @@ export function DataTable<T>({
               const Chevron = expanded ? Icon.Expanded : Icon.Descend;
               return (
                 <Fragment key={`dt-group:${key}`}>
-                  <tr role="row" className="dt-group-header hover:bg-panel-2">
+                  <tr role="row" className={cx('dt-group-header', rowInteractiveClassName)}>
                     <td role="cell" colSpan={columns.length + trailingColumns} className="p-0">
                       <button
                         type="button"
@@ -1420,7 +1431,8 @@ export function DataTable<T>({
                           setGroupExpanded((previous) => ({ ...previous, [key]: !expanded }))
                         }
                         className={cx(
-                          'flex min-h-12 w-full items-center gap-2 px-3 py-2 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                          'flex min-h-12 w-full items-center gap-2 px-3 py-2 text-left',
+                          focusRingInsetClassName,
                           // Off a phone an all-widths fold sits among table
                           // rows, so it takes their height, not a card's.
                           groupBy?.allWidths && 'sm:min-h-0'

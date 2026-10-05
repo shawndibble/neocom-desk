@@ -911,6 +911,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   win before any rebuild and quotes a rebuild's gain on top of them, keeping
   ADR 0012's split between tuning today's extraction and re-planning it.
   Ranked by ISK/day per minute of in-game work.
+- **Sell market**: Where a pilot's PI output is sold, and so what every PI ISK figure is priced at: a trade hub's buy orders (less sales tax), or the pilot's corp buyback at a percentage of the hub's price (no sales tax, collected at home so no route to market). Customs is paid at the colony's own office either way. One sell market is applied to Plan, Map and Colonies together, so they quote identical figures.
 - **Quickbar**: The user's saved item shortcuts in the Market Browser's left
   column. Replaces the pin-to-compare grid; comparing lives in the **Compare**
   drawer over the separate **Compare Set**.

@@ -1,3 +1,5 @@
+import { interactiveClassName } from './controlStyles';
+
 /** Shared styling for the Radix-backed ContextMenu and DropdownMenu wrappers. Internal — not re-exported from the barrel. */
 const menuSurfaceClassName =
   'z-50 rounded-xs border border-line bg-panel p-1 text-text shadow-lg shadow-black/50 outline-none';
@@ -24,5 +26,4 @@ export const MENU_COLLISION_PADDING = 8;
  */
 export const menuScrollClassName = 'max-h-[var(--radix-popper-available-height)] overflow-y-auto';
 
-export const menuItemClassName =
-  'flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:text-text-dim data-[disabled]:opacity-50 data-[highlighted]:bg-panel-2 data-[highlighted]:text-text';
+export const menuItemClassName = `flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-sm outline-none ${interactiveClassName} data-[disabled]:cursor-not-allowed data-[disabled]:text-text-dim data-[disabled]:opacity-40 data-[highlighted]:bg-panel-2 data-[highlighted]:text-text active:bg-panel`;

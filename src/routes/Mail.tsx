@@ -704,7 +704,7 @@ export function Mail() {
                               both sit on the wrapper so they span the twin too. */}
                           <div
                             className={cx(
-                              'flex items-center border-l-2 transition-colors',
+                              'flex items-center border-l-2 transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none',
                               isSelected
                                 ? 'border-l-accent bg-panel-2'
                                 : 'border-l-transparent hover:bg-panel-2/60'

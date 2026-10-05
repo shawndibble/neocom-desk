@@ -36,7 +36,11 @@ export function Spinner({ size = 'md', label = 'Loading', className = '', delayM
 
   return (
     <span role="status" aria-label={label} className={`inline-flex ${className}`}>
-      <svg viewBox="0 0 24 24" fill="none" className={`animate-spin text-accent ${SIZE[size]}`}>
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        className={`animate-spin text-accent motion-reduce:animate-[spin_2s_linear_infinite] ${SIZE[size]}`}
+      >
         <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2" />
         <path
           d="M22 12a10 10 0 0 0-10-10"

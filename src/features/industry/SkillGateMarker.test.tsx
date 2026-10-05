@@ -1,92 +1,121 @@
-import { describe, it, expect } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import type { EngineSkill, PlanEntry } from '@/engine/types';
+import type { TargetPlan } from '@/features/skills/useTargetPlan';
 import { SkillGateMarker } from './SkillGateMarker';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 
-const nameForSkill = (typeID: number) => (typeID === 3380 ? 'Industry' : `#${typeID}`);
+const INDUSTRY: EngineSkill = {
+  typeID: 3380,
+  name: 'Industry',
+  rank: 1,
+  primary: 'memory',
+  secondary: 'charisma',
+  prereqs: [],
+};
+const ELECTRONICS: EngineSkill = { ...INDUSTRY, typeID: 45746, name: 'Electronic Engineering' };
+
+vi.mock('@/features/skills/planner/usePlanEditorData', () => ({
+  usePlanEditorData: () => ({
+    catalog: {
+      engineSkills: new Map([
+        [3380, INDUSTRY],
+        [45746, ELECTRONICS],
+      ]),
+    },
+    trainedSkills: new Map(),
+    attributes: { intelligence: 20, memory: 20, perception: 20, willpower: 20, charisma: 19 },
+    implants: {},
+  }),
+}));
+
+const addEntries = vi.fn(async (entries: readonly PlanEntry[]) => ({
+  planId: 'plan-1',
+  planName: 'Main plan',
+  added: [...entries],
+}));
+vi.mock('@/features/skills/useTargetPlan', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTargetPlan: (): TargetPlan => ({
+    plans: [{ id: 'plan-1', name: 'Main plan', entries: [] } as never],
+    targetPlanId: 'plan-1',
+    setTargetPlanId: vi.fn(),
+    addEntries,
+    removeEntries: vi.fn(async () => {}),
+  }),
+}));
+
+const nameForSkill = (typeID: number) =>
+  typeID === 3380 ? 'Industry' : typeID === 45746 ? 'Electronic Engineering' : `#${typeID}`;
 const nameForCharacter = (id: number) => (id === 7 ? 'Vex Kado' : `#${id}`);
 
-describe('SkillGateMarker', () => {
-  it('names the skill and level when exactly one requirement is unmet', () => {
-    const verdict: SkillGateVerdict = {
-      gated: true,
-      shortfall: [{ typeID: 3380, haveLevel: 2, needLevel: 5 }],
-      bestCharacterId: 7,
-    };
-    render(
+function renderMarker(verdict: Extract<SkillGateVerdict, { gated: true }>) {
+  return render(
+    <MemoryRouter>
       <SkillGateMarker
         verdict={verdict}
         nameForSkill={nameForSkill}
         nameForCharacter={nameForCharacter}
       />
-    );
-    expect(screen.getByText('Industry V')).toBeInTheDocument();
+    </MemoryRouter>
+  );
+}
+
+describe('SkillGateMarker', () => {
+  it('names the skill and level when exactly one requirement is unmet', () => {
+    renderMarker({
+      gated: true,
+      shortfall: [{ typeID: 3380, haveLevel: 2, needLevel: 5 }],
+      bestCharacterId: 7,
+    });
+    expect(screen.getByRole('button', { name: /Industry V/ })).toBeInTheDocument();
   });
 
   it('collapses to a count when more than one requirement is unmet', () => {
-    const verdict: SkillGateVerdict = {
+    renderMarker({
       gated: true,
       shortfall: [
         { typeID: 3380, haveLevel: 2, needLevel: 5 },
         { typeID: 45746, haveLevel: 0, needLevel: 3 },
       ],
       bestCharacterId: 7,
-    };
-    render(
-      <SkillGateMarker
-        verdict={verdict}
-        nameForSkill={nameForSkill}
-        nameForCharacter={nameForCharacter}
-      />
-    );
+    });
     expect(screen.getByText('2 skills short')).toBeInTheDocument();
   });
 
-  it('lists only the unmet requirements and names the closest character on hover', async () => {
+  it('opens a popover with each unmet skill, its train time and the closest character', async () => {
     const user = userEvent.setup();
-    const verdict: SkillGateVerdict = {
+    renderMarker({
       gated: true,
-      shortfall: [{ typeID: 3380, haveLevel: 0, needLevel: 5 }],
+      shortfall: [{ typeID: 45746, haveLevel: 0, needLevel: 3 }],
       bestCharacterId: 7,
-    };
-    render(
-      <SkillGateMarker
-        verdict={verdict}
-        nameForSkill={nameForSkill}
-        nameForCharacter={nameForCharacter}
-      />
-    );
-    await user.hover(screen.getByRole('img'));
+    });
+    await user.click(screen.getByRole('button', { name: /Electronic Engineering III/ }));
     expect(
       await screen.findByText('No character on this account can install this job')
     ).toBeInTheDocument();
-    expect(screen.getByText('Industry — → V')).toBeInTheDocument();
-    expect(screen.getByText('Best on Vex Kado')).toBeInTheDocument();
+    // The skill name is a link into the Skill modal.
+    expect(screen.getByRole('button', { name: 'Electronic Engineering' })).toBeInTheDocument();
+    expect(screen.getByText('— → III')).toBeInTheDocument();
+    expect(screen.getByText(/Closest: Vex Kado · .* to train/)).toBeInTheDocument();
   });
 
-  // The shortfall rows and the best character are nowhere but the tooltip, so
-  // a keyboard has to be able to open it (WCAG 2.1.1).
-  it('takes keyboard focus and reveals the shortfall there', () => {
-    const verdict: SkillGateVerdict = {
+  it('adds the missing skills to the Skill Plan', async () => {
+    const user = userEvent.setup();
+    renderMarker({
       gated: true,
-      shortfall: [{ typeID: 3380, haveLevel: 2, needLevel: 5 }],
+      shortfall: [{ typeID: 45746, haveLevel: 0, needLevel: 3 }],
       bestCharacterId: 7,
-    };
-    render(
-      <SkillGateMarker
-        verdict={verdict}
-        nameForSkill={nameForSkill}
-        nameForCharacter={nameForCharacter}
-      />
+    });
+    await user.click(screen.getByRole('button', { name: /Electronic Engineering III/ }));
+    await user.click(await screen.findByRole('button', { name: 'Add all to Skill Plan' }));
+    expect(addEntries).toHaveBeenCalledWith(
+      [{ skillTypeID: 45746, targetLevel: 3 }],
+      'Industry skills'
     );
-    const marker = screen.getByRole('img');
-    expect(marker).toHaveAttribute('tabindex', '0');
-    fireEvent.focus(marker);
-    const tooltip = screen.getByRole('tooltip');
-    expect(tooltip).toHaveTextContent('Industry II → V');
-    expect(tooltip).toHaveTextContent('Best on Vex Kado');
-    expect(marker).toHaveAttribute('aria-describedby', tooltip.id);
+    expect(await screen.findByRole('status')).toHaveTextContent('Added 1 skill to Main plan');
   });
 });

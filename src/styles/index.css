@@ -1109,8 +1109,10 @@
     background-color: color-mix(in srgb, var(--color-accent) 10%, transparent);
   }
 
-  tr.row-mine:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  @media (hover: hover) {
+    tr.row-mine:hover {
+      background-color: color-mix(in srgb, var(--color-accent) 18%, transparent);
+    }
   }
 }
 

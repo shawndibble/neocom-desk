@@ -1,6 +1,9 @@
 import { cx } from '@/lib/cx';
 import {
   controlHeightClassName,
+  disabledClassName,
+  focusRingClassName,
+  interactiveClassName,
   toggleChipStateClassName,
   type ControlSize,
 } from './controlStyles';
@@ -90,7 +93,10 @@ export function FilterChip({
       aria-disabled={explained || undefined}
       onClick={explained ? undefined : onToggle}
       className={cx(
-        'inline-flex items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40 aria-disabled:cursor-default aria-disabled:opacity-40',
+        'inline-flex items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase',
+        interactiveClassName,
+        focusRingClassName,
+        disabledClassName,
         controlHeightClassName[size],
         // No hover affordance on a chip that cannot be toggled.
         toggleChipStateClassName(selected, { hoverable: !explained }),
