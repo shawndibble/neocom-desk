@@ -96,6 +96,7 @@ import { useMarketOrderColumns } from '@/features/market/useMarketOrderColumns';
 import {
   SELL_ORDER_COLUMN_IDS,
   BUY_ORDER_COLUMN_IDS,
+  orderBookFigureChars,
   orderBookWidthsRem,
   useVisibleMarketOrderColumns,
 } from '@/features/market/marketOrderColumns';
@@ -596,10 +597,14 @@ export function Market() {
 
   // The order book's own width picks columns or two-line cards: a phone,
   // and a desktop whose finder column leaves the book too narrow for the
-  // columns the pilot has picked, both get the card. Short of that, Location
-  // narrows first, so fewer widths need cards at all.
+  // columns the pilot has picked and the figures on screen, both get the
+  // card. Short of that, Location narrows first, so fewer widths need cards.
   const isPhone = useIsPhone();
-  const orderBookWidths = orderBookWidthsRem(useVisibleMarketOrderColumns((state) => state.value));
+  const bookBestSell = loadedView?.summary.bestSell ?? null;
+  const orderBookWidths = orderBookWidthsRem(
+    useVisibleMarketOrderColumns((state) => state.value),
+    orderBookFigureChars([...sellRows, ...buyRows], bookBestSell)
+  );
   const [orderBookRef, [orderLocationSqueezed = false, orderBookNarrow = false]] =
     useElementNarrowerThan<HTMLDivElement>([orderBookWidths.roomy, orderBookWidths.cards]);
   const orderCards = isPhone || orderBookNarrow;

@@ -142,7 +142,7 @@ export function useMarketOrderColumns({
       },
       quantity: {
         id: 'quantity',
-        header: t('market.quantity'),
+        header: t('market.quantityColumn'),
         align: 'right',
         className: 'tabular-nums',
         stackAffix: { before: t('market.quantityAffix') },

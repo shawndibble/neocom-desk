@@ -6,6 +6,7 @@
  */
 import type { TFunction } from 'i18next';
 import { Tooltip } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import {
   resolveOrderLocation,
   type NpcStationLookup,
@@ -74,7 +75,9 @@ export function SecurityCell({ order, npcStations, solarSystems, t }: LocationCe
 /**
  * A sell order priced ten times the best or more (`sellOutlierMultiple`):
  * flagged beside its price rather than hidden, so the book stays complete but
- * the row stops reading as a real offer. In words, not just a colour.
+ * the row stops reading as a real offer. A warning icon, so the flag never
+ * widens the Price column past the figure; its words are the tooltip and the
+ * icon's accessible name, so it is never a colour alone.
  */
 export function BaitFlag({ multiple, t }: { multiple: number | null; t: TFunction }) {
   if (multiple === null) return null;
@@ -83,9 +86,12 @@ export function BaitFlag({ multiple, t }: { multiple: number | null; t: TFunctio
     <Tooltip content={t('market.baitHint', { times })}>
       <span
         tabIndex={0}
-        className="mr-2 text-[0.6875rem] font-normal whitespace-nowrap text-warning"
+        role="img"
+        // Short: the tooltip's full sentence becomes its description.
+        aria-label={t('market.baitLabel')}
+        className="mr-1 inline-flex align-text-bottom text-warning"
       >
-        {t('market.baitFlag', { times })}
+        <Icon.Warn aria-hidden size={Icon.ICON_SIZE.sm} />
       </span>
     </Tooltip>
   );
