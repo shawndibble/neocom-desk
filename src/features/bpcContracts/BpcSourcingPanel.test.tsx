@@ -1803,12 +1803,17 @@ describe('BpcSourcingPanel Jump Range', () => {
     const jitaRow = rows.find((r) => within(r).queryByText('Jita IV - Moon 4'));
     expect(jitaRow).toBeDefined();
     const jumpsCell = (jitaRow as HTMLElement).querySelector('[data-label="Jumps"]');
-    // findByTitle, not getByTitle: the cell can still show the "…" pending
-    // placeholder for a tick after loadCharacterSolarSystemId's mock resolves.
+    // The dash is a HintText trigger now (no native title). waitFor: the cell can
+    // still show the "…" pending placeholder for a tick after
+    // loadCharacterSolarSystemId's mock resolves.
+    const trigger = await waitFor(() => {
+      const el = (jumpsCell as HTMLElement).querySelector<HTMLElement>('[tabindex="0"]');
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    await userEvent.hover(trigger);
     expect(
-      await within(jumpsCell as HTMLElement).findByTitle(
-        'Set your current system to filter by distance.'
-      )
+      await screen.findByRole('tooltip', { name: 'Set your current system to filter by distance.' })
     ).toBeInTheDocument();
   });
 
