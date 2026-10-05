@@ -481,11 +481,13 @@ describe('MaterialsTable on a phone', () => {
     const row = screen.getByText('Tritanium').closest('li')!;
     expect(row).toHaveTextContent('1,000');
     expect(row).toHaveTextContent('600');
-    // Have is a dashed number, not a field stretched across its column.
+    // Have is a number with a faint pencil, not a field stretched across its column.
     expect(within(row).queryByRole('textbox', { name: 'Have: Tritanium' })).toBeNull();
     const have = within(row).getByRole('button', { name: /^Have: Tritanium/ });
     expect(have).toHaveTextContent('400');
-    expect(have).toHaveClass('text-accent', 'decoration-dashed');
+    expect(have).toHaveClass('text-accent');
+    expect(have.querySelector('svg')).not.toBeNull();
+    expect(have.className).not.toContain('dashed');
 
     // A tap opens the field, focused; leaving it puts the number back.
     fireEvent.click(have);

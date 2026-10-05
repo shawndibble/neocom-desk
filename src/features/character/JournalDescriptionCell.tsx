@@ -15,7 +15,10 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { HintText } from '@/components/ui/HintText';
 import { Tooltip, TypeIcon } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { WalletJournalEntry, WalletTransactionCommon } from '@/esi/endpoints';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
@@ -46,7 +49,9 @@ export function JournalDescriptionCell({
     if (name) return <>{name}</>;
     // An unnamed goal keeps its id on hover, so it can be added to the map.
     return (
-      <span title={t('wallet.dailyGoalIdTitle', { id: goalId })}>{t('wallet.dailyGoal')}</span>
+      <HintText content={t('wallet.dailyGoalIdTitle', { id: goalId })}>
+        {t('wallet.dailyGoal')}
+      </HintText>
     );
   }
   if (!transaction && !entry.reason && contractId === undefined) return <>{entry.description}</>;
@@ -68,7 +73,7 @@ export function JournalDescriptionCell({
       {contractId !== undefined && (
         <Link
           to={`/contracts/history?${HIGHLIGHT_PARAM}=${contractId}`}
-          className="w-fit text-text-dim hover:text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className={inlineLinkClassName}
         >
           {t('wallet.journalContractLink')}
         </Link>
@@ -77,7 +82,7 @@ export function JournalDescriptionCell({
         <Tooltip content={fill}>
           <MarketItemLink
             typeId={transaction.type_id}
-            className="inline-flex w-fit items-center gap-1.5 text-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className={entityLinkClassName('inline-flex w-fit items-center gap-1.5')}
           >
             <TypeIcon typeId={transaction.type_id} size={32} className="h-4 w-4 shrink-0" />
             <span>

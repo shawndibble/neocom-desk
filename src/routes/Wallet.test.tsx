@@ -123,12 +123,15 @@ describe('Wallet', () => {
     expect(screen.queryByText('#1000419')).not.toBeInTheDocument();
   });
 
-  it("links each loyalty row's corporation name to its LP Store", async () => {
+  it("links each loyalty row's corporation name to Show Info and its store link to the LP Store", async () => {
     render(<App />);
     expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Caldari Navy' }).getAttribute('href')).toContain(
+      'info=corporation-1000167'
+    );
     // A real link, not just a row click — a screen reader or keyboard user
-    // reaches the LP Store by name.
-    expect(screen.getByRole('link', { name: 'Caldari Navy' })).toHaveAttribute(
+    // reaches the LP Store without the row.
+    expect(screen.getByRole('link', { name: 'Open LP Store for Caldari Navy' })).toHaveAttribute(
       'href',
       '/market/lp-store/1000167'
     );

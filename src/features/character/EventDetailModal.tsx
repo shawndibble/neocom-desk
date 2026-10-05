@@ -193,7 +193,7 @@ export function EventDetailModal({
                   const ResponseIcon = RESPONSE_ICON[state.detail.data.response];
                   return (
                     <p
-                      className={`inline-flex items-center gap-1 rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${RESPONSE_BADGE_TONE[state.detail.data.response]}`}
+                      className={`inline-flex items-center gap-1 rounded-xs px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${RESPONSE_BADGE_TONE[state.detail.data.response]}`}
                     >
                       <ResponseIcon size={Icon.ICON_SIZE.sm} aria-hidden="true" />
                       {t(RESPONSE_KEY[state.detail.data.response])}

@@ -83,7 +83,7 @@ describe('SettleUpDialog', () => {
 
     expect(screen.getByRole('dialog', { name: 'Settle up — Corp Wallet' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Next: pay in game' })).not.toBeInTheDocument();
-    expect(screen.getByTitle('600,000 ISK')).toBeInTheDocument();
+    expect(screen.getAllByText('600,000 ISK').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Copy Amount' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy To' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy Reason' })).toBeInTheDocument();
@@ -110,8 +110,8 @@ describe('SettleUpDialog', () => {
     expect(screen.getAllByRole('button', { name: 'Copy Amount' })).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: 'Copy To' })).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: 'Copy Reason' })).toHaveLength(1);
-    expect(screen.getByTitle('100,000 ISK')).toBeInTheDocument();
-    expect(screen.getByTitle('250,000 ISK')).toBeInTheDocument();
+    expect(screen.getAllByText('100,000 ISK').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('250,000 ISK').length).toBeGreaterThan(0);
   });
 
   it('records the whole total as the payment', async () => {
@@ -193,12 +193,12 @@ describe('SettleUpDialog', () => {
     const onPickFromWallet = vi.fn();
     const { unmount } = renderDialog(THREE_ROWS);
     expect(
-      screen.queryByRole('button', { name: 'Already in my wallet? Pick it' })
+      screen.queryByRole('button', { name: 'Already in my wallet? Pick it…' })
     ).not.toBeInTheDocument();
     unmount();
 
     renderDialog(THREE_ROWS, { onPickFromWallet });
-    await userEvent.click(screen.getByRole('button', { name: 'Already in my wallet? Pick it' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Already in my wallet? Pick it…' }));
     expect(onPickFromWallet).toHaveBeenCalledOnce();
   });
 });

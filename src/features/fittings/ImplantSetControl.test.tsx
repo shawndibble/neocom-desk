@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render as rtlRender, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { FittingImplantSet } from '@/engine/fittings/types';
+
+// Entity names are real links, so every render needs a Router.
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 
 vi.mock('@/features/skills/typeCatalog', () => ({ loadItemNameMap: async () => new Map() }));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: async () => new Map() }));

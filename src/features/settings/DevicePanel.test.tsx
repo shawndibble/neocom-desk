@@ -32,7 +32,7 @@ afterEach(() => {
 async function openDeleteDialog() {
   const user = userEvent.setup();
   render(<DevicePanel />);
-  await user.click(await screen.findByRole('button', { name: 'Delete all' }));
+  await user.click(await screen.findByRole('button', { name: 'Delete all…' }));
   const dialog = await screen.findByRole('dialog');
   return { user, dialog };
 }

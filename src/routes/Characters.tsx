@@ -1,4 +1,10 @@
-import { selectedRowClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
+import { AllianceLink, CorporationLink } from '@/features/entities';
+import {
+  focusRingClassName,
+  interactiveClassName,
+  selectedRowClassName,
+} from '@/components/ui/controlStyles';
 import { HintText } from '@/components/ui/HintText';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -286,6 +292,23 @@ function characterLastSynced(
   return olderOf(olderOf(stats?.skillPointsFetchedAt, stats?.walletFetchedAt), queue?.fetchedAt);
 }
 
+/** A corp or alliance name as its Show Info link (§6c); plain text until the id and name are known. */
+function AffiliationName({
+  name,
+  id,
+  kind,
+}: {
+  name: string | null | undefined;
+  id: number | undefined;
+  kind: 'corp' | 'alliance';
+}) {
+  const { t } = useTranslation();
+  if (!name) return <>{t('common.unknown')}</>;
+  if (id === undefined) return <>{name}</>;
+  const Link = kind === 'corp' ? CorporationLink : AllianceLink;
+  return <Link id={id}>{name}</Link>;
+}
+
 function CharacterCard({
   character,
   info,
@@ -314,23 +337,30 @@ function CharacterCard({
   return (
     <li
       aria-current={isActive ? 'true' : undefined}
-      className={`flex flex-col gap-2 rounded-xs border border-line p-3 backdrop-blur-sm transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none hover:border-line-bright hover:bg-panel-2 ${
+      className={cx(
+        'flex flex-col gap-2 rounded-xs border border-line p-3 backdrop-blur-sm hover:border-line-bright hover:bg-panel-2',
+        interactiveClassName,
         isActive ? selectedRowClassName : 'bg-panel/85'
-      }`}
+      )}
     >
       <div className="flex flex-wrap items-start gap-2">
-        <button
-          type="button"
-          aria-label={t('characters.select', { name: character.name })}
-          onClick={() => onSelect(character.characterId)}
-          className="flex min-w-40 flex-1 items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          <CharacterAvatar
-            characterId={character.characterId}
-            size="lg"
-            loading="lazy"
-            alt={t('characters.portraitAlt', { name: character.name })}
-          />
+        <div className="flex min-w-40 flex-1 items-start gap-3">
+          {/* Pointer convenience: the name below is the keyboard and screen-reader
+              control, so this avatar target stays out of both. */}
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-hidden="true"
+            onClick={() => onSelect(character.characterId)}
+            className={cx('shrink-0 rounded-xs', interactiveClassName)}
+          >
+            <CharacterAvatar
+              characterId={character.characterId}
+              size="lg"
+              loading="lazy"
+              alt={t('characters.portraitAlt', { name: character.name })}
+            />
+          </button>
           <span className="min-w-0">
             {/* The dot rides the name's own line, not a corner of the card:
                 it needs no room of its own, so the identity block loses
@@ -339,7 +369,18 @@ function CharacterCard({
                 of pushing the dot off — and shrinking the name never touches
                 the corp/alliance lines below, which are separate rows. */}
             <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
-              <span className="max-w-full truncate text-sm font-semibold">{character.name}</span>
+              <button
+                type="button"
+                aria-label={t('characters.select', { name: character.name })}
+                onClick={() => onSelect(character.characterId)}
+                className={cx(
+                  'max-w-full truncate rounded-xs text-left text-sm font-semibold',
+                  interactiveClassName,
+                  focusRingClassName
+                )}
+              >
+                {character.name}
+              </button>
               {isActive && (
                 <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
                   {t('characters.activeLabel')}
@@ -350,13 +391,13 @@ function CharacterCard({
               )}
             </span>
             <span className="block truncate text-xs text-text-dim">
-              {info?.corporationName ?? t('common.unknown')}
+              <AffiliationName name={info?.corporationName} id={info?.corporationId} kind="corp" />
             </span>
             <span className="block truncate text-xs text-text-dim">
-              {info?.allianceName ?? t('common.unknown')}
+              <AffiliationName name={info?.allianceName} id={info?.allianceId} kind="alliance" />
             </span>
           </span>
-        </button>
+        </div>
         {/* Group and remove: the card's own controls, not part of the
             name/corp/alliance identity block, so they sit at the top right
             rather than crowding the stat row below. */}
@@ -641,7 +682,13 @@ function buildColumns(
       header: t('characters.column.corp'),
       className: 'text-text-dim',
       sortValue: (row) => row.info?.corporationName ?? '',
-      render: (row) => row.info?.corporationName ?? t('common.unknown'),
+      render: (row) => (
+        <AffiliationName
+          name={row.info?.corporationName}
+          id={row.info?.corporationId}
+          kind="corp"
+        />
+      ),
     },
     // Same Select the card view's group control renders (issue #2077) — a
     // visible, Tab-reachable move-to-group in table view, no context-menu
@@ -1402,8 +1449,12 @@ export function Characters() {
           sort={tableSort}
           onSortChange={setTableSort}
           onRowClick={(row) => void select(row.character.characterId)}
+          rowMoreActions
           rowContextMenu={(row, tr) => (
-            <CharacterRowContextMenu characterId={row.character.characterId}>
+            <CharacterRowContextMenu
+              characterId={row.character.characterId}
+              name={row.character.name}
+            >
               {tr}
             </CharacterRowContextMenu>
           )}

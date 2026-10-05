@@ -120,7 +120,7 @@ export function GroupSummaryModal({
       title={
         <span className="flex items-center gap-1.5">
           {t('miningTax.detailTitle', { date: formatDateRange(dates), system: systemName })}
-          <SecurityValue security={systemSecurity} t={t} />
+          <SecurityValue security={systemSecurity} />
           <InfoTooltip
             label={t('common.aboutLabel', { label: t('miningTax.dateColumn') })}
             content={t('miningTax.dateEveHint')}

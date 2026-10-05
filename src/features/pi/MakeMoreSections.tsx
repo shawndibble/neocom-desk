@@ -24,13 +24,12 @@ import * as Icon from '@/components/ui/icons';
 import type { RebuildPreference } from '@/engine/pi/planAdvice';
 import { HAUL_SHIPS } from '@/engine/pi/planHaul';
 import type { PiPinKind } from '@/sde/types';
-import { SkillLink } from '@/features/entities';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { cx } from '@/lib/cx';
 import { LoadMeter, EstimateBadge, VerbTag } from './DirectiveRow';
-import { INTERPLANETARY_CONSOLIDATION_SKILL_ID } from './planetSlots';
 import { PlanetImage } from './PlanetImage';
+import { Gain, SlotNudge } from './PlanSlotNudge';
 import { Sentence } from './sentence';
 import type {
   AlternativeView,
@@ -70,18 +69,6 @@ function ItemList({ items }: { items: readonly NamedItem[] }) {
         </span>
       ))}
     </>
-  );
-}
-
-/** "+95k/day": a signed ISK a day figure, green when it adds and red when it costs. */
-function Gain({ value, className }: { value: number; className?: string }) {
-  const { t } = useTranslation();
-  return (
-    <span className={cx('tabular-nums', value < 0 ? 'text-isk-neg' : 'text-isk-pos', className)}>
-      {value < 0 ? '−' : '+'}
-      <IskAmount value={Math.abs(value)} decimals={0} />
-      {t('piPlan.make.perDay')}
-    </span>
   );
 }
 
@@ -261,7 +248,7 @@ export function YourPlanetsPanel({
           })}
         </p>
       )}
-      <SlotNudge view={view} onFindBest={onFindBest} />
+      <SlotNudge slots={view.slots} onFindBest={onFindBest} />
     </Panel>
   );
 }
@@ -273,63 +260,6 @@ function PerDay({ value }: { value: number }) {
       <IskAmount value={value} decimals={0} />
       {t('piPlan.make.perDay')}
     </>
-  );
-}
-
-function SlotNudge({ view, onFindBest }: { view: PlanView; onFindBest: () => void }) {
-  const { t } = useTranslation();
-  const { slots } = view;
-  if (slots.free <= 0) return null;
-  const dots = Array.from({ length: slots.allowed }, (_, i) => i < slots.used);
-  const text = t('piPlan.make.slots', {
-    allowed: slots.allowed,
-    used: slots.used,
-    gain: '{gain}',
-    skill: '{skill}',
-    context: slots.gainPerPlanetPerDay === null ? 'nogain' : undefined,
-  });
-  return (
-    <div className="space-y-1.5 border-t border-line px-3 py-3 text-xs text-text">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span
-          role="img"
-          aria-label={t('piPlan.make.slotsLabel', { used: slots.used, allowed: slots.allowed })}
-          className="flex shrink-0 gap-1"
-        >
-          {dots.map((used, i) => (
-            <span
-              key={i}
-              aria-hidden="true"
-              className={cx(
-                'size-4 rounded-full',
-                used ? 'bg-accent-dim' : 'border border-dashed border-line-bright'
-              )}
-            />
-          ))}
-        </span>
-        <span className="min-w-0 flex-1">
-          <Sentence
-            text={text}
-            slots={{
-              gain:
-                slots.gainPerPlanetPerDay === null ? null : (
-                  <Gain value={slots.gainPerPlanetPerDay} />
-                ),
-              skill: (
-                <SkillLink typeId={INTERPLANETARY_CONSOLIDATION_SKILL_ID}>
-                  {t('piPlan.make.slotsSkill')}
-                </SkillLink>
-              ),
-            }}
-          />
-          {slots.assumed && ` ${t('piPlan.make.slotsAssumed')}`}
-        </span>
-      </div>
-      <button type="button" className={textActionClassName('gap-1')} onClick={onFindBest}>
-        {t('piPlan.make.nextPlanet')}
-        <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-      </button>
-    </div>
   );
 }
 

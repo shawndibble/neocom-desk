@@ -1,3 +1,4 @@
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -335,7 +336,7 @@ export function AssignDialog({
               >
                 <label
                   htmlFor={`line-${line.typeId}`}
-                  className="flex shrink-0 items-center gap-1.5"
+                  className={`flex shrink-0 items-center gap-1.5 ${tappableRowClassName}`}
                 >
                   <Checkbox
                     id={`line-${line.typeId}`}
@@ -417,7 +418,7 @@ export function AssignDialog({
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm">
+      <label className={`flex items-center gap-2 text-sm ${tappableRowClassName}`}>
         <Checkbox checked={markPaid} onChange={(e) => setMarkPaid(e.target.checked)} />
         {t('miningTax.markPaidLabel')}
       </label>

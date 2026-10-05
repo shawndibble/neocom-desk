@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   CharacterAvatar,
@@ -40,6 +41,7 @@ import {
   TextInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { InteractionGrammar } from './styleguide/InteractionGrammar';
 
 const COLOR_TOKENS: { name: string; className: string; note?: string }[] = [
   { name: 'bg', className: 'bg-bg' },
@@ -156,6 +158,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export function Styleguide() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState('open');
   const [chip, setChip] = useState<string | null>('skills');
   const [barFilter, setBarFilter] = useState({
@@ -532,6 +535,10 @@ export function Styleguide() {
 
           <SearchInput placeholder="SearchInput — always md, always with the magnifier" />
         </div>
+      </Section>
+
+      <Section title={t('styleguide.interactionGrammar.title')}>
+        <InteractionGrammar />
       </Section>
     </div>
   );

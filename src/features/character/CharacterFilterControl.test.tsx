@@ -76,13 +76,14 @@ describe('CharacterFilterControl', () => {
       const { rerender } = render(
         <CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />
       );
-      const trigger = () => screen.getByRole('button');
-      expect(trigger().querySelector('img')).toBeInTheDocument();
-      expect(trigger().querySelector('svg')).not.toBeInTheDocument();
+      // The phone icon slot only: the md+ text pill carries its own CaretDown.
+      const slot = () => screen.getByRole('button').children[0];
+      expect(slot().querySelector('img')).toBeInTheDocument();
+      expect(slot().querySelector('svg')).not.toBeInTheDocument();
 
       rerender(<CharacterFilterControl activeCharacterId={1} value="all" onChange={() => {}} />);
-      expect(trigger().querySelector('svg')).toBeInTheDocument();
-      expect(trigger().querySelector('img')).not.toBeInTheDocument();
+      expect(slot().querySelector('svg')).toBeInTheDocument();
+      expect(slot().querySelector('img')).not.toBeInTheDocument();
     });
 
     it("defaults to the sm touch tier (a panel meta row's own IconButton size)", () => {

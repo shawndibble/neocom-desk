@@ -18,7 +18,7 @@ import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel, TypeIcon } from '@/components/ui';
+import { Button, Panel, Tooltip, TypeIcon } from '@/components/ui';
 import {
   focusRingClassName,
   interactiveClassName,
@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/controlStyles';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { cx } from '@/lib/cx';
-import { formatIskCompact } from '@/lib/isk';
+import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import type { PlanAdvice } from '../planAdviceModel';
 import { planPicks } from '../planPicks';
@@ -332,29 +332,38 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
       ) : (
         <>
           {picks.picks.map((pick, i) => (
-            <button
+            <Tooltip
               key={pick.typeId}
-              type="button"
-              aria-current={traced?.id === pick.typeId ? 'true' : undefined}
-              onClick={() => openProduct(pick.typeId)}
-              className={cx(
-                'inline-flex h-7 items-center gap-1.5 rounded-xs border border-line px-2 text-xs max-md:h-11',
-                interactiveClassName,
-                focusRingClassName,
-                traced?.id === pick.typeId
-                  ? selectedRowClassName
-                  : '[@media(hover:hover)]:hover:border-line-bright [@media(hover:hover)]:hover:bg-panel-2'
-              )}
+              content={t('common.iskExact', { amount: formatIsk(pick.perDay, 0) })}
             >
-              <span className="text-[11px] font-bold text-warning">#{i + 1}</span>
-              <TypeIcon typeId={pick.typeId} size={64} width={20} height={20} />
-              <span>{pick.name}</span>
-              <span className="text-isk-pos tabular-nums">
-                {picks.kind === 'rebuild' ? '+' : ''}
-                {formatIskCompact(pick.perDay)}
-                {t('piMap.perDaySuffix')}
-              </span>
-            </button>
+              <button
+                type="button"
+                aria-current={traced?.id === pick.typeId ? 'true' : undefined}
+                onClick={() => openProduct(pick.typeId)}
+                className={cx(
+                  'inline-flex h-7 items-center gap-1.5 rounded-xs border border-line px-2 text-xs max-md:h-11',
+                  interactiveClassName,
+                  focusRingClassName,
+                  traced?.id === pick.typeId
+                    ? selectedRowClassName
+                    : '[@media(hover:hover)]:hover:border-line-bright [@media(hover:hover)]:hover:bg-panel-2'
+                )}
+              >
+                <span className="text-[11px] font-bold text-warning">#{i + 1}</span>
+                <TypeIcon typeId={pick.typeId} size={64} width={20} height={20} />
+                <span>{pick.name}</span>
+                <span className="text-isk-pos tabular-nums">
+                  {picks.kind === 'rebuild' ? '+' : ''}
+                  {formatIskCompact(pick.perDay)}
+                  {t('piMap.perDaySuffix')}
+                  {/* A button cannot hold a focusable IskAmount; the tooltip below and this text carry the exact figure. */}
+                  <span className="sr-only">
+                    {' '}
+                    {t('common.iskExact', { amount: formatIsk(pick.perDay, 0) })}
+                  </span>
+                </span>
+              </button>
+            </Tooltip>
           ))}
           <span className="text-[11px] text-text-dim">
             {picks.kind === 'rebuild' ? t('piMap.picksNoteRebuild') : t('piMap.picksNoteRecipes')}

@@ -1,4 +1,9 @@
-import { selectedRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  interactiveClassName,
+  selectedRowClassName,
+  touchCheckboxLabelClassName,
+} from '@/components/ui/controlStyles';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -143,7 +148,7 @@ function SortHeader({
             : t('industry.sortBy', { column: label })
         }
         aria-pressed={active}
-        className={`inline-flex items-center gap-px uppercase tracking-widest hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${active ? 'text-text' : ''}`}
+        className={`inline-flex items-center gap-px rounded-xs uppercase tracking-widest hover:text-text ${interactiveClassName} ${focusRingClassName} ${active ? 'text-text' : ''}`}
       >
         {label}
         <Glyph
@@ -428,9 +433,8 @@ function PlanRow({
           destination this handle does, which is the pointer alternative that
           matters (WCAG 2.5.7).
 
-          The `title` is a pointer-only hint on a pointer-only control rather
-          than a `Tooltip`, which would put it back in the accessibility tree
-          this element is deliberately out of.
+          No tooltip or `title`: either would put it back in the accessibility
+          tree this pointer-only grip is deliberately out of (the cursor is its cue).
 
           `distance: 4` on the sensor and `touch-none` here are both load-
           bearing, for the reasons EntryList.tsx's copy spells out (#408). */}
@@ -446,18 +450,20 @@ function PlanRow({
           tabIndex={-1}
           aria-hidden="true"
           {...listeners}
-          title={t('industry.dragToGroup')}
+          data-testid="plan-drag-handle"
           className={`inline-flex size-9 shrink-0 cursor-grab touch-none items-center justify-center text-text-faint hover:text-text md:size-7 ${gripHitAreaClassName}`}
         >
           <Icon.DragHandle />
         </button>
       )}
       {compareMode && (
-        <Checkbox
-          checked={compareSelected}
-          onChange={() => onToggleCompareSelected(plan.id)}
-          aria-label={t('industry.compareSelectFor', { name: plan.name })}
-        />
+        <label className={touchCheckboxLabelClassName}>
+          <Checkbox
+            checked={compareSelected}
+            onChange={() => onToggleCompareSelected(plan.id)}
+            aria-label={t('industry.compareSelectFor', { name: plan.name })}
+          />
+        </label>
       )}
       {renaming ? (
         <RenameField
@@ -480,15 +486,18 @@ function PlanRow({
             onDuplicate={() => onDuplicate(plan.id)}
             onMovePlan={(groupId) => onMovePlan(plan.id, groupId)}
           >
-            <button
-              type="button"
-              onClick={() => onSelect(plan.id)}
-              onDoubleClick={() => setRenaming(true)}
-              className="flex-1 truncate text-left"
-              title={plan.name}
-            >
-              {plan.name}
-            </button>
+            <span className="flex min-w-0 flex-1">
+              <Tooltip content={plan.name}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(plan.id)}
+                  onDoubleClick={() => setRenaming(true)}
+                  className={`dt-primary min-w-0 truncate rounded-xs text-left ${interactiveClassName} ${focusRingClassName}`}
+                >
+                  {plan.name}
+                </button>
+              </Tooltip>
+            </span>
           </BuildPlanRowContextMenu>
           <BuildPlanRowMoreActions
             plan={plan}
@@ -577,14 +586,16 @@ function GroupHeader({
           collapsed group's members are unreachable without this — it selects
           every member at once rather than making the pilot expand first. */}
       {compareMode && (
-        <Checkbox
-          checked={membersSelected === 'all'}
-          ref={(el) => {
-            if (el) el.indeterminate = membersSelected === 'some';
-          }}
-          onChange={() => onToggleAllMembers(membersSelected !== 'all')}
-          aria-label={t('industry.selectGroupMembers', { name: group.name })}
-        />
+        <label className={touchCheckboxLabelClassName}>
+          <Checkbox
+            checked={membersSelected === 'all'}
+            ref={(el) => {
+              if (el) el.indeterminate = membersSelected === 'some';
+            }}
+            onChange={() => onToggleAllMembers(membersSelected !== 'all')}
+            aria-label={t('industry.selectGroupMembers', { name: group.name })}
+          />
+        </label>
       )}
       <IconButton
         size="sm"
@@ -610,15 +621,18 @@ function GroupHeader({
         <>
           <ContextMenu>
             <ContextMenuTrigger asChild>
-              <button
-                type="button"
-                onClick={onSelect}
-                onDoubleClick={() => setRenaming(true)}
-                className="flex-1 truncate text-left font-semibold"
-                title={group.name}
-              >
-                {group.name}
-              </button>
+              <span className="flex min-w-0 flex-1">
+                <Tooltip content={group.name}>
+                  <button
+                    type="button"
+                    onClick={onSelect}
+                    onDoubleClick={() => setRenaming(true)}
+                    className={`dt-primary min-w-0 truncate rounded-xs text-left font-semibold ${interactiveClassName} ${focusRingClassName}`}
+                  >
+                    {group.name}
+                  </button>
+                </Tooltip>
+              </span>
             </ContextMenuTrigger>
             <ContextMenuContent>
               <ContextMenuItem onSelect={() => setRenaming(true)}>

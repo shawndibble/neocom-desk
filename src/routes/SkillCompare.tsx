@@ -17,7 +17,15 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { controlHeightClassName, toggleChipStateClassName } from '@/components/ui/controlStyles';
+import {
+  controlHeightClassName,
+  focusRingClassName,
+  interactiveClassName,
+  toggleChipStateClassName,
+} from '@/components/ui/controlStyles';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { SkillLink } from '@/features/entities';
+import { cx } from '@/lib/cx';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
@@ -42,9 +50,6 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { skillCompareCsvColumns } from '@/features/skills/skillCompareCsv';
 import { boolParam, idListParam, nullableTextParam } from '@/lib/urlState';
-
-const FOCUS_RING =
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
 
 /** Short-lived view state (ADR 0015): the selection, its saved-comparison link, and the two display toggles. One group — several of these change together in a single click (see `toggleCharacter`, `handleLoad`). */
 const SKILL_COMPARE_PARAMS = {
@@ -131,8 +136,7 @@ function SavedComparisonRow({
         <button
           type="button"
           onClick={() => onLoad(comparison)}
-          onDoubleClick={() => setRenaming(true)}
-          className={`flex-1 truncate text-left ${FOCUS_RING}`}
+          className={entityLinkClassName('flex-1 truncate text-left')}
         >
           {comparison.name}
         </button>
@@ -349,7 +353,8 @@ export function SkillCompare() {
         id: 'skill',
         header: t('skillCompare.skillColumn'),
         sortValue: (row) => row.name,
-        render: (row) => row.name,
+        // Skill -> its modal (DESIGN.md §6c).
+        render: (row) => <SkillLink typeId={row.skillTypeID}>{row.name}</SkillLink>,
       },
       ...(groupColumnVisible
         ? [
@@ -436,7 +441,13 @@ export function SkillCompare() {
                   type="button"
                   aria-pressed={selected}
                   onClick={() => toggleCharacter(character.characterId)}
-                  className={`flex items-center gap-1.5 rounded-xs border px-2.5 text-xs ${controlHeightClassName.sm} ${FOCUS_RING} ${toggleChipStateClassName(selected)}`}
+                  className={cx(
+                    'flex items-center gap-1.5 rounded-xs border px-2.5 text-xs',
+                    controlHeightClassName.sm,
+                    interactiveClassName,
+                    focusRingClassName,
+                    toggleChipStateClassName(selected)
+                  )}
                 >
                   <CharacterAvatar characterId={character.characterId} size="sm" />
                   {character.name}

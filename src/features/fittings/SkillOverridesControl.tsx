@@ -185,7 +185,7 @@ export function SkillOverridesControl() {
           ))}
         </SelectContent>
       </Select>
-      <Button size="sm" className="min-h-11 md:min-h-7" onClick={() => setEditing(true)}>
+      <Button size="sm" className={tappableRowClassName} onClick={() => setEditing(true)}>
         {customCount > 0
           ? t('fittings.skillOverrides.customCount', { count: customCount })
           : t('fittings.skillOverrides.custom')}

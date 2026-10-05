@@ -278,10 +278,13 @@ describe('HaulingPanel, a Cargo Space of several holds', () => {
     ).toBeInTheDocument();
   });
 
-  it('says which hold each plan line rides in', () => {
+  it('says which hold each plan line rides in', async () => {
     renderPanel();
-    expect(
+    await userEvent.hover(
       screen.getByRole('textbox', { name: 'Quantity of Damage Control II to bring' })
-    ).toHaveAttribute('title', '300 m³ · in Cargo hold · limited by space');
+    );
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      '300 m³ · in Cargo hold · limited by space'
+    );
   });
 });

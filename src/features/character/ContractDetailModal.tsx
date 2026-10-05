@@ -397,6 +397,7 @@ function ItemSection({
           rowKey={(item) => item.record_id}
           density="compact"
           responsive="table"
+          rowMoreActions
           rowContextMenu={(item, tr) => (
             <BuildPlanContextMenu
               typeId={item.type_id}

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { CharacterAvatar, StatChip, StatChips } from '@/components/ui';
+import { AllianceLink, CorporationLink } from '@/features/entities';
 import { usePublicInfo } from '@/stores/publicInfo';
 
 interface CharacterHeaderProps {
@@ -73,8 +74,23 @@ export function CharacterHeader({ characterId, totalSp, unallocatedSp }: Charact
           {character?.name ?? t('common.unknown')}
         </h1>
         <p className="truncate text-xs text-text-dim">
-          {publicInfo?.corporationName ?? t('common.unknown')}
-          {publicInfo?.allianceName ? ` / ${publicInfo.allianceName}` : ''}
+          {publicInfo?.corporationName && publicInfo.corporationId !== undefined ? (
+            <CorporationLink id={publicInfo.corporationId}>
+              {publicInfo.corporationName}
+            </CorporationLink>
+          ) : (
+            (publicInfo?.corporationName ?? t('common.unknown'))
+          )}
+          {publicInfo?.allianceName && (
+            <>
+              {' / '}
+              {publicInfo.allianceId !== undefined ? (
+                <AllianceLink id={publicInfo.allianceId}>{publicInfo.allianceName}</AllianceLink>
+              ) : (
+                publicInfo.allianceName
+              )}
+            </>
+          )}
         </p>
       </div>
       <StatChips>

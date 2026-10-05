@@ -28,7 +28,6 @@ import { cx } from '@/lib/cx';
 import { optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { openPublicInfoModal } from '@/stores/publicInfoModal';
 import {
   loadPilotProfile,
   resolvePilotByName,
@@ -204,7 +203,8 @@ function PilotSearch({ onSelect }: { onSelect: (pilot: PilotSummary) => void }) 
                     aria-selected={highlight === i}
                     className={cx(
                       'cursor-pointer px-3 py-1.5 text-xs text-text',
-                      highlight === i ? 'bg-panel-2' : 'hover:bg-panel-2/60'
+                      'hover:bg-panel-2',
+                      highlight === i && 'bg-panel-2'
                     )}
                     onMouseEnter={() => setHighlight(i)}
                     // Keeps the input focused — a plain click would blur it first and close the list.
@@ -288,11 +288,7 @@ function PilotResult({ characterId }: { characterId: number }) {
   }
   return (
     <Panel>
-      <PilotProfileView
-        profile={profile.profile}
-        onOpenCorporation={(id) => openPublicInfoModal('corporation', id)}
-        onOpenAlliance={(id) => openPublicInfoModal('alliance', id)}
-      />
+      <PilotProfileView profile={profile.profile} />
     </Panel>
   );
 }

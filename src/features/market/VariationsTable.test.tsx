@@ -45,6 +45,17 @@ function renderTable(overrides: Partial<VariationsTableProps> = {}) {
 }
 
 describe('VariationsTable', () => {
+  it('names each row with a real Market link that selects in place on a plain click', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    renderTable({ onSelect });
+    const link = screen.getByRole('link', { name: 'Rifter' });
+    expect(link).toHaveAttribute('href', expect.stringContaining('/market/browser'));
+    await user.click(link);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith(587);
+  });
+
   it('renders nothing when there are no rows', () => {
     const { container } = render(<VariationsTable {...defaultProps({ rows: [] })} />);
     expect(container).toBeEmptyDOMElement();

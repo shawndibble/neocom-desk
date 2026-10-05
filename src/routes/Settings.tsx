@@ -1,3 +1,4 @@
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -42,6 +43,8 @@ import {
   Field,
   Fields,
 } from '@/components/ui';
+import { CharacterLink } from '@/features/entities';
+import { HintText } from '@/components/ui/HintText';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
@@ -113,6 +116,24 @@ const OUTCOME_TONE: Record<ActivityOutcome, string> = {
   error: 'text-danger',
 };
 
+/** The Character column: a Show Info link, or plain text for a public (character-less) call. */
+function CharacterNameCell({
+  characterId,
+  characterNames,
+  t,
+}: {
+  characterId: number | undefined;
+  characterNames: ReadonlyMap<number, string>;
+  t: (key: string) => string;
+}) {
+  const label = characterCell(characterId, characterNames, t);
+  return characterId === undefined ? (
+    label
+  ) : (
+    <CharacterLink id={characterId}>{label}</CharacterLink>
+  );
+}
+
 /** Transient "it worked" note beside the button that produced it (same pattern as the skill planner's tools pane). */
 function ActionConfirmation({ message }: { message: string }) {
   return (
@@ -158,7 +179,13 @@ function ActivityLogPanel() {
         id: 'character',
         header: t('activityLog.columnCharacter'),
         sortValue: (entry) => characterCell(entry.characterId, characterNames, t),
-        render: (entry) => characterCell(entry.characterId, characterNames, t),
+        render: (entry) => (
+          <CharacterNameCell
+            characterId={entry.characterId}
+            characterNames={characterNames}
+            t={t}
+          />
+        ),
       },
       {
         id: 'time',
@@ -277,7 +304,13 @@ function DataAgePanel() {
         id: 'character',
         header: t('dataAge.columnCharacter'),
         sortValue: (entry) => characterCell(entry.characterId, characterNames, t),
-        render: (entry) => characterCell(entry.characterId, characterNames, t),
+        render: (entry) => (
+          <CharacterNameCell
+            characterId={entry.characterId}
+            characterNames={characterNames}
+            t={t}
+          />
+        ),
       },
       {
         id: 'updated',
@@ -285,9 +318,9 @@ function DataAgePanel() {
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (entry) => entry.timestamp,
         render: (entry) => (
-          <span title={formatTimestamp(new Date(entry.timestamp), timeZone)}>
+          <HintText content={formatTimestamp(new Date(entry.timestamp), timeZone)}>
             <RelativeAge timestamp={entry.timestamp} />
-          </span>
+          </HintText>
         ),
       },
     ],
@@ -785,11 +818,13 @@ function CharacterDefaultsPanel() {
             inline
             note={t('settings.spExtractionEnabledHint')}
           >
-            <Checkbox
-              id="settings-sp-extraction-enabled"
-              checked={spExtractionEnabled}
-              onChange={() => void setSpExtractionEnabled(!spExtractionEnabled)}
-            />
+            <label className={touchCheckboxLabelClassName}>
+              <Checkbox
+                id="settings-sp-extraction-enabled"
+                checked={spExtractionEnabled}
+                onChange={() => void setSpExtractionEnabled(!spExtractionEnabled)}
+              />
+            </label>
           </Field>
           {spExtractionEnabled && (
             <Field

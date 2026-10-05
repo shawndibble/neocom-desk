@@ -89,6 +89,20 @@ function iskPerLpTone(value: number | null): string {
 const offerRowKey = (row: LoyaltyOfferRow) => row.offer.offer_id;
 
 /**
+ * Item name: Market link (§6c); plain when the product type is unknown. A
+ * blueprint row is labelled with the product the link opens, so the label
+ * says where it goes; the BP badge beside it still marks the row as a blueprint.
+ */
+function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
+  const { typeId, itemName } = resolveLoyaltyRowItem(row);
+  return typeId === null ? (
+    <span className="text-text">{row.itemName}</span>
+  ) : (
+    <MarketItemLink typeId={typeId}>{itemName}</MarketItemLink>
+  );
+}
+
+/**
  * A blueprint offer's row is the *blueprint*, but every market/menu action on
  * it targets the manufactured product — shared by `OfferDetail`'s own
  * View in Market/Plan in Industry buttons and the row's context menu, so the
@@ -554,12 +568,12 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       render: (row) => (
         <span className="flex flex-col">
           <span className="inline-flex items-center gap-1.5">
-            <span className="text-text">{row.itemName}</span>
+            <LoyaltyItemName row={row} />
             {row.isBlueprint && (
               // `shrink-0` + `whitespace-nowrap`: as a flex item next to a
               // long item name the badge was being squeezed until "BP" broke
               // across two lines, one letter each.
-              <span className="shrink-0 rounded-xs border border-warning/40 px-1 text-[0.6875rem] font-bold tracking-widest whitespace-nowrap text-warning uppercase">
+              <span className="shrink-0 px-1 text-[0.6875rem] font-bold tracking-widest whitespace-nowrap text-warning uppercase">
                 BP
               </span>
             )}
@@ -655,6 +669,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
             stackSummary={t('loyaltyStore.offerCount', { count: filteredRows.length })}
             onRowClick={selectRow}
             rowContextMenu={rowContextMenu}
+            rowMoreActions
             selectedRowKey={selectedOfferId}
           />
         </>

@@ -16,9 +16,11 @@
  *
  * On a phone the panel folds above the route, with chips naming the rules on.
  */
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Button,
   Checkbox,
   CollapsiblePanel,
   SegmentedControl,
@@ -26,7 +28,6 @@ import {
   StatChip,
   StatChips,
   TextInput,
-  textActionClassName,
 } from '@/components/ui';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { WORMHOLE_SHIP_SIZES } from '@/engine/route/theraConnections';
@@ -91,16 +92,16 @@ export function RouteBridgeFields({
   const { t } = useTranslation();
   return (
     <div className="space-y-1.5">
-      <label className="flex items-center gap-2 font-semibold">
+      <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
         <Checkbox
           checked={bridgeQuery.enabled}
           onChange={() => onBridgesChange(!bridgeQuery.enabled)}
         />
         {t('travel.bridges.enabled')}
       </label>
-      <button type="button" className={textActionClassName()} onClick={onManageBridges}>
+      <Button size="sm" variant="ghost" onClick={onManageBridges}>
         {t('travel.bridges.manage', { count: bridgeCount })}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -127,7 +128,7 @@ export function RouteHoleFields({
   return (
     <section className={bare ? 'space-y-3 text-xs' : 'space-y-3 border-t border-line pt-4'}>
       {!bare && <GroupLabel>{t('travel.holes.group')}</GroupLabel>}
-      <label className="flex items-center gap-2 font-semibold">
+      <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
         <Checkbox
           checked={enabled}
           onChange={() => onChange({ field: 'enabled', value: !enabled })}

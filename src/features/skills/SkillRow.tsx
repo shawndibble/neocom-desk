@@ -69,7 +69,7 @@ export function SkillRow({
       <div className="ml-auto flex shrink-0 items-center gap-3">
         {tags !== undefined && <span className="flex gap-1">{tags}</span>}
         {inPlan && (
-          <span className="inline-flex items-center rounded-xs border border-accent-dim bg-accent/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+          <span className="inline-flex items-center rounded-xs bg-accent/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
             {inPlanLabel}
           </span>
         )}

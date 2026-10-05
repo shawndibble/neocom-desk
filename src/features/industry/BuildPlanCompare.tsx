@@ -7,6 +7,9 @@
  * idiom: this is a state of the detail pane, not a separate route).
  */
 import { useMemo, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { onPlanLinkClick, planHref } from './planLinkClick';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { Button, DataTable, InfoTooltip, IskAmount, Panel } from '@/components/ui';
@@ -115,13 +118,13 @@ export function BuildPlanCompare({
         const reason = row.loading ? null : unresolvedReason(row, t);
         return (
           <span className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => onOpenPlan(row.planId)}
-              className="truncate text-left hover:underline focus-visible:underline"
+            <Link
+              to={planHref(row.planId)}
+              onClick={onPlanLinkClick(() => onOpenPlan(row.planId))}
+              className={entityLinkClassName('truncate text-left')}
             >
               {row.planName}
-            </button>
+            </Link>
             {reason && (
               <InfoTooltip
                 label={t('industry.compareUnresolvedFor', { plan: row.planName })}

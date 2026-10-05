@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { JournalDescriptionCell } from './JournalDescriptionCell';
@@ -51,7 +52,7 @@ describe('JournalDescriptionCell', () => {
     expect(container.textContent).toBe('Complete 3 Jumps');
   });
 
-  it('falls back to a plain label for a daily goal it has no name for', () => {
+  it('falls back to a plain label for a daily goal it has no name for', async () => {
     const { container } = render(
       <MemoryRouter>
         <JournalDescriptionCell
@@ -63,8 +64,9 @@ describe('JournalDescriptionCell', () => {
     );
     expect(container).toHaveTextContent('Daily goal');
     expect(container).not.toHaveTextContent('999');
-    // Kept on hover, so the goal can be named later.
-    expect(screen.getByTitle('Goal id 999')).toBeInTheDocument();
+    // Kept in a tooltip, so the goal can be named later.
+    await userEvent.hover(screen.getByText('Daily goal'));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Goal id 999');
   });
 
   it('shows a non-empty reason as a second line', () => {

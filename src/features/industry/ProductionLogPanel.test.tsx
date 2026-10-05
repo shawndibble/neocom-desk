@@ -519,7 +519,7 @@ describe('ProductionLogPanel', () => {
     );
     await runsTable();
 
-    await user.click(await screen.findByRole('button', { name: 'Sold' }));
+    await user.click(await screen.findByRole('button', { name: 'Sold…' }));
     await waitFor(() => screen.getByRole('button', { name: 'Link' }));
     await user.click(screen.getByRole('button', { name: 'Link' }));
 

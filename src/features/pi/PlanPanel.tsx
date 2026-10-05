@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, Panel, Spinner, TypeIcon } from '@/components/ui';
+import { EmptyState, Panel, Spinner, TypeIcon } from '@/components/ui';
 import {
   focusRingInsetClassName,
   rowInteractiveClassName,
@@ -9,6 +9,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { cx } from '@/lib/cx';
+import { FindBestPlan } from './FindBestPlan';
 import { GoalPlannerPanel, type GoalPlannerPanelProps } from './GoalPlannerPanel';
 import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { MakeMorePlan } from './MakeMorePlan';
@@ -66,9 +67,8 @@ function Option({
 
 /**
  * The Plan tab: a question picker over three answers. "Make more from my
- * planets" reads the recommendation model; "Find the best thing to build" is a
- * placeholder until its own ticket; "Make a specific product" is the Goal
- * Planner, in place, with every deep link it had (`?goals=`, `?off=`).
+ * planets" and "Find the best thing to build" read the recommendation model;
+ * "Make a specific product" is the Goal Planner, in place, with every deep link it had (`?goals=`, `?off=`).
  */
 export function PlanPanel(props: Props) {
   const { t } = useTranslation();
@@ -198,17 +198,7 @@ export function PlanPanel(props: Props) {
           onFindBest={() => setPicked('find-best')}
         />
       )}
-      {question === 'find-best' && (
-        <EmptyState
-          title={t('piPlan.picker.findBestSoonTitle')}
-          hint={t('piPlan.picker.findBestSoonHint')}
-          action={
-            <Button size="sm" onClick={() => setPicked('product')}>
-              {t('piPlan.picker.product')}
-            </Button>
-          }
-        />
-      )}
+      {question === 'find-best' && <FindBestPlan snapshot={snapshot} characterId={characterId} />}
       {question === 'product' && <GoalPlannerPanel {...props} />}
     </div>
   );

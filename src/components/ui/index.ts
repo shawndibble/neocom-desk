@@ -46,6 +46,7 @@ export { FilterBar, FilterField } from './FilterBar';
 export { DateRangeFields } from './DateRangeFields';
 export { useFilterSurface } from './filterSurface';
 export { Disclosure, Caret } from './Disclosure';
+export { RowCaret } from './RowCaret';
 export { FieldError } from './FieldError';
 export { Fields, Field } from './Fields';
 export type { FieldsVariant } from './Fields';

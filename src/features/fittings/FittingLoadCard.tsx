@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel, TextArea } from '@/components/ui';
+import { Button, entityLinkClassName, Panel, TextArea } from '@/components/ui';
 import type { LoadedFitting, LoadOutcome } from '@/engine/fittings/load';
 import type { FittingXmlDocument } from '@/engine/import/eveFitXml';
 import { parseFittingXmlFile, type FittingXmlDocumentErrorCode } from './fittingXmlDocument';
@@ -206,7 +206,9 @@ export function FittingLoadCard({
                     {load.kind === 'fitting' ? (
                       <button
                         type="button"
-                        className="min-h-11 w-full truncate text-left text-sm text-text hover:text-accent"
+                        className={entityLinkClassName(
+                          'min-h-11 w-full truncate text-left text-sm'
+                        )}
                         aria-label={t('fittings.load.xml.open', { name })}
                         onClick={() => void onOpenLoaded(load)}
                       >

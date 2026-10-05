@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { cx } from '@/lib/cx';
 import {
   controlHeightClassName,
@@ -12,6 +13,8 @@ import { Tooltip } from './Tooltip';
 interface FilterChipProps {
   /** Already-translated label. */
   label: string;
+  /** A decorative glyph or image before the label (the planet-type chips). */
+  icon?: ReactNode;
   selected: boolean;
   onToggle: () => void;
   /** Optional match count, shown after the label. */
@@ -69,6 +72,7 @@ interface FilterChipProps {
  */
 export function FilterChip({
   label,
+  icon,
   selected,
   onToggle,
   count,
@@ -103,6 +107,7 @@ export function FilterChip({
         className
       )}
     >
+      {icon}
       {label}
       {count !== undefined && (
         <>

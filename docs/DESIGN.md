@@ -6,7 +6,7 @@ borders, minimal corner rounding, azure/cyan accent, amber caution, red alert,
 condensed uppercase micro-headings. Density over whitespace — this is a data tool.
 
 Tokens live in `src/styles/index.css` (`@theme`, Tailwind v4 CSS-first config).
-Live reference: hidden `/styleguide` route (`src/routes/Styleguide.tsx`).
+Live reference: hidden `/styleguide` route (`src/routes/Styleguide.tsx`). Its "Interaction grammar" section (`src/routes/styleguide/InteractionGrammar.tsx`) renders every §6c cue and state with the real primitives; add a new cue there in the same PR that adds it to §6c.
 
 Interactive primitives (menus, selects, dialogs) are built on
 [`radix-ui`](https://www.radix-ui.com/)'s unstyled components, styled to this
@@ -821,6 +821,7 @@ row.
 | Paired carets in `IconButton`s                       | Pages (previous / next month, a wizard's step back)                                                                                                                                                      |
 | ⋮                                                    | The row's or table's action menu (⋯ is only the phone nav's More)                                                                                                                                        |
 | Accent 2px left border                               | Selected                                                                                                                                                                                                 |
+| `Icon.Pending` (Hourglass)                           | Pending: awaiting an answer (new)                                                                                                                                                                        |
 | A box sized like a field                             | A control (§6)                                                                                                                                                                                           |
 
 Retired meanings, each with its replacement:
@@ -829,7 +830,7 @@ Retired meanings, each with its replacement:
 | ----------------------------------------------------- | -------------------------------------------------------------------------------- |
 | Dashed underline to mark an editable value            | The pencil                                                                       |
 | Bare `CaretLeft` for "back to the parent"             | A labelled breadcrumb                                                            |
-| ⓘ as a static status glyph                            | `WarningCircle` or `Lightbulb`                                                   |
+| ⓘ as a static status glyph (`Icon.Tip`)               | `WarningCircle` or `Lightbulb`                                                   |
 | Accent left bar for "loaded" or "in use"              | A status word                                                                    |
 | A gear that navigates                                 | The gear opens _this page's_ settings modal; link to Settings with labelled text |
 | `textActionClassName` that navigates or opens a modal | It performs an action; navigation is a link or a row                             |

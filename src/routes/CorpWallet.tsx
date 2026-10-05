@@ -22,8 +22,13 @@
  * The journal is the same table `/wallet` draws (`WalletJournalTable.tsx`) —
  * ESI returns the same schema for both.
  */
-import { selectedRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  interactiveClassName,
+  selectedRowClassName,
+} from '@/components/ui/controlStyles';
 import { useMemo, useState } from 'react';
+import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import {
   CollapsiblePanel,
@@ -34,6 +39,7 @@ import {
   Panel,
   SegmentedControl,
   Spinner,
+  Tooltip,
   type DataTableColumn,
   type DataTableSort,
 } from '@/components/ui';
@@ -237,18 +243,18 @@ function CorpDivisionsPanel({
                     onSelect(entry.division);
                     setExpanded(false);
                   }}
-                  className={`min-h-11 rounded-xs border px-3 py-2 text-left transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
-                    isSelected
-                      ? `border-line ${selectedRowClassName}`
-                      : 'border-line hover:border-text-dim'
-                  }`}
+                  className={cx(
+                    'min-h-11 rounded-xs border border-line px-3 py-2 text-left',
+                    interactiveClassName,
+                    focusRingInsetClassName,
+                    isSelected ? selectedRowClassName : 'hover:bg-panel-2 active:bg-panel'
+                  )}
                 >
-                  <span
-                    title={divisionLabel(entry)}
-                    className="block truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-                  >
-                    {divisionLabel(entry)}
-                  </span>
+                  <Tooltip content={divisionLabel(entry)}>
+                    <span className="block truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {divisionLabel(entry)}
+                    </span>
+                  </Tooltip>
                   <span
                     className={`block text-lg font-medium tabular-nums ${iskToneClass(entry.balance)}`}
                   >

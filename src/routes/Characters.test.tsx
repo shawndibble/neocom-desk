@@ -446,6 +446,15 @@ describe('Characters', () => {
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
   });
 
+  it('links the card corp and alliance names to their Show Info (§6c)', async () => {
+    renderCharacters();
+    const corp = await screen.findByRole('link', { name: 'Test Corp' });
+    expect(corp.getAttribute('href')).toContain('info=corporation-1001');
+    expect(screen.getByRole('link', { name: 'Test Alliance' }).getAttribute('href')).toContain(
+      'info=alliance-2001'
+    );
+  });
+
   it('selecting a character persists it as active and navigates to /overview', async () => {
     const user = userEvent.setup();
     renderCharacters();

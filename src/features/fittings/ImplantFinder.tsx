@@ -11,12 +11,31 @@ import {
   useMemo,
   useState,
   type CSSProperties,
+  type ReactElement,
   type ReactNode,
 } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Button, IconButton, IskAmount, SearchInput, Spinner, TypeIcon } from '@/components/ui';
+import {
+  Button,
+  Caret,
+  IconButton,
+  IskAmount,
+  SearchInput,
+  Spinner,
+  Tooltip,
+  TypeIcon,
+} from '@/components/ui';
+import {
+  focusRingClassName,
+  focusRingInsetClassName,
+  interactiveClassName,
+  rowInteractiveClassName,
+  selectedRowClassName,
+} from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
+import { entityLinkClassName } from '@/components/ui';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { cx } from '@/lib/cx';
 import {
   displayValue,
@@ -211,11 +230,12 @@ export function ImplantFinder({
         type="button"
         aria-pressed={goalId === g.id}
         onClick={() => setGoalId(g.id)}
+        aria-current={goalId === g.id ? 'true' : undefined}
         className={cx(
-          'flex min-h-11 w-full items-center gap-2 rounded-xs border px-2 text-left text-sm md:min-h-9',
-          goalId === g.id
-            ? 'border-accent-dim bg-panel-2 text-accent'
-            : 'border-transparent hover:bg-panel-2',
+          'flex min-h-11 w-full items-center gap-2 border-l-2 px-2 text-left text-sm md:min-h-9',
+          rowInteractiveClassName,
+          focusRingInsetClassName,
+          goalId === g.id ? `${selectedRowClassName} text-accent` : 'border-l-transparent',
           tone === 'off' && goalId !== g.id && 'text-text-dim'
         )}
       >
@@ -427,41 +447,47 @@ function SetStrip({
     const picked = selected === key;
     const name = id === undefined ? undefined : names.get(id);
     const label = slotName(t, kind, slot);
+    // The short name truncates; the full one is a tooltip (hold on touch).
+    const withLabel = (button: ReactElement<{ className?: string }>) =>
+      name === undefined ? button : <Tooltip content={name.full}>{button}</Tooltip>;
     return (
       <li key={key} className="relative min-w-0">
-        <button
-          type="button"
-          aria-pressed={picked}
-          aria-label={t('fittings.implantFinder.pickSlot', {
-            slot: label,
-            item: name?.full ?? (id === undefined ? t('fittings.implantFinder.empty') : `#${id}`),
-          })}
-          title={name?.full}
-          onClick={() => onSelect(key)}
-          className={cx(
-            'flex min-h-11 w-full min-w-0 flex-col justify-between rounded-xs border px-1.5 py-1 text-left md:min-h-0',
-            picked
-              ? 'border-accent bg-panel-2 ring-1 ring-accent'
-              : helps
-                ? 'border-dashed border-accent bg-accent/10 hover:bg-accent/20'
-                : 'border-line bg-panel-2 hover:border-line-bright'
-          )}
-        >
-          <span
+        {withLabel(
+          <button
+            type="button"
+            aria-pressed={picked}
+            aria-label={t('fittings.implantFinder.pickSlot', {
+              slot: label,
+              item: name?.full ?? (id === undefined ? t('fittings.implantFinder.empty') : `#${id}`),
+            })}
+            onClick={() => onSelect(key)}
             className={cx(
-              'text-[0.625rem] tracking-wider uppercase',
-              picked ? 'text-accent' : 'text-text-dim',
-              id !== undefined && 'pr-5'
+              'flex min-h-11 w-full min-w-0 flex-col justify-between rounded-xs border px-1.5 py-1 text-left md:min-h-0',
+              interactiveClassName,
+              focusRingClassName,
+              picked
+                ? 'border-accent bg-panel-2 ring-1 ring-accent'
+                : helps
+                  ? 'border-dashed border-accent bg-accent/10 hover:bg-accent/20 active:bg-accent/28'
+                  : 'border-line bg-panel-2 hover:border-line-bright active:bg-panel'
             )}
           >
-            {label}
-          </span>
-          {id === undefined ? (
-            <span className="text-xs text-text-dim">{t('fittings.implantFinder.empty')}</span>
-          ) : (
-            <span className="truncate text-xs font-semibold">{name?.short ?? `#${id}`}</span>
-          )}
-        </button>
+            <span
+              className={cx(
+                'text-[0.625rem] tracking-wider uppercase',
+                picked ? 'text-accent' : 'text-text-dim',
+                id !== undefined && 'pr-5'
+              )}
+            >
+              {label}
+            </span>
+            {id === undefined ? (
+              <span className="text-xs text-text-dim">{t('fittings.implantFinder.empty')}</span>
+            ) : (
+              <span className="truncate text-xs font-semibold">{name?.short ?? `#${id}`}</span>
+            )}
+          </button>
+        )}
         {id !== undefined && (
           <span className="absolute top-0.5 right-0.5">
             <IconButton
@@ -483,8 +509,13 @@ function SetStrip({
         type="button"
         aria-expanded={expanded}
         onClick={() => setExpanded((v) => !v)}
-        className="flex min-h-11 w-full items-center gap-2 text-left md:hidden"
+        className={cx(
+          'flex min-h-11 w-full items-center gap-2 rounded-xs text-left md:hidden',
+          interactiveClassName,
+          focusRingClassName
+        )}
       >
+        <Caret expanded={expanded} />
         <SectionHeading>{t('fittings.implantFinder.yourSet')}</SectionHeading>
         <span className="flex flex-1 gap-0.5" aria-hidden>
           {cells.map((c) => (
@@ -502,7 +533,6 @@ function SetStrip({
         <span className="text-xs text-text-dim tabular-nums">
           {t('fittings.implantFinder.setCount', { filled, total: cells.length })}
         </span>
-        <Icon.Expanded aria-hidden className={cx('text-text-dim', expanded && 'rotate-180')} />
       </button>
       <div className={cx('space-y-1', !expanded && 'hidden md:block')}>
         <div className="hidden items-baseline gap-2 md:flex">
@@ -555,9 +585,13 @@ function SlotBar({
         <span className="text-text-dim">
           {t('fittings.implantFinder.showingSlot', { slot: label })}
         </span>{' '}
-        <span className={name ? 'font-semibold' : 'text-text-dim'}>
-          {name ?? t('fittings.implantFinder.empty')}
-        </span>
+        {occupant !== undefined && name !== null ? (
+          <MarketItemLink typeId={occupant} className={entityLinkClassName('font-semibold')}>
+            {name}
+          </MarketItemLink>
+        ) : (
+          <span className="text-text-dim">{t('fittings.implantFinder.empty')}</span>
+        )}
       </span>
       {occupant !== undefined && name !== null && (
         <>
@@ -795,14 +829,10 @@ function GoalResults({
   return (
     <>
       <div className="space-y-1">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex min-h-11 items-center gap-1 text-sm text-accent md:hidden"
-        >
+        <Button variant="ghost" size="sm" onClick={onBack} className="md:hidden">
           <Icon.Back aria-hidden />
           {t('fittings.implantFinder.back')}
-        </button>
+        </Button>
         <h3 className="text-base font-semibold">{label}</h3>
         {!off && (
           <p className="text-sm text-text-dim tabular-nums">

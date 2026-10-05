@@ -1,3 +1,4 @@
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Panel } from '@/components/ui';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
@@ -74,7 +75,7 @@ export function ContinueSessionCard({
             {t('miningTax.continue.keepSeparate')}
           </Button>
         </div>
-        <label className="flex items-center gap-2 text-xs text-text-dim">
+        <label className={`flex items-center gap-2 text-xs text-text-dim ${tappableRowClassName}`}>
           <Checkbox
             checked={autoContinue}
             onChange={(e) => onAutoContinueChange(e.target.checked)}

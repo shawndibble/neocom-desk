@@ -12,6 +12,8 @@ import { useTranslation } from 'react-i18next';
 import { IskAmount, TypeIcon, sortRows } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { BlueprintBadge } from '@/features/character/assetBrowserRows';
+import { CharacterLink } from '@/features/entities';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { iskToneClass } from '@/features/character/format';
 import { cx } from '@/lib/cx';
 import { useUrlSort } from '@/lib/useUrlState';
@@ -124,9 +126,11 @@ export function MobileOwnedBlueprintList({
           );
           const location = locationLabel(row) ?? t('industry.ownedBlueprintsResolvingLocation');
           const owner =
-            row.owner.kind === 'character'
-              ? row.owner.name
-              : t('industry.ownedBlueprintsCorporation');
+            row.owner.kind === 'character' ? (
+              <CharacterLink id={row.owner.characterId}>{row.owner.name}</CharacterLink>
+            ) : (
+              t('industry.ownedBlueprintsCorporation')
+            );
           const entry = row.catalogEntry;
           return (
             <li
@@ -142,7 +146,9 @@ export function MobileOwnedBlueprintList({
               />
               <div className="flex min-w-0 flex-col gap-1">
                 <div className="flex flex-wrap items-center gap-y-0.5">
-                  <span className="text-sm font-semibold break-words">{name}</span>
+                  <span className="text-sm font-semibold break-words">
+                    <MarketItemLink typeId={row.blueprint.type_id}>{name}</MarketItemLink>
+                  </span>
                   <BlueprintBadge kind={row.kind === 'bpo' ? 'original' : 'copy'} t={t} />
                   {row.activity === 'reaction' && (
                     <span className="ml-1.5 text-[0.6875rem] text-text-dim">

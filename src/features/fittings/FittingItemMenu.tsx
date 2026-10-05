@@ -63,7 +63,7 @@ function slotName(t: ReturnType<typeof useTranslation>['t'], rack: FittingSlotKi
   return t('fittings.item.slot', { rack: t(`fittings.list.rack.${rack}`), index: index + 1 });
 }
 
-/** Load charge ▸ (from cargo) and "Load into all compatible", for one module. */
+/** Load charge (from cargo) and "Load into all compatible", for one module. */
 function ModuleChargeItems({
   actions,
   module,
@@ -122,7 +122,7 @@ function ChargeToCargoItem({
 }
 
 /**
- * "Change charge (all N) ▸" on a Ring tile or List row: the Charge Picker for
+ * "Change charge (all N)" on a Ring tile or List row: the Charge Picker for
  * every fitted module of this type — the weapon group the Offense row's own
  * menu changes. Only with the editor's Fitting to work it out from.
  */
@@ -474,7 +474,7 @@ export function DroneMenuItems({
   );
 }
 
-/** "Load into all compatible" and "Load into… ▸" for a charge, from cargo or not. */
+/** "Load into all compatible" and "Load into…" for a charge, from cargo or not. */
 function ChargeLoadItems({
   actions,
   typeId,

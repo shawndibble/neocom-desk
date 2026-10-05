@@ -35,6 +35,7 @@ import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { Caret } from '@/components/ui/Disclosure';
+import { HintText } from '@/components/ui/HintText';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import {
@@ -362,12 +363,12 @@ export function AppraisalPanel({
               totalCell(row.refineTotal),
               refineBeatsSellAsIs(row),
               row.refinePricedAll === false && (
-                <span
+                <HintText
+                  content={t('market.appraisal.refinePartialHint')}
                   className="ml-0.5 text-warning"
-                  title={t('market.appraisal.refinePartialHint')}
                 >
                   *
-                </span>
+                </HintText>
               )
             ),
       sortValue: (row) => row.refineTotal ?? undefined,
@@ -395,12 +396,12 @@ export function AppraisalPanel({
           </span>,
           lpBeatsMarket(row),
           row.lpAffordable === false && (
-            <span
+            <HintText
+              content={t('market.appraisal.lpUnaffordableHint', { corp: row.lpCorpName })}
               className="ml-0.5 text-warning"
-              title={t('market.appraisal.lpUnaffordableHint', { corp: row.lpCorpName })}
             >
               *
-            </span>
+            </HintText>
           )
         );
       },
@@ -755,18 +756,12 @@ export function AppraisalPanel({
         {compare !== null && (
           // Deliberately not a panel: the hub cards are panel surfaces
           // themselves, so framing them put a box around five boxes. The fold
-          // survives as a bare heading-plus-caret row on the page ground — the
-          // caret stays its own `IconButton` rather than swallowing the
+          // survives as a bare caret-plus-heading row on the page ground — the
+          // leading caret stays its own `IconButton` rather than swallowing the
           // heading, so the toggle's accessible name is not an `aria-label`
           // overriding visible text (WCAG 2.5.3).
           <section aria-labelledby="market-appraisal-compare-hubs">
             <div className="flex min-h-9 items-center gap-1">
-              <h2
-                id="market-appraisal-compare-hubs"
-                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-              >
-                {t('market.appraisal.compareHubsTitle')}
-              </h2>
               <IconButton
                 size="sm"
                 icon={<Caret expanded={compareExpanded} />}
@@ -778,6 +773,12 @@ export function AppraisalPanel({
                 aria-expanded={compareExpanded}
                 onClick={() => setCompareExpanded((open) => !open)}
               />
+              <h2
+                id="market-appraisal-compare-hubs"
+                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+              >
+                {t('market.appraisal.compareHubsTitle')}
+              </h2>
             </div>
             {compareExpanded && <HubCompareCards rows={compare} />}
           </section>

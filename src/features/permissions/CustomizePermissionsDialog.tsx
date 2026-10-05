@@ -15,6 +15,7 @@
  * The selection persists device-locally only on submit — Cancel discards a
  * half-made change rather than remembering it (`customizeSelection.ts`).
  */
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Checkbox } from '@/components/ui';
@@ -115,7 +116,7 @@ export function CustomizePermissionsDialog({
                 checked
                 disabled
                 tag={
-                  <span className="rounded-xs border border-line bg-panel px-1 py-0.5 text-[0.625rem] text-text-dim">
+                  <span className="rounded-xs bg-panel px-1 py-0.5 text-[0.625rem] text-text-dim">
                     {t('permissions.customize.requiredTag')}
                   </span>
                 }
@@ -158,7 +159,7 @@ export function CustomizePermissionsDialog({
                   onChange={() => toggle(group)}
                   tag={
                     !meta.defaultOn && (
-                      <span className="rounded-xs border border-line bg-panel px-1 py-0.5 text-[0.625rem] text-text-dim">
+                      <span className="rounded-xs bg-panel px-1 py-0.5 text-[0.625rem] text-text-dim">
                         {t('permissions.customize.optInTag')}
                       </span>
                     )
@@ -209,14 +210,16 @@ function CaptionedCheckbox({
   const captionId = `${domId}-caption`;
   return (
     <>
-      <Checkbox
-        checked={checked}
-        disabled={disabled}
-        onChange={onChange}
-        aria-label={label}
-        aria-describedby={captionId}
-        className="mt-0.5 disabled:cursor-default! disabled:opacity-100!"
-      />
+      <label className={touchCheckboxLabelClassName}>
+        <Checkbox
+          checked={checked}
+          disabled={disabled}
+          onChange={onChange}
+          aria-label={label}
+          aria-describedby={captionId}
+          className="mt-0.5 disabled:cursor-default! disabled:opacity-100!"
+        />
+      </label>
       <span className="block min-w-0">
         <span className="flex items-center gap-1.5 font-semibold">
           {label}

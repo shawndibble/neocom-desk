@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { BuildPlanRecord } from '@/db';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
@@ -187,21 +188,23 @@ function renderPanel(
   } = {}
 ) {
   render(
-    <BuildGroupPanel
-      group={overrides.group ?? GROUP}
-      plans={plans}
-      catalog={overrides.catalog ?? CATALOG}
-      pi={null}
-      ownedBlueprints={[]}
-      modifiers={NO_CHARACTER_MODIFIERS}
-      pricingInputs={PRICING_INPUTS_FIXTURE}
-      ownedStockSnapshot={SNAPSHOT}
-      onAutoBuild={overrides.onAutoBuild ?? (() => Promise.resolve())}
-      onOpenPlan={() => {}}
-      onRetarget={() => {}}
-      onOwnedStockChange={overrides.onOwnedStockChange ?? (() => {})}
-      onOwnedStockScopeChange={() => {}}
-    />
+    <MemoryRouter>
+      <BuildGroupPanel
+        group={overrides.group ?? GROUP}
+        plans={plans}
+        catalog={overrides.catalog ?? CATALOG}
+        pi={null}
+        ownedBlueprints={[]}
+        modifiers={NO_CHARACTER_MODIFIERS}
+        pricingInputs={PRICING_INPUTS_FIXTURE}
+        ownedStockSnapshot={SNAPSHOT}
+        onAutoBuild={overrides.onAutoBuild ?? (() => Promise.resolve())}
+        onOpenPlan={() => {}}
+        onRetarget={() => {}}
+        onOwnedStockChange={overrides.onOwnedStockChange ?? (() => {})}
+        onOwnedStockScopeChange={() => {}}
+      />
+    </MemoryRouter>
   );
 }
 
@@ -297,14 +300,17 @@ describe('BuildGroupPanel — mixed-hub multibuy', () => {
 });
 
 describe('BuildGroupPanel — Members list', () => {
-  it('titles the truncated plan name with the full name (#2175)', () => {
+  it('renders each member as a real link to its plan (#2175)', () => {
     const longName = 'Punisher Hull Line — bulk run for the Amarr Navy Issue reprocessing project';
     mockedUseComparedBuildResults.mockReturnValue([
       { ...row('a', [material(34, 100)]), planName: longName },
     ]);
     renderPanel([{ ...plan('a', 'jita'), name: longName }]);
 
-    expect(screen.getByText(longName)).toHaveAttribute('title', longName);
+    expect(screen.getByRole('link', { name: new RegExp(longName) })).toHaveAttribute(
+      'href',
+      '/industry/plans/a'
+    );
   });
 });
 
@@ -325,7 +331,7 @@ describe('BuildGroupPanel — Auto Build (issue #696)', () => {
     const onAutoBuild = vi.fn().mockResolvedValue(undefined);
     renderPanel([plan('a', 'jita')], { catalog: CHAIN_CATALOG, onAutoBuild });
 
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await user.click(screen.getByRole('button', { name: 'Apply…' }));
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText(
@@ -358,7 +364,7 @@ describe('BuildGroupPanel — Auto Build (issue #696)', () => {
       catalog: CHAIN_CATALOG,
     });
 
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await user.click(screen.getByRole('button', { name: 'Apply…' }));
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText(

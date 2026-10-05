@@ -58,13 +58,12 @@ export function SecurityCell({ order, npcStations, solarSystems, t }: LocationCe
   const { security } = resolveOrderLocation(order, npcStations, solarSystems);
   const value = security.toFixed(1);
   return (
-    <span
+    <HintText
+      content={t('market.securityAriaLabel', { value })}
       className="tabular-nums font-semibold"
-      style={{ color: securityStatusColor(security) }}
-      title={t('market.securityAriaLabel', { value })}
     >
-      {value}
-    </span>
+      <span style={{ color: securityStatusColor(security) }}>{value}</span>
+    </HintText>
   );
 }
 

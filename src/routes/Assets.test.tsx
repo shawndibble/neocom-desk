@@ -792,21 +792,21 @@ describe('station pins (issue #84)', () => {
 });
 
 describe('item name and blueprint badge', () => {
-  it('opens Show info from the item name', async () => {
+  it('links the item name to its Market listing', async () => {
     const user = userEvent.setup();
     render(<App />);
     await openLocation(user, JITA);
 
-    const name = await screen.findByRole('button', { name: 'Tritanium' });
-    await user.click(name);
-    expect(screen.getByRole('dialog', { name: 'Item detail: Tritanium' })).toBeInTheDocument();
+    const name = await screen.findByRole('link', { name: 'Tritanium' });
+    expect(name.getAttribute('href')).toMatch(/^\/market\/browser\?.*34/);
+    expect(name).not.toHaveAttribute('title');
   });
 
   it('keeps right-click on the name opening the row menu, not Show info', async () => {
     render(<App />);
     const user = userEvent.setup();
     await openLocation(user, JITA);
-    const name = await screen.findByRole('button', { name: 'Tritanium' });
+    const name = await screen.findByRole('link', { name: 'Tritanium' });
     fireEvent.contextMenu(name);
 
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
@@ -1387,8 +1387,9 @@ describe('jumps-away distance (issue #87)', () => {
 
     render(<App />);
 
-    const badge = await screen.findByTitle('No route found to this station.');
-    expect(badge).toHaveTextContent('-');
+    const badge = await screen.findByText('-');
+    await userEvent.hover(badge);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('No route found to this station.');
   });
 
   it('shows "-" with a reason tooltip when the character\'s own location is unavailable', async () => {
@@ -1404,9 +1405,9 @@ describe('jumps-away distance (issue #87)', () => {
     render(<App />);
 
     // Both visible locations degrade the same way — no pin needed for either.
-    const badges = await screen.findAllByTitle('Character location unavailable.');
-    expect(badges.length).toBeGreaterThan(0);
-    for (const badge of badges) expect(badge).toHaveTextContent('-');
+    const badges = await screen.findAllByText('-');
+    await userEvent.hover(badges[0]);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Character location unavailable.');
     expect(screen.queryByText('Log in again to see your assets')).not.toBeInTheDocument();
   });
 

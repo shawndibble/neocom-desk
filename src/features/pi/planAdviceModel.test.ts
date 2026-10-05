@@ -449,6 +449,18 @@ describe('buildPlanAdvice: hauling, slots, ranking', () => {
     expect(lavaOnly(withLava).length).toBeGreaterThan(0);
   });
 
+  it("carries each recipe's layout and every ranked row for re-ranking", () => {
+    const advice = buildPlanAdvice(input());
+    expect(advice.recipeRows.length).toBeGreaterThanOrEqual(advice.recipes.recipes.length);
+    for (const recipe of advice.recipes.recipes) {
+      expect(recipe.layout).toBeDefined();
+      expect(recipe.layout?.extracts.length).toBeGreaterThan(0);
+      expect(recipe.layout?.makes.at(-1)?.typeId).toBe(recipe.typeId);
+      expect(recipe.layout?.pins.extractorControlUnit).toBeGreaterThan(0);
+      expect(recipe.layout?.unitsPerDay).toBeGreaterThan(0);
+    }
+  });
+
   it('shows the same figures as the standalone ranker for the same rows', () => {
     // The ranking is exactly rankRecipes over the model's rows: Map and Plan share one number.
     const advice = buildPlanAdvice(input());

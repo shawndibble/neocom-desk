@@ -27,6 +27,7 @@ import { useCompareSet } from '@/features/market/compareSet';
 import { ESI_BASE_URL } from '@/esi/client';
 import { configureClipboard } from '@/lib/clipboard';
 import { App } from '@/app/App';
+import { TEXT_DEBOUNCE_MS } from '@/lib/urlState';
 import * as routeChunks from '@/app/routeChunks';
 import type {
   MarketGroupNode,
@@ -1278,6 +1279,11 @@ describe('Market Browser item context menu (issue #6)', () => {
     await waitFor(() =>
       expect(new URLSearchParams(window.location.search).get('type')).toBe('587')
     );
+    // The search box's 300ms debounced write was still pending when the menu
+    // navigated; it must not overwrite the new location with its stale params
+    // (the CI flake: `type` came back null once the timer fired under load).
+    await new Promise((resolve) => setTimeout(resolve, TEXT_DEBOUNCE_MS + 100));
+    expect(new URLSearchParams(window.location.search).get('type')).toBe('587');
     expect(window.location.pathname).toBe('/market/browser');
     expect(new URLSearchParams(window.location.search).get('hub')).toBe('jita');
   });

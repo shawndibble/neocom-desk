@@ -96,7 +96,6 @@ import { loadTypeVolumes } from '@/features/character/typeNames';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
-import { useItemActions } from '@/features/market/itemActions';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
 import { assetBlueprintKind } from '@/engine/blueprintKind';
 import { useCompareSet } from '@/features/market/compareSet';
@@ -861,7 +860,6 @@ function NodeRowView({
   volumeByTypeId,
   blueprintTypeIds,
 }: BrowseRowViewProps & { node: AssetTreeNode }) {
-  const { showInfo } = useItemActions();
   const label = nodeLabel(node, typeNames, locationNames, t);
 
   if (node.kind !== 'item') {
@@ -890,7 +888,7 @@ function NodeRowView({
       estimatedValue={assetStackValue(asset, priceByTypeId, copyValueByItemId)}
       characterBadge={null}
       blueprintKind={assetBlueprintKind(asset, blueprintTypeIds)}
-      onShowInfo={() => showInfo(asset.type_id, label)}
+      typeId={asset.type_id}
       selectMode={selectMode}
       selectionState={selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
       onToggleSelection={() => onToggleSelection([asset.item_id])}
