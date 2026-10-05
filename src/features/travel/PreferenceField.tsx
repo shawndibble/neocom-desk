@@ -1,6 +1,6 @@
 /**
  * The labelled selects Travel's tabs share (issues #2328, #2330): a generic
- * `OptionField`, and the Route Preference built on it. The preference is URL
+ * `OptionField` (sized to its longest option), and the Route Preference built on it. The preference is URL
  * state only — never persisted (`features/route/routePreferences.ts`).
  */
 import { useTranslation } from 'react-i18next';
@@ -21,7 +21,7 @@ export function OptionField<V extends string>({
   options,
   optionLabel,
   onChange,
-  className = 'w-40',
+  className,
 }: {
   label: string;
   value: V;
@@ -34,7 +34,23 @@ export function OptionField<V extends string>({
     <FilterField label={label} stretch={false}>
       <Select value={value} onValueChange={(next) => onChange(next as V)}>
         <SelectTrigger aria-label={label} className={className}>
-          <SelectValue />
+          {/* Sized to the longest option, not the current value, so the trigger
+              never jumps when the selection changes. Each label is stamped in
+              the same grid cell via a pseudo-element: it takes width but is no
+              text a query or a screen reader could find. */}
+          <span className="grid text-left">
+            <span className="col-start-1 row-start-1 min-w-0 truncate">
+              <SelectValue />
+            </span>
+            {options.map((option) => (
+              <span
+                key={option}
+                aria-hidden="true"
+                data-label={optionLabel(option)}
+                className="invisible col-start-1 row-start-1 h-0 overflow-hidden before:content-[attr(data-label)]"
+              />
+            ))}
+          </span>
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (
@@ -63,7 +79,6 @@ export function PreferenceField({
       options={ROUTE_PREFERENCES}
       optionLabel={(preference) => t(ROUTE_PREFERENCE_LABEL_KEYS[preference])}
       onChange={onChange}
-      className="w-44"
     />
   );
 }

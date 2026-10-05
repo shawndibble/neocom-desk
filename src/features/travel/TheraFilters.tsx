@@ -1,8 +1,8 @@
 /**
- * Thera / Turnur's filter row (issue #2499): From, Hub (with counts), Exit and
- * Fits as segmented controls in one row, a compact Route Preference picker on
- * the right. On a phone each becomes a chip that opens its options, so the
- * row wraps instead of scrolling sideways.
+ * Thera / Turnur's filter row (issues #2499, #2607): From, Hub (with counts),
+ * Exit, Fits and Route Preference as content-sized selects in one row. On a
+ * phone each becomes a chip that opens its options, so the row wraps instead
+ * of scrolling sideways.
  */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,7 +12,6 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
-  SegmentedControl,
 } from '@/components/ui';
 import { controlHeightClassName, toggleChipStateClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
@@ -21,7 +20,7 @@ import { THERA_EXITS, type TheraExit } from '@/engine/route/theraConnections';
 import { ROUTE_PREFERENCE_LABEL_KEYS, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { PreferenceField } from './PreferenceField';
+import { OptionField, PreferenceField } from './PreferenceField';
 import { HUB_OPTIONS, SIZE_OPTIONS, type HubOption, type SizeOption } from './theraOptions';
 
 interface Option<V extends string> {
@@ -115,30 +114,33 @@ export function TheraFilters({
     <div className="flex flex-wrap items-end gap-3">
       <Labelled label={t('travel.thera.originLabel')}>{origin}</Labelled>
       <Labelled label={t('travel.thera.hubLabel')}>
-        <SegmentedControl
+        <OptionField
           label={t('travel.thera.hubLabel')}
           value={values.hub}
-          options={hubOptions}
+          options={HUB_OPTIONS}
+          optionLabel={(hub) => hubOptions.find((o) => o.value === hub)?.label ?? hub}
           onChange={(hub) => onChange({ hub })}
         />
       </Labelled>
       <Labelled label={t('travel.thera.exitLabel')}>
-        <SegmentedControl
+        <OptionField
           label={t('travel.thera.exitLabel')}
           value={values.space}
-          options={exitOptions}
+          options={THERA_EXITS}
+          optionLabel={(exit) => t(`travel.thera.exit.${exit}`)}
           onChange={(space) => onChange({ space })}
         />
       </Labelled>
       <Labelled label={t('travel.thera.fitsLabel')}>
-        <SegmentedControl
+        <OptionField
           label={t('travel.thera.fitsLabel')}
           value={values.size}
-          options={sizeOptions}
+          options={SIZE_OPTIONS}
+          optionLabel={(size) => t(`travel.thera.fits.${size}`)}
           onChange={(size) => onChange({ size })}
         />
       </Labelled>
-      <Labelled label={t('travel.preferenceLabel')} className="ml-auto">
+      <Labelled label={t('travel.preferenceLabel')}>
         <PreferenceField value={values.pref} onChange={(pref) => onChange({ pref })} />
       </Labelled>
     </div>
