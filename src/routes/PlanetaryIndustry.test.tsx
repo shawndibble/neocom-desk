@@ -228,6 +228,8 @@ const server = setupServer(
     const ids = (await request.json()) as number[];
     return HttpResponse.json(ids.filter((id) => NAMES[id]).map((id) => ({ id, ...NAMES[id] })));
   }),
+  // The planner's item menus (Quickbar) read the character's public profile.
+  http.get(`${ESI}/characters/${CHAR_ID}/corporationhistory`, () => HttpResponse.json([])),
   http.get(`${ESI}/universe/systems/${SYSTEM_ID}`, () =>
     HttpResponse.json({
       system_id: SYSTEM_ID,
@@ -731,11 +733,10 @@ describe('PlanetaryIndustry', () => {
     window.history.pushState({}, '', `/planetary-industry/plan?goals=${WATER}:24`);
     render(<App />);
 
+    // The plan is computed off deferred inputs, so the Lift lands a render later.
     const headline = await screen.findByTestId('goal-plan-headline');
-    expect(within(headline).getByText('Lift / day')).toBeInTheDocument();
-    expect(
-      within(headline).getByText('vs your colonies each selling their best P1')
-    ).toBeInTheDocument();
+    await waitFor(() => expect(headline).toHaveTextContent(/selling each colony.s best P1/));
+    expect(within(headline).getByText(/^ISK\/day vs/)).toBeInTheDocument();
     expect(screen.getByLabelText(`${WATER_NAME} per day`)).toHaveValue(24);
     const changes = screen.getByRole('heading', { name: 'Changes' });
     // DOM order, not a visual reorder: this is the phone's reading order.
@@ -743,8 +744,12 @@ describe('PlanetaryIndustry', () => {
       screen.getByRole('heading', { name: 'Plan' }).compareDocumentPosition(changes) &
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
+    // Colonies fold away below `md` (jsdom matches no media query): open them.
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Show colonies' }));
     // The colony's customs is its system's highsec rate after level 4.
-    expect(screen.getByLabelText('Customs rate in Jita (%)')).toHaveValue(6);
+    expect(
+      screen.getByLabelText('Customs rate for Jita IV (applies to all colonies in Jita) %')
+    ).toHaveValue(6);
     expect(
       screen.getByRole('table', { name: 'Everything the goals need, by tier' })
     ).toBeInTheDocument();
@@ -756,10 +761,11 @@ describe('PlanetaryIndustry', () => {
     window.history.pushState({}, '', `/planetary-industry/plan?goals=${WATER}:24`);
     render(<App />);
 
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Show colonies' }));
     expect(
       await screen.findByText(/Left out: no link on any of your colonies/)
     ).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Plan with Jita IV' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: /^Jita IV/ })).toBeDisabled();
   });
 
   it('falls back to the colony view rather than crashing on a tab it does not know', async () => {

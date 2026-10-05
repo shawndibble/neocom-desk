@@ -4,21 +4,26 @@
  * and is it worth more than what they earn anyway?"
  *
  * The page wires reads to the engine and nothing else: `goalPlannerSnapshot`
- * reads, `goalPlannerModel` adapts, `planBest` / `planDiff` answer, and
- * `GoalPlannerRail` / `GoalPlannerResults` draw. Goals and switched-off
- * colonies are URL state (the route owns them, so a plan survives a reload
- * and the Industry "PI Plan" link can seed one); the standing assumptions are
- * device-local prefs; the customs rate is the synced per-system override the
- * Advisor writes too.
+ * reads, `goalPlannerModel` adapts, `planBest` / `planDiff` answer,
+ * `goalPlanView` reads the answer, and `GoalPlannerRail` /
+ * `GoalPlannerResults` draw. Goals and switched-off colonies are URL state
+ * (the route owns them); the standing assumptions are device-local prefs; the
+ * customs rate is the synced per-system override the Advisor writes too.
  *
- * Layout is a rail beside the results on a pointer and stacked above them on
- * a phone, by DOM order — the results' own order (Headline first) is the
- * phone's reading order and must not depend on a visual reorder.
+ * ## Layout
+ *
+ * DOM order is Goals, results, Colonies, Assumptions — the phone's reading
+ * order: say what you want, see the answer, then adjust what you have and
+ * how you play (both folded by default there). On a pointer a grid puts
+ * Goals, Colonies and Assumptions in a rail beside the results; the results
+ * span the rail's rows plus a trailing `1fr` row, so the rail panels stay
+ * packed at the top instead of stretching to the results' height.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { EmptyState, Spinner } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { GrantBanner } from '@/app/GrantNote';
 import { planBest, type BestPlan } from '@/engine/pi/planBest';
 import { planDiff } from '@/engine/pi/planDiff';
@@ -26,6 +31,9 @@ import type { Goal } from '@/engine/pi/goalTypes';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { scheduleSync, setSyncedSetting } from '@/sync';
 import { useJumpBasis, jumpsBetween } from '@/features/route/jumpBasis';
+import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
+import { usePageItemActions } from '@/features/market/usePageItemActions';
+import { useMediaQuery } from '@/lib/useMediaQuery';
 import { useCadence } from './cadencePref';
 import { useMarketSourcing } from './marketSourcingPref';
 import {
@@ -49,13 +57,23 @@ import {
   loadGoalPlannerSnapshot,
   type GoalPlannerSnapshot,
 } from './goalPlannerSnapshot';
-import { plannableGoals } from './goalsParam';
+import { parseGoals, plannableGoals, serializeGoals } from './goalsParam';
+import { changeSteps, goalAttainment, planCaveats, shortfallHint } from './goalPlanView';
 import { productOptions } from './products';
 import type { PlanPrices } from './planPrices';
 import { AssumptionsSection, ColoniesSection, GoalsSection } from './GoalPlannerRail';
-import { ChangeList, ColonyFit, Flow, Hauling, Headline, Shortfalls } from './GoalPlannerResults';
+import {
+  Changes,
+  ColonyFit,
+  Flow,
+  Hauling,
+  Headline,
+  Shortfalls,
+  type PlanNames,
+} from './GoalPlannerResults';
 
 const HOURS_PER_DAY = 24;
+const MD_UP = '(min-width: 48rem)';
 
 export interface GoalPlannerPanelProps {
   characterId: number;
@@ -75,7 +93,19 @@ function Loading() {
   );
 }
 
-export function GoalPlannerPanel({
+export function GoalPlannerPanel(props: GoalPlannerPanelProps) {
+  const itemActions = usePageItemActions({
+    activeCharacterId: props.characterId,
+    lazyBlueprints: true,
+  });
+  return (
+    <ItemActionsProvider page={itemActions}>
+      <GoalPlanner {...props} />
+    </ItemActionsProvider>
+  );
+}
+
+function GoalPlanner({
   characterId,
   goals,
   onGoalsChange,
@@ -83,6 +113,12 @@ export function GoalPlannerPanel({
   onDisabledChange,
 }: GoalPlannerPanelProps) {
   const { t } = useTranslation();
+  const mdUp = useMediaQuery(MD_UP);
+  // Phone-sized (44px) controls below `md`; the dense tier beside a pointer.
+  const size = mdUp ? 'sm' : 'md';
+  // Folded on a phone, open beside a pointer, until the pilot says otherwise.
+  const [coloniesOpen, setColoniesOpen] = useState<boolean | null>(null);
+  const [assumptionsOpen, setAssumptionsOpen] = useState<boolean | null>(null);
 
   // --- Reads ---
   const [loaded, setLoaded] = useState<{
@@ -168,11 +204,11 @@ export function GoalPlannerPanel({
     [characterId, customsEdits, snapshot]
   );
 
-  // --- The answer ---
+  // --- Inputs, deferred so typing a rate never waits on a re-plan ---
   const restartHours = cadence.restartDays * HOURS_PER_DAY;
   const haulHours = cadence.haulDays * HOURS_PER_DAY;
   const disabledSet = useMemo(() => new Set(disabled), [disabled]);
-  const rows = useMemo(
+  const liveRows = useMemo(
     () =>
       snapshot && customsOverrides
         ? plannerColonies(snapshot, {
@@ -184,20 +220,28 @@ export function GoalPlannerPanel({
         : [],
     [snapshot, customsOverrides, restartHours, prefs.fallbackRatePerHour, disabledSet]
   );
+  const rows = useDeferredValue(liveRows);
   const products = useMemo(() => (pi ? productOptions(pi) : []), [pi]);
-  const activeGoals = useMemo(
-    () => plannableGoals(goals, new Set(products.map((product) => product.typeId))),
-    [goals, products]
-  );
+  const plannable = useMemo(() => new Set(products.map((p) => p.typeId)), [products]);
+
+  // Once the payload is in, a goal it cannot plan (a hand-edited link) leaves the URL.
+  useEffect(() => {
+    if (plannable.size === 0) return;
+    const kept = plannableGoals(goals, plannable);
+    if (kept.length !== goals.length) onGoalsChange(kept);
+  }, [goals, plannable, onGoalsChange]);
+
+  // Keyed on the goals' serialized form: a new array with the same goals never re-plans.
+  const goalsKey = useDeferredValue(serializeGoals(plannableGoals(goals, plannable)) ?? '');
+  const plannedGoals = useMemo(() => parseGoals(goalsKey), [goalsKey]);
 
   const result = useMemo((): { best: BestPlan } | { error: true } | null => {
     if (!pi || !prices || !snapshot) return null;
     try {
-      const colonies = goalPlannerInput(rows);
       const best = planBest(
         {
-          goals: activeGoals,
-          colonies,
+          goals: plannedGoals,
+          colonies: goalPlannerInput(rows),
           policy: plannerPolicy({ maxP0Types: prefs.maxP0Types, buyP1 }),
           books: priceBooks(prices, snapshot.accountingLevel),
         },
@@ -207,18 +251,18 @@ export function GoalPlannerPanel({
     } catch {
       return { error: true };
     }
-  }, [pi, prices, snapshot, rows, activeGoals, prefs.maxP0Types, buyP1]);
+  }, [pi, prices, snapshot, rows, plannedGoals, prefs.maxP0Types, buyP1]);
 
   // --- Jumps from each colony's system to the hub, on the pilot's route basis ---
   const basis = useJumpBasis();
-  const systemIds = useMemo(
-    () => [...new Set(rows.map((row) => row.systemId))].sort((a, b) => a - b),
+  const systemKey = useMemo(
+    () => [...new Set(rows.map((row) => row.systemId))].sort((a, b) => a - b).join(','),
     [rows]
   );
-  const systemKey = systemIds.join(',');
-  const [jumps, setJumps] = useState<{ key: string; bySystem: Map<number, number | null> } | null>(
-    null
-  );
+  const [jumps, setJumps] = useState<{
+    key: string;
+    bySystem: Map<number, number | null>;
+  } | null>(null);
   const jumpsKey = `${basis.key}|${hub.systemId}|${systemKey}`;
   useEffect(() => {
     if (!basis.hydrated || systemKey === '') return;
@@ -248,11 +292,22 @@ export function GoalPlannerPanel({
     return out;
   }, [jumps, jumpsKey, rows]);
 
+  const names = useMemo((): PlanNames | null => {
+    if (!snapshot || !pi) return null;
+    const systemOf = new Map(rows.map((row) => [row.planetId, row.systemId]));
+    return {
+      planet: (id) => snapshot.planetNames.get(id) ?? t('pi.planetLabel', { id }),
+      systemOf: (id) => systemOf.get(id),
+      hub,
+      pi,
+    };
+  }, [snapshot, pi, rows, hub, t]);
+
   // --- States ---
   if (failedFor === characterId) {
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
   }
-  if (!snapshot || !pi) return <Loading />;
+  if (!snapshot || !pi || !names) return <Loading />;
   if (snapshot.needsReauth) {
     return (
       <GrantBanner
@@ -265,42 +320,10 @@ export function GoalPlannerPanel({
     );
   }
 
-  const planetName = (id: number) => snapshot.planetNames.get(id) ?? t('pi.planetLabel', { id });
   const systemName = (id: number) =>
     snapshot.systemNames.get(id) ?? t('piAdvisor.systemLabel', { id });
   const noColonies = snapshot.colonies.length === 0;
-
-  const rail = (
-    <div className="space-y-4">
-      <GoalsSection goals={goals} products={products} onGoalsChange={onGoalsChange} />
-      <ColoniesSection
-        rows={rows}
-        planetName={planetName}
-        systemName={systemName}
-        onToggle={(planetId, enabled) =>
-          onDisabledChange(
-            enabled ? disabled.filter((id) => id !== planetId) : [...disabled, planetId]
-          )
-        }
-        onCustomsChange={writeCustoms}
-      />
-      <AssumptionsSection
-        hubId={hub.id}
-        onHubChange={setHub}
-        buyP1={buyP1}
-        onBuyP1Change={setBuyP1}
-        fallbackRate={prefs.fallbackRatePerHour}
-        onFallbackRateChange={(rate) => void setPrefs({ ...prefs, fallbackRatePerHour: rate })}
-        fallbackInUse={rows.some((row) =>
-          [...(row.colony?.ratePerEcu.values() ?? [])].some((rate) => rate.source === 'assumed')
-        )}
-        maxP0Types={prefs.maxP0Types}
-        onMaxP0TypesChange={(value) => void setPrefs({ ...prefs, maxP0Types: value })}
-        cadence={cadence}
-        onCadenceChange={(next) => void setCadence(next)}
-      />
-    </div>
-  );
+  const advisorSystem = rows.find((row) => row.enabled)?.systemId;
 
   let results: React.ReactNode;
   if (noColonies && !buyP1) {
@@ -309,7 +332,7 @@ export function GoalPlannerPanel({
         title={t('piPlan.noColoniesTitle')}
         hint={t('piPlan.noColoniesHint')}
         action={
-          <Link className="text-accent hover:underline" to="/planetary-industry/advisor">
+          <Link className={inlineLinkClassName} to="/planetary-industry/advisor">
             {t('piPlan.openAdvisor')}
           </Link>
         }
@@ -325,6 +348,7 @@ export function GoalPlannerPanel({
     results = <EmptyState title={t('piPlan.planFailedTitle')} hint={t('piPlan.planFailedHint')} />;
   } else {
     const { best } = result;
+    const planned = goalPlannerInput(rows);
     const hauling = planHauling(best.plan, best.baseline, pi, haulHours);
     const earnings = earningsNow(
       rows,
@@ -340,11 +364,8 @@ export function GoalPlannerPanel({
             hauling.baselineM3PerTrip
           )
         : null;
-    const baselineP1s = (planetId: number) => {
-      const own = best.baseline.perColony.get(planetId);
-      return own?.status === 'ok' ? own.slots.map((slot) => slot.p1TypeId) : [];
-    };
-    const hasGoals = activeGoals.some((goal) => goal.unitsPerDay > 0);
+    const hasGoals = plannedGoals.some((goal) => goal.unitsPerDay > 0);
+    const steps = changeSteps(best.plan, planDiff(best.plan, planned), rows);
     results = (
       <div className="space-y-4">
         {noColonies && <p className="text-xs text-text-dim">{t('piPlan.noColoniesBuying')}</p>}
@@ -352,38 +373,29 @@ export function GoalPlannerPanel({
           best={best}
           earnings={earnings}
           verdict={hasGoals ? verdict : null}
+          attainment={goalAttainment(best.plan.achieved)}
+          caveats={planCaveats(best.plan.assignments, rows)}
           hasGoals={hasGoals}
-          pi={pi}
-          hub={hub}
+          pricesFetchedAt={prices.fetchedAt}
+          names={names}
         />
         {hasGoals && (
           <>
             <Shortfalls
               shortfalls={best.plan.shortfalls}
-              achieved={best.plan.achieved}
-              pi={pi}
-              planetName={planetName}
+              hints={best.plan.shortfalls.map((s) => shortfallHint(s, rows, buyP1))}
+              names={names}
+              advisorSystem={advisorSystem}
             />
-            <ChangeList
-              changes={planDiff(best.plan, goalPlannerInput(rows))}
-              pi={pi}
-              planetName={planetName}
-              baselineP1s={baselineP1s}
-            />
-            <ColonyFit
-              assignments={best.plan.assignments}
-              rows={rows}
-              pi={pi}
-              planetName={planetName}
-            />
+            <Changes steps={steps} names={names} />
+            <ColonyFit assignments={best.plan.assignments} rows={rows} names={names} />
             <Hauling
               hauling={hauling}
               jumpsByPlanet={jumpsByPlanet}
               haulDays={cadence.haulDays}
-              hub={hub}
-              planetName={planetName}
+              names={names}
             />
-            <Flow demand={best.plan.demand} pi={pi} hub={hub} />
+            <Flow demand={best.plan.demand} names={names} />
           </>
         )}
       </div>
@@ -391,9 +403,53 @@ export function GoalPlannerPanel({
   }
 
   return (
-    <div className="grid items-start gap-4 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
-      {rail}
-      <div className="min-w-0">{results}</div>
+    <div className="grid items-start gap-4 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:grid-rows-[auto_auto_auto_1fr]">
+      <div className="md:col-start-1 md:row-start-1">
+        <GoalsSection
+          goals={goals}
+          products={products}
+          onGoalsChange={onGoalsChange}
+          hubId={hub.id}
+          size={size}
+        />
+      </div>
+      <div className="min-w-0 md:col-start-2 md:row-span-4 md:row-start-1">{results}</div>
+      <div className="md:col-start-1 md:row-start-2">
+        <ColoniesSection
+          rows={liveRows}
+          planetName={names.planet}
+          systemName={systemName}
+          size={size}
+          expanded={coloniesOpen ?? mdUp}
+          onToggleExpanded={() => setColoniesOpen(!(coloniesOpen ?? mdUp))}
+          onToggle={(planetId, enabled) =>
+            onDisabledChange(
+              enabled ? disabled.filter((id) => id !== planetId) : [...disabled, planetId]
+            )
+          }
+          onCustomsChange={writeCustoms}
+        />
+      </div>
+      <div className="md:col-start-1 md:row-start-3">
+        <AssumptionsSection
+          hubId={hub.id}
+          onHubChange={setHub}
+          buyP1={buyP1}
+          onBuyP1Change={setBuyP1}
+          fallbackRate={prefs.fallbackRatePerHour}
+          onFallbackRateChange={(rate) => void setPrefs({ ...prefs, fallbackRatePerHour: rate })}
+          fallbackInUse={liveRows.some((row) =>
+            [...(row.colony?.ratePerEcu.values() ?? [])].some((rate) => rate.source === 'assumed')
+          )}
+          maxP0Types={prefs.maxP0Types}
+          onMaxP0TypesChange={(value) => void setPrefs({ ...prefs, maxP0Types: value })}
+          cadence={cadence}
+          onCadenceChange={(next) => void setCadence(next)}
+          size={size}
+          expanded={assumptionsOpen ?? mdUp}
+          onToggleExpanded={() => setAssumptionsOpen(!(assumptionsOpen ?? mdUp))}
+        />
+      </div>
     </div>
   );
 }

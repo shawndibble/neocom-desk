@@ -32,75 +32,17 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  TextInput,
   buttonClassName,
   Checkbox,
 } from '@/components/ui';
 import { TRADE_HUBS } from '@/market/hubs';
 import type { MarketSourcing } from './marketSourcingPref';
-import { PI_CADENCE_DAYS, useCadence, type PiCadence, type PiCadenceDays } from './cadencePref';
-
-/** A label and its control, on one line. The column's whole rhythm. */
-function Assume({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="flex items-center gap-1.5 text-xs text-text-dim">{label}</span>
-      {children}
-    </div>
-  );
-}
+import { useCadence, type PiCadence } from './cadencePref';
+import { Assume, CadenceRow, PercentInput } from './piControls';
 
 /** Why the line above it matters, in the quietest type on the page. */
 function Footnote({ children }: { children: React.ReactNode }) {
   return <p className="mt-1 text-[0.625rem] leading-relaxed text-text-dim">{children}</p>;
-}
-
-/**
- * One cadence, as a sentence with a hole in it.
- *
- * Two controls, not one: restarting an extractor program does not empty the
- * Launchpad, and hauling does not reinstall a program — see `cadencePref.ts`.
- * The footnotes say what each one changes, because the difference is exactly
- * what a pilot has no reason to know from the labels alone.
- */
-function CadenceRow({
-  label,
-  hint,
-  value,
-  onChange,
-}: {
-  label: string;
-  hint: string;
-  value: PiCadenceDays;
-  onChange: (days: PiCadenceDays) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <Assume
-      label={
-        <>
-          {label}
-          <InfoTooltip label={t('common.aboutLabel', { label })} content={hint} />
-        </>
-      }
-    >
-      <Select
-        value={String(value)}
-        onValueChange={(next) => onChange(Number(next) as PiCadenceDays)}
-      >
-        <SelectTrigger size="sm" aria-label={label} className="w-24 border-accent/70 bg-accent/10">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {PI_CADENCE_DAYS.map((days) => (
-            <SelectItem key={days} value={String(days)}>
-              {t('piAdvisor.cadenceDays', { count: days })}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </Assume>
-  );
 }
 
 export interface HowYouPlayProps {
@@ -130,7 +72,6 @@ export function HowYouPlay(props: HowYouPlayProps) {
   const cadence = useCadence((state) => state.value);
   const hydrate = useCadence((state) => state.hydrate);
   const setCadence = useCadence((state) => state.setValue);
-  const [customsText, setCustomsText] = useState<string | null>(null);
   const [editingCustoms, setEditingCustoms] = useState(false);
 
   useEffect(() => {
@@ -222,27 +163,12 @@ export function HowYouPlay(props: HowYouPlayProps) {
         >
           {editingCustoms ? (
             <span className="flex items-center gap-1.5">
-              <TextInput
-                size="sm"
-                type="number"
-                min={0}
-                max={100}
-                step={0.5}
-                inputMode="decimal"
+              <PercentInput
+                commitOn="change"
                 autoFocus
                 aria-label={t('piAdvisor.customsRate')}
-                className="w-16"
-                value={customsText ?? String(props.customsPercent)}
-                onChange={(event) => {
-                  const { value } = event.target;
-                  setCustomsText(value);
-                  const percent = Number(value);
-                  // An empty or half-typed field is shown but not stored — a
-                  // NaN would declare the system tax-free until the pilot
-                  // noticed.
-                  if (value === '' || !Number.isFinite(percent)) return;
-                  props.onCustomsChange(percent);
-                }}
+                value={props.customsPercent}
+                onCommit={props.onCustomsChange}
               />
               <span className="text-[0.6875rem] text-text-dim">%</span>
               <button
@@ -254,7 +180,6 @@ export function HowYouPlay(props: HowYouPlayProps) {
                     // showing the override the pilot just cleared.
                     props.onCustomsReset();
                   }
-                  setCustomsText(null);
                   setEditingCustoms(false);
                 }}
               >

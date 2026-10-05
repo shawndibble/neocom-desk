@@ -1,15 +1,17 @@
 /**
  * The Goal Planner's inputs: what the pilot wants (Goals), what they have
- * (Colonies) and how they operate (Assumptions). A rail beside the results on
- * a pointer, stacked above them on a phone — DOM order, so the phone reads
- * the inputs first, as the old Plan tab did.
+ * (Colonies) and how they operate (Assumptions). Goals lead on a phone, the
+ * other two fold into collapsible panels after the results there; on a
+ * pointer all three sit in a rail beside the results.
  */
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
 import {
   Button,
   Checkbox,
+  CollapsiblePanel,
   IconButton,
   InfoTooltip,
   Panel,
@@ -21,86 +23,65 @@ import {
   SelectTrigger,
   SelectValue,
   TextInput,
+  type ControlSize,
 } from '@/components/ui';
+import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
-import type { TFunction } from 'i18next';
 import type { Goal } from '@/engine/pi/goalTypes';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { PI_CADENCE_DAYS, type PiCadence, type PiCadenceDays } from './cadencePref';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import type { PiCadence } from './cadencePref';
 import { customsRatePercent, type CustomsRateSource } from './customsRate';
-import type { PlannerColonyRow } from './goalPlannerModel';
-import type { ProductOption } from './products';
-import { TierChip } from './TierChip';
+import { ASSUMED_UNKNOWN_CUSTOMS, type PlannerColonyRow } from './goalPlannerModel';
 import { DEFAULT_GOAL_PER_DAY } from './goalsParam';
+import type { ProductOption } from './products';
+import { SectionLabel, TierChip } from './DirectiveRow';
+import { CadenceRow, PercentInput } from './piControls';
 
-function parseNonNegative(text: string): number | null {
-  if (text.trim() === '') return null;
-  const value = Number(text);
-  return Number.isFinite(value) && value >= 0 ? value : null;
-}
-
-/**
- * A number box that holds what is typed while it has focus. Rendering the
- * parsed value straight back made decimals unreachable — "12." parses to 12
- * and React restores "12" — the reason the Advisor's customs box holds its
- * text the same way.
- */
-function NumberBox({
+/** A units box that holds what is typed while it has focus; commits each valid value. */
+function UnitsBox({
   value,
   onCommit,
   label,
+  size,
   className = 'w-20',
   min = 0,
   step,
+  describedBy,
+  id,
 }: {
-  value: number | null;
-  onCommit: (value: number | null) => void;
+  id?: string;
+  value: number;
+  onCommit: (value: number) => void;
   label: string;
+  size: ControlSize;
   className?: string;
   min?: number;
   step?: number;
+  describedBy?: string;
 }) {
   const [text, setText] = useState<string | null>(null);
   return (
     <TextInput
+      id={id}
       type="number"
       inputMode="decimal"
-      size="sm"
+      size={size}
       min={min}
       step={step}
       aria-label={label}
+      aria-describedby={describedBy}
       className={`${className} text-right tabular-nums`}
-      value={text ?? (value === null ? '' : String(value))}
-      onFocus={() => setText(value === null ? '' : String(value))}
+      value={text ?? String(value)}
       onBlur={() => setText(null)}
       onChange={(event) => {
         setText(event.target.value);
-        onCommit(parseNonNegative(event.target.value));
+        const next = Number(event.target.value);
+        if (event.target.value.trim() !== '' && Number.isFinite(next) && next >= min)
+          onCommit(next);
       }}
     />
-  );
-}
-
-/** A labelled control. The hint sits outside the `<label>` so it is not folded into the name. */
-function RailField({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <div className="space-y-1">
-      <label className="block space-y-1">
-        <span className="block text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {label}
-        </span>
-        {children}
-      </label>
-      {hint && <p className="text-[0.6875rem] text-text-dim">{hint}</p>}
-    </div>
   );
 }
 
@@ -132,50 +113,21 @@ function excludedText(row: PlannerColonyRow, t: TFunction): string | null {
 
 // --- Goals ---------------------------------------------------------------
 
-function GoalRow({
-  goal,
-  name,
-  tier,
-  onRateChange,
-  onRemove,
-}: {
-  goal: Goal;
-  name: string;
-  tier: number;
-  onRateChange: (unitsPerDay: number) => void;
-  onRemove: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <li className="flex items-center gap-2">
-      <TierChip tier={tier} />
-      <span className="min-w-0 flex-1 truncate text-sm text-text">{name}</span>
-      <NumberBox
-        value={goal.unitsPerDay}
-        label={t('piPlan.goalRateLabel', { name })}
-        onCommit={(value) => onRateChange(value ?? 0)}
-      />
-      <span className="text-[0.6875rem] text-text-dim">{t('piPlan.perDayUnit')}</span>
-      <IconButton
-        icon={<Icon.Close />}
-        label={t('piPlan.goalRemove', { name })}
-        size="sm"
-        onClick={onRemove}
-      />
-    </li>
-  );
-}
-
 export function GoalsSection({
   goals,
   products,
   onGoalsChange,
+  hubId,
+  size,
 }: {
   goals: readonly Goal[];
   products: readonly ProductOption[];
   onGoalsChange: (goals: Goal[]) => void;
+  hubId: TradeHub['id'];
+  size: ControlSize;
 }) {
   const { t } = useTranslation();
+  const hintId = useId();
   const byId = new Map(products.map((product) => [product.typeId, product]));
   const shown = goals.filter((goal) => byId.has(goal.typeId));
   const options = products
@@ -190,25 +142,42 @@ export function GoalsSection({
       title={t('piPlan.goalsTitle')}
       meta={<span className="text-[0.6875rem] text-text-dim">{t('piPlan.goalsUnit')}</span>}
     >
-      {shown.length === 0 ? (
-        <p className="mb-2 text-xs text-text-dim">{t('piPlan.goalsEmpty')}</p>
-      ) : (
+      <p id={hintId} className="mb-2 text-xs text-text-dim">
+        {shown.length === 0 ? t('piPlan.goalsEmpty') : t('piPlan.goalsHint')}
+      </p>
+      {shown.length > 0 && (
         <ul className="mb-3 space-y-2" aria-label={t('piPlan.goalsTitle')}>
           {shown.map((goal) => {
             const product = byId.get(goal.typeId)!;
             return (
-              <GoalRow
-                key={goal.typeId}
-                goal={goal}
-                name={product.name}
-                tier={product.tier}
-                onRateChange={(unitsPerDay) =>
-                  onGoalsChange(
-                    goals.map((g) => (g.typeId === goal.typeId ? { ...g, unitsPerDay } : g))
-                  )
-                }
-                onRemove={() => onGoalsChange(goals.filter((g) => g.typeId !== goal.typeId))}
-              />
+              <li key={goal.typeId} className="flex items-center gap-2">
+                <TierChip tier={product.tier} />
+                <span className="min-w-0 flex-1 truncate text-sm text-text">
+                  <ItemContextMenu typeId={goal.typeId} itemName={product.name}>
+                    <MarketItemLink typeId={goal.typeId} hubId={hubId}>
+                      {product.name}
+                    </MarketItemLink>
+                  </ItemContextMenu>
+                </span>
+                <UnitsBox
+                  value={goal.unitsPerDay}
+                  size={size}
+                  label={t('piPlan.goalRateLabel', { name: product.name })}
+                  describedBy={hintId}
+                  onCommit={(unitsPerDay) =>
+                    onGoalsChange(
+                      goals.map((g) => (g.typeId === goal.typeId ? { ...g, unitsPerDay } : g))
+                    )
+                  }
+                />
+                <span className="text-[0.6875rem] text-text-dim">{t('piPlan.perDayUnit')}</span>
+                <IconButton
+                  icon={<Icon.Close />}
+                  label={t('piPlan.goalRemove', { name: product.name })}
+                  size="row"
+                  onClick={() => onGoalsChange(goals.filter((g) => g.typeId !== goal.typeId))}
+                />
+              </li>
             );
           })}
         </ul>
@@ -217,14 +186,15 @@ export function GoalsSection({
         options={options}
         value={null}
         onChange={(typeId) => {
-          if (typeId !== null)
+          if (typeId !== null) {
             onGoalsChange([...goals, { typeId, unitsPerDay: DEFAULT_GOAL_PER_DAY }]);
+          }
         }}
         placeholder={t('piPlan.goalAdd')}
         searchPlaceholder={t('piPlan.goalSearch')}
         noResultsLabel={t('piPlan.goalNoResults')}
         aria-label={t('piPlan.goalAdd')}
-        size="sm"
+        size={size}
         className="w-full"
       />
     </Panel>
@@ -237,80 +207,95 @@ function ColonyRow({
   row,
   name,
   systemName,
+  size,
   onToggle,
   onCustomsChange,
 }: {
   row: PlannerColonyRow;
   name: string;
   systemName: string;
+  size: ControlSize;
   onToggle: (enabled: boolean) => void;
   onCustomsChange: (percent: number | null) => void;
 }) {
   const { t } = useTranslation();
   const excluded = excludedText(row, t);
-  const percent = customsRatePercent(row.taxRate);
+  const inputId = useId();
+  const noteId = useId();
+  const assumedPercent = customsRatePercent(ASSUMED_UNKNOWN_CUSTOMS);
+  const customsLabel = t('piPlan.colonyCustomsLabel', { name, system: systemName });
   return (
-    <li className="space-y-1.5 border-b border-line pb-2.5 last:border-b-0 last:pb-0">
-      <div className="flex items-start gap-2">
+    <li className="space-y-1 border-b border-line pb-2 last:border-b-0 last:pb-0">
+      <label className={`flex items-center gap-2 ${tappableRowClassName}`}>
         <Checkbox
-          className="mt-0.5"
           checked={row.enabled}
           disabled={excluded !== null}
           onChange={(event) => onToggle(event.target.checked)}
-          aria-label={t('piPlan.colonyToggle', { name })}
         />
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm text-text">{name}</div>
-          <div className="text-[0.6875rem] text-text-dim">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm text-text">{name}</span>
+          <span className="block text-[0.6875rem] text-text-dim">
             {t('piPlan.colonyFacts', {
               type: t(`pi.planetType.${row.planetType}`),
               level: row.upgradeLevel,
               system: systemName,
             })}
-          </div>
-        </div>
-      </div>
+          </span>
+        </span>
+      </label>
       {excluded ? (
         <p className="flex items-start gap-1.5 pl-6 text-[0.6875rem] text-text-dim">
           <Icon.Info aria-hidden="true" size={Icon.ICON_SIZE.sm} className="mt-px shrink-0" />
           {excluded}
         </p>
       ) : (
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pl-6">
-          <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('piPlan.colonyCustoms')}
-          </span>
-          <NumberBox
-            value={percent}
-            className="w-16"
-            step={0.5}
-            label={t('piPlan.colonyCustomsLabel', { system: systemName })}
-            onCommit={(value) => {
-              if (value !== null && value <= 100) onCustomsChange(value);
-            }}
-          />
-          <span className="text-[0.6875rem] text-text-dim">%</span>
-          <InfoTooltip
-            label={t('common.aboutLabel', {
-              label: t('piPlan.colonyCustomsLabel', { system: systemName }),
-            })}
-            content={`${
-              row.taxOverridden
-                ? t('piPlan.colonyCustomsOverridden')
-                : customsSourceText(row.taxSource, t)
-            } ${t('piPlan.colonyCustomsSystemWide', { system: systemName })}`}
-          />
-          {row.taxOverridden && (
-            <Button variant="ghost" size="sm" onClick={() => onCustomsChange(null)}>
-              {t('piPlan.colonyCustomsReset')}
-            </Button>
-          )}
-          {row.rateUnknown && (
-            <span className="inline-flex items-center gap-1 text-[0.6875rem] text-warning">
-              <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} />
-              {t('piPlan.colonyCustomsUnknown')}
-            </span>
-          )}
+        <div className="space-y-1 pl-6">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <label htmlFor={inputId} className="text-xs text-text-dim">
+              {t('piPlan.colonyCustoms')}
+            </label>
+            <PercentInput
+              id={inputId}
+              commitOn="blur"
+              size={size}
+              value={row.taxAssumed ? null : customsRatePercent(row.taxRate)}
+              placeholder={row.taxAssumed ? String(assumedPercent) : undefined}
+              aria-label={customsLabel}
+              aria-describedby={noteId}
+              onCommit={(percent) => onCustomsChange(percent)}
+            />
+            <span className="text-[0.6875rem] text-text-dim">%</span>
+            <InfoTooltip
+              label={t('common.aboutLabel', { label: customsLabel })}
+              content={
+                row.taxOverridden
+                  ? t('piPlan.colonyCustomsOverridden')
+                  : customsSourceText(row.taxSource, t)
+              }
+            />
+            {row.taxOverridden && (
+              <Button variant="ghost" size="sm" onClick={() => onCustomsChange(null)}>
+                {t('piPlan.colonyCustomsReset')}
+              </Button>
+            )}
+          </div>
+          <p id={noteId} className="text-[0.6875rem] text-text-dim">
+            {row.taxAssumed ? (
+              <span className="inline-flex flex-wrap items-center gap-1 text-warning">
+                <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+                {t('piPlan.colonyCustomsAssumed', { percent: assumedPercent })}
+                <button
+                  type="button"
+                  className={inlineLinkClassName}
+                  onClick={() => document.getElementById(inputId)?.focus()}
+                >
+                  {t('piPlan.colonyCustomsSetIt')}
+                </button>
+              </span>
+            ) : (
+              t('piPlan.colonyCustomsSystemWide', { system: systemName })
+            )}
+          </p>
         </div>
       )}
     </li>
@@ -321,48 +306,58 @@ export function ColoniesSection({
   rows,
   planetName,
   systemName,
+  size,
+  expanded,
+  onToggleExpanded,
   onToggle,
   onCustomsChange,
 }: {
   rows: readonly PlannerColonyRow[];
   planetName: (planetId: number) => string;
   systemName: (systemId: number) => string;
+  size: ControlSize;
+  expanded: boolean;
+  onToggleExpanded: () => void;
   onToggle: (planetId: number, enabled: boolean) => void;
   onCustomsChange: (systemId: number, percent: number | null) => void;
 }) {
   const { t } = useTranslation();
   const enabled = rows.filter((row) => row.enabled).length;
   return (
-    <Panel
+    <CollapsiblePanel
       title={t('piPlan.coloniesTitle')}
       meta={
         <span className="text-[0.6875rem] text-text-dim tabular-nums">
           {t('piPlan.coloniesCount', { enabled, total: rows.length })}
         </span>
       }
+      expanded={expanded}
+      onToggle={onToggleExpanded}
+      labels={{ show: t('piPlan.coloniesShow'), hide: t('piPlan.coloniesHide') }}
     >
       {rows.length === 0 ? (
         <p className="text-xs text-text-dim">
           {t('piPlan.coloniesNone')}{' '}
-          <Link className="text-accent hover:underline" to="/planetary-industry/advisor">
+          <Link className={inlineLinkClassName} to="/planetary-industry/advisor">
             {t('piPlan.openAdvisor')}
           </Link>
         </p>
       ) : (
-        <ul className="space-y-2.5">
+        <ul className="space-y-2" aria-label={t('piPlan.coloniesListLabel')}>
           {rows.map((row) => (
             <ColonyRow
               key={row.planetId}
               row={row}
               name={planetName(row.planetId)}
               systemName={systemName(row.systemId)}
+              size={size}
               onToggle={(next) => onToggle(row.planetId, next)}
               onCustomsChange={(percent) => onCustomsChange(row.systemId, percent)}
             />
           ))}
         </ul>
       )}
-    </Panel>
+    </CollapsiblePanel>
   );
 }
 
@@ -375,57 +370,56 @@ export interface AssumptionsProps {
   onBuyP1Change: (buy: boolean) => void;
   fallbackRate: number;
   onFallbackRateChange: (rate: number) => void;
-  /** Whether any colony's rate leans on the fallback — says when the box matters. */
+  /** Whether any colony's rate leans on the fallback — the field shows only then. */
   fallbackInUse: boolean;
   maxP0Types: 1 | 2;
   onMaxP0TypesChange: (value: 1 | 2) => void;
   cadence: PiCadence;
   onCadenceChange: (cadence: PiCadence) => void;
+  size: ControlSize;
+  expanded: boolean;
+  onToggleExpanded: () => void;
 }
 
-function CadenceSelect({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: PiCadenceDays;
-  onChange: (days: PiCadenceDays) => void;
-}) {
-  const { t } = useTranslation();
+function Hint({ id, children }: { id: string; children: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-xs text-text">{label}</span>
-      <Select
-        value={String(value)}
-        onValueChange={(next) => onChange(Number(next) as PiCadenceDays)}
-      >
-        <SelectTrigger size="sm" aria-label={label} className="w-24">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {PI_CADENCE_DAYS.map((days) => (
-            <SelectItem key={days} value={String(days)}>
-              {t('piAdvisor.cadenceDays', { count: days })}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <p id={id} className="text-[0.6875rem] text-text-dim">
+      {children}
+    </p>
   );
 }
 
 export function AssumptionsSection(props: AssumptionsProps) {
   const { t } = useTranslation();
+  const hubId = useId();
+  const hubHint = useId();
+  const buyHint = useId();
+  const rateId = useId();
+  const rateHint = useId();
+  const typesHint = useId();
+  const cadenceHint = useId();
   return (
-    <Panel title={t('piPlan.assumptionsTitle')}>
+    <CollapsiblePanel
+      title={t('piPlan.assumptionsTitle')}
+      expanded={props.expanded}
+      onToggle={props.onToggleExpanded}
+      labels={{ show: t('piPlan.assumptionsShow'), hide: t('piPlan.assumptionsHide') }}
+    >
       <div className="space-y-3">
-        <RailField label={t('piPlan.hub')} hint={t('piPlan.hubHint')}>
+        <div className="space-y-1">
+          <label htmlFor={hubId} className="block">
+            <SectionLabel>{t('piPlan.hub')}</SectionLabel>
+          </label>
           <Select
             value={props.hubId}
             onValueChange={(id) => props.onHubChange(id as TradeHub['id'])}
           >
-            <SelectTrigger size="sm" aria-label={t('piPlan.hub')} className="w-full">
+            <SelectTrigger
+              id={hubId}
+              size={props.size}
+              aria-describedby={hubHint}
+              className="w-full"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -436,37 +430,20 @@ export function AssumptionsSection(props: AssumptionsProps) {
               ))}
             </SelectContent>
           </Select>
-        </RailField>
+          <Hint id={hubHint}>{t('piPlan.hubHint')}</Hint>
+        </div>
 
         <div className="space-y-1">
-          <label className="flex items-start gap-2 text-xs text-text">
+          <label className={`flex items-center gap-2 text-xs text-text ${tappableRowClassName}`}>
             <Checkbox
-              className="mt-0.5"
               checked={props.buyP1}
+              aria-describedby={buyHint}
               onChange={(event) => props.onBuyP1Change(event.target.checked)}
             />
             {t('piPlan.buyP1')}
           </label>
-          <p className="pl-6 text-[0.6875rem] text-text-dim">{t('piPlan.buyP1Hint')}</p>
+          <Hint id={buyHint}>{t('piPlan.buyP1Hint')}</Hint>
         </div>
-
-        <RailField
-          label={t('piPlan.fallbackRate')}
-          hint={
-            props.fallbackInUse ? t('piPlan.fallbackRateInUse') : t('piPlan.fallbackRateUnused')
-          }
-        >
-          <NumberBox
-            value={props.fallbackRate}
-            label={t('piPlan.fallbackRate')}
-            className="w-full"
-            min={1}
-            step={500}
-            onCommit={(value) => {
-              if (value !== null && value > 0) props.onFallbackRateChange(value);
-            }}
-          />
-        </RailField>
 
         <div className="space-y-1">
           <SegmentedControl
@@ -477,26 +454,52 @@ export function AssumptionsSection(props: AssumptionsProps) {
             ]}
             value={String(props.maxP0Types) as '1' | '2'}
             onChange={(value) => props.onMaxP0TypesChange(value === '1' ? 1 : 2)}
-            size="sm"
+            size={props.size}
             fill
           />
-          <p className="text-[0.6875rem] text-text-dim">{t('piPlan.maxP0TypesHint')}</p>
+          <Hint id={typesHint}>{t('piPlan.maxP0TypesHint')}</Hint>
         </div>
 
         <div className="space-y-2">
-          <CadenceSelect
+          <CadenceRow
             label={t('piAdvisor.cadenceRestartLabel')}
+            hint={t('piAdvisor.cadenceRestartHint')}
             value={props.cadence.restartDays}
+            size={props.size}
             onChange={(restartDays) => props.onCadenceChange({ ...props.cadence, restartDays })}
           />
-          <CadenceSelect
+          <CadenceRow
             label={t('piAdvisor.cadenceHaulLabel')}
+            hint={t('piAdvisor.cadenceHaulHint')}
             value={props.cadence.haulDays}
+            size={props.size}
             onChange={(haulDays) => props.onCadenceChange({ ...props.cadence, haulDays })}
           />
-          <p className="text-[0.6875rem] text-text-dim">{t('piPlan.cadenceHint')}</p>
+          <Hint id={cadenceHint}>{t('piPlan.cadenceHint')}</Hint>
         </div>
+
+        {props.fallbackInUse && (
+          <div className="space-y-1">
+            <label htmlFor={rateId} className="block">
+              <SectionLabel>{t('piPlan.fallbackRate')}</SectionLabel>
+            </label>
+            <UnitsBox
+              id={rateId}
+              value={props.fallbackRate}
+              size={props.size}
+              label={t('piPlan.fallbackRate')}
+              className="w-full"
+              min={1}
+              step={500}
+              describedBy={rateHint}
+              onCommit={(value) => {
+                if (value > 0) props.onFallbackRateChange(value);
+              }}
+            />
+            <Hint id={rateHint}>{t('piPlan.fallbackRateInUse')}</Hint>
+          </div>
+        )}
       </div>
-    </Panel>
+    </CollapsiblePanel>
   );
 }

@@ -76,14 +76,14 @@ test.describe('PI Plan — Goal Planner', () => {
 
     // Well past the 5s default: the tab awaits the SDE bake, every colony's
     // detail and a hub read, cold on a CI runner.
-    await expect(page.getByText('Lift / day')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/^ISK\/day vs selling/)).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole('heading', { name: 'Changes' })).toBeVisible();
     await expect(
       page.getByRole('table', { name: 'Everything the goals need, by tier' })
     ).toBeAttached();
     // The rail comes first on a phone: inputs, then the answer.
     const goalsBox = (await page.getByRole('heading', { name: 'Goals' }).boundingBox())!;
-    const headlineBox = (await page.getByText('Lift / day').boundingBox())!;
+    const headlineBox = (await page.getByText(/^ISK\/day vs selling/).boundingBox())!;
     expect(goalsBox.y).toBeLessThan(headlineBox.y);
     await assertNoOverflow(page);
   });
