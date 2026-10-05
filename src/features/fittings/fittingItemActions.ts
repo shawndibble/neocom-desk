@@ -73,7 +73,7 @@ export interface FittingItemActions {
   /** The copied module's type, when it goes in this rack. */
   clipboardFor: (rack: FittingSlotKind) => number | null;
   addModule: (rack: FittingSlotKind, index: number, typeId: number) => void;
-  /** Opens the Add panel on a slot — "Add module Browse…". */
+  /** Opens the Add panel on a slot — the slot's "Add module" action. */
   browseFor: (rack: FittingSlotKind, index: number) => void;
   fillRack: (rack: FittingSlotKind, typeId: number) => void;
 

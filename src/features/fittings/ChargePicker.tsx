@@ -11,7 +11,6 @@ import {
   SelectValue,
   TypeIcon,
 } from '@/components/ui';
-import { HintText } from '@/components/ui/HintText';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatCompactNumber } from '@/lib/compactNumber';
@@ -225,7 +224,13 @@ function rowLabel(t: TFunction, c: ChargeChoice, distance: number | null): strin
         ? t('fittings.chargePicker.noPrice')
         : t('fittings.chargePicker.isk', { isk: formatIsk(c.price) }),
   });
-  return c.skillMissing ? `${label}. ${t('fittings.chargePicker.needsSkill')}` : label;
+  const lasts =
+    c.price !== null && iskPerMinute(c) === null
+      ? `. ${t('fittings.chargePicker.lastsTitle')}`
+      : '';
+  return c.skillMissing
+    ? `${label}${lasts}. ${t('fittings.chargePicker.needsSkill')}`
+    : `${label}${lasts}`;
 }
 
 function signedPct(value: number): string {
@@ -620,15 +625,7 @@ function TypeDetail({
                   <span className="text-right">{Math.round(chargeScore(c, distance))}</span>
                   <span className="text-right">{c.price === null ? '—' : formatIsk(c.price)}</span>
                   <span className={cx('text-right', pricey && 'text-warning')}>
-                    {perMin === null ? (
-                      c.price !== null ? (
-                        <HintText content={t('fittings.chargePicker.lastsTitle')}>—</HintText>
-                      ) : (
-                        '—'
-                      )
-                    ) : (
-                      formatIsk(perMin)
-                    )}
+                    {perMin === null ? '—' : formatIsk(perMin)}
                     {/* Colour is never the only signal (DESIGN.md §7). */}
                     {pricey && <span aria-label={t('fittings.chargePicker.priceyLabel')}> ▲</span>}
                   </span>
