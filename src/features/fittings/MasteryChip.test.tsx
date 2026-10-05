@@ -108,6 +108,26 @@ describe('MasteryChip', () => {
     );
   });
 
+  it('calls out skills already in the plan and hides Add All once all of them are', async () => {
+    const user = userEvent.setup();
+    const original = { plans: target.plans, targetPlanId: target.targetPlanId };
+    target.plans = [
+      { id: 'plan-1', name: 'Vexor', entries: [{ skillTypeID: 3436, targetLevel: 4 }] } as never,
+    ];
+    target.targetPlanId = 'plan-1';
+    try {
+      await openChip(user);
+      await screen.findByText('Drones');
+      // Gunnery is trained; Drones is the only untrained row and is planned.
+      expect(
+        screen.getByText('All of these skills are already in the Skill Plan')
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Add all to Skill Plan' })).toBeNull();
+    } finally {
+      Object.assign(target, original);
+    }
+  });
+
   it('renders nothing for a hull with no Mastery data', async () => {
     const { container } = render(
       <MasteryChip hullTypeId={999} hullName="Nothing" characterId={1} />

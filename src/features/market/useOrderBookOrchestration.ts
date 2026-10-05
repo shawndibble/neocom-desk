@@ -52,6 +52,7 @@ import {
 import { getVariationRows, type VariationsResult } from '@/features/market/variations';
 import { resolveOrderLocation, type OrderBookSummary } from '@/engine/market/orderBook';
 import type { VariationIndex } from '@/engine/market/variations';
+import { bookDepth, sortBookSide, type DepthAt } from '@/engine/market/orderBookDepth';
 import { useLazyRowCache } from '@/lib/useLazyRowCache';
 import type { TradeHub } from '@/market/hubs';
 import type { MarketLocationParam } from '@/engine/market/urlState';
@@ -151,8 +152,11 @@ export interface OrderBookOrchestration {
   regionsUnavailable: boolean;
   orderBookView: OrderBookView | null;
   loadedView: LoadedOrderBookView | null;
+  /** Best-first, a price tie broken by distance from the Current System (`sortBookSide`). */
   sortedSell: readonly RegionOrder[];
   sortedBuy: readonly RegionOrder[];
+  /** Running units/ISK per order id, each side walked best-first. */
+  depthByOrder: ReadonlyMap<number, DepthAt>;
   sellShowAll: boolean;
   setSellShowAll: (next: boolean) => void;
   buyShowAll: boolean;
@@ -163,6 +167,12 @@ export interface OrderBookOrchestration {
 
   variationsResult: VariationsResult | null;
   variationPrices: ReadonlyMap<number, OrderBookSummary | undefined>;
+  /**
+   * The selected item's own book at the header's hub or region — what the
+   * Variations rows are priced against, and what a Jump Range's hub
+   * comparison reads. `undefined` until it loads.
+   */
+  headerScopeSummary: OrderBookSummary | undefined;
 
   /** Bypasses every TTL cache for what's on screen, then bumps `refreshTick` (CONTEXT.md "Data Age"). */
   refresh: () => void;
@@ -477,8 +487,25 @@ export function useOrderBookOrchestration({
   );
   const loadedView = orderBookView?.status === 'failed' ? null : orderBookView;
   const orderBookFailed = orderBookView?.status === 'failed';
-  const sortedSell = useMemo(() => loadedView?.sell ?? [], [loadedView]);
-  const sortedBuy = useMemo(() => loadedView?.buy ?? [], [loadedView]);
+  // Distances are known at every range (`useJumpRangeFilter`), so a price
+  // tie leads with the nearer order even with no range set. The tables sort
+  // stably on price, so this order survives their own default sort.
+  const distanceOf = useMemo(() => {
+    const jumps = jumpRangeFilter.jumpsStatus === 'ready' ? jumpRangeFilter.jumps : null;
+    return (systemId: number) => jumps?.get(systemId) ?? null;
+  }, [jumpRangeFilter]);
+  const sortedSell = useMemo(
+    () => sortBookSide(loadedView?.sell ?? [], 'sell', distanceOf),
+    [loadedView, distanceOf]
+  );
+  const sortedBuy = useMemo(
+    () => sortBookSide(loadedView?.buy ?? [], 'buy', distanceOf),
+    [loadedView, distanceOf]
+  );
+  const depthByOrder = useMemo(
+    () => new Map([...bookDepth(sortedSell), ...bookDepth(sortedBuy)]),
+    [sortedSell, sortedBuy]
+  );
   /**
    * The catalogue is otherwise loaded lazily on the first context-menu open,
    * so reading it here without asking for it meant `selectedIsBlueprint` was
@@ -565,6 +592,19 @@ export function useOrderBookOrchestration({
   // place, rather than blanking the table back to a loading state.
   const variationCache = useLazyRowCache<string, OrderBookSummary>();
   const variationLocationKey = `${chosenRegionId}:${orderBookLocation.mode}:${orderBookLocation.hubStationId}:${stationFilter ?? 'none'}`;
+  // The selected item rides the same per-row cache at the same location, so
+  // its own price and its variations' can't be read from different books.
+  const priceTargets = useMemo(
+    () => [
+      ...(selectedItem ? [{ typeId: selectedItem.typeId }] : []),
+      ...(variationsResult?.rows ?? []),
+    ],
+    [selectedItem, variationsResult]
+  );
+  const headerScopeSummary =
+    selectedTypeId === null
+      ? undefined
+      : variationCache.byKey.get(`${selectedTypeId}:${variationLocationKey}`);
   const variationPrices = useMemo(() => {
     const m = new Map<number, OrderBookSummary | undefined>();
     for (const row of variationsResult?.rows ?? []) {
@@ -579,8 +619,7 @@ export function useOrderBookOrchestration({
   // cache — refetches row prices too, not just the on-screen tables.
   useEffect(() => {
     if (
-      !variationsResult ||
-      variationsResult.rows.length === 0 ||
+      priceTargets.length === 0 ||
       !hubHydrated ||
       !locationModeHydrated ||
       globalMarkets === null
@@ -590,35 +629,31 @@ export function useOrderBookOrchestration({
     let cancelled = false;
     // Capped, not one Promise.all: ~20 rows fired at once tripped Sentry's
     // N+1 API Call detector (ORDER_BOOK_FANOUT_CONCURRENCY).
-    void mapWithConcurrencyLimit(
-      variationsResult.rows,
-      ORDER_BOOK_FANOUT_CONCURRENCY,
-      async (row) => {
-        if (cancelled) return;
-        const key = `${row.typeId}:${variationLocationKey}`;
-        // Forces this run to actually fetch even for a key it already
-        // resolved — the refreshTick case the key itself doesn't capture
-        // (see the field doc above). `load` still overwrites `byKey` in
-        // place once it resolves, so the row keeps showing its old price
-        // until the new one lands.
-        variationCache.reset(key);
-        await variationCache.load(key, async () => {
-          const view = await loadOrderBookView(row.typeId, { ...orderBookLocation, stationFilter });
-          // A row's own price is a nice-to-have next to the order book that did
-          // load; a failed fetch reads as "no orders" (the empty summary) rather
-          // than stalling the table on a spinner forever.
-          return view.status === 'failed'
-            ? { bestSell: null, bestBuy: null, spread: null, availableVolume: 0 }
-            : view.summary;
-        });
-      }
-    );
+    void mapWithConcurrencyLimit(priceTargets, ORDER_BOOK_FANOUT_CONCURRENCY, async (row) => {
+      if (cancelled) return;
+      const key = `${row.typeId}:${variationLocationKey}`;
+      // Forces this run to actually fetch even for a key it already
+      // resolved — the refreshTick case the key itself doesn't capture
+      // (see the field doc above). `load` still overwrites `byKey` in
+      // place once it resolves, so the row keeps showing its old price
+      // until the new one lands.
+      variationCache.reset(key);
+      await variationCache.load(key, async () => {
+        const view = await loadOrderBookView(row.typeId, { ...orderBookLocation, stationFilter });
+        // A row's own price is a nice-to-have next to the order book that did
+        // load; a failed fetch reads as "no orders" (the empty summary) rather
+        // than stalling the table on a spinner forever.
+        return view.status === 'failed'
+          ? { bestSell: null, bestBuy: null, spread: null, availableVolume: 0 }
+          : view.summary;
+      });
+    });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `variationCache.load`/`.reset` are the only stable, referenced parts of `variationCache` (see their own doc comments); `variationCache` itself is a fresh object every render (its `byKey` changes on every fetch), so depending on the whole object — which is what listing two of its members forces eslint to ask for — would run this effect on every render instead of only when these actually change. `variationLocationKey` is a plain derived string, safe to list directly.
   }, [
-    variationsResult,
+    priceTargets,
     orderBookLocation,
     stationFilter,
     hubHydrated,
@@ -679,6 +714,7 @@ export function useOrderBookOrchestration({
     loadedView,
     sortedSell,
     sortedBuy,
+    depthByOrder,
     sellShowAll,
     setSellShowAll,
     buyShowAll,
@@ -687,6 +723,7 @@ export function useOrderBookOrchestration({
     jumpNoteShown,
     variationsResult,
     variationPrices,
+    headerScopeSummary,
     refresh,
   };
 }

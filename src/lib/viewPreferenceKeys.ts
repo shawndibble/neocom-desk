@@ -48,7 +48,6 @@ export const VIEW_PREFERENCE_KEYS: readonly string[] = [
   'mailFolders',
   'marketLocationMode',
   'marketPriceHistoryRange',
-  'miningTaxStatusFilter',
   'piAdvisorAltColonies',
   'piColoniesShowAlts',
   'piMarketSourcing',

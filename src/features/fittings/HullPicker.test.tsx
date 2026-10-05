@@ -95,7 +95,7 @@ describe('HullPicker', () => {
     expect(screen.queryByRole('region', { name: 'Popular fits' })).toBeNull();
     search('rift');
     fireEvent.click(screen.getByRole('button', { name: 'Rifter' }));
-    expect(usePopularFitsMock).toHaveBeenLastCalledWith(587);
+    expect(usePopularFitsMock.mock.lastCall?.[0]).toBe(587);
     expect(screen.getByText('4 losses')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Open' }));
     expect(onOpenPopular).toHaveBeenCalledWith(

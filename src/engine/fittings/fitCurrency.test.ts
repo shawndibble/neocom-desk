@@ -3,10 +3,14 @@ import type { LoadParts, LoadWarning } from './load';
 import type { FittingModule, FittingSlotKind } from './types';
 import {
   classifyFitCurrency,
+  gameItemLookup,
   partitionByCurrency,
   type FitCurrency,
   type HullSlotCounts,
 } from './fitCurrency';
+
+/** The game's names don't matter to a test that leaves none unread; with them unknown, an unread item is removed. */
+const NO_GAME_NAMES = () => false;
 
 const VEXOR: HullSlotCounts = { high: 4, medium: 4, low: 5, rig: 3 };
 
@@ -26,7 +30,7 @@ function parts(fitted: FittingModule[], unresolved: LoadWarning[] = []): LoadPar
 describe('classifyFitCurrency', () => {
   it('a fit that loads clean and fits the hull is current', () => {
     const fit = parts([...modules('high', 4), ...modules('medium', 4), ...modules('low', 5)]);
-    expect(classifyFitCurrency(fit, VEXOR)).toEqual({ current: true });
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({ current: true });
   });
 
   it('a fit naming an item the game data no longer has is out of date, naming it', () => {
@@ -34,7 +38,7 @@ describe('classifyFitCurrency', () => {
       { text: 'Old Gun I', reason: 'unknown item', kind: 'unknown-item' },
       { text: 'Old Ammo', reason: 'unknown item', kind: 'unknown-item' },
     ]);
-    expect(classifyFitCurrency(fit, VEXOR)).toEqual({
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({
       current: false,
       reasons: [
         { kind: 'removed-item', name: 'Old Gun I' },
@@ -51,9 +55,65 @@ describe('classifyFitCurrency', () => {
         { text: 'Old Gun I', reason: 'unknown item', kind: 'unknown-item' },
       ]
     );
-    expect(classifyFitCurrency(fit, VEXOR)).toEqual({
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({
       current: false,
       reasons: [{ kind: 'removed-item', name: 'Old Gun I' }],
+    });
+  });
+
+  describe('an item the game still has, though the loader did not resolve it', () => {
+    // Real names the Workbench flagged as removed: Abyssal filaments and Agency
+    // boosters (cargo, booster section) and a mutated module (fitted in a rack).
+    const STILL_IN_GAME = [
+      'Fierce Exotic Filament',
+      'Cataclysmic Electrical Filament',
+      'Raging Gamma Filament',
+      'Agitated Exotic Filament',
+      'Calm Exotic Filament',
+      'Tranquil Exotic Filament',
+      "Agency 'Hardshell' TB5 Dose II",
+      "Agency 'Overclocker' SB3 Dose I",
+      'Large Abyssal Shield Extender',
+    ];
+    const isGameItem = gameItemLookup([...STILL_IN_GAME, 'Gila']);
+    const unknown = (text: string): LoadWarning => ({
+      text,
+      reason: 'unknown item',
+      kind: 'unknown-item',
+    });
+
+    it.each(STILL_IN_GAME)('%s is never a removed item', (name) => {
+      const fit = parts(modules('high', 2), [unknown(name)]);
+      expect(classifyFitCurrency(fit, VEXOR, isGameItem)).toEqual({ current: true });
+    });
+
+    it('a fit whose only unresolved lines are filaments, boosters and an Abyssal module is current', () => {
+      const fit = parts([], STILL_IN_GAME.map(unknown));
+      expect(classifyFitCurrency(fit, VEXOR, isGameItem)).toEqual({ current: true });
+    });
+
+    it('matches the game’s names ignoring case, as the loader does', () => {
+      const fit = parts([], [unknown('large abyssal SHIELD extender')]);
+      expect(classifyFitCurrency(fit, VEXOR, isGameItem)).toEqual({ current: true });
+    });
+
+    it('a name the game does not have is still a removed item beside them', () => {
+      const fit = parts([], [unknown('Fierce Exotic Filament'), unknown('Old Gun I')]);
+      expect(classifyFitCurrency(fit, VEXOR, isGameItem)).toEqual({
+        current: false,
+        reasons: [{ kind: 'removed-item', name: 'Old Gun I' }],
+      });
+    });
+
+    it('a hull is judged by the loader alone, as before', () => {
+      const fit: LoadParts = {
+        hullTypeId: null,
+        unresolved: [{ text: 'Gila', reason: 'unknown ship', kind: 'unknown-ship' }],
+      };
+      expect(classifyFitCurrency(fit, null, isGameItem)).toEqual({
+        current: false,
+        reasons: [{ kind: 'unknown-hull', name: 'Gila' }],
+      });
     });
   });
 
@@ -62,7 +122,7 @@ describe('classifyFitCurrency', () => {
       hullTypeId: null,
       unresolved: [{ text: 'Old Hull', reason: 'unknown ship', kind: 'unknown-ship' }],
     };
-    expect(classifyFitCurrency(fit, null)).toEqual({
+    expect(classifyFitCurrency(fit, null, NO_GAME_NAMES)).toEqual({
       current: false,
       reasons: [{ kind: 'unknown-hull', name: 'Old Hull' }],
     });
@@ -70,7 +130,7 @@ describe('classifyFitCurrency', () => {
 
   it('more modules in a rack than the hull has slots is out of date, naming the rack', () => {
     const fit = parts([...modules('high', 5), ...modules('rig', 4), ...modules('low', 5)]);
-    expect(classifyFitCurrency(fit, VEXOR)).toEqual({
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({
       current: false,
       reasons: [
         { kind: 'lost-slots', rack: 'high' },
@@ -94,7 +154,7 @@ describe('classifyFitCurrency', () => {
         rack: 'medium',
       },
     ]);
-    expect(classifyFitCurrency(fit, VEXOR)).toEqual({
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({
       current: false,
       reasons: [{ kind: 'lost-slots', rack: 'medium' }],
     });
@@ -105,7 +165,7 @@ describe('classifyFitCurrency', () => {
       { text: 'Old Gun I', reason: 'reworded', kind: 'unknown-item' },
       { text: 'Warp Disruptor II', reason: 'reworded', kind: 'too-many-slots', rack: 'medium' },
     ]);
-    expect(classifyFitCurrency(fit, VEXOR)).toEqual({
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({
       current: false,
       reasons: [
         { kind: 'removed-item', name: 'Old Gun I' },
@@ -117,7 +177,7 @@ describe('classifyFitCurrency', () => {
       hullTypeId: null,
       unresolved: [{ text: 'Old Hull', reason: 'reworded', kind: 'unknown-ship' }],
     };
-    expect(classifyFitCurrency(hull, null)).toEqual({
+    expect(classifyFitCurrency(hull, null, NO_GAME_NAMES)).toEqual({
       current: false,
       reasons: [{ kind: 'unknown-hull', name: 'Old Hull' }],
     });
@@ -127,7 +187,7 @@ describe('classifyFitCurrency', () => {
     const fit = parts(modules('high', 6), [
       { text: 'Old Gun I', reason: 'unknown item', kind: 'unknown-item' },
     ]);
-    expect(classifyFitCurrency(fit, VEXOR)).toEqual({
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({
       current: false,
       reasons: [
         { kind: 'removed-item', name: 'Old Gun I' },
@@ -140,14 +200,14 @@ describe('classifyFitCurrency', () => {
     // Ten Large Shield Extenders' worth of powergrid in four mid slots is still
     // four modules in four slots — skills and implants decide the budget.
     const fit = parts(modules('medium', 4, 3841));
-    expect(classifyFitCurrency(fit, VEXOR)).toEqual({ current: true });
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({ current: true });
   });
 
   it('badly written text is not out of date: the game did not change', () => {
     const fit = parts(modules('high', 1), [
       { line: 3, text: '%%%', reason: 'unparseable item line', kind: 'parse-error' },
     ]);
-    expect(classifyFitCurrency(fit, VEXOR)).toEqual({ current: true });
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({ current: true });
 
     // A missing header leaves no hull name to call removed.
     const headerless: LoadParts = {
@@ -157,11 +217,13 @@ describe('classifyFitCurrency', () => {
         { text: '', reason: 'unknown ship', kind: 'unknown-ship' },
       ],
     };
-    expect(classifyFitCurrency(headerless, null)).toEqual({ current: true });
+    expect(classifyFitCurrency(headerless, null, NO_GAME_NAMES)).toEqual({ current: true });
   });
 
   it('without the hull’s slot counts, racks are not counted', () => {
-    expect(classifyFitCurrency(parts(modules('high', 8)), null)).toEqual({ current: true });
+    expect(classifyFitCurrency(parts(modules('high', 8)), null, NO_GAME_NAMES)).toEqual({
+      current: true,
+    });
   });
 
   it('a Tech 3 cruiser’s high, mid and low racks are not counted: its subsystems set them', () => {
@@ -173,9 +235,11 @@ describe('classifyFitCurrency', () => {
       ...modules('low', 4),
       ...modules('rig', 3),
     ]);
-    expect(classifyFitCurrency(fit, t3)).toEqual({ current: true });
+    expect(classifyFitCurrency(fit, t3, NO_GAME_NAMES)).toEqual({ current: true });
     // Its rigs still are.
-    expect(classifyFitCurrency(parts([...modules('high', 6), ...modules('rig', 4)]), t3)).toEqual({
+    expect(
+      classifyFitCurrency(parts([...modules('high', 6), ...modules('rig', 4)]), t3, NO_GAME_NAMES)
+    ).toEqual({
       current: false,
       reasons: [{ kind: 'lost-slots', rack: 'rig' }],
     });

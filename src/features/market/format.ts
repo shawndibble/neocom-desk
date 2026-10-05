@@ -1,5 +1,5 @@
 /** Display helpers for the Market Browser's order tables. */
-import { formatIsk } from '@/lib/isk';
+import { formatMarketIsk } from '@/lib/isk';
 import { idReferenceKind } from '@/engine/market/attributeUnits';
 import type { ResolvedOrderLocation } from '@/engine/market/orderBook';
 
@@ -22,7 +22,7 @@ export function formatMeanCount(value: number): string {
 
 /** A day's traded price range, low to high, for the tooltip and the accessible table. */
 export function formatPriceRange(lowest: number, highest: number): string {
-  return `${formatIsk(lowest, 2)} \u2013 ${formatIsk(highest, 2)}`;
+  return `${formatMarketIsk(lowest)} \u2013 ${formatMarketIsk(highest)}`;
 }
 
 const ATTRIBUTE_VALUE_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });

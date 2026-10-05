@@ -13,7 +13,7 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
 import { cx } from '@/lib/cx';
-import { formatIsk, formatIskAuto } from '@/lib/isk';
+import { formatIskAuto, formatMarketIsk } from '@/lib/isk';
 import { CopyablePrice } from './CopyablePrice';
 import { orderRowSummary } from './orderRowSummary';
 import type { OpenOrderRow } from './openOrdersModel';
@@ -47,7 +47,7 @@ export function OrderRowSummaryText({
       {' '}
       <span className="text-text">
         <CopyablePrice price={relistPrice}>
-          {t('market.orders.relistTo', { price: formatIsk(relistPrice, 2) })}
+          {t('market.orders.relistTo', { price: formatMarketIsk(relistPrice) })}
         </CopyablePrice>
       </span>
     </>

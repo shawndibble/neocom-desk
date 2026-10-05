@@ -11,6 +11,7 @@ export { DataAgeBadge } from './DataAgeBadge';
 export { CachedEmptyState } from './CachedEmptyState';
 export { EmptyState } from './EmptyState';
 export { Toast } from './Toast';
+export { useTimedToast } from './useTimedToast';
 export { Tabs } from './Tabs';
 export type { TabItem } from './Tabs';
 export { Spinner } from './Spinner';
@@ -26,7 +27,7 @@ export { standingTier, type StandingTier } from './standingTier';
 export { Modal } from './Modal';
 export { SlideOver } from './SlideOver';
 export type { ModalPlacement } from './Modal';
-export { DataTable, DataTableDenseCell } from './DataTable';
+export { DataTable, DataTableDenseCell, DataTableSortPicker } from './DataTable';
 export type {
   DataTableColumn,
   DataTableExpandableRow,

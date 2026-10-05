@@ -1,7 +1,8 @@
 /**
- * Route distances from the local stargate graph (issue #942) — the
- * request-free sibling of `features/character/routeDistance.ts`, which asks
- * ESI's `/route/` and therefore costs one request per pair.
+ * Route distances from the local stargate graph (issue #942) — what every
+ * jump count in the app runs on (`jumpBasis.ts`), with no ESI `/route/`
+ * request, so it costs nothing per pair and never touches the shared error
+ * budget.
  *
  * This is what makes a distance affordable across a whole table: both
  * snapshots are local files indexed once per session, so resolving a page of
@@ -39,10 +40,11 @@ import { loadSolarSystemsById } from '@/sde/solarSystems';
 export type LocalRouteRules = Partial<RouteRules>;
 
 /**
- * Connections beyond the stargates, and the systems they make free — Route
- * Safety's open Thera / Turnur holes (issue #2476), built by the caller from
- * `engine/route/routeHoles.ts`. Only Route Safety passes these: no other
- * page's jump count may change with a hole that closes within hours.
+ * Connections beyond the stargates, and the systems they make free — the open
+ * Thera / Turnur holes (issue #2476) and known Ansiblex bridges, as
+ * `useJumpBasis` builds them from the pilot's Route Safety settings. Every
+ * count passes the same ones, so every count matches the route Route Safety
+ * draws.
  */
 export type RouteGraphExtras = Pick<FindJumpRouteOptions, 'extraConnections' | 'freeSystems'>;
 
@@ -120,9 +122,10 @@ export type LocalJumpsResult =
 export async function findLocalJumps(
   originSystemId: number,
   destinationSystemId: number,
-  rules: LocalRouteRules = {}
+  rules: LocalRouteRules = {},
+  extras: RouteGraphExtras = {}
 ): Promise<LocalJumpsResult> {
-  const route = await findLocalRoute(originSystemId, destinationSystemId, rules);
+  const route = await findLocalRoute(originSystemId, destinationSystemId, rules, extras);
   return route.kind === 'route' ? { kind: 'known', jumps: route.systems.length - 1 } : route;
 }
 
@@ -140,7 +143,8 @@ export type LocalJumpDistances =
  */
 export async function localJumpDistances(
   originSystemId: number,
-  rules: LocalRouteRules = {}
+  rules: LocalRouteRules = {},
+  extras: RouteGraphExtras = {}
 ): Promise<LocalJumpDistances> {
   const [graph, securityOf] = await Promise.all([
     loadJumpGraph(),
@@ -149,7 +153,7 @@ export async function localJumpDistances(
   if (!graph) return { kind: 'unknown' };
   return {
     kind: 'known',
-    jumps: jumpDistancesFrom(graph, originSystemId, engineOptions(rules, securityOf)),
+    jumps: jumpDistancesFrom(graph, originSystemId, engineOptions(rules, securityOf, extras)),
   };
 }
 
@@ -169,7 +173,8 @@ export type LocalJumpCounts =
  */
 export async function localJumpCountsForRoutes(
   routes: readonly RouteEnds[],
-  rules: LocalRouteRules = {}
+  rules: LocalRouteRules = {},
+  extras: RouteGraphExtras = {}
 ): Promise<LocalJumpCounts> {
   const [graph, securityOf] = await Promise.all([
     loadJumpGraph(),
@@ -178,13 +183,18 @@ export async function localJumpCountsForRoutes(
   if (!graph) return { kind: 'unknown' };
   return {
     kind: 'known',
-    counts: jumpCountsForRoutes(graph, routes, engineOptions(rules, securityOf)),
+    counts: jumpCountsForRoutes(graph, routes, engineOptions(rules, securityOf, extras)),
   };
 }
 
-/** `graph` is the stargate map the trip was planned on, for telling a gate step from a hole. */
+/**
+ * `graph` is the stargate map the trip was planned on, for telling a gate step
+ * from a hole; `options` the search it was planned under, holes and all, for
+ * weighing a leg's other ways the same way (`engine/route/legWays.ts`).
+ */
 export type LocalTripResult =
-  { kind: 'trip'; plan: TripPlan; graph: JumpGraph } | { kind: 'unknown' };
+  | { kind: 'trip'; plan: TripPlan; graph: JumpGraph; options: FindJumpRouteOptions }
+  | { kind: 'unknown' };
 
 /**
  * A trip from `start` through several Stops (issue #2475): every leg, and the
@@ -203,9 +213,11 @@ export async function planLocalTrip(
     securityLookupFor(rules.preference ?? 'shortest'),
   ]);
   if (!graph) return { kind: 'unknown' };
+  const options = engineOptions(rules, securityOf, extras);
   return {
     kind: 'trip',
-    plan: planTrip(graph, start, stops, engineOptions(rules, securityOf, extras), tripOptions),
+    plan: planTrip(graph, start, stops, options, tripOptions),
     graph,
+    options,
   };
 }

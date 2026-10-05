@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
@@ -32,10 +33,11 @@ const payees: PayeeRecord[] = [
 ];
 
 function renderModal(
-  status: 'unassigned' | 'needs-review' | 'paid',
+  status: 'unassigned' | 'needs-review' | 'paid' | 'outstanding',
   assignment: MiningTaxAssignmentRecord | null,
   onSplit?: () => void,
-  onUnlock?: () => void
+  onEdit: () => void = vi.fn(),
+  extra: Partial<Parameters<typeof RowDetailModal>[0]> = {}
 ) {
   const noop = vi.fn();
   render(
@@ -58,7 +60,8 @@ function renderModal(
         onResolve={noop}
         onUndo={noop}
         onSplit={onSplit}
-        onUnlock={onUnlock}
+        onEdit={onEdit}
+        {...extra}
       />
     </MemoryRouter>
   );
@@ -93,7 +96,7 @@ describe('RowDetailModal item names', () => {
 });
 
 describe('RowDetailModal split', () => {
-  it('offers Split on a needs-review row', () => {
+  it('offers Split on a needs-review row', async () => {
     const onSplit = vi.fn();
     renderModal(
       'needs-review',
@@ -112,7 +115,8 @@ describe('RowDetailModal split', () => {
       } as MiningTaxAssignmentRecord,
       onSplit
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Split' }));
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Split between Payees' }));
     expect(onSplit).toHaveBeenCalledTimes(1);
   });
 });
@@ -157,6 +161,7 @@ describe('RowDetailModal payment', () => {
           pricesFor={() => new Map()}
           busy={false}
           onAssigned={noop}
+          onEdit={noop}
           onDismiss={noop}
           onMarkPaid={noop}
           onResolve={noop}
@@ -169,7 +174,7 @@ describe('RowDetailModal payment', () => {
 
   it('shows when the row was marked paid', () => {
     renderPaid();
-    expect(screen.getByText('2026-09-10')).toBeInTheDocument();
+    expect(screen.getByText(/Paid on 2026-09-10/)).toBeInTheDocument();
   });
 
   it('links a linked transaction to the Wallet Journal, highlighting it', () => {
@@ -198,10 +203,10 @@ describe('RowDetailModal payment', () => {
         },
       ],
     });
-    expect(screen.getByText(/linked automatically/)).toBeInTheDocument();
+    expect(screen.getByText(/auto-linked/)).toBeInTheDocument();
   });
 
-  it('calls onUnlinkTransaction with the clicked transaction', () => {
+  it('calls onUnlinkTransaction with the clicked transaction', async () => {
     const onUnlink = vi.fn();
     const transaction = {
       kind: 'journal' as const,
@@ -210,17 +215,19 @@ describe('RowDetailModal payment', () => {
       label: '100 ISK · 2026-09-10 — Player donation',
     };
     renderPaid({ linkedTransactions: [transaction], onUnlinkTransaction: onUnlink });
-    fireEvent.click(screen.getByRole('button', { name: 'Unlink this transaction' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Payment actions' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Unlink this transaction' }));
     expect(onUnlink).toHaveBeenCalledWith(transaction);
   });
 
-  it('offers Link a transaction whenever the row is paid, even with no payment recorded yet', () => {
+  it('offers Link a transaction whenever the row is paid, even with no payment recorded yet', async () => {
     const onLink = vi.fn();
     renderPaid({
       assignment: { ...paidAssignment, payment: undefined },
       onLinkTransaction: onLink,
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Link a transaction' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Payment actions' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Link a transaction' }));
     expect(onLink).toHaveBeenCalledTimes(1);
   });
 
@@ -230,9 +237,9 @@ describe('RowDetailModal payment', () => {
   });
 });
 
-describe('RowDetailModal paid lock', () => {
-  it('passes onUnlock through to the Assign form, which fires it from its unlock button', () => {
-    const onUnlock = vi.fn();
+describe('RowDetailModal edit', () => {
+  it('hands a paid entry straight to the edit form, with no unlock step here', () => {
+    const onEdit = vi.fn();
     renderModal(
       'paid',
       {
@@ -250,10 +257,67 @@ describe('RowDetailModal paid lock', () => {
         updatedAt: 1,
       } as MiningTaxAssignmentRecord,
       undefined,
-      onUnlock
+      onEdit
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Unlock to edit' }));
-    expect(onUnlock).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: /unlock/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('RowDetailModal owed entry', () => {
+  const owed = {
+    id: 'a1',
+    characterId: 1,
+    date: '2026-09-08',
+    solarSystemId: 30000142,
+    payeeId: 'p1',
+    oreLines: [{ typeId: VELDSPAR, quantity: 250 }],
+    taxPct: 10,
+    estimatedValue: 1_000,
+    taxOwed: 100,
+    status: 'outstanding',
+    updatedAt: 1,
+  } as MiningTaxAssignmentRecord;
+
+  it('leads with settling up its Payee, and opens as a summary rather than the form', () => {
+    const onSettleUp = vi.fn();
+    renderModal('outstanding', owed, undefined, undefined, { onSettleUp });
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Settle up' }));
+    expect(onSettleUp).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks before unassigning', async () => {
+    const onUndo = vi.fn();
+    renderModal('outstanding', owed, undefined, undefined, { onUndo });
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Unassign…' }));
+    expect(onUndo).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Unassign' }));
+    expect(onUndo).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers linking a wallet payment from the More menu', async () => {
+    const onLinkWalletPayment = vi.fn();
+    renderModal('outstanding', owed, undefined, undefined, { onLinkWalletPayment });
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Link a wallet payment' }));
+    expect(onLinkWalletPayment).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('RowDetailModal — a failed action', () => {
+  it('shows the save error it is handed', () => {
+    renderModal('unassigned', null, undefined, vi.fn(), {
+      saveError: 'Couldn’t save — nothing was changed. Try again.',
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(/Couldn’t save/);
+  });
+
+  it('shows no alert while nothing has failed', () => {
+    renderModal('unassigned', null);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

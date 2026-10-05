@@ -61,6 +61,8 @@ const CATALOG = {
 
 const data = {
   cloneState: 'omega' as 'omega' | 'alpha',
+  fetchedAt: null as Date | null,
+  refresh: vi.fn(),
 };
 
 vi.mock('@/features/skills/certificates/useCertificatesData', () => ({
@@ -76,12 +78,16 @@ vi.mock('@/features/skills/certificates/useCertificatesData', () => ({
     attributes: { intelligence: 20, memory: 20, perception: 20, willpower: 20, charisma: 19 },
     implants: {},
     cloneState: data.cloneState,
+    fetchedAt: data.fetchedAt,
+    refresh: data.refresh,
   }),
 }));
 
 beforeEach(async () => {
   await db.skillPlans.clear();
   data.cloneState = 'omega';
+  data.fetchedAt = null;
+  data.refresh = vi.fn();
   useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
 });
 
@@ -151,6 +157,30 @@ describe('SkillCertificates', () => {
     renderPage();
     await screen.findByText('Standard (2 of 5)');
     expect(screen.queryByRole('button', { name: 'Omega only' })).not.toBeInTheDocument();
+  });
+
+  it('badges the page header with the skills read age', async () => {
+    data.fetchedAt = new Date(Date.now() - 12 * 60_000);
+    renderPage();
+    await screen.findByText('Standard (2 of 5)');
+    expect(screen.getByText('12m ago')).toBeInTheDocument();
+  });
+
+  it('shows no age badge before any skills read, but still offers Refresh', async () => {
+    renderPage();
+    await screen.findByText('Standard (2 of 5)');
+    expect(screen.queryByText(/ ago$/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+  });
+
+  it('re-reads skills on Refresh, keeping the rows on screen', async () => {
+    const user = userEvent.setup();
+    data.fetchedAt = new Date(Date.now() - 12 * 60_000);
+    renderPage();
+    await screen.findByText('Standard (2 of 5)');
+    await user.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(data.refresh).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Standard (2 of 5)')).toBeInTheDocument();
   });
 
   it('shows Omega only where the Alpha cap stops the next grade', async () => {

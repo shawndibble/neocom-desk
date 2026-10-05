@@ -42,7 +42,7 @@ describe('resolveShareCodeChange', () => {
     expect(decision).toEqual({ isDifferentFitting: false, resetSavedId: false, adopted: FITTING });
   });
 
-  it("an own write whose code matches but carries no fitting (a Load's own paste) decodes, keeping savedId, but still resets basisOverride", () => {
+  it("an own write whose code matches but carries no fitting (a Load's own paste) decodes, keeping savedId", () => {
     const decision = resolveShareCodeChange({
       ownWrite: { code: 'new-code', fitting: null },
       pendingOpen: null,

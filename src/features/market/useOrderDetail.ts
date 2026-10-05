@@ -12,7 +12,7 @@
  * its view.
  */
 import { useContext, useEffect, useLayoutEffect, useMemo } from 'react';
-import { useRouteQuery } from '@/features/route/routeRules';
+import { useJumpBasis } from '@/features/route/jumpBasis';
 import { useLazyRowCache } from '@/lib/useLazyRowCache';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { TRADE_HUBS } from '@/market/hubs';
@@ -137,7 +137,8 @@ export function useOrderDetail(): OrderDetail {
   const jumps = useLazyRowCache<string, JumpsAwayResult>();
   // Loaded under the Travel Settings in force, and read back only for those:
   // a distance worked out under other rules is not this one.
-  const { rules: routeRules, key: routeKey, hydrated: routeHydrated } = useRouteQuery();
+  const { rules, network, key: routeKey, hydrated: routeHydrated } = useJumpBasis();
+  const routeBasis = useMemo(() => ({ rules, network }), [rules, network]);
   const jumpsForList = useMemo(() => {
     const suffix = `|${routeKey}`;
     const view = new Map<string, JumpsAwayResult>();
@@ -223,7 +224,7 @@ export function useOrderDetail(): OrderDetail {
         // so the effects that call it ask again.
         if (!routeHydrated) return;
         void loadJumps(`${jumpsKey(fromSystemId, toSystemId)}|${routeKey}`, () =>
-          loaders.jumpsBetween(fromSystemId, toSystemId, routeRules)
+          loaders.jumpsBetween(fromSystemId, toSystemId, routeBasis)
         );
       },
       loadStructure,
@@ -257,7 +258,7 @@ export function useOrderDetail(): OrderDetail {
     loadHubBidsFor,
     loadJumps,
     routeKey,
-    routeRules,
+    routeBasis,
     routeHydrated,
   ]);
 

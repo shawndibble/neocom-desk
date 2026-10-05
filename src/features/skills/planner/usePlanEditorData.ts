@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   loadSkillCatalog,
   toAttributeBaseline,
@@ -11,6 +11,7 @@ import {
   type CachedResult,
 } from '@/features/skills/data';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { invalidateFreshness } from '@/esi/cache';
 import { DEFAULT_ATTRIBUTES } from './planSchedule';
 import { remapAvailability, type RemapAvailability } from './remapAvailability';
 import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
@@ -58,6 +59,18 @@ export interface PlanEditorData {
   totalSp: number | null;
   /** ESI's `unallocated_sp`, null until /skills has loaded or when ESI omits it. */
   unallocatedSp: number | null;
+  /**
+   * Freshness of `trainedSkills` for a `DataAgeBadge`: the older of the
+   * /skills and queue reads (`loadCorrectedSkills`), null until either was read.
+   */
+  fetchedAt: Date | null;
+  /**
+   * Re-runs the load, reaching ESI rather than a freshness-window hit (the
+   * same bypass as `useRouteSnapshot`'s `refresh`). The previous answer
+   * stays in place until the new one lands, so a view can keep its rows on
+   * screen while it refreshes.
+   */
+  reload: () => void;
 }
 
 /**
@@ -83,6 +96,12 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
   const [queueFetchedAt, setQueueFetchedAt] = useState<Date | null>(null);
   const [totalSp, setTotalSp] = useState<number | null>(null);
   const [unallocatedSp, setUnallocatedSp] = useState<number | null>(null);
+  const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
+  const reload = useCallback(() => {
+    invalidateFreshness();
+    setReloadCount((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     if (characterId === null) return;
@@ -105,6 +124,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
       setQueueFetchedAt(corrected.queueResult?.fetchedAt ?? null);
       setTotalSp(corrected.totalSp);
       setUnallocatedSp(corrected.skillsResult?.data.unallocated_sp ?? null);
+      setFetchedAt(corrected.fetchedAt);
       if (attrs?.data) {
         // An `impossible` sheet yields no baseline at all, so the scheduler
         // falls back to the same placeholder it uses when ESI cannot be read.
@@ -122,7 +142,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
     return () => {
       cancelled = true;
     };
-  }, [characterId]);
+  }, [characterId, reloadCount]);
 
   return {
     loaded: characterId !== null && loadedFor === characterId,
@@ -138,5 +158,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
     queueFetchedAt,
     totalSp,
     unallocatedSp,
+    fetchedAt,
+    reload,
   };
 }

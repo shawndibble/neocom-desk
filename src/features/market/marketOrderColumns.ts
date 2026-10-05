@@ -16,9 +16,9 @@ import { createLocalSetting } from '@/lib/useLocalSetting';
 export const MARKET_ORDER_COLUMN_IDS = [
   'price',
   'quantity',
+  'jumps',
   'location',
   'security',
-  'jumps',
   'expiry',
   'range',
   'minVolume',
@@ -30,9 +30,9 @@ export type MarketOrderColumnId = (typeof MARKET_ORDER_COLUMN_IDS)[number];
 export const SELL_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = [
   'price',
   'quantity',
+  'jumps',
   'location',
   'security',
-  'jumps',
   'expiry',
 ];
 export const BUY_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = MARKET_ORDER_COLUMN_IDS;
@@ -50,8 +50,11 @@ export const VISIBLE_MARKET_ORDER_COLUMNS_KEY = 'marketOrderVisibleColumns';
 export const useVisibleMarketOrderColumns = createLocalSetting<readonly MarketOrderColumnId[]>({
   key: VISIBLE_MARKET_ORDER_COLUMNS_KEY,
   defaultValue: DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS,
-  parse: (raw) =>
-    Array.isArray(raw) && raw.length > 0 && raw.every(isMarketOrderColumnId)
-      ? (raw as MarketOrderColumnId[])
-      : null,
+  // Unknown ids are dropped rather than voiding the whole preference: a
+  // retired column (Cum. qty's `depth`) shouldn't reset a pilot's picks.
+  parse: (raw) => {
+    if (!Array.isArray(raw)) return null;
+    const known = raw.filter(isMarketOrderColumnId);
+    return known.length > 0 ? known : null;
+  },
 });

@@ -13,18 +13,38 @@
  * Each suggested quantity is the smallest of four limits, and the plan names
  * the one that applied so a hauler can see why (`limitedBy`):
  * - `sales`: a week of expected sales (`demandCapUnits`),
- * - `supply`: the units that are profitable to buy at all — the origin's
- *   ladder past the break-even price only loses money. Sold straight into the
+ * - `supply`: the units that are profitable to buy with a margin to spare — the
+ *   origin's ladder past the break-even price loses money, and a unit just
+ *   under it loses the moment a price slips. Sold straight into the
  *   destination's buy orders there is no sales horizon, and this is the depth
  *   both books keep a unit profitable to (`walkInstant`),
- * - `space`: what fits in the remaining hold,
+ * - `space`: what fits in the room left in the holds that accept the item,
  * - `budget`: what the remaining ISK buys through the origin's ladder.
+ *
+ * Cargo Space is a set of holds (`cargoHolds.ts`): each item goes into a
+ * Specialised Hold that accepts it first, narrowest first, and spills into the
+ * general hold once that is full. An item no Specialised Hold accepts only
+ * uses the general hold.
  *
  * Pure: no fetch/DOM/Dexie.
  */
-import { brokerFeePct, salesTaxPct } from '@/engine/industry/fees';
+import { brokerFeePct, salesTax, salesTaxPct } from '@/engine/industry/fees';
 import type { AppraisalNetFees } from './appraisal';
-import { lotEconomics, walkInstant, walkLadder, type LadderLevel } from './haulingMarket';
+import {
+  HOLD_KINDS,
+  holdAccepts,
+  SPECIALISED_HOLD_KINDS,
+  type CargoHold,
+  type HoldKind,
+} from './cargoHolds';
+import {
+  HAULING_THRESHOLDS,
+  lotEconomics,
+  walkInstant,
+  walkLadder,
+  type LadderLevel,
+} from './haulingMarket';
+import { roundPriceDown } from './priceTick';
 
 export interface TripCandidate {
   typeId: number;
@@ -48,6 +68,9 @@ export interface TripCandidate {
    * broker fee follows the standing toward each hub's owner.
    */
   fees?: AppraisalNetFees;
+  /** The item's SDE group and category, which decide the holds it may go in; absent or null means the general hold only. */
+  groupId?: number | null;
+  categoryId?: number | null;
 }
 
 /** A user's change to one suggested line. `quantity` wins over the suggestion; `selected: false` removes the line. */
@@ -65,8 +88,24 @@ export interface TripLine {
   volumeM3: number;
   cost: number;
   profit: number;
+  /** The dearest unit price still worth paying at the origin; null when no unit clears the margin. */
+  maxBuyPrice: number | null;
   selected: boolean;
   limitedBy: QuantityLimit;
+  /** The holds the line is loaded into, in fill order; empty when space never limits or nothing ships. */
+  placements: HoldPlacement[];
+}
+
+export interface HoldPlacement {
+  kind: HoldKind;
+  quantity: number;
+  volumeM3: number;
+}
+
+export interface HoldUse {
+  kind: HoldKind;
+  capacityM3: number;
+  usedM3: number;
 }
 
 export interface TripPlan {
@@ -75,34 +114,93 @@ export interface TripPlan {
   totals: { volumeM3: number; cost: number; profit: number; items: number };
   /** The limit that stopped the plan short, when one did: space and budget outrank a plain sales cap. */
   binding: 'space' | 'budget' | 'sales' | null;
+  /** Each hold, general first, with what the plan put in it; empty when space never limits. A hold no candidate fits stays at 0. */
+  holds: HoldUse[];
 }
 
 export interface PlanTripInput {
   candidates: readonly TripCandidate[];
-  /** Hold size in m³; null means the user has not said, so space never limits. */
-  cargoM3: number | null;
+  /** The Cargo Space's holds; null or empty means the user has not said, so space never limits. */
+  holds: readonly CargoHold[] | null;
   /** ISK to spend; null means no limit. */
   budgetIsk: number | null;
   fees: AppraisalNetFees;
   overrides: ReadonlyMap<number, TripOverride>;
 }
 
-/** Units of `ladder` that cost less than a unit is worth after fees — past this every further unit loses money. */
-export function profitableDepth(candidate: TripCandidate, planFees: AppraisalNetFees): number {
+/**
+ * Units of `ladder` that cost enough less than a unit is worth after fees to
+ * clear `minUnitMarginPct` — past this every further unit earns too little to
+ * survive a price slipping before it is bought or sold.
+ */
+export function profitableDepth(
+  candidate: TripCandidate,
+  planFees: AppraisalNetFees,
+  minMarginPct: number = HAULING_THRESHOLDS.minUnitMarginPct
+): number {
   const { accountingLevel, brokerRelationsLevel, standing } = candidate.fees ?? planFees;
   if (candidate.destBuyLadder !== undefined) {
     return walkInstant({
       originLadder: candidate.buyLadder,
       destBuyLadder: candidate.destBuyLadder,
       accountingLevel,
+      minMarginPct,
     }).units;
   }
   const feeRate =
     (salesTaxPct(accountingLevel) +
       brokerFeePct(brokerRelationsLevel, standing.factionStanding, standing.corpStanding)) /
     100;
-  const breakEven = candidate.expectedPrice * (1 - feeRate);
+  const breakEven = (candidate.expectedPrice * (1 - feeRate)) / (1 + minMarginPct / 100);
   return candidate.buyLadder.reduce((sum, l) => (l.price <= breakEven ? sum + l.units : sum), 0);
+}
+
+/**
+ * The dearest price a unit may be bought at and still clear `minMarginPct`
+ * after every fee: the line to hold when the origin's book has moved since
+ * the plan was made. Buying past it only loses money once the sale is paid
+ * for. Null when no unit on today's books clears the margin.
+ *
+ * Listed, it is the break-even price less the margin, rounded down to a price
+ * the market can hold. Sold into buy orders it is what the weakest bid the lot
+ * sells into nets after sales tax, less the margin: the origin price of any
+ * unit in the lot can rise to there before that unit stops clearing it.
+ */
+export function maxBuyPrice(
+  candidate: TripCandidate,
+  planFees: AppraisalNetFees,
+  minMarginPct: number = HAULING_THRESHOLDS.minUnitMarginPct
+): number | null {
+  const { accountingLevel, brokerRelationsLevel, standing } = candidate.fees ?? planFees;
+  if (candidate.destBuyLadder !== undefined) {
+    const { units } = walkInstant({
+      originLadder: candidate.buyLadder,
+      destBuyLadder: candidate.destBuyLadder,
+      accountingLevel,
+      minMarginPct,
+    });
+    if (units <= 0) return null;
+    // The weakest bid the lot sells into sets the ceiling: any unit bought
+    // dearer than what that bid nets, less the margin, loses its margin.
+    let sold = 0;
+    for (const level of candidate.destBuyLadder) {
+      sold += level.units;
+      if (sold >= units) {
+        const net = level.price - salesTax(level.price, accountingLevel);
+        const limit = net / (1 + minMarginPct / 100);
+        return roundPriceDown(limit) ?? limit;
+      }
+    }
+    return null;
+  }
+  const feeRate =
+    (salesTaxPct(accountingLevel) +
+      brokerFeePct(brokerRelationsLevel, standing.factionStanding, standing.corpStanding)) /
+    100;
+  const limit = (candidate.expectedPrice * (1 - feeRate)) / (1 + minMarginPct / 100);
+  const cheapest = candidate.buyLadder[0]?.price;
+  if (cheapest === undefined || cheapest > limit) return null;
+  return roundPriceDown(limit) ?? limit;
 }
 
 /** The most units `budget` ISK buys through `ladder`, up to `max`. */
@@ -138,17 +236,78 @@ function lineFor(
     volumeM3: economics.filled * candidate.unitVolumeM3,
     cost: economics.cost,
     profit: economics.profit,
+    maxBuyPrice: maxBuyPrice(candidate, planFees),
     selected,
     limitedBy,
+    placements: [],
   };
 }
 
+const FILL_ORDER: readonly HoldKind[] = [...SPECIALISED_HOLD_KINDS, 'general'];
+
+/** One hold per kind (two of a kind add up), general first then narrowest first; holds of no size are dropped. */
+function holdUses(holds: readonly CargoHold[] | null): HoldUse[] {
+  const byKind = new Map<HoldKind, number>();
+  for (const { kind, capacityM3 } of holds ?? []) {
+    if (capacityM3 > 0) byKind.set(kind, (byKind.get(kind) ?? 0) + capacityM3);
+  }
+  return HOLD_KINDS.filter((kind) => byKind.has(kind)).map((kind) => ({
+    kind,
+    capacityM3: byKind.get(kind)!,
+    usedM3: 0,
+  }));
+}
+
+/** The holds `candidate` may go in, in the order it fills them: Specialised Holds narrowest first, then the general hold. */
+function eligibleHolds(holds: readonly HoldUse[], candidate: TripCandidate): HoldUse[] {
+  const item = { groupId: candidate.groupId ?? null, categoryId: candidate.categoryId ?? null };
+  return FILL_ORDER.flatMap((kind) => {
+    const hold = holds.find((h) => h.kind === kind);
+    return hold !== undefined && holdAccepts(kind, item) ? [hold] : [];
+  });
+}
+
+const freeM3 = (hold: HoldUse) => Math.max(0, hold.capacityM3 - hold.usedM3);
+
+/** Whole units of `unitVolumeM3` that fit in a hold's free room (a hair of slack so 3.8 / 0.38 is 10, not 9). */
+const unitsIn = (hold: HoldUse, unitVolumeM3: number) =>
+  Math.floor(freeM3(hold) / unitVolumeM3 + 1e-9);
+
+/**
+ * Loads `quantity` units into `eligible`, in order, and records the room they
+ * take. A typed quantity can exceed every hold: what is left over-fills the
+ * last hold it may use, so the overflow stays visible rather than vanishing.
+ */
+function load(eligible: readonly HoldUse[], quantity: number, unitVolumeM3: number) {
+  const placements: HoldPlacement[] = [];
+  let left = quantity;
+  for (const [i, hold] of eligible.entries()) {
+    if (left <= 0) break;
+    const last = i === eligible.length - 1;
+    const units = last || unitVolumeM3 <= 0 ? left : Math.min(left, unitsIn(hold, unitVolumeM3));
+    if (units <= 0) continue;
+    hold.usedM3 += units * unitVolumeM3;
+    placements.push({ kind: hold.kind, quantity: units, volumeM3: units * unitVolumeM3 });
+    left -= units;
+  }
+  return placements;
+}
+
 export function planTrip(input: PlanTripInput): TripPlan {
-  const { candidates, cargoM3, budgetIsk, fees, overrides } = input;
+  const { candidates, budgetIsk, fees, overrides } = input;
   const lines = new Map<number, TripLine>();
 
-  let remainingM3 = cargoM3;
+  const holds = holdUses(input.holds);
+  const spaceLimits = holds.length > 0;
   let remainingBudget = budgetIsk;
+
+  const place = (candidate: TripCandidate, line: TripLine): TripLine =>
+    spaceLimits && line.quantity > 0
+      ? {
+          ...line,
+          placements: load(eligibleHolds(holds, candidate), line.quantity, candidate.unitVolumeM3),
+        }
+      : line;
 
   // 1. Unticked items ship nothing; typed quantities are kept and reserve their share first.
   const auto: TripCandidate[] = [];
@@ -157,15 +316,11 @@ export function planTrip(input: PlanTripInput): TripPlan {
     if (override?.selected === false) {
       lines.set(candidate.typeId, lineFor(candidate, 0, false, 'none', fees));
     } else if (override?.quantity !== undefined) {
-      const line = lineFor(
+      const line = place(
         candidate,
-        Math.max(0, Math.floor(override.quantity)),
-        true,
-        'edited',
-        fees
+        lineFor(candidate, Math.max(0, Math.floor(override.quantity)), true, 'edited', fees)
       );
       lines.set(candidate.typeId, line);
-      if (remainingM3 !== null) remainingM3 -= line.volumeM3;
       if (remainingBudget !== null) remainingBudget -= line.cost;
     } else {
       auto.push(candidate);
@@ -187,9 +342,11 @@ export function planTrip(input: PlanTripInput): TripPlan {
       fees: candidate.fees ?? fees,
       destBuyLadder: candidate.destBuyLadder,
     });
+    // Judged against the room this item can actually use, not every hold's.
+    const usableM3 = eligibleHolds(holds, candidate).reduce((sum, h) => sum + freeM3(h), 0);
     let scarcity = 0;
-    if (remainingM3 !== null && remainingM3 > 0) {
-      scarcity = Math.max(scarcity, (atCap.filled * candidate.unitVolumeM3) / remainingM3);
+    if (spaceLimits && usableM3 > 0) {
+      scarcity = Math.max(scarcity, (atCap.filled * candidate.unitVolumeM3) / usableM3);
     }
     if (remainingBudget !== null && remainingBudget > 0) {
       scarcity = Math.max(scarcity, atCap.cost / remainingBudget);
@@ -208,8 +365,11 @@ export function planTrip(input: PlanTripInput): TripPlan {
     let quantity = cap;
     let limitedBy: QuantityLimit = capLimit;
 
-    if (remainingM3 !== null && candidate.unitVolumeM3 > 0) {
-      const bySpace = Math.max(0, Math.floor(remainingM3 / candidate.unitVolumeM3));
+    if (spaceLimits && candidate.unitVolumeM3 > 0) {
+      const bySpace = eligibleHolds(holds, candidate).reduce(
+        (sum, h) => sum + unitsIn(h, candidate.unitVolumeM3),
+        0
+      );
       if (bySpace < quantity) {
         quantity = bySpace;
         limitedBy = 'space';
@@ -223,9 +383,8 @@ export function planTrip(input: PlanTripInput): TripPlan {
       }
     }
 
-    const line = lineFor(candidate, quantity, true, limitedBy, fees);
+    const line = place(candidate, lineFor(candidate, quantity, true, limitedBy, fees));
     lines.set(candidate.typeId, line);
-    if (remainingM3 !== null) remainingM3 -= line.volumeM3;
     if (remainingBudget !== null) remainingBudget -= line.cost;
   }
 
@@ -249,6 +408,7 @@ export function planTrip(input: PlanTripInput): TripPlan {
       items: shipped.length,
     },
     binding,
+    holds,
   };
 }
 

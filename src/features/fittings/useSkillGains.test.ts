@@ -4,6 +4,7 @@ import type { FittingStats, PilotProfile } from '@/engine/fittings/types';
 import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import type { SkillGainEvaluator } from './useFittingEvaluation';
 import { useSkillGains } from './useSkillGains';
+import { fakeDogmaEngine } from './__fixtures__/fakeDogmaEngine';
 
 // Real macrotask yields by default; a test swaps in a gate it opens by hand.
 const yieldToEventLoop = vi.fn(() => Promise.resolve());
@@ -81,6 +82,7 @@ const profile: PilotProfile = {
 function evaluator(sources: number[] = [10, 20, 30, 40]): SkillGainEvaluator {
   return {
     profile,
+    engine: fakeDogmaEngine(),
     skillSources: vi.fn(async () => sources),
     compare: vi.fn(async (skillTypeId: number) => ({
       before: baseStats,
