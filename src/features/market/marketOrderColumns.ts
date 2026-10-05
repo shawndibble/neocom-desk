@@ -58,3 +58,49 @@ export const useVisibleMarketOrderColumns = createLocalSetting<readonly MarketOr
     return known.length > 0 ? known : null;
   },
 });
+
+/**
+ * Location's width cap in a table row: `roomy` while the book has room, then
+ * `squeezed` (still truncated, the full name in the tooltip and expanded row)
+ * before the rows give up and become cards.
+ */
+export const ORDER_BOOK_LOCATION_REM = { roomy: 16, squeezed: 9 } as const;
+
+/**
+ * What each column needs in a table row, in rem, measured in Chrome: mostly
+ * the header (its `px-3` and sort icon) rather than the value, except Price,
+ * sized for a twelve-digit ISK figure. Location is `ORDER_BOOK_LOCATION_REM`.
+ * Min. Volume is not budgeted: it only renders from a 120rem viewport
+ * (`useMarketOrderColumns`), where the book is far wider than any total here.
+ */
+const ORDER_BOOK_COLUMN_REM: Record<Exclude<MarketOrderColumnId, 'location'>, number> = {
+  price: 6.5,
+  quantity: 6.5,
+  jumps: 5.25,
+  security: 6.25,
+  expiry: 5.75,
+  range: 5.25,
+  minVolume: 0,
+};
+
+/** The row's expand toggle (`expandableRow`), plus the card's border. */
+const ORDER_BOOK_FIXED_REM = 2.5 + 0.25;
+
+/**
+ * The order book widths its Sell and Buy tables need for the picked columns
+ * (Buy's, the wider set — Sell's are a subset): below `roomy` Location's cap
+ * shrinks to `squeezed`, below `cards` the rows become cards. Following the
+ * picker means a pilot who hides columns keeps the table at a narrower width.
+ */
+export function orderBookWidthsRem(visible: readonly MarketOrderColumnId[]): {
+  roomy: number;
+  cards: number;
+} {
+  let rest = ORDER_BOOK_FIXED_REM;
+  for (const id of visible) if (id !== 'location') rest += ORDER_BOOK_COLUMN_REM[id];
+  if (!visible.includes('location')) return { roomy: rest, cards: rest };
+  return {
+    roomy: rest + ORDER_BOOK_LOCATION_REM.roomy,
+    cards: rest + ORDER_BOOK_LOCATION_REM.squeezed,
+  };
+}

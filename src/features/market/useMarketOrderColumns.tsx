@@ -55,6 +55,8 @@ export interface UseMarketOrderColumnsArgs {
    * book's own width, so card-only touches can't follow the viewport (ADR 0017).
    */
   cards: boolean;
+  /** The book is short of room for Location's full cap: `ORDER_BOOK_LOCATION_REM.squeezed`. */
+  locationSqueezed: boolean;
 }
 
 export interface MarketOrderColumns {
@@ -75,6 +77,7 @@ export function useMarketOrderColumns({
   jumpRangeFilter,
   bestSell,
   cards,
+  locationSqueezed,
 }: UseMarketOrderColumnsArgs): MarketOrderColumns {
   const visibleOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
   const setVisibleOrderColumns = useVisibleMarketOrderColumns((state) => state.setValue);
@@ -155,7 +158,13 @@ export function useMarketOrderColumns({
         // scrolls sideways beside the finder column.
         // Chosen with `cards` (ADR 0017): a card forced on a desktop is
         // titled by the station, uncapped; a table row caps it.
-        className: cards ? '' : 'max-w-[16rem] truncate',
+        // Squeezed before the rows give up to cards: the two caps are
+        // `ORDER_BOOK_LOCATION_REM`, spelled out for Tailwind to find.
+        className: cards
+          ? ''
+          : locationSqueezed
+            ? 'max-w-[9rem] truncate'
+            : 'max-w-[16rem] truncate',
         // The phone card's title: the station a pilot would fly to.
         primary: true,
         sortValue: (o) =>
@@ -205,10 +214,11 @@ export function useMarketOrderColumns({
       expiry: {
         id: 'expiry',
         header: t('market.expiry'),
-        // Same room rule as Cum. qty; the expanded row states it in full.
-        className: 'whitespace-nowrap text-text-dim max-[105rem]:hidden',
-        headerCellClassName: 'max-[105rem]:hidden',
-        render: (o) => <span data-dense-omit="">{orderExpiry(o).toLocaleDateString()}</span>,
+        // Shown or hidden by the column picker alone, never by width; the
+        // card keeps it too, behind a word saying what the date is.
+        className: 'whitespace-nowrap text-text-dim',
+        stackAffix: { before: t('market.expiryAffix') },
+        render: (o) => orderExpiry(o).toLocaleDateString(),
         sortValue: (o) => orderExpiry(o).getTime(),
       },
       range: {
@@ -233,7 +243,7 @@ export function useMarketOrderColumns({
         sortValue: (o) => o.min_volume,
       },
     }),
-    [t, npcStationMap, solarSystemMap, myOrderIds, orderJumps, bestSell, cards]
+    [t, npcStationMap, solarSystemMap, myOrderIds, orderJumps, bestSell, cards, locationSqueezed]
   );
 
   const baseColumns = useMemo<DataTableColumn<RegionOrder>[]>(

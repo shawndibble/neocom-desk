@@ -10,8 +10,9 @@
  * pairing the short figures two per line.
  *
  * The order book rework (2026-10-04) went further: an order is now the dense
- * two-line card — station and price, then quantity, distance and security —
- * and a phone shows one side at a time behind a Sell | Buy toggle. The card is
+ * two-line card — station and price, then quantity, distance, security and
+ * expiry — and a phone shows one side at a time behind a Sell | Buy toggle.
+ * The card is
  * picked by the order book's own width, not the viewport, so a desktop whose
  * finder column leaves the book narrow (1280px) gets it too.
  *
@@ -189,13 +190,13 @@ test.describe('Market Browser — order book stacked cards', () => {
     await seedOrderBook(page);
   });
 
-  /** The two-line order card: station and price, then quantity, distance and security (and a buy's range). */
+  /** The two-line order card: station and price, then quantity, distance, security and expiry (and a buy's range). */
   async function expectTwoLineCards(page: Page) {
     const sell = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
     expect(sell.display).toBe('flex');
     expect(labelLines(sell.cells, 8)).toEqual([
       ['Location', 'Price'],
-      ['Quantity', 'Jumps', 'Security'],
+      ['Quantity', 'Jumps', 'Security', 'Expires'],
     ]);
     // The real station, not the "Unknown Structure" fallback — truncated on
     // the card's title line, in full in the DOM (and the expanded row).
@@ -221,7 +222,7 @@ test.describe('Market Browser — order book stacked cards', () => {
     const buy = await readRow(page, 'Buy Orders', BUY_ORDER.order_id);
     expect(labelLines(buy.cells, 8)).toEqual([
       ['Location', 'Price'],
-      ['Quantity', 'Jumps', 'Security', 'Range'],
+      ['Quantity', 'Jumps', 'Security', 'Expires', 'Range'],
     ]);
 
     const overflow = await page.evaluate(

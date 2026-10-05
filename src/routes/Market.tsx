@@ -93,14 +93,16 @@ import { ItemSkillsDisclosure } from '@/features/market/ItemSkillsDisclosure';
 import { useOrderBookOrchestration } from '@/features/market/useOrderBookOrchestration';
 import { useOrderRowSkills } from '@/features/market/useOrderRowSkills';
 import { useMarketOrderColumns } from '@/features/market/useMarketOrderColumns';
-import { SELL_ORDER_COLUMN_IDS, BUY_ORDER_COLUMN_IDS } from '@/features/market/marketOrderColumns';
+import {
+  SELL_ORDER_COLUMN_IDS,
+  BUY_ORDER_COLUMN_IDS,
+  orderBookWidthsRem,
+  useVisibleMarketOrderColumns,
+} from '@/features/market/marketOrderColumns';
 import { useTimedToast } from '@/components/ui/useTimedToast';
 
 /** Rows shown per side before "show all" (CONTEXT.md). */
 const ROW_CAP = 15;
-
-/** Below this order-book width the Buy table's columns stop fitting: cards instead. */
-const ORDER_BOOK_CARDS_REM = 48;
 
 /**
  * The page's own top-level tabs: Market Browser plus a character's Open
@@ -593,12 +595,13 @@ export function Market() {
   });
 
   // The order book's own width picks columns or two-line cards: a phone,
-  // and a desktop whose finder column leaves the book too narrow for its
-  // columns (a 1024–1280px window), both get the card.
+  // and a desktop whose finder column leaves the book too narrow for the
+  // columns the pilot has picked, both get the card. Short of that, Location
+  // narrows first, so fewer widths need cards at all.
   const isPhone = useIsPhone();
-  const [orderBookRef, [orderBookNarrow]] = useElementNarrowerThan<HTMLDivElement>([
-    ORDER_BOOK_CARDS_REM,
-  ]);
+  const orderBookWidths = orderBookWidthsRem(useVisibleMarketOrderColumns((state) => state.value));
+  const [orderBookRef, [orderLocationSqueezed = false, orderBookNarrow = false]] =
+    useElementNarrowerThan<HTMLDivElement>([orderBookWidths.roomy, orderBookWidths.cards]);
   const orderCards = isPhone || orderBookNarrow;
 
   const { itemSkills, trainedSkills, targetPlan } = useOrderRowSkills(
@@ -622,6 +625,7 @@ export function Market() {
     jumpRangeFilter,
     bestSell: loadedView?.summary.bestSell ?? null,
     cards: orderCards,
+    locationSqueezed: orderLocationSqueezed,
   });
   // A phone shows one side of the book at a time (`BookSideToggle`).
   const [phoneSide, setPhoneSide] = useState<BookSide>('sell');
