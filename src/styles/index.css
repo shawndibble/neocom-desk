@@ -98,6 +98,15 @@
   --color-series-order-count: #e9a13b;
 
   /*
+   * The PI Map's "what if I add a planet" colour: what a planet type you do
+   * not have would unlock. One meaning, drawn only beside a non-colour marker
+   * (a "+" on the tile, "what if" under the planet, words in the accessible
+   * name). Clear of accent (interactive), warning (the gold picks) and every
+   * status tone.
+   */
+  --color-map-whatif: #ff79c6;
+
+  /*
    * Clock kinds — the app's one NOMINAL palette (DESIGN.md §1). Identity, not
    * magnitude and not status: these say which part of the app a deadline came
    * from. Every hue sits at least 20 ΔE from accent/success/warning/danger so
