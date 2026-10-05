@@ -40,6 +40,7 @@ import { BuildSystemInput } from './BuildSystemInput';
 import { BuildLocationPicker } from './BuildLocationPicker';
 import { buildLocationLabel } from './buildLocationLabel';
 import { rigKindLabelKey } from './rigFitLabels';
+import { RigMatchHelper } from './RigMatchHelper';
 import type { BuildGroup, BuildGroupSnapshot } from './buildGroups';
 
 export type RetargetTarget = Omit<BuildGroupSnapshot, 'appliedAt'>;
@@ -245,7 +246,7 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
             <>
               <div className="flex flex-col gap-1">
                 <span>{t('industry.rigFitLabel')}</span>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {resolveRigFit({ rigFit: target.rigFit }).map((kind, slot) => (
                     // A slot's position is its identity, so the index is a stable key.
                     <Select
@@ -274,6 +275,11 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
                       </SelectContent>
                     </Select>
                   ))}
+                  <RigMatchHelper
+                    facility={target.facility}
+                    security={target.security}
+                    onApply={(fit) => setTarget((current) => ({ ...current, rigFit: fit }))}
+                  />
                 </div>
               </div>
 
