@@ -384,7 +384,9 @@ describe('Settings', () => {
     // Header row plus exactly one data row — the superseded success and the
     // failure both collapse into it, not two rows.
     expect(rows).toHaveLength(2);
-    expect(within(table).getByTitle(formatTimestamp(new Date(2_000)))).toBeInTheDocument();
+    const hint = within(rows[1]).getAllByRole('cell').at(-1)!.querySelector('[tabindex="0"]')!;
+    await userEvent.setup().hover(hint);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(formatTimestamp(new Date(2_000)));
   });
 });
 
@@ -1850,7 +1852,7 @@ describe('Settings — This device', () => {
     expect(
       await screen.findByText(/2 characters are logged in on this device/i)
     ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^log out$/i }));
+    await user.click(screen.getByRole('button', { name: /^log out…$/i }));
     const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
     expect(within(dialog).getByText(/removes 2 characters' logins/i)).toBeInTheDocument();
     // Nothing happens until the dialog is confirmed.
@@ -1870,7 +1872,7 @@ describe('Settings — This device', () => {
     render(<App />);
 
     // Disabled until the live character count resolves.
-    const logOut = await screen.findByRole('button', { name: /^log out$/i });
+    const logOut = await screen.findByRole('button', { name: /^log out…$/i });
     await waitFor(() => expect(logOut).toBeEnabled());
     await user.click(logOut);
     const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
@@ -1889,7 +1891,7 @@ describe('Settings — review follow-ups', () => {
     render(<App />);
 
     // Disabled until the live character count resolves.
-    const logOut = await screen.findByRole('button', { name: /^log out$/i });
+    const logOut = await screen.findByRole('button', { name: /^log out…$/i });
     await waitFor(() => expect(logOut).toBeEnabled());
     await user.click(logOut);
     const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });

@@ -3377,8 +3377,8 @@
       "priceAlertsChecked": "Prices checked {{age}}",
       "priceAlertsNotChecked": "Not priced yet — the alert poller checks these",
       "priceAlertTarget": {
-        "above": "Target ≥ {{price}}",
-        "below": "Target ≤ {{price}}"
+        "above": "Target ≥ <isk/>",
+        "below": "Target ≤ <isk/>"
       },
       "allCardsHidden": "Every card is hidden. Use the edit button above to bring some back.",
       "nextDeadline": "Next deadline",
@@ -6934,7 +6934,7 @@
       }
     },
     "customize": {
-      "linkLabel": "Log in with custom permissions",
+      "linkLabel": "Log in with custom permissions…",
       "title": "Log in with custom permissions",
       "intro": "Pick what to share. You can add more later in Settings › Permissions.",
       "optInTag": "Opt-in",
@@ -6946,7 +6946,7 @@
     }
   },
   "pageSettings": {
-    "menuItem": "Settings…",
+    "menuItem": "Settings",
     "open": "{{page}} settings",
     "title": "{{page}} settings",
     "allSettings": "All settings"
@@ -7041,6 +7041,7 @@
     "deviceLogoutHint": "Removes every character's login and locally stored data from this device. Sync settings and everything already synced stay, and come back when you log a character in again.",
     "deviceLogoutHintLocalOnly": "Removes every character's login and locally stored data from this device. Sync is not set up here, so plans and other data stored only on this device are deleted too.",
     "deviceLogoutAction": "Log out",
+    "deviceLogoutOpen": "Log out…",
     "deviceLogoutFailed": "Could not log out. Try again, or reload the page.",
     "deviceLogoutConfirmTitle": "Log out of all characters?",
     "deviceLogoutConfirm_one": "This removes {{count}} character's login and local data from this device. You will be taken to the login page.",
@@ -7049,6 +7050,7 @@
     "deviceDeleteHint": "Deletes every character's synced data (skill plans, build plans, fittings and more) from the sync server, then erases everything the app stores on this device, settings included, and reloads to the login screen. Another device still logged in keeps its own copy and can sync it back. This can't be undone.",
     "deviceDeleteHintLocalOnly": "Erases everything the app stores on this device — every character, their data, and settings — and reloads to the login screen. Sync isn't set up here, so nothing else is affected. This can't be undone.",
     "deviceDeleteAction": "Delete all",
+    "deviceDeleteOpen": "Delete all…",
     "deviceDeleteFinish": "Finish deleting",
     "deviceDeleteFailed": "Could not finish deleting. Close Neocom Desk in any other tab, reload this page, and try again.",
     "deviceDeleteConfirmTitle": "Delete all data?",

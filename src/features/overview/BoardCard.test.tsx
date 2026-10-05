@@ -19,7 +19,7 @@ function renderCard(help?: string) {
 describe('BoardCard help', () => {
   it('renders exactly one help affordance however many tiles the card has', () => {
     renderCard('Plain-language explanation.');
-    expect(screen.getAllByRole('button', { name: 'Plain-language explanation.' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'About Card' })).toHaveLength(1);
   });
 
   it('renders no help affordance without help text', () => {
@@ -39,6 +39,6 @@ describe('Overview jargon cards', () => {
     );
     expect(container.querySelectorAll('section')).toHaveLength(3);
     expect(screen.getAllByRole('button')).toHaveLength(3);
-    expect(screen.getByRole('button', { name: /cost floor/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /about open orders/i })).toBeTruthy();
   });
 });

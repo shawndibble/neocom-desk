@@ -11,14 +11,13 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  IconButton,
-  Panel,
-  SEVERITY_TEXT,
-  SeverityIcon,
-  textActionClassName,
-} from '@/components/ui';
+import { InfoTooltip, Panel, SEVERITY_TEXT, SeverityIcon } from '@/components/ui';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import { RowTappableContext } from '@/components/ui/tooltipHold';
+import { boardRowLinkBase, boardRowLinkClassName } from './boardRowLink';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
 import type { DeadlineSeverity } from '@/engine/severity';
 import type { AppRoutePath } from '@/app/routeScopes';
 
@@ -40,7 +39,22 @@ export interface BoardCardProps {
   help?: string;
 }
 
+/**
+ * The trailing `CaretRight` of a row that navigates (DESIGN.md §6c): faint at
+ * rest, accent while the row (a `group`) is hovered or focused.
+ */
+export function RowCaret() {
+  return (
+    <Icon.Descend
+      size={Icon.ICON_SIZE.sm}
+      className="shrink-0 text-text-faint group-hover:text-accent group-focus-visible:text-accent"
+      aria-hidden="true"
+    />
+  );
+}
+
 export function BoardCard({ title, meta, to, openLabel, children, footer, help }: BoardCardProps) {
+  const { t } = useTranslation();
   return (
     /*
       Three things, and all three are load-bearing for one effect: cards in a
@@ -68,8 +82,14 @@ export function BoardCard({ title, meta, to, openLabel, children, footer, help }
         // content-hugging height at and above `md`, since desktop's box was
         // never meant to grow (issue #1070).
         <div className="flex items-center gap-1">
-          {help && <IconButton size="sm" variant="plain" icon={<Icon.Info />} label={help} />}
-          <Link to={to} className={textActionClassName('gap-1 whitespace-nowrap')}>
+          {help && <InfoTooltip label={t('common.aboutLabel', { label: title })} content={help} />}
+          {/* Navigates, so a link (accent, underline on hover) and not a text action. */}
+          <Link
+            to={to}
+            className={entityLinkClassName(
+              'flex min-h-11 items-center gap-1 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase md:min-h-0'
+            )}
+          >
             {openLabel}
             <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
           </Link>
@@ -146,7 +166,12 @@ export function NumberTile({ label, value, severity, to }: NumberTileProps) {
   return (
     <Link
       to={to}
-      className={`${className} hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
+      className={cx(
+        className,
+        'hover:border-accent active:bg-panel',
+        interactiveClassName,
+        focusRingClassName
+      )}
     >
       {body}
     </Link>
@@ -160,9 +185,11 @@ export function TileRow({ children }: { children: ReactNode }) {
 export interface TriageRowProps {
   severity: DeadlineSeverity;
   /** The left column: a countdown, "Ready", "Idle 6h" — whatever this row's clock says. */
-  when: string;
+  when: ReactNode;
+  /** Plain text for the row's accessible name when `when` is not a string (an `IskAmount`). */
+  whenLabel?: string;
   subject: string;
-  detail?: string;
+  detail?: ReactNode;
   /** Where the row leads. Every row on this board goes somewhere; there is no read-only variant. */
   to: string;
 }
@@ -172,28 +199,35 @@ export interface TriageRowProps {
  * (different items, different facilities, different clocks) and planetary
  * batches (each one a separate trip).
  */
-export function TriageRow({ severity, when, subject, detail, to }: TriageRowProps) {
+export function TriageRow({ severity, when, whenLabel, subject, detail, to }: TriageRowProps) {
   const { t } = useTranslation();
   return (
     <li className="border-b border-line last:border-b-0">
-      <Link
-        to={to}
-        aria-label={t('overview.board.rowLabel', { subject, when })}
-        className="flex min-h-11 items-center gap-2.5 px-3 py-1.5 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
-      >
-        <span
-          className={`flex w-24 shrink-0 items-center gap-1.5 whitespace-nowrap text-xs font-semibold tabular-nums ${SEVERITY_TEXT[severity]}`}
+      {/* The row navigates: an `IskAmount` inside leaves the tap to it. */}
+      <RowTappableContext.Provider value>
+        <Link
+          to={to}
+          aria-label={t('overview.board.rowLabel', {
+            subject,
+            when: whenLabel ?? (typeof when === 'string' ? when : ''),
+          })}
+          className={boardRowLinkClassName}
         >
-          <SeverityIcon severity={severity} />
-          {when}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs">{subject}</span>
-          {detail && (
-            <span className="block truncate text-[0.6875rem] text-text-dim">{detail}</span>
-          )}
-        </span>
-      </Link>
+          <span
+            className={`flex w-24 shrink-0 items-center gap-1.5 whitespace-nowrap text-xs font-semibold tabular-nums ${SEVERITY_TEXT[severity]}`}
+          >
+            <SeverityIcon severity={severity} />
+            {when}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-xs">{subject}</span>
+            {detail && (
+              <span className="block truncate text-[0.6875rem] text-text-dim">{detail}</span>
+            )}
+          </span>
+          <RowCaret />
+        </Link>
+      </RowTappableContext.Provider>
     </li>
   );
 }
@@ -231,7 +265,7 @@ export function FoldedRow({ domain, summary, severity, to, danger }: FoldedRowPr
       <Link
         to={to}
         aria-label={t('overview.board.foldedRowLabel', { domain, summary })}
-        className="flex min-h-11 items-center gap-2 px-3 py-2 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        className={cx(boardRowLinkBase, 'gap-2 py-2')}
       >
         {/* A fixed slot, so a domain still loading lines its name up with the
             ones that have answered instead of sliding left. */}
@@ -244,11 +278,7 @@ export function FoldedRow({ domain, summary, severity, to, danger }: FoldedRowPr
         >
           {summary}
         </span>
-        <Icon.Descend
-          size={Icon.ICON_SIZE.sm}
-          className="shrink-0 text-accent"
-          aria-hidden="true"
-        />
+        <RowCaret />
       </Link>
     </li>
   );
