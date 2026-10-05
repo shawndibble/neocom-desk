@@ -89,6 +89,15 @@ A second entry here is the start of the parallel palette this section forbids â€
 so before adding one, try telling the new series apart by **form** instead:
 dashed against solid, bars against a line, its own strip.
 
+### PI Map what-if
+
+| Token        | Value     | Use                                                                                                                                                     |
+| ------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `map-whatif` | `#ff79c6` | The PI Map's "what if I add a planet" highlight: the products and wires a planet type you do not have would unlock. Always with a "+" marker and words. |
+
+One meaning only. It is never a status, never interactive, and never the only signal: the tile
+carries a "+" and the accessible name says "unlocked by a Lava planet".
+
 ### Clock kinds â€” the one nominal palette
 
 | Token                    | Value     | Use                                     |

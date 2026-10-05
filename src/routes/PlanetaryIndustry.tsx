@@ -2,15 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useExpiringWindowHours } from '@/features/pi/expiringWindow';
-import {
-  Button,
-  DataAgeBadge,
-  EmptyState,
-  IconButton,
-  PageHeader,
-  Spinner,
-  Tabs,
-} from '@/components/ui';
+import { Button, DataAgeBadge, IconButton, PageHeader, Spinner, Tabs } from '@/components/ui';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import * as Icon from '@/components/ui/icons';
@@ -23,6 +15,8 @@ import { AdvisorPanel } from '@/features/pi/AdvisorPanel';
 import { PiHeaderStrip } from '@/features/pi/PiHeaderStrip';
 import { ColoniesTab } from '@/features/pi/colonies/ColoniesTab';
 import { loadPiSnapshot } from '@/features/pi/colonies/coloniesSnapshot';
+import { PiMapTab } from '@/features/pi/map/PiMapTab';
+import { cx } from '@/lib/cx';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { usePageTab } from '@/lib/usePageTab';
 import { useUrlParams } from '@/lib/useUrlState';
@@ -148,7 +142,7 @@ export function PlanetaryIndustry() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className={cx('mx-auto space-y-4', tab !== 'map' && 'max-w-6xl')}>
       <PageHeader
         title={t('pi.title')}
         meta={planetsResult && <DataAgeBadge date={planetsResult.fetchedAt} />}
@@ -185,11 +179,11 @@ export function PlanetaryIndustry() {
 
       <PiHeaderStrip
         colonySystemIds={(planetsResult?.data ?? []).map((planet) => planet.solar_system_id)}
-        estimate={tab === 'plan'}
+        estimate={tab === 'plan' || tab === 'map'}
       />
 
       {tab === 'map' ? (
-        <EmptyState title={t('piPlan.mapEmptyTitle')} hint={t('piPlan.mapEmptyHint')} />
+        <PiMapTab characterId={activeCharacterId} />
       ) : tab === 'plan' ? (
         <PlanPanel
           seedingGoal={seedTypeId !== null}
