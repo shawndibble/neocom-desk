@@ -207,6 +207,32 @@ describe('planGoals — extraction and shortfalls', () => {
     ]);
   });
 
+  it('ships only what the scarcest input allows, and sells the unused P1', () => {
+    // Coolant at 10/h needs 80 Electrolytes and 80 Water. Storm is the only
+    // Ionic Solutions source and two ECUs make 72 of the 80, so Coolant runs at
+    // 90%: the Water the host cannot use goes to the hub, not to waste.
+    const result = plan(
+      [goal(COOLANT, 10)],
+      [colony(1, 'storm'), colony(2, 'temperate'), colony(3, 'temperate'), colony(4, 'temperate')]
+    );
+    expect(result.factoryHost?.planetId).toBe(2);
+    expect(result.achieved).toEqual([
+      { typeId: COOLANT, unitsPerHour: expect.closeTo(9, 6), fraction: expect.closeTo(0.9, 6) },
+    ]);
+    expect(result.flows).toContainEqual({
+      from: 2,
+      to: 'hub',
+      typeId: COOLANT,
+      tier: 2,
+      unitsPerHour: expect.closeTo(9, 6),
+    });
+    const waterToHost = result.flows
+      .filter((f) => f.typeId === WATER && f.to === 2)
+      .reduce((sum, f) => sum + f.unitsPerHour, 0);
+    expect(waterToHost).toBeCloseTo(72);
+    expect(result.surplusP1).toEqual([{ typeId: WATER, unitsPerHour: expect.closeTo(40, 6) }]);
+  });
+
   it('sells whole-ECU overshoot as surplus P1', () => {
     const result = plan([goal(REACTIVE_METALS, 30)], [colony(1, 'barren')]);
     expect(result.surplusP1).toEqual([{ typeId: REACTIVE_METALS, unitsPerHour: 10 }]);

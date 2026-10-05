@@ -51,6 +51,7 @@ function assignment(
 function planOf(assignments: ColonyAssignment[]): GoalPlan {
   return {
     goals: [],
+    achieved: [],
     demand: [],
     assignments,
     factoryHost: null,

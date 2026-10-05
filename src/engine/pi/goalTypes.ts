@@ -177,7 +177,13 @@ export interface Flow {
 export interface GoalPlan {
   /** The goals as planned: merged by type, zero-rate goals dropped. */
   goals: Goal[];
-  /** Highest tier first, then typeId. */
+  /**
+   * What each goal actually reaches, by typeId. A goal whose inputs are short
+   * runs at the fraction its scarcest P1 allows, and only that much is shipped
+   * and priced — an output whose inputs are missing is not revenue.
+   */
+  achieved: { typeId: number; unitsPerHour: number; fraction: number }[];
+  /** Highest tier first, then typeId. Sized for the goals in full. */
   demand: DemandLine[];
   /** One per colony, by planet id. */
   assignments: ColonyAssignment[];
