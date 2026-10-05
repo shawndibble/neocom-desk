@@ -2,10 +2,9 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
+import { PLAN_PATH } from './piPlanLink';
 import { customsRatePercent } from './customsRate';
 import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';
-
-const PLAN_PATH = '/planetary-industry/plan';
 
 /**
  * Says an ISK figure leans on the assumed customs rate, and sends the pilot to

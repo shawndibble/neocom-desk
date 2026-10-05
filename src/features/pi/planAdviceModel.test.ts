@@ -659,11 +659,4 @@ describe('customs parity across Plan, Colonies and Map', () => {
     expect(nullsec.taxAssumed).toBe(true);
     expect(temperate(advice).taxAssumed).toBe(false);
   });
-
-  it("flags Map's ranking when the rate it costs recipes at is the assumed one", () => {
-    const nullsecOnly = snapshot({ colonies: [planet(OCEANIC_ID, NULLSEC_SYSTEM, 'oceanic')] });
-    expect(buildPlanAdvice(input({ snapshot: nullsecOnly })).rankingBasis.taxAssumed).toBe(true);
-    const highsecOnly = snapshot({ colonies: [planet(TEMPERATE_ID, HIGHSEC_SYSTEM, 'temperate')] });
-    expect(buildPlanAdvice(input({ snapshot: highsecOnly })).rankingBasis.taxAssumed).toBe(false);
-  });
 });

@@ -198,8 +198,6 @@ export interface RankingBasis {
   rateSource: 'measured' | 'assumed';
   ccLevel: number;
   ccAssumed: boolean;
-  /** The customs rate recipes are costed at is the assumed stand-in, not a known rate. */
-  taxAssumed: boolean;
   linkCost: 'borrowed' | 'assumed';
 }
 
@@ -871,12 +869,10 @@ function rankingFor(args: {
   const skill = input.skills.commandCenterUpgrades;
   const ceiling = colonyBudget(skill ?? ASSUMED_RANKING_CC_LEVEL, pi);
   const taxes = rows.map((row) => row.taxRate).sort((a, b) => a - b);
-  const taxMedian = Math.floor((taxes.length - 1) / 2);
   const taxRate =
-    taxes.length > 0 ? taxes[taxMedian] : highsecCustomsRate(input.snapshot.customsSkill);
-  // The median rate is the assumed one when it equals it and some colony's own is assumed.
-  const taxAssumed =
-    taxes.length > 0 && rows.some((row) => row.taxAssumed && row.taxRate === taxRate);
+    taxes.length > 0
+      ? taxes[Math.floor((taxes.length - 1) / 2)]
+      : highsecCustomsRate(input.snapshot.customsSkill);
 
   const planetTypes = [...new Set(pi.raw.flatMap((resource) => resource.planetTypes))].sort();
   const recipeRows: RecipeRow[] = [];
@@ -941,7 +937,6 @@ function rankingFor(args: {
       ccLevel: ceiling.level,
       ccAssumed: skill === null,
       linkCost: borrowed ? 'borrowed' : 'assumed',
-      taxAssumed,
     },
   };
 }

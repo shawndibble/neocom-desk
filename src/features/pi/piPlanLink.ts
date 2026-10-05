@@ -4,7 +4,7 @@
  * (goals, switched-off colonies) and sets `?type=`, which the route seeds as
  * one more goal — the action adds to the plan instead of replacing it.
  */
-const PLAN_PATH = '/planetary-industry/plan';
+export const PLAN_PATH = '/planetary-industry/plan';
 
 export function piPlanHref(typeId: number, pathname: string, search: string): string {
   if (!pathname.startsWith(PLAN_PATH)) return `${PLAN_PATH}?type=${typeId}`;
