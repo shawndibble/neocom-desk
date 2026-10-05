@@ -8,8 +8,7 @@
  * two surfaces end up disagreeing about whether a facility is idle — so they
  * are derived here and passed down.
  *
- * `nearestPin` and `roomSummary` moved here from `AdvisorPanel.tsx` for the
- * same reason: they are inputs to that shared answer, not to one card's markup.
+ * `nearestPin` and `roomSummary` live here because they are inputs to that shared answer, not to one card's markup.
  */
 import { useMemo } from 'react';
 import type { TFunction } from 'i18next';

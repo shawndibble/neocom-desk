@@ -4,12 +4,11 @@
  * readings the engine leaves to its caller (hauling split out/in, and the
  * plain verdict).
  *
- * ## Why a new loader, not the Advisor's
+ * ## Why a dedicated loader
  *
- * `AdvisorPanel` keeps a private snapshot loader that also reads every system's
- * planet list, every unbuilt planet's type and the alt roster — none of which
- * the planner uses — and its behaviour is pinned by a 1,700-line test. Moving
- * it out to share would put that at risk for nothing the planner needs, so
+ * The retired Advisor kept a private snapshot loader that also read every
+ * system's planet list, every unbuilt planet's type and the alt roster — none
+ * of which the planner uses — so
  * `goalPlannerSnapshot.ts` is a slim loader over the *same* lower-level reads
  * (`loadCharacterPlanets`, `loadAllColonyDetails`, `loadSystemSecurity`,
  * `loadCustomsCodeExpertise`, `loadPlanPrices` ...). Both tabs therefore see

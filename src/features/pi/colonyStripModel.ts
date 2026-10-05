@@ -33,8 +33,7 @@ import { FAULT_VERBS, type Worklist } from './worklistModel';
 
 /**
  * Hours under two days read as hours; beyond that a day count is what a
- * pilot plans in. Shared by `ColonyStrip.tsx`'s row and the Colonies tab's
- * "Storage full in" figure, so the two format a fill time the same way.
+ * pilot plans in. Used by the Colonies tab's "Storage full in" figure.
  */
 export function span(hours: number, t: TFunction): string {
   return hours < 48

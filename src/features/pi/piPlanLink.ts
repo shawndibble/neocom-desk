@@ -18,13 +18,5 @@ export function piColonyHref(planetId: number): string {
   return `/planetary-industry/colonies?colony=${planetId}`;
 }
 
-/**
- * The Advisor on one system (`?system=`), or on its own default without one.
- * It has no tab of its own any more: until it retires, its content sits on
- * the Colonies tab.
- */
-export function piAdvisorHref(systemId: number | undefined): string {
-  return systemId === undefined
-    ? '/planetary-industry/colonies'
-    : `/planetary-industry/colonies?system=${systemId}`;
-}
+/** The Map tab: where to find a planet for a new colony. */
+export const PI_MAP_HREF = '/planetary-industry/map';

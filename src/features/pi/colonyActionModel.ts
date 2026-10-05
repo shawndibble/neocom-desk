@@ -1,5 +1,5 @@
 /**
- * The idle-facility decision, computed — so `ColonyActions.tsx` only renders it.
+ * The idle-facility decision, computed — so a component only renders it.
  *
  * The arithmetic here (which input actually binds, how much extraction closes
  * the gap, how many facilities that feeds, what removal frees) is the same kind
