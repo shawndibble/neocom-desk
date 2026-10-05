@@ -325,6 +325,15 @@ export interface PiCommandCenterLevel {
 }
 
 /**
+ * `pi-system-planets.json`: solarSystemID -> how many planets of each PI type
+ * the system holds (types it lacks are absent; systems with no PI-type planet
+ * are absent). Counts only, so planet finders can rank systems without an ESI
+ * fan-out. Shattered planets count under their base type, as in
+ * `PiData.planetTypeByTypeId`.
+ */
+export type PiSystemPlanets = Record<string, Partial<Record<PlanetType, number>>>;
+
+/**
  * The colony budget and the pin costs it pays for — the numbers a pin-layout
  * plan is sized against, all of them the same for every planet type.
  */
