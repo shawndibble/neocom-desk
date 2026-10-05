@@ -15,7 +15,15 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, Disclosure, EmptyState, PageHeader, Panel, Spinner } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  Disclosure,
+  EmptyState,
+  PageHeader,
+  Panel,
+  Spinner,
+} from '@/components/ui';
 import {
   countTheraConnectionsByHub,
   filterTheraConnections,
@@ -138,6 +146,11 @@ function TheraBody({
       <EmptyState
         title={t('travel.thera.unavailableTitle')}
         hint={t('travel.thera.unavailableHint')}
+        action={
+          <Button size="sm" onClick={state.retry}>
+            {t('common.retry')}
+          </Button>
+        }
       />
     );
   }

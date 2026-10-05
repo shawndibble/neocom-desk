@@ -3,7 +3,7 @@
  * snapshot for each exit's security, and one local jump sweep from the chosen
  * origin — never a route request per row.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   buildTheraConnectionRows,
   type ConnectionDistances,
@@ -21,7 +21,11 @@ import { loadSolarSystemsById } from '@/sde/solarSystems';
 
 export type TheraConnectionsState =
   | { kind: 'loading' }
-  | { kind: 'unavailable' }
+  | {
+      kind: 'unavailable';
+      /** Asks EVE-Scout again now, showing the loading state while it does. */
+      retry: () => void;
+    }
   | {
       kind: 'ready';
       rows: TheraConnectionRow[];
@@ -45,6 +49,7 @@ export function useTheraConnections(
   // Asks again once per cache window; inside it the answer is a memory read.
   const cacheWindow = Math.floor(now / EVE_SCOUT_CACHE_MS);
   const [result, setResult] = useState<TheraConnectionsResult | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [systems, setSystems] = useState<ReadonlyMap<number, { security: number }> | null>(null);
   const [distances, setDistances] = useState<{
     key: string;
@@ -61,7 +66,12 @@ export function useTheraConnections(
     return () => {
       cancelled = true;
     };
-  }, [cacheWindow]);
+  }, [cacheWindow, attempt]);
+
+  const retry = useCallback(() => {
+    setResult(null);
+    setAttempt((count) => count + 1);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,7 +98,7 @@ export function useTheraConnections(
 
   return useMemo((): TheraConnectionsState => {
     if (result === null || systems === null) return { kind: 'loading' };
-    if (result.kind === 'unavailable') return { kind: 'unavailable' };
+    if (result.kind === 'unavailable') return { kind: 'unavailable', retry };
     const settled = distances?.key === distanceKey ? distances.value : null;
     const value: ConnectionDistances =
       originId === null ? { kind: 'no-origin' } : (settled ?? { kind: 'unknown' });
@@ -100,5 +110,5 @@ export function useTheraConnections(
       // A sweep reaching nothing but its own origin started somewhere with no gates.
       originUngated: settled?.kind === 'known' && settled.jumps.size <= 1,
     };
-  }, [result, systems, distances, distanceKey, originId, now]);
+  }, [result, systems, distances, distanceKey, originId, now, retry]);
 }
