@@ -130,6 +130,17 @@ describe('buildFindBestView', () => {
     expect(buildFindBestView(input({ rows: [], filter: 'p2' })).hasRecipesAtAll).toBe(false);
   });
 
+  it('does not call it the best when the type that makes it is switched off', () => {
+    const view = buildFindBestView(
+      input({
+        colonyTypes: ['oceanic'],
+        off: new Set<PlanetType>(['oceanic']),
+        madeTypeIds: new Set([30]),
+      })
+    );
+    expect(view.alreadyBest).toBe(false);
+  });
+
   it('counts recipes the market has no price for', () => {
     expect(buildFindBestView(input({ unpriced: [5, 6] })).unpricedCount).toBe(2);
   });

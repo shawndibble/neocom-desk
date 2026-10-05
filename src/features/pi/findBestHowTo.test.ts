@@ -41,7 +41,6 @@ describe('buildHowTo', () => {
     expect(how?.factories).toEqual([
       { kind: 'basic', count: 2, makes: [{ typeId: silicon, name: 'Silicon' }] },
     ]);
-    expect(how?.chain).toEqual({ raws: [rawId('Felsic Magma')], processed: [], product: silicon });
     expect(how?.unitsPerWeek).toBe(1680);
     expect(how?.m3PerWeek).toBe(70);
   });
@@ -79,7 +78,6 @@ describe('buildHowTo', () => {
       }),
       pi
     );
-    expect(how?.chain.processed).toEqual([electrolytes, water]);
     expect(how?.factories.map((f) => f.kind)).toEqual(['basic', 'advanced']);
   });
 });

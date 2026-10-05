@@ -56,6 +56,8 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
   const [filter, setFilter] = useState<RecipeFilter>('any');
   const [mode, setMode] = useState<FindBestMode>('picks');
   const [openId, setOpenId] = useState<number | null>(null);
+  // The finder's Highsec only box is remembered across cards; null follows the origin.
+  const [highsecPick, setHighsecPick] = useState<boolean | null>(null);
 
   const colonyTypes = useMemo(
     () => snapshot.colonies.map((colony) => colony.planet_type as PlanetType),
@@ -104,7 +106,11 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
   const { hubName } = state;
   const mineFor = (hosts: readonly PlanetType[]) =>
     snapshot.colonies
-      .filter((colony) => hosts.includes(colony.planet_type as PlanetType))
+      .filter(
+        (colony) =>
+          hosts.includes(colony.planet_type as PlanetType) &&
+          !off.has(colony.planet_type as PlanetType)
+      )
       .map((colony) => ({
         name:
           snapshot.planetNames.get(colony.planet_id) ??
@@ -120,10 +126,27 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
         toggles={best.toggles}
         chips={best.chips}
         hubName={hubName}
-        onToggle={(type) => setOff((current) => toggled(current, type))}
-        onWhatIf={(type) => setWhatIf((current) => toggled(current, type))}
+        onToggle={(type) => {
+          setOff((current) => toggled(current, type));
+          setOpenId(null);
+        }}
+        onWhatIf={(type) => {
+          setWhatIf((current) => toggled(current, type));
+          setOpenId(null);
+        }}
       />
-      <FindBestControls mode={mode} onMode={setMode} filter={filter} onFilter={setFilter} />
+      <FindBestControls
+        mode={mode}
+        onMode={(next) => {
+          setMode(next);
+          setOpenId(null);
+        }}
+        filter={filter}
+        onFilter={(next) => {
+          setFilter(next);
+          setOpenId(null);
+        }}
+      />
       {mode === 'all' ? (
         <AllProductsPanel tiers={tiers} hubName={hubName} estimate />
       ) : (
@@ -166,6 +189,8 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
               buybackPct={buybackPct}
               restartDays={restartDays}
               estimate
+              highsecPick={highsecPick}
+              onHighsecPick={setHighsecPick}
               onClose={() => setOpenId(null)}
             />
           )}

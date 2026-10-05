@@ -22,13 +22,12 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { cx } from '@/lib/cx';
 import { EstimateBadge, TierChip } from './DirectiveRow';
-import { setupParts } from './findBestHowTo';
+import { DAYS_PER_WEEK, setupParts } from './findBestHowTo';
 import type { RecipeCardView, TypeState, WhatIfChip, TypeToggle } from './findBestView';
 import { PlanetImage } from './PlanetImage';
 
 const MD_UP = '(min-width: 48rem)';
 const EU_GUIDE = 'https://wiki.eveuniversity.org/Planetary_Industry';
-const DAYS_PER_WEEK = 7;
 
 function useTypeName() {
   const { t } = useTranslation();
@@ -289,9 +288,8 @@ function RecipeCard({
   return (
     <div
       className={cx(
-        'grid gap-x-4 gap-y-2 border-l-2 px-3 py-3 md:items-center',
-        'md:grid-cols-[1.5rem_minmax(0,1.3fr)_minmax(0,1.1fr)_auto_7rem_minmax(0,1.1fr)_auto]',
-        card.isNew ? 'border-l-warning bg-panel-2/40' : 'border-l-transparent'
+        'grid gap-x-4 gap-y-2 px-3 py-3 md:items-center',
+        'md:grid-cols-[1.5rem_minmax(0,1.3fr)_minmax(0,1.1fr)_auto_7rem_minmax(0,1.1fr)_auto]'
       )}
     >
       <span className="hidden text-sm text-text-dim tabular-nums md:block">{card.rank}</span>

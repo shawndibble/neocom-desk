@@ -8,7 +8,7 @@
  * Route Safety links with the security colour plus its number, "Highsec only"
  * is a checkbox, and the panel takes focus when it opens.
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, IskAmount, TypeIcon } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -42,6 +42,9 @@ interface Props {
   buybackPct: number | null;
   restartDays: number;
   estimate: boolean;
+  /** The Highsec only box: null follows the origin's security. Kept by the parent across cards. */
+  highsecPick: boolean | null;
+  onHighsecPick: (value: boolean) => void;
   onClose: () => void;
 }
 
@@ -110,11 +113,16 @@ function SystemRow({
   );
 }
 
-function FindStep({ recipe, origin, mine }: Pick<Props, 'recipe' | 'origin' | 'mine'>) {
+function FindStep({
+  recipe,
+  origin,
+  mine,
+  highsecPick,
+  onHighsecPick,
+}: Pick<Props, 'recipe' | 'origin' | 'mine' | 'highsecPick' | 'onHighsecPick'>) {
   const { t } = useTranslation();
   const typeName = useTypeName();
-  const [pickedHighsec, setPickedHighsec] = useState<boolean | null>(null);
-  const highsecOnly = pickedHighsec ?? defaultHighsecOnly(origin.security);
+  const highsecOnly = highsecPick ?? defaultHighsecOnly(origin.security);
   const state = usePlanetFinder({
     originSystemId: origin.systemId,
     types: recipe.hostTypes,
@@ -145,7 +153,7 @@ function FindStep({ recipe, origin, mine }: Pick<Props, 'recipe' | 'origin' | 'm
           <label className={`flex items-center gap-1.5 text-xs ${tappableRowClassName}`}>
             <Checkbox
               checked={highsecOnly}
-              onChange={(event) => setPickedHighsec(event.target.checked)}
+              onChange={(event) => onHighsecPick(event.target.checked)}
             />
             {t('piPlan.find.highsecOnly')}
           </label>
@@ -325,6 +333,12 @@ export function ShowMeHow(props: Props) {
     el.focus({ preventScroll: true });
   }, []);
   const how = buildHowTo(recipe, pi);
+  // Closing removes the focused panel: hand focus back to the card's button.
+  const close = () => {
+    const opener = document.querySelector<HTMLElement>(`[aria-controls="${id}"]`);
+    onClose();
+    opener?.focus();
+  };
   return (
     <section
       ref={ref}
@@ -341,12 +355,18 @@ export function ShowMeHow(props: Props) {
             type: t(`pi.planetType.${recipe.useType}`),
           })}
         </SectionLabel>
-        <Button size={mdUp ? 'sm' : 'md'} className="ml-auto" onClick={onClose}>
+        <Button size={mdUp ? 'sm' : 'md'} className="ml-auto" onClick={close}>
           {t('piPlan.find.close')}
         </Button>
       </div>
       <div className="grid divide-y divide-line md:grid-cols-3 md:divide-x md:divide-y-0">
-        <FindStep recipe={recipe} origin={props.origin} mine={props.mine} />
+        <FindStep
+          recipe={recipe}
+          origin={props.origin}
+          mine={props.mine}
+          highsecPick={props.highsecPick}
+          onHighsecPick={props.onHighsecPick}
+        />
         {how ? (
           <>
             <BuildStep how={how} />

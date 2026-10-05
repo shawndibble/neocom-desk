@@ -130,7 +130,11 @@ export function buildFindBestView(input: FindBestInput): FindBestView {
     toggles,
     chips,
     cards,
-    alreadyBest: hasColonies && cards.length > 0 && input.madeTypeIds.has(cards[0].recipe.typeId),
+    alreadyBest:
+      hasColonies &&
+      cards.length > 0 &&
+      input.madeTypeIds.has(cards[0].recipe.typeId) &&
+      cards[0].hosts.some((host) => host.state === 'have'),
     unpricedCount: ranking.unpriced.length,
     hasRecipesAtAll:
       input.filter === 'any'
@@ -172,11 +176,9 @@ export function buildAllProducts(
     (hasColonies ? input.colonyTypes : allTypes).filter((type) => !input.off.has(type))
   );
   const have = new Set<PlanetType>([...base, ...input.whatIf]);
+  const rows = hasColonies ? input.rows : input.rows.filter((row) => have.has(row.planetType));
   const ranked = new Map(
-    rankRecipes({ rows: input.rows, haveTypes: [...have], filter: 'any' }).recipes.map((r) => [
-      r.typeId,
-      r,
-    ])
+    rankRecipes({ rows, haveTypes: [...have], filter: 'any' }).recipes.map((r) => [r.typeId, r])
   );
 
   const entries: { typeId: number; name: string; tier: ProductTile['tier'] }[] = [

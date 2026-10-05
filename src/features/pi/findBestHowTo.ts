@@ -11,7 +11,7 @@ import type { PiData } from '@/sde/types';
 import { colonyBudget } from './colonyBudget';
 import { DEFAULT_PLANNER_HEADS } from './goalPlannerModel';
 
-const DAYS_PER_WEEK = 7;
+export const DAYS_PER_WEEK = 7;
 const MAX_CC_LEVEL = 5;
 
 export interface HowToItem {
@@ -38,8 +38,6 @@ export interface HowTo {
   storage: number;
   extractors: HowToItem[];
   factories: HowToFactoryLine[];
-  /** The raw → processed → product strip, as type ids. */
-  chain: { raws: number[]; processed: number[]; product: number };
   fit: HowToFit | null;
   unitsPerWeek: number;
   m3PerWeek: number;
@@ -96,13 +94,11 @@ export function buildHowTo(recipe: RecipeRank, pi: PiData): HowTo | null {
     fit = null;
   }
 
-  const processed = layout.makes.slice(0, -1).map((make) => make.typeId);
   return {
     launchpads: pins.launchpad ?? 0,
     storage: pins.storage ?? 0,
     extractors: layout.extracts.map((typeId) => ({ typeId, name: nameOf(typeId) })),
     factories,
-    chain: { raws: [...layout.extracts], processed, product: recipe.typeId },
     fit,
     unitsPerWeek: layout.unitsPerDay * DAYS_PER_WEEK,
     m3PerWeek: recipe.m3PerDay * DAYS_PER_WEEK,

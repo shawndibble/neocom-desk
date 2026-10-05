@@ -33,13 +33,7 @@ function Tile({ tile }: { tile: ProductTile }) {
         ? 'text-success'
         : 'text-warning';
   return (
-    <li
-      className={cx(
-        'flex items-start gap-2 px-3 py-2',
-        !tile.reachable && 'opacity-60',
-        tile.isNew && 'border-l-2 border-l-warning bg-panel-2/40'
-      )}
-    >
+    <li className={cx('flex items-start gap-2 px-3 py-2', !tile.reachable && 'opacity-60')}>
       <TypeIcon typeId={tile.typeId} size={32} width={24} height={24} className="mt-0.5" />
       <div className="min-w-0 space-y-0.5 text-xs">
         <MarketItemLink typeId={tile.typeId}>
@@ -54,9 +48,10 @@ function Tile({ tile }: { tile: ProductTile }) {
               {t('piPlan.make.perDay')} ·{' '}
             </>
           )}
-          {tile.planets === null || tile.planets <= 1
-            ? t('piPlan.find.allOnePlanet')
-            : t('piPlan.find.allNeedsPlanets', { count: tile.planets })}
+          {tile.planets !== null &&
+            (tile.planets <= 1
+              ? t('piPlan.find.allOnePlanet')
+              : t('piPlan.find.allNeedsPlanets', { count: tile.planets }))}
           {tile.isNew && (
             <>
               {' · '}

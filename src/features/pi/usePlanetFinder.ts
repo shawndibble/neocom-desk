@@ -62,7 +62,14 @@ export function useFinderOrigin(
               source: fromColonies === null ? 'location' : 'colonies',
             };
       if (!cancelled) setResolved({ key, origin });
-    })();
+    })().catch(() => {
+      if (!cancelled) {
+        setResolved({
+          key,
+          origin: { status: 'unknown', systemId: null, name: null, security: null, source: null },
+        });
+      }
+    });
     return () => {
       cancelled = true;
     };
@@ -90,10 +97,10 @@ export function usePlanetFinder(args: {
   useEffect(() => {
     if (originSystemId === null || typesKey === '') return;
     let cancelled = false;
-    void Promise.all([loadJumpGraph(), loadPiSystemPlanets(), loadSolarSystemsById()]).then(
-      ([graph, systemPlanets, systems]) => {
+    void Promise.all([loadJumpGraph(), loadPiSystemPlanets(), loadSolarSystemsById()])
+      .then(([graph, systemPlanets, systems]) => {
         if (cancelled) return;
-        if (!graph || !systems) {
+        if (!graph || !systems || !systemPlanets) {
           setState({ key, value: { status: 'failed' } });
           return;
         }
@@ -117,11 +124,10 @@ export function usePlanetFinder(args: {
             })),
           },
         });
-      },
-      () => {
+      })
+      .catch(() => {
         if (!cancelled) setState({ key, value: { status: 'failed' } });
-      }
-    );
+      });
     return () => {
       cancelled = true;
     };

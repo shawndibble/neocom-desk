@@ -177,6 +177,33 @@ describe('FindBestPlan', () => {
     expect(document.getElementById(panel.id)).toBeNull();
   });
 
+  it('puts focus back on the card button when Show me how closes', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+    const button = screen.getAllByRole('button', { name: /Show me how/ })[0];
+    await user.click(button);
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(button).toHaveFocus();
+  });
+
+  it('does not reopen a card that left the list when it comes back', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+    await user.click(screen.getAllByRole('button', { name: /Show me how/ })[0]);
+    await user.click(screen.getByRole('button', { name: 'Factory goods (P2)' }));
+    await user.click(screen.getByRole('button', { name: 'Anything' }));
+    expect(document.querySelector('section[id^="find-how-"]')).toBeNull();
+  });
+
+  it('remembers the Highsec only choice across cards', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+    await user.click(screen.getAllByRole('button', { name: /Show me how/ })[0]);
+    await user.click(screen.getByRole('checkbox', { name: 'Highsec only' }));
+    await user.click(screen.getAllByRole('button', { name: /Show me how/ })[1]);
+    expect(screen.getByRole('checkbox', { name: 'Highsec only' })).not.toBeChecked();
+  });
+
   it('turns Highsec only on for a highsec home and off for nullsec, with the skyhook note', async () => {
     const user = userEvent.setup();
     renderPlan();
