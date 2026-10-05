@@ -19,7 +19,10 @@ _Recorded 2026-10-05._
   keyboard and screen-reader users can't reach them.
 - **Two ISK forms.** Full precision where the exact figure matters,
   `IskAmount` everywhere else.
-- **Touch-and-hold opens the row menu, never a tooltip.** One meaning per
-  gesture. This retires `holdToReveal` and `IskAmount revealOn="longPress"`.
+- **Inside a row with a menu, touch-and-hold opens the menu, never a
+  tooltip.** On a control with no menu (an icon button, a chip), hold still
+  shows its label: that is the only touch path to an icon's name, and it
+  matches Android and Material. This retires `holdToReveal` and
+  `IskAmount revealOn="longPress"` inside rows.
 - **The rules and their sources** (WCAG 2.2, APG, Apple HIG, Material,
   Windows, NN/g, GOV.UK) are in DESIGN.md §6c.

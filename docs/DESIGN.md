@@ -782,7 +782,10 @@ Material, Windows).
 
 Some primitives named here (`ExternalLink`, `HintText`, `Button loading`, the
 shared interaction recipe) are being built during the rollout. Until one
-exists, follow the rule it encodes.
+exists, follow the rule it encodes. Where a §4 component row describes older
+behaviour (hold-to-reveal inside rows, `InfoTooltip`'s `onClick` mode), §6c
+is the target. The rollout PR that changes a primitive also updates its §4
+row.
 
 ### Cue vocabulary
 
@@ -871,14 +874,14 @@ Rows:
 
 ### Touch and hold
 
-| Gesture        | Means                                                                                                                           |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Tap            | The same as a click. On an explain-only trigger ("?", `HintText`, an `IskAmount` outside a tappable row) it toggles the bubble. |
-| Touch and hold | The same menu as the row's or tile's ⋮. On a link, the browser's own link menu wins. Never a tooltip.                           |
-| Drag           | Only from a visible grip (`touch-none`, 4px activation distance).                                                               |
-| Swipe down     | Dismisses a bottom sheet (with a visible grabber).                                                                              |
-| Back / Escape  | Closes the top overlay.                                                                                                         |
-| Tap outside    | Closes a menu, popover or sheet. A sheet holding unsaved edits asks before discarding them.                                     |
+| Gesture        | Means                                                                                                                                                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Tap            | The same as a click. On an explain-only trigger ("?", `HintText`, an `IskAmount` outside a tappable row) it toggles the bubble.                                                                                          |
+| Touch and hold | Opens the row's or tile's menu (the same as its ⋮) wherever one exists, and then never a tooltip. On a control with no menu (an icon button, a chip), hold shows its label. On a link, the browser's own link menu wins. |
+| Drag           | Only from a visible grip (`touch-none`, 4px activation distance).                                                                                                                                                        |
+| Swipe down     | Dismisses a bottom sheet (with a visible grabber).                                                                                                                                                                       |
+| Back / Escape  | Closes the top overlay.                                                                                                                                                                                                  |
+| Tap outside    | Closes a menu, popover or sheet. A sheet holding unsaved edits asks before discarding them.                                                                                                                              |
 
 - **Touch sizing follows the input, not only the width.** The 44px tier
   applies below `md` _or_ on `(pointer: coarse)`, so a touch laptop or tablet
